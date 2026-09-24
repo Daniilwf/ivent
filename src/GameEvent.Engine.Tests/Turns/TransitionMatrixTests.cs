@@ -10,8 +10,8 @@ namespace GameEvent.Engine.Tests.Turns;
 /// <summary>
 /// The turn is a strict state machine (SPEC «Игровой цикл», K-5, D-91): every player turn command in every turn
 /// state is either accepted and moves to its phase, or rejected without events with the code of the first failed
-/// check. Check order (D-91): season running → player known → no pending choice (except MakeChoice and
-/// DeclareAlreadyPlayed, D-92) → phase.
+/// check. Check order (D-91): season running → player known → no pending choice (except MakeChoice,
+/// DeclareAlreadyPlayed, D-92, and Reroll, D-93) → phase.
 /// The active run limit is held by the phase and RulesetSupport, there is no separate check (D-91).
 /// The expected table lives here, independent of the engine's own table.
 /// </summary>
@@ -32,6 +32,7 @@ public class TransitionMatrixTests
         Complete,
         Choose,
         DeclareAlreadyPlayed,
+        Reroll,
     }
 
     /// <summary>Expected outcome: a rejection code, or null, the phase the player ends in and whether a choice is pending.</summary>
@@ -44,13 +45,16 @@ public class TransitionMatrixTests
         [(TurnState.Idle, TurnCommand.Complete)] = new(RejectionCodes.WrongPhase),
         [(TurnState.Idle, TurnCommand.Choose)] = new(RejectionCodes.NoPendingChoice),
         [(TurnState.Idle, TurnCommand.DeclareAlreadyPlayed)] = new(RejectionCodes.WrongPhase),
+        [(TurnState.Idle, TurnCommand.Reroll)] = new(RejectionCodes.WrongPhase),
 
         [(TurnState.RollingWithOffer, TurnCommand.Roll)] = new(RejectionCodes.WrongPhase),
         [(TurnState.RollingWithOffer, TurnCommand.Start)] = new(null, TurnPhase.Playing),
         [(TurnState.RollingWithOffer, TurnCommand.Complete)] = new(RejectionCodes.WrongPhase),
         [(TurnState.RollingWithOffer, TurnCommand.Choose)] = new(RejectionCodes.NoPendingChoice),
-        // «Уже проходил»: the game is excluded and the wheel spins again at once (D-92); two games are left, one is offered
+        // «Уже проходил»: the game is excluded and the wheel spins again at once (D-92); other games are left, one is offered
         [(TurnState.RollingWithOffer, TurnCommand.DeclareAlreadyPlayed)] = new(null, TurnPhase.Rolling),
+        // Reroll: the offer is given up and another game is offered at once, the first reroll is free (D-93)
+        [(TurnState.RollingWithOffer, TurnCommand.Reroll)] = new(null, TurnPhase.Rolling),
 
         // A pending choice blocks every other turn command, even those the phase alone would allow (Start)
         [(TurnState.RollingWithChoice, TurnCommand.Roll)] = new(RejectionCodes.ChoicePending),
@@ -58,14 +62,17 @@ public class TransitionMatrixTests
         [(TurnState.RollingWithChoice, TurnCommand.Complete)] = new(RejectionCodes.ChoicePending),
         // Choosing --> Playing (SPEC diagram): the chosen game starts at once (D-91)
         [(TurnState.RollingWithChoice, TurnCommand.Choose)] = new(null, TurnPhase.Playing),
-        // A pending choice does not block «Уже проходил» on an option: the choice is rolled anew from the two games left
+        // A pending choice does not block «Уже проходил» on an option: the choice is rolled anew from the games left
         [(TurnState.RollingWithChoice, TurnCommand.DeclareAlreadyPlayed)] = new(null, TurnPhase.Rolling, ChoicePending: true),
+        // Nor a reroll: the whole choice is given up and a new choice is rolled from the three other games (D-93)
+        [(TurnState.RollingWithChoice, TurnCommand.Reroll)] = new(null, TurnPhase.Rolling, ChoicePending: true),
 
         [(TurnState.Playing, TurnCommand.Roll)] = new(RejectionCodes.WrongPhase),
         [(TurnState.Playing, TurnCommand.Start)] = new(RejectionCodes.WrongPhase),
         [(TurnState.Playing, TurnCommand.Complete)] = new(null, TurnPhase.Idle),
         [(TurnState.Playing, TurnCommand.Choose)] = new(RejectionCodes.NoPendingChoice),
         [(TurnState.Playing, TurnCommand.DeclareAlreadyPlayed)] = new(RejectionCodes.WrongPhase),
+        [(TurnState.Playing, TurnCommand.Reroll)] = new(RejectionCodes.WrongPhase),
     };
 
     public static TheoryData<TurnState, TurnCommand> DisallowedPairs() =>
@@ -90,6 +97,7 @@ public class TransitionMatrixTests
     /// <summary>
     /// A fresh scenario with Вася in <paramref name="state"/>. Every game has hours, so a completion is valid.
     /// Only the choice state plays with <c>choiceCount</c> 3; the others keep 1, so they do not depend on it.
+    /// Six games: after a choice of three is given up by a reroll, three are still there for a new choice.
     /// </summary>
     private static Scenario In(TurnState state)
     {
@@ -103,6 +111,9 @@ public class TransitionMatrixTests
             .WithGame("Silent Hill", 12, "Horror")
             .WithGame("Alan Wake", 15, "Horror")
             .WithGame("Dead Space", 9, "Horror")
+            .WithGame("Outlast", 5, "Horror")
+            .WithGame("Amnesia", 8, "Horror")
+            .WithGame("Soma", 10, "Horror")
             .WithPlayers("Вася", "Петя");
 
         switch (state)
@@ -140,6 +151,7 @@ public class TransitionMatrixTests
                 ? new MakeChoice(player, choice.ChoiceId, choice.Options[0].Id)
                 : new MakeChoice(player, SequentialIds.Make(0x50000000, 1), "whatever"),
             TurnCommand.DeclareAlreadyPlayed => new DeclareAlreadyPlayed(player, GameOf(s, player)),
+            TurnCommand.Reroll => new Reroll(player),
             _ => throw new ArgumentOutOfRangeException(nameof(command)),
         };
 
@@ -239,6 +251,7 @@ public class TransitionMatrixTests
     [InlineData(TurnCommand.Complete)]
     [InlineData(TurnCommand.Choose)]
     [InlineData(TurnCommand.DeclareAlreadyPlayed)]
+    [InlineData(TurnCommand.Reroll)]
     public void Turn_command_in_a_draft_season_is_rejected_as_not_active(TurnCommand command)
     {
         var s = Scenario.New().AsDraft()
@@ -266,6 +279,7 @@ public class TransitionMatrixTests
     [InlineData(TurnCommand.Complete)]
     [InlineData(TurnCommand.Choose)]
     [InlineData(TurnCommand.DeclareAlreadyPlayed)]
+    [InlineData(TurnCommand.Reroll)]
     public void Unknown_player_in_a_closing_season_gets_season_not_active(TurnCommand command)
     {
         var s = In(TurnState.Idle);

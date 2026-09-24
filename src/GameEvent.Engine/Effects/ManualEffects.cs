@@ -22,5 +22,8 @@ public sealed record ManualEffectCreated(Guid EffectId, Guid PlayerId, EventKind
 internal static class ManualEffects
 {
     public static Seasons.SeasonState Apply(Seasons.SeasonState state, ManualEffectCreated e) =>
-        throw new NotImplementedException("C6");
+        state with
+        {
+            ManualEffects = state.ManualEffects.Add(e.EffectId, new PendingManualEffect(e.EffectId, e.PlayerId, e.DrawEvent, e.Source, e.RunId)),
+        };
 }

@@ -355,6 +355,170 @@ describe('SeasonScreen', () => {
     expect(bodies[0]?.body).not.toMatchObject({ gameId: 'opt-2' });
   });
 
+  it('rerolls an offered game with a new command id', async () => {
+    const bodies: { url: string; body: { commandId?: string } }[] = [];
+    serve(async (r) => {
+      if (isSeasonGet(r)) {
+        return json(
+          200,
+          season({
+            me: {
+              playerId: me,
+              phase: 'rolling',
+              offer: {
+                id: 'a1000000-0000-0000-0000-000000000001',
+                title: 'Silent Hill',
+                hours: 12,
+              },
+              choice: null,
+              activeRun: null,
+              lastCompleted: null,
+            },
+          }),
+        );
+      }
+      bodies.push({ url: r.url, body: (await r.json()) as { commandId?: string } });
+      return json(200, { duplicate: false, events: [] });
+    });
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    await userEvent.click(await screen.findByTestId('reroll'));
+    await vi.waitFor(() => {
+      expect(bodies).toHaveLength(1);
+    });
+    await vi.waitFor(() => {
+      expect(screen.getByTestId('reroll')).toBeEnabled();
+    });
+    await userEvent.click(screen.getByTestId('reroll'));
+    await vi.waitFor(() => {
+      expect(bodies).toHaveLength(2);
+    });
+
+    // The whole offer is given up: the body names no game, only the command
+    expect(bodies[0]).toMatchObject({
+      url: expect.stringMatching(new RegExp(`/api/seasons/${seasonId}/reroll$`)) as unknown,
+      body: { commandId: expect.any(String) as unknown },
+    });
+    expect(bodies[0]?.body.commandId).not.toBe(bodies[1]?.body.commandId);
+  });
+
+  it('rerolls a pending choice as a whole', async () => {
+    const choiceId = 'c0000000-0000-0000-0000-000000000001';
+    const options = [
+      {
+        id: 'opt-1',
+        game: { id: 'a1000000-0000-0000-0000-000000000001', title: 'Silent Hill', hours: 12 },
+      },
+      {
+        id: 'opt-2',
+        game: { id: 'b2000000-0000-0000-0000-000000000002', title: 'Outlast', hours: 9 },
+      },
+    ];
+    const bodies: { url: string; body: unknown }[] = [];
+    serve(async (r) => {
+      if (isSeasonGet(r)) {
+        return json(
+          200,
+          season({
+            me: {
+              playerId: me,
+              phase: 'rolling',
+              offer: null,
+              choice: { id: choiceId, kind: 'game', options },
+              activeRun: null,
+              lastCompleted: null,
+            },
+          }),
+        );
+      }
+      bodies.push({ url: r.url, body: (await r.json()) as unknown });
+      return json(200, { duplicate: false, events: [] });
+    });
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    // One reroll button for the whole choice (D-93), next to the options
+    await screen.findByTestId('choice');
+    expect(screen.getAllByTestId('reroll')).toHaveLength(1);
+    await userEvent.click(screen.getByTestId('reroll'));
+
+    await vi.waitFor(() => {
+      expect(bodies).toHaveLength(1);
+    });
+    expect(bodies[0]).toMatchObject({
+      url: expect.stringMatching(new RegExp(`/api/seasons/${seasonId}/reroll$`)) as unknown,
+      body: { commandId: expect.any(String) as unknown },
+    });
+  });
+
+  it('offers no reroll while idle or playing', async () => {
+    let current = season();
+    serve((r) => (isSeasonGet(r) ? json(200, current) : json(404, {})));
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+    await screen.findByTestId('roll');
+    expect(screen.queryByTestId('reroll')).not.toBeInTheDocument();
+
+    current = season({
+      lastSequence: 5,
+      players: [{ id: me, name: 'Вася', cellId: 'start', points: 0, phase: 'playing' }],
+      me: {
+        playerId: me,
+        phase: 'playing',
+        offer: null,
+        choice: null,
+        activeRun: {
+          id: 'e0000000-0000-0000-0000-000000000001',
+          game: { id: 'a1000000-0000-0000-0000-000000000001', title: 'Silent Hill', hours: 12 },
+          startedAt: '2026-09-24T10:00:00Z',
+        },
+        lastCompleted: null,
+      },
+    });
+    act(() => {
+      hubChange?.();
+    });
+
+    expect(await screen.findAllByText(/Silent Hill/)).not.toHaveLength(0);
+    expect(screen.queryByTestId('reroll')).not.toBeInTheDocument();
+  });
+
+  it('explains a reroll refused for lack of coins in Russian', async () => {
+    serve((r) =>
+      isSeasonGet(r)
+        ? json(
+            200,
+            season({
+              me: {
+                playerId: me,
+                phase: 'rolling',
+                offer: {
+                  id: 'a1000000-0000-0000-0000-000000000001',
+                  title: 'Silent Hill',
+                  hours: 12,
+                },
+                choice: null,
+                activeRun: null,
+                lastCompleted: null,
+              },
+            }),
+          )
+        : json(409, {
+            title: 'rejected',
+            status: 409,
+            detail: null,
+            code: 'roll.notEnoughCoins',
+          }),
+    );
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    await userEvent.click(await screen.findByTestId('reroll'));
+
+    // The dictionary has its own text for the code, not the generic «unknown» one
+    const text = ru.rejection['roll.notEnoughCoins'];
+    expect(text).toEqual(expect.any(String));
+    expect(text).not.toBe(ru.rejection.unknown);
+    expect(await screen.findByRole('alert')).toHaveTextContent(text);
+  });
+
   it('shows a spectator no actions', async () => {
     serve(() => json(200, season({ me: null })));
     render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);

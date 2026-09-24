@@ -20,6 +20,9 @@ public sealed record RollRequest(Guid CommandId);
 
 public sealed record StartRequest(Guid CommandId);
 
+/// <summary>A reroll of the offered game or the whole pending choice; the price follows D-07.</summary>
+public sealed record RerollRequest(Guid CommandId);
+
 /// <summary>«Уже проходил» on the offered game or an option of the pending choice (D-92).</summary>
 public sealed record AlreadyPlayedRequest(Guid CommandId, Guid GameId);
 
@@ -87,6 +90,11 @@ public static class SeasonEndpoints
 
         seasons.MapPost("/start", (Guid seasonId, StartRequest request, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, CancellationToken ct) =>
             ActAsync(seasonId, request.CommandId, user, db, bus, playerId => new StartRun(playerId), ct))
+            .RequireAuthorization(Policies.Player)
+            .WithActionErrors();
+
+        seasons.MapPost("/reroll", (Guid seasonId, RerollRequest request, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, CancellationToken ct) =>
+            ActAsync(seasonId, request.CommandId, user, db, bus, playerId => new Reroll(playerId), ct))
             .RequireAuthorization(Policies.Player)
             .WithActionErrors();
 

@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using GameEvent.Engine.Players;
 using GameEvent.Engine.Rulesets;
 using GameEvent.Engine.Seasons;
 using GameEvent.Engine.Turns;
@@ -275,6 +276,132 @@ public sealed class SeasonApiTests : IAsyncLifetime
         Assert.Equal(offered, mine);
     }
 
+    // ---- Reroll (RR1, D-93) ----
+
+    [Fact]
+    public async Task Player_rerolls_the_offer_and_gets_another_game_at_once()
+    {
+        var vasya = await _site.SignedInAsync("vasya");
+        await PostAsync(vasya, "roll", new { commandId = Guid.NewGuid() });
+        var offered = (await vasya.GetFromJsonAsync<SeasonView>($"/api/seasons/{SiteFactory.SeasonId}", s_json, Ct))!.Me!.Offer!;
+
+        // The first reroll after a roll is free: no payment event
+        var response = await PostAsync(vasya, "reroll", new { commandId = Guid.NewGuid() });
+
+        Assert.Equal(["game-rerolled", "game-rolled"], await TypesAsync(response));
+        var me = (await vasya.GetFromJsonAsync<SeasonView>($"/api/seasons/{SiteFactory.SeasonId}", s_json, Ct))!.Me!;
+        Assert.Equal(TurnPhase.Rolling, me.Phase);
+        Assert.NotEqual(offered.Id, me.Offer!.Id);
+        await using var db = _site.NewDb();
+        Assert.Equal(1, db.SeasonPlayers.Single(p => p.Id == _site.Players["vasya"]).RerollsThisRoll);
+    }
+
+    [Fact]
+    public async Task Paid_reroll_through_the_api_spends_coins()
+    {
+        // Given Вася has exactly the price of one paid reroll (ruleset default: 5 coins)
+        var price = RulesetJson.Default().Roll.RerollCost.Amount!.Value;
+        await _site.SendAsync(new AdjustPlayer(_site.Players["vasya"], "Приз", CoinsDelta: price));
+        var vasya = await _site.SignedInAsync("vasya");
+        await PostAsync(vasya, "roll", new { commandId = Guid.NewGuid() });
+        await PostAsync(vasya, "reroll", new { commandId = Guid.NewGuid() });
+
+        var paid = await PostAsync(vasya, "reroll", new { commandId = Guid.NewGuid() });
+
+        Assert.Equal(["game-rerolled", "coins-changed", "game-rolled"], await TypesAsync(paid));
+        await using var db = _site.NewDb();
+        Assert.Equal(0, db.SeasonPlayers.Single(p => p.Id == _site.Players["vasya"]).Coins);
+    }
+
+    [Fact]
+    public async Task Reroll_without_coins_is_a_conflict_with_not_enough_coins()
+    {
+        // Given Вася used his free reroll and has no coins
+        var vasya = await _site.SignedInAsync("vasya");
+        await PostAsync(vasya, "roll", new { commandId = Guid.NewGuid() });
+        await PostAsync(vasya, "reroll", new { commandId = Guid.NewGuid() });
+        var offered = (await vasya.GetFromJsonAsync<SeasonView>($"/api/seasons/{SiteFactory.SeasonId}", s_json, Ct))!.Me!.Offer!;
+
+        var response = await vasya.PostAsJsonAsync(Url("reroll"), new { commandId = Guid.NewGuid() }, Ct);
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        using var problem = JsonDocument.Parse(await response.Content.ReadAsStringAsync(Ct));
+        Assert.Equal("roll.notEnoughCoins", problem.RootElement.GetProperty("code").GetString());
+        var me = (await vasya.GetFromJsonAsync<SeasonView>($"/api/seasons/{SiteFactory.SeasonId}", s_json, Ct))!.Me!;
+        Assert.Equal(offered, me.Offer);
+        await using var db = _site.NewDb();
+        Assert.Equal(1, db.Events.Count(e => e.Type == "game-rerolled"));
+        Assert.Equal(0, db.SeasonPlayers.Single(p => p.Id == _site.Players["vasya"]).Coins);
+    }
+
+    [Fact]
+    public async Task Reroll_before_rolling_is_a_conflict()
+    {
+        var vasya = await _site.SignedInAsync("vasya");
+
+        var response = await vasya.PostAsJsonAsync(Url("reroll"), new { commandId = Guid.NewGuid() }, Ct);
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        using var problem = JsonDocument.Parse(await response.Content.ReadAsStringAsync(Ct));
+        Assert.Equal("turn.wrongPhase", problem.RootElement.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task Repeating_a_reroll_with_the_same_command_id_acts_once()
+    {
+        // A repeated request of one click must not reroll twice (and so must not pay for a second reroll)
+        var vasya = await _site.SignedInAsync("vasya");
+        await PostAsync(vasya, "roll", new { commandId = Guid.NewGuid() });
+        var body = new { commandId = Guid.NewGuid() };
+
+        var first = await vasya.PostAsJsonAsync(Url("reroll"), body, Ct);
+        var second = await vasya.PostAsJsonAsync(Url("reroll"), body, Ct);
+
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, second.StatusCode);
+        var repeat = await second.Content.ReadFromJsonAsync<CommandResponse>(s_json, Ct);
+        Assert.True(repeat!.Duplicate);
+        Assert.Equal((await first.Content.ReadFromJsonAsync<CommandResponse>(s_json, Ct))!.Events, repeat.Events);
+        await using var db = _site.NewDb();
+        Assert.Equal(1, db.Events.Count(e => e.Type == "game-rerolled"));
+    }
+
+    [Fact]
+    public async Task Player_rerolls_a_pending_choice_as_a_whole()
+    {
+        // Given a choice of two of the three games: after giving both up one game is left, a plain offer
+        var rules = RulesetJson.Default();
+        await _site.SendAsync(new ChangeRuleset(rules with { Roll = rules.Roll with { ChoiceCount = 2 } }, ExpectedVersion: null));
+        var vasya = await _site.SignedInAsync("vasya");
+        await PostAsync(vasya, "roll", new { commandId = Guid.NewGuid() });
+        var choice = (await vasya.GetFromJsonAsync<SeasonView>($"/api/seasons/{SiteFactory.SeasonId}", s_json, Ct))!.Me!.Choice!;
+
+        var response = await PostAsync(vasya, "reroll", new { commandId = Guid.NewGuid() });
+
+        Assert.Equal(["game-rerolled", "game-rolled"], await TypesAsync(response));
+        var me = (await vasya.GetFromJsonAsync<SeasonView>($"/api/seasons/{SiteFactory.SeasonId}", s_json, Ct))!.Me!;
+        Assert.Null(me.Choice);
+        Assert.DoesNotContain(me.Offer!.Id, choice.Options.Select(o => o.Game!.Id));
+    }
+
+    [Fact]
+    public async Task A_player_cannot_reroll_for_another_player()
+    {
+        // Extra fields naming another player are ignored: the session decides whose offer is given up
+        var vasya = await _site.SignedInAsync("vasya");
+        await PostAsync(vasya, "roll", new { commandId = Guid.NewGuid() });
+        var offered = (await vasya.GetFromJsonAsync<SeasonView>($"/api/seasons/{SiteFactory.SeasonId}", s_json, Ct))!.Me!.Offer!;
+        var petya = await _site.SignedInAsync("petya");
+
+        var response = await petya.PostAsJsonAsync(Url("reroll"), new { commandId = Guid.NewGuid(), playerId = _site.Players["vasya"] }, Ct);
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        using var problem = JsonDocument.Parse(await response.Content.ReadAsStringAsync(Ct));
+        Assert.Equal("turn.wrongPhase", problem.RootElement.GetProperty("code").GetString());
+        var mine = (await vasya.GetFromJsonAsync<SeasonView>($"/api/seasons/{SiteFactory.SeasonId}", s_json, Ct))!.Me!.Offer!;
+        Assert.Equal(offered, mine);
+    }
+
     private async Task<ChoiceView> RollChoiceAsync(HttpClient player)
     {
         var rules = RulesetJson.Default();
@@ -336,6 +463,7 @@ public sealed class SeasonApiTests : IAsyncLifetime
     [InlineData("complete")]
     [InlineData("choose")]
     [InlineData("already-played")]
+    [InlineData("reroll")]
     public async Task Anonymous_is_unauthorized(string action)
     {
         var client = await _site.AnonymousAsync();
@@ -362,6 +490,9 @@ public sealed class SeasonApiTests : IAsyncLifetime
     [InlineData("zritel", "already-played")]
     [InlineData("admin", "already-played")]
     [InlineData("masha", "already-played")]
+    [InlineData("zritel", "reroll")]
+    [InlineData("admin", "reroll")]
+    [InlineData("masha", "reroll")]
     public async Task Spectator_admin_and_player_outside_the_season_are_forbidden(string login, string action)
     {
         var client = await _site.SignedInAsync(login);
@@ -392,6 +523,7 @@ public sealed class SeasonApiTests : IAsyncLifetime
     [InlineData("complete")]
     [InlineData("choose")]
     [InlineData("already-played")]
+    [InlineData("reroll")]
     public async Task Post_without_the_antiforgery_token_is_refused(string action)
     {
         var vasya = await _site.SignedInAsync("vasya");
@@ -424,6 +556,10 @@ public sealed class SeasonApiTests : IAsyncLifetime
     [InlineData("already-played", """{"commandId":"5b1e2f0a-0000-0000-0000-00000000000d"}""")]
     [InlineData("already-played", """{"commandId":"5b1e2f0a-0000-0000-0000-00000000000e","gameId":"not-a-guid"}""")]
     [InlineData("already-played", "not json")]
+    [InlineData("reroll", """{"commandId":"00000000-0000-0000-0000-000000000000"}""")]
+    [InlineData("reroll", """{"commandId":"not-a-guid"}""")]
+    [InlineData("reroll", "{}")]
+    [InlineData("reroll", "not json")]
     public async Task Invalid_input_is_a_bad_request(string action, string body)
     {
         var vasya = await _site.SignedInAsync("vasya");
@@ -439,6 +575,7 @@ public sealed class SeasonApiTests : IAsyncLifetime
     [InlineData("complete")]
     [InlineData("choose")]
     [InlineData("already-played")]
+    [InlineData("reroll")]
     public async Task Unknown_season_is_not_found(string action)
     {
         var vasya = await _site.SignedInAsync("vasya");

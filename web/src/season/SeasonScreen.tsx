@@ -8,6 +8,7 @@ type Season = Schemas['SeasonView'];
 type Command =
   | { kind: 'roll' }
   | { kind: 'start' }
+  | { kind: 'reroll' }
   | { kind: 'complete'; completion: Completion }
   | { kind: 'choose'; choiceId: string; optionId: string }
   | { kind: 'alreadyPlayed'; gameId: string };
@@ -22,6 +23,8 @@ function send(seasonId: string, command: Command) {
       return api.POST('/api/seasons/{seasonId}/roll', { params, body: { commandId } });
     case 'start':
       return api.POST('/api/seasons/{seasonId}/start', { params, body: { commandId } });
+    case 'reroll':
+      return api.POST('/api/seasons/{seasonId}/reroll', { params, body: { commandId } });
     case 'complete':
       return api.POST('/api/seasons/{seasonId}/complete', {
         params,
@@ -171,6 +174,13 @@ export function SeasonScreen({
                 </button>
               ) : null,
             )}
+            <button
+              data-testid="reroll"
+              disabled={pending}
+              onClick={() => void act({ kind: 'reroll' })}
+            >
+              {ru.turn.reroll}
+            </button>
           </fieldset>
         )}
         {offer && (
@@ -189,6 +199,13 @@ export function SeasonScreen({
               onClick={() => void act({ kind: 'alreadyPlayed', gameId: offer.id })}
             >
               {ru.turn.alreadyPlayed}
+            </button>
+            <button
+              data-testid="reroll"
+              disabled={pending}
+              onClick={() => void act({ kind: 'reroll' })}
+            >
+              {ru.turn.reroll}
             </button>
           </>
         )}

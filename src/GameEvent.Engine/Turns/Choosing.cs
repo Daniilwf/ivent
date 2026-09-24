@@ -52,7 +52,7 @@ internal static class Choosing
         });
 
     public static SeasonState Apply(SeasonState state, ChoiceDiscarded e) =>
-        Update(state, e.PlayerId, p => p with { Phase = TurnPhase.Idle, Choice = null });
+        Update(state, e.PlayerId, p => p with { Phase = TurnPhase.Idle, Choice = null, RerollsThisRoll = 0 });
 
     private static SeasonState Update(SeasonState state, Guid playerId, Func<SeasonPlayer, SeasonPlayer> change) =>
         state with { Players = state.Players.SetItem(playerId, change(state.Players[playerId])) };

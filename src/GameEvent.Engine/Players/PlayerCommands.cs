@@ -254,6 +254,6 @@ internal static class PlayerAdministration
     public static SeasonState Apply(SeasonState state, OfferDiscarded e) =>
         state with
         {
-            Players = state.Players.SetItem(e.PlayerId, state.Players[e.PlayerId] with { Phase = TurnPhase.Idle, Offer = null }),
+            Players = state.Players.SetItem(e.PlayerId, state.Players[e.PlayerId] with { Phase = TurnPhase.Idle, Offer = null, RerollsThisRoll = 0 }),
         };
 }

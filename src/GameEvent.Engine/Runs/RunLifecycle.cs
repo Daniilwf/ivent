@@ -72,7 +72,7 @@ internal static class RunLifecycle
     {
         var run = new RunState(
             e.RunId, e.PlayerId, e.GameId, RunStatus.Playing, e.Snapshot, e.RolledAt, e.StartedAt, Difficulty: null, Hours: null, Dice: []);
-        var player = state.Players[e.PlayerId] with { Phase = TurnPhase.Playing, Offer = null, ActiveRunId = e.RunId };
+        var player = state.Players[e.PlayerId] with { Phase = TurnPhase.Playing, Offer = null, RerollsThisRoll = 0, ActiveRunId = e.RunId };
         return state with { Runs = state.Runs.Add(e.RunId, run), Players = state.Players.SetItem(e.PlayerId, player) };
     }
 
