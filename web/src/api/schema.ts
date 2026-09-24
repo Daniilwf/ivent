@@ -398,6 +398,92 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/seasons/{seasonId}/already-played": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["AlreadyPlayedRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CommandResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/seasons/{seasonId}/choose": {
         parameters: {
             query?: never;
@@ -760,10 +846,88 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/seasons/{seasonId}/pool-stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PoolStatsView"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Too Many Requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @description «Уже проходил» on the offered game or an option of the pending choice (D-92). */
+        AlreadyPlayedRequest: {
+            /** Format: uuid */
+            commandId: string;
+            /** Format: uuid */
+            gameId: string;
+        };
         AntiforgeryToken: {
             token: string;
             headerName: string;
@@ -777,6 +941,14 @@ export interface components {
             windowHoursAfterRoll: number;
             deadlineOptionsDays: components["schemas"]["EquatableArrayOfint"];
             payoutByHoursPerDay: components["schemas"]["EquatableArrayOfPayoutStep"];
+        };
+        /** @description How many games of a category can be rolled now; personal exclusions are not subtracted. */
+        CategoryStatView: {
+            category: string;
+            /** Format: int32 */
+            weight: number;
+            /** Format: int32 */
+            available: number;
         };
         /** @enum {unknown} */
         CellType: "start" | "empty" | "finish";
@@ -1060,6 +1232,17 @@ export interface components {
             /** Format: int32 */
             points: number;
             phase: components["schemas"]["TurnPhase"];
+        };
+        /** @description A player whose next roll would find no game: the empty-pool signal. */
+        PlayerWithoutGamesView: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+        };
+        /** @description Pool health of a season for the admin (G10, G11, D-92). */
+        PoolStatsView: {
+            categories: components["schemas"]["CategoryStatView"][];
+            playersWithoutGames: components["schemas"]["PlayerWithoutGamesView"][];
         };
         ProblemDetails: {
             type?: null | string;

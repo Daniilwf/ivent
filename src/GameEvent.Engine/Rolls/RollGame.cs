@@ -59,23 +59,68 @@ internal static class Rolling
             return rejection;
         }
 
+        return Draw(state, command.PlayerId, context, Filters(state)) is { } roll
+            ? Decision.Accept(roll)
+            : Decision.Reject(RejectionCodes.NoAvailableGames, "No category has an available game.");
+    }
+
+    public static Decision Decide(SeasonState state, DeclareAlreadyPlayed command, EngineContext context)
+    {
+        if (TurnRules.Check(state, command.PlayerId, command) is { } rejection)
+        {
+            return rejection;
+        }
+
         var player = state.Players[command.PlayerId];
+        if (!IsOffered(player, command.GameId))
+        {
+            return Decision.Reject(RejectionCodes.GameNotOffered, $"Game {command.GameId} is not offered to the player.");
+        }
 
-        // Pool order is whatever storage returns; sort so the same seed gives the same log (invariant 14).
-        var status = SeasonGameStatus.For(state, player.PlayerId);
-        var candidates = context.Pool.Games
-            .Where(g => status.Of(g) != GameAvailability.Hidden)
-            .OrderBy(g => g.Id)
-            .ToList();
+        // The exclusion drops the offer or the choice; the free roll then spins over what is left (D-07, D-92).
+        var excluded = new GameExcluded(player.PlayerId, command.GameId, ExclusionReason.AlreadyPlayed);
+        var after = Apply(state, excluded);
+        return Draw(after, player.PlayerId, context, Filters(after)) is { } roll
+            ? Decision.Accept(excluded, roll)
+            : Decision.Accept(excluded);
+    }
 
-        // The wheel spins only over categories where at least one game is available (SPEC «Уточнения»: Ролл).
-        var wheel = context.Pool.Categories
-            .Where(c => c.Weight > 0 && candidates.Any(g => InCategory(g, c) && status.Of(g) == GameAvailability.Available))
-            .OrderBy(c => c.Name, StringComparer.Ordinal)
-            .ToList();
+    public static SeasonState Apply(SeasonState state, GameExcluded e)
+    {
+        var player = state.Players[e.PlayerId];
+        if (player.Exclusions.Any(x => x.GameId == e.GameId))
+        {
+            // An excluded game is hidden from the player, so it can never be excluded twice (D-92).
+            throw new InvalidOperationException($"Game {e.GameId} is already excluded for player {e.PlayerId}.");
+        }
+
+        var exclusions = player.Exclusions.Append(new GameExclusion(e.GameId, e.Reason)).OrderBy(x => x.GameId);
+        player = player with { Exclusions = [.. exclusions] };
+        if (IsOffered(player, e.GameId))
+        {
+            player = player with { Phase = TurnPhase.Idle, Offer = null, Choice = null };
+        }
+
+        return state with { Players = state.Players.SetItem(e.PlayerId, player) };
+    }
+
+    private static bool IsOffered(SeasonPlayer player, Guid gameId) =>
+        player.Offer?.GameId == gameId || (player.Choice?.Options.Any(o => o.Game?.GameId == gameId) ?? false);
+
+    /// <summary>Whether a roll of <paramref name="playerId"/> would find a game: the same test the wheel makes.</summary>
+    internal static bool CanRoll(SeasonState state, Guid playerId, IPoolView pool, IReadOnlyList<RollFilter> filters) =>
+        Wheel(state, playerId, pool, filters).Categories.Count > 0;
+
+    /// <summary>
+    /// The wheel and the draw (D-05, D-06, D-46): the roll event for <paramref name="playerId"/>, or null when no
+    /// category has an available game under the filters.
+    /// </summary>
+    internal static IGameEvent? Draw(SeasonState state, Guid playerId, EngineContext context, IReadOnlyList<RollFilter> filters)
+    {
+        var (status, candidates, wheel) = Wheel(state, playerId, context.Pool, filters);
         if (wheel.Count == 0)
         {
-            return Decision.Reject(RejectionCodes.NoAvailableGames, "No category has an available game.");
+            return null;
         }
 
         var category = SpinWheel(wheel, context.Random);
@@ -109,10 +154,37 @@ internal static class Rolling
         return offers.Count switch
         {
             0 => throw new InvalidOperationException($"Category '{category.Name}' was on the wheel without an available game."),
-            1 => Decision.Accept(new GameRolled(player.PlayerId, category.Name, [.. misses], offers[0].GameId, offers[0].Snapshot, now)),
-            _ => Decision.Accept(new GameChoiceRolled(player.PlayerId, category.Name, [.. misses], context.Ids.NewId(), [.. offers])),
+            1 => new GameRolled(playerId, category.Name, [.. misses], offers[0].GameId, offers[0].Snapshot, now),
+            _ => new GameChoiceRolled(playerId, category.Name, [.. misses], context.Ids.NewId(), [.. offers]),
         };
     }
+
+    // The candidates under the filters and the categories on the wheel: those with an available game among them
+    // (SPEC «Уточнения»: Ролл). A game counts for a filter only if it is available and on the wheel (weight > 0).
+    private static (SeasonGameStatus Status, List<Game> Candidates, List<Category> Categories) Wheel(
+        SeasonState state, Guid playerId, IPoolView pool, IReadOnlyList<RollFilter> filters)
+    {
+        // Pool order is whatever storage returns; sort so the same seed gives the same log (invariant 14).
+        var status = SeasonGameStatus.For(state, playerId);
+        var weighted = pool.Categories.Where(c => c.Weight > 0).OrderBy(c => c.Name, StringComparer.Ordinal).ToList();
+        var visible = pool.Games.Where(g => status.Of(g) != GameAvailability.Hidden).OrderBy(g => g.Id).ToList();
+        bool Rollable(Game g) => status.Of(g) == GameAvailability.Available && weighted.Any(c => InCategory(g, c));
+
+        var candidates = RollFilters.Apply(visible, Rollable, filters).ToList();
+        var categories = weighted.Where(c => candidates.Any(g => InCategory(g, c) && Rollable(g))).ToList();
+        return (status, candidates, categories);
+    }
+
+    // Stage 1 has no live filters: the length limit of the last days is not supported yet, zones come in stage 2 (D-92).
+    internal static IReadOnlyList<RollFilter> Filters(SeasonState state)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        return [];
+    }
+
+    /// <summary>Whether <paramref name="game"/> is on <paramref name="category"/>'s slice of the wheel (tags ignore case).</summary>
+    internal static bool InCategory(Game game, Category category) =>
+        game.Tags.Contains(category.Name, StringComparer.OrdinalIgnoreCase);
 
     public static SeasonState Apply(SeasonState state, GameRolled e) =>
         state with
@@ -125,9 +197,6 @@ internal static class Rolling
                     Offer = new RollOffer(e.GameId, e.Snapshot, e.RolledAt),
                 }),
         };
-
-    private static bool InCategory(Game game, Category category) =>
-        game.Tags.Contains(category.Name, StringComparer.OrdinalIgnoreCase);
 
     private static Category SpinWheel(List<Category> wheel, IRandomSource random)
     {

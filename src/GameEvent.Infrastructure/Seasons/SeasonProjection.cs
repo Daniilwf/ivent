@@ -97,6 +97,13 @@ internal static class SeasonProjection
             record.OfferJson = player.Offer is null ? null : JsonSerializer.Serialize(player.Offer, EngineJson.Options);
             record.ChoiceJson = player.Choice is null ? null : JsonSerializer.Serialize(player.Choice, EngineJson.Options);
             record.ActiveRunId = player.ActiveRunId;
+
+            // Exclusions only grow within a season (D-08); rows are added, never changed.
+            var known = old?.Exclusions.Select(x => x.GameId).ToHashSet() ?? [];
+            foreach (var exclusion in player.Exclusions.Where(x => !known.Contains(x.GameId)))
+            {
+                db.Exclusions.Add(new PlayerGameExclusionRecord { PlayerId = id, GameId = exclusion.GameId, Reason = exclusion.Reason });
+            }
         }
 
         foreach (var (id, run) in after.Runs)
@@ -145,6 +152,9 @@ internal static class SeasonProjection
         var season = await db.Seasons.AsNoTracking().SingleAsync(s => s.Id == replayed.SeasonId, ct);
         var players = await db.SeasonPlayers.AsNoTracking().Where(p => p.SeasonId == replayed.SeasonId).ToListAsync(ct);
         var runs = await db.Runs.AsNoTracking().Where(r => r.SeasonId == replayed.SeasonId).ToListAsync(ct);
+        var playerIds = players.Select(p => p.Id).ToList();
+        var exclusions = (await db.Exclusions.AsNoTracking().Where(x => playerIds.Contains(x.PlayerId)).ToListAsync(ct))
+            .ToLookup(x => x.PlayerId);
 
         return replayed with
         {
@@ -161,6 +171,7 @@ internal static class SeasonProjection
                     JsonSerializer.Deserialize<PlayerPath>(p.PathJson, EngineJson.Options)!, p.Phase,
                     p.OfferJson is null ? null : JsonSerializer.Deserialize<RollOffer>(p.OfferJson, EngineJson.Options),
                     p.ChoiceJson is null ? null : JsonSerializer.Deserialize<PendingChoice>(p.ChoiceJson, EngineJson.Options),
+                    [.. exclusions[p.Id].OrderBy(r => r.GameId).Select(r => new GameExclusion(r.GameId, r.Reason))],
                     p.ActiveRunId)),
             Runs = runs.ToImmutableSortedDictionary(
                 r => r.Id,

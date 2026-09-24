@@ -8,6 +8,7 @@ const rejection = {
   'turn.noPendingChoice': 'Этот выбор уже сделан или снят. Обновите страницу.',
   'turn.unknownOption': 'Такого варианта нет. Обновите страницу.',
   'roll.noAvailableGames': 'Нет доступных игр для ролла. Сообщите админу.',
+  'roll.gameNotOffered': 'Эта игра вам сейчас не предложена. Обновите страницу.',
   'run.hoursRequired': 'У игры нет данных о длине: укажите оценку часов.',
   'run.invalidHours': 'Часы должны быть больше нуля.',
   'player.unknown': 'Вы не участвуете в этом сезоне.',
@@ -43,6 +44,8 @@ export const ru = {
     offered: (title: string, gameHours: number | null) =>
       gameHours == null ? `Выпала игра: ${title}` : `Выпала игра: ${title} (${hours(gameHours)})`,
     start: 'Начать',
+    alreadyPlayed: 'Уже проходил',
+    alreadyPlayedGame: (title: string) => `Уже проходил: ${title}`,
     choose: 'Выберите одну из выпавших игр',
     option: (title: string, gameHours: number | null) =>
       gameHours == null ? title : `${title} (${hours(gameHours)})`,

@@ -270,6 +270,91 @@ describe('SeasonScreen', () => {
     });
   });
 
+  it('declares an offered game already played', async () => {
+    const gameId = 'a1000000-0000-0000-0000-000000000001';
+    const bodies: unknown[] = [];
+    serve(async (r) => {
+      if (isSeasonGet(r)) {
+        return json(
+          200,
+          season({
+            me: {
+              playerId: me,
+              phase: 'rolling',
+              offer: { id: gameId, title: 'Silent Hill', hours: 12 },
+              choice: null,
+              activeRun: null,
+              lastCompleted: null,
+            },
+          }),
+        );
+      }
+      bodies.push({ url: r.url, body: (await r.json()) as unknown });
+      return json(200, { duplicate: false, events: [] });
+    });
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    await userEvent.click(await screen.findByTestId('already-played'));
+
+    await vi.waitFor(() => {
+      expect(bodies).toHaveLength(1);
+    });
+    expect(bodies[0]).toMatchObject({
+      url: expect.stringMatching(/\/already-played$/) as unknown,
+      body: { gameId, commandId: expect.any(String) as unknown },
+    });
+  });
+
+  it('declares an option of the pending choice already played by its game id, not the option id', async () => {
+    const choiceId = 'c0000000-0000-0000-0000-000000000001';
+    // Option ids and game ids differ on purpose: the command takes the game (D-92)
+    const options = [
+      {
+        id: 'opt-1',
+        game: { id: 'a1000000-0000-0000-0000-000000000001', title: 'Silent Hill', hours: 12 },
+      },
+      {
+        id: 'opt-2',
+        game: { id: 'b2000000-0000-0000-0000-000000000002', title: 'Outlast', hours: 9 },
+      },
+    ];
+    const bodies: { url: string; body: unknown }[] = [];
+    serve(async (r) => {
+      if (isSeasonGet(r)) {
+        return json(
+          200,
+          season({
+            me: {
+              playerId: me,
+              phase: 'rolling',
+              offer: null,
+              choice: { id: choiceId, kind: 'game', options },
+              activeRun: null,
+              lastCompleted: null,
+            },
+          }),
+        );
+      }
+      bodies.push({ url: r.url, body: (await r.json()) as unknown });
+      return json(200, { duplicate: false, events: [] });
+    });
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    await userEvent.click(await screen.findByTestId('already-played-opt-2'));
+
+    await vi.waitFor(() => {
+      expect(bodies).toHaveLength(1);
+    });
+    expect(bodies[0]).toMatchObject({
+      url: expect.stringMatching(new RegExp(`/api/seasons/${seasonId}/already-played$`)) as unknown,
+      body: {
+        gameId: 'b2000000-0000-0000-0000-000000000002',
+        commandId: expect.any(String) as unknown,
+      },
+    });
+    expect(bodies[0]?.body).not.toMatchObject({ gameId: 'opt-2' });
+  });
+
   it('shows a spectator no actions', async () => {
     serve(() => json(200, season({ me: null })));
     render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);

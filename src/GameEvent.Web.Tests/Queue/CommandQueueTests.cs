@@ -260,6 +260,50 @@ public class CommandQueueTests
         Assert.Equal((s_vasya, RunStatus.Playing, vasyaChoice.Options[0].Game!.GameId), (run.PlayerId, run.Status, run.GameId));
     }
 
+    [Fact]
+    public async Task Projection_of_exclusions_equals_the_fold_of_the_log()
+    {
+        await using var h = await QueueHarness.StartAsync();
+        var petya = Guid.Parse("10000000-0000-0000-0000-000000000002");
+        var ct = TestContext.Current.CancellationToken;
+        await AcceptedAsync(h, new CreateSeason(s_season, "Осень", RulesetJson.Default()));
+        await AcceptedAsync(h, new ChangeSeasonStatus(SeasonStatus.Active));
+        await AcceptedAsync(h, new AddSeasonPlayer(s_vasya, s_vasya, "Вася"));
+        await AcceptedAsync(h, new AddSeasonPlayer(petya, petya, "Петя"));
+
+        // When Вася declares «Уже проходил» twice in a row and Петя once (D-92: PlayerGameExclusion)
+        var vasyaFirst = OfferedIn(await AcceptedAsync(h, new RollGame(s_vasya)));
+        var vasyaSecond = OfferedIn(await AcceptedAsync(h, new DeclareAlreadyPlayed(s_vasya, vasyaFirst)));
+        await AcceptedAsync(h, new DeclareAlreadyPlayed(s_vasya, vasyaSecond));
+        var petyaGame = OfferedIn(await AcceptedAsync(h, new RollGame(petya)));
+        await AcceptedAsync(h, new DeclareAlreadyPlayed(petya, petyaGame));
+
+        // Then the projection equals the fold of the log, and the table holds one row per player and game
+        var state = await AssertProjectionEqualsReplayAsync(h, ct);
+        Assert.Equal(
+            new[] { vasyaFirst, vasyaSecond }.Order(),
+            state.Players[s_vasya].Exclusions.Select(x => x.GameId));
+        await using (var db = h.NewDb())
+        {
+            var rows = await db.Exclusions.AsNoTracking().ToListAsync(ct);
+            Assert.Equal(
+                state.Players.Values.SelectMany(p => p.Exclusions.Select(x => (p.PlayerId, x.GameId, x.Reason))).Order(),
+                rows.Select(r => (r.PlayerId, r.GameId, r.Reason)).Order());
+            Assert.All(rows, r => Assert.Equal(ExclusionReason.AlreadyPlayed, r.Reason));
+        }
+
+        // And after a restart and an admin discard the exclusions stay (they never shrink, D-08)
+        await h.RestartAsync();
+        await AcceptedAsync(h, new AdjustPlayer(s_vasya, "Сброс", DiscardOffer: true));
+        var after = await AssertProjectionEqualsReplayAsync(h, ct);
+        Assert.Equal(state.Players[s_vasya].Exclusions, after.Players[s_vasya].Exclusions);
+        await using var final = h.NewDb();
+        Assert.Equal(3, await final.Exclusions.CountAsync(ct));
+    }
+
+    private static Guid OfferedIn(Infrastructure.Queue.CommandOutcome outcome) =>
+        outcome.Events.Select(e => e.Event).OfType<GameRolled>().Single().GameId;
+
     private static async Task<SeasonState> AssertProjectionEqualsReplayAsync(QueueHarness h, CancellationToken ct)
     {
         await using var db = h.NewDb();

@@ -159,6 +159,24 @@ namespace GameEvent.Infrastructure.Database.Migrations
                     b.ToTable("Game", (string)null);
                 });
 
+            modelBuilder.Entity("GameEvent.Infrastructure.Seasons.PlayerGameExclusionRecord", b =>
+                {
+                    b.Property<Guid>("PlayerId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("GameId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("PlayerId", "GameId");
+
+                    b.ToTable("PlayerGameExclusion", (string)null);
+                });
+
             modelBuilder.Entity("GameEvent.Infrastructure.Seasons.RulesetRecord", b =>
                 {
                     b.Property<Guid>("SeasonId")
@@ -325,6 +343,15 @@ namespace GameEvent.Infrastructure.Database.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Season", (string)null);
+                });
+
+            modelBuilder.Entity("GameEvent.Infrastructure.Seasons.PlayerGameExclusionRecord", b =>
+                {
+                    b.HasOne("GameEvent.Infrastructure.Seasons.SeasonPlayerRecord", null)
+                        .WithMany()
+                        .HasForeignKey("PlayerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("GameEvent.Infrastructure.Seasons.RulesetRecord", b =>

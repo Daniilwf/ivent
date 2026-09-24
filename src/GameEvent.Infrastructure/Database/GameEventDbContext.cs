@@ -18,6 +18,8 @@ public sealed class GameEventDbContext(DbContextOptions<GameEventDbContext> opti
 
     public DbSet<RulesetRecord> Rulesets => Set<RulesetRecord>();
 
+    public DbSet<PlayerGameExclusionRecord> Exclusions => Set<PlayerGameExclusionRecord>();
+
     public DbSet<RunRecord> Runs => Set<RunRecord>();
 
     public DbSet<GameRecord> Games => Set<GameRecord>();
@@ -74,6 +76,14 @@ public sealed class GameEventDbContext(DbContextOptions<GameEventDbContext> opti
             e.HasIndex(x => new { x.SeasonId, x.Points });
             e.HasIndex(x => new { x.SeasonId, x.UserId }).IsUnique();
             e.Property(x => x.Phase).HasMaxLength(20);
+        });
+
+        modelBuilder.Entity<PlayerGameExclusionRecord>(e =>
+        {
+            e.ToTable("PlayerGameExclusion");
+            e.HasKey(x => new { x.PlayerId, x.GameId });
+            e.HasOne<SeasonPlayerRecord>().WithMany().HasForeignKey(x => x.PlayerId);
+            e.Property(x => x.Reason).HasMaxLength(20);
         });
 
         modelBuilder.Entity<RunRecord>(e =>

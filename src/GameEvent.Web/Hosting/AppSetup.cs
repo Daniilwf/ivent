@@ -7,6 +7,7 @@ using GameEvent.Infrastructure.Kernel;
 using GameEvent.Infrastructure.Queue;
 using GameEvent.Web.Accounts;
 using GameEvent.Web.Realtime;
+using GameEvent.Web.Rolls;
 using GameEvent.Web.Rulesets;
 using GameEvent.Web.Seasons;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -19,6 +20,11 @@ namespace GameEvent.Web.Hosting;
 public static class AppSetup
 {
     public const string LoginRateLimit = "login";
+
+    /// <summary>Admin reads that fold the whole season log: per user, a few per second at most (D-92).</summary>
+    public const string AdminReadRateLimit = "admin-read";
+
+    public const int AdminReadsPerMinute = 30;
 
     public static void AddGameEvent(this WebApplicationBuilder builder)
     {
@@ -91,6 +97,9 @@ public static class AppSetup
             o.AddPolicy(LoginRateLimit, ctx => RateLimitPartition.GetFixedWindowLimiter(
                 WebSecurity.ClientKey(ctx.Connection.RemoteIpAddress),
                 _ => new FixedWindowRateLimiterOptions { PermitLimit = attempts, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+            o.AddPolicy(AdminReadRateLimit, ctx => RateLimitPartition.GetFixedWindowLimiter(
+                ctx.User.UserId()?.ToString() ?? WebSecurity.ClientKey(ctx.Connection.RemoteIpAddress),
+                _ => new FixedWindowRateLimiterOptions { PermitLimit = AdminReadsPerMinute, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
         });
 
         services.Configure<ForwardedHeadersOptions>(o => WebSecurity.ConfigureForwardedHeaders(o, builder.Configuration));
@@ -134,6 +143,7 @@ public static class AppSetup
         api.MapAccounts();
         api.MapSeasons();
         api.MapRules();
+        api.MapPoolStats();
         app.MapHub<SeasonHub>(SeasonHub.Path);
 
         if (frontend is not null)

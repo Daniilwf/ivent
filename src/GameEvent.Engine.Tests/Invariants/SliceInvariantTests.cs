@@ -15,12 +15,15 @@ namespace GameEvent.Engine.Tests.Invariants;
 /// and after every command the invariants of docs/TESTING.md that the slice can break must hold.
 /// Each byte of <c>script</c> is one command; <c>seed</c> drives the engine's random source.
 /// The choice variant (C4, D-91) plays with <c>roll.choiceCount</c> 3 and adds <see cref="MakeChoice"/> to the script.
+/// The «Уже проходил» variant (C5, D-92) adds <see cref="DeclareAlreadyPlayed"/>, with and without a choice.
 /// </summary>
 public class SliceInvariantTests
 {
     private const int MapLength = 25;
 
     private static readonly string[] s_players = ["Вася", "Петя", "Маша"];
+
+    private static readonly string[] s_games = ["Silent Hill", "Alan Wake", "Deleted Horror", "Tetris", "Unknown Length", "Baba Is You", "Doom"];
 
     private const int ChoiceCount = 3;
 
@@ -75,14 +78,36 @@ public class SliceInvariantTests
         return new MakeChoice(player, choice.ChoiceId, index < choice.Options.Count ? choice.Options[index].Id : "unknown");
     }
 
-    private static Scenario Play(int seed, byte[] script, Action<Scenario, SeasonState, int>? afterEach = null, bool withChoice = false)
+    /// <summary>
+    /// Every sixth kind of command is «Уже проходил»: bits 5–7 pick the offered game or an option (most often), or a
+    /// pool game that is usually not offered (a refusal to check).
+    /// </summary>
+    private static ICommand ExclusionCommandFor(Scenario s, byte b, bool withChoice)
+    {
+        var player = s.PlayerId(s_players[b % s_players.Length]);
+        if ((b / 3) % 6 != 5)
+        {
+            return withChoice ? ChoiceCommandFor(s, b) : CommandFor(s, b);
+        }
+
+        var p = s.State.Players[player];
+        List<Guid> offered = p.Offer is { } offer
+            ? [offer.GameId]
+            : p.Choice?.Options.Select(o => o.Game!.GameId).ToList() ?? [];
+        var pick = b / 32;
+        var game = pick < 5 && offered.Count > 0 ? offered[pick % offered.Count] : s.GameId(s_games[pick % s_games.Length]);
+        return new DeclareAlreadyPlayed(player, game);
+    }
+
+    private static Scenario Play(
+        int seed, byte[] script, Action<Scenario, SeasonState, int>? afterEach = null, bool withChoice = false, bool withExclusions = false)
     {
         var s = NewSeason(seed, withChoice);
         foreach (var b in script)
         {
             var before = s.State;
             var logLength = s.Log.Count;
-            s.Act(withChoice ? ChoiceCommandFor(s, b) : CommandFor(s, b));
+            s.Act(withExclusions ? ExclusionCommandFor(s, b, withChoice) : withChoice ? ChoiceCommandFor(s, b) : CommandFor(s, b));
             afterEach?.Invoke(s, before, logLength);
         }
 
@@ -96,6 +121,24 @@ public class SliceInvariantTests
     [Property(MaxTest = 200)]
     public void Invariants_hold_with_a_choice_of_games(int seed, byte[] script) =>
         Play(seed, script, CheckInvariants, withChoice: true);
+
+    [Property(MaxTest = 200)]
+    public void Invariants_hold_with_already_played(int seed, byte[] script) =>
+        Play(seed, script, CheckInvariants, withExclusions: true);
+
+    [Property(MaxTest = 200)]
+    public void Invariants_hold_with_already_played_and_a_choice_of_games(int seed, byte[] script) =>
+        Play(seed, script, CheckInvariants, withChoice: true, withExclusions: true);
+
+    [Property(MaxTest = 50)]
+    public void Same_seed_and_commands_give_the_same_log_with_already_played(int seed, byte[] script)
+    {
+        // Invariant 14: the free roll after «Уже проходил» comes from the seeded random source only
+        var first = Play(seed, script, withChoice: true, withExclusions: true);
+        var second = Play(seed, script, withChoice: true, withExclusions: true);
+
+        Assert.Equal(first.Log, second.Log);
+    }
 
     [Property(MaxTest = 50)]
     public void Same_seed_and_commands_give_the_same_log_with_a_choice_of_games(int seed, byte[] script)
@@ -140,6 +183,58 @@ public class SliceInvariantTests
             Assert.Equal(TurnPhase.Playing, s.State.Players[made.PlayerId].Phase);
         }
 
+        // G8 (D-92): an accepted «Уже проходил» is GameExcluded of an offered game or option, then at most one free roll
+        // of the same player; it spends nothing
+        if (s.Last.IsAccepted && s.Last.Events.OfType<GameExcluded>().SingleOrDefault() is { } excluded)
+        {
+            Assert.Same(excluded, s.Last.Events[0]);
+            Assert.Equal(ExclusionReason.AlreadyPlayed, excluded.Reason);
+            var was = before.Players[excluded.PlayerId];
+            List<Guid> offeredBefore = was.Offer is { } o ? [o.GameId] : was.Choice?.Options.Select(x => x.Game!.GameId).ToList() ?? [];
+            Assert.Contains(excluded.GameId, offeredBefore);
+            Assert.InRange(s.Last.Events.Count, 1, 2);
+            var now = s.State.Players[excluded.PlayerId];
+            if (s.Last.Events.Count == 2)
+            {
+                Assert.True(
+                    (s.Last.Events[1] is GameRolled r && r.PlayerId == excluded.PlayerId)
+                    || (s.Last.Events[1] is GameChoiceRolled c && c.PlayerId == excluded.PlayerId),
+                    $"Unexpected {s.Last.Events[1]}.");
+                Assert.Equal(TurnPhase.Rolling, now.Phase);
+            }
+            else
+            {
+                Assert.Equal(TurnPhase.Idle, now.Phase);
+            }
+
+            Assert.Equal((was.Coins, was.Points, was.Resources, was.CellId), (now.Coins, now.Points, now.Resources, now.CellId));
+        }
+
+        // G10 / D-92: one check «is there anything to roll». An accepted roll from Idle means CanRoll was true before it
+        var pool = s.Context().Pool;
+        Guid? roller = s.Last.IsAccepted
+            ? (s.Last.Events.Count > 0 ? s.Last.Events[0] : null) switch
+            {
+                GameRolled r => r.PlayerId,
+                GameChoiceRolled c => c.PlayerId,
+                _ => null,
+            }
+            : null;
+        if (roller is { } rollerId && before.Players.TryGetValue(rollerId, out var rollerBefore) && rollerBefore.Phase == TurnPhase.Idle)
+        {
+            Assert.True(Rolling.CanRoll(before, rollerId, pool, []), "A roll was accepted although CanRoll said there was nothing.");
+        }
+
+        // G10 / D-92: the admin signal lists exactly the active idle players of a running season whose roll finds nothing
+        var expectedWithout = s.State.Status == SeasonStatus.Active
+            ? s.State.Players.Values
+                .Where(p => p.Phase == TurnPhase.Idle && !p.IsInactive && !Rolling.CanRoll(s.State, p.PlayerId, pool, []))
+                .OrderBy(p => p.Name, StringComparer.Ordinal)
+                .Select(p => p.PlayerId)
+                .ToList()
+            : [];
+        Assert.Equal(expectedWithout, PoolStats.PlayersWithoutGames(s.State, pool));
+
         // 1. Replaying the log gives the stored state
         Assert.Equal(s.State, SeasonEngine.Replay(s.Log));
 
@@ -173,6 +268,25 @@ public class SliceInvariantTests
 
             // Slice: points equal the completion dice sum (no other point sources yet)
             Assert.Equal(dice, player.Points);
+
+            // G8 / D-92: exclusions are the player's GameExcluded events, one per game, ordered by game id
+            var logged = s.Log.OfType<GameExcluded>().Where(e => e.PlayerId == player.PlayerId).ToList();
+            Assert.Equal(logged.Count, logged.Select(e => e.GameId).Distinct().Count());
+            Assert.Equal(
+                logged.Select(e => new GameExclusion(e.GameId, e.Reason)).OrderBy(x => x.GameId),
+                player.Exclusions);
+
+            // Exclusions never shrink
+            if (before.Players.TryGetValue(player.PlayerId, out var earlier))
+            {
+                Assert.All(earlier.Exclusions, x => Assert.Contains(x, player.Exclusions));
+            }
+
+            // An excluded game is never the player's offer, option or active run
+            var excludedNow = player.Exclusions.Select(x => x.GameId).ToHashSet();
+            Assert.False(player.Offer is { } offer && excludedNow.Contains(offer.GameId), "An excluded game is offered.");
+            Assert.DoesNotContain(player.Choice?.Options.Select(o => o.Game!.GameId) ?? [], excludedNow.Contains);
+            Assert.False(player.ActiveRunId is { } active && excludedNow.Contains(s.State.Runs[active].GameId), "An excluded game is played.");
         }
 
         // 4 / G9. A game is busy for at most one player: offered, among pending options (D-06) or played
@@ -183,13 +297,26 @@ public class SliceInvariantTests
         Assert.Equal(busy.Count, busy.Distinct().Count());
 
         // 5. A game completed in the season is never rolled afterwards; G3: a deleted game is never rolled
+        // G8 / D-05: after «Уже проходил» the game never comes to that player again, not even as a miss
         var completedGames = new HashSet<Guid>();
         var runs = new Dictionary<Guid, Guid>();
+        var excludedFor = new Dictionary<Guid, HashSet<Guid>>();
+        HashSet<Guid> ExcludedFor(Guid player) => excludedFor.TryGetValue(player, out var set) ? set : [];
         foreach (var e in s.Log)
         {
             switch (e)
             {
+                case GameExcluded gameExcluded:
+                    if (!excludedFor.TryGetValue(gameExcluded.PlayerId, out var games))
+                    {
+                        excludedFor[gameExcluded.PlayerId] = games = [];
+                    }
+
+                    games.Add(gameExcluded.GameId);
+                    break;
                 case GameRolled rolled:
+                    Assert.DoesNotContain(rolled.GameId, ExcludedFor(rolled.PlayerId));
+                    Assert.DoesNotContain(rolled.Misses, m => ExcludedFor(rolled.PlayerId).Contains(m.GameId));
                     Assert.DoesNotContain(rolled.GameId, completedGames);
                     Assert.NotEqual(s.GameId("Deleted Horror"), rolled.GameId);
                     Assert.All(rolled.Misses, m => Assert.NotEqual(rolled.GameId, m.GameId));
@@ -197,6 +324,8 @@ public class SliceInvariantTests
                 case GameChoiceRolled choiceRolled:
                     // D-06: 2..N distinct games, none completed or deleted, none among the misses
                     var offered = choiceRolled.Offers.Select(o => o.GameId).ToList();
+                    Assert.DoesNotContain(offered, ExcludedFor(choiceRolled.PlayerId).Contains);
+                    Assert.DoesNotContain(choiceRolled.Misses, m => ExcludedFor(choiceRolled.PlayerId).Contains(m.GameId));
                     Assert.InRange(offered.Count, 2, ChoiceCount);
                     Assert.Equal(offered.Count, offered.Distinct().Count());
                     Assert.All(offered, g =>
@@ -207,6 +336,7 @@ public class SliceInvariantTests
                     });
                     break;
                 case RunStarted started:
+                    Assert.DoesNotContain(started.GameId, ExcludedFor(started.PlayerId));
                     runs[started.RunId] = started.GameId;
                     break;
                 case RunCompleted completed:

@@ -173,6 +173,108 @@ public sealed class SeasonApiTests : IAsyncLifetime
         Assert.Equal("turn.noPendingChoice", problem.RootElement.GetProperty("code").GetString());
     }
 
+    [Fact]
+    public async Task Reloading_the_page_after_a_roll_shows_the_same_offer()
+    {
+        // G5: the wheel is only an animation; the server decided at the click, a reload changes nothing
+        var vasya = await _site.SignedInAsync("vasya");
+        await PostAsync(vasya, "roll", new { commandId = Guid.NewGuid() });
+
+        var first = (await vasya.GetFromJsonAsync<SeasonView>($"/api/seasons/{SiteFactory.SeasonId}", s_json, Ct))!.Me!.Offer!;
+        var again = (await vasya.GetFromJsonAsync<SeasonView>($"/api/seasons/{SiteFactory.SeasonId}", s_json, Ct))!.Me!.Offer!;
+        var otherTab = await _site.SignedInAsync("vasya");
+        var fromOtherTab = (await otherTab.GetFromJsonAsync<SeasonView>($"/api/seasons/{SiteFactory.SeasonId}", s_json, Ct))!.Me!.Offer!;
+
+        Assert.Equal(first, again);
+        Assert.Equal(first, fromOtherTab);
+        await using var db = _site.NewDb();
+        Assert.Equal(1, db.Events.Count(e => e.Type == "game-rolled"));
+    }
+
+    // ---- «Уже проходил» (G8, D-92) ----
+
+    [Fact]
+    public async Task Player_declares_already_played_and_gets_another_game_at_once()
+    {
+        var vasya = await _site.SignedInAsync("vasya");
+        await PostAsync(vasya, "roll", new { commandId = Guid.NewGuid() });
+        var offered = (await vasya.GetFromJsonAsync<SeasonView>($"/api/seasons/{SiteFactory.SeasonId}", s_json, Ct))!.Me!.Offer!;
+
+        var response = await PostAsync(vasya, "already-played", new { commandId = Guid.NewGuid(), gameId = offered.Id });
+
+        Assert.Equal(["game-excluded", "game-rolled"], await TypesAsync(response));
+        var me = (await vasya.GetFromJsonAsync<SeasonView>($"/api/seasons/{SiteFactory.SeasonId}", s_json, Ct))!.Me!;
+        Assert.Equal(TurnPhase.Rolling, me.Phase);
+        Assert.NotEqual(offered.Id, me.Offer!.Id);
+        await using var db = _site.NewDb();
+        var row = Assert.Single(db.Exclusions.ToList());
+        Assert.Equal((_site.Players["vasya"], offered.Id), (row.PlayerId, row.GameId));
+    }
+
+    [Fact]
+    public async Task Repeating_already_played_with_the_same_command_id_acts_once()
+    {
+        var vasya = await _site.SignedInAsync("vasya");
+        await PostAsync(vasya, "roll", new { commandId = Guid.NewGuid() });
+        var offered = (await vasya.GetFromJsonAsync<SeasonView>($"/api/seasons/{SiteFactory.SeasonId}", s_json, Ct))!.Me!.Offer!;
+        var body = new { commandId = Guid.NewGuid(), gameId = offered.Id };
+
+        var first = await vasya.PostAsJsonAsync(Url("already-played"), body, Ct);
+        var second = await vasya.PostAsJsonAsync(Url("already-played"), body, Ct);
+
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, second.StatusCode);
+        Assert.True((await second.Content.ReadFromJsonAsync<CommandResponse>(s_json, Ct))!.Duplicate);
+        await using var db = _site.NewDb();
+        Assert.Equal(1, db.Events.Count(e => e.Type == "game-excluded"));
+    }
+
+    [Fact]
+    public async Task Already_played_on_a_game_that_is_not_offered_is_a_conflict()
+    {
+        var vasya = await _site.SignedInAsync("vasya");
+        await PostAsync(vasya, "roll", new { commandId = Guid.NewGuid() });
+
+        var response = await vasya.PostAsJsonAsync(Url("already-played"), new { commandId = Guid.NewGuid(), gameId = Guid.NewGuid() }, Ct);
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        using var problem = JsonDocument.Parse(await response.Content.ReadAsStringAsync(Ct));
+        Assert.Equal("roll.gameNotOffered", problem.RootElement.GetProperty("code").GetString());
+        await using var db = _site.NewDb();
+        Assert.Empty(db.Exclusions.ToList());
+    }
+
+    [Fact]
+    public async Task Already_played_before_rolling_is_a_conflict()
+    {
+        var vasya = await _site.SignedInAsync("vasya");
+
+        var response = await vasya.PostAsJsonAsync(Url("already-played"), new { commandId = Guid.NewGuid(), gameId = Guid.NewGuid() }, Ct);
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        using var problem = JsonDocument.Parse(await response.Content.ReadAsStringAsync(Ct));
+        Assert.Equal("turn.wrongPhase", problem.RootElement.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task A_player_cannot_declare_another_players_offer()
+    {
+        // Petya names Vasya's offered game: the engine checks it against Petya's own turn
+        var vasya = await _site.SignedInAsync("vasya");
+        await PostAsync(vasya, "roll", new { commandId = Guid.NewGuid() });
+        var offered = (await vasya.GetFromJsonAsync<SeasonView>($"/api/seasons/{SiteFactory.SeasonId}", s_json, Ct))!.Me!.Offer!;
+        var petya = await _site.SignedInAsync("petya");
+        await PostAsync(petya, "roll", new { commandId = Guid.NewGuid() });
+
+        var response = await petya.PostAsJsonAsync(Url("already-played"), new { commandId = Guid.NewGuid(), gameId = offered.Id, playerId = _site.Players["vasya"] }, Ct);
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        using var problem = JsonDocument.Parse(await response.Content.ReadAsStringAsync(Ct));
+        Assert.Equal("roll.gameNotOffered", problem.RootElement.GetProperty("code").GetString());
+        var mine = (await vasya.GetFromJsonAsync<SeasonView>($"/api/seasons/{SiteFactory.SeasonId}", s_json, Ct))!.Me!.Offer!;
+        Assert.Equal(offered, mine);
+    }
+
     private async Task<ChoiceView> RollChoiceAsync(HttpClient player)
     {
         var rules = RulesetJson.Default();
@@ -233,11 +335,12 @@ public sealed class SeasonApiTests : IAsyncLifetime
     [InlineData("start")]
     [InlineData("complete")]
     [InlineData("choose")]
+    [InlineData("already-played")]
     public async Task Anonymous_is_unauthorized(string action)
     {
         var client = await _site.AnonymousAsync();
 
-        var response = await client.PostAsJsonAsync(Url(action), new { commandId = Guid.NewGuid(), difficulty = "normal" }, Ct);
+        var response = await client.PostAsJsonAsync(Url(action), new { commandId = Guid.NewGuid(), difficulty = "normal", gameId = Guid.NewGuid() }, Ct);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync($"/api/seasons/{SiteFactory.SeasonId}", Ct)).StatusCode);
@@ -256,11 +359,14 @@ public sealed class SeasonApiTests : IAsyncLifetime
     [InlineData("zritel", "choose")]
     [InlineData("admin", "choose")]
     [InlineData("masha", "choose")]
+    [InlineData("zritel", "already-played")]
+    [InlineData("admin", "already-played")]
+    [InlineData("masha", "already-played")]
     public async Task Spectator_admin_and_player_outside_the_season_are_forbidden(string login, string action)
     {
         var client = await _site.SignedInAsync(login);
 
-        var response = await client.PostAsJsonAsync(Url(action), new { commandId = Guid.NewGuid(), difficulty = "normal", choiceId = Guid.NewGuid(), optionId = "x" }, Ct);
+        var response = await client.PostAsJsonAsync(Url(action), new { commandId = Guid.NewGuid(), difficulty = "normal", choiceId = Guid.NewGuid(), optionId = "x", gameId = Guid.NewGuid() }, Ct);
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         await using var db = _site.NewDb();
@@ -285,12 +391,13 @@ public sealed class SeasonApiTests : IAsyncLifetime
     [InlineData("start")]
     [InlineData("complete")]
     [InlineData("choose")]
+    [InlineData("already-played")]
     public async Task Post_without_the_antiforgery_token_is_refused(string action)
     {
         var vasya = await _site.SignedInAsync("vasya");
         vasya.DefaultRequestHeaders.Remove(Hosting.Csrf.HeaderName);
 
-        var response = await vasya.PostAsJsonAsync(Url(action), new { commandId = Guid.NewGuid(), difficulty = "normal", choiceId = Guid.NewGuid(), optionId = "x" }, Ct);
+        var response = await vasya.PostAsJsonAsync(Url(action), new { commandId = Guid.NewGuid(), difficulty = "normal", choiceId = Guid.NewGuid(), optionId = "x", gameId = Guid.NewGuid() }, Ct);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
@@ -312,6 +419,11 @@ public sealed class SeasonApiTests : IAsyncLifetime
     [InlineData("choose", """{"commandId":"5b1e2f0a-0000-0000-0000-000000000007","choiceId":"5b1e2f0a-0000-0000-0000-0000000000ff"}""")]
     [InlineData("choose", """{"commandId":"5b1e2f0a-0000-0000-0000-000000000008","choiceId":"5b1e2f0a-0000-0000-0000-0000000000ff","optionId":"  "}""")]
     [InlineData("choose", """{"commandId":"5b1e2f0a-0000-0000-0000-000000000009","choiceId":"5b1e2f0a-0000-0000-0000-0000000000ff","optionId":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}""")]
+    [InlineData("already-played", """{"commandId":"00000000-0000-0000-0000-000000000000","gameId":"5b1e2f0a-0000-0000-0000-0000000000ff"}""")]
+    [InlineData("already-played", """{"commandId":"5b1e2f0a-0000-0000-0000-00000000000c","gameId":"00000000-0000-0000-0000-000000000000"}""")]
+    [InlineData("already-played", """{"commandId":"5b1e2f0a-0000-0000-0000-00000000000d"}""")]
+    [InlineData("already-played", """{"commandId":"5b1e2f0a-0000-0000-0000-00000000000e","gameId":"not-a-guid"}""")]
+    [InlineData("already-played", "not json")]
     public async Task Invalid_input_is_a_bad_request(string action, string body)
     {
         var vasya = await _site.SignedInAsync("vasya");
@@ -326,12 +438,13 @@ public sealed class SeasonApiTests : IAsyncLifetime
     [InlineData("start")]
     [InlineData("complete")]
     [InlineData("choose")]
+    [InlineData("already-played")]
     public async Task Unknown_season_is_not_found(string action)
     {
         var vasya = await _site.SignedInAsync("vasya");
 
         var response = await vasya.PostAsJsonAsync(
-            $"/api/seasons/{Guid.NewGuid()}/{action}", new { commandId = Guid.NewGuid(), difficulty = "normal", choiceId = Guid.NewGuid(), optionId = "x" }, Ct);
+            $"/api/seasons/{Guid.NewGuid()}/{action}", new { commandId = Guid.NewGuid(), difficulty = "normal", choiceId = Guid.NewGuid(), optionId = "x", gameId = Guid.NewGuid() }, Ct);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await vasya.GetAsync($"/api/seasons/{Guid.NewGuid()}", Ct)).StatusCode);

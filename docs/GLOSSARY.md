@@ -130,6 +130,10 @@
 | Враждебный эффект | эффект, наложенный другим игроком во вред | `IsHostile` |
 | Перехват | пассивная защита, гасящая враждебный эффект | `Intercept` |
 | Ручной эффект | текстовый эффект, ждущий разрешения игроком или админом | `PendingManualEffect` |
+| «Уже проходил» | игрок проходил игру до ивента: игра исключается для него, колесо крутится заново бесплатно | команда `DeclareAlreadyPlayed`, событие `GameExcluded` (`ExclusionReason.AlreadyPlayed`) |
+| Исключение игры | игра, которая больше не выпадает этому игроку в сезоне | `GameExclusion`, `SeasonPlayer.Exclusions`, таблица `PlayerGameExclusion` |
+| Фильтр ролла | предикат по играм с приоритетом: эффект > зона > обычный | `RollFilter`, `RollFilterPriority`, `RollFilters.Apply` |
+| Доступные игры категории | сколько игр категории можно выкинуть сейчас (для админки) | `CategoryStat`, `PoolStats.Categories` |
 | Ожидание выбора | ход ждёт решения игрока | `PendingChoice` (`ChoiceKind`, варианты `ChoiceOption`) |
 | Выбор из нескольких игр | ролл при `choiceCount` > 1: игрок выбирает одну из выпавших | `GameChoiceRolled`, команда `MakeChoice`, событие `ChoiceMade` |
 | Сброс выбора | админ снимает ожидание выбора тем же флагом, что и сброс предложенной игры; игры снова свободны | `ChoiceDiscarded` (по `AdjustPlayer.DiscardOffer`) |

@@ -7,6 +7,16 @@ namespace GameEvent.Infrastructure.Seasons;
 // The log is the source of truth: these rows always equal a fold of it (integrity check, L4).
 // Everything that is filtered or sorted is a column; snapshots and dice are JSON.
 
+/// <summary>A game excluded for one player of the season (SPEC «Модель данных»: PlayerGameExclusion).</summary>
+public sealed class PlayerGameExclusionRecord
+{
+    public Guid PlayerId { get; set; }
+
+    public Guid GameId { get; set; }
+
+    public Engine.Rolls.ExclusionReason Reason { get; set; }
+}
+
 public sealed class SeasonRecord
 {
     public Guid Id { get; set; }
