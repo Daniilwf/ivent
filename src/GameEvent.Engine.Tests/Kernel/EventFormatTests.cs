@@ -7,6 +7,7 @@ using GameEvent.Engine.Runs;
 using GameEvent.Engine.Scoring;
 using GameEvent.Engine.Seasons;
 using GameEvent.Engine.Tests.Support;
+using GameEvent.Engine.Turns;
 
 namespace GameEvent.Engine.Tests.Kernel;
 
@@ -104,6 +105,25 @@ public class EventFormatTests
             1,
             """{"playerId":"10000000-0000-0000-0000-000000000001","category":"Horror","misses":[{"gameId":"20000000-0000-0000-0000-000000000001","reason":"completedInSeason","byPlayerId":"10000000-0000-0000-0000-000000000002"}],"gameId":"20000000-0000-0000-0000-000000000001","snapshot":"""
             + SnapshotJson + ""","rolledAt":"2026-10-01T12:30:00+00:00"}"""
+        },
+        {
+            "game-choice-rolled",
+            new GameChoiceRolled(s_player, "Horror", [], s_run, [new RollOffer(s_game, Snapshot(), s_at)]),
+            1,
+            """{"playerId":"10000000-0000-0000-0000-000000000001","category":"Horror","misses":[],"choiceId":"00000000-0000-0000-0000-000000000001","offers":[{"gameId":"20000000-0000-0000-0000-000000000001","snapshot":"""
+            + SnapshotJson + ""","rolledAt":"2026-10-01T12:30:00+00:00"}]}"""
+        },
+        {
+            "choice-made",
+            new ChoiceMade(s_player, s_run, "20000000000000000000000000000001"),
+            1,
+            """{"playerId":"10000000-0000-0000-0000-000000000001","choiceId":"00000000-0000-0000-0000-000000000001","optionId":"20000000000000000000000000000001"}"""
+        },
+        {
+            "choice-discarded",
+            new ChoiceDiscarded(s_player, s_run),
+            1,
+            """{"playerId":"10000000-0000-0000-0000-000000000001","choiceId":"00000000-0000-0000-0000-000000000001"}"""
         },
         {
             "run-started",

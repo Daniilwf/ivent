@@ -36,6 +36,19 @@ public sealed record GameRolled(
     RunSnapshot Snapshot,
     DateTimeOffset RolledAt) : IGameEvent;
 
+/// <summary>
+/// The wheel with <c>roll.choiceCount</c> &gt; 1 (D-06): up to that many available games of one category, drawn without
+/// replacement, reserved until the player picks one with <see cref="Turns.MakeChoice"/>. When the category has only
+/// one available game the roll is a plain <see cref="GameRolled"/>.
+/// </summary>
+[EventType("game-choice-rolled")]
+public sealed record GameChoiceRolled(
+    Guid PlayerId,
+    string Category,
+    EquatableArray<RollMiss> Misses,
+    Guid ChoiceId,
+    EquatableArray<RollOffer> Offers) : IGameEvent;
+
 internal static class Rolling
 {
     public static Decision Decide(SeasonState state, RollGame command, EngineContext context)

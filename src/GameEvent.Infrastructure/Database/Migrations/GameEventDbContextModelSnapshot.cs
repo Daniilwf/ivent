@@ -245,6 +245,9 @@ namespace GameEvent.Infrastructure.Database.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("ChoiceJson")
+                        .HasColumnType("TEXT");
+
                     b.Property<int>("Coins")
                         .HasColumnType("INTEGER");
 

@@ -11,7 +11,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace GameEvent.Infrastructure.Database.Migrations
 {
     [DbContext(typeof(GameEventDbContext))]
-    [Migration("20260924194345_Initial")]
+    [Migration("20260924200843_Initial")]
     partial class Initial
     {
         /// <inheritdoc />
@@ -246,6 +246,9 @@ namespace GameEvent.Infrastructure.Database.Migrations
 
                     b.Property<string>("CellId")
                         .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ChoiceJson")
                         .HasColumnType("TEXT");
 
                     b.Property<int>("Coins")

@@ -5,6 +5,7 @@ using GameEvent.Engine.Rolls;
 using GameEvent.Engine.Rulesets;
 using GameEvent.Engine.Runs;
 using GameEvent.Engine.Scoring;
+using GameEvent.Engine.Turns;
 
 namespace GameEvent.Engine.Seasons;
 
@@ -42,6 +43,7 @@ public static class SeasonEngine
             RollGame c => Rolling.Decide(state, c, context),
             StartRun c => RunLifecycle.Decide(state, c, context),
             CompleteRun c => RunLifecycle.Decide(state, c, context),
+            MakeChoice c => Choosing.Decide(state, c),
             _ => throw new ArgumentException($"Unknown command {command.GetType().Name}.", nameof(command)),
         };
 
@@ -62,6 +64,9 @@ public static class SeasonEngine
             ResourceChanged e => PointsLedger.Apply(state, e),
             RulesetChanged e => RulesetChanges.Apply(state, e),
             GameRolled e => Rolling.Apply(state, e),
+            GameChoiceRolled e => Choosing.Apply(state, e),
+            ChoiceMade e => Choosing.Apply(state, e),
+            ChoiceDiscarded e => Choosing.Apply(state, e),
             RunStarted e => RunLifecycle.Apply(state, e),
             RunCompleted e => RunLifecycle.Apply(state, e),
             CompletionRolled e => RunLifecycle.Apply(state, e),

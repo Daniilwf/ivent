@@ -6,6 +6,7 @@ using GameEvent.Engine.Rolls;
 using GameEvent.Engine.Rulesets;
 using GameEvent.Engine.Runs;
 using GameEvent.Engine.Seasons;
+using GameEvent.Engine.Turns;
 using GameEvent.Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;
 
@@ -94,6 +95,7 @@ internal static class SeasonProjection
             record.PathJson = JsonSerializer.Serialize(player.Path, EngineJson.Options);
             record.Phase = player.Phase;
             record.OfferJson = player.Offer is null ? null : JsonSerializer.Serialize(player.Offer, EngineJson.Options);
+            record.ChoiceJson = player.Choice is null ? null : JsonSerializer.Serialize(player.Choice, EngineJson.Options);
             record.ActiveRunId = player.ActiveRunId;
         }
 
@@ -158,6 +160,7 @@ internal static class SeasonProjection
                     JsonSerializer.Deserialize<ResourceBag>(p.ResourcesJson, EngineJson.Options), p.IsInactive,
                     JsonSerializer.Deserialize<PlayerPath>(p.PathJson, EngineJson.Options)!, p.Phase,
                     p.OfferJson is null ? null : JsonSerializer.Deserialize<RollOffer>(p.OfferJson, EngineJson.Options),
+                    p.ChoiceJson is null ? null : JsonSerializer.Deserialize<PendingChoice>(p.ChoiceJson, EngineJson.Options),
                     p.ActiveRunId)),
             Runs = runs.ToImmutableSortedDictionary(
                 r => r.Id,
