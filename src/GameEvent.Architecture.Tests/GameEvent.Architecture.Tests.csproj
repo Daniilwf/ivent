@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <PackageReference Include="NetArchTest.Rules" />
+    <PackageReference Include="Mono.Cecil" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\GameEvent.Engine\GameEvent.Engine.csproj" />
+    <ProjectReference Include="..\GameEvent.Infrastructure\GameEvent.Infrastructure.csproj" />
+    <ProjectReference Include="..\GameEvent.Web\GameEvent.Web.csproj" />
+    <ProjectReference Include="..\GameEvent.Simulator\GameEvent.Simulator.csproj" />
+    <ProjectReference Include="..\GameEvent.Tools.Import\GameEvent.Tools.Import.csproj" />
+  </ItemGroup>
+
+</Project>

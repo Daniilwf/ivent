@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\GameEvent.Engine\GameEvent.Engine.csproj" />
+    <ProjectReference Include="..\GameEvent.Infrastructure\GameEvent.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

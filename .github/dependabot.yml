@@ -1,0 +1,39 @@
+# Monthly, grouped, so updates arrive as a few PRs instead of dozens.
+# Cooldown: skip versions younger than a week (malicious releases are usually pulled within days).
+# Actions are pinned by SHA; Dependabot updates the SHA and the version comment.
+version: 2
+updates:
+  - package-ecosystem: nuget
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      nuget:
+        patterns: ['*']
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 3
+
+  - package-ecosystem: npm
+    directories: [/, /web, /e2e]
+    schedule:
+      interval: monthly
+    groups:
+      npm:
+        patterns: ['*']
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 3
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ['*']
+
+  - package-ecosystem: dotnet-sdk
+    directory: /
+    schedule:
+      interval: monthly

@@ -1,0 +1,186 @@
+# Every push: build, analyzers, architecture tests, fast tests with coverage, API client check, gitleaks.
+# Pull requests into main: E2E (and, from task J5, migrations on the previous release's demo database).
+# Push and pull_request runs do different work, so a branch with an open PR is not tested twice.
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
+
+jobs:
+  changes:
+    name: Changes and secrets
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read # paths-filter lists PR files through the API
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+      - name: gitleaks (full history)
+        run: node scripts/gitleaks.mjs git --redact --no-banner --verbose
+      - id: filter
+        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        with:
+          # Push: compare with the previous push of this branch. A new branch or a force push
+          # (the previous commit is gone after a rebase) falls back to main.
+          base: ${{ github.event_name == 'push' && !github.event.forced && github.event.before != '0000000000000000000000000000000000000000' && github.event.before || '' }}
+          filters: |
+            code:
+              - '**'
+              - '!docs/**'
+              - '!**/*.md'
+              - '!.claude/**'
+              - '!data/**'
+          predicate-quantifier: every
+
+  build-test:
+    name: Build and fast tests
+    needs: changes
+    if: needs.changes.outputs.code == 'true' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            web/package-lock.json
+            e2e/package-lock.json
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ env.NUGET_PACKAGES }}
+          key: nuget-${{ runner.os }}-${{ hashFiles('Directory.Packages.props', '**/*.csproj', 'dotnet-tools.json') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Install
+        run: |
+          npm ci
+          npm --prefix web ci
+          npm --prefix e2e ci
+          dotnet tool restore
+          dotnet restore GameEvent.slnx
+
+      - name: Build (analyzers, warnings as errors)
+        run: dotnet build GameEvent.slnx --no-restore
+
+      - name: Lint (.NET format, ESLint, Prettier)
+        run: npm run -s lint
+
+      - name: .NET tests with coverage (architecture, engine, short invariants, API)
+        run: npm run -s coverage
+
+      - name: Frontend types, tests and build
+        run: |
+          npm --prefix web run -s typecheck
+          npm --prefix web run -s test
+          npm --prefix web run -s build
+
+      - name: E2E types
+        run: npm --prefix e2e run -s typecheck
+
+      # Active once task B3 adds the generated client.
+      - name: API client matches OpenAPI
+        if: hashFiles('web/src/api/schema.d.ts') != ''
+        run: |
+          npm run -s gen:api
+          git diff --exit-code -- web/src/api
+
+      - name: Coverage report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: coverage
+          path: test-artifacts/coverage/report
+          if-no-files-found: ignore
+          retention-days: 14
+
+  e2e:
+    name: E2E
+    needs: changes
+    if: needs.changes.outputs.code == 'true' && github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            web/package-lock.json
+            e2e/package-lock.json
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ env.NUGET_PACKAGES }}
+          key: nuget-${{ runner.os }}-${{ hashFiles('Directory.Packages.props', '**/*.csproj', 'dotnet-tools.json') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Install
+        run: |
+          npm ci
+          npm --prefix web ci
+          npm --prefix e2e ci
+
+      - name: Playwright version
+        id: pw
+        run: echo "version=$(node -p "require('./e2e/node_modules/@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: pw-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
+      - name: Install Chromium
+        if: steps.pw-cache.outputs.cache-hit != 'true'
+        run: npx --prefix e2e playwright install --with-deps chromium
+      - name: Install Chromium system dependencies
+        if: steps.pw-cache.outputs.cache-hit == 'true'
+        run: npx --prefix e2e playwright install-deps chromium
+
+      - name: E2E
+        run: npm run -s test:e2e
+
+      - name: Playwright traces and report
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: playwright
+          path: test-artifacts/playwright
+          retention-days: 14

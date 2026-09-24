@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <ProjectReference Include="..\GameEvent.Engine\GameEvent.Engine.csproj" />
+    <ProjectReference Include="..\GameEvent.Infrastructure\GameEvent.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="GameEvent.Web.Tests" />
+  </ItemGroup>
+
+</Project>

@@ -13,3 +13,46 @@ test-artifacts/
 .env
 .env.*
 !.env.example
+
+# .NET
+bin/
+obj/
+*.user
+.vs/
+TestResults/
+StrykerOutput/
+coverage/
+
+# Node
+node_modules/
+dist/
+web/src/api/.openapi-cache/
+playwright-report/
+blob-report/
+
+# Local databases and uploads
+*.db
+*.db-shm
+*.db-wal
+/var/
+
+# Downloaded tools (gitleaks)
+.tools/
+
+# NuGet cache in CI workspace
+.nuget/
+
+# Personal data and secrets that must never reach the public repository
+logs/
+*.log
+*.xlsx
+*.sqlite
+*.sqlite3
+*.sqlite-*
+*.bak
+backups/
+*.pem
+*.key
+*.pfx
+deploy/secrets/
+appsettings.*.local.json
