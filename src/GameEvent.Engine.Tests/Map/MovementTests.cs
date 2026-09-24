@@ -38,6 +38,61 @@ public class MovementTests
     private static PlayerPath Path(params string[][] segments) =>
         new([.. segments.Select(cells => new PathSegment([.. cells]))]);
 
+    // A single input needs no primary mark; a cell with two inputs and no primary one is a dead end backwards.
+    // start → a → j, start → b → j with no primary edge anywhere
+    private static MapGraph UnmarkedMap() => new(
+        [
+            new Cell("start", CellType.Start),
+            new Cell("a", CellType.Empty),
+            new Cell("b", CellType.Empty),
+            new Cell("j", CellType.Empty),
+            new Cell("finish", CellType.Finish),
+        ],
+        [
+            new Edge("start", "a", IsDefaultForward: true, IsPrimaryBackward: false),
+            new Edge("start", "b", IsDefaultForward: false, IsPrimaryBackward: false),
+            new Edge("a", "j", IsDefaultForward: true, IsPrimaryBackward: false),
+            new Edge("b", "j", IsDefaultForward: true, IsPrimaryBackward: false),
+            new Edge("j", "finish", IsDefaultForward: true, IsPrimaryBackward: false),
+        ]);
+
+    [Fact]
+    public void Back_without_history_follows_a_single_unmarked_incoming_edge()
+    {
+        Assert.Equal(["j"], Movement.Backward(UnmarkedMap(), Path(["finish"]), 1));
+        Assert.Equal(["start"], Movement.Backward(UnmarkedMap(), Path(["a"]), 3));
+    }
+
+    [Fact]
+    public void Back_without_history_stops_at_a_merge_without_a_primary_edge()
+    {
+        // D-90: the editor forbids such a map (stage 2); the engine loses the remaining steps rather than guessing
+        Assert.Equal(["j"], Movement.Backward(UnmarkedMap(), Path(["finish"]), 4));
+    }
+
+    [Fact]
+    public void Back_from_a_two_cell_segment_uses_its_walked_edge_not_the_primary_one()
+    {
+        // Placed on b1, walked to m: one step back is b1 (history), not a1 (primary)
+        Assert.Equal(["b1"], Movement.Backward(MergeMap(), Path(["start"], ["b1", "m"]), 1));
+    }
+
+    [Fact]
+    public void Back_stops_on_the_start_even_if_an_edge_leads_into_it()
+    {
+        // A loop map: finish → start exists, yet the start is where moving back ends
+        var map = new MapGraph(
+            [new Cell("start", CellType.Start), new Cell("c1", CellType.Empty), new Cell("finish", CellType.Finish)],
+            [
+                new Edge("start", "c1", IsDefaultForward: true, IsPrimaryBackward: true),
+                new Edge("c1", "finish", IsDefaultForward: true, IsPrimaryBackward: true),
+                new Edge("finish", "start", IsDefaultForward: false, IsPrimaryBackward: true),
+            ]);
+
+        Assert.Empty(Movement.Backward(map, Path(["start"]), 2));
+        Assert.Equal(["start"], Movement.Backward(map, Path(["c1"]), 2));
+    }
+
     // ---- Along the walked edges ----
 
     [Fact]

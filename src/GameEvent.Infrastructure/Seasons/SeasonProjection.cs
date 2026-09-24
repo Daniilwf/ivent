@@ -77,8 +77,8 @@ internal static class SeasonProjection
                     UserId = player.UserId,
                     Name = player.Name,
                     CellId = player.CellId,
-                    ResourcesJson = "{}",
-                    PathJson = "{}",
+                    ResourcesJson = JsonSerializer.Serialize(player.Resources, EngineJson.Options),
+                    PathJson = JsonSerializer.Serialize(player.Path, EngineJson.Options),
                 };
                 db.SeasonPlayers.Add(record);
             }
