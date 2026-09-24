@@ -2,17 +2,11 @@
 
 ## Сейчас
 
-- **Этап 1 «Фундамент»**, план подтверждён 2026-09-24. Задача 0.1 сделана: комплект в корне, `games.xlsx` в `data/import/`, дубли удалены, `git init`, первый коммит.
-- Заказчик заменяет `docs/SPEC.md`, ставит `gh` и Playwright MCP и перезапускает сессию в корне.
-- **Следующий шаг после перезапуска:** внести в `DECISIONS.md` ответы ниже (Q-1…Q-5 закрыть, решения D-09/D-16 и связанные поправить), сверить с новым SPEC.md, затем шаг 3 с блока A.
-- Ответы заказчика от 2026-09-24:
-  - Q-1: перенос сделан; репозиторий на GitHub будет публичным.
-  - Q-2: монетки начисляются за прохождение и тратятся на платный реролл (конфиг по умолчанию).
-  - Q-3: принято как предложено.
-  - Q-4: при пересчёте мест пересчитываются бонусы всех финишировавших.
-  - Q-5: при смене сложности каждый кубик пересчитывается: новое = ⌈старое × новые грани / старые грани⌉; в событии хранятся оба значения.
-  - Поправка к заморозке: пока первый финиш на проверке, очки считаются как обычно, заморозка — при одобрении; влиять на других он уже не может. Новый первый после реджекта замораживается в момент, когда стал первым; очки на момент финиша хранить не нужно.
-  - K-1: финиш и места — этап 1. Остальные решения из `DECISIONS.md` приняты.
+- **Этап 1 «Фундамент»**, ветка `chore/stage1-tooling` (ещё не слита в `main`: слияние после `/review`, зелёного CI и подтверждения заказчика).
+- Ответы заказчика на Q-1…Q-5 и поправка к заморозке внесены в `DECISIONS.md` (раздел «Закрытые вопросы», D-09, D-16) и `TEST_MATRIX.md` (P4, T3, W8, SE7, инвариант 8).
+- Блок A сделан: A1–A3 проверены локально, A4 — workflows написаны, репозиторий https://github.com/Daniilwf/ivent (публичный) создан, ждём зелёный CI.
+- **Следующий шаг:** B1 «Движок-минимум» через цепочку `test-author` → реализация → `rules-auditor` → `code-reviewer`, в новой ветке `feat/slice-engine` от `chore/stage1-tooling` (или от `main` после слияния).
+- Известное: штатный Chromium для Playwright не скачивается с этой машины, локально E2E идут на Edge (D-39). `npm run test:mutation` и `test:invariants:long` осмысленны с C13, до этого тестов с `Category=Long` нет.
 
 ## План этапа 1
 
@@ -24,19 +18,19 @@
 
 ### 0. Репозиторий
 
-- ⬜ **0.1 Перенос и git.** Содержимое комплекта в корне, `games.xlsx` в `data/import/`, дубли удалены (после согласия), `git init`, `main`, репозиторий на GitHub, `gh` установлен.
+- ✅ **0.1 Перенос и git.** Содержимое комплекта в корне, `games.xlsx` в `data/import/`, дубли удалены (после согласия), `git init`, `main`, репозиторий на GitHub, `gh` установлен.
   Готово, когда: `/hooks` показывает три хука, `git status` чистый после первого коммита, `data/import/*.xlsx` игнорируется.
 
 ### A. Инструменты проекта
 
-- ⬜ **A1 Решение и проекты.** `GameEvent.sln` с 8 проектами из CLAUDE.md (Simulator — пустая заглушка), `Directory.Build.props` (Nullable, TreatWarningsAsErrors, `AnalysisLevel=latest-recommended`), `Directory.Packages.props`, `BannedSymbols.txt` для движка, `.editorconfig`, `.gitattributes` (LF для `*.sh`), `.gitignore` (включая `.claude/state/`, `.claude/settings.local.json`, `data/import/*` кроме `.gitkeep`, `test-artifacts/`).
+- ✅ **A1 Решение и проекты.** `GameEvent.sln` с 8 проектами из CLAUDE.md (Simulator — пустая заглушка), `Directory.Build.props` (Nullable, TreatWarningsAsErrors, `AnalysisLevel=latest-recommended`), `Directory.Packages.props`, `BannedSymbols.txt` для движка, `.editorconfig`, `.gitattributes` (LF для `*.sh`), `.gitignore` (включая `.claude/state/`, `.claude/settings.local.json`, `data/import/*` кроме `.gitkeep`, `test-artifacts/`).
   Готово, когда: `dotnet build` зелёный. `DateTime.Now`, `new Random()` или `Guid.NewGuid()` в движке ломают сборку.
   Тесты: `Architecture.Tests` — движок не ссылается на ASP.NET, EF, `System.IO.File*`, `System.Net`; проверка IL движка на запрещённые члены; Infrastructure не зависит от Web; механики лежат по папкам.
-- ⬜ **A2 Корневой `package.json`.** Все команды из таблицы CLAUDE.md, ещё не сделанные — заглушки с понятным сообщением. `format:file` (dotnet format / Prettier+ESLint по расширению), `check:stop` (сборка, линтеры, архитектурные тесты, быстрые тесты затронутых частей, до 3 мин), husky + lint-staged, commitlint (Conventional Commits), gitleaks в pre-commit.
+- ✅ **A2 Корневой `package.json`.** Все команды из таблицы CLAUDE.md, ещё не сделанные — заглушки с понятным сообщением. `format:file` (dotnet format / Prettier+ESLint по расширению), `check:stop` (сборка, линтеры, архитектурные тесты, быстрые тесты затронутых частей, до 3 мин), husky + lint-staged, commitlint (Conventional Commits), gitleaks в pre-commit.
   Готово, когда: хук после правки форматирует .cs и .ts; `npm run check:stop` зелёный за < 3 мин; коммит с фейковым токеном блокируется gitleaks.
-- ⬜ **A3 Каркас фронтенда и E2E.** `web/`: Vite + React + TS strict, ESLint, Prettier, Vitest + Testing Library, один тест. `e2e/`: Playwright, конфиг с проектами «десктоп» и «телефон 390×844», трассы в `test-artifacts/`.
+- ✅ **A3 Каркас фронтенда и E2E.** `web/`: Vite + React + TS strict, ESLint, Prettier, Vitest + Testing Library, один тест. `e2e/`: Playwright, конфиг с проектами «десктоп» и «телефон 390×844», трассы в `test-artifacts/`.
   Готово, когда: `npm run test:fast` гоняет .NET и Vitest; `npm run test:e2e` проходит пустой тест.
-- ⬜ **A4 GitHub Actions и Dependabot.** `ci.yml` (push: сборка, анализаторы, архитектурные, быстрые, короткие инварианты, проверка клиента API, gitleaks; PR в `main`: + E2E на демо-сезоне + миграции на базе прошлого релиза; `concurrency` с отменой; фильтры путей для документов; кэш NuGet/npm; артефакты покрытия и трасс). `nightly.yml` (только если были коммиты за сутки: длинные инварианты; по воскресеньям — Stryker). `dependabot.yml` — раз в месяц, группы nuget/npm/actions.
+- 🟨 **A4 GitHub Actions и Dependabot.** `ci.yml` (push: сборка, анализаторы, архитектурные, быстрые, короткие инварианты, проверка клиента API, gitleaks; PR в `main`: + E2E на демо-сезоне + миграции на базе прошлого релиза; `concurrency` с отменой; фильтры путей для документов; кэш NuGet/npm; артефакты покрытия и трасс). `nightly.yml` (только если были коммиты за сутки: длинные инварианты; по воскресеньям — Stryker). `dependabot.yml` — раз в месяц, группы nuget/npm/actions.
   Готово, когда: первый push зелёный, коммит только в `docs/` не запускает тяжёлые шаги.
 
 ### B. Тонкий сквозной срез: ролл → прохождение → кубы → фишка сдвинулась
@@ -162,4 +156,5 @@
 
 ## История
 
+- 2026-09-24 — сессия 2: ответы заказчика в решениях; блок A: решение .NET (8 проектов, строгая сборка, запрет API в движке, 13 архитектурных тестов), корневые команды, husky + lint-staged + commitlint + gitleaks, каркасы `web/` и `e2e/`, workflows CI/nightly/Dependabot, публичный репозиторий на GitHub. Проверено: запрещённые API ломают сборку; `format:file` форматирует .cs и .ts; `check:stop` зелёный за 12 с; коммит с фейковым токеном и коммит без типа блокируются.
 - 2026-09-24 — прочитаны документы, записаны решения, составлены план и матрица тестов этапа 1.
