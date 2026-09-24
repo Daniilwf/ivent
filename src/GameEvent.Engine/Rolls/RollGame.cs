@@ -198,7 +198,8 @@ internal static class Rolling
                 state.RulesetVersion,
                 game.Hours,
                 state.Rules.Reward.DiceCount,
-                state.Rules.Reward.DieByDifficulty);
+                state.Rules.Reward.DieByDifficulty,
+                state.Rules.Roll.TechRerollWindowHours);
             offers.Add(new RollOffer(game.Id, snapshot, now));
         }
 

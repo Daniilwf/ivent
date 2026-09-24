@@ -1,4 +1,4 @@
-import { act, render, screen } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Schemas } from '../api/client';
 import { ru } from '../i18n/ru';
@@ -36,6 +36,9 @@ function season(overrides: Partial<Schemas['SeasonView']> = {}): Schemas['Season
       lastCompleted: null,
       nextReroll: null,
       manualEffects: [],
+      dropHintMinutes: null,
+      dropPenalty: null,
+      techRerollOpen: false,
     },
     lastSequence: 3,
     ...overrides,
@@ -158,7 +161,7 @@ describe('SeasonScreen', () => {
 
   it('shows the pending choice and sends the picked option', async () => {
     const choiceId = 'c0000000-0000-0000-0000-000000000001';
-    const game = (id: string, title: string) => ({ id, title, hours: 12 });
+    const game = (id: string, title: string) => ({ id, title, hours: 12, marks: [] });
     const options = [
       { id: 'a1', game: game('a1000000-0000-0000-0000-000000000001', 'Silent Hill') },
       { id: 'b2', game: game('b2000000-0000-0000-0000-000000000002', 'Outlast') },
@@ -178,6 +181,9 @@ describe('SeasonScreen', () => {
               lastCompleted: null,
               nextReroll: null,
               manualEffects: [],
+              dropHintMinutes: null,
+              dropPenalty: null,
+              techRerollOpen: false,
             },
           }),
         );
@@ -204,7 +210,12 @@ describe('SeasonScreen', () => {
 
   it('explains a choice already made in another tab and refetches the season', async () => {
     const choiceId = 'c0000000-0000-0000-0000-000000000001';
-    const picked = { id: 'a1000000-0000-0000-0000-000000000001', title: 'Silent Hill', hours: 12 };
+    const picked = {
+      id: 'a1000000-0000-0000-0000-000000000001',
+      title: 'Silent Hill',
+      hours: 12,
+      marks: [],
+    };
     const choosing = season({
       me: {
         playerId: me,
@@ -217,7 +228,12 @@ describe('SeasonScreen', () => {
             { id: 'a1', game: picked },
             {
               id: 'b2',
-              game: { id: 'b2000000-0000-0000-0000-000000000002', title: 'Outlast', hours: 9 },
+              game: {
+                id: 'b2000000-0000-0000-0000-000000000002',
+                title: 'Outlast',
+                hours: 9,
+                marks: [],
+              },
             },
           ],
         },
@@ -225,6 +241,9 @@ describe('SeasonScreen', () => {
         lastCompleted: null,
         nextReroll: null,
         manualEffects: [],
+        dropHintMinutes: null,
+        dropPenalty: null,
+        techRerollOpen: false,
       },
     });
     // The other tab already chose: the server now has Вася playing, and answers this tab's choice with 409
@@ -244,6 +263,9 @@ describe('SeasonScreen', () => {
         lastCompleted: null,
         nextReroll: null,
         manualEffects: [],
+        dropHintMinutes: null,
+        dropPenalty: null,
+        techRerollOpen: false,
       },
     });
     let current = choosing;
@@ -289,12 +311,15 @@ describe('SeasonScreen', () => {
             me: {
               playerId: me,
               phase: 'rolling',
-              offer: { id: gameId, title: 'Silent Hill', hours: 12 },
+              offer: { id: gameId, title: 'Silent Hill', hours: 12, marks: [] },
               choice: null,
               activeRun: null,
               lastCompleted: null,
               nextReroll: null,
               manualEffects: [],
+              dropHintMinutes: null,
+              dropPenalty: null,
+              techRerollOpen: false,
             },
           }),
         );
@@ -321,11 +346,21 @@ describe('SeasonScreen', () => {
     const options = [
       {
         id: 'opt-1',
-        game: { id: 'a1000000-0000-0000-0000-000000000001', title: 'Silent Hill', hours: 12 },
+        game: {
+          id: 'a1000000-0000-0000-0000-000000000001',
+          title: 'Silent Hill',
+          hours: 12,
+          marks: [],
+        },
       },
       {
         id: 'opt-2',
-        game: { id: 'b2000000-0000-0000-0000-000000000002', title: 'Outlast', hours: 9 },
+        game: {
+          id: 'b2000000-0000-0000-0000-000000000002',
+          title: 'Outlast',
+          hours: 9,
+          marks: [],
+        },
       },
     ];
     const bodies: { url: string; body: unknown }[] = [];
@@ -343,6 +378,9 @@ describe('SeasonScreen', () => {
               lastCompleted: null,
               nextReroll: null,
               manualEffects: [],
+              dropHintMinutes: null,
+              dropPenalty: null,
+              techRerollOpen: false,
             },
           }),
         );
@@ -381,12 +419,16 @@ describe('SeasonScreen', () => {
                 id: 'a1000000-0000-0000-0000-000000000001',
                 title: 'Silent Hill',
                 hours: 12,
+                marks: [],
               },
               choice: null,
               activeRun: null,
               lastCompleted: null,
               nextReroll: null,
               manualEffects: [],
+              dropHintMinutes: null,
+              dropPenalty: null,
+              techRerollOpen: false,
             },
           }),
         );
@@ -421,11 +463,21 @@ describe('SeasonScreen', () => {
     const options = [
       {
         id: 'opt-1',
-        game: { id: 'a1000000-0000-0000-0000-000000000001', title: 'Silent Hill', hours: 12 },
+        game: {
+          id: 'a1000000-0000-0000-0000-000000000001',
+          title: 'Silent Hill',
+          hours: 12,
+          marks: [],
+        },
       },
       {
         id: 'opt-2',
-        game: { id: 'b2000000-0000-0000-0000-000000000002', title: 'Outlast', hours: 9 },
+        game: {
+          id: 'b2000000-0000-0000-0000-000000000002',
+          title: 'Outlast',
+          hours: 9,
+          marks: [],
+        },
       },
     ];
     const bodies: { url: string; body: unknown }[] = [];
@@ -443,6 +495,9 @@ describe('SeasonScreen', () => {
               lastCompleted: null,
               nextReroll: null,
               manualEffects: [],
+              dropHintMinutes: null,
+              dropPenalty: null,
+              techRerollOpen: false,
             },
           }),
         );
@@ -489,6 +544,9 @@ describe('SeasonScreen', () => {
         lastCompleted: null,
         nextReroll: null,
         manualEffects: [],
+        dropHintMinutes: null,
+        dropPenalty: null,
+        techRerollOpen: false,
       },
     });
     act(() => {
@@ -512,12 +570,16 @@ describe('SeasonScreen', () => {
                   id: 'a1000000-0000-0000-0000-000000000001',
                   title: 'Silent Hill',
                   hours: 12,
+                  marks: [],
                 },
                 choice: null,
                 activeRun: null,
                 lastCompleted: null,
                 nextReroll: null,
                 manualEffects: [],
+                dropHintMinutes: null,
+                dropPenalty: null,
+                techRerollOpen: false,
               },
             }),
           )
@@ -580,12 +642,20 @@ describe('SeasonScreen reroll price and manual effects (D-93)', () => {
       me: {
         playerId: me,
         phase: 'rolling',
-        offer: { id: 'a1000000-0000-0000-0000-000000000001', title: 'Silent Hill', hours: 12 },
+        offer: {
+          id: 'a1000000-0000-0000-0000-000000000001',
+          title: 'Silent Hill',
+          hours: 12,
+          marks: [],
+        },
         choice: null,
         activeRun: null,
         lastCompleted: null,
         nextReroll,
         manualEffects,
+        dropHintMinutes: null,
+        dropPenalty: null,
+        techRerollOpen: false,
       },
     });
   }
@@ -699,5 +769,488 @@ describe('SeasonScreen reroll price and manual effects (D-93)', () => {
 
     await screen.findByTestId('reroll');
     expect(screen.queryByTestId('manual-effects')).not.toBeInTheDocument();
+  });
+});
+
+describe('SeasonScreen drop and tech reroll (RR2, RR4, RR5, D-94)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const runId = 'e0000000-0000-0000-0000-000000000001';
+  const dropUrl = new RegExp(`/api/seasons/${seasonId}/drop$`);
+  const techRerollUrl = new RegExp(`/api/seasons/${seasonId}/tech-reroll$`);
+  const reasons = [
+    'weakPc',
+    'paidUnavailable',
+    'doesNotLaunch',
+    'emulatorTooSlow',
+    'other',
+  ] as const;
+  type Reason = (typeof reasons)[number];
+
+  type Penalty = Schemas['DropPenaltyView'];
+  /** The default ruleset's penalty: 2d4 on points and position and a bad event. */
+  const defaultPenalty: Penalty = {
+    count: 2,
+    sides: 4,
+    affectsPoints: true,
+    affectsPosition: true,
+    badEvent: true,
+  };
+
+  /**
+   * Вася playing Silent Hill. The server decides everything the drop and tech reroll buttons need (D-94 (5)):
+   * `dropHintMinutes` (non-null only while less than the minimum is played), `dropPenalty`, `techRerollOpen`.
+   * The start time is far in the past on purpose: the screen must not compute the hint from it.
+   */
+  function playing(
+    turn: {
+      dropHintMinutes?: number | null;
+      dropPenalty?: Penalty | null;
+      techRerollOpen?: boolean;
+      startedAt?: string;
+    } = {},
+  ): Schemas['SeasonView'] {
+    return season({
+      players: [{ id: me, name: 'Вася', cellId: 'start', points: 0, phase: 'playing' }],
+      me: {
+        playerId: me,
+        phase: 'playing',
+        offer: null,
+        choice: null,
+        activeRun: {
+          id: runId,
+          game: { id: 'a1000000-0000-0000-0000-000000000001', title: 'Silent Hill', hours: 12 },
+          startedAt: turn.startedAt ?? '2026-09-24T10:00:00Z',
+        },
+        lastCompleted: null,
+        nextReroll: null,
+        manualEffects: [],
+        dropHintMinutes: turn.dropHintMinutes === undefined ? null : turn.dropHintMinutes,
+        dropPenalty: turn.dropPenalty === undefined ? defaultPenalty : turn.dropPenalty,
+        techRerollOpen: turn.techRerollOpen ?? true,
+      },
+    });
+  }
+
+  /** Serves the season and records every command request with its body. */
+  function servePlaying(view: Schemas['SeasonView']) {
+    const commands: { url: string; body: Record<string, unknown> }[] = [];
+    serve(async (r) => {
+      if (isSeasonGet(r)) return json(200, view);
+      commands.push({ url: r.url, body: (await r.json()) as Record<string, unknown> });
+      return json(200, { duplicate: false, events: [] });
+    });
+    return commands;
+  }
+
+  it('offers drop and tech reroll only while playing', async () => {
+    let current = season();
+    serve((r) => (isSeasonGet(r) ? json(200, current) : json(404, {})));
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+    await screen.findByTestId('roll');
+    expect(screen.queryByTestId('drop')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('tech-reroll')).not.toBeInTheDocument();
+
+    current = { ...playing(), lastSequence: 9 };
+    act(() => {
+      hubChange?.();
+    });
+
+    expect(await screen.findByTestId('drop')).toHaveTextContent(ru.turn.drop);
+    expect(screen.getByTestId('tech-reroll')).toHaveTextContent(ru.turn.techReroll);
+    // Completing stays available next to them
+    expect(screen.getByTestId('complete-form')).toBeInTheDocument();
+  });
+
+  it('offers no drop or tech reroll for an offered game', async () => {
+    servePlaying(
+      season({
+        me: {
+          playerId: me,
+          phase: 'rolling',
+          offer: {
+            id: 'a1000000-0000-0000-0000-000000000001',
+            title: 'Silent Hill',
+            hours: 12,
+            marks: [],
+          },
+          choice: null,
+          activeRun: null,
+          lastCompleted: null,
+          nextReroll: { payment: 'freeThisRoll', coins: 0 },
+          manualEffects: [],
+          dropHintMinutes: null,
+          dropPenalty: null,
+          techRerollOpen: false,
+        },
+      }),
+    );
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    await screen.findByTestId('start');
+    expect(screen.queryByTestId('drop')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('tech-reroll')).not.toBeInTheDocument();
+  });
+
+  it('asks before a drop, naming the penalty and the bad event, and sends it when confirmed', async () => {
+    const commands = servePlaying(playing());
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    await userEvent.click(await screen.findByTestId('drop'));
+
+    const text = ru.turn.dropConfirm(defaultPenalty);
+    expect(await screen.findByTestId('drop-confirm')).toHaveTextContent(text);
+    expect(text).toMatch(/штраф/i);
+    expect(text).toContain('2d4');
+    expect(text).toMatch(/очки/);
+    expect(text).toMatch(/клетки/);
+    expect(text).toMatch(/плох\S* ивент/i);
+    expect(commands).toHaveLength(0);
+
+    await userEvent.click(screen.getByTestId('drop-confirm-yes'));
+
+    await vi.waitFor(() => {
+      expect(commands).toHaveLength(1);
+    });
+    expect(commands[0]?.url).toMatch(dropUrl);
+    expect(commands[0]?.body).toMatchObject({ commandId: expect.any(String) as unknown });
+  });
+
+  it('cancels a drop without a request', async () => {
+    const commands = servePlaying(playing());
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    await userEvent.click(await screen.findByTestId('drop'));
+    await userEvent.click(await screen.findByTestId('drop-confirm-no'));
+
+    expect(screen.queryByTestId('drop-confirm')).not.toBeInTheDocument();
+    expect(await screen.findByTestId('drop')).toBeEnabled();
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(commands).toHaveLength(0);
+  });
+
+  it.each<[string, Penalty, RegExp[], RegExp[]]>([
+    [
+      '1d6 on points only, no bad event',
+      { count: 1, sides: 6, affectsPoints: true, affectsPosition: false, badEvent: false },
+      [/1d6/, /очки/],
+      [/клетки/, /плох\S* ивент/i, /штрафа кубами нет/],
+    ],
+    [
+      'no dice penalty but a bad event',
+      { count: 2, sides: 4, affectsPoints: false, affectsPosition: false, badEvent: true },
+      [/штрафа кубами нет/, /плох\S* ивент/i],
+      [/2d4/],
+    ],
+    [
+      'nothing at all',
+      { count: 2, sides: 4, affectsPoints: false, affectsPosition: false, badEvent: false },
+      [/штрафа кубами нет/],
+      [/2d4/, /плох\S* ивент/i],
+    ],
+  ])('names the penalty the server gives: %s', async (_case, penalty, present, absent) => {
+    servePlaying(playing({ dropPenalty: penalty }));
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    await userEvent.click(await screen.findByTestId('drop'));
+
+    const text = ru.turn.dropConfirm(penalty);
+    expect(text).not.toBe(ru.turn.dropConfirm(defaultPenalty));
+    expect(await screen.findByTestId('drop-confirm')).toHaveTextContent(text);
+    for (const pattern of present) expect(text).toMatch(pattern);
+    for (const pattern of absent) expect(text).not.toMatch(pattern);
+  });
+
+  it('asks plainly when the server gives no penalty', async () => {
+    servePlaying(playing({ dropPenalty: null }));
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    await userEvent.click(await screen.findByTestId('drop'));
+
+    expect(ru.turn.dropConfirm(null)).toBe('Дропнуть игру?');
+    expect(await screen.findByTestId('drop-confirm')).toHaveTextContent(ru.turn.dropConfirm(null));
+  });
+
+  it('hints before an hour of play but still lets the player drop (RR4)', async () => {
+    // Started long ago by the client's clock: the hint follows the server's minutes, not the start time
+    const commands = servePlaying(playing({ dropHintMinutes: 60 }));
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    await userEvent.click(await screen.findByTestId('drop'));
+
+    expect(await screen.findByTestId('drop-hint')).toHaveTextContent(ru.turn.dropHint(60));
+    await userEvent.click(screen.getByTestId('drop-confirm-yes'));
+    await vi.waitFor(() => {
+      expect(commands).toHaveLength(1);
+    });
+    expect(commands[0]?.url).toMatch(dropUrl);
+  });
+
+  it.each([
+    ['after the hour by the server clock', '2026-09-24T10:00:00Z'],
+    ['even right after the start by the client clock', new Date().toISOString()],
+  ] as const)('shows no hint without hint minutes: %s', async (_case, startedAt) => {
+    servePlaying(playing({ dropHintMinutes: null, startedAt }));
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    await userEvent.click(await screen.findByTestId('drop'));
+
+    expect(await screen.findByTestId('drop-confirm')).toBeInTheDocument();
+    expect(screen.queryByTestId('drop-hint')).not.toBeInTheDocument();
+  });
+
+  it('replaces the tech reroll with a note once the window is closed, keeping the drop', async () => {
+    servePlaying(playing({ techRerollOpen: false }));
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    expect(await screen.findByTestId('tech-reroll-closed')).toHaveTextContent(
+      ru.turn.techRerollClosed,
+    );
+    expect(screen.queryByTestId('tech-reroll')).not.toBeInTheDocument();
+    expect(screen.getByTestId('drop')).toBeInTheDocument();
+    expect(screen.getByTestId('complete-form')).toBeInTheDocument();
+  });
+
+  it('shows the tech reroll and no note while the window is open', async () => {
+    servePlaying(playing({ techRerollOpen: true }));
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    expect(await screen.findByTestId('tech-reroll')).toBeInTheDocument();
+    expect(screen.queryByTestId('tech-reroll-closed')).not.toBeInTheDocument();
+  });
+
+  it('asks for one of the five reasons and sends the tech reroll', async () => {
+    const commands = servePlaying(playing());
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    await userEvent.click(await screen.findByTestId('tech-reroll'));
+
+    const select = await screen.findByTestId<HTMLSelectElement>('tech-reroll-reason');
+    const options = Array.from(select.options).filter((o) => o.value !== '');
+    expect(options.map((o) => o.value)).toEqual([...reasons]);
+    for (const option of options) {
+      expect(option).toHaveTextContent(ru.turn.techRerollReasons[option.value as Reason]);
+    }
+    expect(commands).toHaveLength(0);
+
+    await userEvent.selectOptions(select, 'paidUnavailable');
+    await userEvent.click(screen.getByTestId('tech-reroll-submit'));
+
+    await vi.waitFor(() => {
+      expect(commands).toHaveLength(1);
+    });
+    expect(commands[0]?.url).toMatch(techRerollUrl);
+    expect(commands[0]?.body).toMatchObject({
+      commandId: expect.any(String) as unknown,
+      reason: 'paidUnavailable',
+    });
+  });
+
+  it('requires a comment for the reason «other» before sending', async () => {
+    const commands = servePlaying(playing());
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+    await userEvent.click(await screen.findByTestId('tech-reroll'));
+
+    await userEvent.selectOptions(await screen.findByTestId('tech-reroll-reason'), 'other');
+    await userEvent.click(screen.getByTestId('tech-reroll-submit'));
+
+    // Nothing is sent without the comment; the form explains why
+    expect(await screen.findByText(ru.turn.techRerollCommentRequired)).toBeInTheDocument();
+    expect(commands).toHaveLength(0);
+
+    await userEvent.type(screen.getByTestId('tech-reroll-comment'), 'Нужен руль');
+    await userEvent.click(screen.getByTestId('tech-reroll-submit'));
+
+    await vi.waitFor(() => {
+      expect(commands).toHaveLength(1);
+    });
+    expect(commands[0]?.url).toMatch(techRerollUrl);
+    expect(commands[0]?.body).toMatchObject({ reason: 'other', comment: 'Нужен руль' });
+  });
+
+  it('cancels a tech reroll without a request', async () => {
+    const commands = servePlaying(playing());
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    await userEvent.click(await screen.findByTestId('tech-reroll'));
+    await userEvent.click(await screen.findByTestId('tech-reroll-cancel'));
+
+    expect(screen.queryByTestId('tech-reroll-reason')).not.toBeInTheDocument();
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(commands).toHaveLength(0);
+  });
+
+  it.each(['run.techRerollWindowClosed', 'run.reasonCommentRequired'])(
+    'explains the rejection %s in Russian',
+    async (code) => {
+      serve((r) =>
+        isSeasonGet(r)
+          ? json(200, playing())
+          : json(409, { title: 'rejected', status: 409, detail: null, code }),
+      );
+      render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+      await userEvent.click(await screen.findByTestId('tech-reroll'));
+      await userEvent.selectOptions(await screen.findByTestId('tech-reroll-reason'), 'weakPc');
+      await userEvent.click(screen.getByTestId('tech-reroll-submit'));
+
+      const text = ru.rejection[code];
+      expect(text).toEqual(expect.any(String));
+      expect(text).not.toBe(ru.rejection.unknown);
+      expect(await screen.findByRole('alert')).toHaveTextContent(text ?? '');
+    },
+  );
+
+  it('lists the bad event of a drop among manual effects', async () => {
+    const effect: Schemas['ManualEffectView'] = {
+      id: 'e1000000-0000-0000-0000-000000000003',
+      drawEvent: 'bad',
+      source: 'drop',
+    };
+    servePlaying(
+      season({
+        me: {
+          playerId: me,
+          phase: 'idle',
+          offer: null,
+          choice: null,
+          activeRun: null,
+          lastCompleted: null,
+          nextReroll: null,
+          manualEffects: [effect],
+          dropHintMinutes: null,
+          dropPenalty: null,
+          techRerollOpen: false,
+        },
+      }),
+    );
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    // The source has its own words: not the paid reroll's, not a missing entry
+    const text = ru.effects.drawEvent('bad', 'drop');
+    expect(text).not.toMatch(/undefined/);
+    expect(text).not.toBe(ru.effects.drawEvent('bad', 'paidReroll'));
+    expect(text).toMatch(/дроп/i);
+    expect(await screen.findByTestId(`manual-effect-${effect.id}`)).toHaveTextContent(text);
+  });
+});
+
+describe('SeasonScreen marks on offered games (G8, D-94 (6))', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  type Mark = Schemas['GameMarkView'];
+
+  function rolling(turn: Partial<Schemas['MyTurnView']>): Schemas['SeasonView'] {
+    return season({
+      players: [{ id: me, name: 'Вася', cellId: 'start', points: 0, phase: 'rolling' }],
+      me: {
+        playerId: me,
+        phase: 'rolling',
+        offer: null,
+        choice: null,
+        activeRun: null,
+        lastCompleted: null,
+        nextReroll: { payment: 'freeThisRoll', coins: 0 },
+        manualEffects: [],
+        dropHintMinutes: null,
+        dropPenalty: null,
+        techRerollOpen: false,
+        ...turn,
+      },
+    });
+  }
+
+  function serveView(view: Schemas['SeasonView']) {
+    serve((r) => (isSeasonGet(r) ? json(200, view) : json(404, {})));
+  }
+
+  it('names who dropped and who tech-rerolled the offered game', async () => {
+    const marks: Mark[] = [
+      { playerName: 'Петя', kind: 'dropped' },
+      { playerName: 'Маша', kind: 'techRerolled' },
+    ];
+    serveView(
+      rolling({
+        offer: {
+          id: 'a1000000-0000-0000-0000-000000000001',
+          title: 'Silent Hill',
+          hours: 12,
+          marks,
+        },
+      }),
+    );
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    const shown = await screen.findByTestId('game-marks');
+    expect(shown).toHaveTextContent(ru.turn.gameMark('Петя', 'dropped'));
+    expect(shown).toHaveTextContent(ru.turn.gameMark('Маша', 'techRerolled'));
+    expect(ru.turn.gameMark('Петя', 'dropped')).not.toBe(ru.turn.gameMark('Петя', 'techRerolled'));
+    expect(ru.turn.gameMark('Петя', 'dropped')).toContain('Петя');
+  });
+
+  it('shows no marks for an offered game nobody gave up', async () => {
+    serveView(
+      rolling({
+        offer: {
+          id: 'a1000000-0000-0000-0000-000000000001',
+          title: 'Silent Hill',
+          hours: 12,
+          marks: [],
+        },
+      }),
+    );
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    await screen.findByTestId('start');
+    expect(screen.queryByTestId('game-marks')).not.toBeInTheDocument();
+  });
+
+  it('shows the marks of each choice option on that option only', async () => {
+    serveView(
+      rolling({
+        choice: {
+          id: 'c0000000-0000-0000-0000-000000000001',
+          kind: 'game',
+          options: [
+            {
+              id: 'a1',
+              game: {
+                id: 'a1000000-0000-0000-0000-000000000001',
+                title: 'Silent Hill',
+                hours: 12,
+                marks: [{ playerName: 'Петя', kind: 'techRerolled' }],
+              },
+            },
+            {
+              id: 'b2',
+              game: {
+                id: 'b2000000-0000-0000-0000-000000000002',
+                title: 'Outlast',
+                hours: 9,
+                marks: [],
+              },
+            },
+          ],
+        },
+      }),
+    );
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    const marked = await screen.findByTestId('option-a1');
+    expect(within(marked).getByTestId('game-marks')).toHaveTextContent(
+      ru.turn.gameMark('Петя', 'techRerolled'),
+    );
+    expect(
+      within(screen.getByTestId('option-b2')).queryByTestId('game-marks'),
+    ).not.toBeInTheDocument();
+    expect(screen.getAllByTestId('game-marks')).toHaveLength(1);
   });
 });

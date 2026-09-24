@@ -17,7 +17,15 @@ const coins = (n: number) => {
   return `${n.toLocaleString('ru-RU')} ${word}`;
 };
 
-const effectSources = { paidReroll: '(за реролл)' } as const;
+const effectSources = { paidReroll: '(за реролл)', drop: '(за дроп)' } as const;
+
+type DropPenalty = {
+  count: number;
+  sides: number;
+  affectsPoints: boolean;
+  affectsPosition: boolean;
+  badEvent: boolean;
+};
 
 type RerollPayment = 'freeThisRoll' | 'freeRerollResource' | 'coins' | 'badEvent';
 
@@ -29,6 +37,8 @@ const rejection = {
   'roll.noAvailableGames': 'Нет доступных игр для ролла. Сообщите админу.',
   'roll.notEnoughCoins': 'Не хватает монеток на реролл.',
   'roll.gameNotOffered': 'Эта игра вам сейчас не предложена. Обновите страницу.',
+  'run.techRerollWindowClosed': 'Окно тех-реролла после ролла закрылось. Обратитесь к админу.',
+  'run.reasonCommentRequired': 'Для причины «Другое» нужен комментарий.',
   'run.hoursRequired': 'У игры нет данных о длине: укажите оценку часов.',
   'run.invalidHours': 'Часы должны быть больше нуля.',
   'player.unknown': 'Вы не участвуете в этом сезоне.',
@@ -82,6 +92,44 @@ export const ru = {
         : `Реролл стоит ${coins(price)}. Потратить?`,
     rerollConfirmYes: 'Да, реролл',
     rerollConfirmNo: 'Отмена',
+    drop: 'Дроп',
+    dropConfirm: (penalty: DropPenalty | null) => {
+      if (!penalty) return 'Дропнуть игру?';
+      const takes = [
+        penalty.affectsPoints ? 'очки' : null,
+        penalty.affectsPosition ? 'клетки' : null,
+      ]
+        .filter((part) => part !== null)
+        .join(' и ');
+      const parts = [
+        takes === ''
+          ? 'штрафа кубами нет'
+          : `штраф — кубы за дроп (${String(penalty.count)}d${String(penalty.sides)}) отнимут ${takes}`,
+        penalty.badEvent ? 'вам достанется плохой ивент' : null,
+      ].filter((part) => part !== null);
+      return `Дроп: ${parts.join(', ')}. Дропнуть игру?`;
+    },
+    dropHint: (minutes: number) =>
+      `По правилам дропать стоит не раньше чем через ${minutes} мин. игры.`,
+    dropConfirmYes: 'Да, дропнуть',
+    dropConfirmNo: 'Отмена',
+    techReroll: 'Тех-реролл',
+    techRerollReason: 'Причина',
+    techRerollReasonPlaceholder: 'Выберите причину',
+    techRerollReasons: {
+      weakPc: 'Слабый ПК',
+      paidUnavailable: 'Игра платная, её нет',
+      doesNotLaunch: 'Не запускается',
+      emulatorTooSlow: 'Эмулятор не тянет',
+      other: 'Другое',
+    },
+    techRerollComment: 'Комментарий',
+    techRerollCommentRequired: 'Для причины «Другое» напишите комментарий.',
+    techRerollSubmit: 'Тех-реролл',
+    techRerollCancel: 'Отмена',
+    techRerollClosed: 'Окно тех-реролла закрылось. Если игра не запускается, напишите админу.',
+    gameMark: (player: string, kind: 'dropped' | 'techRerolled') =>
+      kind === 'dropped' ? `Дропнул ${player}` : `Тех-реролл у ${player}`,
     alreadyPlayedGame: (title: string) => `Уже проходил: ${title}`,
     choose: 'Выберите одну из выпавших игр',
     option: (title: string, gameHours: number | null) =>
@@ -104,7 +152,7 @@ export const ru = {
   },
   effects: {
     title: 'Нужно разыграть',
-    drawEvent: (kind: 'good' | 'bad', source: 'paidReroll') =>
+    drawEvent: (kind: 'good' | 'bad', source: keyof typeof effectSources) =>
       `${kind === 'bad' ? 'Плохой ивент' : 'Хороший ивент'} ${effectSources[source]}`,
   },
   map: {

@@ -27,7 +27,7 @@ public class EventFormatTests
     private static readonly DateTimeOffset s_at = new(2026, 10, 1, 12, 30, 0, TimeSpan.Zero);
 
     private const string SnapshotJson =
-        """{"rulesetVersion":1,"hours":7.5,"diceCount":{"hoursPerDie":3,"rounding":"nearest","min":1,"max":10},"dieByDifficulty":{"easy":{"sides":2,"grantEvent":null},"normal":{"sides":4,"grantEvent":null},"hard":{"sides":6,"grantEvent":null},"extreme":{"sides":6,"grantEvent":"good"}}}""";
+        """{"rulesetVersion":1,"hours":7.5,"diceCount":{"hoursPerDie":3,"rounding":"nearest","min":1,"max":10},"dieByDifficulty":{"easy":{"sides":2,"grantEvent":null},"normal":{"sides":4,"grantEvent":null},"hard":{"sides":6,"grantEvent":null},"extreme":{"sides":6,"grantEvent":"good"}},"techRerollWindowHours":48}""";
 
     // The ruleset's own format is frozen by Rulesets/RulesetSchemaTests (docs/ruleset.schema.json); here it is embedded.
     private static string RulesetJsonText => System.Text.Json.JsonSerializer.Serialize(TestRuleset.Create(), EngineJson.Options);
@@ -35,7 +35,7 @@ public class EventFormatTests
     private static RunSnapshot Snapshot()
     {
         var ruleset = TestRuleset.Create();
-        return new RunSnapshot(1, 7.5m, ruleset.Reward.DiceCount, ruleset.Reward.DieByDifficulty);
+        return new RunSnapshot(1, 7.5m, ruleset.Reward.DiceCount, ruleset.Reward.DieByDifficulty, 48);
     }
 
     public static TheoryData<string, IGameEvent, int, string> Samples() => new()
@@ -143,6 +143,24 @@ public class EventFormatTests
             new ManualEffectCreated(s_run, s_player, EventKind.Bad, ManualEffectSource.PaidReroll, null),
             1,
             """{"effectId":"00000000-0000-0000-0000-000000000001","playerId":"10000000-0000-0000-0000-000000000001","drawEvent":"bad","source":"paidReroll","runId":null}"""
+        },
+        {
+            "run-dropped",
+            new RunDropped(s_run, s_player, [new Die(4, 3), new Die(4, 1)], s_at),
+            1,
+            """{"runId":"00000000-0000-0000-0000-000000000001","playerId":"10000000-0000-0000-0000-000000000001","penaltyDice":[{"sides":4,"value":3},{"sides":4,"value":1}],"droppedAt":"2026-10-01T12:30:00+00:00"}"""
+        },
+        {
+            "run-tech-rerolled",
+            new RunTechRerolled(s_run, s_player, TechRerollReason.Other, "Вылетает на старте", false, s_at),
+            1,
+            """{"runId":"00000000-0000-0000-0000-000000000001","playerId":"10000000-0000-0000-0000-000000000001","reason":"other","comment":"Вылетает на старте","byAdmin":false,"rerolledAt":"2026-10-01T12:30:00+00:00"}"""
+        },
+        {
+            "tech-reroll-converted-to-drop",
+            new TechRerollConvertedToDrop(s_run, s_player, "Игра запускалась", [new Die(4, 2)], s_at),
+            1,
+            """{"runId":"00000000-0000-0000-0000-000000000001","playerId":"10000000-0000-0000-0000-000000000001","comment":"Игра запускалась","penaltyDice":[{"sides":4,"value":2}],"convertedAt":"2026-10-01T12:30:00+00:00"}"""
         },
         {
             "run-started",

@@ -12,6 +12,7 @@ namespace GameEvent.Engine.Tests.Turns;
 /// state is either accepted and moves to its phase, or rejected without events with the code of the first failed
 /// check. Check order (D-91): season running → player known → no pending choice (except MakeChoice,
 /// DeclareAlreadyPlayed, D-92, and Reroll, D-93) → phase.
+/// DropRun and TechReroll are turn commands allowed only while Playing (D-94).
 /// The active run limit is held by the phase and RulesetSupport, there is no separate check (D-91).
 /// The expected table lives here, independent of the engine's own table.
 /// </summary>
@@ -33,6 +34,8 @@ public class TransitionMatrixTests
         Choose,
         DeclareAlreadyPlayed,
         Reroll,
+        Drop,
+        TechReroll,
     }
 
     /// <summary>Expected outcome: a rejection code, or null, the phase the player ends in and whether a choice is pending.</summary>
@@ -46,6 +49,8 @@ public class TransitionMatrixTests
         [(TurnState.Idle, TurnCommand.Choose)] = new(RejectionCodes.NoPendingChoice),
         [(TurnState.Idle, TurnCommand.DeclareAlreadyPlayed)] = new(RejectionCodes.WrongPhase),
         [(TurnState.Idle, TurnCommand.Reroll)] = new(RejectionCodes.WrongPhase),
+        [(TurnState.Idle, TurnCommand.Drop)] = new(RejectionCodes.WrongPhase),
+        [(TurnState.Idle, TurnCommand.TechReroll)] = new(RejectionCodes.WrongPhase),
 
         [(TurnState.RollingWithOffer, TurnCommand.Roll)] = new(RejectionCodes.WrongPhase),
         [(TurnState.RollingWithOffer, TurnCommand.Start)] = new(null, TurnPhase.Playing),
@@ -55,6 +60,9 @@ public class TransitionMatrixTests
         [(TurnState.RollingWithOffer, TurnCommand.DeclareAlreadyPlayed)] = new(null, TurnPhase.Rolling),
         // Reroll: the offer is given up and another game is offered at once, the first reroll is free (D-93)
         [(TurnState.RollingWithOffer, TurnCommand.Reroll)] = new(null, TurnPhase.Rolling),
+        // Drop and tech reroll give up a run being played; an offered game is not played yet (D-94)
+        [(TurnState.RollingWithOffer, TurnCommand.Drop)] = new(RejectionCodes.WrongPhase),
+        [(TurnState.RollingWithOffer, TurnCommand.TechReroll)] = new(RejectionCodes.WrongPhase),
 
         // A pending choice blocks every other turn command, even those the phase alone would allow (Start)
         [(TurnState.RollingWithChoice, TurnCommand.Roll)] = new(RejectionCodes.ChoicePending),
@@ -66,6 +74,8 @@ public class TransitionMatrixTests
         [(TurnState.RollingWithChoice, TurnCommand.DeclareAlreadyPlayed)] = new(null, TurnPhase.Rolling, ChoicePending: true),
         // Nor a reroll: the whole choice is given up and a new choice is rolled from the three other games (D-93)
         [(TurnState.RollingWithChoice, TurnCommand.Reroll)] = new(null, TurnPhase.Rolling, ChoicePending: true),
+        [(TurnState.RollingWithChoice, TurnCommand.Drop)] = new(RejectionCodes.ChoicePending),
+        [(TurnState.RollingWithChoice, TurnCommand.TechReroll)] = new(RejectionCodes.ChoicePending),
 
         [(TurnState.Playing, TurnCommand.Roll)] = new(RejectionCodes.WrongPhase),
         [(TurnState.Playing, TurnCommand.Start)] = new(RejectionCodes.WrongPhase),
@@ -73,6 +83,10 @@ public class TransitionMatrixTests
         [(TurnState.Playing, TurnCommand.Choose)] = new(RejectionCodes.NoPendingChoice),
         [(TurnState.Playing, TurnCommand.DeclareAlreadyPlayed)] = new(RejectionCodes.WrongPhase),
         [(TurnState.Playing, TurnCommand.Reroll)] = new(RejectionCodes.WrongPhase),
+        // Playing --> Idle: дроп (SPEC diagram, D-94)
+        [(TurnState.Playing, TurnCommand.Drop)] = new(null, TurnPhase.Idle),
+        // Playing --> Rolling: тех-реролл, a new game is rolled at once (SPEC diagram, D-94); five other games are left
+        [(TurnState.Playing, TurnCommand.TechReroll)] = new(null, TurnPhase.Rolling),
     };
 
     public static TheoryData<TurnState, TurnCommand> DisallowedPairs() =>
@@ -152,6 +166,8 @@ public class TransitionMatrixTests
                 : new MakeChoice(player, SequentialIds.Make(0x50000000, 1), "whatever"),
             TurnCommand.DeclareAlreadyPlayed => new DeclareAlreadyPlayed(player, GameOf(s, player)),
             TurnCommand.Reroll => new Reroll(player),
+            TurnCommand.Drop => new DropRun(player),
+            TurnCommand.TechReroll => new TechReroll(player, TechRerollReason.DoesNotLaunch, Comment: null),
             _ => throw new ArgumentOutOfRangeException(nameof(command)),
         };
 
@@ -252,6 +268,8 @@ public class TransitionMatrixTests
     [InlineData(TurnCommand.Choose)]
     [InlineData(TurnCommand.DeclareAlreadyPlayed)]
     [InlineData(TurnCommand.Reroll)]
+    [InlineData(TurnCommand.Drop)]
+    [InlineData(TurnCommand.TechReroll)]
     public void Turn_command_in_a_draft_season_is_rejected_as_not_active(TurnCommand command)
     {
         var s = Scenario.New().AsDraft()
@@ -280,6 +298,8 @@ public class TransitionMatrixTests
     [InlineData(TurnCommand.Choose)]
     [InlineData(TurnCommand.DeclareAlreadyPlayed)]
     [InlineData(TurnCommand.Reroll)]
+    [InlineData(TurnCommand.Drop)]
+    [InlineData(TurnCommand.TechReroll)]
     public void Unknown_player_in_a_closing_season_gets_season_not_active(TurnCommand command)
     {
         var s = In(TurnState.Idle);

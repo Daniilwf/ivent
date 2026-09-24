@@ -8,6 +8,7 @@ public enum MoveReason
     CompletionRoll,
     StartingCell,
     AdminAdjustment,
+    DropPenalty,
 }
 
 /// <summary>

@@ -8,6 +8,9 @@ public enum ManualEffectSource
 {
     /// <summary>A paid reroll with <c>roll.rerollCost.kind = badEvent</c>.</summary>
     PaidReroll,
+
+    /// <summary>The mandatory bad event of a drop (<c>drop.mandatoryEvent = bad</c>), also after a converted tech reroll.</summary>
+    Drop,
 }
 
 /// <summary>

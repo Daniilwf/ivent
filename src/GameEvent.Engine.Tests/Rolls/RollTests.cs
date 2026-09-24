@@ -32,7 +32,8 @@ public class RollTests
 
         // Then one GameRolled with the game, its category, no misses and the roll-time snapshot
         ScenarioAssert.Accepted(s);
-        var expectedSnapshot = new RunSnapshot(s.Ruleset.Version, 12m, s.Ruleset.Reward.DiceCount, s.Ruleset.Reward.DieByDifficulty);
+        var expectedSnapshot = new RunSnapshot(
+            s.Ruleset.Version, 12m, s.Ruleset.Reward.DiceCount, s.Ruleset.Reward.DieByDifficulty, s.Ruleset.Roll.TechRerollWindowHours);
         var rolled = Assert.IsType<GameRolled>(Assert.Single(s.Last.Events));
         Assert.Equal(
             new GameRolled(s.PlayerId("Вася"), "Horror", [], s.GameId("Silent Hill"), expectedSnapshot, rolledAt),
