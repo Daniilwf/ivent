@@ -11,7 +11,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace GameEvent.Infrastructure.Database.Migrations
 {
     [DbContext(typeof(GameEventDbContext))]
-    [Migration("20260924212840_Initial")]
+    [Migration("20260924215424_Initial")]
     partial class Initial
     {
         /// <inheritdoc />
@@ -190,6 +190,8 @@ namespace GameEvent.Infrastructure.Database.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("PlayerId");
+
+                    b.HasIndex("RunId");
 
                     b.HasIndex("SeasonId", "PlayerId");
 
@@ -392,6 +394,10 @@ namespace GameEvent.Infrastructure.Database.Migrations
                         .HasForeignKey("PlayerId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.HasOne("GameEvent.Infrastructure.Seasons.RunRecord", null)
+                        .WithMany()
+                        .HasForeignKey("RunId");
 
                     b.HasOne("GameEvent.Infrastructure.Seasons.SeasonRecord", null)
                         .WithMany()

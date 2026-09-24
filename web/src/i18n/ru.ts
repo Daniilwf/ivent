@@ -2,6 +2,25 @@
 
 const hours = (value: number) => `${value.toLocaleString('ru-RU')} ч`;
 
+// монетка / монетки / монеток
+const coins = (n: number) => {
+  const tens = n % 100;
+  const ones = n % 10;
+  const word =
+    tens >= 11 && tens <= 14
+      ? 'монеток'
+      : ones === 1
+        ? 'монетка'
+        : ones >= 2 && ones <= 4
+          ? 'монетки'
+          : 'монеток';
+  return `${n.toLocaleString('ru-RU')} ${word}`;
+};
+
+const effectSources = { paidReroll: '(за реролл)' } as const;
+
+type RerollPayment = 'freeThisRoll' | 'freeRerollResource' | 'coins' | 'badEvent';
+
 const rejection = {
   'turn.wrongPhase': 'Это действие сейчас недоступно: обновите страницу.',
   'turn.choicePending': 'Сначала сделайте выбор.',
@@ -47,6 +66,22 @@ export const ru = {
     start: 'Начать',
     alreadyPlayed: 'Уже проходил',
     reroll: 'Реролл',
+    rerollFor: (payment: RerollPayment, price: number) =>
+      payment === 'freeThisRoll'
+        ? 'Реролл — бесплатно'
+        : payment === 'freeRerollResource'
+          ? 'Реролл — купон реролла'
+          : payment === 'badEvent'
+            ? 'Реролл — плохой ивент'
+            : price === 0
+              ? 'Реролл — бесплатно'
+              : `Реролл — ${coins(price)}`,
+    rerollConfirm: (payment: RerollPayment, price: number) =>
+      payment === 'badEvent'
+        ? 'За этот реролл вам достанется плохой ивент. Продолжить?'
+        : `Реролл стоит ${coins(price)}. Потратить?`,
+    rerollConfirmYes: 'Да, реролл',
+    rerollConfirmNo: 'Отмена',
     alreadyPlayedGame: (title: string) => `Уже проходил: ${title}`,
     choose: 'Выберите одну из выпавших игр',
     option: (title: string, gameHours: number | null) =>
@@ -66,6 +101,11 @@ export const ru = {
     normal: 'Нормальная',
     hard: 'Сложная',
     extreme: 'Выше сложной',
+  },
+  effects: {
+    title: 'Нужно разыграть',
+    drawEvent: (kind: 'good' | 'bad', source: 'paidReroll') =>
+      `${kind === 'bad' ? 'Плохой ивент' : 'Хороший ивент'} ${effectSources[source]}`,
   },
   map: {
     title: 'Карта',

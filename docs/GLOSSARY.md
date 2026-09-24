@@ -43,7 +43,7 @@
 | Предложенная игра | выпавшая игра до «Начать»; зарезервирована за игроком | `RollOffer` |
 | Сброс выпавшей игры | админ снимает предложенную игру без реролла: игрок снова ждёт ролла, игра свободна | `OfferDiscarded` |
 | Реролл | повторный ролл до начала игры | команда `Reroll`, событие `GameRerolled` |
-| Оплата реролла | бесплатный за ролл, купон `freeRerolls`, монетки или плохой ивент | `RerollPayment` (`FreeThisRoll`, `FreeRerollResource`, `Coins`, `BadEvent`), `SeasonPlayer.RerollsThisRoll` |
+| Оплата реролла | бесплатный за ролл, купон реролла (ресурс `freeRerolls`), монетки или плохой ивент; цену следующего считает `RerollPrice.Next` | `RerollPayment` (`FreeThisRoll`, `FreeRerollResource`, `Coins`, `BadEvent`), `SeasonPlayer.RerollsThisRoll` |
 | Тех-реролл | бесплатный реролл по технической причине в окне после ролла | `TechReroll` |
 | Исключение | игра, которая больше не выпадает конкретному игроку | `PlayerGameExclusion` |
 | Фильтр ролла | предикат по играм от спецролла, зоны или конфига | `RollFilter` |

@@ -188,6 +188,8 @@ namespace GameEvent.Infrastructure.Database.Migrations
 
                     b.HasIndex("PlayerId");
 
+                    b.HasIndex("RunId");
+
                     b.HasIndex("SeasonId", "PlayerId");
 
                     b.ToTable("PendingManualEffect", (string)null);
@@ -389,6 +391,10 @@ namespace GameEvent.Infrastructure.Database.Migrations
                         .HasForeignKey("PlayerId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.HasOne("GameEvent.Infrastructure.Seasons.RunRecord", null)
+                        .WithMany()
+                        .HasForeignKey("RunId");
 
                     b.HasOne("GameEvent.Infrastructure.Seasons.SeasonRecord", null)
                         .WithMany()

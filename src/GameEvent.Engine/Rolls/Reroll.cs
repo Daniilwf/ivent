@@ -32,3 +32,24 @@ public enum RerollPayment
 /// </summary>
 [EventType("game-rerolled")]
 public sealed record GameRerolled(Guid PlayerId, EquatableArray<Guid> GameIds, RerollPayment Payment) : IGameEvent;
+
+/// <summary>The price of the next reroll, as the command will charge it and the screen shows it (D-93).</summary>
+public static class RerollPrice
+{
+    /// <summary>The reroll coupon resource (CONTENT.md «Купон реролла»).</summary>
+    public const string FreeRerollsResource = "freeRerolls";
+
+    /// <summary>
+    /// How the next reroll is paid after <paramref name="rerollsThisRoll"/> rerolls of this roll with
+    /// <paramref name="coupons"/> reroll coupons, and the coins it costs (0 unless paid in coins).
+    /// </summary>
+    public static (RerollPayment Payment, int Coins) Next(int rerollsThisRoll, int coupons, Rulesets.RollRules rules)
+    {
+        ArgumentNullException.ThrowIfNull(rules);
+
+        return rerollsThisRoll < rules.FreeRerollsPerRoll ? (RerollPayment.FreeThisRoll, 0)
+            : coupons > 0 ? (RerollPayment.FreeRerollResource, 0)
+            : rules.RerollCost.Kind == Rulesets.RerollCostKind.BadEvent ? (RerollPayment.BadEvent, 0)
+            : (RerollPayment.Coins, rules.RerollCost.Amount ?? 0);
+    }
+}

@@ -93,6 +93,7 @@ public sealed class GameEventDbContext(DbContextOptions<GameEventDbContext> opti
             e.ToTable("PendingManualEffect");
             e.HasOne<SeasonRecord>().WithMany().HasForeignKey(x => x.SeasonId);
             e.HasOne<SeasonPlayerRecord>().WithMany().HasForeignKey(x => x.PlayerId);
+            e.HasOne<RunRecord>().WithMany().HasForeignKey(x => x.RunId);
             e.HasIndex(x => new { x.SeasonId, x.PlayerId });
             e.Property(x => x.DrawEvent).HasMaxLength(20);
             e.Property(x => x.Source).HasMaxLength(30);

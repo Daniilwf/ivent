@@ -1,8 +1,10 @@
 using System.Security.Claims;
 using System.Text.Json;
+using GameEvent.Engine.Effects;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Map;
 using GameEvent.Engine.Rolls;
+using GameEvent.Engine.Rulesets;
 using GameEvent.Engine.Runs;
 using GameEvent.Engine.Seasons;
 using GameEvent.Engine.Turns;
@@ -46,7 +48,20 @@ public sealed record CellView(string Id, CellType Type);
 public sealed record PlayerView(Guid Id, string Name, string CellId, int Points, TurnPhase Phase);
 
 public sealed record MyTurnView(
-    Guid PlayerId, TurnPhase Phase, GameView? Offer, ChoiceView? Choice, RunView? ActiveRun, CompletedRunView? LastCompleted);
+    Guid PlayerId,
+    TurnPhase Phase,
+    GameView? Offer,
+    ChoiceView? Choice,
+    RerollPriceView? NextReroll,
+    RunView? ActiveRun,
+    CompletedRunView? LastCompleted,
+    IReadOnlyList<ManualEffectView> ManualEffects);
+
+/// <summary>What the next reroll costs, computed by the engine's rule (D-93); only while a game is offered.</summary>
+public sealed record RerollPriceView(RerollPayment Payment, int Coins);
+
+/// <summary>A manual effect the player still has to play out (D-10, D-93); resolving it comes with C11.</summary>
+public sealed record ManualEffectView(Guid Id, EventKind DrawEvent, ManualEffectSource Source);
 
 /// <summary>The pending choice, kept on the server: a reloaded page shows the same options (T2).</summary>
 public sealed record ChoiceView(Guid Id, ChoiceKind Kind, IReadOnlyList<ChoiceOptionView> Options);
@@ -216,6 +231,16 @@ public static class SeasonEndpoints
                 .ToList();
             var games = await db.Games.AsNoTracking().Where(g => gameIds.Contains(g.Id)).ToDictionaryAsync(g => g.Id, ct);
 
+            var rules = JsonSerializer.Deserialize<Ruleset>(
+                (await db.Seasons.AsNoTracking().SingleAsync(s => s.Id == seasonId, ct)).RulesetJson, EngineJson.Options)!;
+            var coupons = JsonSerializer.Deserialize<ResourceBag>(mine.ResourcesJson, EngineJson.Options)[RerollPrice.FreeRerollsResource];
+            var effects = await db.ManualEffects.AsNoTracking()
+                .Where(x => x.SeasonId == seasonId && x.PlayerId == mine.Id)
+                .OrderBy(x => x.Id)
+                .Select(x => new ManualEffectView(x.Id, x.DrawEvent, x.Source))
+                .ToListAsync(ct);
+            var price = RerollPrice.Next(mine.RerollsThisRoll, coupons, rules.Roll);
+
             me = new MyTurnView(
                 mine.Id,
                 mine.Phase,
@@ -224,8 +249,10 @@ public static class SeasonEndpoints
                     choice.ChoiceId,
                     choice.Kind,
                     [.. choice.Options.Select(o => new ChoiceOptionView(o.Id, o.Game is null ? null : Offered(o.Game, games)))]),
+                mine.Phase == TurnPhase.Rolling ? new RerollPriceView(price.Payment, price.Coins) : null,
                 run is null ? null : new RunView(run.Id, Game(run, games[run.GameId]), run.StartedAt),
-                last is null ? null : Completed(last, games[last.GameId]));
+                last is null ? null : Completed(last, games[last.GameId]),
+                effects);
         }
 
         return TypedResults.Ok(new SeasonView(

@@ -1221,7 +1221,7 @@ export interface components {
          */
         EquatableArrayOfVotedNomination: unknown;
         /** @enum {unknown} */
-        EventKind: "good" | "bad" | null;
+        EventKind: "good" | "bad";
         /** @description Feature flags: a disabled mechanic is invisible in the interface and refused by the engine. */
         Features: {
             mapMode: components["schemas"]["MapMode"];
@@ -1285,6 +1285,18 @@ export interface components {
         };
         /** @enum {unknown} */
         MandatoryEvent: "bad" | "none";
+        /**
+         * @description What created a manual effect; C11 adds item, cell and event sources.
+         * @enum {unknown}
+         */
+        ManualEffectSource: "paidReroll";
+        /** @description A manual effect the player still has to play out (D-10, D-93); resolving it comes with C11. */
+        ManualEffectView: {
+            /** Format: uuid */
+            id: string;
+            drawEvent: components["schemas"]["EventKind"];
+            source: components["schemas"]["ManualEffectSource"];
+        };
         /** @enum {unknown} */
         MapMode: "linear" | "graph";
         MapRules: {
@@ -1297,8 +1309,10 @@ export interface components {
             phase: components["schemas"]["TurnPhase"];
             offer: null | components["schemas"]["GameView"];
             choice: null | components["schemas"]["ChoiceView"];
+            nextReroll: null | components["schemas"]["RerollPriceView"];
             activeRun: null | components["schemas"]["RunView"];
             lastCompleted: null | components["schemas"]["CompletedRunView"];
+            manualEffects: components["schemas"]["ManualEffectView"][];
         };
         NominationRules: {
             auto: components["schemas"]["EquatableArrayOfAutoNomination"];
@@ -1365,6 +1379,17 @@ export interface components {
         };
         /** @enum {unknown} */
         RerollCostKind: "coins" | "badEvent";
+        /**
+         * @description How a reroll was paid for.
+         * @enum {unknown}
+         */
+        RerollPayment: "freeThisRoll" | "freeRerollResource" | "coins" | "badEvent";
+        /** @description What the next reroll costs, computed by the engine's rule (D-93); only while a game is offered. */
+        RerollPriceView: {
+            payment: components["schemas"]["RerollPayment"];
+            /** Format: int32 */
+            coins: number;
+        };
         /** @description A reroll of the offered game or the whole pending choice; the price follows D-07. */
         RerollRequest: {
             /** Format: uuid */
@@ -1556,9 +1581,12 @@ export const choiceKindValues: ReadonlyArray<FlattenedDeepRequired<components>["
 export const coopRoundUpForValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["CoopRoundUpFor"]> = ["roller"];
 export const difficultyValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["Difficulty"]> = ["easy", "normal", "hard", "extreme"];
 export const emptyPoolFallbackValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["EmptyPoolFallback"]> = ["dropZoneFilter"];
+export const eventKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["EventKind"]> = ["good", "bad"];
 export const mandatoryEventValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["MandatoryEvent"]> = ["bad", "none"];
+export const manualEffectSourceValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ManualEffectSource"]> = ["paidReroll"];
 export const mapModeValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["MapMode"]> = ["linear", "graph"];
 export const rerollCostKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["RerollCostKind"]> = ["coins", "badEvent"];
+export const rerollPaymentValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["RerollPayment"]> = ["freeThisRoll", "freeRerollResource", "coins", "badEvent"];
 export const roleValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["Role"]> = ["player", "admin", "spectator"];
 export const roundingValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["Rounding"]> = ["nearest", "floor", "ceil"];
 export const turnPhaseValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["TurnPhase"]> = ["idle", "rolling", "playing"];

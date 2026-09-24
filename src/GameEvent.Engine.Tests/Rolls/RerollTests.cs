@@ -1,3 +1,4 @@
+using FsCheck.Xunit;
 using GameEvent.Engine.Effects;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Players;
@@ -267,6 +268,27 @@ public class RerollTests
     }
 
     [Fact]
+    public void Nothing_else_to_roll_beats_not_enough_coins()
+    {
+        // D-93: coins cannot help when there is nothing else to roll; that check comes before the payment
+        var s = Horror(42, FreePerRoll(0), "Silent Hill").Roll("Вася");
+        Assert.Equal(0, s.Player("Вася").Coins);
+
+        ScenarioAssert.RejectsWithoutChanges(s, x => Reroll(x, "Вася"), RejectionCodes.NoAvailableGames);
+    }
+
+    [Fact]
+    public void Nothing_else_to_roll_beats_not_enough_coins_after_the_free_reroll()
+    {
+        // Given two games: Вася used his free reroll with no coins, then Петя took the game Вася gave up
+        var s = Horror(42, "Silent Hill", "Alan Wake").Roll("Вася");
+        Rerolled(s, "Вася");
+        s.Roll("Петя");
+
+        ScenarioAssert.RejectsWithoutChanges(s, x => Reroll(x, "Вася"), RejectionCodes.NoAvailableGames);
+    }
+
+    [Fact]
     public void Reroll_with_every_other_game_busy_is_rejected()
     {
         // Given Петя holds one of two games and Вася was offered the other
@@ -469,6 +491,56 @@ public class RerollTests
 
         Assert.Equal(-2, Assert.Single(s.LastEvents<CoinsChanged>()).Delta);
         Assert.Equal(2, s.Player("Вася").Coins);
+    }
+
+    // ---- A zero price (rerollCost {kind: coins, amount: 0}, D-93) ----
+
+    [Fact]
+    public void Paid_reroll_priced_at_zero_coins_writes_no_coins_change_and_works_with_no_coins()
+    {
+        foreach (var seed in s_seeds.Take(10))
+        {
+            // Given the paid reroll costs 0 coins; Вася has no coins, no coupons and used the free reroll
+            var s = Horror(seed, CostInCoins(0), s_horror).Roll("Вася");
+            Rerolled(s, "Вася");
+            var givenUp = Offered(s, "Вася");
+
+            // When he rerolls again
+            Reroll(s, "Вася");
+
+            // Then exactly GameRerolled(Coins) and the new roll: no CoinsChanged of 0
+            ScenarioAssert.Accepted(s);
+            Assert.Equal(2, s.Last.Events.Count);
+            Assert.Equal(new GameRerolled(s.PlayerId("Вася"), [givenUp], RerollPayment.Coins), s.Last.Events[0]);
+            Assert.NotEqual(givenUp, Assert.IsType<GameRolled>(s.Last.Events[1]).GameId);
+            Assert.Equal(0, s.Player("Вася").Coins);
+            Assert.Equal(2, s.Player("Вася").RerollsThisRoll);
+
+            // And the next one costs nothing again
+            Rerolled(s, "Вася");
+            Assert.Equal(RerollPayment.Coins, Assert.Single(s.LastEvents<GameRerolled>()).Payment);
+            Assert.Empty(s.LastEvents<CoinsChanged>());
+        }
+    }
+
+    [Fact]
+    public void Coupon_is_spent_before_a_zero_coin_price()
+    {
+        // D-93: the order is literal, the coupon goes first even when coins would cost nothing
+        var s = Give(Horror(42, CostInCoins(0), s_horror), "Вася", coupons: 1).Roll("Вася");
+        Rerolled(s, "Вася");
+
+        Rerolled(s, "Вася");
+
+        Assert.Equal(RerollPayment.FreeRerollResource, Assert.Single(s.LastEvents<GameRerolled>()).Payment);
+        Assert.Equal(
+            new ResourceChanged(s.PlayerId("Вася"), Coupon, -1, ResourceReason.Reroll),
+            Assert.Single(s.LastEvents<ResourceChanged>()));
+        Assert.Equal(0, s.Player("Вася").Resources[Coupon]);
+
+        // Coupons gone: the next reroll is paid in (zero) coins
+        Rerolled(s, "Вася");
+        Assert.Equal(RerollPayment.Coins, Assert.Single(s.LastEvents<GameRerolled>()).Payment);
     }
 
     // ---- A bad event (rerollCost.kind = badEvent, Q-2, D-10) ----
@@ -872,6 +944,112 @@ public class RerollTests
         Rerolled(s, "Вася");
 
         ScenarioAssert.RejectsWithoutChanges(s, x => Reroll(x, "Вася"), RejectionCodes.NotEnoughCoins);
+    }
+
+    // ---- RerollPrice.Next: one function for the command and the screen (D-93) ----
+
+    private static RollRules Rules(int freePerRoll, RerollCostKind kind, int? amount) =>
+        TestRuleset.Create().Roll with
+        {
+            FreeRerollsPerRoll = freePerRoll,
+            RerollCost = new RerollCost { Kind = kind, Amount = amount },
+        };
+
+    [Theory]
+    [InlineData(0, 0, RerollCostKind.Coins, 5)]
+    [InlineData(0, 3, RerollCostKind.Coins, 5)]
+    [InlineData(0, 0, RerollCostKind.BadEvent, null)]
+    [InlineData(1, 2, RerollCostKind.Coins, 0)]
+    public void Next_is_free_while_free_rerolls_of_this_roll_are_left(int rerolls, int coupons, RerollCostKind kind, int? amount) =>
+        Assert.Equal((RerollPayment.FreeThisRoll, 0), RerollPrice.Next(rerolls, coupons, Rules(2, kind, amount)));
+
+    [Theory]
+    [InlineData(1, 1, RerollCostKind.Coins, 5)]
+    [InlineData(3, 4, RerollCostKind.Coins, 5)]
+    [InlineData(1, 1, RerollCostKind.BadEvent, null)]
+    [InlineData(1, 1, RerollCostKind.Coins, 0)]
+    public void Next_spends_a_coupon_once_the_free_rerolls_are_used(int rerolls, int coupons, RerollCostKind kind, int? amount) =>
+        Assert.Equal((RerollPayment.FreeRerollResource, 0), RerollPrice.Next(rerolls, coupons, Rules(1, kind, amount)));
+
+    [Fact]
+    public void Next_with_no_free_rerolls_per_roll_goes_straight_to_the_coupon_or_the_cost()
+    {
+        Assert.Equal((RerollPayment.FreeRerollResource, 0), RerollPrice.Next(0, 1, Rules(0, RerollCostKind.Coins, 5)));
+        Assert.Equal((RerollPayment.Coins, 5), RerollPrice.Next(0, 0, Rules(0, RerollCostKind.Coins, 5)));
+    }
+
+    [Theory]
+    [InlineData(1, 0)]
+    [InlineData(4, 0)]
+    public void Next_costs_a_bad_event_with_no_coupons(int rerolls, int coupons) =>
+        Assert.Equal((RerollPayment.BadEvent, 0), RerollPrice.Next(rerolls, coupons, Rules(1, RerollCostKind.BadEvent, null)));
+
+    [Theory]
+    [InlineData(5)]
+    [InlineData(3)]
+    [InlineData(0)]
+    public void Next_costs_the_amount_of_coins_with_no_coupons(int amount) =>
+        Assert.Equal((RerollPayment.Coins, amount), RerollPrice.Next(1, 0, Rules(1, RerollCostKind.Coins, amount)));
+
+    [Fact]
+    public void Next_counts_a_missing_amount_as_zero_coins() =>
+        Assert.Equal((RerollPayment.Coins, 0), RerollPrice.Next(1, 0, Rules(1, RerollCostKind.Coins, null)));
+
+    [Fact]
+    public void Next_rejects_null_rules() =>
+        Assert.Throws<ArgumentNullException>(() => RerollPrice.Next(0, 0, null!));
+
+    [Property(MaxTest = 100)]
+    public void Reroll_charges_exactly_what_next_returns(
+        int seed, byte freePerRoll, byte coupons, byte coins, bool badEvent, byte amount, byte rerolls)
+    {
+        // Given random free rerolls per roll, coupons, coins and cost
+        var cost = amount % 7;
+        var rules = (Ruleset r) => r with
+        {
+            Roll = r.Roll with
+            {
+                FreeRerollsPerRoll = freePerRoll % 3,
+                RerollCost = badEvent
+                    ? new RerollCost { Kind = RerollCostKind.BadEvent }
+                    : new RerollCost { Kind = RerollCostKind.Coins, Amount = cost },
+            },
+        };
+        var s = Give(Horror(seed, rules, s_horror), "Вася", coins: coins % 13, coupons: coupons % 3).Roll("Вася");
+
+        // When Вася rerolls several times, each reroll is paid exactly as RerollPrice.Next said just before it
+        for (var i = 0; i < (rerolls % 6) + 1; i++)
+        {
+            var before = s.Player("Вася");
+            var price = RerollPrice.Next(before.RerollsThisRoll, before.Resources[Coupon], s.Ruleset.Roll);
+            var effectsBefore = s.State.ManualEffects.Count;
+
+            if (price.Payment == RerollPayment.Coins && price.Coins > before.Coins)
+            {
+                ScenarioAssert.RejectsWithoutChanges(s, x => Reroll(x, "Вася"), RejectionCodes.NotEnoughCoins);
+                return;
+            }
+
+            Rerolled(s, "Вася");
+
+            var after = s.Player("Вася");
+            Assert.Equal(price.Payment, Assert.Single(s.LastEvents<GameRerolled>()).Payment);
+            Assert.Equal(before.Coins - price.Coins, after.Coins);
+            Assert.Equal(
+                price.Payment == RerollPayment.FreeRerollResource ? before.Resources[Coupon] - 1 : before.Resources[Coupon],
+                after.Resources[Coupon]);
+            Assert.Equal(price.Payment == RerollPayment.BadEvent ? effectsBefore + 1 : effectsBefore, s.State.ManualEffects.Count);
+            if (price.Coins == 0)
+            {
+                Assert.Empty(s.LastEvents<CoinsChanged>());
+            }
+            else
+            {
+                Assert.Equal(
+                    new CoinsChanged(s.PlayerId("Вася"), -price.Coins, CoinsReason.Reroll, null),
+                    Assert.Single(s.LastEvents<CoinsChanged>()));
+            }
+        }
     }
 
     // ---- Log and state ----

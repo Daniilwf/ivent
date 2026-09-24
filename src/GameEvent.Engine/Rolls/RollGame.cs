@@ -96,20 +96,9 @@ internal static class Rolling
         }
 
         var player = state.Players[command.PlayerId];
-        var rules = state.Rules.Roll;
-        var cost = rules.RerollCost;
 
         // D-07, D-93: a free reroll of this roll, then a coupon, then the price.
-        var payment = player.RerollsThisRoll < rules.FreeRerollsPerRoll ? RerollPayment.FreeThisRoll
-            : player.Resources[FreeRerollsResource] > 0 ? RerollPayment.FreeRerollResource
-            : cost.Kind == RerollCostKind.BadEvent ? RerollPayment.BadEvent
-            : RerollPayment.Coins;
-        var price = cost.Amount ?? 0;
-        if (payment == RerollPayment.Coins && player.Coins < price)
-        {
-            return Decision.Reject(RejectionCodes.NotEnoughCoins, $"A reroll costs {price} coins, the player has {player.Coins}.");
-        }
-
+        var (payment, price) = RerollPrice.Next(player.RerollsThisRoll, player.Resources[RerollPrice.FreeRerollsResource], state.Rules.Roll);
         var givenUp = player.Offer is { } offer
             ? new HashSet<Guid> { offer.GameId }
             : player.Choice!.Options.Select(o => o.Game?.GameId).OfType<Guid>().ToHashSet();
@@ -120,18 +109,21 @@ internal static class Rolling
             return Decision.Reject(RejectionCodes.NoAvailableGames, "No game is left besides the ones given up.");
         }
 
+        // Nothing to roll is told first: coins would not help (D-93).
+        if (payment == RerollPayment.Coins && player.Coins < price)
+        {
+            return Decision.Reject(RejectionCodes.NotEnoughCoins, $"A reroll costs {price} coins, the player has {player.Coins}.");
+        }
+
         IGameEvent? paid = payment switch
         {
-            RerollPayment.FreeRerollResource => new ResourceChanged(player.PlayerId, FreeRerollsResource, -1, ResourceReason.Reroll),
+            RerollPayment.FreeRerollResource => new ResourceChanged(player.PlayerId, RerollPrice.FreeRerollsResource, -1, ResourceReason.Reroll),
             RerollPayment.Coins when price != 0 => new CoinsChanged(player.PlayerId, -price, CoinsReason.Reroll, RunId: null),
             RerollPayment.BadEvent => new ManualEffectCreated(context.Ids.NewId(), player.PlayerId, EventKind.Bad, ManualEffectSource.PaidReroll, RunId: null),
             _ => null,
         };
         return Decision.Accept(paid is null ? [rerolled, roll] : [rerolled, paid, roll]);
     }
-
-    /// <summary>The reroll coupon resource (CONTENT.md «Купон реролла»).</summary>
-    public const string FreeRerollsResource = "freeRerolls";
 
     public static SeasonState Apply(SeasonState state, GameRerolled e)
     {

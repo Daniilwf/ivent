@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using GameEvent.Engine.Players;
+using GameEvent.Engine.Rolls;
 using GameEvent.Engine.Rulesets;
 using GameEvent.Engine.Seasons;
 using GameEvent.Engine.Turns;
@@ -400,6 +401,99 @@ public sealed class SeasonApiTests : IAsyncLifetime
         Assert.Equal("turn.wrongPhase", problem.RootElement.GetProperty("code").GetString());
         var mine = (await vasya.GetFromJsonAsync<SeasonView>($"/api/seasons/{SiteFactory.SeasonId}", s_json, Ct))!.Me!.Offer!;
         Assert.Equal(offered, mine);
+    }
+
+    // ---- The price of the next reroll and pending manual effects in the season view (D-93) ----
+
+    /// <summary>The raw JSON of the player's own turn, as the frontend reads it.</summary>
+    private static async Task<JsonElement> MeJsonAsync(HttpClient client)
+    {
+        using var doc = JsonDocument.Parse(await client.GetStringAsync($"/api/seasons/{SiteFactory.SeasonId}", Ct));
+        return doc.RootElement.GetProperty("me").Clone();
+    }
+
+    private static void AssertNextReroll(JsonElement me, string payment, int coins)
+    {
+        var next = me.GetProperty("nextReroll");
+        Assert.Equal(JsonValueKind.Object, next.ValueKind);
+        Assert.Equal(payment, next.GetProperty("payment").GetString());
+        Assert.Equal(coins, next.GetProperty("coins").GetInt32());
+    }
+
+    [Fact]
+    public async Task Next_reroll_price_follows_the_payment_order_while_rolling()
+    {
+        var price = RulesetJson.Default().Roll.RerollCost.Amount!.Value;
+        var vasya = await _site.SignedInAsync("vasya");
+
+        // Idle: no price
+        Assert.Equal(JsonValueKind.Null, (await MeJsonAsync(vasya)).GetProperty("nextReroll").ValueKind);
+
+        // After a roll the first reroll is free
+        await PostAsync(vasya, "roll", new { commandId = Guid.NewGuid() });
+        AssertNextReroll(await MeJsonAsync(vasya), "freeThisRoll", 0);
+
+        // After the free one: the ruleset price in coins (even with 0 coins the screen shows the price)
+        await PostAsync(vasya, "reroll", new { commandId = Guid.NewGuid() });
+        AssertNextReroll(await MeJsonAsync(vasya), "coins", price);
+
+        // A reroll coupon given by the admin comes before coins
+        await _site.SendAsync(new AdjustPlayer(
+            _site.Players["vasya"], "Купон", ResourceDeltas: [new ResourceDelta(RerollPrice.FreeRerollsResource, 1)]));
+        AssertNextReroll(await MeJsonAsync(vasya), "freeRerollResource", 0);
+
+        // Playing: no price
+        await PostAsync(vasya, "start", new { commandId = Guid.NewGuid() });
+        Assert.Equal(JsonValueKind.Null, (await MeJsonAsync(vasya)).GetProperty("nextReroll").ValueKind);
+    }
+
+    [Fact]
+    public async Task Next_reroll_price_is_a_bad_event_under_that_ruleset_and_a_paid_one_lists_a_manual_effect()
+    {
+        // Given the paid reroll costs a bad event
+        var rules = RulesetJson.Default();
+        await _site.SendAsync(new ChangeRuleset(
+            rules with { Roll = rules.Roll with { RerollCost = new RerollCost { Kind = RerollCostKind.BadEvent } } },
+            ExpectedVersion: null));
+        var vasya = await _site.SignedInAsync("vasya");
+        var petya = await _site.SignedInAsync("petya");
+        await PostAsync(vasya, "roll", new { commandId = Guid.NewGuid() });
+        await PostAsync(vasya, "reroll", new { commandId = Guid.NewGuid() });
+
+        // Before paying: the price is a bad event, no manual effects yet
+        var before = await MeJsonAsync(vasya);
+        AssertNextReroll(before, "badEvent", 0);
+        Assert.Equal(0, before.GetProperty("manualEffects").GetArrayLength());
+
+        // When he pays with a bad event
+        var paid = await PostAsync(vasya, "reroll", new { commandId = Guid.NewGuid() });
+        Assert.Equal(["game-rerolled", "manual-effect-created", "game-rolled"], await TypesAsync(paid));
+
+        // Then his turn lists one pending manual effect: draw a bad event, from a paid reroll
+        var effect = Assert.Single((await MeJsonAsync(vasya)).GetProperty("manualEffects").EnumerateArray());
+        Assert.NotEqual(Guid.Empty, effect.GetProperty("id").GetGuid());
+        Assert.Equal("bad", effect.GetProperty("drawEvent").GetString());
+        Assert.Equal("paidReroll", effect.GetProperty("source").GetString());
+        await using (var db = _site.NewDb())
+        {
+            Assert.Equal(effect.GetProperty("id").GetGuid(), db.ManualEffects.Single().Id);
+        }
+
+        // And only he sees it: Петя's own turn has none
+        Assert.Equal(0, (await MeJsonAsync(petya)).GetProperty("manualEffects").GetArrayLength());
+    }
+
+    [Fact]
+    public async Task Manual_effects_are_empty_for_a_player_without_them()
+    {
+        var vasya = await _site.SignedInAsync("vasya");
+        await PostAsync(vasya, "roll", new { commandId = Guid.NewGuid() });
+        await PostAsync(vasya, "reroll", new { commandId = Guid.NewGuid() });
+
+        var me = await MeJsonAsync(vasya);
+
+        Assert.Equal(JsonValueKind.Array, me.GetProperty("manualEffects").ValueKind);
+        Assert.Equal(0, me.GetProperty("manualEffects").GetArrayLength());
     }
 
     private async Task<ChoiceView> RollChoiceAsync(HttpClient player)

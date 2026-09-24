@@ -1497,8 +1497,7 @@
       "EventKind": {
         "enum": [
           "good",
-          "bad",
-          null
+          "bad"
         ]
       },
       "Features": {
@@ -1728,6 +1727,33 @@
           "none"
         ]
       },
+      "ManualEffectSource": {
+        "enum": [
+          "paidReroll"
+        ],
+        "description": "What created a manual effect; C11 adds item, cell and event sources."
+      },
+      "ManualEffectView": {
+        "required": [
+          "id",
+          "drawEvent",
+          "source"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "drawEvent": {
+            "$ref": "#/components/schemas/EventKind"
+          },
+          "source": {
+            "$ref": "#/components/schemas/ManualEffectSource"
+          }
+        },
+        "description": "A manual effect the player still has to play out (D-10, D-93); resolving it comes with C11."
+      },
       "MapMode": {
         "enum": [
           "linear",
@@ -1752,8 +1778,10 @@
           "phase",
           "offer",
           "choice",
+          "nextReroll",
           "activeRun",
-          "lastCompleted"
+          "lastCompleted",
+          "manualEffects"
         ],
         "type": "object",
         "properties": {
@@ -1784,6 +1812,16 @@
               }
             ]
           },
+          "nextReroll": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/RerollPriceView"
+              }
+            ]
+          },
           "activeRun": {
             "oneOf": [
               {
@@ -1803,6 +1841,12 @@
                 "$ref": "#/components/schemas/CompletedRunView"
               }
             ]
+          },
+          "manualEffects": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ManualEffectView"
+            }
           }
         }
       },
@@ -2027,6 +2071,32 @@
           "coins",
           "badEvent"
         ]
+      },
+      "RerollPayment": {
+        "enum": [
+          "freeThisRoll",
+          "freeRerollResource",
+          "coins",
+          "badEvent"
+        ],
+        "description": "How a reroll was paid for."
+      },
+      "RerollPriceView": {
+        "required": [
+          "payment",
+          "coins"
+        ],
+        "type": "object",
+        "properties": {
+          "payment": {
+            "$ref": "#/components/schemas/RerollPayment"
+          },
+          "coins": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "What the next reroll costs, computed by the engine's rule (D-93); only while a game is offered."
       },
       "RerollRequest": {
         "required": [
