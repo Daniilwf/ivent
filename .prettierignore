@@ -12,3 +12,4 @@ web/src/api/schema.d.ts
 package-lock.json
 .claude
 .tools
+.nuget

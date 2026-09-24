@@ -38,3 +38,6 @@ blob-report/
 
 # Downloaded tools (gitleaks)
 .tools/
+
+# NuGet cache in CI workspace
+.nuget/
