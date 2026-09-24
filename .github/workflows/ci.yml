@@ -116,6 +116,7 @@ jobs:
         run: |
           npm run -s gen:api
           git status --porcelain -- web/src/api
+          git --no-pager diff -- web/src/api | head -80
           test -z "$(git status --porcelain -- web/src/api)"
 
       - name: Coverage report
