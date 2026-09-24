@@ -1,5 +1,6 @@
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Rolls;
+using GameEvent.Engine.Rulesets;
 using GameEvent.Engine.Runs;
 using GameEvent.Engine.Seasons;
 using GameEvent.Infrastructure.EventLog;
@@ -24,7 +25,7 @@ public class CommandQueueRobustnessTests
     {
         await using var h = await QueueHarness.StartAsync();
 
-        var outcome = await h.SendAsync(new CreateSeason(s_seasonB), s_seasonA);
+        var outcome = await h.SendAsync(new CreateSeason(s_seasonB, RulesetJson.Default()), s_seasonA);
 
         Assert.False(outcome.IsAccepted);
         Assert.Equal(RejectionCodes.SeasonMismatch, outcome.Rejection!.Code);
@@ -38,7 +39,7 @@ public class CommandQueueRobustnessTests
     {
         await using var h = await QueueHarness.StartAsync();
 
-        var outcome = await h.SendAsync(new CreateSeason(Guid.Empty), Guid.Empty);
+        var outcome = await h.SendAsync(new CreateSeason(Guid.Empty, RulesetJson.Default()), Guid.Empty);
 
         Assert.Equal(RejectionCodes.SeasonMismatch, outcome.Rejection?.Code);
         await using var db = h.NewDb();
@@ -49,7 +50,7 @@ public class CommandQueueRobustnessTests
     public async Task Command_id_reused_by_a_different_command_is_rejected()
     {
         await using var h = await QueueHarness.StartAsync();
-        await Accepted(h, new CreateSeason(s_seasonA), s_seasonA);
+        await Accepted(h, new CreateSeason(s_seasonA, RulesetJson.Default()), s_seasonA);
         var id = Guid.NewGuid();
         await Accepted(h, new AddSeasonPlayer(s_vasya, s_vasya, "Вася"), s_seasonA, id);
 
@@ -66,7 +67,7 @@ public class CommandQueueRobustnessTests
     public async Task Command_id_reused_by_another_author_is_rejected()
     {
         await using var h = await QueueHarness.StartAsync();
-        await Accepted(h, new CreateSeason(s_seasonA), s_seasonA);
+        await Accepted(h, new CreateSeason(s_seasonA, RulesetJson.Default()), s_seasonA);
         await Accepted(h, new AddSeasonPlayer(s_vasya, s_vasya, "Вася"), s_seasonA);
         await Accepted(h, new AddSeasonPlayer(s_petya, s_petya, "Петя"), s_seasonA);
         var id = Guid.NewGuid();
@@ -83,8 +84,8 @@ public class CommandQueueRobustnessTests
     public async Task Two_seasons_keep_separate_logs_numbering_and_state()
     {
         await using var h = await QueueHarness.StartAsync();
-        await Accepted(h, new CreateSeason(s_seasonA), s_seasonA);
-        await Accepted(h, new CreateSeason(s_seasonB), s_seasonB);
+        await Accepted(h, new CreateSeason(s_seasonA, RulesetJson.Default()), s_seasonA);
+        await Accepted(h, new CreateSeason(s_seasonB, RulesetJson.Default()), s_seasonB);
         await Accepted(h, new AddSeasonPlayer(s_vasya, s_vasya, "Вася"), s_seasonA);
         await Accepted(h, new AddSeasonPlayer(s_petya, s_petya, "Петя"), s_seasonB);
         await Accepted(h, new RollGame(s_vasya), s_seasonA);
@@ -108,7 +109,7 @@ public class CommandQueueRobustnessTests
     {
         var block = new BlockingSaveInterceptor();
         await using var h = await QueueHarness.StartAsync(block);
-        await Accepted(h, new CreateSeason(s_seasonA), s_seasonA);
+        await Accepted(h, new CreateSeason(s_seasonA, RulesetJson.Default()), s_seasonA);
         await Accepted(h, new AddSeasonPlayer(s_vasya, s_vasya, "Вася"), s_seasonA);
         var id = Guid.NewGuid();
 
@@ -132,7 +133,7 @@ public class CommandQueueRobustnessTests
     {
         var fault = new FailingAfterCommitInterceptor();
         await using var h = await QueueHarness.StartAsync(fault);
-        await Accepted(h, new CreateSeason(s_seasonA), s_seasonA);
+        await Accepted(h, new CreateSeason(s_seasonA, RulesetJson.Default()), s_seasonA);
         await Accepted(h, new AddSeasonPlayer(s_vasya, s_vasya, "Вася"), s_seasonA);
 
         // The roll is committed, but the caller gets an error
@@ -150,7 +151,7 @@ public class CommandQueueRobustnessTests
     {
         var block = new BlockingSaveInterceptor();
         await using var h = await QueueHarness.StartAsync(block);
-        await Accepted(h, new CreateSeason(s_seasonA), s_seasonA);
+        await Accepted(h, new CreateSeason(s_seasonA, RulesetJson.Default()), s_seasonA);
 
         // Given the processor stuck in the first command and 29 more waiting in the queue
         block.Armed = true;

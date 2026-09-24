@@ -15,10 +15,28 @@ public sealed class SeasonRecord
 
     public int RulesetVersion { get; set; }
 
-    /// <summary>The ruleset the season plays by. Versions and history arrive with task C1.</summary>
+    /// <summary>The rules in force, projected from the log (D-82); the history is the log's ruleset events.</summary>
     public required string RulesetJson { get; set; }
 
     public DateTimeOffset CreatedAt { get; set; }
+}
+
+/// <summary>
+/// One version of a season's rules (SPEC «Модель данных»: Ruleset — version, config, date, who changed it).
+/// A projection of season-created and ruleset-changed events (D-82): the log stays the source of truth.
+/// </summary>
+public sealed class RulesetRecord
+{
+    public Guid SeasonId { get; set; }
+
+    public int Version { get; set; }
+
+    public required string Json { get; set; }
+
+    public DateTimeOffset CreatedAt { get; set; }
+
+    /// <summary>Who changed the rules; null for the version created with the season by the system.</summary>
+    public Guid? AuthorId { get; set; }
 }
 
 public sealed class SeasonPlayerRecord

@@ -91,10 +91,10 @@ internal static class Rolling
             }
 
             var snapshot = new RunSnapshot(
-                context.Ruleset.Version,
+                state.RulesetVersion,
                 game.Hours,
-                context.Ruleset.Reward.DiceCount,
-                context.Ruleset.Reward.DieByDifficulty);
+                state.Rules.Reward.DiceCount,
+                state.Rules.Reward.DieByDifficulty);
 
             return Decision.Accept(new GameRolled(
                 player.PlayerId, category.Name, [.. misses], game.Id, snapshot, context.Clock.UtcNow));

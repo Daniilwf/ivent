@@ -7,6 +7,7 @@ using GameEvent.Infrastructure.Kernel;
 using GameEvent.Infrastructure.Queue;
 using GameEvent.Web.Accounts;
 using GameEvent.Web.Realtime;
+using GameEvent.Web.Rulesets;
 using GameEvent.Web.Seasons;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Http.Json;
@@ -71,7 +72,8 @@ public static class AppSetup
                 o.Events.OnRedirectToAccessDenied = ctx => Status(ctx.Response, StatusCodes.Status403Forbidden);
             });
         services.AddAuthorizationBuilder()
-            .AddPolicy(Policies.Player, p => p.RequireRole(nameof(Infrastructure.Accounts.Role.Player)));
+            .AddPolicy(Policies.Player, p => p.RequireRole(nameof(Infrastructure.Accounts.Role.Player)))
+            .AddPolicy(Policies.Admin, p => p.RequireRole(nameof(Infrastructure.Accounts.Role.Admin)));
 
         services.AddAntiforgery(o =>
         {
@@ -131,6 +133,7 @@ public static class AppSetup
         var api = app.MapGroup("/api").AddEndpointFilter<Csrf.Filter>();
         api.MapAccounts();
         api.MapSeasons();
+        api.MapRules();
         app.MapHub<SeasonHub>(SeasonHub.Path);
 
         if (frontend is not null)
@@ -213,6 +216,7 @@ public static class AppSetup
 public static class Policies
 {
     public const string Player = "player";
+    public const string Admin = "admin";
 }
 
 /// <summary>

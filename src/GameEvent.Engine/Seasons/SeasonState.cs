@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using GameEvent.Engine.Map;
 using GameEvent.Engine.Rolls;
+using GameEvent.Engine.Rulesets;
 using GameEvent.Engine.Runs;
 
 namespace GameEvent.Engine.Seasons;
@@ -11,18 +12,25 @@ namespace GameEvent.Engine.Seasons;
 /// </summary>
 public sealed record SeasonState(
     Guid SeasonId,
+    Ruleset? Ruleset,
+    int RulesetVersion,
     MapGraph Map,
     ImmutableSortedDictionary<Guid, SeasonPlayer> Players,
     ImmutableSortedDictionary<Guid, RunState> Runs)
 {
     public static SeasonState Empty { get; } =
-        new(Guid.Empty, new MapGraph([], []), ImmutableSortedDictionary<Guid, SeasonPlayer>.Empty, ImmutableSortedDictionary<Guid, RunState>.Empty);
+        new(Guid.Empty, Ruleset: null, RulesetVersion: 0, new MapGraph([], []), ImmutableSortedDictionary<Guid, SeasonPlayer>.Empty, ImmutableSortedDictionary<Guid, RunState>.Empty);
 
     public bool IsCreated => SeasonId != Guid.Empty;
+
+    /// <summary>The rules in force; only valid on a created season.</summary>
+    public Ruleset Rules => Ruleset ?? throw new InvalidOperationException("The season is not created yet.");
 
     public bool Equals(SeasonState? other) =>
         other is not null
         && SeasonId == other.SeasonId
+        && Ruleset == other.Ruleset
+        && RulesetVersion == other.RulesetVersion
         && Map == other.Map
         && Players.SequenceEqual(other.Players)
         && Runs.SequenceEqual(other.Runs);

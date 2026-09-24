@@ -96,6 +96,27 @@ namespace GameEvent.Infrastructure.Database.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "Ruleset",
+                columns: table => new
+                {
+                    SeasonId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    Version = table.Column<int>(type: "INTEGER", nullable: false),
+                    Json = table.Column<string>(type: "TEXT", nullable: false),
+                    CreatedAt = table.Column<long>(type: "INTEGER", nullable: false),
+                    AuthorId = table.Column<Guid>(type: "TEXT", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Ruleset", x => new { x.SeasonId, x.Version });
+                    table.ForeignKey(
+                        name: "FK_Ruleset_Season_SeasonId",
+                        column: x => x.SeasonId,
+                        principalTable: "Season",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "SeasonPlayer",
                 columns: table => new
                 {
@@ -203,6 +224,9 @@ namespace GameEvent.Infrastructure.Database.Migrations
 
             migrationBuilder.DropTable(
                 name: "GameEvent");
+
+            migrationBuilder.DropTable(
+                name: "Ruleset");
 
             migrationBuilder.DropTable(
                 name: "Run");

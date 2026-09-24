@@ -29,15 +29,10 @@ public static class SeasonEngine
         ArgumentNullException.ThrowIfNull(command);
         ArgumentNullException.ThrowIfNull(context);
 
-        // A ruleset changed mid-season to a mechanic this build lacks is refused on every command (D-53).
-        if (RulesetSupport.Unsupported(context.Ruleset) is { } unsupported)
-        {
-            return new CommandResult(Decision.Reject(RejectionCodes.RulesetUnsupported, unsupported), state);
-        }
-
         var decision = command switch
         {
-            CreateSeason c => SeasonSetup.Decide(state, c, context),
+            CreateSeason c => SeasonSetup.Decide(state, c),
+            ChangeRuleset c => RulesetChanges.Decide(state, c),
             AddSeasonPlayer c => SeasonSetup.Decide(state, c),
             RollGame c => Rolling.Decide(state, c, context),
             StartRun c => RunLifecycle.Decide(state, c, context),
@@ -53,6 +48,7 @@ public static class SeasonEngine
         {
             SeasonCreated e => SeasonSetup.Apply(state, e),
             SeasonPlayerAdded e => SeasonSetup.Apply(state, e),
+            RulesetChanged e => RulesetChanges.Apply(state, e),
             GameRolled e => Rolling.Apply(state, e),
             RunStarted e => RunLifecycle.Apply(state, e),
             RunCompleted e => RunLifecycle.Apply(state, e),

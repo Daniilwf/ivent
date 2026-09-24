@@ -458,6 +458,139 @@
           }
         }
       }
+    },
+    "/api/seasons/{seasonId}/rules": {
+      "get": {
+        "tags": [
+          "Rules"
+        ],
+        "parameters": [
+          {
+            "name": "seasonId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RulesView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/seasons/{seasonId}/rules": {
+      "put": {
+        "tags": [
+          "Admin"
+        ],
+        "parameters": [
+          {
+            "name": "seasonId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeRulesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RulesChangeResult"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RulesetProblem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RejectionProblem"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -474,6 +607,36 @@
           },
           "headerName": {
             "type": "string"
+          }
+        }
+      },
+      "BetRules": {
+        "required": [
+          "maxStake",
+          "maxOpenBetsPerPlayer",
+          "windowHoursAfterRoll",
+          "deadlineOptionsDays",
+          "payoutByHoursPerDay"
+        ],
+        "type": "object",
+        "properties": {
+          "maxStake": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxOpenBetsPerPlayer": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "windowHoursAfterRoll": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "deadlineOptionsDays": {
+            "$ref": "#/components/schemas/EquatableArrayOfint"
+          },
+          "payoutByHoursPerDay": {
+            "$ref": "#/components/schemas/EquatableArrayOfPayoutStep"
           }
         }
       },
@@ -496,6 +659,57 @@
           },
           "type": {
             "$ref": "#/components/schemas/CellType"
+          }
+        }
+      },
+      "ChallengeBonus": {
+        "required": [
+          "extraDice"
+        ],
+        "type": "object",
+        "properties": {
+          "extraDice": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "ChangeRulesRequest": {
+        "required": [
+          "commandId",
+          "expectedVersion",
+          "ruleset"
+        ],
+        "type": "object",
+        "properties": {
+          "commandId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "ruleset": {
+            "$ref": "#/components/schemas/Ruleset"
+          }
+        },
+        "description": "A new ruleset from the admin's editor: the whole document, the version it was edited from, and a command id\ngenerated once per save."
+      },
+      "CoinReward": {
+        "required": [
+          "perHour",
+          "min"
+        ],
+        "type": "object",
+        "properties": {
+          "perHour": {
+            "type": "number",
+            "format": "double"
+          },
+          "min": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
@@ -574,6 +788,27 @@
         },
         "description": "Completing the active run. `estimatedHours` is needed only when the game has no hours."
       },
+      "CoopRoundUpFor": {
+        "enum": [
+          "roller"
+        ]
+      },
+      "CoopRules": {
+        "required": [
+          "pointsShare",
+          "roundUpFor"
+        ],
+        "type": "object",
+        "properties": {
+          "pointsShare": {
+            "type": "number",
+            "format": "double"
+          },
+          "roundUpFor": {
+            "$ref": "#/components/schemas/CoopRoundUpFor"
+          }
+        }
+      },
       "CurrentSeasonView": {
         "required": [
           "id"
@@ -615,6 +850,77 @@
           }
         }
       },
+      "DiceCountRule": {
+        "required": [
+          "hoursPerDie",
+          "rounding",
+          "min",
+          "max"
+        ],
+        "type": "object",
+        "properties": {
+          "hoursPerDie": {
+            "type": "number",
+            "format": "double"
+          },
+          "rounding": {
+            "$ref": "#/components/schemas/Rounding"
+          },
+          "min": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "max": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "DieByDifficulty": {
+        "required": [
+          "easy",
+          "normal",
+          "hard",
+          "extreme"
+        ],
+        "type": "object",
+        "properties": {
+          "easy": {
+            "$ref": "#/components/schemas/DieRule"
+          },
+          "normal": {
+            "$ref": "#/components/schemas/DieRule"
+          },
+          "hard": {
+            "$ref": "#/components/schemas/DieRule"
+          },
+          "extreme": {
+            "$ref": "#/components/schemas/DieRule"
+          }
+        }
+      },
+      "DieRule": {
+        "required": [
+          "sides"
+        ],
+        "type": "object",
+        "properties": {
+          "sides": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "grantEvent": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/EventKind"
+              }
+            ]
+          }
+        }
+      },
       "DieView": {
         "required": [
           "sides",
@@ -640,6 +946,190 @@
           "extreme"
         ]
       },
+      "DropRules": {
+        "required": [
+          "penaltyDice",
+          "affectsPoints",
+          "affectsPosition",
+          "mandatoryEvent"
+        ],
+        "type": "object",
+        "properties": {
+          "penaltyDice": {
+            "$ref": "#/components/schemas/PenaltyDice"
+          },
+          "affectsPoints": {
+            "type": "boolean"
+          },
+          "affectsPosition": {
+            "type": "boolean"
+          },
+          "mandatoryEvent": {
+            "$ref": "#/components/schemas/MandatoryEvent"
+          }
+        }
+      },
+      "EconomyRules": {
+        "required": [
+          "allowNegativeCoins",
+          "inventoryLimit",
+          "rarityWeights",
+          "shop"
+        ],
+        "type": "object",
+        "properties": {
+          "allowNegativeCoins": {
+            "type": "boolean"
+          },
+          "inventoryLimit": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "rarityWeights": {
+            "$ref": "#/components/schemas/RarityWeights"
+          },
+          "shop": {
+            "$ref": "#/components/schemas/ShopRules"
+          }
+        }
+      },
+      "EffectRules": {
+        "required": [
+          "maxChainDepth",
+          "maxEventsPerCommand",
+          "hostileCap",
+          "attacksOnlyOnHigherPoints"
+        ],
+        "type": "object",
+        "properties": {
+          "maxChainDepth": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxEventsPerCommand": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "hostileCap": {
+            "$ref": "#/components/schemas/HostileCap"
+          },
+          "attacksOnlyOnHigherPoints": {
+            "type": "boolean"
+          }
+        }
+      },
+      "EmptyPoolFallback": {
+        "enum": [
+          "dropZoneFilter"
+        ]
+      },
+      "EquatableArrayOfAutoNomination": {
+        "description": "Immutable list with value equality, so records holding lists (events, snapshots) compare by content.\nSerialized as a plain JSON array."
+      },
+      "EquatableArrayOfint": {
+        "description": "Immutable list with value equality, so records holding lists (events, snapshots) compare by content.\nSerialized as a plain JSON array."
+      },
+      "EquatableArrayOfLengthFilterStep": {
+        "description": "Immutable list with value equality, so records holding lists (events, snapshots) compare by content.\nSerialized as a plain JSON array."
+      },
+      "EquatableArrayOfPayoutStep": {
+        "description": "Immutable list with value equality, so records holding lists (events, snapshots) compare by content.\nSerialized as a plain JSON array."
+      },
+      "EquatableArrayOfShopPriceReset": {
+        "description": "Immutable list with value equality, so records holding lists (events, snapshots) compare by content.\nSerialized as a plain JSON array."
+      },
+      "EquatableArrayOfstring": {
+        "description": "Immutable list with value equality, so records holding lists (events, snapshots) compare by content.\nSerialized as a plain JSON array."
+      },
+      "EquatableArrayOfTiebreaker": {
+        "description": "Immutable list with value equality, so records holding lists (events, snapshots) compare by content.\nSerialized as a plain JSON array."
+      },
+      "EquatableArrayOfVotedNomination": {
+        "description": "Immutable list with value equality, so records holding lists (events, snapshots) compare by content.\nSerialized as a plain JSON array."
+      },
+      "EventKind": {
+        "enum": [
+          "good",
+          "bad",
+          null
+        ]
+      },
+      "Features": {
+        "required": [
+          "mapMode",
+          "shop",
+          "items",
+          "events",
+          "bets",
+          "polls",
+          "achievements",
+          "weeklyChallenge",
+          "partnerBoard",
+          "reactions",
+          "comments",
+          "gallery"
+        ],
+        "type": "object",
+        "properties": {
+          "mapMode": {
+            "$ref": "#/components/schemas/MapMode"
+          },
+          "shop": {
+            "type": "boolean"
+          },
+          "items": {
+            "type": "boolean"
+          },
+          "events": {
+            "type": "boolean"
+          },
+          "bets": {
+            "type": "boolean"
+          },
+          "polls": {
+            "type": "boolean"
+          },
+          "achievements": {
+            "type": "boolean"
+          },
+          "weeklyChallenge": {
+            "type": "boolean"
+          },
+          "partnerBoard": {
+            "type": "boolean"
+          },
+          "reactions": {
+            "type": "boolean"
+          },
+          "comments": {
+            "type": "boolean"
+          },
+          "gallery": {
+            "type": "boolean"
+          }
+        },
+        "description": "Feature flags: a disabled mechanic is invisible in the interface and refused by the engine."
+      },
+      "FinishRules": {
+        "required": [
+          "requireApprovalForFirst",
+          "bonusByOrder",
+          "bonusAfterList"
+        ],
+        "type": "object",
+        "properties": {
+          "requireApprovalForFirst": {
+            "type": "boolean"
+          },
+          "bonusByOrder": {
+            "$ref": "#/components/schemas/EquatableArrayOfint"
+          },
+          "bonusAfterList": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "GameView": {
         "required": [
           "id",
@@ -661,6 +1151,22 @@
               "number"
             ],
             "format": "double"
+          }
+        }
+      },
+      "HostileCap": {
+        "required": [
+          "enabled",
+          "maxActive"
+        ],
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "maxActive": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
@@ -709,6 +1215,33 @@
           }
         }
       },
+      "InteractionRules": {
+        "required": [
+          "inviteTtlHours"
+        ],
+        "type": "object",
+        "properties": {
+          "inviteTtlHours": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "LastDaysLengthFilter": {
+        "required": [
+          "enabled",
+          "steps"
+        ],
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "steps": {
+            "$ref": "#/components/schemas/EquatableArrayOfLengthFilterStep"
+          }
+        }
+      },
       "LoggedEventView": {
         "required": [
           "sequence",
@@ -739,6 +1272,30 @@
           "password": {
             "maxLength": 256,
             "type": "string"
+          }
+        }
+      },
+      "MandatoryEvent": {
+        "enum": [
+          "bad",
+          "none"
+        ]
+      },
+      "MapMode": {
+        "enum": [
+          "linear",
+          "graph"
+        ]
+      },
+      "MapRules": {
+        "required": [
+          "linearLength"
+        ],
+        "type": "object",
+        "properties": {
+          "linearLength": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
@@ -788,6 +1345,38 @@
                 "$ref": "#/components/schemas/CompletedRunView"
               }
             ]
+          }
+        }
+      },
+      "NominationRules": {
+        "required": [
+          "auto",
+          "voted"
+        ],
+        "type": "object",
+        "properties": {
+          "auto": {
+            "$ref": "#/components/schemas/EquatableArrayOfAutoNomination"
+          },
+          "voted": {
+            "$ref": "#/components/schemas/EquatableArrayOfVotedNomination"
+          }
+        }
+      },
+      "PenaltyDice": {
+        "required": [
+          "count",
+          "sides"
+        ],
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "sides": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
@@ -856,6 +1445,39 @@
           }
         }
       },
+      "RankingRules": {
+        "required": [
+          "tiebreakers"
+        ],
+        "type": "object",
+        "properties": {
+          "tiebreakers": {
+            "$ref": "#/components/schemas/EquatableArrayOfTiebreaker"
+          }
+        }
+      },
+      "RarityWeights": {
+        "required": [
+          "common",
+          "epic",
+          "legendary"
+        ],
+        "type": "object",
+        "properties": {
+          "common": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "epic": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "legendary": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "RejectionProblem": {
         "required": [
           "title",
@@ -884,6 +1506,62 @@
         },
         "description": "A game rule refused the action; `code` is stable and maps to a text in the interface dictionary."
       },
+      "RerollCost": {
+        "required": [
+          "kind"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/RerollCostKind"
+          },
+          "amount": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          }
+        },
+        "description": "Price of a paid reroll: int? RerollCost.Amount coins, or a bad event (then no amount)."
+      },
+      "RerollCostKind": {
+        "enum": [
+          "coins",
+          "badEvent"
+        ]
+      },
+      "RewardRules": {
+        "required": [
+          "diceCount",
+          "dieByDifficulty",
+          "challengeBonus",
+          "unmetConditionPolicy",
+          "coins",
+          "coop"
+        ],
+        "type": "object",
+        "properties": {
+          "diceCount": {
+            "$ref": "#/components/schemas/DiceCountRule"
+          },
+          "dieByDifficulty": {
+            "$ref": "#/components/schemas/DieByDifficulty"
+          },
+          "challengeBonus": {
+            "$ref": "#/components/schemas/ChallengeBonus"
+          },
+          "unmetConditionPolicy": {
+            "$ref": "#/components/schemas/UnmetConditionPolicy"
+          },
+          "coins": {
+            "$ref": "#/components/schemas/CoinReward"
+          },
+          "coop": {
+            "$ref": "#/components/schemas/CoopRules"
+          }
+        }
+      },
       "Role": {
         "enum": [
           "player",
@@ -905,6 +1583,260 @@
         },
         "description": "A game action. `commandId` is generated by the client once per action: a repeat acts once."
       },
+      "RollRules": {
+        "required": [
+          "choiceCount",
+          "freeRerollsPerRoll",
+          "rerollCost",
+          "techRerollWindowHours",
+          "minPlayMinutesBeforeDrop",
+          "emptyPoolFallback",
+          "lastDaysLengthFilter"
+        ],
+        "type": "object",
+        "properties": {
+          "choiceCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "freeRerollsPerRoll": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "rerollCost": {
+            "$ref": "#/components/schemas/RerollCost"
+          },
+          "techRerollWindowHours": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "minPlayMinutesBeforeDrop": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "emptyPoolFallback": {
+            "$ref": "#/components/schemas/EmptyPoolFallback"
+          },
+          "lastDaysLengthFilter": {
+            "$ref": "#/components/schemas/LastDaysLengthFilter"
+          }
+        }
+      },
+      "Rounding": {
+        "enum": [
+          "nearest",
+          "floor",
+          "ceil"
+        ]
+      },
+      "RulesChangeResult": {
+        "required": [
+          "version"
+        ],
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "Ruleset": {
+        "required": [
+          "version",
+          "features",
+          "season",
+          "roll",
+          "reward",
+          "drop",
+          "finish",
+          "ranking",
+          "map",
+          "economy",
+          "effects",
+          "interactions",
+          "bets",
+          "social",
+          "nominations",
+          "weeklyChallenge"
+        ],
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "integer",
+            "description": "Format version of the configuration document (not the season's ruleset version).",
+            "format": "int32"
+          },
+          "features": {
+            "$ref": "#/components/schemas/Features"
+          },
+          "season": {
+            "$ref": "#/components/schemas/SeasonRules"
+          },
+          "roll": {
+            "$ref": "#/components/schemas/RollRules"
+          },
+          "reward": {
+            "$ref": "#/components/schemas/RewardRules"
+          },
+          "drop": {
+            "$ref": "#/components/schemas/DropRules"
+          },
+          "finish": {
+            "$ref": "#/components/schemas/FinishRules"
+          },
+          "ranking": {
+            "$ref": "#/components/schemas/RankingRules"
+          },
+          "map": {
+            "$ref": "#/components/schemas/MapRules"
+          },
+          "economy": {
+            "$ref": "#/components/schemas/EconomyRules"
+          },
+          "effects": {
+            "$ref": "#/components/schemas/EffectRules"
+          },
+          "interactions": {
+            "$ref": "#/components/schemas/InteractionRules"
+          },
+          "bets": {
+            "$ref": "#/components/schemas/BetRules"
+          },
+          "social": {
+            "$ref": "#/components/schemas/SocialRules"
+          },
+          "nominations": {
+            "$ref": "#/components/schemas/NominationRules"
+          },
+          "weeklyChallenge": {
+            "$ref": "#/components/schemas/WeeklyChallengeRules"
+          }
+        }
+      },
+      "RulesetChange": {
+        "required": [
+          "path",
+          "before",
+          "after"
+        ],
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "before": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "after": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "One changed value between two versions of the rules: the JSON path (for example `reward.diceCount.max`)\nand the values before and after as JSON text (a JSON null is the text `\"null\"`); null when the field\ndid not exist on that side."
+      },
+      "RulesetError": {
+        "required": [
+          "path",
+          "message"
+        ],
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "description": "A problem in a ruleset: the JSON path of the field and what is wrong, in English for logs."
+      },
+      "RulesetProblem": {
+        "required": [
+          "title",
+          "status",
+          "errors"
+        ],
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RulesetError"
+            }
+          }
+        },
+        "description": "An invalid ruleset: every problem with the JSON path of its field (C2)."
+      },
+      "RulesVersionView": {
+        "required": [
+          "version",
+          "at",
+          "authorId",
+          "changes"
+        ],
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "authorId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "changes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RulesetChange"
+            }
+          }
+        },
+        "description": "One version of the rules: when, by whom (null for the season's creation by the system), and what changed."
+      },
+      "RulesView": {
+        "required": [
+          "version",
+          "ruleset",
+          "history"
+        ],
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "ruleset": {
+            "$ref": "#/components/schemas/Ruleset"
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RulesVersionView"
+            }
+          }
+        },
+        "description": "The rules in force and their history: who changed what and when (C3). Numbers on the rules page are real."
+      },
       "RunView": {
         "required": [
           "id",
@@ -923,6 +1855,27 @@
           "startedAt": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "SeasonRules": {
+        "required": [
+          "timezone",
+          "maxActiveRunsPerPlayer",
+          "inactiveHintDays"
+        ],
+        "type": "object",
+        "properties": {
+          "timezone": {
+            "type": "string"
+          },
+          "maxActiveRunsPerPlayer": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "inactiveHintDays": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
@@ -998,6 +1951,62 @@
           }
         }
       },
+      "ShopRules": {
+        "required": [
+          "lotsPerRoll",
+          "lotLifetimeMinutes",
+          "rollCost",
+          "rerollCostStep",
+          "resetOn"
+        ],
+        "type": "object",
+        "properties": {
+          "lotsPerRoll": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "lotLifetimeMinutes": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "rollCost": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "rerollCostStep": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "resetOn": {
+            "$ref": "#/components/schemas/EquatableArrayOfShopPriceReset"
+          }
+        }
+      },
+      "SocialRules": {
+        "required": [
+          "reactions",
+          "galleryUploadsPerDay",
+          "commentsPerDay",
+          "spectatorsCanVote"
+        ],
+        "type": "object",
+        "properties": {
+          "reactions": {
+            "$ref": "#/components/schemas/EquatableArrayOfstring"
+          },
+          "galleryUploadsPerDay": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "commentsPerDay": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "spectatorsCanVote": {
+            "type": "boolean"
+          }
+        }
+      },
       "StartRequest": {
         "required": [
           "commandId"
@@ -1017,6 +2026,25 @@
           "playing"
         ],
         "description": "Where the player is in the turn cycle. Moving and resolving happen inside one command."
+      },
+      "UnmetConditionPolicy": {
+        "enum": [
+          "noDiceKeepCoins",
+          "countAsDrop",
+          "ignore"
+        ]
+      },
+      "WeeklyChallengeRules": {
+        "required": [
+          "defaultRewardCoins"
+        ],
+        "type": "object",
+        "properties": {
+          "defaultRewardCoins": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
       }
     }
   },
@@ -1026,6 +2054,12 @@
     },
     {
       "name": "Seasons"
+    },
+    {
+      "name": "Rules"
+    },
+    {
+      "name": "Admin"
     }
   ]
 }

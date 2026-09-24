@@ -27,7 +27,7 @@ public class DefaultRulesetTests
     [Fact]
     public void Default_ruleset_is_supported_by_this_build()
     {
-        Assert.Null(RulesetSupport.Unsupported(RulesetJson.Default()));
+        Assert.Empty(RulesetSupport.Unsupported(RulesetJson.Default()));
     }
 
     private static string Normalize(string text) => text.Replace("\r\n", "\n", StringComparison.Ordinal).Trim();

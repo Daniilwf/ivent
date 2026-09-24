@@ -1,5 +1,4 @@
 using GameEvent.Engine.Kernel;
-using GameEvent.Engine.Rulesets;
 using GameEvent.Engine.Seasons;
 using GameEvent.Infrastructure.Database;
 using GameEvent.Infrastructure.EventLog;
@@ -111,13 +110,8 @@ public sealed partial class CommandProcessor(
             cached = await EventLogReader.ReplaySeasonAsync(db, envelope.SeasonId, ct);
         }
 
-        var rulesetJson = await db.Seasons.AsNoTracking()
-            .Where(s => s.Id == envelope.SeasonId)
-            .Select(s => s.RulesetJson)
-            .SingleOrDefaultAsync(ct)
-            ?? RulesetJson.DefaultJson();
-        var ruleset = RulesetJson.Parse(rulesetJson);
-        var context = new EngineContext(clock, random, ids, ruleset, await PoolReader.LoadAsync(db, ct));
+        // The rules come from the season's own log (D-82); a new season brings them in CreateSeason.
+        var context = new EngineContext(clock, random, ids, await PoolReader.LoadAsync(db, ct));
 
         var result = SeasonEngine.Execute(cached.State, envelope.Command, context);
         if (!result.IsAccepted)
@@ -153,7 +147,7 @@ public sealed partial class CommandProcessor(
         await using (var transaction = await db.Database.BeginTransactionAsync(ct))
         {
             db.Events.AddRange(records);
-            await SeasonProjection.WriteAsync(db, cached.State, result.State, rulesetJson, ruleset.Version, now, ct);
+            await SeasonProjection.WriteAsync(db, cached.State, result.State, now, envelope.AuthorId, ct);
             await db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
         }

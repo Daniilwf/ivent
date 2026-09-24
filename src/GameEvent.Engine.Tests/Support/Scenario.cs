@@ -28,15 +28,17 @@ public sealed class Scenario
     private readonly List<Category> _categories = [];
     private readonly Dictionary<string, Guid> _players = [];
     private readonly List<IGameEvent> _log = [];
+    private Ruleset _initialRuleset;
     private bool _expectRejection;
 
     private Scenario(Ruleset ruleset, int seed)
     {
-        Ruleset = ruleset;
+        _initialRuleset = ruleset;
         Random = new ScriptedRandom(seed);
     }
 
-    public Ruleset Ruleset { get; private set; }
+    /// <summary>The rules in force: the season's once it exists, the ones it will be created with before that.</summary>
+    public Ruleset Ruleset => State.Ruleset ?? _initialRuleset;
 
     public FixedClock Clock { get; } = new(FixedClock.SeasonStart);
 
@@ -58,9 +60,19 @@ public sealed class Scenario
     /// </summary>
     public static Scenario New(Ruleset? ruleset = null, int seed = 42) => new(ruleset ?? TestRuleset.Create(), seed);
 
+    /// <summary>
+    /// Before the season exists: the rules it is created with. After: the admin changes the rules
+    /// (a <see cref="ChangeRuleset"/> command, so the change is in the log).
+    /// </summary>
     public Scenario WithRuleset(Func<Ruleset, Ruleset> change)
     {
-        Ruleset = change(Ruleset);
+        if (!State.IsCreated)
+        {
+            _initialRuleset = change(_initialRuleset);
+            return this;
+        }
+
+        Setup(new ChangeRuleset(change(Ruleset)));
         return this;
     }
 
@@ -188,7 +200,7 @@ public sealed class Scenario
     public IEnumerable<T> LastEvents<T>() where T : IGameEvent => Last.Events.OfType<T>();
 
     public EngineContext Context() =>
-        new(Clock, Random, Ids, Ruleset, new PoolSnapshot([.. _games], [.. _categories]));
+        new(Clock, Random, Ids, new PoolSnapshot([.. _games], [.. _categories]));
 
     private Scenario Play(ICommand command)
     {
@@ -208,7 +220,7 @@ public sealed class Scenario
     {
         if (!State.IsCreated)
         {
-            Setup(new CreateSeason(SequentialIds.Make(SeasonIdPrefix, 1)));
+            Setup(new CreateSeason(SequentialIds.Make(SeasonIdPrefix, 1), _initialRuleset));
         }
     }
 

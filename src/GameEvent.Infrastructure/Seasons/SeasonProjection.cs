@@ -16,18 +16,37 @@ namespace GameEvent.Infrastructure.Seasons;
 internal static class SeasonProjection
 {
     public static async Task WriteAsync(
-        GameEventDbContext db, SeasonState before, SeasonState after, string rulesetJson, int rulesetVersion, DateTimeOffset now, CancellationToken ct)
+        GameEventDbContext db, SeasonState before, SeasonState after, DateTimeOffset now, Guid? authorId, CancellationToken ct)
     {
+        if (before.RulesetVersion != after.RulesetVersion)
+        {
+            db.Rulesets.Add(new RulesetRecord
+            {
+                SeasonId = after.SeasonId,
+                Version = after.RulesetVersion,
+                Json = JsonSerializer.Serialize(after.Rules, EngineJson.Options),
+                CreatedAt = now,
+                AuthorId = authorId,
+            });
+        }
+
         if (!before.IsCreated && after.IsCreated)
         {
             db.Seasons.Add(new SeasonRecord
             {
                 Id = after.SeasonId,
                 Status = "Active",
-                RulesetVersion = rulesetVersion,
-                RulesetJson = rulesetJson,
+                RulesetVersion = after.RulesetVersion,
+                RulesetJson = JsonSerializer.Serialize(after.Rules, EngineJson.Options),
                 CreatedAt = now,
             });
+        }
+        else if (before.RulesetVersion != after.RulesetVersion)
+        {
+            var season = await db.Seasons.FindAsync([after.SeasonId], ct)
+                ?? throw new InvalidOperationException($"Season {after.SeasonId} has no projection row.");
+            season.RulesetVersion = after.RulesetVersion;
+            season.RulesetJson = JsonSerializer.Serialize(after.Rules, EngineJson.Options);
         }
 
         foreach (var (id, player) in after.Players)

@@ -2,6 +2,7 @@
 // Writes the OpenAPI document of the backend and the TypeScript client types generated from it.
 // API types on the frontend are never written by hand; CI fails if these files are stale.
 // Both files are generated as is (not formatted), so a fresh run on any OS gives the same bytes.
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { quote, root, run } from './lib.mjs';
 
@@ -20,6 +21,12 @@ const steps = [
   ],
 ];
 
-for (const [command, args] of steps) {
-  if (!run(command, args)) process.exit(1);
-}
+const [build, generate] = steps;
+if (!run(...build)) process.exit(1);
+
+// XML doc comments carry the OS line ending (an escaped CR LF on Windows): normalize so any OS writes
+// the same bytes.
+const document = join(apiDir, 'openapi.json');
+writeFileSync(document, readFileSync(document, 'utf8').replaceAll('\\r\\n', '\\n'));
+
+if (!run(...generate)) process.exit(1);

@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using GameEvent.Engine.Kernel;
+using GameEvent.Engine.Rulesets;
 using GameEvent.Engine.Seasons;
 using GameEvent.Infrastructure.Accounts;
 using GameEvent.Infrastructure.Database;
@@ -93,7 +94,7 @@ internal sealed class SiteFactory : WebApplicationFactory<Program>
         }
 
         var bus = Services.GetRequiredService<CommandBus>();
-        await SendAsync(bus, new CreateSeason(SeasonId));
+        await SendAsync(bus, new CreateSeason(SeasonId, RulesetJson.Default()));
         foreach (var login in new[] { "vasya", "petya" })
         {
             Players[login] = Guid.NewGuid();
@@ -105,7 +106,7 @@ internal sealed class SiteFactory : WebApplicationFactory<Program>
     public async Task<Guid> CreateSeasonAsync()
     {
         var id = Guid.NewGuid();
-        var outcome = await Services.GetRequiredService<CommandBus>().SendAsync(new CommandEnvelope(Guid.NewGuid(), id, new CreateSeason(id), AuthorId: null));
+        var outcome = await Services.GetRequiredService<CommandBus>().SendAsync(new CommandEnvelope(Guid.NewGuid(), id, new CreateSeason(id, RulesetJson.Default()), AuthorId: null));
         return outcome.IsAccepted ? id : throw new InvalidOperationException($"Season not created: {outcome.Rejection}");
     }
 

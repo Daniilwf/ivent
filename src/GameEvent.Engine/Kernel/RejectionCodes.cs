@@ -5,7 +5,9 @@ public static class RejectionCodes
 {
     public const string CommandIdReused = "command.idReused";
     public const string SeasonMismatch = "season.mismatch";
-    public const string RulesetUnsupported = "ruleset.unsupported";
+    public const string RulesetInvalid = "ruleset.invalid";
+    public const string RulesetUnchanged = "ruleset.unchanged";
+    public const string RulesetVersionConflict = "ruleset.versionConflict";
     public const string SeasonNotCreated = "season.notCreated";
     public const string SeasonAlreadyCreated = "season.alreadyCreated";
     public const string PlayerUnknown = "player.unknown";
