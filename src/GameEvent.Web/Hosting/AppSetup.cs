@@ -21,6 +21,11 @@ public static class AppSetup
 {
     public const string LoginRateLimit = "login";
 
+    /// <summary>Admin reads that fold the whole season log: per user, a few per second at most (D-92).</summary>
+    public const string AdminReadRateLimit = "admin-read";
+
+    public const int AdminReadsPerMinute = 30;
+
     public static void AddGameEvent(this WebApplicationBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
@@ -92,6 +97,9 @@ public static class AppSetup
             o.AddPolicy(LoginRateLimit, ctx => RateLimitPartition.GetFixedWindowLimiter(
                 WebSecurity.ClientKey(ctx.Connection.RemoteIpAddress),
                 _ => new FixedWindowRateLimiterOptions { PermitLimit = attempts, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+            o.AddPolicy(AdminReadRateLimit, ctx => RateLimitPartition.GetFixedWindowLimiter(
+                ctx.User.UserId()?.ToString() ?? WebSecurity.ClientKey(ctx.Connection.RemoteIpAddress),
+                _ => new FixedWindowRateLimiterOptions { PermitLimit = AdminReadsPerMinute, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
         });
 
         services.Configure<ForwardedHeadersOptions>(o => WebSecurity.ConfigureForwardedHeaders(o, builder.Configuration));

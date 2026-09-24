@@ -15,10 +15,10 @@ public static class PoolStats
     /// <summary>Every category of the pool, ordered by name, with its available games.</summary>
     public static IReadOnlyList<CategoryStat> Categories(SeasonState state, IPoolView pool)
     {
+        ArgumentNullException.ThrowIfNull(state);
         ArgumentNullException.ThrowIfNull(pool);
 
-        // Nobody's personal exclusions: the status as a player with none sees it.
-        var status = SeasonGameStatus.For(state, Guid.Empty);
+        var status = SeasonGameStatus.ForNobody(state);
         var available = pool.Games.Where(g => status.Of(g) == GameAvailability.Available).ToList();
         return [.. pool.Categories
             .OrderBy(c => c.Name, StringComparer.Ordinal)
@@ -26,8 +26,8 @@ public static class PoolStats
     }
 
     /// <summary>
-    /// Players of the season whose next roll would find no game (their exclusions included), ordered by name:
-    /// the signal for the admin. Empty when the season is not running.
+    /// Idle, active players of a running season whose roll would find no game now (their exclusions and the filters
+    /// included), ordered by name: the signal for the admin (D-92). A player playing or holding an offer has a game.
     /// </summary>
     public static IReadOnlyList<Guid> PlayersWithoutGames(SeasonState state, IPoolView pool)
     {
@@ -39,14 +39,9 @@ public static class PoolStats
             return [];
         }
 
-        // The same test as the wheel: some weighted category has a game this player could get.
+        var filters = Rolling.Filters(state);
         return [.. state.Players.Values
-            .Where(p =>
-            {
-                var status = SeasonGameStatus.For(state, p.PlayerId);
-                return !pool.Categories.Any(c => c.Weight > 0
-                    && pool.Games.Any(g => Rolling.InCategory(g, c) && status.Of(g) == GameAvailability.Available));
-            })
+            .Where(p => p is { Phase: TurnPhase.Idle, IsInactive: false } && !Rolling.CanRoll(state, p.PlayerId, pool, filters))
             .OrderBy(p => p.Name, StringComparer.Ordinal)
             .Select(p => p.PlayerId)];
     }

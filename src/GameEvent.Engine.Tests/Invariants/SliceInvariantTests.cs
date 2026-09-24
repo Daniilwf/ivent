@@ -210,6 +210,31 @@ public class SliceInvariantTests
             Assert.Equal((was.Coins, was.Points, was.Resources, was.CellId), (now.Coins, now.Points, now.Resources, now.CellId));
         }
 
+        // G10 / D-92: one check «is there anything to roll». An accepted roll from Idle means CanRoll was true before it
+        var pool = s.Context().Pool;
+        Guid? roller = s.Last.IsAccepted
+            ? (s.Last.Events.Count > 0 ? s.Last.Events[0] : null) switch
+            {
+                GameRolled r => r.PlayerId,
+                GameChoiceRolled c => c.PlayerId,
+                _ => null,
+            }
+            : null;
+        if (roller is { } rollerId && before.Players.TryGetValue(rollerId, out var rollerBefore) && rollerBefore.Phase == TurnPhase.Idle)
+        {
+            Assert.True(Rolling.CanRoll(before, rollerId, pool, []), "A roll was accepted although CanRoll said there was nothing.");
+        }
+
+        // G10 / D-92: the admin signal lists exactly the active idle players of a running season whose roll finds nothing
+        var expectedWithout = s.State.Status == SeasonStatus.Active
+            ? s.State.Players.Values
+                .Where(p => p.Phase == TurnPhase.Idle && !p.IsInactive && !Rolling.CanRoll(s.State, p.PlayerId, pool, []))
+                .OrderBy(p => p.Name, StringComparer.Ordinal)
+                .Select(p => p.PlayerId)
+                .ToList()
+            : [];
+        Assert.Equal(expectedWithout, PoolStats.PlayersWithoutGames(s.State, pool));
+
         // 1. Replaying the log gives the stored state
         Assert.Equal(s.State, SeasonEngine.Replay(s.Log));
 

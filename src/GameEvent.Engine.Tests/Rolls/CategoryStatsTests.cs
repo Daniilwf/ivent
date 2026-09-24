@@ -28,6 +28,18 @@ public class CategoryStatsTests
             .WithPlayers("Вася", "Петя");
 
     [Fact]
+    public void Missing_state_is_an_argument_error()
+    {
+        Assert.Throws<ArgumentNullException>(() => PoolStats.Categories(null!, Pool().Context().Pool));
+    }
+
+    [Fact]
+    public void Missing_pool_is_an_argument_error()
+    {
+        Assert.Throws<ArgumentNullException>(() => PoolStats.Categories(Pool().State, null!));
+    }
+
+    [Fact]
     public void Every_category_is_listed_by_name_with_its_weight_and_available_games()
     {
         var s = Pool();

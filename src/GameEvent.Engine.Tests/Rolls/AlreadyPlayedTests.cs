@@ -142,6 +142,41 @@ public class AlreadyPlayedTests
         Assert.Empty(rolled.Misses);
     }
 
+    [Fact]
+    public void Free_roll_spins_the_category_wheel_again()
+    {
+        var checkedSeeds = 0;
+        foreach (var seed in s_seeds)
+        {
+            // Given heavy Horror has only Silent Hill and light Puzzle has Tetris and Portal
+            var s = Scenario.New(seed: seed)
+                .WithCategory("Horror", weight: 20).WithGame("Silent Hill", 12, "Horror")
+                .WithCategory("Puzzle", weight: 1).WithGame("Tetris", 2, "Puzzle").WithGame("Portal", 5, "Puzzle")
+                .WithPlayers("Вася", "Петя")
+                .Roll("Вася");
+            if (Offered(s, "Вася") != s.GameId("Silent Hill"))
+            {
+                continue;
+            }
+
+            checkedSeeds++;
+
+            // When Вася declares Silent Hill «Уже проходил»
+            Declare(s, "Вася", s.GameId("Silent Hill"));
+
+            // Then the free roll is a whole new spin: Horror has nothing for him, so the game comes from Puzzle,
+            // not a redraw inside the old category (which would find nothing)
+            ScenarioAssert.Accepted(s);
+            var rolled = Assert.IsType<GameRolled>(s.Last.Events[1]);
+            Assert.Equal("Puzzle", rolled.Category);
+            Assert.Contains(rolled.GameId, new[] { s.GameId("Tetris"), s.GameId("Portal") });
+            Assert.Empty(rolled.Misses);
+            Assert.Equal(TurnPhase.Rolling, s.Player("Вася").Phase);
+        }
+
+        Assert.True(checkedSeeds >= 10, $"Over many seeds the heavy Horror must usually come first, got {checkedSeeds}.");
+    }
+
     // ---- Free: not a reroll, spends nothing (D-07), no limit (D-08) ----
 
     [Fact]
@@ -519,6 +554,21 @@ public class AlreadyPlayedTests
             Assert.Equal(s.Player("Вася").Exclusions, replayed.Players[s.PlayerId("Вася")].Exclusions);
             Assert.Equal(s.Player("Петя").Exclusions, replayed.Players[s.PlayerId("Петя")].Exclusions);
         }
+    }
+
+    [Fact]
+    public void Folding_a_second_exclusion_of_the_same_game_fails()
+    {
+        // Given Вася excluded his offered game
+        var s = Horror(42, 1, "Silent Hill", "Alan Wake").Roll("Вася");
+        var excluded = Offered(s, "Вася");
+        Declare(s, "Вася", excluded);
+        ScenarioAssert.Accepted(s);
+        var duplicate = new GameExcluded(s.PlayerId("Вася"), excluded, ExclusionReason.AlreadyPlayed);
+
+        // Then a log that excludes it again is corrupt: the fold refuses it (D-92), one exclusion per game
+        Assert.ThrowsAny<Exception>(() => SeasonEngine.Apply(s.State, duplicate));
+        Assert.ThrowsAny<Exception>(() => SeasonEngine.Replay([.. s.Log, duplicate]));
     }
 
     [Fact]

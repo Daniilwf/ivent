@@ -8,9 +8,9 @@ namespace GameEvent.Engine.Tests.Rolls;
 /// <summary>
 /// G10: when no game is left for a player, the admin gets a signal (SPEC «Уточнения»: пустой пул; D-92). The signal is
 /// computed, not logged: <see cref="PoolStats.PlayersWithoutGames"/> lists players of a running season whose next roll
-/// would find nothing, their own exclusions included, ordered by name. Dropping the zone filter is stage 2.
-/// A rolling or playing player whose only game is his own offer is not asserted on (SPEC does not say), the tests
-/// judge idle players and players who still have a free game.
+/// would find nothing, their own exclusions included, ordered by name. Only players who could roll now are judged:
+/// in phase Idle and not marked inactive (D-92). A rolling or playing player has a game; his signal appears when he is
+/// back to Idle. Dropping the zone filter is stage 2.
 /// </summary>
 public class EmptyPoolTests
 {
@@ -131,6 +131,61 @@ public class EmptyPoolTests
         }
 
         Assert.True(checkedSeeds > 0, "Over many seeds Петя must sometimes roll Alan Wake.");
+    }
+
+    [Fact]
+    public void Player_holding_the_last_game_is_not_listed_until_he_is_idle_again()
+    {
+        // Given one game in the pool, offered to Вася
+        var s = Scenario.New()
+            .WithCategory("Horror").WithGame("Silent Hill", 12, "Horror")
+            .WithPlayers("Вася", "Петя")
+            .Roll("Вася");
+
+        // Then only Петя, who is idle, is the signal: Вася has a game (Rolling)
+        Assert.Equal(TurnPhase.Rolling, s.Player("Вася").Phase);
+        Assert.Equal([s.PlayerId("Петя")], Without(s));
+
+        // While Вася plays it he is still not listed
+        s.Start("Вася");
+        Assert.Equal(TurnPhase.Playing, s.Player("Вася").Phase);
+        Assert.Equal([s.PlayerId("Петя")], Without(s));
+
+        // When he completes it he is back to Idle with nothing left: now both are listed, by name
+        s.Complete("Вася");
+        Assert.Equal(TurnPhase.Idle, s.Player("Вася").Phase);
+        Assert.Equal([s.PlayerId("Вася"), s.PlayerId("Петя")], Without(s));
+    }
+
+    [Fact]
+    public void Player_waiting_on_a_choice_of_the_last_games_is_not_listed()
+    {
+        // Given a choice of both games of the pool pending for Вася
+        var s = Scenario.New()
+            .WithRuleset(r => r with { Roll = r.Roll with { ChoiceCount = 3 } })
+            .WithCategory("Horror").WithGame("Silent Hill", 12, "Horror").WithGame("Alan Wake", 15, "Horror")
+            .WithPlayers("Вася", "Петя")
+            .Roll("Вася");
+        Assert.NotNull(s.Player("Вася").Choice);
+
+        Assert.Equal([s.PlayerId("Петя")], Without(s));
+    }
+
+    [Fact]
+    public void Inactive_player_without_games_is_not_listed()
+    {
+        // Given the pool is empty for everyone and Петя is marked inactive
+        var s = Scenario.New().WithCategory("Horror").WithDeletedGame("Gone", 5, "Horror").WithPlayers("Вася", "Петя");
+        s.Act(new SetPlayerInactive(s.PlayerId("Петя"), IsInactive: true));
+        ScenarioAssert.Accepted(s);
+
+        // Then only Вася is the signal
+        Assert.Equal([s.PlayerId("Вася")], Without(s));
+
+        // When Петя is active again he is listed too
+        s.Act(new SetPlayerInactive(s.PlayerId("Петя"), IsInactive: false));
+        ScenarioAssert.Accepted(s);
+        Assert.Equal([s.PlayerId("Вася"), s.PlayerId("Петя")], Without(s));
     }
 
     [Theory]

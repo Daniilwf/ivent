@@ -138,6 +138,26 @@ public sealed class PoolStatsApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Many_requests_in_a_row_are_limited_per_user()
+    {
+        // The endpoint folds the whole season log on every call (D-92): an admin hammering it gets 429
+        var admin = await _site.SignedInAsync("admin");
+        var codes = new List<HttpStatusCode>();
+        for (var i = 0; i < 40; i++)
+        {
+            codes.Add((await admin.GetAsync(StatsUrl(SiteFactory.SeasonId), Ct)).StatusCode);
+        }
+
+        Assert.Equal(HttpStatusCode.OK, codes[0]);
+        Assert.Contains(HttpStatusCode.TooManyRequests, codes);
+        Assert.All(codes, c => Assert.True(c is HttpStatusCode.OK or HttpStatusCode.TooManyRequests, $"Unexpected {c}."));
+
+        // Once limited, it stays limited within the window: no OK after the first 429
+        var firstLimited = codes.IndexOf(HttpStatusCode.TooManyRequests);
+        Assert.All(codes.Skip(firstLimited), c => Assert.Equal(HttpStatusCode.TooManyRequests, c));
+    }
+
+    [Fact]
     public async Task Unknown_season_is_not_found()
     {
         var admin = await _site.SignedInAsync("admin");

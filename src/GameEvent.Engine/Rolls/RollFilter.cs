@@ -19,9 +19,10 @@ public enum RollFilterPriority
 public sealed record RollFilter(RollFilterPriority Priority, string Name, Func<Game, bool> Matches);
 
 /// <summary>
-/// Combines roll filters (G12): from the highest priority down, each filter narrows the games left; a filter that would
-/// leave no available game is dropped, so the more important one wins and an empty intersection never empties the roll.
-/// Filters of the same priority are applied in the given order.
+/// Combines roll filters (G12, D-92): from the highest priority down, each filter narrows the games left. A lower filter
+/// whose intersection leaves no available game is skipped: the more important one wins. The top filter itself is kept
+/// even when it leaves nothing — then the roll is empty and the admin gets the signal — except a zone filter, which is
+/// lifted on an empty pool (SPEC «Уточнения»: пустой пул). Filters of the same priority keep the given order.
 /// </summary>
 public static class RollFilters
 {
@@ -37,12 +38,18 @@ public static class RollFilters
 
         // OrderByDescending is stable: filters of one priority keep the given order.
         var games = candidates;
+        var narrowedYet = false;
         foreach (var filter in filters.OrderByDescending(f => f.Priority))
         {
             var narrowed = games.Where(filter.Matches).ToList();
             if (narrowed.Any(isAvailable))
             {
                 games = narrowed;
+                narrowedYet = true;
+            }
+            else if (!narrowedYet && filter.Priority != RollFilterPriority.Zone)
+            {
+                return narrowed;
             }
         }
 

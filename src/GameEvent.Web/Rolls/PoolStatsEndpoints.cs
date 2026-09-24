@@ -22,10 +22,12 @@ public static class PoolStatsEndpoints
         api.MapGet("/admin/seasons/{seasonId:guid}/pool-stats", GetAsync)
             .WithTags("Admin")
             .RequireAuthorization(Policies.Admin)
+            .RequireRateLimiting(AppSetup.AdminReadRateLimit)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status403Forbidden);
 
-    // Read-only: the state is folded from the log, the queue is not involved.
+    // Read-only: the state is folded from the log, the queue is not involved; the rate limit caps the cost (D-92).
     private static async Task<Results<Ok<PoolStatsView>, NotFound>> GetAsync(Guid seasonId, GameEventDbContext db, CancellationToken ct)
     {
         var (state, _) = await EventLogReader.ReplaySeasonAsync(db, seasonId, ct);

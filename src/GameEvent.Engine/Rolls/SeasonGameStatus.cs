@@ -73,6 +73,9 @@ internal sealed class SeasonGameStatus
     /// <summary>Game statuses as seen by <paramref name="playerId"/>; an unknown id sees no personal exclusions.</summary>
     public static SeasonGameStatus For(SeasonState state, Guid playerId) => new(state, playerId);
 
+    /// <summary>Game statuses without anyone's personal exclusions (category counts for the admin).</summary>
+    public static SeasonGameStatus ForNobody(SeasonState state) => new(state, Guid.Empty);
+
     public GameAvailability Of(Game game, out RollMiss? miss)
     {
         miss = null;
