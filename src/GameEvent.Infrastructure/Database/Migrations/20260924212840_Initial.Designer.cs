@@ -11,7 +11,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace GameEvent.Infrastructure.Database.Migrations
 {
     [DbContext(typeof(GameEventDbContext))]
-    [Migration("20260924204220_Initial")]
+    [Migration("20260924212840_Initial")]
     partial class Initial
     {
         /// <inheritdoc />
@@ -162,6 +162,40 @@ namespace GameEvent.Infrastructure.Database.Migrations
                     b.ToTable("Game", (string)null);
                 });
 
+            modelBuilder.Entity("GameEvent.Infrastructure.Seasons.PendingManualEffectRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("DrawEvent")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("PlayerId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("RunId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("SeasonId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PlayerId");
+
+                    b.HasIndex("SeasonId", "PlayerId");
+
+                    b.ToTable("PendingManualEffect", (string)null);
+                });
+
             modelBuilder.Entity("GameEvent.Infrastructure.Seasons.PlayerGameExclusionRecord", b =>
                 {
                     b.Property<Guid>("PlayerId")
@@ -294,6 +328,9 @@ namespace GameEvent.Infrastructure.Database.Migrations
                     b.Property<int>("Points")
                         .HasColumnType("INTEGER");
 
+                    b.Property<int>("RerollsThisRoll")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("ResourcesJson")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -346,6 +383,21 @@ namespace GameEvent.Infrastructure.Database.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Season", (string)null);
+                });
+
+            modelBuilder.Entity("GameEvent.Infrastructure.Seasons.PendingManualEffectRecord", b =>
+                {
+                    b.HasOne("GameEvent.Infrastructure.Seasons.SeasonPlayerRecord", null)
+                        .WithMany()
+                        .HasForeignKey("PlayerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("GameEvent.Infrastructure.Seasons.SeasonRecord", null)
+                        .WithMany()
+                        .HasForeignKey("SeasonId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("GameEvent.Infrastructure.Seasons.PlayerGameExclusionRecord", b =>

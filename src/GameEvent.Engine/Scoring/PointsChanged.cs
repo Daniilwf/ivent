@@ -16,12 +16,14 @@ public enum CoinsReason
 {
     StartingBalance,
     AdminAdjustment,
+    Reroll,
 }
 
 /// <summary>What changed another resource of a player.</summary>
 public enum ResourceReason
 {
     AdminAdjustment,
+    Reroll,
 }
 
 /// <summary>Points changed by <see cref="Delta"/>; <see cref="RunId"/> links the change to a run when there is one.</summary>

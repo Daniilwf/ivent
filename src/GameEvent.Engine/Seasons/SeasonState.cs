@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using GameEvent.Engine.Effects;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Map;
 using GameEvent.Engine.Rolls;
@@ -21,10 +22,21 @@ public sealed record SeasonState(
     int RulesetVersion,
     MapGraph Map,
     ImmutableSortedDictionary<Guid, SeasonPlayer> Players,
-    ImmutableSortedDictionary<Guid, RunState> Runs)
+    ImmutableSortedDictionary<Guid, RunState> Runs,
+    ImmutableSortedDictionary<Guid, PendingManualEffect> ManualEffects)
 {
     public static SeasonState Empty { get; } =
-        new(Guid.Empty, Name: "", SeasonStatus.Draft, Deadline: null, Ruleset: null, RulesetVersion: 0, new MapGraph([], []), ImmutableSortedDictionary<Guid, SeasonPlayer>.Empty, ImmutableSortedDictionary<Guid, RunState>.Empty);
+        new(
+            Guid.Empty,
+            Name: "",
+            SeasonStatus.Draft,
+            Deadline: null,
+            Ruleset: null,
+            RulesetVersion: 0,
+            new MapGraph([], []),
+            ImmutableSortedDictionary<Guid, SeasonPlayer>.Empty,
+            ImmutableSortedDictionary<Guid, RunState>.Empty,
+            ImmutableSortedDictionary<Guid, PendingManualEffect>.Empty);
 
     public bool IsCreated => SeasonId != Guid.Empty;
 
@@ -41,7 +53,8 @@ public sealed record SeasonState(
         && RulesetVersion == other.RulesetVersion
         && Map == other.Map
         && Players.SequenceEqual(other.Players)
-        && Runs.SequenceEqual(other.Runs);
+        && Runs.SequenceEqual(other.Runs)
+        && ManualEffects.SequenceEqual(other.ManualEffects);
 
     public override int GetHashCode() => HashCode.Combine(SeasonId, Players.Count, Runs.Count);
 }
@@ -67,6 +80,7 @@ public enum TurnPhase
 /// <summary>
 /// A player's standing in the season. Points and position are independent measures. Points and coins are
 /// fields (the leaderboard sorts by them); any other resource lives in <see cref="Resources"/> (invariant 9).
+/// <see cref="RerollsThisRoll"/> counts rerolls since the last roll from Idle: 0 whenever the player is not Rolling.
 /// </summary>
 public sealed record SeasonPlayer(
     Guid PlayerId,
@@ -82,4 +96,5 @@ public sealed record SeasonPlayer(
     RollOffer? Offer,
     PendingChoice? Choice,
     EquatableArray<GameExclusion> Exclusions,
+    int RerollsThisRoll,
     Guid? ActiveRunId);

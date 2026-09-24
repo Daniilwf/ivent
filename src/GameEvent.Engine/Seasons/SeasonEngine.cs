@@ -1,3 +1,4 @@
+using GameEvent.Engine.Effects;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Map;
 using GameEvent.Engine.Players;
@@ -42,6 +43,7 @@ public static class SeasonEngine
             AdjustPlayer c => PlayerAdministration.Decide(state, c),
             RollGame c => Rolling.Decide(state, c, context),
             DeclareAlreadyPlayed c => Rolling.Decide(state, c, context),
+            Reroll c => Rolling.Decide(state, c, context),
             StartRun c => RunLifecycle.Decide(state, c, context),
             CompleteRun c => RunLifecycle.Decide(state, c, context),
             MakeChoice c => Choosing.Decide(state, c, context),
@@ -66,6 +68,8 @@ public static class SeasonEngine
             RulesetChanged e => RulesetChanges.Apply(state, e),
             GameRolled e => Rolling.Apply(state, e),
             GameExcluded e => Rolling.Apply(state, e),
+            GameRerolled e => Rolling.Apply(state, e),
+            ManualEffectCreated e => ManualEffects.Apply(state, e),
             GameChoiceRolled e => Choosing.Apply(state, e),
             ChoiceMade e => Choosing.Apply(state, e),
             ChoiceDiscarded e => Choosing.Apply(state, e),

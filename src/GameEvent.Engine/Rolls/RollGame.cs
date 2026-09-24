@@ -85,6 +85,12 @@ internal static class Rolling
             : Decision.Accept(excluded);
     }
 
+    public static Decision Decide(SeasonState state, Reroll command, EngineContext context) =>
+        throw new NotImplementedException("C6");
+
+    public static SeasonState Apply(SeasonState state, GameRerolled e) =>
+        throw new NotImplementedException("C6");
+
     public static SeasonState Apply(SeasonState state, GameExcluded e)
     {
         var player = state.Players[e.PlayerId];

@@ -135,6 +135,7 @@ namespace GameEvent.Infrastructure.Database.Migrations
                     Phase = table.Column<string>(type: "TEXT", maxLength: 20, nullable: false),
                     OfferJson = table.Column<string>(type: "TEXT", nullable: true),
                     ChoiceJson = table.Column<string>(type: "TEXT", nullable: true),
+                    RerollsThisRoll = table.Column<int>(type: "INTEGER", nullable: false),
                     ActiveRunId = table.Column<Guid>(type: "TEXT", nullable: true)
                 },
                 constraints: table =>
@@ -142,6 +143,34 @@ namespace GameEvent.Infrastructure.Database.Migrations
                     table.PrimaryKey("PK_SeasonPlayer", x => x.Id);
                     table.ForeignKey(
                         name: "FK_SeasonPlayer_Season_SeasonId",
+                        column: x => x.SeasonId,
+                        principalTable: "Season",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "PendingManualEffect",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "TEXT", nullable: false),
+                    SeasonId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    PlayerId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    DrawEvent = table.Column<string>(type: "TEXT", maxLength: 20, nullable: false),
+                    Source = table.Column<string>(type: "TEXT", maxLength: 30, nullable: false),
+                    RunId = table.Column<Guid>(type: "TEXT", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_PendingManualEffect", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_PendingManualEffect_SeasonPlayer_PlayerId",
+                        column: x => x.PlayerId,
+                        principalTable: "SeasonPlayer",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_PendingManualEffect_Season_SeasonId",
                         column: x => x.SeasonId,
                         principalTable: "Season",
                         principalColumn: "Id",
@@ -212,6 +241,16 @@ namespace GameEvent.Infrastructure.Database.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "IX_PendingManualEffect_PlayerId",
+                table: "PendingManualEffect",
+                column: "PlayerId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_PendingManualEffect_SeasonId_PlayerId",
+                table: "PendingManualEffect",
+                columns: new[] { "SeasonId", "PlayerId" });
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Run_PlayerId",
                 table: "Run",
                 column: "PlayerId");
@@ -250,6 +289,9 @@ namespace GameEvent.Infrastructure.Database.Migrations
 
             migrationBuilder.DropTable(
                 name: "GameEvent");
+
+            migrationBuilder.DropTable(
+                name: "PendingManualEffect");
 
             migrationBuilder.DropTable(
                 name: "PlayerGameExclusion");

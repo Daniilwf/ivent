@@ -1,3 +1,4 @@
+using GameEvent.Engine.Effects;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Map;
 using GameEvent.Engine.Players;
@@ -130,6 +131,18 @@ public class EventFormatTests
             new GameExcluded(s_player, s_game, ExclusionReason.AlreadyPlayed),
             1,
             """{"playerId":"10000000-0000-0000-0000-000000000001","gameId":"20000000-0000-0000-0000-000000000001","reason":"alreadyPlayed"}"""
+        },
+        {
+            "game-rerolled",
+            new GameRerolled(s_player, [s_game], RerollPayment.Coins),
+            1,
+            """{"playerId":"10000000-0000-0000-0000-000000000001","gameIds":["20000000-0000-0000-0000-000000000001"],"payment":"coins"}"""
+        },
+        {
+            "manual-effect-created",
+            new ManualEffectCreated(s_run, s_player, EventKind.Bad, ManualEffectSource.PaidReroll, null),
+            1,
+            """{"effectId":"00000000-0000-0000-0000-000000000001","playerId":"10000000-0000-0000-0000-000000000001","drawEvent":"bad","source":"paidReroll","runId":null}"""
         },
         {
             "run-started",
