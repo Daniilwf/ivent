@@ -2,8 +2,8 @@ namespace GameEvent.Engine.Rulesets;
 
 /// <summary>
 /// Values this build cannot play yet (D-22, D-53): a season must not start or continue with a mechanic that is not
-/// implemented. Each check goes away when its task lands: graph map — stage 2, choice of N — C5, several runs — C4,
-/// each feature flag — its stage.
+/// implemented. Each check goes away when its task lands: graph map — stage 2, each feature flag — its stage.
+/// Several active runs need a turn per run; SPEC keeps one, the limit is in the config for later (D-91).
 /// </summary>
 public static class RulesetSupport
 {
@@ -16,11 +16,6 @@ public static class RulesetSupport
         if (ruleset.Features.MapMode != MapMode.Linear)
         {
             errors.Add(new("features.mapMode", $"'{ruleset.Features.MapMode}' {NotYet} (only linear)"));
-        }
-
-        if (ruleset.Roll.ChoiceCount > 1)
-        {
-            errors.Add(new("roll.choiceCount", $"{ruleset.Roll.ChoiceCount} {NotYet} (only 1)"));
         }
 
         if (ruleset.Season.MaxActiveRunsPerPlayer > 1)

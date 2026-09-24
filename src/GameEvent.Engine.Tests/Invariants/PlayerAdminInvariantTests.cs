@@ -7,6 +7,7 @@ using GameEvent.Engine.Runs;
 using GameEvent.Engine.Scoring;
 using GameEvent.Engine.Seasons;
 using GameEvent.Engine.Tests.Support;
+using GameEvent.Engine.Turns;
 
 namespace GameEvent.Engine.Tests.Invariants;
 
@@ -16,6 +17,8 @@ namespace GameEvent.Engine.Tests.Invariants;
 /// moves the deadline and, rarely, the season status. After every command the invariants of docs/TESTING.md
 /// this can break must hold; the expected values are folded from the log independently of the engine.
 /// Each byte of <c>script</c> is one command; <c>seed</c> drives the engine's random source.
+/// The choice variant (C4, D-91) plays with <c>roll.choiceCount</c> 3 and adds <see cref="MakeChoice"/>, so the admin
+/// discard (D-89) meets pending choices as well as offers.
 /// </summary>
 public class PlayerAdminInvariantTests
 {
@@ -25,8 +28,11 @@ public class PlayerAdminInvariantTests
     private static readonly Guid s_late = SequentialIds.Make(0x10000000, 0x99);
     private static readonly Guid s_lateUser = SequentialIds.Make(0x40000000, 0x99);
 
-    private static Scenario NewSeason(int seed) =>
+    private const int ChoiceCount = 3;
+
+    private static Scenario NewSeason(int seed, bool withChoice = false) =>
         Scenario.New(seed: seed)
+            .WithRuleset(r => withChoice ? r with { Roll = r.Roll with { ChoiceCount = ChoiceCount } } : r)
             .WithMapLength(MapLength)
             .WithCategory("Horror", weight: 3)
             .WithGame("Silent Hill", 12, "Horror")
@@ -40,14 +46,21 @@ public class PlayerAdminInvariantTests
 
     /// <summary>
     /// Bits 0–1 pick the player (the fourth is the late one, maybe not added yet), bits 2–4 the kind of command,
-    /// bits 5–7 its argument, so all three vary independently.
+    /// bits 5–7 its argument, so all three vary independently. With a choice, a start with an odd argument is
+    /// MakeChoice instead: the player's pending choice (the argument picks the option, one past the last is unknown)
+    /// or a made-up id.
     /// </summary>
-    private static ICommand CommandFor(Scenario s, byte b)
+    private static ICommand CommandFor(Scenario s, byte b, bool withChoice = false)
     {
         var index = b % 4;
         var player = index < s_players.Length ? s.PlayerId(s_players[index]) : s_late;
         var arg = b / 32;
         var comment = arg == 7 ? "" : "правка";
+        if (withChoice && (b / 4) % 8 == 1 && arg % 2 == 1)
+        {
+            return ChoiceFor(s, player, arg / 2);
+        }
+
         return ((b / 4) % 8) switch
         {
             0 => new RollGame(player),
@@ -68,16 +81,28 @@ public class PlayerAdminInvariantTests
         };
     }
 
+    private static MakeChoice ChoiceFor(Scenario s, Guid player, int arg)
+    {
+        if (!s.State.Players.TryGetValue(player, out var p) || p.Choice is not { } choice)
+        {
+            return new MakeChoice(player, SequentialIds.Make(0x50000000, arg), "none");
+        }
+
+        var index = arg % (choice.Options.Count + 1);
+        return new MakeChoice(player, choice.ChoiceId, index < choice.Options.Count ? choice.Options[index].Id : "unknown");
+    }
+
     private static string CellAt(Scenario s, int index) => s.State.Map.Cells[Math.Min(index, s.State.Map.Cells.Count - 1)].Id;
 
-    private static Scenario Play(int seed, byte[] script, Action<Scenario, ICommand, SeasonState, int>? afterEach = null)
+    private static Scenario Play(
+        int seed, byte[] script, Action<Scenario, ICommand, SeasonState, int>? afterEach = null, bool withChoice = false)
     {
-        var s = NewSeason(seed);
+        var s = NewSeason(seed, withChoice);
         foreach (var b in script)
         {
             var before = s.State;
             var logLength = s.Log.Count;
-            var command = CommandFor(s, b);
+            var command = CommandFor(s, b, withChoice);
             s.Act(command);
             afterEach?.Invoke(s, command, before, logLength);
         }
@@ -88,6 +113,20 @@ public class PlayerAdminInvariantTests
     [Property(MaxTest = 200)]
     public void Invariants_hold_after_every_command(int seed, byte[] script) =>
         Play(seed, script, CheckInvariants);
+
+    [Property(MaxTest = 200)]
+    public void Invariants_hold_with_a_choice_of_games(int seed, byte[] script) =>
+        Play(seed, script, CheckInvariants, withChoice: true);
+
+    [Property(MaxTest = 50)]
+    public void Same_seed_and_commands_give_the_same_log_with_a_choice_of_games(int seed, byte[] script)
+    {
+        var first = Play(seed, script, withChoice: true);
+        var second = Play(seed, script, withChoice: true);
+
+        Assert.Equal(first.Log, second.Log);
+        Assert.Equal(first.State, second.State);
+    }
 
     [Property(MaxTest = 50)]
     public void Same_seed_and_commands_give_the_same_log(int seed, byte[] script)
@@ -172,16 +211,19 @@ public class PlayerAdminInvariantTests
             // SE5. The flag is what the admin last set
             Assert.Equal(reference.IsInactive, player.IsInactive);
 
-            // 3. No more active runs than allowed; the phase matches the offer and the active run
+            // 3. No more active runs than allowed; the phase matches the offer or pending choice and the active run
             var playing = s.State.Runs.Values.Where(r => r.PlayerId == player.PlayerId && r.Status == RunStatus.Playing).ToList();
             Assert.True(playing.Count <= s.Ruleset.Season.MaxActiveRunsPerPlayer);
             Assert.Equal(playing.SingleOrDefault()?.RunId, player.ActiveRunId);
             Assert.Equal(player.Phase == TurnPhase.Playing, player.ActiveRunId is not null);
-            Assert.Equal(player.Phase == TurnPhase.Rolling, player.Offer is not null);
+            Assert.Equal(player.Phase == TurnPhase.Rolling, player.Offer is not null || player.Choice is not null);
+            Assert.False(player.Offer is not null && player.Choice is not null, "Both an offer and a pending choice.");
         }
 
-        // 4. A game is busy for at most one player: offered or played (a discarded offer frees it)
+        // 4 / G9. A game is busy for at most one player: offered, among pending options (D-06) or played
+        // (a discarded offer or choice frees it)
         var busy = s.State.Players.Values.Where(p => p.Offer is not null).Select(p => p.Offer!.GameId)
+            .Concat(s.State.Players.Values.Where(p => p.Choice is not null).SelectMany(p => p.Choice!.Options.Select(o => o.Game!.GameId)))
             .Concat(s.State.Runs.Values.Where(r => r.Status == RunStatus.Playing).Select(r => r.GameId))
             .ToList();
         Assert.Equal(busy.Count, busy.Distinct().Count());
@@ -203,7 +245,24 @@ public class PlayerAdminInvariantTests
                 Assert.All(events.OfType<PointsChanged>(), e => Assert.Equal(PointsReason.AdminAdjustment, e.Reason));
                 Assert.All(events.OfType<CoinsChanged>(), e => Assert.Equal(CoinsReason.AdminAdjustment, e.Reason));
                 Assert.All(events.OfType<PlayerMoved>(), e => Assert.Equal(MoveReason.AdminAdjustment, e.Reason));
-                Assert.Equal(adjust.DiscardOffer && before.Players[adjust.PlayerId].Phase == TurnPhase.Rolling, events.OfType<OfferDiscarded>().Any());
+                // D-89, D-91: a discard while Rolling drops exactly what was pending: the offer or the choice
+                var was = before.Players[adjust.PlayerId];
+                var discards = events.Where(e => e is OfferDiscarded or ChoiceDiscarded).ToList();
+                if (adjust.DiscardOffer && was.Phase == TurnPhase.Rolling)
+                {
+                    var discarded = Assert.Single(discards);
+                    IGameEvent expectedDiscard = was.Choice is { } pending
+                        ? new ChoiceDiscarded(adjust.PlayerId, pending.ChoiceId)
+                        : new OfferDiscarded(adjust.PlayerId, was.Offer!.GameId);
+                    Assert.Equal(expectedDiscard, discarded);
+                    Assert.Null(s.State.Players[adjust.PlayerId].Choice);
+                    Assert.Null(s.State.Players[adjust.PlayerId].Offer);
+                }
+                else
+                {
+                    Assert.Empty(discards);
+                }
+
                 if (adjust.DiscardOffer)
                 {
                     // Accepted with the flag: the player was idle or rolling, never playing, and is idle now
@@ -233,6 +292,19 @@ public class PlayerAdminInvariantTests
                 // Game actions only in a running season
                 Assert.Equal(SeasonStatus.Active, before.Status);
                 break;
+            case MakeChoice choose:
+                // Choosing --> Playing (D-91): the chosen option starts at once with its roll-time snapshot
+                Assert.Equal(SeasonStatus.Active, before.Status);
+                var option = before.Players[choose.PlayerId].Choice!.Options.Single(o => o.Id == choose.OptionId).Game!;
+                Assert.Equal(2, events.Count);
+                Assert.Equal(new ChoiceMade(choose.PlayerId, choose.ChoiceId, choose.OptionId), events[0]);
+                var started = Assert.IsType<RunStarted>(events[1]);
+                Assert.Equal(
+                    new RunStarted(started.RunId, choose.PlayerId, option.GameId, option.Snapshot, option.RolledAt, s.Clock.UtcNow),
+                    started);
+                Assert.Equal(TurnPhase.Playing, s.State.Players[choose.PlayerId].Phase);
+                Assert.Null(s.State.Players[choose.PlayerId].Choice);
+                break;
         }
     }
 
@@ -242,6 +314,11 @@ public class PlayerAdminInvariantTests
             SeasonPlayerAdded x => x.PlayerId,
             PlayerAdjusted x => x.PlayerId,
             OfferDiscarded x => x.PlayerId,
+            ChoiceDiscarded x => x.PlayerId,
+            GameRolled x => x.PlayerId,
+            GameChoiceRolled x => x.PlayerId,
+            ChoiceMade x => x.PlayerId,
+            RunStarted x => x.PlayerId,
             PointsChanged x => x.PlayerId,
             CoinsChanged x => x.PlayerId,
             ResourceChanged x => x.PlayerId,
@@ -284,7 +361,7 @@ public class PlayerAdminInvariantTests
                     Assert.DoesNotContain(added.PlayerId, players.Keys);
                     players[added.PlayerId] = new ReferencePlayer { CellId = added.CellId };
                     break;
-                case GameRolled or RunStarted or RunCompleted or CompletionRolled:
+                case GameRolled or GameChoiceRolled or ChoiceMade or RunStarted or RunCompleted or CompletionRolled:
                     // SE1/SE2: no game actions outside a running season
                     Assert.Equal(SeasonStatus.Active, status);
                     break;

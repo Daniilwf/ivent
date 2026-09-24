@@ -73,6 +73,9 @@ public sealed class SeasonPlayerRecord
     /// <summary>The offered game waiting for «Начать», as JSON (<see cref="Engine.Rolls.RollOffer"/>).</summary>
     public string? OfferJson { get; set; }
 
+    /// <summary>The pending choice, as JSON (<see cref="Engine.Turns.PendingChoice"/>); one per player at most.</summary>
+    public string? ChoiceJson { get; set; }
+
     public Guid? ActiveRunId { get; set; }
 }
 

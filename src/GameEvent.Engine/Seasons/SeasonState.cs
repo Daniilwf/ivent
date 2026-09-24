@@ -4,6 +4,7 @@ using GameEvent.Engine.Map;
 using GameEvent.Engine.Rolls;
 using GameEvent.Engine.Rulesets;
 using GameEvent.Engine.Runs;
+using GameEvent.Engine.Turns;
 
 namespace GameEvent.Engine.Seasons;
 
@@ -79,4 +80,5 @@ public sealed record SeasonPlayer(
     PlayerPath Path,
     TurnPhase Phase,
     RollOffer? Offer,
+    PendingChoice? Choice,
     Guid? ActiveRunId);

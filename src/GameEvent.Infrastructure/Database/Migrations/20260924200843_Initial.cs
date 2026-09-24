@@ -134,6 +134,7 @@ namespace GameEvent.Infrastructure.Database.Migrations
                     PathJson = table.Column<string>(type: "TEXT", nullable: false),
                     Phase = table.Column<string>(type: "TEXT", maxLength: 20, nullable: false),
                     OfferJson = table.Column<string>(type: "TEXT", nullable: true),
+                    ChoiceJson = table.Column<string>(type: "TEXT", nullable: true),
                     ActiveRunId = table.Column<Guid>(type: "TEXT", nullable: true)
                 },
                 constraints: table =>

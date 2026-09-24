@@ -398,6 +398,92 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/seasons/{seasonId}/choose": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ChooseRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CommandResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/seasons/{seasonId}/complete": {
         parameters: {
             query?: never;
@@ -713,6 +799,30 @@ export interface components {
             expectedVersion: number;
             ruleset: components["schemas"]["Ruleset"];
         };
+        /**
+         * @description What the player is choosing. Stage 1 has games only; branches, targets and outcomes come later (K-5).
+         * @enum {unknown}
+         */
+        ChoiceKind: "game";
+        ChoiceOptionView: {
+            id: string;
+            game: null | components["schemas"]["GameView"];
+        };
+        /** @description The pending choice, kept on the server: a reloaded page shows the same options (T2). */
+        ChoiceView: {
+            /** Format: uuid */
+            id: string;
+            kind: components["schemas"]["ChoiceKind"];
+            options: components["schemas"]["ChoiceOptionView"][];
+        };
+        /** @description An answer to the pending choice: its id and the picked option's id. */
+        ChooseRequest: {
+            /** Format: uuid */
+            commandId: string;
+            /** Format: uuid */
+            choiceId: string;
+            optionId: string;
+        };
         CoinReward: {
             /** Format: double */
             perHour: number;
@@ -928,6 +1038,7 @@ export interface components {
             playerId: string;
             phase: components["schemas"]["TurnPhase"];
             offer: null | components["schemas"]["GameView"];
+            choice: null | components["schemas"]["ChoiceView"];
             activeRun: null | components["schemas"]["RunView"];
             lastCompleted: null | components["schemas"]["CompletedRunView"];
         };
@@ -1167,6 +1278,7 @@ type ReadonlyArray<T> = [
     unknown[]
 ] ? Readonly<Exclude<T, undefined>> : Readonly<Exclude<T, undefined>[]>;
 export const cellTypeValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["CellType"]> = ["start", "empty", "finish"];
+export const choiceKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ChoiceKind"]> = ["game"];
 export const coopRoundUpForValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["CoopRoundUpFor"]> = ["roller"];
 export const difficultyValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["Difficulty"]> = ["easy", "normal", "hard", "extreme"];
 export const emptyPoolFallbackValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["EmptyPoolFallback"]> = ["dropZoneFilter"];

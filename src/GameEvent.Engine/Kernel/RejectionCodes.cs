@@ -26,6 +26,9 @@ public static class RejectionCodes
     public const string PlayerUnknown = "player.unknown";
     public const string PlayerAlreadyAdded = "player.alreadyAdded";
     public const string WrongPhase = "turn.wrongPhase";
+    public const string ChoicePending = "turn.choicePending";
+    public const string NoPendingChoice = "turn.noPendingChoice";
+    public const string UnknownChoiceOption = "turn.unknownOption";
     public const string NoAvailableGames = "roll.noAvailableGames";
     public const string HoursRequired = "run.hoursRequired";
     public const string InvalidHours = "run.invalidHours";

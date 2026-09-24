@@ -337,6 +337,96 @@
         }
       }
     },
+    "/api/seasons/{seasonId}/choose": {
+      "post": {
+        "tags": [
+          "Seasons"
+        ],
+        "parameters": [
+          {
+            "name": "seasonId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChooseRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RejectionProblem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/seasons/{seasonId}/complete": {
       "post": {
         "tags": [
@@ -695,6 +785,80 @@
           }
         },
         "description": "A new ruleset from the admin's editor: the whole document, the version it was edited from, and a command id\ngenerated once per save."
+      },
+      "ChoiceKind": {
+        "enum": [
+          "game"
+        ],
+        "description": "What the player is choosing. Stage 1 has games only; branches, targets and outcomes come later (K-5)."
+      },
+      "ChoiceOptionView": {
+        "required": [
+          "id",
+          "game"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "game": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/GameView"
+              }
+            ]
+          }
+        }
+      },
+      "ChoiceView": {
+        "required": [
+          "id",
+          "kind",
+          "options"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ChoiceKind"
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChoiceOptionView"
+            }
+          }
+        },
+        "description": "The pending choice, kept on the server: a reloaded page shows the same options (T2)."
+      },
+      "ChooseRequest": {
+        "required": [
+          "commandId",
+          "choiceId",
+          "optionId"
+        ],
+        "type": "object",
+        "properties": {
+          "commandId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "choiceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "optionId": {
+            "type": "string"
+          }
+        },
+        "description": "An answer to the pending choice: its id and the picked option's id."
       },
       "CoinReward": {
         "required": [
@@ -1304,6 +1468,7 @@
           "playerId",
           "phase",
           "offer",
+          "choice",
           "activeRun",
           "lastCompleted"
         ],
@@ -1323,6 +1488,16 @@
               },
               {
                 "$ref": "#/components/schemas/GameView"
+              }
+            ]
+          },
+          "choice": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ChoiceView"
               }
             ]
           },

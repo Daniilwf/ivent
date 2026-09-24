@@ -2,6 +2,7 @@ using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Map;
 using GameEvent.Engine.Scoring;
 using GameEvent.Engine.Seasons;
+using GameEvent.Engine.Turns;
 
 namespace GameEvent.Engine.Players;
 
@@ -23,8 +24,8 @@ public sealed record AddSeasonPlayer(
 public sealed record SetPlayerInactive(Guid PlayerId, bool IsInactive) : ICommand;
 
 /// <summary>
-/// The admin corrects a player (D-21): position, points, coins, other resources, and dropping an offered game
-/// (Rolling → Idle). Every change is a logged event with a reason; <see cref="Comment"/> explains it in the log.
+/// The admin corrects a player (D-21): position, points, coins, other resources, and dropping an offered game or a
+/// pending choice of games (<see cref="DiscardOffer"/>, Rolling → Idle). Every change is a logged event with a reason; <see cref="Comment"/> explains it in the log.
 /// A player playing a run is not reset here: that is a drop or tech reroll (C6).
 /// </summary>
 public sealed record AdjustPlayer(
@@ -196,6 +197,11 @@ internal static class PlayerAdministration
             changes.Add(new OfferDiscarded(player.PlayerId, offer.GameId));
         }
 
+        if (command.DiscardOffer && player is { Phase: TurnPhase.Rolling, Choice: { } choice })
+        {
+            changes.Add(new ChoiceDiscarded(player.PlayerId, choice.ChoiceId));
+        }
+
         return changes.Count == 0
             ? Decision.Reject(RejectionCodes.NothingToChange, "The adjustment changes nothing.")
             : Decision.Accept([new PlayerAdjusted(player.PlayerId, command.Comment), .. changes]);
@@ -237,7 +243,7 @@ internal static class PlayerAdministration
                 e.PlayerId,
                 new SeasonPlayer(
                     e.PlayerId, e.UserId, e.Name, e.CellId, Points: 0, Coins: 0, ResourceBag.Empty, IsInactive: false,
-                    PlayerPath.At(e.CellId), TurnPhase.Idle, Offer: null, ActiveRunId: null)),
+                    PlayerPath.At(e.CellId), TurnPhase.Idle, Offer: null, Choice: null, ActiveRunId: null)),
         };
 
     public static SeasonState Apply(SeasonState state, PlayerInactivitySet e) =>

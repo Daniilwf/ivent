@@ -2,6 +2,7 @@ using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Pool;
 using GameEvent.Engine.Runs;
 using GameEvent.Engine.Seasons;
+using GameEvent.Engine.Turns;
 
 namespace GameEvent.Engine.Rolls;
 
@@ -36,24 +37,29 @@ public sealed record GameRolled(
     RunSnapshot Snapshot,
     DateTimeOffset RolledAt) : IGameEvent;
 
+/// <summary>
+/// The wheel with <c>roll.choiceCount</c> &gt; 1 (D-06): up to that many available games of one category, drawn without
+/// replacement, reserved until the player picks one with <see cref="Turns.MakeChoice"/>. When the category has only
+/// one available game the roll is a plain <see cref="GameRolled"/>.
+/// </summary>
+[EventType("game-choice-rolled")]
+public sealed record GameChoiceRolled(
+    Guid PlayerId,
+    string Category,
+    EquatableArray<RollMiss> Misses,
+    Guid ChoiceId,
+    EquatableArray<RollOffer> Offers) : IGameEvent;
+
 internal static class Rolling
 {
     public static Decision Decide(SeasonState state, RollGame command, EngineContext context)
     {
-        if (SeasonSetup.RequireActive(state) is { } inactive)
+        if (TurnRules.Check(state, command.PlayerId, command) is { } rejection)
         {
-            return inactive;
+            return rejection;
         }
 
-        if (!state.Players.TryGetValue(command.PlayerId, out var player))
-        {
-            return Decision.Reject(RejectionCodes.PlayerUnknown, $"Player {command.PlayerId} is not in the season.");
-        }
-
-        if (player.Phase != TurnPhase.Idle)
-        {
-            return Decision.Reject(RejectionCodes.WrongPhase, $"Roll needs phase Idle, player is {player.Phase}.");
-        }
+        var player = state.Players[command.PlayerId];
 
         // Pool order is whatever storage returns; sort so the same seed gives the same log (invariant 14).
         var status = SeasonGameStatus.For(state, player.PlayerId);
@@ -74,11 +80,13 @@ internal static class Rolling
 
         var category = SpinWheel(wheel, context.Random);
 
-        // Draw games of the category without replacement; misses are logged, the first available wins (D-46).
-        // The loop ends: the wheel and the draw share one predicate, so the category has an available game.
+        // Draw games of the category without replacement until choiceCount are available or the category runs out;
+        // misses are logged (D-46). The wheel and the draw share one predicate, so at least one game is found.
         var remaining = candidates.Where(g => InCategory(g, category)).ToList();
         var misses = new List<RollMiss>();
-        while (true)
+        var offers = new List<RollOffer>();
+        var now = context.Clock.UtcNow;
+        while (offers.Count < state.Rules.Roll.ChoiceCount && remaining.Count > 0)
         {
             var index = context.Random.NextInt(0, remaining.Count);
             var game = remaining[index];
@@ -95,10 +103,15 @@ internal static class Rolling
                 game.Hours,
                 state.Rules.Reward.DiceCount,
                 state.Rules.Reward.DieByDifficulty);
-
-            return Decision.Accept(new GameRolled(
-                player.PlayerId, category.Name, [.. misses], game.Id, snapshot, context.Clock.UtcNow));
+            offers.Add(new RollOffer(game.Id, snapshot, now));
         }
+
+        return offers.Count switch
+        {
+            0 => throw new InvalidOperationException($"Category '{category.Name}' was on the wheel without an available game."),
+            1 => Decision.Accept(new GameRolled(player.PlayerId, category.Name, [.. misses], offers[0].GameId, offers[0].Snapshot, now)),
+            _ => Decision.Accept(new GameChoiceRolled(player.PlayerId, category.Name, [.. misses], context.Ids.NewId(), [.. offers])),
+        };
     }
 
     public static SeasonState Apply(SeasonState state, GameRolled e) =>
