@@ -237,7 +237,7 @@ internal static class PlayerAdministration
                 e.PlayerId,
                 new SeasonPlayer(
                     e.PlayerId, e.UserId, e.Name, e.CellId, Points: 0, Coins: 0, ResourceBag.Empty, IsInactive: false,
-                    TurnPhase.Idle, Offer: null, ActiveRunId: null)),
+                    PlayerPath.At(e.CellId), TurnPhase.Idle, Offer: null, ActiveRunId: null)),
         };
 
     public static SeasonState Apply(SeasonState state, PlayerInactivitySet e) =>

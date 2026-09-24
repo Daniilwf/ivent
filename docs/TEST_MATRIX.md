@@ -55,7 +55,7 @@
 | --- | --- | --- | --- |
 | RR1 | Первый реролл после каждого ролла бесплатный, дальше по `rerollCost`; ресурс `freeRerolls` | `Rolls/RerollTests.*` | ⬜ |
 | RR2 | Дроп: кубы за дроп отнимают очки и позицию, обязательный плохой ивент (ручной эффект), монеток нет | `Runs/DropTests.*`, e2e `02-drop` | ⬜ |
-| RR3 | Штраф не откидывает дальше старта (чекпоинт — этап 2) | `Runs/DropTests.Position_clamped_at_start`, инвариант 7 | ⬜ |
+| RR3 | Штраф не откидывает дальше старта (чекпоинт — этап 2) | движение: `Map/MovementTests.Drop_penalty_does_not_go_past_start`, `Map/MovementTests.Back_clamped_at_start`; сам дроп (C6): `Runs/DropTests.Position_clamped_at_start`, инвариант 7 | 🟨 C6 |
 | RR4 | «Дроп не раньше часа» — только подсказка в интерфейсе | `web/…/DropDialog.test.tsx` | ⬜ |
 | RR5 | Тех-реролл: бесплатный, причина обязательна, окно из конфига, позже — только админ | `Runs/TechRerollTests.*`, e2e `03-tech-reroll` | ⬜ |
 | RR6 | Админ превращает тех-реролл в дроп со штрафом | `Runs/TechRerollTests.Admin_converts_to_drop` | ⬜ |
@@ -92,9 +92,10 @@
 | ID | Правило | Тесты | Статус |
 | --- | --- | --- | --- |
 | M1 | Карта — граф; линейная карта — цепочка из `map.linearLength` | `Map/LinearMovementTests.Linear_map_is_a_chain_from_start_through_numbered_cells_to_finish`, `Map/LinearMovementTests.Linear_map_of_length_one_goes_straight_from_start_to_finish`, `Map/LinearMovementTests.Season_map_length_comes_from_the_ruleset`, `Map/LinearMovementTests.Default_season_map_has_linear_length_steps`, `Map/LinearMovementTests.Forward_enters_cells_along_the_chain`, `Map/LinearMovementTests.Forward_zero_steps_goes_nowhere` | ✅ |
-| M2 | Назад дальше старта нельзя | `Map/MovementTests.Back_clamped_at_start` | ⬜ |
-| M3 | Лишние шаги после финиша сгорают | `Map/LinearMovementTests.Forward_extra_steps_after_finish_burn`, `Map/LinearMovementTests.Forward_exactly_to_finish_ends_on_finish`, `Map/LinearMovementTests.Forward_from_finish_goes_nowhere`, `Map/LinearMovementTests.Completion_overshooting_finish_stops_on_finish_but_keeps_all_points`, `Map/LinearMovementTests.Completion_landing_exactly_on_finish`, `Map/LinearMovementTests.Completion_one_step_short_of_finish` | ✅ |
-| M4 | Путь хранится отрезками, назад — по пройденным рёбрам | `Map/PathTests.*` | ⬜ |
+| M2 | Назад дальше старта нельзя | `Map/MovementTests.Back_clamped_at_start`, `Map/MovementTests.Back_clamped_at_start_without_history`, `Map/MovementTests.Back_exactly_to_start_ends_on_start`, `Map/MovementTests.Back_from_start_goes_nowhere`, `Map/MovementTests.Back_from_start_after_walking_back_to_it_goes_nowhere`, `Map/MovementTests.Back_zero_steps_goes_nowhere`, `Map/VisitTests.Moving_back_clamped_at_start_stops_on_the_start`, `Map/VisitTests.A_move_that_entered_no_cell_stops_nowhere` | 🟨 C6 (движок ✅, команды назад — дроп) |
+| M3 | Лишние шаги после финиша сгорают | `Map/LinearMovementTests.Completion_on_the_finish_writes_no_move` (D-47), `Map/LinearMovementTests.Forward_extra_steps_after_finish_burn`, `Map/LinearMovementTests.Forward_exactly_to_finish_ends_on_finish`, `Map/LinearMovementTests.Forward_from_finish_goes_nowhere`, `Map/LinearMovementTests.Completion_overshooting_finish_stops_on_finish_but_keeps_all_points`, `Map/LinearMovementTests.Completion_landing_exactly_on_finish`, `Map/LinearMovementTests.Completion_one_step_short_of_finish` | ✅ |
+| M4 | Путь хранится отрезками, назад — по пройденным рёбрам | `Map/PathTests.*` (отрезки, перенос, откат по истории и после неё, JSON, путь в сезоне и при повторе лога); `Map/MovementTests.Back_retraces_the_walked_cells_of_the_last_segment`, `Map/MovementTests.Back_through_a_merge_follows_the_walked_branch_not_the_primary_one`, `Map/MovementTests.Back_to_the_first_cell_of_the_segment_uses_only_history`, `Map/MovementTests.Back_without_history_follows_the_primary_backward_edge_at_a_merge`, `Map/MovementTests.Back_without_history_follows_the_only_incoming_edge`, `Map/MovementTests.Back_past_the_walked_history_continues_along_primary_edges`, `Map/MovementTests.Back_does_not_cross_a_segment_boundary`, `Map/MovementTests.Back_after_a_transfer_ignores_the_walked_branch_before_it`, `Map/MovementTests.Back_from_the_finish_retraces_the_last_steps`; точки срабатывания (D-90): `Map/VisitTests.*`, `Invariants/PlayerAdminInvariantTests.Every_move_fires_its_entered_cells_and_a_transfer_fires_none`; инвариант M4 «путь кончается на позиции, внутри отрезка — рёбра карты, отрезков = 1 + переносов» (`Invariants/PlayerAdminInvariantTests.Invariants_hold_after_every_command`) | ✅ |
+| M5 | Клетки срабатывают при любой остановке, кроме клетки назначения переноса; шаг, проход, остановка (D-90) | `Map/VisitTests.*`, `Invariants/PlayerAdminInvariantTests.Every_move_fires_its_entered_cells_and_a_transfer_fires_none`; подписчики и чужой толчок — C11, этап 2 | 🟨 C11 |
 
 ### Сезон
 
@@ -167,7 +168,7 @@
 | Правка конфига посреди сезона | снапшот при ролле | S1, S2 | 🟨 C6/C7 |
 | Удалили клетку с игроком | публикация блокируется | — | ➖ этап 2 |
 | Цикл из телепортов | проверка редактора | — | ➖ этап 2 |
-| Откат назад через слияние веток | история пути | M4 (линейно) | ⬜ / ➖ этап 2 |
+| Откат назад через слияние веток | история пути | M4: `Map/MovementTests.Back_through_a_merge_follows_the_walked_branch_not_the_primary_one`, `Map/MovementTests.Back_without_history_follows_the_primary_backward_edge_at_a_merge` (граф вручную; редактор — этап 2) | ✅ движок / ➖ редактор — этап 2 |
 | Чужой толчок через развилку | ветка по умолчанию | — | ➖ этап 2 |
 | Толчок на магазин офлайн | купон | — | ➖ этап 4 |
 | Зона с пустым пулом | предупреждение и приоритет фильтров | G10, G12 | ⬜ / ➖ этап 2 |

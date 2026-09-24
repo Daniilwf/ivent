@@ -131,6 +131,7 @@ namespace GameEvent.Infrastructure.Database.Migrations
                     Coins = table.Column<int>(type: "INTEGER", nullable: false),
                     ResourcesJson = table.Column<string>(type: "TEXT", nullable: false),
                     IsInactive = table.Column<bool>(type: "INTEGER", nullable: false),
+                    PathJson = table.Column<string>(type: "TEXT", nullable: false),
                     Phase = table.Column<string>(type: "TEXT", maxLength: 20, nullable: false),
                     OfferJson = table.Column<string>(type: "TEXT", nullable: true),
                     ActiveRunId = table.Column<Guid>(type: "TEXT", nullable: true)

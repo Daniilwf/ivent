@@ -11,7 +11,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace GameEvent.Infrastructure.Database.Migrations
 {
     [DbContext(typeof(GameEventDbContext))]
-    [Migration("20260924190856_Initial")]
+    [Migration("20260924194345_Initial")]
     partial class Initial
     {
         /// <inheritdoc />
@@ -259,6 +259,10 @@ namespace GameEvent.Infrastructure.Database.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<string>("OfferJson")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PathJson")
+                        .IsRequired()
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Phase")

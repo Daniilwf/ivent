@@ -76,6 +76,7 @@ public sealed record SeasonPlayer(
     int Coins,
     ResourceBag Resources,
     bool IsInactive,
+    PlayerPath Path,
     TurnPhase Phase,
     RollOffer? Offer,
     Guid? ActiveRunId);

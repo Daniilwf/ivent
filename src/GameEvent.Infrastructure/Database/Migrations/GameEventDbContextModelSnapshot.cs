@@ -258,6 +258,10 @@ namespace GameEvent.Infrastructure.Database.Migrations
                     b.Property<string>("OfferJson")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("PathJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Phase")
                         .IsRequired()
                         .HasMaxLength(20)

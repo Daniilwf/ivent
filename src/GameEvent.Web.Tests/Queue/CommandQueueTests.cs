@@ -208,6 +208,7 @@ public class CommandQueueTests
         var row = await db.SeasonPlayers.SingleAsync(p => p.Id == petya, TestContext.Current.CancellationToken);
         Assert.Equal((9, true, "c3", 5), (row.Coins, row.IsInactive, row.CellId, row.Points));
         Assert.Equal("""{"stars":1}""", row.ResourcesJson);
+        Assert.Equal("""{"segments":[{"cells":["start"]},{"cells":["c3"]}]}""", row.PathJson);
         var season = await db.Seasons.SingleAsync(TestContext.Current.CancellationToken);
         Assert.Equal((SeasonStatus.Closing, "Осень"), (season.Status, season.Name));
     }
