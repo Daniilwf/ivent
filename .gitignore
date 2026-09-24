@@ -1,0 +1,15 @@
+# Import sources (personal data, never in git)
+data/import/*
+!data/import/.gitkeep
+
+# Claude Code local state
+.claude/state/
+.claude/settings.local.json
+
+# Test output
+test-artifacts/
+
+# Secrets
+.env
+.env.*
+!.env.example
