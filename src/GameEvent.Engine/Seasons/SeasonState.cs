@@ -81,4 +81,5 @@ public sealed record SeasonPlayer(
     TurnPhase Phase,
     RollOffer? Offer,
     PendingChoice? Choice,
+    EquatableArray<GameExclusion> Exclusions,
     Guid? ActiveRunId);

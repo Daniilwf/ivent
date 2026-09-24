@@ -149,6 +149,25 @@ namespace GameEvent.Infrastructure.Database.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "PlayerGameExclusion",
+                columns: table => new
+                {
+                    PlayerId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    GameId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    Reason = table.Column<string>(type: "TEXT", maxLength: 20, nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_PlayerGameExclusion", x => new { x.PlayerId, x.GameId });
+                    table.ForeignKey(
+                        name: "FK_PlayerGameExclusion_SeasonPlayer_PlayerId",
+                        column: x => x.PlayerId,
+                        principalTable: "SeasonPlayer",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "Run",
                 columns: table => new
                 {
@@ -231,6 +250,9 @@ namespace GameEvent.Infrastructure.Database.Migrations
 
             migrationBuilder.DropTable(
                 name: "GameEvent");
+
+            migrationBuilder.DropTable(
+                name: "PlayerGameExclusion");
 
             migrationBuilder.DropTable(
                 name: "Ruleset");

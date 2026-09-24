@@ -114,6 +114,12 @@ internal static class Rolling
         };
     }
 
+    public static Decision Decide(SeasonState state, DeclareAlreadyPlayed command, EngineContext context) =>
+        throw new NotImplementedException("C5");
+
+    public static SeasonState Apply(SeasonState state, GameExcluded e) =>
+        throw new NotImplementedException("C5");
+
     public static SeasonState Apply(SeasonState state, GameRolled e) =>
         state with
         {

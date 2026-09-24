@@ -30,6 +30,7 @@ public static class RejectionCodes
     public const string NoPendingChoice = "turn.noPendingChoice";
     public const string UnknownChoiceOption = "turn.unknownOption";
     public const string NoAvailableGames = "roll.noAvailableGames";
+    public const string GameNotOffered = "roll.gameNotOffered";
     public const string HoursRequired = "run.hoursRequired";
     public const string InvalidHours = "run.invalidHours";
 }

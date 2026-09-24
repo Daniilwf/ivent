@@ -126,6 +126,12 @@ public class EventFormatTests
             """{"playerId":"10000000-0000-0000-0000-000000000001","choiceId":"00000000-0000-0000-0000-000000000001"}"""
         },
         {
+            "game-excluded",
+            new GameExcluded(s_player, s_game, ExclusionReason.AlreadyPlayed),
+            1,
+            """{"playerId":"10000000-0000-0000-0000-000000000001","gameId":"20000000-0000-0000-0000-000000000001","reason":"alreadyPlayed"}"""
+        },
+        {
             "run-started",
             new RunStarted(s_run, s_player, s_game, Snapshot(), s_at, s_at.AddMinutes(5)),
             1,
