@@ -1,0 +1,15 @@
+# LF everywhere, including Windows working copies: dotnet format, Prettier and CI agree.
+* text=auto eol=lf
+
+# Explicit for shell scripts (CLAUDE.md), in case the default above changes.
+*.sh text eol=lf
+
+# Binary content.
+*.png binary
+*.jpg binary
+*.webp binary
+*.gif binary
+*.woff2 binary
+*.xlsx binary
+*.zip binary
+*.db binary

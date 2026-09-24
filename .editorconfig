@@ -1,0 +1,96 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false
+
+[*.{cs,csx}]
+indent_size = 4
+
+[*.{csproj,props,targets,slnx,xml}]
+indent_size = 2
+
+[*.cs]
+# Namespaces and usings
+csharp_style_namespace_declarations = file_scoped:warning
+dotnet_sort_system_directives_first = true
+dotnet_separate_import_directive_groups = false
+csharp_using_directive_placement = outside_namespace:warning
+
+# var and expression style
+csharp_style_var_for_built_in_types = true:suggestion
+csharp_style_var_when_type_is_apparent = true:suggestion
+csharp_style_var_elsewhere = true:suggestion
+csharp_style_expression_bodied_methods = when_on_single_line:suggestion
+csharp_style_expression_bodied_properties = true:suggestion
+csharp_prefer_braces = when_multiline:suggestion
+csharp_style_prefer_primary_constructors = true:suggestion
+dotnet_style_readonly_field = true:warning
+dotnet_style_qualification_for_field = false:warning
+dotnet_style_qualification_for_property = false:warning
+dotnet_style_qualification_for_method = false:warning
+dotnet_style_qualification_for_event = false:warning
+dotnet_style_predefined_type_for_locals_parameters_members = true:warning
+
+# Naming: private static fields s_camelCase (listed first: more specific)
+dotnet_naming_rule.private_static_fields_s.symbols = private_static_fields
+dotnet_naming_rule.private_static_fields_s.style = s_camel
+dotnet_naming_rule.private_static_fields_s.severity = warning
+dotnet_naming_symbols.private_static_fields.applicable_kinds = field
+dotnet_naming_symbols.private_static_fields.applicable_accessibilities = private
+dotnet_naming_symbols.private_static_fields.required_modifiers = static
+dotnet_naming_style.s_camel.capitalization = camel_case
+dotnet_naming_style.s_camel.required_prefix = s_
+
+# Naming: private fields _camelCase, constants PascalCase, interfaces IName
+dotnet_naming_rule.private_fields_underscore.symbols = private_fields
+dotnet_naming_rule.private_fields_underscore.style = underscore_camel
+dotnet_naming_rule.private_fields_underscore.severity = warning
+dotnet_naming_symbols.private_fields.applicable_kinds = field
+dotnet_naming_symbols.private_fields.applicable_accessibilities = private
+dotnet_naming_style.underscore_camel.capitalization = camel_case
+dotnet_naming_style.underscore_camel.required_prefix = _
+
+dotnet_naming_rule.constants_pascal.symbols = constants
+dotnet_naming_rule.constants_pascal.style = pascal
+dotnet_naming_rule.constants_pascal.severity = warning
+dotnet_naming_symbols.constants.applicable_kinds = field, local
+dotnet_naming_symbols.constants.required_modifiers = const
+dotnet_naming_style.pascal.capitalization = pascal_case
+
+dotnet_naming_rule.interfaces_i.symbols = interfaces
+dotnet_naming_rule.interfaces_i.style = prefix_i
+dotnet_naming_rule.interfaces_i.severity = warning
+dotnet_naming_symbols.interfaces.applicable_kinds = interface
+dotnet_naming_style.prefix_i.capitalization = pascal_case
+dotnet_naming_style.prefix_i.required_prefix = I
+
+# Code-style diagnostics that fail the build (EnforceCodeStyleInBuild)
+dotnet_diagnostic.IDE0005.severity = warning   # unnecessary using
+dotnet_diagnostic.IDE0161.severity = warning   # file-scoped namespace
+dotnet_diagnostic.IDE0044.severity = warning   # readonly field
+dotnet_diagnostic.IDE0055.severity = warning   # formatting
+dotnet_diagnostic.IDE1006.severity = warning   # naming
+
+# Analyzer tuning (latest-recommended). Each exception has a reason.
+dotnet_diagnostic.CA1515.severity = none       # "make types internal": app assemblies, public is fine
+dotnet_diagnostic.CA1848.severity = suggestion # LoggerMessage delegates: Serilog, low traffic
+dotnet_diagnostic.CA1062.severity = none       # nullable reference types cover argument null checks
+dotnet_diagnostic.CA2007.severity = none       # ConfigureAwait: no sync context in ASP.NET Core
+dotnet_diagnostic.CA1303.severity = none       # UI strings live in the frontend dictionary
+
+# Engine bans (RS0030) are errors via TreatWarningsAsErrors.
+dotnet_diagnostic.RS0030.severity = error
+
+[src/*.Tests/**.cs]
+dotnet_diagnostic.CA1707.severity = none       # test names use underscores: Given_when_then
+dotnet_diagnostic.CA1861.severity = none       # constant arrays in test data are fine
+dotnet_diagnostic.CA2201.severity = none       # tests may throw plain exceptions
+dotnet_diagnostic.CA1822.severity = none       # xUnit test methods are instance methods

@@ -13,3 +13,25 @@ test-artifacts/
 .env
 .env.*
 !.env.example
+
+# .NET
+bin/
+obj/
+*.user
+.vs/
+TestResults/
+StrykerOutput/
+coverage/
+
+# Node
+node_modules/
+dist/
+web/src/api/.openapi-cache/
+playwright-report/
+blob-report/
+
+# Local databases and uploads
+*.db
+*.db-shm
+*.db-wal
+/var/

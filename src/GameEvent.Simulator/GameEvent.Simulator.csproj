@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Stage 3. Uses the same engine as the site and nothing else. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\GameEvent.Engine\GameEvent.Engine.csproj" />
+  </ItemGroup>
+
+</Project>

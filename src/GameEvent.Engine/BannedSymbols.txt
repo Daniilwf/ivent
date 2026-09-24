@@ -1,0 +1,18 @@
+P:System.DateTime.Now;Use IClock
+P:System.DateTime.UtcNow;Use IClock
+P:System.DateTime.Today;Use IClock
+P:System.DateTimeOffset.Now;Use IClock
+P:System.DateTimeOffset.UtcNow;Use IClock
+P:System.TimeProvider.System;Use IClock
+P:System.Environment.TickCount;Use IClock
+P:System.Environment.TickCount64;Use IClock
+T:System.Diagnostics.Stopwatch;Use IClock
+T:System.Random;Use IRandomSource
+T:System.Security.Cryptography.RandomNumberGenerator;Use IRandomSource
+M:System.Guid.NewGuid;Use IIdGenerator
+M:System.Guid.CreateVersion7;Use IIdGenerator
+M:System.Guid.CreateVersion7(System.DateTimeOffset);Use IIdGenerator
+T:System.IO.File;The engine has no file system access
+T:System.IO.Directory;The engine has no file system access
+T:System.IO.FileStream;The engine has no file system access
+T:System.Net.Http.HttpClient;The engine has no network access
