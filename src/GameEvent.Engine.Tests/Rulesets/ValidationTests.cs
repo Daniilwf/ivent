@@ -246,12 +246,26 @@ public class ValidationTests
     [Theory]
     [InlineData(2)]
     [InlineData(3)]
+    [InlineData(20)]
     public void Choice_of_several_games_is_playable(int choiceCount)
     {
-        // D-91: the choice of N games (roll.choiceCount > 1) landed with the turn machine in C4
+        // D-91: the choice of N games (roll.choiceCount > 1) landed with the turn machine in C4; 20 is the ceiling itself
         var errors = Errors(r => r with { Roll = r.Roll with { ChoiceCount = choiceCount } });
 
         Assert.True(errors.Count == 0, Show(errors));
+    }
+
+    [Theory]
+    [InlineData(21)]
+    [InlineData(1_000_000)]
+    public void Choice_of_more_than_twenty_games_is_an_error_on_its_field(int choiceCount)
+    {
+        // D-91: a safety ceiling like those of D-86; one past it is refused
+        var errors = Errors(r => r with { Roll = r.Roll with { ChoiceCount = choiceCount } });
+
+        var error = Assert.Single(errors);
+        Assert.Equal("roll.choiceCount", error.Path);
+        Assert.False(string.IsNullOrWhiteSpace(error.Message));
     }
 
     [Fact]

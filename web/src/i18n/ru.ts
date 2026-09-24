@@ -7,7 +7,6 @@ const rejection = {
   'turn.choicePending': 'Сначала сделайте выбор.',
   'turn.noPendingChoice': 'Этот выбор уже сделан или снят. Обновите страницу.',
   'turn.unknownOption': 'Такого варианта нет. Обновите страницу.',
-  'turn.activeRunLimit': 'У вас уже есть активное прохождение.',
   'roll.noAvailableGames': 'Нет доступных игр для ролла. Сообщите админу.',
   'run.hoursRequired': 'У игры нет данных о длине: укажите оценку часов.',
   'run.invalidHours': 'Часы должны быть больше нуля.',

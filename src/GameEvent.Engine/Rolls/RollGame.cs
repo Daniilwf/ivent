@@ -106,13 +106,12 @@ internal static class Rolling
             offers.Add(new RollOffer(game.Id, snapshot, now));
         }
 
-        if (offers.Count == 1)
+        return offers.Count switch
         {
-            var offer = offers[0];
-            return Decision.Accept(new GameRolled(player.PlayerId, category.Name, [.. misses], offer.GameId, offer.Snapshot, now));
-        }
-
-        return Decision.Accept(new GameChoiceRolled(player.PlayerId, category.Name, [.. misses], context.Ids.NewId(), [.. offers]));
+            0 => throw new InvalidOperationException($"Category '{category.Name}' was on the wheel without an available game."),
+            1 => Decision.Accept(new GameRolled(player.PlayerId, category.Name, [.. misses], offers[0].GameId, offers[0].Snapshot, now)),
+            _ => Decision.Accept(new GameChoiceRolled(player.PlayerId, category.Name, [.. misses], context.Ids.NewId(), [.. offers])),
+        };
     }
 
     public static SeasonState Apply(SeasonState state, GameRolled e) =>

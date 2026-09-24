@@ -25,7 +25,10 @@ public sealed record PendingChoice(Guid ChoiceId, ChoiceKind Kind, EquatableArra
 /// <summary>The player picks <see cref="OptionId"/> of the pending choice <see cref="ChoiceId"/>.</summary>
 public sealed record MakeChoice(Guid PlayerId, Guid ChoiceId, string OptionId) : ICommand;
 
-/// <summary>The player picked an option; for a game choice the picked game becomes the offer, the others are freed.</summary>
+/// <summary>
+/// The player picked an option. For a game choice the picked game becomes the offer, the others are freed, and a
+/// <see cref="Runs.RunStarted"/> of the same command starts it (D-91).
+/// </summary>
 [EventType("choice-made")]
 public sealed record ChoiceMade(Guid PlayerId, Guid ChoiceId, string OptionId) : IGameEvent;
 

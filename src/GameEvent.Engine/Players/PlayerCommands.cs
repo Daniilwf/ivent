@@ -24,8 +24,8 @@ public sealed record AddSeasonPlayer(
 public sealed record SetPlayerInactive(Guid PlayerId, bool IsInactive) : ICommand;
 
 /// <summary>
-/// The admin corrects a player (D-21): position, points, coins, other resources, and dropping an offered game
-/// (Rolling → Idle). Every change is a logged event with a reason; <see cref="Comment"/> explains it in the log.
+/// The admin corrects a player (D-21): position, points, coins, other resources, and dropping an offered game or a
+/// pending choice of games (<see cref="DiscardOffer"/>, Rolling → Idle). Every change is a logged event with a reason; <see cref="Comment"/> explains it in the log.
 /// A player playing a run is not reset here: that is a drop or tech reroll (C6).
 /// </summary>
 public sealed record AdjustPlayer(

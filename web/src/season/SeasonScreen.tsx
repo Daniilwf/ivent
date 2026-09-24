@@ -9,6 +9,11 @@ type Action = 'roll' | 'start' | 'complete' | 'choose';
 type Pick = { choiceId: string; optionId: string };
 type Loaded = { kind: 'season'; season: Season } | { kind: 'signedOut' } | { kind: 'failed' };
 
+function required<T>(value: T | undefined): T {
+  if (value === undefined) throw new Error('An action is missing its data.');
+  return value;
+}
+
 async function fetchSeason(seasonId: string): Promise<Loaded> {
   try {
     const { data, response } = await api.GET('/api/seasons/{seasonId}', {
@@ -76,15 +81,15 @@ export function SeasonScreen({
       const commandId = crypto.randomUUID();
       const params = { path: { seasonId } };
       const result =
-        action === 'complete' && completion
+        action === 'complete'
           ? await api.POST('/api/seasons/{seasonId}/complete', {
               params,
-              body: { commandId, ...completion },
+              body: { commandId, ...required(completion) },
             })
-          : action === 'choose' && pick
+          : action === 'choose'
             ? await api.POST('/api/seasons/{seasonId}/choose', {
                 params,
-                body: { commandId, ...pick },
+                body: { commandId, ...required(pick) },
               })
             : action === 'roll'
               ? await api.POST('/api/seasons/{seasonId}/roll', { params, body: { commandId } })
@@ -129,20 +134,20 @@ export function SeasonScreen({
         {choice && (
           <fieldset data-testid="choice">
             <legend>{ru.turn.choose}</legend>
-            {choice.options.map((option) => (
-              <button
-                key={option.id}
-                data-testid={`option-${option.id}`}
-                disabled={pending}
-                onClick={() =>
-                  void act('choose', undefined, { choiceId: choice.id, optionId: option.id })
-                }
-              >
-                {option.game
-                  ? ru.turn.option(option.game.title, option.game.hours ?? null)
-                  : option.id}
-              </button>
-            ))}
+            {choice.options
+              .flatMap(({ id, game }) => (game ? [{ id, game }] : []))
+              .map((option) => (
+                <button
+                  key={option.id}
+                  data-testid={`option-${option.id}`}
+                  disabled={pending}
+                  onClick={() =>
+                    void act('choose', undefined, { choiceId: choice.id, optionId: option.id })
+                  }
+                >
+                  {ru.turn.option(option.game.title, option.game.hours ?? null)}
+                </button>
+              ))}
           </fieldset>
         )}
         {me?.phase === 'rolling' && me.offer && (

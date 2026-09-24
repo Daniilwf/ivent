@@ -88,11 +88,11 @@ public static class SeasonEndpoints
             .WithActionErrors();
 
         seasons.MapPost("/choose", (Guid seasonId, ChooseRequest request, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, CancellationToken ct) =>
-            request.ChoiceId == Guid.Empty || string.IsNullOrWhiteSpace(request.OptionId) || request.OptionId.Length > MaxOptionIdLength
+            request.ChoiceId == Guid.Empty || !IsOptionId(request.OptionId)
                 ? Task.FromResult<Results<Ok<CommandResponse>, ProblemHttpResult, ValidationProblem, NotFound, ForbidHttpResult>>(
                     TypedResults.ValidationProblem(new Dictionary<string, string[]>
                     {
-                        ["optionId"] = [$"A choice id and an option id of at most {MaxOptionIdLength} characters are required."],
+                        ["optionId"] = [$"A choice id and an option id of 1–{MaxOptionIdLength} letters, digits, '-' or '_' are required."],
                     }))
                 : ActAsync(seasonId, request.CommandId, user, db, bus, playerId => new MakeChoice(playerId, request.ChoiceId, request.OptionId), ct))
             .RequireAuthorization(Policies.Player)
@@ -109,6 +109,10 @@ public static class SeasonEndpoints
             .RequireAuthorization(Policies.Player)
             .WithActionErrors();
     }
+
+    // Option ids are engine-made (a game id in the N format); anything else never reaches the engine.
+    private static bool IsOptionId(string? id) =>
+        id is { Length: > 0 and <= MaxOptionIdLength } && id.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_');
 
     /// <summary>Error answers of a game action, described so the generated client has their types.</summary>
     private static RouteHandlerBuilder WithActionErrors(this RouteHandlerBuilder builder) =>

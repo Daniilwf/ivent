@@ -125,6 +125,21 @@ public class SliceInvariantTests
             ScenarioAssert.Rejected(s, before, logLengthBefore, s.Last.Rejection!.Code);
         }
 
+        // T2 (D-91, Choosing --> Playing): an accepted choice is exactly ChoiceMade + RunStarted of the chosen option,
+        // with the option's roll-time snapshot and roll time
+        if (s.Last.IsAccepted && s.Last.Events.OfType<ChoiceMade>().SingleOrDefault() is { } made)
+        {
+            Assert.Equal(2, s.Last.Events.Count);
+            Assert.Same(made, s.Last.Events[0]);
+            var started = Assert.IsType<RunStarted>(s.Last.Events[1]);
+            var option = before.Players[made.PlayerId].Choice!.Options.Single(o => o.Id == made.OptionId).Game!;
+            Assert.Equal(made.PlayerId, started.PlayerId);
+            Assert.Equal(option.GameId, started.GameId);
+            Assert.Equal(option.Snapshot, started.Snapshot);
+            Assert.Equal(option.RolledAt, started.RolledAt);
+            Assert.Equal(TurnPhase.Playing, s.State.Players[made.PlayerId].Phase);
+        }
+
         // 1. Replaying the log gives the stored state
         Assert.Equal(s.State, SeasonEngine.Replay(s.Log));
 

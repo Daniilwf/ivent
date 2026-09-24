@@ -13,7 +13,7 @@ namespace GameEvent.Engine.Tests.Turns;
 /// Waiting for a choice (SPEC «Игровой цикл»: one general state kept on the server, a closed tab breaks nothing;
 /// K-5, D-06, D-46, D-89, D-91). The first kind is the choice of N games: a roll with <c>roll.choiceCount</c> = N
 /// draws without replacement up to N available games of one category, logs misses, reserves every option;
-/// <see cref="MakeChoice"/> turns the picked one into the offer and frees the others.
+/// <see cref="MakeChoice"/> starts the picked one at once (SPEC diagram <c>Choosing --> Playing</c>) and frees the others.
 /// Randomness is not scripted: outcomes must hold for every seed, so seed-dependent tests run many seeds.
 /// </summary>
 public class PendingChoiceTests
@@ -247,10 +247,38 @@ public class PendingChoiceTests
         ScenarioAssert.RejectsWithoutChanges(s, x => x.Roll("Петя"), RejectionCodes.NoAvailableGames);
     }
 
+    [Fact]
+    public void Wheel_skips_a_category_whose_every_game_is_among_another_players_options()
+    {
+        foreach (var seed in s_seeds)
+        {
+            // Given Петя waits for a choice of both horror games, then a light puzzle category appears
+            var s = Scenario.New(seed: seed).WithRuleset(ChoiceOf(3))
+                .WithCategory("Horror", weight: 1000)
+                .WithGame("Silent Hill", 12, "Horror")
+                .WithGame("Alan Wake", 12, "Horror")
+                .WithPlayers("Вася", "Петя");
+            s.Roll("Петя");
+            Assert.Equal(2, ChoiceRoll(s).Offers.Count);
+            s.WithCategory("Puzzle", weight: 1).WithGame("Tetris", 2, "Puzzle").WithGame("Portal", 5, "Puzzle");
+
+            // When Вася rolls, the horror category is not on the wheel at all (G6 with reservation, D-06)
+            s.Roll("Вася");
+
+            // Then the puzzle category is chosen and no horror game is even recorded as a miss
+            var rolled = ChoiceRoll(s);
+            Assert.Equal("Puzzle", rolled.Category);
+            Assert.Empty(rolled.Misses);
+            Assert.Equal(
+                new[] { s.GameId("Tetris"), s.GameId("Portal") }.Order(),
+                rolled.Offers.Select(o => o.GameId).Order());
+        }
+    }
+
     // ---- MakeChoice ----
 
     [Fact]
-    public void Making_a_choice_offers_the_chosen_game_with_its_roll_time_snapshot()
+    public void Making_a_choice_starts_the_chosen_game_with_its_roll_time_snapshot()
     {
         // Given Вася rolled a choice of three games an hour ago
         var s = Horror("Silent Hill", "Alan Wake", "Dead Space");
@@ -258,20 +286,30 @@ public class PendingChoiceTests
         var rolled = ChoiceRoll(s);
         var chosen = rolled.Offers.Single(o => o.GameId == s.GameId("Alan Wake"));
         s.Advance(TimeSpan.FromHours(1));
+        var chosenAt = s.Clock.UtcNow;
 
         // When he picks Alan Wake
         Choose(s, "Вася", "Alan Wake");
 
-        // Then one ChoiceMade, the game is offered exactly as rolled, the choice is gone
+        // Then exactly ChoiceMade and RunStarted: the run has the snapshot and roll time from the roll, starts now
         ScenarioAssert.Accepted(s);
+        Assert.Equal(2, s.Last.Events.Count);
+        Assert.Equal(new ChoiceMade(s.PlayerId("Вася"), rolled.ChoiceId, OptionId(s, "Alan Wake")), s.Last.Events[0]);
+        var started = Assert.IsType<RunStarted>(s.Last.Events[1]);
+        Assert.NotEqual(Guid.Empty, started.RunId);
         Assert.Equal(
-            [new ChoiceMade(s.PlayerId("Вася"), rolled.ChoiceId, OptionId(s, "Alan Wake"))],
-            s.Last.Events);
+            new RunStarted(started.RunId, s.PlayerId("Вася"), s.GameId("Alan Wake"), chosen.Snapshot, chosen.RolledAt, chosenAt),
+            started);
+
+        // And Вася plays that run: nothing is offered or pending any more
         var player = s.Player("Вася");
-        Assert.Equal(TurnPhase.Rolling, player.Phase);
+        Assert.Equal(TurnPhase.Playing, player.Phase);
         Assert.Null(player.Choice);
-        Assert.Equal(chosen, player.Offer);
-        Assert.Null(player.ActiveRunId);
+        Assert.Null(player.Offer);
+        Assert.Equal(started.RunId, player.ActiveRunId);
+        Assert.Equal(
+            new RunState(started.RunId, player.PlayerId, s.GameId("Alan Wake"), RunStatus.Playing, chosen.Snapshot, chosen.RolledAt, chosenAt, null, null, []),
+            s.State.Runs[started.RunId]);
     }
 
     [Fact]
@@ -295,22 +333,32 @@ public class PendingChoiceTests
     }
 
     [Fact]
-    public void Start_after_choosing_plays_the_chosen_game()
+    public void Start_after_choosing_is_rejected_because_the_chosen_game_is_already_played()
+    {
+        // Choosing --> Playing: there is no separate Start after a choice (D-91)
+        var s = Horror("Silent Hill", "Alan Wake", "Dead Space");
+        s.Roll("Вася");
+        Choose(s, "Вася", "Dead Space");
+        ScenarioAssert.Accepted(s);
+        var run = s.Player("Вася").ActiveRunId;
+
+        ScenarioAssert.RejectsWithoutChanges(s, x => x.Start("Вася"), RejectionCodes.WrongPhase);
+        Assert.Equal(run, s.Player("Вася").ActiveRunId);
+        Assert.Single(s.State.Runs.Values, r => r.PlayerId == s.PlayerId("Вася") && r.Status == RunStatus.Playing);
+    }
+
+    [Fact]
+    public void Chosen_game_can_be_completed_like_any_run()
     {
         var s = Horror("Silent Hill", "Alan Wake", "Dead Space");
         s.Roll("Вася");
-        var chosen = ChoiceRoll(s).Offers.Single(o => o.GameId == s.GameId("Dead Space"));
         Choose(s, "Вася", "Dead Space");
 
-        s.Start("Вася");
+        s.Complete("Вася");
 
         ScenarioAssert.Accepted(s);
-        var started = Assert.IsType<RunStarted>(Assert.Single(s.Last.Events));
-        Assert.Equal(s.GameId("Dead Space"), started.GameId);
-        Assert.Equal(chosen.Snapshot, started.Snapshot);
-        Assert.Equal(chosen.RolledAt, started.RolledAt);
-        Assert.Equal(TurnPhase.Playing, s.Player("Вася").Phase);
-        Assert.Null(s.Player("Вася").Offer);
+        Assert.Equal(TurnPhase.Idle, s.Player("Вася").Phase);
+        Assert.Null(s.Player("Вася").ActiveRunId);
     }
 
     [Fact]
@@ -325,8 +373,10 @@ public class PendingChoiceTests
         Choose(s, "Вася", "Silent Hill");
 
         ScenarioAssert.Accepted(s);
-        Assert.Equal(chosen.Snapshot, s.Player("Вася").Offer!.Snapshot);
-        Assert.NotEqual(s.Ruleset.Reward.DiceCount, s.Player("Вася").Offer!.Snapshot.DiceCount);
+        var run = s.State.Runs[s.Player("Вася").ActiveRunId!.Value];
+        Assert.Equal(chosen.Snapshot, run.Snapshot);
+        Assert.Equal(chosen.Snapshot, Assert.Single(s.LastEvents<RunStarted>()).Snapshot);
+        Assert.NotEqual(s.Ruleset.Reward.DiceCount, run.Snapshot.DiceCount);
     }
 
     [Fact]
@@ -404,7 +454,7 @@ public class PendingChoiceTests
 
         ScenarioAssert.RejectsWithoutChanges(
             s, x => x.Act(new MakeChoice(x.PlayerId("Вася"), choiceId, OptionId(x, "Alan Wake"))), RejectionCodes.NoPendingChoice);
-        Assert.Equal(s.GameId("Silent Hill"), s.Player("Вася").Offer!.GameId);
+        Assert.Equal(s.GameId("Silent Hill"), s.State.Runs[s.Player("Вася").ActiveRunId!.Value].GameId);
     }
 
     [Fact]
@@ -444,12 +494,19 @@ public class PendingChoiceTests
         Assert.Equal(s.Player("Вася").Choice, replayed.Players[s.PlayerId("Вася")].Choice);
 
         // And answering it on the replayed state gives the same result as on the live one
+        // (each side gets its own id generator in the same position: the answer now creates a run id, D-91)
         var command = new MakeChoice(s.PlayerId("Вася"), s.Player("Вася").Choice!.ChoiceId, OptionId(s, "Dead Space"));
-        var fromReplay = SeasonEngine.Execute(replayed, command, s.Context());
-        Choose(s, "Вася", "Dead Space");
+        var fromLive = SeasonEngine.Execute(s.State, command, s.Context() with { Ids = new SequentialIds(0x60000000) });
+        var fromReplay = SeasonEngine.Execute(replayed, command, s.Context() with { Ids = new SequentialIds(0x60000000) });
+        Assert.True(fromLive.IsAccepted, $"Rejected: {fromLive.Rejection}");
         Assert.True(fromReplay.IsAccepted, $"Rejected: {fromReplay.Rejection}");
-        Assert.Equal(s.Last.Events, fromReplay.Events);
-        Assert.Equal(s.State, fromReplay.State);
+        Assert.Equal(fromLive.Events, fromReplay.Events);
+        Assert.Equal(fromLive.State, fromReplay.State);
+        Assert.Equal(TurnPhase.Playing, fromReplay.State.Players[s.PlayerId("Вася")].Phase);
+
+        // And the live answer is replayed to the same state
+        Choose(s, "Вася", "Dead Space");
+        ScenarioAssert.Accepted(s);
         Assert.Equal(s.State, SeasonEngine.Replay(s.Log));
     }
 

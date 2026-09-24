@@ -43,7 +43,7 @@ public static class SeasonEngine
             RollGame c => Rolling.Decide(state, c, context),
             StartRun c => RunLifecycle.Decide(state, c, context),
             CompleteRun c => RunLifecycle.Decide(state, c, context),
-            MakeChoice c => Choosing.Decide(state, c),
+            MakeChoice c => Choosing.Decide(state, c, context),
             _ => throw new ArgumentException($"Unknown command {command.GetType().Name}.", nameof(command)),
         };
 

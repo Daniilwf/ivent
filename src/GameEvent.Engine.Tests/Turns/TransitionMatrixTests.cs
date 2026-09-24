@@ -10,8 +10,9 @@ namespace GameEvent.Engine.Tests.Turns;
 /// <summary>
 /// The turn is a strict state machine (SPEC «Игровой цикл», K-5, D-91): every player turn command in every turn
 /// state is either accepted and moves to its phase, or rejected without events with the code of the first failed
-/// check. Check order (D-91): season running → player known → no pending choice (except MakeChoice) → phase →
-/// active run limit. The expected table lives here, independent of the engine's own table.
+/// check. Check order (D-91): season running → player known → no pending choice (except MakeChoice) → phase.
+/// The active run limit is held by the phase and RulesetSupport, there is no separate check (D-91).
+/// The expected table lives here, independent of the engine's own table.
 /// </summary>
 public class TransitionMatrixTests
 {
@@ -50,7 +51,8 @@ public class TransitionMatrixTests
         [(TurnState.RollingWithChoice, TurnCommand.Roll)] = new(RejectionCodes.ChoicePending),
         [(TurnState.RollingWithChoice, TurnCommand.Start)] = new(RejectionCodes.ChoicePending),
         [(TurnState.RollingWithChoice, TurnCommand.Complete)] = new(RejectionCodes.ChoicePending),
-        [(TurnState.RollingWithChoice, TurnCommand.Choose)] = new(null, TurnPhase.Rolling),
+        // Choosing --> Playing (SPEC diagram): the chosen game starts at once (D-91)
+        [(TurnState.RollingWithChoice, TurnCommand.Choose)] = new(null, TurnPhase.Playing),
 
         [(TurnState.Playing, TurnCommand.Roll)] = new(RejectionCodes.WrongPhase),
         [(TurnState.Playing, TurnCommand.Start)] = new(RejectionCodes.WrongPhase),

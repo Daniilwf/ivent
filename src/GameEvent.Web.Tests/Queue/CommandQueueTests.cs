@@ -4,6 +4,7 @@ using GameEvent.Engine.Rolls;
 using GameEvent.Engine.Rulesets;
 using GameEvent.Engine.Runs;
 using GameEvent.Engine.Seasons;
+using GameEvent.Engine.Turns;
 using GameEvent.Infrastructure.EventLog;
 using GameEvent.Infrastructure.Seasons;
 using Microsoft.EntityFrameworkCore;
@@ -211,6 +212,60 @@ public class CommandQueueTests
         Assert.Equal("""{"segments":[{"cells":["start"]},{"cells":["c3"]}]}""", row.PathJson);
         var season = await db.Seasons.SingleAsync(TestContext.Current.CancellationToken);
         Assert.Equal((SeasonStatus.Closing, "Осень"), (season.Status, season.Name));
+    }
+
+    [Fact]
+    public async Task Projection_of_pending_choices_equals_the_fold_of_the_log()
+    {
+        await using var h = await QueueHarness.StartAsync();
+        var petya = Guid.Parse("10000000-0000-0000-0000-000000000002");
+        var ct = TestContext.Current.CancellationToken;
+
+        // Given a season with a choice of 3 (D-91); each pool category has two games
+        await AcceptedAsync(h, new CreateSeason(s_season, "Осень", RulesetJson.Default()));
+        await AcceptedAsync(h, new ChangeSeasonStatus(SeasonStatus.Active));
+        await AcceptedAsync(h, new AddSeasonPlayer(s_vasya, s_vasya, "Вася"));
+        await AcceptedAsync(h, new AddSeasonPlayer(petya, petya, "Петя"));
+        var rules = RulesetJson.Default();
+        await AcceptedAsync(h, new ChangeRuleset(rules with { Roll = rules.Roll with { ChoiceCount = 3 } }));
+
+        // When both roll, each is left waiting for a choice of a whole category (the other's is reserved, D-06)
+        await AcceptedAsync(h, new RollGame(s_vasya));
+        await AcceptedAsync(h, new RollGame(petya));
+
+        // Then while the choices are pending the projection equals the fold of the log and keeps them (L4, T2)
+        var pending = await AssertProjectionEqualsReplayAsync(h, ct);
+        var vasyaChoice = Assert.IsType<PendingChoice>(pending.Players[s_vasya].Choice);
+        Assert.IsType<PendingChoice>(pending.Players[petya].Choice);
+        await using (var db = h.NewDb())
+        {
+            Assert.All(await db.SeasonPlayers.ToListAsync(ct), row =>
+            {
+                Assert.NotNull(row.ChoiceJson);
+                Assert.Equal(TurnPhase.Rolling, row.Phase);
+            });
+        }
+
+        // When Вася picks an option and the admin discards Петя's choice
+        await AcceptedAsync(h, new MakeChoice(s_vasya, vasyaChoice.ChoiceId, vasyaChoice.Options[0].Id));
+        await AcceptedAsync(h, new AdjustPlayer(petya, "Завис выбор", DiscardOffer: true));
+
+        // Then the projection still equals the fold: Вася plays the chosen game, Петя is idle, no choice is stored
+        var after = await AssertProjectionEqualsReplayAsync(h, ct);
+        Assert.Equal(TurnPhase.Playing, after.Players[s_vasya].Phase);
+        Assert.Equal(TurnPhase.Idle, after.Players[petya].Phase);
+        await using var final = h.NewDb();
+        Assert.All(await final.SeasonPlayers.ToListAsync(ct), row => Assert.Null(row.ChoiceJson));
+        var run = await final.Runs.SingleAsync(ct);
+        Assert.Equal((s_vasya, RunStatus.Playing, vasyaChoice.Options[0].Game!.GameId), (run.PlayerId, run.Status, run.GameId));
+    }
+
+    private static async Task<SeasonState> AssertProjectionEqualsReplayAsync(QueueHarness h, CancellationToken ct)
+    {
+        await using var db = h.NewDb();
+        var (replayed, _) = await EventLogReader.ReplaySeasonAsync(db, s_season, ct);
+        Assert.Equal(replayed, await SeasonProjection.ReadAsync(db, replayed, ct));
+        return replayed;
     }
 }
 

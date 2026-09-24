@@ -19,6 +19,7 @@ public static class RulesetValidator
     private const int MaxMapLength = 10_000;
     private const int MaxDice = 1_000;
     private const int MaxSides = 1_000;
+    private const int MaxChoiceCount = 20;
 
     public static IReadOnlyList<RulesetError> Validate(Ruleset ruleset)
     {
@@ -77,6 +78,8 @@ public static class RulesetValidator
         {
             Error("roll.choiceCount", "must be at least 1");
         }
+
+        AtMost("roll.choiceCount", ruleset.Roll.ChoiceCount, MaxChoiceCount);
 
         if (ruleset.Season.MaxActiveRunsPerPlayer < 1)
         {

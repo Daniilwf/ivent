@@ -155,14 +155,16 @@ public sealed class SeasonApiTests : IAsyncLifetime
         Assert.Equal(["Alan Wake", "Outlast", "Silent Hill"], choice.Options.Select(o => o.Game!.Title).Order());
         Assert.All(choice.Options, o => Assert.Equal(o.Game!.Id.ToString("N"), o.Id));
 
-        // When the player picks one, it becomes the offered game
+        // When the player picks one, it starts at once (Choosing --> Playing, D-91)
         var picked = choice.Options[1];
         var choose = await PostAsync(vasya, "choose", new { commandId = Guid.NewGuid(), choiceId = choice.Id, optionId = picked.Id });
 
-        Assert.Equal(["choice-made"], await TypesAsync(choose));
+        Assert.Equal(["choice-made", "run-started"], await TypesAsync(choose));
         var chosen = (await vasya.GetFromJsonAsync<SeasonView>($"/api/seasons/{SiteFactory.SeasonId}", s_json, Ct))!.Me!;
+        Assert.Equal(TurnPhase.Playing, chosen.Phase);
         Assert.Null(chosen.Choice);
-        Assert.Equal(picked.Game, chosen.Offer);
+        Assert.Null(chosen.Offer);
+        Assert.Equal(picked.Game, chosen.ActiveRun!.Game);
 
         // A second tab answering the same choice is refused with the engine code
         var again = await vasya.PostAsJsonAsync(Url("choose"), new { commandId = Guid.NewGuid(), choiceId = choice.Id, optionId = picked.Id }, Ct);
@@ -171,7 +173,60 @@ public sealed class SeasonApiTests : IAsyncLifetime
         Assert.Equal("turn.noPendingChoice", problem.RootElement.GetProperty("code").GetString());
     }
 
+    private async Task<ChoiceView> RollChoiceAsync(HttpClient player)
+    {
+        var rules = RulesetJson.Default();
+        await _site.SendAsync(new ChangeRuleset(rules with { Roll = rules.Roll with { ChoiceCount = 3 } }, ExpectedVersion: null));
+        await PostAsync(player, "roll", new { commandId = Guid.NewGuid() });
+        return (await player.GetFromJsonAsync<SeasonView>($"/api/seasons/{SiteFactory.SeasonId}", s_json, Ct))!.Me!.Choice!;
+    }
+
+    [Fact]
+    public async Task Repeating_a_choice_with_the_same_command_id_acts_once()
+    {
+        var vasya = await _site.SignedInAsync("vasya");
+        var choice = await RollChoiceAsync(vasya);
+        var body = new { commandId = Guid.NewGuid(), choiceId = choice.Id, optionId = choice.Options[0].Id };
+
+        var first = await vasya.PostAsJsonAsync(Url("choose"), body, Ct);
+        var second = await vasya.PostAsJsonAsync(Url("choose"), body, Ct);
+
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, second.StatusCode);
+        Assert.True((await second.Content.ReadFromJsonAsync<CommandResponse>(s_json, Ct))!.Duplicate);
+        await using var db = _site.NewDb();
+        Assert.Equal(1, db.Events.Count(e => e.Type == "choice-made"));
+    }
+
     // ---- Refused: no session, another role, another player ----
+
+    [Fact]
+    public async Task A_player_cannot_answer_or_see_another_players_choice()
+    {
+        var vasya = await _site.SignedInAsync("vasya");
+        var choice = await RollChoiceAsync(vasya);
+
+        // Petya sends Vasya's choice and option: the engine checks it against Petya's own (absent) choice
+        var petya = await _site.SignedInAsync("petya");
+        var response = await petya.PostAsJsonAsync(Url("choose"), new { commandId = Guid.NewGuid(), choiceId = choice.Id, optionId = choice.Options[0].Id }, Ct);
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        using var problem = JsonDocument.Parse(await response.Content.ReadAsStringAsync(Ct));
+        Assert.Equal("turn.noPendingChoice", problem.RootElement.GetProperty("code").GetString());
+        var mine = (await vasya.GetFromJsonAsync<SeasonView>($"/api/seasons/{SiteFactory.SeasonId}", s_json, Ct))!.Me!.Choice!;
+        Assert.Equal(choice.Id, mine.Id);
+        Assert.Equal(choice.Options.Select(o => o.Id), mine.Options.Select(o => o.Id));
+
+        // Nobody else sees the options: Petya has no choice, the spectator and the admin have no turn at all
+        Assert.Null((await petya.GetFromJsonAsync<SeasonView>($"/api/seasons/{SiteFactory.SeasonId}", s_json, Ct))!.Me!.Choice);
+        foreach (var login in new[] { "zritel", "admin" })
+        {
+            var other = await _site.SignedInAsync(login);
+            var text = await other.GetStringAsync($"/api/seasons/{SiteFactory.SeasonId}", Ct);
+            Assert.Null(JsonSerializer.Deserialize<SeasonView>(text, s_json)!.Me);
+            Assert.DoesNotContain(choice.Options[0].Id, text, StringComparison.Ordinal);
+        }
+    }
 
     [Theory]
     [InlineData("roll")]
@@ -225,13 +280,17 @@ public sealed class SeasonApiTests : IAsyncLifetime
         Assert.Equal(TurnPhase.Idle, season.Players.Single(p => p.Id == _site.Players["petya"]).Phase);
     }
 
-    [Fact]
-    public async Task Post_without_the_antiforgery_token_is_refused()
+    [Theory]
+    [InlineData("roll")]
+    [InlineData("start")]
+    [InlineData("complete")]
+    [InlineData("choose")]
+    public async Task Post_without_the_antiforgery_token_is_refused(string action)
     {
         var vasya = await _site.SignedInAsync("vasya");
         vasya.DefaultRequestHeaders.Remove(Hosting.Csrf.HeaderName);
 
-        var response = await vasya.PostAsJsonAsync(Url("roll"), new { commandId = Guid.NewGuid() }, Ct);
+        var response = await vasya.PostAsJsonAsync(Url(action), new { commandId = Guid.NewGuid(), difficulty = "normal", choiceId = Guid.NewGuid(), optionId = "x" }, Ct);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
@@ -247,6 +306,8 @@ public sealed class SeasonApiTests : IAsyncLifetime
     [InlineData("complete", """{"commandId":"5b1e2f0a-0000-0000-0000-000000000004"}""")]
     [InlineData("complete", """{"commandId":"5b1e2f0a-0000-0000-0000-000000000005","difficulty":null}""")]
     [InlineData("start", "not json")]
+    [InlineData("choose", """{"commandId":"5b1e2f0a-0000-0000-0000-00000000000a","choiceId":"5b1e2f0a-0000-0000-0000-0000000000ff","optionId":"a\nb"}""")]
+    [InlineData("choose", """{"commandId":"5b1e2f0a-0000-0000-0000-00000000000b","choiceId":"5b1e2f0a-0000-0000-0000-0000000000ff","optionId":"<script>"}""")]
     [InlineData("choose", """{"commandId":"5b1e2f0a-0000-0000-0000-000000000006","choiceId":"00000000-0000-0000-0000-000000000000","optionId":"a"}""")]
     [InlineData("choose", """{"commandId":"5b1e2f0a-0000-0000-0000-000000000007","choiceId":"5b1e2f0a-0000-0000-0000-0000000000ff"}""")]
     [InlineData("choose", """{"commandId":"5b1e2f0a-0000-0000-0000-000000000008","choiceId":"5b1e2f0a-0000-0000-0000-0000000000ff","optionId":"  "}""")]

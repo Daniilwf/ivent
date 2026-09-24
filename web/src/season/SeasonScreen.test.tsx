@@ -198,6 +198,78 @@ describe('SeasonScreen', () => {
     });
   });
 
+  it('explains a choice already made in another tab and refetches the season', async () => {
+    const choiceId = 'c0000000-0000-0000-0000-000000000001';
+    const picked = { id: 'a1000000-0000-0000-0000-000000000001', title: 'Silent Hill', hours: 12 };
+    const choosing = season({
+      me: {
+        playerId: me,
+        phase: 'rolling',
+        offer: null,
+        choice: {
+          id: choiceId,
+          kind: 'game',
+          options: [
+            { id: 'a1', game: picked },
+            {
+              id: 'b2',
+              game: { id: 'b2000000-0000-0000-0000-000000000002', title: 'Outlast', hours: 9 },
+            },
+          ],
+        },
+        activeRun: null,
+        lastCompleted: null,
+      },
+    });
+    // The other tab already chose: the server now has Вася playing, and answers this tab's choice with 409
+    const playing = season({
+      lastSequence: 5,
+      players: [{ id: me, name: 'Вася', cellId: 'start', points: 0, phase: 'playing' }],
+      me: {
+        playerId: me,
+        phase: 'playing',
+        offer: null,
+        choice: null,
+        activeRun: {
+          id: 'e0000000-0000-0000-0000-000000000001',
+          game: picked,
+          startedAt: '2026-09-24T10:00:00Z',
+        },
+        lastCompleted: null,
+      },
+    });
+    let current = choosing;
+    let seasonGets = 0;
+    serve((r) => {
+      if (isSeasonGet(r)) {
+        seasonGets++;
+        return json(200, current);
+      }
+      current = playing;
+      return json(409, {
+        title: 'rejected',
+        status: 409,
+        detail: null,
+        code: 'turn.noPendingChoice',
+      });
+    });
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+    await screen.findByTestId('choice');
+    const getsBefore = seasonGets;
+
+    await userEvent.click(screen.getByTestId('option-b2'));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      ru.rejection['turn.noPendingChoice'],
+    );
+    await vi.waitFor(() => {
+      expect(seasonGets).toBeGreaterThan(getsBefore);
+    });
+    await vi.waitFor(() => {
+      expect(screen.queryByTestId('choice')).not.toBeInTheDocument();
+    });
+  });
+
   it('shows a spectator no actions', async () => {
     serve(() => json(200, season({ me: null })));
     render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);

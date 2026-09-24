@@ -8,7 +8,8 @@ namespace GameEvent.Engine.Turns;
 /// <summary>
 /// The turn state machine (SPEC «Игровой цикл», K-5) as one table: which phase each player turn command needs.
 /// A pending choice blocks every turn command except <see cref="MakeChoice"/>. Admin commands are not turn commands.
-/// Checks run in a fixed order: season active, player known, pending choice, phase, active run limit.
+/// Checks run in a fixed order: season active, player known, pending choice, phase. The active run limit is the
+/// phase itself: a run starts only from Rolling, and RulesetSupport keeps the limit at 1 (D-91).
 /// </summary>
 internal static class TurnRules
 {
@@ -53,13 +54,6 @@ internal static class TurnRules
         if (player.Phase != required)
         {
             return Decision.Reject(RejectionCodes.WrongPhase, $"Needs phase {required}, player is {player.Phase}.");
-        }
-
-        // Starting a run is where the limit bites; with one run per player the phase already guarantees it (D-91).
-        if (command is RollGame or StartRun
-            && state.Runs.Values.Count(r => r.PlayerId == playerId && r.Status == RunStatus.Playing) >= state.Rules.Season.MaxActiveRunsPerPlayer)
-        {
-            return Decision.Reject(RejectionCodes.ActiveRunLimit, "The player already has the maximum number of active runs.");
         }
 
         return null;
