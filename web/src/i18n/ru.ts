@@ -1,7 +1,67 @@
 // The single dictionary of interface texts. Terms come from docs/GLOSSARY.md.
+
+const hours = (value: number) => `${value.toLocaleString('ru-RU')} ч`;
+
+const rejection = {
+  'turn.wrongPhase': 'Это действие сейчас недоступно: обновите страницу.',
+  'roll.noAvailableGames': 'Нет доступных игр для ролла. Сообщите админу.',
+  'run.hoursRequired': 'У игры нет данных о длине: укажите оценку часов.',
+  'run.invalidHours': 'Часы должны быть больше нуля.',
+  'player.unknown': 'Вы не участвуете в этом сезоне.',
+  'season.notCreated': 'Сезон ещё не создан.',
+  'season.mismatch': 'Действие отправлено не в тот сезон. Обновите страницу.',
+  'command.idReused': 'Действие уже выполнялось. Обновите страницу.',
+  'ruleset.unsupported': 'Правила сезона требуют механику, которой ещё нет. Сообщите админу.',
+  unknown: 'Действие отклонено. Попробуйте ещё раз.',
+} as const;
+
 export const ru = {
   app: {
     title: 'Игровой ивент',
-    placeholder: 'Сайт в разработке',
+    loading: 'Загрузка…',
+    loadError: 'Не удалось загрузить данные. Проверьте соединение и обновите страницу.',
+    noSeason: 'Сезонов пока нет.',
   },
+  login: {
+    title: 'Вход',
+    login: 'Логин',
+    password: 'Пароль',
+    submit: 'Войти',
+    failed: 'Неверный логин или пароль.',
+    throttled: 'Слишком много попыток. Подождите и попробуйте снова.',
+    logout: 'Выйти',
+  },
+  turn: {
+    title: 'Ваш ход',
+    roll: 'Крутить колесо',
+    offered: (title: string, gameHours: number | null) =>
+      gameHours == null ? `Выпала игра: ${title}` : `Выпала игра: ${title} (${hours(gameHours)})`,
+    start: 'Начать',
+    playing: (title: string) => `Сейчас играете: ${title}`,
+    complete: 'Завершить',
+    difficulty: 'Сложность',
+    hours: 'Часы (оценка)',
+    hoursHint: 'У игры нет данных о длине: укажите оценку.',
+    hoursInvalid: 'Укажите число часов больше нуля.',
+    lastDice: (title: string, dice: number[], total: number) =>
+      `Кубы за прохождение (${title}): ${dice.join(' + ')} — итого ${total.toLocaleString('ru-RU')}`,
+    spectator: 'Вы смотрите сезон как зритель.',
+  },
+  difficulty: {
+    easy: 'Лёгкая',
+    normal: 'Нормальная',
+    hard: 'Сложная',
+    extreme: 'Выше сложной',
+  },
+  map: {
+    title: 'Карта',
+    start: 'Старт',
+    finish: 'Финиш',
+    cell: '·',
+  },
+  leaderboard: {
+    title: 'Лидерборд',
+    row: (name: string, points: number) => `${name}: ${points.toLocaleString('ru-RU')} очк.`,
+  },
+  rejection: rejection as Readonly<Record<string, string>> & typeof rejection,
 } as const;

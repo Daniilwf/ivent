@@ -41,6 +41,7 @@ public enum TurnPhase
 /// <summary>A player's standing in the season. Points and position are independent measures.</summary>
 public sealed record SeasonPlayer(
     Guid PlayerId,
+    Guid UserId,
     string Name,
     string CellId,
     int Points,

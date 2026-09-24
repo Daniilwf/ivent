@@ -6,14 +6,17 @@ namespace GameEvent.Engine.Seasons;
 /// <summary>Create a season with the map from the current ruleset.</summary>
 public sealed record CreateSeason(Guid SeasonId) : ICommand;
 
-/// <summary>Add a player to the season; the player starts on the start cell with zero points.</summary>
-public sealed record AddSeasonPlayer(Guid PlayerId, string Name) : ICommand;
+/// <summary>
+/// Add a user to the season as a player; the player starts on the start cell with zero points.
+/// <c>PlayerId</c> is the participation id; a user takes part in a season at most once.
+/// </summary>
+public sealed record AddSeasonPlayer(Guid PlayerId, Guid UserId, string Name) : ICommand;
 
 [EventType("season-created")]
 public sealed record SeasonCreated(Guid SeasonId, int RulesetVersion, MapGraph Map) : IGameEvent;
 
 [EventType("season-player-added")]
-public sealed record SeasonPlayerAdded(Guid PlayerId, string Name, string CellId) : IGameEvent;
+public sealed record SeasonPlayerAdded(Guid PlayerId, Guid UserId, string Name, string CellId) : IGameEvent;
 
 internal static class SeasonSetup
 {
@@ -35,12 +38,12 @@ internal static class SeasonSetup
             return Decision.Reject(RejectionCodes.SeasonNotCreated, "Create the season first.");
         }
 
-        if (state.Players.ContainsKey(command.PlayerId))
+        if (state.Players.ContainsKey(command.PlayerId) || state.Players.Values.Any(p => p.UserId == command.UserId))
         {
-            return Decision.Reject(RejectionCodes.PlayerAlreadyAdded, $"Player {command.PlayerId} is already in the season.");
+            return Decision.Reject(RejectionCodes.PlayerAlreadyAdded, $"Player {command.PlayerId} or user {command.UserId} is already in the season.");
         }
 
-        return Decision.Accept(new SeasonPlayerAdded(command.PlayerId, command.Name, state.Map.Start.Id));
+        return Decision.Accept(new SeasonPlayerAdded(command.PlayerId, command.UserId, command.Name, state.Map.Start.Id));
     }
 
     public static SeasonState Apply(SeasonState state, SeasonCreated e) =>
@@ -51,6 +54,6 @@ internal static class SeasonSetup
         {
             Players = state.Players.Add(
                 e.PlayerId,
-                new SeasonPlayer(e.PlayerId, e.Name, e.CellId, Points: 0, TurnPhase.Idle, Offer: null, ActiveRunId: null)),
+                new SeasonPlayer(e.PlayerId, e.UserId, e.Name, e.CellId, Points: 0, TurnPhase.Idle, Offer: null, ActiveRunId: null)),
         };
 }

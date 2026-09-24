@@ -121,27 +121,32 @@
 | ID | Правило | Тесты | Статус |
 | --- | --- | --- | --- |
 | L1 | Лог всех действий, включая админа, виден всем игрокам | `Web.Tests/Feed/*`, e2e `07-undo` | ⬜ |
-| L2 | События хранят результаты; повтор лога детерминирован | `Seasons/SliceScenarioTests.Replaying_the_log_gives_the_current_state`, `Seasons/SliceScenarioTests.Replay_does_not_depend_on_the_pool_or_the_ruleset_any_more`, `Seasons/SliceScenarioTests.Same_seed_and_commands_give_the_same_log`, `Invariants/SliceInvariantTests.Same_seed_and_commands_give_the_same_log`, снапшот-тесты Verify | 🟨 C13 |
+| L2 | События хранят результаты; повтор лога детерминирован | `Seasons/SliceScenarioTests.Replaying_the_log_gives_the_current_state`, `Seasons/SliceScenarioTests.Replaying_the_log_read_back_from_storage_gives_the_same_state`, `Seasons/SliceScenarioTests.Same_seed_and_commands_give_the_same_log`, `Invariants/SliceInvariantTests.Same_seed_and_commands_give_the_same_log`, снапшот-тесты Verify | 🟨 C13 |
 | L3 | Откат — команда целиком компенсирующими событиями в обратном порядке; есть зависимые — отказ со списком | `Undo/UndoTests.*`, инвариант 13, e2e `07-undo` | ⬜ |
-| L4 | Проверка целостности: пересчёт из лога совпадает с сохранённым | `Seasons/SliceScenarioTests.Replaying_every_prefix_of_the_log_matches_the_state_after_each_command`, инвариант 1 (`Invariants/SliceInvariantTests.Invariants_hold_after_every_command`), `Log/IntegrityTests.*`, `Web.Tests/Integrity/*` | 🟨 C12 |
+| L4 | Проверка целостности: пересчёт из лога совпадает с сохранённым | `Seasons/SliceScenarioTests.Replaying_every_prefix_of_the_log_matches_the_state_after_each_command`, инвариант 1 (`Invariants/SliceInvariantTests.Invariants_hold_after_every_command`), `Log/IntegrityTests.*`, `Web.Tests/Integrity/*`, `Web.Tests/Queue/CommandQueueTests.Command_through_the_queue_writes_log_and_projection_that_agree` | 🟨 C12 |
 | L5 | Экспорт и импорт сезона одним архивом | `Web.Tests/SeasonTransfer/*` | ⬜ |
-| L6 | Формат события версионируется, старые события читаются через преобразование | `Seasons/SliceScenarioTests.Every_event_of_the_slice_survives_the_json_round_trip`, `Seasons/SliceScenarioTests.Roll_misses_survive_the_json_round_trip` (круг сериализации), `Log/EventUpcastTests.*` | 🟨 C12 |
-| L7 | Все изменения через одну очередь, одна команда — одна транзакция, повтор `CommandId` не выполняется дважды | `Web.Tests/Queue/*` | ⬜ |
+| L6 | Формат события версионируется, старые события читаются через преобразование | `Kernel/EventFormatTests.*` (эталонный формат, пошаговое преобразование старых версий, отказ для новее сборки и без преобразования), `Seasons/SliceScenarioTests.Every_event_of_the_slice_survives_the_json_round_trip` | ✅ |
+| L7 | Все изменения через одну очередь, одна команда — одна транзакция, повтор `CommandId` не выполняется дважды | `Web.Tests/Queue/CommandQueueTests.*`, `Web.Tests/Queue/CommandQueueRobustnessTests.*` (атомарность при сбое, 50 параллельных команд, повтор `CommandId` засчитывается только той же команде того же автора и сезона, перезапуск, остановка) | ✅ |
 
 ### Аккаунты, безопасность, эксплуатация
 
 | ID | Правило | Тесты | Статус |
 | --- | --- | --- | --- |
 | A1 | Аккаунты создаёт админ, временный пароль, игрок меняет пароль сам | `Web.Tests/Auth/*` | ⬜ |
-| A2 | Роли: игрок, админ, зритель; зритель не делает ни одного игрового действия | `Web.Tests/Auth/RoleMatrixTests.*`, e2e `11-spectator` | ⬜ |
-| A3 | Ограничение попыток входа, куки HttpOnly/Secure/SameSite, CSRF | `Web.Tests/Auth/LoginSecurityTests.*` | ⬜ |
-| A4 | Игрок действует только за себя | `Web.Tests/Auth/ForeignPlayerTests.*`, e2e `08-permissions` | ⬜ |
+| A2 | Роли: игрок, админ, зритель; зритель не делает ни одного игрового действия | `Web.Tests/Api/SeasonApiTests.Spectator_admin_and_player_outside_the_season_are_forbidden`, `Web.Tests/Api/SeasonApiTests.Spectator_and_outsider_can_view_the_season`, e2e `11-spectator` | 🟨 I1 |
+| A3 | Ограничение попыток входа (по IP и по логину), куки HttpOnly/Secure/SameSite, CSRF, сессия кончается при удалении аккаунта или смене роли | `Web.Tests/Api/AccountApiTests.*` (кука HttpOnly/SameSite, CSRF, неверные данные, удалённый аккаунт), `Web.Tests/Api/LoginRateLimitTests.*`, `Web.Tests/Api/SeasonApiTests.Post_without_the_antiforgery_token_is_refused`, `Web.Tests/Api/WebSecurityTests.*`, `Web.Tests/Api/ProductionSurfaceTests.*` | 🟨 D8 |
+| A4 | Игрок действует только за себя | `Web.Tests/Api/SeasonApiTests.A_player_cannot_act_for_another_player`, `…Spectator_admin_and_player_outside_the_season_are_forbidden`, e2e `08-permissions` | 🟨 I1 |
 | A5 | Аватарка по ссылке: только https, публичные адреса, белый список, лимит | `Web.Tests/Files/AvatarUrlTests.*` | ⬜ |
 | A6 | Загрузка файлов: тип по содержимому, лимиты, WebP, миниатюры GIF | `Web.Tests/Files/UploadTests.*` | ⬜ |
 | A7 | Тестовые эндпоинты есть только в Development и Test | `Web.Tests/Environment/ProductionHasNoTestEndpointsTests` | ⬜ |
 | A8 | Режим обслуживания: баннер и только чтение | `Web.Tests/Maintenance/*` | ⬜ |
 | A9 | Кнопка «Сообщить о баге» с контекстом и скриншотом, выгрузка файлом | `Web.Tests/BugReports/*`, `web/…/BugReportButton.test.tsx` | ⬜ |
 | A10 | `/health` и страница «Ошибки» | `Web.Tests/Observability/*` | ⬜ |
+| A13 | Пользователь участвует в сезоне не больше одного раза (D-65) | `Seasons/SeasonSetupTests.Adding_the_same_user_twice_under_another_player_id_is_rejected` | ✅ |
+| A14 | Обновления в реальном времени: зритель сезона узнаёт о действии другого игрока без перезагрузки; анонимный не подключается | `Web.Tests/Api/SeasonHubTests.*` (догрузка пропущенного — E3) | 🟨 E3 |
+| A15 | Экран среза: ролл → старт → завершение с кубами, фишка сдвигается, второй браузер видит сдвиг без перезагрузки; отказы по-русски; устаревший ответ не затирает свежий; сеть упала — сообщение, а не зависание | `e2e/tests/slice.spec.ts` (десктоп и телефон), `web/src/season/SeasonScreen.test.tsx`, `web/src/season/CompleteForm.test.tsx`, `web/src/App.test.tsx` | 🟨 H2–H4 |
+| A16 | Сезон по умолчанию: последний, где пользователь играет; для остальных — последний; без сезонов — 404 | `Web.Tests/Api/SeasonApiTests.Current_season_*`, `Web.Tests/Api/EmptySiteTests.*` | ✅ |
+| A17 | Сайт раздаёт собранный фронтенд: файлы как есть, клиентские маршруты — SPA, неизвестные `/api` и `/hubs` — 404 | `Web.Tests/Api/FrontendHostingTests.*` | ✅ |
 | A11 | Время хранится в UTC, дедлайны показываются по Москве с подписью | `web/…/formatDeadline.test.ts` | ⬜ |
 | A12 | Внешние сервисы (HLTB, Steam, IGDB) недоступны — сайт работает | `Web.Tests/Providers/*` | ⬜ |
 
@@ -156,7 +161,7 @@
 | Подкармливать друга | прямых переводов нет | нет команд перевода (архитектурный тест списка команд) | ⬜ |
 | Финишировавший первым помогает или вредит | заморожен | P4, T3, инвариант 8 | ⬜ |
 | Реджект прохождения, которое довело до финиша | место предварительное | P3, SE7 | ⬜ |
-| Два действия одновременно | единая очередь | L7, e2e `10-two-tabs` | ⬜ |
+| Два действия одновременно | единая очередь | L7, e2e `10-two-tabs` | 🟨 I1 |
 | Двое финишировали почти одновременно | порядок по очереди команд | `Finish/ConcurrentFinishTests` (Web.Tests) | ⬜ |
 | Реджект после объявления итогов | итоги после проверки всех пруфов | P10 | ⬜ |
 | Правка конфига посреди сезона | снапшот при ролле | S1, S2 | 🟨 C1 |

@@ -1,0 +1,21 @@
+{
+  "categories": [
+    { "name": "Horror", "weight": 3 },
+    { "name": "Puzzle", "weight": 2 },
+    { "name": "Platformer", "weight": 2 },
+    { "name": "RPG", "weight": 1 }
+  ],
+  "games": [
+    { "title": "Silent Hill 2", "tags": ["Horror"], "hours": 9 },
+    { "title": "Amnesia: The Dark Descent", "tags": ["Horror", "Puzzle"], "hours": 7 },
+    { "title": "Outlast", "tags": ["Horror"], "hours": 5 },
+    { "title": "Portal", "tags": ["Puzzle"], "hours": 3 },
+    { "title": "The Witness", "tags": ["Puzzle"], "hours": 19 },
+    { "title": "Baba Is You", "tags": ["Puzzle"], "hours": null },
+    { "title": "Celeste", "tags": ["Platformer"], "hours": 8 },
+    { "title": "Hollow Knight", "tags": ["Platformer", "RPG"], "hours": 27 },
+    { "title": "Super Meat Boy", "tags": ["Platformer"], "hours": 6 },
+    { "title": "Disco Elysium", "tags": ["RPG"], "hours": 22 },
+    { "title": "Undertale", "tags": ["RPG"], "hours": 6 }
+  ]
+}

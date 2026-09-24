@@ -21,10 +21,10 @@
     "test:mutation": "dotnet tool run dotnet-stryker --config-file stryker-config.json",
     "coverage": "node scripts/coverage.mjs",
     "gitleaks": "node scripts/gitleaks.mjs",
-    "dev": "node scripts/todo.mjs dev B4",
+    "dev": "node scripts/dev.mjs",
     "dev:demo": "node scripts/todo.mjs dev:demo F2",
     "seed:demo": "node scripts/todo.mjs seed:demo F2",
-    "gen:api": "node scripts/todo.mjs gen:api B3",
+    "gen:api": "node scripts/gen-api.mjs",
     "import:xlsx": "node scripts/todo.mjs import:xlsx F1",
     "season:export": "node scripts/todo.mjs season:export C12",
     "season:import": "node scripts/todo.mjs season:import C12",
@@ -37,6 +37,7 @@
     "@commitlint/config-conventional": "^21.2.3",
     "husky": "^9.1.7",
     "lint-staged": "^17.5.1",
+    "openapi-typescript": "^7.13.0",
     "prettier": "^3.9.9"
   },
   "engines": {

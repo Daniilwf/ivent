@@ -22,6 +22,7 @@ public sealed class Scenario
     private const uint PlayerIdPrefix = 0x10000000;
     private const uint GameIdPrefix = 0x20000000;
     private const uint SeasonIdPrefix = 0x30000000;
+    private const uint UserIdPrefix = 0x40000000;
 
     private readonly List<Game> _games = [];
     private readonly List<Category> _categories = [];
@@ -126,7 +127,7 @@ public sealed class Scenario
         {
             var id = SequentialIds.Make(PlayerIdPrefix, _players.Count + 1);
             _players.Add(name, id);
-            Setup(new AddSeasonPlayer(id, name));
+            Setup(new AddSeasonPlayer(id, SequentialIds.Make(UserIdPrefix, _players.Count), name));
         }
 
         return this;

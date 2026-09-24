@@ -3,7 +3,11 @@ import { spawnSync } from 'node:child_process';
 import { dirname, join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-export const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+// Upper-case drive letter: a hook may start us from "c:\..." and Vitest then loads two copies of
+// the same module under differently-cased paths (jest-dom matchers land on the wrong `expect`).
+export const root = join(dirname(fileURLToPath(import.meta.url)), '..').replace(/^[a-z]:/, (d) =>
+  d.toUpperCase(),
+);
 
 /** Runs a command, streaming output. Returns true on exit code 0. */
 export function run(command, args = [], options = {}) {
