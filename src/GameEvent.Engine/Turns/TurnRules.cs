@@ -22,6 +22,8 @@ internal static class TurnRules
         [typeof(Reroll)] = TurnPhase.Rolling,
         [typeof(StartRun)] = TurnPhase.Rolling,
         [typeof(CompleteRun)] = TurnPhase.Playing,
+        [typeof(DropRun)] = TurnPhase.Playing,
+        [typeof(TechReroll)] = TurnPhase.Playing,
     };
 
     /// <summary>Rejects <paramref name="command"/> of <paramref name="playerId"/> when the turn does not allow it; null when it does.</summary>

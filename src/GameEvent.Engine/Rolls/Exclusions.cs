@@ -7,6 +7,12 @@ public enum ExclusionReason
 {
     /// <summary>«Уже проходил»: the player played it before the event (D-08: no limit, on their honour, logged).</summary>
     AlreadyPlayed,
+
+    /// <summary>The player dropped it (or the admin turned their tech reroll into a drop).</summary>
+    Dropped,
+
+    /// <summary>The player tech-rerolled it.</summary>
+    TechRerolled,
 }
 
 /// <summary>

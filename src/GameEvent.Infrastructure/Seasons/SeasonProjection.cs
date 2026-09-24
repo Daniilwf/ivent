@@ -100,11 +100,20 @@ internal static class SeasonProjection
             record.ActiveRunId = player.ActiveRunId;
             record.RerollsThisRoll = player.RerollsThisRoll;
 
-            // Exclusions only grow within a season (D-08); rows are added, never changed.
-            var known = old?.Exclusions.Select(x => x.GameId).ToHashSet() ?? [];
-            foreach (var exclusion in player.Exclusions.Where(x => !known.Contains(x.GameId)))
+            // Exclusions only grow within a season (D-08); a tech reroll turned into a drop changes its reason (D-11).
+            var known = old?.Exclusions.ToDictionary(x => x.GameId, x => x.Reason) ?? [];
+            foreach (var exclusion in player.Exclusions)
             {
-                db.Exclusions.Add(new PlayerGameExclusionRecord { PlayerId = id, GameId = exclusion.GameId, Reason = exclusion.Reason });
+                if (!known.TryGetValue(exclusion.GameId, out var reason))
+                {
+                    db.Exclusions.Add(new PlayerGameExclusionRecord { PlayerId = id, GameId = exclusion.GameId, Reason = exclusion.Reason });
+                }
+                else if (reason != exclusion.Reason)
+                {
+                    var row = await db.Exclusions.FindAsync([id, exclusion.GameId], ct)
+                        ?? throw new InvalidOperationException($"Exclusion of game {exclusion.GameId} for player {id} has no projection row.");
+                    row.Reason = exclusion.Reason;
+                }
             }
         }
 

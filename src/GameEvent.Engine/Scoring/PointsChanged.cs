@@ -9,6 +9,7 @@ public enum PointsReason
     CompletionRoll,
     StartingBalance,
     AdminAdjustment,
+    DropPenalty,
 }
 
 /// <summary>What changed a player's coins. Coins always equal the sum of deltas in non-undone events.</summary>

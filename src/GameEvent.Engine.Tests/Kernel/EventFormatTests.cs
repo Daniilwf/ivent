@@ -145,6 +145,24 @@ public class EventFormatTests
             """{"effectId":"00000000-0000-0000-0000-000000000001","playerId":"10000000-0000-0000-0000-000000000001","drawEvent":"bad","source":"paidReroll","runId":null}"""
         },
         {
+            "run-dropped",
+            new RunDropped(s_run, s_player, [new Die(4, 3), new Die(4, 1)], s_at),
+            1,
+            """{"runId":"00000000-0000-0000-0000-000000000001","playerId":"10000000-0000-0000-0000-000000000001","penaltyDice":[{"sides":4,"value":3},{"sides":4,"value":1}],"droppedAt":"2026-10-01T12:30:00+00:00"}"""
+        },
+        {
+            "run-tech-rerolled",
+            new RunTechRerolled(s_run, s_player, TechRerollReason.Other, "Вылетает на старте", false, s_at),
+            1,
+            """{"runId":"00000000-0000-0000-0000-000000000001","playerId":"10000000-0000-0000-0000-000000000001","reason":"other","comment":"Вылетает на старте","byAdmin":false,"rerolledAt":"2026-10-01T12:30:00+00:00"}"""
+        },
+        {
+            "tech-reroll-converted-to-drop",
+            new TechRerollConvertedToDrop(s_run, s_player, "Игра запускалась", [new Die(4, 2)]),
+            1,
+            """{"runId":"00000000-0000-0000-0000-000000000001","playerId":"10000000-0000-0000-0000-000000000001","comment":"Игра запускалась","penaltyDice":[{"sides":4,"value":2}]}"""
+        },
+        {
             "run-started",
             new RunStarted(s_run, s_player, s_game, Snapshot(), s_at, s_at.AddMinutes(5)),
             1,
