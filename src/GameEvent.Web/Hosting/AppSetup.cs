@@ -7,6 +7,7 @@ using GameEvent.Infrastructure.Kernel;
 using GameEvent.Infrastructure.Queue;
 using GameEvent.Web.Accounts;
 using GameEvent.Web.Realtime;
+using GameEvent.Web.Rolls;
 using GameEvent.Web.Rulesets;
 using GameEvent.Web.Seasons;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -134,6 +135,7 @@ public static class AppSetup
         api.MapAccounts();
         api.MapSeasons();
         api.MapRules();
+        api.MapPoolStats();
         app.MapHub<SeasonHub>(SeasonHub.Path);
 
         if (frontend is not null)

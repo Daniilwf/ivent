@@ -20,6 +20,9 @@ public sealed record RollRequest(Guid CommandId);
 
 public sealed record StartRequest(Guid CommandId);
 
+/// <summary>«Уже проходил» on the offered game or an option of the pending choice (D-92).</summary>
+public sealed record AlreadyPlayedRequest(Guid CommandId, Guid GameId);
+
 /// <summary>An answer to the pending choice: its id and the picked option's id.</summary>
 public sealed record ChooseRequest(Guid CommandId, Guid ChoiceId, string OptionId);
 
@@ -84,6 +87,14 @@ public static class SeasonEndpoints
 
         seasons.MapPost("/start", (Guid seasonId, StartRequest request, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, CancellationToken ct) =>
             ActAsync(seasonId, request.CommandId, user, db, bus, playerId => new StartRun(playerId), ct))
+            .RequireAuthorization(Policies.Player)
+            .WithActionErrors();
+
+        seasons.MapPost("/already-played", (Guid seasonId, AlreadyPlayedRequest request, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, CancellationToken ct) =>
+            request.GameId == Guid.Empty
+                ? Task.FromResult<Results<Ok<CommandResponse>, ProblemHttpResult, ValidationProblem, NotFound, ForbidHttpResult>>(
+                    TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["gameId"] = ["A game id is required."] }))
+                : ActAsync(seasonId, request.CommandId, user, db, bus, playerId => new DeclareAlreadyPlayed(playerId, request.GameId), ct))
             .RequireAuthorization(Policies.Player)
             .WithActionErrors();
 

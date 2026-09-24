@@ -5,13 +5,39 @@ import { ru } from '../i18n/ru';
 import { CompleteForm, type Completion } from './CompleteForm';
 
 type Season = Schemas['SeasonView'];
-type Action = 'roll' | 'start' | 'complete' | 'choose';
-type Pick = { choiceId: string; optionId: string };
+type Command =
+  | { kind: 'roll' }
+  | { kind: 'start' }
+  | { kind: 'complete'; completion: Completion }
+  | { kind: 'choose'; choiceId: string; optionId: string }
+  | { kind: 'alreadyPlayed'; gameId: string };
 type Loaded = { kind: 'season'; season: Season } | { kind: 'signedOut' } | { kind: 'failed' };
 
-function required<T>(value: T | undefined): T {
-  if (value === undefined) throw new Error('An action is missing its data.');
-  return value;
+/** Sends one game action; a new command id each time, so a retried request acts once (D-68). */
+function send(seasonId: string, command: Command) {
+  const commandId = crypto.randomUUID();
+  const params = { path: { seasonId } };
+  switch (command.kind) {
+    case 'roll':
+      return api.POST('/api/seasons/{seasonId}/roll', { params, body: { commandId } });
+    case 'start':
+      return api.POST('/api/seasons/{seasonId}/start', { params, body: { commandId } });
+    case 'complete':
+      return api.POST('/api/seasons/{seasonId}/complete', {
+        params,
+        body: { commandId, ...command.completion },
+      });
+    case 'choose':
+      return api.POST('/api/seasons/{seasonId}/choose', {
+        params,
+        body: { commandId, choiceId: command.choiceId, optionId: command.optionId },
+      });
+    case 'alreadyPlayed':
+      return api.POST('/api/seasons/{seasonId}/already-played', {
+        params,
+        body: { commandId, gameId: command.gameId },
+      });
+  }
 }
 
 async function fetchSeason(seasonId: string): Promise<Loaded> {
@@ -73,27 +99,11 @@ export function SeasonScreen({
     };
   }, [seasonId, apply]);
 
-  async function act(action: Action, completion?: Completion, pick?: Pick) {
+  async function act(command: Command) {
     setPending(true);
     setMessage(null);
     try {
-      // One command id per action: a retried request acts once (D-68).
-      const commandId = crypto.randomUUID();
-      const params = { path: { seasonId } };
-      const result =
-        action === 'complete'
-          ? await api.POST('/api/seasons/{seasonId}/complete', {
-              params,
-              body: { commandId, ...required(completion) },
-            })
-          : action === 'choose'
-            ? await api.POST('/api/seasons/{seasonId}/choose', {
-                params,
-                body: { commandId, ...required(pick) },
-              })
-            : action === 'roll'
-              ? await api.POST('/api/seasons/{seasonId}/roll', { params, body: { commandId } })
-              : await api.POST('/api/seasons/{seasonId}/start', { params, body: { commandId } });
+      const result = await send(seasonId, command);
       if (result.response.status === 401) {
         onSignedOut();
         return;
@@ -118,6 +128,7 @@ export function SeasonScreen({
     (me?.phase === 'rolling' && !me.offer && !me.choice) ||
     (me?.phase === 'playing' && !me.activeRun);
   const choice = me?.phase === 'rolling' ? me.choice : null;
+  const offer = me?.phase === 'rolling' ? me.offer : null;
   return (
     <main>
       <h1>{ru.app.title}</h1>
@@ -127,7 +138,7 @@ export function SeasonScreen({
         {!me && <p>{ru.turn.spectator}</p>}
         {waiting && <p>{ru.app.loading}</p>}
         {me?.phase === 'idle' && (
-          <button data-testid="roll" disabled={pending} onClick={() => void act('roll')}>
+          <button data-testid="roll" disabled={pending} onClick={() => void act({ kind: 'roll' })}>
             {ru.turn.roll}
           </button>
         )}
@@ -142,19 +153,42 @@ export function SeasonScreen({
                   data-testid={`option-${option.id}`}
                   disabled={pending}
                   onClick={() =>
-                    void act('choose', undefined, { choiceId: choice.id, optionId: option.id })
+                    void act({ kind: 'choose', choiceId: choice.id, optionId: option.id })
                   }
                 >
                   {ru.turn.option(option.game.title, option.game.hours ?? null)}
                 </button>
               ))}
+            {choice.options.map(({ id, game }) =>
+              game ? (
+                <button
+                  key={`played-${id}`}
+                  data-testid={`already-played-${id}`}
+                  disabled={pending}
+                  onClick={() => void act({ kind: 'alreadyPlayed', gameId: game.id })}
+                >
+                  {ru.turn.alreadyPlayedGame(game.title)}
+                </button>
+              ) : null,
+            )}
           </fieldset>
         )}
-        {me?.phase === 'rolling' && me.offer && (
+        {offer && (
           <>
-            <p data-testid="offer">{ru.turn.offered(me.offer.title, me.offer.hours ?? null)}</p>
-            <button data-testid="start" disabled={pending} onClick={() => void act('start')}>
+            <p data-testid="offer">{ru.turn.offered(offer.title, offer.hours ?? null)}</p>
+            <button
+              data-testid="start"
+              disabled={pending}
+              onClick={() => void act({ kind: 'start' })}
+            >
               {ru.turn.start}
+            </button>
+            <button
+              data-testid="already-played"
+              disabled={pending}
+              onClick={() => void act({ kind: 'alreadyPlayed', gameId: offer.id })}
+            >
+              {ru.turn.alreadyPlayed}
             </button>
           </>
         )}
@@ -164,7 +198,7 @@ export function SeasonScreen({
             <CompleteForm
               needsHours={me.activeRun.game.hours == null}
               pending={pending}
-              onComplete={(completion) => void act('complete', completion)}
+              onComplete={(completion) => void act({ kind: 'complete', completion })}
             />
           </>
         )}

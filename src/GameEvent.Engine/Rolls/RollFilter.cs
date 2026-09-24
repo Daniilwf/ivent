@@ -29,6 +29,23 @@ public static class RollFilters
     /// Games of <paramref name="candidates"/> that pass the kept filters. <paramref name="isAvailable"/> says which games
     /// count when deciding whether a filter leaves anything (a game that would only be a miss does not).
     /// </summary>
-    public static IReadOnlyList<Game> Apply(IReadOnlyList<Game> candidates, Func<Game, bool> isAvailable, IEnumerable<RollFilter> filters) =>
-        throw new NotImplementedException("C5");
+    public static IReadOnlyList<Game> Apply(IReadOnlyList<Game> candidates, Func<Game, bool> isAvailable, IEnumerable<RollFilter> filters)
+    {
+        ArgumentNullException.ThrowIfNull(candidates);
+        ArgumentNullException.ThrowIfNull(isAvailable);
+        ArgumentNullException.ThrowIfNull(filters);
+
+        // OrderByDescending is stable: filters of one priority keep the given order.
+        var games = candidates;
+        foreach (var filter in filters.OrderByDescending(f => f.Priority))
+        {
+            var narrowed = games.Where(filter.Matches).ToList();
+            if (narrowed.Any(isAvailable))
+            {
+                games = narrowed;
+            }
+        }
+
+        return games;
+    }
 }
