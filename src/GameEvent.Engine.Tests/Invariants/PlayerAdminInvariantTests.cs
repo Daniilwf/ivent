@@ -157,7 +157,8 @@ public class PlayerAdminInvariantTests
 
         return arg switch
         {
-            0 or 1 => new DropRun(player),
+            0 => new DropRun(player),
+            1 => new TechReroll(player, (TechRerollReason)(b % 5), "попросил в чате", ByAdmin: true),
             2 => new TechReroll(player, TechRerollReason.Other, "  "),
             3 => new TechReroll(player, TechRerollReason.Other, "не тянет шейдеры"),
             4 => new TechReroll(player, (TechRerollReason)(b % 4), null),
@@ -680,8 +681,10 @@ public class PlayerAdminInvariantTests
         Assert.Equal(TurnPhase.Playing, was.Phase);
         var run = before.Runs[was.ActiveRunId!.Value];
         Assert.True(
-            techReroll.ByAdmin || s.Clock.UtcNow - run.RolledAt <= TimeSpan.FromHours(before.Rules.Roll.TechRerollWindowHours),
-            "A player tech-rerolled after the window.");
+            techReroll.ByAdmin || s.Clock.UtcNow - run.RolledAt <= TimeSpan.FromHours(run.Snapshot.TechRerollWindowHours),
+            "A player tech-rerolled after the window fixed at the roll.");
+        Assert.True(
+            !techReroll.ByAdmin || !string.IsNullOrWhiteSpace(techReroll.Comment), "An admin tech reroll without a comment (D-94 (2)).");
         Assert.True(
             techReroll.Reason != TechRerollReason.Other || !string.IsNullOrWhiteSpace(techReroll.Comment), "«Other» without a comment.");
         Assert.Equal(
@@ -718,7 +721,9 @@ public class PlayerAdminInvariantTests
         var run = before.Runs[convert.RunId];
         Assert.Equal(RunStatus.TechRerolled, run.Status);
         var converted = Assert.IsType<TechRerollConvertedToDrop>(events[0]);
-        Assert.Equal((convert.RunId, run.PlayerId, convert.Comment), (converted.RunId, converted.PlayerId, converted.Comment));
+        Assert.Equal(
+            (convert.RunId, run.PlayerId, convert.Comment, s.Clock.UtcNow),
+            (converted.RunId, converted.PlayerId, converted.Comment, converted.ConvertedAt));
         Assert.Empty(events.OfType<GameExcluded>());
         CheckPenalty(s, [.. events.Skip(1)], run.PlayerId, run.RunId, converted.PenaltyDice, before);
         Assert.Equal(RunStatus.Dropped, s.State.Runs[run.RunId].Status);
@@ -742,7 +747,7 @@ public class PlayerAdminInvariantTests
         var was = before.Players[techReroll.PlayerId];
         Assert.Equal(TurnPhase.Playing, was.Phase);
         var run = before.Runs[was.ActiveRunId!.Value];
-        Assert.True(s.Clock.UtcNow - run.RolledAt > TimeSpan.FromHours(before.Rules.Roll.TechRerollWindowHours));
+        Assert.True(s.Clock.UtcNow - run.RolledAt > TimeSpan.FromHours(run.Snapshot.TechRerollWindowHours));
     }
 
     private static Guid? PlayerOf(IGameEvent e) =>

@@ -12,22 +12,22 @@ const reasons: readonly Reason[] = [
   'other',
 ];
 
-const minutesSince = (iso: string) => (Date.now() - new Date(iso).getTime()) / 60_000;
-
 /**
- * Drop and tech reroll of the active run (D-94). A drop is confirmed with its penalty named; before
- * roll.minPlayMinutesBeforeDrop minutes of play the confirmation also hints to wait (RR4: only a hint).
- * A tech reroll asks for one of the reasons; «other» needs a comment.
+ * Drop and tech reroll of the active run (D-94). A drop is confirmed with its penalty named as the rules say;
+ * while the server says it is early, the confirmation also hints to wait (RR4: only a hint). A tech reroll asks for one
+ * of the reasons, «other» needs a comment; once the window has closed the player is sent to the admin.
  */
 export function RunActions({
-  startedAt,
   dropHintMinutes,
+  dropPenalty,
+  techRerollOpen,
   pending,
   onDrop,
   onTechReroll,
 }: {
-  startedAt: string;
   dropHintMinutes: number | null;
+  dropPenalty: Schemas['DropPenaltyView'] | null;
+  techRerollOpen: boolean;
   pending: boolean;
   onDrop: () => void;
   onTechReroll: (reason: Reason, comment: string | null) => void;
@@ -50,14 +50,12 @@ export function RunActions({
   }
 
   if (mode === 'drop') {
-    const hint =
-      dropHintMinutes !== null && minutesSince(startedAt) < dropHintMinutes
-        ? dropHintMinutes
-        : null;
     return (
       <div role="group" data-testid="drop-confirm">
-        <p>{ru.turn.dropConfirm}</p>
-        {hint !== null && <p data-testid="drop-hint">{ru.turn.dropHint(hint)}</p>}
+        <p>{ru.turn.dropConfirm(dropPenalty)}</p>
+        {dropHintMinutes !== null && (
+          <p data-testid="drop-hint">{ru.turn.dropHint(dropHintMinutes)}</p>
+        )}
         <button
           data-testid="drop-confirm-yes"
           disabled={pending}
@@ -144,15 +142,19 @@ export function RunActions({
       >
         {ru.turn.drop}
       </button>
-      <button
-        data-testid="tech-reroll"
-        disabled={pending}
-        onClick={() => {
-          setMode('techReroll');
-        }}
-      >
-        {ru.turn.techReroll}
-      </button>
+      {techRerollOpen ? (
+        <button
+          data-testid="tech-reroll"
+          disabled={pending}
+          onClick={() => {
+            setMode('techReroll');
+          }}
+        >
+          {ru.turn.techReroll}
+        </button>
+      ) : (
+        <p data-testid="tech-reroll-closed">{ru.turn.techRerollClosed}</p>
+      )}
     </div>
   );
 }

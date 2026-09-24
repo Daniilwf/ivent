@@ -166,7 +166,8 @@ public sealed class SeasonApiTests : IAsyncLifetime
         Assert.Equal(TurnPhase.Playing, chosen.Phase);
         Assert.Null(chosen.Choice);
         Assert.Null(chosen.Offer);
-        Assert.Equal(picked.Game, chosen.ActiveRun!.Game);
+        var playedGame = chosen.ActiveRun!.Game;
+        Assert.Equal((picked.Game!.Id, picked.Game.Title, picked.Game.Hours), (playedGame.Id, playedGame.Title, playedGame.Hours));
 
         // A second tab answering the same choice is refused with the engine code
         var again = await vasya.PostAsJsonAsync(Url("choose"), new { commandId = Guid.NewGuid(), choiceId = choice.Id, optionId = picked.Id }, Ct);
@@ -187,8 +188,8 @@ public sealed class SeasonApiTests : IAsyncLifetime
         var otherTab = await _site.SignedInAsync("vasya");
         var fromOtherTab = (await otherTab.GetFromJsonAsync<SeasonView>($"/api/seasons/{SiteFactory.SeasonId}", s_json, Ct))!.Me!.Offer!;
 
-        Assert.Equal(first, again);
-        Assert.Equal(first, fromOtherTab);
+        Assert.Equivalent(first, again, strict: true); // records with a list of marks: compared by value
+        Assert.Equivalent(first, fromOtherTab, strict: true);
         await using var db = _site.NewDb();
         Assert.Equal(1, db.Events.Count(e => e.Type == "game-rolled"));
     }
@@ -274,7 +275,7 @@ public sealed class SeasonApiTests : IAsyncLifetime
         using var problem = JsonDocument.Parse(await response.Content.ReadAsStringAsync(Ct));
         Assert.Equal("roll.gameNotOffered", problem.RootElement.GetProperty("code").GetString());
         var mine = (await vasya.GetFromJsonAsync<SeasonView>($"/api/seasons/{SiteFactory.SeasonId}", s_json, Ct))!.Me!.Offer!;
-        Assert.Equal(offered, mine);
+        Assert.Equivalent(offered, mine, strict: true);
     }
 
     // ---- Reroll (RR1, D-93) ----
@@ -329,7 +330,7 @@ public sealed class SeasonApiTests : IAsyncLifetime
         using var problem = JsonDocument.Parse(await response.Content.ReadAsStringAsync(Ct));
         Assert.Equal("roll.notEnoughCoins", problem.RootElement.GetProperty("code").GetString());
         var me = (await vasya.GetFromJsonAsync<SeasonView>($"/api/seasons/{SiteFactory.SeasonId}", s_json, Ct))!.Me!;
-        Assert.Equal(offered, me.Offer);
+        Assert.Equivalent(offered, me.Offer, strict: true);
         await using var db = _site.NewDb();
         Assert.Equal(1, db.Events.Count(e => e.Type == "game-rerolled"));
         Assert.Equal(0, db.SeasonPlayers.Single(p => p.Id == _site.Players["vasya"]).Coins);
@@ -400,7 +401,7 @@ public sealed class SeasonApiTests : IAsyncLifetime
         using var problem = JsonDocument.Parse(await response.Content.ReadAsStringAsync(Ct));
         Assert.Equal("turn.wrongPhase", problem.RootElement.GetProperty("code").GetString());
         var mine = (await vasya.GetFromJsonAsync<SeasonView>($"/api/seasons/{SiteFactory.SeasonId}", s_json, Ct))!.Me!.Offer!;
-        Assert.Equal(offered, mine);
+        Assert.Equivalent(offered, mine, strict: true);
     }
 
     // ---- The price of the next reroll and pending manual effects in the season view (D-93) ----
@@ -569,6 +570,112 @@ public sealed class SeasonApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Drop_hint_minutes_are_given_until_the_minimum_is_played_by_the_server_clock()
+    {
+        // D-94 (5): the server decides, by its own clock and the start time, not the roll time
+        var minutes = RulesetJson.Default().Roll.MinPlayMinutesBeforeDrop;
+        Assert.Equal(60, minutes);
+        var vasya = await _site.SignedInAsync("vasya");
+        await PostAsync(vasya, "roll", new { commandId = Guid.NewGuid() });
+        Assert.Equal(JsonValueKind.Null, (await MeJsonAsync(vasya)).GetProperty("dropHintMinutes").ValueKind); // rolling
+        _site.Clock.UtcNow = _site.Clock.UtcNow.AddHours(2);
+        await PostAsync(vasya, "start", new { commandId = Guid.NewGuid() });
+
+        // Right after the start (two hours after the roll): the minimum
+        Assert.Equal(minutes, (await MeJsonAsync(vasya)).GetProperty("dropHintMinutes").GetInt32());
+
+        // A minute before the minimum: still the minimum
+        _site.Clock.UtcNow = _site.Clock.UtcNow.AddMinutes(minutes - 1);
+        Assert.Equal(minutes, (await MeJsonAsync(vasya)).GetProperty("dropHintMinutes").GetInt32());
+
+        // The minimum played: no hint
+        _site.Clock.UtcNow = _site.Clock.UtcNow.AddMinutes(1);
+        Assert.Equal(JsonValueKind.Null, (await MeJsonAsync(vasya)).GetProperty("dropHintMinutes").ValueKind);
+        _site.Clock.UtcNow = _site.Clock.UtcNow.AddHours(5);
+        Assert.Equal(JsonValueKind.Null, (await MeJsonAsync(vasya)).GetProperty("dropHintMinutes").ValueKind);
+    }
+
+    [Fact]
+    public async Task Drop_hint_minutes_follow_the_ruleset()
+    {
+        var rules = RulesetJson.Default();
+        await _site.SendAsync(new ChangeRuleset(rules with { Roll = rules.Roll with { MinPlayMinutesBeforeDrop = 90 } }, ExpectedVersion: null));
+        var vasya = await _site.SignedInAsync("vasya");
+        await PostAsync(vasya, "roll", new { commandId = Guid.NewGuid() });
+        await PostAsync(vasya, "start", new { commandId = Guid.NewGuid() });
+        _site.Clock.UtcNow = _site.Clock.UtcNow.AddMinutes(75);
+
+        Assert.Equal(90, (await MeJsonAsync(vasya)).GetProperty("dropHintMinutes").GetInt32());
+    }
+
+    private static void AssertDropPenalty(JsonElement me, int count, int sides, bool points, bool position, bool badEvent)
+    {
+        var penalty = me.GetProperty("dropPenalty");
+        Assert.Equal(JsonValueKind.Object, penalty.ValueKind);
+        Assert.Equal(
+            (count, sides, points, position, badEvent),
+            (penalty.GetProperty("count").GetInt32(), penalty.GetProperty("sides").GetInt32(), penalty.GetProperty("affectsPoints").GetBoolean(),
+                penalty.GetProperty("affectsPosition").GetBoolean(), penalty.GetProperty("badEvent").GetBoolean()));
+    }
+
+    [Fact]
+    public async Task Drop_penalty_is_shown_only_while_playing_by_the_default_ruleset()
+    {
+        // D-94 (5): the screen does not guess the penalty; the default ruleset is 2d4 on points and position and a bad event
+        var drop = RulesetJson.Default().Drop;
+        Assert.Equal(
+            (2, 4, true, true, MandatoryEvent.Bad),
+            (drop.PenaltyDice.Count, drop.PenaltyDice.Sides, drop.AffectsPoints, drop.AffectsPosition, drop.MandatoryEvent));
+        var vasya = await _site.SignedInAsync("vasya");
+        Assert.Equal(JsonValueKind.Null, (await MeJsonAsync(vasya)).GetProperty("dropPenalty").ValueKind);
+        await PostAsync(vasya, "roll", new { commandId = Guid.NewGuid() });
+        Assert.Equal(JsonValueKind.Null, (await MeJsonAsync(vasya)).GetProperty("dropPenalty").ValueKind);
+        await PostAsync(vasya, "start", new { commandId = Guid.NewGuid() });
+
+        AssertDropPenalty(await MeJsonAsync(vasya), 2, 4, points: true, position: true, badEvent: true);
+
+        await PostAsync(vasya, "drop", new { commandId = Guid.NewGuid() });
+        Assert.Equal(JsonValueKind.Null, (await MeJsonAsync(vasya)).GetProperty("dropPenalty").ValueKind);
+    }
+
+    [Fact]
+    public async Task Drop_penalty_follows_the_ruleset_in_force_now_not_the_roll()
+    {
+        // The drop penalty is a rule of the action (D-94 (1)): a change after the start shows at once
+        var vasya = await _site.SignedInAsync("vasya");
+        await PostAsync(vasya, "roll", new { commandId = Guid.NewGuid() });
+        await PostAsync(vasya, "start", new { commandId = Guid.NewGuid() });
+        var rules = RulesetJson.Default();
+
+        await _site.SendAsync(new ChangeRuleset(
+            rules with
+            {
+                Drop = rules.Drop with
+                {
+                    PenaltyDice = new PenaltyDice { Count = 1, Sides = 6 },
+                    AffectsPosition = false,
+                    MandatoryEvent = MandatoryEvent.None,
+                },
+            },
+            ExpectedVersion: null));
+
+        AssertDropPenalty(await MeJsonAsync(vasya), 1, 6, points: true, position: false, badEvent: false);
+    }
+
+    [Fact]
+    public async Task Drop_penalty_without_points_or_position_is_still_shown()
+    {
+        var rules = RulesetJson.Default();
+        await _site.SendAsync(new ChangeRuleset(
+            rules with { Drop = rules.Drop with { AffectsPoints = false, AffectsPosition = false } }, ExpectedVersion: null));
+        var vasya = await _site.SignedInAsync("vasya");
+        await PostAsync(vasya, "roll", new { commandId = Guid.NewGuid() });
+        await PostAsync(vasya, "start", new { commandId = Guid.NewGuid() });
+
+        AssertDropPenalty(await MeJsonAsync(vasya), 2, 4, points: false, position: false, badEvent: true);
+    }
+
+    [Fact]
     public async Task Drop_before_playing_is_a_conflict()
     {
         var vasya = await _site.SignedInAsync("vasya");
@@ -722,8 +829,173 @@ public sealed class SeasonApiTests : IAsyncLifetime
         var response = await vasya.PostAsJsonAsync(Url("tech-reroll"), new { commandId = Guid.NewGuid(), reason = "weakPc", byAdmin = true }, Ct);
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        using var problem = JsonDocument.Parse(await response.Content.ReadAsStringAsync(Ct));
+        Assert.Equal("run.techRerollWindowClosed", problem.RootElement.GetProperty("code").GetString());
         await using var db = _site.NewDb();
         Assert.Equal(0, db.Events.Count(e => e.Type == "run-tech-rerolled"));
+    }
+
+    [Fact]
+    public async Task Forged_by_admin_inside_the_window_is_logged_as_the_players_own()
+    {
+        // Inside the window the player's tech reroll is accepted, but the forged field never reaches the log
+        var vasya = await _site.SignedInAsync("vasya");
+        await PostAsync(vasya, "roll", new { commandId = Guid.NewGuid() });
+        await PostAsync(vasya, "start", new { commandId = Guid.NewGuid() });
+
+        await PostAsync(vasya, "tech-reroll", new { commandId = Guid.NewGuid(), reason = "weakPc", byAdmin = true });
+
+        await using var db = _site.NewDb();
+        var logged = db.Events.Single(e => e.Type == "run-tech-rerolled");
+        using var data = JsonDocument.Parse(logged.Data);
+        Assert.False(Property(data.RootElement, "byAdmin").GetBoolean());
+        Assert.Equal(_site.Users["vasya"], logged.AuthorId);
+    }
+
+    [Fact]
+    public async Task Tech_reroll_open_is_given_while_playing_until_the_window_ends()
+    {
+        // D-94 (5): the server says whether the window is open; it counts from the roll and is inclusive
+        var vasya = await _site.SignedInAsync("vasya");
+        Assert.False((await MeJsonAsync(vasya)).GetProperty("techRerollOpen").GetBoolean());
+        await PostAsync(vasya, "roll", new { commandId = Guid.NewGuid() });
+        Assert.False((await MeJsonAsync(vasya)).GetProperty("techRerollOpen").GetBoolean()); // rolling
+        var rolledAt = _site.Clock.UtcNow;
+        _site.Clock.UtcNow = _site.Clock.UtcNow.AddHours(10);
+        await PostAsync(vasya, "start", new { commandId = Guid.NewGuid() });
+
+        Assert.True((await MeJsonAsync(vasya)).GetProperty("techRerollOpen").GetBoolean());
+
+        _site.Clock.UtcNow = rolledAt.AddHours(48);
+        Assert.True((await MeJsonAsync(vasya)).GetProperty("techRerollOpen").GetBoolean());
+
+        _site.Clock.UtcNow = rolledAt.AddHours(48).AddSeconds(1);
+        Assert.False((await MeJsonAsync(vasya)).GetProperty("techRerollOpen").GetBoolean());
+        var refused = await vasya.PostAsJsonAsync(Url("tech-reroll"), new { commandId = Guid.NewGuid(), reason = "weakPc" }, Ct);
+        Assert.Equal(HttpStatusCode.Conflict, refused.StatusCode);
+    }
+
+    [Fact]
+    public async Task Tech_reroll_open_follows_the_window_fixed_at_the_roll()
+    {
+        // D-94 (1): lengthening the window after the roll does not reopen it for that run
+        var vasya = await _site.SignedInAsync("vasya");
+        await PostAsync(vasya, "roll", new { commandId = Guid.NewGuid() });
+        await PostAsync(vasya, "start", new { commandId = Guid.NewGuid() });
+        var rules = RulesetJson.Default();
+        await _site.SendAsync(new ChangeRuleset(rules with { Roll = rules.Roll with { TechRerollWindowHours = 100 } }, ExpectedVersion: null));
+        _site.Clock.UtcNow = _site.Clock.UtcNow.AddHours(49);
+
+        Assert.False((await MeJsonAsync(vasya)).GetProperty("techRerollOpen").GetBoolean());
+    }
+
+    // ---- Marks on offered games: another player dropped or tech-rerolled it (G8, D-94 (6)) ----
+
+    /// <summary>Петя rolls and starts a game and gives it up by <paramref name="action"/>; returns the game id.</summary>
+    private async Task<Guid> PetyaGivesUpAsync(string action)
+    {
+        var petya = await _site.SignedInAsync("petya");
+        await PostAsync(petya, "roll", new { commandId = Guid.NewGuid() });
+        await PostAsync(petya, "start", new { commandId = Guid.NewGuid() });
+        var game = (await RunOfAsync(petya)).GetProperty("game").GetProperty("id").GetGuid();
+        await PostAsync(petya, action, new { commandId = Guid.NewGuid(), reason = "doesNotLaunch" });
+        return game;
+    }
+
+    /// <summary>Вася rolls and gives up other offers by «Уже проходил» until <paramref name="game"/> is offered; returns the offer.</summary>
+    private async Task<JsonElement> VasyaIsOfferedAsync(Guid game)
+    {
+        var vasya = await _site.SignedInAsync("vasya");
+        await PostAsync(vasya, "roll", new { commandId = Guid.NewGuid() });
+        for (var i = 0; i < 3; i++)
+        {
+            var offer = (await MeJsonAsync(vasya)).GetProperty("offer");
+            if (offer.GetProperty("id").GetGuid() == game)
+            {
+                return offer;
+            }
+
+            AssertMarks(offer); // nobody gave this one up
+            await PostAsync(vasya, "already-played", new { commandId = Guid.NewGuid(), gameId = offer.GetProperty("id").GetGuid() });
+        }
+
+        throw new Xunit.Sdk.XunitException("The game given up by Петя never came to Вася.");
+    }
+
+    private static void AssertMarks(JsonElement game, params (string Player, string Kind)[] expected) =>
+        Assert.Equal(
+            expected,
+            game.GetProperty("marks").EnumerateArray().Select(m => (m.GetProperty("playerName").GetString()!, m.GetProperty("kind").GetString()!)));
+
+    [Fact]
+    public async Task Offered_game_dropped_by_another_player_carries_the_mark()
+    {
+        var game = await PetyaGivesUpAsync("drop");
+
+        var offer = await VasyaIsOfferedAsync(game);
+
+        AssertMarks(offer, ("petya", "dropped"));
+    }
+
+    [Fact]
+    public async Task Offered_game_tech_rerolled_by_another_player_carries_the_mark()
+    {
+        var game = await PetyaGivesUpAsync("tech-reroll");
+
+        var offer = await VasyaIsOfferedAsync(game);
+
+        AssertMarks(offer, ("petya", "techRerolled"));
+    }
+
+    [Fact]
+    public async Task Tech_reroll_converted_to_a_drop_is_marked_as_a_drop()
+    {
+        var game = await PetyaGivesUpAsync("tech-reroll");
+        await using (var db = _site.NewDb())
+        {
+            var runId = db.Runs.Single(r => r.GameId == game).Id;
+            await _site.SendAsync(new Engine.Runs.ConvertTechRerollToDrop(runId, "Игра запускалась"));
+        }
+
+        var offer = await VasyaIsOfferedAsync(game);
+
+        AssertMarks(offer, ("petya", "dropped"));
+    }
+
+    [Fact]
+    public async Task Choice_options_carry_the_marks_of_their_games()
+    {
+        var game = await PetyaGivesUpAsync("drop");
+        var vasya = await _site.SignedInAsync("vasya");
+        await RollChoiceAsync(vasya);
+
+        var options = (await MeJsonAsync(vasya)).GetProperty("choice").GetProperty("options").EnumerateArray().ToList();
+
+        Assert.Contains(options, o => o.GetProperty("game").GetProperty("id").GetGuid() == game);
+        foreach (var option in options)
+        {
+            var offered = option.GetProperty("game");
+            if (offered.GetProperty("id").GetGuid() == game)
+            {
+                AssertMarks(offered, ("petya", "dropped"));
+            }
+            else
+            {
+                AssertMarks(offered);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task Offer_nobody_gave_up_has_an_empty_list_of_marks()
+    {
+        var vasya = await _site.SignedInAsync("vasya");
+        await PostAsync(vasya, "roll", new { commandId = Guid.NewGuid() });
+
+        var offer = (await MeJsonAsync(vasya)).GetProperty("offer");
+
+        Assert.Equal(JsonValueKind.Array, offer.GetProperty("marks").ValueKind);
+        AssertMarks(offer);
     }
 
     [Fact]

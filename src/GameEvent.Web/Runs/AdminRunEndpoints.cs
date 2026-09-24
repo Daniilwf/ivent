@@ -5,8 +5,13 @@ using GameEvent.Infrastructure.Queue;
 using GameEvent.Web.Accounts;
 using GameEvent.Web.Hosting;
 using GameEvent.Web.Seasons;
-using Microsoft.AspNetCore.Http.HttpResults;
-using Microsoft.EntityFrameworkCore;
+
+using ActionResult = Microsoft.AspNetCore.Http.HttpResults.Results<
+    Microsoft.AspNetCore.Http.HttpResults.Ok<GameEvent.Web.Seasons.CommandResponse>,
+    Microsoft.AspNetCore.Http.HttpResults.ProblemHttpResult,
+    Microsoft.AspNetCore.Http.HttpResults.ValidationProblem,
+    Microsoft.AspNetCore.Http.HttpResults.NotFound,
+    Microsoft.AspNetCore.Http.HttpResults.ForbidHttpResult>;
 
 namespace GameEvent.Web.Runs;
 
@@ -23,13 +28,13 @@ public static class AdminRunEndpoints
         // On the player's behalf and past the window; ByAdmin is set here only, never from a player request.
         season.MapPost("/players/{playerId:guid}/tech-reroll", (Guid seasonId, Guid playerId, TechRerollRequest request, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, CancellationToken ct) =>
             SeasonEndpoints.TechRerollInvalid(request) is { } invalid
-                ? Task.FromResult<Results<Ok<CommandResponse>, ProblemHttpResult, ValidationProblem, NotFound, ForbidHttpResult>>(invalid)
+                ? Task.FromResult<ActionResult>(invalid)
                 : SendAsync(seasonId, request.CommandId, new TechReroll(playerId, request.Reason!.Value, request.Comment, ByAdmin: true), user, db, bus, ct))
             .WithActionErrors();
 
         season.MapPost("/runs/{runId:guid}/convert-to-drop", (Guid seasonId, Guid runId, ConvertToDropRequest request, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, CancellationToken ct) =>
             request.Comment is null || request.Comment.Length > SeasonEndpoints.MaxCommentLength
-                ? Task.FromResult<Results<Ok<CommandResponse>, ProblemHttpResult, ValidationProblem, NotFound, ForbidHttpResult>>(
+                ? Task.FromResult<ActionResult>(
                     TypedResults.ValidationProblem(new Dictionary<string, string[]>
                     {
                         ["comment"] = [$"A comment of at most {SeasonEndpoints.MaxCommentLength} characters is required."],
@@ -38,19 +43,10 @@ public static class AdminRunEndpoints
             .WithActionErrors();
     }
 
-    private static async Task<Results<Ok<CommandResponse>, ProblemHttpResult, ValidationProblem, NotFound, ForbidHttpResult>> SendAsync(
+    private static async Task<ActionResult> SendAsync(
         Guid seasonId, Guid commandId, Engine.Kernel.ICommand command, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, CancellationToken ct)
     {
-        if (commandId == Guid.Empty)
-        {
-            return TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["commandId"] = ["A command id is required."] });
-        }
-
-        if (!await db.Seasons.AnyAsync(s => s.Id == seasonId, ct))
-        {
-            return TypedResults.NotFound();
-        }
-
-        return await SeasonEndpoints.SendAsync(seasonId, commandId, command, user.UserId(), bus, ct);
+        return await SeasonEndpoints.PrecheckAsync(seasonId, commandId, db, ct)
+            ?? await SeasonEndpoints.SendAsync(seasonId, commandId, command, user.UserId(), bus, ct);
     }
 }

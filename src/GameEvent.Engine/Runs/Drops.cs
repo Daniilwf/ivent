@@ -1,7 +1,6 @@
 using GameEvent.Engine.Effects;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Map;
-using GameEvent.Engine.Players;
 using GameEvent.Engine.Rolls;
 using GameEvent.Engine.Rulesets;
 using GameEvent.Engine.Scoring;
@@ -30,8 +29,8 @@ public enum TechRerollReason
 
 /// <summary>
 /// «Тех-реролл»: give up the active run for a technical reason, free (D-11). The player may do it within
-/// <c>roll.techRerollWindowHours</c> after the roll; later only the admin, on the player's behalf
-/// (<see cref="ByAdmin"/>, set by the admin endpoint), with a mark in the log. The game is excluded for the player and a
+/// <c>roll.techRerollWindowHours</c> of the run's snapshot after the roll; later only the admin, on the player's behalf
+/// (<see cref="ByAdmin"/>, set by the admin endpoint), with a mark and a comment in the log. The game is excluded for the player and a
 /// new roll follows at once (SPEC: Playing → Rolling), with its own free rerolls (D-07).
 /// </summary>
 public sealed record TechReroll(Guid PlayerId, TechRerollReason Reason, string? Comment, bool ByAdmin = false) : ICommand;
@@ -52,7 +51,8 @@ public sealed record RunTechRerolled(
 
 /// <summary>A tech reroll became a drop; the penalty events follow in the same command.</summary>
 [EventType("tech-reroll-converted-to-drop")]
-public sealed record TechRerollConvertedToDrop(Guid RunId, Guid PlayerId, string Comment, EquatableArray<Die> PenaltyDice) : IGameEvent;
+public sealed record TechRerollConvertedToDrop(
+    Guid RunId, Guid PlayerId, string Comment, EquatableArray<Die> PenaltyDice, DateTimeOffset ConvertedAt) : IGameEvent;
 
 internal static class Drops
 {
@@ -80,21 +80,26 @@ internal static class Drops
             return rejection;
         }
 
+        if (command.ByAdmin && string.IsNullOrWhiteSpace(command.Comment))
+        {
+            // Every admin change explains itself in the public log (D-89, D-94).
+            return Decision.Reject(RejectionCodes.CommentRequired, "An admin tech reroll needs a comment.");
+        }
+
         if (command.Reason == TechRerollReason.Other && string.IsNullOrWhiteSpace(command.Comment))
         {
             return Decision.Reject(RejectionCodes.ReasonCommentRequired, "The reason 'other' needs a comment.");
         }
 
-        if (command.Comment?.Length > PlayerAdministration.MaxCommentLength)
+        if (command.Comment?.Length > Limits.MaxCommentLength)
         {
-            return Decision.Reject(
-                RejectionCodes.CommentTooLong, $"The comment is limited to {PlayerAdministration.MaxCommentLength} characters.");
+            return Decision.Reject(RejectionCodes.CommentTooLong, $"The comment is limited to {Limits.MaxCommentLength} characters.");
         }
 
         var player = state.Players[command.PlayerId];
         var run = ActiveRun(state, player);
         var now = context.Clock.UtcNow;
-        var window = TimeSpan.FromHours(state.Rules.Roll.TechRerollWindowHours);
+        var window = TimeSpan.FromHours(run.Snapshot.TechRerollWindowHours);
         if (!command.ByAdmin && now - run.RolledAt > window)
         {
             // D-11: after the window only the admin, on the player's behalf.
@@ -139,10 +144,9 @@ internal static class Drops
             return Decision.Reject(RejectionCodes.CommentRequired, "Every admin change explains itself in the public log.");
         }
 
-        if (command.Comment.Length > PlayerAdministration.MaxCommentLength)
+        if (command.Comment.Length > Limits.MaxCommentLength)
         {
-            return Decision.Reject(
-                RejectionCodes.CommentTooLong, $"The comment is limited to {PlayerAdministration.MaxCommentLength} characters.");
+            return Decision.Reject(RejectionCodes.CommentTooLong, $"The comment is limited to {Limits.MaxCommentLength} characters.");
         }
 
         // The penalty hits the player's current points and position; their turn is left alone (D-11).
@@ -150,7 +154,7 @@ internal static class Drops
         var dice = PenaltyRoll(state, context);
         return Decision.Accept(
         [
-            new TechRerollConvertedToDrop(run.RunId, player.PlayerId, command.Comment, dice),
+            new TechRerollConvertedToDrop(run.RunId, player.PlayerId, command.Comment, dice, context.Clock.UtcNow),
             .. Penalty(state, player, dice, run.RunId, context, exclude: false),
         ]);
     }

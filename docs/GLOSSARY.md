@@ -44,7 +44,7 @@
 | Сброс выпавшей игры | админ снимает предложенную игру без реролла: игрок снова ждёт ролла, игра свободна | `OfferDiscarded` |
 | Реролл | повторный ролл до начала игры | команда `Reroll`, событие `GameRerolled` |
 | Оплата реролла | бесплатный за ролл, купон реролла (ресурс `freeRerolls`), монетки или плохой ивент; цену следующего считает `RerollPrice.Next` | `RerollPayment` (`FreeThisRoll`, `FreeRerollResource`, `Coins`, `BadEvent`), `SeasonPlayer.RerollsThisRoll` |
-| Тех-реролл | бесплатный реролл по технической причине в окне после ролла | команда `TechReroll`, событие `RunTechRerolled`, причина `TechRerollReason` (`WeakPc`, `PaidUnavailable`, `DoesNotLaunch`, `EmulatorTooSlow`, `Other`) |
+| Тех-реролл | бесплатный реролл по технической причине в окне после ролла | команда `TechReroll`, событие `RunTechRerolled`, исключение `ExclusionReason.TechRerolled`, окно `RunSnapshot.TechRerollWindowHours`, причина `TechRerollReason` (`WeakPc`, `PaidUnavailable`, `DoesNotLaunch`, `EmulatorTooSlow`, `Other`) |
 | Тех-реролл → дроп | админ превращает тех-реролл в дроп со штрафом | команда `ConvertTechRerollToDrop`, событие `TechRerollConvertedToDrop` |
 | Исключение | игра, которая больше не выпадает конкретному игроку | `PlayerGameExclusion` |
 | Фильтр ролла | предикат по играм от спецролла, зоны или конфига | `RollFilter` |
@@ -65,7 +65,8 @@
 | Правило кубика | грани кубика по сложности и ивент в придачу | `DieRule` |
 | Округление | как число кубов получается из часов: до ближайшего, вниз, вверх | `Rounding` (`Nearest`, `Floor`, `Ceil`) |
 | Кубы за дроп | штрафной бросок при дропе, каждый кубик отдельно | `RunDropped.PenaltyDice`, причины `PointsReason.DropPenalty`, `MoveReason.DropPenalty` |
-| Дроп | отказ от прохождения со штрафом | команда `DropRun`, событие `RunDropped` |
+| Дроп | отказ от прохождения со штрафом | команда `DropRun`, событие `RunDropped`, исключение `ExclusionReason.Dropped`, плохой ивент `ManualEffectSource.Drop` |
+| Пометка игры | у предложенной игры: кто из других дропнул или тех-рерольнул её и почему | `GameMarkView` (`marks`) |
 | Кооп | общее прохождение двух игроков | `Run.PartnerId` |
 | Отзыв | оценка 1–10 и текст к прохождению | `Review` |
 | Бонус финиша | очки за финиш не первым, выдаются один раз | `FinishBonus` |

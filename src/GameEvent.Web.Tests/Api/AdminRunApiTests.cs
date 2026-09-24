@@ -2,17 +2,21 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using GameEvent.Engine.Kernel;
+using GameEvent.Engine.Players;
 using GameEvent.Engine.Rolls;
 using GameEvent.Engine.Runs;
 using GameEvent.Engine.Seasons;
+using GameEvent.Infrastructure.Queue;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace GameEvent.Web.Tests.Api;
 
 /// <summary>
 /// The admin's side of tech rerolls (RR5, RR6, D-11, D-94) over HTTP:
 /// <c>POST /api/admin/seasons/{id}/players/{playerId}/tech-reroll</c> {commandId, reason, comment} — a tech reroll on the
-/// player's behalf at any time, marked <c>byAdmin</c> in the log;
+/// player's behalf at any time, marked <c>byAdmin</c> in the log, always with a comment (D-94 (2));
 /// <c>POST /api/admin/seasons/{id}/runs/{runId}/convert-to-drop</c> {commandId, comment} — the drop penalty for a tech reroll.
 /// Each endpoint: success, anonymous 401, other roles 403, invalid input 400, engine rules 409 with the code, unknown
 /// season 404, CSRF, one command id acts once. Responses are read as raw JSON.
@@ -117,7 +121,7 @@ public sealed class AdminRunApiTests : IAsyncLifetime
     {
         var admin = await _site.SignedInAsync("admin");
 
-        var response = await admin.PostAsJsonAsync(TechRerollUrl(), new { commandId = Guid.NewGuid(), reason = "weakPc" }, Ct);
+        var response = await admin.PostAsJsonAsync(TechRerollUrl(), new { commandId = Guid.NewGuid(), reason = "weakPc", comment = "Попросил в чате" }, Ct);
 
         await AssertConflictAsync(response, "turn.wrongPhase");
     }
@@ -129,7 +133,7 @@ public sealed class AdminRunApiTests : IAsyncLifetime
 
         var response = await admin.PostAsJsonAsync(
             $"/api/admin/seasons/{SiteFactory.SeasonId}/players/{Guid.NewGuid()}/tech-reroll",
-            new { commandId = Guid.NewGuid(), reason = "weakPc" },
+            new { commandId = Guid.NewGuid(), reason = "weakPc", comment = "Попросил в чате" },
             Ct);
 
         await AssertConflictAsync(response, "player.unknown");
@@ -138,12 +142,47 @@ public sealed class AdminRunApiTests : IAsyncLifetime
     [Fact]
     public async Task Admin_tech_reroll_with_reason_other_and_no_comment_is_a_conflict()
     {
+        // D-94 (2): the admin's comment rule comes before the «Other» rule
         await VasyaPlayingAsync();
         var admin = await _site.SignedInAsync("admin");
+        var before = await EventCountAsync();
 
         var response = await admin.PostAsJsonAsync(TechRerollUrl(), new { commandId = Guid.NewGuid(), reason = "other", comment = " " }, Ct);
 
-        await AssertConflictAsync(response, "run.reasonCommentRequired");
+        await AssertConflictAsync(response, "player.commentRequired");
+        Assert.Equal(before, await EventCountAsync());
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task Admin_tech_reroll_without_a_comment_is_a_conflict(string? comment)
+    {
+        // D-94 (2): an admin tech reroll is an admin change (D-89) and needs a comment even for a listed reason
+        await VasyaPlayingAsync();
+        var admin = await _site.SignedInAsync("admin");
+        var before = await EventCountAsync();
+
+        var response = await admin.PostAsJsonAsync(TechRerollUrl(), new { commandId = Guid.NewGuid(), reason = "weakPc", comment }, Ct);
+
+        await AssertConflictAsync(response, "player.commentRequired");
+        Assert.Equal(before, await EventCountAsync());
+        await using var db = _site.NewDb();
+        Assert.Equal(TurnPhase.Playing, (await db.SeasonPlayers.SingleAsync(p => p.Id == _site.Players["vasya"], Ct)).Phase);
+    }
+
+    [Fact]
+    public async Task Admin_tech_reroll_within_the_window_is_marked_as_the_admins()
+    {
+        await VasyaPlayingAsync();
+        var admin = await _site.SignedInAsync("admin");
+
+        await PostOkAsync(admin, TechRerollUrl(), new { commandId = Guid.NewGuid(), reason = "weakPc", comment = "Попросил в чате" });
+
+        await using var db = _site.NewDb();
+        using var data = JsonDocument.Parse((await db.Events.SingleAsync(e => e.Type == "run-tech-rerolled", Ct)).Data);
+        Assert.True(Property(data.RootElement, "byAdmin").GetBoolean());
     }
 
     [Fact]
@@ -151,7 +190,7 @@ public sealed class AdminRunApiTests : IAsyncLifetime
     {
         await VasyaPlayingAsync();
         var admin = await _site.SignedInAsync("admin");
-        var body = new { commandId = Guid.NewGuid(), reason = "weakPc" };
+        var body = new { commandId = Guid.NewGuid(), reason = "weakPc", comment = "Попросил в чате" };
 
         var first = await admin.PostAsJsonAsync(TechRerollUrl(), body, Ct);
         var second = await admin.PostAsJsonAsync(TechRerollUrl(), body, Ct);
@@ -186,6 +225,8 @@ public sealed class AdminRunApiTests : IAsyncLifetime
         Assert.Equal((Engine.Effects.ManualEffectSource.Drop, (Guid?)runId), (effect.Source, effect.RunId));
         var logged = await db.Events.SingleAsync(e => e.Type == "tech-reroll-converted-to-drop", Ct);
         Assert.Equal(_site.Users["admin"], logged.AuthorId);
+        using var data = JsonDocument.Parse(logged.Data);
+        Assert.Equal(_site.Clock.UtcNow, Property(data.RootElement, "convertedAt").GetDateTimeOffset()); // D-94 (3)
     }
 
     [Fact]
@@ -266,6 +307,78 @@ public sealed class AdminRunApiTests : IAsyncLifetime
         await using var db = _site.NewDb();
         Assert.Equal(1, await db.Events.CountAsync(e => e.Type == "tech-reroll-converted-to-drop", Ct));
         Assert.Equal(1, await db.ManualEffects.CountAsync(Ct));
+    }
+
+    // ---- Another season: ids from season B through season A's address ----
+
+    private async Task SendToAsync(Guid seasonId, ICommand command)
+    {
+        var outcome = await _site.Services.GetRequiredService<CommandBus>().SendAsync(
+            new CommandEnvelope(Guid.NewGuid(), seasonId, command, AuthorId: null), Ct);
+        Assert.True(outcome.IsAccepted, $"{command} rejected: {outcome.Rejection}");
+    }
+
+    /// <summary>Season B with Вася in it, playing a game; returns season B and his player id there.</summary>
+    private async Task<(Guid SeasonB, Guid PlayerB, HttpClient Vasya)> VasyaPlayingInSeasonBAsync()
+    {
+        var seasonB = await _site.CreateSeasonAsync();
+        await SendToAsync(seasonB, new ChangeSeasonStatus(SeasonStatus.Active));
+        var playerB = Guid.NewGuid();
+        await SendToAsync(seasonB, new AddSeasonPlayer(playerB, _site.Users["vasya"], "vasya"));
+        var vasya = await _site.SignedInAsync("vasya");
+        await PostOkAsync(vasya, $"/api/seasons/{seasonB}/roll", new { commandId = Guid.NewGuid() });
+        await PostOkAsync(vasya, $"/api/seasons/{seasonB}/start", new { commandId = Guid.NewGuid() });
+        return (seasonB, playerB, vasya);
+    }
+
+    private async Task<List<long>> LogOfAsync(Guid seasonId)
+    {
+        await using var db = _site.NewDb();
+        return await db.Events.Where(e => e.SeasonId == seasonId).Select(e => e.Id).ToListAsync(Ct);
+    }
+
+    [Fact]
+    public async Task Admin_tech_reroll_of_a_player_of_another_season_is_a_conflict_and_leaves_that_season_alone()
+    {
+        var (seasonB, playerB, _) = await VasyaPlayingInSeasonBAsync();
+        var admin = await _site.SignedInAsync("admin");
+        var logA = await LogOfAsync(SiteFactory.SeasonId);
+        var logB = await LogOfAsync(seasonB);
+
+        var response = await admin.PostAsJsonAsync(
+            $"/api/admin/seasons/{SiteFactory.SeasonId}/players/{playerB}/tech-reroll",
+            new { commandId = Guid.NewGuid(), reason = "weakPc", comment = "Попросил в чате" },
+            Ct);
+
+        await AssertConflictAsync(response, "player.unknown");
+        Assert.Equal(logA, await LogOfAsync(SiteFactory.SeasonId));
+        Assert.Equal(logB, await LogOfAsync(seasonB));
+        await using var db = _site.NewDb();
+        Assert.Equal(TurnPhase.Playing, (await db.SeasonPlayers.SingleAsync(p => p.Id == playerB, Ct)).Phase);
+    }
+
+    [Fact]
+    public async Task Converting_a_run_of_another_season_is_a_conflict_and_leaves_that_season_alone()
+    {
+        var (seasonB, _, vasya) = await VasyaPlayingInSeasonBAsync();
+        await PostOkAsync(vasya, $"/api/seasons/{seasonB}/tech-reroll", new { commandId = Guid.NewGuid(), reason = "doesNotLaunch" });
+        Guid runB;
+        await using (var db = _site.NewDb())
+        {
+            runB = (await db.Runs.SingleAsync(r => r.SeasonId == seasonB && r.Status == RunStatus.TechRerolled, Ct)).Id;
+        }
+
+        var admin = await _site.SignedInAsync("admin");
+        var logA = await LogOfAsync(SiteFactory.SeasonId);
+        var logB = await LogOfAsync(seasonB);
+
+        var response = await admin.PostAsJsonAsync(ConvertUrl(runB), new { commandId = Guid.NewGuid(), comment = "Дроп" }, Ct);
+
+        await AssertConflictAsync(response, "run.unknown");
+        Assert.Equal(logA, await LogOfAsync(SiteFactory.SeasonId));
+        Assert.Equal(logB, await LogOfAsync(seasonB));
+        await using var after = _site.NewDb();
+        Assert.Equal(RunStatus.TechRerolled, (await after.Runs.SingleAsync(r => r.Id == runB, Ct)).Status);
     }
 
     // ---- Refused: no session, other roles ----

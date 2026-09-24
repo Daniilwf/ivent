@@ -298,6 +298,47 @@ public class TechRerollTests
     }
 
     [Fact]
+    public void Shortening_the_window_after_the_roll_does_not_close_it_for_that_run()
+    {
+        // D-94 (1): the window concerns the run, so it is fixed at the roll (RunSnapshot.TechRerollWindowHours)
+        var s = Season().Roll("Вася").Start("Вася");
+        var runId = ActiveRun(s, "Вася");
+        Assert.Equal(48, s.State.Runs[runId].Snapshot.TechRerollWindowHours);
+        s.WithRuleset(r => r with { Roll = r.Roll with { TechRerollWindowHours = 2 } });
+        s.Advance(TimeSpan.FromHours(47));
+
+        TechReroll(s, "Вася");
+
+        ScenarioAssert.Accepted(s);
+        Assert.Equal(48, s.State.Runs[runId].Snapshot.TechRerollWindowHours);
+    }
+
+    [Fact]
+    public void Lengthening_the_window_after_the_roll_does_not_reopen_it_for_that_run()
+    {
+        var s = Season().Roll("Вася").Start("Вася");
+        s.WithRuleset(r => r with { Roll = r.Roll with { TechRerollWindowHours = 100 } });
+        s.Advance(TimeSpan.FromHours(48) + TimeSpan.FromTicks(1));
+
+        ScenarioAssert.RejectsWithoutChanges(s, x => TechReroll(x, "Вася"), RejectionCodes.TechRerollWindowClosed);
+    }
+
+    [Fact]
+    public void Changed_window_applies_to_the_next_roll()
+    {
+        // The rule in force at the roll is snapshotted: the new roll after a tech reroll takes the changed window
+        var s = Season().Roll("Вася").Start("Вася");
+        s.WithRuleset(r => r with { Roll = r.Roll with { TechRerollWindowHours = 2 } });
+        TechReroll(s, "Вася");
+        ScenarioAssert.Accepted(s);
+        s.Start("Вася");
+        Assert.Equal(2, s.State.Runs[ActiveRun(s, "Вася")].Snapshot.TechRerollWindowHours);
+        s.Advance(TimeSpan.FromHours(3));
+
+        ScenarioAssert.RejectsWithoutChanges(s, x => TechReroll(x, "Вася"), RejectionCodes.TechRerollWindowClosed);
+    }
+
+    [Fact]
     public void New_roll_after_a_tech_reroll_opens_a_new_window()
     {
         // Given Вася tech-rerolled 40 hours after the first roll and started the new game
@@ -337,20 +378,66 @@ public class TechRerollTests
     public void Admin_tech_reroll_within_the_window_is_marked_too()
     {
         var s = Playing(Season(), "Вася");
+        var runId = ActiveRun(s, "Вася");
 
-        TechReroll(s, "Вася", byAdmin: true);
+        TechReroll(s, "Вася", TechRerollReason.WeakPc, "Попросил в чате", byAdmin: true);
 
         ScenarioAssert.Accepted(s);
-        Assert.True(Assert.Single(s.LastEvents<RunTechRerolled>()).ByAdmin);
+        Assert.Equal(
+            new RunTechRerolled(runId, s.PlayerId("Вася"), TechRerollReason.WeakPc, "Попросил в чате", ByAdmin: true, s.Clock.UtcNow),
+            Assert.Single(s.LastEvents<RunTechRerolled>()));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("\n\t")]
+    public void Admin_tech_reroll_without_a_comment_is_rejected(string? comment)
+    {
+        // D-94 (2): an admin tech reroll is an admin change (D-89), it needs a comment even for a listed reason,
+        // inside the window and after it
+        var s = Playing(Season(), "Вася");
+
+        ScenarioAssert.RejectsWithoutChanges(
+            s, x => TechReroll(x, "Вася", TechRerollReason.DoesNotLaunch, comment, byAdmin: true), RejectionCodes.CommentRequired);
+
+        s.Advance(TimeSpan.FromHours(100));
+        ScenarioAssert.RejectsWithoutChanges(
+            s, x => TechReroll(x, "Вася", TechRerollReason.DoesNotLaunch, comment, byAdmin: true), RejectionCodes.CommentRequired);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("  ")]
+    public void Admin_tech_reroll_for_other_without_a_comment_is_rejected_as_an_admin_change(string? comment)
+    {
+        // D-94 (2): the admin's comment rule is checked before the «Other» rule, so the code is player.commentRequired
+        var s = Playing(Season(), "Вася");
+
+        ScenarioAssert.RejectsWithoutChanges(
+            s, x => TechReroll(x, "Вася", TechRerollReason.Other, comment, byAdmin: true), RejectionCodes.CommentRequired);
     }
 
     [Fact]
-    public void Admin_tech_reroll_still_needs_a_comment_for_other()
+    public void Admin_tech_reroll_for_other_with_a_comment_is_accepted()
+    {
+        var s = Playing(Season(), "Вася");
+
+        TechReroll(s, "Вася", TechRerollReason.Other, "Сломан сейв", byAdmin: true);
+
+        ScenarioAssert.Accepted(s);
+        var logged = Assert.Single(s.LastEvents<RunTechRerolled>());
+        Assert.Equal((TechRerollReason.Other, "Сломан сейв", true), (logged.Reason, logged.Comment, logged.ByAdmin));
+    }
+
+    [Fact]
+    public void Admin_tech_reroll_comment_over_500_characters_is_rejected()
     {
         var s = Playing(Season(), "Вася");
 
         ScenarioAssert.RejectsWithoutChanges(
-            s, x => TechReroll(x, "Вася", TechRerollReason.Other, null, byAdmin: true), RejectionCodes.ReasonCommentRequired);
+            s, x => TechReroll(x, "Вася", TechRerollReason.WeakPc, new string('я', 501), byAdmin: true), RejectionCodes.CommentTooLong);
     }
 
     [Fact]
@@ -360,7 +447,8 @@ public class TechRerollTests
         var s = Playing(Season(), "Вася");
         s.Act(new ChangeSeasonStatus(SeasonStatus.Closing));
 
-        ScenarioAssert.RejectsWithoutChanges(s, x => TechReroll(x, "Вася", byAdmin: true), RejectionCodes.SeasonNotActive);
+        ScenarioAssert.RejectsWithoutChanges(
+            s, x => TechReroll(x, "Вася", comment: "Попросил в чате", byAdmin: true), RejectionCodes.SeasonNotActive);
     }
 
     // ---- Reason and comment ----
@@ -460,7 +548,9 @@ public class TechRerollTests
         // Then TechRerollConvertedToDrop, PointsChanged(-5), PlayerMoved back 5 from where he stands, the bad event
         ScenarioAssert.Accepted(s);
         Assert.Equal(4, s.Last.Events.Count);
-        Assert.Equal(new TechRerollConvertedToDrop(runId, vasya, "Игра запускалась, это дроп", [new Die(4, 3), new Die(4, 2)]), s.Last.Events[0]);
+        Assert.Equal(
+            new TechRerollConvertedToDrop(runId, vasya, "Игра запускалась, это дроп", [new Die(4, 3), new Die(4, 2)], s.Clock.UtcNow),
+            s.Last.Events[0]);
         Assert.Equal(new PointsChanged(vasya, -5, PointsReason.DropPenalty, runId), s.Last.Events[1]);
         Assert.Equal(
             new PlayerMoved(vasya, "c7", "c2", -5, ["c6", "c5", "c4", "c3", "c2"], MoveReason.DropPenalty, runId),

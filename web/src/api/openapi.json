@@ -1469,7 +1469,7 @@
                 "type": "null"
               },
               {
-                "$ref": "#/components/schemas/GameView"
+                "$ref": "#/components/schemas/OfferedGameView"
               }
             ]
           }
@@ -1791,6 +1791,36 @@
           "extreme"
         ]
       },
+      "DropPenaltyView": {
+        "required": [
+          "count",
+          "sides",
+          "affectsPoints",
+          "affectsPosition",
+          "badEvent"
+        ],
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "sides": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "affectsPoints": {
+            "type": "boolean"
+          },
+          "affectsPosition": {
+            "type": "boolean"
+          },
+          "badEvent": {
+            "type": "boolean"
+          }
+        },
+        "description": "The drop penalty: `count` dice of `sides`, what they take, and whether a bad event follows."
+      },
       "DropRequest": {
         "required": [
           "commandId"
@@ -1986,6 +2016,28 @@
             "format": "int32"
           }
         }
+      },
+      "GameMarkKind": {
+        "enum": [
+          "dropped",
+          "techRerolled"
+        ]
+      },
+      "GameMarkView": {
+        "required": [
+          "playerName",
+          "kind"
+        ],
+        "type": "object",
+        "properties": {
+          "playerName": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/GameMarkKind"
+          }
+        },
+        "description": "Another player gave the game up this season: dropped or tech-rerolled it; the game is free again."
       },
       "GameView": {
         "required": [
@@ -2194,7 +2246,9 @@
           "activeRun",
           "lastCompleted",
           "manualEffects",
-          "dropHintMinutes"
+          "dropHintMinutes",
+          "dropPenalty",
+          "techRerollOpen"
         ],
         "type": "object",
         "properties": {
@@ -2211,7 +2265,7 @@
                 "type": "null"
               },
               {
-                "$ref": "#/components/schemas/GameView"
+                "$ref": "#/components/schemas/OfferedGameView"
               }
             ]
           },
@@ -2267,8 +2321,22 @@
               "integer"
             ],
             "format": "int32"
+          },
+          "dropPenalty": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/DropPenaltyView"
+              }
+            ]
+          },
+          "techRerollOpen": {
+            "type": "boolean"
           }
-        }
+        },
+        "description": "The signed-in player's own turn. While playing: `dropHintMinutes` is `roll.minPlayMinutesBeforeDrop` until\nthat much has been played by the server clock (only a hint: D-09), then null; `dropPenalty` is what a drop costs\nunder the rules in force; `techRerollOpen` says whether the player may still tech-reroll themselves (D-94)."
       },
       "NominationRules": {
         "required": [
@@ -2284,6 +2352,38 @@
             "$ref": "#/components/schemas/EquatableArrayOfVotedNomination"
           }
         }
+      },
+      "OfferedGameView": {
+        "required": [
+          "id",
+          "title",
+          "hours",
+          "marks"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "hours": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "marks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GameMarkView"
+            }
+          }
+        },
+        "description": "A game offered to the player, with the hours fixed at roll time and marks from other players (SPEC «Статусы игры»)."
       },
       "PenaltyDice": {
         "required": [

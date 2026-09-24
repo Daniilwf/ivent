@@ -23,10 +23,12 @@ public enum Difficulty
 public sealed record Die(int Sides, int Value);
 
 /// <summary>
-/// Rules fixed for a run at roll time. <see cref="Hours"/> is the game length from the pool;
-/// null means the player must give an estimate when completing.
+/// Rules fixed for a run at roll time (SPEC «Снапшот»). <see cref="Hours"/> is the game length from the pool;
+/// null means the player must give an estimate when completing. <see cref="TechRerollWindowHours"/> is the tech reroll
+/// window after the roll (D-94).
 /// </summary>
-public sealed record RunSnapshot(int RulesetVersion, decimal? Hours, DiceCountRule DiceCount, DieByDifficulty DieByDifficulty);
+public sealed record RunSnapshot(
+    int RulesetVersion, decimal? Hours, DiceCountRule DiceCount, DieByDifficulty DieByDifficulty, int TechRerollWindowHours);
 
 /// <summary>An attempt to complete one rolled game.</summary>
 public sealed record RunState(

@@ -1410,7 +1410,7 @@ export interface components {
         ChoiceKind: "game";
         ChoiceOptionView: {
             id: string;
-            game: null | components["schemas"]["GameView"];
+            game: null | components["schemas"]["OfferedGameView"];
         };
         /** @description The pending choice, kept on the server: a reloaded page shows the same options (T2). */
         ChoiceView: {
@@ -1509,6 +1509,16 @@ export interface components {
         };
         /** @enum {unknown} */
         Difficulty: "easy" | "normal" | "hard" | "extreme";
+        /** @description The drop penalty: `count` dice of `sides`, what they take, and whether a bad event follows. */
+        DropPenaltyView: {
+            /** Format: int32 */
+            count: number;
+            /** Format: int32 */
+            sides: number;
+            affectsPoints: boolean;
+            affectsPosition: boolean;
+            badEvent: boolean;
+        };
         /** @description Drop the active run with the penalty (D-09, D-94). */
         DropRequest: {
             /** Format: uuid */
@@ -1600,6 +1610,13 @@ export interface components {
             /** Format: int32 */
             bonusAfterList: number;
         };
+        /** @enum {unknown} */
+        GameMarkKind: "dropped" | "techRerolled";
+        /** @description Another player gave the game up this season: dropped or tech-rerolled it; the game is free again. */
+        GameMarkView: {
+            playerName: string;
+            kind: components["schemas"]["GameMarkKind"];
+        };
         GameView: {
             /** Format: uuid */
             id: string;
@@ -1660,11 +1677,16 @@ export interface components {
             /** Format: int32 */
             linearLength: number;
         };
+        /**
+         * @description The signed-in player's own turn. While playing: `dropHintMinutes` is `roll.minPlayMinutesBeforeDrop` until
+         *     that much has been played by the server clock (only a hint: D-09), then null; `dropPenalty` is what a drop costs
+         *     under the rules in force; `techRerollOpen` says whether the player may still tech-reroll themselves (D-94).
+         */
         MyTurnView: {
             /** Format: uuid */
             playerId: string;
             phase: components["schemas"]["TurnPhase"];
-            offer: null | components["schemas"]["GameView"];
+            offer: null | components["schemas"]["OfferedGameView"];
             choice: null | components["schemas"]["ChoiceView"];
             nextReroll: null | components["schemas"]["RerollPriceView"];
             activeRun: null | components["schemas"]["RunView"];
@@ -1672,10 +1694,21 @@ export interface components {
             manualEffects: components["schemas"]["ManualEffectView"][];
             /** Format: int32 */
             dropHintMinutes: null | number;
+            dropPenalty: null | components["schemas"]["DropPenaltyView"];
+            techRerollOpen: boolean;
         };
         NominationRules: {
             auto: components["schemas"]["EquatableArrayOfAutoNomination"];
             voted: components["schemas"]["EquatableArrayOfVotedNomination"];
+        };
+        /** @description A game offered to the player, with the hours fixed at roll time and marks from other players (SPEC «Статусы игры»). */
+        OfferedGameView: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            /** Format: double */
+            hours: null | number;
+            marks: components["schemas"]["GameMarkView"][];
         };
         PenaltyDice: {
             /** Format: int32 */
@@ -1950,6 +1983,7 @@ export const coopRoundUpForValues: ReadonlyArray<FlattenedDeepRequired<component
 export const difficultyValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["Difficulty"]> = ["easy", "normal", "hard", "extreme"];
 export const emptyPoolFallbackValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["EmptyPoolFallback"]> = ["dropZoneFilter"];
 export const eventKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["EventKind"]> = ["good", "bad"];
+export const gameMarkKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["GameMarkKind"]> = ["dropped", "techRerolled"];
 export const mandatoryEventValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["MandatoryEvent"]> = ["bad", "none"];
 export const manualEffectSourceValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ManualEffectSource"]> = ["paidReroll", "drop"];
 export const mapModeValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["MapMode"]> = ["linear", "graph"];

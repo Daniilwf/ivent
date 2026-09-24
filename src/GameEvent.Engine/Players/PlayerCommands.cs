@@ -57,7 +57,7 @@ internal static class PlayerAdministration
 {
     // Safety ceilings, not balance (like D-86): a typo must not overflow a balance.
     public const int MaxDelta = 1_000_000;
-    public const int MaxCommentLength = 500;
+    public const int MaxCommentLength = Limits.MaxCommentLength;
 
     // Points and coins are fields, not dictionary entries (invariant 9).
     private static readonly HashSet<string> s_reservedResources = new(StringComparer.OrdinalIgnoreCase) { "points", "coins" };

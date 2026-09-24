@@ -4,6 +4,7 @@ import { watchSeason } from '../api/realtime';
 import { ru } from '../i18n/ru';
 import { CompleteForm, type Completion } from './CompleteForm';
 import { RerollButton } from './RerollButton';
+import { GameMarks } from './GameMarks';
 import { RunActions } from './RunActions';
 
 type Season = Schemas['SeasonView'];
@@ -171,6 +172,7 @@ export function SeasonScreen({
                   }
                 >
                   {ru.turn.option(option.game.title, option.game.hours ?? null)}
+                  <GameMarks marks={option.game.marks} />
                 </button>
               ))}
             {choice.options.map(({ id, game }) =>
@@ -195,6 +197,7 @@ export function SeasonScreen({
         {offer && (
           <>
             <p data-testid="offer">{ru.turn.offered(offer.title, offer.hours ?? null)}</p>
+            <GameMarks marks={offer.marks} />
             <button
               data-testid="start"
               disabled={pending}
@@ -225,8 +228,9 @@ export function SeasonScreen({
               onComplete={(completion) => void act({ kind: 'complete', completion })}
             />
             <RunActions
-              startedAt={me.activeRun.startedAt}
-              dropHintMinutes={me.dropHintMinutes ?? null}
+              dropHintMinutes={me.dropHintMinutes}
+              dropPenalty={me.dropPenalty}
+              techRerollOpen={me.techRerollOpen}
               pending={pending}
               onDrop={() => void act({ kind: 'drop' })}
               onTechReroll={(reason, comment) => void act({ kind: 'techReroll', reason, comment })}
