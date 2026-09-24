@@ -217,6 +217,37 @@ namespace GameEvent.Infrastructure.Database.Migrations
                     b.ToTable("PlayerGameExclusion", (string)null);
                 });
 
+            modelBuilder.Entity("GameEvent.Infrastructure.Seasons.ReviewRecord", b =>
+                {
+                    b.Property<Guid>("RunId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("GameId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("PlayerId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Rating")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("SeasonId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Text")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("RunId");
+
+                    b.HasIndex("GameId");
+
+                    b.HasIndex("PlayerId");
+
+                    b.HasIndex("SeasonId");
+
+                    b.ToTable("Review", (string)null);
+                });
+
             modelBuilder.Entity("GameEvent.Infrastructure.Seasons.RulesetRecord", b =>
                 {
                     b.Property<Guid>("SeasonId")
@@ -246,6 +277,10 @@ namespace GameEvent.Infrastructure.Database.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("ChallengeDiceJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("DiceJson")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -258,6 +293,9 @@ namespace GameEvent.Infrastructure.Database.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<decimal?>("Hours")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("HoursSource")
                         .HasColumnType("TEXT");
 
                     b.Property<Guid>("PlayerId")
@@ -412,6 +450,21 @@ namespace GameEvent.Infrastructure.Database.Migrations
                     b.HasOne("GameEvent.Infrastructure.Seasons.SeasonPlayerRecord", null)
                         .WithMany()
                         .HasForeignKey("PlayerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("GameEvent.Infrastructure.Seasons.ReviewRecord", b =>
+                {
+                    b.HasOne("GameEvent.Infrastructure.Seasons.RunRecord", null)
+                        .WithMany()
+                        .HasForeignKey("RunId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("GameEvent.Infrastructure.Seasons.SeasonRecord", null)
+                        .WithMany()
+                        .HasForeignKey("SeasonId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

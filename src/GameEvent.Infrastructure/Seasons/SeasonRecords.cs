@@ -130,4 +130,26 @@ public sealed class RunRecord
     public decimal? Hours { get; set; }
 
     public required string DiceJson { get; set; }
+
+    /// <summary>The challenge bonus dice, apart from the dice by hours (D-14, D-96).</summary>
+    public required string ChallengeDiceJson { get; set; }
+
+    /// <summary>Where the player's hours estimate comes from, when the pool had no hours.</summary>
+    public string? HoursSource { get; set; }
+}
+
+/// <summary>A review of a completed run (SPEC «Модель данных»: Review): one per run, the latest wins.</summary>
+public sealed class ReviewRecord
+{
+    public Guid RunId { get; set; }
+
+    public Guid SeasonId { get; set; }
+
+    public Guid PlayerId { get; set; }
+
+    public Guid GameId { get; set; }
+
+    public int Rating { get; set; }
+
+    public string? Text { get; set; }
 }

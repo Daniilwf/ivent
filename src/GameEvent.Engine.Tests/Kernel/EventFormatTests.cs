@@ -27,7 +27,7 @@ public class EventFormatTests
     private static readonly DateTimeOffset s_at = new(2026, 10, 1, 12, 30, 0, TimeSpan.Zero);
 
     private const string SnapshotJson =
-        """{"rulesetVersion":1,"hours":7.5,"diceCount":{"hoursPerDie":3,"rounding":"nearest","min":1,"max":10},"dieByDifficulty":{"easy":{"sides":2,"grantEvent":null},"normal":{"sides":4,"grantEvent":null},"hard":{"sides":6,"grantEvent":null},"extreme":{"sides":6,"grantEvent":"good"}},"techRerollWindowHours":48}""";
+        """{"rulesetVersion":1,"hours":7.5,"diceCount":{"hoursPerDie":3,"rounding":"nearest","min":1,"max":10},"dieByDifficulty":{"easy":{"sides":2,"grantEvent":null},"normal":{"sides":4,"grantEvent":null},"hard":{"sides":6,"grantEvent":null},"extreme":{"sides":6,"grantEvent":"good"}},"techRerollWindowHours":48,"challengeExtraDice":1,"coins":{"perHour":1,"min":3}}""";
 
     // The ruleset's own format is frozen by Rulesets/RulesetSchemaTests (docs/ruleset.schema.json); here it is embedded.
     private static string RulesetJsonText => System.Text.Json.JsonSerializer.Serialize(TestRuleset.Create(), EngineJson.Options);
@@ -35,7 +35,7 @@ public class EventFormatTests
     private static RunSnapshot Snapshot()
     {
         var ruleset = TestRuleset.Create();
-        return new RunSnapshot(1, 7.5m, ruleset.Reward.DiceCount, ruleset.Reward.DieByDifficulty, 48);
+        return new RunSnapshot(1, 7.5m, ruleset.Reward.DiceCount, ruleset.Reward.DieByDifficulty, 48, 1, new CoinReward { PerHour = 1, Min = 3 });
     }
 
     public static TheoryData<string, IGameEvent, int, string> Samples() => new()
@@ -163,6 +163,12 @@ public class EventFormatTests
             """{"runId":"00000000-0000-0000-0000-000000000001","playerId":"10000000-0000-0000-0000-000000000001","comment":"Игра запускалась","penaltyDice":[{"sides":4,"value":2}],"convertedAt":"2026-10-01T12:30:00+00:00"}"""
         },
         {
+            "run-reviewed",
+            new RunReviewed(s_run, s_player, 9, "Страшно и красиво", s_at),
+            1,
+            """{"runId":"00000000-0000-0000-0000-000000000001","playerId":"10000000-0000-0000-0000-000000000001","rating":9,"text":"Страшно и красиво","reviewedAt":"2026-10-01T12:30:00+00:00"}"""
+        },
+        {
             "run-started",
             new RunStarted(s_run, s_player, s_game, Snapshot(), s_at, s_at.AddMinutes(5)),
             1,
@@ -171,15 +177,15 @@ public class EventFormatTests
         },
         {
             "run-completed",
-            new RunCompleted(s_run, s_player, Difficulty.Extreme, 7.5m, s_at),
+            new RunCompleted(s_run, s_player, Difficulty.Extreme, 7.5m, s_at, "https://howlongtobeat.com/game/1", true),
             1,
-            """{"runId":"00000000-0000-0000-0000-000000000001","playerId":"10000000-0000-0000-0000-000000000001","difficulty":"extreme","hours":7.5,"completedAt":"2026-10-01T12:30:00+00:00"}"""
+            """{"runId":"00000000-0000-0000-0000-000000000001","playerId":"10000000-0000-0000-0000-000000000001","difficulty":"extreme","hours":7.5,"completedAt":"2026-10-01T12:30:00+00:00","hoursSource":"https://howlongtobeat.com/game/1","challengeDone":true}"""
         },
         {
             "completion-rolled",
-            new CompletionRolled(s_run, s_player, [new Die(6, 5), new Die(6, 1)]),
+            new CompletionRolled(s_run, s_player, [new Die(6, 5), new Die(6, 1)], [new Die(6, 4)]),
             1,
-            """{"runId":"00000000-0000-0000-0000-000000000001","playerId":"10000000-0000-0000-0000-000000000001","dice":[{"sides":6,"value":5},{"sides":6,"value":1}]}"""
+            """{"runId":"00000000-0000-0000-0000-000000000001","playerId":"10000000-0000-0000-0000-000000000001","dice":[{"sides":6,"value":5},{"sides":6,"value":1}],"challengeDice":[{"sides":6,"value":4}]}"""
         },
         {
             "points-changed",

@@ -68,7 +68,9 @@
 | Дроп | отказ от прохождения со штрафом | команда `DropRun`, событие `RunDropped`, исключение `ExclusionReason.Dropped`, плохой ивент `ManualEffectSource.Drop` |
 | Пометка игры | у предложенной игры: кто из других дропнул или тех-рерольнул её и почему | `GameMarkView` (`marks`) |
 | Кооп | общее прохождение двух игроков | `Run.PartnerId` |
-| Отзыв | оценка 1–10 и текст к прохождению | `Review` |
+| Отзыв | оценка 1–10 и текст к прохождению | `RunReview`, команда `ReviewRun`, событие `RunReviewed`, таблица `Review` |
+| Челлендж | условие из заметки к игре, за которое даются дополнительные кубики | `CompleteRun.ChallengeDone`, `CompletionRolled.ChallengeDice`, `RunSnapshot.ChallengeExtraDice` |
+| Монетки за прохождение | награда по длине игры | `CoinsReason.CompletionReward`, `RunSnapshot.Coins` |
 | Бонус финиша | очки за финиш не первым, выдаются один раз | `FinishBonus` |
 
 ## Показатели и экономика

@@ -18,6 +18,7 @@ public enum CoinsReason
     StartingBalance,
     AdminAdjustment,
     Reroll,
+    CompletionReward,
 }
 
 /// <summary>What changed another resource of a player.</summary>

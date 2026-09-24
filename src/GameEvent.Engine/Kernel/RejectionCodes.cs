@@ -39,4 +39,9 @@ public static class RejectionCodes
     public const string ReasonCommentRequired = "run.reasonCommentRequired";
     public const string RunUnknown = "run.unknown";
     public const string NotTechRerolled = "run.notTechRerolled";
+    public const string HoursSourceRequired = "run.hoursSourceRequired";
+    public const string NotYourRun = "run.notYours";
+    public const string RunNotCompleted = "run.notCompleted";
+    public const string InvalidRating = "review.invalidRating";
+    public const string ReviewTooLong = "review.tooLong";
 }

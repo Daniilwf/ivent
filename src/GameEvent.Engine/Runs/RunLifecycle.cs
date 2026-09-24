@@ -68,6 +68,12 @@ internal static class RunLifecycle
         return Decision.Accept(events);
     }
 
+    public static Decision Decide(SeasonState state, ReviewRun command, EngineContext context) =>
+        throw new NotImplementedException("C7");
+
+    public static SeasonState Apply(SeasonState state, RunReviewed e) =>
+        throw new NotImplementedException("C7");
+
     public static SeasonState Apply(SeasonState state, RunStarted e)
     {
         var run = new RunState(
