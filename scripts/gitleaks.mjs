@@ -51,7 +51,7 @@ if (!existsSync(exe)) {
   // On Windows use the system bsdtar (opens zip); GNU tar from Git Bash may shadow it on PATH.
   const tar =
     process.platform === 'win32'
-      ? quote(join(process.env.SystemRoot ?? 'C:\Windows', 'System32', 'tar.exe'))
+      ? quote(join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'tar.exe'))
       : 'tar';
   if (!run(tar, ['-xf', name], { cwd: dir })) fail('gitleaks: extraction failed');
   if (!existsSync(exe)) fail(`gitleaks: ${exe} not found after extraction`);
