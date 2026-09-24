@@ -243,7 +243,7 @@ internal static class PlayerAdministration
                 e.PlayerId,
                 new SeasonPlayer(
                     e.PlayerId, e.UserId, e.Name, e.CellId, Points: 0, Coins: 0, ResourceBag.Empty, IsInactive: false,
-                    PlayerPath.At(e.CellId), TurnPhase.Idle, Offer: null, Choice: null, Exclusions: [], ActiveRunId: null)),
+                    PlayerPath.At(e.CellId), TurnPhase.Idle, Offer: null, Choice: null, Exclusions: [], RerollsThisRoll: 0, ActiveRunId: null)),
         };
 
     public static SeasonState Apply(SeasonState state, PlayerInactivitySet e) =>
@@ -254,6 +254,6 @@ internal static class PlayerAdministration
     public static SeasonState Apply(SeasonState state, OfferDiscarded e) =>
         state with
         {
-            Players = state.Players.SetItem(e.PlayerId, state.Players[e.PlayerId] with { Phase = TurnPhase.Idle, Offer = null }),
+            Players = state.Players.SetItem(e.PlayerId, state.Players[e.PlayerId] with { Phase = TurnPhase.Idle, Offer = null, RerollsThisRoll = 0 }),
         };
 }

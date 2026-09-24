@@ -7,6 +7,22 @@ namespace GameEvent.Infrastructure.Seasons;
 // The log is the source of truth: these rows always equal a fold of it (integrity check, L4).
 // Everything that is filtered or sorted is a column; snapshots and dice are JSON.
 
+/// <summary>A manual effect waiting to be resolved (SPEC «Модель данных»: PendingManualEffect).</summary>
+public sealed class PendingManualEffectRecord
+{
+    public Guid Id { get; set; }
+
+    public Guid SeasonId { get; set; }
+
+    public Guid PlayerId { get; set; }
+
+    public Engine.Rulesets.EventKind DrawEvent { get; set; }
+
+    public Engine.Effects.ManualEffectSource Source { get; set; }
+
+    public Guid? RunId { get; set; }
+}
+
 /// <summary>A game excluded for one player of the season (SPEC «Модель данных»: PlayerGameExclusion).</summary>
 public sealed class PlayerGameExclusionRecord
 {
@@ -85,6 +101,8 @@ public sealed class SeasonPlayerRecord
 
     /// <summary>The pending choice, as JSON (<see cref="Engine.Turns.PendingChoice"/>); one per player at most.</summary>
     public string? ChoiceJson { get; set; }
+
+    public int RerollsThisRoll { get; set; }
 
     public Guid? ActiveRunId { get; set; }
 }

@@ -1,3 +1,4 @@
+using GameEvent.Engine.Effects;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Players;
 using GameEvent.Engine.Rolls;
@@ -299,6 +300,61 @@ public class CommandQueueTests
         Assert.Equal(state.Players[s_vasya].Exclusions, after.Players[s_vasya].Exclusions);
         await using var final = h.NewDb();
         Assert.Equal(3, await final.Exclusions.CountAsync(ct));
+    }
+
+    [Fact]
+    public async Task Projection_of_rerolls_and_manual_effects_equals_the_fold_of_the_log()
+    {
+        await using var h = await QueueHarness.StartAsync();
+        var ct = TestContext.Current.CancellationToken;
+        var rules = RulesetJson.Default();
+        await AcceptedAsync(h, new CreateSeason(s_season, "Осень", rules));
+        await AcceptedAsync(h, new ChangeSeasonStatus(SeasonStatus.Active));
+        await AcceptedAsync(h, new AddSeasonPlayer(s_vasya, s_vasya, "Вася"));
+        await AcceptedAsync(h, new AdjustPlayer(s_vasya, "Приз", CoinsDelta: rules.Roll.RerollCost.Amount!.Value, ResourceDeltas: [new ResourceDelta("freeRerolls", 1)]));
+
+        // When Вася rerolls: free rerolls of the roll, then the coupon, then coins (D-93)
+        await AcceptedAsync(h, new RollGame(s_vasya));
+        for (var i = 0; i < rules.Roll.FreeRerollsPerRoll + 2; i++)
+        {
+            await AcceptedAsync(h, new Reroll(s_vasya));
+        }
+
+        // Then the projection keeps the counter and the spent coupon and coins, equal to the fold of the log
+        var state = await AssertProjectionEqualsReplayAsync(h, ct);
+        Assert.Equal(rules.Roll.FreeRerollsPerRoll + 2, state.Players[s_vasya].RerollsThisRoll);
+        Assert.Equal(0, state.Players[s_vasya].Coins);
+        await using (var db = h.NewDb())
+        {
+            var row = await db.SeasonPlayers.AsNoTracking().SingleAsync(ct);
+            Assert.Equal(state.Players[s_vasya].RerollsThisRoll, row.RerollsThisRoll);
+        }
+
+        // When the paid reroll costs a bad event, a manual effect waits (PendingManualEffect)
+        var badEvent = rules with { Roll = rules.Roll with { RerollCost = new RerollCost { Kind = RerollCostKind.BadEvent } } };
+        await AcceptedAsync(h, new ChangeRuleset(badEvent));
+        await AcceptedAsync(h, new Reroll(s_vasya));
+
+        var withEffect = await AssertProjectionEqualsReplayAsync(h, ct);
+        var effect = Assert.Single(withEffect.ManualEffects.Values);
+        Assert.Equal((s_vasya, EventKind.Bad, ManualEffectSource.PaidReroll, (Guid?)null), (effect.PlayerId, effect.DrawEvent, effect.Source, effect.RunId));
+        await using (var db = h.NewDb())
+        {
+            var rows = await db.ManualEffects.AsNoTracking().ToListAsync(ct);
+            var row = Assert.Single(rows);
+            Assert.Equal(
+                (effect.EffectId, s_season, s_vasya, EventKind.Bad, ManualEffectSource.PaidReroll, (Guid?)null),
+                (row.Id, row.SeasonId, row.PlayerId, row.DrawEvent, row.Source, row.RunId));
+        }
+
+        // And after a restart and starting the game the counter is 0 again, the effect stays
+        await h.RestartAsync();
+        await AcceptedAsync(h, new StartRun(s_vasya));
+        var playing = await AssertProjectionEqualsReplayAsync(h, ct);
+        Assert.Equal(0, playing.Players[s_vasya].RerollsThisRoll);
+        Assert.Single(playing.ManualEffects);
+        await using var final = h.NewDb();
+        Assert.Equal(0, (await final.SeasonPlayers.AsNoTracking().SingleAsync(ct)).RerollsThisRoll);
     }
 
     private static Guid OfferedIn(Infrastructure.Queue.CommandOutcome outcome) =>

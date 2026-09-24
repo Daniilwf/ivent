@@ -252,6 +252,9 @@ public class SliceInvariantTests
             // T2 (D-91): Rolling means an offer or a pending choice, never both; a choice only while Rolling
             Assert.Equal(player.Phase == TurnPhase.Rolling, player.Offer is not null || player.Choice is not null);
             Assert.False(player.Offer is not null && player.Choice is not null, "Both an offer and a pending choice.");
+
+            // RR1 / D-93: no rerolls in this script, and «Уже проходил» is not one: the counter stays 0
+            Assert.Equal(0, player.RerollsThisRoll);
             if (player.Choice is { } choice)
             {
                 Assert.Equal(TurnPhase.Rolling, player.Phase);

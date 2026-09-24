@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Text.Json;
+using GameEvent.Engine.Effects;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Map;
 using GameEvent.Engine.Rolls;
@@ -97,6 +98,7 @@ internal static class SeasonProjection
             record.OfferJson = player.Offer is null ? null : JsonSerializer.Serialize(player.Offer, EngineJson.Options);
             record.ChoiceJson = player.Choice is null ? null : JsonSerializer.Serialize(player.Choice, EngineJson.Options);
             record.ActiveRunId = player.ActiveRunId;
+            record.RerollsThisRoll = player.RerollsThisRoll;
 
             // Exclusions only grow within a season (D-08); rows are added, never changed.
             var known = old?.Exclusions.Select(x => x.GameId).ToHashSet() ?? [];
@@ -132,6 +134,20 @@ internal static class SeasonProjection
             record.Hours = run.Hours;
             record.DiceJson = JsonSerializer.Serialize(run.Dice, EngineJson.Options);
         }
+
+        // Manual effects are only created so far; resolving them (C11) will update these rows.
+        foreach (var (id, effect) in after.ManualEffects.Where(x => !before.ManualEffects.ContainsKey(x.Key)))
+        {
+            db.ManualEffects.Add(new PendingManualEffectRecord
+            {
+                Id = id,
+                SeasonId = after.SeasonId,
+                PlayerId = effect.PlayerId,
+                DrawEvent = effect.DrawEvent,
+                Source = effect.Source,
+                RunId = effect.RunId,
+            });
+        }
     }
 
     // Player ids are participation ids (one per season), never user ids: a clash means a bug upstream.
@@ -152,6 +168,7 @@ internal static class SeasonProjection
         var season = await db.Seasons.AsNoTracking().SingleAsync(s => s.Id == replayed.SeasonId, ct);
         var players = await db.SeasonPlayers.AsNoTracking().Where(p => p.SeasonId == replayed.SeasonId).ToListAsync(ct);
         var runs = await db.Runs.AsNoTracking().Where(r => r.SeasonId == replayed.SeasonId).ToListAsync(ct);
+        var effects = await db.ManualEffects.AsNoTracking().Where(x => x.SeasonId == replayed.SeasonId).ToListAsync(ct);
         var playerIds = players.Select(p => p.Id).ToList();
         var exclusions = (await db.Exclusions.AsNoTracking().Where(x => playerIds.Contains(x.PlayerId)).ToListAsync(ct))
             .ToLookup(x => x.PlayerId);
@@ -172,6 +189,7 @@ internal static class SeasonProjection
                     p.OfferJson is null ? null : JsonSerializer.Deserialize<RollOffer>(p.OfferJson, EngineJson.Options),
                     p.ChoiceJson is null ? null : JsonSerializer.Deserialize<PendingChoice>(p.ChoiceJson, EngineJson.Options),
                     [.. exclusions[p.Id].OrderBy(r => r.GameId).Select(r => new GameExclusion(r.GameId, r.Reason))],
+                    p.RerollsThisRoll,
                     p.ActiveRunId)),
             Runs = runs.ToImmutableSortedDictionary(
                 r => r.Id,
@@ -180,6 +198,9 @@ internal static class SeasonProjection
                     JsonSerializer.Deserialize<RunSnapshot>(r.SnapshotJson, EngineJson.Options)!,
                     r.RolledAt, r.StartedAt, r.Difficulty, r.Hours,
                     JsonSerializer.Deserialize<EquatableArray<Die>>(r.DiceJson, EngineJson.Options))),
+            ManualEffects = effects.ToImmutableSortedDictionary(
+                x => x.Id,
+                x => new PendingManualEffect(x.Id, x.PlayerId, x.DrawEvent, x.Source, x.RunId)),
         };
     }
 }

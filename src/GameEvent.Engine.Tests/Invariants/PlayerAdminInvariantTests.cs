@@ -1,8 +1,10 @@
 using FsCheck.Xunit;
+using GameEvent.Engine.Effects;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Map;
 using GameEvent.Engine.Players;
 using GameEvent.Engine.Rolls;
+using GameEvent.Engine.Rulesets;
 using GameEvent.Engine.Runs;
 using GameEvent.Engine.Scoring;
 using GameEvent.Engine.Seasons;
@@ -19,6 +21,8 @@ namespace GameEvent.Engine.Tests.Invariants;
 /// Each byte of <c>script</c> is one command; <c>seed</c> drives the engine's random source.
 /// The choice variant (C4, D-91) plays with <c>roll.choiceCount</c> 3 and adds <see cref="MakeChoice"/>, so the admin
 /// discard (D-89) meets pending choices as well as offers.
+/// The reroll variants (C6a, D-93) add <see cref="Reroll"/> and give the admin reroll coupons (<c>freeRerolls</c>) to hand
+/// out, with the paid reroll costing coins or a bad event and 0–2 free rerolls per roll picked by the seed.
 /// </summary>
 public class PlayerAdminInvariantTests
 {
@@ -30,9 +34,35 @@ public class PlayerAdminInvariantTests
 
     private const int ChoiceCount = 3;
 
-    private static Scenario NewSeason(int seed, bool withChoice = false) =>
+    private const string Coupon = "freeRerolls";
+
+    private const int RerollCoins = 5;
+
+    /// <summary>How the variant plays rerolls: not at all, or with the paid reroll costing coins or a bad event.</summary>
+    public enum RerollMode
+    {
+        None,
+        Coins,
+        BadEvent,
+    }
+
+    private static Ruleset WithRerolls(Ruleset r, int seed, RerollMode rerolls) =>
+        rerolls == RerollMode.None
+            ? r
+            : r with
+            {
+                Roll = r.Roll with
+                {
+                    FreeRerollsPerRoll = ((seed % 3) + 3) % 3,
+                    RerollCost = rerolls == RerollMode.Coins
+                        ? new RerollCost { Kind = RerollCostKind.Coins, Amount = RerollCoins }
+                        : new RerollCost { Kind = RerollCostKind.BadEvent },
+                },
+            };
+
+    private static Scenario NewSeason(int seed, bool withChoice = false, RerollMode rerolls = RerollMode.None) =>
         Scenario.New(seed: seed)
-            .WithRuleset(r => withChoice ? r with { Roll = r.Roll with { ChoiceCount = ChoiceCount } } : r)
+            .WithRuleset(r => WithRerolls(withChoice ? r with { Roll = r.Roll with { ChoiceCount = ChoiceCount } } : r, seed, rerolls))
             .WithMapLength(MapLength)
             .WithCategory("Horror", weight: 3)
             .WithGame("Silent Hill", 12, "Horror")
@@ -48,9 +78,10 @@ public class PlayerAdminInvariantTests
     /// Bits 0–1 pick the player (the fourth is the late one, maybe not added yet), bits 2–4 the kind of command,
     /// bits 5–7 its argument, so all three vary independently. With a choice, a start with an odd argument is
     /// MakeChoice instead: the player's pending choice (the argument picks the option, one past the last is unknown)
-    /// or a made-up id.
+    /// or a made-up id. With rerolls, a points adjustment is a <see cref="Reroll"/> instead, and so is the inactive flag
+    /// with a small argument; the resource the admin hands out is the reroll coupon.
     /// </summary>
-    private static ICommand CommandFor(Scenario s, byte b, bool withChoice = false)
+    private static ICommand CommandFor(Scenario s, byte b, bool withChoice = false, bool withRerolls = false)
     {
         var index = b % 4;
         var player = index < s_players.Length ? s.PlayerId(s_players[index]) : s_late;
@@ -61,13 +92,18 @@ public class PlayerAdminInvariantTests
             return ChoiceFor(s, player, arg / 2);
         }
 
+        if (withRerolls && ((b / 4) % 8 == 3 || ((b / 4) % 8 == 6 && arg < 4)))
+        {
+            return new Reroll(player);
+        }
+
         return ((b / 4) % 8) switch
         {
             0 => new RollGame(player),
             1 => new StartRun(player),
             2 => new CompleteRun(player, (Difficulty)(arg % 4), EstimatedHours: 1 + arg),
             3 => new AdjustPlayer(player, comment, PointsDelta: arg - 3),
-            4 => new AdjustPlayer(player, comment, CoinsDelta: 3 - arg, ResourceDeltas: [new ResourceDelta("tickets", (arg % 3) - 1)]),
+            4 => new AdjustPlayer(player, comment, CoinsDelta: 3 - arg, ResourceDeltas: [new ResourceDelta(withRerolls ? Coupon : "tickets", (arg % 3) - 1)]),
             5 => new AdjustPlayer(player, comment, CellId: CellAt(s, arg * 4), DiscardOffer: arg % 2 == 1),
             6 => new SetPlayerInactive(player, arg % 2 == 1),
             _ => arg switch
@@ -95,14 +131,18 @@ public class PlayerAdminInvariantTests
     private static string CellAt(Scenario s, int index) => s.State.Map.Cells[Math.Min(index, s.State.Map.Cells.Count - 1)].Id;
 
     private static Scenario Play(
-        int seed, byte[] script, Action<Scenario, ICommand, SeasonState, int>? afterEach = null, bool withChoice = false)
+        int seed,
+        byte[] script,
+        Action<Scenario, ICommand, SeasonState, int>? afterEach = null,
+        bool withChoice = false,
+        RerollMode rerolls = RerollMode.None)
     {
-        var s = NewSeason(seed, withChoice);
+        var s = NewSeason(seed, withChoice, rerolls);
         foreach (var b in script)
         {
             var before = s.State;
             var logLength = s.Log.Count;
-            var command = CommandFor(s, b, withChoice);
+            var command = CommandFor(s, b, withChoice, rerolls != RerollMode.None);
             s.Act(command);
             afterEach?.Invoke(s, command, before, logLength);
         }
@@ -117,6 +157,29 @@ public class PlayerAdminInvariantTests
     [Property(MaxTest = 200)]
     public void Invariants_hold_with_a_choice_of_games(int seed, byte[] script) =>
         Play(seed, script, CheckInvariants, withChoice: true);
+
+    [Property(MaxTest = 200)]
+    public void Invariants_hold_with_rerolls_paid_in_coins(int seed, byte[] script) =>
+        Play(seed, script, CheckInvariants, rerolls: RerollMode.Coins);
+
+    [Property(MaxTest = 200)]
+    public void Invariants_hold_with_rerolls_paid_by_a_bad_event(int seed, byte[] script) =>
+        Play(seed, script, CheckInvariants, rerolls: RerollMode.BadEvent);
+
+    [Property(MaxTest = 200)]
+    public void Invariants_hold_with_rerolls_and_a_choice_of_games(int seed, byte[] script) =>
+        Play(seed, script, CheckInvariants, withChoice: true, rerolls: RerollMode.Coins);
+
+    [Property(MaxTest = 50)]
+    public void Same_seed_and_commands_give_the_same_log_with_rerolls(int seed, byte[] script)
+    {
+        // Invariant 14: the new roll of a reroll comes from the seeded random source only
+        var first = Play(seed, script, withChoice: true, rerolls: RerollMode.BadEvent);
+        var second = Play(seed, script, withChoice: true, rerolls: RerollMode.BadEvent);
+
+        Assert.Equal(first.Log, second.Log);
+        Assert.Equal(first.State, second.State);
+    }
 
     [Property(MaxTest = 50)]
     public void Same_seed_and_commands_give_the_same_log_with_a_choice_of_games(int seed, byte[] script)
@@ -165,6 +228,7 @@ public class PlayerAdminInvariantTests
         if (!s.Last.IsAccepted)
         {
             ScenarioAssert.Rejected(s, before, logLengthBefore, s.Last.Rejection!.Code);
+            CheckRejectedReroll(s, command, before);
         }
         else
         {
@@ -218,7 +282,21 @@ public class PlayerAdminInvariantTests
             Assert.Equal(player.Phase == TurnPhase.Playing, player.ActiveRunId is not null);
             Assert.Equal(player.Phase == TurnPhase.Rolling, player.Offer is not null || player.Choice is not null);
             Assert.False(player.Offer is not null && player.Choice is not null, "Both an offer and a pending choice.");
+
+            // RR1 / D-93: the reroll counter is 0 whenever the player is not Rolling, and never negative
+            Assert.True(player.RerollsThisRoll >= 0, $"Negative reroll counter {player.RerollsThisRoll}.");
+            Assert.True(
+                player.Phase == TurnPhase.Rolling || player.RerollsThisRoll == 0,
+                $"{player.Name} is {player.Phase} with {player.RerollsThisRoll} rerolls.");
         }
+
+        // RR1 / D-93: pending manual effects are exactly the created ones (resolution comes with C11)
+        Assert.Equal(
+            s.Log.OfType<ManualEffectCreated>()
+                .Select(e => new PendingManualEffect(e.EffectId, e.PlayerId, e.DrawEvent, e.Source, e.RunId))
+                .OrderBy(e => e.EffectId),
+            s.State.ManualEffects.Values);
+        Assert.All(s.State.ManualEffects, e => Assert.Equal(e.Key, e.Value.EffectId));
 
         // 4 / G9. A game is busy for at most one player: offered, among pending options (D-06) or played
         // (a discarded offer or choice frees it)
@@ -292,6 +370,9 @@ public class PlayerAdminInvariantTests
                 // Game actions only in a running season
                 Assert.Equal(SeasonStatus.Active, before.Status);
                 break;
+            case Reroll reroll:
+                CheckAcceptedReroll(s, reroll, before);
+                break;
             case MakeChoice choose:
                 // Choosing --> Playing (D-91): the chosen option starts at once with its roll-time snapshot
                 Assert.Equal(SeasonStatus.Active, before.Status);
@@ -308,6 +389,105 @@ public class PlayerAdminInvariantTests
         }
     }
 
+    /// <summary>
+    /// The payment a reroll must take by D-07 / D-93: a free reroll of this roll, then a coupon, then the cost —
+    /// null when the cost is coins and the player cannot pay.
+    /// </summary>
+    private static RerollPayment? ExpectedPayment(SeasonPlayer was, Ruleset rules)
+    {
+        if (was.RerollsThisRoll < rules.Roll.FreeRerollsPerRoll)
+        {
+            return RerollPayment.FreeThisRoll;
+        }
+
+        if (was.Resources[Coupon] >= 1)
+        {
+            return RerollPayment.FreeRerollResource;
+        }
+
+        if (rules.Roll.RerollCost.Kind == RerollCostKind.BadEvent)
+        {
+            return RerollPayment.BadEvent;
+        }
+
+        return was.Coins >= rules.Roll.RerollCost.Amount ? RerollPayment.Coins : null;
+    }
+
+    private static List<Guid> Pending(SeasonPlayer p) =>
+        p.Offer is { } offer ? [offer.GameId] : p.Choice?.Options.Select(o => o.Game!.GameId).ToList() ?? [];
+
+    /// <summary>RR1 / D-93: an accepted reroll gives up exactly what was pending, pays in order, and rolls anew without it.</summary>
+    private static void CheckAcceptedReroll(Scenario s, Reroll reroll, SeasonState before)
+    {
+        var events = s.Last.Events;
+        var was = before.Players[reroll.PlayerId];
+        var now = s.State.Players[reroll.PlayerId];
+        Assert.Equal(SeasonStatus.Active, before.Status);
+        Assert.Equal(TurnPhase.Rolling, was.Phase);
+
+        var givenUp = Pending(was);
+        var rerolled = Assert.IsType<GameRerolled>(events[0]);
+        Assert.Equal(reroll.PlayerId, rerolled.PlayerId);
+        Assert.Equal(givenUp.Order(), rerolled.GameIds.Order());
+
+        // Payment strictly in order; coins and coupons never go negative for a reroll
+        var payment = ExpectedPayment(was, before.Rules);
+        Assert.NotNull(payment);
+        Assert.Equal(payment, rerolled.Payment);
+        var paymentEvents = events.Skip(1).Take(events.Count - 2).ToList();
+        switch (rerolled.Payment)
+        {
+            case RerollPayment.FreeThisRoll:
+                Assert.Empty(paymentEvents);
+                break;
+            case RerollPayment.FreeRerollResource:
+                Assert.Equal([new ResourceChanged(reroll.PlayerId, Coupon, -1, ResourceReason.Reroll)], paymentEvents);
+                break;
+            case RerollPayment.Coins:
+                Assert.Equal([new CoinsChanged(reroll.PlayerId, -RerollCoins, CoinsReason.Reroll, null)], paymentEvents);
+                break;
+            case RerollPayment.BadEvent:
+                var created = Assert.IsType<ManualEffectCreated>(Assert.Single(paymentEvents));
+                Assert.Equal(new ManualEffectCreated(created.EffectId, reroll.PlayerId, EventKind.Bad, ManualEffectSource.PaidReroll, null), created);
+                Assert.DoesNotContain(created.EffectId, before.ManualEffects.Keys);
+                Assert.True(s.State.ManualEffects.ContainsKey(created.EffectId), "The bad event is not pending.");
+                break;
+        }
+
+        Assert.Equal(rerolled.Payment == RerollPayment.Coins ? was.Coins - RerollCoins : was.Coins, now.Coins);
+        Assert.Equal(
+            rerolled.Payment == RerollPayment.FreeRerollResource ? was.Resources[Coupon] - 1 : was.Resources[Coupon],
+            now.Resources[Coupon]);
+        Assert.True(rerolled.Payment != RerollPayment.Coins || now.Coins >= 0, $"A reroll drove coins from {was.Coins} to {now.Coins}.");
+        Assert.True(now.Resources[Coupon] >= 0 || was.Resources[Coupon] < 0, "A reroll drove the coupons negative.");
+
+        // The new roll: the same player, never a game just given up (not even a miss), still Rolling, one more reroll
+        List<Guid> newGames = events[^1] switch
+        {
+            GameRolled r when r.PlayerId == reroll.PlayerId => [r.GameId, .. r.Misses.Select(m => m.GameId)],
+            GameChoiceRolled c when c.PlayerId == reroll.PlayerId => [.. c.Offers.Select(o => o.GameId), .. c.Misses.Select(m => m.GameId)],
+            var other => throw new Xunit.Sdk.XunitException($"A reroll must end with the new roll, got {other}."),
+        };
+        Assert.DoesNotContain(newGames, givenUp.Contains);
+        Assert.Equal(TurnPhase.Rolling, now.Phase);
+        Assert.Equal(was.RerollsThisRoll + 1, now.RerollsThisRoll);
+        Assert.Equal((was.Points, was.CellId), (now.Points, now.CellId));
+    }
+
+    /// <summary>RR1 / D-93: «not enough coins» only when the free rerolls and coupons are used up and the coins fall short.</summary>
+    private static void CheckRejectedReroll(Scenario s, ICommand command, SeasonState before)
+    {
+        if (command is not Reroll reroll || s.Last.Rejection!.Code != RejectionCodes.NotEnoughCoins)
+        {
+            return;
+        }
+
+        var was = before.Players[reroll.PlayerId];
+        Assert.Equal(TurnPhase.Rolling, was.Phase);
+        Assert.Equal(RerollCostKind.Coins, before.Rules.Roll.RerollCost.Kind);
+        Assert.Null(ExpectedPayment(was, before.Rules));
+    }
+
     private static Guid? PlayerOf(IGameEvent e) =>
         e switch
         {
@@ -317,6 +497,8 @@ public class PlayerAdminInvariantTests
             ChoiceDiscarded x => x.PlayerId,
             GameRolled x => x.PlayerId,
             GameChoiceRolled x => x.PlayerId,
+            GameRerolled x => x.PlayerId,
+            ManualEffectCreated x => x.PlayerId,
             ChoiceMade x => x.PlayerId,
             RunStarted x => x.PlayerId,
             PointsChanged x => x.PlayerId,
@@ -361,7 +543,7 @@ public class PlayerAdminInvariantTests
                     Assert.DoesNotContain(added.PlayerId, players.Keys);
                     players[added.PlayerId] = new ReferencePlayer { CellId = added.CellId };
                     break;
-                case GameRolled or GameChoiceRolled or ChoiceMade or RunStarted or RunCompleted or CompletionRolled:
+                case GameRolled or GameChoiceRolled or GameRerolled or ChoiceMade or RunStarted or RunCompleted or CompletionRolled:
                     // SE1/SE2: no game actions outside a running season
                     Assert.Equal(SeasonStatus.Active, status);
                     break;
@@ -372,11 +554,17 @@ public class PlayerAdminInvariantTests
                 case CoinsChanged coins:
                     Assert.NotEqual(0, coins.Delta);
                     players[coins.PlayerId].Coins += coins.Delta;
+
+                    // RR1 / D-93: a reroll is a purchase: it never takes coins into the negative
+                    Assert.True(coins.Reason != CoinsReason.Reroll || players[coins.PlayerId].Coins >= 0, "A reroll took coins below zero.");
                     break;
                 case ResourceChanged resource:
                     Assert.NotEqual(0, resource.Delta);
                     var bag = players[resource.PlayerId].Resources;
                     bag[resource.Resource] = bag.GetValueOrDefault(resource.Resource) + resource.Delta;
+                    Assert.True(
+                        resource.Reason != ResourceReason.Reroll || (resource.Resource == Coupon && resource.Delta == -1 && bag[resource.Resource] >= 0),
+                        "A reroll spent a coupon it did not have.");
                     break;
                 case PlayerMoved moved:
                     var player = players[moved.PlayerId];

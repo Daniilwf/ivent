@@ -3,11 +3,13 @@ import { api, rejectionCode, type Schemas } from '../api/client';
 import { watchSeason } from '../api/realtime';
 import { ru } from '../i18n/ru';
 import { CompleteForm, type Completion } from './CompleteForm';
+import { RerollButton } from './RerollButton';
 
 type Season = Schemas['SeasonView'];
 type Command =
   | { kind: 'roll' }
   | { kind: 'start' }
+  | { kind: 'reroll' }
   | { kind: 'complete'; completion: Completion }
   | { kind: 'choose'; choiceId: string; optionId: string }
   | { kind: 'alreadyPlayed'; gameId: string };
@@ -22,6 +24,8 @@ function send(seasonId: string, command: Command) {
       return api.POST('/api/seasons/{seasonId}/roll', { params, body: { commandId } });
     case 'start':
       return api.POST('/api/seasons/{seasonId}/start', { params, body: { commandId } });
+    case 'reroll':
+      return api.POST('/api/seasons/{seasonId}/reroll', { params, body: { commandId } });
     case 'complete':
       return api.POST('/api/seasons/{seasonId}/complete', {
         params,
@@ -171,6 +175,11 @@ export function SeasonScreen({
                 </button>
               ) : null,
             )}
+            <RerollButton
+              price={me?.nextReroll ?? null}
+              pending={pending}
+              onReroll={() => void act({ kind: 'reroll' })}
+            />
           </fieldset>
         )}
         {offer && (
@@ -190,6 +199,11 @@ export function SeasonScreen({
             >
               {ru.turn.alreadyPlayed}
             </button>
+            <RerollButton
+              price={me?.nextReroll ?? null}
+              pending={pending}
+              onReroll={() => void act({ kind: 'reroll' })}
+            />
           </>
         )}
         {me?.phase === 'playing' && me.activeRun && (
@@ -203,6 +217,18 @@ export function SeasonScreen({
           </>
         )}
         {message && <p role="alert">{message}</p>}
+        {me && me.manualEffects.length > 0 && (
+          <section aria-labelledby="effects-title" data-testid="manual-effects">
+            <h3 id="effects-title">{ru.effects.title}</h3>
+            <ul>
+              {me.manualEffects.map((effect) => (
+                <li key={effect.id} data-testid={`manual-effect-${effect.id}`}>
+                  {ru.effects.drawEvent(effect.drawEvent, effect.source)}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
         {me?.lastCompleted && (
           <p data-testid="last-dice">
             {ru.turn.lastDice(

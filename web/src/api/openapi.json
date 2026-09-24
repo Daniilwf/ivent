@@ -337,6 +337,96 @@
         }
       }
     },
+    "/api/seasons/{seasonId}/reroll": {
+      "post": {
+        "tags": [
+          "Seasons"
+        ],
+        "parameters": [
+          {
+            "name": "seasonId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RerollRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RejectionProblem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/seasons/{seasonId}/already-played": {
       "post": {
         "tags": [
@@ -1407,8 +1497,7 @@
       "EventKind": {
         "enum": [
           "good",
-          "bad",
-          null
+          "bad"
         ]
       },
       "Features": {
@@ -1638,6 +1727,33 @@
           "none"
         ]
       },
+      "ManualEffectSource": {
+        "enum": [
+          "paidReroll"
+        ],
+        "description": "What created a manual effect; C11 adds item, cell and event sources."
+      },
+      "ManualEffectView": {
+        "required": [
+          "id",
+          "drawEvent",
+          "source"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "drawEvent": {
+            "$ref": "#/components/schemas/EventKind"
+          },
+          "source": {
+            "$ref": "#/components/schemas/ManualEffectSource"
+          }
+        },
+        "description": "A manual effect the player still has to play out (D-10, D-93); resolving it comes with C11."
+      },
       "MapMode": {
         "enum": [
           "linear",
@@ -1662,8 +1778,10 @@
           "phase",
           "offer",
           "choice",
+          "nextReroll",
           "activeRun",
-          "lastCompleted"
+          "lastCompleted",
+          "manualEffects"
         ],
         "type": "object",
         "properties": {
@@ -1694,6 +1812,16 @@
               }
             ]
           },
+          "nextReroll": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/RerollPriceView"
+              }
+            ]
+          },
           "activeRun": {
             "oneOf": [
               {
@@ -1713,6 +1841,12 @@
                 "$ref": "#/components/schemas/CompletedRunView"
               }
             ]
+          },
+          "manualEffects": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ManualEffectView"
+            }
           }
         }
       },
@@ -1937,6 +2071,45 @@
           "coins",
           "badEvent"
         ]
+      },
+      "RerollPayment": {
+        "enum": [
+          "freeThisRoll",
+          "freeRerollResource",
+          "coins",
+          "badEvent"
+        ],
+        "description": "How a reroll was paid for."
+      },
+      "RerollPriceView": {
+        "required": [
+          "payment",
+          "coins"
+        ],
+        "type": "object",
+        "properties": {
+          "payment": {
+            "$ref": "#/components/schemas/RerollPayment"
+          },
+          "coins": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "What the next reroll costs, computed by the engine's rule (D-93); only while a game is offered."
+      },
+      "RerollRequest": {
+        "required": [
+          "commandId"
+        ],
+        "type": "object",
+        "properties": {
+          "commandId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "description": "A reroll of the offered game or the whole pending choice; the price follows D-07."
       },
       "RewardRules": {
         "required": [

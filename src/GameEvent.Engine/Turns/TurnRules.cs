@@ -7,7 +7,8 @@ namespace GameEvent.Engine.Turns;
 
 /// <summary>
 /// The turn state machine (SPEC «Игровой цикл», K-5) as one table: which phase each player turn command needs.
-/// A pending choice blocks every turn command except <see cref="MakeChoice"/> and <see cref="DeclareAlreadyPlayed"/>. Admin commands are not turn commands.
+/// A pending choice blocks every turn command except <see cref="MakeChoice"/>, <see cref="DeclareAlreadyPlayed"/> and
+/// <see cref="Reroll"/>. Admin commands are not turn commands.
 /// Checks run in a fixed order: season active, player known, pending choice, phase. The active run limit is the
 /// phase itself: a run starts only from Rolling, and RulesetSupport keeps the limit at 1 (D-91).
 /// </summary>
@@ -18,6 +19,7 @@ internal static class TurnRules
     {
         [typeof(RollGame)] = TurnPhase.Idle,
         [typeof(DeclareAlreadyPlayed)] = TurnPhase.Rolling,
+        [typeof(Reroll)] = TurnPhase.Rolling,
         [typeof(StartRun)] = TurnPhase.Rolling,
         [typeof(CompleteRun)] = TurnPhase.Playing,
     };
@@ -44,8 +46,8 @@ internal static class TurnRules
                 : null;
         }
 
-        // «Уже проходил» may name any option of a pending choice (D-92).
-        if (player.Choice is not null && command is not DeclareAlreadyPlayed)
+        // «Уже проходил» may name any option of a pending choice (D-92); a reroll gives up the whole choice (D-93).
+        if (player.Choice is not null && command is not (DeclareAlreadyPlayed or Reroll))
         {
             return Decision.Reject(RejectionCodes.ChoicePending, "The player must make the pending choice first.");
         }
