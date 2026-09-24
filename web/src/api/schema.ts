@@ -535,6 +535,145 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/seasons/{seasonId}/rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RulesView"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/seasons/{seasonId}/rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ChangeRulesRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RulesChangeResult"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RulesetProblem"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -543,11 +682,42 @@ export interface components {
             token: string;
             headerName: string;
         };
+        BetRules: {
+            /** Format: int32 */
+            maxStake: number;
+            /** Format: int32 */
+            maxOpenBetsPerPlayer: number;
+            /** Format: int32 */
+            windowHoursAfterRoll: number;
+            deadlineOptionsDays: components["schemas"]["EquatableArrayOfint"];
+            payoutByHoursPerDay: components["schemas"]["EquatableArrayOfPayoutStep"];
+        };
         /** @enum {unknown} */
         CellType: "start" | "empty" | "finish";
         CellView: {
             id: string;
             type: components["schemas"]["CellType"];
+        };
+        ChallengeBonus: {
+            /** Format: int32 */
+            extraDice: number;
+        };
+        /**
+         * @description A new ruleset from the admin's editor: the whole document, the version it was edited from, and a command id
+         *     generated once per save.
+         */
+        ChangeRulesRequest: {
+            /** Format: uuid */
+            commandId: string;
+            /** Format: int32 */
+            expectedVersion: number;
+            ruleset: components["schemas"]["Ruleset"];
+        };
+        CoinReward: {
+            /** Format: double */
+            perHour: number;
+            /** Format: int32 */
+            min: number;
         };
         CommandResponse: {
             duplicate: boolean;
@@ -571,6 +741,13 @@ export interface components {
             /** Format: double */
             estimatedHours?: null | number;
         };
+        /** @enum {unknown} */
+        CoopRoundUpFor: "roller";
+        CoopRules: {
+            /** Format: double */
+            pointsShare: number;
+            roundUpFor: components["schemas"]["CoopRoundUpFor"];
+        };
         /** @description The season the signed-in user sees by default (D-18). */
         CurrentSeasonView: {
             /** Format: uuid */
@@ -584,6 +761,26 @@ export interface components {
             role: components["schemas"]["Role"];
             mustChangePassword: boolean;
         };
+        DiceCountRule: {
+            /** Format: double */
+            hoursPerDie: number;
+            rounding: components["schemas"]["Rounding"];
+            /** Format: int32 */
+            min: number;
+            /** Format: int32 */
+            max: number;
+        };
+        DieByDifficulty: {
+            easy: components["schemas"]["DieRule"];
+            normal: components["schemas"]["DieRule"];
+            hard: components["schemas"]["DieRule"];
+            extreme: components["schemas"]["DieRule"];
+        };
+        DieRule: {
+            /** Format: int32 */
+            sides: number;
+            grantEvent?: null | components["schemas"]["EventKind"];
+        };
         DieView: {
             /** Format: int32 */
             sides: number;
@@ -592,12 +789,103 @@ export interface components {
         };
         /** @enum {unknown} */
         Difficulty: "easy" | "normal" | "hard" | "extreme";
+        DropRules: {
+            penaltyDice: components["schemas"]["PenaltyDice"];
+            affectsPoints: boolean;
+            affectsPosition: boolean;
+            mandatoryEvent: components["schemas"]["MandatoryEvent"];
+        };
+        EconomyRules: {
+            allowNegativeCoins: boolean;
+            /** Format: int32 */
+            inventoryLimit: number;
+            rarityWeights: components["schemas"]["RarityWeights"];
+            shop: components["schemas"]["ShopRules"];
+        };
+        EffectRules: {
+            /** Format: int32 */
+            maxChainDepth: number;
+            /** Format: int32 */
+            maxEventsPerCommand: number;
+            hostileCap: components["schemas"]["HostileCap"];
+            attacksOnlyOnHigherPoints: boolean;
+        };
+        /** @enum {unknown} */
+        EmptyPoolFallback: "dropZoneFilter";
+        /**
+         * @description Immutable list with value equality, so records holding lists (events, snapshots) compare by content.
+         *     Serialized as a plain JSON array.
+         */
+        EquatableArrayOfAutoNomination: unknown;
+        /**
+         * @description Immutable list with value equality, so records holding lists (events, snapshots) compare by content.
+         *     Serialized as a plain JSON array.
+         */
+        EquatableArrayOfint: unknown;
+        /**
+         * @description Immutable list with value equality, so records holding lists (events, snapshots) compare by content.
+         *     Serialized as a plain JSON array.
+         */
+        EquatableArrayOfLengthFilterStep: unknown;
+        /**
+         * @description Immutable list with value equality, so records holding lists (events, snapshots) compare by content.
+         *     Serialized as a plain JSON array.
+         */
+        EquatableArrayOfPayoutStep: unknown;
+        /**
+         * @description Immutable list with value equality, so records holding lists (events, snapshots) compare by content.
+         *     Serialized as a plain JSON array.
+         */
+        EquatableArrayOfShopPriceReset: unknown;
+        /**
+         * @description Immutable list with value equality, so records holding lists (events, snapshots) compare by content.
+         *     Serialized as a plain JSON array.
+         */
+        EquatableArrayOfstring: unknown;
+        /**
+         * @description Immutable list with value equality, so records holding lists (events, snapshots) compare by content.
+         *     Serialized as a plain JSON array.
+         */
+        EquatableArrayOfTiebreaker: unknown;
+        /**
+         * @description Immutable list with value equality, so records holding lists (events, snapshots) compare by content.
+         *     Serialized as a plain JSON array.
+         */
+        EquatableArrayOfVotedNomination: unknown;
+        /** @enum {unknown} */
+        EventKind: "good" | "bad" | null;
+        /** @description Feature flags: a disabled mechanic is invisible in the interface and refused by the engine. */
+        Features: {
+            mapMode: components["schemas"]["MapMode"];
+            shop: boolean;
+            items: boolean;
+            events: boolean;
+            bets: boolean;
+            polls: boolean;
+            achievements: boolean;
+            weeklyChallenge: boolean;
+            partnerBoard: boolean;
+            reactions: boolean;
+            comments: boolean;
+            gallery: boolean;
+        };
+        FinishRules: {
+            requireApprovalForFirst: boolean;
+            bonusByOrder: components["schemas"]["EquatableArrayOfint"];
+            /** Format: int32 */
+            bonusAfterList: number;
+        };
         GameView: {
             /** Format: uuid */
             id: string;
             title: string;
             /** Format: double */
             hours: null | number;
+        };
+        HostileCap: {
+            enabled: boolean;
+            /** Format: int32 */
+            maxActive: number;
         };
         HttpValidationProblemDetails: {
             type?: null | string;
@@ -610,6 +898,14 @@ export interface components {
                 [key: string]: string[];
             };
         };
+        InteractionRules: {
+            /** Format: int32 */
+            inviteTtlHours: number;
+        };
+        LastDaysLengthFilter: {
+            enabled: boolean;
+            steps: components["schemas"]["EquatableArrayOfLengthFilterStep"];
+        };
         LoggedEventView: {
             /** Format: int64 */
             sequence: number;
@@ -619,6 +915,14 @@ export interface components {
             login: string;
             password: string;
         };
+        /** @enum {unknown} */
+        MandatoryEvent: "bad" | "none";
+        /** @enum {unknown} */
+        MapMode: "linear" | "graph";
+        MapRules: {
+            /** Format: int32 */
+            linearLength: number;
+        };
         MyTurnView: {
             /** Format: uuid */
             playerId: string;
@@ -626,6 +930,16 @@ export interface components {
             offer: null | components["schemas"]["GameView"];
             activeRun: null | components["schemas"]["RunView"];
             lastCompleted: null | components["schemas"]["CompletedRunView"];
+        };
+        NominationRules: {
+            auto: components["schemas"]["EquatableArrayOfAutoNomination"];
+            voted: components["schemas"]["EquatableArrayOfVotedNomination"];
+        };
+        PenaltyDice: {
+            /** Format: int32 */
+            count: number;
+            /** Format: int32 */
+            sides: number;
         };
         PlayerView: {
             /** Format: uuid */
@@ -644,6 +958,17 @@ export interface components {
             detail?: null | string;
             instance?: null | string;
         };
+        RankingRules: {
+            tiebreakers: components["schemas"]["EquatableArrayOfTiebreaker"];
+        };
+        RarityWeights: {
+            /** Format: int32 */
+            common: number;
+            /** Format: int32 */
+            epic: number;
+            /** Format: int32 */
+            legendary: number;
+        };
         /** @description A game rule refused the action; `code` is stable and maps to a text in the interface dictionary. */
         RejectionProblem: {
             title: string;
@@ -651,6 +976,22 @@ export interface components {
             status: number;
             detail: null | string;
             code: string;
+        };
+        /** @description Price of a paid reroll: int? RerollCost.Amount coins, or a bad event (then no amount). */
+        RerollCost: {
+            kind: components["schemas"]["RerollCostKind"];
+            /** Format: int32 */
+            amount?: null | number;
+        };
+        /** @enum {unknown} */
+        RerollCostKind: "coins" | "badEvent";
+        RewardRules: {
+            diceCount: components["schemas"]["DiceCountRule"];
+            dieByDifficulty: components["schemas"]["DieByDifficulty"];
+            challengeBonus: components["schemas"]["ChallengeBonus"];
+            unmetConditionPolicy: components["schemas"]["UnmetConditionPolicy"];
+            coins: components["schemas"]["CoinReward"];
+            coop: components["schemas"]["CoopRules"];
         };
         /**
          * @description Role of an account. An admin who also plays has two accounts (SPEC «Аккаунты»).
@@ -662,12 +1003,99 @@ export interface components {
             /** Format: uuid */
             commandId: string;
         };
+        RollRules: {
+            /** Format: int32 */
+            choiceCount: number;
+            /** Format: int32 */
+            freeRerollsPerRoll: number;
+            rerollCost: components["schemas"]["RerollCost"];
+            /** Format: int32 */
+            techRerollWindowHours: number;
+            /** Format: int32 */
+            minPlayMinutesBeforeDrop: number;
+            emptyPoolFallback: components["schemas"]["EmptyPoolFallback"];
+            lastDaysLengthFilter: components["schemas"]["LastDaysLengthFilter"];
+        };
+        /** @enum {unknown} */
+        Rounding: "nearest" | "floor" | "ceil";
+        RulesChangeResult: {
+            /** Format: int32 */
+            version: number;
+        };
+        Ruleset: {
+            /**
+             * Format: int32
+             * @description Format version of the configuration document (not the season's ruleset version).
+             */
+            version: number;
+            features: components["schemas"]["Features"];
+            season: components["schemas"]["SeasonRules"];
+            roll: components["schemas"]["RollRules"];
+            reward: components["schemas"]["RewardRules"];
+            drop: components["schemas"]["DropRules"];
+            finish: components["schemas"]["FinishRules"];
+            ranking: components["schemas"]["RankingRules"];
+            map: components["schemas"]["MapRules"];
+            economy: components["schemas"]["EconomyRules"];
+            effects: components["schemas"]["EffectRules"];
+            interactions: components["schemas"]["InteractionRules"];
+            bets: components["schemas"]["BetRules"];
+            social: components["schemas"]["SocialRules"];
+            nominations: components["schemas"]["NominationRules"];
+            weeklyChallenge: components["schemas"]["WeeklyChallengeRules"];
+        };
+        /**
+         * @description One changed value between two versions of the rules: the JSON path (for example `reward.diceCount.max`)
+         *     and the values before and after as JSON text (a JSON null is the text `"null"`); null when the field
+         *     did not exist on that side.
+         */
+        RulesetChange: {
+            path: string;
+            before: null | string;
+            after: null | string;
+        };
+        /** @description A problem in a ruleset: the JSON path of the field and what is wrong, in English for logs. */
+        RulesetError: {
+            path: string;
+            message: string;
+        };
+        /** @description An invalid ruleset: every problem with the JSON path of its field (C2). */
+        RulesetProblem: {
+            title: string;
+            /** Format: int32 */
+            status: number;
+            errors: components["schemas"]["RulesetError"][];
+        };
+        /** @description One version of the rules: when, by whom (null for the season's creation by the system), and what changed. */
+        RulesVersionView: {
+            /** Format: int32 */
+            version: number;
+            /** Format: date-time */
+            at: string;
+            /** Format: uuid */
+            authorId: null | string;
+            changes: components["schemas"]["RulesetChange"][];
+        };
+        /** @description The rules in force and their history: who changed what and when (C3). Numbers on the rules page are real. */
+        RulesView: {
+            /** Format: int32 */
+            version: number;
+            ruleset: components["schemas"]["Ruleset"];
+            history: components["schemas"]["RulesVersionView"][];
+        };
         RunView: {
             /** Format: uuid */
             id: string;
             game: components["schemas"]["GameView"];
             /** Format: date-time */
             startedAt: string;
+        };
+        SeasonRules: {
+            timezone: string;
+            /** Format: int32 */
+            maxActiveRunsPerPlayer: number;
+            /** Format: int32 */
+            inactiveHintDays: number;
         };
         /** @description Sent to everyone watching a season after each committed command: refetch what you show. */
         SeasonUpdate: {
@@ -688,6 +1116,25 @@ export interface components {
             /** Format: int64 */
             lastSequence: number;
         };
+        ShopRules: {
+            /** Format: int32 */
+            lotsPerRoll: number;
+            /** Format: int32 */
+            lotLifetimeMinutes: number;
+            /** Format: int32 */
+            rollCost: number;
+            /** Format: int32 */
+            rerollCostStep: number;
+            resetOn: components["schemas"]["EquatableArrayOfShopPriceReset"];
+        };
+        SocialRules: {
+            reactions: components["schemas"]["EquatableArrayOfstring"];
+            /** Format: int32 */
+            galleryUploadsPerDay: number;
+            /** Format: int32 */
+            commentsPerDay: number;
+            spectatorsCanVote: boolean;
+        };
         StartRequest: {
             /** Format: uuid */
             commandId: string;
@@ -697,6 +1144,12 @@ export interface components {
          * @enum {unknown}
          */
         TurnPhase: "idle" | "rolling" | "playing";
+        /** @enum {unknown} */
+        UnmetConditionPolicy: "noDiceKeepCoins" | "countAsDrop" | "ignore";
+        WeeklyChallengeRules: {
+            /** Format: int32 */
+            defaultRewardCoins: number;
+        };
     };
     responses: never;
     parameters: never;
@@ -714,7 +1167,14 @@ type ReadonlyArray<T> = [
     unknown[]
 ] ? Readonly<Exclude<T, undefined>> : Readonly<Exclude<T, undefined>[]>;
 export const cellTypeValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["CellType"]> = ["start", "empty", "finish"];
+export const coopRoundUpForValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["CoopRoundUpFor"]> = ["roller"];
 export const difficultyValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["Difficulty"]> = ["easy", "normal", "hard", "extreme"];
+export const emptyPoolFallbackValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["EmptyPoolFallback"]> = ["dropZoneFilter"];
+export const mandatoryEventValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["MandatoryEvent"]> = ["bad", "none"];
+export const mapModeValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["MapMode"]> = ["linear", "graph"];
+export const rerollCostKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["RerollCostKind"]> = ["coins", "badEvent"];
 export const roleValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["Role"]> = ["player", "admin", "spectator"];
+export const roundingValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["Rounding"]> = ["nearest", "floor", "ceil"];
 export const turnPhaseValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["TurnPhase"]> = ["idle", "rolling", "playing"];
+export const unmetConditionPolicyValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["UnmetConditionPolicy"]> = ["noDiceKeepCoins", "countAsDrop", "ignore"];
 export type operations = Record<string, never>;

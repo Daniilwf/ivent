@@ -11,7 +11,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace GameEvent.Infrastructure.Database.Migrations
 {
     [DbContext(typeof(GameEventDbContext))]
-    [Migration("20260924165007_Initial")]
+    [Migration("20260924182116_Initial")]
     partial class Initial
     {
         /// <inheritdoc />
@@ -162,6 +162,29 @@ namespace GameEvent.Infrastructure.Database.Migrations
                     b.ToTable("Game", (string)null);
                 });
 
+            modelBuilder.Entity("GameEvent.Infrastructure.Seasons.RulesetRecord", b =>
+                {
+                    b.Property<Guid>("SeasonId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid?>("AuthorId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Json")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("SeasonId", "Version");
+
+                    b.ToTable("Ruleset", (string)null);
+                });
+
             modelBuilder.Entity("GameEvent.Infrastructure.Seasons.RunRecord", b =>
                 {
                     b.Property<Guid>("Id")
@@ -280,6 +303,15 @@ namespace GameEvent.Infrastructure.Database.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Season", (string)null);
+                });
+
+            modelBuilder.Entity("GameEvent.Infrastructure.Seasons.RulesetRecord", b =>
+                {
+                    b.HasOne("GameEvent.Infrastructure.Seasons.SeasonRecord", null)
+                        .WithMany()
+                        .HasForeignKey("SeasonId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("GameEvent.Infrastructure.Seasons.RunRecord", b =>

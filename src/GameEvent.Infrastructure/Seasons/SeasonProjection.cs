@@ -16,8 +16,20 @@ namespace GameEvent.Infrastructure.Seasons;
 internal static class SeasonProjection
 {
     public static async Task WriteAsync(
-        GameEventDbContext db, SeasonState before, SeasonState after, DateTimeOffset now, CancellationToken ct)
+        GameEventDbContext db, SeasonState before, SeasonState after, DateTimeOffset now, Guid? authorId, CancellationToken ct)
     {
+        if (before.RulesetVersion != after.RulesetVersion)
+        {
+            db.Rulesets.Add(new RulesetRecord
+            {
+                SeasonId = after.SeasonId,
+                Version = after.RulesetVersion,
+                Json = JsonSerializer.Serialize(after.Rules, EngineJson.Options),
+                CreatedAt = now,
+                AuthorId = authorId,
+            });
+        }
+
         if (!before.IsCreated && after.IsCreated)
         {
             db.Seasons.Add(new SeasonRecord

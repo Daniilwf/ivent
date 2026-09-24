@@ -67,8 +67,19 @@ internal sealed class EquatableArrayJsonConverterFactory : JsonConverterFactory
 
     private sealed class EquatableArrayJsonConverter<T> : JsonConverter<EquatableArray<T>>
     {
-        public override EquatableArray<T> Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
-            new(JsonSerializer.Deserialize<T[]>(ref reader, options) ?? []);
+        public override EquatableArray<T> Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            try
+            {
+                return new(JsonSerializer.Deserialize<T[]>(ref reader, options) ?? []);
+            }
+            catch (JsonException e)
+            {
+                // The nested call reports a path relative to the list ("$[2]"). Throwing without a path lets the
+                // outer serializer add the real one ("$.ranking.tiebreakers"), so the error names the field.
+                throw new JsonException($"Invalid list item: {e.Message}", e);
+            }
+        }
 
         public override void Write(Utf8JsonWriter writer, EquatableArray<T> value, JsonSerializerOptions options) =>
             JsonSerializer.Serialize(writer, value.ToArray(), options);

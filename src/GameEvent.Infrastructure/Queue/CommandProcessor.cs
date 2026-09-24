@@ -147,7 +147,7 @@ public sealed partial class CommandProcessor(
         await using (var transaction = await db.Database.BeginTransactionAsync(ct))
         {
             db.Events.AddRange(records);
-            await SeasonProjection.WriteAsync(db, cached.State, result.State, now, ct);
+            await SeasonProjection.WriteAsync(db, cached.State, result.State, now, envelope.AuthorId, ct);
             await db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
         }

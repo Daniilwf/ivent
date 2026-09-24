@@ -16,6 +16,8 @@ public sealed class GameEventDbContext(DbContextOptions<GameEventDbContext> opti
 
     public DbSet<SeasonPlayerRecord> SeasonPlayers => Set<SeasonPlayerRecord>();
 
+    public DbSet<RulesetRecord> Rulesets => Set<RulesetRecord>();
+
     public DbSet<RunRecord> Runs => Set<RunRecord>();
 
     public DbSet<GameRecord> Games => Set<GameRecord>();
@@ -55,6 +57,13 @@ public sealed class GameEventDbContext(DbContextOptions<GameEventDbContext> opti
         {
             e.ToTable("Season");
             e.Property(x => x.Status).HasMaxLength(20);
+        });
+
+        modelBuilder.Entity<RulesetRecord>(e =>
+        {
+            e.ToTable("Ruleset");
+            e.HasKey(x => new { x.SeasonId, x.Version });
+            e.HasOne<SeasonRecord>().WithMany().HasForeignKey(x => x.SeasonId);
         });
 
         modelBuilder.Entity<SeasonPlayerRecord>(e =>
