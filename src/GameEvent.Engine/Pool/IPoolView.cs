@@ -8,15 +8,15 @@ namespace GameEvent.Engine.Pool;
 /// </summary>
 public interface IPoolView
 {
-    IReadOnlyList<PoolGame> Games { get; }
+    IReadOnlyList<Game> Games { get; }
 
-    IReadOnlyList<PoolCategory> Categories { get; }
+    IReadOnlyList<Category> Categories { get; }
 }
 
 /// <summary>A game in the pool. <see cref="Hours"/> is null when neither HowLongToBeat nor the admin set it.</summary>
-public sealed record PoolGame(Guid Id, string Title, EquatableArray<string> Tags, decimal? Hours, bool IsDeleted = false);
+public sealed record Game(Guid Id, string Title, EquatableArray<string> Tags, decimal? Hours, bool IsDeleted = false);
 
 /// <summary>A category on the category wheel: a tag with a weight.</summary>
-public sealed record PoolCategory(string Name, int Weight);
+public sealed record Category(string Name, int Weight);
 
-public sealed record PoolSnapshot(IReadOnlyList<PoolGame> Games, IReadOnlyList<PoolCategory> Categories) : IPoolView;
+public sealed record PoolSnapshot(IReadOnlyList<Game> Games, IReadOnlyList<Category> Categories) : IPoolView;

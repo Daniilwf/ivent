@@ -35,6 +35,7 @@ public sealed record RunState(
     Guid GameId,
     RunStatus Status,
     RunSnapshot Snapshot,
+    DateTimeOffset RolledAt,
     DateTimeOffset StartedAt,
     Difficulty? Difficulty,
     decimal? Hours,

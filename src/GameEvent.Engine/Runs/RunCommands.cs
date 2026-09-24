@@ -12,12 +12,13 @@ public sealed record StartRun(Guid PlayerId) : ICommand;
 /// </summary>
 public sealed record CompleteRun(Guid PlayerId, Difficulty Difficulty, decimal? EstimatedHours = null) : ICommand;
 
+/// <summary>The run started. <see cref="RolledAt"/> is kept: the tech reroll window counts from the roll (D-04).</summary>
 [EventType("run-started")]
-public sealed record RunStarted(Guid RunId, Guid PlayerId, Guid GameId, RunSnapshot Snapshot, DateTimeOffset StartedAt) : IGameEvent;
+public sealed record RunStarted(Guid RunId, Guid PlayerId, Guid GameId, RunSnapshot Snapshot, DateTimeOffset RolledAt, DateTimeOffset StartedAt) : IGameEvent;
 
 [EventType("run-completed")]
 public sealed record RunCompleted(Guid RunId, Guid PlayerId, Difficulty Difficulty, decimal Hours, DateTimeOffset CompletedAt) : IGameEvent;
 
 /// <summary>Dice for a completed run, each die separately.</summary>
-[EventType("completion-dice-rolled")]
-public sealed record CompletionDiceRolled(Guid RunId, Guid PlayerId, EquatableArray<Die> Dice) : IGameEvent;
+[EventType("completion-rolled")]
+public sealed record CompletionRolled(Guid RunId, Guid PlayerId, EquatableArray<Die> Dice) : IGameEvent;

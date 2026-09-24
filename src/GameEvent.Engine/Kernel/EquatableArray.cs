@@ -20,7 +20,7 @@ public readonly struct EquatableArray<T> : IEquatable<EquatableArray<T>>, IReadO
 
     public int Count => _items.IsDefault ? 0 : _items.Length;
 
-    public T this[int index] => _items[index];
+    public T this[int index] => _items.IsDefault ? throw new ArgumentOutOfRangeException(nameof(index)) : _items[index];
 
     public bool Equals(EquatableArray<T> other) => this.SequenceEqual(other);
 

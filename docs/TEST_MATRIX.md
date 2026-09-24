@@ -2,7 +2,7 @@
 
 Каждое правило из `docs/SPEC.md` и каждая строка «Проверки на дыры» связаны с тестами. Правило без теста — незакрытая задача.
 
-Статус: ⬜ теста нет, 🟥 тест есть и падает (ждёт реализации), ✅ тест зелёный, ➖ не относится к этапу 1 (указан этап).
+Статус: ⬜ теста нет, 🟥 тест есть и падает (ждёт реализации), 🟨 часть правила покрыта зелёными тестами (остальное — в указанной задаче плана), ✅ тест зелёный, ➖ не относится к этапу 1 (указан этап).
 Пути тестов: `Engine.Tests/<Механика>/…`, `Web.Tests/…`, `web/src/…` (Vitest), `e2e/…` (Playwright). Имена — план, уточняются при написании.
 
 ## Правила этапа 1
@@ -11,7 +11,7 @@
 
 | ID | Правило | Тесты | Статус |
 | --- | --- | --- | --- |
-| P1 | Очки и позиция — разные показатели; кубы за прохождение меняют оба на сумму | `Runs/CompletionTests.Dice_sum_adds_points_and_moves_forward`, `Players/AdminAdjustTests.Position_change_does_not_touch_points` | ⬜ |
+| P1 | Очки и позиция — разные показатели; кубы за прохождение меняют оба на сумму | `Runs/CompletionTests.Dice_sum_adds_points_and_moves_forward`, `Runs/CompletionTests.Points_and_position_accumulate_over_runs`, `Players/AdminAdjustTests.Position_change_does_not_touch_points` | 🟨 C2 |
 | P2 | Первое место — первый дошедший до финиша | `Finish/FirstFinisherTests.First_to_reach_finish_is_first` | ⬜ |
 | P3 | Первый финиш предварительный до одобрения пруфа; при реджекте откат, место следующему | `Finish/ProvisionalFinishTests.*`, e2e `05-finish` | ⬜ |
 | P4 | Первый: до одобрения финиша очки как обычно, но не влияет на других; после одобрения заморожен, очки не растут | `Finish/FreeModeTests.*`, инвариант 8 | ⬜ |
@@ -27,7 +27,7 @@
 
 | ID | Правило | Тесты | Статус |
 | --- | --- | --- | --- |
-| T1 | Строгая машина состояний; активных прохождений не больше лимита из конфига | `Turns/TransitionMatrixTests.Every_disallowed_pair_is_rejected_without_events`, инвариант 3 | ⬜ |
+| T1 | Строгая машина состояний; активных прохождений не больше лимита из конфига | `Rolls/RollTests.Roll_while_rolling_is_rejected_with_wrong_phase`, `Rolls/RollTests.Roll_while_playing_is_rejected_with_wrong_phase`, `Rolls/RollTests.Roll_by_unknown_player_is_rejected`, `Runs/CompletionTests.Start_when_idle_is_rejected_with_wrong_phase`, `Runs/CompletionTests.Start_when_already_playing_is_rejected_with_wrong_phase`, `Runs/CompletionTests.Start_by_unknown_player_is_rejected`, `Runs/CompletionTests.Complete_when_idle_is_rejected_with_wrong_phase`, `Runs/CompletionTests.Complete_when_rolling_is_rejected_with_wrong_phase`, `Runs/CompletionTests.Completing_twice_is_rejected_with_wrong_phase`, `Runs/CompletionTests.Complete_by_unknown_player_is_rejected`, `Turns/TransitionMatrixTests.Every_disallowed_pair_is_rejected_without_events`, инвариант 3 (`Invariants/SliceInvariantTests.Invariants_hold_after_every_command`) | 🟨 C4 |
 | T2 | Ожидание выбора хранится на сервере, закрытая вкладка ничего не ломает | `Turns/PendingChoiceTests.*`, e2e `10-two-tabs` | ⬜ |
 | T3 | Первый финишировавший проходит цикл в свободном режиме без движения и влияния; без очков и монеток после одобрения финиша | `Finish/FreeModeTests.*` | ⬜ |
 | T4 | Финишировавшие не первыми продолжают цикл, фаза движения пропускается | `Finish/LaterFinisherTests.No_movement_after_finish` | ⬜ |
@@ -38,14 +38,14 @@
 | --- | --- | --- | --- |
 | G1 | Пул общий: теги, заметка, автор; игроки добавляют, админ правит и удаляет | `Web.Tests/Pool/*` | ⬜ |
 | G2 | Предупреждение о похожих названиях («Dice Fold» / «Dice & Fold») | `Pool/SimilarTitleTests.*`, `Import/DuplicateReportTests.*` | ⬜ |
-| G3 | Мягкое удаление: пропадает из роллов, прохождения сохраняются | `Rolls/RollTests.Deleted_game_never_rolled`, `Runs/SnapshotTests.Deleted_game_run_keeps_snapshot` | ⬜ |
-| G4 | Часы подтягиваются при добавлении и фиксируются в прохождении при ролле | `Runs/SnapshotTests.Hours_fixed_at_roll`, `Web.Tests/Pool/HoursProviderTests.*` | ⬜ |
+| G3 | Мягкое удаление: пропадает из роллов, прохождения сохраняются | `Rolls/RollTests.Deleted_game_never_rolled`, `Rolls/RollTests.Only_deleted_games_left_rejects_with_no_available_games`, `Rolls/RollTests.Wheel_spins_only_over_categories_with_available_games`, `Runs/SnapshotTests.Deleted_game_run_keeps_snapshot` | 🟨 E1 |
+| G4 | Часы подтягиваются при добавлении и фиксируются в прохождении при ролле | `Rolls/RollTests.Roll_offers_available_game_and_moves_player_to_rolling`, `Rolls/RollTests.Roll_snapshot_keeps_missing_hours_as_null`, `Runs/CompletionTests.Pool_hours_change_after_roll_does_not_change_the_run`, `Web.Tests/Pool/HoursProviderTests.*` | 🟨 D6 |
 | G5 | Колесо — только анимация, результат решает сервер | `Web.Tests/Rolls/RollIdempotencyTests.Refresh_does_not_change_result`, e2e `10-two-tabs` | ⬜ |
-| G6 | Колесо крутится только по категориям, где под фильтрами есть доступная игра | `Rolls/CategoryWheelTests.*` | ⬜ |
-| G7 | Промахи («Уже прошёл», «Сейчас играет») пишутся в лог, выбор идёт из оставшихся, бесконечных рероллов нет | `Rolls/RollMissTests.*` | ⬜ |
-| G8 | Статусы игры: пройдена кем-то / играет другой → промах; дропнута другим → доступна; «Уже проходил» → бесплатно и исключение; своя дропнутая или техдропнутая → не выпадает | `Rolls/AvailabilityTests.*`, инварианты 5, 6 | ⬜ |
-| G9 | Двое одну игру одновременно не играют (включая зарезервированную при ролле) | `Rolls/AvailabilityTests.Reserved_game_is_busy`, инвариант 4 | ⬜ |
-| G10 | Пустой пул: сигнал админу (снятие фильтра зоны — этап 2) | `Rolls/EmptyPoolTests.*` | ⬜ |
+| G6 | Колесо крутится только по категориям, где под фильтрами есть доступная игра | `Rolls/RollTests.Wheel_spins_only_over_categories_with_available_games`, `Rolls/RollTests.Wheel_skips_category_whose_only_game_is_reserved_by_another_player`, `Rolls/RollTests.Wheel_follows_category_weights` | 🟨 C5 |
+| G7 | Промахи («Уже прошёл», «Сейчас играет») пишутся в лог, выбор идёт из оставшихся, бесконечных рероллов нет | `Rolls/RollTests.Game_offered_to_another_player_is_a_being_played_miss`, `Rolls/RollTests.Game_being_played_by_another_player_is_a_being_played_miss`, `Rolls/RollTests.Game_completed_by_another_player_is_a_completed_in_season_miss` | ✅ |
+| G8 | Статусы игры: пройдена кем-то / играет другой → промах; дропнута другим → доступна; «Уже проходил» → бесплатно и исключение; своя дропнутая или техдропнутая → не выпадает | `Rolls/RollTests.Game_completed_by_another_player_is_a_completed_in_season_miss`, `Rolls/RollTests.Game_completed_in_season_is_not_offered_again_even_to_its_player`, `Rolls/AvailabilityTests.*` (дроп, тех-реролл, «Уже проходил»), инварианты 5 (`Invariants/SliceInvariantTests.Invariants_hold_after_every_command`), 6 | 🟨 C6 |
+| G9 | Двое одну игру одновременно не играют (включая зарезервированную при ролле) | `Rolls/RollTests.Game_offered_to_another_player_is_a_being_played_miss`, `Rolls/RollTests.Game_being_played_by_another_player_is_a_being_played_miss`, `Rolls/RollTests.Only_game_reserved_by_another_player_rejects_with_no_available_games`, инвариант 4 (`Invariants/SliceInvariantTests.Invariants_hold_after_every_command`) | ✅ |
+| G10 | Пустой пул: сигнал админу (снятие фильтра зоны — этап 2) | `Rolls/RollTests.Empty_pool_rejects_with_no_available_games`, `Rolls/RollTests.Only_deleted_games_left_rejects_with_no_available_games`, `Rolls/EmptyPoolTests.*` (сигнал админу) | 🟨 C5 |
 | G11 | У каждой категории виден счётчик доступных игр | `Rolls/CategoryStatsTests.*` | ⬜ |
 | G12 | Фильтры — предикат по играм с приоритетом «эффект > зона > обычный», пустое пересечение → более приоритетный | `Rolls/RollFilterPriorityTests.*` (тестовые фильтры) | ⬜ |
 
@@ -64,13 +64,13 @@
 
 | ID | Правило | Тесты | Статус |
 | --- | --- | --- | --- |
-| W1 | Число кубов по часам: `hoursPerDie`, округление, `min`/`max` | `Runs/DiceCountTests.*` (таблица случаев) | ⬜ |
-| W2 | Тип кубика по сложности; «выше сложной» → d6 и ручной хороший ивент | `Runs/DieByDifficultyTests.*` | ⬜ |
+| W1 | Число кубов по часам: `hoursPerDie`, округление, `min`/`max` | `Runs/CompletionTests.Dice_count_is_hours_per_die_rounded_nearest_within_limits`, `Runs/CompletionTests.Dice_count_uses_configured_rounding`, `Runs/CompletionTests.Dice_count_respects_configured_min_and_max`, инвариант «кубики = часы и снапшот» (`Invariants/SliceInvariantTests.Invariants_hold_after_every_command`) | ✅ |
+| W2 | Тип кубика по сложности; «выше сложной» → d6 и ручной хороший ивент | `Runs/CompletionTests.Die_sides_follow_difficulty`, `Runs/CompletionTests.Die_value_comes_from_the_random_source_in_die_range`, `Runs/DieByDifficultyTests.*` (хороший ивент за «выше сложной») | 🟨 C7 |
 | W3 | Челлендж даёт `challengeBonus.extraDice` | `Runs/ChallengeTests.*` | ⬜ |
-| W4 | Пруф не блокирует: кубы кидаются сразу, одобрение позже | `Runs/CompletionTests.Dice_thrown_without_proof` | ⬜ |
+| W4 | Пруф не блокирует: кубы кидаются сразу, одобрение позже | `Runs/CompletionTests.Dice_sum_adds_points_and_moves_forward`, `Runs/CompletionTests.Dice_are_rolled_before_the_token_moves`, `Runs/CompletionTests.Dice_thrown_without_proof` | 🟨 C8 |
 | W5 | Реджект снимает очки и клетки этого прохождения, остальные последствия остаются | `Proofs/RejectTests.*`, e2e `04-reject` | ⬜ |
-| W6 | Без часов нельзя кинуть кубы; оценка игрока со ссылкой, админ правит | `Runs/HoursRequiredTests.*` | ⬜ |
-| W7 | Кубики хранятся по отдельности; правка часов докидывает недостающие, лишние снимает с конца | `Runs/HoursEditTests.*` | ⬜ |
+| W6 | Без часов нельзя кинуть кубы; оценка игрока со ссылкой, админ правит | `Runs/CompletionTests.Completion_without_hours_is_rejected_with_hours_required`, `Runs/CompletionTests.Completion_without_hours_uses_player_estimate`, `Runs/CompletionTests.Completion_with_non_positive_estimate_is_rejected_with_invalid_hours`, `Runs/CompletionTests.Rejected_completion_can_be_retried_with_an_estimate`, `Runs/HoursRequiredTests.*` (ссылка на источник, правка админом) | 🟨 C7 |
+| W7 | Кубики хранятся по отдельности; правка часов докидывает недостающие, лишние снимает с конца | `Runs/CompletionTests.Dice_sum_adds_points_and_moves_forward` (кубики по отдельности), `Runs/HoursEditTests.*` | 🟨 C7 |
 | W8 | Сложность засчитывается по пруфу; понижение → более низкая; каждый кубик ⌈старое × новые грани / старые грани⌉, в событии оба значения (Q-5) | `Proofs/DifficultyOverrideTests.*` | ⬜ |
 | W9 | Отзыв: оценка 1–10 и текст, виден в ленте, профиле, на странице игры | `Runs/ReviewTests.*`, `Web.Tests/Reviews/*` | ⬜ |
 | W10 | Монетки за прохождение по длине игры (Q-2) | `Runs/CoinsRewardTests.*` | ⬜ |
@@ -79,8 +79,8 @@
 
 | ID | Правило | Тесты | Статус |
 | --- | --- | --- | --- |
-| S1 | Всё, что касается прохождения, фиксируется при ролле; остальное — текущая версия конфига | `Runs/SnapshotTests.*` | ⬜ |
-| S2 | Правка конфига посреди сезона не меняет идущие прохождения | `Rulesets/MidSeasonChangeTests.*` | ⬜ |
+| S1 | Всё, что касается прохождения, фиксируется при ролле; остальное — текущая версия конфига | `Rolls/RollTests.Roll_offers_available_game_and_moves_player_to_rolling`, `Runs/CompletionTests.Start_creates_playing_run_with_roll_snapshot`, `Runs/CompletionTests.Ruleset_change_after_roll_does_not_change_dice_count`, `Runs/CompletionTests.Ruleset_change_while_playing_does_not_change_dice_count_or_sides`, `Runs/CompletionTests.Ruleset_change_before_roll_applies_to_that_run`, `Runs/CompletionTests.Pool_hours_change_after_roll_does_not_change_the_run` | 🟨 C7 |
+| S2 | Правка конфига посреди сезона не меняет идущие прохождения | `Runs/CompletionTests.Ruleset_change_after_roll_does_not_change_dice_count`, `Runs/CompletionTests.Ruleset_change_while_playing_does_not_change_dice_count_or_sides`, `Rulesets/MidSeasonChangeTests.*` | 🟨 C1 |
 | C1 | JSON-схема генерируется из типов; `ruleset.default.json` её проходит | `Rulesets/SchemaTests.Default_passes_schema`, `Schema_is_up_to_date` | ⬜ |
 | C2 | Невалидный конфиг не сохраняется | `Rulesets/ValidationTests.*`, `Web.Tests/Admin/RulesetEndpointTests.*` | ⬜ |
 | C3 | Каждое изменение — новая версия с датой и автором; история «было/стало» видна игрокам | `Rulesets/VersionHistoryTests.*`, e2e `12-rules` | ⬜ |
@@ -91,9 +91,9 @@
 
 | ID | Правило | Тесты | Статус |
 | --- | --- | --- | --- |
-| M1 | Карта — граф; линейная карта — цепочка из `map.linearLength` | `Map/LinearMapTests.*` | ⬜ |
+| M1 | Карта — граф; линейная карта — цепочка из `map.linearLength` | `Map/LinearMovementTests.Linear_map_is_a_chain_from_start_through_numbered_cells_to_finish`, `Map/LinearMovementTests.Linear_map_of_length_one_goes_straight_from_start_to_finish`, `Map/LinearMovementTests.Season_map_length_comes_from_the_ruleset`, `Map/LinearMovementTests.Default_season_map_has_linear_length_steps`, `Map/LinearMovementTests.Forward_enters_cells_along_the_chain`, `Map/LinearMovementTests.Forward_zero_steps_goes_nowhere` | ✅ |
 | M2 | Назад дальше старта нельзя | `Map/MovementTests.Back_clamped_at_start` | ⬜ |
-| M3 | Лишние шаги после финиша сгорают | `Map/MovementTests.Extra_steps_after_finish_burn` | ⬜ |
+| M3 | Лишние шаги после финиша сгорают | `Map/LinearMovementTests.Forward_extra_steps_after_finish_burn`, `Map/LinearMovementTests.Forward_exactly_to_finish_ends_on_finish`, `Map/LinearMovementTests.Forward_from_finish_goes_nowhere`, `Map/LinearMovementTests.Completion_overshooting_finish_stops_on_finish_but_keeps_all_points`, `Map/LinearMovementTests.Completion_landing_exactly_on_finish`, `Map/LinearMovementTests.Completion_one_step_short_of_finish` | ✅ |
 | M4 | Путь хранится отрезками, назад — по пройденным рёбрам | `Map/PathTests.*` | ⬜ |
 
 ### Сезон
@@ -121,11 +121,11 @@
 | ID | Правило | Тесты | Статус |
 | --- | --- | --- | --- |
 | L1 | Лог всех действий, включая админа, виден всем игрокам | `Web.Tests/Feed/*`, e2e `07-undo` | ⬜ |
-| L2 | События хранят результаты; повтор лога детерминирован | `Log/ReplayTests.*`, снапшот-тесты Verify, инвариант 14 | ⬜ |
+| L2 | События хранят результаты; повтор лога детерминирован | `Seasons/SliceScenarioTests.Replaying_the_log_gives_the_current_state`, `Seasons/SliceScenarioTests.Replay_does_not_depend_on_the_pool_or_the_ruleset_any_more`, `Seasons/SliceScenarioTests.Same_seed_and_commands_give_the_same_log`, `Invariants/SliceInvariantTests.Same_seed_and_commands_give_the_same_log`, снапшот-тесты Verify | 🟨 C13 |
 | L3 | Откат — команда целиком компенсирующими событиями в обратном порядке; есть зависимые — отказ со списком | `Undo/UndoTests.*`, инвариант 13, e2e `07-undo` | ⬜ |
-| L4 | Проверка целостности: пересчёт из лога совпадает с сохранённым | `Log/IntegrityTests.*`, `Web.Tests/Integrity/*`, инвариант 1 | ⬜ |
+| L4 | Проверка целостности: пересчёт из лога совпадает с сохранённым | `Seasons/SliceScenarioTests.Replaying_every_prefix_of_the_log_matches_the_state_after_each_command`, инвариант 1 (`Invariants/SliceInvariantTests.Invariants_hold_after_every_command`), `Log/IntegrityTests.*`, `Web.Tests/Integrity/*` | 🟨 C12 |
 | L5 | Экспорт и импорт сезона одним архивом | `Web.Tests/SeasonTransfer/*` | ⬜ |
-| L6 | Формат события версионируется, старые события читаются через преобразование | `Log/EventUpcastTests.*` | ⬜ |
+| L6 | Формат события версионируется, старые события читаются через преобразование | `Seasons/SliceScenarioTests.Every_event_of_the_slice_survives_the_json_round_trip`, `Seasons/SliceScenarioTests.Roll_misses_survive_the_json_round_trip` (круг сериализации), `Log/EventUpcastTests.*` | 🟨 C12 |
 | L7 | Все изменения через одну очередь, одна команда — одна транзакция, повтор `CommandId` не выполняется дважды | `Web.Tests/Queue/*` | ⬜ |
 
 ### Аккаунты, безопасность, эксплуатация
@@ -159,15 +159,15 @@
 | Два действия одновременно | единая очередь | L7, e2e `10-two-tabs` | ⬜ |
 | Двое финишировали почти одновременно | порядок по очереди команд | `Finish/ConcurrentFinishTests` (Web.Tests) | ⬜ |
 | Реджект после объявления итогов | итоги после проверки всех пруфов | P10 | ⬜ |
-| Правка конфига посреди сезона | снапшот при ролле | S1, S2 | ⬜ |
+| Правка конфига посреди сезона | снапшот при ролле | S1, S2 | 🟨 C1 |
 | Удалили клетку с игроком | публикация блокируется | — | ➖ этап 2 |
 | Цикл из телепортов | проверка редактора | — | ➖ этап 2 |
 | Откат назад через слияние веток | история пути | M4 (линейно) | ⬜ / ➖ этап 2 |
 | Чужой толчок через развилку | ветка по умолчанию | — | ➖ этап 2 |
 | Толчок на магазин офлайн | купон | — | ➖ этап 4 |
 | Зона с пустым пулом | предупреждение и приоритет фильтров | G10, G12 | ⬜ / ➖ этап 2 |
-| Двое играют одну игру | игра занята | G9, инвариант 4 | ⬜ |
-| Удалили игру во время прохождения | мягкое удаление, снапшот | G3 | ⬜ |
+| Двое играют одну игру | игра занята | G9, инвариант 4 | 🟨 C13 |
+| Удалили игру во время прохождения | мягкое удаление, снапшот | G3, `Runs/CompletionEdgeTests.Deleting_the_game_mid_run_keeps_the_run_and_its_snapshot` | ✅ |
 | Дубли игр в пуле | предупреждение о похожих | G2 | ⬜ |
 | Неактивный как случайная цель | ручной флаг | SE5 (флаг); цели — этап 4 | ⬜ / ➖ этап 4 |
 | Очки фармятся предметами | очки только за кубы и явные эффекты | P1 | ⬜ |
@@ -189,20 +189,20 @@
 
 | # | Инвариант | Этап 1 | Статус |
 | --- | --- | --- | --- |
-| 1 | Пересчёт из лога = сохранённое состояние | да | ⬜ |
-| 2 | Очки и монетки = сумма изменений в неотменённых событиях | да | ⬜ |
-| 3 | Активных прохождений не больше лимита | да | ⬜ |
-| 4 | Одну игру одновременно играет не больше одного прохождения | да (кооп — этап 5) | ⬜ |
-| 5 | Пройденная в сезоне игра никому больше не выпадает | да | ⬜ |
+| 1 | Пересчёт из лога = сохранённое состояние | да; срез B1: `Invariants/SliceInvariantTests.Invariants_hold_after_every_command` | 🟨 C13 |
+| 2 | Очки и монетки = сумма изменений в неотменённых событиях | да; срез B1: `Invariants/SliceInvariantTests.Invariants_hold_after_every_command` | 🟨 C13 |
+| 3 | Активных прохождений не больше лимита | да; срез B1: `Invariants/SliceInvariantTests.Invariants_hold_after_every_command` | 🟨 C13 |
+| 4 | Одну игру одновременно играет не больше одного прохождения | да (кооп — этап 5); срез B1: `Invariants/SliceInvariantTests.Invariants_hold_after_every_command` | 🟨 C13 |
+| 5 | Пройденная в сезоне игра никому больше не выпадает | да; срез B1: `Invariants/SliceInvariantTests.Invariants_hold_after_every_command` | 🟨 C13 |
 | 6 | Своя дропнутая или техдропнутая игра не выпадает | да | ⬜ |
-| 7 | Позиция на существующей клетке, не позади старта (чекпоинт — этап 2) | да | ⬜ |
+| 7 | Позиция на существующей клетке, не позади старта (чекпоинт — этап 2) | да; срез B1: `Invariants/SliceInvariantTests.Invariants_hold_after_every_command` | 🟨 C13 |
 | 8 | После финиша первым позиция не меняется, чужие эффекты не применяются; после одобрения финиша не меняются и очки | да (чужих эффектов на этапе 1 нет) | ⬜ |
 | 9 | Бонус финиша не больше одного раза, позиция финишировавшего не меняется | да | ⬜ |
 | 10 | Порядок лидерборда соответствует правилам мест и тайбрейков (эталонная реализация в тестах) | да | ⬜ |
 | 11 | После дедлайна нет роллов и бросков игрока (K-7) | да | ⬜ |
 | 12 | Цепочка эффектов не превышает лимитов | да, на тестовых эффектах | ⬜ |
 | 13 | Откат команды без зависимых возвращает ровно прежнее состояние | да | ⬜ |
-| 14 | Одинаковое зерно и команды дают одинаковый лог | да | ⬜ |
+| 14 | Одинаковое зерно и команды дают одинаковый лог | да; срез B1: `Invariants/SliceInvariantTests.Same_seed_and_commands_give_the_same_log` | 🟨 C13 |
 | 15 | В минусе нет покупок | ➖ этап 4 | ➖ |
 | 16 | Эффекты от других не меняют начатый шаг | ➖ этап 4 | ➖ |
 | 17 | Залоги = открытые ставки, реджект отменяет выигрыш | ➖ этап 4 | ➖ |
@@ -210,7 +210,7 @@
 | 19 | Выключенная механика не порождает событий | да | ⬜ |
 | 20 | Достижение не больше одного раза в своей области | ➖ этап 6 | ➖ |
 
-Дополнительно на этапе 1: у каждого отклонённого движком действия — ноль событий; число кубиков у завершённого прохождения соответствует его текущим часам и снапшоту.
+Дополнительно на этапе 1: у каждого отклонённого движком действия — ноль событий; число кубиков у завершённого прохождения соответствует его текущим часам и снапшоту. Срез B1: оба проверяются в `Invariants/SliceInvariantTests.Invariants_hold_after_every_command` (там же: удалённая игра не выпадает, фишка стоит на min(сумма кубов, длина карты), очки = сумма кубов); в сценарных тестах каждый отказ проверяется через `ScenarioAssert.RejectsWithoutChanges` (ноль событий, состояние и лог не изменились).
 
 ## E2E-сценарии
 

@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using GameEvent.Engine.Kernel;
 
 namespace GameEvent.Engine.Map;
@@ -18,6 +19,7 @@ public sealed record Edge(string From, string To, bool IsDefaultForward, bool Is
 /// <summary>The map is a graph from day one; the stage 1 linear map is a generated chain.</summary>
 public sealed record MapGraph(EquatableArray<Cell> Cells, EquatableArray<Edge> Edges)
 {
+    [JsonIgnore]
     public Cell Start => Cells.Single(c => c.Type == CellType.Start);
 
     public Cell CellById(string id) =>

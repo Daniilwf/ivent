@@ -7,13 +7,13 @@ namespace GameEvent.Engine.Seasons;
 public sealed record CreateSeason(Guid SeasonId) : ICommand;
 
 /// <summary>Add a player to the season; the player starts on the start cell with zero points.</summary>
-public sealed record AddPlayer(Guid PlayerId, string Name) : ICommand;
+public sealed record AddSeasonPlayer(Guid PlayerId, string Name) : ICommand;
 
 [EventType("season-created")]
 public sealed record SeasonCreated(Guid SeasonId, int RulesetVersion, MapGraph Map) : IGameEvent;
 
-[EventType("player-added")]
-public sealed record PlayerAdded(Guid PlayerId, string Name, string CellId) : IGameEvent;
+[EventType("season-player-added")]
+public sealed record SeasonPlayerAdded(Guid PlayerId, string Name, string CellId) : IGameEvent;
 
 internal static class SeasonSetup
 {
@@ -28,7 +28,7 @@ internal static class SeasonSetup
         return Decision.Accept(new SeasonCreated(command.SeasonId, context.Ruleset.Version, map));
     }
 
-    public static Decision Decide(SeasonState state, AddPlayer command)
+    public static Decision Decide(SeasonState state, AddSeasonPlayer command)
     {
         if (!state.IsCreated)
         {
@@ -40,17 +40,17 @@ internal static class SeasonSetup
             return Decision.Reject(RejectionCodes.PlayerAlreadyAdded, $"Player {command.PlayerId} is already in the season.");
         }
 
-        return Decision.Accept(new PlayerAdded(command.PlayerId, command.Name, state.Map.Start.Id));
+        return Decision.Accept(new SeasonPlayerAdded(command.PlayerId, command.Name, state.Map.Start.Id));
     }
 
     public static SeasonState Apply(SeasonState state, SeasonCreated e) =>
         state with { SeasonId = e.SeasonId, Map = e.Map };
 
-    public static SeasonState Apply(SeasonState state, PlayerAdded e) =>
+    public static SeasonState Apply(SeasonState state, SeasonPlayerAdded e) =>
         state with
         {
             Players = state.Players.Add(
                 e.PlayerId,
-                new PlayerState(e.PlayerId, e.Name, e.CellId, Points: 0, TurnPhase.Idle, Offer: null, ActiveRunId: null)),
+                new SeasonPlayer(e.PlayerId, e.Name, e.CellId, Points: 0, TurnPhase.Idle, Offer: null, ActiveRunId: null)),
         };
 }

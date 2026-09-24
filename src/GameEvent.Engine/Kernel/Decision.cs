@@ -15,7 +15,7 @@ public sealed class Decision
 
     public bool IsAccepted => Rejection is null;
 
-    public static Decision Accept(params IReadOnlyList<IGameEvent> events) => new(events, null);
+    public static Decision Accept(params IReadOnlyList<IGameEvent> events) => new([.. events], null);
 
     public static Decision Reject(string code, string detail) => new([], new Rejection(code, detail));
 }

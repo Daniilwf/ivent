@@ -1,57 +1,33 @@
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
+using System.Text.Unicode;
 
 namespace GameEvent.Engine.Kernel;
 
 /// <summary>
-/// The one JSON format of the engine: rulesets, events in the log, state snapshots.
-/// camelCase names, enums as camelCase strings, events polymorphic by their stable type name.
+/// The one JSON format of the engine: rulesets, event data in the log, state snapshots.
+/// camelCase property names, enums as camelCase strings, nulls written explicitly (D-48).
+/// Dictionary keys are data and are written as is.
 /// </summary>
 public static class EngineJson
 {
-    public const string EventTypeProperty = "$type";
-
     public static JsonSerializerOptions Options { get; } = CreateOptions();
-
-    public static string SerializeEvent(IGameEvent gameEvent) =>
-        JsonSerializer.Serialize(gameEvent, Options);
-
-    public static IGameEvent DeserializeEvent(string json) =>
-        JsonSerializer.Deserialize<IGameEvent>(json, Options)
-        ?? throw new JsonException("Event JSON is null.");
 
     private static JsonSerializerOptions CreateOptions()
     {
         var options = new JsonSerializerOptions
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            DictionaryKeyPolicy = JsonNamingPolicy.CamelCase,
-            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
             RespectNullableAnnotations = true,
             RespectRequiredConstructorParameters = true,
-            TypeInfoResolver = new DefaultJsonTypeInfoResolver { Modifiers = { AddEventTypes } },
+            TypeInfoResolver = new DefaultJsonTypeInfoResolver(),
+            // Cyrillic names stay readable in the log; HTML-sensitive characters are still escaped.
+            Encoder = JavaScriptEncoder.Create(UnicodeRanges.All),
         };
         options.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase, allowIntegerValues: false));
         options.MakeReadOnly();
         return options;
-    }
-
-    private static void AddEventTypes(JsonTypeInfo typeInfo)
-    {
-        if (typeInfo.Type != typeof(IGameEvent))
-        {
-            return;
-        }
-
-        typeInfo.PolymorphismOptions = new JsonPolymorphismOptions
-        {
-            TypeDiscriminatorPropertyName = EventTypeProperty,
-            UnknownDerivedTypeHandling = JsonUnknownDerivedTypeHandling.FailSerialization,
-        };
-        foreach (var type in EventCatalog.Types.OrderBy(t => t.FullName, StringComparer.Ordinal))
-        {
-            typeInfo.PolymorphismOptions.DerivedTypes.Add(new JsonDerivedType(type, EventCatalog.Describe(type).Name));
-        }
     }
 }

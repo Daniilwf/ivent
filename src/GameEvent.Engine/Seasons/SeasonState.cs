@@ -12,11 +12,11 @@ namespace GameEvent.Engine.Seasons;
 public sealed record SeasonState(
     Guid SeasonId,
     MapGraph Map,
-    ImmutableSortedDictionary<Guid, PlayerState> Players,
+    ImmutableSortedDictionary<Guid, SeasonPlayer> Players,
     ImmutableSortedDictionary<Guid, RunState> Runs)
 {
     public static SeasonState Empty { get; } =
-        new(Guid.Empty, new MapGraph([], []), ImmutableSortedDictionary<Guid, PlayerState>.Empty, ImmutableSortedDictionary<Guid, RunState>.Empty);
+        new(Guid.Empty, new MapGraph([], []), ImmutableSortedDictionary<Guid, SeasonPlayer>.Empty, ImmutableSortedDictionary<Guid, RunState>.Empty);
 
     public bool IsCreated => SeasonId != Guid.Empty;
 
@@ -39,7 +39,7 @@ public enum TurnPhase
 }
 
 /// <summary>A player's standing in the season. Points and position are independent measures.</summary>
-public sealed record PlayerState(
+public sealed record SeasonPlayer(
     Guid PlayerId,
     string Name,
     string CellId,

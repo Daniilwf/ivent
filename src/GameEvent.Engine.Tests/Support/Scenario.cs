@@ -23,18 +23,23 @@ public sealed class Scenario
     private const uint GameIdPrefix = 0x20000000;
     private const uint SeasonIdPrefix = 0x30000000;
 
-    private readonly List<PoolGame> _games = [];
-    private readonly List<PoolCategory> _categories = [];
+    private readonly List<Game> _games = [];
+    private readonly List<Category> _categories = [];
     private readonly Dictionary<string, Guid> _players = [];
     private readonly List<IGameEvent> _log = [];
+    private bool _expectRejection;
 
-    private Scenario(Ruleset ruleset) => Ruleset = ruleset;
+    private Scenario(Ruleset ruleset, int seed)
+    {
+        Ruleset = ruleset;
+        Random = new ScriptedRandom(seed);
+    }
 
     public Ruleset Ruleset { get; private set; }
 
     public FixedClock Clock { get; } = new(FixedClock.SeasonStart);
 
-    public ScriptedRandom Random { get; } = new();
+    public ScriptedRandom Random { get; }
 
     public SequentialIds Ids { get; } = new();
 
@@ -46,8 +51,11 @@ public sealed class Scenario
     /// <summary>Result of the last executed command.</summary>
     public CommandResult Last { get; private set; } = null!;
 
-    /// <summary>A scenario on the default ruleset (docs/ruleset.default.json).</summary>
-    public static Scenario New(Ruleset? ruleset = null) => new(ruleset ?? RulesetJson.Default());
+    /// <summary>
+    /// A scenario on the pinned test ruleset (<see cref="TestRuleset"/>), not on docs/ruleset.default.json:
+    /// default numbers are temporary and rebalancing must not break tests of mechanics.
+    /// </summary>
+    public static Scenario New(Ruleset? ruleset = null, int seed = 42) => new(ruleset ?? TestRuleset.Create(), seed);
 
     public Scenario WithRuleset(Func<Ruleset, Ruleset> change)
     {
@@ -60,13 +68,53 @@ public sealed class Scenario
 
     public Scenario WithCategory(string name, int weight = 1)
     {
-        _categories.Add(new PoolCategory(name, weight));
+        _categories.Add(new Category(name, weight));
         return this;
     }
 
     public Scenario WithGame(string title, decimal? hours, params string[] tags)
     {
-        _games.Add(new PoolGame(SequentialIds.Make(GameIdPrefix, _games.Count + 1), title, [.. tags], hours));
+        _games.Add(new Game(SequentialIds.Make(GameIdPrefix, _games.Count + 1), title, [.. tags], hours));
+        return this;
+    }
+
+    /// <summary>A soft-deleted game: it stays in the pool view but must never be rolled.</summary>
+    public Scenario WithDeletedGame(string title, decimal? hours, params string[] tags)
+    {
+        _games.Add(new Game(SequentialIds.Make(GameIdPrefix, _games.Count + 1), title, [.. tags], hours, IsDeleted: true));
+        return this;
+    }
+
+    /// <summary>The admin corrects the hours of a game in the pool (outside the season log).</summary>
+    public Scenario ChangePoolHours(string title, decimal? hours)
+    {
+        var index = _games.FindIndex(g => g.Title == title);
+        if (index < 0)
+        {
+            throw new KeyNotFoundException($"No game '{title}' in the pool.");
+        }
+
+        _games[index] = _games[index] with { Hours = hours };
+        return this;
+    }
+
+    /// <summary>The admin soft-deletes a game from the pool (outside the season log).</summary>
+    public Scenario DeleteGame(string title)
+    {
+        var index = _games.FindIndex(g => g.Title == title);
+        if (index < 0)
+        {
+            throw new KeyNotFoundException($"No game '{title}' in the pool.");
+        }
+
+        _games[index] = _games[index] with { IsDeleted = true };
+        return this;
+    }
+
+    /// <summary>Moves the scenario clock forward.</summary>
+    public Scenario Advance(TimeSpan by)
+    {
+        Clock.Advance(by);
         return this;
     }
 
@@ -78,7 +126,7 @@ public sealed class Scenario
         {
             var id = SequentialIds.Make(PlayerIdPrefix, _players.Count + 1);
             _players.Add(name, id);
-            Setup(new AddPlayer(id, name));
+            Setup(new AddSeasonPlayer(id, name));
         }
 
         return this;
@@ -91,14 +139,24 @@ public sealed class Scenario
         return this;
     }
 
-    public Scenario Roll(string player) => Act(new RollGame(PlayerId(player)));
+    /// <summary>
+    /// The next game action may be rejected. Without it a rejected Roll, Start or Complete throws,
+    /// so a refusal in the middle of a chain cannot hide behind the last step's assertion.
+    /// </summary>
+    public Scenario ExpectRejection()
+    {
+        _expectRejection = true;
+        return this;
+    }
 
-    public Scenario Start(string player) => Act(new StartRun(PlayerId(player)));
+    public Scenario Roll(string player) => Play(new RollGame(PlayerId(player)));
+
+    public Scenario Start(string player) => Play(new StartRun(PlayerId(player)));
 
     public Scenario Complete(string player, Difficulty difficulty = Difficulty.Normal, decimal? estimatedHours = null) =>
-        Act(new CompleteRun(PlayerId(player), difficulty, estimatedHours));
+        Play(new CompleteRun(PlayerId(player), difficulty, estimatedHours));
 
-    /// <summary>Executes any command and records the result.</summary>
+    /// <summary>Executes any command and records the result; never throws on rejection.</summary>
     public Scenario Act(ICommand command)
     {
         Last = SeasonEngine.Execute(State, command, Context());
@@ -117,13 +175,33 @@ public sealed class Scenario
     public Guid GameId(string title) =>
         _games.SingleOrDefault(g => g.Title == title)?.Id ?? throw new KeyNotFoundException($"No game '{title}' in the pool.");
 
-    public PlayerState Player(string name) => State.Players[PlayerId(name)];
+    public SeasonPlayer Player(string name) => State.Players[PlayerId(name)];
+
+    /// <summary>Name of the player with the given id.</summary>
+    public string PlayerName(Guid id) => _players.Single(p => p.Value == id).Key;
+
+    /// <summary>Title of the game with the given id.</summary>
+    public string GameTitle(Guid id) => _games.Single(g => g.Id == id).Title;
 
     /// <summary>Events of the last command of the given type.</summary>
     public IEnumerable<T> LastEvents<T>() where T : IGameEvent => Last.Events.OfType<T>();
 
     public EngineContext Context() =>
         new(Clock, Random, Ids, Ruleset, new PoolSnapshot([.. _games], [.. _categories]));
+
+    private Scenario Play(ICommand command)
+    {
+        var mayBeRejected = _expectRejection;
+        _expectRejection = false;
+        Act(command);
+        if (!Last.IsAccepted && !mayBeRejected)
+        {
+            throw new InvalidOperationException(
+                $"{command} was rejected: {Last.Rejection}. Call ExpectRejection() first if the test expects that.");
+        }
+
+        return this;
+    }
 
     private void EnsureSeason()
     {
