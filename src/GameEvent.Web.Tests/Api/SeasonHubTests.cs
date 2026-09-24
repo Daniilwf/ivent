@@ -41,7 +41,7 @@ public sealed class SeasonHubTests : IAsyncLifetime
         // Then Петя gets the update with the new place in the log
         var update = await received.Task.WaitAsync(TimeSpan.FromSeconds(10), Ct);
         Assert.Equal(SiteFactory.SeasonId, update.SeasonId);
-        Assert.Equal(4, update.FromSequence);
+        Assert.Equal(5, update.FromSequence); // created, started, two players, roll
         Assert.Equal(["game-rolled"], update.Types);
     }
 

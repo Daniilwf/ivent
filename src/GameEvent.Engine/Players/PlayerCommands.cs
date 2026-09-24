@@ -1,4 +1,6 @@
 using GameEvent.Engine.Kernel;
+using GameEvent.Engine.Map;
+using GameEvent.Engine.Scoring;
 using GameEvent.Engine.Seasons;
 
 namespace GameEvent.Engine.Players;
@@ -52,14 +54,130 @@ public sealed record OfferDiscarded(Guid PlayerId, Guid GameId) : IGameEvent;
 
 internal static class PlayerAdministration
 {
-    public static Decision Decide(SeasonState state, AddSeasonPlayer command) =>
-        throw new NotImplementedException("C2");
+    public static Decision Decide(SeasonState state, AddSeasonPlayer command)
+    {
+        if (!state.IsCreated)
+        {
+            return Decision.Reject(RejectionCodes.SeasonNotCreated, "Create the season first.");
+        }
 
-    public static Decision Decide(SeasonState state, SetPlayerInactive command) =>
-        throw new NotImplementedException("C2");
+        if (state.Status is not (SeasonStatus.Draft or SeasonStatus.Active))
+        {
+            return Decision.Reject(RejectionCodes.SeasonClosed, $"Players join a draft or running season; it is {state.Status}.");
+        }
 
-    public static Decision Decide(SeasonState state, AdjustPlayer command) =>
-        throw new NotImplementedException("C2");
+        if (state.Players.ContainsKey(command.PlayerId) || state.Players.Values.Any(p => p.UserId == command.UserId))
+        {
+            return Decision.Reject(RejectionCodes.PlayerAlreadyAdded, $"Player {command.PlayerId} or user {command.UserId} is already in the season.");
+        }
+
+        var start = state.Map.Start.Id;
+        var cell = command.CellId ?? start;
+        if (!state.Map.Cells.Any(c => c.Id == cell))
+        {
+            return Decision.Reject(RejectionCodes.CellUnknown, $"Cell '{cell}' is not on the map.");
+        }
+
+        // Everyone enters on the start cell; the admin's starting cell and balances are logged changes of their own.
+        var events = new List<IGameEvent> { new SeasonPlayerAdded(command.PlayerId, command.UserId, command.Name, start) };
+        if (cell != start)
+        {
+            events.Add(Transfer(command.PlayerId, start, cell, MoveReason.StartingCell));
+        }
+
+        if (command.Points != 0)
+        {
+            events.Add(new PointsChanged(command.PlayerId, command.Points, PointsReason.StartingBalance, RunId: null));
+        }
+
+        if (command.Coins != 0)
+        {
+            events.Add(new CoinsChanged(command.PlayerId, command.Coins, CoinsReason.StartingBalance, RunId: null));
+        }
+
+        return Decision.Accept(events);
+    }
+
+    public static Decision Decide(SeasonState state, SetPlayerInactive command)
+    {
+        if (Find(state, command.PlayerId) is not { } player)
+        {
+            return Unknown(state, command.PlayerId);
+        }
+
+        return player.IsInactive == command.IsInactive
+            ? Decision.Reject(RejectionCodes.NothingToChange, $"The player is already {(command.IsInactive ? "inactive" : "active")}.")
+            : Decision.Accept(new PlayerInactivitySet(player.PlayerId, command.IsInactive));
+    }
+
+    public static Decision Decide(SeasonState state, AdjustPlayer command)
+    {
+        if (Find(state, command.PlayerId) is not { } player)
+        {
+            return Unknown(state, command.PlayerId);
+        }
+
+        if (SeasonSetup.IsOver(state))
+        {
+            return Decision.Reject(RejectionCodes.SeasonClosed, $"The season is {state.Status}: results are fixed.");
+        }
+
+        if (string.IsNullOrWhiteSpace(command.Comment))
+        {
+            return Decision.Reject(RejectionCodes.CommentRequired, "Every admin adjustment explains itself in the public log.");
+        }
+
+        if (command.DiscardOffer && player.Phase == TurnPhase.Playing)
+        {
+            return Decision.Reject(RejectionCodes.PlayerBusy, "The player is playing a run: that is a drop or a tech reroll (C6).");
+        }
+
+        if (command.CellId is { } target && !state.Map.Cells.Any(c => c.Id == target))
+        {
+            return Decision.Reject(RejectionCodes.CellUnknown, $"Cell '{target}' is not on the map.");
+        }
+
+        var changes = new List<IGameEvent>();
+        if (command.CellId is { } cell && cell != player.CellId)
+        {
+            changes.Add(Transfer(player.PlayerId, player.CellId, cell, MoveReason.AdminAdjustment));
+        }
+
+        if (command.PointsDelta != 0)
+        {
+            changes.Add(new PointsChanged(player.PlayerId, command.PointsDelta, PointsReason.AdminAdjustment, RunId: null));
+        }
+
+        if (command.CoinsDelta != 0)
+        {
+            changes.Add(new CoinsChanged(player.PlayerId, command.CoinsDelta, CoinsReason.AdminAdjustment, RunId: null));
+        }
+
+        changes.AddRange(command.ResourceDeltas
+            .Where(r => r.Delta != 0)
+            .Select(r => new ResourceChanged(player.PlayerId, r.Resource, r.Delta, ResourceReason.AdminAdjustment)));
+
+        if (command.DiscardOffer && player is { Phase: TurnPhase.Rolling, Offer: { } offer })
+        {
+            changes.Add(new OfferDiscarded(player.PlayerId, offer.GameId));
+        }
+
+        return changes.Count == 0
+            ? Decision.Reject(RejectionCodes.NothingToChange, "The adjustment changes nothing.")
+            : Decision.Accept([new PlayerAdjusted(player.PlayerId, command.Comment), .. changes]);
+    }
+
+    /// <summary>A move by transfer, not by steps: the path is the destination only.</summary>
+    private static PlayerMoved Transfer(Guid playerId, string from, string to, MoveReason reason) =>
+        new(playerId, from, to, Steps: 0, [to], reason, RunId: null);
+
+    private static SeasonPlayer? Find(SeasonState state, Guid playerId) =>
+        state.IsCreated && state.Players.TryGetValue(playerId, out var player) ? player : null;
+
+    private static Decision Unknown(SeasonState state, Guid playerId) =>
+        state.IsCreated
+            ? Decision.Reject(RejectionCodes.PlayerUnknown, $"Player {playerId} is not in the season.")
+            : Decision.Reject(RejectionCodes.SeasonNotCreated, "Create the season first.");
 
     public static SeasonState Apply(SeasonState state, SeasonPlayerAdded e) =>
         state with

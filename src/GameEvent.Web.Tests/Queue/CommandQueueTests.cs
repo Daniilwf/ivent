@@ -115,7 +115,7 @@ public class CommandQueueTests
         await using var db = h.NewDb();
         Assert.Equal(50, await db.SeasonPlayers.CountAsync(TestContext.Current.CancellationToken));
         var sequences = await db.Events.OrderBy(e => e.Sequence).Select(e => e.Sequence).ToListAsync(TestContext.Current.CancellationToken);
-        Assert.Equal(Enumerable.Range(1, 51).Select(i => (long)i), sequences);
+        Assert.Equal(Enumerable.Range(1, 52).Select(i => (long)i), sequences); // created, started, 50 players
     }
 
     [Fact]
@@ -154,7 +154,7 @@ public class CommandQueueTests
 
         // Then the next command continues from the logged state and numbering
         var outcome = await AcceptedAsync(h, new StartRun(s_vasya));
-        Assert.Equal(4, outcome.Events.Single().Sequence);
+        Assert.Equal(5, outcome.Events.Single().Sequence); // created, started, player, roll, start
     }
 
     [Fact]

@@ -49,11 +49,33 @@ internal static class SeasonSetup
         return Decision.Accept(new SeasonCreated(command.SeasonId, command.Name, command.Ruleset, map, command.Deadline));
     }
 
-    public static Decision Decide(SeasonState state, ChangeSeasonStatus command) =>
-        throw new NotImplementedException("C2");
+    public static Decision Decide(SeasonState state, ChangeSeasonStatus command)
+    {
+        if (!state.IsCreated)
+        {
+            return Decision.Reject(RejectionCodes.SeasonNotCreated, "Create the season first.");
+        }
 
-    public static Decision Decide(SeasonState state, SetSeasonDeadline command) =>
-        throw new NotImplementedException("C2");
+        // One way, one step at a time: draft → active → closing → finished → archived (SE1).
+        return Enum.IsDefined(command.To) && command.To == state.Status + 1
+            ? Decision.Accept(new SeasonStatusChanged(state.Status, command.To))
+            : Decision.Reject(RejectionCodes.SeasonInvalidTransition, $"The season cannot go from {state.Status} to {command.To}.");
+    }
+
+    public static Decision Decide(SeasonState state, SetSeasonDeadline command)
+    {
+        if (!state.IsCreated)
+        {
+            return Decision.Reject(RejectionCodes.SeasonNotCreated, "Create the season first.");
+        }
+
+        return IsOver(state)
+            ? Decision.Reject(RejectionCodes.SeasonClosed, $"The season is {state.Status}.")
+            : Decision.Accept(new SeasonDeadlineSet(command.Deadline));
+    }
+
+    /// <summary>Results are fixed: nothing about the season or its players changes any more.</summary>
+    public static bool IsOver(SeasonState state) => state.Status is SeasonStatus.Finished or SeasonStatus.Archived;
 
     public static SeasonState Apply(SeasonState state, SeasonCreated e) =>
         state with

@@ -40,9 +40,51 @@ public class EventFormatTests
     {
         {
             "season-created",
-            new SeasonCreated(s_season, "Тестовый сезон", TestRuleset.Create(), LinearMap.Generate(1), null),
+            new SeasonCreated(s_season, "Тестовый сезон", TestRuleset.Create(), LinearMap.Generate(1), s_at),
             1,
-            """{"seasonId":"30000000-0000-0000-0000-000000000001","ruleset":""" + RulesetJsonText + ""","map":{"cells":[{"id":"start","type":"start"},{"id":"finish","type":"finish"}],"edges":[{"from":"start","to":"finish","isDefaultForward":true,"isPrimaryBackward":true}]}}"""
+            """{"seasonId":"30000000-0000-0000-0000-000000000001","name":"Тестовый сезон","ruleset":""" + RulesetJsonText + ""","map":{"cells":[{"id":"start","type":"start"},{"id":"finish","type":"finish"}],"edges":[{"from":"start","to":"finish","isDefaultForward":true,"isPrimaryBackward":true}]},"deadline":"2026-10-01T12:30:00+00:00"}"""
+        },
+        {
+            "season-status-changed",
+            new SeasonStatusChanged(SeasonStatus.Draft, SeasonStatus.Active),
+            1,
+            """{"from":"draft","to":"active"}"""
+        },
+        {
+            "season-deadline-set",
+            new SeasonDeadlineSet(s_at),
+            1,
+            """{"deadline":"2026-10-01T12:30:00+00:00"}"""
+        },
+        {
+            "player-inactivity-set",
+            new PlayerInactivitySet(s_player, true),
+            1,
+            """{"playerId":"10000000-0000-0000-0000-000000000001","isInactive":true}"""
+        },
+        {
+            "player-adjusted",
+            new PlayerAdjusted(s_player, "Потерял скрин"),
+            1,
+            """{"playerId":"10000000-0000-0000-0000-000000000001","comment":"Потерял скрин"}"""
+        },
+        {
+            "offer-discarded",
+            new OfferDiscarded(s_player, s_game),
+            1,
+            """{"playerId":"10000000-0000-0000-0000-000000000001","gameId":"20000000-0000-0000-0000-000000000001"}"""
+        },
+        {
+            "coins-changed",
+            new CoinsChanged(s_player, -3, CoinsReason.AdminAdjustment, null),
+            1,
+            """{"playerId":"10000000-0000-0000-0000-000000000001","delta":-3,"reason":"adminAdjustment","runId":null}"""
+        },
+        {
+            "resource-changed",
+            new ResourceChanged(s_player, "tickets", 2, ResourceReason.AdminAdjustment),
+            1,
+            """{"playerId":"10000000-0000-0000-0000-000000000001","resource":"tickets","delta":2,"reason":"adminAdjustment"}"""
         },
         {
             "ruleset-changed",
@@ -95,6 +137,31 @@ public class EventFormatTests
             """{"playerId":"10000000-0000-0000-0000-000000000001","from":"start","to":"c2","steps":2,"path":["c1","c2"],"reason":"completionRoll","runId":"00000000-0000-0000-0000-000000000001"}"""
         },
     };
+
+    /// <summary>Enum values that are not in <see cref="Samples"/> (one sample per type) are frozen here.</summary>
+    public static TheoryData<string, IGameEvent, string> ValueSamples() => new()
+    {
+        { "season-created", new SeasonCreated(s_season, "Тестовый сезон", TestRuleset.Create(), LinearMap.Generate(1), null), "\"deadline\":null" },
+        { "season-status-changed", new SeasonStatusChanged(SeasonStatus.Active, SeasonStatus.Closing), """{"from":"active","to":"closing"}""" },
+        { "season-status-changed", new SeasonStatusChanged(SeasonStatus.Finished, SeasonStatus.Archived), """{"from":"finished","to":"archived"}""" },
+        { "season-deadline-set", new SeasonDeadlineSet(null), """{"deadline":null}""" },
+        { "points-changed", new PointsChanged(s_player, 12, PointsReason.StartingBalance, null), """{"playerId":"10000000-0000-0000-0000-000000000001","delta":12,"reason":"startingBalance","runId":null}""" },
+        { "points-changed", new PointsChanged(s_player, -4, PointsReason.AdminAdjustment, null), """{"playerId":"10000000-0000-0000-0000-000000000001","delta":-4,"reason":"adminAdjustment","runId":null}""" },
+        { "coins-changed", new CoinsChanged(s_player, 7, CoinsReason.StartingBalance, null), """{"playerId":"10000000-0000-0000-0000-000000000001","delta":7,"reason":"startingBalance","runId":null}""" },
+        { "player-moved", new PlayerMoved(s_player, "start", "c5", 5, ["c5"], MoveReason.StartingCell, null), """{"playerId":"10000000-0000-0000-0000-000000000001","from":"start","to":"c5","steps":5,"path":["c5"],"reason":"startingCell","runId":null}""" },
+        { "player-moved", new PlayerMoved(s_player, "c5", "c2", 3, ["c2"], MoveReason.AdminAdjustment, null), """{"playerId":"10000000-0000-0000-0000-000000000001","from":"c5","to":"c2","steps":3,"path":["c2"],"reason":"adminAdjustment","runId":null}""" },
+    };
+
+    [Theory]
+    [MemberData(nameof(ValueSamples))]
+    public void Enum_values_and_nulls_are_stored_in_the_frozen_format(string type, IGameEvent sample, string jsonOrFragment)
+    {
+        var stored = EventCodec.Encode(sample);
+
+        Assert.Equal(type, stored.Type);
+        Assert.Contains(jsonOrFragment, stored.Data, StringComparison.Ordinal);
+        Assert.Equal(sample, EventCodec.Decode(stored));
+    }
 
     [Theory]
     [MemberData(nameof(Samples))]

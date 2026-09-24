@@ -14,6 +14,7 @@ public static class RejectionCodes
     public const string SeasonClosed = "season.closed";
     public const string CellUnknown = "map.unknownCell";
     public const string NothingToChange = "player.nothingToChange";
+    public const string CommentRequired = "player.commentRequired";
     public const string PlayerBusy = "player.busy";
     public const string SeasonAlreadyCreated = "season.alreadyCreated";
     public const string PlayerUnknown = "player.unknown";

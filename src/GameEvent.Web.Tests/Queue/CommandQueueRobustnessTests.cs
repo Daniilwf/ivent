@@ -62,7 +62,7 @@ public class CommandQueueRobustnessTests
         Assert.Equal(RejectionCodes.CommandIdReused, otherCommand.Rejection?.Code);
         Assert.Equal(RejectionCodes.CommandIdReused, otherSeason.Rejection?.Code);
         await using var db = h.NewDb();
-        Assert.Equal(2, await db.Events.CountAsync(Ct));
+        Assert.Equal(3, await db.Events.CountAsync(Ct)); // created, started, player
     }
 
     [Fact]
@@ -100,7 +100,7 @@ public class CommandQueueRobustnessTests
         Assert.Equal(RejectionCodes.PlayerUnknown, cross.Rejection?.Code);
 
         await using var db = h.NewDb();
-        foreach (var (season, count) in new[] { (s_seasonA, 3), (s_seasonB, 2) })
+        foreach (var (season, count) in new[] { (s_seasonA, 4), (s_seasonB, 3) }) // created, started, players, roll
         {
             var sequences = await db.Events.Where(e => e.SeasonId == season).OrderBy(e => e.Sequence).Select(e => e.Sequence).ToListAsync(Ct);
             Assert.Equal(Enumerable.Range(1, count).Select(i => (long)i), sequences);
@@ -150,7 +150,7 @@ public class CommandQueueRobustnessTests
 
         // The next command sees the committed roll (not a stale cache) and continues the numbering
         var start = await Accepted(h, new StartRun(s_vasya), s_seasonA);
-        Assert.Equal(4, Assert.Single(start.Events).Sequence);
+        Assert.Equal(5, Assert.Single(start.Events).Sequence);
     }
 
     [Fact]
@@ -176,7 +176,7 @@ public class CommandQueueRobustnessTests
         await all.WaitAsync(TimeSpan.FromSeconds(10), Ct);
         Assert.All(calls, c => Assert.True(c.IsCanceled, $"Call ended as {c.Status}"));
         await using var db = h.NewDb();
-        Assert.Equal(1, await db.Events.CountAsync(Ct));
+        Assert.Equal(2, await db.Events.CountAsync(Ct)); // created and started only
     }
 
     [Fact]

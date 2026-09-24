@@ -1,0 +1,292 @@
+using FsCheck.Xunit;
+using GameEvent.Engine.Kernel;
+using GameEvent.Engine.Map;
+using GameEvent.Engine.Players;
+using GameEvent.Engine.Rolls;
+using GameEvent.Engine.Runs;
+using GameEvent.Engine.Scoring;
+using GameEvent.Engine.Seasons;
+using GameEvent.Engine.Tests.Support;
+
+namespace GameEvent.Engine.Tests.Invariants;
+
+/// <summary>
+/// Random seasons with the admin in the game (C2): players roll, start and complete while the admin adjusts
+/// points, coins, resources and positions, discards offers, toggles the inactive flag, adds a player mid-season,
+/// moves the deadline and, rarely, the season status. After every command the invariants of docs/TESTING.md
+/// this can break must hold; the expected values are folded from the log independently of the engine.
+/// Each byte of <c>script</c> is one command; <c>seed</c> drives the engine's random source.
+/// </summary>
+public class PlayerAdminInvariantTests
+{
+    private const int MapLength = 25;
+
+    private static readonly string[] s_players = ["Вася", "Петя", "Маша"];
+    private static readonly Guid s_late = SequentialIds.Make(0x10000000, 0x99);
+    private static readonly Guid s_lateUser = SequentialIds.Make(0x40000000, 0x99);
+
+    private static Scenario NewSeason(int seed) =>
+        Scenario.New(seed: seed)
+            .WithMapLength(MapLength)
+            .WithCategory("Horror", weight: 3)
+            .WithGame("Silent Hill", 12, "Horror")
+            .WithGame("Alan Wake", 15, "Horror")
+            .WithCategory("Puzzle", weight: 2)
+            .WithGame("Tetris", 2, "Puzzle")
+            .WithGame("Unknown Length", null, "Puzzle")
+            .WithCategory("Action", weight: 1)
+            .WithGame("Doom", 4, "Action")
+            .WithPlayers(s_players);
+
+    /// <summary>
+    /// Bits 0–1 pick the player (the fourth is the late one, maybe not added yet), bits 2–4 the kind of command,
+    /// bits 5–7 its argument, so all three vary independently.
+    /// </summary>
+    private static ICommand CommandFor(Scenario s, byte b)
+    {
+        var index = b % 4;
+        var player = index < s_players.Length ? s.PlayerId(s_players[index]) : s_late;
+        var arg = b / 32;
+        var comment = arg == 7 ? "" : "правка";
+        return ((b / 4) % 8) switch
+        {
+            0 => new RollGame(player),
+            1 => new StartRun(player),
+            2 => new CompleteRun(player, (Difficulty)(arg % 4), EstimatedHours: 1 + arg),
+            3 => new AdjustPlayer(player, comment, PointsDelta: arg - 3),
+            4 => new AdjustPlayer(player, comment, CoinsDelta: 3 - arg, ResourceDeltas: [new ResourceDelta("tickets", (arg % 3) - 1)]),
+            5 => new AdjustPlayer(player, comment, CellId: CellAt(s, arg * 4), DiscardOffer: arg % 2 == 1),
+            6 => new SetPlayerInactive(player, arg % 2 == 1),
+            _ => arg switch
+            {
+                7 => new ChangeSeasonStatus(s.State.Status + 1),
+                6 => new AdjustPlayer(player, comment, DiscardOffer: true),
+                5 => new SetSeasonDeadline(null),
+                4 => new SetSeasonDeadline(FixedClock.SeasonStart.AddDays(10 + arg)),
+                _ => new AddSeasonPlayer(s_late, s_lateUser, "Лёша", CellId: CellAt(s, arg * 5), Points: arg, Coins: 2 - arg),
+            },
+        };
+    }
+
+    private static string CellAt(Scenario s, int index) => s.State.Map.Cells[Math.Min(index, s.State.Map.Cells.Count - 1)].Id;
+
+    private static Scenario Play(int seed, byte[] script, Action<Scenario, ICommand, SeasonState, int>? afterEach = null)
+    {
+        var s = NewSeason(seed);
+        foreach (var b in script)
+        {
+            var before = s.State;
+            var logLength = s.Log.Count;
+            var command = CommandFor(s, b);
+            s.Act(command);
+            afterEach?.Invoke(s, command, before, logLength);
+        }
+
+        return s;
+    }
+
+    [Property(MaxTest = 200)]
+    public void Invariants_hold_after_every_command(int seed, byte[] script) =>
+        Play(seed, script, CheckInvariants);
+
+    [Property(MaxTest = 50)]
+    public void Same_seed_and_commands_give_the_same_log(int seed, byte[] script)
+    {
+        // Invariant 14 with admin commands in the mix
+        var first = Play(seed, script);
+        var second = Play(seed, script);
+
+        Assert.Equal(first.Log, second.Log);
+        Assert.Equal(first.State, second.State);
+    }
+
+    private static void CheckInvariants(Scenario s, ICommand command, SeasonState before, int logLengthBefore)
+    {
+        // A rejected command has no events and changes nothing
+        if (!s.Last.IsAccepted)
+        {
+            ScenarioAssert.Rejected(s, before, logLengthBefore, s.Last.Rejection!.Code);
+        }
+        else
+        {
+            CheckAcceptedCommand(s, command, before);
+        }
+
+        // 1. Replaying the log gives the stored state
+        Assert.Equal(s.State, SeasonEngine.Replay(s.Log));
+
+        var expected = Fold(s.Log);
+        Assert.Equal(expected.Status, s.State.Status);
+        Assert.Equal(expected.Players.Keys.Order(), s.State.Players.Keys.Order());
+
+        foreach (var player in s.State.Players.Values)
+        {
+            var reference = expected.Players[player.PlayerId];
+
+            // 2. Points and coins equal the sum of their logged changes; other resources too, without zero entries
+            Assert.Equal(reference.Points, player.Points);
+            Assert.Equal(reference.Coins, player.Coins);
+            Assert.Equal(ResourceBag.From(reference.Resources), player.Resources);
+            Assert.DoesNotContain(player.Resources, r => r.Value == 0);
+
+            // P1. The token moves only by PlayerMoved events, each starting where the previous one ended
+            Assert.Equal(reference.CellId, player.CellId);
+
+            // 7. The token is on an existing cell
+            Assert.Contains(s.State.Map.Cells, c => c.Id == player.CellId);
+
+            // SE5. The flag is what the admin last set
+            Assert.Equal(reference.IsInactive, player.IsInactive);
+
+            // 3. No more active runs than allowed; the phase matches the offer and the active run
+            var playing = s.State.Runs.Values.Where(r => r.PlayerId == player.PlayerId && r.Status == RunStatus.Playing).ToList();
+            Assert.True(playing.Count <= s.Ruleset.Season.MaxActiveRunsPerPlayer);
+            Assert.Equal(playing.SingleOrDefault()?.RunId, player.ActiveRunId);
+            Assert.Equal(player.Phase == TurnPhase.Playing, player.ActiveRunId is not null);
+            Assert.Equal(player.Phase == TurnPhase.Rolling, player.Offer is not null);
+        }
+
+        // 4. A game is busy for at most one player: offered or played (a discarded offer frees it)
+        var busy = s.State.Players.Values.Where(p => p.Offer is not null).Select(p => p.Offer!.GameId)
+            .Concat(s.State.Runs.Values.Where(r => r.Status == RunStatus.Playing).Select(r => r.GameId))
+            .ToList();
+        Assert.Equal(busy.Count, busy.Distinct().Count());
+    }
+
+    /// <summary>Per-command rules for accepted administration commands.</summary>
+    private static void CheckAcceptedCommand(Scenario s, ICommand command, SeasonState before)
+    {
+        var events = s.Last.Events;
+        switch (command)
+        {
+            case AdjustPlayer adjust:
+                // D-21: exactly one comment, at least one real change, every change is about this player
+                var adjusted = Assert.Single(events.OfType<PlayerAdjusted>());
+                Assert.Equal(adjust.PlayerId, adjusted.PlayerId);
+                Assert.False(string.IsNullOrWhiteSpace(adjusted.Comment));
+                Assert.True(events.Count >= 2, "An adjustment must change something.");
+                Assert.All(events, e => Assert.Equal(adjust.PlayerId, PlayerOf(e)));
+                Assert.All(events.OfType<PointsChanged>(), e => Assert.Equal(PointsReason.AdminAdjustment, e.Reason));
+                Assert.All(events.OfType<CoinsChanged>(), e => Assert.Equal(CoinsReason.AdminAdjustment, e.Reason));
+                Assert.All(events.OfType<PlayerMoved>(), e => Assert.Equal(MoveReason.AdminAdjustment, e.Reason));
+                Assert.Equal(adjust.DiscardOffer && before.Players[adjust.PlayerId].Phase == TurnPhase.Rolling, events.OfType<OfferDiscarded>().Any());
+                if (adjust.DiscardOffer)
+                {
+                    // Accepted with the flag: the player was idle or rolling, never playing, and is idle now
+                    Assert.NotEqual(TurnPhase.Playing, before.Players[adjust.PlayerId].Phase);
+                    Assert.Equal(TurnPhase.Idle, s.State.Players[adjust.PlayerId].Phase);
+                }
+
+                break;
+            case AddSeasonPlayer add:
+                Assert.Equal(new SeasonPlayerAdded(add.PlayerId, add.UserId, add.Name, s.State.Map.Start.Id), events[0]);
+                Assert.All(events, e => Assert.Equal(add.PlayerId, PlayerOf(e)));
+                Assert.All(events.OfType<PointsChanged>(), e => Assert.Equal(PointsReason.StartingBalance, e.Reason));
+                Assert.All(events.OfType<CoinsChanged>(), e => Assert.Equal(CoinsReason.StartingBalance, e.Reason));
+                Assert.All(events.OfType<PlayerMoved>(), e => Assert.Equal(MoveReason.StartingCell, e.Reason));
+                break;
+            case ChangeSeasonStatus change:
+                Assert.Equal([new SeasonStatusChanged(before.Status, change.To)], events);
+                Assert.Equal(before.Status + 1, change.To);
+                break;
+            case SetPlayerInactive inactive:
+                Assert.Equal([new PlayerInactivitySet(inactive.PlayerId, inactive.IsInactive)], events);
+                break;
+            case SetSeasonDeadline deadline:
+                Assert.Equal([new SeasonDeadlineSet(deadline.Deadline)], events);
+                break;
+            case RollGame or StartRun or CompleteRun:
+                // Game actions only in a running season
+                Assert.Equal(SeasonStatus.Active, before.Status);
+                break;
+        }
+    }
+
+    private static Guid? PlayerOf(IGameEvent e) =>
+        e switch
+        {
+            SeasonPlayerAdded x => x.PlayerId,
+            PlayerAdjusted x => x.PlayerId,
+            OfferDiscarded x => x.PlayerId,
+            PointsChanged x => x.PlayerId,
+            CoinsChanged x => x.PlayerId,
+            ResourceChanged x => x.PlayerId,
+            PlayerMoved x => x.PlayerId,
+            PlayerInactivitySet x => x.PlayerId,
+            _ => null,
+        };
+
+    private sealed class ReferencePlayer
+    {
+        public required string CellId { get; set; }
+
+        public int Points { get; set; }
+
+        public int Coins { get; set; }
+
+        public Dictionary<string, int> Resources { get; } = new(StringComparer.Ordinal);
+
+        public bool IsInactive { get; set; }
+    }
+
+    private sealed record Reference(SeasonStatus Status, Dictionary<Guid, ReferencePlayer> Players);
+
+    /// <summary>Folds the log the way the rules say, independently of the engine's Apply, checking each event on the way.</summary>
+    private static Reference Fold(IEnumerable<IGameEvent> log)
+    {
+        var status = SeasonStatus.Draft;
+        var players = new Dictionary<Guid, ReferencePlayer>();
+        foreach (var e in log)
+        {
+            switch (e)
+            {
+                case SeasonStatusChanged changed:
+                    Assert.Equal(status, changed.From);
+                    Assert.Equal(status + 1, changed.To);
+                    status = changed.To;
+                    break;
+                case SeasonPlayerAdded added:
+                    Assert.True(status is SeasonStatus.Draft or SeasonStatus.Active, $"Player added while {status}.");
+                    Assert.DoesNotContain(added.PlayerId, players.Keys);
+                    players[added.PlayerId] = new ReferencePlayer { CellId = added.CellId };
+                    break;
+                case GameRolled or RunStarted or RunCompleted or CompletionRolled:
+                    // SE1/SE2: no game actions outside a running season
+                    Assert.Equal(SeasonStatus.Active, status);
+                    break;
+                case PointsChanged points:
+                    Assert.True(points.Reason == PointsReason.CompletionRoll || points.Delta != 0, "Zero changes are not logged.");
+                    players[points.PlayerId].Points += points.Delta;
+                    break;
+                case CoinsChanged coins:
+                    Assert.NotEqual(0, coins.Delta);
+                    players[coins.PlayerId].Coins += coins.Delta;
+                    break;
+                case ResourceChanged resource:
+                    Assert.NotEqual(0, resource.Delta);
+                    var bag = players[resource.PlayerId].Resources;
+                    bag[resource.Resource] = bag.GetValueOrDefault(resource.Resource) + resource.Delta;
+                    break;
+                case PlayerMoved moved:
+                    var player = players[moved.PlayerId];
+                    Assert.Equal(player.CellId, moved.From);
+                    Assert.Equal(moved.To, moved.Path[^1]);
+                    if (moved.Reason is MoveReason.AdminAdjustment or MoveReason.StartingCell)
+                    {
+                        // A transfer, not steps; and never a no-op
+                        Assert.Equal([moved.To], moved.Path);
+                        Assert.NotEqual(moved.From, moved.To);
+                    }
+
+                    player.CellId = moved.To;
+                    break;
+                case PlayerInactivitySet inactive:
+                    Assert.NotEqual(players[inactive.PlayerId].IsInactive, inactive.IsInactive);
+                    players[inactive.PlayerId].IsInactive = inactive.IsInactive;
+                    break;
+            }
+        }
+
+        return new Reference(status, players);
+    }
+}
