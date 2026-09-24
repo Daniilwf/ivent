@@ -24,7 +24,7 @@ public class CommandQueueTests
 
         // When a season is played through the queue
         await AcceptedAsync(h, new CreateSeason(s_season));
-        await AcceptedAsync(h, new AddSeasonPlayer(s_vasya, "Вася"));
+        await AcceptedAsync(h, new AddSeasonPlayer(s_vasya, s_vasya, "Вася"));
         await AcceptedAsync(h, new RollGame(s_vasya));
         await AcceptedAsync(h, new StartRun(s_vasya));
         await AcceptedAsync(h, new CompleteRun(s_vasya, Difficulty.Normal));
@@ -50,7 +50,7 @@ public class CommandQueueTests
         var fault = new FailingSaveInterceptor();
         await using var h = await QueueHarness.StartAsync(fault);
         await AcceptedAsync(h, new CreateSeason(s_season));
-        await AcceptedAsync(h, new AddSeasonPlayer(s_vasya, "Вася"));
+        await AcceptedAsync(h, new AddSeasonPlayer(s_vasya, s_vasya, "Вася"));
         await AcceptedAsync(h, new RollGame(s_vasya));
         await AcceptedAsync(h, new StartRun(s_vasya));
         var eventsBefore = await CountEventsAsync(h);
@@ -83,7 +83,7 @@ public class CommandQueueTests
     {
         await using var h = await QueueHarness.StartAsync();
         await AcceptedAsync(h, new CreateSeason(s_season));
-        await AcceptedAsync(h, new AddSeasonPlayer(s_vasya, "Вася"));
+        await AcceptedAsync(h, new AddSeasonPlayer(s_vasya, s_vasya, "Вася"));
         var before = await CountEventsAsync(h);
 
         var outcome = await h.SendAsync(new StartRun(s_vasya), s_season);
@@ -102,7 +102,7 @@ public class CommandQueueTests
 
         // When 50 players are added concurrently
         var players = Enumerable.Range(1, 50).Select(i => Guid.Parse($"10000000-0000-0000-0000-{i:x12}")).ToList();
-        var outcomes = await Task.WhenAll(players.Select(p => h.SendAsync(new AddSeasonPlayer(p, $"Игрок {p}"), s_season)));
+        var outcomes = await Task.WhenAll(players.Select(p => h.SendAsync(new AddSeasonPlayer(p, p, $"Игрок {p}"), s_season)));
 
         // Then every command is applied exactly once, in some order, with a gapless log
         Assert.All(outcomes, o => Assert.True(o.IsAccepted));
@@ -117,7 +117,7 @@ public class CommandQueueTests
     {
         await using var h = await QueueHarness.StartAsync();
         await AcceptedAsync(h, new CreateSeason(s_season));
-        await AcceptedAsync(h, new AddSeasonPlayer(s_vasya, "Вася"));
+        await AcceptedAsync(h, new AddSeasonPlayer(s_vasya, s_vasya, "Вася"));
         var commandId = Guid.NewGuid();
 
         // When a double click sends the same roll twice
@@ -138,7 +138,7 @@ public class CommandQueueTests
     {
         await using var h = await QueueHarness.StartAsync();
         await AcceptedAsync(h, new CreateSeason(s_season));
-        await AcceptedAsync(h, new AddSeasonPlayer(s_vasya, "Вася"));
+        await AcceptedAsync(h, new AddSeasonPlayer(s_vasya, s_vasya, "Вася"));
         await AcceptedAsync(h, new RollGame(s_vasya));
 
         // When the server restarts (in-memory state is lost)

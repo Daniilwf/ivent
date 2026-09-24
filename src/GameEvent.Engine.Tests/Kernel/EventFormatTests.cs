@@ -16,6 +16,7 @@ public class EventFormatTests
 {
     private static readonly Guid s_player = SequentialIds.Make(0x10000000, 1);
     private static readonly Guid s_other = SequentialIds.Make(0x10000000, 2);
+    private static readonly Guid s_user = SequentialIds.Make(0x40000000, 1);
     private static readonly Guid s_game = SequentialIds.Make(0x20000000, 1);
     private static readonly Guid s_run = SequentialIds.Make(0, 1);
     private static readonly Guid s_season = SequentialIds.Make(0x30000000, 1);
@@ -40,9 +41,9 @@ public class EventFormatTests
         },
         {
             "season-player-added",
-            new SeasonPlayerAdded(s_player, "Вася", "start"),
+            new SeasonPlayerAdded(s_player, s_user, "Вася", "start"),
             1,
-            """{"playerId":"10000000-0000-0000-0000-000000000001","name":"Вася","cellId":"start"}"""
+            """{"playerId":"10000000-0000-0000-0000-000000000001","userId":"40000000-0000-0000-0000-000000000001","name":"Вася","cellId":"start"}"""
         },
         {
             "game-rolled",

@@ -76,11 +76,32 @@ namespace GameEvent.Infrastructure.Database.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "User",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "TEXT", nullable: false),
+                    Login = table.Column<string>(type: "TEXT", maxLength: 64, nullable: false),
+                    NormalizedLogin = table.Column<string>(type: "TEXT", maxLength: 64, nullable: false),
+                    Name = table.Column<string>(type: "TEXT", maxLength: 64, nullable: false),
+                    PasswordHash = table.Column<string>(type: "TEXT", nullable: false),
+                    SecurityStamp = table.Column<string>(type: "TEXT", nullable: false),
+                    Role = table.Column<string>(type: "TEXT", maxLength: 20, nullable: false),
+                    MustChangePassword = table.Column<bool>(type: "INTEGER", nullable: false),
+                    IsDeleted = table.Column<bool>(type: "INTEGER", nullable: false),
+                    CreatedAt = table.Column<long>(type: "INTEGER", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_User", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "SeasonPlayer",
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "TEXT", nullable: false),
                     SeasonId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    UserId = table.Column<Guid>(type: "TEXT", nullable: false),
                     Name = table.Column<string>(type: "TEXT", nullable: false),
                     CellId = table.Column<string>(type: "TEXT", nullable: false),
                     Points = table.Column<int>(type: "INTEGER", nullable: false),
@@ -157,6 +178,18 @@ namespace GameEvent.Infrastructure.Database.Migrations
                 name: "IX_SeasonPlayer_SeasonId_Points",
                 table: "SeasonPlayer",
                 columns: new[] { "SeasonId", "Points" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_SeasonPlayer_SeasonId_UserId",
+                table: "SeasonPlayer",
+                columns: new[] { "SeasonId", "UserId" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_User_NormalizedLogin",
+                table: "User",
+                column: "NormalizedLogin",
+                unique: true);
         }
 
         /// <inheritdoc />
@@ -173,6 +206,9 @@ namespace GameEvent.Infrastructure.Database.Migrations
 
             migrationBuilder.DropTable(
                 name: "Run");
+
+            migrationBuilder.DropTable(
+                name: "User");
 
             migrationBuilder.DropTable(
                 name: "SeasonPlayer");

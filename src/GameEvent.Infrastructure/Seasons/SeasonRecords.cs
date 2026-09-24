@@ -23,9 +23,12 @@ public sealed class SeasonRecord
 
 public sealed class SeasonPlayerRecord
 {
+    /// <summary>Participation id (the engine's PlayerId), not the user id.</summary>
     public Guid Id { get; set; }
 
     public Guid SeasonId { get; set; }
+
+    public Guid UserId { get; set; }
 
     public required string Name { get; set; }
 

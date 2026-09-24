@@ -1,5 +1,22 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
+  <!-- OpenAPI document for the generated TypeScript client: written only by `npm run gen:api`. -->
+  <PropertyGroup>
+    <OpenApiGenerateDocuments Condition="'$(GenerateApiDocs)' != 'true'">false</OpenApiGenerateDocuments>
+    <OpenApiDocumentsDirectory>$(MSBuildProjectDirectory)/../../web/src/api</OpenApiDocumentsDirectory>
+    <OpenApiGenerateDocumentsOptions>--file-name openapi</OpenApiGenerateDocumentsOptions>
+  </PropertyGroup>
+
+  <!-- The development settings (seed password) never ship in a published build. -->
+  <ItemGroup>
+    <Content Update="appsettings.Development.json" CopyToPublishDirectory="Never" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="Microsoft.Extensions.ApiDescription.Server" PrivateAssets="all" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\GameEvent.Engine\GameEvent.Engine.csproj" />
     <ProjectReference Include="..\GameEvent.Infrastructure\GameEvent.Infrastructure.csproj" />

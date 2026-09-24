@@ -1,3 +1,4 @@
+using GameEvent.Infrastructure.Accounts;
 using GameEvent.Infrastructure.EventLog;
 using GameEvent.Infrastructure.Pool;
 using GameEvent.Infrastructure.Seasons;
@@ -7,6 +8,8 @@ namespace GameEvent.Infrastructure.Database;
 
 public sealed class GameEventDbContext(DbContextOptions<GameEventDbContext> options) : DbContext(options)
 {
+    public DbSet<UserRecord> Users => Set<UserRecord>();
+
     public DbSet<GameEventRecord> Events => Set<GameEventRecord>();
 
     public DbSet<SeasonRecord> Seasons => Set<SeasonRecord>();
@@ -29,6 +32,16 @@ public sealed class GameEventDbContext(DbContextOptions<GameEventDbContext> opti
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<UserRecord>(e =>
+        {
+            e.ToTable("User");
+            e.HasIndex(x => x.NormalizedLogin).IsUnique();
+            e.Property(x => x.Login).HasMaxLength(64);
+            e.Property(x => x.NormalizedLogin).HasMaxLength(64);
+            e.Property(x => x.Name).HasMaxLength(64);
+            e.Property(x => x.Role).HasMaxLength(20);
+        });
+
         modelBuilder.Entity<GameEventRecord>(e =>
         {
             e.ToTable("GameEvent");
@@ -49,6 +62,7 @@ public sealed class GameEventDbContext(DbContextOptions<GameEventDbContext> opti
             e.ToTable("SeasonPlayer");
             e.HasOne<SeasonRecord>().WithMany().HasForeignKey(x => x.SeasonId);
             e.HasIndex(x => new { x.SeasonId, x.Points });
+            e.HasIndex(x => new { x.SeasonId, x.UserId }).IsUnique();
             e.Property(x => x.Phase).HasMaxLength(20);
         });
 

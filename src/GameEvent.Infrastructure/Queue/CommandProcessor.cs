@@ -90,8 +90,8 @@ public sealed partial class CommandProcessor(
             .ToListAsync(ct);
         if (earlier.Count > 0)
         {
-            // A repeat is the same command for the same season; anything else reusing the id is refused.
-            return earlier.All(e => e.SeasonId == envelope.SeasonId && e.CommandType == commandType)
+            // A repeat is the same command by the same author for the same season; anything else reusing the id is refused.
+            return earlier.All(e => e.SeasonId == envelope.SeasonId && e.CommandType == commandType && e.AuthorId == envelope.AuthorId)
                 ? new CommandOutcome(true, true, null, [.. earlier.Select(ToLogged)])
                 : Rejected(RejectionCodes.CommandIdReused, $"Command id {envelope.CommandId} was used by another command.");
         }

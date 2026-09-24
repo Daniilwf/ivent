@@ -9,6 +9,7 @@ data
 test-artifacts
 playwright-report
 web/src/api/schema.d.ts
+web/src/api/openapi.json
 package-lock.json
 .claude
 .tools

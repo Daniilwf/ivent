@@ -126,22 +126,24 @@
 | L4 | Проверка целостности: пересчёт из лога совпадает с сохранённым | `Seasons/SliceScenarioTests.Replaying_every_prefix_of_the_log_matches_the_state_after_each_command`, инвариант 1 (`Invariants/SliceInvariantTests.Invariants_hold_after_every_command`), `Log/IntegrityTests.*`, `Web.Tests/Integrity/*`, `Web.Tests/Queue/CommandQueueTests.Command_through_the_queue_writes_log_and_projection_that_agree` | 🟨 C12 |
 | L5 | Экспорт и импорт сезона одним архивом | `Web.Tests/SeasonTransfer/*` | ⬜ |
 | L6 | Формат события версионируется, старые события читаются через преобразование | `Kernel/EventFormatTests.*` (эталонный формат, пошаговое преобразование старых версий, отказ для новее сборки и без преобразования), `Seasons/SliceScenarioTests.Every_event_of_the_slice_survives_the_json_round_trip` | ✅ |
-| L7 | Все изменения через одну очередь, одна команда — одна транзакция, повтор `CommandId` не выполняется дважды | `Web.Tests/Queue/CommandQueueTests.*` (атомарность при сбое, 50 параллельных команд, повтор `CommandId`, перезапуск) | ✅ |
+| L7 | Все изменения через одну очередь, одна команда — одна транзакция, повтор `CommandId` не выполняется дважды | `Web.Tests/Queue/CommandQueueTests.*`, `Web.Tests/Queue/CommandQueueRobustnessTests.*` (атомарность при сбое, 50 параллельных команд, повтор `CommandId` засчитывается только той же команде того же автора и сезона, перезапуск, остановка) | ✅ |
 
 ### Аккаунты, безопасность, эксплуатация
 
 | ID | Правило | Тесты | Статус |
 | --- | --- | --- | --- |
 | A1 | Аккаунты создаёт админ, временный пароль, игрок меняет пароль сам | `Web.Tests/Auth/*` | ⬜ |
-| A2 | Роли: игрок, админ, зритель; зритель не делает ни одного игрового действия | `Web.Tests/Auth/RoleMatrixTests.*`, e2e `11-spectator` | ⬜ |
-| A3 | Ограничение попыток входа, куки HttpOnly/Secure/SameSite, CSRF | `Web.Tests/Auth/LoginSecurityTests.*` | ⬜ |
-| A4 | Игрок действует только за себя | `Web.Tests/Auth/ForeignPlayerTests.*`, e2e `08-permissions` | ⬜ |
+| A2 | Роли: игрок, админ, зритель; зритель не делает ни одного игрового действия | `Web.Tests/Api/SeasonApiTests.Spectator_admin_and_player_outside_the_season_are_forbidden`, `Web.Tests/Api/SeasonApiTests.Spectator_and_outsider_can_view_the_season`, e2e `11-spectator` | 🟨 I1 |
+| A3 | Ограничение попыток входа (по IP и по логину), куки HttpOnly/Secure/SameSite, CSRF, сессия кончается при удалении аккаунта или смене роли | `Web.Tests/Api/AccountApiTests.*` (кука HttpOnly/SameSite, CSRF, неверные данные, удалённый аккаунт), `Web.Tests/Api/LoginRateLimitTests.*`, `Web.Tests/Api/SeasonApiTests.Post_without_the_antiforgery_token_is_refused`, `Web.Tests/Api/WebSecurityTests.*`, `Web.Tests/Api/ProductionSurfaceTests.*` | 🟨 D8 |
+| A4 | Игрок действует только за себя | `Web.Tests/Api/SeasonApiTests.A_player_cannot_act_for_another_player`, `…Spectator_admin_and_player_outside_the_season_are_forbidden`, e2e `08-permissions` | 🟨 I1 |
 | A5 | Аватарка по ссылке: только https, публичные адреса, белый список, лимит | `Web.Tests/Files/AvatarUrlTests.*` | ⬜ |
 | A6 | Загрузка файлов: тип по содержимому, лимиты, WebP, миниатюры GIF | `Web.Tests/Files/UploadTests.*` | ⬜ |
 | A7 | Тестовые эндпоинты есть только в Development и Test | `Web.Tests/Environment/ProductionHasNoTestEndpointsTests` | ⬜ |
 | A8 | Режим обслуживания: баннер и только чтение | `Web.Tests/Maintenance/*` | ⬜ |
 | A9 | Кнопка «Сообщить о баге» с контекстом и скриншотом, выгрузка файлом | `Web.Tests/BugReports/*`, `web/…/BugReportButton.test.tsx` | ⬜ |
 | A10 | `/health` и страница «Ошибки» | `Web.Tests/Observability/*` | ⬜ |
+| A13 | Пользователь участвует в сезоне не больше одного раза (D-65) | `Seasons/SeasonSetupTests.Adding_the_same_user_twice_under_another_player_id_is_rejected` | ✅ |
+| A14 | Обновления в реальном времени: зритель сезона узнаёт о действии другого игрока без перезагрузки; анонимный не подключается | `Web.Tests/Api/SeasonHubTests.*` (догрузка пропущенного — E3) | 🟨 E3 |
 | A11 | Время хранится в UTC, дедлайны показываются по Москве с подписью | `web/…/formatDeadline.test.ts` | ⬜ |
 | A12 | Внешние сервисы (HLTB, Steam, IGDB) недоступны — сайт работает | `Web.Tests/Providers/*` | ⬜ |
 

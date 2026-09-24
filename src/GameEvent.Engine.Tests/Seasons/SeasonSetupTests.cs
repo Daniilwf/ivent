@@ -26,7 +26,17 @@ public class SeasonSetupTests
         var s = Scenario.New().WithPlayers("Вася");
 
         ScenarioAssert.RejectsWithoutChanges(
-            s, x => x.Act(new AddSeasonPlayer(s.PlayerId("Вася"), "Вася")), RejectionCodes.PlayerAlreadyAdded);
+            s, x => x.Act(new AddSeasonPlayer(s.PlayerId("Вася"), SequentialIds.Make(0x40000000, 99), "Вася")), RejectionCodes.PlayerAlreadyAdded);
+    }
+
+    [Fact]
+    public void Adding_the_same_user_twice_under_another_player_id_is_rejected()
+    {
+        var s = Scenario.New().WithPlayers("Вася");
+        var vasyaUser = s.Player("Вася").UserId;
+
+        ScenarioAssert.RejectsWithoutChanges(
+            s, x => x.Act(new AddSeasonPlayer(SequentialIds.Make(0x10000000, 99), vasyaUser, "Вася-2")), RejectionCodes.PlayerAlreadyAdded);
     }
 
     [Fact]
@@ -44,7 +54,7 @@ public class SeasonSetupTests
 
     public static TheoryData<string, ICommand> CommandsBeforeSeason() => new()
     {
-        { "add player", new AddSeasonPlayer(SequentialIds.Make(0x10000000, 1), "Вася") },
+        { "add player", new AddSeasonPlayer(SequentialIds.Make(0x10000000, 1), SequentialIds.Make(0x40000000, 1), "Вася") },
         { "roll", new RollGame(SequentialIds.Make(0x10000000, 1)) },
         { "start", new StartRun(SequentialIds.Make(0x10000000, 1)) },
         { "complete", new CompleteRun(SequentialIds.Make(0x10000000, 1), Difficulty.Normal, 3) },

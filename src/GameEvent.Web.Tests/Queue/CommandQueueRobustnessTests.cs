@@ -51,10 +51,10 @@ public class CommandQueueRobustnessTests
         await using var h = await QueueHarness.StartAsync();
         await Accepted(h, new CreateSeason(s_seasonA), s_seasonA);
         var id = Guid.NewGuid();
-        await Accepted(h, new AddSeasonPlayer(s_vasya, "Вася"), s_seasonA, id);
+        await Accepted(h, new AddSeasonPlayer(s_vasya, s_vasya, "Вася"), s_seasonA, id);
 
         var otherCommand = await h.SendAsync(new RollGame(s_vasya), s_seasonA, id);
-        var otherSeason = await h.SendAsync(new AddSeasonPlayer(s_vasya, "Вася"), s_seasonB, id);
+        var otherSeason = await h.SendAsync(new AddSeasonPlayer(s_vasya, s_vasya, "Вася"), s_seasonB, id);
 
         Assert.Equal(RejectionCodes.CommandIdReused, otherCommand.Rejection?.Code);
         Assert.Equal(RejectionCodes.CommandIdReused, otherSeason.Rejection?.Code);
@@ -63,13 +63,30 @@ public class CommandQueueRobustnessTests
     }
 
     [Fact]
+    public async Task Command_id_reused_by_another_author_is_rejected()
+    {
+        await using var h = await QueueHarness.StartAsync();
+        await Accepted(h, new CreateSeason(s_seasonA), s_seasonA);
+        await Accepted(h, new AddSeasonPlayer(s_vasya, s_vasya, "Вася"), s_seasonA);
+        await Accepted(h, new AddSeasonPlayer(s_petya, s_petya, "Петя"), s_seasonA);
+        var id = Guid.NewGuid();
+        var first = await h.Bus.SendAsync(new CommandEnvelope(id, s_seasonA, new RollGame(s_vasya), s_vasya), Ct);
+        Assert.True(first.IsAccepted);
+
+        // Petya guesses Vasya's command id: he must not get Vasya's result as a "duplicate"
+        var other = await h.Bus.SendAsync(new CommandEnvelope(id, s_seasonA, new RollGame(s_petya), s_petya), Ct);
+
+        Assert.Equal(RejectionCodes.CommandIdReused, other.Rejection?.Code);
+    }
+
+    [Fact]
     public async Task Two_seasons_keep_separate_logs_numbering_and_state()
     {
         await using var h = await QueueHarness.StartAsync();
         await Accepted(h, new CreateSeason(s_seasonA), s_seasonA);
         await Accepted(h, new CreateSeason(s_seasonB), s_seasonB);
-        await Accepted(h, new AddSeasonPlayer(s_vasya, "Вася"), s_seasonA);
-        await Accepted(h, new AddSeasonPlayer(s_petya, "Петя"), s_seasonB);
+        await Accepted(h, new AddSeasonPlayer(s_vasya, s_vasya, "Вася"), s_seasonA);
+        await Accepted(h, new AddSeasonPlayer(s_petya, s_petya, "Петя"), s_seasonB);
         await Accepted(h, new RollGame(s_vasya), s_seasonA);
 
         // Vasya is not in season B: the caches do not mix
@@ -92,7 +109,7 @@ public class CommandQueueRobustnessTests
         var block = new BlockingSaveInterceptor();
         await using var h = await QueueHarness.StartAsync(block);
         await Accepted(h, new CreateSeason(s_seasonA), s_seasonA);
-        await Accepted(h, new AddSeasonPlayer(s_vasya, "Вася"), s_seasonA);
+        await Accepted(h, new AddSeasonPlayer(s_vasya, s_vasya, "Вася"), s_seasonA);
         var id = Guid.NewGuid();
 
         // The command is held inside the processor, then the browser request is cancelled
@@ -116,7 +133,7 @@ public class CommandQueueRobustnessTests
         var fault = new FailingAfterCommitInterceptor();
         await using var h = await QueueHarness.StartAsync(fault);
         await Accepted(h, new CreateSeason(s_seasonA), s_seasonA);
-        await Accepted(h, new AddSeasonPlayer(s_vasya, "Вася"), s_seasonA);
+        await Accepted(h, new AddSeasonPlayer(s_vasya, s_vasya, "Вася"), s_seasonA);
 
         // The roll is committed, but the caller gets an error
         fault.Armed = true;
@@ -138,7 +155,7 @@ public class CommandQueueRobustnessTests
         // Given the processor stuck in the first command and 29 more waiting in the queue
         block.Armed = true;
         var calls = Enumerable.Range(1, 30)
-            .Select(i => h.SendAsync(new AddSeasonPlayer(Guid.Parse($"10000000-0000-0000-0000-{i:x12}"), $"Игрок {i}"), s_seasonA))
+            .Select(i => h.SendAsync(new AddSeasonPlayer(Guid.Parse($"10000000-0000-0000-0000-{i:x12}"), Guid.Parse($"40000000-0000-0000-0000-{i:x12}"), $"Игрок {i}"), s_seasonA))
             .ToList();
         await block.Blocked.Task.WaitAsync(TimeSpan.FromSeconds(10), Ct);
 

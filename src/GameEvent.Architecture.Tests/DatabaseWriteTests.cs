@@ -14,6 +14,9 @@ public class DatabaseWriteTests
     [
         "GameEvent.Infrastructure.Queue.CommandProcessor",
         "GameEvent.Infrastructure.Database.SqliteDatabase",
+
+        // Development seed: accounts and pool have no commands yet (D8, E2); its season goes through the queue.
+        "GameEvent.Web.Hosting.DevSeed",
     ];
 
     private static readonly string[] s_writeMethods =

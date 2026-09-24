@@ -40,7 +40,7 @@ internal static class SeasonProjection
             var record = await db.SeasonPlayers.FindAsync([id], ct);
             if (record is null)
             {
-                record = new SeasonPlayerRecord { Id = id, SeasonId = after.SeasonId, Name = player.Name, CellId = player.CellId };
+                record = new SeasonPlayerRecord { Id = id, SeasonId = after.SeasonId, UserId = player.UserId, Name = player.Name, CellId = player.CellId };
                 db.SeasonPlayers.Add(record);
             }
 
@@ -105,7 +105,7 @@ internal static class SeasonProjection
             Players = players.ToImmutableSortedDictionary(
                 p => p.Id,
                 p => new SeasonPlayer(
-                    p.Id, p.Name, p.CellId, p.Points, p.Phase,
+                    p.Id, p.UserId, p.Name, p.CellId, p.Points, p.Phase,
                     p.OfferJson is null ? null : JsonSerializer.Deserialize<RollOffer>(p.OfferJson, EngineJson.Options),
                     p.ActiveRunId)),
             Runs = runs.ToImmutableSortedDictionary(
