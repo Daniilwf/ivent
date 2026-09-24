@@ -100,6 +100,26 @@ public class PlayerAdminInvariantTests
         Assert.Equal(first.State, second.State);
     }
 
+    [Property(MaxTest = 100)]
+    public void Every_move_fires_its_entered_cells_and_a_transfer_fires_none(int seed, byte[] script) =>
+        Play(seed, script, (s, _, _, _) =>
+        {
+            // D-90: a MoveStep per entered cell, a Stop on the last one only if the move had steps
+            foreach (var moved in s.LastEvents<PlayerMoved>())
+            {
+                var visits = Movement.Visits(moved);
+                if (moved.Steps == 0)
+                {
+                    Assert.Empty(visits);
+                    continue;
+                }
+
+                Assert.Equal(moved.Path, visits.Where(v => v.Kind == CellVisitKind.MoveStep).Select(v => v.CellId));
+                Assert.Equal(new CellVisit(moved.To, CellVisitKind.Stop), Assert.Single(visits, v => v.Kind == CellVisitKind.Stop));
+                Assert.Equal(new CellVisit(moved.To, CellVisitKind.Stop), visits[^1]);
+            }
+        });
+
     private static void CheckInvariants(Scenario s, ICommand command, SeasonState before, int logLengthBefore)
     {
         // A rejected command has no events and changes nothing
@@ -134,6 +154,20 @@ public class PlayerAdminInvariantTests
 
             // 7. The token is on an existing cell
             Assert.Contains(s.State.Map.Cells, c => c.Id == player.CellId);
+
+            // M4. The path ends where the token stands; inside a segment every pair of cells is a map edge;
+            // one segment per placement (joining the season) and per transfer (Steps = 0)
+            Assert.Equal(player.CellId, player.Path.Current);
+            Assert.All(player.Path.Segments, segment =>
+            {
+                Assert.NotEmpty(segment.Cells);
+                Assert.All(segment.Cells, cell => Assert.Contains(s.State.Map.Cells, c => c.Id == cell));
+                Assert.All(
+                    segment.Cells.Zip(segment.Cells.Skip(1)),
+                    step => Assert.Contains(s.State.Map.Edges, e => e.From == step.First && e.To == step.Second));
+            });
+            var transfers = s.Log.OfType<PlayerMoved>().Count(e => e.PlayerId == player.PlayerId && e.Steps == 0);
+            Assert.Equal(1 + transfers, player.Path.Segments.Count);
 
             // SE5. The flag is what the admin last set
             Assert.Equal(reference.IsInactive, player.IsInactive);

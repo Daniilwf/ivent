@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using GameEvent.Engine.Kernel;
 
 namespace GameEvent.Engine.Map;
@@ -16,6 +17,7 @@ public sealed record PlayerPath(EquatableArray<PathSegment> Segments)
     public static PlayerPath At(string cellId) => new([new PathSegment([cellId])]);
 
     /// <summary>The cell the player stands on.</summary>
+    [JsonIgnore]
     public string Current => Segments[^1].Cells[^1];
 
     /// <summary>The path after <paramref name="moved"/>: forward extends, back retraces, a transfer starts anew.</summary>
