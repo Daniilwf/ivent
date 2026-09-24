@@ -44,15 +44,12 @@ if (areas.dotnet) {
     'dotnet',
     ['build', 'GameEvent.slnx', '-nologo', '-clp:ErrorsOnly', '-v', 'q'],
   ]);
-  const cs = changed.filter((p) => p.endsWith('.cs'));
-  const include = all ? [] : cs.length ? ['--include', ...cs.map(quote)] : null;
-  if (include) {
-    steps.push([
-      '.NET formatting',
-      'dotnet',
-      ['format', 'whitespace', '--folder', '--verify-no-changes', ...include],
-    ]);
-  }
+  // Full format check (style and import order too), as in CI: ~10 s for the whole solution.
+  steps.push([
+    '.NET formatting and code style',
+    'dotnet',
+    ['format', 'GameEvent.slnx', '--verify-no-changes', '--no-restore'],
+  ]);
   steps.push([
     '.NET architecture and fast tests',
     'dotnet',
