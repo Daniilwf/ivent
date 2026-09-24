@@ -48,6 +48,7 @@ namespace GameEvent.Infrastructure.Database.Migrations
                     Sequence = table.Column<long>(type: "INTEGER", nullable: false),
                     CommandId = table.Column<Guid>(type: "TEXT", nullable: false),
                     CommandType = table.Column<string>(type: "TEXT", maxLength: 100, nullable: false),
+                    CommandHash = table.Column<string>(type: "TEXT", nullable: false),
                     Type = table.Column<string>(type: "TEXT", maxLength: 100, nullable: false),
                     Version = table.Column<int>(type: "INTEGER", nullable: false),
                     Data = table.Column<string>(type: "TEXT", nullable: false),

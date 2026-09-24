@@ -77,6 +77,10 @@ namespace GameEvent.Infrastructure.Database.Migrations
                     b.Property<Guid?>("AuthorId")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("CommandHash")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
                     b.Property<Guid>("CommandId")
                         .HasColumnType("TEXT");
 

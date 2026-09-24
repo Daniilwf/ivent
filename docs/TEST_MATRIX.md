@@ -128,7 +128,7 @@
 | L4 | Проверка целостности: пересчёт из лога совпадает с сохранённым | `Seasons/SliceScenarioTests.Replaying_every_prefix_of_the_log_matches_the_state_after_each_command`, инвариант 1 (`Invariants/SliceInvariantTests.Invariants_hold_after_every_command`), `Log/IntegrityTests.*`, `Web.Tests/Integrity/*`, `Web.Tests/Queue/CommandQueueTests.Command_through_the_queue_writes_log_and_projection_that_agree` | 🟨 C12 |
 | L5 | Экспорт и импорт сезона одним архивом | `Web.Tests/SeasonTransfer/*` | ⬜ |
 | L6 | Формат события версионируется, старые события читаются через преобразование | `Kernel/EventFormatTests.*` (эталонный формат, пошаговое преобразование старых версий, отказ для новее сборки и без преобразования), `Seasons/SliceScenarioTests.Every_event_of_the_slice_survives_the_json_round_trip` | ✅ |
-| L7 | Все изменения через одну очередь, одна команда — одна транзакция, повтор `CommandId` не выполняется дважды | `Web.Tests/Queue/CommandQueueTests.*`, `Web.Tests/Queue/CommandQueueRobustnessTests.*` (атомарность при сбое, 50 параллельных команд, повтор `CommandId` засчитывается только той же команде того же автора и сезона, перезапуск, остановка) | ✅ |
+| L7 | Все изменения через одну очередь, одна команда — одна транзакция, повтор `CommandId` не выполняется дважды | `Web.Tests/Queue/CommandQueueTests.*`, `Web.Tests/Queue/CommandQueueRobustnessTests.*` (атомарность при сбое, 50 параллельных команд, повтор `CommandId` засчитывается только той же команде того же автора и сезона, перезапуск, остановка), `Queue/CommandQueueRobustnessTests.Command_id_reused_with_a_different_body_is_rejected` (тело команды сверяется по хэшу, D-95) | ✅ |
 
 ### Аккаунты, безопасность, эксплуатация
 

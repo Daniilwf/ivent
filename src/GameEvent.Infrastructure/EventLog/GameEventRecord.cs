@@ -23,6 +23,12 @@ public sealed class GameEventRecord
     /// <summary>Command type name: a repeated <see cref="CommandId"/> must be the same command.</summary>
     public required string CommandType { get; set; }
 
+    /// <summary>
+    /// SHA-256 of the command's JSON, hex: a repeated <see cref="CommandId"/> must carry the same body too, or it is
+    /// refused rather than answered with the first command's events.
+    /// </summary>
+    public required string CommandHash { get; set; }
+
     public required string Type { get; set; }
 
     public int Version { get; set; }

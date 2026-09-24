@@ -4,6 +4,7 @@ namespace GameEvent.Engine.Kernel;
 public static class RejectionCodes
 {
     public const string CommandIdReused = "command.idReused";
+    public const string CommandInvalid = "command.invalid";
     public const string SeasonMismatch = "season.mismatch";
     public const string RulesetInvalid = "ruleset.invalid";
     public const string RulesetUnchanged = "ruleset.unchanged";
