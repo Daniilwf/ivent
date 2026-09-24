@@ -1,0 +1,45 @@
+{
+  "name": "game-event",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Project commands for the agent, hooks, CI and humans. See the table in CLAUDE.md.",
+  "scripts": {
+    "prepare": "husky",
+    "setup": "npm install && npm --prefix web install && npm --prefix e2e install && dotnet tool restore && dotnet restore GameEvent.slnx",
+    "format:file": "node scripts/format-file.mjs",
+    "check:stop": "node scripts/check-stop.mjs",
+    "lint": "dotnet format GameEvent.slnx --verify-no-changes && npm --prefix web run -s lint && npm --prefix e2e run -s lint && prettier --check .",
+    "build": "dotnet build GameEvent.slnx -nologo && npm --prefix web run -s build",
+    "test:dotnet:fast": "dotnet test GameEvent.slnx -nologo --filter \"Category!=Long&Category!=Slow\"",
+    "test:dotnet": "dotnet test GameEvent.slnx -nologo --filter \"Category!=Long\"",
+    "test:fast": "npm run -s test:dotnet:fast && npm --prefix web run -s test",
+    "test": "npm run -s test:dotnet && npm --prefix web run -s test",
+    "test:e2e": "node scripts/e2e.mjs e2e",
+    "test:smoke": "node scripts/e2e.mjs smoke",
+    "test:invariants:long": "node scripts/invariants-long.mjs",
+    "test:mutation": "dotnet tool run dotnet-stryker --config-file stryker-config.json",
+    "coverage": "node scripts/coverage.mjs",
+    "gitleaks": "node scripts/gitleaks.mjs",
+    "dev": "node scripts/todo.mjs dev B4",
+    "dev:demo": "node scripts/todo.mjs dev:demo F2",
+    "seed:demo": "node scripts/todo.mjs seed:demo F2",
+    "gen:api": "node scripts/todo.mjs gen:api B3",
+    "import:xlsx": "node scripts/todo.mjs import:xlsx F1",
+    "season:export": "node scripts/todo.mjs season:export C12",
+    "season:import": "node scripts/todo.mjs season:import C12",
+    "backup:verify": "node scripts/todo.mjs backup:verify J3",
+    "deploy:staging": "node scripts/todo.mjs deploy:staging J2",
+    "deploy:prod": "node scripts/todo.mjs deploy:prod J2"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^21.2.3",
+    "@commitlint/config-conventional": "^21.2.3",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.5.1",
+    "prettier": "^3.9.9"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

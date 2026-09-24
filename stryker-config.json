@@ -1,0 +1,12 @@
+{
+  "stryker-config": {
+    "solution": "GameEvent.slnx",
+    "project": "GameEvent.Engine.csproj",
+    "test-projects": ["src/GameEvent.Engine.Tests/GameEvent.Engine.Tests.csproj"],
+    "test-case-filter": "Category!=Long",
+    "reporters": ["html", "progress", "json"],
+    "output": "test-artifacts/stryker",
+    "thresholds": { "high": 90, "low": 80, "break": 80 },
+    "concurrency": 4
+  }
+}

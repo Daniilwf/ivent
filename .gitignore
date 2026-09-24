@@ -35,3 +35,6 @@ blob-report/
 *.db-shm
 *.db-wal
 /var/
+
+# Downloaded tools (gitleaks)
+.tools/
