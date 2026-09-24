@@ -84,6 +84,30 @@ public class CommandQueueRobustnessTests
     }
 
     [Fact]
+    public async Task Command_id_reused_with_a_different_body_is_rejected()
+    {
+        await using var h = await QueueHarness.StartAsync();
+        await Accepted(h, new CreateSeason(s_seasonA, "Тестовый сезон", RulesetJson.Default()), s_seasonA);
+        await Accepted(h, new ChangeSeasonStatus(SeasonStatus.Active), s_seasonA);
+        await Accepted(h, new AddSeasonPlayer(s_vasya, s_vasya, "Вася"), s_seasonA);
+        await Accepted(h, new AddSeasonPlayer(s_petya, s_petya, "Петя"), s_seasonA);
+        var admin = Guid.NewGuid();
+        var id = Guid.NewGuid();
+        var first = await h.Bus.SendAsync(new CommandEnvelope(id, s_seasonA, new AdjustPlayer(s_vasya, "Бонус", PointsDelta: 5), admin), Ct);
+        Assert.True(first.IsAccepted);
+
+        // The same admin reuses the id for another target or another amount: that is not a repeat of the first
+        var otherTarget = await h.Bus.SendAsync(new CommandEnvelope(id, s_seasonA, new AdjustPlayer(s_petya, "Бонус", PointsDelta: 5), admin), Ct);
+        var otherAmount = await h.Bus.SendAsync(new CommandEnvelope(id, s_seasonA, new AdjustPlayer(s_vasya, "Бонус", PointsDelta: 7), admin), Ct);
+        var repeat = await h.Bus.SendAsync(new CommandEnvelope(id, s_seasonA, new AdjustPlayer(s_vasya, "Бонус", PointsDelta: 5), admin), Ct);
+
+        Assert.Equal(RejectionCodes.CommandIdReused, otherTarget.Rejection?.Code);
+        Assert.Equal(RejectionCodes.CommandIdReused, otherAmount.Rejection?.Code);
+        Assert.True(repeat.IsDuplicate);
+        Assert.Equal(first.Events.Select(e => e.Sequence), repeat.Events.Select(e => e.Sequence));
+    }
+
+    [Fact]
     public async Task Two_seasons_keep_separate_logs_numbering_and_state()
     {
         await using var h = await QueueHarness.StartAsync();

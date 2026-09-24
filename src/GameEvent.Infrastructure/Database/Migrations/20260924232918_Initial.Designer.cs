@@ -11,7 +11,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace GameEvent.Infrastructure.Database.Migrations
 {
     [DbContext(typeof(GameEventDbContext))]
-    [Migration("20260924215424_Initial")]
+    [Migration("20260924232918_Initial")]
     partial class Initial
     {
         /// <inheritdoc />
@@ -78,6 +78,10 @@ namespace GameEvent.Infrastructure.Database.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<Guid?>("AuthorId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CommandHash")
+                        .IsRequired()
                         .HasColumnType("TEXT");
 
                     b.Property<Guid>("CommandId")
