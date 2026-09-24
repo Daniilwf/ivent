@@ -22,12 +22,12 @@ export function run(command, args = [], options = {}) {
 }
 
 /**
- * Quotes an argument for the shell used by run() on Windows. cmd.exe expands %VAR% and !VAR!
- * even inside quotes, so such arguments are refused rather than passed on.
+ * Quotes an argument for the shell used by run() on Windows. cmd.exe expands %VAR% even inside quotes,
+ * so such arguments are refused (delayed !VAR! expansion is off in `cmd /c`, so ! is allowed).
  */
 export function quote(arg) {
-  if (process.platform === 'win32' && /[%!"]/.test(arg)) {
-    throw new Error(`Refusing a shell argument with %, ! or ": ${arg}`);
+  if (process.platform === 'win32' && /[%"]/.test(arg)) {
+    throw new Error(`Refusing a shell argument with % or ": ${arg}`);
   }
   return process.platform === 'win32' && /[\s&()^|<>]/.test(arg) ? `"${arg}"` : arg;
 }
