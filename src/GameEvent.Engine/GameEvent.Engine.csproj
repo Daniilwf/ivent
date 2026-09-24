@@ -6,6 +6,11 @@
     <AdditionalFiles Include="BannedSymbols.txt" />
   </ItemGroup>
 
+  <!-- The default ruleset lives in docs/ (source of truth) and ships inside the engine. -->
+  <ItemGroup>
+    <EmbeddedResource Include="../../docs/ruleset.default.json" LogicalName="ruleset.default.json" Link="Rulesets/ruleset.default.json" />
+  </ItemGroup>
+
   <ItemGroup>
     <InternalsVisibleTo Include="GameEvent.Engine.Tests" />
   </ItemGroup>
