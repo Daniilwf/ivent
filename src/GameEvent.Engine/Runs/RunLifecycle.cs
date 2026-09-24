@@ -2,6 +2,7 @@ using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Map;
 using GameEvent.Engine.Scoring;
 using GameEvent.Engine.Seasons;
+using GameEvent.Engine.Turns;
 
 namespace GameEvent.Engine.Runs;
 
@@ -9,7 +10,7 @@ internal static class RunLifecycle
 {
     public static Decision Decide(SeasonState state, StartRun command, EngineContext context)
     {
-        if (Check(state, command.PlayerId, TurnPhase.Rolling) is { } rejection)
+        if (TurnRules.Check(state, command.PlayerId, command) is { } rejection)
         {
             return rejection;
         }
@@ -22,7 +23,7 @@ internal static class RunLifecycle
 
     public static Decision Decide(SeasonState state, CompleteRun command, EngineContext context)
     {
-        if (Check(state, command.PlayerId, TurnPhase.Playing) is { } rejection)
+        if (TurnRules.Check(state, command.PlayerId, command) is { } rejection)
         {
             return rejection;
         }
@@ -84,21 +85,4 @@ internal static class RunLifecycle
 
     public static SeasonState Apply(SeasonState state, CompletionRolled e) =>
         state with { Runs = state.Runs.SetItem(e.RunId, state.Runs[e.RunId] with { Dice = e.Dice }) };
-
-    private static Decision? Check(SeasonState state, Guid playerId, TurnPhase required)
-    {
-        if (SeasonSetup.RequireActive(state) is { } inactive)
-        {
-            return inactive;
-        }
-
-        if (!state.Players.TryGetValue(playerId, out var player))
-        {
-            return Decision.Reject(RejectionCodes.PlayerUnknown, $"Player {playerId} is not in the season.");
-        }
-
-        return player.Phase == required
-            ? null
-            : Decision.Reject(RejectionCodes.WrongPhase, $"Needs phase {required}, player is {player.Phase}.");
-    }
 }

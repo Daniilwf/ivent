@@ -74,7 +74,6 @@ public class SeasonSetupTests
     public static TheoryData<string, Func<Ruleset, Ruleset>> UnsupportedRulesets() => new()
     {
         { "graph map", r => r with { Features = r.Features with { MapMode = MapMode.Graph } } },
-        { "choice of two", r => r with { Roll = r.Roll with { ChoiceCount = 2 } } },
         { "two active runs", r => r with { Season = r.Season with { MaxActiveRunsPerPlayer = 2 } } },
     };
 
@@ -98,7 +97,7 @@ public class SeasonSetupTests
 
         ScenarioAssert.RejectsWithoutChanges(
             s,
-            x => x.Act(new ChangeRuleset(x.Ruleset with { Roll = x.Ruleset.Roll with { ChoiceCount = 2 } })),
+            x => x.Act(new ChangeRuleset(x.Ruleset with { Season = x.Ruleset.Season with { MaxActiveRunsPerPlayer = 2 } })),
             RejectionCodes.RulesetInvalid);
     }
 }

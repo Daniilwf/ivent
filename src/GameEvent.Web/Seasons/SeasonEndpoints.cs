@@ -5,6 +5,7 @@ using GameEvent.Engine.Map;
 using GameEvent.Engine.Rolls;
 using GameEvent.Engine.Runs;
 using GameEvent.Engine.Seasons;
+using GameEvent.Engine.Turns;
 using GameEvent.Infrastructure.Database;
 using GameEvent.Infrastructure.Queue;
 using GameEvent.Web.Accounts;
@@ -18,6 +19,9 @@ namespace GameEvent.Web.Seasons;
 public sealed record RollRequest(Guid CommandId);
 
 public sealed record StartRequest(Guid CommandId);
+
+/// <summary>An answer to the pending choice: its id and the picked option's id.</summary>
+public sealed record ChooseRequest(Guid CommandId, Guid ChoiceId, string OptionId);
 
 /// <summary>Completing the active run. <c>estimatedHours</c> is needed only when the game has no hours.</summary>
 public sealed record CompleteRequest(Guid CommandId, Difficulty Difficulty, decimal? EstimatedHours = null);
@@ -35,7 +39,13 @@ public sealed record CellView(string Id, CellType Type);
 
 public sealed record PlayerView(Guid Id, string Name, string CellId, int Points, TurnPhase Phase);
 
-public sealed record MyTurnView(Guid PlayerId, TurnPhase Phase, GameView? Offer, RunView? ActiveRun, CompletedRunView? LastCompleted);
+public sealed record MyTurnView(
+    Guid PlayerId, TurnPhase Phase, GameView? Offer, ChoiceView? Choice, RunView? ActiveRun, CompletedRunView? LastCompleted);
+
+/// <summary>The pending choice, kept on the server: a reloaded page shows the same options (T2).</summary>
+public sealed record ChoiceView(Guid Id, ChoiceKind Kind, IReadOnlyList<ChoiceOptionView> Options);
+
+public sealed record ChoiceOptionView(string Id, GameView? Game);
 
 /// <summary>The player's latest completed run with its dice, each die separately.</summary>
 public sealed record CompletedRunView(Guid Id, GameView Game, Difficulty Difficulty, IReadOnlyList<DieView> Dice, int Total);
@@ -52,6 +62,8 @@ public sealed record RunView(Guid Id, GameView Game, DateTimeOffset StartedAt);
 public static class SeasonEndpoints
 {
     public const decimal MaxEstimatedHours = 1000;
+
+    public const int MaxOptionIdLength = 64;
 
     public static void MapSeasons(this RouteGroupBuilder api)
     {
@@ -72,6 +84,17 @@ public static class SeasonEndpoints
 
         seasons.MapPost("/start", (Guid seasonId, StartRequest request, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, CancellationToken ct) =>
             ActAsync(seasonId, request.CommandId, user, db, bus, playerId => new StartRun(playerId), ct))
+            .RequireAuthorization(Policies.Player)
+            .WithActionErrors();
+
+        seasons.MapPost("/choose", (Guid seasonId, ChooseRequest request, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, CancellationToken ct) =>
+            request.ChoiceId == Guid.Empty || string.IsNullOrWhiteSpace(request.OptionId) || request.OptionId.Length > MaxOptionIdLength
+                ? Task.FromResult<Results<Ok<CommandResponse>, ProblemHttpResult, ValidationProblem, NotFound, ForbidHttpResult>>(
+                    TypedResults.ValidationProblem(new Dictionary<string, string[]>
+                    {
+                        ["optionId"] = [$"A choice id and an option id of at most {MaxOptionIdLength} characters are required."],
+                    }))
+                : ActAsync(seasonId, request.CommandId, user, db, bus, playerId => new MakeChoice(playerId, request.ChoiceId, request.OptionId), ct))
             .RequireAuthorization(Policies.Player)
             .WithActionErrors();
 
@@ -156,6 +179,7 @@ public static class SeasonEndpoints
         if (players.SingleOrDefault(p => p.UserId == userId) is { } mine)
         {
             var offer = mine.OfferJson is null ? null : JsonSerializer.Deserialize<RollOffer>(mine.OfferJson, EngineJson.Options);
+            var choice = mine.ChoiceJson is null ? null : JsonSerializer.Deserialize<PendingChoice>(mine.ChoiceJson, EngineJson.Options);
             var run = mine.ActiveRunId is { } runId ? await db.Runs.AsNoTracking().SingleAsync(r => r.Id == runId, ct) : null;
             // One active run per player (C4 keeps it that way), so the latest started completed run is the latest
             // completed one. Revisit with a completion time column if several active runs are ever allowed.
@@ -163,13 +187,20 @@ public static class SeasonEndpoints
                 .Where(r => r.PlayerId == mine.Id && r.Status == RunStatus.Completed)
                 .OrderByDescending(r => r.StartedAt)
                 .FirstOrDefaultAsync(ct);
-            var gameIds = new[] { offer?.GameId, run?.GameId, last?.GameId }.OfType<Guid>().ToList();
+            var gameIds = new[] { offer?.GameId, run?.GameId, last?.GameId }
+                .Concat(choice?.Options.Select(o => o.Game?.GameId) ?? [])
+                .OfType<Guid>()
+                .ToList();
             var games = await db.Games.AsNoTracking().Where(g => gameIds.Contains(g.Id)).ToDictionaryAsync(g => g.Id, ct);
 
             me = new MyTurnView(
                 mine.Id,
                 mine.Phase,
-                offer is null ? null : new GameView(offer.GameId, games[offer.GameId].Title, offer.Snapshot.Hours),
+                offer is null ? null : Offered(offer, games),
+                choice is null ? null : new ChoiceView(
+                    choice.ChoiceId,
+                    choice.Kind,
+                    [.. choice.Options.Select(o => new ChoiceOptionView(o.Id, o.Game is null ? null : Offered(o.Game, games)))]),
                 run is null ? null : new RunView(run.Id, Game(run, games[run.GameId]), run.StartedAt),
                 last is null ? null : Completed(last, games[last.GameId]));
         }
@@ -181,6 +212,10 @@ public static class SeasonEndpoints
             me,
             lastSequence));
     }
+
+    /// <summary>An offered game with the hours fixed at roll time.</summary>
+    private static GameView Offered(RollOffer offer, Dictionary<Guid, Infrastructure.Pool.GameRecord> games) =>
+        new(offer.GameId, games[offer.GameId].Title, offer.Snapshot.Hours);
 
     /// <summary>A run's game: the run's own hours when known, otherwise the pool's.</summary>
     private static GameView Game(Infrastructure.Seasons.RunRecord run, Infrastructure.Pool.GameRecord game) =>

@@ -4,6 +4,10 @@ const hours = (value: number) => `${value.toLocaleString('ru-RU')} ч`;
 
 const rejection = {
   'turn.wrongPhase': 'Это действие сейчас недоступно: обновите страницу.',
+  'turn.choicePending': 'Сначала сделайте выбор.',
+  'turn.noPendingChoice': 'Этот выбор уже сделан или снят. Обновите страницу.',
+  'turn.unknownOption': 'Такого варианта нет. Обновите страницу.',
+  'turn.activeRunLimit': 'У вас уже есть активное прохождение.',
   'roll.noAvailableGames': 'Нет доступных игр для ролла. Сообщите админу.',
   'run.hoursRequired': 'У игры нет данных о длине: укажите оценку часов.',
   'run.invalidHours': 'Часы должны быть больше нуля.',
@@ -40,6 +44,9 @@ export const ru = {
     offered: (title: string, gameHours: number | null) =>
       gameHours == null ? `Выпала игра: ${title}` : `Выпала игра: ${title} (${hours(gameHours)})`,
     start: 'Начать',
+    choose: 'Выберите одну из выпавших игр',
+    option: (title: string, gameHours: number | null) =>
+      gameHours == null ? title : `${title} (${hours(gameHours)})`,
     playing: (title: string) => `Сейчас играете: ${title}`,
     complete: 'Завершить',
     difficulty: 'Сложность',

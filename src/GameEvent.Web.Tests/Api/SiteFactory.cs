@@ -104,6 +104,9 @@ internal sealed class SiteFactory : WebApplicationFactory<Program>
         }
     }
 
+    /// <summary>Sends an admin command to the seeded season through the queue; throws when it is rejected.</summary>
+    public Task SendAsync(ICommand command) => SendAsync(Services.GetRequiredService<CommandBus>(), command);
+
     /// <summary>Another season, created now by the test clock, with nobody in it.</summary>
     public async Task<Guid> CreateSeasonAsync()
     {

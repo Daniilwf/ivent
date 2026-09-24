@@ -51,6 +51,15 @@ internal sealed class SeasonGameStatus
             {
                 _misses.TryAdd(offer.GameId, new RollMiss(offer.GameId, RollMissReason.BeingPlayed, player.PlayerId));
             }
+
+            // Every option of a pending choice is reserved until the pick (D-06).
+            foreach (var option in player.Choice?.Options ?? [])
+            {
+                if (option.Game is { } game)
+                {
+                    _misses.TryAdd(game.GameId, new RollMiss(game.GameId, RollMissReason.BeingPlayed, player.PlayerId));
+                }
+            }
         }
     }
 

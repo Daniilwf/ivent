@@ -1,7 +1,9 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using GameEvent.Engine.Rulesets;
 using GameEvent.Engine.Seasons;
+using GameEvent.Engine.Turns;
 using GameEvent.Web.Seasons;
 
 namespace GameEvent.Web.Tests.Api;
@@ -133,12 +135,49 @@ public sealed class SeasonApiTests : IAsyncLifetime
         }
     }
 
+    [Fact]
+    public async Task Player_chooses_one_of_several_rolled_games_and_the_choice_survives_a_reload()
+    {
+        // Given a season where the wheel offers a choice of three games (D-91)
+        var rules = RulesetJson.Default();
+        await _site.SendAsync(new ChangeRuleset(rules with { Roll = rules.Roll with { ChoiceCount = 3 } }, ExpectedVersion: null));
+        var vasya = await _site.SignedInAsync("vasya");
+
+        var roll = await PostAsync(vasya, "roll", new { commandId = Guid.NewGuid() });
+
+        // The pending choice is in the season view: a reloaded page shows the same options
+        Assert.Equal(["game-choice-rolled"], await TypesAsync(roll));
+        var rolled = (await vasya.GetFromJsonAsync<SeasonView>($"/api/seasons/{SiteFactory.SeasonId}", s_json, Ct))!.Me!;
+        Assert.Equal(TurnPhase.Rolling, rolled.Phase);
+        Assert.Null(rolled.Offer);
+        var choice = rolled.Choice!;
+        Assert.Equal(ChoiceKind.Game, choice.Kind);
+        Assert.Equal(["Alan Wake", "Outlast", "Silent Hill"], choice.Options.Select(o => o.Game!.Title).Order());
+        Assert.All(choice.Options, o => Assert.Equal(o.Game!.Id.ToString("N"), o.Id));
+
+        // When the player picks one, it becomes the offered game
+        var picked = choice.Options[1];
+        var choose = await PostAsync(vasya, "choose", new { commandId = Guid.NewGuid(), choiceId = choice.Id, optionId = picked.Id });
+
+        Assert.Equal(["choice-made"], await TypesAsync(choose));
+        var chosen = (await vasya.GetFromJsonAsync<SeasonView>($"/api/seasons/{SiteFactory.SeasonId}", s_json, Ct))!.Me!;
+        Assert.Null(chosen.Choice);
+        Assert.Equal(picked.Game, chosen.Offer);
+
+        // A second tab answering the same choice is refused with the engine code
+        var again = await vasya.PostAsJsonAsync(Url("choose"), new { commandId = Guid.NewGuid(), choiceId = choice.Id, optionId = picked.Id }, Ct);
+        Assert.Equal(HttpStatusCode.Conflict, again.StatusCode);
+        using var problem = JsonDocument.Parse(await again.Content.ReadAsStringAsync(Ct));
+        Assert.Equal("turn.noPendingChoice", problem.RootElement.GetProperty("code").GetString());
+    }
+
     // ---- Refused: no session, another role, another player ----
 
     [Theory]
     [InlineData("roll")]
     [InlineData("start")]
     [InlineData("complete")]
+    [InlineData("choose")]
     public async Task Anonymous_is_unauthorized(string action)
     {
         var client = await _site.AnonymousAsync();
@@ -159,11 +198,14 @@ public sealed class SeasonApiTests : IAsyncLifetime
     [InlineData("masha", "roll")]
     [InlineData("masha", "start")]
     [InlineData("masha", "complete")]
+    [InlineData("zritel", "choose")]
+    [InlineData("admin", "choose")]
+    [InlineData("masha", "choose")]
     public async Task Spectator_admin_and_player_outside_the_season_are_forbidden(string login, string action)
     {
         var client = await _site.SignedInAsync(login);
 
-        var response = await client.PostAsJsonAsync(Url(action), new { commandId = Guid.NewGuid(), difficulty = "normal" }, Ct);
+        var response = await client.PostAsJsonAsync(Url(action), new { commandId = Guid.NewGuid(), difficulty = "normal", choiceId = Guid.NewGuid(), optionId = "x" }, Ct);
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         await using var db = _site.NewDb();
@@ -205,6 +247,10 @@ public sealed class SeasonApiTests : IAsyncLifetime
     [InlineData("complete", """{"commandId":"5b1e2f0a-0000-0000-0000-000000000004"}""")]
     [InlineData("complete", """{"commandId":"5b1e2f0a-0000-0000-0000-000000000005","difficulty":null}""")]
     [InlineData("start", "not json")]
+    [InlineData("choose", """{"commandId":"5b1e2f0a-0000-0000-0000-000000000006","choiceId":"00000000-0000-0000-0000-000000000000","optionId":"a"}""")]
+    [InlineData("choose", """{"commandId":"5b1e2f0a-0000-0000-0000-000000000007","choiceId":"5b1e2f0a-0000-0000-0000-0000000000ff"}""")]
+    [InlineData("choose", """{"commandId":"5b1e2f0a-0000-0000-0000-000000000008","choiceId":"5b1e2f0a-0000-0000-0000-0000000000ff","optionId":"  "}""")]
+    [InlineData("choose", """{"commandId":"5b1e2f0a-0000-0000-0000-000000000009","choiceId":"5b1e2f0a-0000-0000-0000-0000000000ff","optionId":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}""")]
     public async Task Invalid_input_is_a_bad_request(string action, string body)
     {
         var vasya = await _site.SignedInAsync("vasya");
@@ -218,11 +264,13 @@ public sealed class SeasonApiTests : IAsyncLifetime
     [InlineData("roll")]
     [InlineData("start")]
     [InlineData("complete")]
+    [InlineData("choose")]
     public async Task Unknown_season_is_not_found(string action)
     {
         var vasya = await _site.SignedInAsync("vasya");
 
-        var response = await vasya.PostAsJsonAsync($"/api/seasons/{Guid.NewGuid()}/{action}", new { commandId = Guid.NewGuid(), difficulty = "normal" }, Ct);
+        var response = await vasya.PostAsJsonAsync(
+            $"/api/seasons/{Guid.NewGuid()}/{action}", new { commandId = Guid.NewGuid(), difficulty = "normal", choiceId = Guid.NewGuid(), optionId = "x" }, Ct);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await vasya.GetAsync($"/api/seasons/{Guid.NewGuid()}", Ct)).StatusCode);
@@ -238,6 +286,18 @@ public sealed class SeasonApiTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
         using var problem = JsonDocument.Parse(await response.Content.ReadAsStringAsync(Ct));
         Assert.Equal("turn.wrongPhase", problem.RootElement.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task Choosing_without_a_pending_choice_is_a_conflict()
+    {
+        var vasya = await _site.SignedInAsync("vasya");
+
+        var response = await vasya.PostAsJsonAsync(Url("choose"), new { commandId = Guid.NewGuid(), choiceId = Guid.NewGuid(), optionId = "x" }, Ct);
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        using var problem = JsonDocument.Parse(await response.Content.ReadAsStringAsync(Ct));
+        Assert.Equal("turn.noPendingChoice", problem.RootElement.GetProperty("code").GetString());
     }
 
     private static async Task<HttpResponseMessage> PostAsync(HttpClient client, string action, object body)

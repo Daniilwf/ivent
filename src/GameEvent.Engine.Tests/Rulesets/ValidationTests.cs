@@ -217,7 +217,6 @@ public class ValidationTests
     public static TheoryData<string, Func<Ruleset, Ruleset>, string> NotImplementedYet() => new()
     {
         { "graph map", Flags(f => f with { MapMode = MapMode.Graph }), "features.mapMode" },
-        { "choice of two games", r => r with { Roll = r.Roll with { ChoiceCount = 2 } }, "roll.choiceCount" },
         { "two active runs", r => r with { Season = r.Season with { MaxActiveRunsPerPlayer = 2 } }, "season.maxActiveRunsPerPlayer" },
         { "shop", Flags(f => f with { Shop = true }), "features.shop" },
         { "items", Flags(f => f with { Items = true }), "features.items" },
@@ -242,6 +241,17 @@ public class ValidationTests
         var error = Assert.Single(errors);
         Assert.Equal(path, error.Path);
         Assert.False(string.IsNullOrWhiteSpace(error.Message));
+    }
+
+    [Theory]
+    [InlineData(2)]
+    [InlineData(3)]
+    public void Choice_of_several_games_is_playable(int choiceCount)
+    {
+        // D-91: the choice of N games (roll.choiceCount > 1) landed with the turn machine in C4
+        var errors = Errors(r => r with { Roll = r.Roll with { ChoiceCount = choiceCount } });
+
+        Assert.True(errors.Count == 0, Show(errors));
     }
 
     [Fact]

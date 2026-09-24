@@ -2,6 +2,7 @@ using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Map;
 using GameEvent.Engine.Scoring;
 using GameEvent.Engine.Seasons;
+using GameEvent.Engine.Turns;
 
 namespace GameEvent.Engine.Players;
 
@@ -194,6 +195,11 @@ internal static class PlayerAdministration
         if (command.DiscardOffer && player is { Phase: TurnPhase.Rolling, Offer: { } offer })
         {
             changes.Add(new OfferDiscarded(player.PlayerId, offer.GameId));
+        }
+
+        if (command.DiscardOffer && player is { Phase: TurnPhase.Rolling, Choice: { } choice })
+        {
+            changes.Add(new ChoiceDiscarded(player.PlayerId, choice.ChoiceId));
         }
 
         return changes.Count == 0

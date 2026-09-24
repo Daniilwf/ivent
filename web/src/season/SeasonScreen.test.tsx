@@ -27,7 +27,14 @@ function season(overrides: Partial<Schemas['SeasonView']> = {}): Schemas['Season
       { id: 'finish', type: 'finish' },
     ],
     players: [{ id: me, name: 'Вася', cellId: 'start', points: 0, phase: 'idle' }],
-    me: { playerId: me, phase: 'idle', offer: null, activeRun: null, lastCompleted: null },
+    me: {
+      playerId: me,
+      phase: 'idle',
+      offer: null,
+      choice: null,
+      activeRun: null,
+      lastCompleted: null,
+    },
     lastSequence: 3,
     ...overrides,
   };
@@ -145,6 +152,50 @@ describe('SeasonScreen', () => {
     await act(() => Promise.resolve());
 
     expect(screen.getByTestId('cell-c1')).toHaveTextContent('Вася');
+  });
+
+  it('shows the pending choice and sends the picked option', async () => {
+    const choiceId = 'c0000000-0000-0000-0000-000000000001';
+    const game = (id: string, title: string) => ({ id, title, hours: 12 });
+    const options = [
+      { id: 'a1', game: game('a1000000-0000-0000-0000-000000000001', 'Silent Hill') },
+      { id: 'b2', game: game('b2000000-0000-0000-0000-000000000002', 'Outlast') },
+    ];
+    const bodies: unknown[] = [];
+    serve(async (r) => {
+      if (isSeasonGet(r)) {
+        return json(
+          200,
+          season({
+            me: {
+              playerId: me,
+              phase: 'rolling',
+              offer: null,
+              choice: { id: choiceId, kind: 'game', options },
+              activeRun: null,
+              lastCompleted: null,
+            },
+          }),
+        );
+      }
+      bodies.push({ url: r.url, body: (await r.json()) as unknown });
+      return json(200, { duplicate: false, events: [] });
+    });
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    expect(await screen.findByTestId('choice')).toHaveTextContent(ru.turn.choose);
+    expect(screen.queryByTestId('start')).not.toBeInTheDocument();
+    expect(screen.getByTestId('option-a1')).toHaveTextContent(ru.turn.option('Silent Hill', 12));
+
+    await userEvent.click(screen.getByTestId('option-b2'));
+
+    await vi.waitFor(() => {
+      expect(bodies).toHaveLength(1);
+    });
+    expect(bodies[0]).toMatchObject({
+      url: expect.stringMatching(/\/choose$/) as unknown,
+      body: { choiceId, optionId: 'b2', commandId: expect.any(String) as unknown },
+    });
   });
 
   it('shows a spectator no actions', async () => {

@@ -5,7 +5,8 @@ import { ru } from '../i18n/ru';
 import { CompleteForm, type Completion } from './CompleteForm';
 
 type Season = Schemas['SeasonView'];
-type Action = 'roll' | 'start' | 'complete';
+type Action = 'roll' | 'start' | 'complete' | 'choose';
+type Pick = { choiceId: string; optionId: string };
 type Loaded = { kind: 'season'; season: Season } | { kind: 'signedOut' } | { kind: 'failed' };
 
 async function fetchSeason(seasonId: string): Promise<Loaded> {
@@ -67,7 +68,7 @@ export function SeasonScreen({
     };
   }, [seasonId, apply]);
 
-  async function act(action: Action, completion?: Completion) {
+  async function act(action: Action, completion?: Completion, pick?: Pick) {
     setPending(true);
     setMessage(null);
     try {
@@ -80,9 +81,14 @@ export function SeasonScreen({
               params,
               body: { commandId, ...completion },
             })
-          : action === 'roll'
-            ? await api.POST('/api/seasons/{seasonId}/roll', { params, body: { commandId } })
-            : await api.POST('/api/seasons/{seasonId}/start', { params, body: { commandId } });
+          : action === 'choose' && pick
+            ? await api.POST('/api/seasons/{seasonId}/choose', {
+                params,
+                body: { commandId, ...pick },
+              })
+            : action === 'roll'
+              ? await api.POST('/api/seasons/{seasonId}/roll', { params, body: { commandId } })
+              : await api.POST('/api/seasons/{seasonId}/start', { params, body: { commandId } });
       if (result.response.status === 401) {
         onSignedOut();
         return;
@@ -104,7 +110,9 @@ export function SeasonScreen({
 
   const me = season.me;
   const waiting =
-    (me?.phase === 'rolling' && !me.offer) || (me?.phase === 'playing' && !me.activeRun);
+    (me?.phase === 'rolling' && !me.offer && !me.choice) ||
+    (me?.phase === 'playing' && !me.activeRun);
+  const choice = me?.phase === 'rolling' ? me.choice : null;
   return (
     <main>
       <h1>{ru.app.title}</h1>
@@ -117,6 +125,25 @@ export function SeasonScreen({
           <button data-testid="roll" disabled={pending} onClick={() => void act('roll')}>
             {ru.turn.roll}
           </button>
+        )}
+        {choice && (
+          <fieldset data-testid="choice">
+            <legend>{ru.turn.choose}</legend>
+            {choice.options.map((option) => (
+              <button
+                key={option.id}
+                data-testid={`option-${option.id}`}
+                disabled={pending}
+                onClick={() =>
+                  void act('choose', undefined, { choiceId: choice.id, optionId: option.id })
+                }
+              >
+                {option.game
+                  ? ru.turn.option(option.game.title, option.game.hours ?? null)
+                  : option.id}
+              </button>
+            ))}
+          </fieldset>
         )}
         {me?.phase === 'rolling' && me.offer && (
           <>
