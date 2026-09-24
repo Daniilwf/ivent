@@ -17,7 +17,7 @@ public class SeasonSetupTests
         var s = Scenario.New().WithPlayers("Вася");
 
         ScenarioAssert.RejectsWithoutChanges(
-            s, x => x.Act(new CreateSeason(SequentialIds.Make(0x30000000, 2))), RejectionCodes.SeasonAlreadyCreated);
+            s, x => x.Act(new CreateSeason(SequentialIds.Make(0x30000000, 2), TestRuleset.Create())), RejectionCodes.SeasonAlreadyCreated);
     }
 
     [Fact]
@@ -85,17 +85,19 @@ public class SeasonSetupTests
         var s = Scenario.New().WithRuleset(change);
 
         ScenarioAssert.RejectsWithoutChanges(
-            s, x => x.Act(new CreateSeason(SequentialIds.Make(0x30000000, 1))), RejectionCodes.RulesetUnsupported);
+            s, x => x.Act(new CreateSeason(SequentialIds.Make(0x30000000, 1), x.Ruleset)), RejectionCodes.RulesetInvalid);
     }
 
     [Fact]
-    public void Ruleset_changed_mid_season_to_a_mechanic_not_implemented_yet_rejects_commands()
+    public void Ruleset_cannot_be_changed_mid_season_to_a_mechanic_not_implemented_yet()
     {
         var s = Scenario.New()
             .WithCategory("Horror").WithGame("Silent Hill", 12, "Horror")
-            .WithPlayers("Вася")
-            .WithRuleset(r => r with { Roll = r.Roll with { ChoiceCount = 2 } });
+            .WithPlayers("Вася");
 
-        ScenarioAssert.RejectsWithoutChanges(s, x => x.Roll("Вася"), RejectionCodes.RulesetUnsupported);
+        ScenarioAssert.RejectsWithoutChanges(
+            s,
+            x => x.Act(new ChangeRuleset(x.Ruleset with { Roll = x.Ruleset.Roll with { ChoiceCount = 2 } })),
+            RejectionCodes.RulesetInvalid);
     }
 }

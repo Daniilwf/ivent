@@ -1,6 +1,7 @@
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Map;
 using GameEvent.Engine.Rolls;
+using GameEvent.Engine.Rulesets;
 using GameEvent.Engine.Runs;
 using GameEvent.Engine.Scoring;
 using GameEvent.Engine.Seasons;
@@ -25,6 +26,9 @@ public class EventFormatTests
     private const string SnapshotJson =
         """{"rulesetVersion":1,"hours":7.5,"diceCount":{"hoursPerDie":3,"rounding":"nearest","min":1,"max":10},"dieByDifficulty":{"easy":{"sides":2,"grantEvent":null},"normal":{"sides":4,"grantEvent":null},"hard":{"sides":6,"grantEvent":null},"extreme":{"sides":6,"grantEvent":"good"}}}""";
 
+    // The ruleset's own format is frozen by Rulesets/RulesetSchemaTests (docs/ruleset.schema.json); here it is embedded.
+    private static string RulesetJsonText => System.Text.Json.JsonSerializer.Serialize(TestRuleset.Create(), EngineJson.Options);
+
     private static RunSnapshot Snapshot()
     {
         var ruleset = TestRuleset.Create();
@@ -35,9 +39,15 @@ public class EventFormatTests
     {
         {
             "season-created",
-            new SeasonCreated(s_season, 1, LinearMap.Generate(1)),
+            new SeasonCreated(s_season, TestRuleset.Create(), LinearMap.Generate(1)),
             1,
-            """{"seasonId":"30000000-0000-0000-0000-000000000001","rulesetVersion":1,"map":{"cells":[{"id":"start","type":"start"},{"id":"finish","type":"finish"}],"edges":[{"from":"start","to":"finish","isDefaultForward":true,"isPrimaryBackward":true}]}}"""
+            """{"seasonId":"30000000-0000-0000-0000-000000000001","ruleset":""" + RulesetJsonText + ""","map":{"cells":[{"id":"start","type":"start"},{"id":"finish","type":"finish"}],"edges":[{"from":"start","to":"finish","isDefaultForward":true,"isPrimaryBackward":true}]}}"""
+        },
+        {
+            "ruleset-changed",
+            new RulesetChanged(2, TestRuleset.Create()),
+            1,
+            """{"version":2,"ruleset":""" + RulesetJsonText + "}"
         },
         {
             "season-player-added",

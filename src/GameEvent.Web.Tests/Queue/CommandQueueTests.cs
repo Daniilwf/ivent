@@ -1,6 +1,7 @@
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Rolls;
 using GameEvent.Engine.Runs;
+using GameEvent.Engine.Rulesets;
 using GameEvent.Engine.Seasons;
 using GameEvent.Infrastructure.EventLog;
 using GameEvent.Infrastructure.Seasons;
@@ -23,7 +24,7 @@ public class CommandQueueTests
         await using var h = await QueueHarness.StartAsync();
 
         // When a season is played through the queue
-        await AcceptedAsync(h, new CreateSeason(s_season));
+        await AcceptedAsync(h, new CreateSeason(s_season, RulesetJson.Default()));
         await AcceptedAsync(h, new AddSeasonPlayer(s_vasya, s_vasya, "Вася"));
         await AcceptedAsync(h, new RollGame(s_vasya));
         await AcceptedAsync(h, new StartRun(s_vasya));
@@ -49,7 +50,7 @@ public class CommandQueueTests
     {
         var fault = new FailingSaveInterceptor();
         await using var h = await QueueHarness.StartAsync(fault);
-        await AcceptedAsync(h, new CreateSeason(s_season));
+        await AcceptedAsync(h, new CreateSeason(s_season, RulesetJson.Default()));
         await AcceptedAsync(h, new AddSeasonPlayer(s_vasya, s_vasya, "Вася"));
         await AcceptedAsync(h, new RollGame(s_vasya));
         await AcceptedAsync(h, new StartRun(s_vasya));
@@ -82,7 +83,7 @@ public class CommandQueueTests
     public async Task Rejected_command_writes_nothing()
     {
         await using var h = await QueueHarness.StartAsync();
-        await AcceptedAsync(h, new CreateSeason(s_season));
+        await AcceptedAsync(h, new CreateSeason(s_season, RulesetJson.Default()));
         await AcceptedAsync(h, new AddSeasonPlayer(s_vasya, s_vasya, "Вася"));
         var before = await CountEventsAsync(h);
 
@@ -98,7 +99,7 @@ public class CommandQueueTests
     public async Task Parallel_commands_run_one_at_a_time_without_losses()
     {
         await using var h = await QueueHarness.StartAsync();
-        await AcceptedAsync(h, new CreateSeason(s_season));
+        await AcceptedAsync(h, new CreateSeason(s_season, RulesetJson.Default()));
 
         // When 50 players are added concurrently
         var players = Enumerable.Range(1, 50).Select(i => Guid.Parse($"10000000-0000-0000-0000-{i:x12}")).ToList();
@@ -116,7 +117,7 @@ public class CommandQueueTests
     public async Task Same_command_id_twice_acts_once()
     {
         await using var h = await QueueHarness.StartAsync();
-        await AcceptedAsync(h, new CreateSeason(s_season));
+        await AcceptedAsync(h, new CreateSeason(s_season, RulesetJson.Default()));
         await AcceptedAsync(h, new AddSeasonPlayer(s_vasya, s_vasya, "Вася"));
         var commandId = Guid.NewGuid();
 
@@ -137,7 +138,7 @@ public class CommandQueueTests
     public async Task After_restart_the_season_is_rebuilt_from_the_log()
     {
         await using var h = await QueueHarness.StartAsync();
-        await AcceptedAsync(h, new CreateSeason(s_season));
+        await AcceptedAsync(h, new CreateSeason(s_season, RulesetJson.Default()));
         await AcceptedAsync(h, new AddSeasonPlayer(s_vasya, s_vasya, "Вася"));
         await AcceptedAsync(h, new RollGame(s_vasya));
 

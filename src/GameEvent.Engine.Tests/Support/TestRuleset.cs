@@ -11,19 +11,197 @@ public static class TestRuleset
     public const string Json = """
         {
           "version": 1,
-          "features": { "mapMode": "linear" },
-          "season": { "timezone": "Europe/Moscow", "maxActiveRunsPerPlayer": 1 },
-          "roll": { "choiceCount": 1, "freeRerollsPerRoll": 1, "techRerollWindowHours": 48 },
-          "reward": {
-            "diceCount": { "hoursPerDie": 3, "rounding": "nearest", "min": 1, "max": 10 },
-            "dieByDifficulty": {
-              "easy": { "sides": 2 },
-              "normal": { "sides": 4 },
-              "hard": { "sides": 6 },
-              "extreme": { "sides": 6, "grantEvent": "good" }
+          "features": {
+            "mapMode": "linear",
+            "shop": false,
+            "items": false,
+            "events": false,
+            "bets": false,
+            "polls": false,
+            "achievements": false,
+            "weeklyChallenge": false,
+            "partnerBoard": false,
+            "reactions": false,
+            "comments": false,
+            "gallery": false
+          },
+          "season": {
+            "timezone": "Europe/Moscow",
+            "maxActiveRunsPerPlayer": 1,
+            "inactiveHintDays": 3
+          },
+          "roll": {
+            "choiceCount": 1,
+            "freeRerollsPerRoll": 1,
+            "rerollCost": {
+              "kind": "coins",
+              "amount": 5
+            },
+            "techRerollWindowHours": 48,
+            "minPlayMinutesBeforeDrop": 60,
+            "emptyPoolFallback": "dropZoneFilter",
+            "lastDaysLengthFilter": {
+              "enabled": false,
+              "steps": [
+                {
+                  "daysBeforeDeadline": 5,
+                  "maxHours": 10
+                },
+                {
+                  "daysBeforeDeadline": 2,
+                  "maxHours": 4
+                }
+              ]
             }
           },
-          "map": { "linearLength": 60 }
+          "reward": {
+            "diceCount": {
+              "hoursPerDie": 3,
+              "rounding": "nearest",
+              "min": 1,
+              "max": 10
+            },
+            "dieByDifficulty": {
+              "easy": {
+                "sides": 2
+              },
+              "normal": {
+                "sides": 4
+              },
+              "hard": {
+                "sides": 6
+              },
+              "extreme": {
+                "sides": 6,
+                "grantEvent": "good"
+              }
+            },
+            "challengeBonus": {
+              "extraDice": 1
+            },
+            "unmetConditionPolicy": "noDiceKeepCoins",
+            "coins": {
+              "perHour": 1,
+              "min": 3
+            },
+            "coop": {
+              "pointsShare": 0.5,
+              "roundUpFor": "roller"
+            }
+          },
+          "drop": {
+            "penaltyDice": {
+              "count": 2,
+              "sides": 4
+            },
+            "affectsPoints": true,
+            "affectsPosition": true,
+            "mandatoryEvent": "bad"
+          },
+          "finish": {
+            "requireApprovalForFirst": true,
+            "bonusByOrder": [
+              10,
+              8,
+              6,
+              4
+            ],
+            "bonusAfterList": 2
+          },
+          "ranking": {
+            "tiebreakers": [
+              "completedRuns",
+              "earliestFinalScore"
+            ]
+          },
+          "map": {
+            "linearLength": 60
+          },
+          "economy": {
+            "allowNegativeCoins": true,
+            "inventoryLimit": 5,
+            "rarityWeights": {
+              "common": 70,
+              "epic": 25,
+              "legendary": 5
+            },
+            "shop": {
+              "lotsPerRoll": 3,
+              "lotLifetimeMinutes": 15,
+              "rollCost": 5,
+              "rerollCostStep": 5,
+              "resetOn": [
+                "runCompleted",
+                "runDropped"
+              ]
+            }
+          },
+          "effects": {
+            "maxChainDepth": 3,
+            "maxEventsPerCommand": 50,
+            "hostileCap": {
+              "enabled": false,
+              "maxActive": 1
+            },
+            "attacksOnlyOnHigherPoints": false
+          },
+          "interactions": {
+            "inviteTtlHours": 24
+          },
+          "bets": {
+            "maxStake": 10,
+            "maxOpenBetsPerPlayer": 3,
+            "windowHoursAfterRoll": 24,
+            "deadlineOptionsDays": [
+              1,
+              3,
+              7
+            ],
+            "payoutByHoursPerDay": [
+              {
+                "upTo": 1,
+                "multiplier": 1.2
+              },
+              {
+                "upTo": 3,
+                "multiplier": 2.0
+              },
+              {
+                "upTo": null,
+                "multiplier": 3.0
+              }
+            ]
+          },
+          "social": {
+            "reactions": [
+              "🔥",
+              "😂",
+              "💀",
+              "👏",
+              "🤡",
+              "❤️"
+            ],
+            "galleryUploadsPerDay": 10,
+            "commentsPerDay": 100,
+            "spectatorsCanVote": false
+          },
+          "nominations": {
+            "auto": [
+              "mostHours",
+              "mostRuns",
+              "unluckiestDice",
+              "mostDrops",
+              "mostAttacks"
+            ],
+            "voted": [
+              "bestReview",
+              "gameOfSeason",
+              "funniestMoment"
+            ]
+          },
+          "weeklyChallenge": {
+            "defaultRewardCoins": 10
+          }
         }
         """;
 

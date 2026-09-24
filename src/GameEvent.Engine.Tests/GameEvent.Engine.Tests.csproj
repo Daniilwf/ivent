@@ -3,6 +3,7 @@
   <ItemGroup>
     <PackageReference Include="FsCheck" />
     <PackageReference Include="FsCheck.Xunit.v3" />
+    <PackageReference Include="JsonSchema.Net" />
   </ItemGroup>
 
   <ItemGroup>

@@ -15,7 +15,7 @@ public sealed class SeasonRecord
 
     public int RulesetVersion { get; set; }
 
-    /// <summary>The ruleset the season plays by. Versions and history arrive with task C1.</summary>
+    /// <summary>The rules in force, projected from the log (D-82); the history is the log's ruleset events.</summary>
     public required string RulesetJson { get; set; }
 
     public DateTimeOffset CreatedAt { get; set; }
