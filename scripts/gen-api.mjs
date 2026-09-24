@@ -14,7 +14,7 @@ const steps = [
       quote(join(root, 'node_modules', 'openapi-typescript', 'bin', 'cli.js')),
       quote(join(apiDir, 'openapi.json')),
       '--output',
-      quote(join(apiDir, 'schema.d.ts')),
+      quote(join(apiDir, 'schema.ts')),
       '--enum-values',
     ],
   ],

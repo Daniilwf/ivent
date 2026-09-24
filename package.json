@@ -21,7 +21,7 @@
     "test:mutation": "dotnet tool run dotnet-stryker --config-file stryker-config.json",
     "coverage": "node scripts/coverage.mjs",
     "gitleaks": "node scripts/gitleaks.mjs",
-    "dev": "node scripts/todo.mjs dev B4",
+    "dev": "node scripts/dev.mjs",
     "dev:demo": "node scripts/todo.mjs dev:demo F2",
     "seed:demo": "node scripts/todo.mjs seed:demo F2",
     "gen:api": "node scripts/gen-api.mjs",

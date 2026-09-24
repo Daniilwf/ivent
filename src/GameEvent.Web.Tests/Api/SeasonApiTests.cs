@@ -54,9 +54,41 @@ public sealed class SeasonApiTests : IAsyncLifetime
         var season = await vasya.GetFromJsonAsync<SeasonView>($"/api/seasons/{SiteFactory.SeasonId}", s_json, Ct);
         var me = season!.Players.Single(p => p.Id == _site.Players["vasya"]);
         Assert.True(me.Points > 0);
+        var last = season.Me!.LastCompleted!;
+        Assert.Equal(me.Points, last.Total);
+        Assert.Equal(last.Total, last.Dice.Sum(d => d.Value));
+        Assert.All(last.Dice, d => Assert.Equal(6, d.Sides)); // hard
+        Assert.Equal(Engine.Runs.Difficulty.Hard, last.Difficulty);
         Assert.NotEqual("start", me.CellId);
         Assert.Equal(TurnPhase.Idle, season.Me!.Phase);
         Assert.Equal(0, season.Players.Single(p => p.Id == _site.Players["petya"]).Points);
+    }
+
+    [Fact]
+    public async Task Current_season_is_the_latest_one_the_player_plays_in_and_the_latest_for_others()
+    {
+        // Given a later season without Вася
+        _site.Clock.UtcNow = _site.Clock.UtcNow.AddDays(1);
+        var later = await _site.CreateSeasonAsync();
+
+        // Then Вася keeps his season, a spectator and a player outside both see the latest one
+        Assert.Equal(SiteFactory.SeasonId, await CurrentAsync("vasya"));
+        Assert.Equal(later, await CurrentAsync("zritel"));
+        Assert.Equal(later, await CurrentAsync("masha"));
+    }
+
+    [Fact]
+    public async Task Current_season_needs_a_session()
+    {
+        var client = await _site.AnonymousAsync();
+
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/seasons/current", Ct)).StatusCode);
+    }
+
+    private async Task<Guid> CurrentAsync(string login)
+    {
+        var client = await _site.SignedInAsync(login);
+        return (await client.GetFromJsonAsync<CurrentSeasonView>("/api/seasons/current", s_json, Ct))!.Id;
     }
 
     [Fact]

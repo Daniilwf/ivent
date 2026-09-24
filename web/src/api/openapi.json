@@ -7,9 +7,7 @@
   "paths": {
     "/api/auth/antiforgery": {
       "get": {
-        "tags": [
-          "Auth"
-        ],
+        "tags": ["Auth"],
         "responses": {
           "200": {
             "description": "OK",
@@ -26,9 +24,7 @@
     },
     "/api/auth/login": {
       "post": {
-        "tags": [
-          "Auth"
-        ],
+        "tags": ["Auth"],
         "requestBody": {
           "content": {
             "application/json": {
@@ -85,9 +81,7 @@
     },
     "/api/auth/logout": {
       "post": {
-        "tags": [
-          "Auth"
-        ],
+        "tags": ["Auth"],
         "responses": {
           "204": {
             "description": "No Content"
@@ -97,9 +91,7 @@
     },
     "/api/auth/me": {
       "get": {
-        "tags": [
-          "Auth"
-        ],
+        "tags": ["Auth"],
         "responses": {
           "200": {
             "description": "OK",
@@ -116,9 +108,7 @@
     },
     "/api/seasons/{seasonId}": {
       "get": {
-        "tags": [
-          "Seasons"
-        ],
+        "tags": ["Seasons"],
         "parameters": [
           {
             "name": "seasonId",
@@ -159,9 +149,7 @@
     },
     "/api/seasons/{seasonId}/roll": {
       "post": {
-        "tags": [
-          "Seasons"
-        ],
+        "tags": ["Seasons"],
         "parameters": [
           {
             "name": "seasonId",
@@ -249,9 +237,7 @@
     },
     "/api/seasons/{seasonId}/start": {
       "post": {
-        "tags": [
-          "Seasons"
-        ],
+        "tags": ["Seasons"],
         "parameters": [
           {
             "name": "seasonId",
@@ -339,9 +325,7 @@
     },
     "/api/seasons/{seasonId}/complete": {
       "post": {
-        "tags": [
-          "Seasons"
-        ],
+        "tags": ["Seasons"],
         "parameters": [
           {
             "name": "seasonId",
@@ -426,15 +410,42 @@
           }
         }
       }
+    },
+    "/api/seasons/current": {
+      "get": {
+        "tags": ["Seasons"],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CurrentSeasonView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
       "AntiforgeryToken": {
-        "required": [
-          "token",
-          "headerName"
-        ],
+        "required": ["token", "headerName"],
         "type": "object",
         "properties": {
           "token": {
@@ -446,17 +457,10 @@
         }
       },
       "CellType": {
-        "enum": [
-          "start",
-          "empty",
-          "finish"
-        ]
+        "enum": ["start", "empty", "finish"]
       },
       "CellView": {
-        "required": [
-          "id",
-          "type"
-        ],
+        "required": ["id", "type"],
         "type": "object",
         "properties": {
           "id": {
@@ -468,10 +472,7 @@
         }
       },
       "CommandResponse": {
-        "required": [
-          "duplicate",
-          "events"
-        ],
+        "required": ["duplicate", "events"],
         "type": "object",
         "properties": {
           "duplicate": {
@@ -485,11 +486,35 @@
           }
         }
       },
+      "CompletedRunView": {
+        "required": ["id", "game", "difficulty", "dice", "total"],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "game": {
+            "$ref": "#/components/schemas/GameView"
+          },
+          "difficulty": {
+            "$ref": "#/components/schemas/Difficulty"
+          },
+          "dice": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DieView"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "The player's latest completed run with its dice, each die separately."
+      },
       "CompleteRequest": {
-        "required": [
-          "commandId",
-          "difficulty"
-        ],
+        "required": ["commandId", "difficulty"],
         "type": "object",
         "properties": {
           "commandId": {
@@ -500,23 +525,25 @@
             "$ref": "#/components/schemas/Difficulty"
           },
           "estimatedHours": {
-            "type": [
-              "null",
-              "number"
-            ],
+            "type": ["null", "number"],
             "format": "double"
           }
         },
         "description": "Completing the active run. `estimatedHours` is needed only when the game has no hours."
       },
+      "CurrentSeasonView": {
+        "required": ["id"],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "description": "The season the signed-in user sees by default (D-18)."
+      },
       "CurrentUser": {
-        "required": [
-          "id",
-          "login",
-          "name",
-          "role",
-          "mustChangePassword"
-        ],
+        "required": ["id", "login", "name", "role", "mustChangePassword"],
         "type": "object",
         "properties": {
           "id": {
@@ -537,20 +564,25 @@
           }
         }
       },
+      "DieView": {
+        "required": ["sides", "value"],
+        "type": "object",
+        "properties": {
+          "sides": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "value": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "Difficulty": {
-        "enum": [
-          "easy",
-          "normal",
-          "hard",
-          "extreme"
-        ]
+        "enum": ["easy", "normal", "hard", "extreme"]
       },
       "GameView": {
-        "required": [
-          "id",
-          "title",
-          "hours"
-        ],
+        "required": ["id", "title", "hours"],
         "type": "object",
         "properties": {
           "id": {
@@ -561,10 +593,7 @@
             "type": "string"
           },
           "hours": {
-            "type": [
-              "null",
-              "number"
-            ],
+            "type": ["null", "number"],
             "format": "double"
           }
         }
@@ -573,35 +602,20 @@
         "type": "object",
         "properties": {
           "type": {
-            "type": [
-              "null",
-              "string"
-            ]
+            "type": ["null", "string"]
           },
           "title": {
-            "type": [
-              "null",
-              "string"
-            ]
+            "type": ["null", "string"]
           },
           "status": {
-            "type": [
-              "null",
-              "integer"
-            ],
+            "type": ["null", "integer"],
             "format": "int32"
           },
           "detail": {
-            "type": [
-              "null",
-              "string"
-            ]
+            "type": ["null", "string"]
           },
           "instance": {
-            "type": [
-              "null",
-              "string"
-            ]
+            "type": ["null", "string"]
           },
           "errors": {
             "type": "object",
@@ -615,10 +629,7 @@
         }
       },
       "LoggedEventView": {
-        "required": [
-          "sequence",
-          "type"
-        ],
+        "required": ["sequence", "type"],
         "type": "object",
         "properties": {
           "sequence": {
@@ -631,10 +642,7 @@
         }
       },
       "LoginRequest": {
-        "required": [
-          "login",
-          "password"
-        ],
+        "required": ["login", "password"],
         "type": "object",
         "properties": {
           "login": {
@@ -648,12 +656,7 @@
         }
       },
       "MyTurnView": {
-        "required": [
-          "playerId",
-          "phase",
-          "offer",
-          "activeRun"
-        ],
+        "required": ["playerId", "phase", "offer", "activeRun", "lastCompleted"],
         "type": "object",
         "properties": {
           "playerId": {
@@ -682,17 +685,21 @@
                 "$ref": "#/components/schemas/RunView"
               }
             ]
+          },
+          "lastCompleted": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/CompletedRunView"
+              }
+            ]
           }
         }
       },
       "PlayerView": {
-        "required": [
-          "id",
-          "name",
-          "cellId",
-          "points",
-          "phase"
-        ],
+        "required": ["id", "name", "cellId", "points", "phase"],
         "type": "object",
         "properties": {
           "id": {
@@ -718,45 +725,25 @@
         "type": "object",
         "properties": {
           "type": {
-            "type": [
-              "null",
-              "string"
-            ]
+            "type": ["null", "string"]
           },
           "title": {
-            "type": [
-              "null",
-              "string"
-            ]
+            "type": ["null", "string"]
           },
           "status": {
-            "type": [
-              "null",
-              "integer"
-            ],
+            "type": ["null", "integer"],
             "format": "int32"
           },
           "detail": {
-            "type": [
-              "null",
-              "string"
-            ]
+            "type": ["null", "string"]
           },
           "instance": {
-            "type": [
-              "null",
-              "string"
-            ]
+            "type": ["null", "string"]
           }
         }
       },
       "RejectionProblem": {
-        "required": [
-          "title",
-          "status",
-          "detail",
-          "code"
-        ],
+        "required": ["title", "status", "detail", "code"],
         "type": "object",
         "properties": {
           "title": {
@@ -767,10 +754,7 @@
             "format": "int32"
           },
           "detail": {
-            "type": [
-              "null",
-              "string"
-            ]
+            "type": ["null", "string"]
           },
           "code": {
             "type": "string"
@@ -779,17 +763,11 @@
         "description": "A game rule refused the action; `code` is stable and maps to a text in the interface dictionary."
       },
       "Role": {
-        "enum": [
-          "player",
-          "admin",
-          "spectator"
-        ],
+        "enum": ["player", "admin", "spectator"],
         "description": "Role of an account. An admin who also plays has two accounts (SPEC «Аккаунты»)."
       },
       "RollRequest": {
-        "required": [
-          "commandId"
-        ],
+        "required": ["commandId"],
         "type": "object",
         "properties": {
           "commandId": {
@@ -800,11 +778,7 @@
         "description": "A game action. `commandId` is generated by the client once per action: a repeat acts once."
       },
       "RunView": {
-        "required": [
-          "id",
-          "game",
-          "startedAt"
-        ],
+        "required": ["id", "game", "startedAt"],
         "type": "object",
         "properties": {
           "id": {
@@ -821,12 +795,7 @@
         }
       },
       "SeasonUpdate": {
-        "required": [
-          "seasonId",
-          "fromSequence",
-          "toSequence",
-          "types"
-        ],
+        "required": ["seasonId", "fromSequence", "toSequence", "types"],
         "type": "object",
         "properties": {
           "seasonId": {
@@ -851,13 +820,7 @@
         "description": "Sent to everyone watching a season after each committed command: refetch what you show."
       },
       "SeasonView": {
-        "required": [
-          "id",
-          "cells",
-          "players",
-          "me",
-          "lastSequence"
-        ],
+        "required": ["id", "cells", "players", "me", "lastSequence"],
         "type": "object",
         "properties": {
           "id": {
@@ -893,9 +856,7 @@
         }
       },
       "StartRequest": {
-        "required": [
-          "commandId"
-        ],
+        "required": ["commandId"],
         "type": "object",
         "properties": {
           "commandId": {
@@ -905,11 +866,7 @@
         }
       },
       "TurnPhase": {
-        "enum": [
-          "idle",
-          "rolling",
-          "playing"
-        ],
+        "enum": ["idle", "rolling", "playing"],
         "description": "Where the player is in the turn cycle. Moving and resolving happen inside one command."
       }
     }

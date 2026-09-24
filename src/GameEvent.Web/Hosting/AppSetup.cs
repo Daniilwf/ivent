@@ -111,6 +111,11 @@ public static class AppSetup
         }
 
         app.UseApiBodyLimit();
+        var frontend = app.UseFrontendFiles();
+
+        // Explicit routing after the static files: otherwise the SPA fallback endpoint is chosen first
+        // and the static file middleware skips requests for /assets/*.js.
+        app.UseRouting();
         app.UseExceptionHandler();
         app.UseStatusCodePages();
         app.UseAuthentication();
@@ -127,6 +132,36 @@ public static class AppSetup
         api.MapAccounts();
         api.MapSeasons();
         app.MapHub<SeasonHub>(SeasonHub.Path);
+
+        if (frontend is not null)
+        {
+            // Client-side routes get the SPA; unknown API and hub paths stay 404.
+            app.MapFallbackToFile("{*path:regex(^(?!(api|hubs)(/|$)).*$)}", "index.html", new StaticFileOptions { FileProvider = frontend });
+        }
+    }
+
+    /// <summary>
+    /// Serves the built frontend (SPEC: one process serves everything). The path is <c>Frontend:DistPath</c>,
+    /// relative to the content root; by default the Vite build output in <c>web/dist</c>. Absent — API only.
+    /// </summary>
+    private static Microsoft.Extensions.FileProviders.PhysicalFileProvider? UseFrontendFiles(this WebApplication app)
+    {
+        var configured = app.Configuration["Frontend:DistPath"] ?? Path.Combine("..", "..", "web", "dist");
+        var path = Path.GetFullPath(Path.Combine(app.Environment.ContentRootPath, configured));
+        if (!File.Exists(Path.Combine(path, "index.html")))
+        {
+            if (!app.Environment.IsDevelopment() && !app.Environment.IsEnvironment("Test"))
+            {
+                app.Logger.LogWarning("No built frontend at {Path}: the site serves the API only.", path);
+            }
+
+            return null;
+        }
+
+        var files = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(path);
+        app.UseDefaultFiles(new DefaultFilesOptions { FileProvider = files });
+        app.UseStaticFiles(new StaticFileOptions { FileProvider = files });
+        return files;
     }
 
     public static string ConnectionString(this IConfiguration configuration) =>

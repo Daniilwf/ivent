@@ -35,7 +35,15 @@ public sealed record CellView(string Id, CellType Type);
 
 public sealed record PlayerView(Guid Id, string Name, string CellId, int Points, TurnPhase Phase);
 
-public sealed record MyTurnView(Guid PlayerId, TurnPhase Phase, GameView? Offer, RunView? ActiveRun);
+public sealed record MyTurnView(Guid PlayerId, TurnPhase Phase, GameView? Offer, RunView? ActiveRun, CompletedRunView? LastCompleted);
+
+/// <summary>The player's latest completed run with its dice, each die separately.</summary>
+public sealed record CompletedRunView(Guid Id, GameView Game, Difficulty Difficulty, IReadOnlyList<DieView> Dice, int Total);
+
+public sealed record DieView(int Sides, int Value);
+
+/// <summary>The season the signed-in user sees by default (D-18).</summary>
+public sealed record CurrentSeasonView(Guid Id);
 
 public sealed record GameView(Guid Id, string Title, decimal? Hours);
 
@@ -48,6 +56,11 @@ public static class SeasonEndpoints
     public static void MapSeasons(this RouteGroupBuilder api)
     {
         var seasons = api.MapGroup("/seasons/{seasonId:guid}").WithTags("Seasons").RequireAuthorization();
+
+        api.MapGet("/seasons/current", GetCurrentSeasonAsync)
+            .WithTags("Seasons")
+            .RequireAuthorization()
+            .ProducesProblem(StatusCodes.Status401Unauthorized);
 
         seasons.MapGet("/", GetSeasonAsync)
             .ProducesProblem(StatusCodes.Status401Unauthorized);
@@ -144,14 +157,21 @@ public static class SeasonEndpoints
         {
             var offer = mine.OfferJson is null ? null : JsonSerializer.Deserialize<RollOffer>(mine.OfferJson, EngineJson.Options);
             var run = mine.ActiveRunId is { } runId ? await db.Runs.AsNoTracking().SingleAsync(r => r.Id == runId, ct) : null;
-            var gameIds = new[] { offer?.GameId, run?.GameId }.OfType<Guid>().ToList();
+            // One active run per player (C4 keeps it that way), so the latest started completed run is the latest
+            // completed one. Revisit with a completion time column if several active runs are ever allowed.
+            var last = await db.Runs.AsNoTracking()
+                .Where(r => r.PlayerId == mine.Id && r.Status == RunStatus.Completed)
+                .OrderByDescending(r => r.StartedAt)
+                .FirstOrDefaultAsync(ct);
+            var gameIds = new[] { offer?.GameId, run?.GameId, last?.GameId }.OfType<Guid>().ToList();
             var games = await db.Games.AsNoTracking().Where(g => gameIds.Contains(g.Id)).ToDictionaryAsync(g => g.Id, ct);
 
             me = new MyTurnView(
                 mine.Id,
                 mine.Phase,
                 offer is null ? null : new GameView(offer.GameId, games[offer.GameId].Title, offer.Snapshot.Hours),
-                run is null ? null : new RunView(run.Id, new GameView(run.GameId, games[run.GameId].Title, run.Hours ?? games[run.GameId].Hours), run.StartedAt));
+                run is null ? null : new RunView(run.Id, Game(run, games[run.GameId]), run.StartedAt),
+                last is null ? null : Completed(last, games[last.GameId]));
         }
 
         return TypedResults.Ok(new SeasonView(
@@ -160,5 +180,35 @@ public static class SeasonEndpoints
             [.. players.Select(p => new PlayerView(p.Id, p.Name, p.CellId, p.Points, p.Phase))],
             me,
             lastSequence));
+    }
+
+    /// <summary>A run's game: the run's own hours when known, otherwise the pool's.</summary>
+    private static GameView Game(Infrastructure.Seasons.RunRecord run, Infrastructure.Pool.GameRecord game) =>
+        new(run.GameId, game.Title, run.Hours ?? game.Hours);
+
+    private static CompletedRunView Completed(Infrastructure.Seasons.RunRecord run, Infrastructure.Pool.GameRecord game)
+    {
+        var dice = JsonSerializer.Deserialize<EquatableArray<Die>>(run.DiceJson, EngineJson.Options);
+        return new CompletedRunView(
+            run.Id,
+            Game(run, game),
+            run.Difficulty ?? throw new InvalidOperationException($"Completed run {run.Id} has no difficulty."),
+            [.. dice.Select(d => new DieView(d.Sides, d.Value))],
+            dice.Sum(d => d.Value));
+    }
+
+    /// <summary>The latest season the user plays in; for spectators and admins, the latest season.</summary>
+    private static async Task<Results<Ok<CurrentSeasonView>, NotFound>> GetCurrentSeasonAsync(
+        ClaimsPrincipal user, GameEventDbContext db, CancellationToken ct)
+    {
+        var userId = user.UserId();
+        var mine = await db.SeasonPlayers.AsNoTracking()
+            .Where(p => p.UserId == userId)
+            .Join(db.Seasons, p => p.SeasonId, s => s.Id, (_, s) => s)
+            .OrderByDescending(s => s.CreatedAt)
+            .Select(s => (Guid?)s.Id)
+            .FirstOrDefaultAsync(ct);
+        var id = mine ?? await db.Seasons.AsNoTracking().OrderByDescending(s => s.CreatedAt).Select(s => (Guid?)s.Id).FirstOrDefaultAsync(ct);
+        return id is null ? TypedResults.NotFound() : TypedResults.Ok(new CurrentSeasonView(id.Value));
     }
 }

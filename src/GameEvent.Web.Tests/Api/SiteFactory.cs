@@ -32,10 +32,11 @@ internal sealed class SiteFactory : WebApplicationFactory<Program>
     {
     }
 
-    public SiteFactory(int loginAttemptsPerMinute, string environment = "Test")
+    public SiteFactory(int loginAttemptsPerMinute, string environment = "Test", string? frontendPath = null)
     {
         _loginAttemptsPerMinute = loginAttemptsPerMinute;
         _environment = environment;
+        FrontendPath = frontendPath ?? Path.Combine(_directory, "no-frontend");
         Directory.CreateDirectory(_directory);
         ConnectionString = $"Data Source={Path.Combine(_directory, "site.db")};Pooling=False";
         SqliteDatabase.MigrateAsync(ConnectionString).GetAwaiter().GetResult();
@@ -43,14 +44,17 @@ internal sealed class SiteFactory : WebApplicationFactory<Program>
 
     public string ConnectionString { get; }
 
+    /// <summary>Built frontend to serve; by default a missing folder, so tests run API-only.</summary>
+    public string FrontendPath { get; }
+
     public TestClock Clock { get; } = new(new DateTimeOffset(2026, 10, 1, 12, 0, 0, TimeSpan.Zero).AddTicks(7_654_321));
 
     public Dictionary<string, Guid> Users { get; } = [];
 
     public Dictionary<string, Guid> Players { get; } = [];
 
-    /// <summary>Accounts, pool and the season. Call once after construction.</summary>
-    public async Task SeedAsync()
+    /// <summary>Accounts, pool and (unless <paramref name="withSeason"/> is false) the season. Call once.</summary>
+    public async Task SeedAsync(bool withSeason = true)
     {
         using var scope = Services.CreateScope();
         var passwords = scope.ServiceProvider.GetRequiredService<Passwords>();
@@ -83,6 +87,11 @@ internal sealed class SiteFactory : WebApplicationFactory<Program>
             await db.SaveChangesAsync();
         }
 
+        if (!withSeason)
+        {
+            return;
+        }
+
         var bus = Services.GetRequiredService<CommandBus>();
         await SendAsync(bus, new CreateSeason(SeasonId));
         foreach (var login in new[] { "vasya", "petya" })
@@ -90,6 +99,14 @@ internal sealed class SiteFactory : WebApplicationFactory<Program>
             Players[login] = Guid.NewGuid();
             await SendAsync(bus, new AddSeasonPlayer(Players[login], Users[login], login));
         }
+    }
+
+    /// <summary>Another season, created now by the test clock, with nobody in it.</summary>
+    public async Task<Guid> CreateSeasonAsync()
+    {
+        var id = Guid.NewGuid();
+        var outcome = await Services.GetRequiredService<CommandBus>().SendAsync(new CommandEnvelope(Guid.NewGuid(), id, new CreateSeason(id), AuthorId: null));
+        return outcome.IsAccepted ? id : throw new InvalidOperationException($"Season not created: {outcome.Rejection}");
     }
 
     public GameEventDbContext NewDb()
@@ -128,6 +145,7 @@ internal sealed class SiteFactory : WebApplicationFactory<Program>
     {
         builder.UseEnvironment(_environment);
         builder.UseSetting("ConnectionStrings:Main", ConnectionString);
+        builder.UseSetting("Frontend:DistPath", FrontendPath);
         builder.UseSetting("Security:LoginAttemptsPerMinute", _loginAttemptsPerMinute.ToString(System.Globalization.CultureInfo.InvariantCulture));
         builder.ConfigureServices(services =>
         {

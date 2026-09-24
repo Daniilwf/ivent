@@ -144,6 +144,9 @@
 | A10 | `/health` и страница «Ошибки» | `Web.Tests/Observability/*` | ⬜ |
 | A13 | Пользователь участвует в сезоне не больше одного раза (D-65) | `Seasons/SeasonSetupTests.Adding_the_same_user_twice_under_another_player_id_is_rejected` | ✅ |
 | A14 | Обновления в реальном времени: зритель сезона узнаёт о действии другого игрока без перезагрузки; анонимный не подключается | `Web.Tests/Api/SeasonHubTests.*` (догрузка пропущенного — E3) | 🟨 E3 |
+| A15 | Экран среза: ролл → старт → завершение с кубами, фишка сдвигается, второй браузер видит сдвиг без перезагрузки; отказы по-русски; устаревший ответ не затирает свежий; сеть упала — сообщение, а не зависание | `e2e/tests/slice.spec.ts` (десктоп и телефон), `web/src/season/SeasonScreen.test.tsx`, `web/src/season/CompleteForm.test.tsx`, `web/src/App.test.tsx` | 🟨 H2–H4 |
+| A16 | Сезон по умолчанию: последний, где пользователь играет; для остальных — последний; без сезонов — 404 | `Web.Tests/Api/SeasonApiTests.Current_season_*`, `Web.Tests/Api/EmptySiteTests.*` | ✅ |
+| A17 | Сайт раздаёт собранный фронтенд: файлы как есть, клиентские маршруты — SPA, неизвестные `/api` и `/hubs` — 404 | `Web.Tests/Api/FrontendHostingTests.*` | ✅ |
 | A11 | Время хранится в UTC, дедлайны показываются по Москве с подписью | `web/…/formatDeadline.test.ts` | ⬜ |
 | A12 | Внешние сервисы (HLTB, Steam, IGDB) недоступны — сайт работает | `Web.Tests/Providers/*` | ⬜ |
 

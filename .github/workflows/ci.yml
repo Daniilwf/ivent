@@ -112,7 +112,7 @@ jobs:
 
       # Active once task B3 adds the generated client.
       - name: API client matches OpenAPI
-        if: hashFiles('web/src/api/schema.d.ts') != ''
+        if: hashFiles('web/src/api/openapi.json') != ''
         run: |
           npm run -s gen:api
           git status --porcelain -- web/src/api
