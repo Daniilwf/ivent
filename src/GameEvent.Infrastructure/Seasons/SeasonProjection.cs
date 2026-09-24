@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Text.Json;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Rolls;
+using GameEvent.Engine.Rulesets;
 using GameEvent.Engine.Runs;
 using GameEvent.Engine.Seasons;
 using GameEvent.Infrastructure.Database;
@@ -35,18 +36,27 @@ internal static class SeasonProjection
             db.Seasons.Add(new SeasonRecord
             {
                 Id = after.SeasonId,
-                Status = "Active",
+                Name = after.Name,
+                Status = after.Status,
+                Deadline = after.Deadline,
                 RulesetVersion = after.RulesetVersion,
                 RulesetJson = JsonSerializer.Serialize(after.Rules, EngineJson.Options),
                 CreatedAt = now,
             });
         }
-        else if (before.RulesetVersion != after.RulesetVersion)
+        else if (before.RulesetVersion != after.RulesetVersion || before.Status != after.Status
+            || before.Deadline != after.Deadline || before.Name != after.Name)
         {
             var season = await db.Seasons.FindAsync([after.SeasonId], ct)
                 ?? throw new InvalidOperationException($"Season {after.SeasonId} has no projection row.");
-            season.RulesetVersion = after.RulesetVersion;
-            season.RulesetJson = JsonSerializer.Serialize(after.Rules, EngineJson.Options);
+            season.Name = after.Name;
+            season.Status = after.Status;
+            season.Deadline = after.Deadline;
+            if (season.RulesetVersion != after.RulesetVersion)
+            {
+                season.RulesetVersion = after.RulesetVersion;
+                season.RulesetJson = JsonSerializer.Serialize(after.Rules, EngineJson.Options);
+            }
         }
 
         foreach (var (id, player) in after.Players)
@@ -59,7 +69,15 @@ internal static class SeasonProjection
             var record = await db.SeasonPlayers.FindAsync([id], ct);
             if (record is null)
             {
-                record = new SeasonPlayerRecord { Id = id, SeasonId = after.SeasonId, UserId = player.UserId, Name = player.Name, CellId = player.CellId };
+                record = new SeasonPlayerRecord
+                {
+                    Id = id,
+                    SeasonId = after.SeasonId,
+                    UserId = player.UserId,
+                    Name = player.Name,
+                    CellId = player.CellId,
+                    ResourcesJson = "{}",
+                };
                 db.SeasonPlayers.Add(record);
             }
 
@@ -68,6 +86,9 @@ internal static class SeasonProjection
             record.Name = player.Name;
             record.CellId = player.CellId;
             record.Points = player.Points;
+            record.Coins = player.Coins;
+            record.ResourcesJson = JsonSerializer.Serialize(player.Resources, EngineJson.Options);
+            record.IsInactive = player.IsInactive;
             record.Phase = player.Phase;
             record.OfferJson = player.Offer is null ? null : JsonSerializer.Serialize(player.Offer, EngineJson.Options);
             record.ActiveRunId = player.ActiveRunId;
@@ -116,15 +137,22 @@ internal static class SeasonProjection
     /// </summary>
     public static async Task<SeasonState> ReadAsync(GameEventDbContext db, SeasonState replayed, CancellationToken ct)
     {
+        var season = await db.Seasons.AsNoTracking().SingleAsync(s => s.Id == replayed.SeasonId, ct);
         var players = await db.SeasonPlayers.AsNoTracking().Where(p => p.SeasonId == replayed.SeasonId).ToListAsync(ct);
         var runs = await db.Runs.AsNoTracking().Where(r => r.SeasonId == replayed.SeasonId).ToListAsync(ct);
 
         return replayed with
         {
+            Name = season.Name,
+            Status = season.Status,
+            Deadline = season.Deadline,
+            RulesetVersion = season.RulesetVersion,
+            Ruleset = JsonSerializer.Deserialize<Ruleset>(season.RulesetJson, EngineJson.Options),
             Players = players.ToImmutableSortedDictionary(
                 p => p.Id,
                 p => new SeasonPlayer(
-                    p.Id, p.UserId, p.Name, p.CellId, p.Points, p.Phase,
+                    p.Id, p.UserId, p.Name, p.CellId, p.Points, p.Coins,
+                    JsonSerializer.Deserialize<ResourceBag>(p.ResourcesJson, EngineJson.Options), p.IsInactive, p.Phase,
                     p.OfferJson is null ? null : JsonSerializer.Deserialize<RollOffer>(p.OfferJson, EngineJson.Options),
                     p.ActiveRunId)),
             Runs = runs.ToImmutableSortedDictionary(

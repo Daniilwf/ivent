@@ -11,7 +11,11 @@ public sealed class SeasonRecord
 {
     public Guid Id { get; set; }
 
-    public required string Status { get; set; }
+    public required string Name { get; set; }
+
+    public SeasonStatus Status { get; set; }
+
+    public DateTimeOffset? Deadline { get; set; }
 
     public int RulesetVersion { get; set; }
 
@@ -53,6 +57,13 @@ public sealed class SeasonPlayerRecord
     public required string CellId { get; set; }
 
     public int Points { get; set; }
+
+    public int Coins { get; set; }
+
+    /// <summary>Other resources as a JSON object; never filtered or sorted in SQL (invariant 9).</summary>
+    public required string ResourcesJson { get; set; }
+
+    public bool IsInactive { get; set; }
 
     public TurnPhase Phase { get; set; }
 

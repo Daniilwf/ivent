@@ -1,4 +1,5 @@
 using GameEvent.Engine.Kernel;
+using GameEvent.Engine.Players;
 using GameEvent.Engine.Rolls;
 using GameEvent.Engine.Rulesets;
 using GameEvent.Engine.Runs;
@@ -24,7 +25,8 @@ public class CommandQueueTests
         await using var h = await QueueHarness.StartAsync();
 
         // When a season is played through the queue
-        await AcceptedAsync(h, new CreateSeason(s_season, RulesetJson.Default()));
+        await AcceptedAsync(h, new CreateSeason(s_season, "Тестовый сезон", RulesetJson.Default()));
+        await AcceptedAsync(h, new ChangeSeasonStatus(SeasonStatus.Active));
         await AcceptedAsync(h, new AddSeasonPlayer(s_vasya, s_vasya, "Вася"));
         await AcceptedAsync(h, new RollGame(s_vasya));
         await AcceptedAsync(h, new StartRun(s_vasya));
@@ -50,7 +52,8 @@ public class CommandQueueTests
     {
         var fault = new FailingSaveInterceptor();
         await using var h = await QueueHarness.StartAsync(fault);
-        await AcceptedAsync(h, new CreateSeason(s_season, RulesetJson.Default()));
+        await AcceptedAsync(h, new CreateSeason(s_season, "Тестовый сезон", RulesetJson.Default()));
+        await AcceptedAsync(h, new ChangeSeasonStatus(SeasonStatus.Active));
         await AcceptedAsync(h, new AddSeasonPlayer(s_vasya, s_vasya, "Вася"));
         await AcceptedAsync(h, new RollGame(s_vasya));
         await AcceptedAsync(h, new StartRun(s_vasya));
@@ -83,7 +86,8 @@ public class CommandQueueTests
     public async Task Rejected_command_writes_nothing()
     {
         await using var h = await QueueHarness.StartAsync();
-        await AcceptedAsync(h, new CreateSeason(s_season, RulesetJson.Default()));
+        await AcceptedAsync(h, new CreateSeason(s_season, "Тестовый сезон", RulesetJson.Default()));
+        await AcceptedAsync(h, new ChangeSeasonStatus(SeasonStatus.Active));
         await AcceptedAsync(h, new AddSeasonPlayer(s_vasya, s_vasya, "Вася"));
         var before = await CountEventsAsync(h);
 
@@ -99,7 +103,8 @@ public class CommandQueueTests
     public async Task Parallel_commands_run_one_at_a_time_without_losses()
     {
         await using var h = await QueueHarness.StartAsync();
-        await AcceptedAsync(h, new CreateSeason(s_season, RulesetJson.Default()));
+        await AcceptedAsync(h, new CreateSeason(s_season, "Тестовый сезон", RulesetJson.Default()));
+        await AcceptedAsync(h, new ChangeSeasonStatus(SeasonStatus.Active));
 
         // When 50 players are added concurrently
         var players = Enumerable.Range(1, 50).Select(i => Guid.Parse($"10000000-0000-0000-0000-{i:x12}")).ToList();
@@ -110,14 +115,15 @@ public class CommandQueueTests
         await using var db = h.NewDb();
         Assert.Equal(50, await db.SeasonPlayers.CountAsync(TestContext.Current.CancellationToken));
         var sequences = await db.Events.OrderBy(e => e.Sequence).Select(e => e.Sequence).ToListAsync(TestContext.Current.CancellationToken);
-        Assert.Equal(Enumerable.Range(1, 51).Select(i => (long)i), sequences);
+        Assert.Equal(Enumerable.Range(1, 52).Select(i => (long)i), sequences); // created, started, 50 players
     }
 
     [Fact]
     public async Task Same_command_id_twice_acts_once()
     {
         await using var h = await QueueHarness.StartAsync();
-        await AcceptedAsync(h, new CreateSeason(s_season, RulesetJson.Default()));
+        await AcceptedAsync(h, new CreateSeason(s_season, "Тестовый сезон", RulesetJson.Default()));
+        await AcceptedAsync(h, new ChangeSeasonStatus(SeasonStatus.Active));
         await AcceptedAsync(h, new AddSeasonPlayer(s_vasya, s_vasya, "Вася"));
         var commandId = Guid.NewGuid();
 
@@ -138,7 +144,8 @@ public class CommandQueueTests
     public async Task After_restart_the_season_is_rebuilt_from_the_log()
     {
         await using var h = await QueueHarness.StartAsync();
-        await AcceptedAsync(h, new CreateSeason(s_season, RulesetJson.Default()));
+        await AcceptedAsync(h, new CreateSeason(s_season, "Тестовый сезон", RulesetJson.Default()));
+        await AcceptedAsync(h, new ChangeSeasonStatus(SeasonStatus.Active));
         await AcceptedAsync(h, new AddSeasonPlayer(s_vasya, s_vasya, "Вася"));
         await AcceptedAsync(h, new RollGame(s_vasya));
 
@@ -147,7 +154,7 @@ public class CommandQueueTests
 
         // Then the next command continues from the logged state and numbering
         var outcome = await AcceptedAsync(h, new StartRun(s_vasya));
-        Assert.Equal(4, outcome.Events.Single().Sequence);
+        Assert.Equal(5, outcome.Events.Single().Sequence); // created, started, player, roll, start
     }
 
     [Fact]
@@ -174,4 +181,35 @@ public class CommandQueueTests
         await using var db = h.NewDb();
         return await db.Events.CountAsync(TestContext.Current.CancellationToken);
     }
+
+    [Fact]
+    public async Task Projection_of_season_and_player_administration_equals_the_fold_of_the_log()
+    {
+        await using var h = await QueueHarness.StartAsync();
+        var petya = Guid.Parse("10000000-0000-0000-0000-000000000002");
+
+        // A season with every administration command of C2
+        await AcceptedAsync(h, new CreateSeason(s_season, "Осень", RulesetJson.Default(), new DateTimeOffset(2026, 10, 20, 21, 0, 0, TimeSpan.Zero)));
+        await AcceptedAsync(h, new ChangeSeasonStatus(SeasonStatus.Active));
+        await AcceptedAsync(h, new AddSeasonPlayer(s_vasya, s_vasya, "Вася"));
+        await AcceptedAsync(h, new AddSeasonPlayer(petya, petya, "Петя", CellId: "c3", Points: 5, Coins: 2));
+        await AcceptedAsync(h, new SetSeasonDeadline(new DateTimeOffset(2026, 10, 25, 21, 0, 0, TimeSpan.Zero)));
+        await AcceptedAsync(h, new AdjustPlayer(petya, "Бонус за стрим", CoinsDelta: 7, ResourceDeltas: [new ResourceDelta("tickets", 3), new ResourceDelta("stars", 1)]));
+        await AcceptedAsync(h, new AdjustPlayer(petya, "Билеты сгорели", ResourceDeltas: [new ResourceDelta("tickets", -3)]));
+        await AcceptedAsync(h, new SetPlayerInactive(petya, true));
+        await AcceptedAsync(h, new RollGame(s_vasya));
+        await AcceptedAsync(h, new AdjustPlayer(s_vasya, "Сброс по просьбе", DiscardOffer: true));
+        await AcceptedAsync(h, new ChangeSeasonStatus(SeasonStatus.Closing));
+
+        // Then every projected column equals the fold of the log (L4)
+        await using var db = h.NewDb();
+        var (replayed, _) = await EventLogReader.ReplaySeasonAsync(db, s_season, TestContext.Current.CancellationToken);
+        Assert.Equal(replayed, await SeasonProjection.ReadAsync(db, replayed, TestContext.Current.CancellationToken));
+        var row = await db.SeasonPlayers.SingleAsync(p => p.Id == petya, TestContext.Current.CancellationToken);
+        Assert.Equal((9, true, "c3", 5), (row.Coins, row.IsInactive, row.CellId, row.Points));
+        Assert.Equal("""{"stars":1}""", row.ResourcesJson);
+        var season = await db.Seasons.SingleAsync(TestContext.Current.CancellationToken);
+        Assert.Equal((SeasonStatus.Closing, "Осень"), (season.Status, season.Name));
+    }
 }
+

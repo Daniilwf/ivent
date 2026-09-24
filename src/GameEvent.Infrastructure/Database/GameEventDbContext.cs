@@ -57,6 +57,7 @@ public sealed class GameEventDbContext(DbContextOptions<GameEventDbContext> opti
         {
             e.ToTable("Season");
             e.Property(x => x.Status).HasMaxLength(20);
+            e.Property(x => x.Name).HasMaxLength(100);
         });
 
         modelBuilder.Entity<RulesetRecord>(e =>

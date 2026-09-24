@@ -1,5 +1,6 @@
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Map;
+using GameEvent.Engine.Players;
 using GameEvent.Engine.Rolls;
 using GameEvent.Engine.Rulesets;
 using GameEvent.Engine.Runs;
@@ -33,7 +34,11 @@ public static class SeasonEngine
         {
             CreateSeason c => SeasonSetup.Decide(state, c),
             ChangeRuleset c => RulesetChanges.Decide(state, c),
-            AddSeasonPlayer c => SeasonSetup.Decide(state, c),
+            ChangeSeasonStatus c => SeasonSetup.Decide(state, c),
+            SetSeasonDeadline c => SeasonSetup.Decide(state, c),
+            AddSeasonPlayer c => PlayerAdministration.Decide(state, c),
+            SetPlayerInactive c => PlayerAdministration.Decide(state, c),
+            AdjustPlayer c => PlayerAdministration.Decide(state, c),
             RollGame c => Rolling.Decide(state, c, context),
             StartRun c => RunLifecycle.Decide(state, c, context),
             CompleteRun c => RunLifecycle.Decide(state, c, context),
@@ -47,7 +52,14 @@ public static class SeasonEngine
         gameEvent switch
         {
             SeasonCreated e => SeasonSetup.Apply(state, e),
-            SeasonPlayerAdded e => SeasonSetup.Apply(state, e),
+            SeasonStatusChanged e => SeasonSetup.Apply(state, e),
+            SeasonDeadlineSet e => SeasonSetup.Apply(state, e),
+            SeasonPlayerAdded e => PlayerAdministration.Apply(state, e),
+            PlayerInactivitySet e => PlayerAdministration.Apply(state, e),
+            PlayerAdjusted e => PlayerAdministration.Apply(state, e),
+            OfferDiscarded e => PlayerAdministration.Apply(state, e),
+            CoinsChanged e => PointsLedger.Apply(state, e),
+            ResourceChanged e => PointsLedger.Apply(state, e),
             RulesetChanged e => RulesetChanges.Apply(state, e),
             GameRolled e => Rolling.Apply(state, e),
             RunStarted e => RunLifecycle.Apply(state, e),

@@ -1,5 +1,6 @@
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Map;
+using GameEvent.Engine.Players;
 using GameEvent.Engine.Rolls;
 using GameEvent.Engine.Rulesets;
 using GameEvent.Engine.Runs;
@@ -17,7 +18,7 @@ public class SeasonSetupTests
         var s = Scenario.New().WithPlayers("Вася");
 
         ScenarioAssert.RejectsWithoutChanges(
-            s, x => x.Act(new CreateSeason(SequentialIds.Make(0x30000000, 2), TestRuleset.Create())), RejectionCodes.SeasonAlreadyCreated);
+            s, x => x.Act(new CreateSeason(SequentialIds.Make(0x30000000, 2), "Тестовый сезон", TestRuleset.Create())), RejectionCodes.SeasonAlreadyCreated);
     }
 
     [Fact]
@@ -85,7 +86,7 @@ public class SeasonSetupTests
         var s = Scenario.New().WithRuleset(change);
 
         ScenarioAssert.RejectsWithoutChanges(
-            s, x => x.Act(new CreateSeason(SequentialIds.Make(0x30000000, 1), x.Ruleset)), RejectionCodes.RulesetInvalid);
+            s, x => x.Act(new CreateSeason(SequentialIds.Make(0x30000000, 1), "Тестовый сезон", x.Ruleset)), RejectionCodes.RulesetInvalid);
     }
 
     [Fact]

@@ -6,6 +6,8 @@ namespace GameEvent.Engine.Map;
 public enum MoveReason
 {
     CompletionRoll,
+    StartingCell,
+    AdminAdjustment,
 }
 
 /// <summary>

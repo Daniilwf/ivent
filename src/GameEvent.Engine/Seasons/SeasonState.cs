@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Map;
 using GameEvent.Engine.Rolls;
 using GameEvent.Engine.Rulesets;
@@ -12,6 +13,9 @@ namespace GameEvent.Engine.Seasons;
 /// </summary>
 public sealed record SeasonState(
     Guid SeasonId,
+    string Name,
+    SeasonStatus Status,
+    DateTimeOffset? Deadline,
     Ruleset? Ruleset,
     int RulesetVersion,
     MapGraph Map,
@@ -19,7 +23,7 @@ public sealed record SeasonState(
     ImmutableSortedDictionary<Guid, RunState> Runs)
 {
     public static SeasonState Empty { get; } =
-        new(Guid.Empty, Ruleset: null, RulesetVersion: 0, new MapGraph([], []), ImmutableSortedDictionary<Guid, SeasonPlayer>.Empty, ImmutableSortedDictionary<Guid, RunState>.Empty);
+        new(Guid.Empty, Name: "", SeasonStatus.Draft, Deadline: null, Ruleset: null, RulesetVersion: 0, new MapGraph([], []), ImmutableSortedDictionary<Guid, SeasonPlayer>.Empty, ImmutableSortedDictionary<Guid, RunState>.Empty);
 
     public bool IsCreated => SeasonId != Guid.Empty;
 
@@ -29,6 +33,9 @@ public sealed record SeasonState(
     public bool Equals(SeasonState? other) =>
         other is not null
         && SeasonId == other.SeasonId
+        && Name == other.Name
+        && Status == other.Status
+        && Deadline == other.Deadline
         && Ruleset == other.Ruleset
         && RulesetVersion == other.RulesetVersion
         && Map == other.Map
@@ -36,6 +43,16 @@ public sealed record SeasonState(
         && Runs.SequenceEqual(other.Runs);
 
     public override int GetHashCode() => HashCode.Combine(SeasonId, Players.Count, Runs.Count);
+}
+
+/// <summary>Season lifecycle (GLOSSARY «Статус сезона»): draft → active → closing → finished → archived.</summary>
+public enum SeasonStatus
+{
+    Draft,
+    Active,
+    Closing,
+    Finished,
+    Archived,
 }
 
 /// <summary>Where the player is in the turn cycle. Moving and resolving happen inside one command.</summary>
@@ -46,13 +63,19 @@ public enum TurnPhase
     Playing,
 }
 
-/// <summary>A player's standing in the season. Points and position are independent measures.</summary>
+/// <summary>
+/// A player's standing in the season. Points and position are independent measures. Points and coins are
+/// fields (the leaderboard sorts by them); any other resource lives in <see cref="Resources"/> (invariant 9).
+/// </summary>
 public sealed record SeasonPlayer(
     Guid PlayerId,
     Guid UserId,
     string Name,
     string CellId,
     int Points,
+    int Coins,
+    ResourceBag Resources,
+    bool IsInactive,
     TurnPhase Phase,
     RollOffer? Offer,
     Guid? ActiveRunId);

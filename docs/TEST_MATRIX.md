@@ -11,7 +11,7 @@
 
 | ID | Правило | Тесты | Статус |
 | --- | --- | --- | --- |
-| P1 | Очки и позиция — разные показатели; кубы за прохождение меняют оба на сумму | `Runs/CompletionTests.Dice_sum_adds_points_and_moves_forward`, `Runs/CompletionTests.Points_and_position_accumulate_over_runs`, `Players/AdminAdjustTests.Position_change_does_not_touch_points` | 🟨 C2 |
+| P1 | Очки и позиция — разные показатели; кубы за прохождение меняют оба на сумму | `Runs/CompletionTests.Dice_sum_adds_points_and_moves_forward`, `Runs/CompletionTests.Points_and_position_accumulate_over_runs` (зелёные); правка админа и стартовые значения (✅): `Players/AdminAdjustTests.Position_change_does_not_touch_points`, `Players/AdminAdjustTests.Points_change_does_not_touch_position`, `Players/AdminAdjustTests.Position_change_is_a_transfer_with_the_admin_reason`, `Players/AddPlayerMidSeasonTests.Starting_cell_gives_no_points_and_starting_points_give_no_cells`, `Players/AddPlayerMidSeasonTests.Player_joining_mid_season_plays_on_from_the_given_cell_and_points`, инвариант «фишка двигается только событиями `PlayerMoved`, перенос админом — путь из одной клетки» (`Invariants/PlayerAdminInvariantTests.Invariants_hold_after_every_command`) | ✅ |
 | P2 | Первое место — первый дошедший до финиша | `Finish/FirstFinisherTests.First_to_reach_finish_is_first` | ⬜ |
 | P3 | Первый финиш предварительный до одобрения пруфа; при реджекте откат, место следующему | `Finish/ProvisionalFinishTests.*`, e2e `05-finish` | ⬜ |
 | P4 | Первый: до одобрения финиша очки как обычно, но не влияет на других; после одобрения заморожен, очки не растут | `Finish/FreeModeTests.*`, инвариант 8 | ⬜ |
@@ -100,11 +100,11 @@
 
 | ID | Правило | Тесты | Статус |
 | --- | --- | --- | --- |
-| SE1 | Статусы: черновик → идёт → закрытие → завершён → архив; недопустимые переходы отклоняются | `Seasons/SeasonStatusTests.*` | ⬜ |
+| SE1 | Статусы: черновик → идёт → закрытие → завершён → архив; недопустимые переходы отклоняются | `Seasons/SeasonStatusTests.Season_is_created_as_a_draft_with_its_name_and_deadline`, `Season_created_without_a_deadline_has_none`, `Season_goes_through_every_status_in_order`, `Starting_a_draft_season_changes_nothing_but_the_status`, `Status_can_only_move_to_the_next_one` (все недопустимые пары), `Undefined_status_value_is_an_invalid_transition`, `Game_actions_are_rejected_in_a_draft_season`, `Game_actions_are_rejected_once_the_season_is_no_longer_active` (закрытие, завершён, архив), `Game_actions_work_once_the_draft_season_is_started`, `Deadline_can_be_set_by_the_admin`, `Deadline_set_at_creation_can_be_moved`, `Deadline_can_be_removed`, `Deadline_cannot_be_changed_once_the_season_is_finished`, `Season_commands_before_the_season_exists_are_rejected`; лог: `Seasons/SeasonAdministrationLogTests.*`; инвариант «статусы только по порядку, игровые действия только в «идёт»» (`Invariants/PlayerAdminInvariantTests.Invariants_hold_after_every_command`) | ✅ |
 | SE2 | В «закрытии» роллы и броски запрещены, пруфы принимаются | `Seasons/DeadlineTests.*`, инвариант 11 | ⬜ |
 | SE3 | При завершении сохраняется снимок итогов | `Seasons/FinalizeTests.Snapshot_saved` | ⬜ |
-| SE4 | Новый игрок посреди сезона: стартовую позицию, очки и монетки задаёт админ | `Players/AddPlayerMidSeasonTests.*` | ⬜ |
-| SE5 | Флаг неактивности ставит админ; подсказка по игрокам без действий `inactiveHintDays` с отметкой об активной игре | `Players/InactiveHintTests.*` | ⬜ |
+| SE4 | Новый игрок посреди сезона: стартовую позицию, очки и монетки задаёт админ | `Players/AddPlayerMidSeasonTests.Player_added_by_default_starts_on_start_with_zero_balance` (черновик и «идёт»), `Player_joining_mid_season_gets_the_cell_points_and_coins_the_admin_sets`, `Starting_values_are_the_sum_of_logged_changes`, `Explicit_start_cell_and_zero_balance_write_no_changes`, `Only_nonzero_starting_values_are_logged`, `Starting_cell_gives_no_points_and_starting_points_give_no_cells`, `Player_joining_mid_season_plays_on_from_the_given_cell_and_points`, `Unknown_starting_cell_is_rejected`, `Player_cannot_join_once_the_season_is_closing`, `Same_user_cannot_join_twice_mid_season_even_with_a_starting_balance`; `Seasons/SeasonSetupTests.Adding_the_same_player_twice_is_rejected`, `Adding_the_same_user_twice_under_another_player_id_is_rejected`; инвариант 2 (`Invariants/PlayerAdminInvariantTests.Invariants_hold_after_every_command`) | ✅ |
+| SE5 | Флаг неактивности ставит админ; подсказка по игрокам без действий `inactiveHintDays` с отметкой об активной игре | Флаг: `Players/InactivityFlagTests.Admin_marks_a_player_inactive`, `Admin_brings_an_inactive_player_back`, `Marking_an_inactive_player_inactive_again_is_rejected`, `Bringing_back_an_active_player_is_rejected`, `Unknown_player_is_rejected`, `Flag_changes_nothing_else_about_the_player`, `Player_can_be_marked_inactive_in_a_draft_season`, `Flag_survives_replay`, инвариант «флаг = последнее значение от админа, без пустых событий» (`Invariants/PlayerAdminInvariantTests.Invariants_hold_after_every_command`). Подсказка — чтение в админке: `Web.Tests/Admin/InactiveHintTests.*` (E2) | 🟨 E2 |
 | SE6 | Пруф прохождения, которое довело до финиша, стоит в начале очереди | `Proofs/ProofQueueTests.Finishes_on_top` | ⬜ |
 | SE7 | Освобождение первого места: первым становится следующий, его бонус снимается, заморозка с момента, когда стал первым (при подтверждённом финише) или при одобрении; бонусы всех финишировавших пересчитываются (Q-4) | `Finish/FirstPlaceReassignTests.*` | ⬜ |
 
@@ -174,7 +174,7 @@
 | Двое играют одну игру | игра занята | G9, инвариант 4 | 🟨 C13 |
 | Удалили игру во время прохождения | мягкое удаление, снапшот | G3, `Runs/CompletionEdgeTests.Deleting_the_game_mid_run_keeps_the_run_and_its_snapshot` | ✅ |
 | Дубли игр в пуле | предупреждение о похожих | G2 | ⬜ |
-| Неактивный как случайная цель | ручной флаг | SE5 (флаг); цели — этап 4 | ⬜ / ➖ этап 4 |
+| Неактивный как случайная цель | ручной флаг | SE5 (флаг, `Players/InactivityFlagTests.*`); цели — этап 4 | 🟨 флаг — C2; цели — этап 4 |
 | Очки фармятся предметами | очки только за кубы и явные эффекты | P1 | ⬜ |
 | Бесплатный дроп в конце сезона | дроп отнимает очки (и в минус) | RR2, `Runs/DropTests.Points_can_go_negative` | ⬜ |
 | Сталкивают финишировавшего ради второго бонуса | позиция фиксирована, бонус один раз | P6, инвариант 9 | ⬜ |
@@ -195,8 +195,8 @@
 | # | Инвариант | Этап 1 | Статус |
 | --- | --- | --- | --- |
 | 1 | Пересчёт из лога = сохранённое состояние | да; срез B1: `Invariants/SliceInvariantTests.Invariants_hold_after_every_command` | 🟨 C13 |
-| 2 | Очки и монетки = сумма изменений в неотменённых событиях | да; срез B1: `Invariants/SliceInvariantTests.Invariants_hold_after_every_command` | 🟨 C13 |
-| 3 | Активных прохождений не больше лимита | да; срез B1: `Invariants/SliceInvariantTests.Invariants_hold_after_every_command` | 🟨 C13 |
+| 2 | Очки и монетки = сумма изменений в неотменённых событиях | да; срез B1: `Invariants/SliceInvariantTests.Invariants_hold_after_every_command`; с правками админа, стартовыми значениями и прочими ресурсами (без нулевых записей в словаре): `Invariants/PlayerAdminInvariantTests.Invariants_hold_after_every_command` (✅ C2) | 🟨 C13 |
+| 3 | Активных прохождений не больше лимита | да; срез B1: `Invariants/SliceInvariantTests.Invariants_hold_after_every_command`; со сбросом предложенной игры админом: `Invariants/PlayerAdminInvariantTests.Invariants_hold_after_every_command` (✅ C2) | 🟨 C13 |
 | 4 | Одну игру одновременно играет не больше одного прохождения | да (кооп — этап 5); срез B1: `Invariants/SliceInvariantTests.Invariants_hold_after_every_command` | 🟨 C13 |
 | 5 | Пройденная в сезоне игра никому больше не выпадает | да; срез B1: `Invariants/SliceInvariantTests.Invariants_hold_after_every_command` | 🟨 C13 |
 | 6 | Своя дропнутая или техдропнутая игра не выпадает | да | ⬜ |

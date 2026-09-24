@@ -1,5 +1,6 @@
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Map;
+using GameEvent.Engine.Players;
 using GameEvent.Engine.Rolls;
 using GameEvent.Engine.Runs;
 using GameEvent.Engine.Scoring;
@@ -66,8 +67,8 @@ public class SliceScenarioTests
         ScenarioAssert.Accepted(s);
         var sum = faces.Sum();
         Assert.Equal(
-            [typeof(SeasonCreated), typeof(SeasonPlayerAdded), typeof(SeasonPlayerAdded), typeof(GameRolled), typeof(RunStarted)],
-            s.Log.Take(5).Select(e => e.GetType()));
+            [typeof(SeasonCreated), typeof(SeasonStatusChanged), typeof(SeasonPlayerAdded), typeof(SeasonPlayerAdded), typeof(GameRolled), typeof(RunStarted)],
+            s.Log.Take(6).Select(e => e.GetType()));
         Assert.Equal(sum, s.Player("Вася").Points);
         Assert.Equal($"c{sum}", s.Player("Вася").CellId);
         Assert.Equal(RunStatus.Completed, s.State.Runs[runId].Status);

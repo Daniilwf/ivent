@@ -167,7 +167,7 @@ public sealed class SeasonApiTests : IAsyncLifetime
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         await using var db = _site.NewDb();
-        Assert.Equal(3, db.Events.Count()); // season created and two players, nothing more
+        Assert.Equal(4, db.Events.Count()); // season created and started, two players, nothing more
     }
 
     [Fact]
