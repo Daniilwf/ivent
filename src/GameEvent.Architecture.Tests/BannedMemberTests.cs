@@ -7,7 +7,9 @@ public class BannedMemberTests
     [Fact]
     public void Engine_IL_contains_no_banned_members()
     {
-        var violations = BannedMemberScanner.FindViolations(Assemblies.Engine.Location);
+        var violations = BannedMemberScanner.FindViolations(
+            Assemblies.Engine.Location,
+            t => !t.Namespace.StartsWith(Assemblies.CoverageInstrumentationNamespace, StringComparison.Ordinal));
 
         Assert.Empty(violations);
     }

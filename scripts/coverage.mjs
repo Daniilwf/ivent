@@ -17,11 +17,6 @@ const tested = run('dotnet', [
   quote('XPlat Code Coverage'),
   '--results-directory',
   quote(join(out, 'raw')),
-  '--',
-  quote('DataCollectionRunSettings.DataCollector.Configuration.Format=cobertura'),
-  quote(
-    'DataCollectionRunSettings.DataCollector.Configuration.ExcludeByAttribute=GeneratedCodeAttribute,CompilerGeneratedAttribute',
-  ),
 ]);
 if (!tested) process.exit(1);
 

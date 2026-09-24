@@ -1,4 +1,3 @@
-using System.Reflection;
 using System.Xml.Linq;
 using NetArchTest.Rules;
 
@@ -33,7 +32,7 @@ public class ProjectDependencyTests
     [Fact]
     public void Engine_does_not_depend_on_web_database_network_or_other_projects()
     {
-        var result = Types.InAssembly(Assemblies.Engine)
+        var result = Assemblies.EngineTypes()
             .ShouldNot()
             .HaveDependencyOnAny(s_engineForbiddenNamespaces)
             .GetResult();
@@ -44,7 +43,7 @@ public class ProjectDependencyTests
     [Fact]
     public void Engine_does_not_use_file_system_timer_or_random_types()
     {
-        var result = Types.InAssembly(Assemblies.Engine)
+        var result = Assemblies.EngineTypes()
             .ShouldNot()
             .HaveDependencyOnAny(s_engineForbiddenTypes)
             .GetResult();
