@@ -30,6 +30,25 @@ public static class Movement
         return path;
     }
 
-    internal static SeasonState Apply(SeasonState state, PlayerMoved e) =>
-        state with { Players = state.Players.SetItem(e.PlayerId, state.Players[e.PlayerId] with { CellId = e.To }) };
+    /// <summary>
+    /// Cells entered, in order, on <paramref name="steps"/> steps back from where <paramref name="path"/> stands:
+    /// first back along the walked edges of the last segment, then along primary backward edges (the edge a cell
+    /// is entered by when history runs out). Never past the start: missing steps are lost (M2, RR3).
+    /// </summary>
+    public static IReadOnlyList<string> Backward(MapGraph map, PlayerPath path, int steps) =>
+        throw new NotImplementedException("C3");
+
+    /// <summary>
+    /// The trigger points of a move, in path order: for each entered cell a <see cref="CellVisitKind.MoveStep"/>,
+    /// then <see cref="CellVisitKind.Pass"/>, or <see cref="CellVisitKind.Stop"/> for the last cell. A transfer
+    /// (<c>Steps == 0</c>) has none, and a move that entered no cell (blocked at the finish or the start) stops nowhere.
+    /// </summary>
+    public static IReadOnlyList<CellVisit> Visits(PlayerMoved moved) =>
+        throw new NotImplementedException("C3");
+
+    internal static SeasonState Apply(SeasonState state, PlayerMoved e)
+    {
+        var player = state.Players[e.PlayerId];
+        return state with { Players = state.Players.SetItem(e.PlayerId, player with { CellId = e.To, Path = player.Path.After(e) }) };
+    }
 }

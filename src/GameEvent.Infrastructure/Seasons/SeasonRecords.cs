@@ -65,6 +65,9 @@ public sealed class SeasonPlayerRecord
 
     public bool IsInactive { get; set; }
 
+    /// <summary>The player's path in segments, as JSON (<see cref="Engine.Map.PlayerPath"/>); needed to move back.</summary>
+    public required string PathJson { get; set; }
+
     public TurnPhase Phase { get; set; }
 
     /// <summary>The offered game waiting for «Начать», as JSON (<see cref="Engine.Rolls.RollOffer"/>).</summary>

@@ -12,7 +12,8 @@ public enum MoveReason
 
 /// <summary>
 /// The player's token moved. <see cref="Path"/> lists the cells entered in order, ending at <see cref="To"/>.
-/// <see cref="Steps"/> is how many steps were requested; steps beyond the finish burn (D-47).
+/// <see cref="Steps"/> is how many steps were requested: positive forward, negative back, 0 for a transfer
+/// (teleport, admin move, starting cell). Steps beyond the finish or past the start are lost (D-47, M2).
 /// <see cref="RunId"/> links the move to a run when there is one.
 /// </summary>
 [EventType("player-moved")]

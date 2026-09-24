@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Text.Json;
 using GameEvent.Engine.Kernel;
+using GameEvent.Engine.Map;
 using GameEvent.Engine.Rolls;
 using GameEvent.Engine.Rulesets;
 using GameEvent.Engine.Runs;
@@ -77,6 +78,7 @@ internal static class SeasonProjection
                     Name = player.Name,
                     CellId = player.CellId,
                     ResourcesJson = "{}",
+                    PathJson = "{}",
                 };
                 db.SeasonPlayers.Add(record);
             }
@@ -89,6 +91,7 @@ internal static class SeasonProjection
             record.Coins = player.Coins;
             record.ResourcesJson = JsonSerializer.Serialize(player.Resources, EngineJson.Options);
             record.IsInactive = player.IsInactive;
+            record.PathJson = JsonSerializer.Serialize(player.Path, EngineJson.Options);
             record.Phase = player.Phase;
             record.OfferJson = player.Offer is null ? null : JsonSerializer.Serialize(player.Offer, EngineJson.Options);
             record.ActiveRunId = player.ActiveRunId;
@@ -152,7 +155,8 @@ internal static class SeasonProjection
                 p => p.Id,
                 p => new SeasonPlayer(
                     p.Id, p.UserId, p.Name, p.CellId, p.Points, p.Coins,
-                    JsonSerializer.Deserialize<ResourceBag>(p.ResourcesJson, EngineJson.Options), p.IsInactive, p.Phase,
+                    JsonSerializer.Deserialize<ResourceBag>(p.ResourcesJson, EngineJson.Options), p.IsInactive,
+                    JsonSerializer.Deserialize<PlayerPath>(p.PathJson, EngineJson.Options)!, p.Phase,
                     p.OfferJson is null ? null : JsonSerializer.Deserialize<RollOffer>(p.OfferJson, EngineJson.Options),
                     p.ActiveRunId)),
             Runs = runs.ToImmutableSortedDictionary(
