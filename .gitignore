@@ -56,3 +56,6 @@ backups/
 *.pfx
 deploy/secrets/
 appsettings.*.local.json
+
+# EF design-time database (dotnet ef database update without a connection string)
+design-time.db*

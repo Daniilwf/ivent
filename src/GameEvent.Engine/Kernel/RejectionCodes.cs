@@ -3,6 +3,8 @@ namespace GameEvent.Engine.Kernel;
 /// <summary>Stable rejection codes. Each maps to a text in the interface dictionary.</summary>
 public static class RejectionCodes
 {
+    public const string CommandIdReused = "command.idReused";
+    public const string SeasonMismatch = "season.mismatch";
     public const string RulesetUnsupported = "ruleset.unsupported";
     public const string SeasonNotCreated = "season.notCreated";
     public const string SeasonAlreadyCreated = "season.alreadyCreated";

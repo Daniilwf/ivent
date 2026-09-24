@@ -94,3 +94,8 @@ dotnet_diagnostic.CA1707.severity = none       # test names use underscores: Giv
 dotnet_diagnostic.CA1861.severity = none       # constant arrays in test data are fine
 dotnet_diagnostic.CA2201.severity = none       # tests may throw plain exceptions
 dotnet_diagnostic.CA1822.severity = none       # xUnit test methods are instance methods
+
+# EF Core migrations are generated code: never hand-edited, not held to project style.
+[src/GameEvent.Infrastructure/Database/Migrations/**.cs]
+generated_code = true
+dotnet_analyzer_diagnostic.severity = none

@@ -121,12 +121,12 @@
 | ID | Правило | Тесты | Статус |
 | --- | --- | --- | --- |
 | L1 | Лог всех действий, включая админа, виден всем игрокам | `Web.Tests/Feed/*`, e2e `07-undo` | ⬜ |
-| L2 | События хранят результаты; повтор лога детерминирован | `Seasons/SliceScenarioTests.Replaying_the_log_gives_the_current_state`, `Seasons/SliceScenarioTests.Replay_does_not_depend_on_the_pool_or_the_ruleset_any_more`, `Seasons/SliceScenarioTests.Same_seed_and_commands_give_the_same_log`, `Invariants/SliceInvariantTests.Same_seed_and_commands_give_the_same_log`, снапшот-тесты Verify | 🟨 C13 |
+| L2 | События хранят результаты; повтор лога детерминирован | `Seasons/SliceScenarioTests.Replaying_the_log_gives_the_current_state`, `Seasons/SliceScenarioTests.Replaying_the_log_read_back_from_storage_gives_the_same_state`, `Seasons/SliceScenarioTests.Same_seed_and_commands_give_the_same_log`, `Invariants/SliceInvariantTests.Same_seed_and_commands_give_the_same_log`, снапшот-тесты Verify | 🟨 C13 |
 | L3 | Откат — команда целиком компенсирующими событиями в обратном порядке; есть зависимые — отказ со списком | `Undo/UndoTests.*`, инвариант 13, e2e `07-undo` | ⬜ |
-| L4 | Проверка целостности: пересчёт из лога совпадает с сохранённым | `Seasons/SliceScenarioTests.Replaying_every_prefix_of_the_log_matches_the_state_after_each_command`, инвариант 1 (`Invariants/SliceInvariantTests.Invariants_hold_after_every_command`), `Log/IntegrityTests.*`, `Web.Tests/Integrity/*` | 🟨 C12 |
+| L4 | Проверка целостности: пересчёт из лога совпадает с сохранённым | `Seasons/SliceScenarioTests.Replaying_every_prefix_of_the_log_matches_the_state_after_each_command`, инвариант 1 (`Invariants/SliceInvariantTests.Invariants_hold_after_every_command`), `Log/IntegrityTests.*`, `Web.Tests/Integrity/*`, `Web.Tests/Queue/CommandQueueTests.Command_through_the_queue_writes_log_and_projection_that_agree` | 🟨 C12 |
 | L5 | Экспорт и импорт сезона одним архивом | `Web.Tests/SeasonTransfer/*` | ⬜ |
-| L6 | Формат события версионируется, старые события читаются через преобразование | `Seasons/SliceScenarioTests.Every_event_of_the_slice_survives_the_json_round_trip`, `Seasons/SliceScenarioTests.Roll_misses_survive_the_json_round_trip` (круг сериализации), `Log/EventUpcastTests.*` | 🟨 C12 |
-| L7 | Все изменения через одну очередь, одна команда — одна транзакция, повтор `CommandId` не выполняется дважды | `Web.Tests/Queue/*` | ⬜ |
+| L6 | Формат события версионируется, старые события читаются через преобразование | `Kernel/EventFormatTests.*` (эталонный формат, пошаговое преобразование старых версий, отказ для новее сборки и без преобразования), `Seasons/SliceScenarioTests.Every_event_of_the_slice_survives_the_json_round_trip` | ✅ |
+| L7 | Все изменения через одну очередь, одна команда — одна транзакция, повтор `CommandId` не выполняется дважды | `Web.Tests/Queue/CommandQueueTests.*` (атомарность при сбое, 50 параллельных команд, повтор `CommandId`, перезапуск) | ✅ |
 
 ### Аккаунты, безопасность, эксплуатация
 
@@ -156,7 +156,7 @@
 | Подкармливать друга | прямых переводов нет | нет команд перевода (архитектурный тест списка команд) | ⬜ |
 | Финишировавший первым помогает или вредит | заморожен | P4, T3, инвариант 8 | ⬜ |
 | Реджект прохождения, которое довело до финиша | место предварительное | P3, SE7 | ⬜ |
-| Два действия одновременно | единая очередь | L7, e2e `10-two-tabs` | ⬜ |
+| Два действия одновременно | единая очередь | L7, e2e `10-two-tabs` | 🟨 I1 |
 | Двое финишировали почти одновременно | порядок по очереди команд | `Finish/ConcurrentFinishTests` (Web.Tests) | ⬜ |
 | Реджект после объявления итогов | итоги после проверки всех пруфов | P10 | ⬜ |
 | Правка конфига посреди сезона | снапшот при ролле | S1, S2 | 🟨 C1 |
