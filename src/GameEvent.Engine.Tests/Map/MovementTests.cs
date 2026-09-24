@@ -184,15 +184,16 @@ public class MovementTests
     [Fact]
     public void Drop_penalty_does_not_go_past_start()
     {
-        // RR3, movement part: a player one cell from the start is thrown back further than they have walked
+        // RR3, movement part: a player placed mid-season on c2 who walked one cell gets a penalty far larger
+        // than the map behind them: back along the walked edge, then along primary edges, and stop on the start
         var map = LinearMap.Generate(8);
-        var path = PlayerPath.At("start").After(
-            new PlayerMoved(Guid.Empty, "start", "c1", 1, ["c1"], MoveReason.CompletionRoll, RunId: null));
+        var path = PlayerPath.At("start")
+            .After(new PlayerMoved(Guid.Empty, "start", "c2", 0, ["c2"], MoveReason.AdminAdjustment, RunId: null))
+            .After(new PlayerMoved(Guid.Empty, "c2", "c3", 1, ["c3"], MoveReason.CompletionRoll, RunId: null));
 
-        var entered = Movement.Backward(map, path, 4);
+        var entered = Movement.Backward(map, path, 12);
 
-        Assert.Equal(["start"], entered);
-        Assert.Equal("start", entered[^1]);
+        Assert.Equal(["c2", "c1", "start"], entered);
     }
 
     [Fact]

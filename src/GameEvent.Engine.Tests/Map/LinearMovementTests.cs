@@ -161,5 +161,25 @@ public class LinearMovementTests
         Assert.Equal("c4", s.Player("Вася").CellId);
     }
 
+    [Fact]
+    public void Completion_on_the_finish_writes_no_move()
+    {
+        // D-47: a token that cannot move writes no PlayerMoved. Points after the finish are C9's rules.
+        var s = Scenario.New()
+            .WithMapLength(2)
+            .WithCategory("Horror").WithGame("Silent Hill", 6, "Horror").WithGame("Fatal Frame", 6, "Horror")
+            .WithPlayers("Вася")
+            .Roll("Вася").Start("Вася");
+        s.NextRandom(3, 3).Complete("Вася", Difficulty.Hard);
+        Assert.Equal("finish", s.Player("Вася").CellId);
+
+        s.Roll("Вася").Start("Вася").NextRandom(3, 3).Complete("Вася", Difficulty.Hard);
+
+        ScenarioAssert.Accepted(s);
+        Assert.Single(s.LastEvents<RunCompleted>());
+        Assert.Empty(s.LastEvents<PlayerMoved>());
+        Assert.Equal("finish", s.Player("Вася").CellId);
+    }
+
     private static Guid CompletedRunId(Scenario s) => Assert.Single(s.LastEvents<RunCompleted>()).RunId;
 }

@@ -83,7 +83,7 @@
 
 ### D. Инфраструктура и БД
 
-- ⬜ **D1 Схема и миграции.** Все сущности этапа 1 из «Модели данных» (User, Season, SeasonPlayer, SeasonResult, PathStep, Game, Category, PlayerGameExclusion, Run, Proof, Review, PendingChoice, PendingManualEffect, ScheduledTask, GameEvent, Ruleset — проекция событий правил (D-82), BugReport), мягкое удаление, уникальный `CommandId`, индексы лидерборда, WAL. Проекция состояния обновляется в транзакции команды.
+- ⬜ **D1 Схема и миграции.** Все сущности этапа 1 из «Модели данных» (User, Season, SeasonPlayer (путь — JSON-полем, D-90), SeasonResult, Game, Category, PlayerGameExclusion, Run, Proof, Review, PendingChoice, PendingManualEffect, ScheduledTask, GameEvent, Ruleset — проекция событий правил (D-82), BugReport), мягкое удаление, уникальный `CommandId`, индексы лидерборда, WAL. Проекция состояния обновляется в транзакции команды.
   Тесты: проекция из БД = свёртка лога (L4) на демо-базе; тест миграций на копии демо-базы.
 - ⬜ **D2 Очередь команд.** Идемпотентность по `CommandId`, кэш состояния сезона, ответ через `TaskCompletionSource`, публикация в SignalR после коммита, админ и таймеры через ту же очередь.
   Тесты: 50 параллельных команд — последовательное выполнение, без потерь; двойной клик с одним `CommandId` — одно действие (L7).
