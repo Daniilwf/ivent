@@ -42,8 +42,9 @@ jobs:
       - id: filter
         uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         with:
-          # Push: compare with the previous push of this branch (a new branch falls back to main).
-          base: ${{ github.event_name == 'push' && github.event.before != '0000000000000000000000000000000000000000' && github.event.before || '' }}
+          # Push: compare with the previous push of this branch. A new branch or a force push
+          # (the previous commit is gone after a rebase) falls back to main.
+          base: ${{ github.event_name == 'push' && !github.event.forced && github.event.before != '0000000000000000000000000000000000000000' && github.event.before || '' }}
           filters: |
             code:
               - '**'
