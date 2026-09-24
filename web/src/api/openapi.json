@@ -694,7 +694,7 @@
             "$ref": "#/components/schemas/Ruleset"
           }
         },
-        "description": "A new ruleset from the admin's editor: the whole document, the version it was edited from, and a command id\r\ngenerated once per save."
+        "description": "A new ruleset from the admin's editor: the whole document, the version it was edited from, and a command id\ngenerated once per save."
       },
       "CoinReward": {
         "required": [
@@ -1024,28 +1024,28 @@
         ]
       },
       "EquatableArrayOfAutoNomination": {
-        "description": "Immutable list with value equality, so records holding lists (events, snapshots) compare by content.\r\nSerialized as a plain JSON array."
+        "description": "Immutable list with value equality, so records holding lists (events, snapshots) compare by content.\nSerialized as a plain JSON array."
       },
       "EquatableArrayOfint": {
-        "description": "Immutable list with value equality, so records holding lists (events, snapshots) compare by content.\r\nSerialized as a plain JSON array."
+        "description": "Immutable list with value equality, so records holding lists (events, snapshots) compare by content.\nSerialized as a plain JSON array."
       },
       "EquatableArrayOfLengthFilterStep": {
-        "description": "Immutable list with value equality, so records holding lists (events, snapshots) compare by content.\r\nSerialized as a plain JSON array."
+        "description": "Immutable list with value equality, so records holding lists (events, snapshots) compare by content.\nSerialized as a plain JSON array."
       },
       "EquatableArrayOfPayoutStep": {
-        "description": "Immutable list with value equality, so records holding lists (events, snapshots) compare by content.\r\nSerialized as a plain JSON array."
+        "description": "Immutable list with value equality, so records holding lists (events, snapshots) compare by content.\nSerialized as a plain JSON array."
       },
       "EquatableArrayOfShopPriceReset": {
-        "description": "Immutable list with value equality, so records holding lists (events, snapshots) compare by content.\r\nSerialized as a plain JSON array."
+        "description": "Immutable list with value equality, so records holding lists (events, snapshots) compare by content.\nSerialized as a plain JSON array."
       },
       "EquatableArrayOfstring": {
-        "description": "Immutable list with value equality, so records holding lists (events, snapshots) compare by content.\r\nSerialized as a plain JSON array."
+        "description": "Immutable list with value equality, so records holding lists (events, snapshots) compare by content.\nSerialized as a plain JSON array."
       },
       "EquatableArrayOfTiebreaker": {
-        "description": "Immutable list with value equality, so records holding lists (events, snapshots) compare by content.\r\nSerialized as a plain JSON array."
+        "description": "Immutable list with value equality, so records holding lists (events, snapshots) compare by content.\nSerialized as a plain JSON array."
       },
       "EquatableArrayOfVotedNomination": {
-        "description": "Immutable list with value equality, so records holding lists (events, snapshots) compare by content.\r\nSerialized as a plain JSON array."
+        "description": "Immutable list with value equality, so records holding lists (events, snapshots) compare by content.\nSerialized as a plain JSON array."
       },
       "EventKind": {
         "enum": [
@@ -1738,7 +1738,7 @@
             ]
           }
         },
-        "description": "One changed value between two versions of the rules: the JSON path (for example `reward.diceCount.max`)\r\nand the values before and after as JSON text (a JSON null is the text `\"null\"`); null when the field\r\ndid not exist on that side."
+        "description": "One changed value between two versions of the rules: the JSON path (for example `reward.diceCount.max`)\nand the values before and after as JSON text (a JSON null is the text `\"null\"`); null when the field\ndid not exist on that side."
       },
       "RulesetError": {
         "required": [
