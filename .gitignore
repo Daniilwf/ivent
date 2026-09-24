@@ -1,61 +1,66 @@
-# Import sources (personal data, never in git)
+# One .gitignore for the whole repository (web/ and e2e/ have none of their own).
+
+# --- Personal data and secrets: never in the public repository ---
 data/import/*
 !data/import/.gitkeep
-
-# Claude Code local state
-.claude/state/
-.claude/settings.local.json
-
-# Test output
-test-artifacts/
-
-# Secrets
 .env
 .env.*
 !.env.example
-
-# .NET
-bin/
-obj/
-*.user
-.vs/
-TestResults/
-StrykerOutput/
-coverage/
-
-# Node
-node_modules/
-dist/
-web/src/api/.openapi-cache/
-playwright-report/
-blob-report/
-
-# Local databases and uploads
-*.db
-*.db-shm
-*.db-wal
-/var/
-
-# Downloaded tools (gitleaks)
-.tools/
-
-# NuGet cache in CI workspace
-.nuget/
-
-# Personal data and secrets that must never reach the public repository
-logs/
-*.log
-*.xlsx
-*.sqlite
-*.sqlite3
-*.sqlite-*
-*.bak
-backups/
+deploy/secrets/
+appsettings.*.local.json
 *.pem
 *.key
 *.pfx
-deploy/secrets/
-appsettings.*.local.json
+*.xlsx
 
-# EF design-time database (dotnet ef database update without a connection string)
+# --- Local databases, backups, logs ---
+/var/
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+*.sqlite-*
 design-time.db*
+*.bak
+backups/
+logs/
+*.log
+
+# --- .NET build output and caches ---
+bin/
+obj/
+TestResults/
+StrykerOutput/
+.nuget/
+
+# --- Node ---
+node_modules/
+dist/
+dist-ssr/
+*.local
+npm-debug.log*
+
+# --- Test output (Playwright traces, coverage, Stryker reports) ---
+test-artifacts/
+playwright-report/
+blob-report/
+coverage/
+
+# --- Downloaded tools (gitleaks) ---
+.tools/
+
+# --- Editors and OS ---
+.vs/
+*.user
+*.suo
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+.DS_Store
+Thumbs.db
+
+# --- Claude Code local state ---
+.claude/state/
+.claude/settings.local.json

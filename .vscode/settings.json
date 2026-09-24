@@ -1,0 +1,29 @@
+{
+  "files.exclude": {
+    "**/node_modules": true,
+    "**/bin": true,
+    "**/obj": true,
+    "**/dist": true,
+    ".tools": true,
+    ".nuget": true,
+    "test-artifacts": true,
+    "var": true,
+    ".husky/_": true
+  },
+  "search.exclude": {
+    "web/src/api/schema.ts": true,
+    "web/src/api/openapi.json": true,
+    "**/package-lock.json": true,
+    "src/GameEvent.Infrastructure/Database/Migrations": true
+  },
+  "files.watcherExclude": {
+    "**/node_modules/**": true,
+    "**/bin/**": true,
+    "**/obj/**": true,
+    "test-artifacts/**": true,
+    "var/**": true,
+    ".tools/**": true
+  },
+  "files.eol": "\n",
+  "editor.formatOnSave": true
+}
