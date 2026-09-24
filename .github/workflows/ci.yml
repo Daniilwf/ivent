@@ -41,6 +41,8 @@ jobs:
       - id: filter
         uses: dorny/paths-filter@v4
         with:
+          # Push: compare with the previous push of this branch (a new branch falls back to main).
+          base: ${{ github.event_name == 'push' && github.event.before != '0000000000000000000000000000000000000000' && github.event.before || '' }}
           filters: |
             code:
               - '**'
