@@ -30,6 +30,12 @@ const platform = `${process.platform}-${process.arch}`;
 const asset = ASSETS[platform];
 if (!asset) fail(`gitleaks: no pinned release for ${platform}`);
 
+// The binary is trusted only because we downloaded and verified it. A copy committed to git
+// (e.g. a stub that always exits 0) must never run instead.
+const tracked = run('git', ['ls-files', '--', '.tools'], { capture: true });
+if (!tracked.ok || tracked.output.trim() !== '')
+  fail('gitleaks: files under .tools/ are tracked by git; refusing to run.');
+
 const dir = join(root, '.tools', 'gitleaks', VERSION);
 const exe = join(dir, process.platform === 'win32' ? 'gitleaks.exe' : 'gitleaks');
 
