@@ -105,6 +105,49 @@ public class CommandQueueRobustnessTests
         Assert.Equal(RejectionCodes.CommandIdReused, otherAmount.Rejection?.Code);
         Assert.True(repeat.IsDuplicate);
         Assert.Equal(first.Events.Select(e => e.Sequence), repeat.Events.Select(e => e.Sequence));
+
+        // The refused ones wrote nothing: only the first adjustment is in the log and the projection
+        await using var db = h.NewDb();
+        Assert.Equal(6, await db.Events.CountAsync(Ct)); // created, started, two players, adjusted, points
+        Assert.Equal((5, 0), (
+            (await db.SeasonPlayers.SingleAsync(p => p.Id == s_vasya, Ct)).Points,
+            (await db.SeasonPlayers.SingleAsync(p => p.Id == s_petya, Ct)).Points));
+    }
+
+    [Fact]
+    public async Task Equal_bodies_built_separately_are_a_repeat_even_after_a_restart()
+    {
+        // D-95 relies on the command JSON being deterministic: a fresh ruleset instance, default and empty lists
+        await using var h = await QueueHarness.StartAsync();
+        var created = Guid.NewGuid();
+        await Accepted(h, new CreateSeason(s_seasonA, "Тестовый сезон", RulesetJson.Default()), s_seasonA, created);
+        await Accepted(h, new ChangeSeasonStatus(SeasonStatus.Active), s_seasonA);
+        await Accepted(h, new AddSeasonPlayer(s_vasya, s_vasya, "Вася"), s_seasonA);
+        var adjusted = Guid.NewGuid();
+        await Accepted(h, new AdjustPlayer(s_vasya, "Бонус", PointsDelta: 5, ResourceDeltas: default), s_seasonA, adjusted);
+
+        await h.RestartAsync();
+
+        var createdAgain = await h.SendAsync(new CreateSeason(s_seasonA, "Тестовый сезон", RulesetJson.Default()), s_seasonA, created);
+        var adjustedAgain = await h.SendAsync(new AdjustPlayer(s_vasya, "Бонус", PointsDelta: 5, ResourceDeltas: []), s_seasonA, adjusted);
+
+        Assert.True(createdAgain.IsDuplicate);
+        Assert.True(adjustedAgain.IsDuplicate);
+    }
+
+    [Fact]
+    public async Task Command_that_cannot_be_serialized_is_rejected_without_a_failure()
+    {
+        await using var h = await QueueHarness.StartAsync();
+        await Accepted(h, new CreateSeason(s_seasonA, "Тестовый сезон", RulesetJson.Default()), s_seasonA);
+        await Accepted(h, new ChangeSeasonStatus(SeasonStatus.Active), s_seasonA);
+        await Accepted(h, new AddSeasonPlayer(s_vasya, s_vasya, "Вася"), s_seasonA);
+
+        // A null in a non-nullable field (no endpoint lets it through today) is a clean rejection, not a crash
+        var outcome = await h.SendAsync(new AdjustPlayer(s_vasya, null!, PointsDelta: 5), s_seasonA);
+
+        Assert.Equal(RejectionCodes.CommandInvalid, outcome.Rejection?.Code);
+        Assert.True((await h.SendAsync(new AdjustPlayer(s_vasya, "Бонус", PointsDelta: 1), s_seasonA)).IsAccepted);
     }
 
     [Fact]

@@ -84,7 +84,11 @@ public sealed partial class CommandProcessor(
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var commandType = envelope.Command.GetType().Name;
-        var commandHash = Hash(envelope.Command);
+        if (Hash(envelope.Command) is not { } commandHash)
+        {
+            // A null in a non-nullable field: the endpoints refuse such input first; anything else is a clean rejection.
+            return Rejected(RejectionCodes.CommandInvalid, $"Command {commandType} cannot be serialized.");
+        }
 
         var earlier = await db.Events.AsNoTracking()
             .Where(e => e.CommandId == envelope.CommandId)
@@ -190,6 +194,16 @@ public sealed partial class CommandProcessor(
     [LoggerMessage(Level = LogLevel.Error, Message = "Command {CommandId} ({CommandType}) failed; its transaction was not confirmed, the season will be reloaded from the log")]
     private static partial void LogCommandFailed(ILogger logger, Exception exception, Guid commandId, string commandType);
 
-    private static string Hash(ICommand command) =>
-        Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(command, command.GetType(), EngineJson.Options)));
+    // The command's JSON is deterministic within one build (D-95); a retry across a deploy may be refused, never doubled.
+    private static string? Hash(ICommand command)
+    {
+        try
+        {
+            return Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(command, command.GetType(), EngineJson.Options)));
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
 }
