@@ -17,7 +17,7 @@ const coins = (n: number) => {
   return `${n.toLocaleString('ru-RU')} ${word}`;
 };
 
-const effectSources = { paidReroll: '(за реролл)' } as const;
+const effectSources = { paidReroll: '(за реролл)', drop: '(за дроп)' } as const;
 
 type RerollPayment = 'freeThisRoll' | 'freeRerollResource' | 'coins' | 'badEvent';
 
@@ -27,6 +27,8 @@ const rejection = {
   'turn.noPendingChoice': 'Этот выбор уже сделан или снят. Обновите страницу.',
   'turn.unknownOption': 'Такого варианта нет. Обновите страницу.',
   'roll.noAvailableGames': 'Нет доступных игр для ролла. Сообщите админу.',
+  'run.techRerollWindowClosed': 'Окно тех-реролла после ролла закрылось. Обратитесь к админу.',
+  'run.reasonCommentRequired': 'Для причины «Другое» нужен комментарий.',
   'roll.notEnoughCoins': 'Не хватает монеток на реролл.',
   'roll.gameNotOffered': 'Эта игра вам сейчас не предложена. Обновите страницу.',
   'run.hoursRequired': 'У игры нет данных о длине: укажите оценку часов.',
@@ -82,6 +84,27 @@ export const ru = {
         : `Реролл стоит ${coins(price)}. Потратить?`,
     rerollConfirmYes: 'Да, реролл',
     rerollConfirmNo: 'Отмена',
+    drop: 'Дроп',
+    dropConfirm:
+      'Дроп — это штраф: кубы за дроп отнимут очки и клетки, и вам достанется плохой ивент. Дропнуть игру?',
+    dropHint: (minutes: number) =>
+      `По правилам дропать стоит не раньше чем через ${minutes} мин. игры.`,
+    dropConfirmYes: 'Да, дропнуть',
+    dropConfirmNo: 'Отмена',
+    techReroll: 'Тех-реролл',
+    techRerollReason: 'Причина',
+    techRerollReasonPlaceholder: 'Выберите причину',
+    techRerollReasons: {
+      weakPc: 'Слабый ПК',
+      paidUnavailable: 'Игра платная, её нет',
+      doesNotLaunch: 'Не запускается',
+      emulatorTooSlow: 'Эмулятор не тянет',
+      other: 'Другое',
+    },
+    techRerollComment: 'Комментарий',
+    techRerollCommentRequired: 'Для причины «Другое» напишите комментарий.',
+    techRerollSubmit: 'Тех-реролл',
+    techRerollCancel: 'Отмена',
     alreadyPlayedGame: (title: string) => `Уже проходил: ${title}`,
     choose: 'Выберите одну из выпавших игр',
     option: (title: string, gameHours: number | null) =>
@@ -104,7 +127,7 @@ export const ru = {
   },
   effects: {
     title: 'Нужно разыграть',
-    drawEvent: (kind: 'good' | 'bad', source: 'paidReroll') =>
+    drawEvent: (kind: 'good' | 'bad', source: keyof typeof effectSources) =>
       `${kind === 'bad' ? 'Плохой ивент' : 'Хороший ивент'} ${effectSources[source]}`,
   },
   map: {

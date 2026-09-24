@@ -4,12 +4,15 @@ import { watchSeason } from '../api/realtime';
 import { ru } from '../i18n/ru';
 import { CompleteForm, type Completion } from './CompleteForm';
 import { RerollButton } from './RerollButton';
+import { RunActions } from './RunActions';
 
 type Season = Schemas['SeasonView'];
 type Command =
   | { kind: 'roll' }
   | { kind: 'start' }
   | { kind: 'reroll' }
+  | { kind: 'drop' }
+  | { kind: 'techReroll'; reason: NonNullable<Schemas['TechRerollReason']>; comment: string | null }
   | { kind: 'complete'; completion: Completion }
   | { kind: 'choose'; choiceId: string; optionId: string }
   | { kind: 'alreadyPlayed'; gameId: string };
@@ -26,6 +29,13 @@ function send(seasonId: string, command: Command) {
       return api.POST('/api/seasons/{seasonId}/start', { params, body: { commandId } });
     case 'reroll':
       return api.POST('/api/seasons/{seasonId}/reroll', { params, body: { commandId } });
+    case 'drop':
+      return api.POST('/api/seasons/{seasonId}/drop', { params, body: { commandId } });
+    case 'techReroll':
+      return api.POST('/api/seasons/{seasonId}/tech-reroll', {
+        params,
+        body: { commandId, reason: command.reason, comment: command.comment },
+      });
     case 'complete':
       return api.POST('/api/seasons/{seasonId}/complete', {
         params,
@@ -213,6 +223,13 @@ export function SeasonScreen({
               needsHours={me.activeRun.game.hours == null}
               pending={pending}
               onComplete={(completion) => void act({ kind: 'complete', completion })}
+            />
+            <RunActions
+              startedAt={me.activeRun.startedAt}
+              dropHintMinutes={me.dropHintMinutes ?? null}
+              pending={pending}
+              onDrop={() => void act({ kind: 'drop' })}
+              onTechReroll={(reason, comment) => void act({ kind: 'techReroll', reason, comment })}
             />
           </>
         )}

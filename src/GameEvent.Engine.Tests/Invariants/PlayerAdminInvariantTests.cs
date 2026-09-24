@@ -23,6 +23,9 @@ namespace GameEvent.Engine.Tests.Invariants;
 /// discard (D-89) meets pending choices as well as offers.
 /// The reroll variants (C6a, D-93) add <see cref="Reroll"/> and give the admin reroll coupons (<c>freeRerolls</c>) to hand
 /// out, with the paid reroll costing coins or a bad event and 0–2 free rerolls per roll picked by the seed.
+/// The drop variants (C6b, D-94) add <see cref="DropRun"/>, <see cref="TechReroll"/> (by the player and by the admin) and
+/// <see cref="ConvertTechRerollToDrop"/>, and move the clock forward between commands, so the tech reroll window
+/// (<c>roll.techRerollWindowHours</c>) both holds and runs out.
 /// </summary>
 public class PlayerAdminInvariantTests
 {
@@ -130,19 +133,68 @@ public class PlayerAdminInvariantTests
 
     private static string CellAt(Scenario s, int index) => s.State.Map.Cells[Math.Min(index, s.State.Map.Cells.Count - 1)].Id;
 
+    /// <summary>
+    /// With drops, a cell transfer with a small argument is a drop-family command instead (bits 5–7): 0–1 a drop,
+    /// 2 a tech reroll «other» without a comment (refused), 3 a tech reroll «other» with one, 4 a listed reason, 5 an admin
+    /// tech reroll, 6 the admin converting the player's latest tech-rerolled run (or any run of theirs, or a made-up one)
+    /// into a drop; a completion with the top argument is a drop as well.
+    /// </summary>
+    private static ICommand DropCommandFor(Scenario s, byte b, bool withChoice, bool withRerolls)
+    {
+        var index = b % 4;
+        var player = index < s_players.Length ? s.PlayerId(s_players[index]) : s_late;
+        var arg = b / 32;
+        var kind = (b / 4) % 8;
+        if (kind == 2 && arg == 7)
+        {
+            return new DropRun(player);
+        }
+
+        if (kind != 5 || arg == 7)
+        {
+            return CommandFor(s, b, withChoice, withRerolls);
+        }
+
+        return arg switch
+        {
+            0 or 1 => new DropRun(player),
+            2 => new TechReroll(player, TechRerollReason.Other, "  "),
+            3 => new TechReroll(player, TechRerollReason.Other, "не тянет шейдеры"),
+            4 => new TechReroll(player, (TechRerollReason)(b % 4), null),
+            5 => new TechReroll(player, TechRerollReason.DoesNotLaunch, null, ByAdmin: true),
+            _ => new ConvertTechRerollToDrop(RunToConvert(s, player, b), "это был дроп"),
+        };
+    }
+
+    private static Guid RunToConvert(Scenario s, Guid player, byte b)
+    {
+        var runs = s.State.Runs.Values.Where(r => r.PlayerId == player).ToList();
+        var techRerolled = runs.LastOrDefault(r => r.Status == RunStatus.TechRerolled);
+        return techRerolled?.RunId ?? runs.LastOrDefault()?.RunId ?? SequentialIds.Make(0x60000000, b);
+    }
+
     private static Scenario Play(
         int seed,
         byte[] script,
         Action<Scenario, ICommand, SeasonState, int>? afterEach = null,
         bool withChoice = false,
-        RerollMode rerolls = RerollMode.None)
+        RerollMode rerolls = RerollMode.None,
+        bool withDrops = false)
     {
         var s = NewSeason(seed, withChoice, rerolls);
         foreach (var b in script)
         {
+            // With drops the clock runs: 0–21 hours before each command, so the 48-hour window both holds and closes
+            if (withDrops)
+            {
+                s.Advance(TimeSpan.FromHours(3 * ((b / 8) % 8)));
+            }
+
             var before = s.State;
             var logLength = s.Log.Count;
-            var command = CommandFor(s, b, withChoice, rerolls != RerollMode.None);
+            var command = withDrops
+                ? DropCommandFor(s, b, withChoice, rerolls != RerollMode.None)
+                : CommandFor(s, b, withChoice, rerolls != RerollMode.None);
             s.Act(command);
             afterEach?.Invoke(s, command, before, logLength);
         }
@@ -169,6 +221,25 @@ public class PlayerAdminInvariantTests
     [Property(MaxTest = 200)]
     public void Invariants_hold_with_rerolls_and_a_choice_of_games(int seed, byte[] script) =>
         Play(seed, script, CheckInvariants, withChoice: true, rerolls: RerollMode.Coins);
+
+    [Property(MaxTest = 200)]
+    public void Invariants_hold_with_drops_and_tech_rerolls(int seed, byte[] script) =>
+        Play(seed, script, CheckInvariants, withDrops: true);
+
+    [Property(MaxTest = 200)]
+    public void Invariants_hold_with_drops_rerolls_and_a_choice_of_games(int seed, byte[] script) =>
+        Play(seed, script, CheckInvariants, withChoice: true, rerolls: RerollMode.BadEvent, withDrops: true);
+
+    [Property(MaxTest = 50)]
+    public void Same_seed_and_commands_give_the_same_log_with_drops(int seed, byte[] script)
+    {
+        // Invariant 14: penalty dice and the new roll after a tech reroll come from the seeded random source only
+        var first = Play(seed, script, withChoice: true, rerolls: RerollMode.Coins, withDrops: true);
+        var second = Play(seed, script, withChoice: true, rerolls: RerollMode.Coins, withDrops: true);
+
+        Assert.Equal(first.Log, second.Log);
+        Assert.Equal(first.State, second.State);
+    }
 
     [Property(MaxTest = 50)]
     public void Same_seed_and_commands_give_the_same_log_with_rerolls(int seed, byte[] script)
@@ -229,6 +300,7 @@ public class PlayerAdminInvariantTests
         {
             ScenarioAssert.Rejected(s, before, logLengthBefore, s.Last.Rejection!.Code);
             CheckRejectedReroll(s, command, before);
+            CheckRejectedTechReroll(s, command, before);
         }
         else
         {
@@ -274,6 +346,31 @@ public class PlayerAdminInvariantTests
 
             // SE5. The flag is what the admin last set
             Assert.Equal(reference.IsInactive, player.IsInactive);
+
+            // G8 / D-94: exclusions are folded from GameExcluded, a conversion turns TechRerolled into Dropped
+            Assert.Equal(
+                reference.Exclusions.Select(x => new GameExclusion(x.Key, x.Value)).OrderBy(x => x.GameId),
+                player.Exclusions);
+
+            // D-94: run statuses agree with the exclusions: a dropped run's game is excluded as dropped, a tech-rerolled
+            // one as tech-rerolled; the player's excluded game is never offered, an option or played by them
+            foreach (var run in s.State.Runs.Values.Where(r => r.PlayerId == player.PlayerId))
+            {
+                switch (run.Status)
+                {
+                    case RunStatus.Dropped:
+                        Assert.Contains(new GameExclusion(run.GameId, ExclusionReason.Dropped), player.Exclusions);
+                        break;
+                    case RunStatus.TechRerolled:
+                        Assert.Contains(new GameExclusion(run.GameId, ExclusionReason.TechRerolled), player.Exclusions);
+                        break;
+                }
+            }
+
+            var excludedNow = player.Exclusions.Select(x => x.GameId).ToHashSet();
+            Assert.False(player.Offer is { } offered && excludedNow.Contains(offered.GameId), "An excluded game is offered.");
+            Assert.DoesNotContain(player.Choice?.Options.Select(o => o.Game!.GameId) ?? [], excludedNow.Contains);
+            Assert.False(player.ActiveRunId is { } active && excludedNow.Contains(s.State.Runs[active].GameId), "An excluded game is played.");
 
             // 3. No more active runs than allowed; the phase matches the offer or pending choice and the active run
             var playing = s.State.Runs.Values.Where(r => r.PlayerId == player.PlayerId && r.Status == RunStatus.Playing).ToList();
@@ -372,6 +469,15 @@ public class PlayerAdminInvariantTests
                 break;
             case Reroll reroll:
                 CheckAcceptedReroll(s, reroll, before);
+                break;
+            case DropRun drop:
+                CheckAcceptedDrop(s, drop, before);
+                break;
+            case TechReroll techReroll:
+                CheckAcceptedTechReroll(s, techReroll, before);
+                break;
+            case ConvertTechRerollToDrop convert:
+                CheckAcceptedConversion(s, convert, before);
                 break;
             case MakeChoice choose:
                 // Choosing --> Playing (D-91): the chosen option starts at once with its roll-time snapshot
@@ -488,6 +594,157 @@ public class PlayerAdminInvariantTests
         Assert.Null(ExpectedPayment(was, before.Rules));
     }
 
+    /// <summary>
+    /// RR2 / RR3 / D-94: the penalty events: points and a move back by the dice sum (each part only when the rules say
+    /// so), and the mandatory bad event; never coins. The move starts where the token stood and retraces the path.
+    /// </summary>
+    private static void CheckPenalty(
+        Scenario s, IReadOnlyList<IGameEvent> penalty, Guid playerId, Guid runId, EquatableArray<Die> dice, SeasonState before)
+    {
+        var rules = before.Rules.Drop;
+        Assert.Equal(rules.PenaltyDice.Count, dice.Count);
+        Assert.All(dice, d =>
+        {
+            Assert.Equal(rules.PenaltyDice.Sides, d.Sides);
+            Assert.InRange(d.Value, 1, d.Sides);
+        });
+        var sum = dice.Sum(d => d.Value);
+        var was = before.Players[playerId];
+
+        var points = penalty.OfType<PointsChanged>().ToList();
+        Assert.Equal(
+            rules.AffectsPoints && sum > 0 ? [new PointsChanged(playerId, -sum, PointsReason.DropPenalty, runId)] : [],
+            points);
+
+        var moves = penalty.OfType<PlayerMoved>().ToList();
+        if (!rules.AffectsPosition || was.CellId == before.Map.Start.Id || sum == 0)
+        {
+            Assert.Empty(moves);
+        }
+        else
+        {
+            var moved = Assert.Single(moves);
+            Assert.Equal(
+                (playerId, was.CellId, -sum, MoveReason.DropPenalty, (Guid?)runId),
+                (moved.PlayerId, moved.From, moved.Steps, moved.Reason, moved.RunId));
+            Assert.Equal(Movement.Backward(before.Map, was.Path, sum), moved.Path);
+            Assert.InRange(moved.Path.Count, 1, sum);
+        }
+
+        var effects = penalty.OfType<ManualEffectCreated>().ToList();
+        if (rules.MandatoryEvent == MandatoryEvent.Bad)
+        {
+            var created = Assert.Single(effects);
+            Assert.Equal(new ManualEffectCreated(created.EffectId, playerId, EventKind.Bad, ManualEffectSource.Drop, runId), created);
+            Assert.DoesNotContain(created.EffectId, before.ManualEffects.Keys);
+        }
+        else
+        {
+            Assert.Empty(effects);
+        }
+
+        // No coins and no other resources from a drop
+        Assert.Empty(penalty.OfType<CoinsChanged>());
+        Assert.Empty(penalty.OfType<ResourceChanged>());
+        Assert.Equal((was.Coins, was.Resources), (s.State.Players[playerId].Coins, s.State.Players[playerId].Resources));
+    }
+
+    /// <summary>RR2 / D-94: RunDropped of the active run, the penalty, GameExcluded(Dropped); the player is Idle.</summary>
+    private static void CheckAcceptedDrop(Scenario s, DropRun drop, SeasonState before)
+    {
+        var events = s.Last.Events;
+        var was = before.Players[drop.PlayerId];
+        Assert.Equal(SeasonStatus.Active, before.Status);
+        Assert.Equal(TurnPhase.Playing, was.Phase);
+        var runId = was.ActiveRunId!.Value;
+        var dropped = Assert.IsType<RunDropped>(events[0]);
+        Assert.Equal((runId, drop.PlayerId, s.Clock.UtcNow), (dropped.RunId, dropped.PlayerId, dropped.DroppedAt));
+        Assert.Single(events, e => e is GameExcluded);
+        Assert.Contains(new GameExcluded(drop.PlayerId, before.Runs[runId].GameId, ExclusionReason.Dropped), events);
+        Assert.All(events, e => Assert.True(
+            e is RunDropped or GameExcluded or PointsChanged or PlayerMoved or ManualEffectCreated, $"Unexpected {e}."));
+        CheckPenalty(s, [.. events.Where(e => e is not (RunDropped or GameExcluded))], drop.PlayerId, runId, dropped.PenaltyDice, before);
+
+        var now = s.State.Players[drop.PlayerId];
+        Assert.Equal(TurnPhase.Idle, now.Phase);
+        Assert.Null(now.ActiveRunId);
+        Assert.Equal(RunStatus.Dropped, s.State.Runs[runId].Status);
+    }
+
+    /// <summary>RR5 / D-94: within the window (or by the admin), free, the game excluded, then at most a new roll of the same player.</summary>
+    private static void CheckAcceptedTechReroll(Scenario s, TechReroll techReroll, SeasonState before)
+    {
+        var events = s.Last.Events;
+        var was = before.Players[techReroll.PlayerId];
+        Assert.Equal(SeasonStatus.Active, before.Status);
+        Assert.Equal(TurnPhase.Playing, was.Phase);
+        var run = before.Runs[was.ActiveRunId!.Value];
+        Assert.True(
+            techReroll.ByAdmin || s.Clock.UtcNow - run.RolledAt <= TimeSpan.FromHours(before.Rules.Roll.TechRerollWindowHours),
+            "A player tech-rerolled after the window.");
+        Assert.True(
+            techReroll.Reason != TechRerollReason.Other || !string.IsNullOrWhiteSpace(techReroll.Comment), "«Other» without a comment.");
+        Assert.Equal(
+            new RunTechRerolled(run.RunId, techReroll.PlayerId, techReroll.Reason, techReroll.Comment, techReroll.ByAdmin, s.Clock.UtcNow),
+            events[0]);
+        Assert.Equal(new GameExcluded(techReroll.PlayerId, run.GameId, ExclusionReason.TechRerolled), events[1]);
+        Assert.InRange(events.Count, 2, 3);
+
+        var now = s.State.Players[techReroll.PlayerId];
+        if (events.Count == 3)
+        {
+            Assert.True(
+                (events[2] is GameRolled r && r.PlayerId == techReroll.PlayerId && r.GameId != run.GameId)
+                || (events[2] is GameChoiceRolled c && c.PlayerId == techReroll.PlayerId && c.Offers.All(o => o.GameId != run.GameId)),
+                $"Unexpected {events[2]}.");
+            Assert.Equal(TurnPhase.Rolling, now.Phase);
+        }
+        else
+        {
+            Assert.Equal(TurnPhase.Idle, now.Phase);
+        }
+
+        // A new roll with its own free rerolls; free: points, position, coins and resources stay
+        Assert.Equal(0, now.RerollsThisRoll);
+        Assert.Equal((was.Points, was.CellId, was.Coins, was.Resources), (now.Points, now.CellId, now.Coins, now.Resources));
+        Assert.Equal(RunStatus.TechRerolled, s.State.Runs[run.RunId].Status);
+    }
+
+    /// <summary>RR6 / D-94: only a tech-rerolled run, until the season is finished; the penalty by the current standing; the turn untouched.</summary>
+    private static void CheckAcceptedConversion(Scenario s, ConvertTechRerollToDrop convert, SeasonState before)
+    {
+        var events = s.Last.Events;
+        Assert.True(before.Status is SeasonStatus.Active or SeasonStatus.Closing, $"Converted while {before.Status}.");
+        var run = before.Runs[convert.RunId];
+        Assert.Equal(RunStatus.TechRerolled, run.Status);
+        var converted = Assert.IsType<TechRerollConvertedToDrop>(events[0]);
+        Assert.Equal((convert.RunId, run.PlayerId, convert.Comment), (converted.RunId, converted.PlayerId, converted.Comment));
+        Assert.Empty(events.OfType<GameExcluded>());
+        CheckPenalty(s, [.. events.Skip(1)], run.PlayerId, run.RunId, converted.PenaltyDice, before);
+        Assert.Equal(RunStatus.Dropped, s.State.Runs[run.RunId].Status);
+
+        var was = before.Players[run.PlayerId];
+        var now = s.State.Players[run.PlayerId];
+        Assert.Equal(
+            (was.Phase, was.Offer, was.Choice, was.ActiveRunId, was.RerollsThisRoll),
+            (now.Phase, now.Offer, now.Choice, now.ActiveRunId, now.RerollsThisRoll));
+    }
+
+    /// <summary>RR5: «window closed» only for the player and only after the window.</summary>
+    private static void CheckRejectedTechReroll(Scenario s, ICommand command, SeasonState before)
+    {
+        if (command is not TechReroll techReroll || s.Last.Rejection!.Code != RejectionCodes.TechRerollWindowClosed)
+        {
+            return;
+        }
+
+        Assert.False(techReroll.ByAdmin, "The admin is not bound by the tech reroll window.");
+        var was = before.Players[techReroll.PlayerId];
+        Assert.Equal(TurnPhase.Playing, was.Phase);
+        var run = before.Runs[was.ActiveRunId!.Value];
+        Assert.True(s.Clock.UtcNow - run.RolledAt > TimeSpan.FromHours(before.Rules.Roll.TechRerollWindowHours));
+    }
+
     private static Guid? PlayerOf(IGameEvent e) =>
         e switch
         {
@@ -506,6 +763,10 @@ public class PlayerAdminInvariantTests
             ResourceChanged x => x.PlayerId,
             PlayerMoved x => x.PlayerId,
             PlayerInactivitySet x => x.PlayerId,
+            RunDropped x => x.PlayerId,
+            RunTechRerolled x => x.PlayerId,
+            TechRerollConvertedToDrop x => x.PlayerId,
+            GameExcluded x => x.PlayerId,
             _ => null,
         };
 
@@ -520,6 +781,8 @@ public class PlayerAdminInvariantTests
         public Dictionary<string, int> Resources { get; } = new(StringComparer.Ordinal);
 
         public bool IsInactive { get; set; }
+
+        public Dictionary<Guid, ExclusionReason> Exclusions { get; } = [];
     }
 
     private sealed record Reference(SeasonStatus Status, Dictionary<Guid, ReferencePlayer> Players);
@@ -529,6 +792,7 @@ public class PlayerAdminInvariantTests
     {
         var status = SeasonStatus.Draft;
         var players = new Dictionary<Guid, ReferencePlayer>();
+        var runs = new Dictionary<Guid, (Guid Player, Guid Game)>();
         foreach (var e in log)
         {
             switch (e)
@@ -543,15 +807,44 @@ public class PlayerAdminInvariantTests
                     Assert.DoesNotContain(added.PlayerId, players.Keys);
                     players[added.PlayerId] = new ReferencePlayer { CellId = added.CellId };
                     break;
-                case GameRolled or GameChoiceRolled or GameRerolled or ChoiceMade or RunStarted or RunCompleted or CompletionRolled:
+                case GameRolled rolled:
+                    // SE1/SE2: no game actions outside a running season; G8: never a game excluded for the player, not even as a miss
+                    Assert.Equal(SeasonStatus.Active, status);
+                    Assert.DoesNotContain(rolled.GameId, players[rolled.PlayerId].Exclusions.Keys);
+                    Assert.DoesNotContain(rolled.Misses, m => players[rolled.PlayerId].Exclusions.ContainsKey(m.GameId));
+                    break;
+                case GameChoiceRolled choiceRolled:
+                    Assert.Equal(SeasonStatus.Active, status);
+                    Assert.DoesNotContain(choiceRolled.Offers, o => players[choiceRolled.PlayerId].Exclusions.ContainsKey(o.GameId));
+                    Assert.DoesNotContain(choiceRolled.Misses, m => players[choiceRolled.PlayerId].Exclusions.ContainsKey(m.GameId));
+                    break;
+                case RunStarted started:
+                    Assert.Equal(SeasonStatus.Active, status);
+                    Assert.DoesNotContain(started.GameId, players[started.PlayerId].Exclusions.Keys);
+                    runs[started.RunId] = (started.PlayerId, started.GameId);
+                    break;
+                case GameRerolled or ChoiceMade or RunCompleted or CompletionRolled or RunDropped or RunTechRerolled:
                     // SE1/SE2: no game actions outside a running season
                     Assert.Equal(SeasonStatus.Active, status);
+                    break;
+                case GameExcluded excluded:
+                    Assert.Equal(SeasonStatus.Active, status);
+                    Assert.True(players[excluded.PlayerId].Exclusions.TryAdd(excluded.GameId, excluded.Reason), "A game excluded twice.");
+                    break;
+                case TechRerollConvertedToDrop converted:
+                    // D-11: until the season is finished; the exclusion's reason becomes a drop
+                    Assert.True(status is SeasonStatus.Active or SeasonStatus.Closing, $"Converted while {status}.");
+                    var (owner, game) = runs[converted.RunId];
+                    Assert.Equal(owner, converted.PlayerId);
+                    Assert.Equal(ExclusionReason.TechRerolled, players[owner].Exclusions[game]);
+                    players[owner].Exclusions[game] = ExclusionReason.Dropped;
                     break;
                 case PointsChanged points:
                     Assert.True(points.Reason == PointsReason.CompletionRoll || points.Delta != 0, "Zero changes are not logged.");
                     players[points.PlayerId].Points += points.Delta;
                     break;
                 case CoinsChanged coins:
+                    // RR2: no coins from drops (coins have no drop reason at all)
                     Assert.NotEqual(0, coins.Delta);
                     players[coins.PlayerId].Coins += coins.Delta;
 
@@ -570,6 +863,13 @@ public class PlayerAdminInvariantTests
                     var player = players[moved.PlayerId];
                     Assert.Equal(player.CellId, moved.From);
                     Assert.Equal(moved.To, moved.Path[^1]);
+                    if (moved.Reason == MoveReason.DropPenalty)
+                    {
+                        // RR3: a drop only moves back, never past the start
+                        Assert.True(moved.Steps < 0, "A drop penalty moved forward.");
+                        Assert.InRange(moved.Path.Count, 1, -moved.Steps);
+                    }
+
                     if (moved.Reason is MoveReason.AdminAdjustment or MoveReason.StartingCell)
                     {
                         // A transfer, not steps; and never a no-op

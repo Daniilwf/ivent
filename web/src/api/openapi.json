@@ -337,6 +337,186 @@
         }
       }
     },
+    "/api/seasons/{seasonId}/drop": {
+      "post": {
+        "tags": [
+          "Seasons"
+        ],
+        "parameters": [
+          {
+            "name": "seasonId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DropRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RejectionProblem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/seasons/{seasonId}/tech-reroll": {
+      "post": {
+        "tags": [
+          "Seasons"
+        ],
+        "parameters": [
+          {
+            "name": "seasonId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TechRerollRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RejectionProblem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/seasons/{seasonId}/reroll": {
       "post": {
         "tags": [
@@ -924,6 +1104,204 @@
           }
         }
       }
+    },
+    "/api/admin/seasons/{seasonId}/players/{playerId}/tech-reroll": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "parameters": [
+          {
+            "name": "seasonId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "playerId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TechRerollRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RejectionProblem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/seasons/{seasonId}/runs/{runId}/convert-to-drop": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "parameters": [
+          {
+            "name": "seasonId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "runId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConvertToDropRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RejectionProblem"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1235,6 +1613,26 @@
         },
         "description": "Completing the active run. `estimatedHours` is needed only when the game has no hours."
       },
+      "ConvertToDropRequest": {
+        "required": [
+          "commandId",
+          "comment"
+        ],
+        "type": "object",
+        "properties": {
+          "commandId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "comment": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "An admin comment on a change to a player's runs; required, the log shows it."
+      },
       "CoopRoundUpFor": {
         "enum": [
           "roller"
@@ -1392,6 +1790,19 @@
           "hard",
           "extreme"
         ]
+      },
+      "DropRequest": {
+        "required": [
+          "commandId"
+        ],
+        "type": "object",
+        "properties": {
+          "commandId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "description": "Drop the active run with the penalty (D-09, D-94)."
       },
       "DropRules": {
         "required": [
@@ -1729,7 +2140,8 @@
       },
       "ManualEffectSource": {
         "enum": [
-          "paidReroll"
+          "paidReroll",
+          "drop"
         ],
         "description": "What created a manual effect; C11 adds item, cell and event sources."
       },
@@ -1781,7 +2193,8 @@
           "nextReroll",
           "activeRun",
           "lastCompleted",
-          "manualEffects"
+          "manualEffects",
+          "dropHintMinutes"
         ],
         "type": "object",
         "properties": {
@@ -1847,6 +2260,13 @@
             "items": {
               "$ref": "#/components/schemas/ManualEffectView"
             }
+          },
+          "dropHintMinutes": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
           }
         }
       },
@@ -2598,6 +3018,46 @@
             "format": "uuid"
           }
         }
+      },
+      "TechRerollReason": {
+        "enum": [
+          "weakPc",
+          "paidUnavailable",
+          "doesNotLaunch",
+          "emulatorTooSlow",
+          "other",
+          null
+        ]
+      },
+      "TechRerollRequest": {
+        "required": [
+          "commandId",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "commandId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reason": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TechRerollReason"
+              }
+            ]
+          },
+          "comment": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "A tech reroll of the active run; `comment` is required for the reason «other» (D-11)."
       },
       "TurnPhase": {
         "enum": [

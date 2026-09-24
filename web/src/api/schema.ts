@@ -398,6 +398,178 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/seasons/{seasonId}/drop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["DropRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CommandResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/seasons/{seasonId}/tech-reroll": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["TechRerollRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CommandResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/seasons/{seasonId}/reroll": {
         parameters: {
             query?: never;
@@ -1003,6 +1175,180 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/seasons/{seasonId}/players/{playerId}/tech-reroll": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                    playerId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["TechRerollRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CommandResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/seasons/{seasonId}/runs/{runId}/convert-to-drop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                    runId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ConvertToDropRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CommandResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1109,6 +1455,12 @@ export interface components {
             /** Format: double */
             estimatedHours?: null | number;
         };
+        /** @description An admin comment on a change to a player's runs; required, the log shows it. */
+        ConvertToDropRequest: {
+            /** Format: uuid */
+            commandId: string;
+            comment: null | string;
+        };
         /** @enum {unknown} */
         CoopRoundUpFor: "roller";
         CoopRules: {
@@ -1157,6 +1509,11 @@ export interface components {
         };
         /** @enum {unknown} */
         Difficulty: "easy" | "normal" | "hard" | "extreme";
+        /** @description Drop the active run with the penalty (D-09, D-94). */
+        DropRequest: {
+            /** Format: uuid */
+            commandId: string;
+        };
         DropRules: {
             penaltyDice: components["schemas"]["PenaltyDice"];
             affectsPoints: boolean;
@@ -1289,7 +1646,7 @@ export interface components {
          * @description What created a manual effect; C11 adds item, cell and event sources.
          * @enum {unknown}
          */
-        ManualEffectSource: "paidReroll";
+        ManualEffectSource: "paidReroll" | "drop";
         /** @description A manual effect the player still has to play out (D-10, D-93); resolving it comes with C11. */
         ManualEffectView: {
             /** Format: uuid */
@@ -1313,6 +1670,8 @@ export interface components {
             activeRun: null | components["schemas"]["RunView"];
             lastCompleted: null | components["schemas"]["CompletedRunView"];
             manualEffects: components["schemas"]["ManualEffectView"][];
+            /** Format: int32 */
+            dropHintMinutes: null | number;
         };
         NominationRules: {
             auto: components["schemas"]["EquatableArrayOfAutoNomination"];
@@ -1549,6 +1908,15 @@ export interface components {
             /** Format: uuid */
             commandId: string;
         };
+        /** @enum {unknown} */
+        TechRerollReason: "weakPc" | "paidUnavailable" | "doesNotLaunch" | "emulatorTooSlow" | "other" | null;
+        /** @description A tech reroll of the active run; `comment` is required for the reason «other» (D-11). */
+        TechRerollRequest: {
+            /** Format: uuid */
+            commandId: string;
+            reason: null | components["schemas"]["TechRerollReason"];
+            comment?: null | string;
+        };
         /**
          * @description Where the player is in the turn cycle. Moving and resolving happen inside one command.
          * @enum {unknown}
@@ -1583,7 +1951,7 @@ export const difficultyValues: ReadonlyArray<FlattenedDeepRequired<components>["
 export const emptyPoolFallbackValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["EmptyPoolFallback"]> = ["dropZoneFilter"];
 export const eventKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["EventKind"]> = ["good", "bad"];
 export const mandatoryEventValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["MandatoryEvent"]> = ["bad", "none"];
-export const manualEffectSourceValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ManualEffectSource"]> = ["paidReroll"];
+export const manualEffectSourceValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ManualEffectSource"]> = ["paidReroll", "drop"];
 export const mapModeValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["MapMode"]> = ["linear", "graph"];
 export const rerollCostKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["RerollCostKind"]> = ["coins", "badEvent"];
 export const rerollPaymentValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["RerollPayment"]> = ["freeThisRoll", "freeRerollResource", "coins", "badEvent"];

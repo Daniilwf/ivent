@@ -22,6 +22,12 @@ public sealed record RollRequest(Guid CommandId);
 
 public sealed record StartRequest(Guid CommandId);
 
+/// <summary>Drop the active run with the penalty (D-09, D-94).</summary>
+public sealed record DropRequest(Guid CommandId);
+
+/// <summary>A tech reroll of the active run; <c>comment</c> is required for the reason «other» (D-11).</summary>
+public sealed record TechRerollRequest(Guid CommandId, TechRerollReason? Reason, string? Comment = null);
+
 /// <summary>A reroll of the offered game or the whole pending choice; the price follows D-07.</summary>
 public sealed record RerollRequest(Guid CommandId);
 
@@ -55,10 +61,13 @@ public sealed record MyTurnView(
     RerollPriceView? NextReroll,
     RunView? ActiveRun,
     CompletedRunView? LastCompleted,
-    IReadOnlyList<ManualEffectView> ManualEffects);
+    IReadOnlyList<ManualEffectView> ManualEffects,
+    int? DropHintMinutes);
 
 /// <summary>What the next reroll costs, computed by the engine's rule (D-93); only while a game is offered.</summary>
 public sealed record RerollPriceView(RerollPayment Payment, int Coins);
+
+// DropHintMinutes: while playing, how long to play before a drop is fair (roll.minPlayMinutesBeforeDrop, only a hint: D-09).
 
 /// <summary>A manual effect the player still has to play out (D-10, D-93); resolving it comes with C11.</summary>
 public sealed record ManualEffectView(Guid Id, EventKind DrawEvent, ManualEffectSource Source);
@@ -86,6 +95,8 @@ public static class SeasonEndpoints
 
     public const int MaxOptionIdLength = 64;
 
+    public const int MaxCommentLength = 500; // the engine's comment limit (PlayerAdministration.MaxCommentLength)
+
     public static void MapSeasons(this RouteGroupBuilder api)
     {
         var seasons = api.MapGroup("/seasons/{seasonId:guid}").WithTags("Seasons").RequireAuthorization();
@@ -105,6 +116,18 @@ public static class SeasonEndpoints
 
         seasons.MapPost("/start", (Guid seasonId, StartRequest request, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, CancellationToken ct) =>
             ActAsync(seasonId, request.CommandId, user, db, bus, playerId => new StartRun(playerId), ct))
+            .RequireAuthorization(Policies.Player)
+            .WithActionErrors();
+
+        seasons.MapPost("/drop", (Guid seasonId, DropRequest request, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, CancellationToken ct) =>
+            ActAsync(seasonId, request.CommandId, user, db, bus, playerId => new DropRun(playerId), ct))
+            .RequireAuthorization(Policies.Player)
+            .WithActionErrors();
+
+        seasons.MapPost("/tech-reroll", (Guid seasonId, TechRerollRequest request, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, CancellationToken ct) =>
+            TechRerollInvalid(request) is { } invalid
+                ? Task.FromResult<Results<Ok<CommandResponse>, ProblemHttpResult, ValidationProblem, NotFound, ForbidHttpResult>>(invalid)
+                : ActAsync(seasonId, request.CommandId, user, db, bus, playerId => new TechReroll(playerId, request.Reason!.Value, request.Comment), ct))
             .RequireAuthorization(Policies.Player)
             .WithActionErrors();
 
@@ -148,8 +171,16 @@ public static class SeasonEndpoints
     private static bool IsOptionId(string? id) =>
         id is { Length: > 0 and <= MaxOptionIdLength } && id.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_');
 
+    /// <summary>The request-level checks of a tech reroll; the reason's rules live in the engine.</summary>
+    internal static ValidationProblem? TechRerollInvalid(TechRerollRequest request) =>
+        request.Reason is not { } reason || !Enum.IsDefined(reason)
+            ? TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["reason"] = ["A known tech reroll reason is required."] })
+            : request.Comment?.Length > MaxCommentLength
+                ? TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["comment"] = [$"At most {MaxCommentLength} characters."] })
+                : null;
+
     /// <summary>Error answers of a game action, described so the generated client has their types.</summary>
-    private static RouteHandlerBuilder WithActionErrors(this RouteHandlerBuilder builder) =>
+    internal static RouteHandlerBuilder WithActionErrors(this RouteHandlerBuilder builder) =>
         builder
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status401Unauthorized)
@@ -181,7 +212,14 @@ public static class SeasonEndpoints
             return TypedResults.Forbid();
         }
 
-        var outcome = await bus.SendAsync(new CommandEnvelope(commandId, seasonId, command(playerId.Value), userId), ct);
+        return await SendAsync(seasonId, commandId, command(playerId.Value), userId, bus, ct);
+    }
+
+    /// <summary>Sends a checked command through the queue: 409 with the engine code on a rejection.</summary>
+    internal static async Task<Results<Ok<CommandResponse>, ProblemHttpResult, ValidationProblem, NotFound, ForbidHttpResult>> SendAsync(
+        Guid seasonId, Guid commandId, ICommand command, Guid? authorId, CommandBus bus, CancellationToken ct)
+    {
+        var outcome = await bus.SendAsync(new CommandEnvelope(commandId, seasonId, command, authorId), ct);
         if (!outcome.IsAccepted)
         {
             return TypedResults.Problem(
@@ -252,7 +290,8 @@ public static class SeasonEndpoints
                 mine.Phase == TurnPhase.Rolling ? new RerollPriceView(price.Payment, price.Coins) : null,
                 run is null ? null : new RunView(run.Id, Game(run, games[run.GameId]), run.StartedAt),
                 last is null ? null : Completed(last, games[last.GameId]),
-                effects);
+                effects,
+                mine.Phase == TurnPhase.Playing ? rules.Roll.MinPlayMinutesBeforeDrop : null);
         }
 
         return TypedResults.Ok(new SeasonView(

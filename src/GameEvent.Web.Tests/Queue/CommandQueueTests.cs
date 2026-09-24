@@ -357,6 +357,68 @@ public class CommandQueueTests
         Assert.Equal(0, (await final.SeasonPlayers.AsNoTracking().SingleAsync(ct)).RerollsThisRoll);
     }
 
+    [Fact]
+    public async Task Projection_of_drops_tech_rerolls_and_a_conversion_equals_the_fold_of_the_log()
+    {
+        await using var h = await QueueHarness.StartAsync();
+        var ct = TestContext.Current.CancellationToken;
+        await AcceptedAsync(h, new CreateSeason(s_season, "Осень", RulesetJson.Default()));
+        await AcceptedAsync(h, new ChangeSeasonStatus(SeasonStatus.Active));
+        await AcceptedAsync(h, new AddSeasonPlayer(s_vasya, s_vasya, "Вася"));
+
+        // Given Вася walked forward with one completed game
+        await AcceptedAsync(h, new RollGame(s_vasya));
+        await AcceptedAsync(h, new StartRun(s_vasya));
+        await AcceptedAsync(h, new CompleteRun(s_vasya, Difficulty.Hard));
+
+        // When he drops one game (D-94: penalty, exclusion «dropped», a bad event) ...
+        var dropped = OfferedIn(await AcceptedAsync(h, new RollGame(s_vasya)));
+        await AcceptedAsync(h, new StartRun(s_vasya));
+        await AcceptedAsync(h, new DropRun(s_vasya));
+
+        // ... and tech-rerolls the next one (exclusion «tech-rerolled», a new roll at once)
+        var techRerolled = OfferedIn(await AcceptedAsync(h, new RollGame(s_vasya)));
+        await AcceptedAsync(h, new StartRun(s_vasya));
+        await AcceptedAsync(h, new TechReroll(s_vasya, TechRerollReason.Other, "Нужен геймпад"));
+
+        // Then the projection equals the fold: run statuses, exclusions with their reasons, points, position, effects
+        var state = await AssertProjectionEqualsReplayAsync(h, ct);
+        Assert.Equal(
+            [new GameExclusion(dropped, ExclusionReason.Dropped), new GameExclusion(techRerolled, ExclusionReason.TechRerolled)],
+            state.Players[s_vasya].Exclusions.OrderBy(x => x.Reason));
+        await using (var db = h.NewDb())
+        {
+            var rows = await db.Exclusions.AsNoTracking().ToListAsync(ct);
+            Assert.Equal(
+                new[] { (s_vasya, dropped, ExclusionReason.Dropped), (s_vasya, techRerolled, ExclusionReason.TechRerolled) }.Order(),
+                rows.Select(r => (r.PlayerId, r.GameId, r.Reason)).Order());
+            var runs = await db.Runs.AsNoTracking().ToListAsync(ct);
+            Assert.Equal(RunStatus.Dropped, runs.Single(r => r.GameId == dropped).Status);
+            Assert.Equal(RunStatus.TechRerolled, runs.Single(r => r.GameId == techRerolled).Status);
+            var player = await db.SeasonPlayers.AsNoTracking().SingleAsync(ct);
+            Assert.Equal((state.Players[s_vasya].Points, state.Players[s_vasya].CellId), (player.Points, player.CellId));
+            Assert.Equal(state.Players[s_vasya].Phase, player.Phase);
+            var effect = Assert.Single(await db.ManualEffects.AsNoTracking().ToListAsync(ct));
+            Assert.Equal(ManualEffectSource.Drop, effect.Source);
+        }
+
+        // When, after a restart, the admin turns the tech reroll into a drop
+        await h.RestartAsync();
+        var techRun = state.Runs.Values.Single(r => r.Status == RunStatus.TechRerolled).RunId;
+        await AcceptedAsync(h, new ConvertTechRerollToDrop(techRun, "Игра запускалась"));
+
+        // Then the exclusion row's reason is updated to «dropped», the run is dropped, a second bad event waits
+        var after = await AssertProjectionEqualsReplayAsync(h, ct);
+        Assert.All(after.Players[s_vasya].Exclusions, x => Assert.Equal(ExclusionReason.Dropped, x.Reason));
+        await using var final = h.NewDb();
+        var finalRows = await final.Exclusions.AsNoTracking().ToListAsync(ct);
+        Assert.Equal(2, finalRows.Count);
+        Assert.All(finalRows, r => Assert.Equal(ExclusionReason.Dropped, r.Reason));
+        Assert.Equal(RunStatus.Dropped, (await final.Runs.AsNoTracking().SingleAsync(r => r.Id == techRun, ct)).Status);
+        Assert.Equal(2, await final.ManualEffects.CountAsync(ct));
+        Assert.Equal(after.Players[s_vasya].Points, (await final.SeasonPlayers.AsNoTracking().SingleAsync(ct)).Points);
+    }
+
     private static Guid OfferedIn(Infrastructure.Queue.CommandOutcome outcome) =>
         outcome.Events.Select(e => e.Event).OfType<GameRolled>().Single().GameId;
 

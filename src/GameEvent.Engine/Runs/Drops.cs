@@ -1,4 +1,12 @@
+using GameEvent.Engine.Effects;
 using GameEvent.Engine.Kernel;
+using GameEvent.Engine.Map;
+using GameEvent.Engine.Players;
+using GameEvent.Engine.Rolls;
+using GameEvent.Engine.Rulesets;
+using GameEvent.Engine.Scoring;
+using GameEvent.Engine.Seasons;
+using GameEvent.Engine.Turns;
 
 namespace GameEvent.Engine.Runs;
 
@@ -48,21 +56,166 @@ public sealed record TechRerollConvertedToDrop(Guid RunId, Guid PlayerId, string
 
 internal static class Drops
 {
-    public static Decision Decide(Seasons.SeasonState state, DropRun command, Seasons.EngineContext context) =>
-        throw new NotImplementedException("C6");
+    public static Decision Decide(SeasonState state, DropRun command, EngineContext context)
+    {
+        if (TurnRules.Check(state, command.PlayerId, command) is { } rejection)
+        {
+            return rejection;
+        }
 
-    public static Decision Decide(Seasons.SeasonState state, TechReroll command, Seasons.EngineContext context) =>
-        throw new NotImplementedException("C6");
+        var player = state.Players[command.PlayerId];
+        var run = ActiveRun(state, player);
+        var dice = PenaltyRoll(state, context);
+        return Decision.Accept(
+        [
+            new RunDropped(run.RunId, player.PlayerId, dice, context.Clock.UtcNow),
+            .. Penalty(state, player, dice, run.RunId, context),
+        ]);
+    }
 
-    public static Decision Decide(Seasons.SeasonState state, ConvertTechRerollToDrop command, Seasons.EngineContext context) =>
-        throw new NotImplementedException("C6");
+    public static Decision Decide(SeasonState state, TechReroll command, EngineContext context)
+    {
+        if (TurnRules.Check(state, command.PlayerId, command) is { } rejection)
+        {
+            return rejection;
+        }
 
-    public static Seasons.SeasonState Apply(Seasons.SeasonState state, RunDropped e) =>
-        throw new NotImplementedException("C6");
+        if (command.Reason == TechRerollReason.Other && string.IsNullOrWhiteSpace(command.Comment))
+        {
+            return Decision.Reject(RejectionCodes.ReasonCommentRequired, "The reason 'other' needs a comment.");
+        }
 
-    public static Seasons.SeasonState Apply(Seasons.SeasonState state, RunTechRerolled e) =>
-        throw new NotImplementedException("C6");
+        if (command.Comment?.Length > PlayerAdministration.MaxCommentLength)
+        {
+            return Decision.Reject(
+                RejectionCodes.CommentTooLong, $"The comment is limited to {PlayerAdministration.MaxCommentLength} characters.");
+        }
 
-    public static Seasons.SeasonState Apply(Seasons.SeasonState state, TechRerollConvertedToDrop e) =>
-        throw new NotImplementedException("C6");
+        var player = state.Players[command.PlayerId];
+        var run = ActiveRun(state, player);
+        var now = context.Clock.UtcNow;
+        var window = TimeSpan.FromHours(state.Rules.Roll.TechRerollWindowHours);
+        if (!command.ByAdmin && now - run.RolledAt > window)
+        {
+            // D-11: after the window only the admin, on the player's behalf.
+            return Decision.Reject(
+                RejectionCodes.TechRerollWindowClosed, $"The tech reroll window of {window.TotalHours} h after the roll has passed.");
+        }
+
+        var rerolled = new RunTechRerolled(run.RunId, player.PlayerId, command.Reason, command.Comment, command.ByAdmin, now);
+        var excluded = new GameExcluded(player.PlayerId, run.GameId, ExclusionReason.TechRerolled);
+        var after = Rolling.Apply(Apply(state, rerolled), excluded);
+
+        // SPEC: Playing --> Rolling. The new roll is a roll of its own, with its own free rerolls (D-07, D-94).
+        return Rolling.Draw(after, player.PlayerId, context, Rolling.Filters(after)) is { } roll
+            ? Decision.Accept(rerolled, excluded, roll)
+            : Decision.Accept(rerolled, excluded);
+    }
+
+    public static Decision Decide(SeasonState state, ConvertTechRerollToDrop command, EngineContext context)
+    {
+        if (!state.IsCreated)
+        {
+            return Decision.Reject(RejectionCodes.SeasonNotCreated, "The season does not exist yet.");
+        }
+
+        if (SeasonSetup.IsOver(state))
+        {
+            return Decision.Reject(RejectionCodes.SeasonClosed, $"The season is {state.Status}: results are fixed.");
+        }
+
+        if (!state.Runs.TryGetValue(command.RunId, out var run))
+        {
+            return Decision.Reject(RejectionCodes.RunUnknown, $"Run {command.RunId} is not in the season.");
+        }
+
+        if (run.Status != RunStatus.TechRerolled)
+        {
+            return Decision.Reject(RejectionCodes.NotTechRerolled, $"Run {run.RunId} is {run.Status}, not a tech reroll.");
+        }
+
+        if (string.IsNullOrWhiteSpace(command.Comment))
+        {
+            return Decision.Reject(RejectionCodes.CommentRequired, "Every admin change explains itself in the public log.");
+        }
+
+        if (command.Comment.Length > PlayerAdministration.MaxCommentLength)
+        {
+            return Decision.Reject(
+                RejectionCodes.CommentTooLong, $"The comment is limited to {PlayerAdministration.MaxCommentLength} characters.");
+        }
+
+        // The penalty hits the player's current points and position; their turn is left alone (D-11).
+        var player = state.Players[run.PlayerId];
+        var dice = PenaltyRoll(state, context);
+        return Decision.Accept(
+        [
+            new TechRerollConvertedToDrop(run.RunId, player.PlayerId, command.Comment, dice),
+            .. Penalty(state, player, dice, run.RunId, context, exclude: false),
+        ]);
+    }
+
+    public static SeasonState Apply(SeasonState state, RunDropped e) => Finish(state, e.RunId, e.PlayerId, RunStatus.Dropped);
+
+    public static SeasonState Apply(SeasonState state, RunTechRerolled e) => Finish(state, e.RunId, e.PlayerId, RunStatus.TechRerolled);
+
+    public static SeasonState Apply(SeasonState state, TechRerollConvertedToDrop e)
+    {
+        var run = state.Runs[e.RunId];
+        var player = state.Players[e.PlayerId];
+        var exclusions = player.Exclusions
+            .Select(x => x.GameId == run.GameId ? x with { Reason = ExclusionReason.Dropped } : x);
+        return state with
+        {
+            Runs = state.Runs.SetItem(e.RunId, run with { Status = RunStatus.Dropped }),
+            Players = state.Players.SetItem(e.PlayerId, player with { Exclusions = [.. exclusions] }),
+        };
+    }
+
+    private static RunState ActiveRun(SeasonState state, SeasonPlayer player) =>
+        state.Runs[player.ActiveRunId ?? throw new InvalidOperationException($"Player {player.PlayerId} is Playing without a run.")];
+
+    private static EquatableArray<Die> PenaltyRoll(SeasonState state, EngineContext context) =>
+        CompletionRoll.Roll(state.Rules.Drop.PenaltyDice.Count, state.Rules.Drop.PenaltyDice.Sides, context.Random);
+
+    /// <summary>
+    /// The drop penalty (D-09, D-94): points and position by the dice sum, never past the start; the game excluded
+    /// for a drop (a conversion changes the existing exclusion instead); the mandatory bad event.
+    /// </summary>
+    private static IEnumerable<IGameEvent> Penalty(
+        SeasonState state, SeasonPlayer player, EquatableArray<Die> dice, Guid runId, EngineContext context, bool exclude = true)
+    {
+        var rules = state.Rules.Drop;
+        var sum = dice.Sum(d => d.Value);
+        if (rules.AffectsPoints && sum != 0)
+        {
+            yield return new PointsChanged(player.PlayerId, -sum, PointsReason.DropPenalty, runId);
+        }
+
+        if (rules.AffectsPosition && sum != 0)
+        {
+            var path = Movement.Backward(state.Map, player.Path, sum);
+            if (path.Count > 0)
+            {
+                yield return new PlayerMoved(player.PlayerId, player.CellId, path[^1], -sum, [.. path], MoveReason.DropPenalty, runId);
+            }
+        }
+
+        if (exclude)
+        {
+            yield return new GameExcluded(player.PlayerId, state.Runs[runId].GameId, ExclusionReason.Dropped);
+        }
+
+        if (rules.MandatoryEvent == MandatoryEvent.Bad)
+        {
+            yield return new ManualEffectCreated(context.Ids.NewId(), player.PlayerId, EventKind.Bad, ManualEffectSource.Drop, runId);
+        }
+    }
+
+    private static SeasonState Finish(SeasonState state, Guid runId, Guid playerId, RunStatus status) =>
+        state with
+        {
+            Runs = state.Runs.SetItem(runId, state.Runs[runId] with { Status = status }),
+            Players = state.Players.SetItem(playerId, state.Players[playerId] with { Phase = TurnPhase.Idle, ActiveRunId = null }),
+        };
 }
