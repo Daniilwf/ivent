@@ -40,9 +40,9 @@ internal static class Rolling
 {
     public static Decision Decide(SeasonState state, RollGame command, EngineContext context)
     {
-        if (!state.IsCreated)
+        if (SeasonSetup.RequireActive(state) is { } inactive)
         {
-            return Decision.Reject(RejectionCodes.SeasonNotCreated, "Create the season first.");
+            return inactive;
         }
 
         if (!state.Players.TryGetValue(command.PlayerId, out var player))

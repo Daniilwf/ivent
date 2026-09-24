@@ -1,5 +1,6 @@
 using System.Text.Json;
 using GameEvent.Engine.Kernel;
+using GameEvent.Engine.Players;
 using GameEvent.Engine.Rulesets;
 using GameEvent.Engine.Seasons;
 using GameEvent.Infrastructure.Accounts;
@@ -85,7 +86,12 @@ public static class DevSeed
         await using var db = await factory.CreateDbContextAsync(ct);
         if (!await db.Seasons.AnyAsync(s => s.Id == SeasonId, ct))
         {
-            await SendAsync(bus, new CreateSeason(SeasonId, RulesetJson.Default()), ct);
+            await SendAsync(bus, new CreateSeason(SeasonId, "Сезон разработки", RulesetJson.Default()), ct);
+        }
+
+        if (await db.Seasons.AnyAsync(s => s.Id == SeasonId && s.Status == SeasonStatus.Draft, ct))
+        {
+            await SendAsync(bus, new ChangeSeasonStatus(SeasonStatus.Active), ct);
         }
 
         var joined = await db.SeasonPlayers.Where(p => p.SeasonId == SeasonId).Select(p => p.UserId).ToListAsync(ct);

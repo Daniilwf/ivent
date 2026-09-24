@@ -4,24 +4,30 @@ using GameEvent.Engine.Rulesets;
 
 namespace GameEvent.Engine.Seasons;
 
-/// <summary>Create a season playing by <paramref name="Ruleset"/>; the map comes from it.</summary>
-public sealed record CreateSeason(Guid SeasonId, Ruleset Ruleset) : ICommand;
-
 /// <summary>
-/// Add a user to the season as a player; the player starts on the start cell with zero points.
-/// <c>PlayerId</c> is the participation id; a user takes part in a season at most once.
+/// Create a season in the Draft status playing by <paramref name="Ruleset"/>; the map comes from it.
+/// Players can be added while it is a draft; the game starts with <see cref="ChangeSeasonStatus"/> to Active.
 /// </summary>
-public sealed record AddSeasonPlayer(Guid PlayerId, Guid UserId, string Name) : ICommand;
+public sealed record CreateSeason(Guid SeasonId, string Name, Ruleset Ruleset, DateTimeOffset? Deadline = null) : ICommand;
+
+/// <summary>Move the season along its lifecycle. Only the next status is allowed (SE1).</summary>
+public sealed record ChangeSeasonStatus(SeasonStatus To) : ICommand;
+
+/// <summary>Set or move the deadline (UTC); null removes it. After the deadline the season closes (C10).</summary>
+public sealed record SetSeasonDeadline(DateTimeOffset? Deadline) : ICommand;
 
 /// <summary>
-/// The season is created with ruleset version 1. The whole ruleset is in the log: the rules a season plays by
-/// are part of its history (D-82).
+/// The season is created as a draft with ruleset version 1. The whole ruleset is in the log: the rules a season
+/// plays by are part of its history (D-82).
 /// </summary>
 [EventType("season-created")]
-public sealed record SeasonCreated(Guid SeasonId, Ruleset Ruleset, MapGraph Map) : IGameEvent;
+public sealed record SeasonCreated(Guid SeasonId, string Name, Ruleset Ruleset, MapGraph Map, DateTimeOffset? Deadline) : IGameEvent;
 
-[EventType("season-player-added")]
-public sealed record SeasonPlayerAdded(Guid PlayerId, Guid UserId, string Name, string CellId) : IGameEvent;
+[EventType("season-status-changed")]
+public sealed record SeasonStatusChanged(SeasonStatus From, SeasonStatus To) : IGameEvent;
+
+[EventType("season-deadline-set")]
+public sealed record SeasonDeadlineSet(DateTimeOffset? Deadline) : IGameEvent;
 
 internal static class SeasonSetup
 {
@@ -40,32 +46,36 @@ internal static class SeasonSetup
         }
 
         var map = LinearMap.Generate(command.Ruleset.Map.LinearLength);
-        return Decision.Accept(new SeasonCreated(command.SeasonId, command.Ruleset, map));
+        return Decision.Accept(new SeasonCreated(command.SeasonId, command.Name, command.Ruleset, map, command.Deadline));
     }
 
-    public static Decision Decide(SeasonState state, AddSeasonPlayer command)
-    {
-        if (!state.IsCreated)
-        {
-            return Decision.Reject(RejectionCodes.SeasonNotCreated, "Create the season first.");
-        }
+    public static Decision Decide(SeasonState state, ChangeSeasonStatus command) =>
+        throw new NotImplementedException("C2");
 
-        if (state.Players.ContainsKey(command.PlayerId) || state.Players.Values.Any(p => p.UserId == command.UserId))
-        {
-            return Decision.Reject(RejectionCodes.PlayerAlreadyAdded, $"Player {command.PlayerId} or user {command.UserId} is already in the season.");
-        }
-
-        return Decision.Accept(new SeasonPlayerAdded(command.PlayerId, command.UserId, command.Name, state.Map.Start.Id));
-    }
+    public static Decision Decide(SeasonState state, SetSeasonDeadline command) =>
+        throw new NotImplementedException("C2");
 
     public static SeasonState Apply(SeasonState state, SeasonCreated e) =>
-        state with { SeasonId = e.SeasonId, Map = e.Map, Ruleset = e.Ruleset, RulesetVersion = FirstRulesetVersion };
-
-    public static SeasonState Apply(SeasonState state, SeasonPlayerAdded e) =>
         state with
         {
-            Players = state.Players.Add(
-                e.PlayerId,
-                new SeasonPlayer(e.PlayerId, e.UserId, e.Name, e.CellId, Points: 0, TurnPhase.Idle, Offer: null, ActiveRunId: null)),
+            SeasonId = e.SeasonId,
+            Name = e.Name,
+            Status = SeasonStatus.Draft,
+            Deadline = e.Deadline,
+            Map = e.Map,
+            Ruleset = e.Ruleset,
+            RulesetVersion = FirstRulesetVersion,
         };
+
+    public static SeasonState Apply(SeasonState state, SeasonStatusChanged e) => state with { Status = e.To };
+
+    public static SeasonState Apply(SeasonState state, SeasonDeadlineSet e) => state with { Deadline = e.Deadline };
+
+    /// <summary>Game actions (roll, start, complete) need a running season.</summary>
+    public static Decision? RequireActive(SeasonState state) =>
+        !state.IsCreated
+            ? Decision.Reject(RejectionCodes.SeasonNotCreated, "Create the season first.")
+            : state.Status != SeasonStatus.Active
+                ? Decision.Reject(RejectionCodes.SeasonNotActive, $"The season is {state.Status}, game actions need Active.")
+                : null;
 }

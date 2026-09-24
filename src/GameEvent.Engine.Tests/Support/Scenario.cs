@@ -1,4 +1,5 @@
 using GameEvent.Engine.Kernel;
+using GameEvent.Engine.Players;
 using GameEvent.Engine.Pool;
 using GameEvent.Engine.Rolls;
 using GameEvent.Engine.Rulesets;
@@ -29,6 +30,7 @@ public sealed class Scenario
     private readonly Dictionary<string, Guid> _players = [];
     private readonly List<IGameEvent> _log = [];
     private Ruleset _initialRuleset;
+    private bool _startSeason = true;
     private bool _expectRejection;
 
     private Scenario(Ruleset ruleset, int seed)
@@ -131,7 +133,14 @@ public sealed class Scenario
         return this;
     }
 
-    /// <summary>Creates the season if needed and adds players by name.</summary>
+    /// <summary>The season stays a draft after creation (for lifecycle tests).</summary>
+    public Scenario AsDraft()
+    {
+        _startSeason = false;
+        return this;
+    }
+
+    /// <summary>Creates the season if needed (see <see cref="AsDraft"/>) and adds players by name.</summary>
     public Scenario WithPlayers(params string[] names)
     {
         EnsureSeason();
@@ -220,7 +229,13 @@ public sealed class Scenario
     {
         if (!State.IsCreated)
         {
-            Setup(new CreateSeason(SequentialIds.Make(SeasonIdPrefix, 1), _initialRuleset));
+            Setup(new CreateSeason(SequentialIds.Make(SeasonIdPrefix, 1), "Тестовый сезон", _initialRuleset));
+
+            // Scenarios play: the season starts right away unless a test drives the lifecycle itself.
+            if (_startSeason)
+            {
+                Setup(new ChangeSeasonStatus(SeasonStatus.Active));
+            }
         }
     }
 

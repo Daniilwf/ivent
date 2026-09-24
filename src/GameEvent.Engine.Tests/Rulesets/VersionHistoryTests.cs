@@ -29,7 +29,7 @@ public class VersionHistoryTests
         var s = Scenario.New();
         var rules = s.Ruleset;
 
-        s.Act(new CreateSeason(s_seasonId, rules));
+        s.Act(new CreateSeason(s_seasonId, "Тестовый сезон", rules));
 
         ScenarioAssert.Accepted(s);
         var created = Assert.Single(s.LastEvents<SeasonCreated>());
@@ -44,7 +44,7 @@ public class VersionHistoryTests
         var s = Scenario.New();
 
         ScenarioAssert.RejectsWithoutChanges(
-            s, x => x.Act(new CreateSeason(s_seasonId, Invalid(x.Ruleset))), RejectionCodes.RulesetInvalid);
+            s, x => x.Act(new CreateSeason(s_seasonId, "Тестовый сезон", Invalid(x.Ruleset))), RejectionCodes.RulesetInvalid);
         Assert.False(s.State.IsCreated);
         Assert.Equal(0, s.State.RulesetVersion);
     }
@@ -54,7 +54,7 @@ public class VersionHistoryTests
     {
         var s = Scenario.New();
 
-        s.Act(new CreateSeason(s_seasonId, Invalid(s.Ruleset)));
+        s.Act(new CreateSeason(s_seasonId, "Тестовый сезон", Invalid(s.Ruleset)));
 
         Assert.Equal(RejectionCodes.RulesetInvalid, s.Last.Rejection!.Code);
         Assert.Contains("map.linearLength", s.Last.Rejection.Detail, StringComparison.Ordinal);

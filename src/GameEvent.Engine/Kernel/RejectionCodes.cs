@@ -9,6 +9,12 @@ public static class RejectionCodes
     public const string RulesetUnchanged = "ruleset.unchanged";
     public const string RulesetVersionConflict = "ruleset.versionConflict";
     public const string SeasonNotCreated = "season.notCreated";
+    public const string SeasonNotActive = "season.notActive";
+    public const string SeasonInvalidTransition = "season.invalidTransition";
+    public const string SeasonClosed = "season.closed";
+    public const string CellUnknown = "map.unknownCell";
+    public const string NothingToChange = "player.nothingToChange";
+    public const string PlayerBusy = "player.busy";
     public const string SeasonAlreadyCreated = "season.alreadyCreated";
     public const string PlayerUnknown = "player.unknown";
     public const string PlayerAlreadyAdded = "player.alreadyAdded";

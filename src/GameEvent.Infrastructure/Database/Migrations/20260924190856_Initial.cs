@@ -65,7 +65,9 @@ namespace GameEvent.Infrastructure.Database.Migrations
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "TEXT", nullable: false),
+                    Name = table.Column<string>(type: "TEXT", maxLength: 100, nullable: false),
                     Status = table.Column<string>(type: "TEXT", maxLength: 20, nullable: false),
+                    Deadline = table.Column<long>(type: "INTEGER", nullable: true),
                     RulesetVersion = table.Column<int>(type: "INTEGER", nullable: false),
                     RulesetJson = table.Column<string>(type: "TEXT", nullable: false),
                     CreatedAt = table.Column<long>(type: "INTEGER", nullable: false)
@@ -126,6 +128,9 @@ namespace GameEvent.Infrastructure.Database.Migrations
                     Name = table.Column<string>(type: "TEXT", nullable: false),
                     CellId = table.Column<string>(type: "TEXT", nullable: false),
                     Points = table.Column<int>(type: "INTEGER", nullable: false),
+                    Coins = table.Column<int>(type: "INTEGER", nullable: false),
+                    ResourcesJson = table.Column<string>(type: "TEXT", nullable: false),
+                    IsInactive = table.Column<bool>(type: "INTEGER", nullable: false),
                     Phase = table.Column<string>(type: "TEXT", maxLength: 20, nullable: false),
                     OfferJson = table.Column<string>(type: "TEXT", nullable: true),
                     ActiveRunId = table.Column<Guid>(type: "TEXT", nullable: true)

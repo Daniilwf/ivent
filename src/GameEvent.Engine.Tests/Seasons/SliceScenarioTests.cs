@@ -1,5 +1,6 @@
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Map;
+using GameEvent.Engine.Players;
 using GameEvent.Engine.Rolls;
 using GameEvent.Engine.Runs;
 using GameEvent.Engine.Scoring;

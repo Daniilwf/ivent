@@ -1,5 +1,6 @@
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Map;
+using GameEvent.Engine.Players;
 using GameEvent.Engine.Rolls;
 using GameEvent.Engine.Rulesets;
 using GameEvent.Engine.Runs;
@@ -39,7 +40,7 @@ public class EventFormatTests
     {
         {
             "season-created",
-            new SeasonCreated(s_season, TestRuleset.Create(), LinearMap.Generate(1)),
+            new SeasonCreated(s_season, "Тестовый сезон", TestRuleset.Create(), LinearMap.Generate(1), null),
             1,
             """{"seasonId":"30000000-0000-0000-0000-000000000001","ruleset":""" + RulesetJsonText + ""","map":{"cells":[{"id":"start","type":"start"},{"id":"finish","type":"finish"}],"edges":[{"from":"start","to":"finish","isDefaultForward":true,"isPrimaryBackward":true}]}}"""
         },

@@ -245,6 +245,12 @@ namespace GameEvent.Infrastructure.Database.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<int>("Coins")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsInactive")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -259,6 +265,10 @@ namespace GameEvent.Infrastructure.Database.Migrations
 
                     b.Property<int>("Points")
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("ResourcesJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("SeasonId")
                         .HasColumnType("TEXT");
@@ -284,6 +294,14 @@ namespace GameEvent.Infrastructure.Database.Migrations
 
                     b.Property<long>("CreatedAt")
                         .HasColumnType("INTEGER");
+
+                    b.Property<long?>("Deadline")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("RulesetJson")
                         .IsRequired()

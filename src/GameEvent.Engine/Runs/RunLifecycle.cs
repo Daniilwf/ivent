@@ -87,9 +87,9 @@ internal static class RunLifecycle
 
     private static Decision? Check(SeasonState state, Guid playerId, TurnPhase required)
     {
-        if (!state.IsCreated)
+        if (SeasonSetup.RequireActive(state) is { } inactive)
         {
-            return Decision.Reject(RejectionCodes.SeasonNotCreated, "Create the season first.");
+            return inactive;
         }
 
         if (!state.Players.TryGetValue(playerId, out var player))

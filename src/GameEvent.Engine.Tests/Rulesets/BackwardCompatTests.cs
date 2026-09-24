@@ -70,7 +70,7 @@ public class BackwardCompatTests
     public void Season_created_event_with_the_release_ruleset_reads_back()
     {
         var stored = EventCodec.Encode(new SeasonCreated(
-            SequentialIds.Make(0x30000000, 1), RulesetJson.Parse(s_releaseBaseline), new MapGraph([], [])));
+            SequentialIds.Make(0x30000000, 1), "Тестовый сезон", RulesetJson.Parse(s_releaseBaseline), new MapGraph([], []), null));
 
         var read = Assert.IsType<SeasonCreated>(EventCodec.Decode(stored));
 
