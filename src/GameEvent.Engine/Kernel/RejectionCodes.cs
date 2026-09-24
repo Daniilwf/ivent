@@ -15,6 +15,12 @@ public static class RejectionCodes
     public const string CellUnknown = "map.unknownCell";
     public const string NothingToChange = "player.nothingToChange";
     public const string CommentRequired = "player.commentRequired";
+    public const string CommentTooLong = "player.commentTooLong";
+    public const string InvalidResource = "player.invalidResource";
+    public const string DeltaTooLarge = "player.deltaTooLarge";
+    public const string TransferToFinish = "map.transferToFinish";
+    public const string SeasonNothingToChange = "season.nothingToChange";
+    public const string SeasonInvalidName = "season.invalidName";
     public const string PlayerBusy = "player.busy";
     public const string SeasonAlreadyCreated = "season.alreadyCreated";
     public const string PlayerUnknown = "player.unknown";

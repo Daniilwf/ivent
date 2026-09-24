@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Text.Json;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Rolls;
+using GameEvent.Engine.Rulesets;
 using GameEvent.Engine.Runs;
 using GameEvent.Engine.Seasons;
 using GameEvent.Infrastructure.Database;
@@ -51,8 +52,11 @@ internal static class SeasonProjection
             season.Name = after.Name;
             season.Status = after.Status;
             season.Deadline = after.Deadline;
-            season.RulesetVersion = after.RulesetVersion;
-            season.RulesetJson = JsonSerializer.Serialize(after.Rules, EngineJson.Options);
+            if (season.RulesetVersion != after.RulesetVersion)
+            {
+                season.RulesetVersion = after.RulesetVersion;
+                season.RulesetJson = JsonSerializer.Serialize(after.Rules, EngineJson.Options);
+            }
         }
 
         foreach (var (id, player) in after.Players)
@@ -133,11 +137,17 @@ internal static class SeasonProjection
     /// </summary>
     public static async Task<SeasonState> ReadAsync(GameEventDbContext db, SeasonState replayed, CancellationToken ct)
     {
+        var season = await db.Seasons.AsNoTracking().SingleAsync(s => s.Id == replayed.SeasonId, ct);
         var players = await db.SeasonPlayers.AsNoTracking().Where(p => p.SeasonId == replayed.SeasonId).ToListAsync(ct);
         var runs = await db.Runs.AsNoTracking().Where(r => r.SeasonId == replayed.SeasonId).ToListAsync(ct);
 
         return replayed with
         {
+            Name = season.Name,
+            Status = season.Status,
+            Deadline = season.Deadline,
+            RulesetVersion = season.RulesetVersion,
+            Ruleset = JsonSerializer.Deserialize<Ruleset>(season.RulesetJson, EngineJson.Options),
             Players = players.ToImmutableSortedDictionary(
                 p => p.Id,
                 p => new SeasonPlayer(

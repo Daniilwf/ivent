@@ -13,7 +13,7 @@ public sealed record CreateSeason(Guid SeasonId, string Name, Ruleset Ruleset, D
 /// <summary>Move the season along its lifecycle. Only the next status is allowed (SE1).</summary>
 public sealed record ChangeSeasonStatus(SeasonStatus To) : ICommand;
 
-/// <summary>Set or move the deadline (UTC); null removes it. After the deadline the season closes (C10).</summary>
+/// <summary>Set or move the deadline (stored in UTC); null removes it. After the deadline the season closes (C10).</summary>
 public sealed record SetSeasonDeadline(DateTimeOffset? Deadline) : ICommand;
 
 /// <summary>
@@ -32,6 +32,7 @@ public sealed record SeasonDeadlineSet(DateTimeOffset? Deadline) : IGameEvent;
 internal static class SeasonSetup
 {
     public const int FirstRulesetVersion = 1;
+    public const int MaxNameLength = 100;
 
     public static Decision Decide(SeasonState state, CreateSeason command)
     {
@@ -40,13 +41,18 @@ internal static class SeasonSetup
             return Decision.Reject(RejectionCodes.SeasonAlreadyCreated, $"Season {state.SeasonId} already exists.");
         }
 
+        if (string.IsNullOrWhiteSpace(command.Name) || command.Name.Length > MaxNameLength)
+        {
+            return Decision.Reject(RejectionCodes.SeasonInvalidName, $"A season needs a name of 1–{MaxNameLength} characters.");
+        }
+
         if (RulesetValidator.Check(command.Ruleset) is { } rejection)
         {
             return rejection;
         }
 
         var map = LinearMap.Generate(command.Ruleset.Map.LinearLength);
-        return Decision.Accept(new SeasonCreated(command.SeasonId, command.Name, command.Ruleset, map, command.Deadline));
+        return Decision.Accept(new SeasonCreated(command.SeasonId, command.Name.Trim(), command.Ruleset, map, command.Deadline?.ToUniversalTime()));
     }
 
     public static Decision Decide(SeasonState state, ChangeSeasonStatus command)
@@ -69,9 +75,15 @@ internal static class SeasonSetup
             return Decision.Reject(RejectionCodes.SeasonNotCreated, "Create the season first.");
         }
 
-        return IsOver(state)
-            ? Decision.Reject(RejectionCodes.SeasonClosed, $"The season is {state.Status}.")
-            : Decision.Accept(new SeasonDeadlineSet(command.Deadline));
+        if (IsOver(state))
+        {
+            return Decision.Reject(RejectionCodes.SeasonClosed, $"The season is {state.Status}.");
+        }
+
+        var deadline = command.Deadline?.ToUniversalTime();
+        return deadline == state.Deadline
+            ? Decision.Reject(RejectionCodes.SeasonNothingToChange, "The deadline is already set to that value.")
+            : Decision.Accept(new SeasonDeadlineSet(deadline));
     }
 
     /// <summary>Results are fixed: nothing about the season or its players changes any more.</summary>

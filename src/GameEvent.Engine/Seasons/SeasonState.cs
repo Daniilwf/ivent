@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Map;
 using GameEvent.Engine.Rolls;
 using GameEvent.Engine.Rulesets;
@@ -73,7 +74,7 @@ public sealed record SeasonPlayer(
     string CellId,
     int Points,
     int Coins,
-    Kernel.ResourceBag Resources,
+    ResourceBag Resources,
     bool IsInactive,
     TurnPhase Phase,
     RollOffer? Offer,

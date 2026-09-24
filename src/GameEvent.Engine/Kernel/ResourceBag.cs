@@ -7,19 +7,22 @@ namespace GameEvent.Engine.Kernel;
 
 /// <summary>
 /// A player's resources other than points and coins (SPEC «Ресурсы игрока»: a dictionary, so a new currency or
-/// counter needs no schema change). Keys are resource names from the ruleset; zero amounts are not stored.
+/// counter needs no schema change). Keys are resource names (a list of known resources in the ruleset comes with
+/// the economy, stage 4); zero amounts are not stored.
 /// Compares by content and serializes as a JSON object.
 /// </summary>
 [JsonConverter(typeof(ResourceBagJsonConverter))]
 public readonly struct ResourceBag : IEquatable<ResourceBag>, IEnumerable<KeyValuePair<string, int>>
 {
+    private static readonly ImmutableSortedDictionary<string, int> s_none = ImmutableSortedDictionary.Create<string, int>(StringComparer.Ordinal);
+
     private readonly ImmutableSortedDictionary<string, int>? _amounts;
 
     private ResourceBag(ImmutableSortedDictionary<string, int> amounts) => _amounts = amounts;
 
-    public static ResourceBag Empty => new(ImmutableSortedDictionary.Create<string, int>(StringComparer.Ordinal));
+    public static ResourceBag Empty => new(s_none);
 
-    private ImmutableSortedDictionary<string, int> Amounts => _amounts ?? Empty._amounts!;
+    private ImmutableSortedDictionary<string, int> Amounts => _amounts ?? s_none;
 
     public int this[string resource] => Amounts.GetValueOrDefault(resource);
 

@@ -54,6 +54,13 @@ public sealed record OfferDiscarded(Guid PlayerId, Guid GameId) : IGameEvent;
 
 internal static class PlayerAdministration
 {
+    // Safety ceilings, not balance (like D-86): a typo must not overflow a balance.
+    public const int MaxDelta = 1_000_000;
+    public const int MaxCommentLength = 500;
+
+    // Points and coins are fields, not dictionary entries (invariant 9).
+    private static readonly HashSet<string> s_reservedResources = new(StringComparer.OrdinalIgnoreCase) { "points", "coins" };
+
     public static Decision Decide(SeasonState state, AddSeasonPlayer command)
     {
         if (!state.IsCreated)
@@ -73,9 +80,14 @@ internal static class PlayerAdministration
 
         var start = state.Map.Start.Id;
         var cell = command.CellId ?? start;
-        if (!state.Map.Cells.Any(c => c.Id == cell))
+        if (TransferTarget(state, cell) is { } badCell)
         {
-            return Decision.Reject(RejectionCodes.CellUnknown, $"Cell '{cell}' is not on the map.");
+            return badCell;
+        }
+
+        if (Math.Abs((long)command.Points) > MaxDelta || Math.Abs((long)command.Coins) > MaxDelta)
+        {
+            return Decision.Reject(RejectionCodes.DeltaTooLarge, $"Starting balances are limited to ±{MaxDelta}.");
         }
 
         // Everyone enters on the start cell; the admin's starting cell and balances are logged changes of their own.
@@ -105,6 +117,11 @@ internal static class PlayerAdministration
             return Unknown(state, command.PlayerId);
         }
 
+        if (SeasonSetup.IsOver(state))
+        {
+            return Decision.Reject(RejectionCodes.SeasonClosed, $"The season is {state.Status}: results are fixed.");
+        }
+
         return player.IsInactive == command.IsInactive
             ? Decision.Reject(RejectionCodes.NothingToChange, $"The player is already {(command.IsInactive ? "inactive" : "active")}.")
             : Decision.Accept(new PlayerInactivitySet(player.PlayerId, command.IsInactive));
@@ -127,14 +144,31 @@ internal static class PlayerAdministration
             return Decision.Reject(RejectionCodes.CommentRequired, "Every admin adjustment explains itself in the public log.");
         }
 
+        if (command.Comment.Length > MaxCommentLength)
+        {
+            return Decision.Reject(RejectionCodes.CommentTooLong, $"The comment is limited to {MaxCommentLength} characters.");
+        }
+
+        var resources = command.ResourceDeltas.ToList();
+        if (resources.Any(r => r is null || string.IsNullOrWhiteSpace(r.Resource) || s_reservedResources.Contains(r.Resource.Trim()))
+            || resources.Select(r => r.Resource).Distinct(StringComparer.Ordinal).Count() != resources.Count)
+        {
+            return Decision.Reject(RejectionCodes.InvalidResource, "Resource names must be non-empty, unique, and not points or coins.");
+        }
+
+        if (new[] { command.PointsDelta, command.CoinsDelta }.Concat(resources.Select(r => r.Delta)).Any(d => Math.Abs((long)d) > MaxDelta))
+        {
+            return Decision.Reject(RejectionCodes.DeltaTooLarge, $"One adjustment changes a balance by at most ±{MaxDelta}.");
+        }
+
         if (command.DiscardOffer && player.Phase == TurnPhase.Playing)
         {
             return Decision.Reject(RejectionCodes.PlayerBusy, "The player is playing a run: that is a drop or a tech reroll (C6).");
         }
 
-        if (command.CellId is { } target && !state.Map.Cells.Any(c => c.Id == target))
+        if (command.CellId is { } target && TransferTarget(state, target) is { } badCell)
         {
-            return Decision.Reject(RejectionCodes.CellUnknown, $"Cell '{target}' is not on the map.");
+            return badCell;
         }
 
         var changes = new List<IGameEvent>();
@@ -165,6 +199,23 @@ internal static class PlayerAdministration
         return changes.Count == 0
             ? Decision.Reject(RejectionCodes.NothingToChange, "The adjustment changes nothing.")
             : Decision.Accept([new PlayerAdjusted(player.PlayerId, command.Comment), .. changes]);
+    }
+
+    /// <summary>
+    /// A transfer by the admin lands on an existing cell and never on the finish: reaching the finish is a game event
+    /// with places and bonuses (C9), not an administrative move. A transfer does not trigger the cell (D-89).
+    /// </summary>
+    private static Decision? TransferTarget(SeasonState state, string cellId)
+    {
+        var cell = state.Map.Cells.FirstOrDefault(c => c.Id == cellId);
+        if (cell is null)
+        {
+            return Decision.Reject(RejectionCodes.CellUnknown, $"Cell '{cellId}' is not on the map.");
+        }
+
+        return cell.Type == CellType.Finish
+            ? Decision.Reject(RejectionCodes.TransferToFinish, "Players reach the finish by playing, not by a transfer.")
+            : null;
     }
 
     /// <summary>A move by transfer, not by steps: the path is the destination only.</summary>

@@ -148,8 +148,8 @@ public class EventFormatTests
         { "points-changed", new PointsChanged(s_player, 12, PointsReason.StartingBalance, null), """{"playerId":"10000000-0000-0000-0000-000000000001","delta":12,"reason":"startingBalance","runId":null}""" },
         { "points-changed", new PointsChanged(s_player, -4, PointsReason.AdminAdjustment, null), """{"playerId":"10000000-0000-0000-0000-000000000001","delta":-4,"reason":"adminAdjustment","runId":null}""" },
         { "coins-changed", new CoinsChanged(s_player, 7, CoinsReason.StartingBalance, null), """{"playerId":"10000000-0000-0000-0000-000000000001","delta":7,"reason":"startingBalance","runId":null}""" },
-        { "player-moved", new PlayerMoved(s_player, "start", "c5", 5, ["c5"], MoveReason.StartingCell, null), """{"playerId":"10000000-0000-0000-0000-000000000001","from":"start","to":"c5","steps":5,"path":["c5"],"reason":"startingCell","runId":null}""" },
-        { "player-moved", new PlayerMoved(s_player, "c5", "c2", 3, ["c2"], MoveReason.AdminAdjustment, null), """{"playerId":"10000000-0000-0000-0000-000000000001","from":"c5","to":"c2","steps":3,"path":["c2"],"reason":"adminAdjustment","runId":null}""" },
+        { "player-moved", new PlayerMoved(s_player, "start", "c5", 0, ["c5"], MoveReason.StartingCell, null), """{"playerId":"10000000-0000-0000-0000-000000000001","from":"start","to":"c5","steps":0,"path":["c5"],"reason":"startingCell","runId":null}""" },
+        { "player-moved", new PlayerMoved(s_player, "c5", "c2", 0, ["c2"], MoveReason.AdminAdjustment, null), """{"playerId":"10000000-0000-0000-0000-000000000001","from":"c5","to":"c2","steps":0,"path":["c2"],"reason":"adminAdjustment","runId":null}""" },
     };
 
     [Theory]
