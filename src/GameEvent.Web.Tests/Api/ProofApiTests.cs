@@ -277,7 +277,9 @@ public sealed class ProofApiTests : IAsyncLifetime
     public async Task Proof_after_the_season_is_finished_is_a_conflict()
     {
         var vasya = await _site.SignedInAsync("vasya");
+        // The season finishes only with every run checked (D-101): the run is approved first
         var runId = await CompletedRunAsync(vasya);
+        await _site.SendAsync(new ApproveProof(runId, null, "Видел на стриме"));
         await _site.SendAsync(new ChangeSeasonStatus(SeasonStatus.Closing));
         await _site.SendAsync(new ChangeSeasonStatus(SeasonStatus.Finished));
 

@@ -40,6 +40,9 @@ function season(
   };
   return {
     id: seasonId,
+    // D-101: the season's status and deadline (none here)
+    status: 'active',
+    deadline: null,
     cells: [
       { id: 'start', type: 'start' },
       { id: 'c1', type: 'empty' },

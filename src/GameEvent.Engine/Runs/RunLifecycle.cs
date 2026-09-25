@@ -12,7 +12,7 @@ internal static class RunLifecycle
 {
     public static Decision Decide(SeasonState state, StartRun command, EngineContext context)
     {
-        if (TurnRules.Check(state, command.PlayerId, command) is { } rejection)
+        if (TurnRules.Check(state, command.PlayerId, command, context.Clock.UtcNow) is { } rejection)
         {
             return rejection;
         }
@@ -25,7 +25,7 @@ internal static class RunLifecycle
 
     public static Decision Decide(SeasonState state, CompleteRun command, EngineContext context)
     {
-        if (TurnRules.Check(state, command.PlayerId, command) is { } rejection)
+        if (TurnRules.Check(state, command.PlayerId, command, context.Clock.UtcNow) is { } rejection)
         {
             return rejection;
         }

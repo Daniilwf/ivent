@@ -397,7 +397,10 @@ public sealed class AdminProofApiTests : IAsyncLifetime
     [InlineData("reject")]
     public async Task Review_after_the_season_is_finished_is_a_conflict(string action)
     {
+        // The season finishes only with every run checked (D-101): the run is approved first, so after the finish the
+        // season being over is what stops the request
         var runId = await CompletedAsync("vasya");
+        await _site.SendAsync(new ApproveProof(runId, null, "Видел на стриме"));
         await _site.SendAsync(new ChangeSeasonStatus(SeasonStatus.Closing));
         await _site.SendAsync(new ChangeSeasonStatus(SeasonStatus.Finished));
         var admin = await _site.SignedInAsync("admin");

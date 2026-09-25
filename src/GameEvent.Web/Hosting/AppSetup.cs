@@ -5,6 +5,7 @@ using GameEvent.Engine.Kernel;
 using GameEvent.Infrastructure.Database;
 using GameEvent.Infrastructure.Kernel;
 using GameEvent.Infrastructure.Queue;
+using GameEvent.Infrastructure.Seasons;
 using GameEvent.Web.Accounts;
 using GameEvent.Web.Proofs;
 using GameEvent.Web.Realtime;
@@ -44,6 +45,11 @@ public static class AppSetup
         services.AddSingleton<ICommittedEventsListener>(sp => sp.GetRequiredService<SeasonBroadcaster>());
         services.AddHostedService<SeasonBroadcastWorker>();
         services.AddHostedService<CommandProcessor>();
+        // Checked at startup: a bad interval stops the site before it serves anything (D-101).
+        services.AddSingleton(new DeadlineSchedulerSettings(
+            TimeSpan.FromSeconds(builder.Configuration.GetValue("Scheduler:IntervalSeconds", 5)),
+            builder.Configuration.GetValue("Scheduler:Enabled", true)));
+        services.AddHostedService<DeadlineScheduler>();
 
         services.Configure<JsonOptions>(o => ConfigureJson(o.SerializerOptions));
         services.AddSignalR().AddJsonProtocol(o => ConfigureJson(o.PayloadSerializerOptions));
@@ -148,6 +154,7 @@ public static class AppSetup
         api.MapPoolStats();
         api.MapAdminRuns();
         api.MapAdminProofs();
+        api.MapAdminSeasons();
         app.MapHub<SeasonHub>(SeasonHub.Path);
 
         if (frontend is not null)

@@ -9,7 +9,7 @@ internal static class Choosing
 {
     public static Decision Decide(SeasonState state, MakeChoice command, EngineContext context)
     {
-        if (TurnRules.Check(state, command.PlayerId, command) is { } rejection)
+        if (TurnRules.Check(state, command.PlayerId, command, context.Clock.UtcNow) is { } rejection)
         {
             return rejection;
         }

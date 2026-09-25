@@ -11,7 +11,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace GameEvent.Infrastructure.Database.Migrations
 {
     [DbContext(typeof(GameEventDbContext))]
-    [Migration("20260925052514_Initial")]
+    [Migration("20260925084435_Initial")]
     partial class Initial
     {
         /// <inheritdoc />
@@ -504,6 +504,39 @@ namespace GameEvent.Infrastructure.Database.Migrations
                     b.ToTable("Season", (string)null);
                 });
 
+            modelBuilder.Entity("GameEvent.Infrastructure.Seasons.SeasonResultRecord", b =>
+                {
+                    b.Property<Guid>("SeasonId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Row")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("CellsToFinish")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsFirst")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Place")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("PlayerId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Points")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("Provisional")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("SeasonId", "Row");
+
+                    b.HasIndex("PlayerId");
+
+                    b.ToTable("SeasonResult", (string)null);
+                });
+
             modelBuilder.Entity("GameEvent.Infrastructure.Seasons.PendingManualEffectRecord", b =>
                 {
                     b.HasOne("GameEvent.Infrastructure.Seasons.SeasonPlayerRecord", null)
@@ -588,6 +621,21 @@ namespace GameEvent.Infrastructure.Database.Migrations
 
             modelBuilder.Entity("GameEvent.Infrastructure.Seasons.SeasonPlayerRecord", b =>
                 {
+                    b.HasOne("GameEvent.Infrastructure.Seasons.SeasonRecord", null)
+                        .WithMany()
+                        .HasForeignKey("SeasonId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("GameEvent.Infrastructure.Seasons.SeasonResultRecord", b =>
+                {
+                    b.HasOne("GameEvent.Infrastructure.Seasons.SeasonPlayerRecord", null)
+                        .WithMany()
+                        .HasForeignKey("PlayerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.HasOne("GameEvent.Infrastructure.Seasons.SeasonRecord", null)
                         .WithMany()
                         .HasForeignKey("SeasonId")

@@ -18,6 +18,8 @@ public sealed class GameEventDbContext(DbContextOptions<GameEventDbContext> opti
 
     public DbSet<RulesetRecord> Rulesets => Set<RulesetRecord>();
 
+    public DbSet<SeasonResultRecord> SeasonResults => Set<SeasonResultRecord>();
+
     public DbSet<PlayerGameExclusionRecord> Exclusions => Set<PlayerGameExclusionRecord>();
 
     public DbSet<PendingManualEffectRecord> ManualEffects => Set<PendingManualEffectRecord>();
@@ -101,6 +103,14 @@ public sealed class GameEventDbContext(DbContextOptions<GameEventDbContext> opti
             e.HasIndex(x => new { x.SeasonId, x.PlayerId });
             e.Property(x => x.DrawEvent).HasMaxLength(20);
             e.Property(x => x.Source).HasMaxLength(30);
+        });
+
+        modelBuilder.Entity<SeasonResultRecord>(e =>
+        {
+            e.ToTable("SeasonResult");
+            e.HasKey(x => new { x.SeasonId, x.Row });
+            e.HasOne<SeasonRecord>().WithMany().HasForeignKey(x => x.SeasonId);
+            e.HasOne<SeasonPlayerRecord>().WithMany().HasForeignKey(x => x.PlayerId);
         });
 
         modelBuilder.Entity<ProofRecord>(e =>

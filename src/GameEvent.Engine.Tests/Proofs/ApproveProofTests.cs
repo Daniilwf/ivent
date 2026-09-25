@@ -320,7 +320,7 @@ public class ApproveProofTests
     {
         var (s, runId) = Completed([3, 1]);
         Submit(s, "Вася", runId, [Link]);
-        MoveSeasonTo(s, status);
+        s.MoveStatusToForcingFinish(status); // the run stays unchecked on purpose
 
         ScenarioAssert.RejectsWithoutChanges(s, x => Approve(x, runId), RejectionCodes.SeasonClosed);
     }

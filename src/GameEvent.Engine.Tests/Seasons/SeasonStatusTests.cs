@@ -1,4 +1,5 @@
 using GameEvent.Engine.Kernel;
+using GameEvent.Engine.Ranking;
 using GameEvent.Engine.Rolls;
 using GameEvent.Engine.Runs;
 using GameEvent.Engine.Seasons;
@@ -86,11 +87,15 @@ public class SeasonStatusTests
         // When the admin moves it forward step by step
         foreach (var (from, to) in s_order.Zip(s_order.Skip(1)))
         {
+            var before = s.State;
             s.Act(new ChangeSeasonStatus(to));
 
-            // Then each step is one event with the old and new status
+            // Then each step is one event with the old and new status; the finish also records the result (D-101)
             ScenarioAssert.Accepted(s);
-            Assert.Equal([new SeasonStatusChanged(from, to)], s.Last.Events);
+            IGameEvent[] expected = to == SeasonStatus.Finished
+                ? [new SeasonStatusChanged(from, to), new SeasonResultRecorded(Leaderboard.Build(before))]
+                : [new SeasonStatusChanged(from, to)];
+            Assert.Equal(expected, s.Last.Events);
             Assert.Equal(to, s.State.Status);
         }
     }

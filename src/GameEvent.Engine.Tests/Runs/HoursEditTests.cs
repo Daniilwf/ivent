@@ -546,11 +546,7 @@ public class HoursEditTests
     public void Correction_after_the_season_is_finished_is_rejected(SeasonStatus status)
     {
         var (s, runId) = Completed(6, [3, 1]);
-        for (var next = SeasonStatus.Closing; next <= status; next++)
-        {
-            s.Act(new ChangeSeasonStatus(next));
-            ScenarioAssert.Accepted(s);
-        }
+        s.MoveStatusToForcingFinish(status); // the run stays unchecked on purpose
 
         ScenarioAssert.RejectsWithoutChanges(s, x => Correct(x, runId, 12), RejectionCodes.SeasonClosed);
     }

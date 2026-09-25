@@ -217,6 +217,36 @@ namespace GameEvent.Infrastructure.Database.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "SeasonResult",
+                columns: table => new
+                {
+                    SeasonId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    Row = table.Column<int>(type: "INTEGER", nullable: false),
+                    PlayerId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    Place = table.Column<int>(type: "INTEGER", nullable: false),
+                    Points = table.Column<int>(type: "INTEGER", nullable: false),
+                    CellsToFinish = table.Column<int>(type: "INTEGER", nullable: true),
+                    IsFirst = table.Column<bool>(type: "INTEGER", nullable: false),
+                    Provisional = table.Column<bool>(type: "INTEGER", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_SeasonResult", x => new { x.SeasonId, x.Row });
+                    table.ForeignKey(
+                        name: "FK_SeasonResult_SeasonPlayer_PlayerId",
+                        column: x => x.PlayerId,
+                        principalTable: "SeasonPlayer",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_SeasonResult_Season_SeasonId",
+                        column: x => x.SeasonId,
+                        principalTable: "Season",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "PendingManualEffect",
                 columns: table => new
                 {
@@ -376,6 +406,11 @@ namespace GameEvent.Infrastructure.Database.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "IX_SeasonResult_PlayerId",
+                table: "SeasonResult",
+                column: "PlayerId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_User_NormalizedLogin",
                 table: "User",
                 column: "NormalizedLogin",
@@ -408,6 +443,9 @@ namespace GameEvent.Infrastructure.Database.Migrations
 
             migrationBuilder.DropTable(
                 name: "Ruleset");
+
+            migrationBuilder.DropTable(
+                name: "SeasonResult");
 
             migrationBuilder.DropTable(
                 name: "User");

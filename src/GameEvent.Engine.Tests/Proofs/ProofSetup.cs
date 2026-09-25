@@ -65,14 +65,7 @@ internal static class ProofSetup
         s.Act(new RejectProof(runId, comment));
 
     /// <summary>Moves the season forward to <paramref name="status"/> through every status in between.</summary>
-    public static void MoveSeasonTo(Scenario s, SeasonStatus status)
-    {
-        for (var next = s.State.Status + 1; next <= status; next++)
-        {
-            s.Act(new ChangeSeasonStatus(next));
-            ScenarioAssert.Accepted(s);
-        }
-    }
+    public static void MoveSeasonTo(Scenario s, SeasonStatus status) => s.MoveStatusTo(status);
 
     /// <summary>Вася rolls, starts and drops a game; returns the dropped run.</summary>
     public static Guid DroppedRun(Scenario s, string player = "Вася")

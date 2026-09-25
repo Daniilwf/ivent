@@ -299,8 +299,16 @@ public class SliceInvariantTests
                 .Sum(e => e.Dice.Sum(d => d.Value) + e.ChallengeDice.Sum(d => d.Value));
             Assert.Equal(Math.Min(dice, MapLength), cellIndex);
 
-            // Slice: points equal the completion dice sum (no other point sources yet)
-            Assert.Equal(dice, player.Points);
+            // Slice: points come only from completions — each counted one gives its dice sum (a frozen first's give none,
+            // D-99) — and from finish bonuses (C9a, Q-4)
+            var changes = s.Log.OfType<PointsChanged>().Where(e => e.PlayerId == player.PlayerId).ToList();
+            Assert.All(changes, e => Assert.Contains(e.Reason, new[] { PointsReason.CompletionRoll, PointsReason.FinishBonus, PointsReason.FinishBonusRevoked }));
+            var counted = changes.Where(e => e.Reason == PointsReason.CompletionRoll).Select(e => e.RunId).ToHashSet();
+            var countedDice = s.Log.OfType<CompletionRolled>().Where(e => e.PlayerId == player.PlayerId && counted.Contains(e.RunId))
+                .Sum(e => e.Dice.Sum(d => d.Value) + e.ChallengeDice.Sum(d => d.Value));
+            var bonuses = changes.Where(e => e.Reason != PointsReason.CompletionRoll).Sum(e => e.Delta);
+            Assert.Equal(countedDice + bonuses, player.Points);
+            Assert.True(player.Finish?.Frozen == true || counted.Count == s.Log.OfType<CompletionRolled>().Count(e => e.PlayerId == player.PlayerId), "A completion gave no points to a player who is not frozen.");
 
             // W10 / Q-2 / D-96: coins equal their logged changes, and in the slice they come only from completions,
             // each by the formula from the run's roll-time snapshot and its counted hours
@@ -340,6 +348,10 @@ public class SliceInvariantTests
         // 5. A game completed in the season is never rolled afterwards; G3: a deleted game is never rolled
         // G8 / D-05: after «Уже проходил» the game never comes to that player again, not even as a miss
         var completedGames = new HashSet<Guid>();
+
+        // D-16 / D-99: a game the first finisher completed in free mode stays available to others, not to himself
+        var freeModeFor = new Dictionary<Guid, HashSet<Guid>>();
+        HashSet<Guid> FreeModeFor(Guid player) => freeModeFor.TryGetValue(player, out var set) ? set : [];
         var runs = new Dictionary<Guid, Guid>();
         var excludedFor = new Dictionary<Guid, HashSet<Guid>>();
         HashSet<Guid> ExcludedFor(Guid player) => excludedFor.TryGetValue(player, out var set) ? set : [];
@@ -359,6 +371,7 @@ public class SliceInvariantTests
                     Assert.DoesNotContain(rolled.GameId, ExcludedFor(rolled.PlayerId));
                     Assert.DoesNotContain(rolled.Misses, m => ExcludedFor(rolled.PlayerId).Contains(m.GameId));
                     Assert.DoesNotContain(rolled.GameId, completedGames);
+                    Assert.DoesNotContain(rolled.GameId, FreeModeFor(rolled.PlayerId));
                     Assert.NotEqual(s.GameId("Deleted Horror"), rolled.GameId);
                     Assert.All(rolled.Misses, m => Assert.NotEqual(rolled.GameId, m.GameId));
                     break;
@@ -372,6 +385,7 @@ public class SliceInvariantTests
                     Assert.All(offered, g =>
                     {
                         Assert.DoesNotContain(g, completedGames);
+                        Assert.DoesNotContain(g, FreeModeFor(choiceRolled.PlayerId));
                         Assert.NotEqual(s.GameId("Deleted Horror"), g);
                         Assert.DoesNotContain(g, choiceRolled.Misses.Select(m => m.GameId));
                     });
@@ -379,6 +393,14 @@ public class SliceInvariantTests
                 case RunStarted started:
                     Assert.DoesNotContain(started.GameId, ExcludedFor(started.PlayerId));
                     runs[started.RunId] = started.GameId;
+                    break;
+                case RunCompleted { FreeMode: true } freeMode:
+                    if (!freeModeFor.TryGetValue(freeMode.PlayerId, out var own))
+                    {
+                        freeModeFor[freeMode.PlayerId] = own = [];
+                    }
+
+                    own.Add(runs[freeMode.RunId]);
                     break;
                 case RunCompleted completed:
                     completedGames.Add(runs[completed.RunId]);

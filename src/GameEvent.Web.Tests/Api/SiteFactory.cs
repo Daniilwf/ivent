@@ -152,6 +152,9 @@ internal sealed class SiteFactory : WebApplicationFactory<Program>
         builder.UseEnvironment(_environment);
         builder.UseSetting("ConnectionStrings:Main", ConnectionString);
         builder.UseSetting("Frontend:DistPath", FrontendPath);
+
+        // The deadline scheduler's own loop would race the tests that move the clock; they call TickAsync themselves.
+        builder.UseSetting("Scheduler:Enabled", "false");
         builder.UseSetting("Security:LoginAttemptsPerMinute", _loginAttemptsPerMinute.ToString(System.Globalization.CultureInfo.InvariantCulture));
         builder.ConfigureServices(services =>
         {
