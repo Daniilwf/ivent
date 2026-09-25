@@ -17,6 +17,10 @@ public class DatabaseWriteTests
 
         // Development seed: accounts and pool have no commands yet (D8, E2); its season goes through the queue.
         "GameEvent.Web.Hosting.DevSeed",
+
+        // Season import into a local or test copy: a new season no command can reach yet, one transaction, kept only
+        // when the integrity check passes (D-105). Run by the tool, never by the site.
+        "GameEvent.Infrastructure.Seasons.SeasonTransfer",
     ];
 
     private static readonly string[] s_writeMethods =

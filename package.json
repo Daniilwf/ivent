@@ -26,8 +26,8 @@
     "seed:demo": "node scripts/todo.mjs seed:demo F2",
     "gen:api": "node scripts/gen-api.mjs",
     "import:xlsx": "node scripts/todo.mjs import:xlsx F1",
-    "season:export": "node scripts/todo.mjs season:export C12",
-    "season:import": "node scripts/todo.mjs season:import C12",
+    "season:export": "dotnet run --project src/GameEvent.Tools.Import -- season-export",
+    "season:import": "dotnet run --project src/GameEvent.Tools.Import -- season-import",
     "backup:verify": "node scripts/todo.mjs backup:verify J3",
     "deploy:staging": "node scripts/todo.mjs deploy:staging J2",
     "deploy:prod": "node scripts/todo.mjs deploy:prod J2"
