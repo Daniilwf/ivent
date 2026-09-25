@@ -1,5 +1,5 @@
 // Shared helpers for project scripts. Cross-platform: Windows (cmd shims) and Linux CI.
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { dirname, join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -23,6 +23,23 @@ export function run(command, args = [], options = {}) {
   if (options.capture)
     return { ok: result.status === 0, output: `${result.stdout}${result.stderr}` };
   return result.status === 0;
+}
+
+/** Like run() with capture, but without blocking: resolves to { ok, output } when the command exits. */
+export function runAsync(command, args = [], options = {}) {
+  return new Promise((resolve) => {
+    const child = spawn(command, args, {
+      cwd: options.cwd ?? root,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: { ...process.env, ...options.env },
+      shell: process.platform === 'win32',
+    });
+    let output = '';
+    child.stdout.setEncoding('utf8').on('data', (chunk) => (output += chunk));
+    child.stderr.setEncoding('utf8').on('data', (chunk) => (output += chunk));
+    child.on('error', (error) => resolve({ ok: false, output: `${output}${error.message}` }));
+    child.on('close', (code) => resolve({ ok: code === 0, output }));
+  });
 }
 
 /**

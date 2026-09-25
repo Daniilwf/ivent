@@ -13,6 +13,10 @@ updates:
     cooldown:
       default-days: 7
     open-pull-requests-limit: 3
+    # Verify 33+ fails the build until a sponsorship/licence property is declared — a customer decision (D-112)
+    ignore:
+      - dependency-name: 'Verify*'
+        versions: ['>= 33']
 
   - package-ecosystem: npm
     directories: [/, /web, /e2e]

@@ -10,10 +10,12 @@ using GameEvent.Infrastructure.Queue;
 using GameEvent.Web.Accounts;
 using GameEvent.Web.Tests.Queue;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 
 namespace GameEvent.Web.Tests.Api;
 
@@ -40,9 +42,30 @@ internal sealed class SiteFactory : WebApplicationFactory<Program>
         _environment = environment;
         FrontendPath = frontendPath ?? Path.Combine(_directory, "no-frontend");
         Directory.CreateDirectory(_directory);
-        ConnectionString = $"Data Source={Path.Combine(_directory, "site.db")};Pooling=False";
-        SqliteDatabase.MigrateAsync(ConnectionString).GetAwaiter().GetResult();
+        var file = Path.Combine(_directory, "site.db");
+        ConnectionString = $"Data Source={file};Pooling=False";
+
+        // Migrating costs about as much as a whole test: the schema is migrated once per test run and copied
+        File.Copy(s_template.Value, file);
     }
+
+    /// <summary>A database migrated once for the whole test run; every site starts from a copy of it.</summary>
+    private static readonly Lazy<string> s_template = new(() =>
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "game-event-tests", "template-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        var file = Path.Combine(directory, "site.db");
+        SqliteDatabase.MigrateAsync($"Data Source={file};Pooling=False").GetAwaiter().GetResult();
+        return file;
+    });
+
+    /// <summary>
+    /// One hash of <see cref="Password"/> for every seeded account, in the site's own format (PBKDF2, the iteration count
+    /// stored in the hash) but with few iterations: the production count is slow on purpose, and every sign-in of every
+    /// test would pay for it. The site verifies by the count in the hash, so sign-in runs the same code.
+    /// </summary>
+    private static readonly Lazy<string> s_passwordHash = new(() =>
+        new PasswordHasher<UserRecord>(Options.Create(new PasswordHasherOptions { IterationCount = 1000 })).HashPassword(null!, Password));
 
     public string ConnectionString { get; }
 
@@ -58,8 +81,6 @@ internal sealed class SiteFactory : WebApplicationFactory<Program>
     /// <summary>Accounts, pool and (unless <paramref name="withSeason"/> is false) the season. Call once.</summary>
     public async Task SeedAsync(bool withSeason = true)
     {
-        using var scope = Services.CreateScope();
-        var passwords = scope.ServiceProvider.GetRequiredService<Passwords>();
         await using (var db = NewDb())
         {
             foreach (var (login, role) in new[] { ("vasya", Role.Player), ("petya", Role.Player), ("masha", Role.Player), ("zritel", Role.Spectator), ("admin", Role.Admin) })
@@ -70,12 +91,11 @@ internal sealed class SiteFactory : WebApplicationFactory<Program>
                     Login = login,
                     NormalizedLogin = login,
                     Name = login,
-                    PasswordHash = "",
+                    PasswordHash = s_passwordHash.Value,
                     SecurityStamp = Guid.NewGuid().ToString("N"),
                     Role = role,
                     CreatedAt = Clock.UtcNow,
                 };
-                user.PasswordHash = passwords.Hash(user, Password);
                 db.Users.Add(user);
                 Users[login] = user.Id;
             }

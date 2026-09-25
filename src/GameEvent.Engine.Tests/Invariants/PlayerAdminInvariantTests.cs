@@ -13,6 +13,7 @@ using GameEvent.Engine.Scoring;
 using GameEvent.Engine.Seasons;
 using GameEvent.Engine.Tests.Support;
 using GameEvent.Engine.Turns;
+using GameEvent.Engine.Undo;
 
 namespace GameEvent.Engine.Tests.Invariants;
 
@@ -36,7 +37,7 @@ namespace GameEvent.Engine.Tests.Invariants;
 /// <see cref="ApproveProof"/> (with and without a proof, at a lower, the same or a higher difficulty) and
 /// <see cref="RejectProof"/>, and check the review queue (<see cref="ProofReviewOrder.Order"/>) after every command.
 /// </summary>
-public class PlayerAdminInvariantTests
+public partial class PlayerAdminInvariantTests
 {
     private const int MapLength = 25;
 
@@ -368,30 +369,34 @@ public class PlayerAdminInvariantTests
         bool withCorrections = false,
         bool withProofs = false,
         bool finishes = false,
-        bool lifecycle = false)
+        bool lifecycle = false,
+        bool withUndo = false,
+        bool withRulesetChanges = false)
     {
-        var s = NewSeason(seed, withChoice, rerolls, finishes);
-        foreach (var b in script)
+        // C13: a failure prints the (shrunk) game as builder code
+        return NewSeason(seed, withChoice, rerolls, finishes).Explained(s =>
         {
-            // With drops the clock runs: 0–21 hours before each command, so the 48-hour window both holds and closes
-            if (withDrops)
+            foreach (var b in script)
             {
-                s.Advance(TimeSpan.FromHours(3 * ((b / 8) % 8)));
+                // With drops the clock runs: 0–21 hours before each command, so the 48-hour window both holds and closes
+                if (withDrops)
+                {
+                    s.Advance(TimeSpan.FromHours(3 * ((b / 8) % 8)));
+                }
+
+                var before = s.State;
+                var logLength = s.Log.Count;
+                ICommand Base() => withDrops
+                    ? DropCommandFor(s, b, withChoice, rerolls != RerollMode.None)
+                    : CommandFor(s, b, withChoice, rerolls != RerollMode.None);
+                ICommand Other() => withProofs ? ProofCommandFor(s, b, Base) : Base();
+                ICommand Corrected() => withCorrections ? CorrectionCommandFor(s, b, Other) : Other();
+                ICommand Lived() => lifecycle ? LifecycleCommandFor(s, b, Corrected) : Corrected();
+                var command = withUndo || withRulesetChanges ? CombinedCommandFor(s, b, withUndo, withRulesetChanges, Lived) : Lived();
+                s.Act(command);
+                afterEach?.Invoke(s, command, before, logLength);
             }
-
-            var before = s.State;
-            var logLength = s.Log.Count;
-            ICommand Base() => withDrops
-                ? DropCommandFor(s, b, withChoice, rerolls != RerollMode.None)
-                : CommandFor(s, b, withChoice, rerolls != RerollMode.None);
-            ICommand Other() => withProofs ? ProofCommandFor(s, b, Base) : Base();
-            ICommand Corrected() => withCorrections ? CorrectionCommandFor(s, b, Other) : Other();
-            var command = lifecycle ? LifecycleCommandFor(s, b, Corrected) : Corrected();
-            s.Act(command);
-            afterEach?.Invoke(s, command, before, logLength);
-        }
-
-        return s;
+        });
     }
 
     /// <summary>
@@ -716,19 +721,21 @@ public class PlayerAdminInvariantTests
 
             // D-98 (2): ReachedFinish follows the run's latest move — it ended on the finish
             Assert.Equal(
-                s.Log.OfType<PlayerMoved>().LastOrDefault(m => m.RunId == run.RunId)?.To == finish,
+                s.EffectiveLog.OfType<PlayerMoved>().LastOrDefault(m => m.RunId == run.RunId)?.To == finish,
                 run.ReachedFinish);
 
             // D-98: Moved is the cells the run really entered (sign × path), not the steps rolled
-            Assert.Equal(MovedCells(s.Log, run.RunId), run.Moved);
+            Assert.Equal(MovedCells(s.EffectiveLog, run.RunId), run.Moved);
             Assert.True(run.Moved >= 0, $"The run moved {run.Moved} cells.");
 
             // A run's cells exceed its dice only when a later reduction could not take them back: absorbed by a finisher's
             // surplus (Q-3), ignored for a frozen first (D-99) — they stay after a later revoke — or blocked at the start
-            // after the admin transferred the token back (D-98 moves only through entered cells)
-            var detached = s.Log.Any(e =>
+            // after the token went back without them: the admin transferred it, or another cause (a drop's penalty, another
+            // run's reject or correction) moved it back — D-98 moves only through entered cells (C13 long run, D-111)
+            var detached = s.EffectiveLog.Any(e =>
                 (e is PlayerFinished f && f.PlayerId == run.PlayerId)
-                || (e is PlayerMoved { Reason: MoveReason.AdminAdjustment } m && m.PlayerId == run.PlayerId));
+                || (e is PlayerMoved { Reason: MoveReason.AdminAdjustment } m && m.PlayerId == run.PlayerId)
+                || (e is PlayerMoved { Steps: < 0 } back && back.PlayerId == run.PlayerId && back.RunId != run.RunId));
             Assert.True(
                 detached || run.Moved <= run.Dice.Concat(run.ChallengeDice).Sum(d => d.Value),
                 $"The run moved {run.Moved} cells for fewer dice.");
@@ -748,7 +755,7 @@ public class PlayerAdminInvariantTests
         CheckProofInvariants(s, command, before, logLengthBefore);
 
         IReadOnlyList<IGameEvent> events = s.Last.IsAccepted ? s.Last.Events : [];
-        var finishes = FoldFinishes(s.Log);
+        var finishes = FoldFinishes(s.EffectiveLog);
         var standing = s.State.Players.Values.Where(p => p.Finish is not null).OrderBy(p => p.Finish!.Order).ToList();
 
         // The state is the fold of the finish events; surplus never negative
@@ -761,8 +768,10 @@ public class PlayerAdminInvariantTests
             Assert.True(player.Finish is not null || finishes.Bonus.GetValueOrDefault(player.PlayerId) == 0, $"{player.Name} holds a bonus without a finish.");
         }
 
-        // Orders: each finish takes the next number, never reused
-        Assert.Equal(Enumerable.Range(1, finishes.Orders.Count), finishes.Orders);
+        // Orders: each finish takes the next number, never reused — not even the number of an undone finish (D-104)
+        var orders = s.Log.OfType<PlayerFinished>().Select(f => f.Order).ToList();
+        Assert.Equal(Enumerable.Range(1, orders.Count), orders);
+        Assert.All(finishes.Orders, order => Assert.Contains(order, orders));
 
         // The first is the lowest standing order; only he may be frozen
         var first = standing.FirstOrDefault();
@@ -798,7 +807,9 @@ public class PlayerAdminInvariantTests
                 $"{p.Name}'s finish stands on a {run.Status} run.");
         }
 
-        if (!s.Last.IsAccepted)
+        // The rest checks how a command's own events move finishes; an undo has none of those — it gives back what the
+        // undone command changed, which the folds above and CheckUndo compare with the log without it (invariant 13)
+        if (!s.Last.IsAccepted || command is UndoCommand)
         {
             return;
         }
@@ -1064,7 +1075,7 @@ public class PlayerAdminInvariantTests
         // 1. Replaying the log gives the stored state
         Assert.Equal(s.State, SeasonEngine.Replay(s.Log));
 
-        var expected = Fold(s.Log);
+        var expected = Fold(s.EffectiveLog);
         Assert.Equal(expected.Status, s.State.Status);
         Assert.Equal(expected.Players.Keys.Order(), s.State.Players.Keys.Order());
 
@@ -1095,7 +1106,7 @@ public class PlayerAdminInvariantTests
                     segment.Cells.Zip(segment.Cells.Skip(1)),
                     step => Assert.Contains(s.State.Map.Edges, e => e.From == step.First && e.To == step.Second));
             });
-            var transfers = s.Log.OfType<PlayerMoved>().Count(e => e.PlayerId == player.PlayerId && e.Steps == 0);
+            var transfers = s.EffectiveLog.OfType<PlayerMoved>().Count(e => e.PlayerId == player.PlayerId && e.Steps == 0);
             Assert.Equal(1 + transfers, player.Path.Segments.Count);
 
             // SE5. The flag is what the admin last set
@@ -1142,9 +1153,9 @@ public class PlayerAdminInvariantTests
         }
 
         // RR1 / D-93 / D-97: pending manual effects are exactly the created ones minus the resolved ones
-        var resolved = s.Log.OfType<ManualEffectResolved>().Select(e => e.EffectId).ToHashSet();
+        var resolved = s.EffectiveLog.OfType<ManualEffectResolved>().Select(e => e.EffectId).ToHashSet();
         Assert.Equal(
-            s.Log.OfType<ManualEffectCreated>()
+            s.EffectiveLog.OfType<ManualEffectCreated>()
                 .Where(e => !resolved.Contains(e.EffectId))
                 .Select(e => new PendingManualEffect(e.EffectId, e.PlayerId, e.DrawEvent, e.Source, e.RunId))
                 .OrderBy(e => e.EffectId),
@@ -1175,12 +1186,22 @@ public class PlayerAdminInvariantTests
         Assert.Equal(busy.Count, busy.Distinct().Count());
 
         // D-100: points changes are numbered by the fold of the log — every non-zero change the next number, each player
-        // keeps his last one
+        // keeps his last one. D-104: an undone command's numbers are never reused, and its players get their earlier
+        // numbers back — so the count runs over the whole log and a player keeps his last number of a command that counts
         var ticks = new Dictionary<Guid, long>();
         long changes = 0;
-        foreach (var e in s.Log.OfType<PointsChanged>().Where(e => e.Delta != 0))
+        var undone = s.UndoneCommands();
+        foreach (var logged in s.History)
         {
-            ticks[e.PlayerId] = ++changes;
+            var counts = Scenario.IsEffective(logged, undone);
+            foreach (var e in logged.Events.OfType<PointsChanged>().Where(e => e.Delta != 0))
+            {
+                ++changes;
+                if (counts)
+                {
+                    ticks[e.PlayerId] = changes;
+                }
+            }
         }
 
         Assert.Equal(changes, s.State.PointsChanges);
@@ -1200,10 +1221,10 @@ public class PlayerAdminInvariantTests
     /// </summary>
     private static List<RankingEntry> ReferenceEntries(Scenario s, Reference folded, Dictionary<Guid, long> ticks)
     {
-        var completed = s.Log.OfType<RunCompleted>().Select(e => (e.RunId, e.PlayerId)).ToHashSet();
-        completed.ExceptWith(s.Log.OfType<ProofRejected>().Select(e => (e.RunId, e.PlayerId)));
+        var completed = s.EffectiveLog.OfType<RunCompleted>().Select(e => (e.RunId, e.PlayerId)).ToHashSet();
+        completed.ExceptWith(s.EffectiveLog.OfType<ProofRejected>().Select(e => (e.RunId, e.PlayerId)));
         var runs = completed.GroupBy(r => r.PlayerId).ToDictionary(g => g.Key, g => g.Count());
-        var standing = FoldFinishes(s.Log).Standing;
+        var standing = FoldFinishes(s.EffectiveLog).Standing;
 
         return [.. folded.Players.Select(p => new RankingEntry(
             p.Key,
@@ -1686,7 +1707,7 @@ public class PlayerAdminInvariantTests
         // D-98 (1): forward by the difference; back only by the cells really moved beyond the new dice sum
         var after = s.State.Runs[run.RunId];
         var newSum = after.Dice.Concat(after.ChallengeDice).Sum(d => d.Value);
-        var movedBefore = MovedCells(s.Log.Take(s.Log.Count - s.Last.Events.Count), run.RunId);
+        var movedBefore = MovedCells(s.EffectiveLog.Take(s.EffectiveLog.Count - s.Last.Events.Count), run.RunId);
         var steps = diff switch
         {
             > 0 => diff,
@@ -1966,7 +1987,7 @@ public class PlayerAdminInvariantTests
         Assert.DoesNotContain(-1, positions);
         Assert.Equal(positions.Order(), positions);
 
-        var earlier = s.Log.Take(s.Log.Count - all.Count).ToList();
+        var earlier = s.EffectiveLog.Take(s.EffectiveLog.Count - all.Count).ToList();
         var points = keepsAll || (open && !events.OfType<PointsChanged>().Any())
             ? 0
             : earlier.OfType<PointsChanged>().Where(e => e.RunId == run.RunId && e.Reason is not (PointsReason.FinishBonus or PointsReason.FinishBonusRevoked)).Sum(e => e.Delta);
@@ -2033,7 +2054,15 @@ public class PlayerAdminInvariantTests
         Assert.Equal(was.Points - points + ownBonus, now.Points);
         Assert.Equal(was.Coins - coins, now.Coins);
         CheckOwnTurnAndOthers(s, before, player);
-        Assert.All(s.State.Runs.Values.Where(r => r.RunId != run.RunId), r => Assert.Equal(before.Runs[r.RunId], r));
+
+        // Nothing else changes in the other runs — but a revoke turns the owner's runs completed after the finish into
+        // ordinary ones (D-99: they did not move the token; C13 long run, D-111)
+        var revoked = all.OfType<PlayerFinishRevoked>().Any();
+        Assert.All(s.State.Runs.Values.Where(r => r.RunId != run.RunId), r =>
+        {
+            var was = before.Runs[r.RunId];
+            Assert.Equal(revoked && r.PlayerId == player ? was with { AfterFinish = false } : was, r);
+        });
     }
 
     /// <summary>RR1 / D-93: «not enough coins» only when the free rerolls and coupons are used up and the coins fall short.</summary>
@@ -2271,6 +2300,11 @@ public class PlayerAdminInvariantTests
         // D-16: runs the first finisher completes do not count for the race — their games stay available
         var finishOrders = new Dictionary<Guid, int>();
         var outOfRace = new HashSet<Guid>();
+
+        // D-16 / D-99: a game the first completed in free mode is completed for him only (until a reject), so his own roll
+        // meets it as «уже прошёл» (C13 long run)
+        var ownFree = new Dictionary<Guid, HashSet<Guid>>();
+        HashSet<Guid> OwnFree(Guid player) => ownFree.TryGetValue(player, out var set) ? set : ownFree[player] = [];
         foreach (var e in log)
         {
             switch (e)
@@ -2294,8 +2328,9 @@ public class PlayerAdminInvariantTests
                     // G7 / D-15: «уже прошёл» only for a game completed and not rejected; such a game is never offered
                     Assert.All(
                         rolled.Misses.Where(m => m.Reason == RollMissReason.CompletedInSeason),
-                        m => Assert.Contains(m.GameId, completedGames));
+                        m => Assert.True(completedGames.Contains(m.GameId) || OwnFree(rolled.PlayerId).Contains(m.GameId), $"«Уже прошёл» for {m.GameId}, not completed."));
                     Assert.DoesNotContain(rolled.GameId, completedGames);
+                    Assert.DoesNotContain(rolled.GameId, OwnFree(rolled.PlayerId));
                     break;
                 case GameChoiceRolled choiceRolled:
                     Assert.Equal(SeasonStatus.Active, status);
@@ -2303,8 +2338,8 @@ public class PlayerAdminInvariantTests
                     Assert.DoesNotContain(choiceRolled.Misses, m => players[choiceRolled.PlayerId].Exclusions.ContainsKey(m.GameId));
                     Assert.All(
                         choiceRolled.Misses.Where(m => m.Reason == RollMissReason.CompletedInSeason),
-                        m => Assert.Contains(m.GameId, completedGames));
-                    Assert.DoesNotContain(choiceRolled.Offers, o => completedGames.Contains(o.GameId));
+                        m => Assert.True(completedGames.Contains(m.GameId) || OwnFree(choiceRolled.PlayerId).Contains(m.GameId), $"«Уже прошёл» for {m.GameId}, not completed."));
+                    Assert.DoesNotContain(choiceRolled.Offers, o => completedGames.Contains(o.GameId) || OwnFree(choiceRolled.PlayerId).Contains(o.GameId));
                     break;
                 case RunStarted started:
                     Assert.Equal(SeasonStatus.Active, status);
@@ -2317,6 +2352,7 @@ public class PlayerAdminInvariantTests
                     if (byFirst)
                     {
                         outOfRace.Add(completedRun.RunId);
+                        OwnFree(completedRun.PlayerId).Add(runs[completedRun.RunId].Game);
                     }
                     else
                     {
@@ -2357,7 +2393,7 @@ public class PlayerAdminInvariantTests
                     Assert.False(string.IsNullOrWhiteSpace(rejectedProof.Comment), "A reject without a comment.");
                     proofs[rejectedProof.RunId] = ProofStatus.Rejected;
                     Assert.True(
-                        outOfRace.Contains(rejectedProof.RunId) || completedGames.Remove(runs[rejectedProof.RunId].Game),
+                        (outOfRace.Contains(rejectedProof.RunId) && OwnFree(rejectedProof.PlayerId).Remove(runs[rejectedProof.RunId].Game)) || completedGames.Remove(runs[rejectedProof.RunId].Game),
                         "A rejected game was not completed.");
                     break;
                 case GameRerolled or ChoiceMade or CompletionRolled or RunDropped or RunTechRerolled:

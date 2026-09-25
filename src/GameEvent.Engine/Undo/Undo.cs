@@ -240,7 +240,7 @@ internal static class Undoing
                 keys.Add(FinishKey);
             }
 
-            foreach (var (kind, id) in GameIds.Of(e))
+            foreach (var (kind, id) in GameIds.Of(e).Concat(GameIds.Own(e)))
             {
                 keys.Add($"{kind}:{id}");
             }
@@ -296,6 +296,32 @@ internal static class GameIds
         var found = new List<(string, Guid)>();
         Collect(value, found, depth: 0);
         return found;
+    }
+
+    private static readonly ConcurrentDictionary<Type, (string Kind, PropertyInfo Property)[]> s_own = new();
+
+    /// <summary>
+    /// The player, run and manual effect an event itself is about (its own <c>PlayerId</c>, <c>RunId</c>, <c>EffectId</c>).
+    /// A command touches them even when the state comes out the same — a proof sent again: its event still stands in the
+    /// log, so an earlier command on that run cannot be undone past it (C13, BUGS.md C13-1).
+    /// </summary>
+    public static IEnumerable<(string Kind, Guid Id)> Own(object value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        var properties = s_own.GetOrAdd(value.GetType(), t =>
+        [
+            .. new[] { ("player", "PlayerId"), ("run", "RunId"), ("effect", "EffectId") }
+                .Select(x => (x.Item1, Property: t.GetProperty(x.Item2, BindingFlags.Public | BindingFlags.Instance)))
+                .Where(x => x.Property is not null && (x.Property.PropertyType == typeof(Guid) || x.Property.PropertyType == typeof(Guid?)))
+                .Select(x => (x.Item1, x.Property!)),
+        ]);
+        foreach (var (kind, property) in properties)
+        {
+            if (property.GetValue(value) is Guid id)
+            {
+                yield return (kind, id);
+            }
+        }
     }
 
     private static void Collect(object? value, List<(string, Guid)> found, int depth)

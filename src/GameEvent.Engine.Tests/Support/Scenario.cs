@@ -6,6 +6,7 @@ using GameEvent.Engine.Rolls;
 using GameEvent.Engine.Rulesets;
 using GameEvent.Engine.Runs;
 using GameEvent.Engine.Seasons;
+using GameEvent.Engine.Undo;
 
 namespace GameEvent.Engine.Tests.Support;
 
@@ -18,6 +19,7 @@ namespace GameEvent.Engine.Tests.Support;
 /// s.Roll("Вася").Start("Вася").NextRandom(3, 4, 1, 2).Complete("Вася", Difficulty.Normal);
 /// </code>
 /// Setup steps throw if the engine rejects them; game actions record the result in <see cref="Last"/>.
+/// Every builder call is also kept as C# (<see cref="ToCode"/>), so a failing random game prints as a scenario (C13).
 /// </summary>
 public sealed class Scenario
 {
@@ -30,6 +32,7 @@ public sealed class Scenario
     private readonly List<Category> _categories = [];
     private readonly Dictionary<string, Guid> _players = [];
     private readonly List<IGameEvent> _log = [];
+    private readonly List<LoggedCommand> _history = [];
     private Ruleset _initialRuleset;
     private bool _startSeason = true;
     private bool _expectRejection;
@@ -38,6 +41,12 @@ public sealed class Scenario
     {
         _initialRuleset = ruleset;
         Random = new ScriptedRandom(seed);
+        _code.Add(() => $"var s = Scenario.New(seed: {seed});");
+        var pinned = TestRuleset.Create();
+        if (ruleset != pinned)
+        {
+            _code.Add(() => $"s.WithRuleset(r => {ScenarioCode.With("r", pinned, ruleset, CodeName)});");
+        }
     }
 
     /// <summary>The rules in force: the season's once it exists, the ones it will be created with before that.</summary>
@@ -69,27 +78,36 @@ public sealed class Scenario
     /// </summary>
     public Scenario WithRuleset(Func<Ruleset, Ruleset> change)
     {
+        ArgumentNullException.ThrowIfNull(change);
+        var before = Ruleset;
+        var after = change(before);
+        using var _ = Recording(() => before == after ? null : $"s.WithRuleset(r => {ScenarioCode.With("r", before, after, CodeName)});");
         if (!State.IsCreated)
         {
-            _initialRuleset = change(_initialRuleset);
+            _initialRuleset = after;
             return this;
         }
 
-        Setup(new ChangeRuleset(change(Ruleset)));
+        Setup(new ChangeRuleset(after));
         return this;
     }
 
-    public Scenario WithMapLength(int length) =>
-        WithRuleset(r => r with { Map = r.Map with { LinearLength = length } });
+    public Scenario WithMapLength(int length)
+    {
+        using var _ = Recording(() => $"s.WithMapLength({length});");
+        return WithRuleset(r => r with { Map = r.Map with { LinearLength = length } });
+    }
 
     public Scenario WithCategory(string name, int weight = 1)
     {
+        using var _ = Recording(() => $"s.WithCategory({ScenarioCode.Literal(name)}, weight: {weight});");
         _categories.Add(new Category(name, weight));
         return this;
     }
 
     public Scenario WithGame(string title, decimal? hours, params string[] tags)
     {
+        using var _ = Recording(() => $"s.WithGame({GameCode(title, hours, tags)});");
         _games.Add(new Game(SequentialIds.Make(GameIdPrefix, _games.Count + 1), title, [.. tags], hours));
         return this;
     }
@@ -97,6 +115,7 @@ public sealed class Scenario
     /// <summary>A soft-deleted game: it stays in the pool view but must never be rolled.</summary>
     public Scenario WithDeletedGame(string title, decimal? hours, params string[] tags)
     {
+        using var _ = Recording(() => $"s.WithDeletedGame({GameCode(title, hours, tags)});");
         _games.Add(new Game(SequentialIds.Make(GameIdPrefix, _games.Count + 1), title, [.. tags], hours, IsDeleted: true));
         return this;
     }
@@ -104,6 +123,7 @@ public sealed class Scenario
     /// <summary>The admin corrects the hours of a game in the pool (outside the season log).</summary>
     public Scenario ChangePoolHours(string title, decimal? hours)
     {
+        using var _ = Recording(() => $"s.ChangePoolHours({ScenarioCode.Literal(title)}, {ScenarioCode.Value(hours, CodeName)});");
         var index = _games.FindIndex(g => g.Title == title);
         if (index < 0)
         {
@@ -117,6 +137,7 @@ public sealed class Scenario
     /// <summary>The admin soft-deletes a game from the pool (outside the season log).</summary>
     public Scenario DeleteGame(string title)
     {
+        using var _ = Recording(() => $"s.DeleteGame({ScenarioCode.Literal(title)});");
         var index = _games.FindIndex(g => g.Title == title);
         if (index < 0)
         {
@@ -137,6 +158,7 @@ public sealed class Scenario
     /// <summary>The season stays a draft after creation (for lifecycle tests).</summary>
     public Scenario AsDraft()
     {
+        using var _ = Recording(() => "s.AsDraft();");
         _startSeason = false;
         return this;
     }
@@ -144,6 +166,8 @@ public sealed class Scenario
     /// <summary>Creates the season if needed (see <see cref="AsDraft"/>) and adds players by name.</summary>
     public Scenario WithPlayers(params string[] names)
     {
+        ArgumentNullException.ThrowIfNull(names);
+        using var _ = Recording(() => $"s.WithPlayers({string.Join(", ", names.Select(ScenarioCode.Literal))});");
         EnsureSeason();
         foreach (var name in names)
         {
@@ -158,6 +182,8 @@ public sealed class Scenario
     /// <summary>Values the random source returns next, e.g. dice faces.</summary>
     public Scenario NextRandom(params int[] values)
     {
+        ArgumentNullException.ThrowIfNull(values);
+        using var _ = Recording(() => $"s.NextRandom({string.Join(", ", values)});");
         Random.Enqueue(values);
         return this;
     }
@@ -236,8 +262,11 @@ public sealed class Scenario
     /// <summary>Appends events straight to the log, as if an earlier command had written them, and replays the state.</summary>
     public Scenario AppendCraftedEvents(params IGameEvent[] events)
     {
+        ArgumentNullException.ThrowIfNull(events);
+        using var _ = Recording(() => $"s.AppendCraftedEvents({string.Join(", ", events.Select(e => ScenarioCode.Value(e, CodeName)))});");
         _log.AddRange(events);
-        _history.Add(new Engine.Undo.LoggedCommand(SequentialIds.Make(0x7E000000, _history.Count), [.. events]));
+        _history.Add(new LoggedCommand(SequentialIds.Make(0x7E000000, _history.Count), [.. events]));
+        _commands.Add(null);
         State = SeasonEngine.Replay(_log);
         return this;
     }
@@ -245,25 +274,71 @@ public sealed class Scenario
     /// <summary>Executes any command and records the result; never throws on rejection.</summary>
     public Scenario Act(ICommand command)
     {
+        // A ruleset change prints as a with expression on the rules in force when it ran
+        var rules = Ruleset;
+        using var _ = Recording(() => $"s.Act({CommandCode(command, rules)});");
         Last = SeasonEngine.Execute(State, command, Context());
         if (Last.IsAccepted)
         {
             _log.AddRange(Last.Events);
             State = Last.State;
             LastCommandId = SequentialIds.Make(0x7C000000, _history.Count);
-            _history.Add(new Engine.Undo.LoggedCommand(LastCommandId, [.. Last.Events]));
+            _history.Add(new LoggedCommand(LastCommandId, [.. Last.Events]));
+            _commands.Add(command);
         }
 
         return this;
     }
 
-    private readonly List<Engine.Undo.LoggedCommand> _history = [];
-
     /// <summary>The id the last accepted command was logged under (D-104: an undo names it).</summary>
     public Guid LastCommandId { get; private set; }
 
     /// <summary>The season's log by command, as the queue gives it to an undo.</summary>
-    public IReadOnlyList<Engine.Undo.LoggedCommand> History => _history;
+    public IReadOnlyList<LoggedCommand> History => _history;
+
+    /// <summary>The accepted command behind each entry of <see cref="History"/> (null for crafted events).</summary>
+    public IReadOnlyList<ICommand?> Commands => _commands;
+
+    private readonly List<ICommand?> _commands = [];
+
+    /// <summary>
+    /// The log as the rules see it (D-104, invariant 13): the events of the commands that are not undone, without the
+    /// undos themselves. The same list as <see cref="Log"/> while nothing was undone.
+    /// </summary>
+    public IReadOnlyList<IGameEvent> EffectiveLog
+    {
+        get
+        {
+            if (!_log.Any(e => e is CommandUndone))
+            {
+                return _log;
+            }
+
+            if (_effective is { } cached && cached.Commands == _history.Count)
+            {
+                return cached.Log;
+            }
+
+            var undone = UndoneCommands();
+            List<IGameEvent> log = [.. _history.Where(c => IsEffective(c, undone)).SelectMany(c => c.Events)];
+            _effective = (_history.Count, log);
+            return log;
+        }
+    }
+
+    private (int Commands, List<IGameEvent> Log)? _effective;
+
+    /// <summary>The ids of the commands undone so far.</summary>
+    public HashSet<Guid> UndoneCommands() =>
+        [.. _history.SelectMany(c => c.Events.OfType<CommandUndone>()).Select(u => u.CommandId)];
+
+    /// <summary>Whether a logged command counts: it is not undone (by <paramref name="undone"/>) and is not an undo itself.</summary>
+    public static bool IsEffective(LoggedCommand command, IReadOnlySet<Guid> undone)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(undone);
+        return !undone.Contains(command.CommandId) && !command.Events.Any(e => e is CommandUndone);
+    }
 
     public Guid PlayerId(string name) =>
         _players.TryGetValue(name, out var id) ? id : throw new KeyNotFoundException($"No player '{name}' in the scenario.");
@@ -273,11 +348,11 @@ public sealed class Scenario
 
     public SeasonPlayer Player(string name) => State.Players[PlayerId(name)];
 
-    /// <summary>Name of the player with the given id.</summary>
-    public string PlayerName(Guid id) => _players.Single(p => p.Value == id).Key;
+    /// <summary>Name of the player with the given id (the id itself for a player the builder did not add).</summary>
+    public string PlayerName(Guid id) => _players.FirstOrDefault(p => p.Value == id).Key ?? id.ToString();
 
-    /// <summary>Title of the game with the given id.</summary>
-    public string GameTitle(Guid id) => _games.Single(g => g.Id == id).Title;
+    /// <summary>Title of the game with the given id (the id itself for a game not in the pool).</summary>
+    public string GameTitle(Guid id) => _games.FirstOrDefault(g => g.Id == id)?.Title ?? id.ToString();
 
     /// <summary>Events of the last command of the given type.</summary>
     public IEnumerable<T> LastEvents<T>() where T : IGameEvent => Last.Events.OfType<T>();
@@ -290,9 +365,78 @@ public sealed class Scenario
     /// <summary>Test trigger handlers that react to every later command (D-24: stage 1 checks the chain limits with them).</summary>
     public Scenario WithTriggers(params Engine.Effects.ITriggerHandler[] handlers)
     {
+        ArgumentNullException.ThrowIfNull(handlers);
+        using var _ = Recording(() => $"s.WithTriggers(/* {string.Join(", ", handlers.Select(h => h.GetType().Name))} */);");
         _triggers = handlers;
         return this;
     }
+
+    // ---- The scenario as builder code (C13): a failing random game prints as the calls that replay it ----
+
+    private readonly List<Func<string?>> _code = [];
+    private int _codeDepth;
+    private DateTimeOffset _codeTime = FixedClock.SeasonStart;
+
+    /// <summary>The builder calls made so far as C# statements, clock moves included; ids by name where the scenario knows them.</summary>
+    public string ToCode() => string.Join(Environment.NewLine, _code.Select(line => line()).OfType<string>());
+
+    /// <summary>
+    /// Runs <paramref name="play"/>; a failure is rethrown with <see cref="ToCode"/> of the scenario so far. Under FsCheck the
+    /// shrunk game is the one reported, so the message is the minimal failing scenario as builder code.
+    /// </summary>
+    public Scenario Explained(Action<Scenario> play)
+    {
+        ArgumentNullException.ThrowIfNull(play);
+        try
+        {
+            play(this);
+        }
+        catch (Exception e) when (e is not ScenarioFailedException)
+        {
+            throw new ScenarioFailedException(ToCode(), e);
+        }
+
+        return this;
+    }
+
+    /// <summary>Records <paramref name="line"/> (null: nothing to print) unless an outer builder call records itself (nested calls are part of it).</summary>
+    private CodeScope Recording(Func<string?> line)
+    {
+        if (_codeDepth == 0)
+        {
+            // The clock is moved directly as well (s.Clock.Advance): every recorded call carries the time it ran at
+            if (Clock.UtcNow != _codeTime)
+            {
+                var by = Clock.UtcNow - _codeTime;
+                _code.Add(() => $"s.Advance({ScenarioCode.Span(by)});");
+                _codeTime = Clock.UtcNow;
+            }
+
+            _code.Add(line);
+        }
+
+        _codeDepth++;
+        return new CodeScope(this);
+    }
+
+    private readonly struct CodeScope(Scenario scenario) : IDisposable
+    {
+        public void Dispose() => scenario._codeDepth--;
+    }
+
+    private string? CodeName(Guid id) =>
+        _players.FirstOrDefault(p => p.Value == id).Key is { } player ? $"s.PlayerId({ScenarioCode.Literal(player)})"
+        : _games.FirstOrDefault(g => g.Id == id) is { } game ? $"s.GameId({ScenarioCode.Literal(game.Title)})"
+        : State.Runs.TryGetValue(id, out var run) ? $"Guid.Parse(\"{id}\") /* run: {PlayerName(run.PlayerId)}, {GameTitle(run.GameId)} */"
+        : null;
+
+    private string CommandCode(ICommand command, Ruleset rules) =>
+        command is ChangeRuleset change
+            ? $"new ChangeRuleset({ScenarioCode.With("s.Ruleset", rules, change.Ruleset, CodeName)}{(change.ExpectedVersion is { } version ? $", {version}" : "")})"
+            : ScenarioCode.Value(command, CodeName);
+
+    private static string GameCode(string title, decimal? hours, string[] tags) =>
+        string.Join(", ", [ScenarioCode.Literal(title), ScenarioCode.Value(hours, _ => null), .. tags.Select(ScenarioCode.Literal)]);
 
     private Scenario Play(ICommand command)
     {
@@ -330,4 +474,12 @@ public sealed class Scenario
             throw new InvalidOperationException($"Scenario setup {command} was rejected: {Last.Rejection}");
         }
     }
+}
+
+/// <summary>A scenario failed; the message starts with the scenario as builder code (C13), then the original failure.</summary>
+public sealed class ScenarioFailedException(string code, Exception inner)
+    : Xunit.Sdk.XunitException(
+        $"The failing scenario as builder code:{Environment.NewLine}{code}{Environment.NewLine}{Environment.NewLine}{inner.Message}", inner)
+{
+    public string Code { get; } = code;
 }
