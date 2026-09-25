@@ -11,6 +11,7 @@ public enum PointsReason
     AdminAdjustment,
     DropPenalty,
     RunCorrection,
+    ProofRejected,
 }
 
 /// <summary>What changed a player's coins. Coins always equal the sum of deltas in non-undone events.</summary>
@@ -21,6 +22,7 @@ public enum CoinsReason
     Reroll,
     CompletionReward,
     RunCorrection,
+    ProofRejected,
 }
 
 /// <summary>What changed another resource of a player.</summary>

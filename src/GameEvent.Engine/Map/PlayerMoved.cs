@@ -10,6 +10,7 @@ public enum MoveReason
     AdminAdjustment,
     DropPenalty,
     RunCorrection,
+    ProofRejected,
 }
 
 /// <summary>

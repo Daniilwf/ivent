@@ -144,6 +144,25 @@ internal static class SeasonProjection
             record.DiceJson = JsonSerializer.Serialize(run.Dice, EngineJson.Options);
             record.ChallengeDiceJson = JsonSerializer.Serialize(run.ChallengeDice, EngineJson.Options);
             record.HoursSource = run.HoursSource;
+            record.CompletedAt = run.CompletedAt;
+            record.ReachedFinish = run.ReachedFinish;
+
+            if (run.Proof is { } proof && proof != before.Runs.GetValueOrDefault(id)?.Proof)
+            {
+                var proofRow = await db.Proofs.FindAsync([id], ct);
+                if (proofRow is null)
+                {
+                    proofRow = new ProofRecord { RunId = id, SeasonId = after.SeasonId, PlayerId = run.PlayerId, LinksJson = "[]" };
+                    db.Proofs.Add(proofRow);
+                }
+
+                proofRow.Status = proof.Status;
+                proofRow.LinksJson = JsonSerializer.Serialize(proof.Links, EngineJson.Options);
+                proofRow.Note = proof.Note;
+                proofRow.WitnessId = proof.WitnessId;
+                proofRow.SubmittedAt = proof.SubmittedAt;
+                proofRow.Comment = proof.Comment;
+            }
 
             var oldRun = before.Runs.GetValueOrDefault(id);
             if (run.Review is { } review && review != oldRun?.Review)
@@ -201,6 +220,7 @@ internal static class SeasonProjection
         var runs = await db.Runs.AsNoTracking().Where(r => r.SeasonId == replayed.SeasonId).ToListAsync(ct);
         var effects = await db.ManualEffects.AsNoTracking().Where(x => x.SeasonId == replayed.SeasonId).ToListAsync(ct);
         var reviews = await db.Reviews.AsNoTracking().Where(x => x.SeasonId == replayed.SeasonId).ToDictionaryAsync(x => x.RunId, ct);
+        var proofs = await db.Proofs.AsNoTracking().Where(x => x.SeasonId == replayed.SeasonId).ToDictionaryAsync(x => x.RunId, ct);
         var playerIds = players.Select(p => p.Id).ToList();
         var exclusions = (await db.Exclusions.AsNoTracking().Where(x => playerIds.Contains(x.PlayerId)).ToListAsync(ct))
             .ToLookup(x => x.PlayerId);
@@ -232,7 +252,18 @@ internal static class SeasonProjection
                     JsonSerializer.Deserialize<EquatableArray<Die>>(r.DiceJson, EngineJson.Options),
                     JsonSerializer.Deserialize<EquatableArray<Die>>(r.ChallengeDiceJson, EngineJson.Options),
                     r.HoursSource,
-                    reviews.TryGetValue(r.Id, out var review) ? new RunReview(review.Rating, review.Text) : null)),
+                    reviews.TryGetValue(r.Id, out var review) ? new RunReview(review.Rating, review.Text) : null,
+                    r.CompletedAt,
+                    r.ReachedFinish,
+                    proofs.TryGetValue(r.Id, out var proof)
+                        ? new Engine.Proofs.ProofState(
+                            proof.Status,
+                            JsonSerializer.Deserialize<EquatableArray<string>>(proof.LinksJson, EngineJson.Options),
+                            proof.Note,
+                            proof.WitnessId,
+                            proof.SubmittedAt,
+                            proof.Comment)
+                        : null)),
             ManualEffects = effects.ToImmutableSortedDictionary(
                 x => x.Id,
                 x => new PendingManualEffect(x.Id, x.PlayerId, x.DrawEvent, x.Source, x.RunId)),

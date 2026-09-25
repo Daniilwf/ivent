@@ -9,6 +9,9 @@ public enum RunStatus
     Completed,
     Dropped,
     TechRerolled,
+
+    /// <summary>Completed, then rejected by the admin: the game counts as not completed again (D-15).</summary>
+    Rejected,
 }
 
 public enum Difficulty
@@ -40,7 +43,10 @@ public sealed record RunSnapshot(
 /// <summary>A review of a completed run (SPEC «Отзыв»): a rating 1–10 and an optional text.</summary>
 public sealed record RunReview(int Rating, string? Text);
 
-/// <summary>An attempt to complete one rolled game.</summary>
+/// <summary>
+/// An attempt to complete one rolled game. <see cref="CompletedAt"/> orders the proof queue; <see cref="ReachedFinish"/>
+/// says a move of this run brought its player to the finish (SPEC: such proofs go on top).
+/// </summary>
 public sealed record RunState(
     Guid RunId,
     Guid PlayerId,
@@ -54,4 +60,7 @@ public sealed record RunState(
     EquatableArray<Die> Dice,
     EquatableArray<Die> ChallengeDice = default,
     string? HoursSource = null,
-    RunReview? Review = null);
+    RunReview? Review = null,
+    DateTimeOffset? CompletedAt = null,
+    bool ReachedFinish = false,
+    Proofs.ProofState? Proof = null);

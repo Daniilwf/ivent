@@ -102,6 +102,11 @@ public static class Movement
     internal static SeasonState Apply(SeasonState state, PlayerMoved e)
     {
         var player = state.Players[e.PlayerId];
-        return state with { Players = state.Players.SetItem(e.PlayerId, player with { CellId = e.To, Path = player.Path.After(e) }) };
+        state = state with { Players = state.Players.SetItem(e.PlayerId, player with { CellId = e.To, Path = player.Path.After(e) }) };
+
+        // A run whose move lands on the finish is marked: its proof goes on top of the queue (SPEC «Уточнения»).
+        return e.RunId is { } runId && e.Steps > 0 && state.Map.CellById(e.To).Type == CellType.Finish
+            ? state with { Runs = state.Runs.SetItem(runId, state.Runs[runId] with { ReachedFinish = true }) }
+            : state;
     }
 }

@@ -189,7 +189,14 @@ internal static class RunLifecycle
 
     public static SeasonState Apply(SeasonState state, RunCompleted e)
     {
-        var run = state.Runs[e.RunId] with { Status = RunStatus.Completed, Difficulty = e.Difficulty, Hours = e.Hours, HoursSource = e.HoursSource };
+        var run = state.Runs[e.RunId] with
+        {
+            Status = RunStatus.Completed,
+            Difficulty = e.Difficulty,
+            Hours = e.Hours,
+            HoursSource = e.HoursSource,
+            CompletedAt = e.CompletedAt,
+        };
         var player = state.Players[e.PlayerId] with { Phase = TurnPhase.Idle, ActiveRunId = null };
         return state with { Runs = state.Runs.SetItem(e.RunId, run), Players = state.Players.SetItem(e.PlayerId, player) };
     }
