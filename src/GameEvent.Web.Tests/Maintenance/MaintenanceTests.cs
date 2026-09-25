@@ -73,15 +73,32 @@ public sealed class MaintenanceTests : IAsyncLifetime
     [InlineData("POST", "/api/bug-reports")]
     [InlineData("POST", "/api/files")]
     [InlineData("DELETE", "/api/anything")]
+    [InlineData("PATCH", "/api/anything")]
+    [InlineData("POST", "/API/SEASONS/30000000-0000-0000-0000-0000000000AA/ROLL/")]
+    [InlineData("POST", "/api/auth/password")]
+    [InlineData("POST", "/api/admin/maintenance/../../seasons/30000000-0000-0000-0000-0000000000aa/roll")]
     public async Task Every_kind_of_write_is_refused(string method, string url)
     {
-        var admin = await _site.SignedInAsync("admin");
+        // A player: every one of these is open to them, so only maintenance can refuse it
+        var vasya = await _site.SignedInAsync("vasya");
         Mode.TurnOn();
 
         using var request = new HttpRequestMessage(new HttpMethod(method), url) { Content = JsonContent.Create(new { commandId = Guid.NewGuid() }) };
-        var answer = await admin.SendAsync(request, Ct);
+        var answer = await vasya.SendAsync(request, Ct);
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, answer.StatusCode);
+    }
+
+    [Fact]
+    public async Task A_user_with_a_temporary_password_sees_the_maintenance_too()
+    {
+        var reset = await _site.Services.GetRequiredService<CommandBus>()
+            .SendAsync(new CommandEnvelope(Guid.NewGuid(), Guid.Empty, new Infrastructure.Accounts.ResetPassword(_site.Users["petya"]), _site.Users["admin"]), Ct);
+        var petya = await _site.AnonymousAsync();
+        (await petya.PostAsJsonAsync("/api/auth/login", new { login = "petya", password = reset.Secret }, Ct)).EnsureSuccessStatusCode();
+        Mode.TurnOn();
+
+        Assert.True(await MaintenanceAsync(petya));
     }
 
     [Fact]

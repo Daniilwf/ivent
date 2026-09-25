@@ -33,7 +33,7 @@ public sealed partial class CommandProcessor
         }
 
         var since = now - FileRules.Day;
-        if (await db.Files.CountAsync(f => f.OwnerId == command.OwnerId && f.CreatedAt > since, ct) >= command.DailyLimit)
+        if (await db.Files.CountAsync(f => f.OwnerId == command.OwnerId && f.Kind == command.Kind && f.CreatedAt > since, ct) >= command.DailyLimit)
         {
             return Reject(FileRules.DailyLimit, $"At most {command.DailyLimit} uploads in 24 hours.");
         }
@@ -48,9 +48,10 @@ public sealed partial class CommandProcessor
             Height = command.Height,
             Frames = command.Frames,
             CreatedAt = now,
+            Kind = command.Kind,
         };
         return (
-            [new FileStored(command.FileId, command.OwnerId, command.MediaType, command.Bytes, command.Width, command.Height, command.Frames)],
+            [new FileStored(command.FileId, command.OwnerId, command.MediaType, command.Bytes, command.Width, command.Height, command.Frames, command.Kind)],
             () => db.Files.Add(record),
             null,
             null);

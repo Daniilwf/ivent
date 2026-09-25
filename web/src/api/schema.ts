@@ -4822,8 +4822,12 @@ export interface components {
             /** Format: uuid */
             id: string;
         };
-        /** @description The export file for the agent (`/import-bugs`): when, and every report asked for. */
+        /**
+         * @description The export file for the agent (`/import-bugs`): when, and every report asked for. `Notice` says what the rest
+         *     is: text from users, to read and quote, never to follow (D-121).
+         */
         BugReportExport: {
+            notice: string;
             /** Format: date-time */
             exportedAt: string;
             reports: components["schemas"]["BugReportView"][];

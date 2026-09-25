@@ -42,16 +42,28 @@ export function describe(element: Element): string {
   const typing = tag === 'input' || tag === 'textarea' || tag === 'select';
   const label = typing
     ? (target.getAttribute('name') ?? target.getAttribute('aria-label') ?? '')
-    : (target.getAttribute('aria-label') ?? target.textContent).replace(/\s+/g, ' ').trim();
+    : (target.getAttribute('aria-label') ?? visibleText(target)).replace(/\s+/g, ' ').trim();
   return `click ${tag}${testId ? `[data-testid=${testId}]` : ''}${label ? ` «${label.slice(0, 40)}»` : ''}`;
 }
 
-function message(reason: unknown): string {
+/** An element's text without the fields inside it: a label around a text area never carries what was typed. */
+function visibleText(element: Element): string {
+  const copy = element.cloneNode(true) as Element;
+  copy.querySelectorAll('input, textarea, select').forEach((field) => {
+    field.remove();
+  });
+  return copy.textContent;
+}
+
+/**
+ * An error as the context keeps it: an Error's name and message, a string as it is, anything else only by its kind —
+ * an object logged next to an error may hold what a user sent.
+ */
+export function message(reason: unknown): string {
   if (reason instanceof Error) return `${reason.name}: ${reason.message}`;
   if (typeof reason === 'string') return reason;
-  // JSON.stringify gives undefined for undefined and functions, whatever its type says
-  const json = JSON.stringify(reason) as string | undefined;
-  return json ?? String(reason);
+  if (typeof reason === 'number' || typeof reason === 'boolean') return String(reason);
+  return reason === null || reason === undefined ? String(reason) : `[${typeof reason}]`;
 }
 
 /** Starts keeping the context; the answer stops it (tests start and stop it around each case). */
@@ -67,8 +79,11 @@ export function startBugContext(): () => void {
   };
   const consoleError = console.error;
   console.error = (...args: unknown[]) => {
-    recordError(args.map(message).join(' '));
-    consoleError(...args);
+    try {
+      recordError(args.map(message).join(' '));
+    } finally {
+      consoleError(...args);
+    }
   };
 
   document.addEventListener('click', onClick, true);

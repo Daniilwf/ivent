@@ -72,15 +72,26 @@ public static partial class MaintenanceEndpoints
             .RequireAuthorization(Policies.Admin);
     }
 
-    private static Ok<SiteStatusView> Set(MaintenanceRequest request, MaintenanceMode maintenance, ClaimsPrincipal user, ILoggerFactory loggers)
+    private static Results<Ok<SiteStatusView>, ProblemHttpResult> Set(MaintenanceRequest request, MaintenanceMode maintenance, ClaimsPrincipal user, ILoggerFactory loggers)
     {
-        if (request.On)
+        try
         {
-            maintenance.TurnOn();
+            if (request.On)
+            {
+                maintenance.TurnOn();
+            }
+            else
+            {
+                maintenance.TurnOff();
+            }
         }
-        else
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
-            maintenance.TurnOff();
+            return TypedResults.Problem(
+                statusCode: StatusCodes.Status500InternalServerError,
+                title: "The maintenance flag could not be changed.",
+                detail: $"Check the rights on {maintenance.FlagPath}.",
+                extensions: new Dictionary<string, object?> { ["code"] = "site.maintenanceFlag" });
         }
 
         // Not a command (the queue is closed while it is on): the site's log keeps who turned it on and off

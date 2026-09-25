@@ -21,6 +21,13 @@ public static class EventCodec
             data["files"] = new JsonArray();
             return data;
         },
+
+        // D-121: before bug report screenshots every stored file was an upload
+        [("file-stored", 1)] = data =>
+        {
+            data["kind"] = "upload";
+            return data;
+        },
     };
 
     public static StoredEvent Encode(IGameEvent gameEvent)

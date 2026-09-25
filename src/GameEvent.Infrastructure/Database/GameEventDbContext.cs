@@ -63,6 +63,7 @@ public sealed class GameEventDbContext(DbContextOptions<GameEventDbContext> opti
             e.ToTable("StoredFile");
             e.HasIndex(x => new { x.OwnerId, x.CreatedAt });
             e.Property(x => x.MediaType).HasMaxLength(20);
+            e.Property(x => x.Kind).HasMaxLength(20);
         });
 
         modelBuilder.Entity<BugReports.BugReportRecord>(e =>

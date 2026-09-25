@@ -72,8 +72,29 @@ describe('bug report context', () => {
     expect(bugContext().errors?.map((e) => e.text)).toEqual([
       'TypeError: x is undefined',
       'Unhandled: Error: network down',
-      'render failed {"code":1}',
+      'render failed [object]',
     ]);
+    quiet.mockRestore();
+  });
+
+  it('never keeps what a label around a field holds, and never the objects logged with an error', () => {
+    document.body.innerHTML =
+      '<label data-testid="comment">Комментарий <textarea>мой пароль 123</textarea></label>';
+    stop();
+    const quiet = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    stop = startBugContext();
+    const circular: Record<string, unknown> = { password: 'secret' };
+    circular.self = circular;
+
+    document.querySelector('label')?.click();
+    console.error('login failed', circular);
+
+    const kept = JSON.stringify(bugContext());
+    expect(bugContext().actions?.[0]?.text).toBe('click label[data-testid=comment] «Комментарий»');
+    expect(bugContext().errors?.[0]?.text).toBe('login failed [object]');
+    expect(kept).not.toContain('пароль 123');
+    expect(kept).not.toContain('secret');
+    expect(quiet).toHaveBeenCalledWith('login failed', circular);
     quiet.mockRestore();
   });
 

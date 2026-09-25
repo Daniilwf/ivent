@@ -116,7 +116,8 @@ namespace GameEvent.Infrastructure.Database.Migrations
                     Height = table.Column<int>(type: "INTEGER", nullable: false),
                     Frames = table.Column<int>(type: "INTEGER", nullable: false),
                     IsDeleted = table.Column<bool>(type: "INTEGER", nullable: false),
-                    CreatedAt = table.Column<long>(type: "INTEGER", nullable: false)
+                    CreatedAt = table.Column<long>(type: "INTEGER", nullable: false),
+                    Kind = table.Column<string>(type: "TEXT", maxLength: 20, nullable: false)
                 },
                 constraints: table =>
                 {

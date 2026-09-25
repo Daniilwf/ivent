@@ -367,9 +367,9 @@ public class EventFormatTests
         },
         {
             "file-stored",
-            new Engine.Files.FileStored(Guid.Parse("50000000-0000-0000-0000-000000000001"), s_user, "image/webp", 123456, 2560, 1440, 1),
-            1,
-            """{"fileId":"50000000-0000-0000-0000-000000000001","ownerId":"40000000-0000-0000-0000-000000000001","mediaType":"image/webp","bytes":123456,"width":2560,"height":1440,"frames":1}"""
+            new Engine.Files.FileStored(Guid.Parse("50000000-0000-0000-0000-000000000001"), s_user, "image/webp", 123456, 2560, 1440, 1, Engine.Files.FileKind.BugScreenshot),
+            2,
+            """{"fileId":"50000000-0000-0000-0000-000000000001","ownerId":"40000000-0000-0000-0000-000000000001","mediaType":"image/webp","bytes":123456,"width":2560,"height":1440,"frames":1,"kind":"bugScreenshot"}"""
         },
         {
             "effect-chain-cut",
@@ -548,6 +548,20 @@ public class EventFormatTests
             """{"runId":"00000000-0000-0000-0000-000000000001","playerId":"10000000-0000-0000-0000-000000000001","links":["https://imgur.com/a/credits"],"note":"Титры","witnessId":"10000000-0000-0000-0000-000000000002","submittedAt":"2026-10-01T12:30:00+00:00"}""");
 
         Assert.Equal(new ProofSubmitted(s_run, s_player, ["https://imgur.com/a/credits"], "Титры", s_other, s_at, []), EventCodec.Decode(v1));
+    }
+
+    [Fact]
+    public void File_stored_v1_reads_as_an_upload()
+    {
+        // The frozen v1 of file-stored (before D-121): every file was an upload
+        var v1 = new StoredEvent(
+            "file-stored",
+            1,
+            """{"fileId":"50000000-0000-0000-0000-000000000001","ownerId":"40000000-0000-0000-0000-000000000001","mediaType":"image/gif","bytes":900,"width":20,"height":20,"frames":3}""");
+
+        Assert.Equal(
+            new Engine.Files.FileStored(Guid.Parse("50000000-0000-0000-0000-000000000001"), s_user, "image/gif", 900, 20, 20, 3, Engine.Files.FileKind.Upload),
+            EventCodec.Decode(v1));
     }
 
     [Fact]
