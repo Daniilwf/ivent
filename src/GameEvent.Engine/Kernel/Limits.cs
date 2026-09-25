@@ -16,4 +16,10 @@ public static class Limits
     public const int MaxProofLinks = 5;
 
     public const int MaxProofLinkLength = 500;
+
+    /// <summary>How deep effects may react to effects in one command (SPEC «Лимит цепочки»).</summary>
+    public const int MaxEffectDepth = 3;
+
+    /// <summary>How many events one command may write, its reactions included (SPEC «Лимит цепочки»).</summary>
+    public const int MaxEventsPerCommand = 50;
 }

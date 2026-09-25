@@ -226,6 +226,12 @@ public class EventFormatTests
             """{"rows":[{"playerId":"10000000-0000-0000-0000-000000000001","place":1,"points":4,"cellsToFinish":0,"isFirst":true,"provisional":false},{"playerId":"10000000-0000-0000-0000-000000000002","place":2,"points":12,"cellsToFinish":null,"isFirst":false,"provisional":false}]}"""
         },
         {
+            "effect-chain-cut",
+            new EffectChainCut(EffectChainLimit.Depth, 4, 5),
+            1,
+            """{"limit":"depth","depth":4,"events":5}"""
+        },
+        {
             "finish-surplus-changed",
             new FinishSurplusChanged(s_player, -2),
             1,
