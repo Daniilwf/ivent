@@ -57,13 +57,15 @@ public class RulesetInvariantTests
     [Property(MaxTest = 200)]
     public void Snapshots_hold_the_rules_of_their_version_after_every_command(int seed, byte[] script)
     {
-        var s = NewSeason(seed);
-        foreach (var b in script)
+        NewSeason(seed).Explained(s =>
         {
-            var before = s.State;
-            s.Act(CommandFor(s, b));
-            Check(s, before);
-        }
+            foreach (var b in script)
+            {
+                var before = s.State;
+                s.Act(CommandFor(s, b));
+                Check(s, before);
+            }
+        });
     }
 
     private static void Check(Scenario s, SeasonState before)

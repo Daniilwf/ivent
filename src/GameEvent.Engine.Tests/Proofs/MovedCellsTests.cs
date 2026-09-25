@@ -287,4 +287,32 @@ public class MovedCellsTests
 
         Assert.Equal(s.State, SeasonEngine.Replay(s.Log));
     }
+
+    [Fact]
+    public void A_reduction_after_a_drop_took_the_token_to_the_start_moves_nothing_and_the_run_keeps_its_cells()
+    {
+        // C13 long run: run A moved 5 cells; a drop's penalty then took the token back to the start. A lower difficulty
+        // leaves A 3 in dice — the 2 cells beyond them are no longer under the token, so nothing moves (D-98 moves only
+        // through entered cells) and A keeps its 5 cells, more than its dice
+        var s = Scenario.New().WithMapLength(8).WithCategory("Horror");
+        foreach (var title in new[] { "Silent Hill", "Alan Wake", "Dead Space" })
+        {
+            s.WithGame(title, 9, "Horror");
+        }
+
+        s.WithPlayers("Вася");
+        var runA = CompleteRun(s, "Вася", [2, 2, 1], Difficulty.Extreme);
+        s.Roll("Вася").Start("Вася").NextRandom(3, 3).Act(new DropRun(s.PlayerId("Вася")));
+        ScenarioAssert.Accepted(s);
+        Assert.Equal(LinearMap.StartId, s.Player("Вася").CellId);
+
+        s.Act(new ChangeRunDifficulty(runA, Difficulty.Easy, "Сложность по пруфу"));
+
+        ScenarioAssert.Accepted(s);
+        Assert.Equal([1, 1, 1], s.State.Runs[runA].Dice.Select(d => d.Value));
+        Assert.Empty(s.LastEvents<PlayerMoved>());
+        Assert.Equal(LinearMap.StartId, s.Player("Вася").CellId);
+        Assert.Equal(5, s.State.Runs[runA].Moved);
+        Assert.Equal([new PointsChanged(s.PlayerId("Вася"), -2, PointsReason.RunCorrection, runA)], s.LastEvents<PointsChanged>());
+    }
 }

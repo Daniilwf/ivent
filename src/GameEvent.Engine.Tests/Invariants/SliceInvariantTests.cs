@@ -113,29 +113,30 @@ public class SliceInvariantTests
         bool withExclusions = false,
         bool challenges = true)
     {
-        var s = NewSeason(seed, withChoice, challenges);
-        foreach (var b in script)
+        // C13: a failure prints the (shrunk) game as builder code
+        return NewSeason(seed, withChoice, challenges).Explained(s =>
         {
-            var before = s.State;
-            var logLength = s.Log.Count;
-            var command = withExclusions ? ExclusionCommandFor(s, b, withChoice) : withChoice ? ChoiceCommandFor(s, b) : CommandFor(s, b);
-            s.Act(command);
-            afterEach?.Invoke(s, before, logLength);
-
-            // W3 / D-96 (1): with features.challenges off a claim is never accepted
-            if (!challenges && command is CompleteRun { ChallengeDone: true })
+            foreach (var b in script)
             {
-                Assert.False(s.Last.IsAccepted, "A challenge was claimed while features.challenges is off.");
+                var before = s.State;
+                var logLength = s.Log.Count;
+                var command = withExclusions ? ExclusionCommandFor(s, b, withChoice) : withChoice ? ChoiceCommandFor(s, b) : CommandFor(s, b);
+                s.Act(command);
+                afterEach?.Invoke(s, before, logLength);
+
+                // W3 / D-96 (1): with features.challenges off a claim is never accepted
+                if (!challenges && command is CompleteRun { ChallengeDone: true })
+                {
+                    Assert.False(s.Last.IsAccepted, "A challenge was claimed while features.challenges is off.");
+                }
             }
-        }
 
-        if (!challenges)
-        {
-            Assert.DoesNotContain(s.Log.OfType<RunCompleted>(), e => e.ChallengeDone);
-            Assert.All(s.Log.OfType<CompletionRolled>(), e => Assert.Empty(e.ChallengeDice));
-        }
-
-        return s;
+            if (!challenges)
+            {
+                Assert.DoesNotContain(s.Log.OfType<RunCompleted>(), e => e.ChallengeDone);
+                Assert.All(s.Log.OfType<CompletionRolled>(), e => Assert.Empty(e.ChallengeDice));
+            }
+        });
     }
 
     [Property(MaxTest = 200)]
