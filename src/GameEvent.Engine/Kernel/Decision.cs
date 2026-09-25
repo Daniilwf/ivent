@@ -18,4 +18,7 @@ public sealed class Decision
     public static Decision Accept(params IReadOnlyList<IGameEvent> events) => new([.. events], null);
 
     public static Decision Reject(string code, string detail) => new([], new Rejection(code, detail));
+
+    /// <summary>A refusal naming what it is about, such as the later commands an undo waits for (D-104).</summary>
+    public static Decision Reject(string code, string detail, EquatableArray<Guid> related) => new([], new Rejection(code, detail, related));
 }

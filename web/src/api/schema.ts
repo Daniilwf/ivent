@@ -2115,6 +2115,147 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/seasons/{seasonId}/undo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["UndoRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CommandResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/seasons/{seasonId}/commands": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    limit?: number;
+                };
+                header?: never;
+                path: {
+                    seasonId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminCommandView"][];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Too Many Requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/seasons/{seasonId}/effects": {
         parameters: {
             query?: never;
@@ -2345,6 +2486,20 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * @description A command of the season log, newest first (D-104): what the admin picks to undo. `undone` — undone already;
+         *     `events` — the types of its events in order.
+         */
+        AdminCommandView: {
+            /** Format: uuid */
+            commandId: string;
+            commandType: string;
+            authorName: null | string;
+            /** Format: date-time */
+            occurredAt: string;
+            undone: boolean;
+            events: string[];
+        };
         /** @description A pending manual effect of any player, oldest first, for the admin to resolve (D-102). */
         AdminManualEffectView: {
             /** Format: uuid */
@@ -3137,6 +3292,14 @@ export interface components {
          * @enum {unknown}
          */
         TurnPhase: "idle" | "rolling" | "playing";
+        /** @description Undo a whole earlier command (D-104); `comment` is required, at most 500 characters. */
+        UndoRequest: {
+            /** Format: uuid */
+            commandId: string;
+            /** Format: uuid */
+            targetCommandId: string;
+            comment?: null | string;
+        };
         /** @enum {unknown} */
         UnmetConditionPolicy: "noDiceKeepCoins" | "countAsDrop" | "ignore";
         WeeklyChallengeRules: {

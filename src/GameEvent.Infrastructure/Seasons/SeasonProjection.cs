@@ -123,8 +123,15 @@ internal static class SeasonProjection
             record.FinishSurplus = player.Finish?.Surplus ?? 0;
             record.PointsTick = player.PointsTick;
 
-            // Exclusions only grow within a season (D-08); a tech reroll turned into a drop changes its reason (D-11).
+            // Exclusions grow within a season (D-08), a tech reroll turned into a drop changes its reason (D-11), an undo
+            // takes back those its command added (D-104).
             var known = old?.Exclusions.ToDictionary(x => x.GameId, x => x.Reason) ?? [];
+            foreach (var gone in known.Keys.Where(game => player.Exclusions.All(x => x.GameId != game)))
+            {
+                db.Exclusions.Remove(await db.Exclusions.FindAsync([id, gone], ct)
+                    ?? throw new InvalidOperationException($"Exclusion of game {gone} for player {id} has no projection row."));
+            }
+
             foreach (var exclusion in player.Exclusions)
             {
                 if (!known.TryGetValue(exclusion.GameId, out var reason))
@@ -173,6 +180,11 @@ internal static class SeasonProjection
             record.AfterFinish = run.AfterFinish;
             record.FreeMode = run.FreeMode;
 
+            if (run.Proof is null && before.Runs.GetValueOrDefault(id)?.Proof is not null && await db.Proofs.FindAsync([id], ct) is { } undoneProof)
+            {
+                db.Proofs.Remove(undoneProof);
+            }
+
             if (run.Proof is { } proof && proof != before.Runs.GetValueOrDefault(id)?.Proof)
             {
                 var proofRow = await db.Proofs.FindAsync([id], ct);
@@ -191,6 +203,11 @@ internal static class SeasonProjection
             }
 
             var oldRun = before.Runs.GetValueOrDefault(id);
+            if (run.Review is null && oldRun?.Review is not null && await db.Reviews.FindAsync([id], ct) is { } undoneReview)
+            {
+                db.Reviews.Remove(undoneReview);
+            }
+
             if (run.Review is { } review && review != oldRun?.Review)
             {
                 var row = await db.Reviews.FindAsync([id], ct);
@@ -203,6 +220,29 @@ internal static class SeasonProjection
                 row.Rating = review.Rating;
                 row.Text = review.Text;
             }
+        }
+
+        // An undo removes what the undone command created (D-104): runs with their proof and review, then players.
+        foreach (var id in before.Runs.Keys.Where(id => !after.Runs.ContainsKey(id)))
+        {
+            if (await db.Proofs.FindAsync([id], ct) is { } proofRow)
+            {
+                db.Proofs.Remove(proofRow);
+            }
+
+            if (await db.Reviews.FindAsync([id], ct) is { } reviewRow)
+            {
+                db.Reviews.Remove(reviewRow);
+            }
+
+            db.Runs.Remove(await db.Runs.FindAsync([id], ct) ?? throw new InvalidOperationException($"Run {id} has no projection row."));
+        }
+
+        foreach (var id in before.Players.Keys.Where(id => !after.Players.ContainsKey(id)))
+        {
+            db.Exclusions.RemoveRange(await db.Exclusions.Where(x => x.PlayerId == id).ToListAsync(ct));
+            db.SeasonPlayers.Remove(await db.SeasonPlayers.FindAsync([id], ct)
+                ?? throw new InvalidOperationException($"Player {id} has no projection row."));
         }
 
         // The table holds pending manual effects: created ones are added, resolved ones leave it.

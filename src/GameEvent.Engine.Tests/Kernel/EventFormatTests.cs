@@ -226,6 +226,12 @@ public class EventFormatTests
             """{"rows":[{"playerId":"10000000-0000-0000-0000-000000000001","place":1,"points":4,"cellsToFinish":0,"isFirst":true,"provisional":false},{"playerId":"10000000-0000-0000-0000-000000000002","place":2,"points":12,"cellsToFinish":null,"isFirst":false,"provisional":false}]}"""
         },
         {
+            "command-undone",
+            new Engine.Undo.CommandUndone(s_run, "Ошибка админа", [], [s_player], [], [], [], [], null),
+            1,
+            """{"commandId":"00000000-0000-0000-0000-000000000001","comment":"Ошибка админа","players":[],"removedPlayers":["10000000-0000-0000-0000-000000000001"],"runs":[],"removedRuns":[],"effects":[],"removedEffects":[],"season":null}"""
+        },
+        {
             "effect-chain-cut",
             new EffectChainCut(EffectChainLimit.Depth, 4, 5),
             1,

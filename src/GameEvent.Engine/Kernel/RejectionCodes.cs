@@ -21,6 +21,10 @@ public static class RejectionCodes
     public const string NothingToChange = "player.nothingToChange";
     public const string CommentRequired = "player.commentRequired";
     public const string EffectNotPending = "effect.notPending";
+    public const string UndoUnknownCommand = "undo.unknownCommand";
+    public const string UndoNotUndoable = "undo.notUndoable";
+    public const string UndoAlreadyUndone = "undo.alreadyUndone";
+    public const string UndoDependents = "undo.dependents";
     public const string EffectNotYours = "effect.notYours";
     public const string EffectUnknownOutcome = "effect.unknownOutcome";
     public const string CommentTooLong = "player.commentTooLong";

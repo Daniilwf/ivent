@@ -60,6 +60,7 @@ public static class SeasonEngine
             ConvertTechRerollToDrop c => Drops.Decide(state, c, context),
             MakeChoice c => Choosing.Decide(state, c, context),
             ResolveManualEffect c => ManualEffects.Decide(state, c),
+            Undo.UndoCommand c => Undo.Undoing.Decide(state, c, context),
             _ => throw new ArgumentException($"Unknown command {command.GetType().Name}.", nameof(command)),
         };
 
@@ -117,6 +118,7 @@ public static class SeasonEngine
             PointsChanged e => PointsLedger.Apply(state, e),
             PlayerMoved e => Movement.Apply(state, e),
             EffectChainCut e => EffectChain.Apply(state, e),
+            Undo.CommandUndone e => Undo.Undoing.Apply(state, e),
             _ => throw new ArgumentException($"Unknown event {gameEvent.GetType().Name}.", nameof(gameEvent)),
         };
 
