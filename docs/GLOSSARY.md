@@ -199,3 +199,5 @@
 | Версия правил | номер версии конфига сезона: 1 при создании, +1 при каждой правке админом | `SeasonState.RulesetVersion`, `RulesetChanged.Version` |
 | История правил | список версий с датой, автором и изменениями «было/стало» | `RulesetChange`, `RulesVersionView` |
 | Отложенная задача | таймер, хранящийся в БД | `ScheduledTask` |
+| Журнал ошибок, страница «Ошибки» | последние необработанные исключения запросов с запросом и пользователем, для админа | `ErrorJournal`, `ErrorEntry` |
+| Проверка здоровья | ответ `/health`: общий статус и статусы базы, диска и очереди | `HealthView`, `DatabaseHealthCheck`, `DiskHealthCheck`, `QueueHealthCheck` |

@@ -71,14 +71,14 @@ public static partial class AccountEndpoints
         var address = WebSecurity.ClientKey(http.Connection.RemoteIpAddress);
         if (!throttle.TryBegin(normalized, address))
         {
-            LogLoginThrottled(logger, normalized, address);
+            LogLoginThrottled(logger, TypedLogin(null, normalized), address);
             return TypedResults.StatusCode(StatusCodes.Status429TooManyRequests);
         }
 
         var user = await db.Users.AsNoTracking().SingleOrDefaultAsync(u => u.NormalizedLogin == normalized && !u.IsDeleted, ct);
         if (!passwords.Verify(user, request.Password))
         {
-            LogLoginFailed(logger, normalized, address);
+            LogLoginFailed(logger, TypedLogin(user, normalized), address);
             return TypedResults.Unauthorized();
         }
 
@@ -100,6 +100,14 @@ public static partial class AccountEndpoints
             CookieAuthenticationDefaults.AuthenticationScheme);
         return http.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity));
     }
+
+    /// <summary>
+    /// What a failed sign-in writes to the log (D-107): an existing login as it is, anything else only as a short hash —
+    /// the field may hold a pasted password, and the log is kept for a month.
+    /// </summary>
+    internal static string TypedLogin(UserRecord? user, string normalized) => user is not null
+        ? user.Login
+        : "unknown#" + Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(normalized)))[..8];
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Failed sign-in for {Login} from {Address}")]
     private static partial void LogLoginFailed(ILogger logger, string login, string address);

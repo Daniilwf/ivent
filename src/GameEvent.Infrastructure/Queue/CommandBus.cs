@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Threading.Channels;
 using GameEvent.Engine.Kernel;
 
@@ -29,11 +30,50 @@ public sealed class CommandBus
 
     internal ChannelReader<Pending> Reader => _channel.Reader;
 
+    private int _queued;
+
+    /// <summary>
+    /// Commands waiting for the consumer (the health check, D-107). Counted here: a single-reader channel cannot count
+    /// its own items.
+    /// </summary>
+    public int Queued => Volatile.Read(ref _queued);
+
+    private long _runningSince;
+
+    /// <summary>
+    /// How long the consumer has worked on the current command, or null between commands (the health check finds a hung
+    /// command, D-107). Monotonic time: a clock change or a test clock does not move it.
+    /// </summary>
+    public TimeSpan? CurrentCommandRunningFor => Interlocked.Read(ref _runningSince) is var since and not 0
+        ? Stopwatch.GetElapsedTime(since)
+        : null;
+
+    internal void Taken() => Interlocked.Decrement(ref _queued);
+
+    internal void Running(bool running) => Interlocked.Exchange(ref _runningSince, running ? Stopwatch.GetTimestamp() : 0);
+
+    private volatile bool _consuming;
+
+    /// <summary>The consumer is reading the queue now (the health check, D-107).</summary>
+    public bool IsConsuming => _consuming;
+
+    internal void Consuming(bool consuming) => _consuming = consuming;
+
     public async Task<CommandOutcome> SendAsync(CommandEnvelope envelope, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(envelope);
         var pending = new Pending(envelope, new TaskCompletionSource<CommandOutcome>(TaskCreationOptions.RunContinuationsAsynchronously));
-        await _channel.Writer.WriteAsync(pending, ct);
+        Interlocked.Increment(ref _queued);
+        try
+        {
+            await _channel.Writer.WriteAsync(pending, ct);
+        }
+        catch
+        {
+            Interlocked.Decrement(ref _queued);
+            throw;
+        }
+
         return await pending.Completion.Task.WaitAsync(ct);
     }
 

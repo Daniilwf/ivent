@@ -8,6 +8,7 @@ using GameEvent.Infrastructure.Kernel;
 using GameEvent.Infrastructure.Queue;
 using GameEvent.Infrastructure.Seasons;
 using GameEvent.Web.Accounts;
+using GameEvent.Web.Observability;
 using GameEvent.Web.Proofs;
 using GameEvent.Web.Realtime;
 using GameEvent.Web.Rolls;
@@ -57,6 +58,7 @@ public static class AppSetup
         services.Configure<JsonOptions>(o => ConfigureJson(o.SerializerOptions));
         services.AddSignalR().AddJsonProtocol(o => ConfigureJson(o.PayloadSerializerOptions));
         services.AddProblemDetails();
+        builder.AddObservability();
         services.AddOpenApi(o => o.AddDocumentTransformer(async (document, context, ct) =>
         {
             // Hub messages are part of the contract too: the frontend gets their types from the same document.
@@ -151,7 +153,6 @@ public static class AppSetup
             app.MapOpenApi();
         }
 
-        app.MapGet("/health", () => Results.Ok(new { status = "ok" })).ExcludeFromDescription();
         var api = app.MapGroup("/api").AddEndpointFilter<Csrf.Filter>();
         api.MapAccounts();
         api.MapSeasons();
@@ -161,6 +162,10 @@ public static class AppSetup
         api.MapAdminProofs();
         api.MapAdminSeasons();
         api.MapAdminAccounts();
+
+        // Last: the OpenAPI document keeps the order its shared schemas were first met in (a nullable first use of an
+        // enum would make the enum itself nullable for every client)
+        app.MapObservability(api);
         app.MapHub<SeasonHub>(SeasonHub.Path);
 
         if (frontend is not null)

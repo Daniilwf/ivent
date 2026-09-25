@@ -155,6 +155,9 @@ internal sealed class SiteFactory : WebApplicationFactory<Program>
 
         // The deadline scheduler's own loop would race the tests that move the clock; they call TickAsync themselves.
         builder.UseSetting("Scheduler:Enabled", "false");
+
+        // Tests log to the console only; one observability test turns the file on in its own folder
+        builder.UseSetting("Logging:File:Enabled", "false");
         builder.UseSetting("Security:LoginAttemptsPerMinute", _loginAttemptsPerMinute.ToString(System.Globalization.CultureInfo.InvariantCulture));
         builder.ConfigureServices(services =>
         {

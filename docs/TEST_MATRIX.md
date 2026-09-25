@@ -144,7 +144,7 @@
 | A7 | Тестовые эндпоинты есть только в Development и Test | `Web.Tests/Environment/ProductionHasNoTestEndpointsTests` | ⬜ |
 | A8 | Режим обслуживания: баннер и только чтение | `Web.Tests/Maintenance/*` | ⬜ |
 | A9 | Кнопка «Сообщить о баге» с контекстом и скриншотом, выгрузка файлом | `Web.Tests/BugReports/*`, `web/…/BugReportButton.test.tsx` | ⬜ |
-| A10 | `/health` и страница «Ошибки» | `Web.Tests/Observability/*` | ⬜ |
+| A10 | `/health` и страница «Ошибки» | `Web.Tests/Observability/ObservabilityTests.*` (здоровье зелёное и только статусы; красное без схемы БД и при нехватке диска; исключение в журнале с запросом и пользователем без строки запроса, кук и пароля, клиент без подробностей; порядок; только админ; запись в файл лога; в Production тестового эндпоинта нет; уровни лога из конфига); `Web.Tests/Queue/QueueHealthTests.*` (счётчики очереди в покое после работы, отменённого вызова и остановки; `degraded` при очереди, `unhealthy` при зависшей команде и без потребителя); экран «Ошибки» — H8 | 🟨 H8 |
 | A13 | Пользователь участвует в сезоне не больше одного раза (D-65) | `Seasons/SeasonSetupTests.Adding_the_same_user_twice_under_another_player_id_is_rejected` | ✅ |
 | A14 | Обновления в реальном времени: зритель сезона узнаёт о действии другого игрока без перезагрузки; анонимный не подключается | `Web.Tests/Api/SeasonHubTests.*` (догрузка пропущенного — E3) | 🟨 E3 |
 | A15 | Экран среза: ролл → старт → завершение с кубами, фишка сдвигается, второй браузер видит сдвиг без перезагрузки; отказы по-русски; устаревший ответ не затирает свежий; сеть упала — сообщение, а не зависание | `e2e/tests/slice.spec.ts` (десктоп и телефон), `web/src/season/SeasonScreen.test.tsx`, `web/src/season/CompleteForm.test.tsx`, `web/src/App.test.tsx` | 🟨 H2–H4 |

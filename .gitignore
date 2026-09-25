@@ -67,3 +67,6 @@ Thumbs.db
 
 # Worktrees of parallel agents (Claude Code)
 .claude/worktrees/
+
+# Logs and data next to the web project's content root
+src/GameEvent.Web/var/
