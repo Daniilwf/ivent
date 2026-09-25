@@ -9,6 +9,7 @@ public enum MoveReason
     StartingCell,
     AdminAdjustment,
     DropPenalty,
+    RunCorrection,
 }
 
 /// <summary>
