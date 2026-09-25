@@ -80,7 +80,7 @@ public sealed partial record ContentValue
     public const int MaxDice = 20;
     public const int MaxSides = 100;
 
-    [GeneratedRegex(@"^(?<minus>-)?(?<count>\d{1,2})?d(?<sides>\d{1,3})$", RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 1000)]
+    [GeneratedRegex(@"^(?<minus>-)?(?<count>[1-9]\d?)?d(?<sides>[1-9]\d{0,2})$", RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 1000)]
     private static partial Regex DicePattern();
 
     [GeneratedRegex(@"^(?<minus>-)?\$(?<name>[a-zA-Z][a-zA-Z0-9]{0,39})$", RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 1000)]

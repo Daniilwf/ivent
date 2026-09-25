@@ -60,7 +60,7 @@ public enum Trigger
 }
 
 /// <summary>Whom an effect targets (SPEC «Селекторы»).</summary>
-public enum Selector
+public enum TargetSelector
 {
     Self,
     Chosen,
@@ -71,7 +71,7 @@ public enum Selector
     LowerPoints,
 }
 
-/// <summary>Narrows <see cref="Selector.Chosen"/> and <see cref="Selector.RandomActive"/>.</summary>
+/// <summary>Narrows <see cref="TargetSelector.Chosen"/> and <see cref="TargetSelector.RandomActive"/>.</summary>
 public enum Among
 {
     HigherPoints,
@@ -142,7 +142,7 @@ public sealed record EffectSpec
 
 public sealed record TargetSpec
 {
-    public required Selector Selector { get; init; }
+    public required TargetSelector Selector { get; init; }
 
     public Among? Among { get; init; }
 
@@ -162,6 +162,24 @@ public sealed record DurationSpec
 }
 
 /// <summary>
+/// A player statistic a condition may test (CONTENT.md «Статистика игрока»); each new one is its own task with a test.
+/// </summary>
+public enum ContentStat
+{
+    /// <summary>Hostile effects received this season; needs <c>gte</c>.</summary>
+    HostileReceived,
+
+    /// <summary>Completed runs in a row with <c>tag</c>; needs <c>tag</c> and <c>gte</c>.</summary>
+    CompletedStreakWithTag,
+
+    /// <summary>Every die of the roll at its maximum; needs <c>minDice</c>.</summary>
+    AllDiceMax,
+
+    /// <summary>The run's hours; needs <c>gte</c>.</summary>
+    RunHours,
+}
+
+/// <summary>
 /// A condition (CONTENT.md «Условия и фильтры»): on the run (<see cref="DifficultyAtLeast"/>), on the game
 /// (<see cref="Game"/>) or on a player statistic (<see cref="Stat"/> with its parameters).
 /// </summary>
@@ -171,7 +189,7 @@ public sealed record ConditionSpec
 
     public GameFilterSpec? Game { get; init; }
 
-    public string? Stat { get; init; }
+    public ContentStat? Stat { get; init; }
 
     public string? Tag { get; init; }
 
@@ -261,7 +279,7 @@ public sealed record GiveObjectAction : ActionSpec
 {
     public required string ObjectId { get; init; }
 
-    public IReadOnlyDictionary<string, string>? Params { get; init; }
+    public ContentParamDictionary? Params { get; init; }
 }
 
 public enum TakeMode

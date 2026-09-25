@@ -295,9 +295,11 @@ public class ContentValidatorTests
     [Fact]
     public void A_zone_multiplier_is_above_zero()
     {
-        var zone = new ZoneDefinition { Id = "swamp", Name = "Болото", DropPenaltyMultiplier = 0 };
+        var zone = new ZoneDefinition { Id = "swamp", Name = "Болото", DropPenaltyMultiplier = 0, ShopPriceMultiplier = -1 };
 
-        Assert.Contains(ContentValidator.Check(zone), e => e.Path == "$");
+        var paths = ContentValidator.Check(zone).Select(e => e.Path).ToList();
+
+        Assert.Equal(["$.dropPenaltyMultiplier", "$.shopPriceMultiplier"], paths);
     }
 
     [Fact]
@@ -334,7 +336,7 @@ public class ContentValidatorTests
     [Fact]
     public void A_challenge_pays_coins()
     {
-        var challenge = new ChallengeDefinition
+        var challenge = new WeeklyChallengeDefinition
         {
             Id = "old-school",
             Name = "Олдскул",
@@ -393,5 +395,221 @@ public class ContentValidatorTests
         Assert.Contains("\"steps\":\"-1d6\"", written, StringComparison.Ordinal);
         Assert.Contains("\"steps\":\"$roll\"", written, StringComparison.Ordinal);
         Assert.Equal(actions, ContentJson.Parse<EquatableArray<ActionSpec>>(written));
+    }
+
+    // ---- Rules added after the reviews of C11b ----
+
+    [Theory]
+    [InlineData("event")]
+    [InlineData("effect")]
+    [InlineData("achievement")]
+    public void Only_items_have_a_price(string kind)
+    {
+        var json = $$$"""{"id":"a","kind":"{{{kind}}}","name":"A","description":"B","price":5,"scope":"season","effect":{"trigger":"runCompleted","actions":[{"type":"move","steps":1}]}}""";
+
+        Assert.Contains(Errors(json), e => e.Path == "$.price");
+    }
+
+    [Fact]
+    public void An_achievement_needs_a_trigger()
+    {
+        const string Json = """{"id":"a","kind":"achievement","name":"A","description":"B","scope":"season","effect":{"actions":[{"type":"move","steps":1}]}}""";
+
+        AssertError(Json, "$.effect.trigger");
+    }
+
+    [Fact]
+    public void An_event_acts_without_a_trigger()
+    {
+        const string Json = """{"id":"a","kind":"event","name":"A","description":"B","effect":{"trigger":"beforeRoll","actions":[{"type":"move","steps":1}]}}""";
+
+        AssertError(Json, "$.effect.trigger");
+    }
+
+    [Theory]
+    [InlineData("item", ",\"window\":\"anytime\"")]
+    [InlineData("event", "")]
+    public void Items_and_events_do_not_last(string kind, string window)
+    {
+        var json = $$$"""{"id":"a","kind":"{{{kind}}}","name":"A","description":"B"{{{window.Replace("\\", "", StringComparison.Ordinal)}}},"effect":{"duration":{"uses":1},"actions":[{"type":"move","steps":1}]}}""";
+
+        AssertError(json, "$.effect.duration");
+    }
+
+    [Fact]
+    public void Only_an_effect_intercepts()
+    {
+        const string Json = """{"id":"a","kind":"achievement","name":"A","description":"B","scope":"season","effect":{"trigger":"hostileIncoming","intercept":"hostile","actions":[]}}""";
+
+        AssertError(Json, "$.effect.intercept");
+    }
+
+    [Fact]
+    public void A_null_action_is_an_error()
+    {
+        AssertError(Orange.Replace("[{\"type\":\"move\",\"steps\":1}]", "[null]", StringComparison.Ordinal), "$.effect.actions[0]");
+    }
+
+    [Fact]
+    public void An_action_without_a_type_is_a_parse_error()
+    {
+        var json = Orange.Replace("{\"type\":\"move\",\"steps\":1}", "{\"steps\":1}", StringComparison.Ordinal);
+
+        Assert.ThrowsAny<System.Text.Json.JsonException>(() => ContentJson.Parse<ObjectDefinition>(json));
+    }
+
+    [Fact]
+    public void A_null_parameter_is_a_parse_error()
+    {
+        var json = Orange.Replace(
+            "[{\"type\":\"move\",\"steps\":1}]",
+            "[{\"type\":\"giveObject\",\"objectId\":\"forced-genre\",\"params\":{\"tag\":null}}]",
+            StringComparison.Ordinal);
+
+        Assert.ThrowsAny<System.Text.Json.JsonException>(() => ContentJson.Parse<ObjectDefinition>(json));
+    }
+
+    [Fact]
+    public void Transform_turns_into_an_object_id()
+    {
+        AssertError(
+            Orange.Replace("{\"type\":\"move\",\"steps\":1}", "{\"type\":\"transformObject\",\"mode\":\"transform\",\"into\":\"Золото!\"}", StringComparison.Ordinal),
+            "$.effect.actions[0].into");
+    }
+
+    [Theory]
+    [InlineData("{\"from\":\"players\",\"list\":[]}", "$.effect.actions[0].options")]
+    [InlineData("{\"list\":[\"a\"]}", "$.effect.actions[0].options.list")]
+    [InlineData("{\"list\":[\"a\",\" \"]}", "$.effect.actions[0].options.list")]
+    public void Options_are_a_source_or_a_list_of_two_or_more(string options, string path)
+    {
+        AssertError(
+            Orange.Replace("{\"type\":\"move\",\"steps\":1}", $"{{\"type\":\"requestChoice\",\"prompt\":\"?\",\"options\":{options}}}", StringComparison.Ordinal),
+            path);
+    }
+
+    [Fact]
+    public void Result_reference_belongs_to_a_poll()
+    {
+        var json = Orange.Replace(
+            "[{\"type\":\"move\",\"steps\":1}]",
+            "[{\"type\":\"giveObject\",\"objectId\":\"forced-genre\",\"params\":{\"tag\":\"$result\"}}]",
+            StringComparison.Ordinal);
+
+        AssertError(json, "$.effect.actions[0].params.tag");
+    }
+
+    [Fact]
+    public void A_poll_result_acts_at_once()
+    {
+        var poll = new PollDefinition
+        {
+            Question = "Какой жанр?",
+            Options = new ChoiceOptionsSpec { From = ChoiceSource.Categories },
+            Voters = PollVoters.Players,
+            ClosesInHours = 24,
+            OnResult = new EffectSpec
+            {
+                Trigger = Trigger.BeforeRoll,
+                Actions = [new GiveObjectAction { ObjectId = "forced-genre", Params = new ContentParamDictionary([new("tag", "$result")]) }],
+            },
+        };
+
+        Assert.Equal(["$.onResult"], ContentValidator.Check(poll).Select(e => e.Path));
+    }
+
+    [Theory]
+    [InlineData("{}", "$.effect.condition")]
+    [InlineData("{\"stat\":\"hostileReceived\"}", "$.effect.condition.gte")]
+    [InlineData("{\"stat\":\"completedStreakWithTag\",\"gte\":3}", "$.effect.condition.tag")]
+    [InlineData("{\"stat\":\"completedStreakWithTag\",\"tag\":\"Horror\"}", "$.effect.condition.gte")]
+    [InlineData("{\"stat\":\"allDiceMax\"}", "$.effect.condition.minDice")]
+    [InlineData("{\"stat\":\"runHours\"}", "$.effect.condition.gte")]
+    [InlineData("{\"gte\":5}", "$.effect.condition.stat")]
+    [InlineData("{\"game\":{}}", "$.effect.condition.game")]
+    [InlineData("{\"game\":{\"minHours\":10,\"maxHours\":2}}", "$.effect.condition.game.minHours")]
+    [InlineData("{\"game\":{\"tags\":[]}}", "$.effect.condition.game.tags")]
+    [InlineData("{\"game\":{\"maxHours\":0}}", "$.effect.condition.game")]
+    public void Conditions_test_something_with_what_it_needs(string condition, string path)
+    {
+        var json = $$$"""{"id":"a","kind":"achievement","name":"A","description":"B","scope":"season","effect":{"trigger":"runCompleted","condition":{{{condition}}},"actions":[{"type":"changeResource","resource":"coins","amount":5}]}}""";
+
+        AssertError(json, path);
+    }
+
+    [Fact]
+    public void An_unknown_statistic_is_a_parse_error()
+    {
+        const string Json = """{"id":"a","kind":"achievement","name":"A","description":"B","scope":"season","effect":{"trigger":"runCompleted","condition":{"stat":"hostileRecieved","gte":5},"actions":[{"type":"changeResource","resource":"coins","amount":5}]}}""";
+
+        Assert.ThrowsAny<System.Text.Json.JsonException>(() => ContentJson.Parse<ObjectDefinition>(Json));
+    }
+
+    [Fact]
+    public void A_weekly_challenge_needs_a_real_condition()
+    {
+        var challenge = new WeeklyChallengeDefinition
+        {
+            Id = "old-school",
+            Name = "Олдскул",
+            Description = "Пройди старую игру.",
+            Condition = new ConditionSpec(),
+            Reward = new RewardSpec { Coins = 10 },
+            Check = ChallengeCheck.Auto,
+        };
+
+        Assert.Equal(["$.condition"], ContentValidator.Check(challenge).Select(e => e.Path));
+    }
+
+    [Fact]
+    public void Next_roll_filters_and_zone_filters_are_checked()
+    {
+        AssertError(
+            Orange.Replace("{\"type\":\"move\",\"steps\":1}", "{\"type\":\"modifyNextRoll\",\"filter\":{\"minHours\":5,\"maxHours\":1}}", StringComparison.Ordinal),
+            "$.effect.actions[0].filter.minHours");
+        Assert.Contains(
+            ContentValidator.Check(new ZoneDefinition { Id = "swamp", Name = "Болото", RollFilter = new GameFilterSpec() }),
+            e => e.Path == "$.rollFilter");
+    }
+
+    [Theory]
+    [InlineData("\"reroll\"", "0")]
+    [InlineData("\"reroll\"", "-1")]
+    public void A_reroll_stage_rerolls_at_least_once(string stage, string value)
+    {
+        var json = Orange.Replace(
+            "{\"type\":\"move\",\"steps\":1}",
+            $"{{\"type\":\"modifyDice\",\"when\":\"current\",\"stage\":{stage},\"value\":{value}}}",
+            StringComparison.Ordinal);
+
+        AssertError(json, "$.effect.actions[0].value");
+    }
+
+    [Fact]
+    public void A_roll_has_no_minus()
+    {
+        AssertError(Orange.Replace("[{\"type\":\"move\",\"steps\":1}]", "[{\"type\":\"roll\",\"dice\":\"-1d6\"}]", StringComparison.Ordinal), "$.effect.actions[0].dice");
+    }
+
+    [Theory]
+    [InlineData("01d6")]
+    [InlineData("1d06")]
+    public void Dice_have_one_spelling(string text)
+    {
+        Assert.Null(ContentValue.TryParse(text));
+    }
+
+    [Fact]
+    public void Take_object_parses_its_mode_filter_and_pick()
+    {
+        var json = Orange.Replace(
+            "{\"type\":\"move\",\"steps\":1}",
+            "{\"type\":\"takeObject\",\"mode\":\"steal\",\"filter\":{\"kind\":\"item\",\"rarity\":\"epic\"},\"pick\":\"chosen\"}",
+            StringComparison.Ordinal);
+
+        var take = Assert.IsType<TakeObjectAction>(Assert.Single(ContentJson.Parse<ObjectDefinition>(json).Effect!.Actions));
+
+        Assert.Equal((TakeMode.Steal, (ObjectKind?)ObjectKind.Item, (Rarity?)Rarity.Epic, Pick.Chosen), (take.Mode, take.Filter!.Kind, take.Filter.Rarity, take.Pick));
+        Assert.Empty(Errors(json));
     }
 }

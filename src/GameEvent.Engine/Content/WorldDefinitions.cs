@@ -87,7 +87,7 @@ public sealed record RewardSpec
 }
 
 /// <summary>A weekly challenge (CONTENT.md «челлендж недели», stage 6).</summary>
-public sealed record ChallengeDefinition
+public sealed record WeeklyChallengeDefinition
 {
     public required string Id { get; init; }
 

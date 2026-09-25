@@ -8,7 +8,4 @@ namespace GameEvent.Engine.Seasons;
 /// they come from the log (D-82). <see cref="Triggers"/> react to a command's events (D-103); none in stage 1's product.
 /// </summary>
 public sealed record EngineContext(
-    IClock Clock, IRandomSource Random, IIdGenerator Ids, IPoolView Pool, IReadOnlyList<Effects.ITriggerHandler>? Triggers = null)
-{
-    public IReadOnlyList<Effects.ITriggerHandler> Handlers => Triggers ?? [];
-}
+    IClock Clock, IRandomSource Random, IIdGenerator Ids, IPoolView Pool, IReadOnlyList<Effects.ITriggerHandler>? Triggers = null);

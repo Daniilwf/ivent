@@ -38,6 +38,11 @@ public static class ContentJson
         {
             throw new JsonException($"{path}: {e.Message}", path, e.LineNumber, e.BytePositionInLine, e);
         }
+        catch (NotSupportedException e)
+        {
+            // An action without «type» (or «type» after other fields the reader cannot buffer) is malformed content.
+            throw new JsonException($"An action needs «type»: {e.Message}", e);
+        }
     }
 
     public static string Write<T>(T content) => JsonSerializer.Serialize(content, Options);

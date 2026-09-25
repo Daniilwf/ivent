@@ -26,12 +26,16 @@ public static partial class ContentValidator
         CheckText(definition.Name, MaxNameLength, "$.name", Error);
         CheckText(definition.Description, MaxDescriptionLength, "$.description", Error);
 
+        var kind = definition.Kind;
         if (definition.Price is < 0)
         {
             Error("$.price", "A price is 0 or more; null means not for sale.");
         }
 
-        var kind = definition.Kind;
+        if (kind != ObjectKind.Item && definition.Price is not null)
+        {
+            Error("$.price", "Only items are sold in the shop.");
+        }
         if (kind == ObjectKind.Item && definition.Window is null)
         {
             Error("$.window", "An item needs a window of use.");
@@ -74,12 +78,25 @@ public static partial class ContentValidator
             Error("$.effect.trigger", $"A {kind} acts when it is used or drawn, without a trigger.");
         }
 
+        if (kind is not (ObjectKind.Effect or ObjectKind.SpecialRoll) && effect.Duration is not null)
+        {
+            Error("$.effect.duration", "Only effects and special rolls last; a duration elsewhere means nothing.");
+        }
+
+        if (kind != ObjectKind.Effect && effect.Intercept is not null)
+        {
+            Error("$.effect.intercept", "Only an effect intercepts (an item gives such an effect, as «Щит» does).");
+        }
+
         CheckEffect(effect, "$.effect", Error);
         return errors;
     }
 
     /// <summary>The errors of an effect block; used for objects and for a poll's result.</summary>
-    public static void CheckEffect(EffectSpec effect, string path, Action<string, string> error)
+    public static void CheckEffect(EffectSpec effect, string path, Action<string, string> error) =>
+        CheckEffect(effect, path, inPoll: false, error);
+
+    private static void CheckEffect(EffectSpec effect, string path, bool inPoll, Action<string, string> error)
     {
         ArgumentNullException.ThrowIfNull(effect);
         ArgumentNullException.ThrowIfNull(error);
@@ -100,7 +117,7 @@ public static partial class ContentValidator
             error(path, "An effect needs actions, outcomes or an interception.");
         }
 
-        if (effect.Target is { } target && target.Among is not null && target.Selector is not (Selector.Chosen or Selector.RandomActive))
+        if (effect.Target is { } target && target.Among is not null && target.Selector is not (TargetSelector.Chosen or TargetSelector.RandomActive))
         {
             error($"{path}.target.among", "«among» narrows only «chosen» and «randomActive».");
         }
@@ -110,11 +127,17 @@ public static partial class ContentValidator
             CheckDuration(duration, $"{path}.duration", error);
         }
 
-        CheckActions(effect.Actions, $"{path}.actions", rolled: false, error);
+        if (effect.Condition is { } condition)
+        {
+            CheckCondition(condition, $"{path}.condition", error);
+        }
+
+        var scope = new Scope(Rolled: false, Chose: false, InPoll: inPoll);
+        CheckActions(effect.Actions, $"{path}.actions", scope, error);
 
         if (effect.Outcomes is { } outcomes)
         {
-            CheckOutcomes(outcomes, $"{path}.outcomes", error);
+            CheckOutcomes(outcomes, $"{path}.outcomes", scope, error);
         }
     }
 
@@ -125,14 +148,23 @@ public static partial class ContentValidator
         void Error(string path, string message) => errors.Add(new ContentError(path, message));
         CheckId(zone.Id, "$.id", Error);
         CheckText(zone.Name, MaxNameLength, "$.name", Error);
+        if (zone.RollFilter is { } filter)
+        {
+            CheckFilter(filter, "$.rollFilter", Error);
+        }
         if (zone.DiceModifier is { } modifier)
         {
             CheckDiceValue(modifier.Stage, modifier.Value, "$.diceModifier.value", Error);
         }
 
-        if (zone.DropPenaltyMultiplier is <= 0 || zone.ShopPriceMultiplier is <= 0)
+        if (zone.DropPenaltyMultiplier is <= 0)
         {
-            Error("$", "Multipliers are above 0.");
+            Error("$.dropPenaltyMultiplier", "A multiplier is above 0.");
+        }
+
+        if (zone.ShopPriceMultiplier is <= 0)
+        {
+            Error("$.shopPriceMultiplier", "A multiplier is above 0.");
         }
 
         return errors;
@@ -184,13 +216,17 @@ public static partial class ContentValidator
 
         if (poll.OnResult is { } result)
         {
-            CheckEffect(result, "$.onResult", Error);
+            CheckEffect(result, "$.onResult", inPoll: true, Error);
+            if (result.Trigger is not null || result.Duration is not null || result.Intercept is not null)
+            {
+                Error("$.onResult", "A poll's result acts at once: no trigger, duration or interception.");
+            }
         }
 
         return errors;
     }
 
-    public static IReadOnlyList<ContentError> Check(ChallengeDefinition challenge)
+    public static IReadOnlyList<ContentError> Check(WeeklyChallengeDefinition challenge)
     {
         ArgumentNullException.ThrowIfNull(challenge);
         var errors = new List<ContentError>();
@@ -198,6 +234,7 @@ public static partial class ContentValidator
         CheckId(challenge.Id, "$.id", Error);
         CheckText(challenge.Name, MaxNameLength, "$.name", Error);
         CheckText(challenge.Description, MaxDescriptionLength, "$.description", Error);
+        CheckCondition(challenge.Condition, "$.condition", Error);
         if (challenge.Reward.Coins is null or <= 0)
         {
             Error("$.reward.coins", "A challenge pays a positive number of coins.");
@@ -206,12 +243,22 @@ public static partial class ContentValidator
         return errors;
     }
 
-    private static void CheckActions(Kernel.EquatableArray<ActionSpec> actions, string path, bool rolled, Action<string, string> error)
+    // What a reference may point at here: a roll or a choice before it, a poll's result.
+    private sealed record Scope(bool Rolled, bool Chose, bool InPoll);
+
+    private static void CheckActions(Kernel.EquatableArray<ActionSpec> actions, string path, Scope scope, Action<string, string> error)
     {
-        var chose = false;
+        var rolled = scope.Rolled;
+        var chose = scope.Chose;
         for (var i = 0; i < actions.Count; i++)
         {
             var at = $"{path}[{i}]";
+            if (actions[i] is null)
+            {
+                error(at, "An action is an object with «type».");
+                continue;
+            }
+
             var values = actions[i] switch
             {
                 MoveAction a => [("steps", a.Steps)],
@@ -222,7 +269,7 @@ public static partial class ContentValidator
             };
             foreach (var (field, value) in values)
             {
-                CheckReference(value, $"{at}.{field}", rolled, chose, error);
+                CheckReference(value, $"{at}.{field}", scope with { Rolled = rolled, Chose = chose }, error);
             }
 
             switch (actions[i])
@@ -230,8 +277,8 @@ public static partial class ContentValidator
                 case ChangeResourceAction change when string.IsNullOrWhiteSpace(change.Resource):
                     error($"{at}.resource", "A resource is «points», «coins» or another key.");
                     break;
-                case RollAction roll when roll.Dice.Kind != ContentValueKind.Dice:
-                    error($"{at}.dice", "A roll needs dice such as «1d6».");
+                case RollAction roll when roll.Dice.Kind != ContentValueKind.Dice || roll.Dice.Negative:
+                    error($"{at}.dice", "A roll needs dice such as «1d6», without a minus.");
                     break;
                 case ModifyDiceAction modify:
                     CheckDiceValue(modify.Stage, modify.Value, $"{at}.value", error);
@@ -239,22 +286,36 @@ public static partial class ContentValidator
                 case ModifyNextRollAction next when next.Filter is null && next.ChoiceCount is null && next.RunCondition is null:
                     error(at, "«modifyNextRoll» changes a filter, the choice count or the run condition.");
                     break;
+                case ModifyNextRollAction next when next.Filter is { } filter:
+                    CheckFilter(filter, $"{at}.filter", error);
+                    if (next.RunCondition is { } condition)
+                    {
+                        CheckCondition(condition, $"{at}.runCondition", error);
+                    }
+
+                    break;
+                case ModifyNextRollAction { RunCondition: { } runCondition }:
+                    CheckCondition(runCondition, $"{at}.runCondition", error);
+                    break;
                 case ModifyNextRollAction { ChoiceCount: < 2 }:
                     error($"{at}.choiceCount", "A choice is among at least 2 games.");
                     break;
                 case GiveObjectAction give:
                     CheckId(give.ObjectId, $"{at}.objectId", error);
-                    foreach (var (name, value) in give.Params ?? new Dictionary<string, string>())
+                    foreach (var (name, value) in give.Params ?? new ContentParamDictionary([]))
                     {
                         if (value.StartsWith('$') || value.StartsWith("-$", StringComparison.Ordinal))
                         {
-                            CheckReference(ContentValue.TryParse(value), $"{at}.params.{name}", rolled, chose, error);
+                            CheckReference(ContentValue.TryParse(value), $"{at}.params.{name}", scope with { Rolled = rolled, Chose = chose }, error);
                         }
                     }
 
                     break;
                 case TransformObjectAction { Mode: TransformMode.Transform, Into: null or "" }:
                     error($"{at}.into", "«transform» names the object to turn into.");
+                    break;
+                case TransformObjectAction { Mode: TransformMode.Transform, Into: { } into }:
+                    CheckId(into, $"{at}.into", error);
                     break;
                 case TransformObjectAction { Mode: TransformMode.Annotate, Note: null or "" }:
                     error($"{at}.note", "«annotate» needs a note.");
@@ -281,7 +342,7 @@ public static partial class ContentValidator
 
     // $roll needs a roll before it (an action or the outcome's own roll); $choice a choice before it. $result and
     // parameters come from outside the effect: a poll, a giveObject's params.
-    private static void CheckReference(ContentValue? value, string path, bool rolled, bool chose, Action<string, string> error)
+    private static void CheckReference(ContentValue? value, string path, Scope scope, Action<string, string> error)
     {
         if (value is null)
         {
@@ -294,14 +355,19 @@ public static partial class ContentValidator
             return;
         }
 
-        if (value.Name == "roll" && !rolled)
+        if (value.Name == "roll" && !scope.Rolled)
         {
             error(path, "«$roll» needs a «roll» action before it.");
         }
 
-        if (value.Name == "choice" && !chose)
+        if (value.Name == "choice" && !scope.Chose)
         {
             error(path, "«$choice» needs a «requestChoice» action before it.");
+        }
+
+        if (value.Name == "result" && !scope.InPoll)
+        {
+            error(path, "«$result» is a poll's result: only in its «onResult».");
         }
     }
 
@@ -317,13 +383,13 @@ public static partial class ContentValidator
         {
             error(path, $"The «{stage}» stage takes a whole number.");
         }
-        else if (stage is DiceStage.Sides or DiceStage.Multiply && value.Number < 1)
+        else if (stage is DiceStage.Sides or DiceStage.Multiply or DiceStage.Reroll && value.Number < 1)
         {
             error(path, $"The «{stage}» stage takes a number of 1 or more.");
         }
     }
 
-    private static void CheckOutcomes(OutcomesSpec outcomes, string path, Action<string, string> error)
+    private static void CheckOutcomes(OutcomesSpec outcomes, string path, Scope scope, Action<string, string> error)
     {
         if (outcomes.Roll.Kind != ContentValueKind.Dice || outcomes.Roll.Negative)
         {
@@ -349,12 +415,69 @@ public static partial class ContentValidator
                 error(at, "Cases do not overlap.");
             }
 
-            CheckActions(@case.Actions, $"{at}.actions", rolled: true, error);
+            CheckActions(@case.Actions, $"{at}.actions", scope with { Rolled = true }, error);
         }
 
         if (covered.Count != high - low + 1)
         {
             error($"{path}.cases", $"Cases cover every result {low}–{high}.");
+        }
+    }
+
+    // A condition tests something: the run, the game or a statistic with the parameters it needs.
+    private static void CheckCondition(ConditionSpec condition, string path, Action<string, string> error)
+    {
+        if (condition is { DifficultyAtLeast: null, Game: null, Stat: null, Gte: null, Tag: null, MinDice: null })
+        {
+            error(path, "A condition tests the run («difficultyAtLeast»), the game («game») or a statistic («stat»).");
+            return;
+        }
+
+        var missing = condition.Stat switch
+        {
+            ContentStat.HostileReceived or ContentStat.RunHours when condition.Gte is null => "gte",
+            ContentStat.CompletedStreakWithTag when string.IsNullOrWhiteSpace(condition.Tag) => "tag",
+            ContentStat.CompletedStreakWithTag when condition.Gte is null => "gte",
+            ContentStat.AllDiceMax when condition.MinDice is null => "minDice",
+            _ => null,
+        };
+        if (missing is not null)
+        {
+            error($"{path}.{missing}", $"The «{condition.Stat}» statistic needs «{missing}».");
+        }
+
+        if (condition.Stat is null && (condition.Gte is not null || condition.Tag is not null || condition.MinDice is not null))
+        {
+            error($"{path}.stat", "«gte», «tag» and «minDice» belong to a statistic.");
+        }
+
+        if (condition.Game is { } game)
+        {
+            CheckFilter(game, $"{path}.game", error);
+        }
+    }
+
+    // A game filter narrows something: tags, hours in a sensible range, a year.
+    private static void CheckFilter(GameFilterSpec filter, string path, Action<string, string> error)
+    {
+        if (filter is { Tags: null, MaxHours: null, MinHours: null, ReleaseYearBefore: null })
+        {
+            error(path, "A filter names tags, hours or a release year.");
+        }
+
+        if (filter.Tags is { } tags && (tags.Count == 0 || tags.Any(string.IsNullOrWhiteSpace)))
+        {
+            error($"{path}.tags", "Tags are non-empty.");
+        }
+
+        if (filter.MinHours is < 0 || filter.MaxHours is <= 0)
+        {
+            error(path, "Hours are positive.");
+        }
+
+        if (filter is { MinHours: { } min, MaxHours: { } max } && min > max)
+        {
+            error($"{path}.minHours", "«minHours» is at most «maxHours».");
         }
     }
 
@@ -375,10 +498,14 @@ public static partial class ContentValidator
 
     private static void CheckOptions(ChoiceOptionsSpec options, string path, Action<string, string> error)
     {
-        var fromList = options.List is { Count: > 0 };
-        if (options.From is null == !fromList)
+        var hasList = options.List is not null;
+        if (options.From is null == !hasList)
         {
             error(path, "Options come either «from» a source or as a «list».");
+        }
+        else if (options.List is { } list && (list.Count < 2 || list.Any(string.IsNullOrWhiteSpace)))
+        {
+            error($"{path}.list", "A list offers at least 2 non-empty options.");
         }
     }
 

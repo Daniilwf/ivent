@@ -70,10 +70,10 @@ public static class SeasonEngine
 
         // Effects react after the command's own events, within the chain limits (D-24, D-103).
         var after = decision.Events.Aggregate(state, Apply);
-        var reactions = EffectChain.Run(after, decision.Events, context);
+        var (reactions, final) = EffectChain.Run(after, decision.Events, context);
         return reactions.Count == 0
             ? new CommandResult(decision, after)
-            : new CommandResult(Decision.Accept([.. decision.Events, .. reactions]), reactions.Aggregate(after, Apply));
+            : new CommandResult(Decision.Accept([.. decision.Events, .. reactions]), final);
     }
 
     public static SeasonState Apply(SeasonState state, IGameEvent gameEvent) =>

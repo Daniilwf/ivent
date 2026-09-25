@@ -34,16 +34,18 @@ public sealed record EffectChainCut(EffectChainLimit Limit, int Depth, int Event
 /// The trigger dispatcher (D-24, D-103): after a command is accepted, every handler reacts to its events, then to those
 /// reactions, level by level. The command's own events are level 0; reactions may go down to
 /// <see cref="Limits.MaxEffectDepth"/> levels and the command to <see cref="Limits.MaxEventsPerCommand"/> events in all;
-/// the first reaction beyond either limit ends the chain with <see cref="EffectChainCut"/>.
+/// the first reaction beyond either limit ends the chain with <see cref="EffectChainCut"/>, written over the 50 (D-103).
+/// The command's own events are not limited here: commands write a handful.
 /// </summary>
 internal static class EffectChain
 {
-    public static IReadOnlyList<IGameEvent> Run(SeasonState state, IReadOnlyList<IGameEvent> commandEvents, EngineContext context)
+    public static (IReadOnlyList<IGameEvent> Reactions, SeasonState State) Run(
+        SeasonState state, IReadOnlyList<IGameEvent> commandEvents, EngineContext context)
     {
-        var handlers = context.Handlers;
+        var handlers = context.Triggers ?? [];
         if (handlers.Count == 0)
         {
-            return [];
+            return ([], state);
         }
 
         var written = new List<IGameEvent>();
@@ -62,7 +64,7 @@ internal static class EffectChain
                         {
                             var limit = depth > Limits.MaxEffectDepth ? EffectChainLimit.Depth : EffectChainLimit.Events;
                             written.Add(new EffectChainCut(limit, depth, total));
-                            return written;
+                            return (written, state);
                         }
 
                         state = SeasonEngine.Apply(state, reaction);
@@ -76,7 +78,7 @@ internal static class EffectChain
             level = next;
         }
 
-        return written;
+        return (written, state);
     }
 
     public static SeasonState Apply(SeasonState state, EffectChainCut e) => state;

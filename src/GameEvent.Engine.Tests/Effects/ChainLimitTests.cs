@@ -151,8 +151,41 @@ public class ChainLimitTests
         Assert.Equal(before, SeasonEngine.Apply(before, new EffectChainCut(EffectChainLimit.Depth, 4, 4)));
     }
 
-    // Invariant 12: whatever the handlers and the commands, no command writes more than 50 events besides a cut, no
-    // reaction goes deeper than 3 levels, the cut is always last, and the log replays to the state
+    [Fact]
+    public void A_fan_out_is_cut_by_events_on_the_last_allowed_level()
+    {
+        // 2 + 4 + 16 = 22 by level 2; level 3 would add 64: cut by events at 50, still on level 3
+        var s = Season(new PointsEcho(4));
+
+        s.Act(Bonus(s));
+
+        var cut = Assert.IsType<EffectChainCut>(s.Last.Events[^1]);
+        Assert.Equal((EffectChainLimit.Events, 3, Limits.MaxEventsPerCommand), (cut.Limit, cut.Depth, cut.Events));
+    }
+
+    [Fact]
+    public void A_chain_of_exactly_fifty_is_not_cut_when_nothing_follows()
+    {
+        // A handler that answers only the command's own points change with 48 reactions: 2 + 48 = 50, then silence
+        var s = Season(new FirstOnly(48));
+
+        s.Act(Bonus(s));
+
+        Assert.Equal(Limits.MaxEventsPerCommand, s.Last.Events.Count);
+        Assert.Empty(s.LastEvents<EffectChainCut>());
+    }
+
+    // Answers only the command's own points change (reason AdminAdjustment with a delta other than 1)
+    private sealed class FirstOnly(int count) : ITriggerHandler
+    {
+        public IEnumerable<IGameEvent> React(SeasonState state, IGameEvent trigger, EngineContext context) =>
+            trigger is PointsChanged { Delta: not 1 } changed
+                ? Enumerable.Repeat<IGameEvent>(new PointsChanged(changed.PlayerId, 1, PointsReason.AdminAdjustment, null), count)
+                : [];
+    }
+
+    // Invariant 12: whatever the handlers and the commands, a command writes exactly what an independent count of the
+    // levels says — reactions level by level, cut at the 4th level or when 50 events are written, the cut last
     [Property(MaxTest = 200)]
     public void Chains_stay_within_the_limits(byte fanOut, byte[] script)
     {
@@ -162,29 +195,55 @@ public class ChainLimitTests
             handlers.Add(new PointsEcho(1));
         }
 
+        var perTrigger = (fanOut % 5) + (fanOut % 3 == 0 ? 1 : 0);
         var s = Season([.. handlers]);
         foreach (var b in script.Take(20))
         {
-            s.Act(new AdjustPlayer(s.PlayerId(b % 2 == 0 ? "Вася" : "Петя"), "Бонус", PointsDelta: (b % 7) - 3));
+            var delta = (b % 7) - 3;
+            s.Act(new AdjustPlayer(s.PlayerId(b % 2 == 0 ? "Вася" : "Петя"), "Бонус", PointsDelta: delta));
+            if (!s.Last.IsAccepted)
+            {
+                Assert.Empty(s.Last.Events);
+                continue;
+            }
+
             var events = s.Last.Events;
-            var cuts = events.OfType<EffectChainCut>().ToList();
+            // The command's own events: the adjustment, and its points change when the delta is not 0
+            var (expectedCount, expectedCut) = Expected(own: delta == 0 ? 1 : 2, pointsChanges: delta == 0 ? 0 : 1, perTrigger);
 
-            Assert.True(cuts.Count <= 1, "More than one cut.");
-            Assert.True(cuts.Count == 0 || events[^1] is EffectChainCut, "A cut that is not last.");
-            Assert.True(events.Count - cuts.Count <= Limits.MaxEventsPerCommand, "More than 50 events.");
-            if (cuts.SingleOrDefault() is { } cut)
-            {
-                Assert.Equal(events.Count - 1, cut.Events);
-                Assert.True(cut.Limit == EffectChainLimit.Events || cut.Depth == Limits.MaxEffectDepth + 1);
-            }
-
-            // Without the loop the chain dies on its own: the fan-out of 0 writes only the command
-            if (handlers.Count == 1 && fanOut % 5 == 0)
-            {
-                Assert.Empty(cuts);
-            }
+            Assert.Equal(expectedCount, events.Count(e => e is not EffectChainCut));
+            Assert.Equal(expectedCut, events.OfType<EffectChainCut>().SingleOrDefault());
+            Assert.True(expectedCut is null || events[^1] is EffectChainCut, "A cut that is not last.");
         }
 
         Assert.Equal(s.State, SeasonEngine.Replay(s.Log));
+    }
+
+    // The reference: level by level, each points change answered by `perTrigger` more; cut past level 3 or at 50
+    private static (int Count, EffectChainCut? Cut) Expected(int own, int pointsChanges, int perTrigger)
+    {
+        var total = own;
+        var level = pointsChanges;
+        for (var depth = 1; ; depth++)
+        {
+            var produced = level * perTrigger;
+            if (produced == 0)
+            {
+                return (total, null);
+            }
+
+            if (depth > Limits.MaxEffectDepth)
+            {
+                return (total, new EffectChainCut(EffectChainLimit.Depth, depth, total));
+            }
+
+            if (total + produced > Limits.MaxEventsPerCommand)
+            {
+                return (Limits.MaxEventsPerCommand, new EffectChainCut(EffectChainLimit.Events, depth, Limits.MaxEventsPerCommand));
+            }
+
+            total += produced;
+            level = produced;
+        }
     }
 }
