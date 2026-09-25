@@ -604,6 +604,76 @@ public class CommandQueueTests
         Assert.Equal(0, await final.ManualEffects.CountAsync(ct));
     }
 
+    [Fact]
+    public async Task Projection_of_finishes_freezes_and_a_revoke_equals_the_fold_of_the_log()
+    {
+        await using var h = await QueueHarness.StartAsync();
+        var ct = TestContext.Current.CancellationToken;
+        var petya = Guid.Parse("10000000-0000-0000-0000-000000000002");
+        var masha = Guid.Parse("10000000-0000-0000-0000-000000000003");
+        var rules = RulesetJson.Default();
+
+        // A map of 1 step: every completion reaches the finish (C9a, D-99)
+        await AcceptedAsync(h, new CreateSeason(s_season, "Осень", rules with { Map = rules.Map with { LinearLength = 1 } }));
+        await AcceptedAsync(h, new ChangeSeasonStatus(SeasonStatus.Active));
+        foreach (var (id, name) in new[] { (s_vasya, "Вася"), (petya, "Петя"), (masha, "Маша") })
+        {
+            await AcceptedAsync(h, new AddSeasonPlayer(id, id, name));
+        }
+
+        // Given Вася, Петя and Маша finish in this order
+        var runs = new Dictionary<Guid, Guid>();
+        foreach (var player in new[] { s_vasya, petya, masha })
+        {
+            await AcceptedAsync(h, new RollGame(player));
+            await AcceptedAsync(h, new StartRun(player));
+            await AcceptedAsync(h, new CompleteRun(player, Difficulty.Normal));
+            h.Clock.UtcNow = h.Clock.UtcNow.AddHours(1);
+        }
+
+        // Then the finish columns equal the fold: orders 1, 2, 3 with their runs and times, nobody frozen
+        var finished = await AssertProjectionEqualsReplayAsync(h, ct);
+        foreach (var player in new[] { s_vasya, petya, masha })
+        {
+            runs[player] = finished.Players[player].Finish!.RunId;
+        }
+
+        await using (var db = h.NewDb())
+        {
+            var rows = await db.SeasonPlayers.AsNoTracking().ToDictionaryAsync(p => p.Id, ct);
+            Assert.Equal(((int?)1, (int?)2, (int?)3), (rows[s_vasya].FinishOrder, rows[petya].FinishOrder, rows[masha].FinishOrder));
+            Assert.Equal((Guid?)runs[petya], rows[petya].FinishRunId);
+            Assert.Equal((DateTimeOffset?)finished.Players[petya].Finish!.FinishedAt, rows[petya].FinishedAt);
+            Assert.All(rows.Values, r => Assert.False(r.Frozen));
+
+            // Q-4 / Q-3: the bonus held and the surplus are columns too
+            Assert.Equal(
+                (finished.Players[petya].Finish!.Bonus, finished.Players[petya].Finish!.Surplus),
+                (rows[petya].FinishBonus, rows[petya].FinishSurplus));
+            Assert.Equal(0, rows[s_vasya].FinishBonus);
+        }
+
+        // When, after a restart, Петя's finish is approved and Вася's finishing run is rejected
+        await h.RestartAsync();
+        await AcceptedAsync(h, new ApproveProof(runs[petya], Comment: "Видел на стриме"));
+        await AcceptedAsync(h, new RejectProof(runs[s_vasya], "На скрине другая игра"));
+
+        // Then Вася's finish is gone, Петя is first and frozen, Маша keeps her order
+        var revoked = await AssertProjectionEqualsReplayAsync(h, ct);
+        Assert.Null(revoked.Players[s_vasya].Finish);
+        Assert.True(revoked.Players[petya].Finish!.Frozen);
+        await using var final = h.NewDb();
+        var after = await final.SeasonPlayers.AsNoTracking().ToDictionaryAsync(p => p.Id, ct);
+        Assert.Equal(((int?)null, (Guid?)null, (DateTimeOffset?)null, false), (after[s_vasya].FinishOrder, after[s_vasya].FinishRunId, after[s_vasya].FinishedAt, after[s_vasya].Frozen));
+        Assert.Equal(((int?)2, true), (after[petya].FinishOrder, after[petya].Frozen));
+        Assert.Equal(((int?)3, false), (after[masha].FinishOrder, after[masha].Frozen));
+        Assert.Equal(revoked.Players[petya].Points, after[petya].Points);
+
+        // Q-4: Петя is first (no bonus), Маша second holds the second place's bonus
+        Assert.Equal((0, revoked.Players[masha].Finish!.Bonus), (after[petya].FinishBonus, after[masha].FinishBonus));
+        Assert.Equal(0, after[s_vasya].FinishBonus);
+    }
+
     private static Guid OfferedIn(Infrastructure.Queue.CommandOutcome outcome) =>
         outcome.Events.Select(e => e.Event).OfType<GameRolled>().Single().GameId;
 

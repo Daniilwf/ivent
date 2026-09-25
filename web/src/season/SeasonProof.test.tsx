@@ -46,9 +46,9 @@ function season(
       { id: 'finish', type: 'finish' },
     ],
     players: [
-      { id: me, name: 'Вася', cellId: 'c1', points: 4, phase: 'idle' },
-      { id: petya, name: 'Петя', cellId: 'start', points: 0, phase: 'idle' },
-      { id: masha, name: 'Маша', cellId: 'start', points: 0, phase: 'idle' },
+      { id: me, name: 'Вася', cellId: 'c1', points: 4, phase: 'idle', finishOrder: null },
+      { id: petya, name: 'Петя', cellId: 'start', points: 0, phase: 'idle', finishOrder: null },
+      { id: masha, name: 'Маша', cellId: 'start', points: 0, phase: 'idle', finishOrder: null },
     ],
     me: {
       playerId: me,
@@ -63,6 +63,7 @@ function season(
       dropPenalty: null,
       techRerollOpen: false,
       challengesEnabled: false,
+      finish: null,
     },
     lastSequence: 3,
   };

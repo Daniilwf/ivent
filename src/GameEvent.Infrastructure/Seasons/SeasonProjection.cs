@@ -103,6 +103,8 @@ internal static class SeasonProjection
             record.FinishRunId = player.Finish?.RunId;
             record.FinishedAt = player.Finish?.FinishedAt;
             record.Frozen = player.Finish?.Frozen ?? false;
+            record.FinishBonus = player.Finish?.Bonus ?? 0;
+            record.FinishSurplus = player.Finish?.Surplus ?? 0;
 
             // Exclusions only grow within a season (D-08); a tech reroll turned into a drop changes its reason (D-11).
             var known = old?.Exclusions.ToDictionary(x => x.GameId, x => x.Reason) ?? [];
@@ -151,6 +153,8 @@ internal static class SeasonProjection
             record.CompletedAt = run.CompletedAt;
             record.ReachedFinish = run.ReachedFinish;
             record.Moved = run.Moved;
+            record.AfterFinish = run.AfterFinish;
+            record.FreeMode = run.FreeMode;
 
             if (run.Proof is { } proof && proof != before.Runs.GetValueOrDefault(id)?.Proof)
             {
@@ -248,7 +252,7 @@ internal static class SeasonProjection
                     [.. exclusions[p.Id].OrderBy(r => r.GameId).Select(r => new GameExclusion(r.GameId, r.Reason))],
                     p.RerollsThisRoll,
                     p.FinishOrder is { } order
-                        ? new Engine.Finish.FinishState(order, p.FinishRunId!.Value, p.FinishedAt!.Value, p.Frozen)
+                        ? new Engine.Finish.FinishState(order, p.FinishRunId!.Value, p.FinishedAt!.Value, p.Frozen, p.FinishBonus, p.FinishSurplus)
                         : null,
                     p.ActiveRunId)),
             Runs = runs.ToImmutableSortedDictionary(
@@ -272,7 +276,9 @@ internal static class SeasonProjection
                             proof.SubmittedAt,
                             proof.Comment)
                         : null,
-                    r.Moved)),
+                    r.Moved,
+                    r.AfterFinish,
+                    r.FreeMode)),
             ManualEffects = effects.ToImmutableSortedDictionary(
                 x => x.Id,
                 x => new PendingManualEffect(x.Id, x.PlayerId, x.DrawEvent, x.Source, x.RunId)),

@@ -1,4 +1,5 @@
 using GameEvent.Engine.Effects;
+using GameEvent.Engine.Finish;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Map;
 using GameEvent.Engine.Runs;
@@ -55,16 +56,17 @@ public sealed record ProofRejected(Guid RunId, Guid PlayerId, string Comment, Da
 public static class ProofReviewOrder
 {
     /// <summary>
-    /// Completed runs not yet approved or rejected: those that brought their player to the finish first, then the
-    /// earliest completed; ties by run id.
+    /// Completed runs not yet approved or rejected: the runs of standing finishers up to their finish first (they decide the
+    /// places, Q-3), then the earliest completed; ties by run id.
     /// </summary>
     public static IReadOnlyList<Guid> Order(SeasonState state)
     {
         ArgumentNullException.ThrowIfNull(state);
 
+        // A finisher's runs up to the finish decide the first place (Q-3): they go on top, with the run that reached it.
         return [.. state.Runs.Values
             .Where(r => r.Status == RunStatus.Completed && r.Proof?.Status is null or ProofStatus.Pending)
-            .OrderByDescending(r => r.ReachedFinish)
+            .OrderByDescending(r => state.Players[r.PlayerId].Finish is not null && !r.AfterFinish)
             .ThenBy(r => r.CompletedAt)
             .ThenBy(r => r.RunId)
             .Select(r => r.RunId)];
@@ -180,6 +182,9 @@ internal static class ProofReview
         }
 
         events.Add(new ProofApproved(run.RunId, run.PlayerId, withoutProof, command.Comment, context.Clock.UtcNow));
+
+        // The first place becomes final once every run up to the finish is approved (Q-3).
+        events.AddRange(Finishes.FreezeIfDue(events.Aggregate(state, SeasonEngine.Apply)));
         return Decision.Accept(events);
     }
 
@@ -208,14 +213,23 @@ internal static class ProofReview
         var player = state.Players[run.PlayerId];
         var events = new List<IGameEvent> { new ProofRejected(run.RunId, run.PlayerId, command.Comment, context.Clock.UtcNow) };
 
+        // The frozen first loses nothing (Q-3); his runs up to the finish are approved, so only later ones get here.
+        // The rejected run's pending difficulty event still does not apply (D-98, D-99).
+        if (Finishes.IsFrozen(player))
+        {
+            events.AddRange(PendingDifficultyEvents(state, run, command.Comment));
+            return Decision.Accept(events);
+        }
+
         var points = run.Dice.Sum(d => d.Value) + run.ChallengeDice.Sum(d => d.Value);
         if (points != 0)
         {
             events.Add(new PointsChanged(run.PlayerId, -points, PointsReason.ProofRejected, run.RunId));
         }
 
-        // The cells this run really moved the token (steps that burned at the finish gave none).
-        if (run.Moved != 0)
+        // The cells this run really moved the token (steps that burned at the finish gave none); a finisher's position
+        // changes only through a run up to the finish, and then by the surplus rule (Q-3).
+        if (player.Finish is null && run.Moved != 0)
         {
             var path = run.Moved > 0
                 ? Movement.Backward(state.Map, player.Path, run.Moved)
@@ -235,12 +249,21 @@ internal static class ProofReview
             events.Add(new CoinsChanged(run.PlayerId, -coins, CoinsReason.ProofRejected, run.RunId));
         }
 
-        events.AddRange(state.ManualEffects.Values
-            .Where(e => e.RunId == run.RunId && e.Source == ManualEffectSource.Difficulty)
-            .Select(e => new ManualEffectResolved(e.EffectId, e.PlayerId, e.RunId, ManualEffectOutcome.NotApplicable, command.Comment)));
+        events.AddRange(PendingDifficultyEvents(state, run, command.Comment));
+
+        if (Finishes.CountsForFinish(player, run))
+        {
+            var after = events.Aggregate(state, SeasonEngine.Apply);
+            events.AddRange(Finishes.AfterReduction(after, after.Players[player.PlayerId], after.Runs[run.RunId], points, MoveReason.ProofRejected));
+        }
 
         return Decision.Accept(events);
     }
+
+    private static IEnumerable<IGameEvent> PendingDifficultyEvents(SeasonState state, RunState run, string comment) =>
+        state.ManualEffects.Values
+            .Where(e => e.RunId == run.RunId && e.Source == ManualEffectSource.Difficulty)
+            .Select(e => new ManualEffectResolved(e.EffectId, e.PlayerId, e.RunId, ManualEffectOutcome.NotApplicable, comment));
 
     public static SeasonState Apply(SeasonState state, ProofSubmitted e) =>
         Update(state, e.RunId, run => run with

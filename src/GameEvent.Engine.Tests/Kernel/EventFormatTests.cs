@@ -210,9 +210,15 @@ public class EventFormatTests
         },
         {
             "player-finished",
-            new PlayerFinished(s_player, s_run, 2, s_at),
+            new PlayerFinished(s_player, s_run, 2, s_at, 3),
             1,
-            """{"playerId":"10000000-0000-0000-0000-000000000001","runId":"00000000-0000-0000-0000-000000000001","order":2,"finishedAt":"2026-10-01T12:30:00+00:00"}"""
+            """{"playerId":"10000000-0000-0000-0000-000000000001","runId":"00000000-0000-0000-0000-000000000001","order":2,"finishedAt":"2026-10-01T12:30:00+00:00","surplus":3}"""
+        },
+        {
+            "finish-surplus-changed",
+            new FinishSurplusChanged(s_player, -2),
+            1,
+            """{"playerId":"10000000-0000-0000-0000-000000000001","delta":-2}"""
         },
         {
             "player-frozen",

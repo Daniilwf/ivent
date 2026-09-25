@@ -93,6 +93,7 @@ public static class SeasonEngine
             PlayerFinished e => Finishing.Apply(state, e),
             PlayerFrozen e => Finishing.Apply(state, e),
             PlayerFinishRevoked e => Finishing.Apply(state, e),
+            FinishSurplusChanged e => Finishing.Apply(state, e),
             ProofApproved e => ProofReview.Apply(state, e),
             ProofRejected e => ProofReview.Apply(state, e),
             RunDifficultyChanged e => Corrections.Apply(state, e),

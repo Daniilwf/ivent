@@ -23,7 +23,8 @@ public sealed record SeasonState(
     MapGraph Map,
     ImmutableSortedDictionary<Guid, SeasonPlayer> Players,
     ImmutableSortedDictionary<Guid, RunState> Runs,
-    ImmutableSortedDictionary<Guid, PendingManualEffect> ManualEffects)
+    ImmutableSortedDictionary<Guid, PendingManualEffect> ManualEffects,
+    int FinishesSoFar = 0)
 {
     public static SeasonState Empty { get; } =
         new(
@@ -54,7 +55,8 @@ public sealed record SeasonState(
         && Map == other.Map
         && Players.SequenceEqual(other.Players)
         && Runs.SequenceEqual(other.Runs)
-        && ManualEffects.SequenceEqual(other.ManualEffects);
+        && ManualEffects.SequenceEqual(other.ManualEffects)
+        && FinishesSoFar == other.FinishesSoFar;
 
     public override int GetHashCode() => HashCode.Combine(SeasonId, Players.Count, Runs.Count);
 }

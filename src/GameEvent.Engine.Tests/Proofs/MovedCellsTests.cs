@@ -1,3 +1,4 @@
+using GameEvent.Engine.Finish;
 using GameEvent.Engine.Map;
 using GameEvent.Engine.Proofs;
 using GameEvent.Engine.Runs;
@@ -14,9 +15,12 @@ namespace GameEvent.Engine.Tests.Proofs;
 /// <see cref="RunState.Moved"/> counts the cells entered, not the steps rolled: steps burned at the finish give no
 /// cells. The reject moves back exactly those cells; an hours correction down moves back only the cells beyond the new
 /// dice sum. <see cref="RunState.ReachedFinish"/> follows the run's latest move, so a correction that leaves the finish
-/// clears it and the run leaves the top of the review queue.
+/// clears it. Since C9a (Q-3, D-99) a finisher's runs up to the finish go through the surplus — the steps burned at the
+/// finish: a reduction within it moves nothing, beyond it the finish is revoked and the token goes back by the rest; a
+/// correction never brings a player who has not finished to the finish. The review queue puts the runs of standing
+/// finishers up to their finish on top, by completion time.
 /// The map is 8 steps; every game is 9 hours, so three d4 by hours (hoursPerDie 3). Вася's run A (2 + 2 + 2) brings
-/// him to c6; run B (1 + 4 + 2 = 7) is 2 cells from the finish, so 5 of its steps burn.
+/// him to c6; run B (1 + 4 + 2 = 7) is 2 cells from the finish, so 5 of its steps burn: surplus 5.
 /// </summary>
 public class MovedCellsTests
 {
@@ -47,7 +51,10 @@ public class MovedCellsTests
         Assert.Equal(13, s.Player("Вася").Points);
         Assert.Equal((6, false), (s.State.Runs[runA].Moved, s.State.Runs[runA].ReachedFinish));
         Assert.Equal((2, true), (s.State.Runs[runB].Moved, s.State.Runs[runB].ReachedFinish));
-        Assert.Equal([runB, runA], ProofReviewOrder.Order(s.State));
+        Assert.Equal(5, s.Player("Вася").Finish!.Surplus);
+
+        // Q-3: both runs are up to the finish — on top, by completion time
+        Assert.Equal([runA, runB], ProofReviewOrder.Order(s.State));
     }
 
     [Fact]
@@ -120,14 +127,16 @@ public class MovedCellsTests
         ScenarioAssert.Accepted(s);
         Assert.Equal(new PointsChanged(vasya, -2, PointsReason.RunCorrection, runB), Assert.Single(s.LastEvents<PointsChanged>()));
         Assert.Empty(s.LastEvents<PlayerMoved>());
-        Assert.Equal((11, LinearMap.FinishId), (s.Player("Вася").Points, s.Player("Вася").CellId));
+        Assert.Equal([new FinishSurplusChanged(vasya, -2)], s.LastEvents<FinishSurplusChanged>());
+        Assert.Empty(s.LastEvents<PlayerFinishRevoked>());
+        Assert.Equal((11, LinearMap.FinishId, 3), (s.Player("Вася").Points, s.Player("Вася").CellId, s.Player("Вася").Finish!.Surplus));
         Assert.Equal((2, true), (s.State.Runs[runB].Moved, s.State.Runs[runB].ReachedFinish));
     }
 
     [Fact]
-    public void Correction_down_below_the_moved_cells_moves_back_the_difference()
+    public void Correction_down_beyond_the_surplus_revokes_the_finish_and_moves_back_the_rest()
     {
-        // 9 → 3 hours leaves one die (1): 2 cells moved, the new sum 1 → back 1, not 6
+        // 9 → 3 hours leaves one die (1): k = 6 > surplus 5 — the finish goes, back 6 − 5 = 1 cell, not 6
         var (s, _, runB) = Overshoot();
         var vasya = s.PlayerId("Вася");
 
@@ -135,27 +144,32 @@ public class MovedCellsTests
 
         ScenarioAssert.Accepted(s);
         Assert.Equal(new PointsChanged(vasya, -6, PointsReason.RunCorrection, runB), Assert.Single(s.LastEvents<PointsChanged>()));
-        Assert.Equal(
-            new PlayerMoved(vasya, LinearMap.FinishId, "c7", -1, ["c7"], MoveReason.RunCorrection, runB),
-            Assert.Single(s.LastEvents<PlayerMoved>()));
+        Assert.Equal(vasya, Assert.Single(s.LastEvents<PlayerFinishRevoked>()).PlayerId);
+        var moved = Assert.Single(s.LastEvents<PlayerMoved>());
+        Assert.Equal((vasya, LinearMap.FinishId, "c7", MoveReason.RunCorrection, (Guid?)runB), (moved.PlayerId, moved.From, moved.To, moved.Reason, moved.RunId));
+        Assert.Equal(["c7"], moved.Path);
         Assert.Equal((7, "c7"), (s.Player("Вася").Points, s.Player("Вася").CellId));
+        Assert.Null(s.Player("Вася").Finish);
         Assert.Equal(1, s.State.Runs[runB].Moved);
     }
 
     [Fact]
     public void Two_corrections_down_add_up_to_the_same_cells()
     {
-        // 9 → 6 (sum 5, nothing) and then 6 → 3 (sum 1, back 1): the same place as one correction 9 → 3
+        // 9 → 6 (k = 2 within the surplus 5: surplus 3) and then 6 → 3 (k = 4 > 3: back 1): the same place as 9 → 3
         var (s, _, runB) = Overshoot();
+        var vasya = s.PlayerId("Вася");
         s.Act(new CorrectRunHours(runB, 6, Hours));
         ScenarioAssert.Accepted(s);
+        Assert.Equal([new FinishSurplusChanged(vasya, -2)], s.LastEvents<FinishSurplusChanged>());
 
         s.Act(new CorrectRunHours(runB, 3, Hours));
 
         ScenarioAssert.Accepted(s);
-        Assert.Equal(
-            new PlayerMoved(s.PlayerId("Вася"), LinearMap.FinishId, "c7", -1, ["c7"], MoveReason.RunCorrection, runB),
-            Assert.Single(s.LastEvents<PlayerMoved>()));
+        Assert.Single(s.LastEvents<PlayerFinishRevoked>());
+        var moved = Assert.Single(s.LastEvents<PlayerMoved>());
+        Assert.Equal((LinearMap.FinishId, "c7", MoveReason.RunCorrection), (moved.From, moved.To, moved.Reason));
+        Assert.Equal(["c7"], moved.Path);
         Assert.Equal((7, "c7", 1), (s.Player("Вася").Points, s.Player("Вася").CellId, s.State.Runs[runB].Moved));
     }
 
@@ -170,29 +184,43 @@ public class MovedCellsTests
 
         ScenarioAssert.Accepted(s);
         Assert.Empty(s.LastEvents<PlayerMoved>());
-        Assert.Equal((16, LinearMap.FinishId), (s.Player("Вася").Points, s.Player("Вася").CellId));
+        Assert.Equal([new FinishSurplusChanged(s.PlayerId("Вася"), 3)], s.LastEvents<FinishSurplusChanged>());
+        Assert.Equal((16, LinearMap.FinishId, 8), (s.Player("Вася").Points, s.Player("Вася").CellId, s.Player("Вася").Finish!.Surplus));
         Assert.Equal((2, true), (s.State.Runs[runB].Moved, s.State.Runs[runB].ReachedFinish));
     }
 
     // ---- ReachedFinish follows the latest move (D-98 (2)) ----
 
     [Fact]
-    public void Correction_that_leaves_the_finish_clears_reached_finish_and_the_run_leaves_the_top()
+    public void Correction_that_revokes_the_finish_clears_reached_finish_and_the_runs_leave_the_top()
     {
-        var (s, runA, runB) = Overshoot();
-        Assert.Equal([runB, runA], ProofReviewOrder.Order(s.State));
+        // Петя completes P first; Вася's A and B are up to his finish, so they are on top. 9 → 3 hours revokes the finish:
+        // B's latest move now ends on c7 and both of Вася's runs fall back to completion time, behind P
+        var s = Scenario.New().WithMapLength(8).WithCategory("Horror");
+        foreach (var title in new[] { "Silent Hill", "Alan Wake", "Dead Space", "Outlast" })
+        {
+            s.WithGame(title, 9, "Horror");
+        }
+
+        s.WithPlayers("Вася", "Петя");
+        var petyaRun = CompleteRun(s, "Петя", [1, 1, 1]);
+        var runA = CompleteRun(s, "Вася", [2, 2, 2]);
+        var runB = CompleteRun(s, "Вася", [1, 4, 2]);
+        Assert.Equal([runA, runB, petyaRun], ProofReviewOrder.Order(s.State));
 
         s.Act(new CorrectRunHours(runB, 3, Hours));
 
         ScenarioAssert.Accepted(s);
+        Assert.Null(s.Player("Вася").Finish);
         Assert.False(s.State.Runs[runB].ReachedFinish);
-        Assert.Equal([runA, runB], ProofReviewOrder.Order(s.State));
+        Assert.Equal([petyaRun, runA, runB], ProofReviewOrder.Order(s.State));
     }
 
     [Fact]
-    public void Correction_that_brings_the_player_back_to_the_finish_sets_reached_finish_again()
+    public void Correction_up_after_a_revoke_does_not_bring_the_player_back_to_the_finish()
     {
-        // Back to c7 by 9 → 3 hours, then 3 → 6 adds a die 3: forward 1 cell to the finish, 2 steps burn
+        // Back to c7 by 9 → 3 hours (the finish revoked), then 3 → 6 adds a die 3: the finish is one cell ahead, but a
+        // correction never finishes (RR8) — the token stays on c7, the points come
         var (s, runA, runB) = Overshoot();
         s.Act(new CorrectRunHours(runB, 3, Hours));
         ScenarioAssert.Accepted(s);
@@ -201,25 +229,49 @@ public class MovedCellsTests
         s.Act(new CorrectRunHours(runB, 6, Hours));
 
         ScenarioAssert.Accepted(s);
-        Assert.Equal(
-            new PlayerMoved(s.PlayerId("Вася"), "c7", LinearMap.FinishId, 3, [LinearMap.FinishId], MoveReason.RunCorrection, runB),
-            Assert.Single(s.LastEvents<PlayerMoved>()));
-        Assert.Equal((2, true), (s.State.Runs[runB].Moved, s.State.Runs[runB].ReachedFinish));
-        Assert.Equal([runB, runA], ProofReviewOrder.Order(s.State));
+        Assert.Empty(s.LastEvents<PlayerMoved>());
+        Assert.Empty(s.LastEvents<PlayerFinished>());
+        Assert.Equal((10, "c7"), (s.Player("Вася").Points, s.Player("Вася").CellId));
+        Assert.Null(s.Player("Вася").Finish);
+        Assert.Equal((1, false), (s.State.Runs[runB].Moved, s.State.Runs[runB].ReachedFinish));
+        Assert.Equal([runA, runB], ProofReviewOrder.Order(s.State));
     }
 
     [Fact]
-    public void Correction_of_another_run_does_not_touch_reached_finish()
+    public void Correction_of_an_earlier_run_within_the_surplus_keeps_the_player_on_the_finish()
     {
-        // Run A's correction moves the player off the finish, but run B's latest move still ended there
+        // Run A 9 → 3 hours leaves one die (2): k = 4 within the surplus 5 — no move, surplus 1; B's flag stays
         var (s, runA, runB) = Overshoot();
 
         s.Act(new CorrectRunHours(runA, 3, Hours));
 
         ScenarioAssert.Accepted(s);
-        Assert.NotEqual(LinearMap.FinishId, s.Player("Вася").CellId);
+        Assert.Equal([new FinishSurplusChanged(s.PlayerId("Вася"), -4)], s.LastEvents<FinishSurplusChanged>());
+        Assert.Empty(s.LastEvents<PlayerMoved>());
+        Assert.Equal((LinearMap.FinishId, 1), (s.Player("Вася").CellId, s.Player("Вася").Finish!.Surplus));
         Assert.True(s.State.Runs[runB].ReachedFinish);
         Assert.False(s.State.Runs[runA].ReachedFinish);
+        Assert.Equal(6, s.State.Runs[runA].Moved);
+    }
+
+    [Fact]
+    public void Second_reduction_beyond_the_remaining_surplus_moves_back_the_rest()
+    {
+        // Run A 9 → 3 hours takes 4 of the surplus 5 (1 left); then B easy — ⌈1·2/4⌉ + ⌈4·2/4⌉ + ⌈2·2/4⌉ = 1 + 2 + 1 = 4,
+        // k = 3 > 1: the finish goes, back 2 cells to c6
+        var (s, runA, runB) = Overshoot();
+        s.Act(new CorrectRunHours(runA, 3, Hours));
+        ScenarioAssert.Accepted(s);
+        Assert.Equal(1, s.Player("Вася").Finish!.Surplus);
+
+        s.Act(new ChangeRunDifficulty(runB, Difficulty.Easy, "По пруфу — лёгкая"));
+
+        ScenarioAssert.Accepted(s);
+        Assert.Single(s.LastEvents<PlayerFinishRevoked>());
+        var moved = Assert.Single(s.LastEvents<PlayerMoved>());
+        Assert.Equal((LinearMap.FinishId, "c6", MoveReason.RunCorrection, (Guid?)runB), (moved.From, moved.To, moved.Reason, moved.RunId));
+        Assert.Equal(["c7", "c6"], moved.Path);
+        Assert.False(s.State.Runs[runB].ReachedFinish);
     }
 
     // ---- The log ----

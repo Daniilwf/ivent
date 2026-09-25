@@ -46,7 +46,9 @@ public sealed record RunReview(int Rating, string? Text);
 /// <summary>
 /// An attempt to complete one rolled game. <see cref="CompletedAt"/> orders the proof queue; <see cref="ReachedFinish"/>
 /// says a move of this run brought its player to the finish (SPEC: such proofs go on top); <see cref="Moved"/> is the net
-/// steps its moves took, which a reject takes back (D-98).
+/// steps its moves took, which a reject takes back (D-98). <see cref="AfterFinish"/>: completed after its player had
+/// finished, so it does not count for the position (Q-3); <see cref="FreeMode"/>: completed while its player was first,
+/// so it does not make the game completed in the season (D-16).
 /// </summary>
 public sealed record RunState(
     Guid RunId,
@@ -65,4 +67,6 @@ public sealed record RunState(
     DateTimeOffset? CompletedAt = null,
     bool ReachedFinish = false,
     Proofs.ProofState? Proof = null,
-    int Moved = 0);
+    int Moved = 0,
+    bool AfterFinish = false,
+    bool FreeMode = false);

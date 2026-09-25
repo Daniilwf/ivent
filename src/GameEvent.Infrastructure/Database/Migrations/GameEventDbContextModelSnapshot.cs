@@ -316,6 +316,9 @@ namespace GameEvent.Infrastructure.Database.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("TEXT");
 
+                    b.Property<bool>("AfterFinish")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("ChallengeDiceJson")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -330,6 +333,9 @@ namespace GameEvent.Infrastructure.Database.Migrations
                     b.Property<string>("Difficulty")
                         .HasMaxLength(20)
                         .HasColumnType("TEXT");
+
+                    b.Property<bool>("FreeMode")
+                        .HasColumnType("INTEGER");
 
                     b.Property<Guid>("GameId")
                         .HasColumnType("TEXT");
@@ -395,11 +401,17 @@ namespace GameEvent.Infrastructure.Database.Migrations
                     b.Property<int>("Coins")
                         .HasColumnType("INTEGER");
 
+                    b.Property<int>("FinishBonus")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int?>("FinishOrder")
                         .HasColumnType("INTEGER");
 
                     b.Property<Guid?>("FinishRunId")
                         .HasColumnType("TEXT");
+
+                    b.Property<int>("FinishSurplus")
+                        .HasColumnType("INTEGER");
 
                     b.Property<long?>("FinishedAt")
                         .HasColumnType("INTEGER");

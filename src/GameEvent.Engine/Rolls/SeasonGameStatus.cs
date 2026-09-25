@@ -38,6 +38,8 @@ internal sealed class SeasonGameStatus
         {
             switch (run.Status)
             {
+                case RunStatus.Completed when run.FreeMode:
+                    break;
                 case RunStatus.Completed:
                     // «Уже прошёл» wins over «Сейчас играет».
                     _misses[run.GameId] = new RollMiss(run.GameId, RollMissReason.CompletedInSeason, run.PlayerId);

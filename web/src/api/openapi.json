@@ -3042,6 +3042,23 @@
           }
         }
       },
+      "MyFinishView": {
+        "required": [
+          "order",
+          "frozen"
+        ],
+        "type": "object",
+        "properties": {
+          "order": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "frozen": {
+            "type": "boolean"
+          }
+        },
+        "description": "The player's own finish (D-99): order among the finishers and whether the first place is final and frozen."
+      },
       "MyTurnView": {
         "required": [
           "playerId",
@@ -3055,7 +3072,8 @@
           "dropHintMinutes",
           "dropPenalty",
           "techRerollOpen",
-          "challengesEnabled"
+          "challengesEnabled",
+          "finish"
         ],
         "type": "object",
         "properties": {
@@ -3144,6 +3162,16 @@
           },
           "challengesEnabled": {
             "type": "boolean"
+          },
+          "finish": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/MyFinishView"
+              }
+            ]
           }
         },
         "description": "The signed-in player's own turn. While playing: `dropHintMinutes` is `roll.minPlayMinutesBeforeDrop` until\nthat much has been played by the server clock (only a hint: D-09), then null; `dropPenalty` is what a drop costs\nunder the rules in force; `techRerollOpen` says whether the player may still tech-reroll themselves (D-94);\n`challengesEnabled` says whether a challenge may be claimed on completion (`features.challenges`, D-96)."
@@ -3218,7 +3246,8 @@
           "name",
           "cellId",
           "points",
-          "phase"
+          "phase",
+          "finishOrder"
         ],
         "type": "object",
         "properties": {
@@ -3238,8 +3267,16 @@
           },
           "phase": {
             "$ref": "#/components/schemas/TurnPhase"
+          },
+          "finishOrder": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
           }
-        }
+        },
+        "description": "A player on the map and the leaderboard; `finishOrder` is their order among the finishers, null before the finish."
       },
       "PlayerWithoutGamesView": {
         "required": [

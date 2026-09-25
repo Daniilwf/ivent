@@ -2308,6 +2308,12 @@ export interface components {
             /** Format: int32 */
             linearLength: number;
         };
+        /** @description The player's own finish (D-99): order among the finishers and whether the first place is final and frozen. */
+        MyFinishView: {
+            /** Format: int32 */
+            order: number;
+            frozen: boolean;
+        };
         /**
          * @description The signed-in player's own turn. While playing: `dropHintMinutes` is `roll.minPlayMinutesBeforeDrop` until
          *     that much has been played by the server clock (only a hint: D-09), then null; `dropPenalty` is what a drop costs
@@ -2329,6 +2335,7 @@ export interface components {
             dropPenalty: null | components["schemas"]["DropPenaltyView"];
             techRerollOpen: boolean;
             challengesEnabled: boolean;
+            finish: null | components["schemas"]["MyFinishView"];
         };
         NominationRules: {
             auto: components["schemas"]["EquatableArrayOfAutoNomination"];
@@ -2349,6 +2356,7 @@ export interface components {
             /** Format: int32 */
             sides: number;
         };
+        /** @description A player on the map and the leaderboard; `finishOrder` is their order among the finishers, null before the finish. */
         PlayerView: {
             /** Format: uuid */
             id: string;
@@ -2357,6 +2365,8 @@ export interface components {
             /** Format: int32 */
             points: number;
             phase: components["schemas"]["TurnPhase"];
+            /** Format: int32 */
+            finishOrder: null | number;
         };
         /** @description A player whose next roll would find no game: the empty-pool signal. */
         PlayerWithoutGamesView: {
