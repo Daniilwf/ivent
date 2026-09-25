@@ -14,8 +14,8 @@ completion-rolled v1 {"runId":"00000000-0000-0000-0000-000000000001","playerId":
 points-changed v1 {"playerId":"10000000-0000-0000-0000-000000000001","delta":5,"reason":"completionRoll","runId":"00000000-0000-0000-0000-000000000001"}
 player-moved v1 {"playerId":"10000000-0000-0000-0000-000000000001","from":"start","to":"c5","steps":5,"path":["c1","c2","c3","c4","c5"],"reason":"completionRoll","runId":"00000000-0000-0000-0000-000000000001"}
 coins-changed v1 {"playerId":"10000000-0000-0000-0000-000000000001","delta":6,"reason":"completionReward","runId":"00000000-0000-0000-0000-000000000001"}
-# SubmitProof { PlayerId = 10000000-0000-0000-0000-000000000001, RunId = 00000000-0000-0000-0000-000000000001, Links = [https://imgur.com/a/other], Note = , WitnessId =  }
-proof-submitted v1 {"runId":"00000000-0000-0000-0000-000000000001","playerId":"10000000-0000-0000-0000-000000000001","links":["https://imgur.com/a/other"],"note":null,"witnessId":null,"submittedAt":"2026-10-01T19:00:00+00:00"}
+# SubmitProof { PlayerId = 10000000-0000-0000-0000-000000000001, RunId = 00000000-0000-0000-0000-000000000001, Links = [https://imgur.com/a/other], Note = , WitnessId = , Files = [] }
+proof-submitted v2 {"runId":"00000000-0000-0000-0000-000000000001","playerId":"10000000-0000-0000-0000-000000000001","links":["https://imgur.com/a/other"],"note":null,"witnessId":null,"submittedAt":"2026-10-01T19:00:00+00:00","files":[]}
 # RejectProof { RunId = 00000000-0000-0000-0000-000000000001, Comment = На скрине другая игра }
 proof-rejected v1 {"runId":"00000000-0000-0000-0000-000000000001","playerId":"10000000-0000-0000-0000-000000000001","comment":"На скрине другая игра","rejectedAt":"2026-10-01T19:00:00+00:00"}
 points-changed v1 {"playerId":"10000000-0000-0000-0000-000000000001","delta":-5,"reason":"proofRejected","runId":"00000000-0000-0000-0000-000000000001"}

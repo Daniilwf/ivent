@@ -17,8 +17,9 @@ public enum ProofStatus
 }
 
 /// <summary>
-/// The proof of a completed run (D-98): links to screenshots or videos (http/https), a note, or another player of the
-/// season who saw the run. <see cref="SubmittedAt"/> is null when the admin approved without a proof («без скрина»).
+/// The proof of a completed run (D-98): links to screenshots or videos (http/https), uploaded screenshots
+/// (<see cref="Files"/>, D-116), a note, or another player of the season who saw the run. <see cref="SubmittedAt"/> is
+/// null when the admin approved without a proof («без скрина»).
 /// </summary>
 public sealed record ProofState(
     ProofStatus Status,
@@ -26,10 +27,18 @@ public sealed record ProofState(
     string? Note,
     Guid? WitnessId,
     DateTimeOffset? SubmittedAt,
-    string? Comment);
+    string? Comment,
 
-/// <summary>The player sends the proof of their completed run; while unchecked, a new one replaces the old (D-98).</summary>
-public sealed record SubmitProof(Guid PlayerId, Guid RunId, EquatableArray<string> Links, string? Note = null, Guid? WitnessId = null) : ICommand;
+    // Not written while empty: undo snapshots of proofs without screenshots keep their frozen format (D-116)
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    EquatableArray<Guid> Files = default);
+
+/// <summary>
+/// The player sends the proof of their completed run; while unchecked, a new one replaces the old (D-98).
+/// <see cref="Files"/> — screenshots the player uploaded (D-116): the site checks they are his before the command.
+/// </summary>
+public sealed record SubmitProof(
+    Guid PlayerId, Guid RunId, EquatableArray<string> Links, string? Note = null, Guid? WitnessId = null, EquatableArray<Guid> Files = default) : ICommand;
 
 /// <summary>
 /// The admin approves a run: with its proof, or without one («одобрить без скрина», a comment then). A
@@ -41,9 +50,10 @@ public sealed record ApproveProof(Guid RunId, Difficulty? Difficulty = null, str
 /// <summary>The admin rejects a run (D-15): its points, cells and completion coins are taken back.</summary>
 public sealed record RejectProof(Guid RunId, string Comment) : ICommand;
 
-[EventType("proof-submitted")]
+/// <summary>The player's proof, as checked. v2 (D-116) adds <see cref="Files"/>; a v1 record reads with none.</summary>
+[EventType("proof-submitted", version: 2)]
 public sealed record ProofSubmitted(
-    Guid RunId, Guid PlayerId, EquatableArray<string> Links, string? Note, Guid? WitnessId, DateTimeOffset SubmittedAt) : IGameEvent;
+    Guid RunId, Guid PlayerId, EquatableArray<string> Links, string? Note, Guid? WitnessId, DateTimeOffset SubmittedAt, EquatableArray<Guid> Files) : IGameEvent;
 
 [EventType("proof-approved")]
 public sealed record ProofApproved(Guid RunId, Guid PlayerId, bool WithoutProof, string? Comment, DateTimeOffset ApprovedAt) : IGameEvent;
@@ -124,9 +134,14 @@ internal static class ProofReview
                 $"Up to {Limits.MaxProofLinks} http or https links of at most {Limits.MaxProofLinkLength} characters.");
         }
 
-        if (command.Links.Count == 0 && command.WitnessId is null)
+        if (command.Files.Count > Limits.MaxProofFiles || command.Files.Distinct().Count() != command.Files.Count || command.Files.Contains(Guid.Empty))
         {
-            return Decision.Reject(RejectionCodes.ProofEmpty, "A proof is a link or a witness.");
+            return Decision.Reject(RejectionCodes.ProofInvalidFile, $"Up to {Limits.MaxProofFiles} different screenshots.");
+        }
+
+        if (command.Links.Count == 0 && command.Files.Count == 0 && command.WitnessId is null)
+        {
+            return Decision.Reject(RejectionCodes.ProofEmpty, "A proof is a link, a screenshot or a witness.");
         }
 
         if (command.WitnessId is { } witness && (witness == command.PlayerId || !state.Players.ContainsKey(witness)))
@@ -142,7 +157,7 @@ internal static class ProofReview
         // Stored as checked: links and the note trimmed, a blank note is none.
         var note = string.IsNullOrWhiteSpace(command.Note) ? null : command.Note.Trim();
         return Decision.Accept(new ProofSubmitted(
-            run.RunId, run.PlayerId, [.. command.Links.Select(l => l.Trim())], note, command.WitnessId, context.Clock.UtcNow));
+            run.RunId, run.PlayerId, [.. command.Links.Select(l => l.Trim())], note, command.WitnessId, context.Clock.UtcNow, command.Files));
     }
 
     public static Decision Decide(SeasonState state, ApproveProof command, EngineContext context)
@@ -277,7 +292,7 @@ internal static class ProofReview
     public static SeasonState Apply(SeasonState state, ProofSubmitted e) =>
         Update(state, e.RunId, run => run with
         {
-            Proof = new ProofState(ProofStatus.Pending, e.Links, e.Note, e.WitnessId, e.SubmittedAt, Comment: null),
+            Proof = new ProofState(ProofStatus.Pending, e.Links, e.Note, e.WitnessId, e.SubmittedAt, Comment: null, e.Files),
         });
 
     public static SeasonState Apply(SeasonState state, ProofApproved e) =>

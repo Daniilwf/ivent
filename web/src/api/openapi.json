@@ -4578,6 +4578,27 @@
         },
         "description": "Feature flags: a disabled mechanic is invisible in the interface and refused by the engine."
       },
+      "FileLinkView": {
+        "required": [
+          "id",
+          "url",
+          "thumbnailUrl"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "url": {
+            "type": "string"
+          },
+          "thumbnailUrl": {
+            "type": "string"
+          }
+        },
+        "description": "A stored file where a proof or a page shows it (D-116): the picture and its thumbnail."
+      },
       "FileUploadForm": {
         "required": [
           "commandId",
@@ -5271,7 +5292,8 @@
           "difficulty",
           "hours",
           "diceTotal",
-          "decidesFinish"
+          "decidesFinish",
+          "files"
         ],
         "type": "object",
         "properties": {
@@ -5350,6 +5372,12 @@
           },
           "decidesFinish": {
             "type": "boolean"
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FileLinkView"
+            }
           }
         },
         "description": "A run to check, in queue order (D-98, Q-3): the runs that decide a finish on top (`decidesFinish`), then by\ncompletion time; with the claimed difficulty, the counted hours and the dice total, what an approval at a lower\ndifficulty or a reject changes. `reachedFinish`: this run's latest move stands on the finish."
@@ -5386,9 +5414,19 @@
               "string"
             ],
             "format": "uuid"
+          },
+          "files": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
           }
         },
-        "description": "The proof of the player's own completed run: links (http/https), a note, or a witness (D-98)."
+        "description": "The proof of the player's own completed run: links (http/https), screenshots the player uploaded (`files` — ids\nfrom `POST /api/files`, D-116), a note, or a witness (D-98)."
       },
       "ProofStatus": {
         "enum": [
@@ -5403,7 +5441,8 @@
           "status",
           "links",
           "note",
-          "comment"
+          "comment",
+          "files"
         ],
         "type": "object",
         "properties": {
@@ -5427,6 +5466,12 @@
               "null",
               "string"
             ]
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FileLinkView"
+            }
           }
         },
         "description": "The proof of a run and how the admin checked it."

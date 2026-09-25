@@ -15,6 +15,9 @@ public static class Limits
     /// <summary>Proof links: how many, and how long each.</summary>
     public const int MaxProofLinks = 5;
 
+    /// <summary>Screenshots in one proof (D-116).</summary>
+    public const int MaxProofFiles = 5;
+
     public const int MaxProofLinkLength = 500;
 
     /// <summary>How deep effects may react to effects in one command (SPEC «Лимит цепочки»).</summary>

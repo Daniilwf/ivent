@@ -210,6 +210,9 @@ public sealed class ProofRecord
 
     public required string LinksJson { get; set; }
 
+    /// <summary>Uploaded screenshots of the proof (D-116), JSON array of file ids.</summary>
+    public string FilesJson { get; set; } = "[]";
+
     public string? Note { get; set; }
 
     public Guid? WitnessId { get; set; }

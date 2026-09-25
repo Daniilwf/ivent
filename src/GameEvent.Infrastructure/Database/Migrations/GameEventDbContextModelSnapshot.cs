@@ -264,6 +264,10 @@ namespace GameEvent.Infrastructure.Database.Migrations
                     b.Property<string>("Comment")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("FilesJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("LinksJson")
                         .IsRequired()
                         .HasColumnType("TEXT");

@@ -17,7 +17,7 @@ points-changed v1 {"playerId":"10000000-0000-0000-0000-000000000001","delta":7,"
 player-moved v1 {"playerId":"10000000-0000-0000-0000-000000000001","from":"start","to":"c7","steps":7,"path":["c1","c2","c3","c4","c5","c6","c7"],"reason":"completionRoll","runId":"00000000-0000-0000-0000-000000000001"}
 coins-changed v1 {"playerId":"10000000-0000-0000-0000-000000000001","delta":6,"reason":"completionReward","runId":"00000000-0000-0000-0000-000000000001"}
 run-reviewed v1 {"runId":"00000000-0000-0000-0000-000000000001","playerId":"10000000-0000-0000-0000-000000000001","rating":9,"text":"Отличная игра","reviewedAt":"2026-10-01T18:00:00+00:00"}
-# SubmitProof { PlayerId = 10000000-0000-0000-0000-000000000001, RunId = 00000000-0000-0000-0000-000000000001, Links = [https://imgur.com/a/credits], Note = Титры, WitnessId =  }
-proof-submitted v1 {"runId":"00000000-0000-0000-0000-000000000001","playerId":"10000000-0000-0000-0000-000000000001","links":["https://imgur.com/a/credits"],"note":"Титры","witnessId":null,"submittedAt":"2026-10-01T18:00:00+00:00"}
+# SubmitProof { PlayerId = 10000000-0000-0000-0000-000000000001, RunId = 00000000-0000-0000-0000-000000000001, Links = [https://imgur.com/a/credits], Note = Титры, WitnessId = , Files = [] }
+proof-submitted v2 {"runId":"00000000-0000-0000-0000-000000000001","playerId":"10000000-0000-0000-0000-000000000001","links":["https://imgur.com/a/credits"],"note":"Титры","witnessId":null,"submittedAt":"2026-10-01T18:00:00+00:00","files":[]}
 # ApproveProof { RunId = 00000000-0000-0000-0000-000000000001, Difficulty = , Comment =  }
 proof-approved v1 {"runId":"00000000-0000-0000-0000-000000000001","playerId":"10000000-0000-0000-0000-000000000001","withoutProof":false,"comment":null,"approvedAt":"2026-10-01T18:00:00+00:00"}

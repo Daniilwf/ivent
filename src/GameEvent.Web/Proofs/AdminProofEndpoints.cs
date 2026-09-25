@@ -37,7 +37,8 @@ public sealed record ProofQueueItemView(
     Difficulty? Difficulty,
     decimal? Hours,
     int DiceTotal,
-    bool DecidesFinish);
+    bool DecidesFinish,
+    IReadOnlyList<Files.FileLinkView> Files);
 
 /// <summary>Approve a run: with its proof, or without one («без скрина», a comment then); a lower proven difficulty.</summary>
 public sealed record ApproveProofRequest(Guid CommandId, Difficulty? Difficulty = null, string? Comment = null);
@@ -106,7 +107,8 @@ public static class AdminProofEndpoints
                     run.Difficulty,
                     run.Hours,
                     run.Dice.Sum(d => d.Value) + run.ChallengeDice.Sum(d => d.Value),
-                    ProofReviewOrder.DecidesFinish(state, run));
+                    ProofReviewOrder.DecidesFinish(state, run),
+                    proof is null ? [] : [.. proof.Files.Select(Files.FileLinkView.Of)]);
             }),
         ];
         return TypedResults.Ok(items);

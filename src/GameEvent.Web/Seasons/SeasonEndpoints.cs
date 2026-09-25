@@ -64,8 +64,11 @@ public sealed record CompleteRequest(
 /// <summary>A review: a rating 1–10 and an optional text (D-96).</summary>
 public sealed record ReviewInput(int Rating, string? Text = null);
 
-/// <summary>The proof of the player's own completed run: links (http/https), a note, or a witness (D-98).</summary>
-public sealed record ProofRequest(Guid CommandId, IReadOnlyList<string?>? Links, string? Note = null, Guid? WitnessId = null);
+/// <summary>
+/// The proof of the player's own completed run: links (http/https), screenshots the player uploaded (<c>files</c> — ids
+/// from <c>POST /api/files</c>, D-116), a note, or a witness (D-98).
+/// </summary>
+public sealed record ProofRequest(Guid CommandId, IReadOnlyList<string?>? Links, string? Note = null, Guid? WitnessId = null, IReadOnlyList<Guid>? Files = null);
 
 /// <summary>A review of the player's own completed run, written later or changed.</summary>
 public sealed record ReviewRequest(Guid CommandId, int Rating, string? Text = null);
@@ -168,7 +171,7 @@ public sealed record CompletedRunView(
     RunStatus Status);
 
 /// <summary>The proof of a run and how the admin checked it.</summary>
-public sealed record ProofView(ProofStatus Status, IReadOnlyList<string> Links, string? Note, string? Comment);
+public sealed record ProofView(ProofStatus Status, IReadOnlyList<string> Links, string? Note, string? Comment, IReadOnlyList<Files.FileLinkView> Files);
 
 public sealed record ReviewView(int Rating, string? Text);
 
@@ -268,17 +271,19 @@ public static class SeasonEndpoints
             .RequireAuthorization(Policies.Player)
             .WithActionErrors();
 
-        seasons.MapPost("/runs/{runId:guid}/proof", (Guid seasonId, Guid runId, ProofRequest request, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, CancellationToken ct) =>
+        seasons.MapPost("/runs/{runId:guid}/proof", async (Guid seasonId, Guid runId, ProofRequest request, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, CancellationToken ct) =>
             ProofInvalid(request) is { } invalid
-                ? Task.FromResult<ActionResult>(invalid)
-                : ActAsync(
-                    seasonId,
-                    request.CommandId,
-                    user,
-                    db,
-                    bus,
-                    playerId => new SubmitProof(playerId, runId, [.. request.Links!.OfType<string>()], request.Note, request.WitnessId),
-                    ct))
+                ? invalid
+                : await ForeignFilesAsync(request.Files ?? [], user, db, ct) is { } foreign
+                    ? foreign
+                    : await ActAsync(
+                        seasonId,
+                        request.CommandId,
+                        user,
+                        db,
+                        bus,
+                        playerId => new SubmitProof(playerId, runId, [.. request.Links!.OfType<string>()], request.Note, request.WitnessId, [.. request.Files ?? []]),
+                        ct))
             .RequireAuthorization(Policies.Player)
             .WithActionErrors();
 
@@ -316,9 +321,34 @@ public static class SeasonEndpoints
                     ? ReviewInvalid(review.Rating, review.Text)
                     : null;
 
+    /// <summary>
+    /// D-116: a proof shows only the player's own uploads — a file of someone else, deleted or unknown is refused before
+    /// the engine (which does not see the files).
+    /// </summary>
+    private static async Task<Microsoft.AspNetCore.Http.HttpResults.ProblemHttpResult?> ForeignFilesAsync(IReadOnlyList<Guid> files, ClaimsPrincipal user, GameEventDbContext db, CancellationToken ct)
+    {
+        if (files.Count == 0)
+        {
+            return null;
+        }
+
+        var owner = user.UserId();
+        var distinct = files.Distinct().ToList();
+        var own = await db.Files.AsNoTracking().CountAsync(f => distinct.Contains(f.Id) && f.OwnerId == owner && !f.IsDeleted, ct);
+        return own == distinct.Count
+            ? null
+            : TypedResults.Problem(
+                statusCode: StatusCodes.Status409Conflict,
+                title: "The command was rejected.",
+                detail: "A proof shows only your own uploaded screenshots.",
+                extensions: new Dictionary<string, object?> { ["code"] = RejectionCodes.ProofInvalidFile });
+    }
+
     private static ValidationProblem? ProofInvalid(ProofRequest request) =>
         request.Links is not { } links || links.Count > Limits.MaxProofLinks || links.Any(link => !ProofLinks.IsValid(link))
             ? Invalid("links", $"Up to {Limits.MaxProofLinks} http or https links of at most {Limits.MaxProofLinkLength} characters.")
+            : request.Files?.Count > Limits.MaxProofFiles
+                ? Invalid("files", $"Up to {Limits.MaxProofFiles} screenshots.")
             : request.Note?.Length > Limits.MaxCommentLength
                 ? Invalid("note", $"At most {Limits.MaxCommentLength} characters.")
                 : null;
@@ -556,7 +586,8 @@ public static class SeasonEndpoints
                     proof.Status,
                     JsonSerializer.Deserialize<EquatableArray<string>>(proof.LinksJson, EngineJson.Options).ToArray(),
                     proof.Note,
-                    proof.Comment),
+                    proof.Comment,
+                    [.. JsonSerializer.Deserialize<EquatableArray<Guid>>(proof.FilesJson, EngineJson.Options).Select(Files.FileLinkView.Of)]),
             run.Status);
     }
 

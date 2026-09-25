@@ -63,6 +63,7 @@ public static class RejectionCodes
     public const string ProofAlreadyReviewed = "proof.alreadyReviewed";
     public const string ProofInvalidLink = "proof.invalidLink";
     public const string ProofEmpty = "proof.empty";
+    public const string ProofInvalidFile = "proof.invalidFile";
     public const string ProofWitnessInvalid = "proof.witnessInvalid";
     public const string ProofDifficultyAboveClaimed = "proof.difficultyAboveClaimed";
     public const string InvalidRating = "review.invalidRating";

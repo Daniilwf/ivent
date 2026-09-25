@@ -342,7 +342,16 @@ public partial class PlayerAdminInvariantTests
                     1 => [.. Enumerable.Range(0, 6).Select(i => $"https://imgur.com/a/{i}")],
                     _ => [s_proofLinks[0], s_proofLinks[1]],
                 },
-                (variant % 3) switch { 0 => "титры", 1 => "  титры ", _ => null }),
+                (variant % 3) switch { 0 => "титры", 1 => "  титры ", _ => null },
+                Files: (variant % 5) switch
+                {
+                    // D-116: screenshots with the links, alone below, and the refused kinds (too many, the same twice)
+                    0 => [SequentialIds.Make(0x51000000, b)],
+                    1 => [.. Enumerable.Range(0, 6).Select(i => SequentialIds.Make(0x51000000, i))],
+                    2 => [SequentialIds.Make(0x51000000, 1), SequentialIds.Make(0x51000000, 1)],
+                    _ => [],
+                }),
+            4 when variant % 6 == 0 => new SubmitProof(player, runId, [], Files: [SequentialIds.Make(0x51000000, b)]),
             4 => new SubmitProof(player, runId, [], (variant % 4) switch { 0 => null, 1 => "   ", _ => "видел" }, variant % 5 == 0 ? player : witness),
             5 or 7 => new ApproveProof(
                 runId,
@@ -1934,21 +1943,25 @@ public partial class PlayerAdminInvariantTests
         Assert.True(run.Proof?.Status is null or ProofStatus.Pending, "A checked proof was replaced.");
         Assert.InRange(submit.Links.Count, 0, Limits.MaxProofLinks);
 
+        // D-116: up to five different screenshots; a proof is a link, a screenshot or a witness
+        Assert.InRange(submit.Files.Count, 0, Limits.MaxProofFiles);
+        Assert.Equal(submit.Files.Count, submit.Files.Distinct().Count());
+
         // D-98 (4): links and the note are stored trimmed, a blank note is no note
         EquatableArray<string> links = [.. submit.Links.Select(l => l.Trim())];
         var note = string.IsNullOrWhiteSpace(submit.Note) ? null : submit.Note.Trim();
         Assert.All(links, link => Assert.True(IsHttpLink(link), $"Link «{link}» was accepted."));
-        Assert.True(links.Count > 0 || submit.WitnessId is not null, "An empty proof was accepted.");
+        Assert.True(links.Count > 0 || submit.Files.Count > 0 || submit.WitnessId is not null, "An empty proof was accepted.");
         Assert.True(
             submit.WitnessId is null || (submit.WitnessId != submit.PlayerId && before.Players.ContainsKey(submit.WitnessId.Value)),
             "An invalid witness was accepted.");
         Assert.True((note?.Length ?? 0) <= Limits.MaxCommentLength, "A note over the limit was accepted.");
 
         Assert.Equal(
-            [new ProofSubmitted(run.RunId, submit.PlayerId, links, note, submit.WitnessId, s.Clock.UtcNow)],
+            [new ProofSubmitted(run.RunId, submit.PlayerId, links, note, submit.WitnessId, s.Clock.UtcNow, submit.Files)],
             s.Last.Events);
         Assert.Equal(
-            run with { Proof = new ProofState(ProofStatus.Pending, links, note, submit.WitnessId, s.Clock.UtcNow, null) },
+            run with { Proof = new ProofState(ProofStatus.Pending, links, note, submit.WitnessId, s.Clock.UtcNow, null, submit.Files) },
             s.State.Runs[run.RunId]);
         Assert.Equal(before.Players, s.State.Players);
     }

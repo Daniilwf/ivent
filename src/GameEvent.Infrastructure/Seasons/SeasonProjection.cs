@@ -198,6 +198,7 @@ internal static class SeasonProjection
 
                 proofRow.Status = proof.Status;
                 proofRow.LinksJson = JsonSerializer.Serialize(proof.Links, EngineJson.Options);
+                proofRow.FilesJson = JsonSerializer.Serialize(proof.Files, EngineJson.Options);
                 proofRow.Note = proof.Note;
                 proofRow.WitnessId = proof.WitnessId;
                 proofRow.SubmittedAt = proof.SubmittedAt;
@@ -339,7 +340,8 @@ internal static class SeasonProjection
                             proof.Note,
                             proof.WitnessId,
                             proof.SubmittedAt,
-                            proof.Comment)
+                            proof.Comment,
+                            JsonSerializer.Deserialize<EquatableArray<Guid>>(proof.FilesJson, EngineJson.Options))
                         : null,
                     r.Moved,
                     r.AfterFinish,
