@@ -10,6 +10,7 @@ using GameEvent.Infrastructure.Seasons;
 using GameEvent.Web.Accounts;
 using GameEvent.Web.Files;
 using GameEvent.Web.Observability;
+using GameEvent.Web.Pool;
 using GameEvent.Web.Proofs;
 using GameEvent.Web.Realtime;
 using GameEvent.Web.Rolls;
@@ -61,6 +62,7 @@ public static class AppSetup
         services.AddProblemDetails();
         builder.AddObservability();
         builder.AddFiles();
+        builder.AddGameLookup();
         services.AddOpenApi(o => o.AddDocumentTransformer(async (document, context, ct) =>
         {
             // Hub messages are part of the contract too: the frontend gets their types from the same document.
@@ -173,6 +175,7 @@ public static class AppSetup
         api.MapAdminAccounts();
         api.MapFiles();
         api.MapAvatars();
+        api.MapGameLookup();
 
         // Last: the OpenAPI document keeps the order its shared schemas were first met in (a nullable first use of an
         // enum would make the enum itself nullable for every client)

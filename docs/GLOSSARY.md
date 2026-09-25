@@ -206,6 +206,8 @@
 | Миниатюра | уменьшенная копия файла для карты и списков, у GIF — анимированная | `FileNames.Thumbnail`, `thumbnailUrl` |
 | Аватарка | картинка аккаунта: загрузка или гифка по ссылке, живёт между сезонами | `UserRecord.AvatarFileId`, `SetAvatar`, событие `AccountAvatarChanged` |
 | Скачивание по ссылке | сервер сам берёт картинку по https-ссылке с разрешённого сайта | `SafeDownloader`, `POST /api/files/from-url` |
+| Обложка | картинка игры из Steam или IGDB (или загруженная админом), хранится у нас | `ICoverProvider`, `CoverCandidate`, `GameLookupView.Cover` |
+| Поиск игры | подсказки для добавления в пул: часы, год, Steam AppID, обложка | `POST /api/admin/pool/lookup`, `GameLookupEndpoints` |
 | Скрин пруфа | загруженная игроком картинка, приложенная к пруфу (до 5) | `ProofState.Files`, `SubmitProof.Files`, `FileLinkView` |
 | Журнал ошибок, страница «Ошибки» | последние необработанные исключения запросов с запросом и пользователем, для админа | `ErrorJournal`, `ErrorEntry` |
 | Проверка здоровья | ответ `/health`: общий статус и статусы базы, диска и очереди | `HealthView`, `DatabaseHealthCheck`, `DiskHealthCheck`, `QueueHealthCheck` |

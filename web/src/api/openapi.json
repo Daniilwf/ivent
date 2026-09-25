@@ -1643,6 +1643,55 @@
         }
       }
     },
+    "/api/admin/pool/lookup": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GameLookupRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GameLookupView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/admin/errors": {
       "get": {
         "tags": [
@@ -4951,6 +5000,82 @@
             "format": "int32"
           }
         }
+      },
+      "GameLookupRequest": {
+        "required": [
+          "commandId",
+          "title"
+        ],
+        "type": "object",
+        "properties": {
+          "commandId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "What the admin looks up for a game by its title (D-118)."
+      },
+      "GameLookupView": {
+        "required": [
+          "hours",
+          "year",
+          "steamAppId",
+          "cover",
+          "coverSource",
+          "unavailable"
+        ],
+        "type": "object",
+        "properties": {
+          "hours": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "year": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "steamAppId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "cover": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/FileLinkView"
+              }
+            ]
+          },
+          "coverSource": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "unavailable": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "description": "What the external bases say about a game (SPEC «Обложки игр», «Длина игры», D-28, D-29, D-118): the main story hours\n(HowLongToBeat, when on), the release year and Steam app, and the cover — already downloaded and stored on our server.\nAnything not found is null; `unavailable` names the services that failed, so the admin knows to fill it by hand."
       },
       "GameMarkKind": {
         "enum": [

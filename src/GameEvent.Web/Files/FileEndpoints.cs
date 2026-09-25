@@ -250,12 +250,19 @@ public static class FileEndpoints
             : null;
     }
 
-    private static async Task<IResult> StoreAsync(byte[] content, Guid commandId, Guid ownerId, FileServices services, CancellationToken ct)
+    private static async Task<IResult> StoreAsync(byte[] content, Guid commandId, Guid ownerId, FileServices services, CancellationToken ct) =>
+        (await StoreFileAsync(content, commandId, ownerId, services, ct)).Answer;
+
+    /// <summary>
+    /// Stores a picture as an upload of <paramref name="ownerId"/> (D-108): the answer an endpoint gives, and the stored
+    /// file's id when there is one (a cover found for the pool, D-118, uses it).
+    /// </summary>
+    internal static async Task<(IResult Answer, Guid? FileId)> StoreFileAsync(byte[] content, Guid commandId, Guid ownerId, FileServices services, CancellationToken ct)
     {
         var (db, storage, limits, ids, _, bus) = services;
         if (!await s_processing.WaitAsync(s_processingWait, ct))
         {
-            return Problem(StatusCodes.Status503ServiceUnavailable, "The server is busy with other pictures.", "Try again in a minute.", SafeDownloader.Busy);
+            return (Problem(StatusCodes.Status503ServiceUnavailable, "The server is busy with other pictures.", "Try again in a minute.", SafeDownloader.Busy), null);
         }
 
         ProcessedFile? processed;
@@ -271,9 +278,9 @@ public static class FileEndpoints
 
         if (processed is null)
         {
-            return rejection!.Code == ImageProcessor.TooLarge
+            return (rejection!.Code == ImageProcessor.TooLarge
                 ? TooLarge(limits)
-                : Problem(StatusCodes.Status422UnprocessableEntity, "The picture was refused.", rejection.Detail, rejection.Code);
+                : Problem(StatusCodes.Status422UnprocessableEntity, "The picture was refused.", rejection.Detail, rejection.Code), null);
         }
 
         // The bytes go to disk first; the queue then records whose they are. From here the request is not cancelled: a
@@ -301,18 +308,18 @@ public static class FileEndpoints
 
         if (outcome.IsAccepted)
         {
-            return await ViewAsync(stored!.Value, outcome.IsDuplicate, db, ct);
+            return (await ViewAsync(stored!.Value, outcome.IsDuplicate, db, ct), stored);
         }
 
         // Two retries at once: the other one was recorded first with a file of its own — answer with that one
         if (outcome.Rejection!.Code == RejectionCodes.CommandIdReused && await EarlierAsync(commandId, ownerId, db, ct) is { } first)
         {
-            return first;
+            return (first, null);
         }
 
-        return outcome.Rejection.Code == FileRules.DailyLimit
+        return (outcome.Rejection.Code == FileRules.DailyLimit
             ? DailyLimit(outcome.Rejection.Detail)
-            : Problem(StatusCodes.Status409Conflict, "The command was rejected.", outcome.Rejection.Detail, outcome.Rejection.Code);
+            : Problem(StatusCodes.Status409Conflict, "The command was rejected.", outcome.Rejection.Detail, outcome.Rejection.Code), null);
     }
 
     /// <summary>The answer to a command id seen before: the same user's stored file, or a refusal of someone else's id.</summary>

@@ -85,3 +85,12 @@
 - Скачивание аватарок по ссылке — раздел `Files:Download`: `AllowedHosts` (список заменяет стандартный: `media.tenor.com`, `i.giphy.com`, `*.klipy.com`…), `TimeoutSeconds`, `MaxRedirects`, `MaxConcurrent`. Через переменные окружения: `Files__Download__AllowedHosts__0=media.tenor.com`, `Files__Download__AllowedHosts__1=…`.
 - Хост из списка перестал отдавать картинки или взломан — убрать его из `AllowedHosts` и перезапустить сайт.
 
+## Часы и обложки игр
+
+Не проверено руками (проверки — `MetadataProviderTests`, `GameLookupApiTests`).
+
+- Steam включён по умолчанию (`Metadata:SteamEnabled`), ключ не нужен.
+- IGDB: создать приложение Twitch (dev.twitch.tv), задать `IGDB_CLIENT_ID` и `IGDB_CLIENT_SECRET` в окружении, перезапустить. Без них IGDB не спрашивается.
+- HowLongToBeat выключен, пока не задан `Metadata:HltbSearchUrl` (например `https://howlongtobeat.com/api/search`). Адрес у сервиса меняется: перестали приходить часы — в логе предупреждение «Game lookup: hltb failed», поправить адрес или оставить выключенным, часы вводятся руками.
+- Сервис недоступен — поиск всё равно отвечает, в `unavailable` его имя; ничего чинить не нужно.
+
