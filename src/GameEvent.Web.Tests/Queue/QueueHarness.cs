@@ -108,17 +108,34 @@ internal sealed class QueueHarness : IAsyncDisposable
     }
 }
 
-internal sealed class TestClock(DateTimeOffset start) : IClock
+/// <summary>The tests' clock: set by the tests, and movable by the test endpoints like the Development one (D-120).</summary>
+internal sealed class TestClock : GameEvent.Infrastructure.Kernel.IAdjustableClock
 {
-    public DateTimeOffset UtcNow { get; set; } = start;
+    private readonly DateTimeOffset _start;
+
+    public TestClock(DateTimeOffset start)
+    {
+        _start = start;
+        UtcNow = start;
+    }
+
+    public DateTimeOffset UtcNow { get; set; }
+
+    public void Advance(TimeSpan by) => UtcNow += by;
+
+    public void MoveTo(DateTimeOffset at) => UtcNow = at;
+
+    public void Reset() => UtcNow = _start;
 }
 
-internal sealed class SeededRandom(int seed) : IRandomSource
+internal sealed class SeededRandom(int seed) : GameEvent.Infrastructure.Kernel.IReseedableRandom
 {
 #pragma warning disable CA5394 // deterministic randomness is the point in tests
-    private readonly Random _random = new(seed);
+    private Random _random = new(seed);
 
     public int NextInt(int minInclusive, int maxExclusive) => _random.Next(minInclusive, maxExclusive);
+
+    public void Seed(int? value) => _random = new Random(value ?? seed);
 #pragma warning restore CA5394
 }
 
