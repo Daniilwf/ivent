@@ -134,13 +134,17 @@ public static class WebSecurity
         ArgumentNullException.ThrowIfNull(app);
         app.Use(async (context, next) =>
         {
+            // An upload carries a picture (D-108); every other API body is small JSON
+            var bodyLimit = Files.FileEndpoints.IsUpload(context.Request)
+                ? context.RequestServices.GetRequiredService<Infrastructure.Files.FileLimits>().MaxUploadBytes + Files.FileEndpoints.FormOverheadBytes
+                : ApiBodyLimitBytes;
             if (context.Request.Path.StartsWithSegments("/api")
                 && context.Features.Get<IHttpMaxRequestBodySizeFeature>() is { IsReadOnly: false } limit)
             {
-                limit.MaxRequestBodySize = ApiBodyLimitBytes;
+                limit.MaxRequestBodySize = bodyLimit;
             }
 
-            if (context.Request.Path.StartsWithSegments("/api") && context.Request.ContentLength > ApiBodyLimitBytes)
+            if (context.Request.Path.StartsWithSegments("/api") && context.Request.ContentLength > bodyLimit)
             {
                 context.Response.StatusCode = StatusCodes.Status413PayloadTooLarge;
                 return;

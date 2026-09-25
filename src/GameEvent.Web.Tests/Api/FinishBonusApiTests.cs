@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 namespace GameEvent.Web.Tests.Api;
 
 /// <summary>
-/// Finish bonuses are not recalculated retroactively (D-111): a change of the finish list warns the admin that the
+/// Finish bonuses are not recalculated retroactively (D-113): a change of the finish list warns the admin that the
 /// bonuses already given stay (<c>warnings: ["finish.bonusesKept"]</c>); «Пересчитать бонусы по текущим правилам» —
 /// <c>POST /api/admin/seasons/{id}/finish-bonuses/recalculate</c> — is the deliberate recalculation, in the log.
 /// </summary>

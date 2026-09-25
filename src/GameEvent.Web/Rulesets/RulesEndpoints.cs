@@ -22,7 +22,7 @@ public sealed record RulesVersionView(int Version, DateTimeOffset At, Guid? Auth
 
 /// <summary>
 /// The new version of the rules and what the admin should know about it: <c>finish.bonusesKept</c> — the finish bonus
-/// list changed while some players have finished under another one; their bonuses stay (D-111) until «Пересчитать бонусы
+/// list changed while some players have finished under another one; their bonuses stay (D-113) until «Пересчитать бонусы
 /// по текущим правилам».
 /// </summary>
 public sealed record RulesChangeResult(int Version, IReadOnlyList<string> Warnings);
@@ -162,7 +162,7 @@ public static class RulesEndpoints
 
     public const string BonusesKept = "finish.bonusesKept";
 
-    /// <summary>D-111: finishers who hold a bonus list other than the one now in force keep their bonuses.</summary>
+    /// <summary>D-113: finishers who hold a bonus list other than the one now in force keep their bonuses.</summary>
     private static async Task<IReadOnlyList<string>> WarningsAsync(Guid seasonId, Ruleset ruleset, GameEventDbContext db, CancellationToken ct)
     {
         var current = FinishBonusRules.Of(ruleset.Finish);

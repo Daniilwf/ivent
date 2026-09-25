@@ -778,7 +778,7 @@ public partial class PlayerAdminInvariantTests
         Assert.Equal(first?.PlayerId, FinishLine.First(s.State));
         Assert.All(standing.Where(p => p.Finish!.Frozen), p => Assert.Equal(first!.PlayerId, p.PlayerId));
 
-        // 9 / Q-4 / D-111: each standing finisher holds the bonus of his place now, by the table he finished under (the
+        // 9 / Q-4 / D-113: each standing finisher holds the bonus of his place now, by the table he finished under (the
         // reference fold keeps it)
         for (var place = 1; place <= standing.Count; place++)
         {
@@ -1028,7 +1028,7 @@ public partial class PlayerAdminInvariantTests
         var orders = new List<int>();
         var bonus = new Dictionary<Guid, int>();
 
-        // D-111: a finisher keeps the bonus table in force at his finish, until the admin's recalculation
+        // D-113: a finisher keeps the bonus table in force at his finish, until the admin's recalculation
         FinishBonusRules? table = null;
         foreach (var e in log)
         {

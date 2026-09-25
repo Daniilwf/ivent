@@ -34,6 +34,8 @@ public sealed class GameEventDbContext(DbContextOptions<GameEventDbContext> opti
 
     public DbSet<CategoryRecord> Categories => Set<CategoryRecord>();
 
+    public DbSet<Files.FileRecord> Files => Set<Files.FileRecord>();
+
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
         // SQLite has no native time type: full-precision UTC ticks sort and compare correctly in SQL
@@ -52,6 +54,13 @@ public sealed class GameEventDbContext(DbContextOptions<GameEventDbContext> opti
             e.Property(x => x.NormalizedLogin).HasMaxLength(64);
             e.Property(x => x.Name).HasMaxLength(64);
             e.Property(x => x.Role).HasMaxLength(20);
+        });
+
+        modelBuilder.Entity<Files.FileRecord>(e =>
+        {
+            e.ToTable("StoredFile");
+            e.HasIndex(x => new { x.OwnerId, x.CreatedAt });
+            e.Property(x => x.MediaType).HasMaxLength(20);
         });
 
         modelBuilder.Entity<GameEventRecord>(e =>

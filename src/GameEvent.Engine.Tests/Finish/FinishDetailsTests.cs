@@ -319,7 +319,7 @@ public class FinishDetailsTests
         Assert.Equal("c2", s.Player("Петя").CellId);
     }
 
-    // ---- 8. A bonus follows the rules in force at the finisher's own finish (D-111) ----
+    // ---- 8. A bonus follows the rules in force at the finisher's own finish (D-113) ----
 
     [Fact]
     public void Each_finisher_keeps_the_list_in_force_at_his_finish()

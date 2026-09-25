@@ -9,7 +9,7 @@ using static GameEvent.Engine.Tests.Finish.FinishSetup;
 namespace GameEvent.Engine.Tests.Finish;
 
 /// <summary>
-/// Finish bonuses are not recalculated retroactively (D-111): a finisher keeps the bonus table in force at his finish; a
+/// Finish bonuses are not recalculated retroactively (D-113): a finisher keeps the bonus table in force at his finish; a
 /// change of the rules alone moves no bonus. The admin's deliberate «Пересчитать бонусы по текущим правилам» brings every
 /// standing finisher to the current table and pays the differences at their places, in the log.
 /// </summary>

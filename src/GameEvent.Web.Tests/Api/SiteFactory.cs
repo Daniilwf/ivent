@@ -69,6 +69,9 @@ internal sealed class SiteFactory : WebApplicationFactory<Program>
 
     public string ConnectionString { get; }
 
+    /// <summary>Where this site stores uploaded files (D-108): inside its own temp folder.</summary>
+    public string FilesPath => Path.Combine(_directory, "files");
+
     /// <summary>Built frontend to serve; by default a missing folder, so tests run API-only.</summary>
     public string FrontendPath { get; }
 
@@ -175,6 +178,8 @@ internal sealed class SiteFactory : WebApplicationFactory<Program>
 
         // The deadline scheduler's own loop would race the tests that move the clock; they call TickAsync themselves.
         builder.UseSetting("Scheduler:Enabled", "false");
+
+        builder.UseSetting("Files:Path", FilesPath);
 
         // Tests log to the console only; one observability test turns the file on in its own folder
         builder.UseSetting("Logging:File:Enabled", "false");

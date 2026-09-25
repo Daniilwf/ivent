@@ -298,6 +298,12 @@ public class EventFormatTests
             """{"rulesetVersion":3}"""
         },
         {
+            "file-stored",
+            new Engine.Files.FileStored(Guid.Parse("50000000-0000-0000-0000-000000000001"), s_user, "image/webp", 123456, 2560, 1440, 1),
+            1,
+            """{"fileId":"50000000-0000-0000-0000-000000000001","ownerId":"40000000-0000-0000-0000-000000000001","mediaType":"image/webp","bytes":123456,"width":2560,"height":1440,"frames":1}"""
+        },
+        {
             "effect-chain-cut",
             new EffectChainCut(EffectChainLimit.Depth, 4, 5),
             1,

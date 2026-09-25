@@ -6,7 +6,7 @@ using GameEvent.Engine.Kernel;
 namespace GameEvent.Infrastructure.Accounts;
 
 /// <summary>A command about accounts: it goes through the queue to the global log (D-106), not to a season.</summary>
-public interface IAccountCommand : ICommand;
+public interface IAccountCommand : Queue.IGlobalCommand;
 
 /// <summary>A command carrying a secret: its fingerprint for the repeat check is taken without it (D-95, D-106).</summary>
 public interface ISecretCommand

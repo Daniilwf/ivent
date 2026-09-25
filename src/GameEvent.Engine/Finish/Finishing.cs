@@ -11,12 +11,12 @@ namespace GameEvent.Engine.Finish;
 /// A player's finish (D-99, Q-3, Q-4): <see cref="Order"/> among the finishers (1, 2, 3…, never reused), the run whose
 /// move brought them there, whether they are frozen, the finish bonus they hold now (at most one), and the
 /// <see cref="Surplus"/> — steps that burned at the finish, which absorb a later reduction of a run up to the finish.
-/// <see cref="BonusRules"/> — the bonus table in force when they finished (D-111): a later change of the rules does not
+/// <see cref="BonusRules"/> — the bonus table in force when they finished (D-113): a later change of the rules does not
 /// touch the bonus; null only in states made before it was kept, which read the season's current table.
 /// </summary>
 public sealed record FinishState(int Order, Guid RunId, DateTimeOffset FinishedAt, bool Frozen, int Bonus, int Surplus, FinishBonusRules? BonusRules = null);
 
-/// <summary>The finish bonuses by place a finisher keeps from the moment of their finish (D-111).</summary>
+/// <summary>The finish bonuses by place a finisher keeps from the moment of their finish (D-113).</summary>
 public sealed record FinishBonusRules(EquatableArray<int> ByOrder, int AfterList)
 {
     public static FinishBonusRules Of(Rulesets.FinishRules rules)
@@ -27,13 +27,13 @@ public sealed record FinishBonusRules(EquatableArray<int> ByOrder, int AfterList
 }
 
 /// <summary>
-/// The admin brought every standing finisher's bonus table to the season's current rules (D-111), version
+/// The admin brought every standing finisher's bonus table to the season's current rules (D-113), version
 /// <see cref="RulesetVersion"/>; the bonus differences follow as points changes in the same command.
 /// </summary>
 [EventType("finish-bonus-rules-refreshed")]
 public sealed record FinishBonusRulesRefreshed(int RulesetVersion) : IGameEvent;
 
-/// <summary>The admin's deliberate recalculation of the finish bonuses by the current rules (D-111), written to the log.</summary>
+/// <summary>The admin's deliberate recalculation of the finish bonuses by the current rules (D-113), written to the log.</summary>
 public sealed record RecalculateFinishBonuses : ICommand;
 
 /// <summary>
@@ -75,7 +75,7 @@ public static class FinishLine
     /// <summary>The finish bonus at <paramref name="place"/> among the standing finishers (1 — the first, no bonus; Q-4).</summary>
     public static int Bonus(Rulesets.FinishRules rules, int place) => Bonus(FinishBonusRules.Of(rules), place);
 
-    /// <summary>The finish bonus at <paramref name="place"/> by a finisher's own table (D-111).</summary>
+    /// <summary>The finish bonus at <paramref name="place"/> by a finisher's own table (D-113).</summary>
     public static int Bonus(FinishBonusRules rules, int place)
     {
         ArgumentNullException.ThrowIfNull(rules);
@@ -150,7 +150,7 @@ internal static class Finishes
     }
 
     /// <summary>
-    /// Q-4 bonuses of all standing finishers by their order — each by the table they finished under (D-111), at the place
+    /// Q-4 bonuses of all standing finishers by their order — each by the table they finished under (D-113), at the place
     /// they hold now — then the first's freeze if due.
     /// </summary>
     public static IEnumerable<IGameEvent> Settle(SeasonState state)
@@ -196,7 +196,7 @@ internal static class Finishes
 internal static class Finishing
 {
     /// <summary>
-    /// The admin recalculates the finish bonuses by the current rules (D-111): every standing finisher takes the current
+    /// The admin recalculates the finish bonuses by the current rules (D-113): every standing finisher takes the current
     /// table, bonuses follow at their places. Nothing to do — no finisher, or all of them already on the current table.
     /// </summary>
     public static Decision Decide(SeasonState state, RecalculateFinishBonuses command)

@@ -122,7 +122,7 @@ public partial class PlayerAdminInvariantTests
         ("drop event", r => r with { Drop = r.Drop with { MandatoryEvent = r.Drop.MandatoryEvent == MandatoryEvent.Bad ? MandatoryEvent.None : MandatoryEvent.Bad } }),
         ("tiebreakers", r => r with { Ranking = new RankingRules { Tiebreakers = [.. r.Ranking.Tiebreakers.Reverse()] } }),
 
-        // D-111: finish bonuses change mid-season; the finishers keep theirs until the admin recalculates
+        // D-113: finish bonuses change mid-season; the finishers keep theirs until the admin recalculates
         ("finish bonuses up", r => r with { Finish = r.Finish with { BonusByOrder = [.. r.Finish.BonusByOrder.Select(b => b + 5)], BonusAfterList = r.Finish.BonusAfterList + 1 } }),
         ("finish bonuses down", r => r with { Finish = r.Finish with { BonusByOrder = [.. r.Finish.BonusByOrder.Take(1).Select(b => Math.Max(0, b - 3))], BonusAfterList = Math.Max(0, r.Finish.BonusAfterList - 1) } }),
         ("approval for the first", r => r with { Finish = r.Finish with { RequireApprovalForFirst = !r.Finish.RequireApprovalForFirst } }),
@@ -161,7 +161,7 @@ public partial class PlayerAdminInvariantTests
                 && s.State.Players.Values.Any(p => p.Finish is { } f && f.BonusRules != FinishBonusRules.Of(s.Ruleset.Finish)):
                 return new RecalculateFinishBonuses();
             case 6 when withRulesetChanges:
-                // D-111: with finishers in the season the finish list itself changes more often than its share
+                // D-113: with finishers in the season the finish list itself changes more often than its share
                 var (_, change) = s.State.Players.Values.Count(p => p.Finish is not null) >= 2 && variant % 3 == 0
                     ? s_ruleChanges.First(r => r.Name == (variant % 2 == 0 ? "finish bonuses up" : "finish bonuses down"))
                     : s_ruleChanges[(index + variant) % s_ruleChanges.Length];
@@ -208,7 +208,7 @@ public partial class PlayerAdminInvariantTests
     }
 
     /// <summary>
-    /// D-111: a change of the rules by itself gives and takes nothing — points, coins and every finisher's bonus and bonus
+    /// D-113: a change of the rules by itself gives and takes nothing — points, coins and every finisher's bonus and bonus
     /// table stay as they were; only the admin's recalculation moves bonuses, to the current table.
     /// </summary>
     private static void CheckRuleChangeKeepsWhatWasGiven(Scenario s, ICommand command, SeasonState before)
@@ -387,9 +387,10 @@ public partial class PlayerAdminInvariantTests
                 or PlayerFinished or PlayerFrozen or PlayerFinishRevoked or FinishSurplusChanged or FinishBonusRulesRefreshed
                 or ManualEffectCreated or ManualEffectResolved or CommandUndone
 
-                // Accounts (D8, D-106) are the site's, not a season mechanic
+                // Accounts (D8, D-106) and stored files (D4a, D-108) are the site's, not a season mechanic
                 or Accounts.AccountCreated or Accounts.AccountPasswordReset or Accounts.AccountPasswordChanged
-                or Accounts.AccountChanged or Accounts.AccountDeleted or Accounts.AccountRestored => null,
+                or Accounts.AccountChanged or Accounts.AccountDeleted or Accounts.AccountRestored
+                or Files.FileStored => null,
             _ => throw new Xunit.Sdk.XunitException($"{e.GetType().Name} is not mapped to a mechanic: add it to the core or to its feature flag."),
         };
 

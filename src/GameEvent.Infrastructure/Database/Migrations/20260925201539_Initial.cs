@@ -79,6 +79,25 @@ namespace GameEvent.Infrastructure.Database.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "StoredFile",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "TEXT", nullable: false),
+                    OwnerId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    MediaType = table.Column<string>(type: "TEXT", maxLength: 20, nullable: false),
+                    Bytes = table.Column<long>(type: "INTEGER", nullable: false),
+                    Width = table.Column<int>(type: "INTEGER", nullable: false),
+                    Height = table.Column<int>(type: "INTEGER", nullable: false),
+                    Frames = table.Column<int>(type: "INTEGER", nullable: false),
+                    IsDeleted = table.Column<bool>(type: "INTEGER", nullable: false),
+                    CreatedAt = table.Column<long>(type: "INTEGER", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_StoredFile", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "User",
                 columns: table => new
                 {
@@ -143,6 +162,7 @@ namespace GameEvent.Infrastructure.Database.Migrations
                     Frozen = table.Column<bool>(type: "INTEGER", nullable: false),
                     FinishBonus = table.Column<int>(type: "INTEGER", nullable: false),
                     FinishSurplus = table.Column<int>(type: "INTEGER", nullable: false),
+                    FinishBonusRulesJson = table.Column<string>(type: "TEXT", nullable: true),
                     PointsTick = table.Column<long>(type: "INTEGER", nullable: false),
                     ActiveRunId = table.Column<Guid>(type: "TEXT", nullable: true)
                 },
@@ -411,6 +431,11 @@ namespace GameEvent.Infrastructure.Database.Migrations
                 column: "PlayerId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_StoredFile_OwnerId_CreatedAt",
+                table: "StoredFile",
+                columns: new[] { "OwnerId", "CreatedAt" });
+
+            migrationBuilder.CreateIndex(
                 name: "IX_User_NormalizedLogin",
                 table: "User",
                 column: "NormalizedLogin",
@@ -446,6 +471,9 @@ namespace GameEvent.Infrastructure.Database.Migrations
 
             migrationBuilder.DropTable(
                 name: "SeasonResult");
+
+            migrationBuilder.DropTable(
+                name: "StoredFile");
 
             migrationBuilder.DropTable(
                 name: "User");
