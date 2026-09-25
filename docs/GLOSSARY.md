@@ -73,7 +73,8 @@
 | Источник оценки | откуда игрок взял часы, если в пуле их нет: ссылка или пометка | `CompleteRun.HoursSource`, `RunState.HoursSource` |
 | Ивент за сложность | ручной эффект, который даёт сложность с `grantEvent` («выше сложной» — хороший) | `ManualEffectSource.Difficulty` |
 | Монетки за прохождение | награда по длине игры | `CoinsReason.CompletionReward`, `RunSnapshot.Coins` |
-| Бонус финиша | очки за финиш не первым, выдаются один раз | `FinishBonus` |
+| Бонус финиша | очки за финиш не первым, выдаются один раз | `PointsReason.FinishBonus`, снятие — `PointsReason.FinishBonusRevoked` |
+| Финиш игрока | порядок финиша, прохождение, которое довело, заморозка | `FinishState`, события `PlayerFinished`, `PlayerFrozen`, `PlayerFinishRevoked`, `FinishLine.First` |
 
 ## Показатели и экономика
 

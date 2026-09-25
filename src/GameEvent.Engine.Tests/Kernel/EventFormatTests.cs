@@ -1,4 +1,5 @@
 using GameEvent.Engine.Effects;
+using GameEvent.Engine.Finish;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Map;
 using GameEvent.Engine.Players;
@@ -206,6 +207,24 @@ public class EventFormatTests
             new ProofRejected(s_run, s_player, "На скрине другая игра", s_at),
             1,
             """{"runId":"00000000-0000-0000-0000-000000000001","playerId":"10000000-0000-0000-0000-000000000001","comment":"На скрине другая игра","rejectedAt":"2026-10-01T12:30:00+00:00"}"""
+        },
+        {
+            "player-finished",
+            new PlayerFinished(s_player, s_run, 2, s_at),
+            1,
+            """{"playerId":"10000000-0000-0000-0000-000000000001","runId":"00000000-0000-0000-0000-000000000001","order":2,"finishedAt":"2026-10-01T12:30:00+00:00"}"""
+        },
+        {
+            "player-frozen",
+            new PlayerFrozen(s_player),
+            1,
+            """{"playerId":"10000000-0000-0000-0000-000000000001"}"""
+        },
+        {
+            "player-finish-revoked",
+            new PlayerFinishRevoked(s_player, s_run),
+            1,
+            """{"playerId":"10000000-0000-0000-0000-000000000001","runId":"00000000-0000-0000-0000-000000000001"}"""
         },
         {
             "run-started",

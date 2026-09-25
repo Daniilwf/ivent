@@ -104,6 +104,15 @@ public sealed class SeasonPlayerRecord
 
     public int RerollsThisRoll { get; set; }
 
+    /// <summary>Order among the finishers (D-99); null while not finished. The leaderboard sorts by it.</summary>
+    public int? FinishOrder { get; set; }
+
+    public Guid? FinishRunId { get; set; }
+
+    public DateTimeOffset? FinishedAt { get; set; }
+
+    public bool Frozen { get; set; }
+
     public Guid? ActiveRunId { get; set; }
 }
 

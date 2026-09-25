@@ -137,6 +137,10 @@ namespace GameEvent.Infrastructure.Database.Migrations
                     OfferJson = table.Column<string>(type: "TEXT", nullable: true),
                     ChoiceJson = table.Column<string>(type: "TEXT", nullable: true),
                     RerollsThisRoll = table.Column<int>(type: "INTEGER", nullable: false),
+                    FinishOrder = table.Column<int>(type: "INTEGER", nullable: true),
+                    FinishRunId = table.Column<Guid>(type: "TEXT", nullable: true),
+                    FinishedAt = table.Column<long>(type: "INTEGER", nullable: true),
+                    Frozen = table.Column<bool>(type: "INTEGER", nullable: false),
                     ActiveRunId = table.Column<Guid>(type: "TEXT", nullable: true)
                 },
                 constraints: table =>

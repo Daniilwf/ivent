@@ -12,6 +12,8 @@ public enum PointsReason
     DropPenalty,
     RunCorrection,
     ProofRejected,
+    FinishBonus,
+    FinishBonusRevoked,
 }
 
 /// <summary>What changed a player's coins. Coins always equal the sum of deltas in non-undone events.</summary>

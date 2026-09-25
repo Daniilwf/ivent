@@ -395,6 +395,18 @@ namespace GameEvent.Infrastructure.Database.Migrations
                     b.Property<int>("Coins")
                         .HasColumnType("INTEGER");
 
+                    b.Property<int?>("FinishOrder")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid?>("FinishRunId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("FinishedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("Frozen")
+                        .HasColumnType("INTEGER");
+
                     b.Property<bool>("IsInactive")
                         .HasColumnType("INTEGER");
 

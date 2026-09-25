@@ -99,6 +99,10 @@ internal static class SeasonProjection
             record.ChoiceJson = player.Choice is null ? null : JsonSerializer.Serialize(player.Choice, EngineJson.Options);
             record.ActiveRunId = player.ActiveRunId;
             record.RerollsThisRoll = player.RerollsThisRoll;
+            record.FinishOrder = player.Finish?.Order;
+            record.FinishRunId = player.Finish?.RunId;
+            record.FinishedAt = player.Finish?.FinishedAt;
+            record.Frozen = player.Finish?.Frozen ?? false;
 
             // Exclusions only grow within a season (D-08); a tech reroll turned into a drop changes its reason (D-11).
             var known = old?.Exclusions.ToDictionary(x => x.GameId, x => x.Reason) ?? [];
@@ -243,6 +247,9 @@ internal static class SeasonProjection
                     p.ChoiceJson is null ? null : JsonSerializer.Deserialize<PendingChoice>(p.ChoiceJson, EngineJson.Options),
                     [.. exclusions[p.Id].OrderBy(r => r.GameId).Select(r => new GameExclusion(r.GameId, r.Reason))],
                     p.RerollsThisRoll,
+                    p.FinishOrder is { } order
+                        ? new Engine.Finish.FinishState(order, p.FinishRunId!.Value, p.FinishedAt!.Value, p.Frozen)
+                        : null,
                     p.ActiveRunId)),
             Runs = runs.ToImmutableSortedDictionary(
                 r => r.Id,

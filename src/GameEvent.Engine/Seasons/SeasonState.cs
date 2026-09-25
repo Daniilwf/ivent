@@ -97,4 +97,5 @@ public sealed record SeasonPlayer(
     PendingChoice? Choice,
     EquatableArray<GameExclusion> Exclusions,
     int RerollsThisRoll,
+    Finish.FinishState? Finish,
     Guid? ActiveRunId);
