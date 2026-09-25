@@ -257,7 +257,8 @@ public static class FileEndpoints
     /// Stores a picture as an upload of <paramref name="ownerId"/> (D-108): the answer an endpoint gives, and the stored
     /// file's id when there is one (a cover found for the pool, D-118, uses it).
     /// </summary>
-    internal static async Task<(IResult Answer, Guid? FileId)> StoreFileAsync(byte[] content, Guid commandId, Guid ownerId, FileServices services, CancellationToken ct)
+    internal static async Task<(IResult Answer, Guid? FileId)> StoreFileAsync(
+        byte[] content, Guid commandId, Guid ownerId, FileServices services, CancellationToken ct, bool countTowardsLimit = true)
     {
         var (db, storage, limits, ids, _, bus) = services;
         if (!await s_processing.WaitAsync(s_processingWait, ct))
@@ -294,7 +295,7 @@ public static class FileEndpoints
             new CommandEnvelope(
                 commandId,
                 Guid.Empty,
-                new RecordFile(fileId, ownerId, processed.MediaType, processed.Main.LongLength, processed.Width, processed.Height, processed.Frames, limits.UploadsPerDay),
+                new RecordFile(fileId, ownerId, processed.MediaType, processed.Main.LongLength, processed.Width, processed.Height, processed.Frames, countTowardsLimit ? limits.UploadsPerDay : int.MaxValue),
                 ownerId),
             CancellationToken.None);
         var stored = outcome.Events.Select(e => e.Event).OfType<FileStored>().SingleOrDefault()?.FileId;

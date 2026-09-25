@@ -7,6 +7,7 @@ using GameEvent.Web.Pool;
 using GameEvent.Web.Tests.Api;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using NetVips;
@@ -87,6 +88,94 @@ public sealed class GameLookupApiTests : IAsyncLifetime
 
         Assert.Equal(JsonValueKind.Null, view.GetProperty("cover").ValueKind);
         Assert.Equal(["hltb", "igdb", "steam"], view.GetProperty("unavailable").EnumerateArray().Select(u => u.GetString()).Order());
+    }
+
+    [Fact]
+    public async Task A_missing_picture_falls_back_to_the_alternate_and_then_the_next_provider()
+    {
+        var asked = new List<string>();
+        using var site = With(
+            hours: new FixedHours(null),
+            covers:
+            [
+                new FixedCover("steam", new CoverCandidate("https://shared.akamai.steamstatic.com/a/library.jpg", 2001, "2310", "steam", "https://shared.akamai.steamstatic.com/a/header.jpg")),
+                new FixedCover("igdb", new CoverCandidate("https://images.igdb.com/igdb/image/upload/t_cover_big/co1.jpg", 2001, null, "igdb")),
+            ],
+            picture: r =>
+            {
+                asked.Add(r.RequestUri!.AbsolutePath);
+                return r.RequestUri!.Host == "images.igdb.com" ? Picture() : new HttpResponseMessage(HttpStatusCode.NotFound);
+            });
+        var admin = await SignedInAsync(site, "admin");
+
+        var view = await OkAsync(await admin.PostAsJsonAsync(Url, new { commandId = Guid.NewGuid(), title = "Silent Hill 2" }, Ct));
+
+        Assert.Equal("igdb", view.GetProperty("coverSource").GetString());
+        Assert.Equal(["/a/library.jpg", "/a/header.jpg", "/igdb/image/upload/t_cover_big/co1.jpg"], asked);
+        Assert.Contains("steam-cover", view.GetProperty("unavailable").EnumerateArray().Select(u => u.GetString()));
+    }
+
+    [Fact]
+    public async Task A_repeated_lookup_keeps_its_cover_and_stores_nothing_twice()
+    {
+        var downloads = 0;
+        using var site = With(
+            hours: new FixedHours(null),
+            covers: [new FixedCover("steam", new CoverCandidate("https://shared.akamai.steamstatic.com/a.jpg", 2001, "2310", "steam"))],
+            picture: _ =>
+            {
+                downloads++;
+                return Picture();
+            });
+        var admin = await SignedInAsync(site, "admin");
+        var commandId = Guid.NewGuid();
+
+        var first = await OkAsync(await admin.PostAsJsonAsync(Url, new { commandId, title = "Silent Hill 2" }, Ct));
+        var again = await OkAsync(await admin.PostAsJsonAsync(Url, new { commandId, title = "Silent Hill 2" }, Ct));
+
+        Assert.Equal(first.GetProperty("cover").GetProperty("id").GetGuid(), again.GetProperty("cover").GetProperty("id").GetGuid());
+        Assert.Equal(1, downloads);
+    }
+
+    [Fact]
+    public async Task Covers_do_not_use_up_the_admins_daily_uploads()
+    {
+        using var site = With(
+            hours: new FixedHours(null),
+            covers: [new FixedCover("steam", new CoverCandidate("https://shared.akamai.steamstatic.com/a.jpg", 2001, "2310", "steam"))],
+            picture: _ => Picture(),
+            more: b => b.UseSetting("Files:UploadsPerDay", "1"));
+        var admin = await SignedInAsync(site, "admin");
+
+        for (var i = 0; i < 3; i++)
+        {
+            var view = await OkAsync(await admin.PostAsJsonAsync(Url, new { commandId = Guid.NewGuid(), title = $"Game {i}" }, Ct));
+            Assert.NotEqual(JsonValueKind.Null, view.GetProperty("cover").ValueKind);
+        }
+    }
+
+    [Fact]
+    public void The_sites_own_cover_downloader_takes_only_the_cover_hosts()
+    {
+        var downloader = _site.Services.GetRequiredService<CoverDownloader>().Inner;
+
+        Assert.Null(downloader.Check("https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1/header.jpg"));
+        Assert.Null(downloader.Check("https://images.igdb.com/igdb/image/upload/t_cover_big/co1.jpg"));
+        Assert.Equal(SafeDownloader.HostNotAllowed, downloader.Check("https://evil.steamstatic.com.example/a.jpg")?.Code);
+        Assert.Equal(SafeDownloader.HostNotAllowed, downloader.Check("https://forgotten.steamstatic.com/a.jpg")?.Code);
+    }
+
+    [Fact]
+    public void Cover_hosts_in_the_config_replace_the_defaults()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["Metadata:CoverHosts:0"] = "images.igdb.com", ["IGDB_CLIENT_ID"] = "id" })
+            .Build();
+
+        var settings = GameLookupEndpoints.SettingsFrom(configuration);
+
+        Assert.Equal(["images.igdb.com"], settings.CoverHosts);
+        Assert.Equal("id", settings.IgdbClientId);
     }
 
     [Fact]
@@ -172,19 +261,29 @@ public sealed class GameLookupApiTests : IAsyncLifetime
 
     // ---- Helpers ----
 
-    private WebApplicationFactory<Program> With(IHoursProvider hours, ICoverProvider[] covers, Func<HttpRequestMessage, HttpResponseMessage> picture) =>
-        _site.WithWebHostBuilder(b => b.ConfigureTestServices(services =>
+    private WebApplicationFactory<Program> With(
+        IHoursProvider hours,
+        ICoverProvider[] covers,
+        Func<HttpRequestMessage, HttpResponseMessage> picture,
+        Action<Microsoft.AspNetCore.Hosting.IWebHostBuilder>? more = null) =>
+        _site.WithWebHostBuilder(b =>
         {
-            services.AddSingleton(hours);
-            services.RemoveAll<ICoverProvider>();
-            foreach (var cover in covers)
+            more?.Invoke(b);
+            b.ConfigureTestServices(services =>
             {
-                services.AddSingleton(cover);
-            }
+                services.AddSingleton(hours);
+                services.RemoveAll<ICoverProvider>();
+                foreach (var cover in covers)
+                {
+                    services.AddSingleton(cover);
+                }
 
-            services.AddSingleton(sp => new CoverDownloader(new SafeDownloader(
-                new DownloadSettings { AllowedHosts = ["*.steamstatic.com", "*.igdb.com"] }, sp.GetRequiredService<FileLimits>(), new Answering(picture))));
-        }));
+                services.AddSingleton(sp => new CoverDownloader(new SafeDownloader(
+                    new DownloadSettings { AllowedHosts = ["shared.akamai.steamstatic.com", "images.igdb.com"] },
+                    sp.GetRequiredService<FileLimits>(),
+                    new Answering(picture))));
+            });
+        });
 
     private static HttpResponseMessage Picture()
     {

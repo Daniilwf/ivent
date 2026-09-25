@@ -27,7 +27,14 @@ public sealed class MetadataProviderTests
 
         var cover = await steam.FindCoverAsync("portal", Ct);
 
-        Assert.Equal(new CoverCandidate("https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/400/library_600x900.jpg", 2007, "400", "steam"), cover);
+        Assert.Equal(
+            new CoverCandidate(
+                "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/400/library_600x900.jpg",
+                2007,
+                "400",
+                "steam",
+                "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/400/header.jpg"),
+            cover);
     }
 
     [Fact]
@@ -40,6 +47,21 @@ public sealed class MetadataProviderTests
         var cover = await steam.FindCoverAsync("Silent Hill", Ct);
 
         Assert.Equal(("1", null), (cover?.SteamAppId, cover?.Year));
+    }
+
+    [Fact]
+    public async Task Steam_details_that_time_out_or_come_odd_leave_the_cover_without_a_year()
+    {
+        foreach (var details in new Func<HttpResponseMessage>[] { () => throw new TaskCanceledException("timed out"), () => Json("[1, 2]") })
+        {
+            var steam = new SteamCoverProvider(
+                Http(r => r.RequestUri!.AbsolutePath == "/api/storesearch/" ? Json("""{"items":[{"id":400,"name":"Portal"}]}""") : details()),
+                NullLogger<SteamCoverProvider>.Instance);
+
+            var cover = await steam.FindCoverAsync("Portal", Ct);
+
+            Assert.Equal(("400", null), (cover?.SteamAppId, cover?.Year));
+        }
     }
 
     [Fact]
@@ -118,6 +140,37 @@ public sealed class MetadataProviderTests
     }
 
     [Fact]
+    public async Task Igdb_drops_a_revoked_token_and_asks_once_more()
+    {
+        var tokens = 0;
+        var searches = 0;
+        var igdb = new IgdbCoverProvider(Http(r =>
+        {
+            if (r.RequestUri!.Host == "id.twitch.tv")
+            {
+                tokens++;
+                return Json($$"""{"access_token":"t{{tokens}}","expires_in":5000000}""");
+            }
+
+            searches++;
+            return r.Headers.Authorization?.Parameter == "t1"
+                ? new HttpResponseMessage(HttpStatusCode.Unauthorized)
+                : Json("""[{"name":"Portal","cover":{"image_id":"co1"}}]""");
+        }), new MetadataSettings { IgdbClientId = "id", IgdbClientSecret = "secret" }, Clock());
+
+        var cover = await igdb.FindCoverAsync("Portal", Ct);
+
+        Assert.NotNull(cover);
+        Assert.Equal((2, 2), (tokens, searches));
+    }
+
+    [Fact]
+    public void The_settings_never_print_the_igdb_secret()
+    {
+        Assert.DoesNotContain("top-secret", new MetadataSettings { IgdbClientId = "id", IgdbClientSecret = "top-secret" }.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Igdb_refuses_an_odd_image_id()
     {
         var igdb = new IgdbCoverProvider(Http(r => r.RequestUri!.Host == "id.twitch.tv"
@@ -146,9 +199,17 @@ public sealed class MetadataProviderTests
     [Fact]
     public async Task Hltb_asks_only_its_own_site()
     {
-        var hltb = new HltbHoursProvider(Http(_ => Json("{}")), new MetadataSettings { HltbSearchUrl = "https://evil.example/api/search" });
+        var asked = 0;
+        var hltb = new HltbHoursProvider(
+            Http(_ =>
+            {
+                asked++;
+                return Json("""{"data":[{"game_name":"Portal","comp_main":36000}]}""");
+            }),
+            new MetadataSettings { HltbSearchUrl = "https://evil.example/api/search" });
 
         Assert.Null(await hltb.FindHoursAsync("Portal", Ct));
+        Assert.Equal(0, asked);
     }
 
     [Theory]
@@ -186,7 +247,7 @@ public sealed class MetadataProviderTests
 
     private static HttpClient Http(Func<HttpRequestMessage, HttpResponseMessage> answer) => new(new Answering(answer));
 
-    private static TimeProviderClock Clock() => new(TimeProvider.System);
+    private static TimeProvider Clock() => TimeProvider.System;
 
     private sealed class Answering(Func<HttpRequestMessage, HttpResponseMessage> answer) : HttpMessageHandler
     {

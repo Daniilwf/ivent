@@ -4,6 +4,8 @@ using GameEvent.Infrastructure.Pool.Metadata;
 using GameEvent.Web.Accounts;
 using GameEvent.Web.Files;
 using GameEvent.Web.Hosting;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace GameEvent.Web.Pool;
 
@@ -36,23 +38,17 @@ public static partial class GameLookupEndpoints
     {
         ArgumentNullException.ThrowIfNull(builder);
         var configuration = builder.Configuration;
-        var settings = (configuration.GetSection("Metadata").Get<MetadataSettings>() ?? new MetadataSettings()) with
-        {
-            IgdbClientId = configuration["Metadata:IgdbClientId"] ?? configuration["IGDB_CLIENT_ID"],
-            IgdbClientSecret = configuration["Metadata:IgdbClientSecret"] ?? configuration["IGDB_CLIENT_SECRET"],
-        };
+        var settings = SettingsFrom(configuration);
         var services = builder.Services;
         services.AddSingleton(settings);
-        services.AddSingleton(TimeProvider.System);
-        services.AddSingleton<TimeProviderClock>();
+        services.TryAddSingleton(TimeProvider.System);
         services.AddHttpClient("metadata", c =>
         {
             c.Timeout = TimeSpan.FromSeconds(settings.TimeoutSeconds);
             c.DefaultRequestHeaders.UserAgent.ParseAdd("GameEvent/1.0 (game pool)");
         });
-        services.AddSingleton<IHoursProvider>(sp => string.IsNullOrEmpty(settings.HltbSearchUrl)
-            ? new ManualHours()
-            : new HltbHoursProvider(Client(sp), settings));
+        // An address that is not HowLongToBeat's own leaves the hours to the admin (D-29)
+        services.AddSingleton<IHoursProvider>(sp => settings.HltbUsable ? new HltbHoursProvider(Client(sp), settings) : new ManualHours());
         if (settings.SteamEnabled)
         {
             services.AddSingleton<ICoverProvider>(sp => new SteamCoverProvider(Client(sp), sp.GetRequiredService<ILogger<SteamCoverProvider>>()));
@@ -60,12 +56,12 @@ public static partial class GameLookupEndpoints
 
         if (!string.IsNullOrEmpty(settings.IgdbClientId) && !string.IsNullOrEmpty(settings.IgdbClientSecret))
         {
-            services.AddSingleton<ICoverProvider>(sp => new IgdbCoverProvider(Client(sp), settings, sp.GetRequiredService<TimeProviderClock>()));
+            services.AddSingleton<ICoverProvider>(sp => new IgdbCoverProvider(Client(sp), settings, sp.GetRequiredService<TimeProvider>()));
         }
 
         services.AddSingleton(sp => new CoverDownloader(new SafeDownloader(
             sp.GetRequiredService<IHostResolver>(),
-            new DownloadSettings { AllowedHosts = [.. settings.CoverHosts.Select(h => "*." + h)], TimeoutSeconds = settings.TimeoutSeconds * 2 },
+            new DownloadSettings { AllowedHosts = settings.CoverHosts, TimeoutSeconds = settings.TimeoutSeconds * 2 },
             sp.GetRequiredService<FileLimits>())));
     }
 
@@ -79,6 +75,25 @@ public static partial class GameLookupEndpoints
             .Produces<GameLookupView>()
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status429TooManyRequests);
+    }
+
+    /// <summary>
+    /// <c>Metadata</c> (D-118): the IGDB keys also as <c>IGDB_CLIENT_ID</c>/<c>IGDB_CLIENT_SECRET</c>; a list of cover hosts
+    /// in the configuration replaces the default one.
+    /// </summary>
+    internal static MetadataSettings SettingsFrom(IConfiguration configuration)
+    {
+        var section = configuration.GetSection("Metadata");
+        var bound = section.Get<MetadataSettings>() ?? new MetadataSettings();
+        return new MetadataSettings
+        {
+            TimeoutSeconds = bound.TimeoutSeconds,
+            SteamEnabled = bound.SteamEnabled,
+            HltbSearchUrl = bound.HltbSearchUrl,
+            IgdbClientId = configuration["Metadata:IgdbClientId"] ?? configuration["IGDB_CLIENT_ID"],
+            IgdbClientSecret = configuration["Metadata:IgdbClientSecret"] ?? configuration["IGDB_CLIENT_SECRET"],
+            CoverHosts = section.GetSection("CoverHosts").Get<string[]>() is { Length: > 0 } hosts ? hosts : new MetadataSettings().CoverHosts,
+        };
     }
 
     private static HttpClient Client(IServiceProvider sp) => sp.GetRequiredService<IHttpClientFactory>().CreateClient("metadata");
@@ -104,43 +119,84 @@ public static partial class GameLookupEndpoints
 
         var title = request.Title.Trim();
         var unavailable = new List<string>();
-
-        // Both lookups at once; each one's failure is its own
         var hoursTask = Safe("hltb", () => hours.FindHoursAsync(title, ct), unavailable, logger, ct);
+
+        // A repeat of the same lookup keeps the cover it stored: nothing is downloaded or stored twice
+        var owner = principal.UserId();
+        var earlier = owner is { } id ? await EarlierCoverAsync(request.CommandId, id, files, ct) : null;
         CoverCandidate? cover = null;
+        FileLinkView? stored = earlier is { } earlierFile ? FileLinkView.Of(earlierFile) : null;
         foreach (var provider in covers)
         {
-            cover = await Safe(provider.Name, () => provider.FindCoverAsync(title, ct), unavailable, logger, ct);
-            if (cover is not null)
+            var candidate = await Safe(provider.Name, () => provider.FindCoverAsync(title, ct), unavailable, logger, ct);
+            if (candidate is null)
+            {
+                continue;
+            }
+
+            cover ??= candidate;
+            if (stored is not null || owner is null)
             {
                 break;
             }
+
+            // The picture, else its alternate; nothing downloadable — the next provider is asked
+            foreach (var url in new[] { candidate.ImageUrl, candidate.AlternateImageUrl }.OfType<string>())
+            {
+                stored = await StoreCoverAsync(url, candidate.Source, request.CommandId, owner.Value, downloader, files, logger, ct);
+                if (stored is not null)
+                {
+                    cover = candidate;
+                    break;
+                }
+            }
+
+            if (stored is not null)
+            {
+                break;
+            }
+
+            unavailable.Add(candidate.Source + "-cover");
         }
 
         var foundHours = await hoursTask;
-        FileLinkView? stored = null;
-        if (cover is not null && principal.UserId() is { } admin)
-        {
-            var (content, refused) = await downloader.Inner.DownloadAsync(cover.ImageUrl, ct);
-            if (content is not null)
-            {
-                var (_, fileId) = await FileEndpoints.StoreFileAsync(content, request.CommandId, admin, files, ct);
-                stored = fileId is { } id ? FileLinkView.Of(id) : null;
-            }
-            else
-            {
-                LogCoverRefused(logger, cover.Source, refused?.Code ?? "?");
-            }
-
-            if (stored is null)
-            {
-                unavailable.Add(cover.Source + "-cover");
-            }
-        }
-
         return TypedResults.Ok(new GameLookupView(
             foundHours, cover?.Year, cover?.SteamAppId, stored, stored is null ? null : cover?.Source, [.. unavailable.Distinct()]));
     }
+
+    // Covers are the pool's, not the admin's own uploads: they do not use up his daily limit (D-118)
+    private static async Task<FileLinkView?> StoreCoverAsync(
+        string url, string source, Guid commandId, Guid owner, CoverDownloader downloader, FileServices files, ILogger logger, CancellationToken ct)
+    {
+        var (content, refused) = await downloader.Inner.DownloadAsync(url, ct);
+        if (content is null)
+        {
+            LogCoverRefused(logger, source, refused?.Code ?? "?");
+            return null;
+        }
+
+        var (answer, fileId) = await FileEndpoints.StoreFileAsync(content, commandId, owner, files, ct, countTowardsLimit: false);
+        if (fileId is null)
+        {
+            LogCoverNotStored(logger, source, ((answer as Microsoft.AspNetCore.Http.HttpResults.ProblemHttpResult)?.ProblemDetails.Extensions.TryGetValue("code", out var code) == true ? code?.ToString() : null) ?? "?");
+        }
+
+        return fileId is { } id ? FileLinkView.Of(id) : null;
+    }
+
+    private static async Task<Guid?> EarlierCoverAsync(Guid commandId, Guid owner, FileServices files, CancellationToken ct)
+    {
+        var earlier = await files.Db.Events.AsNoTracking()
+            .Where(e => e.SeasonId == Guid.Empty && e.CommandId == commandId && e.AuthorId == owner && e.Type == "file-stored")
+            .Select(e => new { e.Type, e.Version, e.Data })
+            .FirstOrDefaultAsync(ct);
+        return earlier is null
+            ? null
+            : (Engine.Kernel.EventCodec.Decode(new Engine.Kernel.StoredEvent(earlier.Type, earlier.Version, earlier.Data)) as Engine.Files.FileStored)?.FileId;
+    }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Game lookup: the {Source} cover was downloaded but not stored ({Code})")]
+    private static partial void LogCoverNotStored(ILogger logger, string source, string code);
 
     private static async Task<T?> Safe<T>(string service, Func<Task<T?>> lookup, List<string> unavailable, ILogger logger, CancellationToken ct)
     {

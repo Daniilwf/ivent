@@ -6,8 +6,11 @@ using Microsoft.Extensions.Logging;
 
 namespace GameEvent.Infrastructure.Pool.Metadata;
 
-/// <summary>What an external base says about a game (D-118): a cover picture to download, the release year, the Steam app.</summary>
-public sealed record CoverCandidate(string ImageUrl, int? Year, string? SteamAppId, string Source);
+/// <summary>
+/// What an external base says about a game (D-118): a cover picture to download (and another to try if that one is missing),
+/// the release year, the Steam app.
+/// </summary>
+public sealed record CoverCandidate(string ImageUrl, int? Year, string? SteamAppId, string Source, string? AlternateImageUrl = null);
 
 /// <summary>Length of the main story (SPEC «Длина игры»: HowLongToBeat); null — no data, the admin enters it.</summary>
 public interface IHoursProvider
@@ -49,8 +52,17 @@ public sealed record MetadataSettings
     /// </summary>
     public string? HltbSearchUrl { get; init; }
 
-    /// <summary>Hosts covers are downloaded from (the URLs come from the services' answers).</summary>
-    public IReadOnlyList<string> CoverHosts { get; init; } = ["steamstatic.com", "igdb.com"];
+    /// <summary>
+    /// Hosts covers are downloaded from — the exact hosts the links are built with, not every subdomain (D-117). A list in
+    /// the configuration replaces this one.
+    /// </summary>
+    public IReadOnlyList<string> CoverHosts { get; init; } = ["shared.akamai.steamstatic.com", "cdn.akamai.steamstatic.com", "images.igdb.com"];
+
+    // The IGDB secret stays out of any log or exception text
+    public override string ToString() => $"MetadataSettings {{ Steam = {SteamEnabled}, Igdb = {IgdbClientId is { Length: > 0 }}, Hltb = {HltbSearchUrl is { Length: > 0 }} }}";
+
+    /// <summary>A HowLongToBeat address the provider may call: its own site only.</summary>
+    public bool HltbUsable => HltbSearchUrl is { Length: > 0 } url && url.StartsWith("https://howlongtobeat.com/", StringComparison.Ordinal);
 }
 
 /// <summary>Steam Store: search by title, the vertical library capsule or the header, the release year (D-28).</summary>
@@ -92,13 +104,20 @@ public sealed partial class SteamCoverProvider(HttpClient http, ILogger<SteamCov
                 year = YearOf(date.GetString());
             }
         }
-        catch (Exception e) when (e is HttpRequestException or JsonException or NotSupportedException)
+        catch (Exception e) when (e is HttpRequestException or JsonException or NotSupportedException or InvalidOperationException
+            || (e is TaskCanceledException && !ct.IsCancellationRequested))
         {
-            // The year is a nicety: the cover stands without it
+            // The year is a nicety: the cover stands without it (a timeout or an odd answer included)
             LogDetailsFailed(logger, appId, e.Message);
         }
 
-        return new CoverCandidate($"https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/{appId}/library_600x900.jpg", year, appId, Name);
+        // The vertical library capsule is missing for some apps: the header is the one to try then
+        return new CoverCandidate(
+            $"https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/{appId}/library_600x900.jpg",
+            year,
+            appId,
+            Name,
+            $"https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/{appId}/header.jpg");
     }
 
     internal static int? YearOf(string? date) =>
@@ -118,8 +137,9 @@ public sealed partial class SteamCoverProvider(HttpClient http, ILogger<SteamCov
 }
 
 /// <summary>IGDB through Twitch client credentials (D-28): the cover in the big size and the first release year.</summary>
-public sealed class IgdbCoverProvider(HttpClient http, MetadataSettings settings, TimeProviderClock clock) : ICoverProvider
+public sealed class IgdbCoverProvider(HttpClient http, MetadataSettings settings, TimeProvider time) : ICoverProvider, IDisposable
 {
+    private readonly SemaphoreSlim _refresh = new(1, 1);
     private string? _token;
     private DateTimeOffset _tokenUntil;
 
@@ -132,15 +152,7 @@ public sealed class IgdbCoverProvider(HttpClient http, MetadataSettings settings
             return null;
         }
 
-        var token = await TokenAsync(clientId, secret, ct);
-        using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.igdb.com/v4/games")
-        {
-            // IGDB's own query language; the title is quoted, its quotes and backslashes escaped
-            Content = new StringContent($"search \"{title.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("\"", "\\\"", StringComparison.Ordinal)}\"; fields name,first_release_date,cover.image_id; limit 5;"),
-        };
-        request.Headers.Add("Client-ID", clientId);
-        request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
-        using var response = await http.SendAsync(request, ct);
+        using var response = await SearchAsync(title, clientId, secret, ct);
         response.EnsureSuccessStatusCode();
         var games = await response.Content.ReadFromJsonAsync<JsonElement>(ct);
         if (games.ValueKind != JsonValueKind.Array)
@@ -163,7 +175,7 @@ public sealed class IgdbCoverProvider(HttpClient http, MetadataSettings settings
         }
 
         var imageId = best.GetProperty("cover").GetProperty("image_id").GetString();
-        if (imageId is null || !imageId.All(char.IsLetterOrDigit))
+        if (string.IsNullOrEmpty(imageId) || !imageId.All(char.IsAsciiLetterOrDigit))
         {
             return null;
         }
@@ -174,9 +186,48 @@ public sealed class IgdbCoverProvider(HttpClient http, MetadataSettings settings
         return new CoverCandidate($"https://images.igdb.com/igdb/image/upload/t_cover_big/{imageId}.jpg", year, null, Name);
     }
 
+    public void Dispose() => _refresh.Dispose();
+
+    // A token revoked or keys changed: 401 drops the cached token, and the search is asked once more with a new one
+    private async Task<HttpResponseMessage> SearchAsync(string title, string clientId, string secret, CancellationToken ct)
+    {
+        for (var attempt = 0; ; attempt++)
+        {
+            var token = await TokenAsync(clientId, secret, ct);
+            using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.igdb.com/v4/games")
+            {
+                // IGDB's own query language; the title is quoted, its quotes and backslashes escaped
+                Content = new StringContent($"search \"{title.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("\"", "\\\"", StringComparison.Ordinal)}\"; fields name,first_release_date,cover.image_id; limit 5;"),
+            };
+            request.Headers.Add("Client-ID", clientId);
+            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+            var response = await http.SendAsync(request, ct);
+            if (response.StatusCode != System.Net.HttpStatusCode.Unauthorized || attempt > 0)
+            {
+                return response;
+            }
+
+            response.Dispose();
+            _token = null;
+        }
+    }
+
     private async Task<string> TokenAsync(string clientId, string secret, CancellationToken ct)
     {
-        if (_token is not null && clock.Now < _tokenUntil)
+        await _refresh.WaitAsync(ct);
+        try
+        {
+            return await FreshTokenAsync(clientId, secret, ct);
+        }
+        finally
+        {
+            _refresh.Release();
+        }
+    }
+
+    private async Task<string> FreshTokenAsync(string clientId, string secret, CancellationToken ct)
+    {
+        if (_token is not null && time.GetUtcNow() < _tokenUntil)
         {
             return _token;
         }
@@ -192,15 +243,9 @@ public sealed class IgdbCoverProvider(HttpClient http, MetadataSettings settings
         var answer = await response.Content.ReadFromJsonAsync<JsonElement>(ct);
         _token = answer.GetProperty("access_token").GetString() ?? throw new JsonException("No access token.");
         var seconds = answer.TryGetProperty("expires_in", out var expires) && expires.ValueKind == JsonValueKind.Number ? expires.GetInt64() : 3600;
-        _tokenUntil = clock.Now.AddSeconds(Math.Max(60, seconds - 60));
+        _tokenUntil = time.GetUtcNow().AddSeconds(Math.Max(60, seconds - 60));
         return _token;
     }
-}
-
-/// <summary>Wall-clock time for token lifetimes outside the engine (the engine's IClock is for game time).</summary>
-public sealed class TimeProviderClock(TimeProvider time)
-{
-    public DateTimeOffset Now => time.GetUtcNow();
 }
 
 /// <summary>
@@ -211,10 +256,12 @@ public sealed class HltbHoursProvider(HttpClient http, MetadataSettings settings
 {
     public async Task<decimal?> FindHoursAsync(string title, CancellationToken ct)
     {
-        if (settings.HltbSearchUrl is not { Length: > 0 } url || !url.StartsWith("https://howlongtobeat.com/", StringComparison.Ordinal))
+        if (!settings.HltbUsable)
         {
             return null;
         }
+
+        var url = settings.HltbSearchUrl!;
 
         using var request = new HttpRequestMessage(HttpMethod.Post, url)
         {

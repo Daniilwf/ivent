@@ -183,6 +183,8 @@ internal sealed class SiteFactory : WebApplicationFactory<Program>
 
         // Tests never reach the outside: the pool's services are replaced by the tests that need them (D-118)
         builder.UseSetting("Metadata:SteamEnabled", "false");
+        builder.UseSetting("Metadata:IgdbClientId", "");
+        builder.UseSetting("Metadata:HltbSearchUrl", "");
 
         // Tests log to the console only; one observability test turns the file on in its own folder
         builder.UseSetting("Logging:File:Enabled", "false");
