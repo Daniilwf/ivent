@@ -64,3 +64,6 @@ Thumbs.db
 # --- Claude Code local state ---
 .claude/state/
 .claude/settings.local.json
+
+# Worktrees of parallel agents (Claude Code)
+.claude/worktrees/

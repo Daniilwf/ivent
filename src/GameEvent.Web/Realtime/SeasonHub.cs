@@ -11,8 +11,20 @@ public sealed record SeasonUpdate(Guid SeasonId, long FromSequence, long ToSeque
 
 /// <summary>Real-time updates: a client joins the group of the season it shows. The season log is public.</summary>
 [Authorize]
-public sealed class SeasonHub : Hub
+public sealed class SeasonHub(HubSessions sessions) : Hub
 {
+    public override Task OnConnectedAsync()
+    {
+        sessions.Add(Context);
+        return base.OnConnectedAsync();
+    }
+
+    public override Task OnDisconnectedAsync(Exception? exception)
+    {
+        sessions.Remove(Context.ConnectionId);
+        return base.OnDisconnectedAsync(exception);
+    }
+
     public const string Path = "/hubs/season";
     public const string UpdateMethod = "seasonUpdated";
 
@@ -37,7 +49,9 @@ public sealed class SeasonBroadcaster : ICommittedEventsListener
     public Task OnCommittedAsync(IReadOnlyList<LoggedEvent> events, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(events);
-        if (events.Count > 0)
+
+        // The global log (accounts, D-106) is nobody's season
+        if (events.Count > 0 && events[0].SeasonId != Guid.Empty)
         {
             _updates.Writer.TryWrite(new SeasonUpdate(
                 events[0].SeasonId,

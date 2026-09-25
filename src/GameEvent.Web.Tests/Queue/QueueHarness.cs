@@ -81,7 +81,7 @@ internal sealed class QueueHarness : IAsyncDisposable
     private async Task StartProcessorAsync()
     {
         _processor = new CommandProcessor(
-            Bus, _factory, Clock, new SeededRandom(7), new CountingIds(), [], NullLogger<CommandProcessor>.Instance);
+            Bus, _factory, Clock, new SeededRandom(7), new CountingIds(), new Accounts.Passwords(), [], NullLogger<CommandProcessor>.Instance);
         await _processor.StartAsync(CancellationToken.None);
     }
 

@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Identity;
 namespace GameEvent.Web.Accounts;
 
 /// <summary>Password hashing with ASP.NET Core Identity's PBKDF2 hasher, without the rest of Identity (D-26).</summary>
-public sealed class Passwords
+public sealed class Passwords : IPasswords
 {
     private readonly PasswordHasher<UserRecord> _hasher = new();
 

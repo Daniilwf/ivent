@@ -256,6 +256,42 @@ public class EventFormatTests
             """{"commandId":"00000000-0000-0000-0000-000000000001","comment":"Ошибка админа","players":[{"playerId":"10000000-0000-0000-0000-000000000001","userId":"40000000-0000-0000-0000-000000000001","name":"Вася","cellId":"c2","points":7,"coins":3,"resources":{"freeRerolls":1},"isInactive":false,"path":{"segments":[{"cells":["start","c1","c2"]}]},"phase":"playing","offer":null,"choice":null,"exclusions":[{"gameId":"20000000-0000-0000-0000-000000000001","reason":"dropped"}],"rerollsThisRoll":1,"finish":null,"activeRunId":"00000000-0000-0000-0000-000000000001","pointsTick":4}],"removedPlayers":["10000000-0000-0000-0000-000000000002"],"runs":[{"runId":"00000000-0000-0000-0000-000000000001","playerId":"10000000-0000-0000-0000-000000000001","gameId":"20000000-0000-0000-0000-000000000001","status":"completed","snapshot":{"rulesetVersion":1,"hours":7.5,"diceCount":{"hoursPerDie":3,"rounding":"nearest","min":1,"max":10},"dieByDifficulty":{"easy":{"sides":2,"grantEvent":null},"normal":{"sides":4,"grantEvent":null},"hard":{"sides":6,"grantEvent":null},"extreme":{"sides":6,"grantEvent":"good"}},"techRerollWindowHours":48,"challengeExtraDice":1,"coins":{"perHour":1,"min":3}},"rolledAt":"2026-10-01T12:30:00+00:00","startedAt":"2026-10-01T12:30:00+00:00","difficulty":"normal","hours":7.5,"dice":[{"sides":4,"value":3}],"challengeDice":[{"sides":4,"value":2}],"hoursSource":"HLTB","review":{"rating":8,"text":"Хорошо"},"completedAt":"2026-10-01T12:30:00+00:00","reachedFinish":true,"proof":{"status":"pending","links":["https://imgur.com/a/credits"],"note":"Концовка","witnessId":"10000000-0000-0000-0000-000000000002","submittedAt":"2026-10-01T12:30:00+00:00","comment":null},"moved":2,"afterFinish":false,"freeMode":false}],"removedRuns":["00000000-0000-0000-0000-000000000001"],"effects":[{"effectId":"00000000-0000-0000-0000-000000000001","playerId":"10000000-0000-0000-0000-000000000001","drawEvent":"bad","source":"drop","runId":"00000000-0000-0000-0000-000000000001"}],"removedEffects":["20000000-0000-0000-0000-000000000001"],"season":{"status":"active","deadline":"2026-10-01T12:30:00+00:00","name":"Тестовый сезон","ruleset":null}}"""
         },
         {
+            "account-created",
+            new Engine.Accounts.AccountCreated(s_user, "vasya", "Вася", Engine.Accounts.AccountRole.Player, true),
+            1,
+            """{"userId":"40000000-0000-0000-0000-000000000001","login":"vasya","name":"Вася","role":"player","mustChangePassword":true}"""
+        },
+        {
+            "account-password-reset",
+            new Engine.Accounts.AccountPasswordReset(s_user),
+            1,
+            """{"userId":"40000000-0000-0000-0000-000000000001"}"""
+        },
+        {
+            "account-password-changed",
+            new Engine.Accounts.AccountPasswordChanged(s_user),
+            1,
+            """{"userId":"40000000-0000-0000-0000-000000000001"}"""
+        },
+        {
+            "account-changed",
+            new Engine.Accounts.AccountChanged(s_user, "Василий", Engine.Accounts.AccountRole.Spectator),
+            1,
+            """{"userId":"40000000-0000-0000-0000-000000000001","name":"Василий","role":"spectator"}"""
+        },
+        {
+            "account-deleted",
+            new Engine.Accounts.AccountDeleted(s_user),
+            1,
+            """{"userId":"40000000-0000-0000-0000-000000000001"}"""
+        },
+        {
+            "account-restored",
+            new Engine.Accounts.AccountRestored(s_user),
+            1,
+            """{"userId":"40000000-0000-0000-0000-000000000001"}"""
+        },
+        {
             "effect-chain-cut",
             new EffectChainCut(EffectChainLimit.Depth, 4, 5),
             1,

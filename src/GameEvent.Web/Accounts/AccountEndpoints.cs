@@ -17,7 +17,7 @@ public sealed record CurrentUser(Guid Id, string Login, string Name, Role Role, 
 
 public sealed record AntiforgeryToken(string Token, string HeaderName);
 
-/// <summary>Sign-in by login and password with a cookie (D-26). Accounts are created by the admin (task D8).</summary>
+/// <summary>Sign-in by login and password with a cookie (D-26). Accounts are created by the admin (D-106).</summary>
 public static partial class AccountEndpoints
 {
     public static void MapAccounts(this RouteGroupBuilder api)
@@ -83,17 +83,22 @@ public static partial class AccountEndpoints
         }
 
         throttle.Succeeded(normalized, address);
+        await SignInAsync(http, user!);
+        return TypedResults.Ok(ToCurrent(user!));
+    }
 
+    /// <summary>The session cookie for <paramref name="user"/> with its current security stamp (D-67).</summary>
+    internal static Task SignInAsync(HttpContext http, UserRecord user)
+    {
         var identity = new ClaimsIdentity(
             [
-                new Claim(ClaimTypes.NameIdentifier, user!.Id.ToString()),
+                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
                 new Claim(ClaimTypes.Name, user.Login),
                 new Claim(ClaimTypes.Role, user.Role.ToString()),
                 new Claim(WebSecurity.StampClaim, user.SecurityStamp),
             ],
             CookieAuthenticationDefaults.AuthenticationScheme);
-        await http.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity));
-        return TypedResults.Ok(ToCurrent(user));
+        return http.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity));
     }
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Failed sign-in for {Login} from {Address}")]

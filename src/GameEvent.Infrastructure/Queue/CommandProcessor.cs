@@ -23,6 +23,7 @@ public sealed partial class CommandProcessor(
     IClock clock,
     IRandomSource random,
     IIdGenerator ids,
+    Accounts.IPasswords passwords,
     IEnumerable<ICommittedEventsListener> listeners,
     ILogger<CommandProcessor> logger) : BackgroundService
 {
@@ -110,6 +111,14 @@ public sealed partial class CommandProcessor(
                 : new CommandOutcome(true, true, null, [.. earlier.Select(ToLogged)]);
         }
 
+        // Account commands belong to the global log (D-106); season commands to their season.
+        if (envelope.Command is Accounts.IAccountCommand account)
+        {
+            return envelope.SeasonId == Guid.Empty
+                ? await ProcessAccountAsync(db, envelope, account, commandType, commandHash, ct)
+                : Rejected(RejectionCodes.SeasonMismatch, "Account commands go to the global log (no season).");
+        }
+
         if (envelope.SeasonId == Guid.Empty)
         {
             return Rejected(RejectionCodes.SeasonMismatch, "Season commands need a season id; Guid.Empty is the global log.");
@@ -183,6 +192,12 @@ public sealed partial class CommandProcessor(
         _cache[envelope.SeasonId] = (result.State, sequence);
 
         var logged = records.Zip(result.Events, (r, e) => new LoggedEvent(r.SeasonId, r.Sequence, r.CommandId, e, r.OccurredAt)).ToList();
+        await NotifyAsync(envelope, logged, ct);
+        return new CommandOutcome(true, false, null, logged);
+    }
+
+    private async Task NotifyAsync(CommandEnvelope envelope, IReadOnlyList<LoggedEvent> logged, CancellationToken ct)
+    {
         foreach (var listener in listeners)
         {
             // The command is committed: a failing listener (a broadcast) must not turn it into a failure.
@@ -197,8 +212,6 @@ public sealed partial class CommandProcessor(
                 LogListenerFailed(logger, e, envelope.CommandId, listener.GetType().Name);
             }
         }
-
-        return new CommandOutcome(true, false, null, logged);
     }
 
     private static CommandOutcome Rejected(string code, string detail) => new(false, false, new Rejection(code, detail), []);
@@ -217,7 +230,9 @@ public sealed partial class CommandProcessor(
     {
         try
         {
-            return Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(command, command.GetType(), EngineJson.Options)));
+            // A secret never goes into the fingerprint: an unsalted hash of a password would sit in the log (D-106)
+            var hashed = command is Accounts.ISecretCommand secret ? secret.WithoutSecret() : command;
+            return Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(hashed, hashed.GetType(), EngineJson.Options)));
         }
         catch (JsonException)
         {
