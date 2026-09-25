@@ -373,6 +373,28 @@ public class UndoTests
     }
 
     [Fact]
+    public void A_later_command_that_repeated_the_change_blocks_the_undo()
+    {
+        // BUGS.md C13-1 (found by the long run): the same proof sent twice — the second changes nothing in the state, yet its
+        // event stands in the log. Undoing the first proof wiped the second one with it, and the log replayed without the
+        // first no longer gave the season (invariant 13).
+        var s = Season();
+        s.Roll("Вася").Start("Вася").NextRandom(3, 4).Complete("Вася");
+        var runId = s.State.Runs.Values.Single().RunId;
+        s.Act(new Engine.Proofs.SubmitProof(s.PlayerId("Вася"), runId, ["https://imgur.com/a/credits"]));
+        ScenarioAssert.Accepted(s);
+        var first = s.LastCommandId;
+        s.Act(new Engine.Proofs.SubmitProof(s.PlayerId("Вася"), runId, ["https://imgur.com/a/credits"]));
+        ScenarioAssert.Accepted(s);
+        var second = s.LastCommandId;
+
+        s.Act(Undo(first));
+
+        Assert.Equal(RejectionCodes.UndoDependents, s.Last.Rejection?.Code);
+        Assert.Equal([second], s.Last.Rejection!.Related);
+    }
+
+    [Fact]
     public void Without_the_history_an_undo_is_refused()
     {
         var s = Season();
@@ -478,9 +500,11 @@ public class UndoTests
     // replayed without it (up to the counters that only grow); an undo with dependents changes nothing and names only
     // commands that are later, not undone, not undos
     [Property(MaxTest = 150)]
-    public void An_accepted_undo_equals_the_log_without_the_command(byte[] script)
+    public void An_accepted_undo_equals_the_log_without_the_command(byte[] script) =>
+        Season().Explained(s => PlayUndos(s, script));
+
+    private static void PlayUndos(Scenario s, byte[] script)
     {
-        var s = Season();
         string[] names = ["Вася", "Петя", "Маша"];
         foreach (var b in script.Take(60))
         {
