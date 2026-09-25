@@ -2152,6 +2152,52 @@
         }
       }
     },
+    "/api/admin/seasons/{seasonId}/effects": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "parameters": [
+          {
+            "name": "seasonId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AdminManualEffectView"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/admin/seasons/{seasonId}/effects/{effectId}/resolve": {
       "post": {
         "tags": [
@@ -2344,6 +2390,44 @@
   },
   "components": {
     "schemas": {
+      "AdminManualEffectView": {
+        "required": [
+          "id",
+          "playerId",
+          "playerName",
+          "drawEvent",
+          "source",
+          "runId"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "playerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "playerName": {
+            "type": "string"
+          },
+          "drawEvent": {
+            "$ref": "#/components/schemas/EventKind"
+          },
+          "source": {
+            "$ref": "#/components/schemas/ManualEffectSource"
+          },
+          "runId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          }
+        },
+        "description": "A pending manual effect of any player, oldest first, for the admin to resolve (D-102)."
+      },
       "AlreadyPlayedRequest": {
         "required": [
           "commandId",

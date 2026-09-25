@@ -2115,6 +2115,59 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/seasons/{seasonId}/effects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminManualEffectView"][];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Too Many Requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/seasons/{seasonId}/effects/{effectId}/resolve": {
         parameters: {
             query?: never;
@@ -2292,6 +2345,18 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @description A pending manual effect of any player, oldest first, for the admin to resolve (D-102). */
+        AdminManualEffectView: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            playerId: string;
+            playerName: string;
+            drawEvent: components["schemas"]["EventKind"];
+            source: components["schemas"]["ManualEffectSource"];
+            /** Format: uuid */
+            runId: null | string;
+        };
         /** @description «Уже проходил» on the offered game or an option of the pending choice (D-92). */
         AlreadyPlayedRequest: {
             /** Format: uuid */
