@@ -3820,6 +3820,16 @@
           "required": true
         },
         "responses": {
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
           "200": {
             "description": "OK",
             "content": {
@@ -5716,6 +5726,12 @@
           "force": {
             "type": "boolean",
             "default": false
+          },
+          "completionCondition": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         },
         "description": "A game card from a player or the admin (D-119). `force` — add although the pool has an alike title (the site showed\nit); the same title is never added twice. `coverFileId` — the author's own upload or a found cover (D-118)."

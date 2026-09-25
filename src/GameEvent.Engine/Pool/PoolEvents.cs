@@ -5,7 +5,11 @@ namespace GameEvent.Engine.Pool;
 // The global log's pool events (D-119): the shared pool of games and the category wheel live across seasons. A season's
 // roll reads the pool as it is then, and a run keeps its own snapshot of the hours (invariant 5).
 
-/// <summary>A game's card as the pool keeps it: what a player sees and what the roll reads.</summary>
+/// <summary>
+/// A game's card as the pool keeps it: what a player sees and what the roll reads. <see cref="Note"/> — the challenge or a
+/// remark (SPEC «Челлендж из заметки»); <see cref="CompletionCondition"/> — what counts as finishing an endless or
+/// multiplayer game (SPEC «условие прохождения»); <see cref="IsCoop"/> — a game played together.
+/// </summary>
 public sealed record GameCard(
     string Title,
     EquatableArray<string> Tags,
@@ -14,7 +18,8 @@ public sealed record GameCard(
     string? SteamAppId,
     Guid? CoverFileId,
     string? Note,
-    bool IsCoop);
+    bool IsCoop,
+    string? CompletionCondition = null);
 
 /// <summary>A player or the admin added a game to the pool; <see cref="AuthorId"/> — the account that added it.</summary>
 [EventType("game-added")]

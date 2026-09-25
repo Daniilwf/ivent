@@ -51,7 +51,9 @@
 | Тег | метка жанра или свойства игры | `Tag` |
 | Категория | тег с весом на колесе категорий | `Category`, `SetCategory`, `RemoveCategory`, события `CategorySet`, `CategoryRemoved` |
 | Часы | длина игры по HowLongToBeat, основной сюжет | `Game.Hours`, `RunSnapshot.Hours` |
-| Условие прохождения | что считается прохождением для бесконечной игры | `Game.CompletionCondition` |
+| Условие прохождения | что считается прохождением для бесконечной или мультиплеерной игры | `GameRecord.CompletionCondition`, `GameCard.CompletionCondition` |
+| Заметка к игре | челлендж или пометка в карточке игры | `GameRecord.Note`, `GameCard.Note` |
+| Кооп-игра | игра, которую проходят вместе (признак карточки, не само совместное прохождение) | `GameRecord.IsCoop`, `GameCard.IsCoop` |
 | Колесо | взвешенный список записей | `Wheel`, `WheelEntry` |
 | Колесо категорий | колесо, по которому выбирается категория для ролла | `Wheel` с видом `Categories` |
 | Ролл | выбор игры: категория, затем игра | `Roll` |

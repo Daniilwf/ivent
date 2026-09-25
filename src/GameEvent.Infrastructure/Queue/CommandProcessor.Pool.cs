@@ -112,14 +112,15 @@ public sealed partial class CommandProcessor
                         return ([], null, null, invalid);
                     }
 
+                    // The wheel matches tags without case: «horror» is the category «Horror», not a second one
                     var name = set.Name.Trim();
-                    var existing = await db.Categories.SingleOrDefaultAsync(c => c.Name == name, ct);
+                    var existing = (await db.Categories.ToListAsync(ct)).FirstOrDefault(c => string.Equals(c.Name, name, StringComparison.OrdinalIgnoreCase));
                     if (existing?.Weight == set.Weight)
                     {
                         return Reject(PoolRules.NothingToChange, "The category already has this weight.");
                     }
 
-                    return ([new CategorySet(name, set.Weight)], () =>
+                    return ([new CategorySet(existing?.Name ?? name, set.Weight)], () =>
                     {
                         if (existing is null)
                         {
@@ -135,7 +136,7 @@ public sealed partial class CommandProcessor
             case RemoveCategory remove:
                 {
                     var name = remove.Name?.Trim() ?? "";
-                    return await db.Categories.SingleOrDefaultAsync(c => c.Name == name, ct) is not { } category
+                    return (await db.Categories.ToListAsync(ct)).FirstOrDefault(c => string.Equals(c.Name, name, StringComparison.OrdinalIgnoreCase)) is not { } category
                         ? Reject(PoolRules.CategoryUnknown, $"The wheel has no category «{name}».")
                         : ([new CategoryRemoved(category.Name)], () => db.Categories.Remove(category), null, null);
                 }
@@ -174,8 +175,9 @@ public sealed partial class CommandProcessor
         record.CoverFileId = card.CoverFileId;
         record.Note = card.Note;
         record.IsCoop = card.IsCoop;
+        record.CompletionCondition = card.CompletionCondition;
     }
 
     internal static GameCard Card(GameRecord record) =>
-        new(record.Title, PoolReader.Tags(record.TagsJson), record.Hours, record.Year, record.SteamAppId, record.CoverFileId, record.Note, record.IsCoop);
+        new(record.Title, PoolReader.Tags(record.TagsJson), record.Hours, record.Year, record.SteamAppId, record.CoverFileId, record.Note, record.IsCoop, record.CompletionCondition);
 }

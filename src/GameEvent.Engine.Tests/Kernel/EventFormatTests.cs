@@ -305,13 +305,13 @@ public class EventFormatTests
                 new GameCard("Silent Hill 2", ["Horror", "Classic"], 12.5m, 2001, "2124490", Guid.Parse("50000000-0000-0000-0000-000000000001"), "Концовка любая", IsCoop: false),
                 s_user),
             1,
-            """{"gameId":"20000000-0000-0000-0000-000000000001","card":{"title":"Silent Hill 2","tags":["Horror","Classic"],"hours":12.5,"year":2001,"steamAppId":"2124490","coverFileId":"50000000-0000-0000-0000-000000000001","note":"Концовка любая","isCoop":false},"authorId":"40000000-0000-0000-0000-000000000001"}"""
+            """{"gameId":"20000000-0000-0000-0000-000000000001","card":{"title":"Silent Hill 2","tags":["Horror","Classic"],"hours":12.5,"year":2001,"steamAppId":"2124490","coverFileId":"50000000-0000-0000-0000-000000000001","note":"Концовка любая","isCoop":false,"completionCondition":null},"authorId":"40000000-0000-0000-0000-000000000001"}"""
         },
         {
             "game-changed",
-            new GameChanged(Guid.Parse("20000000-0000-0000-0000-000000000001"), new GameCard("Portal", ["Puzzle"], null, null, null, null, null, IsCoop: true)),
+            new GameChanged(Guid.Parse("20000000-0000-0000-0000-000000000001"), new GameCard("Portal", ["Puzzle"], null, null, null, null, null, IsCoop: true, "Пройти сюжет")),
             1,
-            """{"gameId":"20000000-0000-0000-0000-000000000001","card":{"title":"Portal","tags":["Puzzle"],"hours":null,"year":null,"steamAppId":null,"coverFileId":null,"note":null,"isCoop":true}}"""
+            """{"gameId":"20000000-0000-0000-0000-000000000001","card":{"title":"Portal","tags":["Puzzle"],"hours":null,"year":null,"steamAppId":null,"coverFileId":null,"note":null,"isCoop":true,"completionCondition":"Пройти сюжет"}}"""
         },
         {
             "game-deleted",

@@ -50,7 +50,7 @@ public static class PoolRules
     public static (GameCard? Card, string? Problem) Normalize(GameCard card)
     {
         ArgumentNullException.ThrowIfNull(card);
-        var title = card.Title?.Trim() ?? "";
+        var title = Tidy(card.Title);
         if (title.Length is 0 or > MaxTitleLength)
         {
             return (null, $"A title is 1–{MaxTitleLength} characters.");
@@ -79,12 +79,13 @@ public static class PoolRules
         }
 
         var note = string.IsNullOrWhiteSpace(card.Note) ? null : card.Note.Trim();
-        if (note?.Length > MaxNoteLength)
+        var condition = string.IsNullOrWhiteSpace(card.CompletionCondition) ? null : card.CompletionCondition.Trim();
+        if (note?.Length > MaxNoteLength || condition?.Length > MaxNoteLength)
         {
-            return (null, $"A note is at most {MaxNoteLength} characters.");
+            return (null, $"A note and a condition are at most {MaxNoteLength} characters.");
         }
 
-        return (new GameCard(title, [.. tags], card.Hours, card.Year, steam, card.CoverFileId, note, card.IsCoop), null);
+        return (new GameCard(title, [.. tags], card.Hours, card.Year, steam, card.CoverFileId, note, card.IsCoop, condition), null);
     }
 
     /// <summary>
@@ -92,7 +93,14 @@ public static class PoolRules
     /// digits are all that is left («Dice Fold» and «Dice &amp; Fold»), or a letter or two apart in a long enough title.
     /// </summary>
     public static bool IsSame(string a, string b) =>
-        string.Equals(a.Trim(), b.Trim(), StringComparison.OrdinalIgnoreCase);
+        string.Equals(Tidy(a), Tidy(b), StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// A title as stored: one Unicode form (a composed «é» equals a decomposed one) and single spaces — two titles that look
+    /// alike are the same title.
+    /// </summary>
+    public static string Tidy(string? title) =>
+        string.Join(' ', (title ?? "").Normalize(System.Text.NormalizationForm.FormC).Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
 
     public static bool IsAlike(string a, string b)
     {
@@ -118,7 +126,7 @@ public static class PoolRules
 
     /// <summary>Letters and digits of a title, lower case: the key two titles are compared by.</summary>
     public static string Key(string title) =>
-        new([.. (title ?? "").ToLower(CultureInfo.InvariantCulture).Where(char.IsLetterOrDigit)]);
+        new([.. Tidy(title).ToLower(CultureInfo.InvariantCulture).Where(char.IsLetterOrDigit)]);
 
     public static Rejection? CheckCategory(string name, int weight) =>
         string.IsNullOrWhiteSpace(name) || name.Trim().Length > MaxTagLength

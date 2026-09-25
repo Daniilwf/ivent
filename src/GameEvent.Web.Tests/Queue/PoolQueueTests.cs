@@ -51,6 +51,8 @@ public sealed class PoolQueueTests
     [InlineData("Silent Hill")]
     [InlineData("silent hill")]
     [InlineData("  SILENT HILL ")]
+    [InlineData("Silent   Hill")]
+    [InlineData("Silent\tHill")]
     public async Task The_same_title_is_never_added_twice_even_when_confirmed(string title)
     {
         await using var h = await QueueHarness.StartAsync();
@@ -194,6 +196,82 @@ public sealed class PoolQueueTests
         Assert.Equal(PoolRules.CategoryUnknown, (await SendAsync(h, new RemoveCategory("Racing"))).Rejection!.Code);
         await using var db = h.NewDb();
         Assert.DoesNotContain(await db.Categories.ToListAsync(Ct), c => c.Name == "Racing");
+    }
+
+    [Fact]
+    public async Task A_title_in_another_unicode_form_is_the_same_title()
+    {
+        await using var h = await QueueHarness.StartAsync();
+        Assert.True((await SendAsync(h, new AddGame(Card("Pokémon Snap", "Puzzle"), null, false))).IsAccepted);
+
+        // «é» composed above, «e» and a combining acute below: they look the same, they are the same
+        var outcome = await SendAsync(h, new AddGame(Card("Pokémon Snap", "Puzzle"), null, Force: true));
+
+        Assert.Equal(PoolRules.Duplicate, outcome.Rejection!.Code);
+    }
+
+    [Fact]
+    public async Task A_title_is_stored_in_one_form_with_single_spaces()
+    {
+        await using var h = await QueueHarness.StartAsync();
+
+        var outcome = await SendAsync(h, new AddGame(Card("  Pokémon   Snap ", "Puzzle"), null, false));
+
+        Assert.Equal("Pokémon Snap", Assert.IsType<GameAdded>(Assert.Single(outcome.Events).Event).Card.Title);
+    }
+
+    [Fact]
+    public async Task The_card_limits_are_inclusive()
+    {
+        await using var h = await QueueHarness.StartAsync();
+        var edge = new GameCard(new string('a', PoolRules.MaxTitleLength), [new string('t', PoolRules.MaxTagLength)], PoolRules.MaxHours, PoolRules.MaxYear, "123456789012", null, new string('n', PoolRules.MaxNoteLength), IsCoop: false, new string('c', PoolRules.MaxNoteLength));
+
+        Assert.True((await SendAsync(h, new AddGame(edge, null, false))).IsAccepted);
+        Assert.True((await SendAsync(h, new AddGame(Card("Low edge") with { Hours = PoolRules.MinHours, Year = PoolRules.MinYear }, null, false))).IsAccepted);
+    }
+
+    [Fact]
+    public async Task A_change_to_an_alike_title_needs_the_confirmation_too()
+    {
+        await using var h = await QueueHarness.StartAsync();
+        var gameId = await AddAsync(h, "Dead Space");
+
+        Assert.Equal(PoolRules.Similar, (await SendAsync(h, new ChangeGame(gameId, Card("Silent Hills", "Horror"), false))).Rejection!.Code);
+        Assert.True((await SendAsync(h, new ChangeGame(gameId, Card("Silent Hills", "Horror"), true))).IsAccepted);
+    }
+
+    [Fact]
+    public async Task A_game_comes_back_next_to_an_alike_title()
+    {
+        await using var h = await QueueHarness.StartAsync();
+        var gameId = await AddAsync(h, "Dead Space");
+        Assert.True((await SendAsync(h, new DeleteGame(gameId))).IsAccepted);
+        Assert.True((await SendAsync(h, new AddGame(Card("Dead Space 2", "Horror"), null, Force: true))).IsAccepted);
+
+        Assert.True((await SendAsync(h, new RestoreGame(gameId))).IsAccepted);
+    }
+
+    [Fact]
+    public async Task Categories_are_one_whatever_the_case()
+    {
+        await using var h = await QueueHarness.StartAsync();
+
+        // The harness has «Horror» (weight 2): «horror» changes its weight, not a second category
+        Assert.Equal(new CategorySet("Horror", 5), Assert.Single((await SendAsync(h, new SetCategory("horror", 5))).Events).Event);
+        Assert.Equal(new CategoryRemoved("Horror"), Assert.Single((await SendAsync(h, new RemoveCategory("HORROR"))).Events).Event);
+        await using var db = h.NewDb();
+        Assert.DoesNotContain(await db.Categories.ToListAsync(Ct), c => string.Equals(c.Name, "horror", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task The_completion_condition_is_kept_apart_from_the_note()
+    {
+        await using var h = await QueueHarness.StartAsync();
+
+        var outcome = await SendAsync(h, new AddGame(Card("Tetris Effect", "Puzzle") with { Note = "Челлендж: без удержания", CompletionCondition = " 100 линий " }, null, false));
+
+        var card = Assert.IsType<GameAdded>(Assert.Single(outcome.Events).Event).Card;
+        Assert.Equal(("Челлендж: без удержания", "100 линий"), (card.Note, card.CompletionCondition));
     }
 
     [Theory]

@@ -31,6 +31,9 @@ public sealed class GameRecord
     /// <summary>A challenge or the condition of finishing an endless game (SPEC «Пул общий»).</summary>
     public string? Note { get; set; }
 
+    /// <summary>What counts as finishing an endless or multiplayer game (SPEC «условие прохождения»).</summary>
+    public string? CompletionCondition { get; set; }
+
     public bool IsCoop { get; set; }
 
     /// <summary>The account that added the game; none for the seed and the import.</summary>

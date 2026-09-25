@@ -29,7 +29,23 @@ public sealed record ExportedEvent(
     DateTimeOffset OccurredAt,
     long? UndoneBySequence);
 
-public sealed record ExportedGame(Guid Id, string Title, string TagsJson, decimal? Hours, bool IsDeleted);
+/// <summary>
+/// A game of the archive. The card's other fields (D-119) are optional, so archives made before them still read; the
+/// cover is a file the archive does not carry, so a copy has none.
+/// </summary>
+public sealed record ExportedGame(
+    Guid Id,
+    string Title,
+    string TagsJson,
+    decimal? Hours,
+    bool IsDeleted,
+    int? Year = null,
+    string? SteamAppId = null,
+    string? Note = null,
+    string? CompletionCondition = null,
+    bool IsCoop = false,
+    Guid? AuthorId = null,
+    DateTimeOffset? CreatedAt = null);
 
 public sealed record ExportedCategory(string Name, int Weight);
 
@@ -87,14 +103,17 @@ public static class SeasonTransfer
         var sequenceOf = rows.ToDictionary(r => r.Id, r => r.Sequence);
 
         // Every account the log names: authors, players' arrivals and the player snapshots undos keep
+        var authors = await db.Games.AsNoTracking().Where(g => g.AuthorId != null).Select(g => g.AuthorId!.Value).ToListAsync(ct);
         var userIds = rows.Select(r => r.AuthorId).OfType<Guid>()
+            .Concat(authors)
             .Concat(rows.SelectMany(r => AccountIds(EventCodec.Decode(new StoredEvent(r.Type, r.Version, r.Data)))))
             .Distinct()
             .ToList();
         var users = await db.Users.AsNoTracking().Where(u => userIds.Contains(u.Id)).OrderBy(u => u.Login)
             .Select(u => new ExportedUser(u.Id, u.Login, u.Name, u.Role)).ToListAsync(ct);
         var games = await db.Games.AsNoTracking().OrderBy(g => g.Id)
-            .Select(g => new ExportedGame(g.Id, g.Title, g.TagsJson, g.Hours, g.IsDeleted)).ToListAsync(ct);
+            .Select(g => new ExportedGame(g.Id, g.Title, g.TagsJson, g.Hours, g.IsDeleted, g.Year, g.SteamAppId, g.Note, g.CompletionCondition, g.IsCoop, g.AuthorId, g.CreatedAt))
+            .ToListAsync(ct);
         var categories = await db.Categories.AsNoTracking().OrderBy(c => c.Name).Select(c => new ExportedCategory(c.Name, c.Weight)).ToListAsync(ct);
 
         return new SeasonArchive(
@@ -227,7 +246,21 @@ public static class SeasonTransfer
         {
             if (!await db.Games.AnyAsync(g => g.Id == game.Id, ct))
             {
-                db.Games.Add(new GameRecord { Id = game.Id, Title = game.Title, TagsJson = game.TagsJson, Hours = game.Hours, IsDeleted = game.IsDeleted || !options.WithPool });
+                db.Games.Add(new GameRecord
+                {
+                    Id = game.Id,
+                    Title = game.Title,
+                    TagsJson = game.TagsJson,
+                    Hours = game.Hours,
+                    IsDeleted = game.IsDeleted || !options.WithPool,
+                    Year = game.Year,
+                    SteamAppId = game.SteamAppId,
+                    Note = game.Note,
+                    CompletionCondition = game.CompletionCondition,
+                    IsCoop = game.IsCoop,
+                    AuthorId = game.AuthorId is { } author && userMap.TryGetValue(author, out var localAuthor) ? localAuthor : null,
+                    CreatedAt = game.CreatedAt,
+                });
             }
         }
 

@@ -24,7 +24,8 @@ public sealed record GameView(
     string? Note,
     bool IsCoop,
     string? Author,
-    bool IsDeleted);
+    bool IsDeleted,
+    string? CompletionCondition);
 
 /// <summary>A category of the wheel with its weight and how many games in the pool carry its tag.</summary>
 public sealed record CategoryView(string Name, int Weight, int Games);
@@ -46,7 +47,8 @@ public sealed record GameRequest(
     Guid? CoverFileId = null,
     string? Note = null,
     bool IsCoop = false,
-    bool Force = false);
+    bool Force = false,
+    string? CompletionCondition = null);
 
 public sealed record PoolActionRequest(Guid CommandId);
 
@@ -60,11 +62,19 @@ public static class PoolEndpoints
 {
     public const string PlayerOrAdmin = "player-or-admin";
 
+    /// <summary>Games a user adds in a minute: each one holds the queue for the duplicate check.</summary>
+    public const string AddRateLimit = "pool-add";
+    public const int AddsPerMinute = 10;
+
     public static void AddPool(this WebApplicationBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
         builder.Services.AddAuthorizationBuilder()
             .AddPolicy(PlayerOrAdmin, p => p.RequireRole(nameof(Role.Player), nameof(Role.Admin)));
+        builder.Services.Configure<Microsoft.AspNetCore.RateLimiting.RateLimiterOptions>(o =>
+            o.AddPolicy(AddRateLimit, ctx => System.Threading.RateLimiting.RateLimitPartition.GetFixedWindowLimiter(
+                ctx.User.UserId()?.ToString() ?? WebSecurity.ClientKey(ctx.Connection.RemoteIpAddress),
+                _ => new System.Threading.RateLimiting.FixedWindowRateLimiterOptions { PermitLimit = AddsPerMinute, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 })));
     }
 
     public static void MapPool(this RouteGroupBuilder api)
@@ -80,6 +90,8 @@ public static class PoolEndpoints
         pool.MapPost("", (GameRequest request, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, CancellationToken ct) =>
                 SendCardAsync(request, user, db, bus, card => new AddGame(card, user.UserId(), request.Force), null, ct))
             .RequireAuthorization(PlayerOrAdmin)
+            .RequireRateLimiting(AddRateLimit)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests)
             .WithPoolErrors();
 
         var admin = api.MapGroup("/admin/pool").WithTags("Admin").RequireAuthorization(Policies.Admin);
@@ -116,9 +128,10 @@ public static class PoolEndpoints
         return TypedResults.Ok(views);
     }
 
-    private static async Task<Results<Ok<GameView>, NotFound>> GetAsync(Guid gameId, GameEventDbContext db, CancellationToken ct)
+    private static async Task<Results<Ok<GameView>, NotFound>> GetAsync(Guid gameId, ClaimsPrincipal user, GameEventDbContext db, CancellationToken ct)
     {
-        if (await db.Games.AsNoTracking().SingleOrDefaultAsync(g => g.Id == gameId, ct) is not { } game)
+        // Like the list: a deleted game is the admin's to see
+        if (await db.Games.AsNoTracking().SingleOrDefaultAsync(g => g.Id == gameId, ct) is not { } game || (game.IsDeleted && !user.IsInRole(nameof(Role.Admin))))
         {
             return TypedResults.NotFound();
         }
@@ -170,7 +183,8 @@ public static class PoolEndpoints
             return Rejected(PoolRules.CoverUnknown, "The cover is one of your own uploads.");
         }
 
-        var card = new GameCard(request.Title, [.. request.Tags.Select(t => t ?? "")], request.Hours, request.Year, request.SteamAppId, request.CoverFileId, request.Note, request.IsCoop);
+        var card = new GameCard(
+            request.Title, [.. request.Tags.Select(t => t ?? "")], request.Hours, request.Year, request.SteamAppId, request.CoverFileId, request.Note, request.IsCoop, request.CompletionCondition);
         return await SendAsync(request.CommandId, command(card), gameId, user, db, bus, ct);
     }
 
@@ -223,7 +237,8 @@ public static class PoolEndpoints
             game.Note,
             game.IsCoop,
             game.AuthorId is { } author ? authors.GetValueOrDefault(author) : null,
-            game.IsDeleted);
+            game.IsDeleted,
+            game.CompletionCondition);
 
     private static ProblemHttpResult Rejected(string code, string detail) =>
         TypedResults.Problem(statusCode: StatusCodes.Status409Conflict, title: "The command was rejected.", detail: detail, extensions: new Dictionary<string, object?> { ["code"] = code });

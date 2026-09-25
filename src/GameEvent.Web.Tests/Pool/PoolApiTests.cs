@@ -249,6 +249,45 @@ public sealed class PoolApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_deleted_game_is_the_admins_to_see_by_its_id()
+    {
+        var admin = await _site.SignedInAsync("admin");
+        var vasya = await _site.SignedInAsync("vasya");
+        var id = (await AddAsync(vasya, "Dead Space", ["Horror"])).GetProperty("id").GetGuid();
+        await OkAsync(await admin.PostAsJsonAsync($"/api/admin/pool/{id}/delete", new { commandId = Guid.NewGuid() }, Ct));
+
+        Assert.Equal(HttpStatusCode.NotFound, (await vasya.GetAsync($"/api/pool/{id}", Ct)).StatusCode);
+        Assert.True((await OkAsync(await admin.GetAsync($"/api/pool/{id}", Ct))).GetProperty("isDeleted").GetBoolean());
+    }
+
+    [Fact]
+    public async Task The_admin_keeps_a_players_cover_when_changing_the_card()
+    {
+        var admin = await _site.SignedInAsync("admin");
+        var vasya = await _site.SignedInAsync("vasya");
+        var cover = await UploadAsync(vasya);
+        var id = (await AddAsync(vasya, "Dead Space", ["Horror"], cover: cover)).GetProperty("id").GetGuid();
+
+        var changed = await OkAsync(await admin.PutAsJsonAsync($"/api/admin/pool/{id}", new { commandId = Guid.NewGuid(), title = "Dead Space", tags = new[] { "Horror" }, hours = 12, coverFileId = cover }, Ct));
+
+        Assert.Equal(cover, changed.GetProperty("cover").GetProperty("id").GetGuid());
+    }
+
+    [Fact]
+    public async Task Adding_is_limited_per_minute()
+    {
+        var vasya = await _site.SignedInAsync("vasya");
+        for (var i = 0; i < GameEvent.Web.Pool.PoolEndpoints.AddsPerMinute; i++)
+        {
+            await AddAsync(vasya, $"Game number {i}", ["Horror"]);
+        }
+
+        var over = await vasya.PostAsJsonAsync("/api/pool", new { commandId = Guid.NewGuid(), title = "One more", tags = new[] { "Horror" } }, Ct);
+
+        Assert.Equal(HttpStatusCode.TooManyRequests, over.StatusCode);
+    }
+
+    [Fact]
     public async Task An_unknown_game_is_not_found_for_the_admin()
     {
         var admin = await _site.SignedInAsync("admin");
