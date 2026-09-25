@@ -123,12 +123,12 @@ public sealed partial class CommandProcessor(
                 : new CommandOutcome(true, true, null, [.. earlier.Select(ToLogged)]);
         }
 
-        // Account commands belong to the global log (D-106); season commands to their season.
-        if (envelope.Command is Accounts.IAccountCommand account)
+        // Account and file commands belong to the global log (D-106, D-108); season commands to their season.
+        if (envelope.Command is IGlobalCommand global)
         {
             return envelope.SeasonId == Guid.Empty
-                ? await ProcessAccountAsync(db, envelope, account, commandType, commandHash, ct)
-                : Rejected(RejectionCodes.SeasonMismatch, "Account commands go to the global log (no season).");
+                ? await ProcessGlobalAsync(db, envelope, global, commandType, commandHash, ct)
+                : Rejected(RejectionCodes.SeasonMismatch, "Account and file commands go to the global log (no season).");
         }
 
         if (envelope.SeasonId == Guid.Empty)

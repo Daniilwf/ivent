@@ -13,11 +13,16 @@ namespace GameEvent.Infrastructure.Queue;
 /// </summary>
 public sealed partial class CommandProcessor
 {
-    private async Task<CommandOutcome> ProcessAccountAsync(
-        GameEventDbContext db, CommandEnvelope envelope, IAccountCommand command, string commandType, string commandHash, CancellationToken ct)
+    private async Task<CommandOutcome> ProcessGlobalAsync(
+        GameEventDbContext db, CommandEnvelope envelope, IGlobalCommand command, string commandType, string commandHash, CancellationToken ct)
     {
         var now = clock.UtcNow;
-        var (events, apply, secret, rejection) = await DecideAccountAsync(db, command, now, ct);
+        var (events, apply, secret, rejection) = command switch
+        {
+            IAccountCommand account => await DecideAccountAsync(db, account, now, ct),
+            Files.RecordFile file => await DecideFileAsync(db, file, now, ct),
+            _ => throw new InvalidOperationException($"No rules for the global command {commandType}."),
+        };
         if (rejection is not null)
         {
             return new CommandOutcome(false, false, rejection, []);
