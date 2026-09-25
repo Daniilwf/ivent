@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
 using NetVips;
 
 namespace GameEvent.Web.Tests.Api;
@@ -79,6 +80,46 @@ public sealed class ProofFilesApiTests : IAsyncLifetime
         var response = await vasya.PostAsJsonAsync(Url($"runs/{runId}/proof"), new { commandId = Guid.NewGuid(), links = Array.Empty<string>(), files = new[] { fileId, fileId } }, Ct);
 
         await AssertConflictAsync(response, "proof.invalidFile");
+    }
+
+    [Fact]
+    public async Task An_own_deleted_screenshot_is_refused()
+    {
+        var vasya = await _site.SignedInAsync("vasya");
+        var runId = await CompletedRunAsync(vasya);
+        var fileId = await UploadAsync(vasya);
+        await using (var db = _site.NewDb())
+        {
+            // Deletion has no command yet (D-108): the test marks the row the way it will look
+            await db.Files.Where(f => f.Id == fileId).ExecuteUpdateAsync(f => f.SetProperty(x => x.IsDeleted, true), Ct);
+        }
+
+        var response = await vasya.PostAsJsonAsync(Url($"runs/{runId}/proof"), new { commandId = Guid.NewGuid(), links = Array.Empty<string>(), files = new[] { fileId } }, Ct);
+
+        await AssertConflictAsync(response, "proof.invalidFile");
+    }
+
+    [Fact]
+    public async Task A_spectator_with_a_screenshot_is_forbidden_before_the_files_are_looked_at()
+    {
+        var vasya = await _site.SignedInAsync("vasya");
+        var runId = await CompletedRunAsync(vasya);
+        var zritel = await _site.SignedInAsync("zritel");
+
+        var response = await zritel.PostAsJsonAsync(Url($"runs/{runId}/proof"), new { commandId = Guid.NewGuid(), links = Array.Empty<string>(), files = new[] { Guid.NewGuid() } }, Ct);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task A_proof_without_a_command_id_is_invalid_before_the_files_are_looked_at()
+    {
+        var vasya = await _site.SignedInAsync("vasya");
+        var runId = await CompletedRunAsync(vasya);
+
+        var response = await vasya.PostAsJsonAsync(Url($"runs/{runId}/proof"), new { commandId = Guid.Empty, links = Array.Empty<string>(), files = new[] { Guid.NewGuid() } }, Ct);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
     [Fact]
