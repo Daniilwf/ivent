@@ -163,6 +163,7 @@ namespace GameEvent.Infrastructure.Database.Migrations
                     FinishBonus = table.Column<int>(type: "INTEGER", nullable: false),
                     FinishSurplus = table.Column<int>(type: "INTEGER", nullable: false),
                     FinishBonusRulesJson = table.Column<string>(type: "TEXT", nullable: true),
+                    FinishApprovalRequired = table.Column<bool>(type: "INTEGER", nullable: true),
                     PointsTick = table.Column<long>(type: "INTEGER", nullable: false),
                     ActiveRunId = table.Column<Guid>(type: "TEXT", nullable: true)
                 },

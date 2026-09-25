@@ -11,7 +11,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace GameEvent.Infrastructure.Database.Migrations
 {
     [DbContext(typeof(GameEventDbContext))]
-    [Migration("20260925201539_Initial")]
+    [Migration("20260925203134_Initial")]
     partial class Initial
     {
         /// <inheritdoc />
@@ -441,6 +441,9 @@ namespace GameEvent.Infrastructure.Database.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<int>("Coins")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool?>("FinishApprovalRequired")
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("FinishBonus")

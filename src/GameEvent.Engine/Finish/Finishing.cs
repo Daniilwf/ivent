@@ -12,9 +12,12 @@ namespace GameEvent.Engine.Finish;
 /// move brought them there, whether they are frozen, the finish bonus they hold now (at most one), and the
 /// <see cref="Surplus"/> — steps that burned at the finish, which absorb a later reduction of a run up to the finish.
 /// <see cref="BonusRules"/> — the bonus table in force when they finished (D-113): a later change of the rules does not
-/// touch the bonus; null only in states made before it was kept, which read the season's current table.
+/// touch the bonus. <see cref="ApprovalRequired"/> — whether the first's approval was required when they finished (D-115):
+/// it decides the freeze of this finisher as the first, whatever the rule says later. Both are null only in states made
+/// before they were kept, which read the season's current rules.
 /// </summary>
-public sealed record FinishState(int Order, Guid RunId, DateTimeOffset FinishedAt, bool Frozen, int Bonus, int Surplus, FinishBonusRules? BonusRules = null);
+public sealed record FinishState(
+    int Order, Guid RunId, DateTimeOffset FinishedAt, bool Frozen, int Bonus, int Surplus, FinishBonusRules? BonusRules = null, bool? ApprovalRequired = null);
 
 /// <summary>The finish bonuses by place a finisher keeps from the moment of their finish (D-113).</summary>
 public sealed record FinishBonusRules(EquatableArray<int> ByOrder, int AfterList)
@@ -27,11 +30,11 @@ public sealed record FinishBonusRules(EquatableArray<int> ByOrder, int AfterList
 }
 
 /// <summary>
-/// The admin brought every standing finisher's bonus table to the season's current rules (D-113), version
-/// <see cref="RulesetVersion"/>; the bonus differences follow as points changes in the same command.
+/// The admin brought every standing finisher's bonus table to <see cref="Rules"/> — the season's rules of version
+/// <see cref="RulesetVersion"/> (D-113); the bonus differences follow as points changes in the same command.
 /// </summary>
 [EventType("finish-bonus-rules-refreshed")]
-public sealed record FinishBonusRulesRefreshed(int RulesetVersion) : IGameEvent;
+public sealed record FinishBonusRulesRefreshed(int RulesetVersion, FinishBonusRules Rules) : IGameEvent;
 
 /// <summary>The admin's deliberate recalculation of the finish bonuses by the current rules (D-113), written to the log.</summary>
 public sealed record RecalculateFinishBonuses : ICommand;
@@ -155,6 +158,13 @@ internal static class Finishes
     /// </summary>
     public static IEnumerable<IGameEvent> Settle(SeasonState state)
     {
+        var events = BonusChanges(state);
+        return [.. events, .. FreezeIfDue(events.Aggregate(state, SeasonEngine.Apply))];
+    }
+
+    /// <summary>The Q-4 bonus differences alone (D-113: the admin's recalculation freezes nobody).</summary>
+    public static List<IGameEvent> BonusChanges(SeasonState state)
+    {
         var current = FinishBonusRules.Of(state.Rules.Finish);
         var events = new List<IGameEvent>();
         var place = 0;
@@ -174,8 +184,15 @@ internal static class Finishes
             }
         }
 
-        return [.. events, .. FreezeIfDue(events.Aggregate(state, SeasonEngine.Apply))];
+        return events;
     }
+
+    /// <summary>
+    /// The standing finishers whose bonus depends on their table: all but the first, who holds no bonus at his place
+    /// (D-113) — his table changes nothing, so it neither needs a recalculation nor warns.
+    /// </summary>
+    public static IEnumerable<SeasonPlayer> Bonused(SeasonState state) =>
+        state.Players.Values.Where(p => p.Finish is not null).OrderBy(p => p.Finish!.Order).Skip(1);
 
     /// <summary>The first is frozen once every run up to the finish is approved (Q-3), or at once without required approval.</summary>
     public static IEnumerable<IGameEvent> FreezeIfDue(SeasonState state)
@@ -185,7 +202,8 @@ internal static class Finishes
             return [];
         }
 
-        var approved = !state.Rules.Finish.RequireApprovalForFirst
+        // D-115: the rule in force when the first finished, not the one now
+        var approved = !(state.Players[firstId].Finish!.ApprovalRequired ?? state.Rules.Finish.RequireApprovalForFirst)
             || state.Runs.Values
                 .Where(r => r.PlayerId == firstId && r.Status == RunStatus.Completed && !r.AfterFinish)
                 .All(r => r.Proof?.Status == ProofStatus.Approved);
@@ -207,25 +225,32 @@ internal static class Finishing
             return Decision.Reject(RejectionCodes.SeasonNotCreated, "The season does not exist yet.");
         }
 
+        if (state.Status == SeasonStatus.Draft)
+        {
+            return Decision.Reject(RejectionCodes.SeasonNotActive, "The season has not started: nobody has finished.");
+        }
+
         if (state.Status is not (SeasonStatus.Active or SeasonStatus.Closing))
         {
             return Decision.Reject(RejectionCodes.SeasonClosed, $"The season is {state.Status}: results are fixed.");
         }
 
         var current = FinishBonusRules.Of(state.Rules.Finish);
-        if (state.Players.Values.All(p => p.Finish is null || p.Finish.BonusRules == current))
+        if (Finishes.Bonused(state).All(p => p.Finish!.BonusRules == current))
         {
-            return Decision.Reject(RejectionCodes.FinishNothingToRecalculate, "Every finisher already holds the bonus table of the current rules.");
+            return Decision.Reject(RejectionCodes.FinishNothingToRecalculate, "Every finisher with a bonus already holds the bonus table of the current rules.");
         }
 
-        var refreshed = new FinishBonusRulesRefreshed(state.RulesetVersion);
-        return Decision.Accept([refreshed, .. Finishes.Settle(Apply(state, refreshed))]);
+        // Bonuses only: the recalculation is about the bonus table, it does not settle the first's freeze
+        var refreshed = new FinishBonusRulesRefreshed(state.RulesetVersion, current);
+        return Decision.Accept([refreshed, .. Finishes.BonusChanges(Apply(state, refreshed))]);
     }
 
     public static SeasonState Apply(SeasonState state, PlayerFinished e) =>
         Update(state, e.PlayerId, p => p with
         {
-            Finish = new FinishState(e.Order, e.RunId, e.FinishedAt, Frozen: false, Bonus: 0, e.Surplus, FinishBonusRules.Of(state.Rules.Finish)),
+            Finish = new FinishState(
+                e.Order, e.RunId, e.FinishedAt, Frozen: false, Bonus: 0, e.Surplus, FinishBonusRules.Of(state.Rules.Finish), state.Rules.Finish.RequireApprovalForFirst),
         })
             with
         { FinishesSoFar = Math.Max(state.FinishesSoFar, e.Order) };
@@ -233,11 +258,10 @@ internal static class Finishing
     public static SeasonState Apply(SeasonState state, FinishBonusRulesRefreshed e)
     {
         ArgumentNullException.ThrowIfNull(e);
-        var current = FinishBonusRules.Of(state.Rules.Finish);
         var players = state.Players;
         foreach (var player in state.Players.Values.Where(p => p.Finish is not null))
         {
-            players = players.SetItem(player.PlayerId, player with { Finish = player.Finish! with { BonusRules = current } });
+            players = players.SetItem(player.PlayerId, player with { Finish = player.Finish! with { BonusRules = e.Rules } });
         }
 
         return state with { Players = players };

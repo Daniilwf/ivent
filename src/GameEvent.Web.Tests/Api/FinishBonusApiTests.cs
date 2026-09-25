@@ -41,6 +41,17 @@ public sealed class FinishBonusApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Changing_the_finish_list_with_only_the_first_finished_warns_of_nothing()
+    {
+        await FinishAsync("vasya");
+        var admin = await _site.SignedInAsync("admin");
+
+        var result = await ChangeFinishListAsync(admin, [20, 15]);
+
+        Assert.Empty(result.GetProperty("warnings").EnumerateArray());
+    }
+
+    [Fact]
     public async Task Changing_the_finish_list_without_finishers_warns_of_nothing()
     {
         var admin = await _site.SignedInAsync("admin");
@@ -74,6 +85,7 @@ public sealed class FinishBonusApiTests : IAsyncLifetime
     public async Task With_every_finisher_on_the_current_list_there_is_nothing_to_recalculate()
     {
         await FinishAsync("vasya");
+        await FinishAsync("petya");
         var admin = await _site.SignedInAsync("admin");
 
         var response = await admin.PostAsJsonAsync(Recalculate, new { commandId = Guid.NewGuid() }, Ct);

@@ -87,7 +87,7 @@ public class ProvisionalFinishTests
         Assert.Equal([new FinishSurplusChanged(vasya, -2)], s.LastEvents<FinishSurplusChanged>());
         Assert.Empty(s.LastEvents<PlayerMoved>());
         Assert.Empty(s.LastEvents<PlayerFinishRevoked>());
-        Assert.Equal(new FinishState(1, runB, at, Frozen: false, Bonus: 0, Surplus: 4, FinishBonusRules.Of(s.Ruleset.Finish)), FinishOf(s, "Вася"));
+        Assert.Equal(new FinishState(1, runB, at, Frozen: false, Bonus: 0, Surplus: 4, FinishBonusRules.Of(s.Ruleset.Finish), s.Ruleset.Finish.RequireApprovalForFirst), FinishOf(s, "Вася"));
         Assert.Equal((8, LinearMap.FinishId), (s.Player("Вася").Points, s.Player("Вася").CellId));
     }
 
@@ -161,7 +161,7 @@ public class ProvisionalFinishTests
 
         Assert.Equal(new PlayerFinished(vasya, again, 3, at, 0), Assert.Single(s.LastEvents<PlayerFinished>()));
         Assert.Equal([(vasya, 10, PointsReason.FinishBonus)], BonusChanges(s));
-        Assert.Equal(new FinishState(3, again, at, Frozen: false, Bonus: 10, Surplus: 0, FinishBonusRules.Of(s.Ruleset.Finish)), FinishOf(s, "Вася"));
+        Assert.Equal(new FinishState(3, again, at, Frozen: false, Bonus: 10, Surplus: 0, FinishBonusRules.Of(s.Ruleset.Finish), s.Ruleset.Finish.RequireApprovalForFirst), FinishOf(s, "Вася"));
         Assert.Equal(s.PlayerId("Петя"), FinishLine.First(s.State));
     }
 

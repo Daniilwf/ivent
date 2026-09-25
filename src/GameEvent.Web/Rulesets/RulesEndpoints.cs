@@ -21,9 +21,9 @@ public sealed record RulesView(int Version, Ruleset Ruleset, IReadOnlyList<Rules
 public sealed record RulesVersionView(int Version, DateTimeOffset At, Guid? AuthorId, IReadOnlyList<RulesetChange> Changes);
 
 /// <summary>
-/// The new version of the rules and what the admin should know about it: <c>finish.bonusesKept</c> — the finish bonus
-/// list changed while some players have finished under another one; their bonuses stay (D-113) until «Пересчитать бонусы
-/// по текущим правилам».
+/// The new version of the rules and what the admin should know about it: <c>finish.bonusesKept</c> — after this change
+/// some finishers with a bonus (all but the first) hold a bonus list other than the one now in force; their bonuses stay
+/// (D-113) until «Пересчитать бонусы по текущим правилам».
 /// </summary>
 public sealed record RulesChangeResult(int Version, IReadOnlyList<string> Warnings);
 
@@ -166,10 +166,12 @@ public static class RulesEndpoints
     private static async Task<IReadOnlyList<string>> WarningsAsync(Guid seasonId, Ruleset ruleset, GameEventDbContext db, CancellationToken ct)
     {
         var current = FinishBonusRules.Of(ruleset.Finish);
-        var tables = await db.SeasonPlayers.AsNoTracking()
+        // The first holds no bonus at his place: his list changes nothing
+        var tables = (await db.SeasonPlayers.AsNoTracking()
             .Where(p => p.SeasonId == seasonId && p.FinishOrder != null)
+            .OrderBy(p => p.FinishOrder)
             .Select(p => p.FinishBonusRulesJson)
-            .ToListAsync(ct);
+            .ToListAsync(ct)).Skip(1);
         return tables.Any(t => t is null || JsonSerializer.Deserialize<FinishBonusRules>(t, EngineJson.Options) != current) ? [BonusesKept] : [];
     }
 

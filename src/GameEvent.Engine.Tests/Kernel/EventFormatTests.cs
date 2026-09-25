@@ -293,9 +293,9 @@ public class EventFormatTests
         },
         {
             "finish-bonus-rules-refreshed",
-            new FinishBonusRulesRefreshed(3),
+            new FinishBonusRulesRefreshed(3, new FinishBonusRules([20, 15], 2)),
             1,
-            """{"rulesetVersion":3}"""
+            """{"rulesetVersion":3,"rules":{"byOrder":[20,15],"afterList":2}}"""
         },
         {
             "file-stored",

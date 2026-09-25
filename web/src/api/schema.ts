@@ -4196,9 +4196,9 @@ export interface components {
         /** @enum {unknown} */
         Rounding: "nearest" | "floor" | "ceil";
         /**
-         * @description The new version of the rules and what the admin should know about it: `finish.bonusesKept` — the finish bonus
-         *     list changed while some players have finished under another one; their bonuses stay (D-113) until «Пересчитать бонусы
-         *     по текущим правилам».
+         * @description The new version of the rules and what the admin should know about it: `finish.bonusesKept` — after this change
+         *     some finishers with a bonus (all but the first) hold a bonus list other than the one now in force; their bonuses stay
+         *     (D-113) until «Пересчитать бонусы по текущим правилам».
          */
         RulesChangeResult: {
             /** Format: int32 */

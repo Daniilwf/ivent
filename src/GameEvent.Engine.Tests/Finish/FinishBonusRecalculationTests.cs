@@ -28,10 +28,10 @@ public class FinishBonusRecalculationTests
         s.Act(new RecalculateFinishBonuses());
 
         ScenarioAssert.Accepted(s);
-        Assert.Equal(new FinishBonusRulesRefreshed(s.State.RulesetVersion), s.Last.Events[0]);
+        Assert.Equal(new FinishBonusRulesRefreshed(s.State.RulesetVersion, new FinishBonusRules([20, 15], 2)), s.Last.Events[0]);
         Assert.Equal(
-            [(s.PlayerId("Петя"), 10, PointsReason.FinishBonus), (s.PlayerId("Маша"), 7, PointsReason.FinishBonus)],
-            BonusChanges(s).OrderBy(x => x.Delta > 7 ? 0 : 1));
+            new[] { (s.PlayerId("Петя"), 10, PointsReason.FinishBonus), (s.PlayerId("Маша"), 7, PointsReason.FinishBonus) }.OrderBy(x => x.Item1),
+            BonusChanges(s).OrderBy(x => x.Player));
         Assert.Equal((0, 20, 15), (FinishOf(s, "Вася")!.Bonus, FinishOf(s, "Петя")!.Bonus, FinishOf(s, "Маша")!.Bonus));
         Assert.All(Names.Take(3), n => Assert.Equal(new FinishBonusRules([20, 15], 2), FinishOf(s, n)!.BonusRules));
         Assert.Equal((24, 19), (s.Player("Петя").Points, s.Player("Маша").Points));
@@ -123,6 +123,45 @@ public class FinishBonusRecalculationTests
 
         Assert.DoesNotContain(BonusChanges(s), c => c.Player == s.PlayerId("Вася"));
         Assert.Equal((0, points, true), (FinishOf(s, "Вася")!.Bonus, s.Player("Вася").Points, FinishOf(s, "Вася")!.Frozen));
+    }
+
+    [Fact]
+    public void With_only_the_first_finished_there_is_nothing_to_recalculate()
+    {
+        // The first holds no bonus at his place: his list changes nothing
+        var s = New();
+        FinishRun(s, "Вася");
+        s.WithRuleset(r => r with { Finish = r.Finish with { BonusByOrder = [20] } });
+
+        ScenarioAssert.RejectsWithoutChanges(s, x => x.Act(new RecalculateFinishBonuses()), RejectionCodes.FinishNothingToRecalculate);
+    }
+
+    [Fact]
+    public void The_recalculation_does_not_freeze_the_first()
+    {
+        // Approval for the first is switched off while Вася's finish is provisional: the bonus button leaves him as he is
+        var s = New();
+        FinishRun(s, "Вася");
+        FinishRun(s, "Петя");
+        s.WithRuleset(r => r with { Finish = r.Finish with { RequireApprovalForFirst = false, BonusByOrder = [20] } });
+
+        s.Act(new RecalculateFinishBonuses());
+
+        ScenarioAssert.Accepted(s);
+        Assert.DoesNotContain(s.Last.Events, e => e is PlayerFrozen);
+        Assert.False(FinishOf(s, "Вася")!.Frozen);
+        Assert.Equal(20, FinishOf(s, "Петя")!.Bonus);
+    }
+
+    [Fact]
+    public void A_draft_season_has_nobody_to_recalculate()
+    {
+        var s = New();
+        var draft = s.State with { Status = SeasonStatus.Draft };
+
+        var result = SeasonEngine.Execute(draft, new RecalculateFinishBonuses(), s.Context());
+
+        Assert.Equal(RejectionCodes.SeasonNotActive, result.Decision.Rejection!.Code);
     }
 
     [Theory]

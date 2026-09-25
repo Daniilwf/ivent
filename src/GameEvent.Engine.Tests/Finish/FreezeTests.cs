@@ -30,7 +30,7 @@ public class FreezeTests
         Assert.Equal(
             [new ProofApproved(runId, vasya, true, "Видел на стриме", s.Clock.UtcNow), new PlayerFrozen(vasya)],
             s.Last.Events);
-        Assert.Equal(new FinishState(1, runId, at, Frozen: true, Bonus: 0, Surplus: 0, FinishBonusRules.Of(s.Ruleset.Finish)), FinishOf(s, "Вася"));
+        Assert.Equal(new FinishState(1, runId, at, Frozen: true, Bonus: 0, Surplus: 0, FinishBonusRules.Of(s.Ruleset.Finish), s.Ruleset.Finish.RequireApprovalForFirst), FinishOf(s, "Вася"));
         Assert.Equal(vasya, FinishLine.First(s.State));
 
         // Frozen as he was: nothing is taken or given by the freeze

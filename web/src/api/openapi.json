@@ -5785,7 +5785,7 @@
             }
           }
         },
-        "description": "The new version of the rules and what the admin should know about it: `finish.bonusesKept` — the finish bonus\nlist changed while some players have finished under another one; their bonuses stay (D-113) until «Пересчитать бонусы\nпо текущим правилам»."
+        "description": "The new version of the rules and what the admin should know about it: `finish.bonusesKept` — after this change\nsome finishers with a bonus (all but the first) hold a bonus list other than the one now in force; their bonuses stay\n(D-113) until «Пересчитать бонусы по текущим правилам»."
       },
       "Ruleset": {
         "required": [

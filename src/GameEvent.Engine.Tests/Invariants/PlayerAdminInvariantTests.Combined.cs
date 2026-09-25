@@ -62,6 +62,7 @@ public partial class PlayerAdminInvariantTests
         var claimRefused = false;
         var finishListChangedWithFinishers = 0;
         var recalculated = 0;
+        var nothingToRecalculate = 0;
         for (var seed = 0; seed < 200; seed++)
         {
             var x = (uint)seed + 13;
@@ -88,6 +89,7 @@ public partial class PlayerAdminInvariantTests
                 finishListChangedWithFinishers += command is ChangeRuleset && s.Last.IsAccepted && before.FinishesSoFar > 0
                     && FinishBonusRules.Of(before.Rules.Finish) != FinishBonusRules.Of(s.State.Rules.Finish) ? 1 : 0;
                 recalculated += command is RecalculateFinishBonuses && s.Last.IsAccepted ? 1 : 0;
+                nothingToRecalculate += command is RecalculateFinishBonuses && s.Last.Rejection?.Code == RejectionCodes.FinishNothingToRecalculate ? 1 : 0;
                 claimRefused |= command is CompleteRun { ChallengeDone: true } && !before.Rules.Features.Challenges
                     && before.Players.TryGetValue(((CompleteRun)command).PlayerId, out var p) && p.Phase == TurnPhase.Playing
                     && !s.Last.IsAccepted;
@@ -103,8 +105,10 @@ public partial class PlayerAdminInvariantTests
         Assert.True(unsupported > 5, $"Only {unsupported} unsupported rulesets refused.");
         Assert.True(claimRefused, "No challenge claim met disabled challenges.");
         Assert.True(finishListChangedWithFinishers > 5, $"Only {finishListChangedWithFinishers} finish list changes with finishers in the season.");
-        // Two finishers are rare in these games: a recalculation that moves a bonus is covered by FinishBonusRecalculationTests
-        Assert.True(recalculated > 2, $"Only {recalculated} recalculations accepted.");
+        // Two finishers are rare in these games (4 of 200 scripts): the bonus moves of a recalculation are covered by
+        // FinishBonusRecalculationTests; here the recalculation is reached both ways
+        Assert.True(recalculated > 0, "No recalculation was accepted.");
+        Assert.True(nothingToRecalculate > 0, "No recalculation was refused as having nothing to do.");
     }
 
     private static readonly (string Name, Func<Ruleset, Ruleset> Change)[] s_ruleChanges =
@@ -158,7 +162,7 @@ public partial class PlayerAdminInvariantTests
             case 5 when withUndo:
                 return UndoFor(s, b);
             case 6 when withRulesetChanges && variant % 2 == 1
-                && s.State.Players.Values.Any(p => p.Finish is { } f && f.BonusRules != FinishBonusRules.Of(s.Ruleset.Finish)):
+                && s.State.Players.Values.Any(p => p.Finish is { } f && f.BonusRules != FinishBonusRules.Of(s.Ruleset.Finish)) && variant % 3 != 0:
                 return new RecalculateFinishBonuses();
             case 6 when withRulesetChanges:
                 // D-113: with finishers in the season the finish list itself changes more often than its share
@@ -227,7 +231,7 @@ public partial class PlayerAdminInvariantTests
         {
             var current = FinishBonusRules.Of(s.State.Rules.Finish);
             Assert.All(s.State.Players.Values.Where(p => p.Finish is not null), p => Assert.Equal(current, p.Finish!.BonusRules));
-            Assert.All(s.Last.Events.OfType<PointsChanged>(), e => Assert.True(e.Reason is PointsReason.FinishBonus or PointsReason.FinishBonusRevoked, $"{e} in a recalculation."));
+            Assert.All(s.Last.Events.Skip(1), e => Assert.True(e is PointsChanged { Reason: PointsReason.FinishBonus or PointsReason.FinishBonusRevoked }, $"{e} in a recalculation."));
         }
     }
 

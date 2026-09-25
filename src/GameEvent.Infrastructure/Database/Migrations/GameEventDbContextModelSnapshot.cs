@@ -440,6 +440,9 @@ namespace GameEvent.Infrastructure.Database.Migrations
                     b.Property<int>("Coins")
                         .HasColumnType("INTEGER");
 
+                    b.Property<bool?>("FinishApprovalRequired")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int>("FinishBonus")
                         .HasColumnType("INTEGER");
 

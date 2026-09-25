@@ -791,10 +791,14 @@ public partial class PlayerAdminInvariantTests
         {
             var allApproved = UpToFinishRuns(s.State, first).All(r => r.Proof?.Status == ProofStatus.Approved);
             Assert.True(!allApproved || first.Finish!.Frozen, $"{first.Name} is first with all runs approved but not frozen.");
-            // D-113: a freeze follows the rule in force when it happened; a later change of the rule does not undo it
-            if (!first.Finish!.Frozen || RequiredApprovalWhenFrozen(s.EffectiveLog, first.PlayerId))
+            // D-115: the freeze follows the rule in force when the first finished; a later change of the rule changes nothing
+            if (RequiredApprovalAtFinish(s.EffectiveLog, first.PlayerId))
             {
                 Assert.True(!first.Finish!.Frozen || allApproved, $"{first.Name} is frozen before all his runs up to the finish are approved.");
+            }
+            else
+            {
+                Assert.True(first.Finish!.Frozen, $"{first.Name} finished first without required approval but is not frozen.");
             }
         }
 
@@ -806,7 +810,7 @@ public partial class PlayerAdminInvariantTests
             Assert.Equal(p.PlayerId, run.PlayerId);
             Assert.True(
                 run.Status == RunStatus.Completed
-                    || (run.Status == RunStatus.Rejected && p.Finish.Frozen && !RequiredApprovalWhenFrozen(s.EffectiveLog, p.PlayerId)),
+                    || (run.Status == RunStatus.Rejected && p.Finish.Frozen && !RequiredApprovalAtFinish(s.EffectiveLog, p.PlayerId)),
                 $"{p.Name}'s finish stands on a {run.Status} run.");
         }
 
@@ -919,11 +923,11 @@ public partial class PlayerAdminInvariantTests
     }
 
     /// <summary>Q-4 reference: place 1 (the first) nothing, place 2 the first element of the list, …, past it the value after the list.</summary>
-    /// <summary>Whether the first's approval was required by the rules in force at the player's last freeze.</summary>
-    private static bool RequiredApprovalWhenFrozen(IEnumerable<IGameEvent> log, Guid playerId)
+    /// <summary>Whether the first's approval was required by the rules in force at the player's last finish (D-115).</summary>
+    private static bool RequiredApprovalAtFinish(IEnumerable<IGameEvent> log, Guid playerId)
     {
         var required = true;
-        var atFreeze = true;
+        var atFinish = true;
         foreach (var e in log)
         {
             switch (e)
@@ -934,13 +938,13 @@ public partial class PlayerAdminInvariantTests
                 case RulesetChanged changed:
                     required = changed.Ruleset.Finish.RequireApprovalForFirst;
                     break;
-                case PlayerFrozen frozen when frozen.PlayerId == playerId:
-                    atFreeze = required;
+                case PlayerFinished finished when finished.PlayerId == playerId:
+                    atFinish = required;
                     break;
             }
         }
 
-        return atFreeze;
+        return atFinish;
     }
 
     private static int ReferenceBonus(FinishBonusRules rules, int place) =>
@@ -1030,17 +1034,21 @@ public partial class PlayerAdminInvariantTests
 
         // D-113: a finisher keeps the bonus table in force at his finish, until the admin's recalculation
         FinishBonusRules? table = null;
+        bool? approval = null;
         foreach (var e in log)
         {
             switch (e)
             {
                 case SeasonCreated created:
                     table = new FinishBonusRules(created.Ruleset.Finish.BonusByOrder, created.Ruleset.Finish.BonusAfterList);
+                    approval = created.Ruleset.Finish.RequireApprovalForFirst;
                     break;
                 case RulesetChanged changed:
                     table = new FinishBonusRules(changed.Ruleset.Finish.BonusByOrder, changed.Ruleset.Finish.BonusAfterList);
+                    approval = changed.Ruleset.Finish.RequireApprovalForFirst;
                     break;
-                case FinishBonusRulesRefreshed:
+                case FinishBonusRulesRefreshed refreshed:
+                    Assert.Equal(table, refreshed.Rules);
                     foreach (var id in standing.Keys.ToList())
                     {
                         standing[id] = standing[id] with { BonusRules = table };
@@ -1052,7 +1060,7 @@ public partial class PlayerAdminInvariantTests
                     Assert.True(finished.Surplus >= 0, "A negative surplus.");
                     orders.Add(finished.Order);
                     standing[finished.PlayerId] = new FinishState(
-                        finished.Order, finished.RunId, finished.FinishedAt, false, bonus.GetValueOrDefault(finished.PlayerId), finished.Surplus, table);
+                        finished.Order, finished.RunId, finished.FinishedAt, false, bonus.GetValueOrDefault(finished.PlayerId), finished.Surplus, table, approval);
                     break;
                 case FinishSurplusChanged surplus:
                     Assert.True(standing.TryGetValue(surplus.PlayerId, out var withSurplus), "A surplus change without a finish.");

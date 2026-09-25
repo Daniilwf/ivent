@@ -33,7 +33,7 @@ public class FinishBonusTests
 
         // 4 for the dice and 10 for the finish; the position is the finish; the bonus is held in the finish
         Assert.Equal((14, LinearMap.FinishId), (s.Player("Петя").Points, s.Player("Петя").CellId));
-        Assert.Equal(new FinishState(2, runId, at, Frozen: false, Bonus: 10, Surplus: 0, FinishBonusRules.Of(s.Ruleset.Finish)), FinishOf(s, "Петя"));
+        Assert.Equal(new FinishState(2, runId, at, Frozen: false, Bonus: 10, Surplus: 0, FinishBonusRules.Of(s.Ruleset.Finish), s.Ruleset.Finish.RequireApprovalForFirst), FinishOf(s, "Петя"));
     }
 
     [Fact]
