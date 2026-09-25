@@ -44,6 +44,7 @@ public static class RejectionCodes
     public const string FeatureDisabled = "feature.disabled";
     public const string NotYourRun = "run.notYours";
     public const string RunNotCompleted = "run.notCompleted";
+    public const string RunNothingToChange = "run.nothingToChange";
     public const string InvalidRating = "review.invalidRating";
     public const string ReviewTooLong = "review.tooLong";
 }

@@ -160,7 +160,7 @@ internal static class SeasonProjection
             }
         }
 
-        // Manual effects are only created so far; resolving them (C11) will update these rows.
+        // The table holds pending manual effects: created ones are added, resolved ones leave it.
         foreach (var (id, effect) in after.ManualEffects.Where(x => !before.ManualEffects.ContainsKey(x.Key)))
         {
             db.ManualEffects.Add(new PendingManualEffectRecord
@@ -172,6 +172,12 @@ internal static class SeasonProjection
                 Source = effect.Source,
                 RunId = effect.RunId,
             });
+        }
+
+        foreach (var id in before.ManualEffects.Keys.Where(id => !after.ManualEffects.ContainsKey(id)))
+        {
+            db.ManualEffects.Remove(await db.ManualEffects.FindAsync([id], ct)
+                ?? throw new InvalidOperationException($"Manual effect {id} has no projection row."));
         }
     }
 

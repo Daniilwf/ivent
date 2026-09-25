@@ -135,7 +135,9 @@
 | Селектор целей | правило выбора, на кого действует эффект | `TargetSelector` |
 | Враждебный эффект | эффект, наложенный другим игроком во вред | `IsHostile` |
 | Перехват | пассивная защита, гасящая враждебный эффект | `Intercept` |
-| Ручной эффект | текстовый эффект, ждущий разрешения игроком или админом | `PendingManualEffect`, событие `ManualEffectCreated`, источник `ManualEffectSource` |
+| Ручной эффект | текстовый эффект, ждущий разрешения игроком или админом | `PendingManualEffect`, событие `ManualEffectCreated`, источник `ManualEffectSource`, разрешение `ManualEffectResolved` (`ManualEffectOutcome`: `Applied`, `NotApplicable`) |
+| Правка часов прохождения | админ меняет часы после броска: кубики докидываются или снимаются с конца | команда `CorrectRunHours`, событие `RunHoursCorrected`, причины `*.RunCorrection` |
+| Смена сложности прохождения | админ меняет сложность по пруфу: каждый кубик пересчитывается | команда `ChangeRunDifficulty`, событие `RunDifficultyChanged`, `DieChange` |
 | «Уже проходил» | игрок проходил игру до ивента: игра исключается для него, колесо крутится заново бесплатно | команда `DeclareAlreadyPlayed`, событие `GameExcluded` (`ExclusionReason.AlreadyPlayed`) |
 | Исключение игры | игра, которая больше не выпадает этому игроку в сезоне | `GameExclusion`, `SeasonPlayer.Exclusions`, таблица `PlayerGameExclusion` |
 | Фильтр ролла | предикат по играм с приоритетом: эффект > зона > обычный | `RollFilter`, `RollFilterPriority`, `RollFilters.Apply` |

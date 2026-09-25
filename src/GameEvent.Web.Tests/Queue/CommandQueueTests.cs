@@ -475,6 +475,54 @@ public class CommandQueueTests
         Assert.Equal((3, (string?)null), (replaced.Rating, replaced.Text));
     }
 
+    [Fact]
+    public async Task Projection_of_hours_corrections_difficulty_changes_and_resolved_effects_equals_the_fold_of_the_log()
+    {
+        await using var h = await QueueHarness.StartAsync();
+        var ct = TestContext.Current.CancellationToken;
+        await AcceptedAsync(h, new CreateSeason(s_season, "Осень", RulesetJson.Default()));
+        await AcceptedAsync(h, new ChangeSeasonStatus(SeasonStatus.Active));
+        await AcceptedAsync(h, new AddSeasonPlayer(s_vasya, s_vasya, "Вася"));
+
+        // Given Вася completed a game on «выше сложной»: a good event waits (PendingManualEffect row)
+        await AcceptedAsync(h, new RollGame(s_vasya));
+        await AcceptedAsync(h, new StartRun(s_vasya));
+        await AcceptedAsync(h, new CompleteRun(s_vasya, Difficulty.Extreme));
+        var completed = await AssertProjectionEqualsReplayAsync(h, ct);
+        var run = Assert.Single(completed.Runs.Values);
+        Assert.Single(completed.ManualEffects);
+
+        // When the admin adds 6 hours (D-97: two more dice appended, points, cells and coins follow)
+        await AcceptedAsync(h, new CorrectRunHours(run.RunId, run.Hours!.Value + 6, "Часы по HLTB"));
+
+        // Then the projection equals the fold: the run's hours and dice, the player's points, cell and coins
+        var corrected = await AssertProjectionEqualsReplayAsync(h, ct);
+        Assert.Equal(run.Dice.Count + 2, corrected.Runs[run.RunId].Dice.Count);
+        await using (var db = h.NewDb())
+        {
+            var row = await db.Runs.AsNoTracking().SingleAsync(ct);
+            Assert.Equal(run.Hours + 6, row.Hours);
+            var player = await db.SeasonPlayers.AsNoTracking().SingleAsync(ct);
+            var state = corrected.Players[s_vasya];
+            Assert.Equal((state.Points, state.CellId, state.Coins), (player.Points, player.CellId, player.Coins));
+        }
+
+        // When, after a restart, the proof shows normal: the dice are recalculated and the good event is not applicable
+        await h.RestartAsync();
+        await AcceptedAsync(h, new ChangeRunDifficulty(run.RunId, Difficulty.Normal, "По пруфу — нормальная"));
+
+        // Then the run's difficulty and dice follow, and the PendingManualEffect row is gone
+        var changed = await AssertProjectionEqualsReplayAsync(h, ct);
+        Assert.Equal(Difficulty.Normal, changed.Runs[run.RunId].Difficulty);
+        Assert.All(changed.Runs[run.RunId].Dice, d => Assert.Equal(4, d.Sides)); // default ruleset: normal d4
+        Assert.Empty(changed.ManualEffects);
+        await using var final = h.NewDb();
+        Assert.Equal(0, await final.ManualEffects.CountAsync(ct));
+        var finalRun = await final.Runs.AsNoTracking().SingleAsync(ct);
+        Assert.Equal(Difficulty.Normal, finalRun.Difficulty);
+        Assert.Equal(changed.Players[s_vasya].Points, (await final.SeasonPlayers.AsNoTracking().SingleAsync(ct)).Points);
+    }
+
     private static Guid OfferedIn(Infrastructure.Queue.CommandOutcome outcome) =>
         outcome.Events.Select(e => e.Event).OfType<GameRolled>().Single().GameId;
 

@@ -22,11 +22,30 @@ public enum ManualEffectSource
 /// </summary>
 public sealed record PendingManualEffect(Guid EffectId, Guid PlayerId, EventKind DrawEvent, ManualEffectSource Source, Guid? RunId);
 
+/// <summary>How a manual effect was resolved (GLOSSARY «Ручной эффект»: применено / не применимо + комментарий).</summary>
+public enum ManualEffectOutcome
+{
+    Applied,
+    NotApplicable,
+}
+
+/// <summary>
+/// A manual effect is resolved and no longer pending. Stage 1 writes it when a run's difficulty drops below the one that
+/// granted the effect (Q-5); the player's and the admin's own commands come with C11.
+/// </summary>
+[EventType("manual-effect-resolved")]
+public sealed record ManualEffectResolved(Guid EffectId, Guid PlayerId, Guid? RunId, ManualEffectOutcome Outcome, string Comment) : IGameEvent;
+
 [EventType("manual-effect-created")]
 public sealed record ManualEffectCreated(Guid EffectId, Guid PlayerId, EventKind DrawEvent, ManualEffectSource Source, Guid? RunId) : IGameEvent;
 
 internal static class ManualEffects
 {
+    public static Seasons.SeasonState Apply(Seasons.SeasonState state, ManualEffectResolved e) =>
+        state.ManualEffects.ContainsKey(e.EffectId)
+            ? state with { ManualEffects = state.ManualEffects.Remove(e.EffectId) }
+            : throw new InvalidOperationException($"Manual effect {e.EffectId} is not pending.");
+
     public static Seasons.SeasonState Apply(Seasons.SeasonState state, ManualEffectCreated e) =>
         state with
         {

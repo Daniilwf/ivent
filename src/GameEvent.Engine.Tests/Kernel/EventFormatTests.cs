@@ -169,6 +169,26 @@ public class EventFormatTests
             """{"runId":"00000000-0000-0000-0000-000000000001","playerId":"10000000-0000-0000-0000-000000000001","rating":9,"text":"Страшно и красиво","reviewedAt":"2026-10-01T12:30:00+00:00"}"""
         },
         {
+            "run-hours-corrected",
+            new RunHoursCorrected(s_run, s_player, 6m, 12m, [new Die(4, 2), new Die(4, 3)], [], "Часы по HLTB", s_at),
+            1,
+            """{"runId":"00000000-0000-0000-0000-000000000001","playerId":"10000000-0000-0000-0000-000000000001","oldHours":6,"newHours":12,"added":[{"sides":4,"value":2},{"sides":4,"value":3}],"removed":[],"comment":"Часы по HLTB","correctedAt":"2026-10-01T12:30:00+00:00"}"""
+        },
+        {
+            "run-difficulty-changed",
+            new RunDifficultyChanged(
+                s_run, s_player, Difficulty.Hard, Difficulty.Normal,
+                [new DieChange(new Die(6, 5), new Die(4, 4))], [new DieChange(new Die(6, 1), new Die(4, 1))], "По пруфу — нормальная", s_at),
+            1,
+            """{"runId":"00000000-0000-0000-0000-000000000001","playerId":"10000000-0000-0000-0000-000000000001","oldDifficulty":"hard","newDifficulty":"normal","dice":[{"before":{"sides":6,"value":5},"after":{"sides":4,"value":4}}],"challengeDice":[{"before":{"sides":6,"value":1},"after":{"sides":4,"value":1}}],"comment":"По пруфу — нормальная","changedAt":"2026-10-01T12:30:00+00:00"}"""
+        },
+        {
+            "manual-effect-resolved",
+            new ManualEffectResolved(s_run, s_player, s_run, ManualEffectOutcome.NotApplicable, "Сложность понижена по пруфу"),
+            1,
+            """{"effectId":"00000000-0000-0000-0000-000000000001","playerId":"10000000-0000-0000-0000-000000000001","runId":"00000000-0000-0000-0000-000000000001","outcome":"notApplicable","comment":"Сложность понижена по пруфу"}"""
+        },
+        {
             "run-started",
             new RunStarted(s_run, s_player, s_game, Snapshot(), s_at, s_at.AddMinutes(5)),
             1,

@@ -144,7 +144,8 @@ public sealed record RunView(Guid Id, GameView Game, DateTimeOffset StartedAt);
 
 public static class SeasonEndpoints
 {
-    public const decimal MaxEstimatedHours = 1000;
+    /// <summary>The most hours a request may carry: a player's estimate or an admin's correction.</summary>
+    public const decimal MaxHours = 1000;
 
     public const int MaxOptionIdLength = 64;
 
@@ -238,8 +239,8 @@ public static class SeasonEndpoints
 
     /// <summary>The request-level checks of a completion; the rules (hours needed, source needed) live in the engine.</summary>
     private static ValidationProblem? CompletionInvalid(CompleteRequest request) =>
-        request.EstimatedHours is <= 0 or > MaxEstimatedHours
-            ? Invalid("estimatedHours", $"Hours must be greater than 0 and at most {MaxEstimatedHours}.")
+        request.EstimatedHours is <= 0 or > MaxHours
+            ? Invalid("estimatedHours", $"Hours must be greater than 0 and at most {MaxHours}.")
             : request.HoursSource?.Length > Limits.MaxHoursSourceLength
                 ? Invalid("hoursSource", $"At most {Limits.MaxHoursSourceLength} characters.")
                 : request.Review is { } review
