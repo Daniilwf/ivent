@@ -3236,8 +3236,15 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
                     };
+                };
+                /** @description Unsupported Media Type */
+                415: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
                 };
                 /** @description Unprocessable Entity */
                 422: {
@@ -3245,7 +3252,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
                     };
                 };
                 /** @description Too Many Requests */
@@ -3254,7 +3261,16 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+                /** @description Service Unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
                     };
                 };
             };
@@ -3288,7 +3304,10 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "image/webp": string;
+                        "image/gif": string;
+                    };
                 };
                 /** @description Not Found */
                 404: {
@@ -3330,7 +3349,10 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "image/webp": string;
+                        "image/gif": string;
+                    };
                 };
                 /** @description Not Found */
                 404: {

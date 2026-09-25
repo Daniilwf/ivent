@@ -88,6 +88,36 @@ public sealed class FileUploadTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_webp_is_accepted_and_re_encoded()
+    {
+        var vasya = await _site.SignedInAsync("vasya");
+        using var grey = Image.Black(300, 200, bands: 3) + 60;
+        using var source = grey.Cast(Enums.BandFormat.Uchar);
+
+        var view = await StoredAsync(await UploadAsync(vasya, source.WebpsaveBuffer(), "shot.webp"));
+
+        Assert.Equal(("image/webp", 300, 200), (view.GetProperty("mediaType").GetString(), view.GetProperty("width").GetInt32(), view.GetProperty("height").GetInt32()));
+    }
+
+    [Fact]
+    public async Task A_photo_is_turned_by_its_orientation()
+    {
+        var vasya = await _site.SignedInAsync("vasya");
+        using var grey = Image.Black(60, 40, bands: 3) + 100;
+        using var plain = grey.Cast(Enums.BandFormat.Uchar);
+        using var sideways = plain.Mutate(m => m.Set(GValue.GIntType, "orientation", 6));
+        var jpeg = sideways.JpegsaveBuffer();
+        using (var check = Image.NewFromBuffer(jpeg))
+        {
+            Assert.Equal(6, (int)check.Get("orientation"));
+        }
+
+        var view = await StoredAsync(await UploadAsync(vasya, jpeg, "phone.jpg"));
+
+        Assert.Equal((40, 60), (view.GetProperty("width").GetInt32(), view.GetProperty("height").GetInt32()));
+    }
+
+    [Fact]
     public async Task The_type_comes_from_the_content_not_the_name_or_the_header()
     {
         var vasya = await _site.SignedInAsync("vasya");
@@ -135,6 +165,45 @@ public sealed class FileUploadTests : IAsyncLifetime
         var response = await UploadAsync(vasya, jpeg[..(jpeg.Length / 2)], "cut.jpg");
 
         await AssertRefusedAsync(response, HttpStatusCode.UnprocessableEntity, "file.broken");
+    }
+
+    [Fact]
+    public async Task A_cut_off_gif_is_refused_and_nothing_is_kept()
+    {
+        var vasya = await _site.SignedInAsync("vasya");
+        var gif = AnimatedGif(64, 64, frames: 6, noise: true);
+
+        var response = await UploadAsync(vasya, gif[..(gif.Length * 2 / 3)], "cut.gif");
+
+        await AssertRefusedAsync(response, HttpStatusCode.UnprocessableEntity, "file.broken");
+        Assert.Empty(StoredFiles());
+    }
+
+    [Fact]
+    public async Task An_interlaced_png_or_a_progressive_jpeg_has_a_lower_pixel_limit()
+    {
+        using var strict = _site.WithWebHostBuilder(b => b.UseSetting("Files:MaxInterlacedPixels", "10000"));
+        var vasya = await SignedInAsync(strict, "vasya");
+        using var grey = Image.Black(200, 200, bands: 3) + 80;
+        using var picture = grey.Cast(Enums.BandFormat.Uchar);
+
+        // Decoded whole in memory, not line by line: refused above the lower limit
+        await AssertRefusedAsync(await UploadAsync(vasya, picture.PngsaveBuffer(interlace: true), "adam7.png"), HttpStatusCode.UnprocessableEntity, "file.tooManyPixels");
+        await AssertRefusedAsync(await UploadAsync(vasya, picture.JpegsaveBuffer(interlace: true), "progressive.jpg"), HttpStatusCode.UnprocessableEntity, "file.tooManyPixels");
+
+        // The same pictures read line by line keep the usual limit
+        await StoredAsync(await UploadAsync(vasya, picture.PngsaveBuffer(), "plain.png"));
+        await StoredAsync(await UploadAsync(vasya, picture.JpegsaveBuffer(), "baseline.jpg"));
+    }
+
+    [Fact]
+    public async Task A_gif_with_too_many_frames_is_refused()
+    {
+        using var strict = _site.WithWebHostBuilder(b => b.UseSetting("Files:MaxFrames", "2"));
+        var vasya = await SignedInAsync(strict, "vasya");
+
+        await AssertRefusedAsync(await UploadAsync(vasya, AnimatedGif(20, 20, frames: 3), "long.gif"), HttpStatusCode.UnprocessableEntity, "file.tooManyFrames");
+        await StoredAsync(await UploadAsync(vasya, AnimatedGif(20, 20, frames: 2), "short.gif"));
     }
 
     [Fact]
@@ -279,6 +348,9 @@ public sealed class FileUploadTests : IAsyncLifetime
             Assert.Contains("sandbox", Assert.Single(response.Headers.GetValues("Content-Security-Policy")), StringComparison.Ordinal);
             Assert.Contains("default-src 'none'", Assert.Single(response.Headers.GetValues("Content-Security-Policy")), StringComparison.Ordinal);
             Assert.True(response.Headers.CacheControl?.Private);
+            Assert.Contains("immutable", response.Headers.CacheControl!.Extensions.Select(e => e.Name));
+            Assert.Contains("frame-ancestors 'none'", Assert.Single(response.Headers.GetValues("Content-Security-Policy")), StringComparison.Ordinal);
+            Assert.Equal("same-origin", Assert.Single(response.Headers.GetValues("Cross-Origin-Resource-Policy")));
             Assert.Null(response.Content.Headers.ContentDisposition?.FileName);
         }
     }
@@ -300,6 +372,51 @@ public sealed class FileUploadTests : IAsyncLifetime
         await using var db = _site.NewDb();
         Assert.Equal(1, await db.Files.CountAsync(Ct));
         Assert.Equal(2, StoredFiles().Length); // the file and its thumbnail
+    }
+
+    [Fact]
+    public async Task Two_uploads_with_the_same_command_id_at_once_give_one_file()
+    {
+        var vasya = await _site.SignedInAsync("vasya");
+        var commandId = Guid.NewGuid();
+        var picture = Png(400, 300, noise: true);
+
+        var answers = await Task.WhenAll(
+            UploadAsync(vasya, picture, "a.png", commandId: commandId),
+            UploadAsync(vasya, picture, "a.png", commandId: commandId));
+
+        var views = await Task.WhenAll(answers.Select(StoredAsync));
+        Assert.Single(views.Select(v => v.GetProperty("id").GetGuid()).Distinct());
+        Assert.Single(views, v => !v.GetProperty("duplicate").GetBoolean());
+        await using var db = _site.NewDb();
+        Assert.Equal(1, await db.Files.CountAsync(Ct));
+        Assert.Equal(2, StoredFiles().Length);
+    }
+
+    [Fact]
+    public async Task An_upload_to_the_path_with_a_trailing_slash_keeps_the_upload_limit()
+    {
+        var vasya = await _site.SignedInAsync("vasya");
+        using var form = new MultipartFormDataContent
+        {
+            { new StringContent(Guid.NewGuid().ToString()), "commandId" },
+            { new ByteArrayContent(Png(300, 300, noise: true)), "file", "a.png" },
+        };
+
+        var response = await vasya.PostAsync("/api/files/", form, Ct);
+
+        await StoredAsync(response);
+    }
+
+    [Fact]
+    public async Task Uploads_per_minute_are_limited()
+    {
+        using var strict = _site.WithWebHostBuilder(b => b.UseSetting("Files:UploadsPerMinute", "2"));
+        var vasya = await SignedInAsync(strict, "vasya");
+        await StoredAsync(await UploadAsync(vasya, Png(10, 10), "a.png"));
+        await StoredAsync(await UploadAsync(vasya, Png(10, 10), "b.png"));
+
+        Assert.Equal(HttpStatusCode.TooManyRequests, (await UploadAsync(vasya, Png(10, 10), "c.png")).StatusCode);
     }
 
     [Fact]

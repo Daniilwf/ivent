@@ -16,7 +16,16 @@ public sealed record FileLimits
     public int MaxLongSide { get; init; } = 2560;
 
     /// <summary>Width × height × frames of the decoded image: a small file that unpacks into gigabytes is refused.</summary>
-    public long MaxPixels { get; init; } = 100_000_000;
+    public long MaxPixels { get; init; } = 40_000_000;
+
+    /// <summary>
+    /// An interlaced PNG or a progressive JPEG is decoded whole in memory, not line by line: a lower limit keeps one upload
+    /// within a small server's memory.
+    /// </summary>
+    public long MaxInterlacedPixels { get; init; } = 16_000_000;
+
+    /// <summary>Frames of a GIF: every frame is decoded and re-quantised for the thumbnail.</summary>
+    public int MaxFrames { get; init; } = 1000;
 
     /// <summary>The longer side of the thumbnail for the map and lists.</summary>
     public int ThumbnailSize { get; init; } = 256;
@@ -25,6 +34,9 @@ public sealed record FileLimits
 
     /// <summary>Uploads per user in 24 hours.</summary>
     public int UploadsPerDay { get; init; } = 60;
+
+    /// <summary>Uploads per user in a minute (the answer is a 429 without a code, like every other rate limit).</summary>
+    public int UploadsPerMinute { get; init; } = 20;
 }
 
 /// <summary>An upload after processing: the file to store, its thumbnail and what it is.</summary>
@@ -41,6 +53,7 @@ public static class ImageProcessor
     public const string TypeInvalid = "file.typeInvalid";
     public const string TooLarge = "file.tooLarge";
     public const string TooManyPixels = "file.tooManyPixels";
+    public const string TooManyFrames = "file.tooManyFrames";
     public const string Broken = "file.broken";
 
     static ImageProcessor()
@@ -48,6 +61,9 @@ public static class ImageProcessor
         // Only the decoders libvips marks as safe for untrusted input; no operation cache of users' pictures
         NetVips.NetVips.BlockUntrusted = true;
         Cache.Max = 0;
+
+        // One thread per picture: uploads are rare, the server small; the endpoint lets one picture through at a time
+        NetVips.NetVips.Concurrency = 1;
     }
 
     private enum Kind
@@ -81,7 +97,7 @@ public static class ImageProcessor
         {
             return kind == Kind.Gif ? Gif(input, limits) : Still(input, kind, limits);
         }
-        catch (VipsException)
+        catch (Exception e) when (e is VipsException or InvalidCastException or FormatException or OverflowException)
         {
             return (null, new Rejection(Broken, "The picture cannot be read."));
         }
@@ -97,14 +113,18 @@ public static class ImageProcessor
                 return (null, mismatch);
             }
 
-            if ((long)header.Width * header.Height > limits.MaxPixels)
+            var interlaced = header.Contains("interlaced") && Convert.ToInt32(header.Get("interlaced"), System.Globalization.CultureInfo.InvariantCulture) != 0;
+            var maxPixels = interlaced ? Math.Min(limits.MaxPixels, limits.MaxInterlacedPixels) : limits.MaxPixels;
+            if ((long)header.Width * header.Height > maxPixels)
             {
-                return (null, new Rejection(TooManyPixels, $"A picture has at most {limits.MaxPixels} pixels."));
+                return (null, new Rejection(TooManyPixels, $"A picture has at most {maxPixels} pixels."));
             }
         }
 
-        using var main = Image.ThumbnailBuffer(input, limits.MaxLongSide, height: limits.MaxLongSide, size: Enums.Size.Down, failOn: Enums.FailOn.Error);
-        using var thumbnail = Image.ThumbnailBuffer(input, limits.ThumbnailSize, height: limits.ThumbnailSize, size: Enums.Size.Down, failOn: Enums.FailOn.Error);
+        // The upload is decoded once; the thumbnail comes from the reduced picture held in memory (at most MaxLongSide²)
+        using var reduced = Image.ThumbnailBuffer(input, limits.MaxLongSide, height: limits.MaxLongSide, size: Enums.Size.Down, failOn: Enums.FailOn.Error);
+        using var main = reduced.CopyMemory();
+        using var thumbnail = main.ThumbnailImage(limits.ThumbnailSize, height: limits.ThumbnailSize, size: Enums.Size.Down);
         return (new ProcessedFile(
             FileNames.Webp,
             main.WebpsaveBuffer(q: limits.WebpQuality, keep: Enums.ForeignKeep.None),
@@ -116,6 +136,12 @@ public static class ImageProcessor
 
     private static (ProcessedFile?, Rejection?) Gif(byte[] input, FileLimits limits)
     {
+        // libvips reads the frames a cut-off GIF still has without a word; a whole GIF ends with its trailer byte
+        if (input[^1] != 0x3B)
+        {
+            return (null, new Rejection(Broken, "The picture cannot be read."));
+        }
+
         int width, height, frames;
         using (var header = Image.NewFromBuffer(input, access: Enums.Access.Sequential, failOn: Enums.FailOn.Error, kwargs: new VOption { { "n", -1 } }))
         {
@@ -127,6 +153,11 @@ public static class ImageProcessor
             width = header.Width;
             height = header.PageHeight;
             frames = header.Contains("n-pages") ? (int)header.Get("n-pages") : 1;
+            if (frames > limits.MaxFrames)
+            {
+                return (null, new Rejection(TooManyFrames, $"A GIF has at most {limits.MaxFrames} frames."));
+            }
+
             if ((long)width * height * frames > limits.MaxPixels)
             {
                 return (null, new Rejection(TooManyPixels, $"A GIF has at most {limits.MaxPixels} pixels in all its frames."));

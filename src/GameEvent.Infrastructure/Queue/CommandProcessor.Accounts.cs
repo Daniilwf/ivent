@@ -8,7 +8,8 @@ using Microsoft.EntityFrameworkCore;
 namespace GameEvent.Infrastructure.Queue;
 
 /// <summary>
-/// Account commands (D-106): the same queue, one transaction each, events in the global log (no season). The account
+/// Global commands — accounts (D-106) and files (D-108): the same queue, one transaction each, events in the global log
+/// (no season); the account rules are here, the file rules in CommandProcessor.Files. The account
 /// table holds what the log must not — password hashes — so the rules read it, and the log is the audit trail.
 /// </summary>
 public sealed partial class CommandProcessor
