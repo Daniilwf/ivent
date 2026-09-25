@@ -98,10 +98,16 @@ public sealed partial class CommandProcessor(
         {
             // A repeat is the same command, with the same body, by the same author for the same season;
             // anything else reusing the id is refused.
-            return earlier.All(e => e.SeasonId == envelope.SeasonId && e.CommandType == commandType
-                    && e.CommandHash == commandHash && e.AuthorId == envelope.AuthorId)
-                ? new CommandOutcome(true, true, null, [.. earlier.Select(ToLogged)])
-                : Rejected(RejectionCodes.CommandIdReused, $"Command id {envelope.CommandId} was used by another command.");
+            if (!earlier.All(e => e.SeasonId == envelope.SeasonId && e.CommandType == commandType
+                    && e.CommandHash == commandHash && e.AuthorId == envelope.AuthorId))
+            {
+                return Rejected(RejectionCodes.CommandIdReused, $"Command id {envelope.CommandId} was used by another command.");
+            }
+
+            // The same command, but undone since (D-104): repeating it does not bring it back.
+            return earlier.All(e => e.UndoneByEventId is not null)
+                ? Rejected(RejectionCodes.CommandUndone, $"Command {envelope.CommandId} was undone; send it again with a new id.")
+                : new CommandOutcome(true, true, null, [.. earlier.Select(ToLogged)]);
         }
 
         if (envelope.SeasonId == Guid.Empty)
@@ -120,7 +126,9 @@ public sealed partial class CommandProcessor(
         }
 
         // The rules come from the season's own log (D-82); a new season brings them in CreateSeason.
-        var context = new EngineContext(clock, random, ids, await PoolReader.LoadAsync(db, ct));
+        // An undo decides on the whole log by command (D-104); other commands need only the state.
+        var history = envelope.Command is Engine.Undo.UndoCommand ? await EventLogReader.ReadCommandsAsync(db, envelope.SeasonId, ct) : null;
+        var context = new EngineContext(clock, random, ids, await PoolReader.LoadAsync(db, ct), History: history);
 
         var result = SeasonEngine.Execute(cached.State, envelope.Command, context);
         if (!result.IsAccepted)
@@ -159,6 +167,16 @@ public sealed partial class CommandProcessor(
             db.Events.AddRange(records);
             await SeasonProjection.WriteAsync(db, cached.State, result.State, now, envelope.AuthorId, ct);
             await db.SaveChangesAsync(ct);
+
+            // The undone command's events stay in the log, marked with the event that undid them (D-104).
+            foreach (var (record, undone) in records.Zip(result.Events).Where(x => x.Second is Engine.Undo.CommandUndone)
+                .Select(x => (x.First, (Engine.Undo.CommandUndone)x.Second)))
+            {
+                await db.Events
+                    .Where(e => e.SeasonId == envelope.SeasonId && e.CommandId == undone.CommandId)
+                    .ExecuteUpdateAsync(u => u.SetProperty(e => e.UndoneByEventId, record.Id), ct);
+            }
+
             await transaction.CommitAsync(ct);
         }
 

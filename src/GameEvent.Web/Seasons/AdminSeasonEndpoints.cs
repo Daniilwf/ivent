@@ -25,6 +25,16 @@ public sealed record SeasonDeadlineRequest(Guid CommandId, DateTimeOffset? Deadl
 public sealed record AdminManualEffectView(
     Guid Id, Guid PlayerId, string PlayerName, Engine.Rulesets.EventKind DrawEvent, Engine.Effects.ManualEffectSource Source, Guid? RunId);
 
+/// <summary>Undo a whole earlier command (D-104); <c>comment</c> is required, at most 500 characters.</summary>
+public sealed record UndoRequest(Guid CommandId, Guid TargetCommandId, string? Comment = null);
+
+/// <summary>
+/// A command of the season log, newest first (D-104): what the admin picks to undo. <c>undone</c> — undone already;
+/// <c>events</c> — the types of its events in order.
+/// </summary>
+public sealed record AdminCommandView(
+    Guid CommandId, string CommandType, string? AuthorName, DateTimeOffset OccurredAt, bool Undone, IReadOnlyList<string> Events);
+
 /// <summary>The admin's season actions: the lifecycle (D-101) and resolving manual effects (D-102).</summary>
 public static class AdminSeasonEndpoints
 {
@@ -38,6 +48,25 @@ public static class AdminSeasonEndpoints
                     TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["to"] = ["A known season status is required."] }))
                 : SendAsync(seasonId, request.CommandId, new ChangeSeasonStatus(to), user, db, bus, ct))
             .WithActionErrors();
+
+        // A refusal with later commands that depend on it lists them in «related» (409 undo.dependents).
+        season.MapPost("/undo", (Guid seasonId, UndoRequest request, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, CancellationToken ct) =>
+            request.TargetCommandId == Guid.Empty
+                ? Task.FromResult<ActionResult>(TypedResults.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["targetCommandId"] = ["The command to undo is required."],
+                }))
+                : string.IsNullOrWhiteSpace(request.Comment) || request.Comment.Length > SeasonEndpoints.MaxCommentLength
+                    ? Task.FromResult<ActionResult>(TypedResults.ValidationProblem(new Dictionary<string, string[]>
+                    {
+                        ["comment"] = [$"A comment of at most {SeasonEndpoints.MaxCommentLength} characters is required."],
+                    }))
+                    : SendAsync(seasonId, request.CommandId, new Engine.Undo.UndoCommand(request.TargetCommandId, request.Comment), user, db, bus, ct))
+            .WithActionErrors();
+
+        season.MapGet("/commands", GetCommandsAsync)
+            .RequireRateLimiting(AppSetup.AdminReadRateLimit)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
 
         season.MapGet("/effects", GetEffectsAsync)
             .RequireRateLimiting(AppSetup.AdminReadRateLimit)
@@ -72,6 +101,48 @@ public static class AdminSeasonEndpoints
             .Select(r => new AdminManualEffectView(r.x.Id, r.x.PlayerId, r.Name, r.x.DrawEvent, r.x.Source, r.x.RunId))
             .ToListAsync(ct);
         return TypedResults.Ok(effects);
+    }
+
+    /// <summary>The newest commands of the season log, up to <paramref name="limit"/> (1–500, 100 by default).</summary>
+    private static async Task<Microsoft.AspNetCore.Http.HttpResults.Results<
+        Microsoft.AspNetCore.Http.HttpResults.Ok<IReadOnlyList<AdminCommandView>>,
+        Microsoft.AspNetCore.Http.HttpResults.NotFound>> GetCommandsAsync(Guid seasonId, GameEventDbContext db, CancellationToken ct, int limit = 100)
+    {
+        if (!await db.Seasons.AnyAsync(s => s.Id == seasonId, ct))
+        {
+            return TypedResults.NotFound();
+        }
+
+        limit = Math.Clamp(limit, 1, 500);
+        var newest = await db.Events.AsNoTracking()
+            .Where(e => e.SeasonId == seasonId)
+            .GroupBy(e => e.CommandId)
+            .Select(g => new { CommandId = g.Key, Last = g.Max(e => e.Sequence) })
+            .OrderByDescending(g => g.Last)
+            .Take(limit)
+            .Select(g => g.CommandId)
+            .ToListAsync(ct);
+        var rows = await db.Events.AsNoTracking()
+            .Where(e => e.SeasonId == seasonId && newest.Contains(e.CommandId))
+            .OrderBy(e => e.Sequence)
+            .ToListAsync(ct);
+        var authorIds = rows.Select(r => r.AuthorId).OfType<Guid>().Distinct().ToList();
+        var authors = await db.Users.AsNoTracking().Where(u => authorIds.Contains(u.Id)).ToDictionaryAsync(u => u.Id, u => u.Name, ct);
+        IReadOnlyList<AdminCommandView> commands = [.. rows
+            .GroupBy(r => r.CommandId)
+            .OrderByDescending(g => g.Max(r => r.Sequence))
+            .Select(g =>
+            {
+                var first = g.First();
+                return new AdminCommandView(
+                    g.Key,
+                    first.CommandType,
+                    first.AuthorId is { } author ? authors.GetValueOrDefault(author) : null,
+                    first.OccurredAt,
+                    g.Any(r => r.UndoneByEventId is not null),
+                    [.. g.Select(r => r.Type)]);
+            })];
+        return TypedResults.Ok(commands);
     }
 
     private static async Task<ActionResult> SendAsync(

@@ -403,7 +403,9 @@ public static class SeasonEndpoints
                 statusCode: StatusCodes.Status409Conflict,
                 title: "The command was rejected.",
                 detail: outcome.Rejection!.Detail,
-                extensions: new Dictionary<string, object?> { ["code"] = outcome.Rejection.Code });
+                extensions: outcome.Rejection.Related.Count == 0
+                    ? new Dictionary<string, object?> { ["code"] = outcome.Rejection.Code }
+                    : new Dictionary<string, object?> { ["code"] = outcome.Rejection.Code, ["related"] = outcome.Rejection.Related.ToArray() });
         }
 
         return TypedResults.Ok(new CommandResponse(

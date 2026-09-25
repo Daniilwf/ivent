@@ -41,6 +41,30 @@ public class EventFormatTests
         return new RunSnapshot(1, 7.5m, ruleset.Reward.DiceCount, ruleset.Reward.DieByDifficulty, 48, 1, new CoinReward { PerHour = 1, Min = 3 });
     }
 
+    // An undo with every kind of snapshot filled, so a change to the state records it stores shows up here (D-49, D-104)
+    private static Engine.Undo.CommandUndone FilledUndo() =>
+        new(
+            s_run,
+            "Ошибка админа",
+            [
+                new SeasonPlayer(
+                    s_player, s_user, "Вася", "c2", 7, 3, ResourceBag.From([new("freeRerolls", 1)]), false,
+                    new PlayerPath([new PathSegment(["start", "c1", "c2"])]), TurnPhase.Playing, null, null,
+                    [new GameExclusion(s_game, ExclusionReason.Dropped)], 1, null, s_run, 4),
+            ],
+            [s_other],
+            [
+                new RunState(
+                    s_run, s_player, s_game, RunStatus.Completed, Snapshot(), s_at, s_at, Difficulty.Normal, 7.5m,
+                    [new Die(4, 3)], [new Die(4, 2)], "HLTB", new RunReview(8, "Хорошо"), s_at, true,
+                    new Engine.Proofs.ProofState(Engine.Proofs.ProofStatus.Pending, ["https://imgur.com/a/credits"], "Концовка", s_other, s_at, null),
+                    2, false, false),
+            ],
+            [s_run],
+            [new PendingManualEffect(s_run, s_player, EventKind.Bad, ManualEffectSource.Drop, s_run)],
+            [s_game],
+            new Engine.Undo.SeasonFields(SeasonStatus.Active, s_at, "Тестовый сезон", null));
+
     public static TheoryData<string, IGameEvent, int, string> Samples() => new()
     {
         {
@@ -224,6 +248,12 @@ public class EventFormatTests
                 ]),
             1,
             """{"rows":[{"playerId":"10000000-0000-0000-0000-000000000001","place":1,"points":4,"cellsToFinish":0,"isFirst":true,"provisional":false},{"playerId":"10000000-0000-0000-0000-000000000002","place":2,"points":12,"cellsToFinish":null,"isFirst":false,"provisional":false}]}"""
+        },
+        {
+            "command-undone",
+            FilledUndo(),
+            1,
+            """{"commandId":"00000000-0000-0000-0000-000000000001","comment":"Ошибка админа","players":[{"playerId":"10000000-0000-0000-0000-000000000001","userId":"40000000-0000-0000-0000-000000000001","name":"Вася","cellId":"c2","points":7,"coins":3,"resources":{"freeRerolls":1},"isInactive":false,"path":{"segments":[{"cells":["start","c1","c2"]}]},"phase":"playing","offer":null,"choice":null,"exclusions":[{"gameId":"20000000-0000-0000-0000-000000000001","reason":"dropped"}],"rerollsThisRoll":1,"finish":null,"activeRunId":"00000000-0000-0000-0000-000000000001","pointsTick":4}],"removedPlayers":["10000000-0000-0000-0000-000000000002"],"runs":[{"runId":"00000000-0000-0000-0000-000000000001","playerId":"10000000-0000-0000-0000-000000000001","gameId":"20000000-0000-0000-0000-000000000001","status":"completed","snapshot":{"rulesetVersion":1,"hours":7.5,"diceCount":{"hoursPerDie":3,"rounding":"nearest","min":1,"max":10},"dieByDifficulty":{"easy":{"sides":2,"grantEvent":null},"normal":{"sides":4,"grantEvent":null},"hard":{"sides":6,"grantEvent":null},"extreme":{"sides":6,"grantEvent":"good"}},"techRerollWindowHours":48,"challengeExtraDice":1,"coins":{"perHour":1,"min":3}},"rolledAt":"2026-10-01T12:30:00+00:00","startedAt":"2026-10-01T12:30:00+00:00","difficulty":"normal","hours":7.5,"dice":[{"sides":4,"value":3}],"challengeDice":[{"sides":4,"value":2}],"hoursSource":"HLTB","review":{"rating":8,"text":"Хорошо"},"completedAt":"2026-10-01T12:30:00+00:00","reachedFinish":true,"proof":{"status":"pending","links":["https://imgur.com/a/credits"],"note":"Концовка","witnessId":"10000000-0000-0000-0000-000000000002","submittedAt":"2026-10-01T12:30:00+00:00","comment":null},"moved":2,"afterFinish":false,"freeMode":false}],"removedRuns":["00000000-0000-0000-0000-000000000001"],"effects":[{"effectId":"00000000-0000-0000-0000-000000000001","playerId":"10000000-0000-0000-0000-000000000001","drawEvent":"bad","source":"drop","runId":"00000000-0000-0000-0000-000000000001"}],"removedEffects":["20000000-0000-0000-0000-000000000001"],"season":{"status":"active","deadline":"2026-10-01T12:30:00+00:00","name":"Тестовый сезон","ruleset":null}}"""
         },
         {
             "effect-chain-cut",

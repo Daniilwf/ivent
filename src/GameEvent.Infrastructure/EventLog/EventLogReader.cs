@@ -22,6 +22,19 @@ public static class EventLogReader
         return (SeasonEngine.Replay(rows.Select(Decode)), rows.Count == 0 ? 0 : rows[^1].Sequence);
     }
 
+    /// <summary>The season log by command, in log order: what an undo decides on (D-104).</summary>
+    public static async Task<List<Engine.Undo.LoggedCommand>> ReadCommandsAsync(GameEventDbContext db, Guid seasonId, CancellationToken ct = default)
+    {
+        var rows = await ReadRowsAsync(db, seasonId, ct);
+        var commands = new List<Engine.Undo.LoggedCommand>();
+        foreach (var group in rows.GroupBy(r => r.CommandId).OrderBy(g => g.Min(r => r.Sequence)))
+        {
+            commands.Add(new Engine.Undo.LoggedCommand(group.Key, [.. group.OrderBy(r => r.Sequence).Select(Decode)]));
+        }
+
+        return commands;
+    }
+
     private static async Task<List<GameEventRecord>> ReadRowsAsync(GameEventDbContext db, Guid seasonId, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(db);

@@ -237,6 +237,7 @@ public sealed class Scenario
     public Scenario AppendCraftedEvents(params IGameEvent[] events)
     {
         _log.AddRange(events);
+        _history.Add(new Engine.Undo.LoggedCommand(SequentialIds.Make(0x7E000000, _history.Count), [.. events]));
         State = SeasonEngine.Replay(_log);
         return this;
     }
@@ -249,10 +250,20 @@ public sealed class Scenario
         {
             _log.AddRange(Last.Events);
             State = Last.State;
+            LastCommandId = SequentialIds.Make(0x7C000000, _history.Count);
+            _history.Add(new Engine.Undo.LoggedCommand(LastCommandId, [.. Last.Events]));
         }
 
         return this;
     }
+
+    private readonly List<Engine.Undo.LoggedCommand> _history = [];
+
+    /// <summary>The id the last accepted command was logged under (D-104: an undo names it).</summary>
+    public Guid LastCommandId { get; private set; }
+
+    /// <summary>The season's log by command, as the queue gives it to an undo.</summary>
+    public IReadOnlyList<Engine.Undo.LoggedCommand> History => _history;
 
     public Guid PlayerId(string name) =>
         _players.TryGetValue(name, out var id) ? id : throw new KeyNotFoundException($"No player '{name}' in the scenario.");
@@ -272,7 +283,7 @@ public sealed class Scenario
     public IEnumerable<T> LastEvents<T>() where T : IGameEvent => Last.Events.OfType<T>();
 
     public EngineContext Context() =>
-        new(Clock, Random, Ids, new PoolSnapshot([.. _games], [.. _categories]), _triggers);
+        new(Clock, Random, Ids, new PoolSnapshot([.. _games], [.. _categories]), _triggers, _history);
 
     private IReadOnlyList<Engine.Effects.ITriggerHandler> _triggers = [];
 
