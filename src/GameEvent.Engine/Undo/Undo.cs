@@ -18,8 +18,11 @@ public sealed record LoggedCommand(Guid CommandId, EquatableArray<IGameEvent> Ev
 /// </summary>
 public sealed record UndoCommand(Guid TargetCommandId, string Comment) : ICommand;
 
-/// <summary>The season's own fields as they were before the undone command.</summary>
-public sealed record SeasonFields(SeasonStatus Status, DateTimeOffset? Deadline, string Name, Rulesets.Ruleset Ruleset);
+/// <summary>
+/// The season's own fields as they were before the undone command; <see cref="Ruleset"/> only when the command changed
+/// the rules (null — they stay).
+/// </summary>
+public sealed record SeasonFields(SeasonStatus Status, DateTimeOffset? Deadline, string Name, Rulesets.Ruleset? Ruleset);
 
 /// <summary>
 /// A command is undone (D-104): what it touched gets back the values it had before — players, runs and pending manual
@@ -64,8 +67,17 @@ internal static class Undoing
             return Decision.Reject(RejectionCodes.CommentTooLong, $"The comment is limited to {Limits.MaxCommentLength} characters.");
         }
 
-        var history = context.History ?? throw new InvalidOperationException("An undo needs the season's command history.");
-        var index = history.ToList().FindIndex(c => c.CommandId == command.TargetCommandId);
+        if (context.History is not { } history)
+        {
+            return Decision.Reject(RejectionCodes.UndoNoHistory, "An undo needs the season's command history (the queue gives it).");
+        }
+
+        var index = -1;
+        for (var i = 0; i < history.Count && index < 0; i++)
+        {
+            index = history[i].CommandId == command.TargetCommandId ? i : -1;
+        }
+
         if (index < 0)
         {
             return Decision.Reject(RejectionCodes.UndoUnknownCommand, $"Command {command.TargetCommandId} is not in this season's log.");
@@ -97,8 +109,10 @@ internal static class Undoing
                 targetKeys = Keys(before, after, history[i].Events);
             }
             else if (i > index && !undone.Contains(history[i].CommandId) && !history[i].Events.Any(e => e is CommandUndone)
-                && Keys(before, after, history[i].Events).Overlaps(targetKeys!))
+                && (targetKeys!.Contains(SeasonKey) || Keys(before, after, history[i].Events).Overlaps(targetKeys)))
             {
+                // Every later command was decided under the season's status, deadline and rules: after a change of
+                // those, all of them depend on it (D-104).
                 dependents.Add(history[i].CommandId);
             }
 
@@ -113,8 +127,25 @@ internal static class Undoing
                 [.. dependents]);
         }
 
-        return Decision.Accept(Compensation(beforeTarget!, state, target, command.Comment));
+        var compensation = Compensation(beforeTarget!, state, target, command.Comment);
+        if (compensation.Season is { } season && season.Deadline != state.Deadline && season.Deadline is { } deadline
+            && deadline <= context.Clock.UtcNow)
+        {
+            return Decision.Reject(RejectionCodes.SeasonDeadlineInPast, "The deadline it would bring back has passed.");
+        }
+
+        // Statuses go back only while the turns they reopen are still allowed by the clock (D-101, D-104): a season
+        // closed at or after its deadline stays closed.
+        if (compensation.Season is { Status: SeasonStatus.Active } reopened && state.Status != SeasonStatus.Active
+            && SeasonSetup.IsPastDeadline(state with { Deadline = reopened.Deadline }, context.Clock.UtcNow))
+        {
+            return Decision.Reject(RejectionCodes.SeasonDeadlinePassed, "The deadline has passed: the season stays closed.");
+        }
+
+        return Decision.Accept(compensation);
     }
+
+    private const string SeasonKey = "season";
 
     public static SeasonState Apply(SeasonState state, CommandUndone e)
     {
@@ -133,8 +164,8 @@ internal static class Undoing
             Status = season.Status,
             Deadline = season.Deadline,
             Name = season.Name,
-            Ruleset = season.Ruleset,
-            RulesetVersion = season.Ruleset == state.Ruleset ? state.RulesetVersion : state.RulesetVersion + 1,
+            Ruleset = season.Ruleset ?? state.Ruleset,
+            RulesetVersion = season.Ruleset is null || season.Ruleset == state.Ruleset ? state.RulesetVersion : state.RulesetVersion + 1,
         };
     }
 
@@ -152,6 +183,28 @@ internal static class Undoing
         foreach (var id in Changed(before.Players, after.Players))
         {
             keys.Add($"player:{id}");
+            foreach (var player in new[] { before.Players.GetValueOrDefault(id), after.Players.GetValueOrDefault(id) }.OfType<SeasonPlayer>())
+            {
+                // A game offered or among the choice's options is taken by this player (D-06, D-91)
+                if (player.Offer is { } offer)
+                {
+                    keys.Add($"game:{offer.GameId}");
+                }
+
+                foreach (var option in player.Choice?.Options ?? [])
+                {
+                    if (option.Game is { } game)
+                    {
+                        keys.Add($"game:{game.GameId}");
+                    }
+                }
+
+                // A finisher's changes move the finish order, bonuses and the freeze (Q-3, Q-4, D-99)
+                if (player.Finish is not null)
+                {
+                    keys.Add(FinishKey);
+                }
+            }
         }
 
         foreach (var id in Changed(before.Runs, after.Runs))
@@ -160,6 +213,11 @@ internal static class Undoing
             foreach (var run in new[] { before.Runs.GetValueOrDefault(id), after.Runs.GetValueOrDefault(id) }.OfType<RunState>())
             {
                 keys.Add($"game:{run.GameId}");
+                keys.Add($"player:{run.PlayerId}");
+                if (before.Players.GetValueOrDefault(run.PlayerId)?.Finish is not null || after.Players.GetValueOrDefault(run.PlayerId)?.Finish is not null)
+                {
+                    keys.Add(FinishKey);
+                }
             }
         }
 
@@ -171,24 +229,27 @@ internal static class Undoing
         if (before.Status != after.Status || before.Deadline != after.Deadline || before.Name != after.Name
             || before.Ruleset != after.Ruleset || before.Result != after.Result)
         {
-            keys.Add("season");
+            keys.Add(SeasonKey);
         }
 
         foreach (var e in events)
         {
-            if (e is PlayerFinished or PlayerFinishRevoked or PlayerFrozen)
+            if (e is PlayerFinished or PlayerFinishRevoked or PlayerFrozen or FinishSurplusChanged
+                or Scoring.PointsChanged { Reason: Scoring.PointsReason.FinishBonus or Scoring.PointsReason.FinishBonusRevoked })
             {
-                keys.Add("finishOrder");
+                keys.Add(FinishKey);
             }
 
-            foreach (var game in GameIds.Of(e))
+            foreach (var (kind, id) in GameIds.Of(e))
             {
-                keys.Add($"game:{game}");
+                keys.Add($"{kind}:{id}");
             }
         }
 
         return keys;
     }
+
+    private const string FinishKey = "finishOrder";
 
     private static CommandUndone Compensation(SeasonState before, SeasonState now, LoggedCommand target, string comment)
     {
@@ -209,32 +270,35 @@ internal static class Undoing
             [.. runs.Where(id => !before.Runs.ContainsKey(id) && now.Runs.ContainsKey(id))],
             [.. effects.Where(before.ManualEffects.ContainsKey).Select(id => before.ManualEffects[id])],
             [.. effects.Where(id => !before.ManualEffects.ContainsKey(id) && now.ManualEffects.ContainsKey(id))],
-            seasonChanged ? new SeasonFields(before.Status, before.Deadline, before.Name, before.Rules) : null);
+            seasonChanged ? new SeasonFields(before.Status, before.Deadline, before.Name, before.Ruleset == after.Ruleset ? null : before.Rules) : null);
     }
 
     private static IEnumerable<Guid> Changed<T>(
         System.Collections.Immutable.ImmutableSortedDictionary<Guid, T> before, System.Collections.Immutable.ImmutableSortedDictionary<Guid, T> after) =>
-        before.Keys.Union(after.Keys)
-            .Where(id => !(before.TryGetValue(id, out var was) && after.TryGetValue(id, out var now) && Equals(was, now)))
-            .Order();
+        ReferenceEquals(before, after)
+            ? []
+            : before.Keys.Union(after.Keys)
+                .Where(id => !(before.TryGetValue(id, out var was) && after.TryGetValue(id, out var now) && (ReferenceEquals(was, now) || Equals(was, now))))
+                .Order();
 }
 
 /// <summary>
-/// The games an event names: every <c>GameId</c> and <c>GameIds</c> in it, however deep (a roll's misses, a choice's
-/// options). Found by reflection once per event type, so a new event with a game in it is covered without a list (D-104).
+/// What an event names beyond its own player and run: every <c>GameId</c> and <c>GameIds</c> (a roll's misses, a choice's
+/// options) and a proof's <c>WitnessId</c>, however deep. Found by reflection once per event type, so a new event with a
+/// game in it is covered without a list (D-104).
 /// </summary>
 internal static class GameIds
 {
     private static readonly ConcurrentDictionary<Type, PropertyInfo[]> s_properties = new();
 
-    public static IEnumerable<Guid> Of(object value)
+    public static IEnumerable<(string Kind, Guid Id)> Of(object value)
     {
-        var found = new List<Guid>();
+        var found = new List<(string, Guid)>();
         Collect(value, found, depth: 0);
         return found;
     }
 
-    private static void Collect(object? value, List<Guid> found, int depth)
+    private static void Collect(object? value, List<(string, Guid)> found, int depth)
     {
         if (value is null || depth > 6 || value is string || value.GetType().IsPrimitive || value is Guid or DateTimeOffset or decimal)
         {
@@ -262,10 +326,13 @@ internal static class GameIds
             switch (property.Name)
             {
                 case "GameId" when inner is Guid game:
-                    found.Add(game);
+                    found.Add(("game", game));
                     break;
                 case "GameIds" when inner is IEnumerable<Guid> games:
-                    found.AddRange(games);
+                    found.AddRange(games.Select(g => ("game", g)));
+                    break;
+                case "WitnessId" when inner is Guid witness:
+                    found.Add(("player", witness));
                     break;
                 default:
                     if (inner is not null && (inner is IEnumerable || inner.GetType().Assembly == typeof(GameIds).Assembly))

@@ -208,7 +208,24 @@ public sealed class UndoApiTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.NotFound, (await admin.GetAsync(AdminUrl("commands", Guid.NewGuid()), Ct)).StatusCode);
     }
 
+    [Fact]
+    public async Task Repeating_an_undone_command_is_refused_not_a_silent_duplicate()
+    {
+        var vasya = await _site.SignedInAsync("vasya");
+        var admin = await _site.SignedInAsync("admin");
+        var roll = Guid.NewGuid();
+        await PostOkAsync(vasya, Url("roll"), new { commandId = roll });
+        await PostOkAsync(admin, AdminUrl("undo"), new { commandId = Guid.NewGuid(), targetCommandId = roll, comment = "Ошибка" });
+
+        var response = await vasya.PostAsJsonAsync(Url("roll"), new { commandId = roll }, Ct);
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        using var problem = JsonDocument.Parse(await response.Content.ReadAsStringAsync(Ct));
+        Assert.Equal("command.undone", problem.RootElement.GetProperty("code").GetString());
+    }
+
     [Theory]
+    [InlineData("{\"commandId\":\"{id}\",\"targetCommandId\":\"{id}\",\"comment\":\"   \"}")]
     [InlineData("{\"commandId\":\"{id}\",\"comment\":\"x\"}")]
     [InlineData("{\"commandId\":\"{id}\",\"targetCommandId\":\"{id}\"}")]
     [InlineData("{\"commandId\":\"{id}\",\"targetCommandId\":\"{id}\",\"comment\":\"{long}\"}")]

@@ -98,10 +98,16 @@ public sealed partial class CommandProcessor(
         {
             // A repeat is the same command, with the same body, by the same author for the same season;
             // anything else reusing the id is refused.
-            return earlier.All(e => e.SeasonId == envelope.SeasonId && e.CommandType == commandType
-                    && e.CommandHash == commandHash && e.AuthorId == envelope.AuthorId)
-                ? new CommandOutcome(true, true, null, [.. earlier.Select(ToLogged)])
-                : Rejected(RejectionCodes.CommandIdReused, $"Command id {envelope.CommandId} was used by another command.");
+            if (!earlier.All(e => e.SeasonId == envelope.SeasonId && e.CommandType == commandType
+                    && e.CommandHash == commandHash && e.AuthorId == envelope.AuthorId))
+            {
+                return Rejected(RejectionCodes.CommandIdReused, $"Command id {envelope.CommandId} was used by another command.");
+            }
+
+            // The same command, but undone since (D-104): repeating it does not bring it back.
+            return earlier.All(e => e.UndoneByEventId is not null)
+                ? Rejected(RejectionCodes.CommandUndone, $"Command {envelope.CommandId} was undone; send it again with a new id.")
+                : new CommandOutcome(true, true, null, [.. earlier.Select(ToLogged)]);
         }
 
         if (envelope.SeasonId == Guid.Empty)

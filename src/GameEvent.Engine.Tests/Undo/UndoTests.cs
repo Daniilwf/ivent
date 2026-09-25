@@ -238,6 +238,151 @@ public class UndoTests
         Assert.Equal(0, s.Player("Вася").Points);
     }
 
+    // ---- Reads the reviews of C12a found: a later command decided on what the undone one changed ----
+
+    [Fact]
+    public void A_change_of_the_season_makes_every_later_command_depend_on_it()
+    {
+        // The deadline moved, then a roll: the roll was allowed by the moved deadline
+        var s = Season();
+        s.Act(new SetSeasonDeadline(s.Clock.UtcNow + TimeSpan.FromDays(3)));
+        var deadline = s.LastCommandId;
+        s.Roll("Петя");
+        var roll = s.LastCommandId;
+
+        s.Act(Undo(deadline));
+
+        Assert.Equal(RejectionCodes.UndoDependents, s.Last.Rejection!.Code);
+        Assert.Equal([roll], s.Last.Rejection.Related);
+    }
+
+    [Fact]
+    public void Starting_the_season_cannot_be_undone_once_somebody_played()
+    {
+        var s = Scenario.New().AsDraft().WithCategory("Horror").WithGame("Silent Hill", 6, "Horror").WithPlayers("Вася");
+        s.Act(new ChangeSeasonStatus(SeasonStatus.Active));
+        var start = s.LastCommandId;
+        s.Roll("Вася");
+
+        s.Act(Undo(start));
+
+        Assert.Equal(RejectionCodes.UndoDependents, s.Last.Rejection!.Code);
+    }
+
+    [Fact]
+    public void A_deadline_that_has_passed_is_not_brought_back()
+    {
+        var s = Season();
+        s.Act(new SetSeasonDeadline(s.Clock.UtcNow + TimeSpan.FromHours(1)));
+        s.Act(new SetSeasonDeadline(s.Clock.UtcNow + TimeSpan.FromDays(5)));
+        var moved = s.LastCommandId;
+        s.Advance(TimeSpan.FromHours(2));
+
+        ScenarioAssert.RejectsWithoutChanges(s, x => x.Act(Undo(moved)), RejectionCodes.SeasonDeadlineInPast);
+    }
+
+    [Fact]
+    public void A_season_closed_at_its_deadline_stays_closed()
+    {
+        var s = Season();
+        s.Act(new SetSeasonDeadline(s.Clock.UtcNow + TimeSpan.FromHours(1)));
+        s.Advance(TimeSpan.FromHours(1));
+        s.Act(new ReachDeadline());
+        ScenarioAssert.Accepted(s);
+        var reached = s.LastCommandId;
+
+        ScenarioAssert.RejectsWithoutChanges(s, x => x.Act(Undo(reached)), RejectionCodes.SeasonDeadlinePassed);
+    }
+
+    [Fact]
+    public void An_early_close_is_not_undone_after_the_deadline()
+    {
+        var s = Season();
+        s.Act(new SetSeasonDeadline(s.Clock.UtcNow + TimeSpan.FromHours(1)));
+        s.Act(new ChangeSeasonStatus(SeasonStatus.Closing));
+        var close = s.LastCommandId;
+        s.Advance(TimeSpan.FromHours(2));
+
+        ScenarioAssert.RejectsWithoutChanges(s, x => x.Act(Undo(close)), RejectionCodes.SeasonDeadlinePassed);
+    }
+
+    [Fact]
+    public void Undoing_a_choice_is_refused_once_another_player_took_a_freed_game()
+    {
+        // Вася picks one of two; the other is free again and Петя's roll can take it
+        var s = Scenario.New().WithRuleset(r => r with { Roll = r.Roll with { ChoiceCount = 2 } }).WithCategory("Horror")
+            .WithGame("Silent Hill", 6, "Horror").WithGame("Alan Wake", 6, "Horror").WithPlayers("Вася", "Петя");
+        s.Roll("Вася");
+        var choice = s.Player("Вася").Choice!;
+        s.Act(new Engine.Turns.MakeChoice(s.PlayerId("Вася"), choice.ChoiceId, choice.Options[0].Id));
+        ScenarioAssert.Accepted(s);
+        var made = s.LastCommandId;
+        var freed = choice.Options[1].Game!.GameId;
+        s.Roll("Петя");
+        Assert.Equal(freed, s.Player("Петя").Offer!.GameId);
+        var roll = s.LastCommandId;
+
+        s.Act(Undo(made));
+
+        Assert.Equal(RejectionCodes.UndoDependents, s.Last.Rejection!.Code);
+        Assert.Equal([roll], s.Last.Rejection.Related);
+    }
+
+    [Fact]
+    public void A_witness_added_later_blocks_the_undo_of_their_arrival()
+    {
+        var s = Season();
+        var lyosha = SequentialIds.Make(0x50000000, 9);
+        s.Act(new AddSeasonPlayer(lyosha, SequentialIds.Make(0x51000000, 9), "Лёша"));
+        var added = s.LastCommandId;
+        s.Roll("Вася").Start("Вася").NextRandom(3, 4).Complete("Вася");
+        var runId = s.State.Runs.Values.Single().RunId;
+        s.Act(new Engine.Proofs.SubmitProof(s.PlayerId("Вася"), runId, [], null, lyosha));
+        ScenarioAssert.Accepted(s);
+        var proof = s.LastCommandId;
+
+        s.Act(Undo(added));
+
+        Assert.Contains(proof, s.Last.Rejection!.Related);
+    }
+
+    [Fact]
+    public void Undoing_an_approval_of_the_first_is_refused_once_the_first_was_frozen()
+    {
+        // The first finisher has two runs up to the finish; the second approval freezes him — the first approval cannot
+        // go back to «waiting» under a frozen first (Q-3)
+        var s = Scenario.New().WithRuleset(r => r with { Map = r.Map with { LinearLength = 4 } }).WithCategory("Horror")
+            .WithGame("Silent Hill", 6, "Horror").WithGame("Alan Wake", 6, "Horror").WithPlayers("Вася", "Петя");
+        s.Roll("Вася").Start("Вася").NextRandom(1, 1).Complete("Вася");
+        var first = s.State.Runs.Values.Single().RunId;
+        s.Roll("Вася").Start("Вася").NextRandom(4, 4).Complete("Вася");
+        var second = s.State.Runs.Values.Single(r => r.RunId != first).RunId;
+        Assert.NotNull(s.Player("Вася").Finish);
+        s.Act(new Engine.Proofs.ApproveProof(first, null, "Видел"));
+        ScenarioAssert.Accepted(s);
+        var approval = s.LastCommandId;
+        s.Act(new Engine.Proofs.ApproveProof(second, null, "Видел"));
+        ScenarioAssert.Accepted(s);
+        Assert.True(s.Player("Вася").Finish!.Frozen);
+        var freeze = s.LastCommandId;
+
+        s.Act(Undo(approval));
+
+        Assert.Equal(RejectionCodes.UndoDependents, s.Last.Rejection!.Code);
+        Assert.Equal([freeze], s.Last.Rejection.Related);
+    }
+
+    [Fact]
+    public void Without_the_history_an_undo_is_refused()
+    {
+        var s = Season();
+        var context = s.Context() with { History = null };
+
+        var result = SeasonEngine.Execute(s.State, Undo(Guid.NewGuid()), context);
+
+        Assert.Equal(RejectionCodes.UndoNoHistory, result.Rejection!.Code);
+    }
+
     // ---- Refusals ----
 
     [Fact]
@@ -321,8 +466,12 @@ public class UndoTests
         var missed = Guid.NewGuid();
         var rolled = new GameRolled(Guid.NewGuid(), "Horror", [new RollMiss(missed, RollMissReason.CompletedInSeason, Guid.NewGuid())], game, null!, DateTimeOffset.UnixEpoch);
 
-        Assert.Equal(new[] { missed, game }.Order(), GameIds.Of(rolled).Order());
-        Assert.Equal([game], GameIds.Of(new GameRerolled(Guid.NewGuid(), [game], RerollPayment.FreeThisRoll)));
+        Assert.Equal(new[] { ("game", missed), ("game", game) }.Order(), GameIds.Of(rolled).Order());
+        Assert.Equal([("game", game)], GameIds.Of(new GameRerolled(Guid.NewGuid(), [game], RerollPayment.FreeThisRoll)));
+
+        var witness = Guid.NewGuid();
+        var proof = new Engine.Proofs.ProofSubmitted(Guid.NewGuid(), Guid.NewGuid(), [], null, witness, DateTimeOffset.UnixEpoch);
+        Assert.Equal([("player", witness)], GameIds.Of(proof));
     }
 
     // Invariant 13: an undo without dependents leaves the season as if the command had never been — the same as the log
@@ -333,17 +482,33 @@ public class UndoTests
     {
         var s = Season();
         string[] names = ["Вася", "Петя", "Маша"];
-        foreach (var b in script.Take(40))
+        foreach (var b in script.Take(60))
         {
             var player = s.PlayerId(names[b % 3]);
-            ICommand command = (b / 3 % 7) switch
+            var completed = s.State.Runs.Values.Where(r => r.Status == RunStatus.Completed).ToList();
+            var run = completed.Count == 0 ? Guid.NewGuid() : completed[b % completed.Count].RunId;
+            ICommand command = (b / 3 % 14) switch
             {
-                0 => new RollGame(player),
-                1 => new StartRun(player),
-                2 => new CompleteRun(player, Difficulty.Normal),
-                3 => new AdjustPlayer(player, "Бонус", PointsDelta: (b % 5) - 2, CoinsDelta: b % 2),
+                0 or 7 => new RollGame(player),
+                1 or 8 => new StartRun(player),
+                2 or 9 => new CompleteRun(player, Difficulty.Normal),
+                3 => new AdjustPlayer(player, "Бонус", PointsDelta: (b % 5) - 2, CoinsDelta: b % 2, DiscardOffer: b % 4 == 3),
                 4 => new DropRun(player),
                 5 => new SetPlayerInactive(player, b % 2 == 0),
+                10 => new Reroll(player),
+                11 => (b % 4) switch
+                {
+                    0 => new Engine.Proofs.SubmitProof(player, run, ["https://imgur.com/a/credits"]),
+                    1 => new Engine.Proofs.ApproveProof(run, null, "Видел"),
+                    2 => new Engine.Proofs.RejectProof(run, "Нет пруфа"),
+                    _ => new CorrectRunHours(run, 3 + (b % 9), "Часы по пруфу"),
+                },
+                12 => (b % 3) switch
+                {
+                    0 => new SetSeasonDeadline(s.Clock.UtcNow + TimeSpan.FromDays(1 + (b % 5))),
+                    1 => new ChangeSeasonStatus(SeasonStatus.Closing),
+                    _ => new AdjustPlayer(player, "Переход", CellId: "c3"),
+                },
                 _ => Undo(s.History[b % s.History.Count].CommandId),
             };
             var before = s.State;
@@ -371,6 +536,7 @@ public class UndoTests
                 continue;
             }
 
+            CheckRules(s.State);
             var skipped = new HashSet<Guid>(Undoing.UndoneCommands(s.History));
             var expected = SeasonEngine.Replay(s.History
                 .Where(c => !skipped.Contains(c.CommandId) && !c.Events.Any(e => e is CommandUndone))
@@ -379,5 +545,35 @@ public class UndoTests
         }
 
         Assert.Equal(s.State, SeasonEngine.Replay(s.Log));
+    }
+
+    // What the rules forbid, checked on the state an undo leaves (reviews of C12a: a later command may have decided on
+    // what the undone one changed)
+    private static void CheckRules(SeasonState state)
+    {
+        // A game is held by one player at a time: offered, among the options of a choice, or played (D-06, G9)
+        var held = state.Players.Values
+            .SelectMany(p => new[] { p.Offer?.GameId }.Concat(p.Choice?.Options.Select(o => o.Game?.GameId) ?? []))
+            .Concat(state.Runs.Values.Where(r => r.Status == RunStatus.Playing).Select(r => (Guid?)r.GameId))
+            .OfType<Guid>()
+            .ToList();
+        Assert.Equal(held.Count, held.Distinct().Count());
+
+        // Nothing is played in a draft
+        Assert.True(state.Status != SeasonStatus.Draft || state.Runs.Count == 0, "Runs in a draft.");
+
+        // The phase follows the active run
+        foreach (var p in state.Players.Values)
+        {
+            Assert.Equal(p.Phase == TurnPhase.Playing, p.ActiveRunId is { } active && state.Runs[active].Status == RunStatus.Playing);
+        }
+
+        // A frozen first has every run up to the finish approved (Q-3)
+        foreach (var p in state.Players.Values.Where(p => p.Finish?.Frozen == true && state.Rules.Finish.RequireApprovalForFirst))
+        {
+            Assert.All(
+                state.Runs.Values.Where(r => r.PlayerId == p.PlayerId && r.Status == RunStatus.Completed && !r.AfterFinish),
+                r => Assert.Equal(Engine.Proofs.ProofStatus.Approved, r.Proof?.Status));
+        }
     }
 }

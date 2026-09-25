@@ -56,7 +56,7 @@ public static class AdminSeasonEndpoints
                 {
                     ["targetCommandId"] = ["The command to undo is required."],
                 }))
-                : request.Comment is null || request.Comment.Length > SeasonEndpoints.MaxCommentLength
+                : string.IsNullOrWhiteSpace(request.Comment) || request.Comment.Length > SeasonEndpoints.MaxCommentLength
                     ? Task.FromResult<ActionResult>(TypedResults.ValidationProblem(new Dictionary<string, string[]>
                     {
                         ["comment"] = [$"A comment of at most {SeasonEndpoints.MaxCommentLength} characters is required."],
