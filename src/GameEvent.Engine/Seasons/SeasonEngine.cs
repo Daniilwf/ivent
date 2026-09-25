@@ -63,7 +63,17 @@ public static class SeasonEngine
             _ => throw new ArgumentException($"Unknown command {command.GetType().Name}.", nameof(command)),
         };
 
-        return new CommandResult(decision, decision.Events.Aggregate(state, Apply));
+        if (!decision.IsAccepted)
+        {
+            return new CommandResult(decision, state);
+        }
+
+        // Effects react after the command's own events, within the chain limits (D-24, D-103).
+        var after = decision.Events.Aggregate(state, Apply);
+        var (reactions, final) = EffectChain.Run(after, decision.Events, context);
+        return reactions.Count == 0
+            ? new CommandResult(decision, after)
+            : new CommandResult(Decision.Accept([.. decision.Events, .. reactions]), final);
     }
 
     public static SeasonState Apply(SeasonState state, IGameEvent gameEvent) =>
@@ -106,6 +116,7 @@ public static class SeasonEngine
             TechRerollConvertedToDrop e => Drops.Apply(state, e),
             PointsChanged e => PointsLedger.Apply(state, e),
             PlayerMoved e => Movement.Apply(state, e),
+            EffectChainCut e => EffectChain.Apply(state, e),
             _ => throw new ArgumentException($"Unknown event {gameEvent.GetType().Name}.", nameof(gameEvent)),
         };
 

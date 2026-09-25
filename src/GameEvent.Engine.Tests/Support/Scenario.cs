@@ -272,7 +272,16 @@ public sealed class Scenario
     public IEnumerable<T> LastEvents<T>() where T : IGameEvent => Last.Events.OfType<T>();
 
     public EngineContext Context() =>
-        new(Clock, Random, Ids, new PoolSnapshot([.. _games], [.. _categories]));
+        new(Clock, Random, Ids, new PoolSnapshot([.. _games], [.. _categories]), _triggers);
+
+    private IReadOnlyList<Engine.Effects.ITriggerHandler> _triggers = [];
+
+    /// <summary>Test trigger handlers that react to every later command (D-24: stage 1 checks the chain limits with them).</summary>
+    public Scenario WithTriggers(params Engine.Effects.ITriggerHandler[] handlers)
+    {
+        _triggers = handlers;
+        return this;
+    }
 
     private Scenario Play(ICommand command)
     {
