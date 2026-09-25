@@ -15,7 +15,7 @@ namespace GameEvent.Web.Tests.SeasonTransfer;
 /// <summary>
 /// The integrity check and the season archive (C12b, L4, L5, D-32, D-105): <c>GET /api/admin/seasons/{id}/integrity</c>
 /// compares the log's state with the stored one; <c>GET /api/admin/seasons/{id}/export</c> gives the archive that
-/// <see cref="Infrastructure.Seasons.SeasonTransfer.ImportAsync"/> loads into another database.
+/// <c>SeasonTransfer.ImportAsync</c> loads into another database.
 /// </summary>
 public sealed class SeasonTransferTests : IAsyncLifetime
 {
@@ -121,7 +121,7 @@ public sealed class SeasonTransferTests : IAsyncLifetime
         var archive = await ExportAsync();
 
         await using var other = OpenOther();
-        var result = await Infrastructure.Seasons.SeasonTransfer.ImportAsync(other, archive, _site.Clock.UtcNow, Ct);
+        var result = await Infrastructure.Seasons.SeasonTransfer.ImportAsync(other, archive, _site.Clock.UtcNow, ct: Ct);
 
         Assert.True(result.Integrity.IsIntact);
         Assert.Equal(archive.Events.Count, result.Events);
@@ -157,7 +157,7 @@ public sealed class SeasonTransferTests : IAsyncLifetime
         other.Users.Add(localVasya);
         await other.SaveChangesAsync(Ct);
 
-        var result = await Infrastructure.Seasons.SeasonTransfer.ImportAsync(other, archive, _site.Clock.UtcNow, Ct);
+        var result = await Infrastructure.Seasons.SeasonTransfer.ImportAsync(other, archive, _site.Clock.UtcNow, ct: Ct);
 
         Assert.DoesNotContain("vasya", result.CreatedUsers);
         Assert.Contains(await other.SeasonPlayers.Select(p => p.UserId).ToListAsync(Ct), id => id == localVasya.Id);
@@ -173,9 +173,9 @@ public sealed class SeasonTransferTests : IAsyncLifetime
         await PlayAsync();
         var archive = await ExportAsync();
         await using var other = OpenOther();
-        await Infrastructure.Seasons.SeasonTransfer.ImportAsync(other, archive, _site.Clock.UtcNow, Ct);
+        await Infrastructure.Seasons.SeasonTransfer.ImportAsync(other, archive, _site.Clock.UtcNow, ct: Ct);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => Infrastructure.Seasons.SeasonTransfer.ImportAsync(other, archive, _site.Clock.UtcNow, Ct));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => Infrastructure.Seasons.SeasonTransfer.ImportAsync(other, archive, _site.Clock.UtcNow, ct: Ct));
     }
 
     [Fact]
@@ -186,7 +186,7 @@ public sealed class SeasonTransferTests : IAsyncLifetime
         var broken = archive with { Events = [.. archive.Events.Skip(1)] };
         await using var other = OpenOther();
 
-        await Assert.ThrowsAnyAsync<Exception>(() => Infrastructure.Seasons.SeasonTransfer.ImportAsync(other, broken, _site.Clock.UtcNow, Ct));
+        await Assert.ThrowsAnyAsync<Exception>(() => Infrastructure.Seasons.SeasonTransfer.ImportAsync(other, broken, _site.Clock.UtcNow, ct: Ct));
 
         await using var after = OpenOther();
         Assert.Empty(await after.Events.ToListAsync(Ct));
@@ -221,6 +221,226 @@ public sealed class SeasonTransferTests : IAsyncLifetime
         await using var db = _site.NewDb();
         Assert.Equal(await db.Events.CountAsync(e => e.SeasonId == SiteFactory.SeasonId, Ct), archive.Events.Count);
         Assert.Contains(archive.Users, u => u.Login == "vasya");
+    }
+
+    // ---- After the reviews of C12b ----
+
+    [Fact]
+    public async Task Accounts_in_undo_snapshots_are_this_databases_accounts()
+    {
+        await PlayAsync();
+        var archive = await ExportAsync();
+        await using var other = OpenOther();
+
+        await Infrastructure.Seasons.SeasonTransfer.ImportAsync(other, archive, _site.Clock.UtcNow, ct: Ct);
+
+        var local = (await other.Users.Select(u => u.Id).ToListAsync(Ct)).ToHashSet();
+        var undos = (await EventLogReader.ReadSeasonAsync(other, SiteFactory.SeasonId, Ct)).OfType<Engine.Undo.CommandUndone>().ToList();
+        Assert.NotEmpty(undos);
+        Assert.All(undos.SelectMany(u => u.Players), p => Assert.Contains(p.UserId, local));
+        Assert.All(await other.Events.Where(e => e.AuthorId != null).Select(e => e.AuthorId!.Value).ToListAsync(Ct), id => Assert.Contains(id, local));
+    }
+
+    [Fact]
+    public async Task The_log_is_copied_as_stored_except_the_events_naming_accounts()
+    {
+        await PlayAsync();
+        var archive = await ExportAsync();
+        await using var other = OpenOther();
+
+        await Infrastructure.Seasons.SeasonTransfer.ImportAsync(other, archive, _site.Clock.UtcNow, ct: Ct);
+
+        var copied = await other.Events.Where(e => e.SeasonId == SiteFactory.SeasonId).OrderBy(e => e.Sequence).ToListAsync(Ct);
+        foreach (var (original, copy) in archive.Events.Zip(copied))
+        {
+            Assert.Equal((original.Sequence, original.CommandId, original.CommandType, original.Type, original.OccurredAt), (copy.Sequence, copy.CommandId, copy.CommandType, copy.Type, copy.OccurredAt));
+            if (original.Type is not ("season-player-added" or "command-undone"))
+            {
+                Assert.Equal((original.Version, original.Data), (copy.Version, copy.Data));
+            }
+        }
+    }
+
+    [Fact]
+    public async Task A_projection_that_disagrees_with_the_log_refuses_the_import()
+    {
+        await PlayAsync();
+        var archive = await ExportAsync();
+        await using var other = OpenOther();
+
+        await Assert.ThrowsAsync<InvalidDataException>(() => Infrastructure.Seasons.SeasonTransfer.ImportAsync(
+            other, archive, _site.Clock.UtcNow, new ImportOptions(), async db =>
+            {
+                var player = await db.SeasonPlayers.FirstAsync(Ct);
+                player.Points += 5;
+                await db.SaveChangesAsync(Ct);
+            },
+            Ct));
+
+        await using var after = OpenOther();
+        Assert.Empty(await after.Events.ToListAsync(Ct));
+        Assert.Empty(await after.SeasonPlayers.ToListAsync(Ct));
+    }
+
+    [Fact]
+    public async Task A_finished_season_travels_with_its_result_and_a_spoiled_result_is_found()
+    {
+        await PlayAsync();
+        var admin = await _site.SignedInAsync("admin");
+        await using (var db = _site.NewDb())
+        {
+            foreach (var run in await db.Runs.Where(r => r.Status == Engine.Runs.RunStatus.Completed).ToListAsync(Ct))
+            {
+                await PostOkAsync(admin, AdminUrl($"runs/{run.Id}/approve"), new { commandId = Guid.NewGuid(), comment = "Видел" });
+            }
+        }
+
+        await PostOkAsync(admin, AdminUrl("status"), new { commandId = Guid.NewGuid(), to = "closing" });
+        await PostOkAsync(admin, AdminUrl("status"), new { commandId = Guid.NewGuid(), to = "finished" });
+        var archive = await ExportAsync();
+        await using var other = OpenOther();
+
+        var result = await Infrastructure.Seasons.SeasonTransfer.ImportAsync(other, archive, _site.Clock.UtcNow, ct: Ct);
+
+        Assert.True(result.Integrity.IsIntact);
+        Assert.NotEmpty(await other.SeasonResults.ToListAsync(Ct));
+        var row = await other.SeasonResults.FirstAsync(Ct);
+        row.Points += 10;
+        await other.SaveChangesAsync(Ct);
+        var report = await SeasonIntegrity.CheckAsync(other, SiteFactory.SeasonId, Ct);
+        Assert.Contains("season.result", report!.Differences);
+    }
+
+    [Fact]
+    public async Task A_missing_ruleset_version_row_is_found()
+    {
+        await PlayAsync();
+        await using (var db = _site.NewDb())
+        {
+            await db.Rulesets.Where(r => r.SeasonId == SiteFactory.SeasonId).ExecuteDeleteAsync(Ct);
+        }
+
+        await using var check = _site.NewDb();
+        var report = await SeasonIntegrity.CheckAsync(check, SiteFactory.SeasonId, Ct);
+
+        Assert.Contains("ruleset v1: in the log, not stored", report!.Differences);
+    }
+
+    public static TheoryData<string> BrokenArchives() => ["notFirst", "gap", "sameLogin", "danglingUndo", "badTags", "unlistedAccount", "noEvents"];
+
+    [Theory]
+    [MemberData(nameof(BrokenArchives))]
+    public async Task An_inconsistent_archive_is_refused_before_anything_is_written(string kind)
+    {
+        await PlayAsync();
+        var archive = await ExportAsync();
+        var events = archive.Events.ToList();
+        SeasonArchive broken = kind switch
+        {
+            "notFirst" => archive with { Events = [.. events.Skip(1).Select((e, i) => e with { Sequence = i + 1, UndoneBySequence = null })] },
+            "gap" => archive with { Events = [.. events.Take(2), .. events.Skip(3)] },
+            "sameLogin" => archive with { Users = [.. archive.Users, archive.Users[0] with { Id = Guid.NewGuid(), Login = archive.Users[0].Login.ToUpperInvariant() }] },
+            "danglingUndo" => archive with { Events = [.. events.Select(e => e with { UndoneBySequence = e.Sequence == 2 ? 999 : e.UndoneBySequence })] },
+            "badTags" => archive with { Games = [.. archive.Games.Select((g, i) => i == 0 ? g with { TagsJson = "{" } : g)] },
+            "unlistedAccount" => archive with { Users = [] },
+            _ => archive with { Events = [] },
+        };
+        await using var other = OpenOther();
+
+        await Assert.ThrowsAsync<InvalidDataException>(() => Infrastructure.Seasons.SeasonTransfer.ImportAsync(other, broken, _site.Clock.UtcNow, ct: Ct));
+
+        await using var after = OpenOther();
+        Assert.Empty(await after.Events.ToListAsync(Ct));
+        Assert.Empty(await after.Users.ToListAsync(Ct));
+    }
+
+    [Fact]
+    public async Task A_matched_account_with_another_role_is_refused_unless_allowed()
+    {
+        await PlayAsync();
+        var archive = await ExportAsync();
+        await using var other = OpenOther();
+        other.Users.Add(new UserRecord
+        {
+            Id = Guid.NewGuid(),
+            Login = "vasya",
+            NormalizedLogin = "vasya",
+            Name = "Вася-админ",
+            PasswordHash = "x",
+            SecurityStamp = "x",
+            Role = Role.Admin,
+            CreatedAt = _site.Clock.UtcNow,
+        });
+        await other.SaveChangesAsync(Ct);
+
+        await Assert.ThrowsAsync<InvalidDataException>(() => Infrastructure.Seasons.SeasonTransfer.ImportAsync(other, archive, _site.Clock.UtcNow, ct: Ct));
+
+        var result = await Infrastructure.Seasons.SeasonTransfer.ImportAsync(other, archive, _site.Clock.UtcNow, new ImportOptions(AllowRoleMismatch: true), Ct);
+        Assert.Contains(result.MatchedUsers, m => m is { Login: "vasya", LocalRole: Role.Admin, ArchiveRole: Role.Player });
+    }
+
+    [Fact]
+    public async Task Placeholders_are_deleted_spectators_even_for_an_admin_of_the_archive()
+    {
+        await PlayAsync();
+        var archive = await ExportAsync();
+        Assert.Contains(archive.Users, u => u.Role == Role.Admin);
+        await using var other = OpenOther();
+
+        var result = await Infrastructure.Seasons.SeasonTransfer.ImportAsync(other, archive, _site.Clock.UtcNow, ct: Ct);
+
+        var placeholders = await other.Users.Where(u => result.CreatedUsers.Contains(u.Login)).ToListAsync(Ct);
+        Assert.Equal(archive.Users.Count, placeholders.Count);
+        Assert.All(placeholders, u => Assert.Equal((Role.Spectator, true), (u.Role, u.IsDeleted)));
+    }
+
+    [Fact]
+    public async Task The_live_pool_changes_only_when_asked()
+    {
+        await PlayAsync();
+        var archive = await ExportAsync();
+
+        await using (var quiet = OpenOther())
+        {
+            await Infrastructure.Seasons.SeasonTransfer.ImportAsync(quiet, archive, _site.Clock.UtcNow, ct: Ct);
+            Assert.All(await quiet.Games.ToListAsync(Ct), g => Assert.True(g.IsDeleted));
+            Assert.Empty(await quiet.Categories.ToListAsync(Ct));
+        }
+
+        var second = Path.Combine(_otherDirectory, "second.db");
+        var connection = $"Data Source={second};Pooling=False";
+        await SqliteDatabase.MigrateAsync(connection, Ct);
+        var options = new DbContextOptionsBuilder<GameEventDbContext>();
+        SqliteDatabase.Configure(options, connection);
+        await using var withPool = new GameEventDbContext(options.Options);
+        await Infrastructure.Seasons.SeasonTransfer.ImportAsync(withPool, archive, _site.Clock.UtcNow, new ImportOptions(WithPool: true), Ct);
+        Assert.Contains(await withPool.Games.ToListAsync(Ct), g => !g.IsDeleted);
+        Assert.Equal(archive.Categories.Count, await withPool.Categories.CountAsync(Ct));
+    }
+
+    [Fact]
+    public async Task A_placeholder_account_fails_to_sign_in_cleanly()
+    {
+        await using (var db = _site.NewDb())
+        {
+            db.Users.Add(new UserRecord
+            {
+                Id = Guid.NewGuid(),
+                Login = "ghost",
+                NormalizedLogin = "ghost",
+                Name = "Призрак",
+                PasswordHash = Infrastructure.Seasons.SeasonTransfer.PlaceholderHashPrefix + "00",
+                SecurityStamp = "x",
+                Role = Role.Spectator,
+                CreatedAt = _site.Clock.UtcNow,
+            });
+            await db.SaveChangesAsync(Ct);
+        }
+
+        var client = await _site.AnonymousAsync();
+        var response = await client.PostAsJsonAsync("/api/auth/login", new { login = "ghost", password = "anything" }, Ct);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
     // ---- Roles ----

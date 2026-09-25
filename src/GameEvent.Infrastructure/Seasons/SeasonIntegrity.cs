@@ -7,8 +7,11 @@ using Microsoft.EntityFrameworkCore;
 
 namespace GameEvent.Infrastructure.Seasons;
 
-/// <summary>The result of an integrity check: the log's last event and what the stored state has that the log does not.</summary>
-public sealed record IntegrityReport(Guid SeasonId, long LastSequence, IReadOnlyList<string> Differences)
+/// <summary>
+/// The result of an integrity check: the log's last event, what the stored state has that the log does not, and whether
+/// the log stood still while it was read (<see cref="Settled"/> false: commands kept coming — check again).
+/// </summary>
+public sealed record IntegrityReport(Guid SeasonId, long LastSequence, IReadOnlyList<string> Differences, bool Settled = true)
 {
     public bool IsIntact => Differences.Count == 0;
 }
@@ -34,10 +37,11 @@ public static class SeasonIntegrity
             }
 
             var stored = await SeasonProjection.ReadAsync(db, replayed, ct);
+            var differences = Differences(replayed, stored).Concat(await RulesetHistoryDifferencesAsync(db, seasonId, ct)).ToList();
             var lastAfter = await db.Events.AsNoTracking().Where(e => e.SeasonId == seasonId).MaxAsync(e => e.Sequence, ct);
             if (lastAfter == last || attempt == Attempts)
             {
-                return new IntegrityReport(seasonId, last, Differences(replayed, stored));
+                return new IntegrityReport(seasonId, last, differences, Settled: lastAfter == last);
             }
         }
     }
@@ -62,6 +66,28 @@ public static class SeasonIntegrity
         return differences;
     }
 
+    // Every version of the rules the log went through is a stored row with those rules (D-82, D-104).
+    private static async Task<IEnumerable<string>> RulesetHistoryDifferencesAsync(GameEventDbContext db, Guid seasonId, CancellationToken ct)
+    {
+        var expected = new SortedDictionary<int, Engine.Rulesets.Ruleset>();
+        var state = SeasonState.Empty;
+        foreach (var e in await EventLogReader.ReadSeasonAsync(db, seasonId, ct))
+        {
+            var version = state.RulesetVersion;
+            state = SeasonEngine.Apply(state, e);
+            if (state.RulesetVersion != version && state.Ruleset is { } rules)
+            {
+                expected[state.RulesetVersion] = rules;
+            }
+        }
+
+        var rows = await db.Rulesets.AsNoTracking().Where(r => r.SeasonId == seasonId).ToListAsync(ct);
+        var stored = rows.ToDictionary(r => r.Version, r => System.Text.Json.JsonSerializer.Deserialize<Engine.Rulesets.Ruleset>(r.Json, Engine.Kernel.EngineJson.Options));
+        return expected.Keys.Union(stored.Keys).Order()
+            .Where(v => !(expected.TryGetValue(v, out var a) && stored.TryGetValue(v, out var b) && a == b))
+            .Select(v => $"ruleset v{v}: {(expected.ContainsKey(v) ? stored.ContainsKey(v) ? "differs" : "in the log, not stored" : "stored, not in the log")}");
+    }
+
     private static void Compare<T>(
         string kind, IReadOnlyDictionary<Guid, T> fromLog, IReadOnlyDictionary<Guid, T> stored, List<string> differences)
         where T : notnull
@@ -81,7 +107,8 @@ public static class SeasonIntegrity
                 var fields = typeof(T).GetProperties(BindingFlags.Public | BindingFlags.Instance)
                     .Where(p => p.GetIndexParameters().Length == 0 && !SameValue(p.GetValue(l), p.GetValue(s)))
                     .Select(p => Camel(p.Name));
-                differences.Add($"{kind} {id}: {string.Join(", ", fields)}");
+                var list = string.Join(", ", fields);
+                differences.Add($"{kind} {id}: {(list.Length == 0 ? "differs" : list)}");
             }
         }
     }

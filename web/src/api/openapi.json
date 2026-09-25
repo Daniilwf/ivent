@@ -3684,11 +3684,15 @@
               "type": "string"
             }
           },
+          "settled": {
+            "type": "boolean",
+            "default": true
+          },
           "isIntact": {
             "type": "boolean"
           }
         },
-        "description": "The result of an integrity check: the log's last event and what the stored state has that the log does not."
+        "description": "The result of an integrity check: the log's last event, what the stored state has that the log does not, and whether\nthe log stood still while it was read (bool IntegrityReport.Settled false: commands kept coming — check again)."
       },
       "InteractionRules": {
         "required": [

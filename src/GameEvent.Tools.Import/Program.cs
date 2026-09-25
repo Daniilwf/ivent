@@ -1,21 +1,31 @@
+using System.Text.Json;
 using GameEvent.Infrastructure.Database;
 using GameEvent.Infrastructure.Seasons;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
-// Project tools (package.json): season export and import (C12b, D-105); the xlsx import comes with task F1.
+// Project tools (package.json): season export, import and the integrity check (C12b, D-105); xlsx comes with task F1.
 //   season-export <season id> <archive.zip> [--db <path>]
-//   season-import <archive.zip> [--db <path>]
-// The database defaults to the development one (var/dev.db) or GAMEEVENT_DB.
+//   season-import <archive.zip> [--db <path>] [--allow-role-mismatch] [--with-pool]
+//   season-check <season id> [--db <path>]
+// The database defaults to the development one (var/dev.db) or GAMEEVENT_DB. Never point an import at production.
 var arguments = args.ToList();
+var allowRoleMismatch = arguments.Remove("--allow-role-mismatch");
+var withPool = arguments.Remove("--with-pool");
 var dbIndex = arguments.IndexOf("--db");
-var dbPath = dbIndex >= 0 && dbIndex + 1 < arguments.Count ? arguments[dbIndex + 1] : Environment.GetEnvironmentVariable("GAMEEVENT_DB")
-    ?? Path.Combine("var", "dev.db");
-if (dbIndex >= 0)
+if (dbIndex >= 0 && dbIndex + 1 >= arguments.Count)
 {
-    arguments.RemoveRange(dbIndex, Math.Min(2, arguments.Count - dbIndex));
+    Console.Error.WriteLine("--db needs a path.");
+    return 2;
 }
 
-var connectionString = $"Data Source={Path.GetFullPath(dbPath)}";
+var dbPath = Path.GetFullPath(dbIndex >= 0 ? arguments[dbIndex + 1] : Environment.GetEnvironmentVariable("GAMEEVENT_DB") ?? Path.Combine("var", "dev.db"));
+if (dbIndex >= 0)
+{
+    arguments.RemoveRange(dbIndex, 2);
+}
+
+var connectionString = new SqliteConnectionStringBuilder { DataSource = dbPath }.ToString();
 using var cancel = new CancellationTokenSource();
 Console.CancelKeyPress += (_, e) =>
 {
@@ -23,62 +33,94 @@ Console.CancelKeyPress += (_, e) =>
     cancel.Cancel();
 };
 
-switch (arguments.FirstOrDefault())
+try
 {
-    case "season-export" when arguments.Count == 3 && Guid.TryParse(arguments[1], out var seasonId):
-        {
-            await using var db = Open(connectionString);
-            var archive = await SeasonTransfer.ExportAsync(db, seasonId, DateTimeOffset.UtcNow, cancel.Token);
-            if (archive is null)
+    switch (arguments.FirstOrDefault())
+    {
+        case "season-export" when arguments.Count == 3 && Guid.TryParse(arguments[1], out var seasonId):
             {
-                Console.Error.WriteLine($"Season {seasonId} is not in {dbPath}.");
-                return 1;
+                await using var db = Open(connectionString);
+                var archive = await SeasonTransfer.ExportAsync(db, seasonId, DateTimeOffset.UtcNow, cancel.Token);
+                if (archive is null)
+                {
+                    Console.Error.WriteLine($"Season {seasonId} is not in {dbPath}.");
+                    return 1;
+                }
+
+                await using (var file = File.Create(arguments[2]))
+                {
+                    await SeasonTransfer.WriteZipAsync(archive, file, cancel.Token);
+                }
+
+                Console.WriteLine($"Season «{archive.Name}»: {archive.Events.Count} events → {arguments[2]}. The archive holds logins and the log: keep it private.");
+                return 0;
             }
 
-            await using (var file = File.Create(arguments[2]))
+        case "season-import" when arguments.Count == 2:
             {
-                await SeasonTransfer.WriteZipAsync(archive, file, cancel.Token);
-            }
+                SeasonArchive archive;
+                await using (var file = File.OpenRead(arguments[1]))
+                {
+                    archive = await SeasonTransfer.ReadZipAsync(file, cancel.Token);
+                }
 
-            Console.WriteLine($"Season «{archive.Name}»: {archive.Events.Count} events → {arguments[2]}");
-            return 0;
-        }
+                // A new database gets its tables; an existing one is imported into as it is.
+                if (!File.Exists(dbPath))
+                {
+                    await SqliteDatabase.MigrateAsync(connectionString);
+                }
 
-    case "season-import" when arguments.Count == 2:
-        {
-            await SqliteDatabase.MigrateAsync(connectionString);
-            await using var db = Open(connectionString);
-            SeasonArchive archive;
-            await using (var file = File.OpenRead(arguments[1]))
-            {
-                archive = await SeasonTransfer.ReadZipAsync(file, cancel.Token);
-            }
-
-            try
-            {
-                var result = await SeasonTransfer.ImportAsync(db, archive, DateTimeOffset.UtcNow, cancel.Token);
+                await using var db = Open(connectionString);
+                var result = await SeasonTransfer.ImportAsync(db, archive, DateTimeOffset.UtcNow, new ImportOptions(allowRoleMismatch, withPool), cancel.Token);
                 Console.WriteLine($"Season «{archive.Name}» ({result.SeasonId}): {result.Events} events, integrity ok.");
+                foreach (var user in result.MatchedUsers)
+                {
+                    Console.WriteLine($"Matched account {user.Login}: {user.LocalRole} here, {user.ArchiveRole} in the archive.");
+                }
+
                 if (result.CreatedUsers.Count > 0)
                 {
-                    Console.WriteLine($"Placeholder accounts (deleted, no password): {string.Join(", ", result.CreatedUsers)}");
+                    Console.WriteLine($"Placeholder accounts (deleted spectators, no usable password): {string.Join(", ", result.CreatedUsers)}");
                 }
 
                 return 0;
             }
-            catch (Exception e) when (e is InvalidOperationException or InvalidDataException)
+
+        case "season-check" when arguments.Count == 2 && Guid.TryParse(arguments[1], out var seasonId):
             {
-                Console.Error.WriteLine(e.Message);
-                return 1;
+                await using var db = Open(connectionString);
+                var report = await SeasonIntegrity.CheckAsync(db, seasonId, cancel.Token);
+                if (report is null)
+                {
+                    Console.Error.WriteLine($"Season {seasonId} is not in {dbPath}.");
+                    return 1;
+                }
+
+                Console.WriteLine(report.IsIntact
+                    ? $"Season {seasonId}: intact up to event {report.LastSequence}."
+                    : $"Season {seasonId}: {report.Differences.Count} difference(s) up to event {report.LastSequence}{(report.Settled ? "" : " (the log kept moving: check again)")}:");
+                foreach (var difference in report.Differences)
+                {
+                    Console.WriteLine("  " + difference);
+                }
+
+                return report.IsIntact ? 0 : 3;
             }
-        }
 
-    case "xlsx":
-        Console.Error.WriteLine("xlsx import is implemented in task F1.");
-        return 1;
+        case "xlsx":
+            Console.Error.WriteLine("xlsx import is implemented in task F1.");
+            return 1;
 
-    default:
-        Console.Error.WriteLine("Usage: season-export <season id> <archive.zip> [--db <path>] | season-import <archive.zip> [--db <path>]");
-        return 2;
+        default:
+            Console.Error.WriteLine(
+                "Usage: season-export <season id> <archive.zip> | season-import <archive.zip> [--allow-role-mismatch] [--with-pool] | season-check <season id>; each takes [--db <path>]");
+            return 2;
+    }
+}
+catch (Exception e) when (e is InvalidDataException or InvalidOperationException or JsonException or IOException or DbUpdateException or SqliteException)
+{
+    Console.Error.WriteLine(e.Message);
+    return 1;
 }
 
 static GameEventDbContext Open(string connectionString)

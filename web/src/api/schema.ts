@@ -2943,13 +2943,18 @@ export interface components {
                 [key: string]: string[];
             };
         };
-        /** @description The result of an integrity check: the log's last event and what the stored state has that the log does not. */
+        /**
+         * @description The result of an integrity check: the log's last event, what the stored state has that the log does not, and whether
+         *     the log stood still while it was read (bool IntegrityReport.Settled false: commands kept coming — check again).
+         */
         IntegrityReport: {
             /** Format: uuid */
             seasonId: string;
             /** Format: int64 */
             lastSequence: number;
             differences: string[];
+            /** @default true */
+            settled: boolean;
             isIntact?: boolean;
         };
         InteractionRules: {
