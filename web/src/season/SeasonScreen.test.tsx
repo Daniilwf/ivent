@@ -35,7 +35,15 @@ function leaderboardOf(players: Schemas['PlayerView'][]): Schemas['LeaderboardRo
 
 function season(overrides: Partial<Schemas['SeasonView']> = {}): Schemas['SeasonView'] {
   const players = overrides.players ?? [
-    { id: me, name: 'Вася', cellId: 'start', points: 0, phase: 'idle', finishOrder: null },
+    {
+      id: me,
+      name: 'Вася',
+      cellId: 'start',
+      points: 0,
+      phase: 'idle',
+      finishOrder: null,
+      avatar: null,
+    },
   ];
   return {
     id: seasonId,
@@ -153,7 +161,15 @@ describe('SeasonScreen', () => {
     current = season({
       lastSequence: 7,
       players: [
-        { id: me, name: 'Вася', cellId: 'c1', points: 4, phase: 'idle', finishOrder: null },
+        {
+          id: me,
+          name: 'Вася',
+          cellId: 'c1',
+          points: 4,
+          phase: 'idle',
+          finishOrder: null,
+          avatar: null,
+        },
       ],
     });
     act(() => {
@@ -170,7 +186,15 @@ describe('SeasonScreen', () => {
     let current = season({
       lastSequence: 9,
       players: [
-        { id: me, name: 'Вася', cellId: 'c1', points: 4, phase: 'idle', finishOrder: null },
+        {
+          id: me,
+          name: 'Вася',
+          cellId: 'c1',
+          points: 4,
+          phase: 'idle',
+          finishOrder: null,
+          avatar: null,
+        },
       ],
     });
     serve((r) => (isSeasonGet(r) ? json(200, current) : json(404, {})));
@@ -282,7 +306,15 @@ describe('SeasonScreen', () => {
     const playing = season({
       lastSequence: 5,
       players: [
-        { id: me, name: 'Вася', cellId: 'start', points: 0, phase: 'playing', finishOrder: null },
+        {
+          id: me,
+          name: 'Вася',
+          cellId: 'start',
+          points: 0,
+          phase: 'playing',
+          finishOrder: null,
+          avatar: null,
+        },
       ],
       me: {
         playerId: me,
@@ -575,7 +607,15 @@ describe('SeasonScreen', () => {
     current = season({
       lastSequence: 5,
       players: [
-        { id: me, name: 'Вася', cellId: 'start', points: 0, phase: 'playing', finishOrder: null },
+        {
+          id: me,
+          name: 'Вася',
+          cellId: 'start',
+          points: 0,
+          phase: 'playing',
+          finishOrder: null,
+          avatar: null,
+        },
       ],
       me: {
         playerId: me,
@@ -866,7 +906,15 @@ describe('SeasonScreen drop and tech reroll (RR2, RR4, RR5, D-94)', () => {
   ): Schemas['SeasonView'] {
     return season({
       players: [
-        { id: me, name: 'Вася', cellId: 'start', points: 0, phase: 'playing', finishOrder: null },
+        {
+          id: me,
+          name: 'Вася',
+          cellId: 'start',
+          points: 0,
+          phase: 'playing',
+          finishOrder: null,
+          avatar: null,
+        },
       ],
       me: {
         playerId: me,
@@ -1211,7 +1259,15 @@ describe('SeasonScreen marks on offered games (G8, D-94 (6))', () => {
   function rolling(turn: Partial<Schemas['MyTurnView']>): Schemas['SeasonView'] {
     return season({
       players: [
-        { id: me, name: 'Вася', cellId: 'start', points: 0, phase: 'rolling', finishOrder: null },
+        {
+          id: me,
+          name: 'Вася',
+          cellId: 'start',
+          points: 0,
+          phase: 'rolling',
+          finishOrder: null,
+          avatar: null,
+        },
       ],
       me: {
         playerId: me,
@@ -1338,6 +1394,7 @@ describe('SeasonScreen completion reward (C7a, D-96)', () => {
           points: last.total,
           phase: 'idle',
           finishOrder: null,
+          avatar: null,
         },
       ],
       me: {
@@ -1379,7 +1436,15 @@ describe('SeasonScreen completion reward (C7a, D-96)', () => {
   function playingWithoutHours(challengesEnabled = true) {
     return season({
       players: [
-        { id: me, name: 'Вася', cellId: 'start', points: 0, phase: 'playing', finishOrder: null },
+        {
+          id: me,
+          name: 'Вася',
+          cellId: 'start',
+          points: 0,
+          phase: 'playing',
+          finishOrder: null,
+          avatar: null,
+        },
       ],
       me: {
         playerId: me,

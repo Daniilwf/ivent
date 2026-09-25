@@ -33,9 +33,33 @@ function season(leaderboard: Row[]): Schemas['SeasonView'] {
     ],
     // Players in id order, Петя far ahead by points: the leaderboard, not the points, decides the order
     players: [
-      { id: vasya, name: 'Вася', cellId: 'finish', points: 4, phase: 'idle', finishOrder: 1 },
-      { id: petya, name: 'Петя', cellId: 'c1', points: 50, phase: 'idle', finishOrder: null },
-      { id: masha, name: 'Маша', cellId: 'start', points: 7, phase: 'idle', finishOrder: null },
+      {
+        id: vasya,
+        name: 'Вася',
+        cellId: 'finish',
+        points: 4,
+        phase: 'idle',
+        finishOrder: 1,
+        avatar: null,
+      },
+      {
+        id: petya,
+        name: 'Петя',
+        cellId: 'c1',
+        points: 50,
+        phase: 'idle',
+        finishOrder: null,
+        avatar: null,
+      },
+      {
+        id: masha,
+        name: 'Маша',
+        cellId: 'start',
+        points: 7,
+        phase: 'idle',
+        finishOrder: null,
+        avatar: null,
+      },
     ],
     me: {
       playerId: vasya,

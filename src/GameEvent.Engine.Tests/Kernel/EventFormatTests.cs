@@ -298,6 +298,12 @@ public class EventFormatTests
             """{"rulesetVersion":3,"rules":{"byOrder":[20,15],"afterList":2}}"""
         },
         {
+            "account-avatar-changed",
+            new Engine.Accounts.AccountAvatarChanged(s_user, Guid.Parse("50000000-0000-0000-0000-000000000001")),
+            1,
+            """{"userId":"40000000-0000-0000-0000-000000000001","fileId":"50000000-0000-0000-0000-000000000001"}"""
+        },
+        {
             "file-stored",
             new Engine.Files.FileStored(Guid.Parse("50000000-0000-0000-0000-000000000001"), s_user, "image/webp", 123456, 2560, 1440, 1),
             1,
