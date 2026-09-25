@@ -121,6 +121,7 @@ internal static class SeasonProjection
             record.Frozen = player.Finish?.Frozen ?? false;
             record.FinishBonus = player.Finish?.Bonus ?? 0;
             record.FinishSurplus = player.Finish?.Surplus ?? 0;
+            record.FinishBonusRulesJson = player.Finish?.BonusRules is { } bonusRules ? JsonSerializer.Serialize(bonusRules, EngineJson.Options) : null;
             record.PointsTick = player.PointsTick;
 
             // Exclusions grow within a season (D-08), a tech reroll turned into a drop changes its reason (D-11), an undo
@@ -311,7 +312,9 @@ internal static class SeasonProjection
                     [.. exclusions[p.Id].OrderBy(r => r.GameId).Select(r => new GameExclusion(r.GameId, r.Reason))],
                     p.RerollsThisRoll,
                     p.FinishOrder is { } order
-                        ? new Engine.Finish.FinishState(order, p.FinishRunId!.Value, p.FinishedAt!.Value, p.Frozen, p.FinishBonus, p.FinishSurplus)
+                        ? new Engine.Finish.FinishState(
+                            order, p.FinishRunId!.Value, p.FinishedAt!.Value, p.Frozen, p.FinishBonus, p.FinishSurplus,
+                            p.FinishBonusRulesJson is null ? null : JsonSerializer.Deserialize<Engine.Finish.FinishBonusRules>(p.FinishBonusRulesJson, EngineJson.Options))
                         : null,
                     p.ActiveRunId,
                     p.PointsTick)),

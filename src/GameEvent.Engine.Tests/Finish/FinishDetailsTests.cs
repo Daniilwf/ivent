@@ -319,27 +319,26 @@ public class FinishDetailsTests
         Assert.Equal("c2", s.Player("Петя").CellId);
     }
 
-    // ---- 8. Bonuses follow the rules in force at each recalculation ----
+    // ---- 8. A bonus follows the rules in force at the finisher's own finish (D-111) ----
 
     [Fact]
-    public void Bonuses_are_recalculated_by_the_list_in_force_at_the_next_finish()
+    public void Each_finisher_keeps_the_list_in_force_at_his_finish()
     {
         // Вася 1, Петя 2 (+10 by [10, 8, 6, 4]); the admin changes the list to [20, 15]; Маша finishes third:
-        // Петя (place 2) goes 10 → 20, Маша (place 3) gets 15
+        // Петя keeps 10 (his list), Маша gets 15 (place 3 by the list in force at her finish)
         var s = New();
         FinishRun(s, "Вася");
         FinishRun(s, "Петя");
-        var (petya, masha) = (s.PlayerId("Петя"), s.PlayerId("Маша"));
+        var masha = s.PlayerId("Маша");
         s.WithRuleset(r => r with { Finish = r.Finish with { BonusByOrder = [20, 15] } });
-        Assert.Equal(10, FinishOf(s, "Петя")!.Bonus);
 
         FinishRun(s, "Маша");
 
-        Assert.Equal(
-            [(petya, 10, PointsReason.FinishBonus), (masha, 15, PointsReason.FinishBonus)],
-            BonusChanges(s).OrderBy(x => x.Player));
-        Assert.Equal((20, 15), (FinishOf(s, "Петя")!.Bonus, FinishOf(s, "Маша")!.Bonus));
-        Assert.Equal((24, 19), (s.Player("Петя").Points, s.Player("Маша").Points));
+        Assert.Equal([(masha, 15, PointsReason.FinishBonus)], BonusChanges(s));
+        Assert.Equal((10, 15), (FinishOf(s, "Петя")!.Bonus, FinishOf(s, "Маша")!.Bonus));
+        Assert.Equal((14, 19), (s.Player("Петя").Points, s.Player("Маша").Points));
+        Assert.Equal(new FinishBonusRules([10, 8, 6, 4], 2), FinishOf(s, "Петя")!.BonusRules);
+        Assert.Equal(new FinishBonusRules([20, 15], 2), FinishOf(s, "Маша")!.BonusRules);
     }
 
     [Fact]
@@ -357,9 +356,10 @@ public class FinishDetailsTests
     }
 
     [Fact]
-    public void Bonuses_after_a_revoke_follow_the_list_in_force()
+    public void After_a_revoke_the_new_place_is_paid_by_the_list_at_the_finish()
     {
-        // The list changes to [5] (after it 1); Петя, second, is revoked: Маша moves to place 2 — 8 → 5
+        // The list changes to [5] (after it 1); Петя, second, is revoked: Маша moves to place 2 and is paid by her own
+        // list [10, 8, 6, 4] — 8 → 10, not the new list's 5
         var s = New();
         FinishRun(s, "Вася");
         var petyaRun = FinishRun(s, "Петя");
@@ -369,7 +369,25 @@ public class FinishDetailsTests
         Reject(s, petyaRun);
 
         ScenarioAssert.Accepted(s);
-        Assert.Contains((s.PlayerId("Маша"), -3, PointsReason.FinishBonusRevoked), BonusChanges(s));
+        Assert.Contains((s.PlayerId("Маша"), 2, PointsReason.FinishBonus), BonusChanges(s));
+        Assert.Equal(10, FinishOf(s, "Маша")!.Bonus);
+    }
+
+    [Fact]
+    public void A_finisher_after_the_change_is_paid_by_the_new_list_at_any_new_place()
+    {
+        // Маша finished third under [5] (after it 1) → 1; Петя, second under the old list, is revoked: Маша moves to
+        // place 2 by her own list — 1 → 5
+        var s = New();
+        FinishRun(s, "Вася");
+        var petyaRun = FinishRun(s, "Петя");
+        s.WithRuleset(r => r with { Finish = r.Finish with { BonusByOrder = [5], BonusAfterList = 1 } });
+        FinishRun(s, "Маша");
+        Assert.Equal(1, FinishOf(s, "Маша")!.Bonus);
+
+        Reject(s, petyaRun);
+
+        Assert.Contains((s.PlayerId("Маша"), 4, PointsReason.FinishBonus), BonusChanges(s));
         Assert.Equal(5, FinishOf(s, "Маша")!.Bonus);
     }
 

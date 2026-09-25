@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using GameEvent.Engine.Finish;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Rulesets;
 using GameEvent.Engine.Seasons;
@@ -19,7 +20,12 @@ public sealed record RulesView(int Version, Ruleset Ruleset, IReadOnlyList<Rules
 /// <summary>One version of the rules: when, by whom (null for the season's creation by the system), and what changed.</summary>
 public sealed record RulesVersionView(int Version, DateTimeOffset At, Guid? AuthorId, IReadOnlyList<RulesetChange> Changes);
 
-public sealed record RulesChangeResult(int Version);
+/// <summary>
+/// The new version of the rules and what the admin should know about it: <c>finish.bonusesKept</c> — the finish bonus
+/// list changed while some players have finished under another one; their bonuses stay (D-111) until «Пересчитать бонусы
+/// по текущим правилам».
+/// </summary>
+public sealed record RulesChangeResult(int Version, IReadOnlyList<string> Warnings);
 
 /// <summary>
 /// A new ruleset from the admin's editor: the whole document, the version it was edited from, and a command id
@@ -151,7 +157,20 @@ public static class RulesEndpoints
         }
 
         var changed = outcome.Events.Select(e => e.Event).OfType<RulesetChanged>().Single();
-        return TypedResults.Ok(new RulesChangeResult(changed.Version));
+        return TypedResults.Ok(new RulesChangeResult(changed.Version, await WarningsAsync(seasonId, changed.Ruleset, db, ct)));
+    }
+
+    public const string BonusesKept = "finish.bonusesKept";
+
+    /// <summary>D-111: finishers who hold a bonus list other than the one now in force keep their bonuses.</summary>
+    private static async Task<IReadOnlyList<string>> WarningsAsync(Guid seasonId, Ruleset ruleset, GameEventDbContext db, CancellationToken ct)
+    {
+        var current = FinishBonusRules.Of(ruleset.Finish);
+        var tables = await db.SeasonPlayers.AsNoTracking()
+            .Where(p => p.SeasonId == seasonId && p.FinishOrder != null)
+            .Select(p => p.FinishBonusRulesJson)
+            .ToListAsync(ct);
+        return tables.Any(t => t is null || JsonSerializer.Deserialize<FinishBonusRules>(t, EngineJson.Options) != current) ? [BonusesKept] : [];
     }
 
     private static JsonHttpResult<RulesetProblem> Invalid(IReadOnlyList<RulesetError> errors) =>

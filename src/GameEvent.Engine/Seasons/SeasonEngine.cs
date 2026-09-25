@@ -60,6 +60,7 @@ public static class SeasonEngine
             ConvertTechRerollToDrop c => Drops.Decide(state, c, context),
             MakeChoice c => Choosing.Decide(state, c, context),
             ResolveManualEffect c => ManualEffects.Decide(state, c),
+            RecalculateFinishBonuses c => Finishing.Decide(state, c),
             Undo.UndoCommand c => Undo.Undoing.Decide(state, c, context),
             _ => throw new ArgumentException($"Unknown command {command.GetType().Name}.", nameof(command)),
         };
@@ -108,6 +109,7 @@ public static class SeasonEngine
             PlayerFrozen e => Finishing.Apply(state, e),
             PlayerFinishRevoked e => Finishing.Apply(state, e),
             FinishSurplusChanged e => Finishing.Apply(state, e),
+            FinishBonusRulesRefreshed e => Finishing.Apply(state, e),
             ProofApproved e => ProofReview.Apply(state, e),
             ProofRejected e => ProofReview.Apply(state, e),
             RunDifficultyChanged e => Corrections.Apply(state, e),

@@ -140,6 +140,9 @@ public sealed class SeasonPlayerRecord
 
     public int FinishSurplus { get; set; }
 
+    /// <summary>The finish bonus table the player finished under (D-111), JSON; null while not finished.</summary>
+    public string? FinishBonusRulesJson { get; set; }
+
     /// <summary>The number of the season's points change that set the current points (D-100): the «earliest final score».</summary>
     public long PointsTick { get; set; }
 

@@ -37,6 +37,7 @@ public static class RejectionCodes
     public const string SeasonInvalidName = "season.invalidName";
     public const string PlayerBusy = "player.busy";
     public const string PlayerFinished = "player.finished";
+    public const string FinishNothingToRecalculate = "finish.nothingToRecalculate";
     public const string SeasonAlreadyCreated = "season.alreadyCreated";
     public const string PlayerUnknown = "player.unknown";
     public const string PlayerAlreadyAdded = "player.alreadyAdded";

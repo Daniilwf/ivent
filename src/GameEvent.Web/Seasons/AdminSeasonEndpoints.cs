@@ -26,6 +26,9 @@ public sealed record AdminManualEffectView(
     Guid Id, Guid PlayerId, string PlayerName, Engine.Rulesets.EventKind DrawEvent, Engine.Effects.ManualEffectSource Source, Guid? RunId);
 
 /// <summary>Undo a whole earlier command (D-104); <c>comment</c> is required, at most 500 characters.</summary>
+/// <summary>An admin action on the season with nothing else to say (D-111: recalculate the finish bonuses).</summary>
+public sealed record SeasonActionRequest(Guid CommandId);
+
 public sealed record UndoRequest(Guid CommandId, Guid TargetCommandId, string? Comment = null);
 
 /// <summary>
@@ -110,6 +113,11 @@ public static class AdminSeasonEndpoints
 
         season.MapPost("/deadline", (Guid seasonId, SeasonDeadlineRequest request, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, CancellationToken ct) =>
             SendAsync(seasonId, request.CommandId, new SetSeasonDeadline(request.Deadline), user, db, bus, ct))
+            .WithActionErrors();
+
+        // D-111: «Пересчитать бонусы по текущим правилам» — the only way a finisher's bonus follows a change of the rules
+        season.MapPost("/finish-bonuses/recalculate", (Guid seasonId, SeasonActionRequest request, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, CancellationToken ct) =>
+            SendAsync(seasonId, request.CommandId, new Engine.Finish.RecalculateFinishBonuses(), user, db, bus, ct))
             .WithActionErrors();
     }
 

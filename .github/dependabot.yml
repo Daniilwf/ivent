@@ -13,10 +13,10 @@ updates:
     cooldown:
       default-days: 7
     open-pull-requests-limit: 3
-    # Verify 33+ fails the build until a sponsorship/licence property is declared — a customer decision (D-112)
+    # The customer keeps Verify on 32 (D-112): 33+ needs a sponsorship/licence declaration. Patches and minors of 32 still come.
     ignore:
       - dependency-name: 'Verify*'
-        versions: ['>= 33']
+        update-types: ['version-update:semver-major']
 
   - package-ecosystem: npm
     directories: [/, /web, /e2e]

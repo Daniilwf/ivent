@@ -292,6 +292,12 @@ public class EventFormatTests
             """{"userId":"40000000-0000-0000-0000-000000000001"}"""
         },
         {
+            "finish-bonus-rules-refreshed",
+            new FinishBonusRulesRefreshed(3),
+            1,
+            """{"rulesetVersion":3}"""
+        },
+        {
             "effect-chain-cut",
             new EffectChainCut(EffectChainLimit.Depth, 4, 5),
             1,

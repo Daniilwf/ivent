@@ -37,7 +37,7 @@ public class FirstFinisherTests
 
         // And he is first; the finish is provisional (the first finish needs approved proofs)
         Assert.Equal(vasya, FinishLine.First(s.State));
-        Assert.Equal(new FinishState(1, runId, at, Frozen: false, Bonus: 0, Surplus: 0), FinishOf(s, "Вася"));
+        Assert.Equal(new FinishState(1, runId, at, Frozen: false, Bonus: 0, Surplus: 0, FinishBonusRules.Of(s.Ruleset.Finish)), FinishOf(s, "Вася"));
         Assert.Empty(s.LastEvents<PlayerFrozen>());
 
         // And the completion counted as usual: 4 points, 6 coins, on the finish
@@ -154,7 +154,7 @@ public class FirstFinisherTests
         // The freeze follows the finish in the same command
         Assert.Equal(new PlayerFrozen(vasya), Assert.Single(s.LastEvents<PlayerFrozen>()));
         Assert.True(IndexOf<PlayerFrozen>(s) > IndexOf<PlayerFinished>(s), "The freeze must follow the finish.");
-        Assert.Equal(new FinishState(1, runId, at, Frozen: true, Bonus: 0, Surplus: 0), FinishOf(s, "Вася"));
+        Assert.Equal(new FinishState(1, runId, at, Frozen: true, Bonus: 0, Surplus: 0, FinishBonusRules.Of(s.Ruleset.Finish)), FinishOf(s, "Вася"));
 
         // The run that reached the finish still counts: its points and coins came before the freeze
         Assert.Equal((4, CoinsPerRun), (s.Player("Вася").Points, s.Player("Вася").Coins));
