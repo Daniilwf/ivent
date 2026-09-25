@@ -757,6 +757,8 @@ describe('SeasonScreen reroll price and manual effects (D-93)', () => {
     const commands: string[] = [];
     serve((r) => {
       if (isSeasonGet(r)) return json(200, view);
+      // Reads (the account for the avatar block, D-117) are not commands
+      if (r.method === 'GET') return json(404, {});
       commands.push(r.url);
       return json(200, { duplicate: false, events: [] });
     });

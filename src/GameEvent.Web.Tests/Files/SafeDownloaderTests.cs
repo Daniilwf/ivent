@@ -173,7 +173,7 @@ public sealed class SafeDownloaderTests
         var release = new TaskCompletionSource();
         var started = 0;
         using var downloader = new SafeDownloader(
-            new DownloadSettings { MaxConcurrent = 1, TimeoutSeconds = 1 },
+            new DownloadSettings { MaxConcurrent = 1, TimeoutSeconds = 30, QueueWaitSeconds = 1 },
             s_limits,
             new FakeHandler(async (_, ct) =>
             {

@@ -1586,13 +1586,6 @@ export interface paths {
                         "application/problem+json": components["schemas"]["ProblemDetails"];
                     };
                 };
-                /** @description Not Found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
                 /** @description Conflict */
                 409: {
                     headers: {
@@ -4291,7 +4284,10 @@ export interface components {
             /** Format: int32 */
             sides: number;
         };
-        /** @description A player on the map and the leaderboard; `finishOrder` is their order among the finishers, null before the finish. */
+        /**
+         * @description A player on the map and the leaderboard; `finishOrder` is their order among the finishers, null before the finish;
+         *     `avatar` — the account's picture (D-117), or none.
+         */
         PlayerView: {
             /** Format: uuid */
             id: string;

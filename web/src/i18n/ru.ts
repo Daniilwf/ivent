@@ -275,6 +275,7 @@ export const ru = {
       'file.tooManyFrames': 'В GIF слишком много кадров.',
       'file.dailyLimit': 'На сегодня лимит загрузок исчерпан.',
       'file.busy': 'Сервер занят другими картинками. Попробуйте через минуту.',
+      'file.downloadsPerHour': 'Лимит скачиваний по ссылке на этот час исчерпан.',
       'file.urlInvalid': 'Нужна ссылка, начинающаяся с https://.',
       'file.hostNotAllowed': 'Ссылки принимаются только с Tenor, Giphy и Klipy.',
       'file.addressNotPublic': 'По этой ссылке картинку взять нельзя.',

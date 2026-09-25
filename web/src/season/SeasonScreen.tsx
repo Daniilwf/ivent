@@ -351,14 +351,11 @@ export function SeasonScreen({
         )}
       </section>
 
-      {me && (
-        <AvatarSection
-          avatar={season.players.find((p) => p.id === me.playerId)?.avatar ?? null}
-          onChanged={() => {
-            void fetchSeason(seasonId).then(apply);
-          }}
-        />
-      )}
+      <AvatarSection
+        onChanged={() => {
+          void fetchSeason(seasonId).then(apply);
+        }}
+      />
 
       <section aria-labelledby="map-title">
         <h2 id="map-title">{ru.map.title}</h2>

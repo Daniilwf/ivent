@@ -3,9 +3,11 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using GameEvent.Infrastructure.Files;
+using GameEvent.Web.Files;
 using GameEvent.Web.Tests.Api;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NetVips;
 
@@ -58,6 +60,84 @@ public sealed class AvatarApiTests : IAsyncLifetime
 
         await RefusedAsync(response, HttpStatusCode.UnprocessableEntity, code);
         Assert.Equal(0, asked);
+    }
+
+    [Fact]
+    public async Task Downloads_per_hour_are_limited_failed_ones_included()
+    {
+        using var site = WithInternet(_ => new HttpResponseMessage(HttpStatusCode.NotFound), b => b.UseSetting("Files:DownloadsPerHour", "2"));
+        var vasya = await SignedInAsync(site, "vasya");
+
+        for (var i = 0; i < 2; i++)
+        {
+            Assert.Equal(HttpStatusCode.UnprocessableEntity, (await vasya.PostAsJsonAsync("/api/files/from-url", new { commandId = Guid.NewGuid(), url = "https://media.tenor.com/missing.gif" }, Ct)).StatusCode);
+        }
+
+        Assert.Equal(HttpStatusCode.TooManyRequests, (await vasya.PostAsJsonAsync("/api/files/from-url", new { commandId = Guid.NewGuid(), url = "https://media.tenor.com/missing.gif" }, Ct)).StatusCode);
+    }
+
+    [Fact]
+    public async Task At_the_daily_limit_nothing_is_downloaded()
+    {
+        var asked = 0;
+        using var site = WithInternet(
+            _ =>
+            {
+                asked++;
+                return Picture(Gif());
+            },
+            b => b.UseSetting("Files:UploadsPerDay", "0"));
+        var vasya = await SignedInAsync(site, "vasya");
+
+        var response = await vasya.PostAsJsonAsync("/api/files/from-url", new { commandId = Guid.NewGuid(), url = "https://media.tenor.com/cat.gif" }, Ct);
+
+        await RefusedAsync(response, HttpStatusCode.TooManyRequests, "file.dailyLimit");
+        Assert.Equal(0, asked);
+    }
+
+    [Fact]
+    public async Task A_file_over_the_limit_by_link_is_too_large()
+    {
+        using var site = WithInternet(_ => Picture(new byte[5000]), b => b.UseSetting("Files:MaxUploadBytes", "1000"));
+        var vasya = await SignedInAsync(site, "vasya");
+
+        var response = await vasya.PostAsJsonAsync("/api/files/from-url", new { commandId = Guid.NewGuid(), url = "https://media.tenor.com/big.gif" }, Ct);
+
+        await RefusedAsync(response, HttpStatusCode.RequestEntityTooLarge, "file.tooLarge");
+    }
+
+    [Fact]
+    public async Task A_busy_downloader_answers_503()
+    {
+        var release = new TaskCompletionSource();
+        using var site = _site.WithWebHostBuilder(b => b.ConfigureTestServices(services =>
+            services.AddSingleton(sp => new SafeDownloader(
+                new DownloadSettings { MaxConcurrent = 1, TimeoutSeconds = 30, QueueWaitSeconds = 1 },
+                sp.GetRequiredService<FileLimits>(),
+                new Waiting(release.Task)))));
+        var vasya = await SignedInAsync(site, "vasya");
+        var petya = await SignedInAsync(site, "petya");
+
+        var first = vasya.PostAsJsonAsync("/api/files/from-url", new { commandId = Guid.NewGuid(), url = "https://media.tenor.com/a.gif" }, Ct);
+        await Task.Delay(300, Ct);
+        var second = await petya.PostAsJsonAsync("/api/files/from-url", new { commandId = Guid.NewGuid(), url = "https://media.tenor.com/b.gif" }, Ct);
+        release.SetResult();
+        await first;
+
+        await RefusedAsync(second, HttpStatusCode.ServiceUnavailable, "file.busy");
+    }
+
+    [Fact]
+    public void Allowed_hosts_in_the_config_replace_the_defaults()
+    {
+        var configuration = new Microsoft.Extensions.Configuration.ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["Files:Download:AllowedHosts:0"] = "media.tenor.com" })
+            .Build();
+
+        var settings = FileEndpoints.DownloadSettingsFrom(configuration);
+
+        Assert.Equal(["media.tenor.com"], settings.AllowedHosts);
+        Assert.Contains("i.giphy.com", FileEndpoints.DownloadSettingsFrom(new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build()).AllowedHosts);
     }
 
     [Fact]
@@ -228,11 +308,22 @@ public sealed class AvatarApiTests : IAsyncLifetime
     // ---- Helpers ----
 
     /// <summary>The site with the downloader's network replaced: the link rules stay, the answer is the test's.</summary>
-    private WebApplicationFactory<Program> WithInternet(Func<HttpRequestMessage, HttpResponseMessage> answer) =>
-        _site.WithWebHostBuilder(b => b.ConfigureTestServices(services =>
+    private WebApplicationFactory<Program> WithInternet(Func<HttpRequestMessage, HttpResponseMessage> answer, Action<Microsoft.AspNetCore.Hosting.IWebHostBuilder>? more = null) =>
+        _site.WithWebHostBuilder(b =>
         {
-            services.AddSingleton(sp => new SafeDownloader(new DownloadSettings(), sp.GetRequiredService<FileLimits>(), new Internet(answer)));
-        }));
+            more?.Invoke(b);
+            b.ConfigureTestServices(services =>
+                services.AddSingleton(sp => new SafeDownloader(new DownloadSettings(), sp.GetRequiredService<FileLimits>(), new Internet(answer))));
+        });
+
+    private sealed class Waiting(Task release) : HttpMessageHandler
+    {
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            await release.WaitAsync(cancellationToken);
+            return new HttpResponseMessage(HttpStatusCode.NotFound);
+        }
+    }
 
     private sealed class Internet(Func<HttpRequestMessage, HttpResponseMessage> answer) : HttpMessageHandler
     {

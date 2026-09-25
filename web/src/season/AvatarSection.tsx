@@ -1,4 +1,4 @@
-import { useState, type ChangeEvent, type SyntheticEvent } from 'react';
+import { useEffect, useState, type ChangeEvent, type SyntheticEvent } from 'react';
 import { api, rejectionCode, type Schemas } from '../api/client';
 import { uploadFile, UploadError } from '../api/files';
 import { ru } from '../i18n/ru';
@@ -6,19 +6,27 @@ import { ru } from '../i18n/ru';
 const pictureTypes = 'image/png,image/jpeg,image/webp,image/gif';
 
 /**
- * The player's own avatar (D-117): a picture from the device or a GIF by link from Tenor, Giphy or Klipy (the server
- * downloads it), or none. The avatar is on the account, so it stays across seasons.
+ * The signed-in user's own avatar (D-117) — a player's, a spectator's or the admin's: a picture from the device or a GIF
+ * by link from Tenor, Giphy or Klipy (the server downloads it), or none. The avatar is on the account, so it stays across
+ * seasons; it is read from the account itself, not from a season.
  */
-export function AvatarSection({
-  avatar,
-  onChanged,
-}: {
-  avatar: Schemas['FileLinkView'] | null;
-  onChanged: () => void;
-}) {
+export function AvatarSection({ onChanged }: { onChanged: () => void }) {
+  const [avatar, setAvatar] = useState<Schemas['FileLinkView'] | null>(null);
   const [link, setLink] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // The account's avatar: read at start and after every change (the version moves)
+  const [version, setVersion] = useState(0);
+  useEffect(() => {
+    let active = true;
+    void api.GET('/api/auth/me').then(({ data }) => {
+      if (active) setAvatar(data?.avatar ?? null);
+    });
+    return () => {
+      active = false;
+    };
+  }, [version]);
 
   async function use(fileId: string | null) {
     const { error: refused } = await api.PUT('/api/auth/me/avatar', {
@@ -29,6 +37,7 @@ export function AvatarSection({
       setError((code && ru.rejection[code]) ?? ru.rejection.unknown);
       return;
     }
+    setVersion((v) => v + 1);
     onChanged();
   }
 
@@ -67,11 +76,18 @@ export function AvatarSection({
       return;
     }
     void run(async () => {
-      const { data, error: refused } = await api.POST('/api/files/from-url', {
+      const {
+        data,
+        error: refused,
+        response,
+      } = await api.POST('/api/files/from-url', {
         body: { commandId: crypto.randomUUID(), url },
       });
       if (!data) {
-        throw new UploadError(rejectionCode(refused));
+        // The hourly limit of downloads answers without a code (D-117)
+        throw new UploadError(
+          rejectionCode(refused) ?? (response.status === 429 ? 'file.downloadsPerHour' : null),
+        );
       }
       setLink('');
       await use(data.id);
@@ -107,7 +123,7 @@ export function AvatarSection({
           onChange={pick}
         />
       </label>
-      <form onSubmit={byLink}>
+      <form onSubmit={byLink} noValidate>
         <label>
           {ru.avatar.link}
           <input

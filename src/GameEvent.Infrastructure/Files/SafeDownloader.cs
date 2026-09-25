@@ -32,6 +32,9 @@ public sealed record DownloadSettings
     /// <summary>Downloads at once on the whole site: each holds up to a file in memory.</summary>
     public int MaxConcurrent { get; init; } = 2;
 
+    /// <summary>How long a download waits for a free place before the answer «busy».</summary>
+    public int QueueWaitSeconds { get; init; } = 2;
+
     public int TimeoutSeconds { get; init; } = 15;
 
     public int MaxRedirects { get; init; } = 3;
@@ -97,6 +100,7 @@ public sealed class SafeDownloader : IDisposable
     public const string HostNotAllowed = "file.hostNotAllowed";
     public const string AddressNotPublic = "file.addressNotPublic";
     public const string DownloadFailed = "file.downloadFailed";
+    public const string Busy = "file.busy";
 
     private readonly DownloadSettings _settings;
     private readonly FileLimits _limits;
@@ -118,8 +122,6 @@ public sealed class SafeDownloader : IDisposable
         _client.DefaultRequestHeaders.UserAgent.ParseAdd("GameEvent/1.0 (avatar download)");
     }
 
-    public const string Busy = "file.busy";
-
     public async Task<(byte[]? Content, Rejection? Rejection)> DownloadAsync(string url, CancellationToken ct)
     {
         if (Check(url) is { } refused)
@@ -127,7 +129,7 @@ public sealed class SafeDownloader : IDisposable
             return (null, refused);
         }
 
-        if (!await _slots.WaitAsync(TimeSpan.FromSeconds(_settings.TimeoutSeconds), ct))
+        if (!await _slots.WaitAsync(TimeSpan.FromSeconds(_settings.QueueWaitSeconds), ct))
         {
             return (null, new Rejection(Busy, "The server is busy with other downloads."));
         }

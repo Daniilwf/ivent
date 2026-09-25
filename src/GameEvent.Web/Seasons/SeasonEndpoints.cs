@@ -102,8 +102,10 @@ public sealed record LeaderboardRowView(Guid PlayerId, int Place, int Points, in
 
 public sealed record CellView(string Id, CellType Type);
 
-/// <summary>A player on the map and the leaderboard; <c>finishOrder</c> is their order among the finishers, null before the finish.</summary>
-/// <summary>A player of the season; <c>avatar</c> — the account's picture (D-117), or none.</summary>
+/// <summary>
+/// A player on the map and the leaderboard; <c>finishOrder</c> is their order among the finishers, null before the finish;
+/// <c>avatar</c> — the account's picture (D-117), or none.
+/// </summary>
 public sealed record PlayerView(Guid Id, string Name, string CellId, int Points, TurnPhase Phase, int? FinishOrder, Files.FileLinkView? Avatar);
 
 /// <summary>

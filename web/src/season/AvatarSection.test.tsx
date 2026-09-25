@@ -25,7 +25,10 @@ function json(status: number, body: unknown) {
 
 type Sent = { url: string; method: string; body: unknown };
 
-function serve(answer: (url: string, method: string) => Response) {
+type Link = { id: string; url: string; thumbnailUrl: string };
+
+// The account (GET /api/auth/me) answers with `avatar`; every other request goes to `answer` and is recorded
+function serve(answer: (url: string, method: string) => Response, avatar: Link | null = null) {
   const sent: Sent[] = [];
   vi.stubGlobal(
     'fetch',
@@ -33,6 +36,16 @@ function serve(answer: (url: string, method: string) => Response) {
       const request = typeof input === 'string' ? null : input;
       const url = request?.url ?? (input as string);
       const method = request?.method ?? init?.method ?? 'GET';
+      if (method === 'GET' && url.endsWith('/api/auth/me')) {
+        return json(200, {
+          id: 'u',
+          login: 'vasya',
+          name: 'Вася',
+          role: 'player',
+          mustChangePassword: false,
+          avatar,
+        });
+      }
       const body: unknown = request
         ? await request
             .clone()
@@ -60,7 +73,7 @@ describe('My avatar', () => {
         : json(200, { duplicate: false, avatar: null }),
     );
     const onChanged = vi.fn();
-    render(<AvatarSection avatar={null} onChanged={onChanged} />);
+    render(<AvatarSection onChanged={onChanged} />);
 
     await userEvent.upload(screen.getByTestId('avatar-file'), picture());
 
@@ -79,7 +92,7 @@ describe('My avatar', () => {
         : json(200, { duplicate: false, avatar: null }),
     );
     const onChanged = vi.fn();
-    render(<AvatarSection avatar={null} onChanged={onChanged} />);
+    render(<AvatarSection onChanged={onChanged} />);
 
     await userEvent.type(screen.getByTestId('avatar-link'), 'https://media.tenor.com/cat.gif');
     await userEvent.click(screen.getByRole('button', { name: ru.avatar.useLink }));
@@ -96,7 +109,7 @@ describe('My avatar', () => {
   it('says in Russian that a link from another site is not taken', async () => {
     serve(() => json(422, { title: 'refused', status: 422, code: 'file.hostNotAllowed' }));
     const onChanged = vi.fn();
-    render(<AvatarSection avatar={null} onChanged={onChanged} />);
+    render(<AvatarSection onChanged={onChanged} />);
 
     await userEvent.type(screen.getByTestId('avatar-link'), 'https://example.com/cat.gif');
     await userEvent.click(screen.getByRole('button', { name: ru.avatar.useLink }));
@@ -109,25 +122,24 @@ describe('My avatar', () => {
 
   it('asks for a link before sending an empty one', async () => {
     const sent = serve(() => json(500, {}));
-    render(<AvatarSection avatar={null} onChanged={vi.fn()} />);
+    render(<AvatarSection onChanged={vi.fn()} />);
 
     await userEvent.click(screen.getByRole('button', { name: ru.avatar.useLink }));
 
     expect(screen.getByRole('alert')).toHaveTextContent(ru.avatar.linkRequired);
-    expect(sent).toHaveLength(0);
+    expect(sent.filter((x) => x.method !== 'GET')).toHaveLength(0);
   });
 
-  it('shows the current avatar and removes it', async () => {
-    const sent = serve(() => json(200, { duplicate: false, avatar: null }));
+  it('shows the current avatar of the account and removes it', async () => {
+    const sent = serve(() => json(200, { duplicate: false, avatar: null }), {
+      id: stored.id,
+      url: stored.url,
+      thumbnailUrl: stored.thumbnailUrl,
+    });
     const onChanged = vi.fn();
-    render(
-      <AvatarSection
-        avatar={{ id: stored.id, url: stored.url, thumbnailUrl: stored.thumbnailUrl }}
-        onChanged={onChanged}
-      />,
-    );
+    render(<AvatarSection onChanged={onChanged} />);
 
-    expect(screen.getByRole('img', { name: ru.avatar.current })).toHaveAttribute(
+    expect(await screen.findByRole('img', { name: ru.avatar.current })).toHaveAttribute(
       'src',
       stored.thumbnailUrl,
     );
@@ -136,7 +148,19 @@ describe('My avatar', () => {
     await vi.waitFor(() => {
       expect(onChanged).toHaveBeenCalled();
     });
-    expect(sent[0]?.body).toMatchObject({ fileId: null });
+    expect(sent.find((x) => x.method === 'PUT')?.body).toMatchObject({ fileId: null });
+  });
+
+  it('names the hourly limit of downloads when the server answers 429 without a code', async () => {
+    serve(() => new Response('', { status: 429 }));
+    render(<AvatarSection onChanged={vi.fn()} />);
+
+    await userEvent.type(screen.getByTestId('avatar-link'), 'https://media.tenor.com/cat.gif');
+    await userEvent.click(screen.getByRole('button', { name: ru.avatar.useLink }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      ru.upload.errors['file.downloadsPerHour'],
+    );
   });
 
   it('says in Russian when the server refuses the avatar', async () => {
@@ -145,7 +169,7 @@ describe('My avatar', () => {
         ? json(200, stored)
         : json(409, { title: 'refused', status: 409, code: 'account.avatarNotYours' }),
     );
-    render(<AvatarSection avatar={null} onChanged={vi.fn()} />);
+    render(<AvatarSection onChanged={vi.fn()} />);
 
     await userEvent.upload(screen.getByTestId('avatar-file'), picture());
 

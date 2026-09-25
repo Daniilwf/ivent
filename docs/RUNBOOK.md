@@ -77,3 +77,11 @@
 4. Последние ошибки с запросом и пользователем: `GET /api/admin/errors` (админ); в логе у каждой — номер ошибки.
 5. Если данные выглядят не так — проверка целостности (выше).
 
+## Файлы, аватарки и ссылки
+
+Не проверено руками (проверки — `FileUploadTests`, `SafeDownloaderTests`, `AvatarApiTests`).
+
+- Файлы — `var/files` (`Files:Path`), лимиты — раздел `Files` (`MaxUploadBytes`, `MaxGifBytes`, `MaxPixels`, `MaxInterlacedPixels`, `MaxFrames`, `UploadsPerDay`, `UploadsPerMinute`, `DownloadsPerHour`), D-108, D-117.
+- Скачивание аватарок по ссылке — раздел `Files:Download`: `AllowedHosts` (список заменяет стандартный: `media.tenor.com`, `i.giphy.com`, `*.klipy.com`…), `TimeoutSeconds`, `MaxRedirects`, `MaxConcurrent`. Через переменные окружения: `Files__Download__AllowedHosts__0=media.tenor.com`, `Files__Download__AllowedHosts__1=…`.
+- Хост из списка перестал отдавать картинки или взломан — убрать его из `AllowedHosts` и перезапустить сайт.
+

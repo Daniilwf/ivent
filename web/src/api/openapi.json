@@ -1527,9 +1527,6 @@
               }
             }
           },
-          "404": {
-            "description": "Not Found"
-          },
           "400": {
             "description": "Bad Request",
             "content": {
@@ -1610,9 +1607,6 @@
               }
             }
           },
-          "404": {
-            "description": "Not Found"
-          },
           "400": {
             "description": "Bad Request",
             "content": {
@@ -1642,6 +1636,9 @@
                 }
               }
             }
+          },
+          "404": {
+            "description": "Not Found"
           }
         }
       }
@@ -5530,7 +5527,7 @@
             ]
           }
         },
-        "description": "A player on the map and the leaderboard; `finishOrder` is their order among the finishers, null before the finish."
+        "description": "A player on the map and the leaderboard; `finishOrder` is their order among the finishers, null before the finish;\n`avatar` — the account's picture (D-117), or none."
       },
       "PlayerWithoutGamesView": {
         "required": [

@@ -67,7 +67,7 @@ public static class FileEndpoints
             builder.Environment.ContentRootPath, builder.Configuration["Files:Path"] ?? Path.Combine("var", "files")));
         builder.Services.AddSingleton(limits);
         builder.Services.AddSingleton(new FileStorage(root));
-        builder.Services.AddSingleton(builder.Configuration.GetSection("Files:Download").Get<DownloadSettings>() ?? new DownloadSettings());
+        builder.Services.AddSingleton(DownloadSettingsFrom(builder.Configuration));
         builder.Services.AddSingleton<IHostResolver, DnsHostResolver>();
         builder.Services.AddSingleton<SafeDownloader>();
         builder.Services.Configure<FormOptions>(o =>
@@ -83,6 +83,23 @@ public static class FileEndpoints
             o.AddPolicy(DownloadRateLimit, ctx => RateLimitPartition.GetFixedWindowLimiter(
                 ctx.User.UserId()?.ToString() ?? WebSecurity.ClientKey(ctx.Connection.RemoteIpAddress),
                 _ => new FixedWindowRateLimiterOptions { PermitLimit = limits.DownloadsPerHour, Window = TimeSpan.FromHours(1), QueueLimit = 0 })));
+    }
+
+    /// <summary>
+    /// <c>Files:Download</c> (D-117). A list in the configuration replaces the default hosts rather than adding to them:
+    /// a host found compromised is taken out without a rebuild.
+    /// </summary>
+    internal static DownloadSettings DownloadSettingsFrom(IConfiguration configuration)
+    {
+        var section = configuration.GetSection("Files:Download");
+        var settings = section.Get<DownloadSettings>() ?? new DownloadSettings();
+        return section.GetSection("AllowedHosts").Get<string[]>() is { Length: > 0 } hosts ? settings with { AllowedHosts = hosts } : new DownloadSettings
+        {
+            TimeoutSeconds = settings.TimeoutSeconds,
+            MaxRedirects = settings.MaxRedirects,
+            MaxConcurrent = settings.MaxConcurrent,
+            QueueWaitSeconds = settings.QueueWaitSeconds,
+        };
     }
 
     /// <summary>The body limit of an upload request (the rest of the API stays at <see cref="WebSecurity.ApiBodyLimitBytes"/>).</summary>
@@ -238,7 +255,7 @@ public static class FileEndpoints
         var (db, storage, limits, ids, _, bus) = services;
         if (!await s_processing.WaitAsync(s_processingWait, ct))
         {
-            return Problem(StatusCodes.Status503ServiceUnavailable, "The server is busy with other pictures.", "Try again in a minute.", "file.busy");
+            return Problem(StatusCodes.Status503ServiceUnavailable, "The server is busy with other pictures.", "Try again in a minute.", SafeDownloader.Busy);
         }
 
         ProcessedFile? processed;

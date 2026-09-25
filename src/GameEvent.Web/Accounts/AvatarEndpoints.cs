@@ -38,7 +38,8 @@ public static class AvatarEndpoints
                 SetAsync(request, userId, [userId, principal.UserId() ?? Guid.Empty], principal, db, bus, ct))
             .WithTags("Admin")
             .RequireAuthorization(Policies.Admin)
-            .WithAvatarErrors();
+            .WithAvatarErrors()
+            .Produces(StatusCodes.Status404NotFound);
     }
 
     private static async Task<IResult> SetAsync(
@@ -49,7 +50,9 @@ public static class AvatarEndpoints
             return TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["commandId"] = ["A command id is required."] });
         }
 
-        // Only a picture the account's owner (or the admin setting it) uploaded: nobody wears someone else's upload
+        // Only a picture the account's owner (or the admin setting it) uploaded: nobody wears someone else's upload. Checked
+        // before the queue, so a repeat after the file changed hands is refused rather than answered as a duplicate — no
+        // file changes hands today (no deletion yet)
         if (request.FileId is { } fileId && !await db.Files.AsNoTracking().AnyAsync(f => f.Id == fileId && !f.IsDeleted && owners.Contains(f.OwnerId), ct))
         {
             return Rejected(NotYours, "The avatar is one of your own uploads.");
@@ -78,7 +81,6 @@ public static class AvatarEndpoints
         builder
             .Produces<AvatarResponse>()
             .Produces<Seasons.RejectionProblem>(StatusCodes.Status409Conflict, "application/problem+json")
-            .Produces(StatusCodes.Status404NotFound)
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status403Forbidden);
