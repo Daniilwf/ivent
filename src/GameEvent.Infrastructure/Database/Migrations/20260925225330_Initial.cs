@@ -12,6 +12,24 @@ namespace GameEvent.Infrastructure.Database.Migrations
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.CreateTable(
+                name: "BugReport",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "TEXT", nullable: false),
+                    AuthorId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    Page = table.Column<string>(type: "TEXT", maxLength: 500, nullable: false),
+                    Text = table.Column<string>(type: "TEXT", maxLength: 4000, nullable: false),
+                    ContextJson = table.Column<string>(type: "TEXT", nullable: false),
+                    ScreenshotFileId = table.Column<Guid>(type: "TEXT", nullable: true),
+                    Status = table.Column<string>(type: "TEXT", maxLength: 20, nullable: false),
+                    CreatedAt = table.Column<long>(type: "INTEGER", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_BugReport", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "Category",
                 columns: table => new
                 {
@@ -370,6 +388,11 @@ namespace GameEvent.Infrastructure.Database.Migrations
                 });
 
             migrationBuilder.CreateIndex(
+                name: "IX_BugReport_Status_CreatedAt",
+                table: "BugReport",
+                columns: new[] { "Status", "CreatedAt" });
+
+            migrationBuilder.CreateIndex(
                 name: "IX_GameEvent_CommandId",
                 table: "GameEvent",
                 column: "CommandId");
@@ -456,6 +479,9 @@ namespace GameEvent.Infrastructure.Database.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropTable(
+                name: "BugReport");
+
             migrationBuilder.DropTable(
                 name: "Category");
 

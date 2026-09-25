@@ -1,4 +1,4 @@
-import { antiforgeryHeaders, rejectionCode, type Schemas } from './client';
+import { antiforgeryHeaders, noteResponse, rejectionCode, type Schemas } from './client';
 
 export type StoredFile = Schemas['StoredFileView'];
 
@@ -17,16 +17,22 @@ export class UploadError extends Error {
  * (a retry of the same request on the server stores it once). The typed client builds JSON requests, so the form goes
  * through fetch itself; the answer is still the generated type.
  */
-export async function uploadFile(file: File): Promise<StoredFile> {
+export async function uploadFile(
+  file: Blob,
+  name = file instanceof File ? file.name : 'picture.png',
+  path: '/api/files' | '/api/bug-reports/screenshot' = '/api/files',
+): Promise<StoredFile> {
   const form = new FormData();
   form.append('commandId', crypto.randomUUID());
-  form.append('file', file, file.name);
-  const response = await globalThis.fetch(`${globalThis.location.origin}/api/files`, {
+  form.append('file', file, name);
+  const url = `${globalThis.location.origin}${path}`;
+  const response = await globalThis.fetch(url, {
     method: 'POST',
     body: form,
     credentials: 'same-origin',
     headers: antiforgeryHeaders(),
   });
+  noteResponse('POST', url, response.status);
   const body: unknown = await response.json().catch(() => null);
   if (!response.ok) {
     // A proxy or the rate limiter answers without a code: the status still says why

@@ -42,11 +42,20 @@ public sealed partial class DeadlineScheduler(
     IDbContextFactory<GameEventDbContext> dbFactory,
     IClock clock,
     DeadlineSchedulerSettings settings,
-    ILogger<DeadlineScheduler> logger) : BackgroundService
+    ILogger<DeadlineScheduler> logger,
+    Site.MaintenanceMode? maintenance = null) : BackgroundService
 {
-    /// <summary>One pass: every active season whose deadline has come gets a <see cref="ReachDeadline"/>.</summary>
+    /// <summary>
+    /// One pass: every active season whose deadline has come gets a <see cref="ReachDeadline"/>. Under maintenance the
+    /// pass waits (D-121): the queue would refuse, and the first pass after it closes the season.
+    /// </summary>
     public async Task TickAsync(CancellationToken ct)
     {
+        if (maintenance?.IsOn == true)
+        {
+            return;
+        }
+
         var now = clock.UtcNow;
         List<(Guid Id, DateTimeOffset Deadline)> due;
         await using (var db = await dbFactory.CreateDbContextAsync(ct))

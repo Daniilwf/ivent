@@ -8,6 +8,7 @@ using GameEvent.Infrastructure.Kernel;
 using GameEvent.Infrastructure.Queue;
 using GameEvent.Infrastructure.Seasons;
 using GameEvent.Web.Accounts;
+using GameEvent.Web.BugReports;
 using GameEvent.Web.Files;
 using GameEvent.Web.Observability;
 using GameEvent.Web.Pool;
@@ -17,6 +18,7 @@ using GameEvent.Web.Rolls;
 using GameEvent.Web.Rulesets;
 using GameEvent.Web.Runs;
 using GameEvent.Web.Seasons;
+using GameEvent.Web.Site;
 using GameEvent.Web.Testing;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Http.Json;
@@ -65,6 +67,8 @@ public static class AppSetup
         builder.AddFiles();
         builder.AddGameLookup();
         builder.AddPool();
+        builder.AddMaintenance(connectionString);
+        builder.AddBugReports();
         builder.AddTestSupport();
         services.AddOpenApi(o => o.AddDocumentTransformer(async (document, context, ct) =>
         {
@@ -161,6 +165,7 @@ public static class AppSetup
         app.Use((http, next) => WebSecurity.RequirePasswordChangeAsync(http, () => next(http)));
         app.UseAuthorization();
         app.UseRateLimiter();
+        app.UseMaintenance();
 
         if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Test"))
         {
@@ -180,6 +185,8 @@ public static class AppSetup
         api.MapAvatars();
         api.MapGameLookup();
         api.MapPool();
+        api.MapMaintenance();
+        api.MapBugReports();
 
         // Last: the OpenAPI document keeps the order its shared schemas were first met in (a nullable first use of an
         // enum would make the enum itself nullable for every client)

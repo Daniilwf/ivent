@@ -36,6 +36,8 @@ public sealed class GameEventDbContext(DbContextOptions<GameEventDbContext> opti
 
     public DbSet<Files.FileRecord> Files => Set<Files.FileRecord>();
 
+    public DbSet<BugReports.BugReportRecord> BugReports => Set<BugReports.BugReportRecord>();
+
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
         // SQLite has no native time type: full-precision UTC ticks sort and compare correctly in SQL
@@ -61,6 +63,15 @@ public sealed class GameEventDbContext(DbContextOptions<GameEventDbContext> opti
             e.ToTable("StoredFile");
             e.HasIndex(x => new { x.OwnerId, x.CreatedAt });
             e.Property(x => x.MediaType).HasMaxLength(20);
+        });
+
+        modelBuilder.Entity<BugReports.BugReportRecord>(e =>
+        {
+            e.ToTable("BugReport");
+            e.HasIndex(x => new { x.Status, x.CreatedAt });
+            e.Property(x => x.Page).HasMaxLength(500);
+            e.Property(x => x.Text).HasMaxLength(4000);
+            e.Property(x => x.Status).HasMaxLength(20);
         });
 
         modelBuilder.Entity<GameEventRecord>(e =>

@@ -299,6 +299,28 @@ public class EventFormatTests
             """{"rulesetVersion":3,"rules":{"byOrder":[20,15],"afterList":2}}"""
         },
         {
+            "bug-reported",
+            new Engine.BugReports.BugReported(
+                Guid.Parse("60000000-0000-0000-0000-000000000001"),
+                s_user,
+                "/seasons/current",
+                "Кнопка «Бросить» не нажимается",
+                new Engine.BugReports.BugReportContext(
+                    "Mozilla/5.0",
+                    "390x844",
+                    [new Engine.BugReports.BugContextEntry(new DateTimeOffset(2026, 10, 1, 12, 30, 0, TimeSpan.Zero), "click button[data-testid=roll]")],
+                    [new Engine.BugReports.BugContextEntry(null, "TypeError: x is undefined")]),
+                Guid.Parse("50000000-0000-0000-0000-000000000001")),
+            1,
+            """{"reportId":"60000000-0000-0000-0000-000000000001","authorId":"40000000-0000-0000-0000-000000000001","page":"/seasons/current","text":"Кнопка «Бросить» не нажимается","context":{"userAgent":"Mozilla/5.0","viewport":"390x844","actions":[{"at":"2026-10-01T12:30:00+00:00","text":"click button[data-testid=roll]"}],"errors":[{"at":null,"text":"TypeError: x is undefined"}]},"screenshotFileId":"50000000-0000-0000-0000-000000000001"}"""
+        },
+        {
+            "bug-report-status-changed",
+            new Engine.BugReports.BugReportStatusChanged(Guid.Parse("60000000-0000-0000-0000-000000000001"), Engine.BugReports.BugReportStatus.InWork),
+            1,
+            """{"reportId":"60000000-0000-0000-0000-000000000001","status":"inWork"}"""
+        },
+        {
             "game-added",
             new GameAdded(
                 Guid.Parse("20000000-0000-0000-0000-000000000001"),

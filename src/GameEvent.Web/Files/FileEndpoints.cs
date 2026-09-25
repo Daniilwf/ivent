@@ -105,7 +105,9 @@ public static class FileEndpoints
     /// <summary>The body limit of an upload request (the rest of the API stays at <see cref="WebSecurity.ApiBodyLimitBytes"/>).</summary>
     public static bool IsUpload(HttpRequest request) =>
         HttpMethods.IsPost(request.Method)
-        && string.Equals(request.Path.Value?.TrimEnd('/'), "/api/files", StringComparison.OrdinalIgnoreCase);
+        && request.Path.Value?.TrimEnd('/') is { } path
+        && (string.Equals(path, "/api/files", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(path, BugReports.BugReportEndpoints.ScreenshotPath, StringComparison.OrdinalIgnoreCase));
 
     public static void MapFiles(this RouteGroupBuilder api)
     {
@@ -146,7 +148,15 @@ public static class FileEndpoints
             .Produces(StatusCodes.Status404NotFound);
     }
 
-    private static async Task<IResult> UploadAsync(HttpRequest request, ClaimsPrincipal principal, [AsParameters] FileServices services, CancellationToken ct)
+    private static Task<IResult> UploadAsync(HttpRequest request, ClaimsPrincipal principal, [AsParameters] FileServices services, CancellationToken ct) =>
+        UploadPictureAsync(request, principal, services, countTowardsLimit: true, ct);
+
+    /// <summary>
+    /// An upload as <c>POST /api/files</c> takes it; <paramref name="countTowardsLimit"/> false — outside the daily limit
+    /// (a bug report's screenshot, D-121: a user at the limit still reports), the endpoint's own rate limit keeps it small.
+    /// </summary>
+    internal static async Task<IResult> UploadPictureAsync(
+        HttpRequest request, ClaimsPrincipal principal, FileServices services, bool countTowardsLimit, CancellationToken ct)
     {
         if (principal.UserId() is not { } ownerId)
         {
@@ -180,7 +190,7 @@ public static class FileEndpoints
             return TooLarge(services.Limits);
         }
 
-        if (await OverDailyLimitAsync(ownerId, services, ct) is { } limited)
+        if (countTowardsLimit && await OverDailyLimitAsync(ownerId, services, ct) is { } limited)
         {
             return limited;
         }
@@ -192,7 +202,7 @@ public static class FileEndpoints
             await stream.ReadExactlyAsync(content, ct);
         }
 
-        return await StoreAsync(content, commandId, ownerId, services, ct);
+        return (await StoreFileAsync(content, commandId, ownerId, services, ct, countTowardsLimit)).Answer;
     }
 
     /// <summary>
