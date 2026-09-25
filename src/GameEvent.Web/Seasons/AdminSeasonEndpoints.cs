@@ -20,7 +20,7 @@ public sealed record SeasonStatusRequest(Guid CommandId, SeasonStatus? To);
 /// <summary>The admin sets or removes (null) the deadline; only in draft or active (D-101).</summary>
 public sealed record SeasonDeadlineRequest(Guid CommandId, DateTimeOffset? Deadline);
 
-/// <summary>The admin's season lifecycle actions (D-101).</summary>
+/// <summary>The admin's season actions: the lifecycle (D-101) and resolving manual effects (D-102).</summary>
 public static class AdminSeasonEndpoints
 {
     public static void MapAdminSeasons(this RouteGroupBuilder api)
@@ -32,6 +32,13 @@ public static class AdminSeasonEndpoints
                 ? Task.FromResult<ActionResult>(
                     TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["to"] = ["A known season status is required."] }))
                 : SendAsync(seasonId, request.CommandId, new ChangeSeasonStatus(to), user, db, bus, ct))
+            .WithActionErrors();
+
+        // Any player's effect; the comment is required (D-89, D-102).
+        season.MapPost("/effects/{effectId:guid}/resolve", (Guid seasonId, Guid effectId, ResolveEffectRequest request, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, CancellationToken ct) =>
+            SeasonEndpoints.ResolveInvalid(request) is { } invalid
+                ? Task.FromResult<ActionResult>(invalid)
+                : SendAsync(seasonId, request.CommandId, new Engine.Effects.ResolveManualEffect(effectId, request.Outcome!.Value, request.Comment, PlayerId: null), user, db, bus, ct))
             .WithActionErrors();
 
         season.MapPost("/deadline", (Guid seasonId, SeasonDeadlineRequest request, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, CancellationToken ct) =>

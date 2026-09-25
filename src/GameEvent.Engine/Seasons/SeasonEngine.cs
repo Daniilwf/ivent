@@ -59,6 +59,7 @@ public static class SeasonEngine
             TechReroll c => Drops.Decide(state, c, context),
             ConvertTechRerollToDrop c => Drops.Decide(state, c, context),
             MakeChoice c => Choosing.Decide(state, c, context),
+            ResolveManualEffect c => ManualEffects.Decide(state, c),
             _ => throw new ArgumentException($"Unknown command {command.GetType().Name}.", nameof(command)),
         };
 

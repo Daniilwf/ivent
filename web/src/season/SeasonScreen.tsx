@@ -6,6 +6,7 @@ import { CompleteForm, type Completion } from './CompleteForm';
 import { RerollButton } from './RerollButton';
 import { GameMarks } from './GameMarks';
 import { ProofSection } from './ProofForm';
+import { ManualEffectItem, type EffectOutcome } from './ManualEffectItem';
 import { RunActions } from './RunActions';
 
 type Season = Schemas['SeasonView'];
@@ -18,7 +19,8 @@ type Command =
   | { kind: 'techReroll'; reason: NonNullable<Schemas['TechRerollReason']>; comment: string | null }
   | { kind: 'complete'; completion: Completion }
   | { kind: 'choose'; choiceId: string; optionId: string }
-  | { kind: 'alreadyPlayed'; gameId: string };
+  | { kind: 'alreadyPlayed'; gameId: string }
+  | { kind: 'resolveEffect'; effectId: string; outcome: EffectOutcome; comment: string | null };
 type Loaded = { kind: 'season'; season: Season } | { kind: 'signedOut' } | { kind: 'failed' };
 
 /** Sends one game action; a new command id each time, so a retried request acts once (D-68). */
@@ -62,6 +64,11 @@ function send(seasonId: string, command: Command) {
       return api.POST('/api/seasons/{seasonId}/already-played', {
         params,
         body: { commandId, gameId: command.gameId },
+      });
+    case 'resolveEffect':
+      return api.POST('/api/seasons/{seasonId}/effects/{effectId}/resolve', {
+        params: { path: { seasonId, effectId: command.effectId } },
+        body: { commandId, outcome: command.outcome, comment: command.comment },
       });
   }
 }
@@ -270,9 +277,14 @@ export function SeasonScreen({
             <h3 id="effects-title">{ru.effects.title}</h3>
             <ul>
               {me.manualEffects.map((effect) => (
-                <li key={effect.id} data-testid={`manual-effect-${effect.id}`}>
-                  {ru.effects.drawEvent(effect.drawEvent, effect.source)}
-                </li>
+                <ManualEffectItem
+                  key={effect.id}
+                  effect={effect}
+                  pending={pending}
+                  onResolve={(outcome, comment) =>
+                    void act({ kind: 'resolveEffect', effectId: effect.id, outcome, comment })
+                  }
+                />
               ))}
             </ul>
           </section>

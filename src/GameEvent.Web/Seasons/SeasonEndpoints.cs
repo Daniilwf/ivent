@@ -40,6 +40,12 @@ public sealed record TechRerollRequest(Guid CommandId, TechRerollReason? Reason,
 /// <summary>A reroll of the offered game or the whole pending choice; the price follows D-07.</summary>
 public sealed record RerollRequest(Guid CommandId);
 
+/// <summary>
+/// Resolve a pending manual effect (D-102): <c>outcome</c> «applied» or «notApplicable»; <c>comment</c> is required for
+/// «notApplicable» and for the admin, at most 500 characters.
+/// </summary>
+public sealed record ResolveEffectRequest(Guid CommandId, ManualEffectOutcome? Outcome, string? Comment = null);
+
 /// <summary>«Уже проходил» on the offered game or an option of the pending choice (D-92).</summary>
 public sealed record AlreadyPlayedRequest(Guid CommandId, Guid GameId);
 
@@ -138,7 +144,7 @@ public enum GameMarkKind
 /// <summary>What the next reroll costs, computed by the engine's rule (D-93); only while a game is offered.</summary>
 public sealed record RerollPriceView(RerollPayment Payment, int Coins);
 
-/// <summary>A manual effect the player still has to play out (D-10, D-93); resolving it comes with C11.</summary>
+/// <summary>A manual effect the player still has to play out (D-10, D-93); the player resolves it (D-102).</summary>
 public sealed record ManualEffectView(Guid Id, EventKind DrawEvent, ManualEffectSource Source);
 
 /// <summary>The pending choice, kept on the server: a reloaded page shows the same options (T2).</summary>
@@ -282,7 +288,23 @@ public static class SeasonEndpoints
                 : ActAsync(seasonId, request.CommandId, user, db, bus, playerId => new ReviewRun(playerId, runId, new RunReview(request.Rating, request.Text)), ct))
             .RequireAuthorization(Policies.Player)
             .WithActionErrors();
+
+        // The player resolves only their own effects: the engine checks the owner against the signed-in player (D-102).
+        seasons.MapPost("/effects/{effectId:guid}/resolve", (Guid seasonId, Guid effectId, ResolveEffectRequest request, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, CancellationToken ct) =>
+            ResolveInvalid(request) is { } invalid
+                ? Task.FromResult<ActionResult>(invalid)
+                : ActAsync(seasonId, request.CommandId, user, db, bus, playerId => new ResolveManualEffect(effectId, request.Outcome!.Value, request.Comment, playerId), ct))
+            .RequireAuthorization(Policies.Player)
+            .WithActionErrors();
     }
+
+    /// <summary>A known outcome and a comment within the limit; whether a comment is needed is the engine's rule (409).</summary>
+    internal static ValidationProblem? ResolveInvalid(ResolveEffectRequest request) =>
+        request.Outcome is not { } outcome || !Enum.IsDefined(outcome)
+            ? Invalid("outcome", "«applied» or «notApplicable» is required.")
+            : request.Comment?.Length > Limits.MaxCommentLength
+                ? Invalid("comment", $"At most {Limits.MaxCommentLength} characters.")
+                : null;
 
     /// <summary>The request-level checks of a completion; the rules (hours needed, source needed) live in the engine.</summary>
     private static ValidationProblem? CompletionInvalid(CompleteRequest request) =>

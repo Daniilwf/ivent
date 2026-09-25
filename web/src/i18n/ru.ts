@@ -60,6 +60,11 @@ const rejection = {
   'review.invalidRating': 'Оценка — от 1 до 10.',
   'review.tooLong': 'Отзыв слишком длинный: не больше 2000 символов.',
   'season.closed': 'Сезон закрыт для этого действия.',
+  'effect.notPending': 'Этот эффект уже разрешён.',
+  'player.commentRequired': 'Нужен комментарий.',
+  'player.commentTooLong': 'Комментарий слишком длинный: не больше 500 символов.',
+  'effect.notYours': 'Это не ваш эффект.',
+  'effect.unknownOutcome': 'Неизвестный исход.',
   'season.deadlinePassed': 'Дедлайн прошёл: броски закрыты, пруфы принимаются.',
   'season.deadlineNotReached': 'Дедлайн ещё не наступил.',
   'season.proofsPending': 'Сначала проверьте все пруфы: итоги — только после проверки.',
@@ -210,6 +215,10 @@ export const ru = {
     title: 'Нужно разыграть',
     drawEvent: (kind: 'good' | 'bad', source: keyof typeof effectSources) =>
       `${kind === 'bad' ? 'Плохой ивент' : 'Хороший ивент'} ${effectSources[source]}`,
+    comment: 'Комментарий',
+    applied: 'Применено',
+    notApplicable: 'Не применимо',
+    commentNeeded: 'Для «не применимо» напишите комментарий',
   },
   map: {
     title: 'Карта',

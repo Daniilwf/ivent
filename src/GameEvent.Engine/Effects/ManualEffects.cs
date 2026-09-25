@@ -30,8 +30,16 @@ public enum ManualEffectOutcome
 }
 
 /// <summary>
-/// A manual effect is resolved and no longer pending. Stage 1 writes it when a run's difficulty drops below the one that
-/// granted the effect (Q-5); the player's and the admin's own commands come with C11.
+/// Resolve a pending manual effect (D-31, D-102): the owner (<see cref="PlayerId"/> set by the player endpoint) or the
+/// admin (<see cref="PlayerId"/> null, set by the admin endpoint) marks it applied or not applicable. «Не применимо» needs a
+/// comment; the admin always writes one (D-89); the player's «применено» may go without.
+/// </summary>
+public sealed record ResolveManualEffect(Guid EffectId, ManualEffectOutcome Outcome, string? Comment, Guid? PlayerId) : ICommand;
+
+/// <summary>
+/// A manual effect is resolved and no longer pending: by the owner or the admin (<see cref="ResolveManualEffect"/>), or
+/// by the engine when a run's difficulty drops below the one that granted it (Q-5). <see cref="Comment"/> is empty when the
+/// owner applied it without one.
 /// </summary>
 [EventType("manual-effect-resolved")]
 public sealed record ManualEffectResolved(Guid EffectId, Guid PlayerId, Guid? RunId, ManualEffectOutcome Outcome, string Comment) : IGameEvent;
@@ -41,6 +49,46 @@ public sealed record ManualEffectCreated(Guid EffectId, Guid PlayerId, EventKind
 
 internal static class ManualEffects
 {
+    public static Decision Decide(Seasons.SeasonState state, ResolveManualEffect command)
+    {
+        if (!state.IsCreated)
+        {
+            return Decision.Reject(RejectionCodes.SeasonNotCreated, "Create the season first.");
+        }
+
+        // Pending effects are settled while the season runs or closes; after the finish the log is final (D-101).
+        if (state.Status is not (Seasons.SeasonStatus.Active or Seasons.SeasonStatus.Closing))
+        {
+            return Decision.Reject(RejectionCodes.SeasonClosed, $"The season is {state.Status}.");
+        }
+
+        if (!Enum.IsDefined(command.Outcome))
+        {
+            return Decision.Reject(RejectionCodes.EffectUnknownOutcome, $"Unknown outcome {command.Outcome}.");
+        }
+
+        if (!state.ManualEffects.TryGetValue(command.EffectId, out var effect))
+        {
+            return Decision.Reject(RejectionCodes.EffectNotPending, $"Manual effect {command.EffectId} is not pending.");
+        }
+
+        if (command.PlayerId is { } playerId && playerId != effect.PlayerId)
+        {
+            return Decision.Reject(RejectionCodes.EffectNotYours, "A player resolves only their own manual effects.");
+        }
+
+        var comment = command.Comment?.Trim() ?? "";
+        var needsComment = command.PlayerId is null || command.Outcome == ManualEffectOutcome.NotApplicable;
+        if (needsComment && comment.Length == 0)
+        {
+            return Decision.Reject(RejectionCodes.CommentRequired, "«Не применимо» and every admin resolution explain themselves.");
+        }
+
+        return comment.Length > Limits.MaxCommentLength
+            ? Decision.Reject(RejectionCodes.CommentTooLong, $"The comment is limited to {Limits.MaxCommentLength} characters.")
+            : Decision.Accept(new ManualEffectResolved(effect.EffectId, effect.PlayerId, effect.RunId, command.Outcome, comment));
+    }
+
     public static Seasons.SeasonState Apply(Seasons.SeasonState state, ManualEffectResolved e) =>
         state.ManualEffects.ContainsKey(e.EffectId)
             ? state with { ManualEffects = state.ManualEffects.Remove(e.EffectId) }

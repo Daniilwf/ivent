@@ -20,6 +20,9 @@ public static class RejectionCodes
     public const string CellUnknown = "map.unknownCell";
     public const string NothingToChange = "player.nothingToChange";
     public const string CommentRequired = "player.commentRequired";
+    public const string EffectNotPending = "effect.notPending";
+    public const string EffectNotYours = "effect.notYours";
+    public const string EffectUnknownOutcome = "effect.unknownOutcome";
     public const string CommentTooLong = "player.commentTooLong";
     public const string InvalidResource = "player.invalidResource";
     public const string DeltaTooLarge = "player.deltaTooLarge";
