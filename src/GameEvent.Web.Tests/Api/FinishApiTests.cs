@@ -75,6 +75,32 @@ public sealed class FinishApiTests : IAsyncLifetime
         Assert.Equal((2, false), (mine.GetProperty("order").GetInt32(), mine.GetProperty("frozen").GetBoolean()));
     }
 
+    [Fact]
+    public async Task Two_finishes_sent_at_once_get_orders_one_and_two_by_the_queue()
+    {
+        // «Проверка на дыры»: two players one cell before the finish complete at the same moment — the single command queue
+        // (L7) runs one after the other, so exactly one is first and the other second, never two firsts
+        var vasya = await _site.SignedInAsync("vasya");
+        var petya = await _site.SignedInAsync("petya");
+        var beforeFinish = $"c{RulesetJson.Default().Map.LinearLength - 1}";
+        foreach (var (client, login) in new[] { (vasya, "vasya"), (petya, "petya") })
+        {
+            await _site.SendAsync(new AdjustPlayer(_site.Players[login], "Перенос для теста", CellId: beforeFinish));
+            await PostOkAsync(client, Url("roll"), new { commandId = Guid.NewGuid() });
+            await PostOkAsync(client, Url("start"), new { commandId = Guid.NewGuid() });
+        }
+
+        await Task.WhenAll(
+            PostOkAsync(vasya, Url("complete"), new { commandId = Guid.NewGuid(), difficulty = "normal" }),
+            PostOkAsync(petya, Url("complete"), new { commandId = Guid.NewGuid(), difficulty = "normal" }));
+
+        var season = await SeasonJsonAsync(vasya);
+        var orders = new[] { "vasya", "petya" }
+            .Select(login => PlayerOf(season, _site.Players[login]).GetProperty("finishOrder").GetInt32())
+            .Order();
+        Assert.Equal([1, 2], orders);
+    }
+
     // ---- Helpers ----
 
     // ---- The turn of a finisher (D-99) ----
