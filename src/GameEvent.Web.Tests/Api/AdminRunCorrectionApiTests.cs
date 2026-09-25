@@ -115,7 +115,7 @@ public sealed class AdminRunCorrectionApiTests : IAsyncLifetime
         Assert.Equal(run.Hours, Property(data.RootElement, "oldHours").GetDecimal());
         Assert.Equal(run.Hours + 6, Property(data.RootElement, "newHours").GetDecimal());
         Assert.Equal(2, Property(data.RootElement, "added").GetArrayLength());
-        Assert.Equal(0, Property(data.RootElement, "removed").GetInt32());
+        Assert.Equal(0, Property(data.RootElement, "removed").GetArrayLength());
         Assert.Equal("Часы по HLTB", Property(data.RootElement, "comment").GetString());
         Assert.Equal(_site.Clock.UtcNow, Property(data.RootElement, "correctedAt").GetDateTimeOffset());
     }
@@ -136,6 +136,14 @@ public sealed class AdminRunCorrectionApiTests : IAsyncLifetime
         using var after = JsonDocument.Parse(row.DiceJson);
         Assert.Equal(1, after.RootElement.GetArrayLength()); // min 1 die
         Assert.Equal(before.RootElement[0].GetRawText(), after.RootElement[0].GetRawText());
+
+        // The event keeps the values of the dice taken off the end, in their order
+        var logged = await db.Events.SingleAsync(e => e.Type == "run-hours-corrected", Ct);
+        using var data = JsonDocument.Parse(logged.Data);
+        static (int, int) Face(JsonElement die) => (Property(die, "sides").GetInt32(), Property(die, "value").GetInt32());
+        Assert.Equal(
+            before.RootElement.EnumerateArray().Skip(1).Select(Face),
+            Property(data.RootElement, "removed").EnumerateArray().Select(Face));
     }
 
     [Fact]
@@ -324,6 +332,30 @@ public sealed class AdminRunCorrectionApiTests : IAsyncLifetime
         Assert.True(repeat.RootElement.GetProperty("duplicate").GetBoolean());
         await using var db = _site.NewDb();
         Assert.Equal(1, await db.Events.CountAsync(e => e.Type == type, Ct));
+    }
+
+    [Theory]
+    [InlineData("hours")]
+    [InlineData("difficulty")]
+    public async Task Same_command_id_with_another_body_is_a_conflict(string action)
+    {
+        // D-95: a repeat counts only with the same body; another body under a used id is refused and changes nothing
+        var run = await VasyaCompletedAsync();
+        var admin = await _site.SignedInAsync("admin");
+        var commandId = Guid.NewGuid();
+        object First() => action == "hours"
+            ? new { commandId, hours = run.Hours + 6, comment = "Часы по HLTB" }
+            : (object)new { commandId, difficulty = "hard", comment = "По пруфу — сложная" };
+        object Other() => action == "hours"
+            ? new { commandId, hours = run.Hours + 9, comment = "Часы по HLTB" }
+            : (object)new { commandId, difficulty = "extreme", comment = "По пруфу — сложная" };
+
+        await PostOkAsync(admin, Url(action, run.Id), First());
+        var before = await EventCountAsync();
+        var second = await admin.PostAsJsonAsync(Url(action, run.Id), Other(), Ct);
+
+        await AssertConflictAsync(second, "command.idReused");
+        Assert.Equal(before, await EventCountAsync());
     }
 
     // ---- Another season ----

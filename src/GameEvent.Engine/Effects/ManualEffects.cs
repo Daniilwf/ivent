@@ -34,7 +34,7 @@ public enum ManualEffectOutcome
 /// granted the effect (Q-5); the player's and the admin's own commands come with C11.
 /// </summary>
 [EventType("manual-effect-resolved")]
-public sealed record ManualEffectResolved(Guid EffectId, ManualEffectOutcome Outcome, string Comment) : IGameEvent;
+public sealed record ManualEffectResolved(Guid EffectId, Guid PlayerId, Guid? RunId, ManualEffectOutcome Outcome, string Comment) : IGameEvent;
 
 [EventType("manual-effect-created")]
 public sealed record ManualEffectCreated(Guid EffectId, Guid PlayerId, EventKind DrawEvent, ManualEffectSource Source, Guid? RunId) : IGameEvent;

@@ -39,8 +39,8 @@ public static class AdminRunEndpoints
             .WithActionErrors();
 
         season.MapPost("/runs/{runId:guid}/hours", (Guid seasonId, Guid runId, HoursCorrectionRequest request, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, CancellationToken ct) =>
-            request.Hours is not { } hours || hours <= 0 || hours > SeasonEndpoints.MaxEstimatedHours
-                ? Invalid("hours", $"Hours must be greater than 0 and at most {SeasonEndpoints.MaxEstimatedHours}.")
+            request.Hours is not { } hours || hours <= 0 || hours > SeasonEndpoints.MaxHours
+                ? Invalid("hours", $"Hours must be greater than 0 and at most {SeasonEndpoints.MaxHours}.")
                 : CommentInvalid(request.Comment) is { } badComment
                     ? Task.FromResult<ActionResult>(badComment)
                     : SendAsync(seasonId, request.CommandId, new CorrectRunHours(runId, hours, request.Comment!), user, db, bus, ct))

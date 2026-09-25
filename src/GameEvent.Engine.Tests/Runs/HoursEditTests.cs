@@ -13,7 +13,7 @@ namespace GameEvent.Engine.Tests.Runs;
 /// The admin corrects the hours of a completed run (W7; SPEC «Каждый кубик хранится отдельно. Если админ поправил часы
 /// после броска, недостающие кубики докидываются, лишние снимаются с конца»; «Без часов … админ может поправить»;
 /// D-13, D-14, D-96 (2), D-97). <see cref="CorrectRunHours"/> writes <see cref="RunHoursCorrected"/> (old and new hours,
-/// the dice rolled and appended, how many were taken off the end), then the difference:
+/// the dice rolled and appended, the dice taken off the end with their values), then the difference:
 /// <see cref="PointsChanged"/>, <see cref="PlayerMoved"/> from the current cell (forward along the arrows, back along the
 /// walked path, never past the start) and <see cref="CoinsChanged"/> by the coin formula of the snapshot — each only
 /// when it is not zero. The dice count uses the rule fixed in the run's snapshot. Challenge dice are never touched.
@@ -81,7 +81,7 @@ public class HoursEditTests
         Assert.Equal(1, s.Random.ScriptedLeft);
         Assert.Equal(
             [
-                new RunHoursCorrected(runId, vasya, 6, 12, [new Die(4, 2), new Die(4, 4)], 0, Comment, s.Clock.UtcNow),
+                new RunHoursCorrected(runId, vasya, 6, 12, [new Die(4, 2), new Die(4, 4)], [], Comment, s.Clock.UtcNow),
                 new PointsChanged(vasya, 6, PointsReason.RunCorrection, runId),
                 new PlayerMoved(vasya, "c4", "c10", 6, Cells(5, 10), MoveReason.RunCorrection, runId),
                 new CoinsChanged(vasya, 6, CoinsReason.RunCorrection, runId),
@@ -129,7 +129,7 @@ public class HoursEditTests
         Assert.Equal(1, s.Random.ScriptedLeft);
         Assert.Equal(
             [
-                new RunHoursCorrected(runId, vasya, 12, 6, [], 2, Comment, s.Clock.UtcNow),
+                new RunHoursCorrected(runId, vasya, 12, 6, [], [new Die(4, 3), new Die(4, 4)], Comment, s.Clock.UtcNow),
                 new PointsChanged(vasya, -7, PointsReason.RunCorrection, runId),
                 new PlayerMoved(vasya, "c10", "c3", -7, Cells(9, 3), MoveReason.RunCorrection, runId),
                 new CoinsChanged(vasya, -6, CoinsReason.RunCorrection, runId),
@@ -151,7 +151,7 @@ public class HoursEditTests
         Correct(s, runId, 6);
 
         ScenarioAssert.Accepted(s);
-        Assert.Equal(2, Assert.Single(s.LastEvents<RunHoursCorrected>()).Removed);
+        Assert.Equal([new Die(4, 2), new Die(4, 4)], Assert.Single(s.LastEvents<RunHoursCorrected>()).Removed);
         Assert.Equal([new Die(4, 3), new Die(4, 1)], s.State.Runs[runId].Dice);
         Assert.Equal((before.Points, before.CellId, before.Coins), (s.Player("Вася").Points, s.Player("Вася").CellId, s.Player("Вася").Coins));
     }
@@ -165,7 +165,23 @@ public class HoursEditTests
         var result = SeasonEngine.Execute(s.State, new CorrectRunHours(runId, 3, Comment), s.Context() with { Random = new NoRandom() });
 
         Assert.True(result.IsAccepted, $"Rejected: {result.Rejection}");
-        Assert.Equal(3, Assert.Single(result.Events.OfType<RunHoursCorrected>()).Removed);
+        Assert.Equal([new Die(4, 2), new Die(4, 3), new Die(4, 4)], Assert.Single(result.Events.OfType<RunHoursCorrected>()).Removed);
+    }
+
+    [Fact]
+    public void Removed_dice_keep_their_values_in_order_from_the_end()
+    {
+        // Given a 12-hour game: dice 2, 3, 4, 1
+        var (s, runId) = Completed(12, [2, 3, 4, 1]);
+
+        // When the hours drop to 6 (2 dice)
+        Correct(s, runId, 6);
+
+        // Then the event keeps exactly the dice taken off the end — 4 and 1 — in their order in the run
+        ScenarioAssert.Accepted(s);
+        Assert.Equal([new Die(4, 4), new Die(4, 1)], Assert.Single(s.LastEvents<RunHoursCorrected>()).Removed);
+        Assert.Equal([new Die(4, 2), new Die(4, 3)], s.State.Runs[runId].Dice);
+        Assert.Equal(-5, Assert.Single(s.LastEvents<PointsChanged>()).Delta);
     }
 
     // ---- The dice count by the snapshot (D-13, S1) ----
@@ -201,7 +217,8 @@ public class HoursEditTests
 
         ScenarioAssert.Accepted(s);
         var corrected = Assert.Single(s.LastEvents<RunHoursCorrected>());
-        Assert.Equal((added, removed), (corrected.Added.Count, corrected.Removed));
+        Assert.Equal((added, removed), (corrected.Added.Count, corrected.Removed.Count));
+        Assert.All(corrected.Removed, d => Assert.Equal(new Die(4, 1), d));
         Assert.Equal((int)(oldHours / 3) + added - removed, s.State.Runs[runId].Dice.Count);
     }
 
@@ -217,7 +234,7 @@ public class HoursEditTests
         ScenarioAssert.Accepted(s);
         Assert.Equal(
             [
-                new RunHoursCorrected(runId, vasya, 6, 7, [], 0, Comment, s.Clock.UtcNow),
+                new RunHoursCorrected(runId, vasya, 6, 7, [], [], Comment, s.Clock.UtcNow),
                 new CoinsChanged(vasya, 1, CoinsReason.RunCorrection, runId),
             ],
             s.Last.Events);
@@ -237,7 +254,7 @@ public class HoursEditTests
 
         ScenarioAssert.Accepted(s);
         Assert.Equal(
-            [new RunHoursCorrected(runId, vasya, (decimal)oldHours, (decimal)newHours, [], 0, Comment, s.Clock.UtcNow)],
+            [new RunHoursCorrected(runId, vasya, (decimal)oldHours, (decimal)newHours, [], [], Comment, s.Clock.UtcNow)],
             s.Last.Events);
     }
 
@@ -291,7 +308,7 @@ public class HoursEditTests
         Correct(s, runId, 3);
 
         ScenarioAssert.Accepted(s);
-        Assert.Equal(1, Assert.Single(s.LastEvents<RunHoursCorrected>()).Removed);
+        Assert.Equal([new Die(4, 1)], Assert.Single(s.LastEvents<RunHoursCorrected>()).Removed);
         Assert.Equal(new PointsChanged(s.PlayerId("Вася"), -1, PointsReason.RunCorrection, runId), Assert.Single(s.LastEvents<PointsChanged>()));
         Assert.Equal([new Die(4, 3)], s.State.Runs[runId].Dice);
         Assert.Equal([new Die(4, 4)], s.State.Runs[runId].ChallengeDice);

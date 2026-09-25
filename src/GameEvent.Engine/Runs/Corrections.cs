@@ -24,8 +24,8 @@ public sealed record ChangeRunDifficulty(Guid RunId, Difficulty Difficulty, stri
 public sealed record DieChange(Die Before, Die After);
 
 /// <summary>
-/// The hours of a run were corrected: <see cref="Added"/> dice were rolled and appended, <see cref="Removed"/> dice
-/// were taken off the end of the dice by hours.
+/// The hours of a run were corrected: <see cref="Added"/> dice were rolled and appended, the <see cref="Removed"/> dice
+/// were taken off the end of the dice by hours (their values kept, like the dice of a difficulty change).
 /// </summary>
 [EventType("run-hours-corrected")]
 public sealed record RunHoursCorrected(
@@ -34,7 +34,7 @@ public sealed record RunHoursCorrected(
     decimal OldHours,
     decimal NewHours,
     EquatableArray<Die> Added,
-    int Removed,
+    EquatableArray<Die> Removed,
     string Comment,
     DateTimeOffset CorrectedAt) : IGameEvent;
 
@@ -75,8 +75,8 @@ internal static class Corrections
         var count = CompletionRoll.Count(command.Hours, run.Snapshot.DiceCount);
         var sides = CompletionRoll.DieFor(run.Difficulty!.Value, run.Snapshot.DieByDifficulty).Sides;
         var added = count > run.Dice.Count ? CompletionRoll.Roll(count - run.Dice.Count, sides, context.Random) : [];
-        var removed = Math.Max(0, run.Dice.Count - count);
-        var delta = added.Sum(d => d.Value) - run.Dice.Skip(count).Sum(d => d.Value);
+        EquatableArray<Die> removed = [.. run.Dice.Skip(count)];
+        var delta = added.Sum(d => d.Value) - removed.Sum(d => d.Value);
 
         var corrected = new RunHoursCorrected(
             run.RunId, run.PlayerId, oldHours, command.Hours, added, removed, command.Comment, context.Clock.UtcNow);
@@ -96,6 +96,11 @@ internal static class Corrections
             return rejection;
         }
 
+        if (!Enum.IsDefined(command.Difficulty))
+        {
+            return Decision.Reject(RejectionCodes.CommandInvalid, $"Unknown difficulty {command.Difficulty}.");
+        }
+
         var run = state.Runs[command.RunId];
         var old = run.Difficulty ?? throw new InvalidOperationException($"Completed run {run.RunId} has no difficulty.");
         if (command.Difficulty == old)
@@ -104,7 +109,6 @@ internal static class Corrections
         }
 
         // Q-5: each die ⌈old × new sides / old sides⌉; no randomness.
-        var oldRule = CompletionRoll.DieFor(old, run.Snapshot.DieByDifficulty);
         var newRule = CompletionRoll.DieFor(command.Difficulty, run.Snapshot.DieByDifficulty);
         EquatableArray<DieChange> Recalculate(EquatableArray<Die> dice) =>
             [.. dice.Select(d => new DieChange(d, new Die(newRule.Sides, (int)Math.Ceiling((decimal)d.Value * newRule.Sides / d.Sides))))];
@@ -117,14 +121,11 @@ internal static class Corrections
         var events = new List<IGameEvent> { changed };
         events.AddRange(Difference(state, run, delta));
 
-        // The difficulty's own event follows the change: a pending one of the old difficulty is not applicable,
-        // the new difficulty grants its own (Q-5, D-97).
-        if (oldRule.GrantEvent is not null)
-        {
-            events.AddRange(state.ManualEffects.Values
-                .Where(e => e.RunId == run.RunId && e.Source == ManualEffectSource.Difficulty)
-                .Select(e => new ManualEffectResolved(e.EffectId, ManualEffectOutcome.NotApplicable, command.Comment)));
-        }
+        // The difficulty's own event follows the change: a pending one of the old difficulty is not applicable (one already
+        // played out stays, the admin corrects by hand), the new difficulty grants its own (Q-5, D-97).
+        events.AddRange(state.ManualEffects.Values
+            .Where(e => e.RunId == run.RunId && e.Source == ManualEffectSource.Difficulty)
+            .Select(e => new ManualEffectResolved(e.EffectId, e.PlayerId, e.RunId, ManualEffectOutcome.NotApplicable, command.Comment)));
 
         if (newRule.GrantEvent is { } granted)
         {
@@ -137,7 +138,7 @@ internal static class Corrections
     public static SeasonState Apply(SeasonState state, RunHoursCorrected e)
     {
         var run = state.Runs[e.RunId];
-        EquatableArray<Die> dice = [.. run.Dice.Take(run.Dice.Count - e.Removed), .. e.Added];
+        EquatableArray<Die> dice = [.. run.Dice.Take(run.Dice.Count - e.Removed.Count), .. e.Added];
         return state with { Runs = state.Runs.SetItem(e.RunId, run with { Hours = e.NewHours, Dice = dice }) };
     }
 

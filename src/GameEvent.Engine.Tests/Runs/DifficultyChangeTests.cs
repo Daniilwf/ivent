@@ -14,7 +14,7 @@ namespace GameEvent.Engine.Tests.Runs;
 /// игрок понизил сложность посреди игры, считается более низкая»; Q-5, D-97). Every die — the challenge dice too —
 /// becomes ⌈old × new sides / old sides⌉; <see cref="RunDifficultyChanged"/> keeps both values of each die. Points and
 /// position change by the difference (no coins: they do not depend on difficulty). No randomness. The difficulty's event:
-/// a pending one granted by the old difficulty is resolved «не применимо» with the comment
+/// any pending difficulty event of the run is resolved «не применимо» with the comment, the player and the run
 /// (<see cref="ManualEffectResolved"/>) and leaves the pending list; a new difficulty with <c>grantEvent</c> creates one.
 /// Test ruleset: easy d2, normal d4, hard d6, extreme d6 with a good event; hoursPerDie 3.
 /// </summary>
@@ -260,7 +260,7 @@ public class DifficultyChangeTests
         Assert.Equal(
             [typeof(RunDifficultyChanged), typeof(PointsChanged), typeof(PlayerMoved), typeof(ManualEffectResolved)],
             s.Last.Events.Select(e => e.GetType()));
-        Assert.Equal(new ManualEffectResolved(effectId, ManualEffectOutcome.NotApplicable, Comment), s.Last.Events[^1]);
+        Assert.Equal(new ManualEffectResolved(effectId, vasya, runId, ManualEffectOutcome.NotApplicable, Comment), s.Last.Events[^1]);
         Assert.Equal(new PointsChanged(vasya, -1, PointsReason.RunCorrection, runId), s.Last.Events[1]);
         Assert.Empty(s.State.ManualEffects);
         Assert.Empty(s.LastEvents<ManualEffectCreated>());
@@ -276,7 +276,7 @@ public class DifficultyChangeTests
 
         ScenarioAssert.Accepted(s);
         Assert.Equal([typeof(RunDifficultyChanged), typeof(ManualEffectResolved)], s.Last.Events.Select(e => e.GetType()));
-        Assert.Equal(new ManualEffectResolved(effectId, ManualEffectOutcome.NotApplicable, Comment), s.Last.Events[1]);
+        Assert.Equal(new ManualEffectResolved(effectId, s.PlayerId("Вася"), runId, ManualEffectOutcome.NotApplicable, Comment), s.Last.Events[1]);
         Assert.False(s.State.ManualEffects.ContainsKey(effectId));
     }
 
@@ -377,10 +377,78 @@ public class DifficultyChangeTests
         Change(s, runId, Difficulty.Hard);
 
         ScenarioAssert.Accepted(s);
-        Assert.Equal(new ManualEffectResolved(good, ManualEffectOutcome.NotApplicable, Comment), Assert.Single(s.LastEvents<ManualEffectResolved>()));
+        Assert.Equal(
+            new ManualEffectResolved(good, s.PlayerId("Вася"), runId, ManualEffectOutcome.NotApplicable, Comment),
+            Assert.Single(s.LastEvents<ManualEffectResolved>()));
         var created = Assert.Single(s.LastEvents<ManualEffectCreated>());
         Assert.Equal((EventKind.Bad, ManualEffectSource.Difficulty, (Guid?)runId), (created.DrawEvent, created.Source, created.RunId));
         Assert.Equal(created.EffectId, Assert.Single(s.State.ManualEffects.Keys));
+    }
+
+    [Fact]
+    public void Resolved_event_carries_the_player_and_the_run()
+    {
+        // Петя's run is lowered: the resolution names Петя and his run, not whoever else has effects
+        var (s, _) = Completed(Difficulty.Extreme, [5, 2]);
+        s.Roll("Петя").Start("Петя");
+        var petyaRun = s.Player("Петя").ActiveRunId!.Value;
+        s.NextRandom(4, 4).Complete("Петя", Difficulty.Extreme);
+        ScenarioAssert.Accepted(s);
+        var effectId = PendingEffectOf(s, petyaRun);
+
+        Change(s, petyaRun, Difficulty.Hard);
+
+        ScenarioAssert.Accepted(s);
+        var resolved = Assert.Single(s.LastEvents<ManualEffectResolved>());
+        Assert.Equal(
+            new ManualEffectResolved(effectId, s.PlayerId("Петя"), petyaRun, ManualEffectOutcome.NotApplicable, Comment),
+            resolved);
+    }
+
+    /// <summary>The good event of «выше сложной» was already played (resolved «применено») before the proof check.</summary>
+    private static SeasonState AppliedGoodEvent(Scenario s, Guid runId) =>
+        SeasonEngine.Apply(
+            s.State,
+            new ManualEffectResolved(PendingEffectOf(s, runId), s.PlayerId("Вася"), runId, ManualEffectOutcome.Applied, "Разыграли"));
+
+    [Fact]
+    public void Lowering_after_the_good_event_was_applied_leaves_it_to_the_admin()
+    {
+        // Given the good event of «выше сложной» was already played
+        var (s, runId) = Completed(Difficulty.Extreme, [5, 2]);
+        var applied = AppliedGoodEvent(s, runId);
+        Assert.Empty(applied.ManualEffects);
+
+        // When the proof shows normal
+        var result = SeasonEngine.Execute(applied, new ChangeRunDifficulty(runId, Difficulty.Normal, Comment), s.Context());
+
+        // Then the dice and points follow; nothing is resolved (it is gone already) and nothing fails — the admin fixes it by hand
+        Assert.True(result.IsAccepted, $"Rejected: {result.Rejection}");
+        Assert.Equal(
+            [typeof(RunDifficultyChanged), typeof(PointsChanged), typeof(PlayerMoved)],
+            result.Events.Select(e => e.GetType()));
+        Assert.Empty(result.State.ManualEffects);
+        Assert.Equal(Difficulty.Normal, result.State.Runs[runId].Difficulty);
+    }
+
+    [Fact]
+    public void Applied_then_lowered_then_raised_gives_a_second_good_event()
+    {
+        // D-97: accepted — the admin corrects the second event by hand
+        var (s, runId) = Completed(Difficulty.Extreme, [5, 2]);
+        var first = PendingEffectOf(s, runId);
+        var state = AppliedGoodEvent(s, runId);
+
+        var lowered = SeasonEngine.Execute(state, new ChangeRunDifficulty(runId, Difficulty.Normal, Comment), s.Context());
+        Assert.True(lowered.IsAccepted, $"Rejected: {lowered.Rejection}");
+        var raised = SeasonEngine.Execute(lowered.State, new ChangeRunDifficulty(runId, Difficulty.Extreme, "Всё-таки выше сложной"), s.Context());
+
+        Assert.True(raised.IsAccepted, $"Rejected: {raised.Rejection}");
+        var created = Assert.Single(raised.Events.OfType<ManualEffectCreated>());
+        Assert.NotEqual(first, created.EffectId);
+        Assert.Equal(
+            new PendingManualEffect(created.EffectId, s.PlayerId("Вася"), EventKind.Good, ManualEffectSource.Difficulty, runId),
+            Assert.Single(raised.State.ManualEffects.Values));
     }
 
     // ---- Determinism: no dice are thrown ----
@@ -420,6 +488,39 @@ public class DifficultyChangeTests
     }
 
     [Fact]
+    public void Dropped_run_is_rejected()
+    {
+        var (s, _) = Completed(Difficulty.Normal, [3, 1]);
+        s.Roll("Вася").Start("Вася");
+        var dropped = s.Player("Вася").ActiveRunId!.Value;
+        s.Act(new DropRun(s.PlayerId("Вася")));
+        ScenarioAssert.Accepted(s);
+
+        ScenarioAssert.RejectsWithoutChanges(s, x => Change(x, dropped, Difficulty.Hard), RejectionCodes.RunNotCompleted);
+    }
+
+    [Fact]
+    public void Tech_rerolled_run_is_rejected()
+    {
+        var (s, _) = Completed(Difficulty.Normal, [3, 1]);
+        s.Roll("Вася").Start("Вася");
+        var rerolled = s.Player("Вася").ActiveRunId!.Value;
+        s.Act(new TechReroll(s.PlayerId("Вася"), TechRerollReason.DoesNotLaunch, "Не запускается"));
+        ScenarioAssert.Accepted(s);
+        Assert.Equal(RunStatus.TechRerolled, s.State.Runs[rerolled].Status);
+
+        ScenarioAssert.RejectsWithoutChanges(s, x => Change(x, rerolled, Difficulty.Hard), RejectionCodes.RunNotCompleted);
+    }
+
+    [Fact]
+    public void Undefined_difficulty_is_rejected_as_an_invalid_command()
+    {
+        var (s, runId) = Completed(Difficulty.Normal, [3, 1]);
+
+        ScenarioAssert.RejectsWithoutChanges(s, x => Change(x, runId, (Difficulty)99), RejectionCodes.CommandInvalid);
+    }
+
+    [Fact]
     public void Unknown_run_is_rejected()
     {
         var (s, _) = Completed(Difficulty.Normal, [3, 1]);
@@ -446,6 +547,18 @@ public class DifficultyChangeTests
 
         ScenarioAssert.RejectsWithoutChanges(
             s, x => Change(x, runId, Difficulty.Hard, new string('я', Limits.MaxCommentLength + 1)), RejectionCodes.CommentTooLong);
+    }
+
+    [Fact]
+    public void Comment_at_the_limit_is_accepted()
+    {
+        var (s, runId) = Completed(Difficulty.Normal, [3, 1]);
+        var comment = new string('я', Limits.MaxCommentLength);
+
+        Change(s, runId, Difficulty.Hard, comment);
+
+        ScenarioAssert.Accepted(s);
+        Assert.Equal(comment, Assert.Single(s.LastEvents<RunDifficultyChanged>()).Comment);
     }
 
     [Fact]
@@ -530,7 +643,7 @@ public class DifficultyChangeTests
         var (s, runId) = Completed(Difficulty.Extreme, [5, 2]);
         var effectId = PendingEffectOf(s, runId);
 
-        var after = SeasonEngine.Apply(s.State, new ManualEffectResolved(effectId, ManualEffectOutcome.Applied, "Разыграли"));
+        var after = SeasonEngine.Apply(s.State, new ManualEffectResolved(effectId, s.PlayerId("Вася"), runId, ManualEffectOutcome.Applied, "Разыграли"));
 
         Assert.Empty(after.ManualEffects);
         Assert.Equal(s.State with { ManualEffects = after.ManualEffects }, after);

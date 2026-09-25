@@ -170,9 +170,9 @@ public class EventFormatTests
         },
         {
             "run-hours-corrected",
-            new RunHoursCorrected(s_run, s_player, 6m, 12m, [new Die(4, 2), new Die(4, 3)], 0, "Часы по HLTB", s_at),
+            new RunHoursCorrected(s_run, s_player, 6m, 12m, [new Die(4, 2), new Die(4, 3)], [], "Часы по HLTB", s_at),
             1,
-            """{"runId":"00000000-0000-0000-0000-000000000001","playerId":"10000000-0000-0000-0000-000000000001","oldHours":6,"newHours":12,"added":[{"sides":4,"value":2},{"sides":4,"value":3}],"removed":0,"comment":"Часы по HLTB","correctedAt":"2026-10-01T12:30:00+00:00"}"""
+            """{"runId":"00000000-0000-0000-0000-000000000001","playerId":"10000000-0000-0000-0000-000000000001","oldHours":6,"newHours":12,"added":[{"sides":4,"value":2},{"sides":4,"value":3}],"removed":[],"comment":"Часы по HLTB","correctedAt":"2026-10-01T12:30:00+00:00"}"""
         },
         {
             "run-difficulty-changed",
@@ -184,9 +184,9 @@ public class EventFormatTests
         },
         {
             "manual-effect-resolved",
-            new ManualEffectResolved(s_run, ManualEffectOutcome.NotApplicable, "Сложность понижена по пруфу"),
+            new ManualEffectResolved(s_run, s_player, s_run, ManualEffectOutcome.NotApplicable, "Сложность понижена по пруфу"),
             1,
-            """{"effectId":"00000000-0000-0000-0000-000000000001","outcome":"notApplicable","comment":"Сложность понижена по пруфу"}"""
+            """{"effectId":"00000000-0000-0000-0000-000000000001","playerId":"10000000-0000-0000-0000-000000000001","runId":"00000000-0000-0000-0000-000000000001","outcome":"notApplicable","comment":"Сложность понижена по пруфу"}"""
         },
         {
             "run-started",

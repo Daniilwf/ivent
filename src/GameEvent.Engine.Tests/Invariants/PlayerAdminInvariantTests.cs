@@ -228,11 +228,16 @@ public class PlayerAdminInvariantTests
         };
         return arg switch
         {
-            4 => new CorrectRunHours(runId, s_correctedHours[b % 8], "часы по HLTB"),
-            6 => new CorrectRunHours(runId, s_correctedHours[(b / 2) % 8], b % 2 == 0 ? " " : "часы по пруфу"),
+            4 or 6 => new CorrectRunHours(runId, s_correctedHours[HoursIndex(arg, b)], arg == 6 && b % 4 == 3 ? " " : "часы по пруфу"),
             _ => new ChangeRunDifficulty(runId, (Difficulty)(b % 4), "сложность по пруфу"),
         };
     }
+
+    /// <summary>
+    /// Bits 2–7 are fixed by the choice of a hours correction, so the index takes the argument (4 or 6) and the free bits
+    /// 0–1: argument 4 gives 0, 1, 3, 6 hours, argument 6 gives 7.5, 12, 30, 100 — every value is reachable.
+    /// </summary>
+    private static int HoursIndex(int arg, byte b) => ((arg - 4) * 2) + (b % 4);
 
     private static Guid RunToConvert(Scenario s, Guid player, byte b)
     {
@@ -307,6 +312,18 @@ public class PlayerAdminInvariantTests
     [Property(MaxTest = 200)]
     public void Invariants_hold_with_run_corrections_drops_and_rerolls(int seed, byte[] script) =>
         Play(seed, script, CheckInvariants, withChoice: true, rerolls: RerollMode.BadEvent, withDrops: true, withCorrections: true);
+
+    [Fact]
+    public void Every_corrected_hours_value_is_reachable_from_the_script()
+    {
+        // The generator must be able to produce every value, including the ones above the dice and coins ceilings
+        var reachable = Enumerable.Range(0, 256)
+            .Where(b => (b / 4) % 8 == 6 && b / 32 is 4 or 6)
+            .Select(b => s_correctedHours[HoursIndex(b / 32, (byte)b)])
+            .ToHashSet();
+
+        Assert.Equal(s_correctedHours.ToHashSet(), reachable);
+    }
 
     [Property(MaxTest = 50)]
     public void Same_seed_and_commands_give_the_same_log_with_run_corrections(int seed, byte[] script)
@@ -880,7 +897,7 @@ public class PlayerAdminInvariantTests
         var newCount = ExpectedDiceCount(correct.Hours, run.Snapshot.DiceCount);
         var corrected = Assert.IsType<RunHoursCorrected>(events[0]);
         Assert.Equal(
-            (run.RunId, run.PlayerId, run.Hours!.Value, correct.Hours, Math.Max(0, oldCount - newCount), correct.Comment, s.Clock.UtcNow),
+            (run.RunId, run.PlayerId, run.Hours!.Value, correct.Hours, (EquatableArray<Die>)[.. run.Dice.Skip(newCount)], correct.Comment, s.Clock.UtcNow),
             (corrected.RunId, corrected.PlayerId, corrected.OldHours, corrected.NewHours, corrected.Removed, corrected.Comment, corrected.CorrectedAt));
         Assert.Equal(Math.Max(0, newCount - oldCount), corrected.Added.Count);
         var sides = DieOf(run.Difficulty!.Value, run.Snapshot.DieByDifficulty).Sides;
@@ -940,10 +957,10 @@ public class PlayerAdminInvariantTests
         Assert.All(events, e => Assert.Contains(e.GetType(), allowed));
         CheckCorrectionDifference(s, run, dice.Concat(challenge).Sum(d => d.After.Value - d.Before.Value), before);
 
-        // The old difficulty's pending event is resolved «not applicable» with the comment; the new one's is created
+        // Any pending event of the run's difficulty is resolved «not applicable» with the comment; the new one's is created
         var pending = before.ManualEffects.Values.Where(e => e.RunId == run.RunId && e.Source == ManualEffectSource.Difficulty);
         Assert.Equal(
-            oldRule.GrantEvent is null ? [] : pending.Select(e => new ManualEffectResolved(e.EffectId, ManualEffectOutcome.NotApplicable, change.Comment)),
+            pending.Select(e => new ManualEffectResolved(e.EffectId, run.PlayerId, run.RunId, ManualEffectOutcome.NotApplicable, change.Comment)),
             events.OfType<ManualEffectResolved>());
         var created = events.OfType<ManualEffectCreated>().ToList();
         if (newRule.GrantEvent is { } kind)
@@ -1178,7 +1195,7 @@ public class PlayerAdminInvariantTests
         var status = SeasonStatus.Draft;
         var players = new Dictionary<Guid, ReferencePlayer>();
         var runs = new Dictionary<Guid, (Guid Player, Guid Game)>();
-        var pendingEffects = new HashSet<Guid>();
+        var pendingEffects = new Dictionary<Guid, (Guid Player, Guid? Run)>();
         foreach (var e in log)
         {
             switch (e)
@@ -1223,11 +1240,12 @@ public class PlayerAdminInvariantTests
                     Assert.True(status is SeasonStatus.Active or SeasonStatus.Closing, $"Corrected while {status}.");
                     break;
                 case ManualEffectCreated created:
-                    Assert.True(pendingEffects.Add(created.EffectId), "An effect created twice.");
+                    Assert.True(pendingEffects.TryAdd(created.EffectId, (created.PlayerId, created.RunId)), "An effect created twice.");
                     break;
                 case ManualEffectResolved resolvedEffect:
                     // D-97: only a pending effect is resolved, once, with a comment
-                    Assert.True(pendingEffects.Remove(resolvedEffect.EffectId), "A resolved effect was not pending.");
+                    Assert.True(pendingEffects.Remove(resolvedEffect.EffectId, out var effectOwner), "A resolved effect was not pending.");
+                    Assert.Equal(effectOwner, (resolvedEffect.PlayerId, resolvedEffect.RunId));
                     Assert.False(string.IsNullOrWhiteSpace(resolvedEffect.Comment), "A resolution without a comment.");
                     break;
                 case GameExcluded excluded:

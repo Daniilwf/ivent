@@ -29,6 +29,11 @@ internal static class RunLifecycle
             return rejection;
         }
 
+        if (!Enum.IsDefined(command.Difficulty))
+        {
+            return Decision.Reject(RejectionCodes.CommandInvalid, $"Unknown difficulty {command.Difficulty}.");
+        }
+
         if (command.ChallengeDone && !state.Rules.Features.Challenges)
         {
             // Games carry no challenge note yet and the proof does not check it: claims are off (D-96).
