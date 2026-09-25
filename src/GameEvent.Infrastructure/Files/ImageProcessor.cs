@@ -37,6 +37,9 @@ public sealed record FileLimits
 
     /// <summary>Uploads per user in a minute (the answer is a 429 without a code, like every other rate limit).</summary>
     public int UploadsPerMinute { get; init; } = 20;
+
+    /// <summary>Downloads by link per user in an hour, failed ones included (D-117).</summary>
+    public int DownloadsPerHour { get; init; } = 30;
 }
 
 /// <summary>An upload after processing: the file to store, its thumbnail and what it is.</summary>

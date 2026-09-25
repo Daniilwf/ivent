@@ -47,6 +47,9 @@ public static class FileEndpoints
 {
     public const string UploadRateLimit = "upload";
 
+    /// <summary>Downloads by link per user in an hour, failed ones included (D-117): each costs the server traffic.</summary>
+    public const string DownloadRateLimit = "download";
+
     /// <summary>One picture is decoded at a time (D-108): a small server keeps its memory for the site.</summary>
     private static readonly SemaphoreSlim s_processing = new(1, 1);
 
@@ -76,6 +79,10 @@ public static class FileEndpoints
             o.AddPolicy(UploadRateLimit, ctx => RateLimitPartition.GetFixedWindowLimiter(
                 ctx.User.UserId()?.ToString() ?? WebSecurity.ClientKey(ctx.Connection.RemoteIpAddress),
                 _ => new FixedWindowRateLimiterOptions { PermitLimit = limits.UploadsPerMinute, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 })));
+        builder.Services.Configure<Microsoft.AspNetCore.RateLimiting.RateLimiterOptions>(o =>
+            o.AddPolicy(DownloadRateLimit, ctx => RateLimitPartition.GetFixedWindowLimiter(
+                ctx.User.UserId()?.ToString() ?? WebSecurity.ClientKey(ctx.Connection.RemoteIpAddress),
+                _ => new FixedWindowRateLimiterOptions { PermitLimit = limits.DownloadsPerHour, Window = TimeSpan.FromHours(1), QueueLimit = 0 })));
     }
 
     /// <summary>The body limit of an upload request (the rest of the API stays at <see cref="WebSecurity.ApiBodyLimitBytes"/>).</summary>
@@ -102,7 +109,7 @@ public static class FileEndpoints
             .ProducesValidationProblem();
 
         files.MapPost("/from-url", FromUrlAsync)
-            .RequireRateLimiting(UploadRateLimit)
+            .RequireRateLimiting(DownloadRateLimit)
             .Produces<StoredFileView>()
             .Produces<Seasons.RejectionProblem>(StatusCodes.Status409Conflict, "application/problem+json")
             .Produces<Seasons.RejectionProblem>(StatusCodes.Status413PayloadTooLarge, "application/problem+json")
@@ -206,9 +213,12 @@ public static class FileEndpoints
         var (content, refused) = await downloader.DownloadAsync(request.Url.Trim(), ct);
         if (content is null)
         {
-            return refused!.Code == ImageProcessor.TooLarge
-                ? TooLarge(services.Limits)
-                : Problem(StatusCodes.Status422UnprocessableEntity, "The link was refused.", refused.Detail, refused.Code);
+            return refused!.Code switch
+            {
+                ImageProcessor.TooLarge => TooLarge(services.Limits),
+                SafeDownloader.Busy => Problem(StatusCodes.Status503ServiceUnavailable, "The server is busy.", refused.Detail, refused.Code),
+                _ => Problem(StatusCodes.Status422UnprocessableEntity, "The link was refused.", refused.Detail, refused.Code),
+            };
         }
 
         return await StoreAsync(content, request.CommandId, ownerId, services, ct);

@@ -35,6 +35,9 @@ public sealed class SafeDownloaderTests
     [InlineData("https://example.com/a.gif")]
     [InlineData("https://tenor.com.evil.com/a.gif")]
     [InlineData("https://eviltenor.com/a.gif")]
+    [InlineData("https://tenor.com/view/cat-123")]
+    [InlineData("https://developers.giphy.com/a.gif")]
+    [InlineData("https://evilklipy.com/a.gif")]
     [InlineData("https://localhost/a.gif")]
     [InlineData("https://127.0.0.1/a.gif")]
     [InlineData("https://[::1]/a.gif")]
@@ -47,7 +50,6 @@ public sealed class SafeDownloaderTests
     }
 
     [Theory]
-    [InlineData("https://tenor.com/view/cat-123")]
     [InlineData("https://media.tenor.com/abc/cat.gif")]
     [InlineData("https://MEDIA.TENOR.COM/abc/cat.gif")]
     [InlineData("https://i.giphy.com/media/abc/giphy.gif")]
@@ -136,6 +138,57 @@ public sealed class SafeDownloaderTests
         var (_, refused) = await downloader.DownloadAsync("https://media.tenor.com/big.gif", Ct);
 
         Assert.Equal(ImageProcessor.TooLarge, refused?.Code);
+    }
+
+    [Fact]
+    public async Task A_gif_stops_at_its_own_limit_while_reading()
+    {
+        using var downloader = new SafeDownloader(
+            s_settings,
+            new FileLimits { MaxUploadBytes = 10_000, MaxGifBytes = 100 },
+            new FakeHandler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StreamContent(new MemoryStream([.. "GIF89a"u8.ToArray(), .. new byte[500]])),
+            })));
+
+        var (_, refused) = await downloader.DownloadAsync("https://media.tenor.com/big.gif", Ct);
+
+        Assert.Equal(ImageProcessor.TooLarge, refused?.Code);
+    }
+
+    [Fact]
+    public async Task A_redirect_to_a_link_that_cannot_be_built_is_a_failed_download()
+    {
+        using var downloader = Downloader(_ => Redirect("https://media.tenor.com/" + new string('a', 70_000)));
+
+        var (content, refused) = await downloader.DownloadAsync("https://media.tenor.com/a", Ct);
+
+        Assert.Null(content);
+        Assert.NotNull(refused);
+    }
+
+    [Fact]
+    public async Task Downloads_at_once_are_limited_on_the_whole_site()
+    {
+        var release = new TaskCompletionSource();
+        var started = 0;
+        using var downloader = new SafeDownloader(
+            new DownloadSettings { MaxConcurrent = 1, TimeoutSeconds = 1 },
+            s_limits,
+            new FakeHandler(async (_, ct) =>
+            {
+                Interlocked.Increment(ref started);
+                await release.Task.WaitAsync(ct);
+                return Png();
+            }));
+
+        var first = downloader.DownloadAsync("https://media.tenor.com/a.png", Ct);
+        var (_, refused) = await downloader.DownloadAsync("https://media.tenor.com/b.png", Ct);
+        release.SetResult();
+        await first;
+
+        Assert.Equal(SafeDownloader.Busy, refused?.Code);
+        Assert.Equal(1, started);
     }
 
     [Fact]
@@ -238,6 +291,14 @@ public sealed class SafeDownloaderTests
     [InlineData("64:ff9b::a00:1", false)]
     [InlineData("2002:a00:1::1", false)]
     [InlineData("2001:db8::1", false)]
+    [InlineData("::7f00:1", false)]
+    [InlineData("64:ff9b:1::a00:1", false)]
+    [InlineData("100::1", false)]
+    [InlineData("2001:2::1", false)]
+    [InlineData("2001:10::1", false)]
+    [InlineData("2001:20::1", false)]
+    [InlineData("3fff::1", false)]
+    [InlineData("2a00:1450:4001::1", true)]
     public void Public_addresses_are_told_from_the_rest(string address, bool isPublic)
     {
         Assert.Equal(isPublic, PublicAddress.IsPublic(IPAddress.Parse(address)));

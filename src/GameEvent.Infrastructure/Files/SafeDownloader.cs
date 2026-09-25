@@ -18,8 +18,19 @@ public sealed class DnsHostResolver : IHostResolver
 /// <summary>Downloads by link (D-117), from the <c>Files:Download</c> section of the configuration.</summary>
 public sealed record DownloadSettings
 {
-    /// <summary>Hosts a link may point to — each with its subdomains (SPEC: Tenor, Giphy, Klipy).</summary>
-    public IReadOnlyList<string> AllowedHosts { get; init; } = ["tenor.com", "giphy.com", "klipy.com"];
+    /// <summary>
+    /// Hosts a link may point to (SPEC: Tenor, Giphy, Klipy): the media hosts themselves, not every subdomain — a
+    /// forgotten marketing subdomain taken over would serve anything. <c>*.name</c> allows the subdomains of a name.
+    /// </summary>
+    public IReadOnlyList<string> AllowedHosts { get; init; } =
+    [
+        "media.tenor.com", "c.tenor.com", "media1.tenor.com",
+        "i.giphy.com", "media.giphy.com", "media0.giphy.com", "media1.giphy.com", "media2.giphy.com", "media3.giphy.com", "media4.giphy.com",
+        "*.klipy.com",
+    ];
+
+    /// <summary>Downloads at once on the whole site: each holds up to a file in memory.</summary>
+    public int MaxConcurrent { get; init; } = 2;
 
     public int TimeoutSeconds { get; init; } = 15;
 
@@ -58,17 +69,16 @@ public static class PublicAddress
 
         if (address.AddressFamily == AddressFamily.InterNetworkV6)
         {
+            // Global unicast 2000::/3 only (no loopback, IPv4-compatible, NAT64, discard, unique or link local, multicast),
+            // and not the special ranges inside it
             var b = address.GetAddressBytes();
-            return !(IPAddress.IsLoopback(address)
-                || address.Equals(IPAddress.IPv6None)
-                || address.IsIPv6LinkLocal
-                || address.IsIPv6SiteLocal
-                || address.IsIPv6Multicast
-                || (b[0] & 0xFE) == 0xFC // unique local fc00::/7
-                || (b[0] == 0x00 && b[1] == 0x64 && b[2] == 0xFF && b[3] == 0x9B) // NAT64 64:ff9b::/96 — may lead to a private IPv4
-                || (b[0] == 0x20 && b[1] == 0x01 && b[2] == 0x0D && b[3] == 0xB8) // documentation 2001:db8::/32
-                || (b[0] == 0x20 && b[1] == 0x02) // 6to4 2002::/16 — may embed a private IPv4
-                || (b[0] == 0x20 && b[1] == 0x01 && b[2] == 0x00 && b[3] == 0x00)); // Teredo 2001::/32
+            return (b[0] & 0xE0) == 0x20
+                && !(b[0] == 0x20 && b[1] == 0x01 && b[2] == 0x0D && b[3] == 0xB8) // documentation 2001:db8::/32
+                && !(b[0] == 0x20 && b[1] == 0x02) // 6to4 2002::/16 — may embed a private IPv4
+                && !(b[0] == 0x20 && b[1] == 0x01 && b[2] == 0x00 && b[3] == 0x00) // Teredo 2001::/32
+                && !(b[0] == 0x20 && b[1] == 0x01 && b[2] == 0x00 && b[3] == 0x02 && b[4] == 0x00 && b[5] == 0x00) // benchmarking 2001:2::/48
+                && !(b[0] == 0x20 && b[1] == 0x01 && b[2] == 0x00 && (b[3] & 0xF0) is 0x10 or 0x20) // ORCHID 2001:10::/28, 2001:20::/28
+                && !(b[0] == 0x3F && (b[1] & 0xF0) == 0xF0); // documentation 3fff::/20
         }
 
         return false;
@@ -91,6 +101,7 @@ public sealed class SafeDownloader : IDisposable
     private readonly DownloadSettings _settings;
     private readonly FileLimits _limits;
     private readonly HttpClient _client;
+    private readonly SemaphoreSlim _slots;
 
     public SafeDownloader(IHostResolver resolver, DownloadSettings settings, FileLimits limits)
         : this(settings, limits, Handler(resolver ?? throw new ArgumentNullException(nameof(resolver)), settings))
@@ -102,18 +113,39 @@ public sealed class SafeDownloader : IDisposable
     {
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
         _limits = limits ?? throw new ArgumentNullException(nameof(limits));
+        _slots = new SemaphoreSlim(Math.Max(1, settings.MaxConcurrent));
         _client = new HttpClient(handler) { Timeout = Timeout.InfiniteTimeSpan };
         _client.DefaultRequestHeaders.UserAgent.ParseAdd("GameEvent/1.0 (avatar download)");
     }
 
+    public const string Busy = "file.busy";
+
     public async Task<(byte[]? Content, Rejection? Rejection)> DownloadAsync(string url, CancellationToken ct)
     {
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        timeout.CancelAfter(TimeSpan.FromSeconds(_settings.TimeoutSeconds));
         if (Check(url) is { } refused)
         {
             return (null, refused);
         }
+
+        if (!await _slots.WaitAsync(TimeSpan.FromSeconds(_settings.TimeoutSeconds), ct))
+        {
+            return (null, new Rejection(Busy, "The server is busy with other downloads."));
+        }
+
+        try
+        {
+            return await DownloadCheckedAsync(url, ct);
+        }
+        finally
+        {
+            _slots.Release();
+        }
+    }
+
+    private async Task<(byte[]? Content, Rejection? Rejection)> DownloadCheckedAsync(string url, CancellationToken ct)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeout.CancelAfter(TimeSpan.FromSeconds(_settings.TimeoutSeconds));
 
         var current = new Uri(url);
         try
@@ -150,12 +182,14 @@ public sealed class SafeDownloader : IDisposable
                 }
 
                 await using var stream = await response.Content.ReadAsStreamAsync(timeout.Token);
-                using var buffer = new MemoryStream();
+                using var buffer = new MemoryStream((int)Math.Min(response.Content.Headers.ContentLength ?? 256 * 1024, _limits.MaxUploadBytes));
                 var chunk = new byte[64 * 1024];
                 int read;
                 while ((read = await stream.ReadAsync(chunk, timeout.Token)) > 0)
                 {
-                    if (buffer.Length + read > _limits.MaxUploadBytes)
+                    // A GIF is kept as it is: past its own limit there is no point reading on
+                    var limit = IsGif(buffer, chunk, read) ? _limits.MaxGifBytes : _limits.MaxUploadBytes;
+                    if (buffer.Length + read > limit)
                     {
                         return (null, TooLarge());
                     }
@@ -170,7 +204,7 @@ public sealed class SafeDownloader : IDisposable
         {
             return (null, new Rejection(AddressNotPublic, "The link leads to an address that is not public."));
         }
-        catch (Exception e) when (e is HttpRequestException or OperationCanceledException or IOException && !ct.IsCancellationRequested)
+        catch (Exception e) when (e is HttpRequestException or OperationCanceledException or IOException or UriFormatException && !ct.IsCancellationRequested)
         {
             return (null, new Rejection(DownloadFailed, "The picture could not be downloaded."));
         }
@@ -191,12 +225,24 @@ public sealed class SafeDownloader : IDisposable
         }
 
         var host = uri.IdnHost.ToLowerInvariant().TrimEnd('.');
-        return _settings.AllowedHosts.Any(allowed => host == allowed || host.EndsWith("." + allowed, StringComparison.Ordinal))
+        return _settings.AllowedHosts.Any(allowed => allowed.StartsWith("*.", StringComparison.Ordinal)
+                ? host.EndsWith(allowed[1..], StringComparison.Ordinal)
+                : host == allowed)
             ? null
             : new Rejection(HostNotAllowed, $"Links to {host} are not accepted.");
     }
 
-    public void Dispose() => _client.Dispose();
+    public void Dispose()
+    {
+        _client.Dispose();
+        _slots.Dispose();
+    }
+
+    private static bool IsGif(MemoryStream buffer, byte[] chunk, int read)
+    {
+        ReadOnlySpan<byte> head = buffer.Length >= 4 ? buffer.GetBuffer().AsSpan(0, 4) : chunk.AsSpan(0, Math.Min(read, 4));
+        return head.StartsWith("GIF8"u8);
+    }
 
     private Rejection TooLarge() => new(ImageProcessor.TooLarge, $"A file is at most {_limits.MaxUploadBytes / 1024 / 1024} MB.");
 
