@@ -326,9 +326,9 @@ namespace GameEvent.Infrastructure.Database.Migrations
                 columns: new[] { "SeasonId", "PlayerId" });
 
             migrationBuilder.CreateIndex(
-                name: "IX_Proof_SeasonId_Status",
+                name: "IX_Proof_SeasonId",
                 table: "Proof",
-                columns: new[] { "SeasonId", "Status" });
+                column: "SeasonId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Review_GameId",

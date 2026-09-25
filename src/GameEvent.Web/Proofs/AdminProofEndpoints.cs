@@ -18,7 +18,10 @@ using ActionResult = Microsoft.AspNetCore.Http.HttpResults.Results<
 
 namespace GameEvent.Web.Proofs;
 
-/// <summary>A run to check, in queue order (D-98): finishes on top, then by completion time.</summary>
+/// <summary>
+/// A run to check, in queue order (D-98): finishes on top, then by completion time; with the claimed difficulty, the
+/// counted hours and the dice total, what an approval at a lower difficulty or a reject changes.
+/// </summary>
 public sealed record ProofQueueItemView(
     Guid RunId,
     Guid PlayerId,
@@ -29,7 +32,10 @@ public sealed record ProofQueueItemView(
     ProofStatus? Status,
     IReadOnlyList<string> Links,
     string? Note,
-    string? WitnessName);
+    string? WitnessName,
+    Difficulty? Difficulty,
+    decimal? Hours,
+    int DiceTotal);
 
 /// <summary>Approve a run: with its proof, or without one («без скрина», a comment then); a lower proven difficulty.</summary>
 public sealed record ApproveProofRequest(Guid CommandId, Difficulty? Difficulty = null, string? Comment = null);
@@ -94,7 +100,10 @@ public static class AdminProofEndpoints
                     proof?.Status,
                     proof is null ? [] : [.. proof.Links],
                     proof?.Note,
-                    proof?.WitnessId is { } witness ? state.Players[witness].Name : null);
+                    proof?.WitnessId is { } witness ? state.Players[witness].Name : null,
+                    run.Difficulty,
+                    run.Hours,
+                    run.Dice.Sum(d => d.Value) + run.ChallengeDice.Sum(d => d.Value));
             }),
         ];
         return TypedResults.Ok(items);

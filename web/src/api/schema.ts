@@ -2039,7 +2039,7 @@ export interface components {
         };
         /**
          * @description The player's latest completed run: dice by the hours and the challenge dice apart, each die separately; the total
-         *     counts both; the review when there is one.
+         *     counts both; the review when there is one; `status` is `rejected` when the admin took the run back.
          */
         CompletedRunView: {
             /** Format: uuid */
@@ -2052,6 +2052,7 @@ export interface components {
             total: number;
             review: null | components["schemas"]["ReviewView"];
             proof: null | components["schemas"]["ProofView"];
+            status: components["schemas"]["RunStatus"];
         };
         /** @description Completing the active run. `estimatedHours` is needed only when the game has no hours. */
         CompleteRequest: {
@@ -2376,7 +2377,10 @@ export interface components {
             detail?: null | string;
             instance?: null | string;
         };
-        /** @description A run to check, in queue order (D-98): finishes on top, then by completion time. */
+        /**
+         * @description A run to check, in queue order (D-98): finishes on top, then by completion time; with the claimed difficulty, the
+         *     counted hours and the dice total, what an approval at a lower difficulty or a reject changes.
+         */
         ProofQueueItemView: {
             /** Format: uuid */
             runId: string;
@@ -2391,6 +2395,11 @@ export interface components {
             links: string[];
             note: null | string;
             witnessName: null | string;
+            difficulty: null | components["schemas"]["Difficulty"];
+            /** Format: double */
+            hours: null | number;
+            /** Format: int32 */
+            diceTotal: number;
         };
         /** @description The proof of the player's own completed run: links (http/https), a note, or a witness (D-98). */
         ProofRequest: {
@@ -2579,6 +2588,8 @@ export interface components {
             ruleset: components["schemas"]["Ruleset"];
             history: components["schemas"]["RulesVersionView"][];
         };
+        /** @enum {unknown} */
+        RunStatus: "playing" | "completed" | "dropped" | "techRerolled" | "rejected";
         RunView: {
             /** Format: uuid */
             id: string;
@@ -2686,6 +2697,7 @@ export const rerollCostKindValues: ReadonlyArray<FlattenedDeepRequired<component
 export const rerollPaymentValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["RerollPayment"]> = ["freeThisRoll", "freeRerollResource", "coins", "badEvent"];
 export const roleValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["Role"]> = ["player", "admin", "spectator"];
 export const roundingValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["Rounding"]> = ["nearest", "floor", "ceil"];
+export const runStatusValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["RunStatus"]> = ["playing", "completed", "dropped", "techRerolled", "rejected"];
 export const turnPhaseValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["TurnPhase"]> = ["idle", "rolling", "playing"];
 export const unmetConditionPolicyValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["UnmetConditionPolicy"]> = ["noDiceKeepCoins", "countAsDrop", "ignore"];
 export type operations = Record<string, never>;

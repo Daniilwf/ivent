@@ -14,14 +14,15 @@ namespace GameEvent.Engine.Tests.Proofs;
 /// The admin approves a run (W4, W8; SPEC «Очередь пруфов: одобрить, отклонить, одобрить без скрина»; «Сложность
 /// засчитывается по пруфу. Если игрок понизил сложность посреди игры, считается более низкая»; Q-5, D-97, D-98).
 /// <see cref="ApproveProof"/> with a submitted proof writes <see cref="ProofApproved"/> (without proof: false); without
-/// one — «одобрить без скрина» — a comment is required (without proof: true). A difficulty below the claimed one is a
-/// difficulty change in the same command: <see cref="RunDifficultyChanged"/> and the difference (points, move, the
+/// one — «одобрить без скрина» — a comment is required (without proof: true). A difficulty below the claimed one needs a
+/// comment too (D-98 (3), no default text in the engine) and is a difficulty change in the same command: <see cref="RunDifficultyChanged"/> and the difference (points, move, the
 /// pending difficulty event «не применимо»), then <see cref="ProofApproved"/>; a higher one is refused. Only a completed,
 /// unchecked run; until the season is finished. Corrections stay possible after the approval.
 /// </summary>
 public class ApproveProofTests
 {
     private const string WithoutProof = "Видел на стриме";
+    private const string LowerByProof = "На скрине нормальная сложность";
 
     private static Guid PendingEffectOf(Scenario s, Guid runId) =>
         Assert.Single(s.State.ManualEffects.Values, e => e.RunId == runId && e.Source == ManualEffectSource.Difficulty).EffectId;
@@ -136,8 +137,8 @@ public class ApproveProofTests
         var vasya = s.PlayerId("Вася");
         Submit(s, "Вася", runId, [Link]);
 
-        // When the admin approves at normal
-        Approve(s, runId, Difficulty.Normal);
+        // When the admin approves at normal with the reason (D-98 (3): a lower difficulty needs a comment)
+        Approve(s, runId, Difficulty.Normal, LowerByProof);
 
         // Then the difficulty change and its difference come first, the approval last
         ScenarioAssert.Accepted(s);
@@ -149,10 +150,10 @@ public class ApproveProofTests
             (runId, vasya, Difficulty.Hard, Difficulty.Normal, s.Clock.UtcNow),
             (changed.RunId, changed.PlayerId, changed.OldDifficulty, changed.NewDifficulty, changed.ChangedAt));
         Assert.Equal([new DieChange(new Die(6, 5), new Die(4, 4)), new DieChange(new Die(6, 2), new Die(4, 2))], changed.Dice);
-        Assert.False(string.IsNullOrWhiteSpace(changed.Comment), "The difficulty change needs a comment in the log.");
+        Assert.Equal(LowerByProof, changed.Comment);
         Assert.Equal(new PointsChanged(vasya, -1, PointsReason.RunCorrection, runId), s.Last.Events[1]);
         Assert.Equal(new PlayerMoved(vasya, "c7", "c6", -1, ["c6"], MoveReason.RunCorrection, runId), s.Last.Events[2]);
-        Assert.Equal(new ProofApproved(runId, vasya, false, null, s.Clock.UtcNow), s.Last.Events[3]);
+        Assert.Equal(new ProofApproved(runId, vasya, false, LowerByProof, s.Clock.UtcNow), s.Last.Events[3]);
 
         // And the run counts at normal
         var run = s.State.Runs[runId];
@@ -171,7 +172,7 @@ public class ApproveProofTests
         var effectId = PendingEffectOf(s, runId);
         Submit(s, "Вася", runId, [Link]);
 
-        Approve(s, runId, Difficulty.Hard);
+        Approve(s, runId, Difficulty.Hard, LowerByProof);
 
         ScenarioAssert.Accepted(s);
         Assert.Equal(
@@ -181,8 +182,21 @@ public class ApproveProofTests
         Assert.Equal(
             (effectId, vasya, (Guid?)runId, ManualEffectOutcome.NotApplicable),
             (resolved.EffectId, resolved.PlayerId, resolved.RunId, resolved.Outcome));
-        Assert.False(string.IsNullOrWhiteSpace(resolved.Comment));
+        Assert.Equal(LowerByProof, resolved.Comment);
         Assert.Empty(s.State.ManualEffects);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Approve_at_a_lower_difficulty_without_a_comment_is_rejected(string? comment)
+    {
+        // D-98 (3): like «одобрить без скрина», a lower difficulty needs the admin's reason; the engine has no default text
+        var (s, runId) = Completed([5, 2], Difficulty.Hard);
+        Submit(s, "Вася", runId, [Link]);
+
+        ScenarioAssert.RejectsWithoutChanges(s, x => Approve(x, runId, Difficulty.Normal, comment), RejectionCodes.CommentRequired);
     }
 
     [Fact]
@@ -378,7 +392,8 @@ public class ApproveProofTests
         var (s, runId) = Completed([5, 2], Difficulty.Extreme);
         var second = CompleteRun(s, "Вася", [2, 2]);
         Submit(s, "Вася", runId, [Link]);
-        Approve(s, runId, Difficulty.Normal);
+        Approve(s, runId, Difficulty.Normal, LowerByProof);
+        ScenarioAssert.Accepted(s);
         Approve(s, second, comment: WithoutProof);
         ScenarioAssert.Accepted(s);
 
@@ -392,7 +407,7 @@ public class ApproveProofTests
         Submit(s, "Вася", runId, [Link]);
         var before = s.State;
 
-        Approve(s, runId, Difficulty.Normal);
+        Approve(s, runId, Difficulty.Normal, LowerByProof);
 
         ScenarioAssert.Accepted(s);
         Assert.Equal(s.State, s.Last.Events.Aggregate(before, SeasonEngine.Apply));

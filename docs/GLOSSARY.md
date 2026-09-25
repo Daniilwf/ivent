@@ -53,7 +53,7 @@
 | Термин | Что значит | В коде |
 | --- | --- | --- |
 | Прохождение | попытка пройти одну выпавшую игру | `Run` |
-| Статус прохождения | идёт, завершено, дропнуто, тех-реролл | `RunStatus` (`Playing`, `Completed`, `Dropped`, `TechRerolled`) |
+| Статус прохождения | идёт, завершено, дропнуто, тех-реролл, отклонено (реджект) | `RunStatus` (`Playing`, `Completed`, `Dropped`, `TechRerolled`, `Rejected`) |
 | Снапшот | правила и параметры, зафиксированные в момент ролла | `RunSnapshot` |
 | Сложность | лёгкая, нормальная, сложная, выше сложной | `Difficulty` (`Easy`, `Normal`, `Hard`, `Extreme`) |
 | Пруф | доказательство прохождения: ссылки, заметка или свидетель | `ProofState` (`ProofStatus`: `Pending`, `Approved`, `Rejected`), команда `SubmitProof`, событие `ProofSubmitted`, таблица `Proof` |

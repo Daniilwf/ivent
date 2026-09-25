@@ -14,7 +14,7 @@ type Command =
   | { kind: 'start' }
   | { kind: 'reroll' }
   | { kind: 'drop' }
-  | { kind: 'proof'; runId: string; links: string[]; note: string | null }
+  | { kind: 'proof'; runId: string; links: string[]; note: string | null; witnessId: string | null }
   | { kind: 'techReroll'; reason: NonNullable<Schemas['TechRerollReason']>; comment: string | null }
   | { kind: 'complete'; completion: Completion }
   | { kind: 'choose'; choiceId: string; optionId: string }
@@ -37,7 +37,7 @@ function send(seasonId: string, command: Command) {
     case 'proof':
       return api.POST('/api/seasons/{seasonId}/runs/{runId}/proof', {
         params: { path: { seasonId, runId: command.runId } },
-        body: { commandId, links: command.links, note: command.note },
+        body: { commandId, links: command.links, note: command.note, witnessId: command.witnessId },
       });
     case 'techReroll':
       return api.POST('/api/seasons/{seasonId}/tech-reroll', {
@@ -265,11 +265,15 @@ export function SeasonScreen({
         {me?.lastCompleted && (
           <>
             <p data-testid="last-dice">
-              {ru.turn.lastDice(
-                me.lastCompleted.game.title,
-                [...me.lastCompleted.dice, ...me.lastCompleted.challengeDice].map((d) => d.value),
-                me.lastCompleted.total,
-              )}
+              {me.lastCompleted.status === 'rejected'
+                ? ru.turn.lastRejected(me.lastCompleted.game.title)
+                : ru.turn.lastDice(
+                    me.lastCompleted.game.title,
+                    [...me.lastCompleted.dice, ...me.lastCompleted.challengeDice].map(
+                      (d) => d.value,
+                    ),
+                    me.lastCompleted.total,
+                  )}
             </p>
             {me.lastCompleted.challengeDice.length > 0 && (
               <p data-testid="last-challenge-dice">
@@ -287,9 +291,10 @@ export function SeasonScreen({
             <ProofSection
               proof={me.lastCompleted.proof ?? null}
               pending={pending}
-              onSubmit={(links, note) => {
+              witnesses={season.players.filter((p) => p.id !== me.playerId)}
+              onSubmit={(links, note, witnessId) => {
                 if (me.lastCompleted) {
-                  void act({ kind: 'proof', runId: me.lastCompleted.id, links, note });
+                  void act({ kind: 'proof', runId: me.lastCompleted.id, links, note, witnessId });
                 }
               }}
             />

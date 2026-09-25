@@ -109,9 +109,11 @@ public static class Movement
             return state;
         }
 
-        // The run keeps its net steps (a reject takes them back) and whether it reached the finish (its proof goes on top).
+        // The run keeps the cells it really moved the token (steps past the finish burn, D-47), which a reject or a
+        // correction takes back, and whether its latest move stands on the finish (its proof goes on top).
         var run = state.Runs[runId];
-        var reached = run.ReachedFinish || (e.Steps > 0 && state.Map.CellById(e.To).Type == CellType.Finish);
-        return state with { Runs = state.Runs.SetItem(runId, run with { Moved = run.Moved + e.Steps, ReachedFinish = reached }) };
+        var moved = run.Moved + (Math.Sign(e.Steps) * e.Path.Count);
+        var reached = state.Map.CellById(e.To).Type == CellType.Finish;
+        return state with { Runs = state.Runs.SetItem(runId, run with { Moved = moved, ReachedFinish = reached }) };
     }
 }

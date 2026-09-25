@@ -124,7 +124,7 @@ public sealed record ChoiceOptionView(string Id, OfferedGameView? Game);
 
 /// <summary>
 /// The player's latest completed run: dice by the hours and the challenge dice apart, each die separately; the total
-/// counts both; the review when there is one.
+/// counts both; the review when there is one; <c>status</c> is <c>rejected</c> when the admin took the run back.
 /// </summary>
 public sealed record CompletedRunView(
     Guid Id,
@@ -134,7 +134,8 @@ public sealed record CompletedRunView(
     IReadOnlyList<DieView> ChallengeDice,
     int Total,
     ReviewView? Review,
-    ProofView? Proof);
+    ProofView? Proof,
+    RunStatus Status);
 
 /// <summary>The proof of a run and how the admin checked it.</summary>
 public sealed record ProofView(ProofStatus Status, IReadOnlyList<string> Links, string? Note, string? Comment);
@@ -484,7 +485,8 @@ public static class SeasonEndpoints
                     proof.Status,
                     JsonSerializer.Deserialize<EquatableArray<string>>(proof.LinksJson, EngineJson.Options).ToArray(),
                     proof.Note,
-                    proof.Comment));
+                    proof.Comment),
+            run.Status);
     }
 
     /// <summary>The latest season the user plays in; for spectators and admins, the latest season.</summary>

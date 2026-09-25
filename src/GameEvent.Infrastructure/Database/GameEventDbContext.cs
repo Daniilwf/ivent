@@ -109,7 +109,6 @@ public sealed class GameEventDbContext(DbContextOptions<GameEventDbContext> opti
             e.HasKey(x => x.RunId);
             e.HasOne<RunRecord>().WithMany().HasForeignKey(x => x.RunId);
             e.HasOne<SeasonRecord>().WithMany().HasForeignKey(x => x.SeasonId);
-            e.HasIndex(x => new { x.SeasonId, x.Status });
             e.Property(x => x.Status).HasMaxLength(20);
         });
 

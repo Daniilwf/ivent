@@ -575,10 +575,10 @@ public class CommandQueueTests
             Assert.Contains("https://youtu.be/ending", proof.LinksJson, StringComparison.Ordinal);
         }
 
-        // When, after a restart, the admin approves it at hard (a lower difficulty: the good event is not applicable),
-        // approves Петя's run without a proof and rejects Вася's second run
+        // When, after a restart, the admin approves it at hard (a lower difficulty, with the reason, D-98 (3): the good
+        // event is not applicable), approves Петя's run without a proof and rejects Вася's second run
         await h.RestartAsync();
-        await AcceptedAsync(h, new ApproveProof(first.RunId, Difficulty.Hard));
+        await AcceptedAsync(h, new ApproveProof(first.RunId, Difficulty.Hard, "На скрине сложная"));
         await AcceptedAsync(h, new ApproveProof(petyaRun.RunId, Comment: "Видел на стриме"));
         await AcceptedAsync(h, new RejectProof(second.RunId, "На скрине другая игра"));
 

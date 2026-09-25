@@ -73,8 +73,6 @@ public static class ProofReviewOrder
 
 internal static class ProofReview
 {
-    private const string DefaultApprovalNote = "Сложность по пруфу";
-
     public static Decision Decide(SeasonState state, SubmitProof command, EngineContext context)
     {
         ArgumentNullException.ThrowIfNull(command);
@@ -109,7 +107,7 @@ internal static class ProofReview
             return Decision.Reject(RejectionCodes.RunNotCompleted, $"Run {run.RunId} is {run.Status}.");
         }
 
-        if (command.Links.Count > Limits.MaxProofLinks || command.Links.Any(link => !IsLink(link)))
+        if (command.Links.Count > Limits.MaxProofLinks || command.Links.Any(link => !ProofLinks.IsValid(link)))
         {
             return Decision.Reject(
                 RejectionCodes.ProofInvalidLink,
@@ -131,8 +129,10 @@ internal static class ProofReview
             return Decision.Reject(RejectionCodes.CommentTooLong, $"The note is limited to {Limits.MaxCommentLength} characters.");
         }
 
+        // Stored as checked: links and the note trimmed, a blank note is none.
+        var note = string.IsNullOrWhiteSpace(command.Note) ? null : command.Note.Trim();
         return Decision.Accept(new ProofSubmitted(
-            run.RunId, run.PlayerId, command.Links, command.Note, command.WitnessId, context.Clock.UtcNow));
+            run.RunId, run.PlayerId, [.. command.Links.Select(l => l.Trim())], note, command.WitnessId, context.Clock.UtcNow));
     }
 
     public static Decision Decide(SeasonState state, ApproveProof command, EngineContext context)
@@ -159,10 +159,12 @@ internal static class ProofReview
             }
         }
 
+        // Approving without a proof, or at a lower difficulty than claimed, explains itself in the public log.
         var withoutProof = run.Proof is null;
-        if (withoutProof && string.IsNullOrWhiteSpace(command.Comment))
+        var lowered = command.Difficulty is { } asked && asked < claimed;
+        if ((withoutProof || lowered) && string.IsNullOrWhiteSpace(command.Comment))
         {
-            return Decision.Reject(RejectionCodes.CommentRequired, "Approving without a proof explains itself in the public log.");
+            return Decision.Reject(RejectionCodes.CommentRequired, "Approving without a proof or at a lower difficulty needs a comment.");
         }
 
         if (command.Comment?.Length > Limits.MaxCommentLength)
@@ -174,8 +176,7 @@ internal static class ProofReview
         var events = new List<IGameEvent>();
         if (command.Difficulty is { } lower && lower < claimed)
         {
-            var comment = string.IsNullOrWhiteSpace(command.Comment) ? DefaultApprovalNote : command.Comment;
-            events.AddRange(Corrections.DifficultyChange(state, run, lower, comment, context));
+            events.AddRange(Corrections.DifficultyChange(state, run, lower, command.Comment!, context));
         }
 
         events.Add(new ProofApproved(run.RunId, run.PlayerId, withoutProof, command.Comment, context.Clock.UtcNow));
@@ -213,6 +214,7 @@ internal static class ProofReview
             events.Add(new PointsChanged(run.PlayerId, -points, PointsReason.ProofRejected, run.RunId));
         }
 
+        // The cells this run really moved the token (steps that burned at the finish gave none).
         if (run.Moved != 0)
         {
             var path = run.Moved > 0
@@ -298,7 +300,6 @@ internal static class ProofReview
             ? Decision.Reject(RejectionCodes.ProofAlreadyReviewed, $"Run {run.RunId} is already checked.")
             : null;
 
-    private static bool IsLink(string? link) => ProofLinks.IsValid(link);
 }
 
 /// <summary>What a proof link may be: an absolute http or https address with a host, not too long (D-98).</summary>

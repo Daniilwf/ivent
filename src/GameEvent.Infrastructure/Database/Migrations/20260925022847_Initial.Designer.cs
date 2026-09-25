@@ -11,7 +11,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace GameEvent.Infrastructure.Database.Migrations
 {
     [DbContext(typeof(GameEventDbContext))]
-    [Migration("20260925021230_Initial")]
+    [Migration("20260925022847_Initial")]
     partial class Initial
     {
         /// <inheritdoc />
@@ -254,7 +254,7 @@ namespace GameEvent.Infrastructure.Database.Migrations
 
                     b.HasKey("RunId");
 
-                    b.HasIndex("SeasonId", "Status");
+                    b.HasIndex("SeasonId");
 
                     b.ToTable("Proof", (string)null);
                 });

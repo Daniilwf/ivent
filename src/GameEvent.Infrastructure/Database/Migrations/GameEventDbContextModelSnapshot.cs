@@ -251,7 +251,7 @@ namespace GameEvent.Infrastructure.Database.Migrations
 
                     b.HasKey("RunId");
 
-                    b.HasIndex("SeasonId", "Status");
+                    b.HasIndex("SeasonId");
 
                     b.ToTable("Proof", (string)null);
                 });

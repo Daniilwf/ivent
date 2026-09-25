@@ -244,11 +244,12 @@ public class PlayerAdminInvariantTests
     private static int HoursIndex(int arg, byte b) => ((arg - 4) * 2) + (b % 4);
 
     private static readonly string[] s_proofLinks =
-        ["https://imgur.com/a/credits", "http://example.com/ending.png", "javascript:alert(1)", "ftp://example.com/x.png"];
+        ["https://imgur.com/a/credits", "http://example.com/ending.png", "javascript:alert(1)", "ftp://example.com/x.png", "  https://youtu.be/ending	"];
 
     /// <summary>
     /// With proofs, a coins adjustment with an argument of 3 and up is a proof command instead (bits 5–7): 3 a proof with
-    /// links (sometimes a bad one, sometimes six), 4 a proof by a witness (sometimes the player themself), 5 an approval
+    /// links (sometimes a bad one, sometimes six, sometimes padded with spaces; the note sometimes padded or blank), 4 a proof by a
+    /// witness (sometimes the player themself), 5 an approval
     /// (with or without a comment, at no, a lower, the same or a higher difficulty), 6 a reject (sometimes with a blank
     /// comment), 7 an approval of any run of the season. The run is the player's latest completed one, or any run of the
     /// season, or a made-up one. The variant inside a kind comes from the log length, since bits 2–7 are fixed.
@@ -286,8 +287,8 @@ public class PlayerAdminInvariantTests
                     1 => [.. Enumerable.Range(0, 6).Select(i => $"https://imgur.com/a/{i}")],
                     _ => [s_proofLinks[0], s_proofLinks[1]],
                 },
-                variant % 3 == 0 ? "титры" : null),
-            4 => new SubmitProof(player, runId, [], variant % 4 == 0 ? null : "видел", variant % 5 == 0 ? player : witness),
+                (variant % 3) switch { 0 => "титры", 1 => "  титры ", _ => null }),
+            4 => new SubmitProof(player, runId, [], (variant % 4) switch { 0 => null, 1 => "   ", _ => "видел" }, variant % 5 == 0 ? player : witness),
             5 or 7 => new ApproveProof(
                 runId,
                 (variant % 5) switch { 0 => null, var d => (Difficulty)(d - 1) },
@@ -513,12 +514,25 @@ public class PlayerAdminInvariantTests
             Assert.Equal(run.Status == RunStatus.Rejected, run.Proof?.Status == ProofStatus.Rejected);
             Assert.Equal(run.Status is RunStatus.Completed or RunStatus.Rejected, run.CompletedAt is not null);
 
-            // ReachedFinish: some forward move of this run ended on the finish
+            if (run.Status != RunStatus.Completed)
+            {
+                continue;
+            }
+
+            // D-98 (2): ReachedFinish follows the run's latest move — it ended on the finish
             Assert.Equal(
-                s.Log.OfType<PlayerMoved>().Any(m => m.RunId == run.RunId && m.Steps > 0 && m.To == finish),
+                s.Log.OfType<PlayerMoved>().LastOrDefault(m => m.RunId == run.RunId)?.To == finish,
                 run.ReachedFinish);
+
+            // D-98: Moved is the cells the run really entered (sign × path), not the steps rolled
+            Assert.Equal(MovedCells(s.Log, run.RunId), run.Moved);
+            Assert.InRange(run.Moved, 0, run.Dice.Concat(run.ChallengeDice).Sum(d => d.Value));
         }
     }
+
+    /// <summary>Cells a run really moved, folded from its logged moves: each move counts its path, signed by its direction.</summary>
+    private static int MovedCells(IEnumerable<IGameEvent> log, Guid runId) =>
+        log.OfType<PlayerMoved>().Where(m => m.RunId == runId).Sum(m => Math.Sign(m.Steps) * m.Path.Count);
 
     private static void CheckInvariants(Scenario s, ICommand command, SeasonState before, int logLengthBefore)
     {
@@ -988,10 +1002,20 @@ public class PlayerAdminInvariantTests
             events.OfType<PointsChanged>());
         Assert.Equal(was.Points + diff, s.State.Players[run.PlayerId].Points);
 
-        var path = diff switch
+        // D-98 (1): forward by the difference; back only by the cells really moved beyond the new dice sum
+        var after = s.State.Runs[run.RunId];
+        var newSum = after.Dice.Concat(after.ChallengeDice).Sum(d => d.Value);
+        var movedBefore = MovedCells(s.Log.Take(s.Log.Count - s.Last.Events.Count), run.RunId);
+        var steps = diff switch
         {
-            > 0 => Movement.Forward(before.Map, was.CellId, diff),
-            < 0 => Movement.Backward(before.Map, was.Path, -diff),
+            > 0 => diff,
+            < 0 => -Math.Max(0, movedBefore - newSum),
+            _ => 0,
+        };
+        var path = steps switch
+        {
+            > 0 => Movement.Forward(before.Map, was.CellId, steps),
+            < 0 => Movement.Backward(before.Map, was.Path, -steps),
             _ => [],
         };
         var moves = events.OfType<PlayerMoved>().ToList();
@@ -1002,7 +1026,7 @@ public class PlayerAdminInvariantTests
         else
         {
             Assert.Equal(
-                [new PlayerMoved(run.PlayerId, was.CellId, path[^1], diff, [.. path], MoveReason.RunCorrection, run.RunId)],
+                [new PlayerMoved(run.PlayerId, was.CellId, path[^1], steps, [.. path], MoveReason.RunCorrection, run.RunId)],
                 moves);
         }
 
@@ -1122,18 +1146,22 @@ public class PlayerAdminInvariantTests
         Assert.Equal(RunStatus.Completed, run.Status);
         Assert.True(run.Proof?.Status is null or ProofStatus.Pending, "A checked proof was replaced.");
         Assert.InRange(submit.Links.Count, 0, Limits.MaxProofLinks);
-        Assert.All(submit.Links, link => Assert.True(IsHttpLink(link), $"Link «{link}» was accepted."));
-        Assert.True(submit.Links.Count > 0 || submit.WitnessId is not null, "An empty proof was accepted.");
+
+        // D-98 (4): links and the note are stored trimmed, a blank note is no note
+        EquatableArray<string> links = [.. submit.Links.Select(l => l.Trim())];
+        var note = string.IsNullOrWhiteSpace(submit.Note) ? null : submit.Note.Trim();
+        Assert.All(links, link => Assert.True(IsHttpLink(link), $"Link «{link}» was accepted."));
+        Assert.True(links.Count > 0 || submit.WitnessId is not null, "An empty proof was accepted.");
         Assert.True(
             submit.WitnessId is null || (submit.WitnessId != submit.PlayerId && before.Players.ContainsKey(submit.WitnessId.Value)),
             "An invalid witness was accepted.");
-        Assert.True((submit.Note?.Length ?? 0) <= Limits.MaxCommentLength, "A note over the limit was accepted.");
+        Assert.True((note?.Length ?? 0) <= Limits.MaxCommentLength, "A note over the limit was accepted.");
 
         Assert.Equal(
-            [new ProofSubmitted(run.RunId, submit.PlayerId, submit.Links, submit.Note, submit.WitnessId, s.Clock.UtcNow)],
+            [new ProofSubmitted(run.RunId, submit.PlayerId, links, note, submit.WitnessId, s.Clock.UtcNow)],
             s.Last.Events);
         Assert.Equal(
-            run with { Proof = new ProofState(ProofStatus.Pending, submit.Links, submit.Note, submit.WitnessId, s.Clock.UtcNow, null) },
+            run with { Proof = new ProofState(ProofStatus.Pending, links, note, submit.WitnessId, s.Clock.UtcNow, null) },
             s.State.Runs[run.RunId]);
         Assert.Equal(before.Players, s.State.Players);
     }
@@ -1158,8 +1186,10 @@ public class PlayerAdminInvariantTests
         var change = events.Take(events.Count - 1).ToList();
         if (approve.Difficulty is { } difficulty && difficulty < run.Difficulty)
         {
+            // D-98 (3): a lower difficulty needs the admin's comment, and the change carries it (no default text)
+            Assert.False(string.IsNullOrWhiteSpace(approve.Comment), "Approved at a lower difficulty without a comment.");
             var changed = Assert.IsType<RunDifficultyChanged>(change[0]);
-            Assert.False(string.IsNullOrWhiteSpace(changed.Comment));
+            Assert.Equal(approve.Comment, changed.Comment);
             CheckAcceptedDifficultyChange(s, new ChangeRunDifficulty(run.RunId, difficulty, changed.Comment), before, change);
         }
         else
@@ -1209,16 +1239,14 @@ public class PlayerAdminInvariantTests
             coins == 0 ? [] : [new CoinsChanged(player, -coins, CoinsReason.ProofRejected, run.RunId)],
             events.OfType<CoinsChanged>());
 
-        // Back by the net steps of the run; when they are not above zero (a completion on the finish writes no move,
-        // D-47) the direction is left open here
-        var steps = earlier.OfType<PlayerMoved>().Where(e => e.RunId == run.RunId).Sum(e => e.Steps);
-        if (steps > 0)
-        {
-            var path = Movement.Backward(before.Map, was.Path, steps);
-            Assert.Equal(
-                path.Count == 0 ? [] : [new PlayerMoved(player, was.CellId, path[^1], -steps, [.. path], MoveReason.ProofRejected, run.RunId)],
-                events.OfType<PlayerMoved>());
-        }
+        // Back by the cells the run really moved (sign × path of its logged moves, not the steps rolled: steps burned
+        // at the finish gave no cells, D-47, D-98), from the current cell along the walked path
+        var cells = MovedCells(earlier, run.RunId);
+        Assert.True(cells >= 0, $"The run moved {cells} cells.");
+        var path = cells > 0 ? Movement.Backward(before.Map, was.Path, cells) : [];
+        Assert.Equal(
+            path.Count == 0 ? [] : [new PlayerMoved(player, was.CellId, path[^1], -cells, [.. path], MoveReason.ProofRejected, run.RunId)],
+            events.OfType<PlayerMoved>());
 
         var pending = before.ManualEffects.Values.Where(e => e.RunId == run.RunId && e.Source == ManualEffectSource.Difficulty).ToList();
         Assert.Equal(
@@ -1470,6 +1498,7 @@ public class PlayerAdminInvariantTests
         var pendingEffects = new Dictionary<Guid, (Guid Player, Guid? Run)>();
         var proofs = new Dictionary<Guid, ProofStatus>();
         var completedGames = new HashSet<Guid>();
+        var cellsByRun = new Dictionary<Guid, int>();
         foreach (var e in log)
         {
             switch (e)
@@ -1618,6 +1647,14 @@ public class PlayerAdminInvariantTests
                         // D-98: a reject only moves back, never past the start
                         Assert.True(moved.Steps < 0, "A reject moved forward.");
                         Assert.InRange(moved.Path.Count, 1, -moved.Steps);
+
+                        // D-98: back by the cells the run really moved, not by its steps rolled
+                        Assert.Equal(cellsByRun.GetValueOrDefault(moved.RunId!.Value), -moved.Steps);
+                    }
+
+                    if (moved.RunId is { } movedRun)
+                    {
+                        cellsByRun[movedRun] = cellsByRun.GetValueOrDefault(movedRun) + (Math.Sign(moved.Steps) * moved.Path.Count);
                     }
 
                     if (moved.Reason == MoveReason.RunCorrection)

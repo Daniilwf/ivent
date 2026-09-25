@@ -92,6 +92,49 @@ public sealed class AdminProofApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Queue_items_carry_the_claimed_difficulty_the_hours_and_the_dice_total()
+    {
+        // D-98: what an approval at a lower difficulty or a reject would change; Вася's only run gave all his points
+        var runId = await CompletedAsync("vasya", "hard");
+        var vasya = await _site.SignedInAsync("vasya");
+        var points = await PointsOfAsync(vasya, "vasya");
+        var admin = await _site.SignedInAsync("admin");
+
+        using var queue = JsonDocument.Parse(await admin.GetStringAsync(QueueUrl(), Ct));
+
+        var item = Assert.Single(queue.RootElement.EnumerateArray().ToList());
+        Assert.Equal(runId, item.GetProperty("runId").GetGuid());
+        Assert.Equal("hard", item.GetProperty("difficulty").GetString());
+        Assert.Equal(points, item.GetProperty("diceTotal").GetInt32());
+        Assert.True(points > 0);
+        await using var db = _site.NewDb();
+        var hours = (await db.Runs.AsNoTracking().SingleAsync(r => r.Id == runId, Ct)).Hours;
+        Assert.NotNull(hours);
+        Assert.Equal(hours.Value, item.GetProperty("hours").GetDecimal());
+    }
+
+    [Fact]
+    public async Task Queue_dice_total_follows_an_hours_correction()
+    {
+        // The total is the run's dice after corrections (C7b), not the ones rolled at completion
+        var runId = await CompletedAsync("vasya");
+        await using (var db = _site.NewDb())
+        {
+            var hours = (await db.Runs.AsNoTracking().SingleAsync(r => r.Id == runId, Ct)).Hours!.Value;
+            await _site.SendAsync(new CorrectRunHours(runId, hours + 30, "Часы по HLTB"));
+        }
+
+        var vasya = await _site.SignedInAsync("vasya");
+        var points = await PointsOfAsync(vasya, "vasya");
+        var admin = await _site.SignedInAsync("admin");
+
+        using var queue = JsonDocument.Parse(await admin.GetStringAsync(QueueUrl(), Ct));
+
+        var item = Assert.Single(queue.RootElement.EnumerateArray().ToList());
+        Assert.Equal(points, item.GetProperty("diceTotal").GetInt32());
+    }
+
+    [Fact]
     public async Task Run_that_reached_the_finish_is_on_top_of_the_queue()
     {
         // Вася completes first from the start; the admin puts Петя one cell before the finish, so his completion finishes

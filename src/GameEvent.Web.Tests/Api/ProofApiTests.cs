@@ -83,6 +83,72 @@ public sealed class ProofApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Witness_only_proof_is_logged_with_the_witness_and_no_links()
+    {
+        // D-98 (5): the screen sends {links: [], witnessId}; the API accepts it as a proof
+        var vasya = await _site.SignedInAsync("vasya");
+        var runId = await CompletedRunAsync(vasya);
+
+        var response = await PostOkAsync(vasya, ProofUrl(runId), new { commandId = Guid.NewGuid(), links = Array.Empty<string>(), witnessId = _site.Players["petya"] });
+
+        Assert.Equal(["proof-submitted"], await TypesAsync(response));
+        await using var db = _site.NewDb();
+        var logged = await db.Events.SingleAsync(e => e.Type == "proof-submitted", Ct);
+        using var data = JsonDocument.Parse(logged.Data);
+        Assert.Equal(_site.Players["petya"], data.RootElement.GetProperty("witnessId").GetGuid());
+        Assert.Equal(0, data.RootElement.GetProperty("links").GetArrayLength());
+        var proof = (await MeJsonAsync(vasya)).GetProperty("lastCompleted").GetProperty("proof");
+        Assert.Equal("pending", proof.GetProperty("status").GetString());
+        Assert.Equal(0, proof.GetProperty("links").GetArrayLength());
+    }
+
+    [Fact]
+    public async Task Links_and_note_are_stored_trimmed_and_a_blank_note_is_none()
+    {
+        // D-98 (4)
+        var vasya = await _site.SignedInAsync("vasya");
+        var runId = await CompletedRunAsync(vasya);
+
+        await PostOkAsync(vasya, ProofUrl(runId), new { commandId = Guid.NewGuid(), links = new[] { "  " + Link + " " }, note = "  Титры \n" });
+
+        var proof = (await MeJsonAsync(vasya)).GetProperty("lastCompleted").GetProperty("proof");
+        Assert.Equal([Link], proof.GetProperty("links").EnumerateArray().Select(l => l.GetString()));
+        Assert.Equal("Титры", proof.GetProperty("note").GetString());
+
+        await PostOkAsync(vasya, ProofUrl(runId), new { commandId = Guid.NewGuid(), links = new[] { Link }, note = "   " });
+
+        await using var db = _site.NewDb();
+        Assert.Null((await db.Proofs.AsNoTracking().SingleAsync(Ct)).Note);
+    }
+
+    [Fact]
+    public async Task Last_completed_run_status_is_completed_and_rejected_after_a_reject()
+    {
+        // The season view tells a rejected last run apart, so the screen shows the reject instead of the dice
+        var vasya = await _site.SignedInAsync("vasya");
+        var runId = await CompletedRunAsync(vasya);
+        Assert.Equal("completed", (await MeJsonAsync(vasya)).GetProperty("lastCompleted").GetProperty("status").GetString());
+
+        await _site.SendAsync(new RejectProof(runId, "На скрине другая игра"));
+
+        var last = (await MeJsonAsync(vasya)).GetProperty("lastCompleted");
+        Assert.Equal(runId, last.GetProperty("id").GetGuid());
+        Assert.Equal("rejected", last.GetProperty("status").GetString());
+        Assert.Equal("rejected", last.GetProperty("proof").GetProperty("status").GetString());
+    }
+
+    [Fact]
+    public async Task Last_completed_run_status_stays_completed_after_an_approval()
+    {
+        var vasya = await _site.SignedInAsync("vasya");
+        var runId = await CompletedRunAsync(vasya);
+
+        await _site.SendAsync(new ApproveProof(runId, Comment: "Видел на стриме"));
+
+        Assert.Equal("completed", (await MeJsonAsync(vasya)).GetProperty("lastCompleted").GetProperty("status").GetString());
+    }
+
+    [Fact]
     public async Task New_proof_replaces_the_pending_one()
     {
         var vasya = await _site.SignedInAsync("vasya");

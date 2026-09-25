@@ -206,10 +206,14 @@ internal static class Corrections
         var player = state.Players[run.PlayerId];
         yield return new PointsChanged(player.PlayerId, delta, PointsReason.RunCorrection, run.RunId);
 
-        var path = delta > 0 ? Movement.Forward(state.Map, player.CellId, delta) : Movement.Backward(state.Map, player.Path, -delta);
+        // Forward: from where the player stands, extra steps burn at the finish. Back: only what the run really gave
+        // beyond its new dice sum — steps that burned at the finish gave no cells to take back (D-47, D-97).
+        var newSum = run.Dice.Sum(d => d.Value) + run.ChallengeDice.Sum(d => d.Value) + delta;
+        var steps = delta > 0 ? delta : -Math.Max(0, run.Moved - newSum);
+        var path = steps > 0 ? Movement.Forward(state.Map, player.CellId, steps) : Movement.Backward(state.Map, player.Path, -steps);
         if (path.Count > 0)
         {
-            yield return new PlayerMoved(player.PlayerId, player.CellId, path[^1], delta, [.. path], MoveReason.RunCorrection, run.RunId);
+            yield return new PlayerMoved(player.PlayerId, player.CellId, path[^1], steps, [.. path], MoveReason.RunCorrection, run.RunId);
         }
     }
 

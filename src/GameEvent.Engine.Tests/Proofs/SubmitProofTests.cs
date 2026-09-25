@@ -124,6 +124,61 @@ public class SubmitProofTests
         Assert.Equal(note, s.State.Runs[runId].Proof!.Note);
     }
 
+    // ---- Stored trimmed (D-98 (4)) ----
+
+    [Fact]
+    public void Links_with_surrounding_spaces_are_stored_trimmed()
+    {
+        var (s, runId) = Completed([3, 1]);
+
+        Submit(s, "Вася", runId, ["  " + Link + " ", "\thttps://youtu.be/ending\n"]);
+
+        // The event stores the result, so the log and the state agree
+        ScenarioAssert.Accepted(s);
+        Assert.Equal([Link, "https://youtu.be/ending"], Assert.Single(s.LastEvents<ProofSubmitted>()).Links);
+        Assert.Equal([Link, "https://youtu.be/ending"], s.State.Runs[runId].Proof!.Links);
+    }
+
+    [Fact]
+    public void Note_is_stored_trimmed()
+    {
+        var (s, runId) = Completed([3, 1]);
+
+        Submit(s, "Вася", runId, [Link], "  " + Note + "\n");
+
+        ScenarioAssert.Accepted(s);
+        Assert.Equal(Note, Assert.Single(s.LastEvents<ProofSubmitted>()).Note);
+        Assert.Equal(Note, s.State.Runs[runId].Proof!.Note);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("\n\t")]
+    public void Blank_note_is_stored_as_no_note(string note)
+    {
+        var (s, runId) = Completed([3, 1]);
+
+        Submit(s, "Вася", runId, [Link], note);
+
+        ScenarioAssert.Accepted(s);
+        Assert.Null(Assert.Single(s.LastEvents<ProofSubmitted>()).Note);
+        Assert.Equal(new ProofState(ProofStatus.Pending, [Link], null, null, s.Clock.UtcNow, null), s.State.Runs[runId].Proof);
+    }
+
+    [Fact]
+    public void Blank_note_with_a_witness_only_is_still_a_proof_without_a_note()
+    {
+        // A blank note is no note: the witness alone makes the proof
+        var (s, runId) = Completed([3, 1]);
+        var masha = s.PlayerId("Маша");
+
+        Submit(s, "Вася", runId, [], "   ", masha);
+
+        ScenarioAssert.Accepted(s);
+        Assert.Equal(new ProofState(ProofStatus.Pending, [], null, masha, s.Clock.UtcNow, null), s.State.Runs[runId].Proof);
+    }
+
     [Fact]
     public void New_proof_replaces_the_pending_one()
     {

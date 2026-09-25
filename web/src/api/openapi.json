@@ -2254,7 +2254,8 @@
           "challengeDice",
           "total",
           "review",
-          "proof"
+          "proof",
+          "status"
         ],
         "type": "object",
         "properties": {
@@ -2303,9 +2304,12 @@
                 "$ref": "#/components/schemas/ProofView"
               }
             ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/RunStatus"
           }
         },
-        "description": "The player's latest completed run: dice by the hours and the challenge dice apart, each die separately; the total\ncounts both; the review when there is one."
+        "description": "The player's latest completed run: dice by the hours and the challenge dice apart, each die separately; the total\ncounts both; the review when there is one; `status` is `rejected` when the admin took the run back."
       },
       "CompleteRequest": {
         "required": [
@@ -3323,7 +3327,10 @@
           "status",
           "links",
           "note",
-          "witnessName"
+          "witnessName",
+          "difficulty",
+          "hours",
+          "diceTotal"
         ],
         "type": "object",
         "properties": {
@@ -3378,9 +3385,30 @@
               "null",
               "string"
             ]
+          },
+          "difficulty": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Difficulty"
+              }
+            ]
+          },
+          "hours": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "diceTotal": {
+            "type": "integer",
+            "format": "int32"
           }
         },
-        "description": "A run to check, in queue order (D-98): finishes on top, then by completion time."
+        "description": "A run to check, in queue order (D-98): finishes on top, then by completion time; with the claimed difficulty, the\ncounted hours and the dice total, what an approval at a lower difficulty or a reject changes."
       },
       "ProofRequest": {
         "required": [
@@ -3971,6 +3999,15 @@
           }
         },
         "description": "The rules in force and their history: who changed what and when (C3). Numbers on the rules page are real."
+      },
+      "RunStatus": {
+        "enum": [
+          "playing",
+          "completed",
+          "dropped",
+          "techRerolled",
+          "rejected"
+        ]
       },
       "RunView": {
         "required": [
