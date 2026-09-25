@@ -199,5 +199,7 @@
 | Версия правил | номер версии конфига сезона: 1 при создании, +1 при каждой правке админом | `SeasonState.RulesetVersion`, `RulesetChanged.Version` |
 | История правил | список версий с датой, автором и изменениями «было/стало» | `RulesetChange`, `RulesVersionView` |
 | Отложенная задача | таймер, хранящийся в БД | `ScheduledTask` |
+| Файл | загруженная картинка: скрин в WebP или GIF как есть, с миниатюрой | `FileRecord`, `StoredFile`, событие `FileStored`, команда `RecordFile` |
+| Миниатюра | уменьшенная копия файла для карты и списков, у GIF — анимированная | `FileNames.Thumbnail`, `thumbnailUrl` |
 | Журнал ошибок, страница «Ошибки» | последние необработанные исключения запросов с запросом и пользователем, для админа | `ErrorJournal`, `ErrorEntry` |
 | Проверка здоровья | ответ `/health`: общий статус и статусы базы, диска и очереди | `HealthView`, `DatabaseHealthCheck`, `DiskHealthCheck`, `QueueHealthCheck` |

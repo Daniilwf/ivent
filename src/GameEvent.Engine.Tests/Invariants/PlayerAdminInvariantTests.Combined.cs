@@ -340,9 +340,10 @@ public partial class PlayerAdminInvariantTests
                 or PlayerFinished or PlayerFrozen or PlayerFinishRevoked or FinishSurplusChanged
                 or ManualEffectCreated or ManualEffectResolved or CommandUndone
 
-                // Accounts (D8, D-106) are the site's, not a season mechanic
+                // Accounts (D8, D-106) and stored files (D4a, D-108) are the site's, not a season mechanic
                 or Accounts.AccountCreated or Accounts.AccountPasswordReset or Accounts.AccountPasswordChanged
-                or Accounts.AccountChanged or Accounts.AccountDeleted or Accounts.AccountRestored => null,
+                or Accounts.AccountChanged or Accounts.AccountDeleted or Accounts.AccountRestored
+                or Files.FileStored => null,
             _ => throw new Xunit.Sdk.XunitException($"{e.GetType().Name} is not mapped to a mechanic: add it to the core or to its feature flag."),
         };
 

@@ -8,6 +8,7 @@ using GameEvent.Infrastructure.Kernel;
 using GameEvent.Infrastructure.Queue;
 using GameEvent.Infrastructure.Seasons;
 using GameEvent.Web.Accounts;
+using GameEvent.Web.Files;
 using GameEvent.Web.Observability;
 using GameEvent.Web.Proofs;
 using GameEvent.Web.Realtime;
@@ -52,13 +53,14 @@ public static class AppSetup
         // Checked at startup: a bad interval stops the site before it serves anything (D-101).
         services.AddSingleton(new DeadlineSchedulerSettings(
             TimeSpan.FromSeconds(builder.Configuration.GetValue("Scheduler:IntervalSeconds", 5)),
-            builder.Configuration.GetValue("Scheduler:Enabled", true)));
+            builder.Configuration.GetValue("Scheduler:Enabled", true) && !IsGeneratingApiDocument));
         services.AddHostedService<DeadlineScheduler>();
 
         services.Configure<JsonOptions>(o => ConfigureJson(o.SerializerOptions));
         services.AddSignalR().AddJsonProtocol(o => ConfigureJson(o.PayloadSerializerOptions));
         services.AddProblemDetails();
         builder.AddObservability();
+        builder.AddFiles();
         services.AddOpenApi(o => o.AddDocumentTransformer(async (document, context, ct) =>
         {
             // Hub messages are part of the contract too: the frontend gets their types from the same document.
@@ -119,6 +121,13 @@ public static class AppSetup
         services.Configure<ForwardedHeadersOptions>(o => WebSecurity.ConfigureForwardedHeaders(o, builder.Configuration));
     }
 
+    /// <summary>
+    /// The OpenAPI document is written by starting the app over an empty database (<c>npm run gen:api</c>): the deadline
+    /// scheduler's first pass would log a missing table, and the generator fails on any logged error.
+    /// </summary>
+    private static bool IsGeneratingApiDocument =>
+        System.Reflection.Assembly.GetEntryAssembly()?.GetName().Name == "GetDocument.Insider";
+
     public static void UseGameEvent(this WebApplication app)
     {
         ArgumentNullException.ThrowIfNull(app);
@@ -162,6 +171,7 @@ public static class AppSetup
         api.MapAdminProofs();
         api.MapAdminSeasons();
         api.MapAdminAccounts();
+        api.MapFiles();
 
         // Last: the OpenAPI document keeps the order its shared schemas were first met in (a nullable first use of an
         // enum would make the enum itself nullable for every client)

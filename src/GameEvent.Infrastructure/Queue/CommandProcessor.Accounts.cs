@@ -8,16 +8,22 @@ using Microsoft.EntityFrameworkCore;
 namespace GameEvent.Infrastructure.Queue;
 
 /// <summary>
-/// Account commands (D-106): the same queue, one transaction each, events in the global log (no season). The account
+/// Global commands — accounts (D-106) and files (D-108): the same queue, one transaction each, events in the global log
+/// (no season); the account rules are here, the file rules in CommandProcessor.Files. The account
 /// table holds what the log must not — password hashes — so the rules read it, and the log is the audit trail.
 /// </summary>
 public sealed partial class CommandProcessor
 {
-    private async Task<CommandOutcome> ProcessAccountAsync(
-        GameEventDbContext db, CommandEnvelope envelope, IAccountCommand command, string commandType, string commandHash, CancellationToken ct)
+    private async Task<CommandOutcome> ProcessGlobalAsync(
+        GameEventDbContext db, CommandEnvelope envelope, IGlobalCommand command, string commandType, string commandHash, CancellationToken ct)
     {
         var now = clock.UtcNow;
-        var (events, apply, secret, rejection) = await DecideAccountAsync(db, command, now, ct);
+        var (events, apply, secret, rejection) = command switch
+        {
+            IAccountCommand account => await DecideAccountAsync(db, account, now, ct),
+            Files.RecordFile file => await DecideFileAsync(db, file, now, ct),
+            _ => throw new InvalidOperationException($"No rules for the global command {commandType}."),
+        };
         if (rejection is not null)
         {
             return new CommandOutcome(false, false, rejection, []);

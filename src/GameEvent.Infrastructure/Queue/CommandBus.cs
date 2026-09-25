@@ -82,6 +82,9 @@ public sealed class CommandBus
     internal sealed record Pending(CommandEnvelope Envelope, TaskCompletionSource<CommandOutcome> Completion);
 }
 
+/// <summary>A command of the global log (no season): accounts (D-106) and files (D-108).</summary>
+public interface IGlobalCommand : ICommand;
+
 /// <summary>Called after a command's transaction commits (SignalR broadcast in B3).</summary>
 public interface ICommittedEventsListener
 {
