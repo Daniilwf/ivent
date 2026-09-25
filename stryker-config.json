@@ -3,10 +3,9 @@
     "solution": "GameEvent.slnx",
     "project": "GameEvent.Engine.csproj",
     "test-projects": ["src/GameEvent.Engine.Tests/GameEvent.Engine.Tests.csproj"],
-    "test-case-filter": "Category!=Long",
-    "reporters": ["html", "progress", "json"],
-    "output": "test-artifacts/stryker",
-    "thresholds": { "high": 90, "low": 80, "break": 80 },
-    "concurrency": 4
+    "test-case-filter": "Category!=Long&FullyQualifiedName!~.Invariants.&FullyQualifiedName!~Chains_stay_within_the_limits&FullyQualifiedName!~An_accepted_undo_equals_the_log_without_the_command",
+    "coverage-analysis": "off",
+    "reporters": ["html", "progress", "json", "markdown"],
+    "thresholds": { "high": 90, "low": 80, "break": 80 }
   }
 }

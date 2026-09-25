@@ -299,4 +299,25 @@ public class CoinsRewardTests
         Assert.Empty(s.LastEvents<CoinsChanged>());
         Assert.Equal(0, s.Player("Вася").Coins);
     }
+
+    [Fact]
+    public void A_run_rolled_before_coins_existed_neither_earns_nor_loses_coins()
+    {
+        // C13: logs written before D-96 hold snapshots without a coin rule. Such a run completes, is corrected and is
+        // rejected without a single coins change — the rule of its roll said nothing about coins
+        var s = Scenario.New().WithCategory("Horror").WithGame("Silent Hill", 6, "Horror").WithPlayers("Вася").Roll("Вася");
+        var offer = s.Player("Вася").Offer!;
+        var runId = SequentialIds.Make(0x60000000, 1);
+        s.AppendCraftedEvents(new RunStarted(runId, s.PlayerId("Вася"), offer.GameId, offer.Snapshot with { Coins = null }, offer.RolledAt, s.Clock.UtcNow));
+
+        s.NextRandom(3, 2).Complete("Вася");
+        s.Act(new CorrectRunHours(runId, 12, "Часы по пруфу"));
+        ScenarioAssert.Accepted(s);
+        s.Act(new Engine.Proofs.RejectProof(runId, "На скрине другая игра"));
+        ScenarioAssert.Accepted(s);
+
+        Assert.DoesNotContain(s.Log, e => e is CoinsChanged);
+        Assert.Equal(0, s.Player("Вася").Coins);
+        Assert.Equal(0, s.Player("Вася").Points);
+    }
 }
