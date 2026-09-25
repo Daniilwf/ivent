@@ -143,6 +143,7 @@ namespace GameEvent.Infrastructure.Database.Migrations
                     Frozen = table.Column<bool>(type: "INTEGER", nullable: false),
                     FinishBonus = table.Column<int>(type: "INTEGER", nullable: false),
                     FinishSurplus = table.Column<int>(type: "INTEGER", nullable: false),
+                    PointsTick = table.Column<long>(type: "INTEGER", nullable: false),
                     ActiveRunId = table.Column<Guid>(type: "TEXT", nullable: true)
                 },
                 constraints: table =>

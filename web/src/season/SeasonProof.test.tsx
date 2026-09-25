@@ -50,6 +50,26 @@ function season(
       { id: petya, name: 'Петя', cellId: 'start', points: 0, phase: 'idle', finishOrder: null },
       { id: masha, name: 'Маша', cellId: 'start', points: 0, phase: 'idle', finishOrder: null },
     ],
+    // The server's leaderboard (D-100): Вася by points, Петя and Маша share place 2
+    leaderboard: [
+      { playerId: me, place: 1, points: 4, cellsToFinish: 1, isFirst: false, provisional: false },
+      {
+        playerId: petya,
+        place: 2,
+        points: 0,
+        cellsToFinish: 2,
+        isFirst: false,
+        provisional: false,
+      },
+      {
+        playerId: masha,
+        place: 2,
+        points: 0,
+        cellsToFinish: 2,
+        isFirst: false,
+        provisional: false,
+      },
+    ],
     me: {
       playerId: me,
       phase: 'idle',

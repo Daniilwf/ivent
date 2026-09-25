@@ -441,6 +441,9 @@ namespace GameEvent.Infrastructure.Database.Migrations
                     b.Property<int>("Points")
                         .HasColumnType("INTEGER");
 
+                    b.Property<long>("PointsTick")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int>("RerollsThisRoll")
                         .HasColumnType("INTEGER");
 

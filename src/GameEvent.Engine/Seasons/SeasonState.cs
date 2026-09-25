@@ -24,7 +24,8 @@ public sealed record SeasonState(
     ImmutableSortedDictionary<Guid, SeasonPlayer> Players,
     ImmutableSortedDictionary<Guid, RunState> Runs,
     ImmutableSortedDictionary<Guid, PendingManualEffect> ManualEffects,
-    int FinishesSoFar = 0)
+    int FinishesSoFar = 0,
+    long PointsChanges = 0)
 {
     public static SeasonState Empty { get; } =
         new(
@@ -56,7 +57,8 @@ public sealed record SeasonState(
         && Players.SequenceEqual(other.Players)
         && Runs.SequenceEqual(other.Runs)
         && ManualEffects.SequenceEqual(other.ManualEffects)
-        && FinishesSoFar == other.FinishesSoFar;
+        && FinishesSoFar == other.FinishesSoFar
+        && PointsChanges == other.PointsChanges;
 
     public override int GetHashCode() => HashCode.Combine(SeasonId, Players.Count, Runs.Count);
 }
@@ -83,6 +85,8 @@ public enum TurnPhase
 /// A player's standing in the season. Points and position are independent measures. Points and coins are
 /// fields (the leaderboard sorts by them); any other resource lives in <see cref="Resources"/> (invariant 9).
 /// <see cref="RerollsThisRoll"/> counts rerolls since the last roll from Idle: 0 whenever the player is not Rolling.
+/// <see cref="PointsTick"/> is when the points last changed, as the number of the season's points change (1, 2, 3…;
+/// 0 — never): the «earliest final score» tiebreaker (D-100).
 /// </summary>
 public sealed record SeasonPlayer(
     Guid PlayerId,
@@ -100,4 +104,5 @@ public sealed record SeasonPlayer(
     EquatableArray<GameExclusion> Exclusions,
     int RerollsThisRoll,
     Finish.FinishState? Finish,
-    Guid? ActiveRunId);
+    Guid? ActiveRunId,
+    long PointsTick = 0);

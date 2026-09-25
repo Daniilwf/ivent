@@ -117,6 +117,9 @@ public sealed class SeasonPlayerRecord
 
     public int FinishSurplus { get; set; }
 
+    /// <summary>The number of the season's points change that set the current points (D-100): the «earliest final score».</summary>
+    public long PointsTick { get; set; }
+
     public Guid? ActiveRunId { get; set; }
 }
 

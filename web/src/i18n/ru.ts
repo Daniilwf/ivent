@@ -215,7 +215,15 @@ export const ru = {
   },
   leaderboard: {
     title: 'Лидерборд',
-    row: (name: string, points: number) => `${name}: ${points.toLocaleString('ru-RU')} очк.`,
+    row: (place: number, name: string, points: number, cellsToFinish: number | null) =>
+      `${place}. ${name}: ${points.toLocaleString('ru-RU')} очк.` +
+      (cellsToFinish === null
+        ? ''
+        : cellsToFinish === 0
+          ? ', на финише'
+          : `, до финиша ${cellsToFinish} кл.`),
+    first: '— первое место',
+    provisional: '— первое место (предварительно)',
   },
   rejection: rejection as Readonly<Record<string, string>> & typeof rejection,
 } as const;

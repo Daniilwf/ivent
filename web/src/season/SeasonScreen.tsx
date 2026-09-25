@@ -331,15 +331,20 @@ export function SeasonScreen({
 
       <section aria-labelledby="leaders-title">
         <h2 id="leaders-title">{ru.leaderboard.title}</h2>
-        {/* Stage 1 slice: by points only; the first finisher on top comes with task C9. */}
+        {/* In the server's place order (D-100): the first finisher on top whatever the points. */}
         <ol data-testid="leaderboard">
-          {[...season.players]
-            .sort((a, b) => b.points - a.points)
-            .map((p) => (
-              <li key={p.id} data-testid={`leader-${p.id}`}>
-                {ru.leaderboard.row(p.name, p.points)}
-              </li>
-            ))}
+          {season.leaderboard.map((row) => (
+            <li key={row.playerId} data-testid={`leader-${row.playerId}`}>
+              {ru.leaderboard.row(
+                row.place,
+                season.players.find((p) => p.id === row.playerId)?.name ?? '',
+                row.points,
+                row.cellsToFinish ?? null,
+              )}
+              {row.isFirst &&
+                ` ${row.provisional ? ru.leaderboard.provisional : ru.leaderboard.first}`}
+            </li>
+          ))}
         </ol>
       </section>
     </main>
