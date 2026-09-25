@@ -10,8 +10,27 @@ using Microsoft.Extensions.Logging;
 
 namespace GameEvent.Infrastructure.Seasons;
 
-/// <summary>How often the scheduler looks for seasons whose deadline has come (<c>Scheduler:IntervalSeconds</c>).</summary>
-public sealed record DeadlineSchedulerSettings(TimeSpan Interval);
+/// <summary>
+/// How often the scheduler looks for seasons whose deadline has come (<c>Scheduler:IntervalSeconds</c>, above 0), and
+/// whether its own loop runs (<c>Scheduler:Enabled</c>; tests turn it off and call <see cref="DeadlineScheduler.TickAsync"/>).
+/// </summary>
+public sealed record DeadlineSchedulerSettings
+{
+    public DeadlineSchedulerSettings(TimeSpan interval, bool enabled = true)
+    {
+        if (interval <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(nameof(interval), interval, "Scheduler:IntervalSeconds must be above 0.");
+        }
+
+        Interval = interval;
+        Enabled = enabled;
+    }
+
+    public TimeSpan Interval { get; }
+
+    public bool Enabled { get; }
+}
 
 /// <summary>
 /// Closes active seasons at their deadline (D-101). It only reads the projection and sends <see cref="ReachDeadline"/>
@@ -57,6 +76,11 @@ public sealed partial class DeadlineScheduler(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        if (!settings.Enabled)
+        {
+            return;
+        }
+
         using var timer = new PeriodicTimer(settings.Interval);
         try
         {
@@ -66,7 +90,7 @@ public sealed partial class DeadlineScheduler(
                 {
                     await TickAsync(stoppingToken);
                 }
-                catch (Exception ex) when (ex is not OperationCanceledException)
+                catch (Exception ex) when (!stoppingToken.IsCancellationRequested)
                 {
                     // A failed pass is retried on the next tick; the deadline is still in the table.
                     LogTickFailed(logger, ex);

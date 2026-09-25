@@ -125,4 +125,81 @@ describe('Season lifecycle', () => {
     expect(screen.queryByTestId('roll')).toBeNull();
     expect(screen.getByTestId('leaderboard')).toBeInTheDocument();
   });
+
+  // The reviews of C10: no turn action the server would refuse, in any phase, once the turns are over.
+  const offered = {
+    id: 'a1000000-0000-0000-0000-000000000001',
+    title: 'Silent Hill',
+    hours: 12,
+    marks: [],
+  };
+  const playing = {
+    id: 'e0000000-0000-0000-0000-000000000001',
+    game: { id: offered.id, title: 'Silent Hill', hours: 12 },
+    startedAt: '2026-09-24T10:00:00Z',
+  };
+  function inPhase(
+    status: 'active' | 'closing' | 'finished' | 'archived',
+    phase: 'rolling' | 'playing',
+    deadlineAt: string | null = deadline,
+  ): Schemas['SeasonView'] {
+    const base = season(status === 'archived' ? 'finished' : status);
+    const me = base.me;
+    if (!me) throw new Error('The fixture has a player.');
+    return {
+      ...base,
+      status,
+      deadline: deadlineAt,
+      me: {
+        ...me,
+        phase,
+        offer: phase === 'rolling' ? offered : null,
+        activeRun: phase === 'playing' ? playing : null,
+        nextReroll: phase === 'rolling' ? { payment: 'freeThisRoll', coins: 0 } : null,
+      },
+    };
+  }
+
+  it.each(['closing', 'finished', 'archived'] as const)(
+    'in %s offers no start, reroll or «уже проходил» for an offered game',
+    async (status) => {
+      serve(inPhase(status, 'rolling'));
+      render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+      await screen.findByTestId('season-status');
+
+      expect(screen.queryByTestId('start')).toBeNull();
+      expect(screen.queryByTestId('already-played')).toBeNull();
+      expect(screen.queryByTestId('reroll')).toBeNull();
+    },
+  );
+
+  it.each(['closing', 'finished', 'archived'] as const)(
+    'in %s shows the run left playing but offers no completion, drop or tech reroll',
+    async (status) => {
+      serve(inPhase(status, 'playing'));
+      render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+      expect(await screen.findByTestId('active-run')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: ru.turn.complete })).toBeNull();
+      expect(screen.queryByTestId('drop')).toBeNull();
+      expect(screen.queryByTestId('tech-reroll')).toBeNull();
+    },
+  );
+
+  it('shows the finished note for an archived season', async () => {
+    serve(inPhase('archived', 'rolling'));
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    expect(await screen.findByTestId('season-status')).toHaveTextContent(texts().finished);
+  });
+
+  it('closes the turns once the deadline has passed, before the scheduler closes the season', async () => {
+    const past = new Date(Date.now() - 60_000).toISOString();
+    serve({ ...season('active'), deadline: past });
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    expect(await screen.findByTestId('season-status')).toHaveTextContent(texts().closing);
+    expect(screen.queryByTestId('roll')).toBeNull();
+  });
 });

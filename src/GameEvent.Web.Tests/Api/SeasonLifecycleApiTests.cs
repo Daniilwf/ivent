@@ -98,6 +98,14 @@ public sealed class SeasonLifecycleApiTests : IAsyncLifetime
         var (state, _) = await EventLogReader.ReplaySeasonAsync(db, SiteFactory.SeasonId, Ct);
         Assert.NotNull(state.Result);
         Assert.Equal([.. state.Result!.Value], Rows(season));
+
+        // The view reads the snapshot, not a live ranking: a projection row changed behind the engine's back (as a later
+        // ranking change would) leaves the shown result as recorded
+        var shownFirst = state.Result!.Value[0].PlayerId;
+        var player = await db.SeasonPlayers.SingleAsync(p => p.Id == shownFirst, Ct);
+        player.Points += 100;
+        await db.SaveChangesAsync(Ct);
+        Assert.Equal([.. state.Result!.Value], Rows(await SeasonJsonAsync(vasya)));
     }
 
     // ---- Rule refusals: 409 ----
@@ -124,6 +132,18 @@ public sealed class SeasonLifecycleApiTests : IAsyncLifetime
         var response = await admin.PostAsJsonAsync(AdminUrl("deadline"), ValidBody("deadline"), Ct);
 
         await AssertConflictAsync(response, "season.closed");
+    }
+
+    [Fact]
+    public async Task Deadline_in_the_past_is_a_conflict()
+    {
+        // The code review of C10: a typo must not close every turn at once
+        var admin = await _site.SignedInAsync("admin");
+
+        var response = await admin.PostAsJsonAsync(
+            AdminUrl("deadline"), new { commandId = Guid.NewGuid(), deadline = _site.Clock.UtcNow - TimeSpan.FromHours(1) }, Ct);
+
+        await AssertConflictAsync(response, "season.deadlineInPast");
     }
 
     [Fact]

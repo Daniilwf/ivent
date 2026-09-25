@@ -38,8 +38,8 @@ public static class SeasonEngine
         {
             CreateSeason c => SeasonSetup.Decide(state, c),
             ChangeRuleset c => RulesetChanges.Decide(state, c),
-            ChangeSeasonStatus c => SeasonSetup.Decide(state, c),
-            SetSeasonDeadline c => SeasonSetup.Decide(state, c),
+            ChangeSeasonStatus c => SeasonSetup.Decide(state, c, context),
+            SetSeasonDeadline c => SeasonSetup.Decide(state, c, context),
             ReachDeadline c => SeasonSetup.Decide(state, c, context),
             AddSeasonPlayer c => PlayerAdministration.Decide(state, c),
             SetPlayerInactive c => PlayerAdministration.Decide(state, c),

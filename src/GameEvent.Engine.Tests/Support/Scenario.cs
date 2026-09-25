@@ -189,13 +189,28 @@ public sealed class Scenario
     public Scenario Review(string player, Guid runId, int rating, string? text = null) =>
         Play(new ReviewRun(PlayerId(player), runId, new RunReview(rating, text)));
 
-    /// <summary>
-    /// Walks the season forward to <paramref name="status"/> by the admin's status commands. Since C10 (D-101) the season
-    /// finishes only with an empty proof queue; tests of what a finished season refuses may need one with an unchecked
-    /// run, so when the engine refuses the finish with <c>season.proofsPending</c> the finish is appended as a crafted log
-    /// — the events the finish writes (<see cref="SeasonStatusChanged"/> and the result), replayed into the state.
-    /// </summary>
+    /// <summary>Walks the season forward to <paramref name="status"/> by the admin's status commands; every step must be accepted.</summary>
     public Scenario MoveStatusTo(SeasonStatus status)
+    {
+        while (State.Status < status)
+        {
+            var next = State.Status + 1;
+            Act(new ChangeSeasonStatus(next));
+            if (!Last.IsAccepted)
+            {
+                throw new InvalidOperationException($"Moving the season to {next} was rejected: {Last.Rejection}");
+            }
+        }
+
+        return this;
+    }
+
+    /// <summary>
+    /// Like <see cref="MoveStatusTo"/>, but a finish the engine refuses with <c>season.proofsPending</c> is appended as a
+    /// crafted log (the status change and the result). Since C10 (D-101) the engine never finishes with unchecked runs;
+    /// only tests of what a finished season refuses to such a run use this, and say so by calling it.
+    /// </summary>
+    public Scenario MoveStatusToForcingFinish(SeasonStatus status)
     {
         while (State.Status < status)
         {

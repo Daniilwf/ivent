@@ -15,6 +15,7 @@ public static class RejectionCodes
     public const string SeasonClosed = "season.closed";
     public const string SeasonDeadlinePassed = "season.deadlinePassed";
     public const string SeasonDeadlineNotReached = "season.deadlineNotReached";
+    public const string SeasonDeadlineInPast = "season.deadlineInPast";
     public const string SeasonProofsPending = "season.proofsPending";
     public const string CellUnknown = "map.unknownCell";
     public const string NothingToChange = "player.nothingToChange";

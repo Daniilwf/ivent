@@ -237,4 +237,76 @@ public class ClosingTests
         ScenarioAssert.Accepted(s);
         Assert.Contains(s.Last.Events, e => e is OfferDiscarded);
     }
+
+    // ---- A deadline in the past (code review of C10) ----
+
+    [Fact]
+    public void Deadline_in_the_past_is_refused_while_active()
+    {
+        // A typo in the year would close every turn at once, and statuses do not go back
+        var s = New();
+
+        ScenarioAssert.RejectsWithoutChanges(
+            s, x => x.Act(new SetSeasonDeadline(x.Clock.UtcNow - TimeSpan.FromHours(1))), RejectionCodes.SeasonDeadlineInPast);
+        ScenarioAssert.RejectsWithoutChanges(
+            s, x => x.Act(new SetSeasonDeadline(x.Clock.UtcNow)), RejectionCodes.SeasonDeadlineInPast);
+    }
+
+    [Fact]
+    public void Deadline_in_the_past_is_refused_in_a_draft()
+    {
+        var s = Scenario.New().AsDraft().WithCategory("Horror").WithGame("Silent Hill", 6, "Horror").WithPlayers("Вася");
+
+        ScenarioAssert.RejectsWithoutChanges(
+            s, x => x.Act(new SetSeasonDeadline(x.Clock.UtcNow - TimeSpan.FromDays(1))), RejectionCodes.SeasonDeadlineInPast);
+    }
+
+    [Fact]
+    public void Draft_whose_deadline_has_passed_does_not_start()
+    {
+        var s = Scenario.New().AsDraft().WithCategory("Horror").WithGame("Silent Hill", 6, "Horror").WithPlayers("Вася");
+        s.Act(new SetSeasonDeadline(s.Clock.UtcNow + TimeSpan.FromHours(1)));
+        ScenarioAssert.Accepted(s);
+        s.Advance(TimeSpan.FromHours(1));
+
+        ScenarioAssert.RejectsWithoutChanges(s, x => x.Act(new ChangeSeasonStatus(SeasonStatus.Active)), RejectionCodes.SeasonDeadlineInPast);
+    }
+
+    [Fact]
+    public void Removing_the_deadline_is_always_allowed_while_active()
+    {
+        var s = New();
+
+        s.Act(new SetSeasonDeadline(null));
+
+        ScenarioAssert.Accepted(s);
+        Assert.Null(s.State.Deadline);
+    }
+
+    [Fact]
+    public void Deadline_with_an_offset_is_stored_in_utc()
+    {
+        // A11: 18:00 in Moscow is 15:00 UTC
+        var s = New();
+        var moscow = new DateTimeOffset(DateTime.SpecifyKind(s.Clock.UtcNow.UtcDateTime.Date.AddDays(3).AddHours(18), DateTimeKind.Unspecified), TimeSpan.FromHours(3));
+
+        s.Act(new SetSeasonDeadline(moscow));
+
+        ScenarioAssert.Accepted(s);
+        Assert.Equal(TimeSpan.Zero, s.State.Deadline!.Value.Offset);
+        Assert.Equal(moscow.UtcDateTime, s.State.Deadline.Value.UtcDateTime);
+        Assert.Equal(new SeasonDeadlineSet(moscow.ToUniversalTime()), s.Last.Events.Single());
+    }
+
+    [Fact]
+    public void Early_close_refuses_turns_before_the_deadline_by_the_status()
+    {
+        // Closed by the admin with the deadline still ahead: the status alone stops the turns
+        var s = New();
+        s.Act(new ChangeSeasonStatus(SeasonStatus.Closing));
+        ScenarioAssert.Accepted(s);
+        Assert.False(SeasonSetup.IsPastDeadline(s.State, s.Clock.UtcNow));
+
+        ScenarioAssert.RejectsWithoutChanges(s, x => x.Roll("Вася"), RejectionCodes.SeasonNotActive);
+    }
 }

@@ -45,8 +45,10 @@ public static class AppSetup
         services.AddSingleton<ICommittedEventsListener>(sp => sp.GetRequiredService<SeasonBroadcaster>());
         services.AddHostedService<SeasonBroadcastWorker>();
         services.AddHostedService<CommandProcessor>();
+        // Checked at startup: a bad interval stops the site before it serves anything (D-101).
         services.AddSingleton(new DeadlineSchedulerSettings(
-            TimeSpan.FromSeconds(builder.Configuration.GetValue("Scheduler:IntervalSeconds", 30))));
+            TimeSpan.FromSeconds(builder.Configuration.GetValue("Scheduler:IntervalSeconds", 5)),
+            builder.Configuration.GetValue("Scheduler:Enabled", true)));
         services.AddHostedService<DeadlineScheduler>();
 
         services.Configure<JsonOptions>(o => ConfigureJson(o.SerializerOptions));

@@ -71,8 +71,9 @@ internal static class SeasonSetup
         return Decision.Accept(new SeasonCreated(command.SeasonId, command.Name.Trim(), command.Ruleset, map, command.Deadline?.ToUniversalTime()));
     }
 
-    public static Decision Decide(SeasonState state, ChangeSeasonStatus command)
+    public static Decision Decide(SeasonState state, ChangeSeasonStatus command, EngineContext context)
     {
+        ArgumentNullException.ThrowIfNull(context);
         if (!state.IsCreated)
         {
             return Decision.Reject(RejectionCodes.SeasonNotCreated, "Create the season first.");
@@ -82,6 +83,12 @@ internal static class SeasonSetup
         if (!Enum.IsDefined(command.To) || command.To != state.Status + 1)
         {
             return Decision.Reject(RejectionCodes.SeasonInvalidTransition, $"The season cannot go from {state.Status} to {command.To}.");
+        }
+
+        // Starting a season whose deadline has passed would open it closed (D-101).
+        if (command.To == SeasonStatus.Active && IsPastDeadline(state, context.Clock.UtcNow))
+        {
+            return Decision.Reject(RejectionCodes.SeasonDeadlineInPast, "The deadline has passed; move it before starting the season.");
         }
 
         var changed = new SeasonStatusChanged(state.Status, command.To);
@@ -99,8 +106,9 @@ internal static class SeasonSetup
         return Decision.Accept(changed, new SeasonResultRecorded(Ranking.Leaderboard.Build(state)));
     }
 
-    public static Decision Decide(SeasonState state, SetSeasonDeadline command)
+    public static Decision Decide(SeasonState state, SetSeasonDeadline command, EngineContext context)
     {
+        ArgumentNullException.ThrowIfNull(context);
         if (!state.IsCreated)
         {
             return Decision.Reject(RejectionCodes.SeasonNotCreated, "Create the season first.");
@@ -112,7 +120,14 @@ internal static class SeasonSetup
             return Decision.Reject(RejectionCodes.SeasonClosed, $"The season is {state.Status}.");
         }
 
+        // A deadline in the past would close the turns at once and the season within a scheduler tick; statuses do not
+        // go back, so a typo must not do that. Closing early is the status change (D-101).
         var deadline = command.Deadline?.ToUniversalTime();
+        if (deadline is { } set && set <= context.Clock.UtcNow)
+        {
+            return Decision.Reject(RejectionCodes.SeasonDeadlineInPast, "The deadline must be in the future; close the season by its status instead.");
+        }
+
         return deadline == state.Deadline
             ? Decision.Reject(RejectionCodes.SeasonNothingToChange, "The deadline is already set to that value.")
             : Decision.Accept(new SeasonDeadlineSet(deadline));

@@ -451,7 +451,7 @@ public class RejectProofTests
     public void Reject_after_the_season_is_finished_is_rejected(SeasonStatus status)
     {
         var (s, runId) = Completed([3, 1]);
-        MoveSeasonTo(s, status);
+        s.MoveStatusToForcingFinish(status); // the run stays unchecked on purpose
 
         ScenarioAssert.RejectsWithoutChanges(s, x => Reject(x, runId), RejectionCodes.SeasonClosed);
     }

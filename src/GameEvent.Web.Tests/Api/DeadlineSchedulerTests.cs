@@ -138,4 +138,33 @@ public sealed class DeadlineSchedulerTests : IAsyncLifetime
         await using var db = _site.NewDb();
         return await db.Events.CountAsync(e => e.Type == "season-status-changed" && e.Data.Contains("\"to\":\"closing\""), Ct);
     }
+
+    [Fact]
+    public void Command_id_follows_the_season_and_the_deadline()
+    {
+        // A repeated tick for the same deadline is a duplicate; a moved deadline is a new command (D-101)
+        var season = Guid.Parse("30000000-0000-0000-0000-0000000000aa");
+        var deadline = new DateTimeOffset(2026, 12, 31, 21, 0, 0, TimeSpan.Zero);
+
+        var same = Infrastructure.Seasons.DeadlineScheduler.CommandIdFor(season, deadline);
+
+        Assert.Equal(same, Infrastructure.Seasons.DeadlineScheduler.CommandIdFor(season, deadline.ToOffset(TimeSpan.FromHours(3))));
+        Assert.NotEqual(same, Infrastructure.Seasons.DeadlineScheduler.CommandIdFor(season, deadline.AddMinutes(1)));
+        Assert.NotEqual(same, Infrastructure.Seasons.DeadlineScheduler.CommandIdFor(Guid.NewGuid(), deadline));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-5)]
+    public void Interval_must_be_above_zero(int seconds)
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => new Infrastructure.Seasons.DeadlineSchedulerSettings(TimeSpan.FromSeconds(seconds)));
+    }
+
+    [Fact]
+    public void Scheduler_loop_is_off_in_the_tests()
+    {
+        // The tests call TickAsync themselves; a background tick would race the clock they move
+        Assert.False(_site.Services.GetRequiredService<Infrastructure.Seasons.DeadlineSchedulerSettings>().Enabled);
+    }
 }

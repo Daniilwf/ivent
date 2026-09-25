@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { api, rejectionCode, type Schemas } from '../api/client';
 import { watchSeason } from '../api/realtime';
 import { ru } from '../i18n/ru';
@@ -146,6 +146,9 @@ export function SeasonScreen({
     }
   }
 
+  // Turns end at the deadline even before the scheduler closes the season (D-101): no action the server would refuse.
+  const pastDeadline = useIsPast(season?.deadline ?? null);
+
   if (loadFailed && !season) return <p role="alert">{ru.app.loadError}</p>;
   if (!season) return <p>{ru.app.loading}</p>;
 
@@ -153,8 +156,9 @@ export function SeasonScreen({
   const waiting =
     (me?.phase === 'rolling' && !me.offer && !me.choice) ||
     (me?.phase === 'playing' && !me.activeRun);
-  const choice = me?.phase === 'rolling' ? me.choice : null;
-  const offer = me?.phase === 'rolling' ? me.offer : null;
+  const turnsOpen = season.status === 'active' && !pastDeadline;
+  const choice = turnsOpen && me?.phase === 'rolling' ? me.choice : null;
+  const offer = turnsOpen && me?.phase === 'rolling' ? me.offer : null;
   return (
     <main>
       <h1>{ru.app.title}</h1>
@@ -162,7 +166,9 @@ export function SeasonScreen({
       {season.deadline && (
         <p data-testid="season-deadline">{ru.season.deadline(moscowTime(season.deadline))}</p>
       )}
-      {season.status === 'closing' && <p data-testid="season-status">{ru.season.closing}</p>}
+      {(season.status === 'closing' || (season.status === 'active' && pastDeadline)) && (
+        <p data-testid="season-status">{ru.season.closing}</p>
+      )}
       {(season.status === 'finished' || season.status === 'archived') && (
         <p data-testid="season-status">{ru.season.finished}</p>
       )}
@@ -170,7 +176,7 @@ export function SeasonScreen({
         <h2 id="turn-title">{ru.turn.title}</h2>
         {!me && <p>{ru.turn.spectator}</p>}
         {waiting && <p>{ru.app.loading}</p>}
-        {me?.phase === 'idle' && season.status === 'active' && (
+        {me?.phase === 'idle' && turnsOpen && (
           <button data-testid="roll" disabled={pending} onClick={() => void act({ kind: 'roll' })}>
             {ru.turn.roll}
           </button>
@@ -238,8 +244,10 @@ export function SeasonScreen({
           </>
         )}
         {me?.phase === 'playing' && me.activeRun && (
+          <p data-testid="active-run">{ru.turn.playing(me.activeRun.game.title)}</p>
+        )}
+        {turnsOpen && me?.phase === 'playing' && me.activeRun && (
           <>
-            <p data-testid="active-run">{ru.turn.playing(me.activeRun.game.title)}</p>
             <CompleteForm
               needsHours={me.activeRun.game.hours == null}
               challengesEnabled={me.challengesEnabled}
@@ -368,4 +376,23 @@ function moscowTime(utc: string): string {
     hour: '2-digit',
     minute: '2-digit',
   });
+}
+
+// The longest delay setTimeout takes; a farther deadline is checked again when the timer fires.
+const maxTimeout = 2_147_483_647;
+
+/** Whether the UTC instant has passed; re-renders when it does. */
+function useIsPast(instant: string | null): boolean {
+  const at = instant === null ? null : Date.parse(instant);
+  const subscribe = useCallback(
+    (notify: () => void) => {
+      if (at === null) return () => {};
+      const timer = setTimeout(notify, Math.min(Math.max(0, at - Date.now()), maxTimeout));
+      return () => {
+        clearTimeout(timer);
+      };
+    },
+    [at],
+  );
+  return useSyncExternalStore(subscribe, () => at !== null && Date.now() >= at);
 }

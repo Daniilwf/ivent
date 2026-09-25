@@ -181,6 +181,12 @@ public class SeasonResultTests
         s.NextRandom(3, 3).Act(command);
 
         Assert.False(s.Last.IsAccepted, $"{kind} was accepted after the finish.");
+        // Where the finished season is the only reason to refuse, it must be the reason (rules audit of C10)
+        if (kind is "correctHours" or "changeDifficulty" or "convertToDrop" or "adjustPlayer" or "deadline")
+        {
+            Assert.Equal(RejectionCodes.SeasonClosed, s.Last.Rejection!.Code);
+        }
+
         Assert.Empty(s.Last.Events);
         Assert.Equal(before, s.State);
         Assert.Equal(logLength, s.Log.Count);
