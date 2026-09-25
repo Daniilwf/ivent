@@ -6,6 +6,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Every test builds its own site over its own database, so tests run in parallel inside a class too (C13, D-110). -->
+    <Content Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\GameEvent.Web\GameEvent.Web.csproj" />
   </ItemGroup>
 
