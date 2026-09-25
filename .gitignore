@@ -67,3 +67,6 @@ Thumbs.db
 
 # Worktrees of parallel agents (Claude Code)
 .claude/worktrees/
+
+# --- Verify snapshots: only *.verified.* are kept (C13) ---
+*.received.*
