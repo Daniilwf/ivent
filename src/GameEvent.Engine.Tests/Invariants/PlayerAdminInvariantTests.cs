@@ -160,6 +160,9 @@ public class PlayerAdminInvariantTests
             3 => new AdjustPlayer(player, comment, PointsDelta: arg - 3),
             4 => new AdjustPlayer(player, comment, CoinsDelta: 3 - arg, ResourceDeltas: [new ResourceDelta(withRerolls ? Coupon : "tickets", (arg % 3) - 1)]),
             5 => new AdjustPlayer(player, comment, CellId: CellAt(s, arg * 4), DiscardOffer: arg % 2 == 1),
+            // C11a (D-102): the upper arguments resolve a pending manual effect — by its owner, by another player or by the
+            // admin (7), applied or not applicable, with or without a comment
+            6 when arg >= 4 && s.State.ManualEffects.Count > 0 => ResolveFor(s, player, b),
             6 => new SetPlayerInactive(player, arg % 2 == 1),
             _ => arg switch
             {
@@ -170,6 +173,25 @@ public class PlayerAdminInvariantTests
                 _ => new AddSeasonPlayer(s_late, s_lateUser, "Лёша", CellId: CellAt(s, arg * 5), Points: arg, Coins: 2 - arg),
             },
         };
+    }
+
+    private static ResolveManualEffect ResolveFor(Scenario s, Guid player, byte b)
+    {
+        var arg = b / 32;
+        var effects = s.State.ManualEffects.Values.ToList();
+        var effect = effects[(b + s.Log.Count) % effects.Count];
+
+        // Sometimes an effect already resolved (the log's last one) or a made-up one: the engine refuses it
+        if (s.Log.Count % 5 == 4)
+        {
+            var old = s.Log.OfType<ManualEffectResolved>().LastOrDefault()?.EffectId ?? SequentialIds.Make(0x70000000, b);
+            return new ResolveManualEffect(old, ManualEffectOutcome.Applied, "повтор", null);
+        }
+
+        var outcome = (b + s.Log.Count) % 2 == 0 ? ManualEffectOutcome.Applied : ManualEffectOutcome.NotApplicable;
+        var comment = (s.Log.Count % 3) switch { 0 => null, 1 => " ", _ => "разыграли" };
+        var by = arg == 7 ? (Guid?)null : arg == 6 ? player : effect.PlayerId;
+        return new ResolveManualEffect(effect.EffectId, outcome, comment, by);
     }
 
     /// <summary>
@@ -833,6 +855,15 @@ public class PlayerAdminInvariantTests
             Assert.Equal(moved.Steps - moved.Path.Count, f.Surplus);
         }
 
+        // D-102: a resolution command resolves exactly its effect; a player only their own, the admin always with a comment
+        if (command is ResolveManualEffect resolve && s.Last.IsAccepted)
+        {
+            var resolved = Assert.IsType<ManualEffectResolved>(Assert.Single(events));
+            Assert.Equal((resolve.EffectId, resolve.Outcome), (resolved.EffectId, resolved.Outcome));
+            Assert.True(resolve.PlayerId is null || resolve.PlayerId == resolved.PlayerId, "A player resolved someone else's effect.");
+            Assert.True(resolve.PlayerId is not null || resolved.Comment.Length > 0, "The admin resolved without a comment.");
+        }
+
         // Q-3: a finish is revoked only by a reject or a reduction of a run up to the finish
         foreach (var revoked in events.OfType<PlayerFinishRevoked>())
         {
@@ -901,7 +932,12 @@ public class PlayerAdminInvariantTests
                 .Where(e => e.PlayerId == now.PlayerId && e.Reason is PointsReason.FinishBonus or PointsReason.FinishBonusRevoked)
                 .Sum(e => e.Delta);
             Assert.Equal(then.Points + bonus, now.Points);
-            Assert.Equal(then with { Points = now.Points, Finish = now.Finish }, now);
+
+            // D-100: a bonus change numbers the player's points anew; without one the number stays
+            var bonusChanged = s.Last.Events.OfType<PointsChanged>()
+                .Any(e => e.PlayerId == now.PlayerId && e.Delta != 0 && e.Reason is PointsReason.FinishBonus or PointsReason.FinishBonusRevoked);
+            Assert.Equal(then with { Points = now.Points, Finish = now.Finish, PointsTick = bonusChanged ? now.PointsTick : then.PointsTick }, now);
+            Assert.True(!bonusChanged || now.PointsTick > then.PointsTick, "A bonus change did not number the points anew.");
             if (then.Finish is null)
             {
                 Assert.Null(now.Finish);
@@ -2341,10 +2377,16 @@ public class PlayerAdminInvariantTests
                     Assert.True(pendingEffects.TryAdd(created.EffectId, (created.PlayerId, created.RunId)), "An effect created twice.");
                     break;
                 case ManualEffectResolved resolvedEffect:
-                    // D-97: only a pending effect is resolved, once, with a comment
+                    // D-97, D-102: only a pending effect is resolved, once, while the season runs or closes; «не применимо»
+                    // always with a comment (only the owner's «применено» may go without one — checked by command below)
                     Assert.True(pendingEffects.Remove(resolvedEffect.EffectId, out var effectOwner), "A resolved effect was not pending.");
                     Assert.Equal(effectOwner, (resolvedEffect.PlayerId, resolvedEffect.RunId));
-                    Assert.False(string.IsNullOrWhiteSpace(resolvedEffect.Comment), "A resolution without a comment.");
+                    Assert.True(status is SeasonStatus.Active or SeasonStatus.Closing, $"Resolved while {status}.");
+                    Assert.Equal(resolvedEffect.Comment.Trim(), resolvedEffect.Comment);
+                    Assert.True(resolvedEffect.Comment.Length <= Limits.MaxCommentLength, "A resolution comment over the limit.");
+                    Assert.True(
+                        resolvedEffect.Outcome == ManualEffectOutcome.Applied || resolvedEffect.Comment.Length > 0,
+                        "«Не применимо» without a comment.");
                     break;
                 case GameExcluded excluded:
                     Assert.Equal(SeasonStatus.Active, status);
