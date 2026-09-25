@@ -42,7 +42,9 @@ public sealed record ManualEffectCreated(Guid EffectId, Guid PlayerId, EventKind
 internal static class ManualEffects
 {
     public static Seasons.SeasonState Apply(Seasons.SeasonState state, ManualEffectResolved e) =>
-        throw new NotImplementedException("C7");
+        state.ManualEffects.ContainsKey(e.EffectId)
+            ? state with { ManualEffects = state.ManualEffects.Remove(e.EffectId) }
+            : throw new InvalidOperationException($"Manual effect {e.EffectId} is not pending.");
 
     public static Seasons.SeasonState Apply(Seasons.SeasonState state, ManualEffectCreated e) =>
         state with

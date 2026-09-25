@@ -26,6 +26,9 @@ namespace GameEvent.Engine.Tests.Invariants;
 /// The drop variants (C6b, D-94) add <see cref="DropRun"/>, <see cref="TechReroll"/> (by the player and by the admin) and
 /// <see cref="ConvertTechRerollToDrop"/>, and move the clock forward between commands, so the tech reroll window
 /// (<c>roll.techRerollWindowHours</c>) both holds and runs out.
+/// The correction variants (C7b, D-97) add the admin's <see cref="CorrectRunHours"/> and <see cref="ChangeRunDifficulty"/>
+/// of completed runs (and of runs that are not, and of made-up ones), so dice are appended, taken off the end and
+/// recalculated, and the difficulty's good event is created and resolved.
 /// </summary>
 public class PlayerAdminInvariantTests
 {
@@ -197,6 +200,40 @@ public class PlayerAdminInvariantTests
         };
     }
 
+    private static readonly decimal[] s_correctedHours = [0, 1, 3, 6, 7.5m, 12, 30, 100];
+
+    /// <summary>
+    /// With corrections, the inactive flag with an argument of 4 and up is a correction instead (bits 5–7): 4 and 6 correct
+    /// the hours (one of <see cref="s_correctedHours"/>, 0 is refused; 6 sometimes with a blank comment), 5 and 7 change
+    /// the difficulty (7 of a made-up run). The run is the player's latest completed one, or any run of the season, or a
+    /// made-up one.
+    /// </summary>
+    private static ICommand CorrectionCommandFor(Scenario s, byte b, Func<ICommand> otherwise)
+    {
+        var arg = b / 32;
+        if ((b / 4) % 8 != 6 || arg < 4)
+        {
+            return otherwise();
+        }
+
+        var runs = s.State.Runs.Values.ToList();
+        var index = b % 4;
+        var player = index < s_players.Length ? s.PlayerId(s_players[index]) : s_late;
+        var runId = (b % 3) switch
+        {
+            _ when arg == 7 => SequentialIds.Make(0x60000000, b),
+            1 when runs.Count > 0 => runs[b % runs.Count].RunId,
+            _ => runs.LastOrDefault(r => r.PlayerId == player && r.Status == RunStatus.Completed)?.RunId
+                ?? SequentialIds.Make(0x60000000, b),
+        };
+        return arg switch
+        {
+            4 => new CorrectRunHours(runId, s_correctedHours[b % 8], "часы по HLTB"),
+            6 => new CorrectRunHours(runId, s_correctedHours[(b / 2) % 8], b % 2 == 0 ? " " : "часы по пруфу"),
+            _ => new ChangeRunDifficulty(runId, (Difficulty)(b % 4), "сложность по пруфу"),
+        };
+    }
+
     private static Guid RunToConvert(Scenario s, Guid player, byte b)
     {
         var runs = s.State.Runs.Values.Where(r => r.PlayerId == player).ToList();
@@ -210,7 +247,8 @@ public class PlayerAdminInvariantTests
         Action<Scenario, ICommand, SeasonState, int>? afterEach = null,
         bool withChoice = false,
         RerollMode rerolls = RerollMode.None,
-        bool withDrops = false)
+        bool withDrops = false,
+        bool withCorrections = false)
     {
         var s = NewSeason(seed, withChoice, rerolls);
         foreach (var b in script)
@@ -223,9 +261,10 @@ public class PlayerAdminInvariantTests
 
             var before = s.State;
             var logLength = s.Log.Count;
-            var command = withDrops
+            ICommand Other() => withDrops
                 ? DropCommandFor(s, b, withChoice, rerolls != RerollMode.None)
                 : CommandFor(s, b, withChoice, rerolls != RerollMode.None);
+            var command = withCorrections ? CorrectionCommandFor(s, b, Other) : Other();
             s.Act(command);
             afterEach?.Invoke(s, command, before, logLength);
         }
@@ -260,6 +299,25 @@ public class PlayerAdminInvariantTests
     [Property(MaxTest = 200)]
     public void Invariants_hold_with_drops_rerolls_and_a_choice_of_games(int seed, byte[] script) =>
         Play(seed, script, CheckInvariants, withChoice: true, rerolls: RerollMode.BadEvent, withDrops: true);
+
+    [Property(MaxTest = 200)]
+    public void Invariants_hold_with_run_corrections(int seed, byte[] script) =>
+        Play(seed, script, CheckInvariants, withCorrections: true);
+
+    [Property(MaxTest = 200)]
+    public void Invariants_hold_with_run_corrections_drops_and_rerolls(int seed, byte[] script) =>
+        Play(seed, script, CheckInvariants, withChoice: true, rerolls: RerollMode.BadEvent, withDrops: true, withCorrections: true);
+
+    [Property(MaxTest = 50)]
+    public void Same_seed_and_commands_give_the_same_log_with_run_corrections(int seed, byte[] script)
+    {
+        // Invariant 14: the dice added by an hours correction come from the seeded random source only
+        var first = Play(seed, script, withDrops: true, withCorrections: true);
+        var second = Play(seed, script, withDrops: true, withCorrections: true);
+
+        Assert.Equal(first.Log, second.Log);
+        Assert.Equal(first.State, second.State);
+    }
 
     [Property(MaxTest = 50)]
     public void Same_seed_and_commands_give_the_same_log_with_drops(int seed, byte[] script)
@@ -418,12 +476,29 @@ public class PlayerAdminInvariantTests
                 $"{player.Name} is {player.Phase} with {player.RerollsThisRoll} rerolls.");
         }
 
-        // RR1 / D-93: pending manual effects are exactly the created ones (resolution comes with C11)
+        // RR1 / D-93 / D-97: pending manual effects are exactly the created ones minus the resolved ones
+        var resolved = s.Log.OfType<ManualEffectResolved>().Select(e => e.EffectId).ToHashSet();
         Assert.Equal(
             s.Log.OfType<ManualEffectCreated>()
+                .Where(e => !resolved.Contains(e.EffectId))
                 .Select(e => new PendingManualEffect(e.EffectId, e.PlayerId, e.DrawEvent, e.Source, e.RunId))
                 .OrderBy(e => e.EffectId),
             s.State.ManualEffects.Values);
+
+        // W7 / W8 / D-13 / D-14 / D-97: a completed run has as many dice as the snapshot's rule gives for its current
+        // hours, all of the die of its current difficulty (the challenge dice too), each within its sides
+        foreach (var run in s.State.Runs.Values.Where(r => r.Status == RunStatus.Completed))
+        {
+            Assert.NotNull(run.Hours);
+            Assert.NotNull(run.Difficulty);
+            Assert.Equal(ExpectedDiceCount(run.Hours.Value, run.Snapshot.DiceCount), run.Dice.Count);
+            var sides = DieOf(run.Difficulty.Value, run.Snapshot.DieByDifficulty).Sides;
+            Assert.All(run.Dice.Concat(run.ChallengeDice), d =>
+            {
+                Assert.Equal(sides, d.Sides);
+                Assert.InRange(d.Value, 1, d.Sides);
+            });
+        }
         Assert.All(s.State.ManualEffects, e => Assert.Equal(e.Key, e.Value.EffectId));
 
         // 4 / G9. A game is busy for at most one player: offered, among pending options (D-06) or played
@@ -515,6 +590,12 @@ public class PlayerAdminInvariantTests
                 break;
             case ConvertTechRerollToDrop convert:
                 CheckAcceptedConversion(s, convert, before);
+                break;
+            case CorrectRunHours correct:
+                CheckAcceptedHoursCorrection(s, correct, before);
+                break;
+            case ChangeRunDifficulty change:
+                CheckAcceptedDifficultyChange(s, change, before);
                 break;
             case MakeChoice choose:
                 // Choosing --> Playing (D-91): the chosen option starts at once with its roll-time snapshot
@@ -716,6 +797,167 @@ public class PlayerAdminInvariantTests
         Assert.Equal(run with { Review = new RunReview(review.Review.Rating, text) }, s.State.Runs[run.RunId]);
     }
 
+    /// <summary>D-13: hours / hoursPerDie, rounded by the rule (nearest: half away from zero), then clamped to min..max.</summary>
+    private static int ExpectedDiceCount(decimal hours, DiceCountRule rule)
+    {
+        var raw = hours / rule.HoursPerDie;
+        var rounded = rule.Rounding switch
+        {
+            Rounding.Floor => Math.Floor(raw),
+            Rounding.Ceil => Math.Ceiling(raw),
+            _ => Math.Round(raw, MidpointRounding.AwayFromZero),
+        };
+        return (int)Math.Clamp(rounded, rule.Min, rule.Max);
+    }
+
+    private static DieRule DieOf(Difficulty difficulty, DieByDifficulty dice) =>
+        difficulty switch
+        {
+            Difficulty.Easy => dice.Easy,
+            Difficulty.Normal => dice.Normal,
+            Difficulty.Hard => dice.Hard,
+            _ => dice.Extreme,
+        };
+
+    /// <summary>W10 / D-96 (2): coins of a completion by the snapshot's rule, capped by the dice ceiling.</summary>
+    private static int ExpectedCoins(decimal hours, RunSnapshot snapshot)
+    {
+        var counted = Math.Min(hours, snapshot.DiceCount.Max * snapshot.DiceCount.HoursPerDie);
+        return Math.Max(snapshot.Coins!.Min, (int)Math.Floor(counted * snapshot.Coins.PerHour));
+    }
+
+    /// <summary>
+    /// D-97: the difference of a correction: points, then a move from the current cell (forward along the arrows, back
+    /// along the walked path; none when no cell is entered), each only when not zero, all linked to the run. The owner's
+    /// turn is untouched and nobody else changes.
+    /// </summary>
+    private static void CheckCorrectionDifference(Scenario s, RunState run, int diff, SeasonState before)
+    {
+        var events = s.Last.Events;
+        var was = before.Players[run.PlayerId];
+        Assert.Equal(
+            diff == 0 ? [] : [new PointsChanged(run.PlayerId, diff, PointsReason.RunCorrection, run.RunId)],
+            events.OfType<PointsChanged>());
+        Assert.Equal(was.Points + diff, s.State.Players[run.PlayerId].Points);
+
+        var path = diff switch
+        {
+            > 0 => Movement.Forward(before.Map, was.CellId, diff),
+            < 0 => Movement.Backward(before.Map, was.Path, -diff),
+            _ => [],
+        };
+        var moves = events.OfType<PlayerMoved>().ToList();
+        if (path.Count == 0)
+        {
+            Assert.Empty(moves);
+        }
+        else
+        {
+            Assert.Equal(
+                [new PlayerMoved(run.PlayerId, was.CellId, path[^1], diff, [.. path], MoveReason.RunCorrection, run.RunId)],
+                moves);
+        }
+
+        var now = s.State.Players[run.PlayerId];
+        Assert.Equal(
+            (was.Phase, was.Offer, was.Choice, was.ActiveRunId, was.RerollsThisRoll, was.Resources, was.Exclusions),
+            (now.Phase, now.Offer, now.Choice, now.ActiveRunId, now.RerollsThisRoll, now.Resources, now.Exclusions));
+        Assert.All(s.State.Players.Values.Where(p => p.PlayerId != run.PlayerId), p => Assert.Equal(before.Players[p.PlayerId], p));
+    }
+
+    /// <summary>W7 / D-14 / D-97: only a completed run, until the season is finished; dice by count, appended or taken off the end.</summary>
+    private static void CheckAcceptedHoursCorrection(Scenario s, CorrectRunHours correct, SeasonState before)
+    {
+        var events = s.Last.Events;
+        Assert.True(before.Status is SeasonStatus.Active or SeasonStatus.Closing, $"Corrected while {before.Status}.");
+        Assert.True(correct.Hours > 0, "Hours not above zero were accepted.");
+        Assert.False(string.IsNullOrWhiteSpace(correct.Comment), "A correction without a comment.");
+        var run = before.Runs[correct.RunId];
+        Assert.Equal(RunStatus.Completed, run.Status);
+        Assert.NotEqual(run.Hours, correct.Hours);
+
+        var oldCount = run.Dice.Count;
+        var newCount = ExpectedDiceCount(correct.Hours, run.Snapshot.DiceCount);
+        var corrected = Assert.IsType<RunHoursCorrected>(events[0]);
+        Assert.Equal(
+            (run.RunId, run.PlayerId, run.Hours!.Value, correct.Hours, Math.Max(0, oldCount - newCount), correct.Comment, s.Clock.UtcNow),
+            (corrected.RunId, corrected.PlayerId, corrected.OldHours, corrected.NewHours, corrected.Removed, corrected.Comment, corrected.CorrectedAt));
+        Assert.Equal(Math.Max(0, newCount - oldCount), corrected.Added.Count);
+        var sides = DieOf(run.Difficulty!.Value, run.Snapshot.DieByDifficulty).Sides;
+        Assert.All(corrected.Added, d => Assert.Equal(sides, d.Sides));
+
+        // The dice by hours: the old ones kept from the start, the new ones appended; the challenge dice untouched
+        EquatableArray<Die> dice = [.. run.Dice.Take(Math.Min(oldCount, newCount)), .. corrected.Added];
+        var after = s.State.Runs[run.RunId];
+        Assert.Equal(dice, after.Dice);
+        Assert.Equal(run.ChallengeDice, after.ChallengeDice);
+        Assert.Equal(correct.Hours, after.Hours);
+        Assert.Equal(run.Difficulty, after.Difficulty);
+
+        // Order: the correction, points, move, coins; nothing else
+        var order = new[] { typeof(RunHoursCorrected), typeof(PointsChanged), typeof(PlayerMoved), typeof(CoinsChanged) };
+        var positions = events.Select(e => Array.IndexOf(order, e.GetType())).ToList();
+        Assert.DoesNotContain(-1, positions);
+        Assert.Equal(positions.Distinct().Order(), positions);
+
+        CheckCorrectionDifference(s, run, dice.Sum(d => d.Value) - run.Dice.Sum(d => d.Value), before);
+
+        // Coins by the snapshot's formula for the new hours
+        var coins = ExpectedCoins(correct.Hours, run.Snapshot) - ExpectedCoins(run.Hours.Value, run.Snapshot);
+        Assert.Equal(
+            coins == 0 ? [] : [new CoinsChanged(run.PlayerId, coins, CoinsReason.RunCorrection, run.RunId)],
+            events.OfType<CoinsChanged>());
+        Assert.Equal(before.Players[run.PlayerId].Coins + coins, s.State.Players[run.PlayerId].Coins);
+    }
+
+    /// <summary>W8 / Q-5 / D-97: every die ⌈old × new sides / old sides⌉, both kept; the difficulty's event follows.</summary>
+    private static void CheckAcceptedDifficultyChange(Scenario s, ChangeRunDifficulty change, SeasonState before)
+    {
+        var events = s.Last.Events;
+        Assert.True(before.Status is SeasonStatus.Active or SeasonStatus.Closing, $"Changed while {before.Status}.");
+        Assert.False(string.IsNullOrWhiteSpace(change.Comment), "A difficulty change without a comment.");
+        var run = before.Runs[change.RunId];
+        Assert.Equal(RunStatus.Completed, run.Status);
+        Assert.NotEqual(run.Difficulty, change.Difficulty);
+        var oldRule = DieOf(run.Difficulty!.Value, run.Snapshot.DieByDifficulty);
+        var newRule = DieOf(change.Difficulty, run.Snapshot.DieByDifficulty);
+
+        DieChange Recalculate(Die d) => new(d, new Die(newRule.Sides, ((d.Value * newRule.Sides) + d.Sides - 1) / d.Sides));
+        EquatableArray<DieChange> dice = [.. run.Dice.Select(Recalculate)];
+        EquatableArray<DieChange> challenge = [.. run.ChallengeDice.Select(Recalculate)];
+        Assert.Equal(
+            new RunDifficultyChanged(
+                run.RunId, run.PlayerId, run.Difficulty.Value, change.Difficulty, dice, challenge, change.Comment, s.Clock.UtcNow),
+            events[0]);
+
+        var after = s.State.Runs[run.RunId];
+        Assert.Equal(change.Difficulty, after.Difficulty);
+        Assert.Equal(dice.Select(d => d.After), after.Dice);
+        Assert.Equal(challenge.Select(d => d.After), after.ChallengeDice);
+        Assert.Equal(run.Hours, after.Hours);
+
+        Type[] allowed = [typeof(RunDifficultyChanged), typeof(PointsChanged), typeof(PlayerMoved), typeof(ManualEffectResolved), typeof(ManualEffectCreated)];
+        Assert.All(events, e => Assert.Contains(e.GetType(), allowed));
+        CheckCorrectionDifference(s, run, dice.Concat(challenge).Sum(d => d.After.Value - d.Before.Value), before);
+
+        // The old difficulty's pending event is resolved «not applicable» with the comment; the new one's is created
+        var pending = before.ManualEffects.Values.Where(e => e.RunId == run.RunId && e.Source == ManualEffectSource.Difficulty);
+        Assert.Equal(
+            oldRule.GrantEvent is null ? [] : pending.Select(e => new ManualEffectResolved(e.EffectId, ManualEffectOutcome.NotApplicable, change.Comment)),
+            events.OfType<ManualEffectResolved>());
+        var created = events.OfType<ManualEffectCreated>().ToList();
+        if (newRule.GrantEvent is { } kind)
+        {
+            var effect = Assert.Single(created);
+            Assert.Equal(new ManualEffectCreated(effect.EffectId, run.PlayerId, kind, ManualEffectSource.Difficulty, run.RunId), effect);
+            Assert.DoesNotContain(effect.EffectId, before.ManualEffects.Keys);
+        }
+        else
+        {
+            Assert.Empty(created);
+        }
+    }
+
     /// <summary>RR1 / D-93: «not enough coins» only when the free rerolls and coupons are used up and the coins fall short.</summary>
     private static void CheckRejectedReroll(Scenario s, ICommand command, SeasonState before)
     {
@@ -908,6 +1150,8 @@ public class PlayerAdminInvariantTests
             TechRerollConvertedToDrop x => x.PlayerId,
             GameExcluded x => x.PlayerId,
             RunReviewed x => x.PlayerId,
+            RunHoursCorrected x => x.PlayerId,
+            RunDifficultyChanged x => x.PlayerId,
             _ => null,
         };
 
@@ -934,6 +1178,7 @@ public class PlayerAdminInvariantTests
         var status = SeasonStatus.Draft;
         var players = new Dictionary<Guid, ReferencePlayer>();
         var runs = new Dictionary<Guid, (Guid Player, Guid Game)>();
+        var pendingEffects = new HashSet<Guid>();
         foreach (var e in log)
         {
             switch (e)
@@ -972,6 +1217,18 @@ public class PlayerAdminInvariantTests
                     // W9 / D-96: reviews until the archive, only of one's own runs
                     Assert.NotEqual(SeasonStatus.Archived, status);
                     Assert.Equal(runs[reviewed.RunId].Player, reviewed.PlayerId);
+                    break;
+                case RunHoursCorrected or RunDifficultyChanged:
+                    // D-97: corrections until the season is finished
+                    Assert.True(status is SeasonStatus.Active or SeasonStatus.Closing, $"Corrected while {status}.");
+                    break;
+                case ManualEffectCreated created:
+                    Assert.True(pendingEffects.Add(created.EffectId), "An effect created twice.");
+                    break;
+                case ManualEffectResolved resolvedEffect:
+                    // D-97: only a pending effect is resolved, once, with a comment
+                    Assert.True(pendingEffects.Remove(resolvedEffect.EffectId), "A resolved effect was not pending.");
+                    Assert.False(string.IsNullOrWhiteSpace(resolvedEffect.Comment), "A resolution without a comment.");
                     break;
                 case GameExcluded excluded:
                     Assert.Equal(SeasonStatus.Active, status);
@@ -1017,6 +1274,13 @@ public class PlayerAdminInvariantTests
                         // RR3: a drop only moves back, never past the start
                         Assert.True(moved.Steps < 0, "A drop penalty moved forward.");
                         Assert.InRange(moved.Path.Count, 1, -moved.Steps);
+                    }
+
+                    if (moved.Reason == MoveReason.RunCorrection)
+                    {
+                        // D-97: a correction moves by steps, never past the start, and never a no-op
+                        Assert.NotEqual(0, moved.Steps);
+                        Assert.InRange(moved.Path.Count, 1, Math.Abs(moved.Steps));
                     }
 
                     if (moved.Reason is MoveReason.AdminAdjustment or MoveReason.StartingCell)

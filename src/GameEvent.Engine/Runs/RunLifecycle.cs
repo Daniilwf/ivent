@@ -99,8 +99,7 @@ internal static class RunLifecycle
         // a player's estimate cannot mint coins without limit.
         if (run.Snapshot.Coins is { } reward)
         {
-            var ceiling = run.Snapshot.DiceCount.Max * run.Snapshot.DiceCount.HoursPerDie;
-            var coins = Math.Max(reward.Min, (int)Math.Floor(Math.Min(hours.Value, ceiling) * reward.PerHour));
+            var coins = CompletionCoins(reward, run.Snapshot.DiceCount, hours.Value);
             if (coins != 0)
             {
                 events.Add(new CoinsChanged(player.PlayerId, coins, CoinsReason.CompletionReward, run.RunId));
@@ -119,6 +118,10 @@ internal static class RunLifecycle
 
         return Decision.Accept(events);
     }
+
+    /// <summary>Coins for completing (Q-2, D-96): by the hours, up to the hours the dice top out at, at least the minimum.</summary>
+    public static int CompletionCoins(Rulesets.CoinReward reward, Rulesets.DiceCountRule dice, decimal hours) =>
+        Math.Max(reward.Min, (int)Math.Floor(Math.Min(hours, dice.Max * dice.HoursPerDie) * reward.PerHour));
 
     public static Decision Decide(SeasonState state, ReviewRun command, EngineContext context)
     {
