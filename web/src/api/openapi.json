@@ -6914,6 +6914,31 @@
         },
         "description": "Pool health of a season for the admin (G10, G11, D-92)."
       },
+      "PoolUpdate": {
+        "required": [
+          "fromSequence",
+          "toSequence",
+          "types"
+        ],
+        "type": "object",
+        "properties": {
+          "fromSequence": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "toSequence": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "types": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "description": "Sent to everyone watching the pool after a committed change of the pool or the category wheel (D-122)."
+      },
       "ProblemDetails": {
         "type": "object",
         "properties": {
@@ -7765,6 +7790,57 @@
         },
         "description": "The admin sets or removes (null) the deadline; only in draft or active (D-101)."
       },
+      "SeasonJoin": {
+        "required": [
+          "lastSequence",
+          "missed",
+          "reload"
+        ],
+        "type": "object",
+        "properties": {
+          "lastSequence": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "missed": {
+            "type": "array",
+            "items": {
+              "required": [
+                "seasonId",
+                "fromSequence",
+                "toSequence",
+                "types"
+              ],
+              "type": "object",
+              "properties": {
+                "seasonId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "fromSequence": {
+                  "type": "integer",
+                  "format": "int64"
+                },
+                "toSequence": {
+                  "type": "integer",
+                  "format": "int64"
+                },
+                "types": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "description": "Sent to everyone watching a season after each committed command: refetch what you show. The sequences are the\ncommand's place in the season log: a client that last saw `FromSequence - 1` missed nothing."
+            }
+          },
+          "reload": {
+            "type": "boolean"
+          }
+        },
+        "description": "The answer to joining a season (E3, D-122): the last sequence of its log now, and what was committed after the\nsequence the client last saw — one update per command, in log order. `Reload` — too much was missed to list:\nrefetch everything."
+      },
       "SeasonRules": {
         "required": [
           "timezone",
@@ -7848,7 +7924,7 @@
             }
           }
         },
-        "description": "Sent to everyone watching a season after each committed command: refetch what you show."
+        "description": "Sent to everyone watching a season after each committed command: refetch what you show. The sequences are the\ncommand's place in the season log: a client that last saw `FromSequence - 1` missed nothing."
       },
       "SeasonView": {
         "required": [
