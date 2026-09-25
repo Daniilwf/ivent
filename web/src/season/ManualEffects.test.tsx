@@ -15,10 +15,10 @@ const seasonId = '5ea50000-0000-0000-0000-000000000001';
 const me = '10000000-0000-0000-0000-000000000001';
 const effectId = 'e1000000-0000-0000-0000-000000000001';
 
-function season(): Schemas['SeasonView'] {
+function season(status: Schemas['SeasonView']['status'] = 'active'): Schemas['SeasonView'] {
   return {
     id: seasonId,
-    status: 'active',
+    status,
     deadline: null,
     cells: [
       { id: 'start', type: 'start' },
@@ -59,12 +59,15 @@ function json(status: number, body: unknown) {
 const resolveUrl = `/api/seasons/${seasonId}/effects/${effectId}/resolve`;
 
 /** Serves the season; records the bodies sent to the resolve endpoint and answers with `answer`. */
-function serve(answer: () => Response = () => json(200, { duplicate: false, events: [] })) {
+function serve(
+  answer: () => Response = () => json(200, { duplicate: false, events: [] }),
+  status: Schemas['SeasonView']['status'] = 'active',
+) {
   const sent: unknown[] = [];
   vi.stubGlobal(
     'fetch',
     vi.fn(async (request: Request) => {
-      if (request.method === 'GET') return json(200, season());
+      if (request.method === 'GET') return json(200, season(status));
       if (request.url.endsWith(resolveUrl)) {
         sent.push(await request.json());
         return answer();
@@ -144,5 +147,35 @@ describe('Manual effects', () => {
     expect(await screen.findByLabelText(ru.effects.comment)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: ru.effects.applied })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: ru.effects.notApplicable })).toBeInTheDocument();
+  });
+
+  it.each(['finished', 'archived'] as const)(
+    'shows the effect without the buttons once the season is %s',
+    async (status) => {
+      serve(undefined, status);
+      render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+      expect(await screen.findByTestId(`manual-effect-${effectId}`)).toHaveTextContent(
+        ru.effects.drawEvent('bad', 'drop'),
+      );
+      expect(screen.queryByTestId(`manual-effect-applied-${effectId}`)).toBeNull();
+      expect(screen.queryByTestId(`manual-effect-not-applicable-${effectId}`)).toBeNull();
+    },
+  );
+
+  it('resolves while the season is closing', async () => {
+    serve(undefined, 'closing');
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    expect(await screen.findByTestId(`manual-effect-applied-${effectId}`)).toBeEnabled();
+  });
+
+  it('says in plain text that «не применимо» needs a comment', async () => {
+    serve();
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    const button = await screen.findByTestId(`manual-effect-not-applicable-${effectId}`);
+    expect(button).toHaveAccessibleDescription(ru.effects.commentNeeded);
+    expect(screen.getByText(ru.effects.commentNeeded)).toBeVisible();
   });
 });

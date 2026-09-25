@@ -281,6 +281,7 @@ export function SeasonScreen({
                   key={effect.id}
                   effect={effect}
                   pending={pending}
+                  resolvable={season.status === 'active' || season.status === 'closing'}
                   onResolve={(outcome, comment) =>
                     void act({ kind: 'resolveEffect', effectId: effect.id, outcome, comment })
                   }

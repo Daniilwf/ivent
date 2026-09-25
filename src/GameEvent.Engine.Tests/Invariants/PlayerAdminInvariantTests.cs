@@ -180,6 +180,14 @@ public class PlayerAdminInvariantTests
         var arg = b / 32;
         var effects = s.State.ManualEffects.Values.ToList();
         var effect = effects[(b + s.Log.Count) % effects.Count];
+
+        // Sometimes an effect already resolved (the log's last one) or a made-up one: the engine refuses it
+        if (s.Log.Count % 5 == 4)
+        {
+            var old = s.Log.OfType<ManualEffectResolved>().LastOrDefault()?.EffectId ?? SequentialIds.Make(0x70000000, b);
+            return new ResolveManualEffect(old, ManualEffectOutcome.Applied, "повтор", null);
+        }
+
         var outcome = (b + s.Log.Count) % 2 == 0 ? ManualEffectOutcome.Applied : ManualEffectOutcome.NotApplicable;
         var comment = (s.Log.Count % 3) switch { 0 => null, 1 => " ", _ => "разыграли" };
         var by = arg == 7 ? (Guid?)null : arg == 6 ? player : effect.PlayerId;
@@ -929,6 +937,7 @@ public class PlayerAdminInvariantTests
             var bonusChanged = s.Last.Events.OfType<PointsChanged>()
                 .Any(e => e.PlayerId == now.PlayerId && e.Delta != 0 && e.Reason is PointsReason.FinishBonus or PointsReason.FinishBonusRevoked);
             Assert.Equal(then with { Points = now.Points, Finish = now.Finish, PointsTick = bonusChanged ? now.PointsTick : then.PointsTick }, now);
+            Assert.True(!bonusChanged || now.PointsTick > then.PointsTick, "A bonus change did not number the points anew.");
             if (then.Finish is null)
             {
                 Assert.Null(now.Finish);

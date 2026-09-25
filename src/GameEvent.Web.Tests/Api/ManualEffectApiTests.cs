@@ -243,7 +243,115 @@ public sealed class ManualEffectApiTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
+    // ---- Both endpoints: bad input and the antiforgery token (code review of C11a) ----
+
+    public static TheoryData<string, string> BadBodies => new()
+    {
+        { "player", "{\"commandId\":\"{id}\",\"outcome\":\"maybe\",\"comment\":\"x\"}" },
+        { "admin", "{\"commandId\":\"{id}\",\"outcome\":\"maybe\",\"comment\":\"x\"}" },
+        { "player", "{\"commandId\":\"{id}\",\"comment\":\"x\"}" },
+        { "admin", "{\"commandId\":\"{id}\",\"comment\":\"x\"}" },
+        { "player", "{\"commandId\":\"{id}\",\"outcome\":\"notApplicable\",\"comment\":\"{long}\"}" },
+        { "admin", "{\"commandId\":\"{id}\",\"outcome\":\"notApplicable\",\"comment\":\"{long}\"}" },
+        { "player", "{\"outcome\":\"applied\",\"comment\":\"x\"}" },
+        { "admin", "{\"outcome\":\"applied\",\"comment\":\"x\"}" },
+        { "admin", "{\"commandId\":\"00000000-0000-0000-0000-000000000000\",\"outcome\":\"applied\",\"comment\":\"x\"}" },
+    };
+
+    [Theory]
+    [MemberData(nameof(BadBodies))]
+    public async Task Bad_input_is_a_bad_request_on_both_endpoints(string endpoint, string body)
+    {
+        var vasya = await _site.SignedInAsync("vasya");
+        var effectId = await DropAsync(vasya);
+        var client = endpoint == "admin" ? await _site.SignedInAsync("admin") : vasya;
+        var json = body.Replace("{id}", Guid.NewGuid().ToString(), StringComparison.Ordinal)
+            .Replace("{long}", new string('я', 501), StringComparison.Ordinal);
+
+        var response = await client.PostAsync(
+            endpoint == "admin" ? AdminUrl(effectId) : PlayerUrl(effectId),
+            new StringContent(json, System.Text.Encoding.UTF8, "application/json"),
+            Ct);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(1, (await MeAsync(vasya)).GetProperty("manualEffects").GetArrayLength());
+    }
+
+    [Fact]
+    public async Task Admin_post_without_the_antiforgery_token_is_refused()
+    {
+        var vasya = await _site.SignedInAsync("vasya");
+        var admin = await _site.SignedInAsync("admin");
+        var effectId = await DropAsync(vasya);
+        admin.DefaultRequestHeaders.Remove(Hosting.Csrf.HeaderName);
+
+        var response = await admin.PostAsJsonAsync(AdminUrl(effectId), new { commandId = Guid.NewGuid(), outcome = "applied", comment = "x" }, Ct);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(1, (await MeAsync(vasya)).GetProperty("manualEffects").GetArrayLength());
+    }
+
+    // ---- The admin's list of pending effects ----
+
+    [Fact]
+    public async Task Admin_lists_the_pending_effects_of_every_player()
+    {
+        var vasya = await _site.SignedInAsync("vasya");
+        var petya = await _site.SignedInAsync("petya");
+        var admin = await _site.SignedInAsync("admin");
+        var first = await DropAsync(vasya);
+        var second = await DropAsync(petya);
+
+        var list = await ListAsync(admin);
+
+        Assert.Equal([first, second], list.Select(e => e.GetProperty("id").GetGuid()));
+        Assert.Equal("drop", list[0].GetProperty("source").GetString());
+        Assert.Equal("bad", list[0].GetProperty("drawEvent").GetString());
+        Assert.NotEqual(list[0].GetProperty("playerName").GetString(), list[1].GetProperty("playerName").GetString());
+
+        await PostOkAsync(admin, AdminUrl(first), new { commandId = Guid.NewGuid(), outcome = "applied", comment = "Разыграли" });
+        Assert.Equal([second], (await ListAsync(admin)).Select(e => e.GetProperty("id").GetGuid()));
+    }
+
+    [Theory]
+    [InlineData("vasya")]
+    [InlineData("zritel")]
+    public async Task Players_and_spectators_cannot_list_the_effects(string login)
+    {
+        var client = await _site.SignedInAsync(login);
+
+        var response = await client.GetAsync($"/api/admin/seasons/{SiteFactory.SeasonId}/effects", Ct);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Anonymous_cannot_list_the_effects()
+    {
+        var client = await _site.AnonymousAsync();
+
+        var response = await client.GetAsync($"/api/admin/seasons/{SiteFactory.SeasonId}/effects", Ct);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Effects_of_an_unknown_season_are_not_found()
+    {
+        var admin = await _site.SignedInAsync("admin");
+
+        var response = await admin.GetAsync($"/api/admin/seasons/{Guid.NewGuid()}/effects", Ct);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
     // ---- Helpers ----
+
+    private static async Task<List<JsonElement>> ListAsync(HttpClient admin)
+    {
+        using var doc = JsonDocument.Parse(await admin.GetStringAsync($"/api/admin/seasons/{SiteFactory.SeasonId}/effects", Ct));
+        return [.. doc.RootElement.EnumerateArray().Select(e => e.Clone())];
+    }
 
     // The player rolls, starts and drops: the mandatory bad event waits as a manual effect
     private static async Task<Guid> DropAsync(HttpClient client)

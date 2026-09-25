@@ -4,6 +4,7 @@ using GameEvent.Infrastructure.Database;
 using GameEvent.Infrastructure.Queue;
 using GameEvent.Web.Accounts;
 using GameEvent.Web.Hosting;
+using Microsoft.EntityFrameworkCore;
 
 using ActionResult = Microsoft.AspNetCore.Http.HttpResults.Results<
     Microsoft.AspNetCore.Http.HttpResults.Ok<GameEvent.Web.Seasons.CommandResponse>,
@@ -20,6 +21,10 @@ public sealed record SeasonStatusRequest(Guid CommandId, SeasonStatus? To);
 /// <summary>The admin sets or removes (null) the deadline; only in draft or active (D-101).</summary>
 public sealed record SeasonDeadlineRequest(Guid CommandId, DateTimeOffset? Deadline);
 
+/// <summary>A pending manual effect of any player, oldest first, for the admin to resolve (D-102).</summary>
+public sealed record AdminManualEffectView(
+    Guid Id, Guid PlayerId, string PlayerName, Engine.Rulesets.EventKind DrawEvent, Engine.Effects.ManualEffectSource Source, Guid? RunId);
+
 /// <summary>The admin's season actions: the lifecycle (D-101) and resolving manual effects (D-102).</summary>
 public static class AdminSeasonEndpoints
 {
@@ -34,6 +39,10 @@ public static class AdminSeasonEndpoints
                 : SendAsync(seasonId, request.CommandId, new ChangeSeasonStatus(to), user, db, bus, ct))
             .WithActionErrors();
 
+        season.MapGet("/effects", GetEffectsAsync)
+            .RequireRateLimiting(AppSetup.AdminReadRateLimit)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
+
         // Any player's effect; the comment is required (D-89, D-102).
         season.MapPost("/effects/{effectId:guid}/resolve", (Guid seasonId, Guid effectId, ResolveEffectRequest request, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, CancellationToken ct) =>
             SeasonEndpoints.ResolveInvalid(request) is { } invalid
@@ -44,6 +53,25 @@ public static class AdminSeasonEndpoints
         season.MapPost("/deadline", (Guid seasonId, SeasonDeadlineRequest request, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, CancellationToken ct) =>
             SendAsync(seasonId, request.CommandId, new SetSeasonDeadline(request.Deadline), user, db, bus, ct))
             .WithActionErrors();
+    }
+
+    private static async Task<Microsoft.AspNetCore.Http.HttpResults.Results<
+        Microsoft.AspNetCore.Http.HttpResults.Ok<IReadOnlyList<AdminManualEffectView>>,
+        Microsoft.AspNetCore.Http.HttpResults.NotFound>> GetEffectsAsync(Guid seasonId, GameEventDbContext db, CancellationToken ct)
+    {
+        if (!await db.Seasons.AnyAsync(s => s.Id == seasonId, ct))
+        {
+            return TypedResults.NotFound();
+        }
+
+        // Effect ids are time-ordered (UUID v7), so their order is the order they were created in.
+        IReadOnlyList<AdminManualEffectView> effects = await db.ManualEffects.AsNoTracking()
+            .Where(x => x.SeasonId == seasonId)
+            .Join(db.SeasonPlayers, x => x.PlayerId, p => p.Id, (x, p) => new { x, p.Name })
+            .OrderBy(r => r.x.Id)
+            .Select(r => new AdminManualEffectView(r.x.Id, r.x.PlayerId, r.Name, r.x.DrawEvent, r.x.Source, r.x.RunId))
+            .ToListAsync(ct);
+        return TypedResults.Ok(effects);
     }
 
     private static async Task<ActionResult> SendAsync(
