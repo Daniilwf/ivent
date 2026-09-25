@@ -102,6 +102,18 @@ public static class Movement
     internal static SeasonState Apply(SeasonState state, PlayerMoved e)
     {
         var player = state.Players[e.PlayerId];
-        return state with { Players = state.Players.SetItem(e.PlayerId, player with { CellId = e.To, Path = player.Path.After(e) }) };
+        state = state with { Players = state.Players.SetItem(e.PlayerId, player with { CellId = e.To, Path = player.Path.After(e) }) };
+
+        if (e.RunId is not { } runId)
+        {
+            return state;
+        }
+
+        // The run keeps the cells it really moved the token (steps past the finish burn, D-47), which a reject or a
+        // correction takes back, and whether its latest move stands on the finish (its proof goes on top).
+        var run = state.Runs[runId];
+        var moved = run.Moved + (Math.Sign(e.Steps) * e.Path.Count);
+        var reached = state.Map.CellById(e.To).Type == CellType.Finish;
+        return state with { Runs = state.Runs.SetItem(runId, run with { Moved = moved, ReachedFinish = reached }) };
     }
 }

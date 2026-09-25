@@ -11,4 +11,9 @@ public static class Limits
 
     /// <summary>Where an hours estimate comes from: a link or a short note.</summary>
     public const int MaxHoursSourceLength = 300;
+
+    /// <summary>Proof links: how many, and how long each.</summary>
+    public const int MaxProofLinks = 5;
+
+    public const int MaxProofLinkLength = 500;
 }

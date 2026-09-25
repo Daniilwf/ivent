@@ -136,6 +136,36 @@ public sealed class RunRecord
 
     /// <summary>Where the player's hours estimate comes from, when the pool had no hours.</summary>
     public string? HoursSource { get; set; }
+
+    public DateTimeOffset? CompletedAt { get; set; }
+
+    /// <summary>A move of this run brought its player to the finish: its proof goes on top of the queue.</summary>
+    public bool ReachedFinish { get; set; }
+
+    /// <summary>Net steps the run's moves took; a reject takes them back.</summary>
+    public int Moved { get; set; }
+}
+
+/// <summary>The proof of a run (SPEC «Модель данных»: Proof), one per run; the admin's queue reads pending rows.</summary>
+public sealed class ProofRecord
+{
+    public Guid RunId { get; set; }
+
+    public Guid SeasonId { get; set; }
+
+    public Guid PlayerId { get; set; }
+
+    public Engine.Proofs.ProofStatus Status { get; set; }
+
+    public required string LinksJson { get; set; }
+
+    public string? Note { get; set; }
+
+    public Guid? WitnessId { get; set; }
+
+    public DateTimeOffset? SubmittedAt { get; set; }
+
+    public string? Comment { get; set; }
 }
 
 /// <summary>A review of a completed run (SPEC «Модель данных»: Review): one per run, the latest wins.</summary>

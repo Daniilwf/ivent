@@ -185,7 +185,10 @@ namespace GameEvent.Infrastructure.Database.Migrations
                     Hours = table.Column<decimal>(type: "TEXT", nullable: true),
                     DiceJson = table.Column<string>(type: "TEXT", nullable: false),
                     ChallengeDiceJson = table.Column<string>(type: "TEXT", nullable: false),
-                    HoursSource = table.Column<string>(type: "TEXT", nullable: true)
+                    HoursSource = table.Column<string>(type: "TEXT", nullable: true),
+                    CompletedAt = table.Column<long>(type: "INTEGER", nullable: true),
+                    ReachedFinish = table.Column<bool>(type: "INTEGER", nullable: false),
+                    Moved = table.Column<int>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -231,6 +234,37 @@ namespace GameEvent.Infrastructure.Database.Migrations
                         onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
                         name: "FK_PendingManualEffect_Season_SeasonId",
+                        column: x => x.SeasonId,
+                        principalTable: "Season",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Proof",
+                columns: table => new
+                {
+                    RunId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    SeasonId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    PlayerId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    Status = table.Column<string>(type: "TEXT", maxLength: 20, nullable: false),
+                    LinksJson = table.Column<string>(type: "TEXT", nullable: false),
+                    Note = table.Column<string>(type: "TEXT", nullable: true),
+                    WitnessId = table.Column<Guid>(type: "TEXT", nullable: true),
+                    SubmittedAt = table.Column<long>(type: "INTEGER", nullable: true),
+                    Comment = table.Column<string>(type: "TEXT", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Proof", x => x.RunId);
+                    table.ForeignKey(
+                        name: "FK_Proof_Run_RunId",
+                        column: x => x.RunId,
+                        principalTable: "Run",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_Proof_Season_SeasonId",
                         column: x => x.SeasonId,
                         principalTable: "Season",
                         principalColumn: "Id",
@@ -292,6 +326,11 @@ namespace GameEvent.Infrastructure.Database.Migrations
                 columns: new[] { "SeasonId", "PlayerId" });
 
             migrationBuilder.CreateIndex(
+                name: "IX_Proof_SeasonId",
+                table: "Proof",
+                column: "SeasonId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Review_GameId",
                 table: "Review",
                 column: "GameId");
@@ -351,6 +390,9 @@ namespace GameEvent.Infrastructure.Database.Migrations
 
             migrationBuilder.DropTable(
                 name: "PlayerGameExclusion");
+
+            migrationBuilder.DropTable(
+                name: "Proof");
 
             migrationBuilder.DropTable(
                 name: "Review");

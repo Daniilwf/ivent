@@ -108,8 +108,17 @@ internal static class Corrections
             return Decision.Reject(RejectionCodes.RunNothingToChange, $"Run {run.RunId} is already {old}.");
         }
 
+        return Decision.Accept(DifficultyChange(state, run, command.Difficulty, command.Comment, context));
+    }
+
+    /// <summary>The events of a difficulty change (Q-5, D-97), also written by a proof approval at a lower difficulty (D-98).</summary>
+    public static IReadOnlyList<IGameEvent> DifficultyChange(
+        SeasonState state, RunState run, Difficulty difficulty, string comment, EngineContext context)
+    {
+        var old = run.Difficulty ?? throw new InvalidOperationException($"Completed run {run.RunId} has no difficulty.");
+
         // Q-5: each die ⌈old × new sides / old sides⌉; no randomness.
-        var newRule = CompletionRoll.DieFor(command.Difficulty, run.Snapshot.DieByDifficulty);
+        var newRule = CompletionRoll.DieFor(difficulty, run.Snapshot.DieByDifficulty);
         EquatableArray<DieChange> Recalculate(EquatableArray<Die> dice) =>
             [.. dice.Select(d => new DieChange(d, new Die(newRule.Sides, (int)Math.Ceiling((decimal)d.Value * newRule.Sides / d.Sides))))];
         var dice = Recalculate(run.Dice);
@@ -117,7 +126,7 @@ internal static class Corrections
         var delta = dice.Concat(challenge).Sum(c => c.After.Value - c.Before.Value);
 
         var changed = new RunDifficultyChanged(
-            run.RunId, run.PlayerId, old, command.Difficulty, dice, challenge, command.Comment, context.Clock.UtcNow);
+            run.RunId, run.PlayerId, old, difficulty, dice, challenge, comment, context.Clock.UtcNow);
         var events = new List<IGameEvent> { changed };
         events.AddRange(Difference(state, run, delta));
 
@@ -125,14 +134,14 @@ internal static class Corrections
         // played out stays, the admin corrects by hand), the new difficulty grants its own (Q-5, D-97).
         events.AddRange(state.ManualEffects.Values
             .Where(e => e.RunId == run.RunId && e.Source == ManualEffectSource.Difficulty)
-            .Select(e => new ManualEffectResolved(e.EffectId, e.PlayerId, e.RunId, ManualEffectOutcome.NotApplicable, command.Comment)));
+            .Select(e => new ManualEffectResolved(e.EffectId, e.PlayerId, e.RunId, ManualEffectOutcome.NotApplicable, comment)));
 
         if (newRule.GrantEvent is { } granted)
         {
             events.Add(new ManualEffectCreated(context.Ids.NewId(), run.PlayerId, granted, ManualEffectSource.Difficulty, run.RunId));
         }
 
-        return Decision.Accept(events);
+        return events;
     }
 
     public static SeasonState Apply(SeasonState state, RunHoursCorrected e)
@@ -197,10 +206,14 @@ internal static class Corrections
         var player = state.Players[run.PlayerId];
         yield return new PointsChanged(player.PlayerId, delta, PointsReason.RunCorrection, run.RunId);
 
-        var path = delta > 0 ? Movement.Forward(state.Map, player.CellId, delta) : Movement.Backward(state.Map, player.Path, -delta);
+        // Forward: from where the player stands, extra steps burn at the finish. Back: only what the run really gave
+        // beyond its new dice sum — steps that burned at the finish gave no cells to take back (D-47, D-97).
+        var newSum = run.Dice.Sum(d => d.Value) + run.ChallengeDice.Sum(d => d.Value) + delta;
+        var steps = delta > 0 ? delta : -Math.Max(0, run.Moved - newSum);
+        var path = steps > 0 ? Movement.Forward(state.Map, player.CellId, steps) : Movement.Backward(state.Map, player.Path, -steps);
         if (path.Count > 0)
         {
-            yield return new PlayerMoved(player.PlayerId, player.CellId, path[^1], delta, [.. path], MoveReason.RunCorrection, run.RunId);
+            yield return new PlayerMoved(player.PlayerId, player.CellId, path[^1], steps, [.. path], MoveReason.RunCorrection, run.RunId);
         }
     }
 

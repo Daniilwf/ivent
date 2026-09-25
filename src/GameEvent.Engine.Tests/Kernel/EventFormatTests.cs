@@ -2,6 +2,7 @@ using GameEvent.Engine.Effects;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Map;
 using GameEvent.Engine.Players;
+using GameEvent.Engine.Proofs;
 using GameEvent.Engine.Rolls;
 using GameEvent.Engine.Rulesets;
 using GameEvent.Engine.Runs;
@@ -187,6 +188,24 @@ public class EventFormatTests
             new ManualEffectResolved(s_run, s_player, s_run, ManualEffectOutcome.NotApplicable, "Сложность понижена по пруфу"),
             1,
             """{"effectId":"00000000-0000-0000-0000-000000000001","playerId":"10000000-0000-0000-0000-000000000001","runId":"00000000-0000-0000-0000-000000000001","outcome":"notApplicable","comment":"Сложность понижена по пруфу"}"""
+        },
+        {
+            "proof-submitted",
+            new ProofSubmitted(s_run, s_player, ["https://imgur.com/a/credits"], "Титры", s_other, s_at),
+            1,
+            """{"runId":"00000000-0000-0000-0000-000000000001","playerId":"10000000-0000-0000-0000-000000000001","links":["https://imgur.com/a/credits"],"note":"Титры","witnessId":"10000000-0000-0000-0000-000000000002","submittedAt":"2026-10-01T12:30:00+00:00"}"""
+        },
+        {
+            "proof-approved",
+            new ProofApproved(s_run, s_player, true, "Видел на стриме", s_at),
+            1,
+            """{"runId":"00000000-0000-0000-0000-000000000001","playerId":"10000000-0000-0000-0000-000000000001","withoutProof":true,"comment":"Видел на стриме","approvedAt":"2026-10-01T12:30:00+00:00"}"""
+        },
+        {
+            "proof-rejected",
+            new ProofRejected(s_run, s_player, "На скрине другая игра", s_at),
+            1,
+            """{"runId":"00000000-0000-0000-0000-000000000001","playerId":"10000000-0000-0000-0000-000000000001","comment":"На скрине другая игра","rejectedAt":"2026-10-01T12:30:00+00:00"}"""
         },
         {
             "run-started",

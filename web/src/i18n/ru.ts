@@ -41,6 +41,11 @@ const rejection = {
   'roll.noAvailableGames': 'Нет доступных игр для ролла. Сообщите админу.',
   'roll.notEnoughCoins': 'Не хватает монеток на реролл.',
   'roll.gameNotOffered': 'Эта игра вам сейчас не предложена. Обновите страницу.',
+  'proof.invalidLink': 'Ссылка должна начинаться с http:// или https://, ссылок не больше пяти.',
+  'proof.empty': 'Добавьте ссылку на пруф или выберите свидетеля.',
+  'proof.witnessInvalid': 'Свидетелем может быть только другой игрок сезона.',
+  'proof.alreadyReviewed': 'Пруф уже проверен.',
+  'proof.difficultyAboveClaimed': 'По пруфу нельзя поднять заявленную сложность.',
   'run.techRerollWindowClosed': 'Окно тех-реролла после ролла закрылось. Обратитесь к админу.',
   'run.reasonCommentRequired': 'Для причины «Другое» нужен комментарий.',
   'run.hoursRequired': 'У игры нет данных о длине: укажите оценку часов.',
@@ -163,6 +168,7 @@ export const ru = {
     reviewNoRating: 'Без отзыва',
     reviewText: 'Отзыв',
     reviewRatingRequired: 'Чтобы оставить отзыв, поставьте оценку от 1 до 10.',
+    lastRejected: (title: string) => `Прохождение отклонено (${title}): очки и клетки сняты.`,
     lastChallengeDice: (dice: number[]) => `Кубы за челлендж: ${dice.join(' + ')}`,
     lastReview: (rating: number, text: string | null) =>
       text
@@ -177,6 +183,23 @@ export const ru = {
     normal: 'Нормальная',
     hard: 'Сложная',
     extreme: 'Выше сложной',
+  },
+  proof: {
+    title: 'Пруф',
+    link: 'Ссылка на скрин или видео',
+    addLink: 'Ещё ссылка',
+    note: 'Заметка',
+    submit: 'Отправить пруф',
+    linkRequired: 'Добавьте хотя бы одну ссылку или выберите свидетеля.',
+    witness: 'Свидетель (видел прохождение)',
+    noWitness: 'Без свидетеля',
+    linkInvalid: 'Ссылка должна начинаться с http:// или https://.',
+    status: {
+      pending: 'Пруф ждёт проверки админом.',
+      approved: 'Пруф одобрен.',
+      rejected: 'Пруф отклонён.',
+    },
+    reviewComment: (comment: string) => `Комментарий админа: ${comment}`,
   },
   effects: {
     title: 'Нужно разыграть',

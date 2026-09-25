@@ -45,6 +45,11 @@ public static class RejectionCodes
     public const string NotYourRun = "run.notYours";
     public const string RunNotCompleted = "run.notCompleted";
     public const string RunNothingToChange = "run.nothingToChange";
+    public const string ProofAlreadyReviewed = "proof.alreadyReviewed";
+    public const string ProofInvalidLink = "proof.invalidLink";
+    public const string ProofEmpty = "proof.empty";
+    public const string ProofWitnessInvalid = "proof.witnessInvalid";
+    public const string ProofDifficultyAboveClaimed = "proof.difficultyAboveClaimed";
     public const string InvalidRating = "review.invalidRating";
     public const string ReviewTooLong = "review.tooLong";
 }

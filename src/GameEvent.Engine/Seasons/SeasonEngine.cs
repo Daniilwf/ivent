@@ -2,6 +2,7 @@ using GameEvent.Engine.Effects;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Map;
 using GameEvent.Engine.Players;
+using GameEvent.Engine.Proofs;
 using GameEvent.Engine.Rolls;
 using GameEvent.Engine.Rulesets;
 using GameEvent.Engine.Runs;
@@ -48,6 +49,9 @@ public static class SeasonEngine
             CompleteRun c => RunLifecycle.Decide(state, c, context),
             ReviewRun c => RunLifecycle.Decide(state, c, context),
             CorrectRunHours c => Corrections.Decide(state, c, context),
+            SubmitProof c => ProofReview.Decide(state, c, context),
+            ApproveProof c => ProofReview.Decide(state, c, context),
+            RejectProof c => ProofReview.Decide(state, c, context),
             ChangeRunDifficulty c => Corrections.Decide(state, c, context),
             DropRun c => Drops.Decide(state, c, context),
             TechReroll c => Drops.Decide(state, c, context),
@@ -84,6 +88,9 @@ public static class SeasonEngine
             CompletionRolled e => RunLifecycle.Apply(state, e),
             RunReviewed e => RunLifecycle.Apply(state, e),
             RunHoursCorrected e => Corrections.Apply(state, e),
+            ProofSubmitted e => ProofReview.Apply(state, e),
+            ProofApproved e => ProofReview.Apply(state, e),
+            ProofRejected e => ProofReview.Apply(state, e),
             RunDifficultyChanged e => Corrections.Apply(state, e),
             ManualEffectResolved e => ManualEffects.Apply(state, e),
             RunDropped e => Drops.Apply(state, e),

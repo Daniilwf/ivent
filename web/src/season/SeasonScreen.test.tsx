@@ -1275,12 +1275,7 @@ describe('SeasonScreen completion reward (C7a, D-96)', () => {
     vi.unstubAllGlobals();
   });
 
-  // The generated client does not know the new fields yet: the view is typed as the old one plus them.
-  type Review = { rating: number; text: string | null };
-  type CompletedWithReward = Schemas['CompletedRunView'] & {
-    challengeDice: Schemas['DieView'][];
-    review: Review | null;
-  };
+  type CompletedWithReward = Schemas['CompletedRunView'];
 
   const runId = 'b1000000-0000-0000-0000-000000000009';
 
@@ -1316,6 +1311,8 @@ describe('SeasonScreen completion reward (C7a, D-96)', () => {
       challengeDice: [{ sides: 4, value: 4 }],
       total: 8,
       review: { rating: 9, text: 'Туман и радио' },
+      proof: null,
+      status: 'completed',
       ...overrides,
     };
   }
@@ -1380,6 +1377,39 @@ describe('SeasonScreen completion reward (C7a, D-96)', () => {
     );
   });
 
+  it('shows the reject instead of the dice line for a rejected last run', async () => {
+    // D-98: the run's points and cells were taken back, so its dice no longer count
+    serve((r) =>
+      isSeasonGet(r)
+        ? json(
+            200,
+            completed(
+              last({
+                status: 'rejected',
+                proof: { status: 'rejected', links: [], note: null, comment: 'Не та игра' },
+              }),
+            ),
+          )
+        : json(404, {}),
+    );
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    const line = await screen.findByTestId('last-dice');
+    expect(line).toHaveTextContent(ru.turn.lastRejected('Silent Hill'));
+    expect(line).not.toHaveTextContent(ru.turn.lastDice('Silent Hill', [3, 1, 4], 8));
+  });
+
+  it('shows the dice line for a completed last run', async () => {
+    serve((r) =>
+      isSeasonGet(r) ? json(200, completed(last({ status: 'completed' }))) : json(404, {}),
+    );
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    const line = await screen.findByTestId('last-dice');
+    expect(line).toHaveTextContent(ru.turn.lastDice('Silent Hill', [3, 1, 4], 8));
+    expect(line).not.toHaveTextContent(ru.turn.lastRejected('Silent Hill'));
+  });
+
   it('shows neither challenge dice nor a review when there are none', async () => {
     serve((r) =>
       isSeasonGet(r)
@@ -1410,11 +1440,11 @@ describe('SeasonScreen completion reward (C7a, D-96)', () => {
   });
 
   it('lists the good event of «выше сложной» among manual effects with its own words', async () => {
-    const effect = {
+    const effect: Schemas['ManualEffectView'] = {
       id: 'e1000000-0000-0000-0000-000000000009',
       drawEvent: 'good',
       source: 'difficulty',
-    } as unknown as Schemas['ManualEffectView'];
+    };
     serve((r) =>
       isSeasonGet(r)
         ? json(200, completed(last({ difficulty: 'extreme' }), [effect]))

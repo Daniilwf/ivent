@@ -217,6 +217,45 @@ namespace GameEvent.Infrastructure.Database.Migrations
                     b.ToTable("PlayerGameExclusion", (string)null);
                 });
 
+            modelBuilder.Entity("GameEvent.Infrastructure.Seasons.ProofRecord", b =>
+                {
+                    b.Property<Guid>("RunId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Comment")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("LinksJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Note")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("PlayerId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("SeasonId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("SubmittedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid?>("WitnessId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("RunId");
+
+                    b.HasIndex("SeasonId");
+
+                    b.ToTable("Proof", (string)null);
+                });
+
             modelBuilder.Entity("GameEvent.Infrastructure.Seasons.ReviewRecord", b =>
                 {
                     b.Property<Guid>("RunId")
@@ -281,6 +320,9 @@ namespace GameEvent.Infrastructure.Database.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<long?>("CompletedAt")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("DiceJson")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -298,8 +340,14 @@ namespace GameEvent.Infrastructure.Database.Migrations
                     b.Property<string>("HoursSource")
                         .HasColumnType("TEXT");
 
+                    b.Property<int>("Moved")
+                        .HasColumnType("INTEGER");
+
                     b.Property<Guid>("PlayerId")
                         .HasColumnType("TEXT");
+
+                    b.Property<bool>("ReachedFinish")
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("RolledAt")
                         .HasColumnType("INTEGER");
@@ -450,6 +498,21 @@ namespace GameEvent.Infrastructure.Database.Migrations
                     b.HasOne("GameEvent.Infrastructure.Seasons.SeasonPlayerRecord", null)
                         .WithMany()
                         .HasForeignKey("PlayerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("GameEvent.Infrastructure.Seasons.ProofRecord", b =>
+                {
+                    b.HasOne("GameEvent.Infrastructure.Seasons.RunRecord", null)
+                        .WithMany()
+                        .HasForeignKey("RunId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("GameEvent.Infrastructure.Seasons.SeasonRecord", null)
+                        .WithMany()
+                        .HasForeignKey("SeasonId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

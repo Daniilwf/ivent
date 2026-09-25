@@ -5,6 +5,7 @@ import { ru } from '../i18n/ru';
 import { CompleteForm, type Completion } from './CompleteForm';
 import { RerollButton } from './RerollButton';
 import { GameMarks } from './GameMarks';
+import { ProofSection } from './ProofForm';
 import { RunActions } from './RunActions';
 
 type Season = Schemas['SeasonView'];
@@ -13,6 +14,7 @@ type Command =
   | { kind: 'start' }
   | { kind: 'reroll' }
   | { kind: 'drop' }
+  | { kind: 'proof'; runId: string; links: string[]; note: string | null; witnessId: string | null }
   | { kind: 'techReroll'; reason: NonNullable<Schemas['TechRerollReason']>; comment: string | null }
   | { kind: 'complete'; completion: Completion }
   | { kind: 'choose'; choiceId: string; optionId: string }
@@ -32,6 +34,11 @@ function send(seasonId: string, command: Command) {
       return api.POST('/api/seasons/{seasonId}/reroll', { params, body: { commandId } });
     case 'drop':
       return api.POST('/api/seasons/{seasonId}/drop', { params, body: { commandId } });
+    case 'proof':
+      return api.POST('/api/seasons/{seasonId}/runs/{runId}/proof', {
+        params: { path: { seasonId, runId: command.runId } },
+        body: { commandId, links: command.links, note: command.note, witnessId: command.witnessId },
+      });
     case 'techReroll':
       return api.POST('/api/seasons/{seasonId}/tech-reroll', {
         params,
@@ -258,11 +265,15 @@ export function SeasonScreen({
         {me?.lastCompleted && (
           <>
             <p data-testid="last-dice">
-              {ru.turn.lastDice(
-                me.lastCompleted.game.title,
-                [...me.lastCompleted.dice, ...me.lastCompleted.challengeDice].map((d) => d.value),
-                me.lastCompleted.total,
-              )}
+              {me.lastCompleted.status === 'rejected'
+                ? ru.turn.lastRejected(me.lastCompleted.game.title)
+                : ru.turn.lastDice(
+                    me.lastCompleted.game.title,
+                    [...me.lastCompleted.dice, ...me.lastCompleted.challengeDice].map(
+                      (d) => d.value,
+                    ),
+                    me.lastCompleted.total,
+                  )}
             </p>
             {me.lastCompleted.challengeDice.length > 0 && (
               <p data-testid="last-challenge-dice">
@@ -277,6 +288,16 @@ export function SeasonScreen({
                 )}
               </p>
             )}
+            <ProofSection
+              proof={me.lastCompleted.proof ?? null}
+              pending={pending}
+              witnesses={season.players.filter((p) => p.id !== me.playerId)}
+              onSubmit={(links, note, witnessId) => {
+                if (me.lastCompleted) {
+                  void act({ kind: 'proof', runId: me.lastCompleted.id, links, note, witnessId });
+                }
+              }}
+            />
           </>
         )}
       </section>
