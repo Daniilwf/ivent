@@ -2,7 +2,10 @@ using GameEvent.Engine.Kernel;
 
 namespace GameEvent.Infrastructure.Kernel;
 
-/// <summary>A clock the test endpoints may move (E4, D-120): only in Development and Test.</summary>
+/// <summary>
+/// A clock the test endpoints may move (E4, D-120): only in Development and Test. The time keeps running after a move; a
+/// move too far from the real time throws and changes nothing.
+/// </summary>
 public interface IAdjustableClock : IClock
 {
     void Advance(TimeSpan by);
@@ -20,12 +23,17 @@ public interface IReseedableRandom : IRandomSource
     void Seed(int? seed);
 }
 
-/// <summary>The real time plus an offset, or a fixed moment (D-120). Registered only in Development and Test.</summary>
+/// <summary>
+/// The real time plus an offset (D-120): a move to a moment is an offset too, so the time runs on from there and the
+/// scheduler meets the deadlines as it would. Registered only in Development and Test.
+/// </summary>
 public sealed class ShiftableClock : IAdjustableClock
 {
+    /// <summary>How far from the real time the clock may go: far enough for any season, never near the calendar's end.</summary>
+    public static readonly TimeSpan MaxOffset = TimeSpan.FromDays(100 * 365);
+
     private readonly Lock _lock = new();
     private TimeSpan _offset;
-    private DateTimeOffset? _fixed;
 
     public DateTimeOffset UtcNow
     {
@@ -33,7 +41,7 @@ public sealed class ShiftableClock : IAdjustableClock
         {
             lock (_lock)
             {
-                return _fixed ?? DateTimeOffset.UtcNow + _offset;
+                return DateTimeOffset.UtcNow + _offset;
             }
         }
     }
@@ -42,14 +50,7 @@ public sealed class ShiftableClock : IAdjustableClock
     {
         lock (_lock)
         {
-            if (_fixed is { } at)
-            {
-                _fixed = at + by;
-            }
-            else
-            {
-                _offset += by;
-            }
+            _offset = Checked(by.Duration() > MaxOffset ? TimeSpan.MaxValue : _offset + by);
         }
     }
 
@@ -57,7 +58,7 @@ public sealed class ShiftableClock : IAdjustableClock
     {
         lock (_lock)
         {
-            _fixed = at.ToUniversalTime();
+            _offset = Checked(at.ToUniversalTime() - DateTimeOffset.UtcNow);
         }
     }
 
@@ -65,10 +66,12 @@ public sealed class ShiftableClock : IAdjustableClock
     {
         lock (_lock)
         {
-            _fixed = null;
             _offset = TimeSpan.Zero;
         }
     }
+
+    private static TimeSpan Checked(TimeSpan offset) =>
+        offset.Duration() <= MaxOffset ? offset : throw new ArgumentOutOfRangeException(nameof(offset), "The clock goes at most 100 years from the real time.");
 }
 
 /// <summary>Cryptographic randomness until a seed is set (D-120). Registered only in Development and Test.</summary>

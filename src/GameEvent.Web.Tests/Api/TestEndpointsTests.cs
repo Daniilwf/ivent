@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace GameEvent.Web.Tests.Api;
@@ -43,17 +44,43 @@ public sealed class TestEndpointsTests : IAsyncLifetime
     [Fact]
     public async Task A_seed_makes_the_rolls_repeat()
     {
-        // Roll with a seed, undo the roll, seed again: the same game comes up
+        // Eight rolls (each undone) after a seed, then the same seed again: the same eight games; one roll could match by chance
         var admin = await _site.SignedInAsync("admin");
         var vasya = await _site.SignedInAsync("vasya");
 
-        var (first, rollId) = await RollAfterSeedAsync(admin, vasya, 42);
-        var undo = await admin.PostAsJsonAsync(
-            $"/api/admin/seasons/{SiteFactory.SeasonId}/undo", new { commandId = Guid.NewGuid(), targetCommandId = rollId, comment = "повтор с тем же зерном" }, Ct);
-        Assert.True(undo.IsSuccessStatusCode, await undo.Content.ReadAsStringAsync(Ct));
-        var (second, _) = await RollAfterSeedAsync(admin, vasya, 42);
+        var first = await RollsAfterSeedAsync(admin, vasya, 42, 8);
+        var again = await RollsAfterSeedAsync(admin, vasya, 42, 8);
+        var other = await RollsAfterSeedAsync(admin, vasya, 7, 8);
 
-        Assert.Equal(first, second);
+        Assert.Equal(first, again);
+        Assert.NotEqual(first, other);
+    }
+
+    [Theory]
+    [InlineData("""{}""")]
+    [InlineData("""{"advanceMinutes":1e15}""")]
+    [InlineData("""{"advanceMinutes":-6000000}""")]
+    [InlineData("""{"moveTo":"9999-12-31T00:00:00Z"}""")]
+    [InlineData("""{"moveTo":"1900-01-01T00:00:00Z"}""")]
+    public async Task A_clock_move_out_of_bounds_is_invalid_and_changes_nothing(string body)
+    {
+        var admin = await _site.SignedInAsync("admin");
+        var before = _site.Clock.UtcNow;
+
+        var response = await admin.PostAsync("/api/test/clock", new StringContent(body, System.Text.Encoding.UTF8, "application/json"), Ct);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(before, _site.Clock.UtcNow);
+    }
+
+    [Fact]
+    public async Task A_clock_request_without_a_body_is_invalid()
+    {
+        var admin = await _site.SignedInAsync("admin");
+
+        var response = await admin.PostAsync("/api/test/clock", new StringContent("", System.Text.Encoding.UTF8, "application/json"), Ct);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
     [Fact]
@@ -135,21 +162,46 @@ public sealed class TestEndpointsTests : IAsyncLifetime
         await production.SeedAsync();
         var client = production.CreateClient(new WebApplicationFactoryClientOptions { BaseAddress = new Uri("https://localhost"), HandleCookies = true });
 
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/api/test/clock", Ct)).StatusCode);
         foreach (var url in new[] { "/api/test/clock", "/api/test/random", Scenario("finish-soon") })
         {
-            Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync(url, Ct)).StatusCode);
+            Assert.Equal(HttpStatusCode.NotFound, (await client.PostAsJsonAsync(url, new { }, Ct)).StatusCode);
         }
+    }
+
+    [Theory]
+    [InlineData("Production", false)]
+    [InlineData("Staging", false)]
+    [InlineData("Development", true)]
+    [InlineData("Test", true)]
+    public void Only_development_and_test_get_the_movable_clock_and_the_seedable_randomness(string environment, bool registered)
+    {
+        // The site as it is built, without the tests' own clock: production keeps the real time and the real randomness
+        var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = environment });
+
+        GameEvent.Web.Testing.TestEndpoints.AddTestSupport(builder);
+
+        Assert.Equal(registered, builder.Services.Any(s => s.ImplementationType == typeof(GameEvent.Infrastructure.Kernel.ShiftableClock)));
+        Assert.Equal(registered, builder.Services.Any(s => s.ImplementationType == typeof(GameEvent.Infrastructure.Kernel.ReseedableRandom)));
     }
 
     // ---- Helpers ----
 
-    private static async Task<(string? Title, Guid RollId)> RollAfterSeedAsync(HttpClient admin, HttpClient player, int seed)
+    private static async Task<List<string?>> RollsAfterSeedAsync(HttpClient admin, HttpClient player, int seed, int count)
     {
         Assert.Equal(HttpStatusCode.NoContent, (await admin.PostAsJsonAsync("/api/test/random", new { seed }, Ct)).StatusCode);
-        var rollId = Guid.NewGuid();
-        Assert.True((await player.PostAsJsonAsync($"/api/seasons/{SiteFactory.SeasonId}/roll", new { commandId = rollId }, Ct)).IsSuccessStatusCode);
-        var me = (await SeasonAsync(player)).GetProperty("me");
-        return (me.GetProperty("offer").GetProperty("title").GetString(), rollId);
+        var titles = new List<string?>();
+        for (var i = 0; i < count; i++)
+        {
+            var rollId = Guid.NewGuid();
+            Assert.True((await player.PostAsJsonAsync($"/api/seasons/{SiteFactory.SeasonId}/roll", new { commandId = rollId }, Ct)).IsSuccessStatusCode);
+            titles.Add((await SeasonAsync(player)).GetProperty("me").GetProperty("offer").GetProperty("title").GetString());
+            var undo = await admin.PostAsJsonAsync(
+                $"/api/admin/seasons/{SiteFactory.SeasonId}/undo", new { commandId = Guid.NewGuid(), targetCommandId = rollId, comment = "повтор с тем же зерном" }, Ct);
+            Assert.True(undo.IsSuccessStatusCode, await undo.Content.ReadAsStringAsync(Ct));
+        }
+
+        return titles;
     }
 
     private static async Task<JsonElement> SeasonAsync(HttpClient client)

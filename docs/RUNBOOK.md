@@ -98,7 +98,7 @@
 
 Проверено тестами (`TestEndpointsTests`); на боевом сайте их нет.
 
-- Войти админом, затем: `POST /api/test/clock {"advanceMinutes": 60}` — время вперёд на час; `{"moveTo": "2026-12-31T20:00:00Z"}` — к моменту; `{"reset": true}` — настоящее время.
+- Войти админом, затем: `POST /api/test/clock {"advanceMinutes": 60}` — время вперёд на час; `{"moveTo": "2026-12-31T20:00:00Z"}` — к моменту (часы идут дальше с него); `{"reset": true}` — настоящее время.
 - `POST /api/test/random {"seed": 42}` — одинаковые роллы и кубы; `{"seed": null}` — снова случайно.
 - `POST /api/test/seasons/{id}/scenarios/finish-soon {"player": "vasya"}` — игрок перед финишем; `deadline-in-hour` — дедлайн через час; `five-manual-effects` — пять ручных эффектов на игроке.
 
