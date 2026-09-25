@@ -167,9 +167,16 @@ internal static class PlayerAdministration
             return Decision.Reject(RejectionCodes.PlayerBusy, "The player is playing a run: that is a drop or a tech reroll (C6).");
         }
 
-        if (command.CellId is { } target && TransferTarget(state, target) is { } badCell)
+        // Naming the cell the player stands on is not a move: nothing to check.
+        if (command.CellId is { } target && target != player.CellId && TransferTarget(state, target) is { } badCell)
         {
             return badCell;
+        }
+
+        // A finisher's position follows his runs up to the finish (Q-3); a reject or a correction changes it, not a transfer.
+        if (command.CellId is { } moveTo && moveTo != player.CellId && player.Finish is not null)
+        {
+            return Decision.Reject(RejectionCodes.PlayerFinished, "A finished player's position follows the runs up to the finish.");
         }
 
         var changes = new List<IGameEvent>();
@@ -243,7 +250,7 @@ internal static class PlayerAdministration
                 e.PlayerId,
                 new SeasonPlayer(
                     e.PlayerId, e.UserId, e.Name, e.CellId, Points: 0, Coins: 0, ResourceBag.Empty, IsInactive: false,
-                    PlayerPath.At(e.CellId), TurnPhase.Idle, Offer: null, Choice: null, Exclusions: [], RerollsThisRoll: 0, ActiveRunId: null)),
+                    PlayerPath.At(e.CellId), TurnPhase.Idle, Offer: null, Choice: null, Exclusions: [], RerollsThisRoll: 0, Finish: null, ActiveRunId: null)),
         };
 
     public static SeasonState Apply(SeasonState state, PlayerInactivitySet e) =>

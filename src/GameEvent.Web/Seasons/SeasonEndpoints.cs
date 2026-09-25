@@ -74,7 +74,8 @@ public sealed record SeasonView(Guid Id, IReadOnlyList<CellView> Cells, IReadOnl
 
 public sealed record CellView(string Id, CellType Type);
 
-public sealed record PlayerView(Guid Id, string Name, string CellId, int Points, TurnPhase Phase);
+/// <summary>A player on the map and the leaderboard; <c>finishOrder</c> is their order among the finishers, null before the finish.</summary>
+public sealed record PlayerView(Guid Id, string Name, string CellId, int Points, TurnPhase Phase, int? FinishOrder);
 
 /// <summary>
 /// The signed-in player's own turn. While playing: <c>dropHintMinutes</c> is <c>roll.minPlayMinutesBeforeDrop</c> until
@@ -94,7 +95,11 @@ public sealed record MyTurnView(
     int? DropHintMinutes,
     DropPenaltyView? DropPenalty,
     bool TechRerollOpen,
-    bool ChallengesEnabled);
+    bool ChallengesEnabled,
+    MyFinishView? Finish);
+
+/// <summary>The player's own finish (D-99): order among the finishers and whether the first place is final and frozen.</summary>
+public sealed record MyFinishView(int Order, bool Frozen);
 
 /// <summary>The drop penalty: <c>count</c> dice of <c>sides</c>, what they take, and whether a bad event follows.</summary>
 public sealed record DropPenaltyView(int Count, int Sides, bool AffectsPoints, bool AffectsPosition, bool BadEvent);
@@ -410,7 +415,7 @@ public static class SeasonEndpoints
                 .OrderBy(x => x.Id)
                 .Select(x => new ManualEffectView(x.Id, x.DrawEvent, x.Source))
                 .ToListAsync(ct);
-            var price = RerollPrice.Next(mine.RerollsThisRoll, coupons, rules.Roll);
+            var price = mine.Frozen ? (Payment: RerollPayment.FreeMode, Coins: 0) : RerollPrice.Next(mine.RerollsThisRoll, coupons, rules.Roll);
             var now = clock.UtcNow;
 
             // Other players' drops and tech rerolls of the offered games (SPEC «Статусы игры в сезоне»: a mark).
@@ -444,17 +449,24 @@ public static class SeasonEndpoints
                 last is null ? null : Completed(last, games[last.GameId], lastReview, lastProof),
                 effects,
                 playing && played < TimeSpan.FromMinutes(rules.Roll.MinPlayMinutesBeforeDrop) ? rules.Roll.MinPlayMinutesBeforeDrop : null,
-                playing
-                    ? new DropPenaltyView(drop.PenaltyDice.Count, drop.PenaltyDice.Sides, drop.AffectsPoints, drop.AffectsPosition, drop.MandatoryEvent == MandatoryEvent.Bad)
+                // The frozen first drops with no penalty; a finisher's position is fixed (D-99).
+                playing && !mine.Frozen
+                    ? new DropPenaltyView(
+                        drop.PenaltyDice.Count,
+                        drop.PenaltyDice.Sides,
+                        drop.AffectsPoints,
+                        drop.AffectsPosition && mine.FinishOrder is null,
+                        drop.MandatoryEvent == MandatoryEvent.Bad)
                     : null,
                 playing && now - run!.RolledAt <= TimeSpan.FromHours(snapshot!.TechRerollWindowHours),
-                rules.Features.Challenges);
+                rules.Features.Challenges,
+                mine.FinishOrder is { } order ? new MyFinishView(order, mine.Frozen) : null);
         }
 
         return TypedResults.Ok(new SeasonView(
             seasonId,
             [.. season.Map.Cells.Select(c => new CellView(c.Id, c.Type))],
-            [.. players.Select(p => new PlayerView(p.Id, p.Name, p.CellId, p.Points, p.Phase))],
+            [.. players.Select(p => new PlayerView(p.Id, p.Name, p.CellId, p.Points, p.Phase, p.FinishOrder))],
             me,
             lastSequence));
     }

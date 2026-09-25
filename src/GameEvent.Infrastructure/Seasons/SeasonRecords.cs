@@ -104,6 +104,19 @@ public sealed class SeasonPlayerRecord
 
     public int RerollsThisRoll { get; set; }
 
+    /// <summary>Order among the finishers (D-99); null while not finished. The leaderboard sorts by it.</summary>
+    public int? FinishOrder { get; set; }
+
+    public Guid? FinishRunId { get; set; }
+
+    public DateTimeOffset? FinishedAt { get; set; }
+
+    public bool Frozen { get; set; }
+
+    public int FinishBonus { get; set; }
+
+    public int FinishSurplus { get; set; }
+
     public Guid? ActiveRunId { get; set; }
 }
 
@@ -144,6 +157,12 @@ public sealed class RunRecord
 
     /// <summary>Net steps the run's moves took; a reject takes them back.</summary>
     public int Moved { get; set; }
+
+    /// <summary>Completed after its player had finished: it does not count for the position (Q-3).</summary>
+    public bool AfterFinish { get; set; }
+
+    /// <summary>Completed while its player was first: it does not complete the game in the season (D-16).</summary>
+    public bool FreeMode { get; set; }
 }
 
 /// <summary>The proof of a run (SPEC «Модель данных»: Proof), one per run; the admin's queue reads pending rows.</summary>

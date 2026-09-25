@@ -26,7 +26,9 @@ function season(overrides: Partial<Schemas['SeasonView']> = {}): Schemas['Season
       { id: 'c1', type: 'empty' },
       { id: 'finish', type: 'finish' },
     ],
-    players: [{ id: me, name: 'Вася', cellId: 'start', points: 0, phase: 'idle' }],
+    players: [
+      { id: me, name: 'Вася', cellId: 'start', points: 0, phase: 'idle', finishOrder: null },
+    ],
     me: {
       playerId: me,
       phase: 'idle',
@@ -40,6 +42,7 @@ function season(overrides: Partial<Schemas['SeasonView']> = {}): Schemas['Season
       dropPenalty: null,
       techRerollOpen: false,
       challengesEnabled: false,
+      finish: null,
     },
     lastSequence: 3,
     ...overrides,
@@ -129,7 +132,9 @@ describe('SeasonScreen', () => {
 
     current = season({
       lastSequence: 7,
-      players: [{ id: me, name: 'Вася', cellId: 'c1', points: 4, phase: 'idle' }],
+      players: [
+        { id: me, name: 'Вася', cellId: 'c1', points: 4, phase: 'idle', finishOrder: null },
+      ],
     });
     act(() => {
       hubChange?.();
@@ -144,7 +149,9 @@ describe('SeasonScreen', () => {
   it('ignores an answer older than what it already shows', async () => {
     let current = season({
       lastSequence: 9,
-      players: [{ id: me, name: 'Вася', cellId: 'c1', points: 4, phase: 'idle' }],
+      players: [
+        { id: me, name: 'Вася', cellId: 'c1', points: 4, phase: 'idle', finishOrder: null },
+      ],
     });
     serve((r) => (isSeasonGet(r) ? json(200, current) : json(404, {})));
     render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
@@ -186,6 +193,7 @@ describe('SeasonScreen', () => {
               dropPenalty: null,
               techRerollOpen: false,
               challengesEnabled: false,
+              finish: null,
             },
           }),
         );
@@ -247,12 +255,15 @@ describe('SeasonScreen', () => {
         dropPenalty: null,
         techRerollOpen: false,
         challengesEnabled: false,
+        finish: null,
       },
     });
     // The other tab already chose: the server now has Вася playing, and answers this tab's choice with 409
     const playing = season({
       lastSequence: 5,
-      players: [{ id: me, name: 'Вася', cellId: 'start', points: 0, phase: 'playing' }],
+      players: [
+        { id: me, name: 'Вася', cellId: 'start', points: 0, phase: 'playing', finishOrder: null },
+      ],
       me: {
         playerId: me,
         phase: 'playing',
@@ -270,6 +281,7 @@ describe('SeasonScreen', () => {
         dropPenalty: null,
         techRerollOpen: false,
         challengesEnabled: false,
+        finish: null,
       },
     });
     let current = choosing;
@@ -325,6 +337,7 @@ describe('SeasonScreen', () => {
               dropPenalty: null,
               techRerollOpen: false,
               challengesEnabled: false,
+              finish: null,
             },
           }),
         );
@@ -387,6 +400,7 @@ describe('SeasonScreen', () => {
               dropPenalty: null,
               techRerollOpen: false,
               challengesEnabled: false,
+              finish: null,
             },
           }),
         );
@@ -436,6 +450,7 @@ describe('SeasonScreen', () => {
               dropPenalty: null,
               techRerollOpen: false,
               challengesEnabled: false,
+              finish: null,
             },
           }),
         );
@@ -506,6 +521,7 @@ describe('SeasonScreen', () => {
               dropPenalty: null,
               techRerollOpen: false,
               challengesEnabled: false,
+              finish: null,
             },
           }),
         );
@@ -538,7 +554,9 @@ describe('SeasonScreen', () => {
 
     current = season({
       lastSequence: 5,
-      players: [{ id: me, name: 'Вася', cellId: 'start', points: 0, phase: 'playing' }],
+      players: [
+        { id: me, name: 'Вася', cellId: 'start', points: 0, phase: 'playing', finishOrder: null },
+      ],
       me: {
         playerId: me,
         phase: 'playing',
@@ -556,6 +574,7 @@ describe('SeasonScreen', () => {
         dropPenalty: null,
         techRerollOpen: false,
         challengesEnabled: false,
+        finish: null,
       },
     });
     act(() => {
@@ -590,6 +609,7 @@ describe('SeasonScreen', () => {
                 dropPenalty: null,
                 techRerollOpen: false,
                 challengesEnabled: false,
+                finish: null,
               },
             }),
           )
@@ -667,6 +687,7 @@ describe('SeasonScreen reroll price and manual effects (D-93)', () => {
         dropPenalty: null,
         techRerollOpen: false,
         challengesEnabled: false,
+        finish: null,
       },
     });
   }
@@ -824,7 +845,9 @@ describe('SeasonScreen drop and tech reroll (RR2, RR4, RR5, D-94)', () => {
     } = {},
   ): Schemas['SeasonView'] {
     return season({
-      players: [{ id: me, name: 'Вася', cellId: 'start', points: 0, phase: 'playing' }],
+      players: [
+        { id: me, name: 'Вася', cellId: 'start', points: 0, phase: 'playing', finishOrder: null },
+      ],
       me: {
         playerId: me,
         phase: 'playing',
@@ -842,6 +865,7 @@ describe('SeasonScreen drop and tech reroll (RR2, RR4, RR5, D-94)', () => {
         dropPenalty: turn.dropPenalty === undefined ? defaultPenalty : turn.dropPenalty,
         techRerollOpen: turn.techRerollOpen ?? true,
         challengesEnabled: false,
+        finish: null,
       },
     });
   }
@@ -897,6 +921,7 @@ describe('SeasonScreen drop and tech reroll (RR2, RR4, RR5, D-94)', () => {
           dropPenalty: null,
           techRerollOpen: false,
           challengesEnabled: false,
+          finish: null,
         },
       }),
     );
@@ -1141,6 +1166,7 @@ describe('SeasonScreen drop and tech reroll (RR2, RR4, RR5, D-94)', () => {
           dropPenalty: null,
           techRerollOpen: false,
           challengesEnabled: false,
+          finish: null,
         },
       }),
     );
@@ -1164,7 +1190,9 @@ describe('SeasonScreen marks on offered games (G8, D-94 (6))', () => {
 
   function rolling(turn: Partial<Schemas['MyTurnView']>): Schemas['SeasonView'] {
     return season({
-      players: [{ id: me, name: 'Вася', cellId: 'start', points: 0, phase: 'rolling' }],
+      players: [
+        { id: me, name: 'Вася', cellId: 'start', points: 0, phase: 'rolling', finishOrder: null },
+      ],
       me: {
         playerId: me,
         phase: 'rolling',
@@ -1178,6 +1206,7 @@ describe('SeasonScreen marks on offered games (G8, D-94 (6))', () => {
         dropPenalty: null,
         techRerollOpen: false,
         challengesEnabled: false,
+        finish: null,
         ...turn,
       },
     });
@@ -1281,7 +1310,16 @@ describe('SeasonScreen completion reward (C7a, D-96)', () => {
 
   function completed(last: CompletedWithReward, effects: Schemas['ManualEffectView'][] = []) {
     return season({
-      players: [{ id: me, name: 'Вася', cellId: 'c1', points: last.total, phase: 'idle' }],
+      players: [
+        {
+          id: me,
+          name: 'Вася',
+          cellId: 'c1',
+          points: last.total,
+          phase: 'idle',
+          finishOrder: null,
+        },
+      ],
       me: {
         playerId: me,
         phase: 'idle',
@@ -1295,6 +1333,7 @@ describe('SeasonScreen completion reward (C7a, D-96)', () => {
         dropPenalty: null,
         techRerollOpen: false,
         challengesEnabled: false,
+        finish: null,
       },
     });
   }
@@ -1319,7 +1358,9 @@ describe('SeasonScreen completion reward (C7a, D-96)', () => {
 
   function playingWithoutHours(challengesEnabled = true) {
     return season({
-      players: [{ id: me, name: 'Вася', cellId: 'start', points: 0, phase: 'playing' }],
+      players: [
+        { id: me, name: 'Вася', cellId: 'start', points: 0, phase: 'playing', finishOrder: null },
+      ],
       me: {
         playerId: me,
         phase: 'playing',
@@ -1337,6 +1378,7 @@ describe('SeasonScreen completion reward (C7a, D-96)', () => {
         dropPenalty: null,
         techRerollOpen: true,
         challengesEnabled,
+        finish: null,
       },
     });
   }

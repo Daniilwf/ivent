@@ -68,7 +68,7 @@
 
 | Поле | Значение |
 | --- | --- |
-| `finish.requireApprovalForFirst` | первый финиш предварительный до одобрения пруфа |
+| `finish.requireApprovalForFirst` | `true`: первый заморожен, когда одобрены пруфы всех его прохождений до финиша включительно; `false`: заморожен сразу при финише первым (D-99) |
 | `finish.bonusByOrder` | бонус финишировавшим не первыми по порядку финиша |
 | `finish.bonusAfterList` | бонус для всех, кто финишировал позже списка |
 | `ranking.tiebreakers` | порядок тайбрейков: `completedRuns`, `earliestFinalScore` |

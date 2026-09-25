@@ -1,5 +1,6 @@
 using FsCheck.Xunit;
 using GameEvent.Engine.Effects;
+using GameEvent.Engine.Finish;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Map;
 using GameEvent.Engine.Players;
@@ -38,6 +39,8 @@ public class PlayerAdminInvariantTests
 {
     private const int MapLength = 25;
 
+    private const int ShortMapLength = 6;
+
     private static readonly string[] s_players = ["Вася", "Петя", "Маша"];
     private static readonly Guid s_late = SequentialIds.Make(0x10000000, 0x99);
     private static readonly Guid s_lateUser = SequentialIds.Make(0x40000000, 0x99);
@@ -74,11 +77,16 @@ public class PlayerAdminInvariantTests
     /// The script claims challenges; <c>features.challenges</c> (D-96 (1)) is on for even seeds and off for odd ones, so
     /// both the claim and its refusal are exercised.
     /// </remarks>
-    private static Scenario NewSeason(int seed, bool withChoice = false, RerollMode rerolls = RerollMode.None) =>
-        Scenario.New(seed: seed)
+    /// <remarks>
+    /// The finish variant (C9a, D-99) plays on a map of <see cref="ShortMapLength"/> steps, so finishes, bonuses, freezes and
+    /// revokes happen often, with more games in the pool; <c>finish.requireApprovalForFirst</c> is off for every third seed.
+    /// </remarks>
+    private static Scenario NewSeason(int seed, bool withChoice = false, RerollMode rerolls = RerollMode.None, bool finishes = false)
+    {
+        var s = Scenario.New(seed: seed)
             .WithRuleset(r => WithRerolls(withChoice ? r with { Roll = r.Roll with { ChoiceCount = ChoiceCount } } : r, seed, rerolls))
             .WithRuleset(r => r with { Features = r.Features with { Challenges = seed % 2 == 0 } })
-            .WithMapLength(MapLength)
+            .WithMapLength(finishes ? ShortMapLength : MapLength)
             .WithCategory("Horror", weight: 3)
             .WithGame("Silent Hill", 12, "Horror")
             .WithGame("Alan Wake", 15, "Horror")
@@ -86,8 +94,19 @@ public class PlayerAdminInvariantTests
             .WithGame("Tetris", 2, "Puzzle")
             .WithGame("Unknown Length", null, "Puzzle")
             .WithCategory("Action", weight: 1)
-            .WithGame("Doom", 4, "Action")
-            .WithPlayers(s_players);
+            .WithGame("Doom", 4, "Action");
+        if (finishes)
+        {
+            s.WithRuleset(r => r with { Finish = r.Finish with { RequireApprovalForFirst = ((seed % 3) + 3) % 3 != 1 } })
+                .WithGame("Dead Space", 9, "Horror")
+                .WithGame("Portal", 3, "Puzzle")
+                .WithGame("Limbo", null, "Puzzle")
+                .WithGame("Quake", 6, "Action")
+                .WithGame("Prey", 18, "Action");
+        }
+
+        return s.WithPlayers(s_players);
+    }
 
     /// <summary>
     /// Bits 0–1 pick the player (the fourth is the late one, maybe not added yet), bits 2–4 the kind of command,
@@ -312,9 +331,10 @@ public class PlayerAdminInvariantTests
         RerollMode rerolls = RerollMode.None,
         bool withDrops = false,
         bool withCorrections = false,
-        bool withProofs = false)
+        bool withProofs = false,
+        bool finishes = false)
     {
-        var s = NewSeason(seed, withChoice, rerolls);
+        var s = NewSeason(seed, withChoice, rerolls, finishes);
         foreach (var b in script)
         {
             // With drops the clock runs: 0–21 hours before each command, so the 48-hour window both holds and closes
@@ -380,6 +400,50 @@ public class PlayerAdminInvariantTests
     [Property(MaxTest = 200)]
     public void Invariants_hold_with_proofs_corrections_drops_and_rerolls(int seed, byte[] script) =>
         Play(seed, script, CheckProofInvariants, withChoice: true, rerolls: RerollMode.Coins, withDrops: true, withCorrections: true, withProofs: true);
+
+    [Property(MaxTest = 200)]
+    public void Invariants_hold_with_finishes(int seed, byte[] script) =>
+        Play(seed, script, CheckFinishInvariants, withDrops: true, withCorrections: true, withProofs: true, finishes: true);
+
+    [Property(MaxTest = 200)]
+    public void Invariants_hold_with_finishes_rerolls_and_a_choice_of_games(int seed, byte[] script) =>
+        Play(seed, script, CheckFinishInvariants, withChoice: true, rerolls: RerollMode.Coins, withDrops: true, withCorrections: true, withProofs: true, finishes: true);
+
+    [Property(MaxTest = 50)]
+    public void Same_seed_and_commands_give_the_same_log_with_finishes(int seed, byte[] script)
+    {
+        var first = Play(seed, script, withDrops: true, withCorrections: true, withProofs: true, finishes: true);
+        var second = Play(seed, script, withDrops: true, withCorrections: true, withProofs: true, finishes: true);
+
+        Assert.Equal(first.Log, second.Log);
+        Assert.Equal(first.State, second.State);
+    }
+
+    [Fact]
+    public void Finish_variant_reaches_finishes_bonuses_freezes_and_revokes()
+    {
+        // The generator must exercise the finish rules, not only allow them: over a fixed set of scripts every finish
+        // event comes out (a guard against a variant that never finishes)
+        var seen = new HashSet<Type>();
+        var bonus = false;
+        var revokedBonus = false;
+        for (var seed = 0; seed < 60; seed++)
+        {
+            // A fixed pseudo-random script per seed (a linear congruential generator, so the guard is deterministic)
+            var x = (uint)seed + 1;
+            var script = Enumerable.Range(0, 600).Select(_ => (byte)((x = (x * 1103515245) + 12345) >> 16)).ToArray();
+            var s = Play(seed, script, withDrops: true, withCorrections: true, withProofs: true, finishes: true);
+            seen.UnionWith(s.Log.Select(e => e.GetType()).Where(t => t == typeof(PlayerFinished) || t == typeof(PlayerFrozen) || t == typeof(PlayerFinishRevoked)));
+            bonus |= s.Log.OfType<PointsChanged>().Any(e => e.Reason == PointsReason.FinishBonus);
+            revokedBonus |= s.Log.OfType<PointsChanged>().Any(e => e.Reason == PointsReason.FinishBonusRevoked);
+        }
+
+        Assert.Contains(typeof(PlayerFinished), seen);
+        Assert.Contains(typeof(PlayerFrozen), seen);
+        Assert.Contains(typeof(PlayerFinishRevoked), seen);
+        Assert.True(bonus, "No finish bonus in the finish variant.");
+        Assert.True(revokedBonus, "No finish bonus taken back in the finish variant.");
+    }
 
     [Property(MaxTest = 50)]
     public void Same_seed_and_commands_give_the_same_log_with_proofs(int seed, byte[] script)
@@ -500,7 +564,7 @@ public class PlayerAdminInvariantTests
 
         var expected = s.State.Runs.Values
             .Where(r => r.Status == RunStatus.Completed && r.Proof?.Status is null or ProofStatus.Pending)
-            .OrderByDescending(r => r.ReachedFinish)
+            .OrderByDescending(r => IsUpToFinish(s.State, r)) // Q-3: every run up to a standing finish goes on top
             .ThenBy(r => r.CompletedAt)
             .ThenBy(r => r.RunId)
             .Select(r => r.RunId);
@@ -526,8 +590,295 @@ public class PlayerAdminInvariantTests
 
             // D-98: Moved is the cells the run really entered (sign × path), not the steps rolled
             Assert.Equal(MovedCells(s.Log, run.RunId), run.Moved);
-            Assert.InRange(run.Moved, 0, run.Dice.Concat(run.ChallengeDice).Sum(d => d.Value));
+            Assert.True(run.Moved >= 0, $"The run moved {run.Moved} cells.");
+
+            // A run's cells exceed its dice only when a later reduction could not take them back: absorbed by a finisher's
+            // surplus (Q-3), ignored for a frozen first (D-99) — they stay after a later revoke — or blocked at the start
+            // after the admin transferred the token back (D-98 moves only through entered cells)
+            var detached = s.Log.Any(e =>
+                (e is PlayerFinished f && f.PlayerId == run.PlayerId)
+                || (e is PlayerMoved { Reason: MoveReason.AdminAdjustment } m && m.PlayerId == run.PlayerId));
+            Assert.True(
+                detached || run.Moved <= run.Dice.Concat(run.ChallengeDice).Sum(d => d.Value),
+                $"The run moved {run.Moved} cells for fewer dice.");
         }
+    }
+
+    /// <summary>
+    /// P2–P6, T3, T4, RR7, RR8, SE7, invariants 8 and 9 (C9a, D-16, D-99, Q-3, Q-4), after every command of the finish
+    /// variant: the finish state is the fold of the finish events; orders go 1, 2, 3… and are never reused; the first is
+    /// the lowest standing order; each standing finisher holds the bonus of his place among the standing finishers (a
+    /// reference table, not the engine's); only the first is ever frozen, and exactly when all his runs up to the finish
+    /// are approved (or at once without required approval); a finisher's token and a frozen player's points, coins and
+    /// resources do not change until a revoke (the admin's own adjustments aside); only a run's completion finishes.
+    /// </summary>
+    private static void CheckFinishInvariants(Scenario s, ICommand command, SeasonState before, int logLengthBefore)
+    {
+        CheckProofInvariants(s, command, before, logLengthBefore);
+
+        IReadOnlyList<IGameEvent> events = s.Last.IsAccepted ? s.Last.Events : [];
+        var finishes = FoldFinishes(s.Log);
+        var standing = s.State.Players.Values.Where(p => p.Finish is not null).OrderBy(p => p.Finish!.Order).ToList();
+
+        // The state is the fold of the finish events; surplus never negative
+        foreach (var player in s.State.Players.Values)
+        {
+            Assert.Equal(finishes.Standing.GetValueOrDefault(player.PlayerId), player.Finish);
+            Assert.True(player.Finish is null || player.Finish.Surplus >= 0, $"{player.Name} has a negative surplus.");
+
+            // Q-4: a bonus is held only with a standing finish
+            Assert.True(player.Finish is not null || finishes.Bonus.GetValueOrDefault(player.PlayerId) == 0, $"{player.Name} holds a bonus without a finish.");
+        }
+
+        // Orders: each finish takes the next number, never reused
+        Assert.Equal(Enumerable.Range(1, finishes.Orders.Count), finishes.Orders);
+
+        // The first is the lowest standing order; only he may be frozen
+        var first = standing.FirstOrDefault();
+        Assert.Equal(first?.PlayerId, FinishLine.First(s.State));
+        Assert.All(standing.Where(p => p.Finish!.Frozen), p => Assert.Equal(first!.PlayerId, p.PlayerId));
+
+        // 9 / Q-4: each standing finisher holds the bonus of his place, by a reference table
+        for (var place = 1; place <= standing.Count; place++)
+        {
+            Assert.Equal(ReferenceBonus(s.Ruleset.Finish, place), standing[place - 1].Finish!.Bonus);
+        }
+
+        // Q-3: frozen exactly when all runs up to the finish are approved (or at once without required approval)
+        if (first is not null)
+        {
+            var allApproved = UpToFinishRuns(s.State, first).All(r => r.Proof?.Status == ProofStatus.Approved);
+            Assert.True(!allApproved || first.Finish!.Frozen, $"{first.Name} is first with all runs approved but not frozen.");
+            if (s.Ruleset.Finish.RequireApprovalForFirst)
+            {
+                Assert.True(!first.Finish!.Frozen || allApproved, $"{first.Name} is frozen before all his runs up to the finish are approved.");
+            }
+        }
+
+        // A standing finish links to a completed run of the player. The one exception is open (D-99 decides corrections
+        // only): a first frozen at once without required approval keeps his final place when that run is rejected
+        foreach (var p in standing)
+        {
+            var run = s.State.Runs[p.Finish!.RunId];
+            Assert.Equal(p.PlayerId, run.PlayerId);
+            Assert.True(
+                run.Status == RunStatus.Completed
+                    || (run.Status == RunStatus.Rejected && p.Finish.Frozen && !s.Ruleset.Finish.RequireApprovalForFirst),
+                $"{p.Name}'s finish stands on a {run.Status} run.");
+        }
+
+        if (!s.Last.IsAccepted)
+        {
+            return;
+        }
+
+        foreach (var was in before.Players.Values)
+        {
+            var now = s.State.Players[was.PlayerId];
+            var adjusted = command is AdjustPlayer adjust && adjust.PlayerId == was.PlayerId;
+
+            // P6 / T4 / 8 / 9: a finisher's position is fixed until the finish is revoked (the admin's transfer aside)
+            if (was.Finish is not null && now.Finish?.Order == was.Finish.Order && !adjusted)
+            {
+                Assert.Equal(was.CellId, now.CellId);
+                Assert.DoesNotContain(events, e => e is PlayerMoved m && m.PlayerId == was.PlayerId);
+            }
+
+            // P4 / T3 / 8: a frozen first gets and loses nothing until a revoke; rerolls are free (D-99)
+            if (was.Finish?.Frozen == true && now.Finish?.Order == was.Finish.Order && !adjusted)
+            {
+                Assert.Equal((was.Points, was.Coins, was.Resources), (now.Points, now.Coins, now.Resources));
+                Assert.DoesNotContain(events, e => e is ManualEffectCreated c && c.PlayerId == was.PlayerId);
+            }
+
+            // A standing finish keeps its order, run and time, and is never unfrozen
+            if (was.Finish is not null && now.Finish is not null)
+            {
+                Assert.Equal((was.Finish.Order, was.Finish.RunId, was.Finish.FinishedAt), (now.Finish.Order, now.Finish.RunId, now.Finish.FinishedAt));
+                Assert.True(!was.Finish.Frozen || now.Finish.Frozen, $"{was.Name} was unfrozen without a revoke.");
+            }
+        }
+
+        // Q-4: bonuses move only when the finishers change: a finish or a revoke in the same command
+        var finishersChanged = events.Any(e => e is PlayerFinished or PlayerFinishRevoked);
+        Assert.True(
+            finishersChanged || !events.Any(e => e is PointsChanged { Reason: PointsReason.FinishBonus or PointsReason.FinishBonusRevoked }),
+            "A bonus changed without a finish or a revoke.");
+
+        // RR8 / D-99: only a run's completion finishes, right after its move onto the finish; the surplus is the steps burned
+        var finished = events.OfType<PlayerFinished>().ToList();
+        Assert.True(finished.Count <= 1, "Two finishes in one command.");
+        var list = events.ToList();
+        if (finished.SingleOrDefault() is { } f)
+        {
+            var complete = Assert.IsType<CompleteRun>(command);
+            Assert.Equal(complete.PlayerId, f.PlayerId);
+            Assert.Null(before.Players[f.PlayerId].Finish);
+            Assert.Equal(before.Players[f.PlayerId].ActiveRunId, f.RunId);
+            Assert.Equal(s.Clock.UtcNow, f.FinishedAt);
+            var index = list.IndexOf(f);
+            var moved = list.Take(index).OfType<PlayerMoved>().Last();
+            Assert.Equal(
+                (f.PlayerId, s.State.Map.Cells.Single(c => c.Type == CellType.Finish).Id, MoveReason.CompletionRoll),
+                (moved.PlayerId, moved.To, moved.Reason));
+            Assert.Equal(moved.Steps - moved.Path.Count, f.Surplus);
+        }
+
+        // Q-3: a finish is revoked only by a reject or a reduction of a run up to the finish
+        foreach (var revoked in events.OfType<PlayerFinishRevoked>())
+        {
+            Assert.True(
+                command is RejectProof or CorrectRunHours or ChangeRunDifficulty or ApproveProof { Difficulty: not null },
+                $"{command} revoked a finish.");
+            Assert.NotNull(before.Players[revoked.PlayerId].Finish);
+            Assert.Null(s.State.Players[revoked.PlayerId].Finish);
+        }
+
+        // Q-3: the surplus changes only by a correction or a reject, never with a revoke of the same player
+        foreach (var changed in events.OfType<FinishSurplusChanged>())
+        {
+            Assert.True(command is RejectProof or CorrectRunHours or ChangeRunDifficulty or ApproveProof, $"{command} changed a surplus.");
+            Assert.NotEqual(0, changed.Delta);
+        }
+
+        // P4: a freeze only at a completion without required approval, an approval, or a command that moved the first place
+        foreach (var frozen in events.OfType<PlayerFrozen>())
+        {
+            Assert.Equal(FinishLine.First(s.State), frozen.PlayerId);
+            Assert.False(before.Players[frozen.PlayerId].Finish?.Frozen ?? false, "Frozen twice.");
+            var movedFirst = events.Any(e => e is PlayerFinishRevoked);
+            switch (command)
+            {
+                case CompleteRun:
+                    Assert.False(before.Rules.Finish.RequireApprovalForFirst, "Frozen at the finish with approval required.");
+                    break;
+                case ApproveProof approve when !movedFirst:
+                    Assert.Contains(approve.RunId, UpToFinishRuns(s.State, s.State.Players[frozen.PlayerId]).Select(r => r.RunId));
+                    break;
+                case ApproveProof or RejectProof or CorrectRunHours or ChangeRunDifficulty:
+                    Assert.True(movedFirst, $"{command} froze a player without moving the first place.");
+                    break;
+                default:
+                    throw new Xunit.Sdk.XunitException($"{command} froze a player.");
+            }
+        }
+    }
+
+    /// <summary>Q-4 reference: place 1 (the first) nothing, place 2 the first element of the list, …, past it the value after the list.</summary>
+    private static int ReferenceBonus(FinishRules rules, int place) =>
+        place == 1 ? 0 : place - 2 < rules.BonusByOrder.Count ? rules.BonusByOrder[place - 2] : rules.BonusAfterList;
+
+    /// <summary>Q-3: the player's completed runs up to and including the finishing one (by completion time).</summary>
+    private static IEnumerable<RunState> UpToFinishRuns(SeasonState state, SeasonPlayer player) =>
+        player.Finish is { } finish
+            ? state.Runs.Values.Where(r => r.PlayerId == player.PlayerId && r.Status == RunStatus.Completed && r.CompletedAt <= state.Runs[finish.RunId].CompletedAt)
+            : [];
+
+    /// <summary>Q-3: the run counts for the player's position — he has a finish and completed it at or before the finish.</summary>
+    private static bool IsUpToFinish(SeasonState state, RunState run) =>
+        state.Players.TryGetValue(run.PlayerId, out var player) && UpToFinishRuns(state, player).Any(r => r.RunId == run.RunId);
+
+    private static bool IsFinishEvent(IGameEvent e) =>
+        e is PlayerFinished or PlayerFrozen or PlayerFinishRevoked or FinishSurplusChanged
+            or PointsChanged { Reason: PointsReason.FinishBonus or PointsReason.FinishBonusRevoked };
+
+    /// <summary>Q-4: players other than <paramref name="owner"/> change only by their bonus recalculation and a freeze.</summary>
+    private static void CheckOthersOnlyRecalculated(Scenario s, SeasonState before, Guid owner)
+    {
+        foreach (var now in s.State.Players.Values.Where(p => p.PlayerId != owner))
+        {
+            var then = before.Players[now.PlayerId];
+            var bonus = s.Last.Events.OfType<PointsChanged>()
+                .Where(e => e.PlayerId == now.PlayerId && e.Reason is PointsReason.FinishBonus or PointsReason.FinishBonusRevoked)
+                .Sum(e => e.Delta);
+            Assert.Equal(then.Points + bonus, now.Points);
+            Assert.Equal(then with { Points = now.Points, Finish = now.Finish }, now);
+            if (then.Finish is null)
+            {
+                Assert.Null(now.Finish);
+            }
+            else
+            {
+                Assert.NotNull(now.Finish);
+                Assert.Equal(then.Finish with { Bonus = now.Finish.Bonus, Frozen = now.Finish.Frozen }, now.Finish);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Q-3: a finisher's run up to the finish changed by <paramref name="steps"/>: an increase adds to the surplus; a
+    /// reduction within the surplus takes from it; beyond it the finish is revoked and the token goes back by the rest
+    /// along the walked path. Nothing else of the owner's finish moves.
+    /// </summary>
+    private static void CheckFinishPosition(
+        IReadOnlyList<IGameEvent> events, SeasonState before, SeasonPlayer was, Guid runId, int steps, MoveReason reason)
+    {
+        var surplus = events.OfType<FinishSurplusChanged>().Where(e => e.PlayerId == was.PlayerId).ToList();
+        var revokes = events.OfType<PlayerFinishRevoked>().Where(e => e.PlayerId == was.PlayerId).ToList();
+        var moves = events.OfType<PlayerMoved>().Where(e => e.PlayerId == was.PlayerId).ToList();
+        var have = was.Finish!.Surplus;
+        if (steps >= 0 || -steps <= have)
+        {
+            Assert.Equal(steps == 0 ? [] : [new FinishSurplusChanged(was.PlayerId, steps)], surplus);
+            Assert.Empty(revokes);
+            Assert.Empty(moves);
+            return;
+        }
+
+        Assert.Single(revokes);
+        var path = Movement.Backward(before.Map, was.Path, -steps - have);
+        var moved = Assert.Single(moves);
+        Assert.Equal((was.CellId, path[^1], reason, (Guid?)runId), (moved.From, moved.To, moved.Reason, moved.RunId));
+        Assert.Equal(path, moved.Path);
+    }
+
+    private sealed record FinishFold(Dictionary<Guid, FinishState> Standing, List<int> Orders, Dictionary<Guid, int> Bonus);
+
+    /// <summary>Folds the finish events of the log independently of the engine, checking each on the way.</summary>
+    private static FinishFold FoldFinishes(IEnumerable<IGameEvent> log)
+    {
+        var standing = new Dictionary<Guid, FinishState>();
+        var orders = new List<int>();
+        var bonus = new Dictionary<Guid, int>();
+        foreach (var e in log)
+        {
+            switch (e)
+            {
+                case PlayerFinished finished:
+                    Assert.False(standing.ContainsKey(finished.PlayerId), "Finished twice without a revoke.");
+                    Assert.True(finished.Surplus >= 0, "A negative surplus.");
+                    orders.Add(finished.Order);
+                    standing[finished.PlayerId] = new FinishState(
+                        finished.Order, finished.RunId, finished.FinishedAt, false, bonus.GetValueOrDefault(finished.PlayerId), finished.Surplus);
+                    break;
+                case FinishSurplusChanged surplus:
+                    Assert.True(standing.TryGetValue(surplus.PlayerId, out var withSurplus), "A surplus change without a finish.");
+                    standing[surplus.PlayerId] = withSurplus with { Surplus = withSurplus.Surplus + surplus.Delta };
+                    Assert.True(standing[surplus.PlayerId].Surplus >= 0, "The surplus went negative.");
+                    break;
+                case PlayerFrozen frozen:
+                    Assert.True(standing.TryGetValue(frozen.PlayerId, out var toFreeze), "Frozen without a finish.");
+                    Assert.False(toFreeze.Frozen, "Frozen twice.");
+                    Assert.Equal(standing.Values.Min(x => x.Order), toFreeze.Order);
+                    standing[frozen.PlayerId] = toFreeze with { Frozen = true };
+                    break;
+                case PlayerFinishRevoked revoked:
+                    Assert.True(standing.Remove(revoked.PlayerId), "Revoked without a finish.");
+                    break;
+                case PointsChanged { Reason: PointsReason.FinishBonus or PointsReason.FinishBonusRevoked } change:
+                    Assert.True(change.Reason == PointsReason.FinishBonus ? change.Delta > 0 : change.Delta < 0, $"A bonus change {change}.");
+                    bonus[change.PlayerId] = bonus.GetValueOrDefault(change.PlayerId) + change.Delta;
+                    Assert.True(bonus[change.PlayerId] >= 0, "A bonus taken back that was not held.");
+                    if (standing.TryGetValue(change.PlayerId, out var holder))
+                    {
+                        standing[change.PlayerId] = holder with { Bonus = bonus[change.PlayerId] };
+                    }
+
+                    break;
+            }
+        }
+
+        return new FinishFold(standing, orders, bonus);
     }
 
     /// <summary>Cells a run really moved, folded from its logged moves: each move counts its path, signed by its direction.</summary>
@@ -815,12 +1166,20 @@ public class PlayerAdminInvariantTests
         Assert.Equal(reroll.PlayerId, rerolled.PlayerId);
         Assert.Equal(givenUp.Order(), rerolled.GameIds.Order());
 
+        // D-99: a frozen first rerolls for free: no coins, no coupon, no bad event
+        var frozen = was.Finish?.Frozen == true;
+        if (frozen)
+        {
+            Assert.Equal(2, events.Count);
+            Assert.Equal((was.Coins, was.Resources), (now.Coins, now.Resources));
+        }
+
         // Payment strictly in order; coins and coupons never go negative for a reroll
-        var payment = ExpectedPayment(was, before.Rules);
+        var payment = frozen ? rerolled.Payment : ExpectedPayment(was, before.Rules);
         Assert.NotNull(payment);
         Assert.Equal(payment, rerolled.Payment);
         var paymentEvents = events.Skip(1).Take(events.Count - 2).ToList();
-        switch (rerolled.Payment)
+        switch (frozen ? RerollPayment.FreeThisRoll : rerolled.Payment)
         {
             case RerollPayment.FreeThisRoll:
                 Assert.Empty(paymentEvents);
@@ -839,9 +1198,9 @@ public class PlayerAdminInvariantTests
                 break;
         }
 
-        Assert.Equal(rerolled.Payment == RerollPayment.Coins ? was.Coins - RerollCoins : was.Coins, now.Coins);
+        Assert.Equal(rerolled.Payment == RerollPayment.Coins && !frozen ? was.Coins - RerollCoins : was.Coins, now.Coins);
         Assert.Equal(
-            rerolled.Payment == RerollPayment.FreeRerollResource ? was.Resources[Coupon] - 1 : was.Resources[Coupon],
+            rerolled.Payment == RerollPayment.FreeRerollResource && !frozen ? was.Resources[Coupon] - 1 : was.Resources[Coupon],
             now.Resources[Coupon]);
         Assert.True(rerolled.Payment != RerollPayment.Coins || now.Coins >= 0, $"A reroll drove coins from {was.Coins} to {now.Coins}.");
         Assert.True(now.Resources[Coupon] >= 0 || was.Resources[Coupon] < 0, "A reroll drove the coupons negative.");
@@ -871,10 +1230,20 @@ public class PlayerAdminInvariantTests
     /// </summary>
     private static void CheckAcceptedCompletion(Scenario s, CompleteRun complete, SeasonState before)
     {
-        var events = s.Last.Events;
         Assert.Equal(SeasonStatus.Active, before.Status);
         var was = before.Players[complete.PlayerId];
         var run = before.Runs[was.ActiveRunId!.Value];
+
+        // D-99: the finish, its bonus and a freeze are checked by CheckFinishInvariants; the rest follows D-96. A frozen
+        // first gets no points, coins or event; a finisher does not move.
+        var frozen = was.Finish?.Frozen == true;
+        var events = s.Last.Events
+            .Where(e => !IsFinishEvent(e))
+            .ToList();
+        if (was.Finish is not null)
+        {
+            Assert.Empty(events.OfType<PlayerMoved>());
+        }
 
         // Order: each kind at most once, in the order of D-96
         var positions = events.Select(e => Array.IndexOf(s_completionOrder, e.GetType())).ToList();
@@ -897,13 +1266,17 @@ public class PlayerAdminInvariantTests
         var sides = Assert.Single(rolled.Dice.Select(d => d.Sides).Distinct());
         Assert.All(rolled.ChallengeDice, d => Assert.Equal(sides, d.Sides));
         var sum = rolled.Dice.Sum(d => d.Value) + rolled.ChallengeDice.Sum(d => d.Value);
-        Assert.Equal(sum, events.OfType<PointsChanged>().Sum(e => e.Delta));
-        Assert.Equal(was.Points + sum, s.State.Players[complete.PlayerId].Points);
+        var bonus = s.Last.Events.OfType<PointsChanged>()
+            .Where(e => e.PlayerId == complete.PlayerId && e.Reason is PointsReason.FinishBonus or PointsReason.FinishBonusRevoked)
+            .Sum(e => e.Delta);
+        Assert.Equal(frozen ? 0 : sum, events.OfType<PointsChanged>().Sum(e => e.Delta));
+        Assert.Equal(frozen ? [] : [PointsReason.CompletionRoll], events.OfType<PointsChanged>().Select(e => e.Reason));
+        Assert.Equal(was.Points + (frozen ? 0 : sum) + bonus, s.State.Players[complete.PlayerId].Points);
 
         // W10 / Q-2 / D-96 (2): coins by the snapshot's rule and the counted hours, capped by the dice ceiling
         Assert.NotNull(run.Snapshot.Coins);
         var counted = Math.Min(completed.Hours, run.Snapshot.DiceCount.Max * run.Snapshot.DiceCount.HoursPerDie);
-        var coins = Math.Max(run.Snapshot.Coins.Min, (int)Math.Floor(counted * run.Snapshot.Coins.PerHour));
+        var coins = frozen ? 0 : Math.Max(run.Snapshot.Coins.Min, (int)Math.Floor(counted * run.Snapshot.Coins.PerHour));
         Assert.Equal(
             coins == 0 ? [] : [new CoinsChanged(complete.PlayerId, coins, CoinsReason.CompletionReward, run.RunId)],
             events.OfType<CoinsChanged>());
@@ -918,7 +1291,7 @@ public class PlayerAdminInvariantTests
             _ => run.Snapshot.DieByDifficulty.Extreme,
         };
         var effects = events.OfType<ManualEffectCreated>().ToList();
-        if (rule.GrantEvent is { } kind)
+        if (rule.GrantEvent is { } kind && !frozen)
         {
             var created = Assert.Single(effects);
             Assert.Equal(new ManualEffectCreated(created.EffectId, complete.PlayerId, kind, ManualEffectSource.Difficulty, run.RunId), created);
@@ -997,10 +1370,42 @@ public class PlayerAdminInvariantTests
     {
         var events = only ?? s.Last.Events;
         var was = before.Players[run.PlayerId];
+
+        // RR8 / D-99: a frozen first gets no points from a correction; bonus recalculations are checked apart (Q-4)
+        var points = was.Finish?.Frozen == true ? 0 : diff;
         Assert.Equal(
-            diff == 0 ? [] : [new PointsChanged(run.PlayerId, diff, PointsReason.RunCorrection, run.RunId)],
-            events.OfType<PointsChanged>());
-        Assert.Equal(was.Points + diff, s.State.Players[run.PlayerId].Points);
+            points == 0 ? [] : [new PointsChanged(run.PlayerId, points, PointsReason.RunCorrection, run.RunId)],
+            events.OfType<PointsChanged>().Where(e => e.Reason == PointsReason.RunCorrection));
+        var ownBonus = events.OfType<PointsChanged>()
+            .Where(e => e.PlayerId == run.PlayerId && e.Reason is PointsReason.FinishBonus or PointsReason.FinishBonusRevoked)
+            .Sum(e => e.Delta);
+        Assert.Equal(was.Points + points + ownBonus, s.State.Players[run.PlayerId].Points);
+
+        // Q-3: a finisher's position follows his runs up to the finish through the surplus; other runs never move him
+        if (was.Finish is not null)
+        {
+            if (was.Finish.Frozen)
+            {
+                // D-99: the frozen first's place is final: a correction of any of his runs changes neither the surplus nor
+                // the position, and does not revoke
+                Assert.DoesNotContain(events, e => e is PlayerMoved or PlayerFinishRevoked or FinishSurplusChanged);
+            }
+            else if (IsUpToFinish(before, run))
+            {
+                // An earlier (not finishing) run can only lose the cells it really moved beyond its new dice (D-99)
+                var corrected = s.State.Runs[run.RunId];
+                var correctedSum = corrected.Dice.Concat(corrected.ChallengeDice).Sum(d => d.Value);
+                var lost = diff < 0 && was.Finish.RunId != run.RunId ? -Math.Max(0, run.Moved - correctedSum) : diff;
+                CheckFinishPosition(events, before, was, run.RunId, lost, MoveReason.RunCorrection);
+            }
+            else
+            {
+                Assert.DoesNotContain(events, e => e is PlayerMoved or FinishSurplusChanged or PlayerFinishRevoked);
+            }
+
+            CheckOwnTurnAndOthers(s, before, run.PlayerId);
+            return;
+        }
 
         // D-98 (1): forward by the difference; back only by the cells really moved beyond the new dice sum
         var after = s.State.Runs[run.RunId];
@@ -1018,10 +1423,28 @@ public class PlayerAdminInvariantTests
             < 0 => Movement.Backward(before.Map, was.Path, -steps),
             _ => [],
         };
+
+        // RR8 / D-99: a correction never brings a player to the finish: the token stops one cell before it
+        var finish = before.Map.Cells.Single(c => c.Type == CellType.Finish).Id;
+        var cut = path.Count > 0 && path[^1] == finish;
+        if (cut)
+        {
+            path = [.. path.Take(path.Count - 1)];
+        }
+
         var moves = events.OfType<PlayerMoved>().ToList();
         if (path.Count == 0)
         {
             Assert.Empty(moves);
+        }
+        else if (cut)
+        {
+            // The steps asked stay in the event (D-47); the path ends short of the finish
+            var moved = Assert.Single(moves);
+            Assert.Equal(
+                (run.PlayerId, was.CellId, path[^1], MoveReason.RunCorrection, (Guid?)run.RunId),
+                (moved.PlayerId, moved.From, moved.To, moved.Reason, moved.RunId));
+            Assert.Equal(path, moved.Path);
         }
         else
         {
@@ -1030,11 +1453,19 @@ public class PlayerAdminInvariantTests
                 moves);
         }
 
-        var now = s.State.Players[run.PlayerId];
+        Assert.DoesNotContain(events, e => e is PlayerFinished or FinishSurplusChanged or PlayerFinishRevoked);
+        CheckOwnTurnAndOthers(s, before, run.PlayerId);
+    }
+
+    /// <summary>The owner's turn is untouched; nobody else changes but by the bonus recalculation and a freeze (Q-4).</summary>
+    private static void CheckOwnTurnAndOthers(Scenario s, SeasonState before, Guid owner)
+    {
+        var was = before.Players[owner];
+        var now = s.State.Players[owner];
         Assert.Equal(
             (was.Phase, was.Offer, was.Choice, was.ActiveRunId, was.RerollsThisRoll, was.Resources, was.Exclusions),
             (now.Phase, now.Offer, now.Choice, now.ActiveRunId, now.RerollsThisRoll, now.Resources, now.Exclusions));
-        Assert.All(s.State.Players.Values.Where(p => p.PlayerId != run.PlayerId), p => Assert.Equal(before.Players[p.PlayerId], p));
+        CheckOthersOnlyRecalculated(s, before, owner);
     }
 
     /// <summary>W7 / D-14 / D-97: only a completed run, until the season is finished; dice by count, appended or taken off the end.</summary>
@@ -1066,16 +1497,18 @@ public class PlayerAdminInvariantTests
         Assert.Equal(correct.Hours, after.Hours);
         Assert.Equal(run.Difficulty, after.Difficulty);
 
-        // Order: the correction, points, move, coins; nothing else
+        // Order: the correction, points, move, coins; nothing else but the finish events (Q-3, Q-4)
         var order = new[] { typeof(RunHoursCorrected), typeof(PointsChanged), typeof(PlayerMoved), typeof(CoinsChanged) };
-        var positions = events.Select(e => Array.IndexOf(order, e.GetType())).ToList();
+        var positions = events.Where(e => !IsFinishEvent(e)).Select(e => Array.IndexOf(order, e.GetType())).ToList();
         Assert.DoesNotContain(-1, positions);
         Assert.Equal(positions.Distinct().Order(), positions);
 
         CheckCorrectionDifference(s, run, dice.Sum(d => d.Value) - run.Dice.Sum(d => d.Value), before);
 
         // Coins by the snapshot's formula for the new hours
-        var coins = ExpectedCoins(correct.Hours, run.Snapshot) - ExpectedCoins(run.Hours.Value, run.Snapshot);
+        var coins = before.Players[run.PlayerId].Finish?.Frozen == true
+            ? 0
+            : ExpectedCoins(correct.Hours, run.Snapshot) - ExpectedCoins(run.Hours.Value, run.Snapshot);
         Assert.Equal(
             coins == 0 ? [] : [new CoinsChanged(run.PlayerId, coins, CoinsReason.RunCorrection, run.RunId)],
             events.OfType<CoinsChanged>());
@@ -1110,7 +1543,7 @@ public class PlayerAdminInvariantTests
         Assert.Equal(run.Hours, after.Hours);
 
         Type[] allowed = [typeof(RunDifficultyChanged), typeof(PointsChanged), typeof(PlayerMoved), typeof(ManualEffectResolved), typeof(ManualEffectCreated)];
-        Assert.All(events, e => Assert.Contains(e.GetType(), allowed));
+        Assert.All(events.Where(e => !IsFinishEvent(e)), e => Assert.Contains(e.GetType(), allowed));
         CheckCorrectionDifference(s, run, dice.Concat(challenge).Sum(d => d.After.Value - d.Before.Value), before, events);
 
         // Any pending event of the run's difficulty is resolved «not applicable» with the comment; the new one's is created
@@ -1119,7 +1552,9 @@ public class PlayerAdminInvariantTests
             pending.Select(e => new ManualEffectResolved(e.EffectId, run.PlayerId, run.RunId, ManualEffectOutcome.NotApplicable, change.Comment)),
             events.OfType<ManualEffectResolved>());
         var created = events.OfType<ManualEffectCreated>().ToList();
-        if (newRule.GrantEvent is { } kind)
+
+        // D-99: a frozen first is given nothing, a difficulty event neither
+        if (newRule.GrantEvent is { } kind && before.Players[run.PlayerId].Finish?.Frozen != true)
         {
             var effect = Assert.Single(created);
             Assert.Equal(new ManualEffectCreated(effect.EffectId, run.PlayerId, kind, ManualEffectSource.Difficulty, run.RunId), effect);
@@ -1168,11 +1603,21 @@ public class PlayerAdminInvariantTests
 
     /// <summary>
     /// W4 / W8 / Q-5 / D-98: only a completed unchecked run; without a proof a comment is needed; a lower difficulty is a
-    /// difficulty change in the same command, a higher one never; the approval is the last event.
+    /// difficulty change in the same command, a higher one never; the approval is the last event but a freeze (Q-3).
     /// </summary>
     private static void CheckAcceptedApproval(Scenario s, ApproveProof approve, SeasonState before)
     {
-        var events = s.Last.Events;
+        var all = s.Last.Events;
+        var events = all.Where(e => !IsFinishEvent(e)).ToList();
+        var owner = before.Runs[approve.RunId].PlayerId;
+
+        // Q-3: a freeze comes right after the approval that completes the set of runs up to the finish
+        var freezes = all.OfType<PlayerFrozen>().ToList();
+        if (freezes.Count > 0)
+        {
+            Assert.IsType<PlayerFrozen>(all[^1]);
+        }
+
         Assert.True(before.Status is SeasonStatus.Active or SeasonStatus.Closing, $"Approved while {before.Status}.");
         var run = before.Runs[approve.RunId];
         Assert.Equal(RunStatus.Completed, run.Status);
@@ -1183,19 +1628,24 @@ public class PlayerAdminInvariantTests
 
         Assert.Equal(new ProofApproved(run.RunId, run.PlayerId, withoutProof, approve.Comment, s.Clock.UtcNow), events[^1]);
         Assert.Single(events.OfType<ProofApproved>());
-        var change = events.Take(events.Count - 1).ToList();
         if (approve.Difficulty is { } difficulty && difficulty < run.Difficulty)
         {
             // D-98 (3): a lower difficulty needs the admin's comment, and the change carries it (no default text)
             Assert.False(string.IsNullOrWhiteSpace(approve.Comment), "Approved at a lower difficulty without a comment.");
-            var changed = Assert.IsType<RunDifficultyChanged>(change[0]);
+            var changed = Assert.IsType<RunDifficultyChanged>(all[0]);
             Assert.Equal(approve.Comment, changed.Comment);
-            CheckAcceptedDifficultyChange(s, new ChangeRunDifficulty(run.RunId, difficulty, changed.Comment), before, change);
+            CheckAcceptedDifficultyChange(
+                s, new ChangeRunDifficulty(run.RunId, difficulty, changed.Comment), before, [.. all.Where(e => e is not ProofApproved)]);
         }
         else
         {
-            Assert.Empty(change);
-            Assert.Equal(before.Players, s.State.Players);
+            // Nothing but the approval and the owner's freeze
+            Assert.Single(events);
+            Assert.Equal(freezes.Count, all.Count - 1);
+            Assert.All(freezes, f => Assert.Equal(owner, f.PlayerId));
+            Assert.Equal(
+                before.Players.Values,
+                s.State.Players.Values.Select(p => freezes.Any(f => f.PlayerId == p.PlayerId) ? p with { Finish = p.Finish! with { Frozen = false } } : p));
             Assert.Equal(before.ManualEffects, s.State.ManualEffects);
         }
 
@@ -1208,13 +1658,15 @@ public class PlayerAdminInvariantTests
     }
 
     /// <summary>
-    /// W5 / D-15 / D-98: only a completed unchecked run, with a comment; minus everything the run gave — points and
-    /// coins by the sum of its logged changes, steps back by its net steps from the current cell along the walked path,
-    /// its pending difficulty event «не применимо»; the run is rejected; nobody else and the owner's turn untouched.
+    /// W5 / D-15 / D-98 / Q-3: only a completed unchecked run, with a comment; minus everything the run gave — points and
+    /// coins by the sum of its logged changes; the position: a player who has not finished goes back by the cells the run
+    /// moved, a finisher by the Q-3 surplus rule for a run up to the finish and not at all for a later one; its pending
+    /// difficulty event «не применимо»; the run is rejected; the owner's turn untouched, the others only recalculated.
     /// </summary>
     private static void CheckAcceptedReject(Scenario s, RejectProof reject, SeasonState before)
     {
-        var events = s.Last.Events;
+        var all = s.Last.Events;
+        var events = all.Where(e => !IsFinishEvent(e)).ToList();
         Assert.True(before.Status is SeasonStatus.Active or SeasonStatus.Closing, $"Rejected while {before.Status}.");
         Assert.False(string.IsNullOrWhiteSpace(reject.Comment), "A reject without a comment.");
         var run = before.Runs[reject.RunId];
@@ -1222,31 +1674,67 @@ public class PlayerAdminInvariantTests
         Assert.True(run.Proof?.Status is null or ProofStatus.Pending, "A checked run was rejected.");
         var player = run.PlayerId;
         var was = before.Players[player];
+        var upToFinish = was.Finish is not null && IsUpToFinish(before, run);
+        var frozen = was.Finish?.Frozen == true;
 
-        Assert.Equal(new ProofRejected(run.RunId, player, reject.Comment, s.Clock.UtcNow), events[0]);
+        // D-99 / Q-3: a frozen first loses nothing by a reject of his runs after the finish. His runs up to the finish are
+        // approved before the freeze, unless approval is not required — whether such a reject takes the run's points and
+        // coins back is open, so both are accepted.
+        var keepsAll = frozen && !upToFinish;
+        var open = frozen && upToFinish;
+
+        Assert.Equal(new ProofRejected(run.RunId, player, reject.Comment, s.Clock.UtcNow), all[0]);
         var order = new[] { typeof(ProofRejected), typeof(PointsChanged), typeof(PlayerMoved), typeof(CoinsChanged), typeof(ManualEffectResolved) };
-        var positions = events.Select(e => Array.IndexOf(order, e.GetType())).ToList();
+        // A finisher's move back comes with the revoke (Q-3), after the reject itself; its place among the rest is open
+        var positions = events.Where(e => was.Finish is null || e is not PlayerMoved).Select(e => Array.IndexOf(order, e.GetType())).ToList();
         Assert.DoesNotContain(-1, positions);
         Assert.Equal(positions.Order(), positions);
 
-        var earlier = s.Log.Take(s.Log.Count - events.Count).ToList();
-        var points = earlier.OfType<PointsChanged>().Where(e => e.RunId == run.RunId).Sum(e => e.Delta);
+        var earlier = s.Log.Take(s.Log.Count - all.Count).ToList();
+        var points = keepsAll || (open && !events.OfType<PointsChanged>().Any())
+            ? 0
+            : earlier.OfType<PointsChanged>().Where(e => e.RunId == run.RunId && e.Reason is not (PointsReason.FinishBonus or PointsReason.FinishBonusRevoked)).Sum(e => e.Delta);
         Assert.Equal(
             points == 0 ? [] : [new PointsChanged(player, -points, PointsReason.ProofRejected, run.RunId)],
             events.OfType<PointsChanged>());
-        var coins = earlier.OfType<CoinsChanged>().Where(e => e.RunId == run.RunId).Sum(e => e.Delta);
+        var coins = keepsAll || (open && !events.OfType<CoinsChanged>().Any()) ? 0 : earlier.OfType<CoinsChanged>().Where(e => e.RunId == run.RunId).Sum(e => e.Delta);
         Assert.Equal(
             coins == 0 ? [] : [new CoinsChanged(player, -coins, CoinsReason.ProofRejected, run.RunId)],
             events.OfType<CoinsChanged>());
 
-        // Back by the cells the run really moved (sign × path of its logged moves, not the steps rolled: steps burned
-        // at the finish gave no cells, D-47, D-98), from the current cell along the walked path
-        var cells = MovedCells(earlier, run.RunId);
-        Assert.True(cells >= 0, $"The run moved {cells} cells.");
-        var path = cells > 0 ? Movement.Backward(before.Map, was.Path, cells) : [];
-        Assert.Equal(
-            path.Count == 0 ? [] : [new PlayerMoved(player, was.CellId, path[^1], -cells, [.. path], MoveReason.ProofRejected, run.RunId)],
-            events.OfType<PlayerMoved>());
+        // Only the owner's finish may be revoked
+        Assert.All(all.OfType<PlayerFinishRevoked>(), e => Assert.Equal(player, e.PlayerId));
+        Assert.All(all.OfType<FinishSurplusChanged>(), e => Assert.Equal(player, e.PlayerId));
+        if (was.Finish is null)
+        {
+            // Back by the cells the run really moved (sign × path of its logged moves, not the steps rolled: steps burned
+            // at the finish gave no cells, D-47, D-98), from the current cell along the walked path
+            var cells = MovedCells(earlier, run.RunId);
+            Assert.True(cells >= 0, $"The run moved {cells} cells.");
+            var path = cells > 0 ? Movement.Backward(before.Map, was.Path, cells) : [];
+            Assert.Equal(
+                path.Count == 0 ? [] : [new PlayerMoved(player, was.CellId, path[^1], -cells, [.. path], MoveReason.ProofRejected, run.RunId)],
+                events.OfType<PlayerMoved>());
+            Assert.DoesNotContain(all, e => e is PlayerFinishRevoked or FinishSurplusChanged);
+        }
+        else if (open && !all.OfType<PlayerFinishRevoked>().Any())
+        {
+            // Without required approval the frozen first's run up to the finish can be rejected; whether his place stays
+            // final then is open (D-99 decides it for corrections only): kept — nothing moves
+            Assert.DoesNotContain(all, e => e is PlayerMoved or FinishSurplusChanged);
+        }
+        else if (upToFinish)
+        {
+            // Q-3: the run's steps come off the position: within the surplus the finish stands, beyond it it goes
+            // The finishing run takes back its dice (its cells plus the steps it burned); an earlier run only the cells it
+            // really moved (D-99)
+            var taken = was.Finish!.RunId == run.RunId ? run.Dice.Concat(run.ChallengeDice).Sum(d => d.Value) : run.Moved;
+            CheckFinishPosition(all, before, was, run.RunId, -taken, MoveReason.ProofRejected);
+        }
+        else
+        {
+            Assert.DoesNotContain(all, e => e is PlayerMoved or PlayerFinishRevoked or FinishSurplusChanged);
+        }
 
         var pending = before.ManualEffects.Values.Where(e => e.RunId == run.RunId && e.Source == ManualEffectSource.Difficulty).ToList();
         Assert.Equal(
@@ -1263,12 +1751,12 @@ public class PlayerAdminInvariantTests
         Assert.Equal((run.Dice, run.ChallengeDice, run.Hours, run.Difficulty), (after.Dice, after.ChallengeDice, after.Hours, after.Difficulty));
 
         var now = s.State.Players[player];
-        Assert.Equal(was.Points - points, now.Points);
+        var ownBonus = all.OfType<PointsChanged>()
+            .Where(e => e.PlayerId == player && e.Reason is PointsReason.FinishBonus or PointsReason.FinishBonusRevoked)
+            .Sum(e => e.Delta);
+        Assert.Equal(was.Points - points + ownBonus, now.Points);
         Assert.Equal(was.Coins - coins, now.Coins);
-        Assert.Equal(
-            (was.Phase, was.Offer, was.Choice, was.ActiveRunId, was.RerollsThisRoll, was.Resources, was.Exclusions),
-            (now.Phase, now.Offer, now.Choice, now.ActiveRunId, now.RerollsThisRoll, now.Resources, now.Exclusions));
-        Assert.All(s.State.Players.Values.Where(p => p.PlayerId != player), p => Assert.Equal(before.Players[p.PlayerId], p));
+        CheckOwnTurnAndOthers(s, before, player);
         Assert.All(s.State.Runs.Values.Where(r => r.RunId != run.RunId), r => Assert.Equal(before.Runs[r.RunId], r));
     }
 
@@ -1282,6 +1770,7 @@ public class PlayerAdminInvariantTests
 
         var was = before.Players[reroll.PlayerId];
         Assert.Equal(TurnPhase.Rolling, was.Phase);
+        Assert.False(was.Finish?.Frozen == true, "A frozen first rerolls for free (D-99), never short of coins.");
         Assert.Equal(RerollCostKind.Coins, before.Rules.Roll.RerollCost.Kind);
         Assert.Null(ExpectedPayment(was, before.Rules));
     }
@@ -1294,22 +1783,25 @@ public class PlayerAdminInvariantTests
         Scenario s, IReadOnlyList<IGameEvent> penalty, Guid playerId, Guid runId, EquatableArray<Die> dice, SeasonState before)
     {
         var rules = before.Rules.Drop;
-        Assert.Equal(rules.PenaltyDice.Count, dice.Count);
+        var was = before.Players[playerId];
+
+        // RR7 / D-09 / D-99: a frozen first pays nothing (the dice may be left unrolled); a finisher pays in points only
+        var frozen = was.Finish?.Frozen == true;
+        Assert.True(dice.Count == rules.PenaltyDice.Count || (frozen && dice.Count == 0), $"{dice.Count} penalty dice.");
         Assert.All(dice, d =>
         {
             Assert.Equal(rules.PenaltyDice.Sides, d.Sides);
             Assert.InRange(d.Value, 1, d.Sides);
         });
         var sum = dice.Sum(d => d.Value);
-        var was = before.Players[playerId];
 
         var points = penalty.OfType<PointsChanged>().ToList();
         Assert.Equal(
-            rules.AffectsPoints && sum > 0 ? [new PointsChanged(playerId, -sum, PointsReason.DropPenalty, runId)] : [],
+            rules.AffectsPoints && sum > 0 && !frozen ? [new PointsChanged(playerId, -sum, PointsReason.DropPenalty, runId)] : [],
             points);
 
         var moves = penalty.OfType<PlayerMoved>().ToList();
-        if (!rules.AffectsPosition || was.CellId == before.Map.Start.Id || sum == 0)
+        if (!rules.AffectsPosition || was.CellId == before.Map.Start.Id || sum == 0 || was.Finish is not null)
         {
             Assert.Empty(moves);
         }
@@ -1324,7 +1816,7 @@ public class PlayerAdminInvariantTests
         }
 
         var effects = penalty.OfType<ManualEffectCreated>().ToList();
-        if (rules.MandatoryEvent == MandatoryEvent.Bad)
+        if (rules.MandatoryEvent == MandatoryEvent.Bad && !frozen)
         {
             var created = Assert.Single(effects);
             Assert.Equal(new ManualEffectCreated(created.EffectId, playerId, EventKind.Bad, ManualEffectSource.Drop, runId), created);
@@ -1499,6 +1991,10 @@ public class PlayerAdminInvariantTests
         var proofs = new Dictionary<Guid, ProofStatus>();
         var completedGames = new HashSet<Guid>();
         var cellsByRun = new Dictionary<Guid, int>();
+
+        // D-16: runs the first finisher completes do not count for the race — their games stay available
+        var finishOrders = new Dictionary<Guid, int>();
+        var outOfRace = new HashSet<Guid>();
         foreach (var e in log)
         {
             switch (e)
@@ -1541,7 +2037,22 @@ public class PlayerAdminInvariantTests
                     break;
                 case RunCompleted completedRun:
                     Assert.Equal(SeasonStatus.Active, status);
-                    Assert.True(completedGames.Add(runs[completedRun.RunId].Game), "A game completed twice in the season.");
+                    var byFirst = finishOrders.Count > 0 && finishOrders.MinBy(x => x.Value).Key == completedRun.PlayerId;
+                    if (byFirst)
+                    {
+                        outOfRace.Add(completedRun.RunId);
+                    }
+                    else
+                    {
+                        Assert.True(completedGames.Add(runs[completedRun.RunId].Game), "A game completed twice in the season.");
+                    }
+
+                    break;
+                case PlayerFinished finishedPlayer:
+                    finishOrders[finishedPlayer.PlayerId] = finishedPlayer.Order;
+                    break;
+                case PlayerFinishRevoked revokedPlayer:
+                    finishOrders.Remove(revokedPlayer.PlayerId);
                     break;
                 case ProofSubmitted submitted:
                     // D-98: a proof of one's own run, until the season is finished, replacing only an unchecked one
@@ -1569,7 +2080,9 @@ public class PlayerAdminInvariantTests
                         $"Rejected a {rejectedFrom} proof.");
                     Assert.False(string.IsNullOrWhiteSpace(rejectedProof.Comment), "A reject without a comment.");
                     proofs[rejectedProof.RunId] = ProofStatus.Rejected;
-                    Assert.True(completedGames.Remove(runs[rejectedProof.RunId].Game), "A rejected game was not completed.");
+                    Assert.True(
+                        outOfRace.Contains(rejectedProof.RunId) || completedGames.Remove(runs[rejectedProof.RunId].Game),
+                        "A rejected game was not completed.");
                     break;
                 case GameRerolled or ChoiceMade or CompletionRolled or RunDropped or RunTechRerolled:
                     // SE1/SE2: no game actions outside a running season
@@ -1648,8 +2161,11 @@ public class PlayerAdminInvariantTests
                         Assert.True(moved.Steps < 0, "A reject moved forward.");
                         Assert.InRange(moved.Path.Count, 1, -moved.Steps);
 
-                        // D-98: back by the cells the run really moved, not by its steps rolled
-                        Assert.Equal(cellsByRun.GetValueOrDefault(moved.RunId!.Value), -moved.Steps);
+                        // D-98: back by the cells the run really moved, not by its steps rolled — for a player who has
+                        // not finished; a finisher's revoke goes back by the Q-3 surplus rule (checked per command)
+                        Assert.True(
+                            finishOrders.ContainsKey(moved.PlayerId) || cellsByRun.GetValueOrDefault(moved.RunId!.Value) == -moved.Steps,
+                            $"A reject moved {moved.Steps} for a run of {cellsByRun.GetValueOrDefault(moved.RunId!.Value)} cells.");
                     }
 
                     if (moved.RunId is { } movedRun)

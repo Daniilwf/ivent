@@ -38,6 +38,9 @@ internal sealed class SeasonGameStatus
         {
             switch (run.Status)
             {
+                case RunStatus.Completed when run.FreeMode && run.PlayerId != playerId:
+                    // The first's games in free mode do not complete the game for the others (D-16); for him they do.
+                    break;
                 case RunStatus.Completed:
                     // «Уже прошёл» wins over «Сейчас играет».
                     _misses[run.GameId] = new RollMiss(run.GameId, RollMissReason.CompletedInSeason, run.PlayerId);

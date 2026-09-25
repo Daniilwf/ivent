@@ -23,6 +23,9 @@ public enum RerollPayment
 
     /// <summary>A manual «draw a bad event» effect.</summary>
     BadEvent,
+
+    /// <summary>The frozen first's reroll in free mode: nothing is spent (D-99).</summary>
+    FreeMode,
 }
 
 /// <summary>
@@ -38,6 +41,15 @@ public static class RerollPrice
 {
     /// <summary>The reroll coupon resource (CONTENT.md «Купон реролла»).</summary>
     public const string FreeRerollsResource = "freeRerolls";
+
+    /// <summary>The price of the next reroll for <paramref name="player"/>: free in the first's free mode (D-99).</summary>
+    public static (RerollPayment Payment, int Coins) For(Seasons.SeasonPlayer player, Rulesets.RollRules rules)
+    {
+        ArgumentNullException.ThrowIfNull(player);
+        return player.Finish?.Frozen == true
+            ? (RerollPayment.FreeMode, 0)
+            : Next(player.RerollsThisRoll, player.Resources[FreeRerollsResource], rules);
+    }
 
     /// <summary>
     /// How the next reroll is paid after <paramref name="rerollsThisRoll"/> rerolls of this roll with

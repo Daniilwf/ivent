@@ -1,4 +1,5 @@
 using GameEvent.Engine.Effects;
+using GameEvent.Engine.Finish;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Map;
 using GameEvent.Engine.Scoring;
@@ -85,19 +86,43 @@ internal static class RunLifecycle
 
         var events = new List<IGameEvent>
         {
-            new RunCompleted(run.RunId, player.PlayerId, command.Difficulty, hours.Value, now, source, command.ChallengeDone),
+            // Whether the run comes after the finish or in the first's free mode is stored, not recomputed on replay (D-99).
+            new RunCompleted(
+                run.RunId,
+                player.PlayerId,
+                command.Difficulty,
+                hours.Value,
+                now,
+                source,
+                command.ChallengeDone,
+                AfterFinish: player.Finish is not null,
+                FreeMode: player.Finish is not null && FinishLine.First(state) == player.PlayerId),
             new CompletionRolled(run.RunId, player.PlayerId, dice, challengeDice),
         };
+
+        // The frozen first plays in free mode: dice only (the freeze amendment, Q-3).
+        if (Finishes.IsFrozen(player))
+        {
+            if (command.Review is { } kept)
+            {
+                events.Add(Reviewed(run, kept, now));
+            }
+
+            return Decision.Accept(events);
+        }
 
         if (sum != 0)
         {
             events.Add(new PointsChanged(player.PlayerId, sum, PointsReason.CompletionRoll, run.RunId));
         }
 
-        var path = Movement.Forward(state.Map, player.CellId, sum);
+        // A finisher's position is fixed (Q-3); otherwise the token moves and may reach the finish (D-99).
+        PlayerMoved? moved = null;
+        var path = player.Finish is null ? Movement.Forward(state.Map, player.CellId, sum) : [];
         if (path.Count > 0)
         {
-            events.Add(new PlayerMoved(player.PlayerId, player.CellId, path[^1], sum, [.. path], MoveReason.CompletionRoll, run.RunId));
+            moved = new PlayerMoved(player.PlayerId, player.CellId, path[^1], sum, [.. path], MoveReason.CompletionRoll, run.RunId);
+            events.Add(moved);
         }
 
         // Coins by the counted hours, from the rules fixed at the roll (Q-2, D-96), up to the hours the dice top out at:
@@ -114,6 +139,12 @@ internal static class RunLifecycle
         if (die.GrantEvent is { } granted)
         {
             events.Add(new ManualEffectCreated(context.Ids.NewId(), player.PlayerId, granted, ManualEffectSource.Difficulty, run.RunId));
+        }
+
+        // The finish comes after the run's own rewards, so a first frozen at once is frozen after them (D-99).
+        if (moved is not null)
+        {
+            events.AddRange(Finishes.AfterCompletionMove(events.Aggregate(state, SeasonEngine.Apply), player, run, moved, now));
         }
 
         if (command.Review is { } given)
@@ -196,6 +227,8 @@ internal static class RunLifecycle
             Hours = e.Hours,
             HoursSource = e.HoursSource,
             CompletedAt = e.CompletedAt,
+            AfterFinish = e.AfterFinish,
+            FreeMode = e.FreeMode,
         };
         var player = state.Players[e.PlayerId] with { Phase = TurnPhase.Idle, ActiveRunId = null };
         return state with { Runs = state.Runs.SetItem(e.RunId, run), Players = state.Players.SetItem(e.PlayerId, player) };

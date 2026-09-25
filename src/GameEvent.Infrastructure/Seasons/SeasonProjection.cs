@@ -99,6 +99,12 @@ internal static class SeasonProjection
             record.ChoiceJson = player.Choice is null ? null : JsonSerializer.Serialize(player.Choice, EngineJson.Options);
             record.ActiveRunId = player.ActiveRunId;
             record.RerollsThisRoll = player.RerollsThisRoll;
+            record.FinishOrder = player.Finish?.Order;
+            record.FinishRunId = player.Finish?.RunId;
+            record.FinishedAt = player.Finish?.FinishedAt;
+            record.Frozen = player.Finish?.Frozen ?? false;
+            record.FinishBonus = player.Finish?.Bonus ?? 0;
+            record.FinishSurplus = player.Finish?.Surplus ?? 0;
 
             // Exclusions only grow within a season (D-08); a tech reroll turned into a drop changes its reason (D-11).
             var known = old?.Exclusions.ToDictionary(x => x.GameId, x => x.Reason) ?? [];
@@ -147,6 +153,8 @@ internal static class SeasonProjection
             record.CompletedAt = run.CompletedAt;
             record.ReachedFinish = run.ReachedFinish;
             record.Moved = run.Moved;
+            record.AfterFinish = run.AfterFinish;
+            record.FreeMode = run.FreeMode;
 
             if (run.Proof is { } proof && proof != before.Runs.GetValueOrDefault(id)?.Proof)
             {
@@ -212,7 +220,7 @@ internal static class SeasonProjection
 
     /// <summary>
     /// Rebuilds the state a projection describes, for the integrity check: it must equal the fold of the log.
-    /// The map is not projected; it is taken from <paramref name="replayed"/>.
+    /// The map and the count of finishes so far are not projected; they are taken from <paramref name="replayed"/>.
     /// </summary>
     public static async Task<SeasonState> ReadAsync(GameEventDbContext db, SeasonState replayed, CancellationToken ct)
     {
@@ -243,6 +251,9 @@ internal static class SeasonProjection
                     p.ChoiceJson is null ? null : JsonSerializer.Deserialize<PendingChoice>(p.ChoiceJson, EngineJson.Options),
                     [.. exclusions[p.Id].OrderBy(r => r.GameId).Select(r => new GameExclusion(r.GameId, r.Reason))],
                     p.RerollsThisRoll,
+                    p.FinishOrder is { } order
+                        ? new Engine.Finish.FinishState(order, p.FinishRunId!.Value, p.FinishedAt!.Value, p.Frozen, p.FinishBonus, p.FinishSurplus)
+                        : null,
                     p.ActiveRunId)),
             Runs = runs.ToImmutableSortedDictionary(
                 r => r.Id,
@@ -265,7 +276,9 @@ internal static class SeasonProjection
                             proof.SubmittedAt,
                             proof.Comment)
                         : null,
-                    r.Moved)),
+                    r.Moved,
+                    r.AfterFinish,
+                    r.FreeMode)),
             ManualEffects = effects.ToImmutableSortedDictionary(
                 x => x.Id,
                 x => new PendingManualEffect(x.Id, x.PlayerId, x.DrawEvent, x.Source, x.RunId)),

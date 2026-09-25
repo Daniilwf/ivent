@@ -12,6 +12,8 @@ public enum PointsReason
     DropPenalty,
     RunCorrection,
     ProofRejected,
+    FinishBonus,
+    FinishBonusRevoked,
 }
 
 /// <summary>What changed a player's coins. Coins always equal the sum of deltas in non-undone events.</summary>
@@ -45,7 +47,15 @@ public sealed record ResourceChanged(Guid PlayerId, string Resource, int Delta, 
 internal static class PointsLedger
 {
     public static SeasonState Apply(SeasonState state, PointsChanged e) =>
-        Update(state, e.PlayerId, p => p with { Points = p.Points + e.Delta });
+        Update(state, e.PlayerId, p => p with
+        {
+            Points = p.Points + e.Delta,
+
+            // The finish bonus a player holds now (Q-4: at most one).
+            Finish = e.Reason is PointsReason.FinishBonus or PointsReason.FinishBonusRevoked && p.Finish is { } finish
+                ? finish with { Bonus = finish.Bonus + e.Delta }
+                : p.Finish,
+        });
 
     public static SeasonState Apply(SeasonState state, CoinsChanged e) =>
         Update(state, e.PlayerId, p => p with { Coins = p.Coins + e.Delta });

@@ -2308,6 +2308,12 @@ export interface components {
             /** Format: int32 */
             linearLength: number;
         };
+        /** @description The player's own finish (D-99): order among the finishers and whether the first place is final and frozen. */
+        MyFinishView: {
+            /** Format: int32 */
+            order: number;
+            frozen: boolean;
+        };
         /**
          * @description The signed-in player's own turn. While playing: `dropHintMinutes` is `roll.minPlayMinutesBeforeDrop` until
          *     that much has been played by the server clock (only a hint: D-09), then null; `dropPenalty` is what a drop costs
@@ -2329,6 +2335,7 @@ export interface components {
             dropPenalty: null | components["schemas"]["DropPenaltyView"];
             techRerollOpen: boolean;
             challengesEnabled: boolean;
+            finish: null | components["schemas"]["MyFinishView"];
         };
         NominationRules: {
             auto: components["schemas"]["EquatableArrayOfAutoNomination"];
@@ -2349,6 +2356,7 @@ export interface components {
             /** Format: int32 */
             sides: number;
         };
+        /** @description A player on the map and the leaderboard; `finishOrder` is their order among the finishers, null before the finish. */
         PlayerView: {
             /** Format: uuid */
             id: string;
@@ -2357,6 +2365,8 @@ export interface components {
             /** Format: int32 */
             points: number;
             phase: components["schemas"]["TurnPhase"];
+            /** Format: int32 */
+            finishOrder: null | number;
         };
         /** @description A player whose next roll would find no game: the empty-pool signal. */
         PlayerWithoutGamesView: {
@@ -2378,8 +2388,9 @@ export interface components {
             instance?: null | string;
         };
         /**
-         * @description A run to check, in queue order (D-98): finishes on top, then by completion time; with the claimed difficulty, the
-         *     counted hours and the dice total, what an approval at a lower difficulty or a reject changes.
+         * @description A run to check, in queue order (D-98, Q-3): the runs that decide a finish on top (`decidesFinish`), then by
+         *     completion time; with the claimed difficulty, the counted hours and the dice total, what an approval at a lower
+         *     difficulty or a reject changes. `reachedFinish`: this run's latest move stands on the finish.
          */
         ProofQueueItemView: {
             /** Format: uuid */
@@ -2400,6 +2411,7 @@ export interface components {
             hours: null | number;
             /** Format: int32 */
             diceTotal: number;
+            decidesFinish: boolean;
         };
         /** @description The proof of the player's own completed run: links (http/https), a note, or a witness (D-98). */
         ProofRequest: {
@@ -2459,7 +2471,7 @@ export interface components {
          * @description How a reroll was paid for.
          * @enum {unknown}
          */
-        RerollPayment: "freeThisRoll" | "freeRerollResource" | "coins" | "badEvent";
+        RerollPayment: "freeThisRoll" | "freeRerollResource" | "coins" | "badEvent" | "freeMode";
         /** @description What the next reroll costs, computed by the engine's rule (D-93); only while a game is offered. */
         RerollPriceView: {
             payment: components["schemas"]["RerollPayment"];
@@ -2694,7 +2706,7 @@ export const manualEffectSourceValues: ReadonlyArray<FlattenedDeepRequired<compo
 export const mapModeValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["MapMode"]> = ["linear", "graph"];
 export const proofStatusValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ProofStatus"]> = ["pending", "approved", "rejected"];
 export const rerollCostKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["RerollCostKind"]> = ["coins", "badEvent"];
-export const rerollPaymentValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["RerollPayment"]> = ["freeThisRoll", "freeRerollResource", "coins", "badEvent"];
+export const rerollPaymentValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["RerollPayment"]> = ["freeThisRoll", "freeRerollResource", "coins", "badEvent", "freeMode"];
 export const roleValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["Role"]> = ["player", "admin", "spectator"];
 export const roundingValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["Rounding"]> = ["nearest", "floor", "ceil"];
 export const runStatusValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["RunStatus"]> = ["playing", "completed", "dropped", "techRerolled", "rejected"];

@@ -1,4 +1,5 @@
 using GameEvent.Engine.Effects;
+using GameEvent.Engine.Finish;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Map;
 using GameEvent.Engine.Rolls;
@@ -191,12 +192,24 @@ internal static class Drops
     {
         var rules = state.Rules.Drop;
         var sum = dice.Sum(d => d.Value);
+
+        // The frozen first loses nothing and is dealt no event; a finisher's position is fixed (D-09, D-99).
+        if (Finishes.IsFrozen(player))
+        {
+            if (exclude)
+            {
+                yield return new GameExcluded(player.PlayerId, state.Runs[runId].GameId, ExclusionReason.Dropped);
+            }
+
+            yield break;
+        }
+
         if (rules.AffectsPoints && sum != 0)
         {
             yield return new PointsChanged(player.PlayerId, -sum, PointsReason.DropPenalty, runId);
         }
 
-        if (rules.AffectsPosition && sum != 0)
+        if (rules.AffectsPosition && sum != 0 && player.Finish is null)
         {
             var path = Movement.Backward(state.Map, player.Path, sum);
             if (path.Count > 0)

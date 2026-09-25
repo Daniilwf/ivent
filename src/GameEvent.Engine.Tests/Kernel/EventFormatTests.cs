@@ -1,4 +1,5 @@
 using GameEvent.Engine.Effects;
+using GameEvent.Engine.Finish;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Map;
 using GameEvent.Engine.Players;
@@ -208,6 +209,30 @@ public class EventFormatTests
             """{"runId":"00000000-0000-0000-0000-000000000001","playerId":"10000000-0000-0000-0000-000000000001","comment":"На скрине другая игра","rejectedAt":"2026-10-01T12:30:00+00:00"}"""
         },
         {
+            "player-finished",
+            new PlayerFinished(s_player, s_run, 2, s_at, 3),
+            1,
+            """{"playerId":"10000000-0000-0000-0000-000000000001","runId":"00000000-0000-0000-0000-000000000001","order":2,"finishedAt":"2026-10-01T12:30:00+00:00","surplus":3}"""
+        },
+        {
+            "finish-surplus-changed",
+            new FinishSurplusChanged(s_player, -2),
+            1,
+            """{"playerId":"10000000-0000-0000-0000-000000000001","delta":-2}"""
+        },
+        {
+            "player-frozen",
+            new PlayerFrozen(s_player),
+            1,
+            """{"playerId":"10000000-0000-0000-0000-000000000001"}"""
+        },
+        {
+            "player-finish-revoked",
+            new PlayerFinishRevoked(s_player, s_run),
+            1,
+            """{"playerId":"10000000-0000-0000-0000-000000000001","runId":"00000000-0000-0000-0000-000000000001"}"""
+        },
+        {
             "run-started",
             new RunStarted(s_run, s_player, s_game, Snapshot(), s_at, s_at.AddMinutes(5)),
             1,
@@ -216,9 +241,9 @@ public class EventFormatTests
         },
         {
             "run-completed",
-            new RunCompleted(s_run, s_player, Difficulty.Extreme, 7.5m, s_at, "https://howlongtobeat.com/game/1", true),
+            new RunCompleted(s_run, s_player, Difficulty.Extreme, 7.5m, s_at, "https://howlongtobeat.com/game/1", true, AfterFinish: true, FreeMode: true),
             1,
-            """{"runId":"00000000-0000-0000-0000-000000000001","playerId":"10000000-0000-0000-0000-000000000001","difficulty":"extreme","hours":7.5,"completedAt":"2026-10-01T12:30:00+00:00","hoursSource":"https://howlongtobeat.com/game/1","challengeDone":true}"""
+            """{"runId":"00000000-0000-0000-0000-000000000001","playerId":"10000000-0000-0000-0000-000000000001","difficulty":"extreme","hours":7.5,"completedAt":"2026-10-01T12:30:00+00:00","hoursSource":"https://howlongtobeat.com/game/1","challengeDone":true,"afterFinish":true,"freeMode":true}"""
         },
         {
             "completion-rolled",

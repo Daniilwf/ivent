@@ -1,4 +1,5 @@
 using GameEvent.Engine.Effects;
+using GameEvent.Engine.Finish;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Map;
 using GameEvent.Engine.Players;
@@ -89,6 +90,10 @@ public static class SeasonEngine
             RunReviewed e => RunLifecycle.Apply(state, e),
             RunHoursCorrected e => Corrections.Apply(state, e),
             ProofSubmitted e => ProofReview.Apply(state, e),
+            PlayerFinished e => Finishing.Apply(state, e),
+            PlayerFrozen e => Finishing.Apply(state, e),
+            PlayerFinishRevoked e => Finishing.Apply(state, e),
+            FinishSurplusChanged e => Finishing.Apply(state, e),
             ProofApproved e => ProofReview.Apply(state, e),
             ProofRejected e => ProofReview.Apply(state, e),
             RunDifficultyChanged e => Corrections.Apply(state, e),
