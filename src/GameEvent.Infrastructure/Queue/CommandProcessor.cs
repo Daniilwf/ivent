@@ -31,11 +31,21 @@ public sealed partial class CommandProcessor(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        queue.Consuming(true);
         try
         {
             await foreach (var pending in queue.Reader.ReadAllAsync(stoppingToken))
             {
-                await HandleAsync(pending, stoppingToken);
+                queue.Taken();
+                queue.Running(true);
+                try
+                {
+                    await HandleAsync(pending, stoppingToken);
+                }
+                finally
+                {
+                    queue.Running(false);
+                }
             }
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
@@ -44,8 +54,10 @@ public sealed partial class CommandProcessor(
         }
         finally
         {
+            queue.Consuming(false);
             while (queue.Reader.TryRead(out var left))
             {
+                queue.Taken();
                 left.Completion.TrySetCanceled(CancellationToken.None);
             }
         }

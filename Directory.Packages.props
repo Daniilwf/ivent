@@ -12,6 +12,7 @@
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.12" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.12" />
     <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.12" />
+    <PackageVersion Include="Serilog.AspNetCore" Version="9.0.0" />
   </ItemGroup>
 
   <ItemGroup Label="Web">

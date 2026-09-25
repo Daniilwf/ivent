@@ -1491,6 +1491,38 @@
         }
       }
     },
+    "/api/admin/errors": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ErrorEntry"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/admin/seasons/{seasonId}/players/{playerId}/tech-reroll": {
       "post": {
         "tags": [
@@ -4168,6 +4200,55 @@
       },
       "EquatableArrayOfVotedNomination": {
         "description": "Immutable list with value equality, so records holding lists (events, snapshots) compare by content.\nSerialized as a plain JSON array."
+      },
+      "ErrorEntry": {
+        "required": [
+          "id",
+          "at",
+          "method",
+          "path",
+          "userLogin",
+          "exceptionType",
+          "message",
+          "stackTrace",
+          "traceId"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "method": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "userLogin": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "exceptionType": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "stackTrace": {
+            "type": "string"
+          },
+          "traceId": {
+            "type": "string"
+          }
+        },
+        "description": "An unhandled exception as the admin's «Ошибки» page shows it (SPEC «Наблюдаемость», A10, D-107): when, which request\n(method and path — no query, body, headers or cookies), whose, what exception and where."
       },
       "EventKind": {
         "enum": [
