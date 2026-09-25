@@ -85,7 +85,7 @@ internal static class Corrections
         return Decision.Accept(
         [
             corrected,
-            .. Difference(state, run, delta),
+            .. Difference(SeasonEngine.Apply(state, corrected), run.RunId, delta),
             .. coins != 0 ? [new CoinsChanged(run.PlayerId, coins, CoinsReason.RunCorrection, run.RunId)] : Array.Empty<IGameEvent>(),
         ]);
     }
@@ -129,13 +129,8 @@ internal static class Corrections
         var changed = new RunDifficultyChanged(
             run.RunId, run.PlayerId, old, difficulty, dice, challenge, comment, context.Clock.UtcNow);
         var events = new List<IGameEvent> { changed };
-        events.AddRange(Difference(state, run, delta));
-
-        // The frozen first gains and loses nothing, not even a difficulty event (the freeze amendment).
-        if (Finishes.IsFrozen(state.Players[run.PlayerId]))
-        {
-            return events;
-        }
+        events.AddRange(Difference(SeasonEngine.Apply(state, changed), run.RunId, delta));
+        var frozen = Finishes.IsFrozen(state.Players[run.PlayerId]);
 
         // The difficulty's own event follows the change: a pending one of the old difficulty is not applicable (one already
         // played out stays, the admin corrects by hand), the new difficulty grants its own (Q-5, D-97).
@@ -143,7 +138,8 @@ internal static class Corrections
             .Where(e => e.RunId == run.RunId && e.Source == ManualEffectSource.Difficulty)
             .Select(e => new ManualEffectResolved(e.EffectId, e.PlayerId, e.RunId, ManualEffectOutcome.NotApplicable, comment)));
 
-        if (newRule.GrantEvent is { } granted)
+        // The frozen first gets no new event (the freeze amendment); the old one still does not apply.
+        if (!frozen && newRule.GrantEvent is { } granted)
         {
             events.Add(new ManualEffectCreated(context.Ids.NewId(), run.PlayerId, granted, ManualEffectSource.Difficulty, run.RunId));
         }
@@ -203,13 +199,15 @@ internal static class Corrections
     }
 
     // Points and position by the difference, from where the player stands now (D-97).
-    private static IEnumerable<IGameEvent> Difference(SeasonState state, RunState run, int delta)
+    // state already holds the correction event, so the run carries its new dice.
+    private static IEnumerable<IGameEvent> Difference(SeasonState state, Guid runId, int delta)
     {
         if (delta == 0)
         {
             yield break;
         }
 
+        var run = state.Runs[runId];
         var player = state.Players[run.PlayerId];
         if (Finishes.IsFrozen(player))
         {
@@ -226,7 +224,8 @@ internal static class Corrections
                 var after = SeasonEngine.Apply(state, new PointsChanged(player.PlayerId, delta, PointsReason.RunCorrection, run.RunId));
                 var events = delta > 0
                     ? [new FinishSurplusChanged(player.PlayerId, delta)]
-                    : Finishes.AfterReduction(after, after.Players[player.PlayerId], run, -delta, MoveReason.RunCorrection);
+                    : Finishes.AfterReduction(
+                        after, after.Players[player.PlayerId], run, Finishes.Reduction(player, run, -delta), MoveReason.RunCorrection);
                 foreach (var e in events)
                 {
                     yield return e;
@@ -238,7 +237,7 @@ internal static class Corrections
 
         // Forward: from where the player stands, extra steps burn at the finish. Back: only what the run really gave
         // beyond its new dice sum — steps that burned at the finish gave no cells to take back (D-47, D-97).
-        var newSum = run.Dice.Sum(d => d.Value) + run.ChallengeDice.Sum(d => d.Value) + delta;
+        var newSum = run.Dice.Sum(d => d.Value) + run.ChallengeDice.Sum(d => d.Value);
         var steps = delta > 0 ? delta : -Math.Max(0, run.Moved - newSum);
         var path = steps > 0 ? Movement.Forward(state.Map, player.CellId, steps) : Movement.Backward(state.Map, player.Path, -steps);
 

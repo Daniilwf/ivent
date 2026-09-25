@@ -1,5 +1,4 @@
 using GameEvent.Engine.Effects;
-using GameEvent.Engine.Finish;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Pool;
 using GameEvent.Engine.Rulesets;
@@ -99,9 +98,7 @@ internal static class Rolling
         var player = state.Players[command.PlayerId];
 
         // D-07, D-93: a free reroll of this roll, then a coupon, then the price.
-        var (payment, price) = Finishes.IsFrozen(player)
-            ? (RerollPayment.FreeThisRoll, 0) // free mode: coins and coupons of the frozen first do not change (D-99)
-            : RerollPrice.Next(player.RerollsThisRoll, player.Resources[RerollPrice.FreeRerollsResource], state.Rules.Roll);
+        var (payment, price) = RerollPrice.For(player, state.Rules.Roll);
         var givenUp = player.Offer is { } offer
             ? new HashSet<Guid> { offer.GameId }
             : player.Choice!.Options.Select(o => o.Game?.GameId).OfType<Guid>().ToHashSet();

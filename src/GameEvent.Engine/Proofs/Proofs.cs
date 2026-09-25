@@ -52,9 +52,17 @@ public sealed record ProofApproved(Guid RunId, Guid PlayerId, bool WithoutProof,
 [EventType("proof-rejected")]
 public sealed record ProofRejected(Guid RunId, Guid PlayerId, string Comment, DateTimeOffset RejectedAt) : IGameEvent;
 
-/// <summary>The admin's queue of runs to check (SPEC «Уточнения»: a run that reached the finish goes on top).</summary>
+/// <summary>The admin's queue of runs to check (SPEC «Уточнения», Q-3: the runs that decide a finish go on top).</summary>
 public static class ProofReviewOrder
 {
+    /// <summary>A standing finisher's run up to the finish: it decides the places and goes on top of the queue (Q-3).</summary>
+    public static bool DecidesFinish(SeasonState state, RunState run)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        ArgumentNullException.ThrowIfNull(run);
+        return state.Players[run.PlayerId].Finish is not null && !run.AfterFinish;
+    }
+
     /// <summary>
     /// Completed runs not yet approved or rejected: the runs of standing finishers up to their finish first (they decide the
     /// places, Q-3), then the earliest completed; ties by run id.
@@ -66,7 +74,7 @@ public static class ProofReviewOrder
         // A finisher's runs up to the finish decide the first place (Q-3): they go on top, with the run that reached it.
         return [.. state.Runs.Values
             .Where(r => r.Status == RunStatus.Completed && r.Proof?.Status is null or ProofStatus.Pending)
-            .OrderByDescending(r => state.Players[r.PlayerId].Finish is not null && !r.AfterFinish)
+            .OrderByDescending(r => DecidesFinish(state, r))
             .ThenBy(r => r.CompletedAt)
             .ThenBy(r => r.RunId)
             .Select(r => r.RunId)];
@@ -254,7 +262,8 @@ internal static class ProofReview
         if (Finishes.CountsForFinish(player, run))
         {
             var after = events.Aggregate(state, SeasonEngine.Apply);
-            events.AddRange(Finishes.AfterReduction(after, after.Players[player.PlayerId], after.Runs[run.RunId], points, MoveReason.ProofRejected));
+            var taken = player.Finish!.RunId == run.RunId ? points : run.Moved;
+            events.AddRange(Finishes.AfterReduction(after, after.Players[player.PlayerId], after.Runs[run.RunId], taken, MoveReason.ProofRejected));
         }
 
         return Decision.Accept(events);

@@ -29,7 +29,10 @@ public sealed record FinishSurplusChanged(Guid PlayerId, int Delta) : IGameEvent
 [EventType("player-frozen")]
 public sealed record PlayerFrozen(Guid PlayerId) : IGameEvent;
 
-/// <summary>The run that brought the player to the finish was rejected: the finish is revoked (D-15, D-99).</summary>
+/// <summary>
+/// The finish is revoked (D-15, Q-3, D-99): a reject or a reduction of a run up to the finish went beyond the surplus.
+/// <see cref="RunId"/> is the run that had reached the finish, not necessarily the one rejected or cut.
+/// </summary>
 [EventType("player-finish-revoked")]
 public sealed record PlayerFinishRevoked(Guid PlayerId, Guid RunId) : IGameEvent;
 
@@ -73,6 +76,22 @@ internal static class Finishes
 
         var finished = new PlayerFinished(player.PlayerId, run.RunId, state.FinishesSoFar + 1, now, move.Steps - move.Path.Count);
         return [finished, .. Settle(SeasonEngine.Apply(state, finished))];
+    }
+
+    /// <summary>
+    /// How much a run up to the finish takes from the position when its dice drop by <paramref name="points"/>: the finishing
+    /// run's dice all count (the surplus holds its burned steps); an earlier run gave only the cells it moved, so it takes
+    /// back only what it moved beyond its new sum (D-98, RR8).
+    /// </summary>
+    public static int Reduction(SeasonPlayer player, RunState run, int points)
+    {
+        if (player.Finish?.RunId == run.RunId)
+        {
+            return points;
+        }
+
+        var newSum = run.Dice.Sum(d => d.Value) + run.ChallengeDice.Sum(d => d.Value);
+        return Math.Max(0, run.Moved - newSum);
     }
 
     /// <summary>
@@ -156,8 +175,19 @@ internal static class Finishing
     public static SeasonState Apply(SeasonState state, PlayerFrozen e) =>
         Update(state, e.PlayerId, p => p with { Finish = p.Finish! with { Frozen = true } });
 
-    public static SeasonState Apply(SeasonState state, PlayerFinishRevoked e) =>
-        Update(state, e.PlayerId, p => p with { Finish = null });
+    // With the finish gone, the runs completed after it count as ordinary runs of an unfinished player (they did not move
+    // the token); games played in free mode stay available to the others (D-99). Cells need no fix: the backward move
+    // that follows the revoke brings the cut run's cells down to its new dice.
+    public static SeasonState Apply(SeasonState state, PlayerFinishRevoked e)
+    {
+        var runs = state.Runs;
+        foreach (var run in state.Runs.Values.Where(r => r.PlayerId == e.PlayerId && r.AfterFinish))
+        {
+            runs = runs.SetItem(run.RunId, run with { AfterFinish = false });
+        }
+
+        return Update(state with { Runs = runs }, e.PlayerId, p => p with { Finish = null });
+    }
 
     public static SeasonState Apply(SeasonState state, FinishSurplusChanged e) =>
         Update(state, e.PlayerId, p => p with { Finish = p.Finish! with { Surplus = p.Finish.Surplus + e.Delta } });

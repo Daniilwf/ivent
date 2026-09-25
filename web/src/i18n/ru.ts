@@ -31,7 +31,7 @@ type DropPenalty = {
   badEvent: boolean;
 };
 
-type RerollPayment = 'freeThisRoll' | 'freeRerollResource' | 'coins' | 'badEvent';
+type RerollPayment = 'freeThisRoll' | 'freeRerollResource' | 'coins' | 'badEvent' | 'freeMode';
 
 const rejection = {
   'turn.wrongPhase': 'Это действие сейчас недоступно: обновите страницу.',
@@ -60,6 +60,7 @@ const rejection = {
   'review.invalidRating': 'Оценка — от 1 до 10.',
   'review.tooLong': 'Отзыв слишком длинный: не больше 2000 символов.',
   'season.closed': 'Сезон закрыт для этого действия.',
+  'player.finished': 'Позиция финишировавшего меняется только через его прохождения.',
   'player.unknown': 'Вы не участвуете в этом сезоне.',
   'season.notCreated': 'Сезон ещё не создан.',
   'season.mismatch': 'Действие отправлено не в тот сезон. Обновите страницу.',
@@ -97,7 +98,7 @@ export const ru = {
     alreadyPlayed: 'Уже проходил',
     reroll: 'Реролл',
     rerollFor: (payment: RerollPayment, price: number) =>
-      payment === 'freeThisRoll'
+      payment === 'freeThisRoll' || payment === 'freeMode'
         ? 'Реролл — бесплатно'
         : payment === 'freeRerollResource'
           ? 'Реролл — купон реролла'

@@ -35,7 +35,9 @@ public sealed record RunCompleted(
     decimal Hours,
     DateTimeOffset CompletedAt,
     string? HoursSource = null,
-    bool ChallengeDone = false) : IGameEvent;
+    bool ChallengeDone = false,
+    bool AfterFinish = false,
+    bool FreeMode = false) : IGameEvent;
 
 /// <summary>
 /// Dice for a completed run, each die separately: <see cref="Dice"/> by the hours, <see cref="ChallengeDice"/> the

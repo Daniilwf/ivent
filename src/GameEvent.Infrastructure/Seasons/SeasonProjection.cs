@@ -220,7 +220,7 @@ internal static class SeasonProjection
 
     /// <summary>
     /// Rebuilds the state a projection describes, for the integrity check: it must equal the fold of the log.
-    /// The map is not projected; it is taken from <paramref name="replayed"/>.
+    /// The map and the count of finishes so far are not projected; they are taken from <paramref name="replayed"/>.
     /// </summary>
     public static async Task<SeasonState> ReadAsync(GameEventDbContext db, SeasonState replayed, CancellationToken ct)
     {

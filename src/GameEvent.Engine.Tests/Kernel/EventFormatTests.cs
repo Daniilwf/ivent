@@ -241,9 +241,9 @@ public class EventFormatTests
         },
         {
             "run-completed",
-            new RunCompleted(s_run, s_player, Difficulty.Extreme, 7.5m, s_at, "https://howlongtobeat.com/game/1", true),
+            new RunCompleted(s_run, s_player, Difficulty.Extreme, 7.5m, s_at, "https://howlongtobeat.com/game/1", true, AfterFinish: true, FreeMode: true),
             1,
-            """{"runId":"00000000-0000-0000-0000-000000000001","playerId":"10000000-0000-0000-0000-000000000001","difficulty":"extreme","hours":7.5,"completedAt":"2026-10-01T12:30:00+00:00","hoursSource":"https://howlongtobeat.com/game/1","challengeDone":true}"""
+            """{"runId":"00000000-0000-0000-0000-000000000001","playerId":"10000000-0000-0000-0000-000000000001","difficulty":"extreme","hours":7.5,"completedAt":"2026-10-01T12:30:00+00:00","hoursSource":"https://howlongtobeat.com/game/1","challengeDone":true,"afterFinish":true,"freeMode":true}"""
         },
         {
             "completion-rolled",

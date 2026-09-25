@@ -592,10 +592,14 @@ public class PlayerAdminInvariantTests
             Assert.Equal(MovedCells(s.Log, run.RunId), run.Moved);
             Assert.True(run.Moved >= 0, $"The run moved {run.Moved} cells.");
 
-            // A reduction absorbed by a finisher's surplus (Q-3) leaves the cells where they are: only then can a run's
-            // cells exceed its dice
+            // A run's cells exceed its dice only when a later reduction could not take them back: absorbed by a finisher's
+            // surplus (Q-3), ignored for a frozen first (D-99) — they stay after a later revoke — or blocked at the start
+            // after the admin transferred the token back (D-98 moves only through entered cells)
+            var detached = s.Log.Any(e =>
+                (e is PlayerFinished f && f.PlayerId == run.PlayerId)
+                || (e is PlayerMoved { Reason: MoveReason.AdminAdjustment } m && m.PlayerId == run.PlayerId));
             Assert.True(
-                IsUpToFinish(s.State, run) || run.Moved <= run.Dice.Concat(run.ChallengeDice).Sum(d => d.Value),
+                detached || run.Moved <= run.Dice.Concat(run.ChallengeDice).Sum(d => d.Value),
                 $"The run moved {run.Moved} cells for fewer dice.");
         }
     }
@@ -651,12 +655,16 @@ public class PlayerAdminInvariantTests
             }
         }
 
-        // A standing finish links to a completed run of the player
+        // A standing finish links to a completed run of the player. The one exception is open (D-99 decides corrections
+        // only): a first frozen at once without required approval keeps his final place when that run is rejected
         foreach (var p in standing)
         {
             var run = s.State.Runs[p.Finish!.RunId];
             Assert.Equal(p.PlayerId, run.PlayerId);
-            Assert.Equal(RunStatus.Completed, run.Status);
+            Assert.True(
+                run.Status == RunStatus.Completed
+                    || (run.Status == RunStatus.Rejected && p.Finish.Frozen && !s.Ruleset.Finish.RequireApprovalForFirst),
+                $"{p.Name}'s finish stands on a {run.Status} run.");
         }
 
         if (!s.Last.IsAccepted)
@@ -1384,7 +1392,11 @@ public class PlayerAdminInvariantTests
             }
             else if (IsUpToFinish(before, run))
             {
-                CheckFinishPosition(events, before, was, run.RunId, diff, MoveReason.RunCorrection);
+                // An earlier (not finishing) run can only lose the cells it really moved beyond its new dice (D-99)
+                var corrected = s.State.Runs[run.RunId];
+                var correctedSum = corrected.Dice.Concat(corrected.ChallengeDice).Sum(d => d.Value);
+                var lost = diff < 0 && was.Finish.RunId != run.RunId ? -Math.Max(0, run.Moved - correctedSum) : diff;
+                CheckFinishPosition(events, before, was, run.RunId, lost, MoveReason.RunCorrection);
             }
             else
             {
@@ -1705,10 +1717,19 @@ public class PlayerAdminInvariantTests
                 events.OfType<PlayerMoved>());
             Assert.DoesNotContain(all, e => e is PlayerFinishRevoked or FinishSurplusChanged);
         }
+        else if (open && !all.OfType<PlayerFinishRevoked>().Any())
+        {
+            // Without required approval the frozen first's run up to the finish can be rejected; whether his place stays
+            // final then is open (D-99 decides it for corrections only): kept — nothing moves
+            Assert.DoesNotContain(all, e => e is PlayerMoved or FinishSurplusChanged);
+        }
         else if (upToFinish)
         {
             // Q-3: the run's steps come off the position: within the surplus the finish stands, beyond it it goes
-            CheckFinishPosition(all, before, was, run.RunId, -run.Dice.Concat(run.ChallengeDice).Sum(d => d.Value), MoveReason.ProofRejected);
+            // The finishing run takes back its dice (its cells plus the steps it burned); an earlier run only the cells it
+            // really moved (D-99)
+            var taken = was.Finish!.RunId == run.RunId ? run.Dice.Concat(run.ChallengeDice).Sum(d => d.Value) : run.Moved;
+            CheckFinishPosition(all, before, was, run.RunId, -taken, MoveReason.ProofRejected);
         }
         else
         {

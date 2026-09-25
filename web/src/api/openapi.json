@@ -3367,7 +3367,8 @@
           "witnessName",
           "difficulty",
           "hours",
-          "diceTotal"
+          "diceTotal",
+          "decidesFinish"
         ],
         "type": "object",
         "properties": {
@@ -3443,9 +3444,12 @@
           "diceTotal": {
             "type": "integer",
             "format": "int32"
+          },
+          "decidesFinish": {
+            "type": "boolean"
           }
         },
-        "description": "A run to check, in queue order (D-98): finishes on top, then by completion time; with the claimed difficulty, the\ncounted hours and the dice total, what an approval at a lower difficulty or a reject changes."
+        "description": "A run to check, in queue order (D-98, Q-3): the runs that decide a finish on top (`decidesFinish`), then by\ncompletion time; with the claimed difficulty, the counted hours and the dice total, what an approval at a lower\ndifficulty or a reject changes. `reachedFinish`: this run's latest move stands on the finish."
       },
       "ProofRequest": {
         "required": [
@@ -3635,7 +3639,8 @@
           "freeThisRoll",
           "freeRerollResource",
           "coins",
-          "badEvent"
+          "badEvent",
+          "freeMode"
         ],
         "description": "How a reroll was paid for."
       },

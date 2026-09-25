@@ -86,7 +86,17 @@ internal static class RunLifecycle
 
         var events = new List<IGameEvent>
         {
-            new RunCompleted(run.RunId, player.PlayerId, command.Difficulty, hours.Value, now, source, command.ChallengeDone),
+            // Whether the run comes after the finish or in the first's free mode is stored, not recomputed on replay (D-99).
+            new RunCompleted(
+                run.RunId,
+                player.PlayerId,
+                command.Difficulty,
+                hours.Value,
+                now,
+                source,
+                command.ChallengeDone,
+                AfterFinish: player.Finish is not null,
+                FreeMode: player.Finish is not null && FinishLine.First(state) == player.PlayerId),
             new CompletionRolled(run.RunId, player.PlayerId, dice, challengeDice),
         };
 
@@ -115,11 +125,6 @@ internal static class RunLifecycle
             events.Add(moved);
         }
 
-        if (moved is not null)
-        {
-            events.AddRange(Finishes.AfterCompletionMove(events.Aggregate(state, SeasonEngine.Apply), player, run, moved, now));
-        }
-
         // Coins by the counted hours, from the rules fixed at the roll (Q-2, D-96), up to the hours the dice top out at:
         // a player's estimate cannot mint coins without limit.
         if (run.Snapshot.Coins is { } reward)
@@ -134,6 +139,12 @@ internal static class RunLifecycle
         if (die.GrantEvent is { } granted)
         {
             events.Add(new ManualEffectCreated(context.Ids.NewId(), player.PlayerId, granted, ManualEffectSource.Difficulty, run.RunId));
+        }
+
+        // The finish comes after the run's own rewards, so a first frozen at once is frozen after them (D-99).
+        if (moved is not null)
+        {
+            events.AddRange(Finishes.AfterCompletionMove(events.Aggregate(state, SeasonEngine.Apply), player, run, moved, now));
         }
 
         if (command.Review is { } given)
@@ -209,7 +220,6 @@ internal static class RunLifecycle
 
     public static SeasonState Apply(SeasonState state, RunCompleted e)
     {
-        var finished = state.Players[e.PlayerId].Finish is not null;
         var run = state.Runs[e.RunId] with
         {
             Status = RunStatus.Completed,
@@ -217,8 +227,8 @@ internal static class RunLifecycle
             Hours = e.Hours,
             HoursSource = e.HoursSource,
             CompletedAt = e.CompletedAt,
-            AfterFinish = finished,
-            FreeMode = finished && FinishLine.First(state) == e.PlayerId,
+            AfterFinish = e.AfterFinish,
+            FreeMode = e.FreeMode,
         };
         var player = state.Players[e.PlayerId] with { Phase = TurnPhase.Idle, ActiveRunId = null };
         return state with { Runs = state.Runs.SetItem(e.RunId, run), Players = state.Players.SetItem(e.PlayerId, player) };

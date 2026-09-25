@@ -415,7 +415,7 @@ public static class SeasonEndpoints
                 .OrderBy(x => x.Id)
                 .Select(x => new ManualEffectView(x.Id, x.DrawEvent, x.Source))
                 .ToListAsync(ct);
-            var price = RerollPrice.Next(mine.RerollsThisRoll, coupons, rules.Roll);
+            var price = mine.Frozen ? (Payment: RerollPayment.FreeMode, Coins: 0) : RerollPrice.Next(mine.RerollsThisRoll, coupons, rules.Roll);
             var now = clock.UtcNow;
 
             // Other players' drops and tech rerolls of the offered games (SPEC «Статусы игры в сезоне»: a mark).
@@ -449,8 +449,14 @@ public static class SeasonEndpoints
                 last is null ? null : Completed(last, games[last.GameId], lastReview, lastProof),
                 effects,
                 playing && played < TimeSpan.FromMinutes(rules.Roll.MinPlayMinutesBeforeDrop) ? rules.Roll.MinPlayMinutesBeforeDrop : null,
-                playing
-                    ? new DropPenaltyView(drop.PenaltyDice.Count, drop.PenaltyDice.Sides, drop.AffectsPoints, drop.AffectsPosition, drop.MandatoryEvent == MandatoryEvent.Bad)
+                // The frozen first drops with no penalty; a finisher's position is fixed (D-99).
+                playing && !mine.Frozen
+                    ? new DropPenaltyView(
+                        drop.PenaltyDice.Count,
+                        drop.PenaltyDice.Sides,
+                        drop.AffectsPoints,
+                        drop.AffectsPosition && mine.FinishOrder is null,
+                        drop.MandatoryEvent == MandatoryEvent.Bad)
                     : null,
                 playing && now - run!.RolledAt <= TimeSpan.FromHours(snapshot!.TechRerollWindowHours),
                 rules.Features.Challenges,

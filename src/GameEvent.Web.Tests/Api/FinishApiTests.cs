@@ -77,6 +77,73 @@ public sealed class FinishApiTests : IAsyncLifetime
 
     // ---- Helpers ----
 
+    // ---- The turn of a finisher (D-99) ----
+
+    [Fact]
+    public async Task Frozen_first_rerolls_in_free_mode_and_has_no_drop_penalty()
+    {
+        // Вася finishes, the admin approves: frozen. His next reroll is free («freeMode», 0 coins), his drop costs nothing
+        var vasya = await _site.SignedInAsync("vasya");
+        var runId = await FinishAsync(vasya, "vasya");
+        var admin = await _site.SignedInAsync("admin");
+        await PostOkAsync(admin, $"/api/admin/seasons/{SiteFactory.SeasonId}/runs/{runId}/approve", new { commandId = Guid.NewGuid(), comment = "Видел на стриме" });
+
+        await PostOkAsync(vasya, Url("roll"), new { commandId = Guid.NewGuid() });
+        var rolling = (await SeasonJsonAsync(vasya)).GetProperty("me");
+        var next = rolling.GetProperty("nextReroll");
+        Assert.Equal(("freeMode", 0), (next.GetProperty("payment").GetString(), next.GetProperty("coins").GetInt32()));
+
+        await PostOkAsync(vasya, Url("start"), new { commandId = Guid.NewGuid() });
+        var playing = (await SeasonJsonAsync(vasya)).GetProperty("me");
+        Assert.Equal("playing", playing.GetProperty("phase").GetString());
+        Assert.Equal(JsonValueKind.Null, playing.GetProperty("dropPenalty").ValueKind);
+    }
+
+    [Fact]
+    public async Task Later_finisher_drop_penalty_does_not_affect_the_position()
+    {
+        var vasya = await _site.SignedInAsync("vasya");
+        var petya = await _site.SignedInAsync("petya");
+        await FinishAsync(vasya, "vasya");
+        await FinishAsync(petya, "petya");
+
+        await PostOkAsync(petya, Url("roll"), new { commandId = Guid.NewGuid() });
+        await PostOkAsync(petya, Url("start"), new { commandId = Guid.NewGuid() });
+
+        var penalty = (await SeasonJsonAsync(petya)).GetProperty("me").GetProperty("dropPenalty");
+        Assert.Equal(JsonValueKind.Object, penalty.ValueKind);
+        Assert.False(penalty.GetProperty("affectsPosition").GetBoolean());
+        Assert.True(penalty.GetProperty("affectsPoints").GetBoolean());
+    }
+
+    [Fact]
+    public async Task Proof_queue_marks_the_runs_that_decide_a_finish()
+    {
+        // Вася: run A from the start (not a finish), then run B from the cell before the finish — both decide his finish;
+        // Петя's run from the start decides nothing
+        var vasya = await _site.SignedInAsync("vasya");
+        var petya = await _site.SignedInAsync("petya");
+        var runA = await CompleteAsync(vasya);
+        var runB = await FinishAsync(vasya, "vasya");
+        var petyaRun = await CompleteAsync(petya);
+        var admin = await _site.SignedInAsync("admin");
+
+        using var queue = JsonDocument.Parse(await admin.GetStringAsync($"/api/admin/seasons/{SiteFactory.SeasonId}/proofs", Ct));
+
+        var decides = queue.RootElement.EnumerateArray().ToDictionary(i => i.GetProperty("runId").GetGuid(), i => i.GetProperty("decidesFinish").GetBoolean());
+        Assert.Equal([runA, runB, petyaRun], decides.Keys);
+        Assert.Equal([true, true, false], decides.Values);
+    }
+
+    private async Task<Guid> CompleteAsync(HttpClient client)
+    {
+        await PostOkAsync(client, Url("roll"), new { commandId = Guid.NewGuid() });
+        await PostOkAsync(client, Url("start"), new { commandId = Guid.NewGuid() });
+        await PostOkAsync(client, Url("complete"), new { commandId = Guid.NewGuid(), difficulty = "normal" });
+        _site.Clock.UtcNow = _site.Clock.UtcNow.AddHours(1);
+        return Guid.Parse((await SeasonJsonAsync(client)).GetProperty("me").GetProperty("lastCompleted").GetProperty("id").GetString()!);
+    }
+
     /// <summary>The admin puts the player one cell before the finish; the player rolls, starts and completes.</summary>
     private async Task<Guid> FinishAsync(HttpClient client, string login)
     {
