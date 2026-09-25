@@ -86,8 +86,21 @@ function json(status: number, body: unknown) {
 
 type Handler = (request: Request) => Response | Promise<Response>;
 
+// The avatar section (D-117) asks for the account itself; the cases here are about the season, so it has none
+const isAccountGet = (r: Request) => r.method === 'GET' && r.url.endsWith('/api/auth/me');
+const account = {
+  id: 'u',
+  login: 'vasya',
+  name: 'Вася',
+  role: 'player',
+  mustChangePassword: false,
+  avatar: null,
+};
+
 function serve(handler: Handler) {
-  const fetch = vi.fn((request: Request) => Promise.resolve(handler(request)));
+  const fetch = vi.fn((request: Request) =>
+    Promise.resolve(isAccountGet(request) ? json(200, account) : handler(request)),
+  );
   vi.stubGlobal('fetch', fetch);
   return fetch;
 }
