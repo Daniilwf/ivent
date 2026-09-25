@@ -22,6 +22,8 @@ public sealed partial class CommandProcessor
         {
             IAccountCommand account => await DecideAccountAsync(db, account, now, ct),
             Files.RecordFile file => await DecideFileAsync(db, file, now, ct),
+            Pool.AddGame or Pool.ChangeGame or Pool.DeleteGame or Pool.RestoreGame or Pool.SetCategory or Pool.RemoveCategory
+                => await DecidePoolAsync(db, command, now, ct),
             _ => throw new InvalidOperationException($"No rules for the global command {commandType}."),
         };
         if (rejection is not null)

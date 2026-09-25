@@ -155,6 +155,8 @@ public sealed class GameEventDbContext(DbContextOptions<GameEventDbContext> opti
         {
             e.ToTable("Game");
             e.Property(x => x.Title).HasMaxLength(300);
+            e.Property(x => x.SteamAppId).HasMaxLength(12);
+            e.Property(x => x.Note).HasMaxLength(1000);
         });
 
         modelBuilder.Entity<CategoryRecord>(e =>

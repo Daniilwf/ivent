@@ -3,6 +3,7 @@ using GameEvent.Engine.Finish;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Map;
 using GameEvent.Engine.Players;
+using GameEvent.Engine.Pool;
 using GameEvent.Engine.Proofs;
 using GameEvent.Engine.Ranking;
 using GameEvent.Engine.Rolls;
@@ -296,6 +297,45 @@ public class EventFormatTests
             new FinishBonusRulesRefreshed(3, new FinishBonusRules([20, 15], 2)),
             1,
             """{"rulesetVersion":3,"rules":{"byOrder":[20,15],"afterList":2}}"""
+        },
+        {
+            "game-added",
+            new GameAdded(
+                Guid.Parse("20000000-0000-0000-0000-000000000001"),
+                new GameCard("Silent Hill 2", ["Horror", "Classic"], 12.5m, 2001, "2124490", Guid.Parse("50000000-0000-0000-0000-000000000001"), "Концовка любая", IsCoop: false),
+                s_user),
+            1,
+            """{"gameId":"20000000-0000-0000-0000-000000000001","card":{"title":"Silent Hill 2","tags":["Horror","Classic"],"hours":12.5,"year":2001,"steamAppId":"2124490","coverFileId":"50000000-0000-0000-0000-000000000001","note":"Концовка любая","isCoop":false},"authorId":"40000000-0000-0000-0000-000000000001"}"""
+        },
+        {
+            "game-changed",
+            new GameChanged(Guid.Parse("20000000-0000-0000-0000-000000000001"), new GameCard("Portal", ["Puzzle"], null, null, null, null, null, IsCoop: true)),
+            1,
+            """{"gameId":"20000000-0000-0000-0000-000000000001","card":{"title":"Portal","tags":["Puzzle"],"hours":null,"year":null,"steamAppId":null,"coverFileId":null,"note":null,"isCoop":true}}"""
+        },
+        {
+            "game-deleted",
+            new GameDeleted(Guid.Parse("20000000-0000-0000-0000-000000000001")),
+            1,
+            """{"gameId":"20000000-0000-0000-0000-000000000001"}"""
+        },
+        {
+            "game-restored",
+            new GameRestored(Guid.Parse("20000000-0000-0000-0000-000000000001")),
+            1,
+            """{"gameId":"20000000-0000-0000-0000-000000000001"}"""
+        },
+        {
+            "category-set",
+            new CategorySet("Horror", 3),
+            1,
+            """{"name":"Horror","weight":3}"""
+        },
+        {
+            "category-removed",
+            new CategoryRemoved("Horror"),
+            1,
+            """{"name":"Horror"}"""
         },
         {
             "account-avatar-changed",

@@ -2,6 +2,7 @@ using FsCheck.Xunit;
 using GameEvent.Engine.Effects;
 using GameEvent.Engine.Finish;
 using GameEvent.Engine.Kernel;
+using GameEvent.Engine.Pool;
 using GameEvent.Engine.Map;
 using GameEvent.Engine.Players;
 using GameEvent.Engine.Proofs;
@@ -394,6 +395,9 @@ public partial class PlayerAdminInvariantTests
                 // Accounts (D8, D-106) and stored files (D4a, D-108) are the site's, not a season mechanic
                 or Accounts.AccountCreated or Accounts.AccountPasswordReset or Accounts.AccountPasswordChanged
                 or Accounts.AccountChanged or Accounts.AccountDeleted or Accounts.AccountRestored or Accounts.AccountAvatarChanged
+
+                // The pool lives across seasons (D-119)
+                or GameAdded or GameChanged or GameDeleted or GameRestored or CategorySet or CategoryRemoved
                 or Files.FileStored => null,
             _ => throw new Xunit.Sdk.XunitException($"{e.GetType().Name} is not mapped to a mechanic: add it to the core or to its feature flag."),
         };
