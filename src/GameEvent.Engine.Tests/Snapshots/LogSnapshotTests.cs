@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using GameEvent.Engine.Effects;
 using GameEvent.Engine.Kernel;
@@ -32,6 +33,21 @@ public class LogSnapshotTests
 
     /// <summary>One block per command: its name, then each event in the stored form.</summary>
     private static string Render(Scenario s)
+    {
+        // A record prints its dates and numbers in the current culture: the snapshot must read the same on every machine
+        var culture = CultureInfo.CurrentCulture;
+        CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
+        try
+        {
+            return RenderInvariant(s);
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = culture;
+        }
+    }
+
+    private static string RenderInvariant(Scenario s)
     {
         var text = new StringBuilder();
         for (var i = 0; i < s.History.Count; i++)
