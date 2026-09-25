@@ -127,7 +127,7 @@ internal static class SeasonProjection
             var record = await db.Runs.FindAsync([id], ct);
             if (record is null)
             {
-                record = new RunRecord { Id = id, SeasonId = after.SeasonId, SnapshotJson = "", DiceJson = "" };
+                record = new RunRecord { Id = id, SeasonId = after.SeasonId, SnapshotJson = "", DiceJson = "", ChallengeDiceJson = "" };
                 db.Runs.Add(record);
             }
 
@@ -142,6 +142,22 @@ internal static class SeasonProjection
             record.Difficulty = run.Difficulty;
             record.Hours = run.Hours;
             record.DiceJson = JsonSerializer.Serialize(run.Dice, EngineJson.Options);
+            record.ChallengeDiceJson = JsonSerializer.Serialize(run.ChallengeDice, EngineJson.Options);
+            record.HoursSource = run.HoursSource;
+
+            var oldRun = before.Runs.GetValueOrDefault(id);
+            if (run.Review is { } review && review != oldRun?.Review)
+            {
+                var row = await db.Reviews.FindAsync([id], ct);
+                if (row is null)
+                {
+                    row = new ReviewRecord { RunId = id, SeasonId = after.SeasonId, PlayerId = run.PlayerId, GameId = run.GameId };
+                    db.Reviews.Add(row);
+                }
+
+                row.Rating = review.Rating;
+                row.Text = review.Text;
+            }
         }
 
         // Manual effects are only created so far; resolving them (C11) will update these rows.
@@ -178,6 +194,7 @@ internal static class SeasonProjection
         var players = await db.SeasonPlayers.AsNoTracking().Where(p => p.SeasonId == replayed.SeasonId).ToListAsync(ct);
         var runs = await db.Runs.AsNoTracking().Where(r => r.SeasonId == replayed.SeasonId).ToListAsync(ct);
         var effects = await db.ManualEffects.AsNoTracking().Where(x => x.SeasonId == replayed.SeasonId).ToListAsync(ct);
+        var reviews = await db.Reviews.AsNoTracking().Where(x => x.SeasonId == replayed.SeasonId).ToDictionaryAsync(x => x.RunId, ct);
         var playerIds = players.Select(p => p.Id).ToList();
         var exclusions = (await db.Exclusions.AsNoTracking().Where(x => playerIds.Contains(x.PlayerId)).ToListAsync(ct))
             .ToLookup(x => x.PlayerId);
@@ -206,7 +223,10 @@ internal static class SeasonProjection
                     r.Id, r.PlayerId, r.GameId, r.Status,
                     JsonSerializer.Deserialize<RunSnapshot>(r.SnapshotJson, EngineJson.Options)!,
                     r.RolledAt, r.StartedAt, r.Difficulty, r.Hours,
-                    JsonSerializer.Deserialize<EquatableArray<Die>>(r.DiceJson, EngineJson.Options))),
+                    JsonSerializer.Deserialize<EquatableArray<Die>>(r.DiceJson, EngineJson.Options),
+                    JsonSerializer.Deserialize<EquatableArray<Die>>(r.ChallengeDiceJson, EngineJson.Options),
+                    r.HoursSource,
+                    reviews.TryGetValue(r.Id, out var review) ? new RunReview(review.Rating, review.Text) : null)),
             ManualEffects = effects.ToImmutableSortedDictionary(
                 x => x.Id,
                 x => new PendingManualEffect(x.Id, x.PlayerId, x.DrawEvent, x.Source, x.RunId)),

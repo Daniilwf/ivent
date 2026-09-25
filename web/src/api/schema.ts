@@ -914,6 +914,93 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/seasons/{seasonId}/runs/{runId}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                    runId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ReviewRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CommandResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/seasons/current": {
         parameters: {
             query?: never;
@@ -1437,15 +1524,20 @@ export interface components {
             duplicate: boolean;
             events: components["schemas"]["LoggedEventView"][];
         };
-        /** @description The player's latest completed run with its dice, each die separately. */
+        /**
+         * @description The player's latest completed run: dice by the hours and the challenge dice apart, each die separately; the total
+         *     counts both; the review when there is one.
+         */
         CompletedRunView: {
             /** Format: uuid */
             id: string;
             game: components["schemas"]["GameView"];
             difficulty: components["schemas"]["Difficulty"];
             dice: components["schemas"]["DieView"][];
+            challengeDice: components["schemas"]["DieView"][];
             /** Format: int32 */
             total: number;
+            review: null | components["schemas"]["ReviewView"];
         };
         /** @description Completing the active run. `estimatedHours` is needed only when the game has no hours. */
         CompleteRequest: {
@@ -1454,6 +1546,10 @@ export interface components {
             difficulty: components["schemas"]["Difficulty"];
             /** Format: double */
             estimatedHours?: null | number;
+            hoursSource?: null | string;
+            /** @default false */
+            challengeDone: boolean;
+            review?: null | components["schemas"]["ReviewInput"];
         };
         /** @description An admin comment on a change to a player's runs; required, the log shows it. */
         ConvertToDropRequest: {
@@ -1603,6 +1699,11 @@ export interface components {
             reactions: boolean;
             comments: boolean;
             gallery: boolean;
+            /**
+             * @description Claiming a game's challenge on completion (D-96). Off until games carry a challenge note and the proof checks it;
+             *     optional, so older configs without it still read.
+             */
+            challenges?: boolean;
         };
         FinishRules: {
             requireApprovalForFirst: boolean;
@@ -1663,7 +1764,7 @@ export interface components {
          * @description What created a manual effect; C11 adds item, cell and event sources.
          * @enum {unknown}
          */
-        ManualEffectSource: "paidReroll" | "drop";
+        ManualEffectSource: "paidReroll" | "drop" | "difficulty";
         /** @description A manual effect the player still has to play out (D-10, D-93); resolving it comes with C11. */
         ManualEffectView: {
             /** Format: uuid */
@@ -1680,7 +1781,8 @@ export interface components {
         /**
          * @description The signed-in player's own turn. While playing: `dropHintMinutes` is `roll.minPlayMinutesBeforeDrop` until
          *     that much has been played by the server clock (only a hint: D-09), then null; `dropPenalty` is what a drop costs
-         *     under the rules in force; `techRerollOpen` says whether the player may still tech-reroll themselves (D-94).
+         *     under the rules in force; `techRerollOpen` says whether the player may still tech-reroll themselves (D-94);
+         *     `challengesEnabled` says whether a challenge may be claimed on completion (`features.challenges`, D-96).
          */
         MyTurnView: {
             /** Format: uuid */
@@ -1696,6 +1798,7 @@ export interface components {
             dropHintMinutes: null | number;
             dropPenalty: null | components["schemas"]["DropPenaltyView"];
             techRerollOpen: boolean;
+            challengesEnabled: boolean;
         };
         NominationRules: {
             auto: components["schemas"]["EquatableArrayOfAutoNomination"];
@@ -1786,6 +1889,25 @@ export interface components {
         RerollRequest: {
             /** Format: uuid */
             commandId: string;
+        };
+        /** @description A review: a rating 1–10 and an optional text (D-96). */
+        ReviewInput: {
+            /** Format: int32 */
+            rating: number;
+            text?: null | string;
+        };
+        /** @description A review of the player's own completed run, written later or changed. */
+        ReviewRequest: {
+            /** Format: uuid */
+            commandId: string;
+            /** Format: int32 */
+            rating: number;
+            text?: null | string;
+        };
+        ReviewView: {
+            /** Format: int32 */
+            rating: number;
+            text: null | string;
         };
         RewardRules: {
             diceCount: components["schemas"]["DiceCountRule"];
@@ -1985,7 +2107,7 @@ export const emptyPoolFallbackValues: ReadonlyArray<FlattenedDeepRequired<compon
 export const eventKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["EventKind"]> = ["good", "bad"];
 export const gameMarkKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["GameMarkKind"]> = ["dropped", "techRerolled"];
 export const mandatoryEventValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["MandatoryEvent"]> = ["bad", "none"];
-export const manualEffectSourceValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ManualEffectSource"]> = ["paidReroll", "drop"];
+export const manualEffectSourceValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ManualEffectSource"]> = ["paidReroll", "drop", "difficulty"];
 export const mapModeValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["MapMode"]> = ["linear", "graph"];
 export const rerollCostKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["RerollCostKind"]> = ["coins", "badEvent"];
 export const rerollPaymentValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["RerollPayment"]> = ["freeThisRoll", "freeRerollResource", "coins", "badEvent"];

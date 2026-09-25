@@ -45,8 +45,12 @@ test('slice: roll → start → complete moves the token, and another browser se
   await expect(player.getByTestId('offer')).toBeVisible();
   await player.getByTestId('start').click();
   await expect(player.getByTestId('active-run')).toBeVisible();
+  // A game without pool hours needs an estimate with its source (D-96)
   const hours = player.getByTestId('complete-hours');
-  if (await hours.isVisible()) await hours.fill('5');
+  if (await hours.isVisible()) {
+    await hours.fill('5');
+    await player.getByTestId('complete-hours-source').fill('HowLongToBeat');
+  }
   await player.getByTestId('complete-difficulty').selectOption('normal');
   await player.getByTestId('complete-submit').click();
 

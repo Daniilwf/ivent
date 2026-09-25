@@ -419,6 +419,62 @@ public class CommandQueueTests
         Assert.Equal(after.Players[s_vasya].Points, (await final.SeasonPlayers.AsNoTracking().SingleAsync(ct)).Points);
     }
 
+    [Fact]
+    public async Task Projection_of_challenge_dice_hours_source_coins_and_reviews_equals_the_fold_of_the_log()
+    {
+        await using var h = await QueueHarness.StartAsync();
+        var ct = TestContext.Current.CancellationToken;
+        const string Source = "https://howlongtobeat.com/game/2231";
+        var rules = RulesetJson.Default();
+        await AcceptedAsync(h, new CreateSeason(s_season, "Осень", rules with { Features = rules.Features with { Challenges = true } }));
+        await AcceptedAsync(h, new ChangeSeasonStatus(SeasonStatus.Active));
+        await AcceptedAsync(h, new AddSeasonPlayer(s_vasya, s_vasya, "Вася"));
+
+        // Given the pool knows no hours, so the completion carries an estimate with its source (D-96)
+        await using (var db = h.NewDb())
+        {
+            await db.Games.ExecuteUpdateAsync(g => g.SetProperty(x => x.Hours, (decimal?)null), ct);
+        }
+
+        // When Вася completes on «выше сложной» with the challenge and a review
+        await AcceptedAsync(h, new RollGame(s_vasya));
+        await AcceptedAsync(h, new StartRun(s_vasya));
+        await AcceptedAsync(h, new CompleteRun(
+            s_vasya, Difficulty.Extreme, EstimatedHours: 6, HoursSource: Source, ChallengeDone: true, Review: new RunReview(8, "Страшно")));
+
+        // Then the projection equals the fold: challenge dice apart, the source, coins, the good event and the review row
+        var state = await AssertProjectionEqualsReplayAsync(h, ct);
+        var run = Assert.Single(state.Runs.Values);
+        Assert.Single(run.ChallengeDice); // default ruleset: challengeBonus.extraDice 1
+        Assert.Equal(Source, run.HoursSource);
+        Assert.Equal(new RunReview(8, "Страшно"), run.Review);
+        Assert.Equal(6, state.Players[s_vasya].Coins); // default ruleset: 1 coin per hour, min 3
+        await using (var db = h.NewDb())
+        {
+            var runRow = await db.Runs.AsNoTracking().SingleAsync(ct);
+            Assert.Equal(Source, runRow.HoursSource);
+            Assert.NotEqual("[]", runRow.ChallengeDiceJson);
+            var review = Assert.Single(await db.Reviews.AsNoTracking().ToListAsync(ct));
+            Assert.Equal(
+                (run.RunId, s_season, s_vasya, run.GameId, 8, (string?)"Страшно"),
+                (review.RunId, review.SeasonId, review.PlayerId, review.GameId, review.Rating, review.Text));
+            Assert.Equal(6, (await db.SeasonPlayers.AsNoTracking().SingleAsync(ct)).Coins);
+            var effect = Assert.Single(await db.ManualEffects.AsNoTracking().ToListAsync(ct));
+            Assert.Equal((EventKind.Good, ManualEffectSource.Difficulty, (Guid?)run.RunId), (effect.DrawEvent, effect.Source, effect.RunId));
+        }
+
+        // When, after a restart, he changes the review and drops the text
+        await h.RestartAsync();
+        await AcceptedAsync(h, new ReviewRun(s_vasya, run.RunId, new RunReview(3, null)));
+
+        // Then the one review row is replaced, not duplicated
+        var after = await AssertProjectionEqualsReplayAsync(h, ct);
+        Assert.Equal(new RunReview(3, null), after.Runs[run.RunId].Review);
+        await using var final = h.NewDb();
+        var replaced = Assert.Single(await final.Reviews.AsNoTracking().ToListAsync(ct));
+        Assert.Equal((3, (string?)null), (replaced.Rating, replaced.Text));
+    }
+
     private static Guid OfferedIn(Infrastructure.Queue.CommandOutcome outcome) =>
         outcome.Events.Select(e => e.Event).OfType<GameRolled>().Single().GameId;
 

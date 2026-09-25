@@ -74,6 +74,12 @@ public sealed record Features
     public required bool Comments { get; init; }
 
     public required bool Gallery { get; init; }
+
+    /// <summary>
+    /// Claiming a game's challenge on completion (D-96). Off until games carry a challenge note and the proof checks it;
+    /// optional, so older configs without it still read.
+    /// </summary>
+    public bool Challenges { get; init; }
 }
 
 public sealed record SeasonRules

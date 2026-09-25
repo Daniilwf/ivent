@@ -11,6 +11,9 @@ public enum ManualEffectSource
 
     /// <summary>The mandatory bad event of a drop (<c>drop.mandatoryEvent = bad</c>), also after a converted tech reroll.</summary>
     Drop,
+
+    /// <summary>The event a difficulty grants on completion (<c>dieByDifficulty.*.grantEvent</c>: «выше сложной» — good).</summary>
+    Difficulty,
 }
 
 /// <summary>

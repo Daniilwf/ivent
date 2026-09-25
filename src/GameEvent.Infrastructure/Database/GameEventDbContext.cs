@@ -22,6 +22,8 @@ public sealed class GameEventDbContext(DbContextOptions<GameEventDbContext> opti
 
     public DbSet<PendingManualEffectRecord> ManualEffects => Set<PendingManualEffectRecord>();
 
+    public DbSet<ReviewRecord> Reviews => Set<ReviewRecord>();
+
     public DbSet<RunRecord> Runs => Set<RunRecord>();
 
     public DbSet<GameRecord> Games => Set<GameRecord>();
@@ -97,6 +99,16 @@ public sealed class GameEventDbContext(DbContextOptions<GameEventDbContext> opti
             e.HasIndex(x => new { x.SeasonId, x.PlayerId });
             e.Property(x => x.DrawEvent).HasMaxLength(20);
             e.Property(x => x.Source).HasMaxLength(30);
+        });
+
+        modelBuilder.Entity<ReviewRecord>(e =>
+        {
+            e.ToTable("Review");
+            e.HasKey(x => x.RunId);
+            e.HasOne<RunRecord>().WithMany().HasForeignKey(x => x.RunId);
+            e.HasOne<SeasonRecord>().WithMany().HasForeignKey(x => x.SeasonId);
+            e.HasIndex(x => x.GameId);
+            e.HasIndex(x => x.PlayerId);
         });
 
         modelBuilder.Entity<RunRecord>(e =>

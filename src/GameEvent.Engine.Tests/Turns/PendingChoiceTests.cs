@@ -41,7 +41,9 @@ public class PendingChoiceTests
     private static Scenario Horror(params string[] games) => Horror(3, seed: 42, games);
 
     private static RunSnapshot SnapshotFor(Scenario s, decimal? hours) =>
-        new(s.Ruleset.Version, hours, s.Ruleset.Reward.DiceCount, s.Ruleset.Reward.DieByDifficulty, s.Ruleset.Roll.TechRerollWindowHours);
+        new(
+            s.Ruleset.Version, hours, s.Ruleset.Reward.DiceCount, s.Ruleset.Reward.DieByDifficulty, s.Ruleset.Roll.TechRerollWindowHours,
+            s.Ruleset.Reward.ChallengeBonus.ExtraDice, s.Ruleset.Reward.Coins);
 
     private static string OptionId(Scenario s, string title) => s.GameId(title).ToString("N");
 

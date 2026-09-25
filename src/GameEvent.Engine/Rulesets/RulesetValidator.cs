@@ -20,6 +20,7 @@ public static class RulesetValidator
     private const int MaxDice = 1_000;
     private const int MaxSides = 1_000;
     private const int MaxChoiceCount = 20;
+    private const int MaxCoins = 1_000_000;
 
     public static IReadOnlyList<RulesetError> Validate(Ruleset ruleset)
     {
@@ -113,7 +114,13 @@ public static class RulesetValidator
             Error("reward.coins.perHour", "must not be negative");
         }
 
+        if (ruleset.Reward.Coins.PerHour > MaxCoins)
+        {
+            Error("reward.coins.perHour", $"must not exceed {MaxCoins}");
+        }
+
         NotNegative("reward.coins.min", ruleset.Reward.Coins.Min);
+        AtMost("reward.coins.min", ruleset.Reward.Coins.Min, MaxCoins);
 
         var reroll = ruleset.Roll.RerollCost;
         switch (reroll.Kind)

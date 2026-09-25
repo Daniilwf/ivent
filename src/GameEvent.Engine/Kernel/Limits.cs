@@ -5,4 +5,10 @@ public static class Limits
 {
     /// <summary>A comment in the public log: admin changes, tech reroll reasons.</summary>
     public const int MaxCommentLength = 500;
+
+    /// <summary>The text of a review.</summary>
+    public const int MaxReviewLength = 2000;
+
+    /// <summary>Where an hours estimate comes from: a link or a short note.</summary>
+    public const int MaxHoursSourceLength = 300;
 }

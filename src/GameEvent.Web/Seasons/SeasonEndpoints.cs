@@ -45,7 +45,19 @@ public sealed record AlreadyPlayedRequest(Guid CommandId, Guid GameId);
 public sealed record ChooseRequest(Guid CommandId, Guid ChoiceId, string OptionId);
 
 /// <summary>Completing the active run. <c>estimatedHours</c> is needed only when the game has no hours.</summary>
-public sealed record CompleteRequest(Guid CommandId, Difficulty Difficulty, decimal? EstimatedHours = null);
+public sealed record CompleteRequest(
+    Guid CommandId,
+    Difficulty Difficulty,
+    decimal? EstimatedHours = null,
+    string? HoursSource = null,
+    bool ChallengeDone = false,
+    ReviewInput? Review = null);
+
+/// <summary>A review: a rating 1–10 and an optional text (D-96).</summary>
+public sealed record ReviewInput(int Rating, string? Text = null);
+
+/// <summary>A review of the player's own completed run, written later or changed.</summary>
+public sealed record ReviewRequest(Guid CommandId, int Rating, string? Text = null);
 
 public sealed record CommandResponse(bool Duplicate, IReadOnlyList<LoggedEventView> Events);
 
@@ -63,7 +75,8 @@ public sealed record PlayerView(Guid Id, string Name, string CellId, int Points,
 /// <summary>
 /// The signed-in player's own turn. While playing: <c>dropHintMinutes</c> is <c>roll.minPlayMinutesBeforeDrop</c> until
 /// that much has been played by the server clock (only a hint: D-09), then null; <c>dropPenalty</c> is what a drop costs
-/// under the rules in force; <c>techRerollOpen</c> says whether the player may still tech-reroll themselves (D-94).
+/// under the rules in force; <c>techRerollOpen</c> says whether the player may still tech-reroll themselves (D-94);
+/// <c>challengesEnabled</c> says whether a challenge may be claimed on completion (<c>features.challenges</c>, D-96).
 /// </summary>
 public sealed record MyTurnView(
     Guid PlayerId,
@@ -76,7 +89,8 @@ public sealed record MyTurnView(
     IReadOnlyList<ManualEffectView> ManualEffects,
     int? DropHintMinutes,
     DropPenaltyView? DropPenalty,
-    bool TechRerollOpen);
+    bool TechRerollOpen,
+    bool ChallengesEnabled);
 
 /// <summary>The drop penalty: <c>count</c> dice of <c>sides</c>, what they take, and whether a bad event follows.</summary>
 public sealed record DropPenaltyView(int Count, int Sides, bool AffectsPoints, bool AffectsPosition, bool BadEvent);
@@ -104,8 +118,20 @@ public sealed record ChoiceView(Guid Id, ChoiceKind Kind, IReadOnlyList<ChoiceOp
 
 public sealed record ChoiceOptionView(string Id, OfferedGameView? Game);
 
-/// <summary>The player's latest completed run with its dice, each die separately.</summary>
-public sealed record CompletedRunView(Guid Id, GameView Game, Difficulty Difficulty, IReadOnlyList<DieView> Dice, int Total);
+/// <summary>
+/// The player's latest completed run: dice by the hours and the challenge dice apart, each die separately; the total
+/// counts both; the review when there is one.
+/// </summary>
+public sealed record CompletedRunView(
+    Guid Id,
+    GameView Game,
+    Difficulty Difficulty,
+    IReadOnlyList<DieView> Dice,
+    IReadOnlyList<DieView> ChallengeDice,
+    int Total,
+    ReviewView? Review);
+
+public sealed record ReviewView(int Rating, string? Text);
 
 public sealed record DieView(int Sides, int Value);
 
@@ -183,16 +209,52 @@ public static class SeasonEndpoints
             .WithActionErrors();
 
         seasons.MapPost("/complete", (Guid seasonId, CompleteRequest request, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, CancellationToken ct) =>
-            request.EstimatedHours is <= 0 or > MaxEstimatedHours
-                ? Task.FromResult<ActionResult>(
-                    TypedResults.ValidationProblem(new Dictionary<string, string[]>
-                    {
-                        ["estimatedHours"] = [$"Hours must be greater than 0 and at most {MaxEstimatedHours}."],
-                    }))
-                : ActAsync(seasonId, request.CommandId, user, db, bus, playerId => new CompleteRun(playerId, request.Difficulty, request.EstimatedHours), ct))
+            CompletionInvalid(request) is { } invalid
+                ? Task.FromResult<ActionResult>(invalid)
+                : ActAsync(
+                    seasonId,
+                    request.CommandId,
+                    user,
+                    db,
+                    bus,
+                    playerId => new CompleteRun(
+                        playerId,
+                        request.Difficulty,
+                        request.EstimatedHours,
+                        request.HoursSource,
+                        request.ChallengeDone,
+                        request.Review is { } review ? new RunReview(review.Rating, review.Text) : null),
+                    ct))
+            .RequireAuthorization(Policies.Player)
+            .WithActionErrors();
+
+        seasons.MapPost("/runs/{runId:guid}/review", (Guid seasonId, Guid runId, ReviewRequest request, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, CancellationToken ct) =>
+            ReviewInvalid(request.Rating, request.Text) is { } invalid
+                ? Task.FromResult<ActionResult>(invalid)
+                : ActAsync(seasonId, request.CommandId, user, db, bus, playerId => new ReviewRun(playerId, runId, new RunReview(request.Rating, request.Text)), ct))
             .RequireAuthorization(Policies.Player)
             .WithActionErrors();
     }
+
+    /// <summary>The request-level checks of a completion; the rules (hours needed, source needed) live in the engine.</summary>
+    private static ValidationProblem? CompletionInvalid(CompleteRequest request) =>
+        request.EstimatedHours is <= 0 or > MaxEstimatedHours
+            ? Invalid("estimatedHours", $"Hours must be greater than 0 and at most {MaxEstimatedHours}.")
+            : request.HoursSource?.Length > Limits.MaxHoursSourceLength
+                ? Invalid("hoursSource", $"At most {Limits.MaxHoursSourceLength} characters.")
+                : request.Review is { } review
+                    ? ReviewInvalid(review.Rating, review.Text)
+                    : null;
+
+    private static ValidationProblem? ReviewInvalid(int rating, string? text) =>
+        rating is < 1 or > 10
+            ? Invalid("rating", "A rating is 1–10.")
+            : text?.Length > Limits.MaxReviewLength
+                ? Invalid("text", $"At most {Limits.MaxReviewLength} characters.")
+                : null;
+
+    private static ValidationProblem Invalid(string field, string message) =>
+        TypedResults.ValidationProblem(new Dictionary<string, string[]> { [field] = [message] });
 
     // Option ids are engine-made (a game id in the N format); anything else never reaches the engine.
     private static bool IsOptionId(string? id) =>
@@ -301,6 +363,7 @@ public static class SeasonEndpoints
                 .Where(r => r.PlayerId == mine.Id && r.Status == RunStatus.Completed)
                 .OrderByDescending(r => r.StartedAt)
                 .FirstOrDefaultAsync(ct);
+            var lastReview = last is null ? null : await db.Reviews.AsNoTracking().SingleOrDefaultAsync(x => x.RunId == last.Id, ct);
             var gameIds = new[] { offer?.GameId, run?.GameId, last?.GameId }
                 .Concat(choice?.Options.Select(o => o.Game?.GameId) ?? [])
                 .OfType<Guid>()
@@ -346,13 +409,14 @@ public static class SeasonEndpoints
                     [.. choice.Options.Select(o => new ChoiceOptionView(o.Id, o.Game is null ? null : Offered(o.Game)))]),
                 mine.Phase == TurnPhase.Rolling ? new RerollPriceView(price.Payment, price.Coins) : null,
                 run is null ? null : new RunView(run.Id, Game(run, games[run.GameId]), run.StartedAt),
-                last is null ? null : Completed(last, games[last.GameId]),
+                last is null ? null : Completed(last, games[last.GameId], lastReview),
                 effects,
                 playing && played < TimeSpan.FromMinutes(rules.Roll.MinPlayMinutesBeforeDrop) ? rules.Roll.MinPlayMinutesBeforeDrop : null,
                 playing
                     ? new DropPenaltyView(drop.PenaltyDice.Count, drop.PenaltyDice.Sides, drop.AffectsPoints, drop.AffectsPosition, drop.MandatoryEvent == MandatoryEvent.Bad)
                     : null,
-                playing && now - run!.RolledAt <= TimeSpan.FromHours(snapshot!.TechRerollWindowHours));
+                playing && now - run!.RolledAt <= TimeSpan.FromHours(snapshot!.TechRerollWindowHours),
+                rules.Features.Challenges);
         }
 
         return TypedResults.Ok(new SeasonView(
@@ -367,15 +431,19 @@ public static class SeasonEndpoints
     private static GameView Game(Infrastructure.Seasons.RunRecord run, Infrastructure.Pool.GameRecord game) =>
         new(run.GameId, game.Title, run.Hours ?? game.Hours);
 
-    private static CompletedRunView Completed(Infrastructure.Seasons.RunRecord run, Infrastructure.Pool.GameRecord game)
+    private static CompletedRunView Completed(
+        Infrastructure.Seasons.RunRecord run, Infrastructure.Pool.GameRecord game, Infrastructure.Seasons.ReviewRecord? review)
     {
         var dice = JsonSerializer.Deserialize<EquatableArray<Die>>(run.DiceJson, EngineJson.Options);
+        var challenge = JsonSerializer.Deserialize<EquatableArray<Die>>(run.ChallengeDiceJson, EngineJson.Options);
         return new CompletedRunView(
             run.Id,
             Game(run, game),
             run.Difficulty ?? throw new InvalidOperationException($"Completed run {run.Id} has no difficulty."),
             [.. dice.Select(d => new DieView(d.Sides, d.Value))],
-            dice.Sum(d => d.Value));
+            [.. challenge.Select(d => new DieView(d.Sides, d.Value))],
+            dice.Sum(d => d.Value) + challenge.Sum(d => d.Value),
+            review is null ? null : new ReviewView(review.Rating, review.Text));
     }
 
     /// <summary>The latest season the user plays in; for spectators and admins, the latest season.</summary>

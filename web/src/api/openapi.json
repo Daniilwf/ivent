@@ -877,6 +877,105 @@
         }
       }
     },
+    "/api/seasons/{seasonId}/runs/{runId}/review": {
+      "post": {
+        "tags": [
+          "Seasons"
+        ],
+        "parameters": [
+          {
+            "name": "seasonId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "runId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RejectionProblem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/seasons/current": {
       "get": {
         "tags": [
@@ -1562,7 +1661,9 @@
           "game",
           "difficulty",
           "dice",
-          "total"
+          "challengeDice",
+          "total",
+          "review"
         ],
         "type": "object",
         "properties": {
@@ -1582,12 +1683,28 @@
               "$ref": "#/components/schemas/DieView"
             }
           },
+          "challengeDice": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DieView"
+            }
+          },
           "total": {
             "type": "integer",
             "format": "int32"
+          },
+          "review": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ReviewView"
+              }
+            ]
           }
         },
-        "description": "The player's latest completed run with its dice, each die separately."
+        "description": "The player's latest completed run: dice by the hours and the challenge dice apart, each die separately; the total\ncounts both; the review when there is one."
       },
       "CompleteRequest": {
         "required": [
@@ -1609,6 +1726,26 @@
               "number"
             ],
             "format": "double"
+          },
+          "hoursSource": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "challengeDone": {
+            "type": "boolean",
+            "default": false
+          },
+          "review": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ReviewInput"
+              }
+            ]
           }
         },
         "description": "Completing the active run. `estimatedHours` is needed only when the game has no hours."
@@ -1993,6 +2130,10 @@
           },
           "gallery": {
             "type": "boolean"
+          },
+          "challenges": {
+            "type": "boolean",
+            "description": "Claiming a game's challenge on completion (D-96). Off until games carry a challenge note and the proof checks it;\noptional, so older configs without it still read."
           }
         },
         "description": "Feature flags: a disabled mechanic is invisible in the interface and refused by the engine."
@@ -2193,7 +2334,8 @@
       "ManualEffectSource": {
         "enum": [
           "paidReroll",
-          "drop"
+          "drop",
+          "difficulty"
         ],
         "description": "What created a manual effect; C11 adds item, cell and event sources."
       },
@@ -2248,7 +2390,8 @@
           "manualEffects",
           "dropHintMinutes",
           "dropPenalty",
-          "techRerollOpen"
+          "techRerollOpen",
+          "challengesEnabled"
         ],
         "type": "object",
         "properties": {
@@ -2334,9 +2477,12 @@
           },
           "techRerollOpen": {
             "type": "boolean"
+          },
+          "challengesEnabled": {
+            "type": "boolean"
           }
         },
-        "description": "The signed-in player's own turn. While playing: `dropHintMinutes` is `roll.minPlayMinutesBeforeDrop` until\nthat much has been played by the server clock (only a hint: D-09), then null; `dropPenalty` is what a drop costs\nunder the rules in force; `techRerollOpen` says whether the player may still tech-reroll themselves (D-94)."
+        "description": "The signed-in player's own turn. While playing: `dropHintMinutes` is `roll.minPlayMinutesBeforeDrop` until\nthat much has been played by the server clock (only a hint: D-09), then null; `dropPenalty` is what a drop costs\nunder the rules in force; `techRerollOpen` says whether the player may still tech-reroll themselves (D-94);\n`challengesEnabled` says whether a challenge may be claimed on completion (`features.challenges`, D-96)."
       },
       "NominationRules": {
         "required": [
@@ -2630,6 +2776,68 @@
           }
         },
         "description": "A reroll of the offered game or the whole pending choice; the price follows D-07."
+      },
+      "ReviewInput": {
+        "required": [
+          "rating"
+        ],
+        "type": "object",
+        "properties": {
+          "rating": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "text": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "A review: a rating 1–10 and an optional text (D-96)."
+      },
+      "ReviewRequest": {
+        "required": [
+          "commandId",
+          "rating"
+        ],
+        "type": "object",
+        "properties": {
+          "commandId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "rating": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "text": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "A review of the player's own completed run, written later or changed."
+      },
+      "ReviewView": {
+        "required": [
+          "rating",
+          "text"
+        ],
+        "type": "object",
+        "properties": {
+          "rating": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "text": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
       },
       "RewardRules": {
         "required": [

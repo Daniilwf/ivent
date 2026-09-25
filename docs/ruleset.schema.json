@@ -45,6 +45,9 @@
         },
         "gallery": {
           "type": "boolean"
+        },
+        "challenges": {
+          "type": "boolean"
         }
       },
       "required": [

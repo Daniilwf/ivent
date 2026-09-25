@@ -199,7 +199,9 @@ internal static class Rolling
                 game.Hours,
                 state.Rules.Reward.DiceCount,
                 state.Rules.Reward.DieByDifficulty,
-                state.Rules.Roll.TechRerollWindowHours);
+                state.Rules.Roll.TechRerollWindowHours,
+                state.Rules.Reward.ChallengeBonus.ExtraDice,
+                state.Rules.Reward.Coins);
             offers.Add(new RollOffer(game.Id, snapshot, now));
         }
 
