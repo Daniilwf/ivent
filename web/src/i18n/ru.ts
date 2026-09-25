@@ -17,7 +17,11 @@ const coins = (n: number) => {
   return `${n.toLocaleString('ru-RU')} ${word}`;
 };
 
-const effectSources = { paidReroll: '(за реролл)', drop: '(за дроп)' } as const;
+const effectSources = {
+  paidReroll: '(за реролл)',
+  drop: '(за дроп)',
+  difficulty: '(за сложность)',
+} as const;
 
 type DropPenalty = {
   count: number;
@@ -41,6 +45,13 @@ const rejection = {
   'run.reasonCommentRequired': 'Для причины «Другое» нужен комментарий.',
   'run.hoursRequired': 'У игры нет данных о длине: укажите оценку часов.',
   'run.invalidHours': 'Часы должны быть больше нуля.',
+  'run.hoursSourceRequired': 'Укажите, откуда оценка часов: ссылку или короткую пометку.',
+  'run.notYours': 'Это не ваше прохождение.',
+  'run.notCompleted': 'Отзыв можно оставить только к завершённому прохождению.',
+  'run.unknown': 'Прохождение не найдено. Обновите страницу.',
+  'review.invalidRating': 'Оценка — от 1 до 10.',
+  'review.tooLong': 'Отзыв слишком длинный: не больше 2000 символов.',
+  'season.closed': 'Сезон в архиве: изменить уже ничего нельзя.',
   'player.unknown': 'Вы не участвуете в этом сезоне.',
   'season.notCreated': 'Сезон ещё не создан.',
   'season.mismatch': 'Действие отправлено не в тот сезон. Обновите страницу.',
@@ -141,6 +152,19 @@ export const ru = {
     hours: 'Часы (оценка)',
     hoursHint: 'У игры нет данных о длине: укажите оценку.',
     hoursInvalid: 'Укажите число часов больше нуля.',
+    hoursSource: 'Источник оценки',
+    hoursSourceHint: 'Ссылка, например на HowLongToBeat, или короткая пометка.',
+    hoursSourceRequired: 'Укажите источник оценки: ссылку или пометку.',
+    challengeDone: 'Челлендж выполнен',
+    reviewRating: 'Оценка игры',
+    reviewNoRating: 'Без отзыва',
+    reviewText: 'Отзыв',
+    reviewRatingRequired: 'Чтобы оставить отзыв, поставьте оценку от 1 до 10.',
+    lastChallengeDice: (dice: number[]) => `Кубы за челлендж: ${dice.join(' + ')}`,
+    lastReview: (rating: number, text: string | null) =>
+      text
+        ? `Ваш отзыв: ${rating.toString()}/10 — ${text}`
+        : `Ваша оценка: ${rating.toString()}/10`,
     lastDice: (title: string, dice: number[], total: number) =>
       `Кубы за прохождение (${title}): ${dice.join(' + ')} — итого ${total.toLocaleString('ru-RU')}`,
     spectator: 'Вы смотрите сезон как зритель.',

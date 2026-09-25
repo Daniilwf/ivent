@@ -1,3 +1,4 @@
+using GameEvent.Engine.Effects;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Map;
 using GameEvent.Engine.Scoring;
@@ -31,8 +32,10 @@ internal static class RunLifecycle
         var player = state.Players[command.PlayerId];
         var run = state.Runs[player.ActiveRunId ?? throw new InvalidOperationException($"Player {player.PlayerId} is Playing without a run.")];
 
-        // Hours come from the snapshot; the player's estimate counts only when the pool had none (D-44).
-        var hours = run.Snapshot.Hours is > 0 ? run.Snapshot.Hours : command.EstimatedHours;
+        // Hours come from the snapshot; the player's estimate counts only when the pool had none (D-44),
+        // and then it needs a source (D-96).
+        var estimated = run.Snapshot.Hours is not > 0;
+        var hours = estimated ? command.EstimatedHours : run.Snapshot.Hours;
         if (hours is null)
         {
             return Decision.Reject(RejectionCodes.HoursRequired, "The game has no hours: give an estimate with a source.");
@@ -43,15 +46,36 @@ internal static class RunLifecycle
             return Decision.Reject(RejectionCodes.InvalidHours, $"Hours must be positive, got {hours}.");
         }
 
+        var source = estimated ? command.HoursSource : null;
+        if (estimated && string.IsNullOrWhiteSpace(source))
+        {
+            return Decision.Reject(RejectionCodes.HoursSourceRequired, "An hours estimate needs its source.");
+        }
+
+        if (source?.Length > Limits.MaxHoursSourceLength)
+        {
+            return Decision.Reject(RejectionCodes.CommentTooLong, $"The source is limited to {Limits.MaxHoursSourceLength} characters.");
+        }
+
+        if (command.Review is { } review && ReviewProblem(review) is { } badReview)
+        {
+            // The completion is one command: a bad review rejects it as a whole (D-96).
+            return badReview;
+        }
+
+        var now = context.Clock.UtcNow;
         var count = CompletionRoll.Count(hours.Value, run.Snapshot.DiceCount);
         var die = CompletionRoll.DieFor(command.Difficulty, run.Snapshot.DieByDifficulty);
         var dice = CompletionRoll.Roll(count, die.Sides, context.Random);
-        var sum = dice.Sum(d => d.Value);
+        var challengeDice = command.ChallengeDone
+            ? CompletionRoll.Roll(run.Snapshot.ChallengeExtraDice, die.Sides, context.Random)
+            : [];
+        var sum = dice.Sum(d => d.Value) + challengeDice.Sum(d => d.Value);
 
         var events = new List<IGameEvent>
         {
-            new RunCompleted(run.RunId, player.PlayerId, command.Difficulty, hours.Value, context.Clock.UtcNow),
-            new CompletionRolled(run.RunId, player.PlayerId, dice),
+            new RunCompleted(run.RunId, player.PlayerId, command.Difficulty, hours.Value, now, source, command.ChallengeDone),
+            new CompletionRolled(run.RunId, player.PlayerId, dice, challengeDice),
         };
 
         if (sum != 0)
@@ -65,14 +89,79 @@ internal static class RunLifecycle
             events.Add(new PlayerMoved(player.PlayerId, player.CellId, path[^1], sum, [.. path], MoveReason.CompletionRoll, run.RunId));
         }
 
+        // Coins by the counted hours, from the rules fixed at the roll (Q-2, D-96).
+        if (run.Snapshot.Coins is { } reward)
+        {
+            var coins = Math.Max(reward.Min, (int)Math.Floor(hours.Value * reward.PerHour));
+            if (coins != 0)
+            {
+                events.Add(new CoinsChanged(player.PlayerId, coins, CoinsReason.CompletionReward, run.RunId));
+            }
+        }
+
+        if (die.GrantEvent is { } granted)
+        {
+            events.Add(new ManualEffectCreated(context.Ids.NewId(), player.PlayerId, granted, ManualEffectSource.Difficulty, run.RunId));
+        }
+
+        if (command.Review is { } given)
+        {
+            events.Add(Reviewed(run, given, now));
+        }
+
         return Decision.Accept(events);
     }
 
-    public static Decision Decide(SeasonState state, ReviewRun command, EngineContext context) =>
-        throw new NotImplementedException("C7");
+    public static Decision Decide(SeasonState state, ReviewRun command, EngineContext context)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+
+        if (!state.IsCreated)
+        {
+            return Decision.Reject(RejectionCodes.SeasonNotCreated, "The season does not exist yet.");
+        }
+
+        if (state.Status == SeasonStatus.Archived)
+        {
+            return Decision.Reject(RejectionCodes.SeasonClosed, "The season is archived.");
+        }
+
+        if (!state.Players.ContainsKey(command.PlayerId))
+        {
+            return Decision.Reject(RejectionCodes.PlayerUnknown, $"Player {command.PlayerId} is not in the season.");
+        }
+
+        if (!state.Runs.TryGetValue(command.RunId, out var run))
+        {
+            return Decision.Reject(RejectionCodes.RunUnknown, $"Run {command.RunId} is not in the season.");
+        }
+
+        if (run.PlayerId != command.PlayerId)
+        {
+            return Decision.Reject(RejectionCodes.NotYourRun, "Only the player who completed a run reviews it.");
+        }
+
+        if (run.Status != RunStatus.Completed)
+        {
+            return Decision.Reject(RejectionCodes.RunNotCompleted, $"Run {run.RunId} is {run.Status}.");
+        }
+
+        return ReviewProblem(command.Review) ?? Decision.Accept(Reviewed(run, command.Review, context.Clock.UtcNow));
+    }
 
     public static SeasonState Apply(SeasonState state, RunReviewed e) =>
-        throw new NotImplementedException("C7");
+        state with { Runs = state.Runs.SetItem(e.RunId, state.Runs[e.RunId] with { Review = new RunReview(e.Rating, e.Text) }) };
+
+    private static Decision? ReviewProblem(RunReview review) =>
+        review.Rating is < 1 or > 10
+            ? Decision.Reject(RejectionCodes.InvalidRating, $"A rating is 1–10, got {review.Rating}.")
+            : review.Text?.Length > Limits.MaxReviewLength
+                ? Decision.Reject(RejectionCodes.ReviewTooLong, $"A review is limited to {Limits.MaxReviewLength} characters.")
+                : null;
+
+    // Blank text is no text.
+    private static RunReviewed Reviewed(RunState run, RunReview review, DateTimeOffset at) =>
+        new(run.RunId, run.PlayerId, review.Rating, string.IsNullOrWhiteSpace(review.Text) ? null : review.Text, at);
 
     public static SeasonState Apply(SeasonState state, RunStarted e)
     {
@@ -84,11 +173,11 @@ internal static class RunLifecycle
 
     public static SeasonState Apply(SeasonState state, RunCompleted e)
     {
-        var run = state.Runs[e.RunId] with { Status = RunStatus.Completed, Difficulty = e.Difficulty, Hours = e.Hours };
+        var run = state.Runs[e.RunId] with { Status = RunStatus.Completed, Difficulty = e.Difficulty, Hours = e.Hours, HoursSource = e.HoursSource };
         var player = state.Players[e.PlayerId] with { Phase = TurnPhase.Idle, ActiveRunId = null };
         return state with { Runs = state.Runs.SetItem(e.RunId, run), Players = state.Players.SetItem(e.PlayerId, player) };
     }
 
     public static SeasonState Apply(SeasonState state, CompletionRolled e) =>
-        state with { Runs = state.Runs.SetItem(e.RunId, state.Runs[e.RunId] with { Dice = e.Dice }) };
+        state with { Runs = state.Runs.SetItem(e.RunId, state.Runs[e.RunId] with { Dice = e.Dice, ChallengeDice = e.ChallengeDice }) };
 }

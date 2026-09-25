@@ -1254,3 +1254,187 @@ describe('SeasonScreen marks on offered games (G8, D-94 (6))', () => {
     expect(screen.getAllByTestId('game-marks')).toHaveLength(1);
   });
 });
+
+describe('SeasonScreen completion reward (C7a, D-96)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  // The generated client does not know the new fields yet: the view is typed as the old one plus them.
+  type Review = { rating: number; text: string | null };
+  type CompletedWithReward = Schemas['CompletedRunView'] & {
+    challengeDice: Schemas['DieView'][];
+    review: Review | null;
+  };
+
+  const runId = 'b1000000-0000-0000-0000-000000000009';
+
+  function completed(last: CompletedWithReward, effects: Schemas['ManualEffectView'][] = []) {
+    return season({
+      players: [{ id: me, name: 'Вася', cellId: 'c1', points: last.total, phase: 'idle' }],
+      me: {
+        playerId: me,
+        phase: 'idle',
+        offer: null,
+        choice: null,
+        activeRun: null,
+        lastCompleted: last,
+        nextReroll: null,
+        manualEffects: effects,
+        dropHintMinutes: null,
+        dropPenalty: null,
+        techRerollOpen: false,
+      },
+    });
+  }
+
+  function last(overrides: Partial<CompletedWithReward> = {}): CompletedWithReward {
+    return {
+      id: runId,
+      game: { id: 'a1000000-0000-0000-0000-000000000001', title: 'Silent Hill', hours: 6 },
+      difficulty: 'normal',
+      dice: [
+        { sides: 4, value: 3 },
+        { sides: 4, value: 1 },
+      ],
+      challengeDice: [{ sides: 4, value: 4 }],
+      total: 8,
+      review: { rating: 9, text: 'Туман и радио' },
+      ...overrides,
+    };
+  }
+
+  function playingWithoutHours() {
+    return season({
+      players: [{ id: me, name: 'Вася', cellId: 'start', points: 0, phase: 'playing' }],
+      me: {
+        playerId: me,
+        phase: 'playing',
+        offer: null,
+        choice: null,
+        activeRun: {
+          id: runId,
+          game: { id: 'a1000000-0000-0000-0000-000000000002', title: 'Pathologic', hours: null },
+          startedAt: '2026-09-24T10:00:00Z',
+        },
+        lastCompleted: null,
+        nextReroll: null,
+        manualEffects: [],
+        dropHintMinutes: null,
+        dropPenalty: null,
+        techRerollOpen: true,
+      },
+    });
+  }
+
+  it('shows the challenge dice and the review of the last completed run', async () => {
+    serve((r) => (isSeasonGet(r) ? json(200, completed(last())) : json(404, {})));
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    expect(
+      await screen.findByText(ru.turn.lastChallengeDice([4]), { exact: false }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(ru.turn.lastReview(9, 'Туман и радио'), { exact: false }),
+    ).toBeInTheDocument();
+  });
+
+  it('shows neither challenge dice nor a review when there are none', async () => {
+    serve((r) =>
+      isSeasonGet(r)
+        ? json(200, completed(last({ challengeDice: [], total: 4, review: null })))
+        : json(404, {}),
+    );
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+    await screen.findByTestId('roll');
+
+    const challengePrefix = ru.turn.lastChallengeDice([]).split(':')[0] ?? '';
+    expect(screen.queryByText(challengePrefix, { exact: false })).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(ru.turn.lastReview(9, null).split(':')[0] ?? '', { exact: false }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows a rating without text as a rating', async () => {
+    serve((r) =>
+      isSeasonGet(r)
+        ? json(200, completed(last({ review: { rating: 4, text: null } })))
+        : json(404, {}),
+    );
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    expect(
+      await screen.findByText(ru.turn.lastReview(4, null), { exact: false }),
+    ).toBeInTheDocument();
+  });
+
+  it('lists the good event of «выше сложной» among manual effects with its own words', async () => {
+    const effect = {
+      id: 'e1000000-0000-0000-0000-000000000009',
+      drawEvent: 'good',
+      source: 'difficulty',
+    } as unknown as Schemas['ManualEffectView'];
+    serve((r) =>
+      isSeasonGet(r)
+        ? json(200, completed(last({ difficulty: 'extreme' }), [effect]))
+        : json(404, {}),
+    );
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    const text = ru.effects.drawEvent('good', 'difficulty');
+    expect(text).not.toMatch(/undefined/);
+    expect(text).toMatch(/сложн/i);
+    expect(await screen.findByTestId(`manual-effect-${effect.id}`)).toHaveTextContent(text);
+  });
+
+  it('sends the estimate with its source, the challenge and the review with the completion', async () => {
+    const commands: { url: string; body: Record<string, unknown> }[] = [];
+    serve(async (r) => {
+      if (isSeasonGet(r)) return json(200, playingWithoutHours());
+      commands.push({ url: r.url, body: (await r.json()) as Record<string, unknown> });
+      return json(200, { duplicate: false, events: [] });
+    });
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    await userEvent.type(await screen.findByTestId('complete-hours'), '6');
+    await userEvent.type(screen.getByTestId('complete-hours-source'), 'HLTB');
+    await userEvent.click(screen.getByLabelText(ru.turn.challengeDone));
+    await userEvent.selectOptions(screen.getByTestId('complete-review-rating'), '7');
+    await userEvent.type(screen.getByTestId('complete-review-text'), 'Хорошо');
+    await userEvent.click(screen.getByTestId('complete-submit'));
+
+    await vi.waitFor(() => {
+      expect(commands).toHaveLength(1);
+    });
+    expect(commands[0]?.url).toMatch(new RegExp(`/api/seasons/${seasonId}/complete$`));
+    expect(commands[0]?.body).toMatchObject({
+      difficulty: 'normal',
+      estimatedHours: 6,
+      hoursSource: 'HLTB',
+      challengeDone: true,
+      review: { rating: 7, text: 'Хорошо' },
+    });
+  });
+
+  it('shows the engine refusal of a missing source in Russian', async () => {
+    serve((r) =>
+      isSeasonGet(r)
+        ? json(200, playingWithoutHours())
+        : json(409, {
+            title: 'rejected',
+            status: 409,
+            detail: null,
+            code: 'run.hoursSourceRequired',
+          }),
+    );
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    await userEvent.type(await screen.findByTestId('complete-hours'), '6');
+    await userEvent.type(screen.getByTestId('complete-hours-source'), 'HLTB');
+    await userEvent.click(screen.getByTestId('complete-submit'));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      ru.rejection['run.hoursSourceRequired'],
+    );
+  });
+});

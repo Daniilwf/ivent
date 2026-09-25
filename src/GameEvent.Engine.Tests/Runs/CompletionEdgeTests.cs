@@ -35,7 +35,7 @@ public class CompletionEdgeTests
 
         ScenarioAssert.RejectsWithoutChanges(s, x => x.Complete("Вася"), Engine.Kernel.RejectionCodes.HoursRequired);
 
-        s.NextRandom(2).Complete("Вася", Difficulty.Normal, estimatedHours: 3);
+        s.NextRandom(2).Complete("Вася", Difficulty.Normal, estimatedHours: 3, hoursSource: "HLTB");
         Assert.Equal(3m, Assert.Single(s.LastEvents<RunCompleted>()).Hours);
     }
 

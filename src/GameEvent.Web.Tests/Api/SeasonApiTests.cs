@@ -53,7 +53,7 @@ public sealed class SeasonApiTests : IAsyncLifetime
 
         Assert.Equal(["game-rolled"], await TypesAsync(roll));
         Assert.Equal(["run-started"], await TypesAsync(start));
-        Assert.Equal(["run-completed", "completion-rolled", "points-changed", "player-moved"], await TypesAsync(complete));
+        Assert.Equal(["run-completed", "completion-rolled", "points-changed", "player-moved", "coins-changed"], await TypesAsync(complete)); // Q-2, D-96: coins for the completion
 
         var season = await vasya.GetFromJsonAsync<SeasonView>($"/api/seasons/{SiteFactory.SeasonId}", s_json, Ct);
         var me = season!.Players.Single(p => p.Id == _site.Players["vasya"]);

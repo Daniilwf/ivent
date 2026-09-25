@@ -175,8 +175,18 @@ public sealed class Scenario
 
     public Scenario Start(string player) => Play(new StartRun(PlayerId(player)));
 
-    public Scenario Complete(string player, Difficulty difficulty = Difficulty.Normal, decimal? estimatedHours = null) =>
-        Play(new CompleteRun(PlayerId(player), difficulty, estimatedHours));
+    public Scenario Complete(
+        string player,
+        Difficulty difficulty = Difficulty.Normal,
+        decimal? estimatedHours = null,
+        string? hoursSource = null,
+        bool challengeDone = false,
+        RunReview? review = null) =>
+        Play(new CompleteRun(PlayerId(player), difficulty, estimatedHours, hoursSource, challengeDone, review));
+
+    /// <summary>The player reviews one of their runs (or changes the review) with <see cref="ReviewRun"/>.</summary>
+    public Scenario Review(string player, Guid runId, int rating, string? text = null) =>
+        Play(new ReviewRun(PlayerId(player), runId, new RunReview(rating, text)));
 
     /// <summary>Executes any command and records the result; never throws on rejection.</summary>
     public Scenario Act(ICommand command)

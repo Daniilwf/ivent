@@ -1,4 +1,5 @@
 using FsCheck.Xunit;
+using GameEvent.Engine.Effects;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Rolls;
 using GameEvent.Engine.Rulesets;
@@ -52,8 +53,11 @@ public class SliceInvariantTests
         {
             0 => new RollGame(player),
             1 => new StartRun(player),
-            2 => new CompleteRun(player, difficulty, EstimatedHours: 1 + ((b / 48) % 9)), // bits independent of the player
-            _ => new CompleteRun(player, difficulty),
+            // bits independent of the player; odd bytes claim the challenge (D-96)
+            2 => new CompleteRun(player, difficulty, EstimatedHours: 1 + ((b / 48) % 9), HoursSource: "HLTB", ChallengeDone: b % 2 == 1),
+
+            // half of these carry a review, its rating 0..11 is sometimes out of range and then refuses the completion
+            _ => new CompleteRun(player, difficulty, ChallengeDone: b % 2 == 0, Review: b % 4 < 2 ? new RunReview(b % 12, b % 8 == 0 ? " " : "отзыв") : null),
         };
     }
 
@@ -266,11 +270,21 @@ public class SliceInvariantTests
             // 7. The token is on an existing cell; on the linear map it stands at min(sum of steps, length)
             var cellIndex = s.State.Map.Cells.ToList().FindIndex(c => c.Id == player.CellId);
             Assert.True(cellIndex >= 0, $"Cell {player.CellId} is not on the map.");
-            var dice = s.Log.OfType<CompletionRolled>().Where(e => e.PlayerId == player.PlayerId).Sum(e => e.Dice.Sum(d => d.Value));
+            // W3 / D-96: the challenge dice count in points and steps as well
+            var dice = s.Log.OfType<CompletionRolled>().Where(e => e.PlayerId == player.PlayerId)
+                .Sum(e => e.Dice.Sum(d => d.Value) + e.ChallengeDice.Sum(d => d.Value));
             Assert.Equal(Math.Min(dice, MapLength), cellIndex);
 
             // Slice: points equal the completion dice sum (no other point sources yet)
             Assert.Equal(dice, player.Points);
+
+            // W10 / Q-2 / D-96: coins equal their logged changes, and in the slice they come only from completions,
+            // each by the formula from the run's roll-time snapshot and its counted hours
+            Assert.Equal(s.Log.OfType<CoinsChanged>().Where(e => e.PlayerId == player.PlayerId).Sum(e => e.Delta), player.Coins);
+            var expectedCoins = s.State.Runs.Values
+                .Where(r => r.PlayerId == player.PlayerId && r.Status == RunStatus.Completed)
+                .Sum(r => ExpectedCoins(r.Snapshot.Coins, r.Hours!.Value));
+            Assert.Equal(expectedCoins, player.Coins);
 
             // G8 / D-92: exclusions are the player's GameExcluded events, one per game, ordered by game id
             var logged = s.Log.OfType<GameExcluded>().Where(e => e.PlayerId == player.PlayerId).ToList();
@@ -349,6 +363,13 @@ public class SliceInvariantTests
         }
 
         // Stage 1 extra: dice of every completed run match its hours and roll-time snapshot
+        var claimed = s.Log.OfType<RunCompleted>().ToDictionary(e => e.RunId, e => e.ChallengeDone);
+        var reviews = new Dictionary<Guid, RunReview>();
+        foreach (var reviewed in s.Log.OfType<RunReviewed>())
+        {
+            reviews[reviewed.RunId] = new RunReview(reviewed.Rating, reviewed.Text);
+        }
+
         foreach (var run in s.State.Runs.Values.Where(r => r.Status == RunStatus.Completed))
         {
             Assert.NotNull(run.Hours);
@@ -360,7 +381,43 @@ public class SliceInvariantTests
                 Assert.Equal(sides, d.Sides);
                 Assert.InRange(d.Value, 1, sides);
             });
+
+            // W3 / D-96: challenge dice only when claimed, as many as the snapshot says, of the same type
+            Assert.Equal(claimed[run.RunId] ? run.Snapshot.ChallengeExtraDice : 0, run.ChallengeDice.Count);
+            Assert.All(run.ChallengeDice, d =>
+            {
+                Assert.Equal(sides, d.Sides);
+                Assert.InRange(d.Value, 1, sides);
+            });
+
+            // W6 / D-96: a source only for an estimate, i.e. when the snapshot had no hours
+            Assert.Equal(run.Snapshot.Hours is > 0 ? null : "HLTB", run.HoursSource);
+
+            // W2 / D-96: a difficulty with grantEvent leaves exactly one manual effect for the run
+            var grant = GrantFor(run.Snapshot.DieByDifficulty, run.Difficulty.Value);
+            var effects = s.State.ManualEffects.Values.Where(e => e.RunId == run.RunId).ToList();
+            if (grant is { } kind)
+            {
+                var effect = Assert.Single(effects);
+                Assert.Equal(new PendingManualEffect(effect.EffectId, run.PlayerId, kind, ManualEffectSource.Difficulty, run.RunId), effect);
+            }
+            else
+            {
+                Assert.Empty(effects);
+            }
+
+            // W9 / D-96: the review is the latest logged one; the rating in 1..10, blank text is no text
+            Assert.Equal(reviews.GetValueOrDefault(run.RunId), run.Review);
+            if (run.Review is { } review)
+            {
+                Assert.InRange(review.Rating, 1, 10);
+                Assert.False(review.Text is { } text && string.IsNullOrWhiteSpace(text), "A blank review text is stored.");
+            }
         }
+
+        // Nothing else is reviewed, and in the slice the only manual effects are the difficulty's
+        Assert.All(reviews.Keys, id => Assert.Equal(RunStatus.Completed, s.State.Runs[id].Status));
+        Assert.All(s.State.ManualEffects.Values, e => Assert.Equal(ManualEffectSource.Difficulty, e.Source));
     }
 
     /// <summary>Reference formula from D-13, independent of the engine.</summary>
@@ -376,6 +433,23 @@ public class SliceInvariantTests
         };
         return Math.Clamp((int)rounded, rule.Min, rule.Max);
     }
+
+    /// <summary>Reference formula from D-96: <c>max(min, ⌊hours × perHour⌋)</c>.</summary>
+    private static int ExpectedCoins(CoinReward? rule, decimal hours)
+    {
+        Assert.NotNull(rule);
+        return Math.Max(rule.Min, (int)Math.Floor(hours * rule.PerHour));
+    }
+
+    private static EventKind? GrantFor(DieByDifficulty rule, Difficulty difficulty) =>
+        difficulty switch
+        {
+            Difficulty.Easy => rule.Easy.GrantEvent,
+            Difficulty.Normal => rule.Normal.GrantEvent,
+            Difficulty.Hard => rule.Hard.GrantEvent,
+            Difficulty.Extreme => rule.Extreme.GrantEvent,
+            _ => throw new ArgumentOutOfRangeException(nameof(difficulty)),
+        };
 
     private static int SidesFor(DieByDifficulty rule, Difficulty difficulty) =>
         difficulty switch

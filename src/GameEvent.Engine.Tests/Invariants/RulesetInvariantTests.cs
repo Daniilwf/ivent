@@ -38,7 +38,7 @@ public class RulesetInvariantTests
         {
             0 => new RollGame(player),
             1 => new StartRun(player),
-            2 => new CompleteRun(player, (Difficulty)((b / 10) % 4), EstimatedHours: 1 + ((b / 40) % 6)),
+            2 => new CompleteRun(player, (Difficulty)((b / 10) % 4), EstimatedHours: 1 + ((b / 40) % 6), HoursSource: "HLTB"),
             // The admin changes numbers that go into the snapshot; some changes repeat the current value (unchanged)
             3 => new ChangeRuleset(r with
             {

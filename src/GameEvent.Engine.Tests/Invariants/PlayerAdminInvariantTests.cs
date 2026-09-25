@@ -104,7 +104,15 @@ public class PlayerAdminInvariantTests
         {
             0 => new RollGame(player),
             1 => new StartRun(player),
-            2 => new CompleteRun(player, (Difficulty)(arg % 4), EstimatedHours: 1 + arg),
+            // D-96: the upper arguments claim the challenge, 5 adds a review (its rating sometimes out of range), 6 reviews later
+            2 when arg == 6 => ReviewFor(s, player, b),
+            2 => new CompleteRun(
+                player,
+                (Difficulty)(arg % 4),
+                EstimatedHours: 1 + arg,
+                HoursSource: "HLTB",
+                ChallengeDone: arg >= 4,
+                Review: arg == 5 ? new RunReview(b % 12, b % 3 == 0 ? " " : "отзыв") : null),
             3 => new AdjustPlayer(player, comment, PointsDelta: arg - 3),
             4 => new AdjustPlayer(player, comment, CoinsDelta: 3 - arg, ResourceDeltas: [new ResourceDelta(withRerolls ? Coupon : "tickets", (arg % 3) - 1)]),
             5 => new AdjustPlayer(player, comment, CellId: CellAt(s, arg * 4), DiscardOffer: arg % 2 == 1),
@@ -118,6 +126,23 @@ public class PlayerAdminInvariantTests
                 _ => new AddSeasonPlayer(s_late, s_lateUser, "Лёша", CellId: CellAt(s, arg * 5), Points: arg, Coins: 2 - arg),
             },
         };
+    }
+
+    /// <summary>
+    /// A later review (D-96): of the player's latest run whatever its status, or of another player's run, or of a made-up
+    /// one; the rating 0..11 is sometimes out of range, the text sometimes blank.
+    /// </summary>
+    private static ReviewRun ReviewFor(Scenario s, Guid player, byte b)
+    {
+        var runs = s.State.Runs.Values.ToList();
+        var own = runs.LastOrDefault(r => r.PlayerId == player);
+        var runId = (b % 3) switch
+        {
+            0 when own is not null => own.RunId,
+            1 when runs.Count > 0 => runs[b % runs.Count].RunId,
+            _ => own?.RunId ?? SequentialIds.Make(0x60000000, b),
+        };
+        return new ReviewRun(player, runId, new RunReview(b % 12, b % 5 == 0 ? "  " : "перепрошёл"));
     }
 
     private static MakeChoice ChoiceFor(Scenario s, Guid player, int arg)
@@ -464,9 +489,15 @@ public class PlayerAdminInvariantTests
             case SetSeasonDeadline deadline:
                 Assert.Equal([new SeasonDeadlineSet(deadline.Deadline)], events);
                 break;
-            case RollGame or StartRun or CompleteRun:
+            case RollGame or StartRun:
                 // Game actions only in a running season
                 Assert.Equal(SeasonStatus.Active, before.Status);
+                break;
+            case CompleteRun complete:
+                CheckAcceptedCompletion(s, complete, before);
+                break;
+            case ReviewRun review:
+                CheckAcceptedReview(s, review, before);
                 break;
             case Reroll reroll:
                 CheckAcceptedReroll(s, reroll, before);
@@ -579,6 +610,101 @@ public class PlayerAdminInvariantTests
         Assert.Equal(TurnPhase.Rolling, now.Phase);
         Assert.Equal(was.RerollsThisRoll + 1, now.RerollsThisRoll);
         Assert.Equal((was.Points, was.CellId), (now.Points, now.CellId));
+    }
+
+    private static readonly Type[] s_completionOrder =
+    [
+        typeof(RunCompleted), typeof(CompletionRolled), typeof(PointsChanged), typeof(PlayerMoved),
+        typeof(CoinsChanged), typeof(ManualEffectCreated), typeof(RunReviewed),
+    ];
+
+    /// <summary>
+    /// W2, W3, W6, W9, W10 / D-96: a completion logs its parts in the decided order; the challenge dice come from the
+    /// snapshot, points grow by all dice, coins by the formula from the snapshot, a granted event and the review follow.
+    /// </summary>
+    private static void CheckAcceptedCompletion(Scenario s, CompleteRun complete, SeasonState before)
+    {
+        var events = s.Last.Events;
+        Assert.Equal(SeasonStatus.Active, before.Status);
+        var was = before.Players[complete.PlayerId];
+        var run = before.Runs[was.ActiveRunId!.Value];
+
+        // Order: each kind at most once, in the order of D-96
+        var positions = events.Select(e => Array.IndexOf(s_completionOrder, e.GetType())).ToList();
+        Assert.DoesNotContain(-1, positions);
+        Assert.Equal(positions.Distinct().Order(), positions);
+        var completed = Assert.IsType<RunCompleted>(events[0]);
+        var rolled = Assert.IsType<CompletionRolled>(events[1]);
+
+        // W6: the estimate and its source count only without hours in the snapshot
+        var fromPool = run.Snapshot.Hours is > 0;
+        Assert.Equal(fromPool ? run.Snapshot.Hours : complete.EstimatedHours, completed.Hours);
+        Assert.Equal(fromPool ? null : complete.HoursSource, completed.HoursSource);
+
+        // W3: as many challenge dice as the snapshot says, of the difficulty's type
+        Assert.Equal(complete.ChallengeDone, completed.ChallengeDone);
+        Assert.Equal(complete.ChallengeDone ? run.Snapshot.ChallengeExtraDice : 0, rolled.ChallengeDice.Count);
+        var sides = Assert.Single(rolled.Dice.Select(d => d.Sides).Distinct());
+        Assert.All(rolled.ChallengeDice, d => Assert.Equal(sides, d.Sides));
+        var sum = rolled.Dice.Sum(d => d.Value) + rolled.ChallengeDice.Sum(d => d.Value);
+        Assert.Equal(sum, events.OfType<PointsChanged>().Sum(e => e.Delta));
+        Assert.Equal(was.Points + sum, s.State.Players[complete.PlayerId].Points);
+
+        // W10 / Q-2: coins by the snapshot's rule and the counted hours
+        Assert.NotNull(run.Snapshot.Coins);
+        var coins = Math.Max(run.Snapshot.Coins.Min, (int)Math.Floor(completed.Hours * run.Snapshot.Coins.PerHour));
+        Assert.Equal(
+            coins == 0 ? [] : [new CoinsChanged(complete.PlayerId, coins, CoinsReason.CompletionReward, run.RunId)],
+            events.OfType<CoinsChanged>());
+        Assert.Equal(was.Coins + coins, s.State.Players[complete.PlayerId].Coins);
+
+        // W2: the difficulty's event from the snapshot, a new manual effect of this run
+        var rule = complete.Difficulty switch
+        {
+            Difficulty.Easy => run.Snapshot.DieByDifficulty.Easy,
+            Difficulty.Normal => run.Snapshot.DieByDifficulty.Normal,
+            Difficulty.Hard => run.Snapshot.DieByDifficulty.Hard,
+            _ => run.Snapshot.DieByDifficulty.Extreme,
+        };
+        var effects = events.OfType<ManualEffectCreated>().ToList();
+        if (rule.GrantEvent is { } kind)
+        {
+            var created = Assert.Single(effects);
+            Assert.Equal(new ManualEffectCreated(created.EffectId, complete.PlayerId, kind, ManualEffectSource.Difficulty, run.RunId), created);
+            Assert.DoesNotContain(created.EffectId, before.ManualEffects.Keys);
+        }
+        else
+        {
+            Assert.Empty(effects);
+        }
+
+        // W9: the review, if any, is valid and stored with blank text as none
+        var reviews = events.OfType<RunReviewed>().ToList();
+        if (complete.Review is { } review)
+        {
+            Assert.InRange(review.Rating, 1, 10);
+            var text = string.IsNullOrWhiteSpace(review.Text) ? null : review.Text;
+            Assert.Equal([new RunReviewed(run.RunId, complete.PlayerId, review.Rating, text, s.Clock.UtcNow)], reviews);
+            Assert.Equal(new RunReview(review.Rating, text), s.State.Runs[run.RunId].Review);
+        }
+        else
+        {
+            Assert.Empty(reviews);
+        }
+    }
+
+    /// <summary>W9 / D-96: a later review is only of one's own completed run, until the archive, and changes only the review.</summary>
+    private static void CheckAcceptedReview(Scenario s, ReviewRun review, SeasonState before)
+    {
+        Assert.NotEqual(SeasonStatus.Archived, before.Status);
+        var run = before.Runs[review.RunId];
+        Assert.Equal(review.PlayerId, run.PlayerId);
+        Assert.Equal(RunStatus.Completed, run.Status);
+        Assert.InRange(review.Review.Rating, 1, 10);
+        var text = string.IsNullOrWhiteSpace(review.Review.Text) ? null : review.Review.Text;
+        Assert.Equal([new RunReviewed(run.RunId, review.PlayerId, review.Review.Rating, text, s.Clock.UtcNow)], s.Last.Events);
+        Assert.Equal(before.Players, s.State.Players);
+        Assert.Equal(run with { Review = new RunReview(review.Review.Rating, text) }, s.State.Runs[run.RunId]);
     }
 
     /// <summary>RR1 / D-93: «not enough coins» only when the free rerolls and coupons are used up and the coins fall short.</summary>
@@ -772,6 +898,7 @@ public class PlayerAdminInvariantTests
             RunTechRerolled x => x.PlayerId,
             TechRerollConvertedToDrop x => x.PlayerId,
             GameExcluded x => x.PlayerId,
+            RunReviewed x => x.PlayerId,
             _ => null,
         };
 
@@ -832,6 +959,11 @@ public class PlayerAdminInvariantTests
                     // SE1/SE2: no game actions outside a running season
                     Assert.Equal(SeasonStatus.Active, status);
                     break;
+                case RunReviewed reviewed:
+                    // W9 / D-96: reviews until the archive, only of one's own runs
+                    Assert.NotEqual(SeasonStatus.Archived, status);
+                    Assert.Equal(runs[reviewed.RunId].Player, reviewed.PlayerId);
+                    break;
                 case GameExcluded excluded:
                     Assert.Equal(SeasonStatus.Active, status);
                     Assert.True(players[excluded.PlayerId].Exclusions.TryAdd(excluded.GameId, excluded.Reason), "A game excluded twice.");
@@ -852,6 +984,9 @@ public class PlayerAdminInvariantTests
                     // RR2: no coins from drops (coins have no drop reason at all)
                     Assert.NotEqual(0, coins.Delta);
                     players[coins.PlayerId].Coins += coins.Delta;
+
+                    // W10 / D-96: the completion reward is always a gain
+                    Assert.True(coins.Reason != CoinsReason.CompletionReward || coins.Delta > 0, "A completion took coins.");
 
                     // RR1 / D-93: a reroll is a purchase: it never takes coins into the negative
                     Assert.True(coins.Reason != CoinsReason.Reroll || players[coins.PlayerId].Coins >= 0, "A reroll took coins below zero.");

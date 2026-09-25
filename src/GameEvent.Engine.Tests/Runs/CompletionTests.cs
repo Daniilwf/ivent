@@ -358,7 +358,7 @@ public class CompletionTests
     {
         var s = Playing(null);
 
-        s.Complete("Вася", Difficulty.Normal, estimatedHours: 6);
+        s.Complete("Вася", Difficulty.Normal, estimatedHours: 6, hoursSource: "https://howlongtobeat.com/game/1");
 
         ScenarioAssert.Accepted(s);
         Assert.Equal(6m, Assert.Single(s.LastEvents<RunCompleted>()).Hours);
@@ -374,7 +374,7 @@ public class CompletionTests
         var s = Playing(null);
 
         ScenarioAssert.RejectsWithoutChanges(
-            s, x => x.Complete("Вася", Difficulty.Normal, estimatedHours: (decimal)estimate), RejectionCodes.InvalidHours);
+            s, x => x.Complete("Вася", Difficulty.Normal, estimatedHours: (decimal)estimate, hoursSource: "HLTB"), RejectionCodes.InvalidHours);
     }
 
     [Fact]
@@ -384,7 +384,7 @@ public class CompletionTests
         s.ExpectRejection().Complete("Вася");
         Assert.False(s.Last.IsAccepted);
 
-        s.Complete("Вася", Difficulty.Hard, estimatedHours: 3);
+        s.Complete("Вася", Difficulty.Hard, estimatedHours: 3, hoursSource: "HLTB");
 
         ScenarioAssert.Accepted(s);
         Assert.Equal(new[] { 6 }, DiceOf(s).Dice.Select(d => d.Sides));

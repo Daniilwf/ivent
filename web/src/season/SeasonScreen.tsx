@@ -251,13 +251,28 @@ export function SeasonScreen({
           </section>
         )}
         {me?.lastCompleted && (
-          <p data-testid="last-dice">
-            {ru.turn.lastDice(
-              me.lastCompleted.game.title,
-              me.lastCompleted.dice.map((d) => d.value),
-              me.lastCompleted.total,
+          <>
+            <p data-testid="last-dice">
+              {ru.turn.lastDice(
+                me.lastCompleted.game.title,
+                me.lastCompleted.dice.map((d) => d.value),
+                me.lastCompleted.total,
+              )}
+            </p>
+            {me.lastCompleted.challengeDice.length > 0 && (
+              <p data-testid="last-challenge-dice">
+                {ru.turn.lastChallengeDice(me.lastCompleted.challengeDice.map((d) => d.value))}
+              </p>
             )}
-          </p>
+            {me.lastCompleted.review && (
+              <p data-testid="last-review">
+                {ru.turn.lastReview(
+                  me.lastCompleted.review.rating,
+                  me.lastCompleted.review.text ?? null,
+                )}
+              </p>
+            )}
+          </>
         )}
       </section>
 
