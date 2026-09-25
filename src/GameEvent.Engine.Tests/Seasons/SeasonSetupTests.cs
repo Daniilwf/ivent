@@ -59,6 +59,28 @@ public class SeasonSetupTests
         { "roll", new RollGame(SequentialIds.Make(0x10000000, 1)) },
         { "start", new StartRun(SequentialIds.Make(0x10000000, 1)) },
         { "complete", new CompleteRun(SequentialIds.Make(0x10000000, 1), Difficulty.Normal, 3) },
+
+        // C13: every other command of stage 1 refuses the same way before the season exists
+        { "review", new ReviewRun(SequentialIds.Make(0x10000000, 1), SequentialIds.Make(0x60000000, 1), new RunReview(8, null)) },
+        { "correct hours", new CorrectRunHours(SequentialIds.Make(0x60000000, 1), 5, "Часы по пруфу") },
+        { "change difficulty", new ChangeRunDifficulty(SequentialIds.Make(0x60000000, 1), Difficulty.Easy, "Сложность по пруфу") },
+        { "drop", new DropRun(SequentialIds.Make(0x10000000, 1)) },
+        { "tech reroll", new TechReroll(SequentialIds.Make(0x10000000, 1), TechRerollReason.DoesNotLaunch, null) },
+        { "convert to a drop", new ConvertTechRerollToDrop(SequentialIds.Make(0x60000000, 1), "Это был дроп") },
+        { "adjust", new AdjustPlayer(SequentialIds.Make(0x10000000, 1), "Правка", PointsDelta: 1) },
+        { "inactive", new SetPlayerInactive(SequentialIds.Make(0x10000000, 1), true) },
+        { "resolve an effect", new Engine.Effects.ResolveManualEffect(SequentialIds.Make(0x70000000, 1), Engine.Effects.ManualEffectOutcome.Applied, "Разыграли", null) },
+        { "change the rules", new ChangeRuleset(TestRuleset.Create()) },
+        { "undo", new Engine.Undo.UndoCommand(SequentialIds.Make(0x7C000000, 1), "Ошибка") },
+        { "deadline", new SetSeasonDeadline(FixedClock.SeasonStart.AddDays(3)) },
+        { "reach the deadline", new ReachDeadline() },
+        { "status", new ChangeSeasonStatus(SeasonStatus.Active) },
+        { "reroll", new Reroll(SequentialIds.Make(0x10000000, 1)) },
+        { "already played", new DeclareAlreadyPlayed(SequentialIds.Make(0x10000000, 1), SequentialIds.Make(0x20000000, 1)) },
+        { "choose", new Engine.Turns.MakeChoice(SequentialIds.Make(0x10000000, 1), SequentialIds.Make(0x50000000, 1), "a") },
+        { "proof", new Engine.Proofs.SubmitProof(SequentialIds.Make(0x10000000, 1), SequentialIds.Make(0x60000000, 1), ["https://imgur.com/a/1"]) },
+        { "approve", new Engine.Proofs.ApproveProof(SequentialIds.Make(0x60000000, 1), null, "Видел") },
+        { "reject", new Engine.Proofs.RejectProof(SequentialIds.Make(0x60000000, 1), "Другая игра") },
     };
 
     [Theory]
