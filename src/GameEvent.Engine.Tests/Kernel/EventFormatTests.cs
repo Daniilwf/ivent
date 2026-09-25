@@ -4,6 +4,7 @@ using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Map;
 using GameEvent.Engine.Players;
 using GameEvent.Engine.Proofs;
+using GameEvent.Engine.Ranking;
 using GameEvent.Engine.Rolls;
 using GameEvent.Engine.Rulesets;
 using GameEvent.Engine.Runs;
@@ -213,6 +214,16 @@ public class EventFormatTests
             new PlayerFinished(s_player, s_run, 2, s_at, 3),
             1,
             """{"playerId":"10000000-0000-0000-0000-000000000001","runId":"00000000-0000-0000-0000-000000000001","order":2,"finishedAt":"2026-10-01T12:30:00+00:00","surplus":3}"""
+        },
+        {
+            "season-result-recorded",
+            new SeasonResultRecorded(
+                [
+                    new LeaderboardRow(s_player, 1, 4, 0, true, false),
+                    new LeaderboardRow(s_other, 2, 12, null, false, false),
+                ]),
+            1,
+            """{"rows":[{"playerId":"10000000-0000-0000-0000-000000000001","place":1,"points":4,"cellsToFinish":0,"isFirst":true,"provisional":false},{"playerId":"10000000-0000-0000-0000-000000000002","place":2,"points":12,"cellsToFinish":null,"isFirst":false,"provisional":false}]}"""
         },
         {
             "finish-surplus-changed",

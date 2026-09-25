@@ -159,11 +159,18 @@ export function SeasonScreen({
     <main>
       <h1>{ru.app.title}</h1>
       {loadFailed && <p role="alert">{ru.app.loadError}</p>}
+      {season.deadline && (
+        <p data-testid="season-deadline">{ru.season.deadline(moscowTime(season.deadline))}</p>
+      )}
+      {season.status === 'closing' && <p data-testid="season-status">{ru.season.closing}</p>}
+      {(season.status === 'finished' || season.status === 'archived') && (
+        <p data-testid="season-status">{ru.season.finished}</p>
+      )}
       <section aria-labelledby="turn-title" data-testid="turn">
         <h2 id="turn-title">{ru.turn.title}</h2>
         {!me && <p>{ru.turn.spectator}</p>}
         {waiting && <p>{ru.app.loading}</p>}
-        {me?.phase === 'idle' && (
+        {me?.phase === 'idle' && season.status === 'active' && (
           <button data-testid="roll" disabled={pending} onClick={() => void act({ kind: 'roll' })}>
             {ru.turn.roll}
           </button>
@@ -349,4 +356,16 @@ export function SeasonScreen({
       </section>
     </main>
   );
+}
+
+/** A UTC instant as the Moscow date and time: deadlines are shown in Moscow time with an explicit label (SPEC). */
+function moscowTime(utc: string): string {
+  return new Date(utc).toLocaleString('ru-RU', {
+    timeZone: 'Europe/Moscow',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }

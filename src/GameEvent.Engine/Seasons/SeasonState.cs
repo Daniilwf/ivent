@@ -25,7 +25,8 @@ public sealed record SeasonState(
     ImmutableSortedDictionary<Guid, RunState> Runs,
     ImmutableSortedDictionary<Guid, PendingManualEffect> ManualEffects,
     int FinishesSoFar = 0,
-    long PointsChanges = 0)
+    long PointsChanges = 0,
+    EquatableArray<Ranking.LeaderboardRow>? Result = null)
 {
     public static SeasonState Empty { get; } =
         new(
@@ -58,7 +59,8 @@ public sealed record SeasonState(
         && Runs.SequenceEqual(other.Runs)
         && ManualEffects.SequenceEqual(other.ManualEffects)
         && FinishesSoFar == other.FinishesSoFar
-        && PointsChanges == other.PointsChanges;
+        && PointsChanges == other.PointsChanges
+        && Result == other.Result;
 
     public override int GetHashCode() => HashCode.Combine(SeasonId, Players.Count, Runs.Count);
 }

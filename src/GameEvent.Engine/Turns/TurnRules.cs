@@ -9,7 +9,7 @@ namespace GameEvent.Engine.Turns;
 /// The turn state machine (SPEC «Игровой цикл», K-5) as one table: which phase each player turn command needs.
 /// A pending choice blocks every turn command except <see cref="MakeChoice"/>, <see cref="DeclareAlreadyPlayed"/> and
 /// <see cref="Reroll"/>. Admin commands are not turn commands.
-/// Checks run in a fixed order: season active, player known, pending choice, phase. The active run limit is the
+/// Checks run in a fixed order: season active, deadline not passed, player known, pending choice, phase. The active run limit is the
 /// phase itself: a run starts only from Rolling, and RulesetSupport keeps the limit at 1 (D-91).
 /// </summary>
 internal static class TurnRules
@@ -27,13 +27,19 @@ internal static class TurnRules
     };
 
     /// <summary>Rejects <paramref name="command"/> of <paramref name="playerId"/> when the turn does not allow it; null when it does.</summary>
-    public static Decision? Check(SeasonState state, Guid playerId, ICommand command)
+    public static Decision? Check(SeasonState state, Guid playerId, ICommand command, DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(command);
 
         if (SeasonSetup.RequireActive(state) is { } inactive)
         {
             return inactive;
+        }
+
+        // The scheduler may be late: the engine's clock decides (D-101, invariant 11).
+        if (SeasonSetup.IsPastDeadline(state, now))
+        {
+            return Decision.Reject(RejectionCodes.SeasonDeadlinePassed, "The deadline has passed: no more turns this season.");
         }
 
         if (!state.Players.TryGetValue(playerId, out var player))

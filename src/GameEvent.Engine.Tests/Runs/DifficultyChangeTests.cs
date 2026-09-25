@@ -580,11 +580,7 @@ public class DifficultyChangeTests
     public void Change_after_the_season_is_finished_is_rejected(SeasonStatus status)
     {
         var (s, runId) = Completed(Difficulty.Hard, [5, 2]);
-        for (var next = SeasonStatus.Closing; next <= status; next++)
-        {
-            s.Act(new ChangeSeasonStatus(next));
-            ScenarioAssert.Accepted(s);
-        }
+        s.MoveStatusTo(status);
 
         ScenarioAssert.RejectsWithoutChanges(s, x => Change(x, runId, Difficulty.Normal), RejectionCodes.SeasonClosed);
     }

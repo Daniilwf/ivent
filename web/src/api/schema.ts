@@ -1942,6 +1942,178 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/seasons/{seasonId}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SeasonStatusRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CommandResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/seasons/{seasonId}/deadline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SeasonDeadlineRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CommandResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2625,12 +2797,30 @@ export interface components {
             /** Format: date-time */
             startedAt: string;
         };
+        /** @description The admin sets or removes (null) the deadline; only in draft or active (D-101). */
+        SeasonDeadlineRequest: {
+            /** Format: uuid */
+            commandId: string;
+            /** Format: date-time */
+            deadline: null | string;
+        };
         SeasonRules: {
             timezone: string;
             /** Format: int32 */
             maxActiveRunsPerPlayer: number;
             /** Format: int32 */
             inactiveHintDays: number;
+        };
+        /**
+         * @description Season lifecycle (GLOSSARY «Статус сезона»): draft → active → closing → finished → archived.
+         * @enum {unknown}
+         */
+        SeasonStatus: "draft" | "active" | "closing" | "finished" | "archived";
+        /** @description The admin moves the season to its next status (SE1, D-101): closing early, finishing, archiving. */
+        SeasonStatusRequest: {
+            /** Format: uuid */
+            commandId: string;
+            to: null | components["schemas"]["SeasonStatus"];
         };
         /** @description Sent to everyone watching a season after each committed command: refetch what you show. */
         SeasonUpdate: {
@@ -2642,9 +2832,16 @@ export interface components {
             toSequence: number;
             types: string[];
         };
+        /**
+         * @description The season screen's data. `status` and `deadline` (UTC; the screen shows it in Moscow time) follow the
+         *     lifecycle (D-101); after the finish `leaderboard` is the recorded result.
+         */
         SeasonView: {
             /** Format: uuid */
             id: string;
+            status: components["schemas"]["SeasonStatus"];
+            /** Format: date-time */
+            deadline: null | string;
             cells: components["schemas"]["CellView"][];
             players: components["schemas"]["PlayerView"][];
             leaderboard: components["schemas"]["LeaderboardRowView"][];
@@ -2727,6 +2924,7 @@ export const rerollPaymentValues: ReadonlyArray<FlattenedDeepRequired<components
 export const roleValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["Role"]> = ["player", "admin", "spectator"];
 export const roundingValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["Rounding"]> = ["nearest", "floor", "ceil"];
 export const runStatusValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["RunStatus"]> = ["playing", "completed", "dropped", "techRerolled", "rejected"];
+export const seasonStatusValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["SeasonStatus"]> = ["draft", "active", "closing", "finished", "archived"];
 export const turnPhaseValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["TurnPhase"]> = ["idle", "rolling", "playing"];
 export const unmetConditionPolicyValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["UnmetConditionPolicy"]> = ["noDiceKeepCoins", "countAsDrop", "ignore"];
 export type operations = Record<string, never>;

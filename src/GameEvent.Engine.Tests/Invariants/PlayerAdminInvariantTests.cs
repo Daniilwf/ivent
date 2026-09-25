@@ -345,7 +345,8 @@ public class PlayerAdminInvariantTests
         bool withDrops = false,
         bool withCorrections = false,
         bool withProofs = false,
-        bool finishes = false)
+        bool finishes = false,
+        bool lifecycle = false)
     {
         var s = NewSeason(seed, withChoice, rerolls, finishes);
         foreach (var b in script)
@@ -362,12 +363,81 @@ public class PlayerAdminInvariantTests
                 ? DropCommandFor(s, b, withChoice, rerolls != RerollMode.None)
                 : CommandFor(s, b, withChoice, rerolls != RerollMode.None);
             ICommand Other() => withProofs ? ProofCommandFor(s, b, Base) : Base();
-            var command = withCorrections ? CorrectionCommandFor(s, b, Other) : Other();
+            ICommand Corrected() => withCorrections ? CorrectionCommandFor(s, b, Other) : Other();
+            var command = lifecycle ? LifecycleCommandFor(s, b, Corrected) : Corrected();
             s.Act(command);
             afterEach?.Invoke(s, command, before, logLength);
         }
 
         return s;
+    }
+
+    /// <summary>
+    /// With the season lifecycle (C10, D-101), the admin's season commands with arguments 4–6 are instead: 4 a deadline a
+    /// few hours ahead of the engine's clock (4, 8, 12 or 16 by bits 0–1), 5 the scheduler's <see cref="ReachDeadline"/>,
+    /// 6 the admin checking the head of the proof queue (approve, or reject with bits 0–1 = 3), so the queue empties and
+    /// the season can finish; 7 stays the next status.
+    /// </summary>
+    private static ICommand LifecycleCommandFor(Scenario s, byte b, Func<ICommand> otherwise)
+    {
+        var arg = b / 32;
+        if ((b / 4) % 8 != 7 || arg is < 4 or > 6)
+        {
+            return otherwise();
+        }
+
+        var queue = ProofReviewOrder.Order(s.State);
+        var head = queue.Count > 0 ? queue[0] : Guid.Empty;
+        return arg switch
+        {
+            4 => new SetSeasonDeadline(s.Clock.UtcNow + TimeSpan.FromHours(4 * ((b % 4) + 1))),
+            5 => new ReachDeadline(),
+            _ when b % 4 == 3 => new RejectProof(head, "на скрине другая игра"),
+            _ => new ApproveProof(head, null, "проверено"),
+        };
+    }
+
+    [Property(MaxTest = 200)]
+    public void Invariants_hold_with_the_season_lifecycle(int seed, byte[] script) =>
+        Play(seed, script, CheckFinishInvariants, withDrops: true, withCorrections: true, withProofs: true, finishes: true, lifecycle: true);
+
+    [Property(MaxTest = 200)]
+    public void Invariants_hold_with_the_season_lifecycle_rerolls_and_a_choice_of_games(int seed, byte[] script) =>
+        Play(seed, script, CheckFinishInvariants, withChoice: true, rerolls: RerollMode.Coins, withDrops: true, withCorrections: true, withProofs: true, finishes: true, lifecycle: true);
+
+    [Property(MaxTest = 50)]
+    public void Same_seed_and_commands_give_the_same_log_with_the_season_lifecycle(int seed, byte[] script)
+    {
+        var first = Play(seed, script, withDrops: true, withCorrections: true, withProofs: true, finishes: true, lifecycle: true);
+        var second = Play(seed, script, withDrops: true, withCorrections: true, withProofs: true, finishes: true, lifecycle: true);
+
+        Assert.Equal(first.Log, second.Log);
+        Assert.Equal(first.State, second.State);
+    }
+
+    [Fact]
+    public void Lifecycle_variant_reaches_the_deadline_closing_and_the_result()
+    {
+        // Invariant 11 must meet its cases: over fixed scripts a turn is refused past the deadline, the scheduler closes
+        // a season, a season finishes with its result
+        var refused = false;
+        var closed = false;
+        var finished = false;
+        for (var seed = 0; seed < 60; seed++)
+        {
+            var x = (uint)seed + 11;
+            var script = Enumerable.Range(0, 400).Select(_ => (byte)((x = (x * 1103515245) + 12345) >> 16)).ToArray();
+            var s = Play(seed, script, (s, command, _, _) =>
+            {
+                refused |= !s.Last.IsAccepted && s.Last.Rejection!.Code == RejectionCodes.SeasonDeadlinePassed;
+                closed |= s.Last.IsAccepted && command is ReachDeadline;
+            }, withDrops: true, withCorrections: true, withProofs: true, finishes: true, lifecycle: true);
+            finished |= s.Log.OfType<SeasonResultRecorded>().Any();
+        }
+
+        Assert.True(refused, "No turn command was refused past the deadline.");
+        Assert.True(closed, "The scheduler never closed a season.");
+        Assert.True(finished, "No season finished with a result.");
     }
 
     [Property(MaxTest = 200)]
@@ -938,6 +1008,23 @@ public class PlayerAdminInvariantTests
             CheckAcceptedCommand(s, command, before);
         }
 
+        // 11 / K-7 / D-101: no player turn command is accepted once the engine's clock has reached the deadline — so no
+        // roll, reroll, start, completion dice or drop penalty of a player after it
+        if (s.Last.IsAccepted && before.Deadline is { } deadline && s.Clock.UtcNow >= deadline)
+        {
+            Assert.False(
+                command is RollGame or DeclareAlreadyPlayed or Reroll or MakeChoice or StartRun or CompleteRun or DropRun or TechReroll,
+                $"{command} was accepted at {s.Clock.UtcNow:O}, past the deadline {deadline:O}.");
+            Assert.DoesNotContain(s.Last.Events, e => e is GameRolled or GameChoiceRolled or GameRerolled or RunStarted or CompletionRolled or RunDropped);
+        }
+
+        // SE4 / D-101: the result is written once, at the finish, and never changes
+        var results = s.Log.OfType<SeasonResultRecorded>().ToList();
+        Assert.True(results.Count <= 1, "The result was written twice.");
+        Assert.Equal(results.SingleOrDefault()?.Rows, s.State.Result);
+        Assert.True(before.Result is null || before.Result == s.State.Result, "The result changed.");
+        Assert.Equal(s.State.Status is SeasonStatus.Finished or SeasonStatus.Archived, s.State.Result is not null);
+
         // 1. Replaying the log gives the stored state
         Assert.Equal(s.State, SeasonEngine.Replay(s.Log));
 
@@ -1199,14 +1286,30 @@ public class PlayerAdminInvariantTests
                 Assert.All(events.OfType<CoinsChanged>(), e => Assert.Equal(CoinsReason.StartingBalance, e.Reason));
                 Assert.All(events.OfType<PlayerMoved>(), e => Assert.Equal(MoveReason.StartingCell, e.Reason));
                 break;
+            case ChangeSeasonStatus { To: SeasonStatus.Finished }:
+                // SE4 / D-101: finished only with an empty proof queue; the result is the leaderboard at that moment
+                Assert.Equal(SeasonStatus.Closing, before.Status);
+                Assert.Empty(ProofReviewOrder.Order(before));
+                Assert.Equal(
+                    [new SeasonStatusChanged(SeasonStatus.Closing, SeasonStatus.Finished), new SeasonResultRecorded(Leaderboard.Build(before))],
+                    events);
+                break;
             case ChangeSeasonStatus change:
                 Assert.Equal([new SeasonStatusChanged(before.Status, change.To)], events);
                 Assert.Equal(before.Status + 1, change.To);
+                break;
+            case ReachDeadline:
+                // D-101: only an Active season, only once the deadline has come by the engine's clock
+                Assert.Equal(SeasonStatus.Active, before.Status);
+                Assert.True(before.Deadline is { } d && s.Clock.UtcNow >= d, "Closed before the deadline.");
+                Assert.Equal([new SeasonStatusChanged(SeasonStatus.Active, SeasonStatus.Closing)], events);
                 break;
             case SetPlayerInactive inactive:
                 Assert.Equal([new PlayerInactivitySet(inactive.PlayerId, inactive.IsInactive)], events);
                 break;
             case SetSeasonDeadline deadline:
+                // D-101: the deadline changes only in Draft and Active
+                Assert.True(before.Status is SeasonStatus.Draft or SeasonStatus.Active, $"Deadline changed while {before.Status}.");
                 Assert.Equal([new SeasonDeadlineSet(deadline.Deadline)], events);
                 break;
             case RollGame or StartRun:

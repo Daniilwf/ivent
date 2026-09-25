@@ -57,7 +57,7 @@ internal static class Rolling
 {
     public static Decision Decide(SeasonState state, RollGame command, EngineContext context)
     {
-        if (TurnRules.Check(state, command.PlayerId, command) is { } rejection)
+        if (TurnRules.Check(state, command.PlayerId, command, context.Clock.UtcNow) is { } rejection)
         {
             return rejection;
         }
@@ -69,7 +69,7 @@ internal static class Rolling
 
     public static Decision Decide(SeasonState state, DeclareAlreadyPlayed command, EngineContext context)
     {
-        if (TurnRules.Check(state, command.PlayerId, command) is { } rejection)
+        if (TurnRules.Check(state, command.PlayerId, command, context.Clock.UtcNow) is { } rejection)
         {
             return rejection;
         }
@@ -90,7 +90,7 @@ internal static class Rolling
 
     public static Decision Decide(SeasonState state, Reroll command, EngineContext context)
     {
-        if (TurnRules.Check(state, command.PlayerId, command) is { } rejection)
+        if (TurnRules.Check(state, command.PlayerId, command, context.Clock.UtcNow) is { } rejection)
         {
             return rejection;
         }

@@ -60,6 +60,10 @@ const rejection = {
   'review.invalidRating': 'Оценка — от 1 до 10.',
   'review.tooLong': 'Отзыв слишком длинный: не больше 2000 символов.',
   'season.closed': 'Сезон закрыт для этого действия.',
+  'season.deadlinePassed': 'Дедлайн прошёл: броски закрыты, пруфы принимаются.',
+  'season.deadlineNotReached': 'Дедлайн ещё не наступил.',
+  'season.proofsPending': 'Сначала проверьте все пруфы: итоги — только после проверки.',
+  'season.notActive': 'Сезон сейчас не идёт.',
   'player.finished': 'Позиция финишировавшего меняется только через его прохождения.',
   'player.unknown': 'Вы не участвуете в этом сезоне.',
   'season.notCreated': 'Сезон ещё не создан.',
@@ -212,6 +216,11 @@ export const ru = {
     start: 'Старт',
     finish: 'Финиш',
     cell: '·',
+  },
+  season: {
+    deadline: (text: string) => `Дедлайн: ${text} МСК`,
+    closing: 'Дедлайн прошёл: броски закрыты, пруфы принимаются.',
+    finished: 'Сезон завершён. Итоги ниже.',
   },
   leaderboard: {
     title: 'Лидерборд',

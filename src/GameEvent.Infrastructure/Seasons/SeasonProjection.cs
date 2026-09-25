@@ -62,6 +62,22 @@ internal static class SeasonProjection
             }
         }
 
+        // The final table is written once, when the season finishes (D-101).
+        if (before.Result is null && after.Result is { } result)
+        {
+            db.SeasonResults.AddRange(result.Select((r, i) => new SeasonResultRecord
+            {
+                SeasonId = after.SeasonId,
+                Row = i,
+                PlayerId = r.PlayerId,
+                Place = r.Place,
+                Points = r.Points,
+                CellsToFinish = r.CellsToFinish,
+                IsFirst = r.IsFirst,
+                Provisional = r.Provisional,
+            }));
+        }
+
         foreach (var (id, player) in after.Players)
         {
             if (before.Players.TryGetValue(id, out var old) && old == player)
@@ -232,6 +248,7 @@ internal static class SeasonProjection
         var effects = await db.ManualEffects.AsNoTracking().Where(x => x.SeasonId == replayed.SeasonId).ToListAsync(ct);
         var reviews = await db.Reviews.AsNoTracking().Where(x => x.SeasonId == replayed.SeasonId).ToDictionaryAsync(x => x.RunId, ct);
         var proofs = await db.Proofs.AsNoTracking().Where(x => x.SeasonId == replayed.SeasonId).ToDictionaryAsync(x => x.RunId, ct);
+        var result = await db.SeasonResults.AsNoTracking().Where(x => x.SeasonId == replayed.SeasonId).OrderBy(x => x.Row).ToListAsync(ct);
         var playerIds = players.Select(p => p.Id).ToList();
         var exclusions = (await db.Exclusions.AsNoTracking().Where(x => playerIds.Contains(x.PlayerId)).ToListAsync(ct))
             .ToLookup(x => x.PlayerId);
@@ -285,6 +302,9 @@ internal static class SeasonProjection
             ManualEffects = effects.ToImmutableSortedDictionary(
                 x => x.Id,
                 x => new PendingManualEffect(x.Id, x.PlayerId, x.DrawEvent, x.Source, x.RunId)),
+            Result = result.Count == 0
+                ? null
+                : [.. result.Select(x => new Engine.Ranking.LeaderboardRow(x.PlayerId, x.Place, x.Points, x.CellsToFinish, x.IsFirst, x.Provisional))],
         };
     }
 }

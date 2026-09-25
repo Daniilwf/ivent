@@ -52,6 +52,29 @@ public sealed class SeasonRecord
 }
 
 /// <summary>
+/// A row of the season's final table (SPEC «Модель данных»: SeasonResult), written once when the season finishes
+/// (D-101). <see cref="Row"/> keeps the order of the table.
+/// </summary>
+public sealed class SeasonResultRecord
+{
+    public Guid SeasonId { get; set; }
+
+    public int Row { get; set; }
+
+    public Guid PlayerId { get; set; }
+
+    public int Place { get; set; }
+
+    public int Points { get; set; }
+
+    public int? CellsToFinish { get; set; }
+
+    public bool IsFirst { get; set; }
+
+    public bool Provisional { get; set; }
+}
+
+/// <summary>
 /// One version of a season's rules (SPEC «Модель данных»: Ruleset — version, config, date, who changed it).
 /// A projection of season-created and ruleset-changed events (D-82): the log stays the source of truth.
 /// </summary>

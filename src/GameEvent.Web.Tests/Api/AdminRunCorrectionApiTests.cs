@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Players;
+using GameEvent.Engine.Proofs;
 using GameEvent.Engine.Runs;
 using GameEvent.Engine.Seasons;
 using GameEvent.Infrastructure.Queue;
@@ -302,7 +303,10 @@ public sealed class AdminRunCorrectionApiTests : IAsyncLifetime
     [InlineData("difficulty")]
     public async Task Correcting_after_the_season_is_finished_is_a_conflict(string action)
     {
+        // The season finishes only with every run checked (D-101); a correction of an approved run is allowed while the
+        // season is open, so after the finish only the season being over stops it
         var run = await VasyaCompletedAsync();
+        await _site.SendAsync(new ApproveProof(run.Id, null, "Видел на стриме"));
         await _site.SendAsync(new ChangeSeasonStatus(SeasonStatus.Closing));
         await _site.SendAsync(new ChangeSeasonStatus(SeasonStatus.Finished));
         var admin = await _site.SignedInAsync("admin");

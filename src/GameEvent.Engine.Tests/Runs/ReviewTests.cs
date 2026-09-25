@@ -317,12 +317,5 @@ public class ReviewTests
         ScenarioAssert.RejectsWithoutChanges(s, x => x.Review("Вася", runId, 10), RejectionCodes.SeasonClosed);
     }
 
-    private static void MoveTo(Scenario s, SeasonStatus status)
-    {
-        while (s.State.Status < status)
-        {
-            s.Act(new ChangeSeasonStatus(s.State.Status + 1));
-            ScenarioAssert.Accepted(s);
-        }
-    }
+    private static void MoveTo(Scenario s, SeasonStatus status) => s.MoveStatusTo(status);
 }

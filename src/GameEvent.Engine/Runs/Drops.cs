@@ -59,7 +59,7 @@ internal static class Drops
 {
     public static Decision Decide(SeasonState state, DropRun command, EngineContext context)
     {
-        if (TurnRules.Check(state, command.PlayerId, command) is { } rejection)
+        if (TurnRules.Check(state, command.PlayerId, command, context.Clock.UtcNow) is { } rejection)
         {
             return rejection;
         }
@@ -76,7 +76,7 @@ internal static class Drops
 
     public static Decision Decide(SeasonState state, TechReroll command, EngineContext context)
     {
-        if (TurnRules.Check(state, command.PlayerId, command) is { } rejection)
+        if (TurnRules.Check(state, command.PlayerId, command, context.Clock.UtcNow) is { } rejection)
         {
             return rejection;
         }
