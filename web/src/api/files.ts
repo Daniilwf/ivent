@@ -13,9 +13,9 @@ export class UploadError extends Error {
 }
 
 /**
- * Uploads one picture (D-108) as multipart with the antiforgery header. A new command id each time; the server stores it
- * once even if the request is repeated. The typed client builds JSON requests, so the form goes through fetch itself;
- * the answer is still the generated type.
+ * Uploads one picture (D-108) as multipart with the antiforgery header. Each call is a new upload with a new command id
+ * (a retry of the same request on the server stores it once). The typed client builds JSON requests, so the form goes
+ * through fetch itself; the answer is still the generated type.
  */
 export async function uploadFile(file: File): Promise<StoredFile> {
   const form = new FormData();
@@ -29,7 +29,10 @@ export async function uploadFile(file: File): Promise<StoredFile> {
   });
   const body: unknown = await response.json().catch(() => null);
   if (!response.ok) {
-    throw new UploadError(rejectionCode(body));
+    // A proxy or the rate limiter answers without a code: the status still says why
+    const byStatus =
+      response.status === 413 ? 'file.tooLarge' : response.status === 429 ? 'file.tooOften' : null;
+    throw new UploadError(rejectionCode(body) ?? byStatus);
   }
   return body as StoredFile;
 }

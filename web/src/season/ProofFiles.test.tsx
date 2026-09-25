@@ -1,6 +1,6 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { Schemas } from '../api/client';
+import { refreshCsrf, type Schemas } from '../api/client';
 import { ru } from '../i18n/ru';
 import { ProofSection } from './ProofForm';
 
@@ -117,6 +117,38 @@ describe('Screenshots in the proof', () => {
     await userEvent.upload(screen.getByTestId('proof-file'), picture());
 
     expect(await screen.findByRole('alert')).toHaveTextContent(ru.upload.failed);
+  });
+
+  it('sends the antiforgery token with the upload', async () => {
+    const sent: { url: string; headers: Record<string, string> }[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: Request | string, init?: RequestInit) => {
+        const url = typeof input === 'string' ? input : input.url;
+        if (url.endsWith('/api/auth/antiforgery')) {
+          return Promise.resolve(json(200, { headerName: 'X-CSRF-TOKEN', token: 'token-1' }));
+        }
+        sent.push({ url, headers: (init?.headers ?? {}) as Record<string, string> });
+        return Promise.resolve(json(200, shot(1)));
+      }),
+    );
+    await refreshCsrf();
+    renderForm();
+
+    await userEvent.upload(screen.getByTestId('proof-file'), picture());
+
+    await screen.findByRole('img', { name: ru.proof.shotAlt(1) });
+    expect(sent).toHaveLength(1);
+    expect(sent[0]?.headers['X-CSRF-TOKEN']).toBe('token-1');
+  });
+
+  it('says why when the server refuses by status only', async () => {
+    serveUploads([new Response('', { status: 429 })]);
+    renderForm();
+
+    await userEvent.upload(screen.getByTestId('proof-file'), picture());
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(ru.upload.errors['file.tooOften']);
   });
 
   it('offers no more upload after five screenshots', async () => {

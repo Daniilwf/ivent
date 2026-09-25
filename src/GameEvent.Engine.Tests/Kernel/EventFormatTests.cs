@@ -451,6 +451,26 @@ public class EventFormatTests
     }
 
     [Fact]
+    public void A_proof_in_a_snapshot_writes_its_screenshots_and_leaves_out_an_empty_list()
+    {
+        // D-116: undo snapshots carry ProofState; without screenshots its frozen form stays, with them it gains "files"
+        var withShots = new ProofState(ProofStatus.Pending, [], null, null, s_at, null, [Guid.Parse("50000000-0000-0000-0000-000000000001")]);
+        var without = withShots with { Files = [] };
+
+        var written = System.Text.Json.JsonSerializer.Serialize(withShots, EngineJson.Options);
+        var plain = System.Text.Json.JsonSerializer.Serialize(without, EngineJson.Options);
+
+        Assert.Equal(
+            """{"status":"pending","links":[],"note":null,"witnessId":null,"submittedAt":"2026-10-01T12:30:00+00:00","comment":null,"files":["50000000-0000-0000-0000-000000000001"]}""",
+            written);
+        Assert.Equal(
+            """{"status":"pending","links":[],"note":null,"witnessId":null,"submittedAt":"2026-10-01T12:30:00+00:00","comment":null}""",
+            plain);
+        Assert.Equal(withShots, System.Text.Json.JsonSerializer.Deserialize<ProofState>(written, EngineJson.Options));
+        Assert.Equal(without, System.Text.Json.JsonSerializer.Deserialize<ProofState>(plain, EngineJson.Options));
+    }
+
+    [Fact]
     public void Proof_submitted_v1_reads_with_no_files()
     {
         // The frozen v1 of proof-submitted (before D-116): the log keeps it as it was, the upcaster adds no screenshots

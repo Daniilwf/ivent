@@ -272,19 +272,19 @@ public static class SeasonEndpoints
             .RequireAuthorization(Policies.Player)
             .WithActionErrors();
 
-        seasons.MapPost("/runs/{runId:guid}/proof", async (Guid seasonId, Guid runId, ProofRequest request, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, CancellationToken ct) =>
+        seasons.MapPost("/runs/{runId:guid}/proof", (Guid seasonId, Guid runId, ProofRequest request, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, CancellationToken ct) =>
             ProofInvalid(request) is { } invalid
-                ? invalid
-                : await ForeignFilesAsync(request.Files ?? [], user, db, ct) is { } foreign
-                    ? foreign
-                    : await ActAsync(
-                        seasonId,
-                        request.CommandId,
-                        user,
-                        db,
-                        bus,
-                        playerId => new SubmitProof(playerId, runId, [.. request.Links!.OfType<string>()], request.Note, request.WitnessId, [.. request.Files ?? []]),
-                        ct))
+                ? Task.FromResult<ActionResult>(invalid)
+                : ActAsync(
+                    seasonId,
+                    request.CommandId,
+                    user,
+                    db,
+                    bus,
+                    playerId => new SubmitProof(playerId, runId, [.. request.Links!.OfType<string>()], request.Note, request.WitnessId, [.. request.Files ?? []]),
+                    ct,
+                    // After the season, the command id and the player are known: a spectator gets 403, not a file refusal
+                    () => ForeignFilesAsync(request.Files ?? [], user, db, ct)))
             .RequireAuthorization(Policies.Player)
             .WithActionErrors();
 
@@ -386,7 +386,14 @@ public static class SeasonEndpoints
             .Produces<RejectionProblem>(StatusCodes.Status409Conflict, "application/problem+json");
 
     private static async Task<ActionResult> ActAsync(
-        Guid seasonId, Guid commandId, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, Func<Guid, ICommand> command, CancellationToken ct)
+        Guid seasonId,
+        Guid commandId,
+        ClaimsPrincipal user,
+        GameEventDbContext db,
+        CommandBus bus,
+        Func<Guid, ICommand> command,
+        CancellationToken ct,
+        Func<Task<Microsoft.AspNetCore.Http.HttpResults.ProblemHttpResult?>>? check = null)
     {
         if (await PrecheckAsync(seasonId, commandId, db, ct) is { } refused)
         {
@@ -402,6 +409,11 @@ public static class SeasonEndpoints
         if (playerId is null)
         {
             return TypedResults.Forbid();
+        }
+
+        if (check is not null && await check() is { } refusedByCheck)
+        {
+            return refusedByCheck;
         }
 
         return await SendAsync(seasonId, commandId, command(playerId.Value), userId, bus, ct);

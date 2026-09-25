@@ -1,4 +1,4 @@
-import { useState, type ChangeEvent, type SyntheticEvent } from 'react';
+import { useRef, useState, type ChangeEvent, type SyntheticEvent } from 'react';
 import type { Schemas } from '../api/client';
 import { uploadFile, UploadError } from '../api/files';
 import { ru } from '../i18n/ru';
@@ -45,6 +45,7 @@ export function ProofSection({
   const [links, setLinks] = useState(['']);
   const [shots, setShots] = useState<Shot[]>([]);
   const [uploading, setUploading] = useState(false);
+  const fileInput = useRef<HTMLInputElement>(null);
   const [note, setNote] = useState('');
   const [witness, setWitness] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -151,7 +152,9 @@ export function ProofSection({
                     type="button"
                     aria-label={ru.proof.removeShot(i + 1)}
                     onClick={() => {
-                      setShots(shots.filter((x) => x.id !== s.id));
+                      setShots((current) => current.filter((x) => x.id !== s.id));
+                      // The button is gone: the keyboard goes on from the file field
+                      requestAnimationFrame(() => fileInput.current?.focus());
                     }}
                   >
                     {ru.proof.remove}
@@ -164,6 +167,7 @@ export function ProofSection({
             <label>
               {ru.proof.shot}
               <input
+                ref={fileInput}
                 data-testid="proof-file"
                 type="file"
                 accept={pictureTypes}
@@ -174,7 +178,7 @@ export function ProofSection({
               />
             </label>
           )}
-          {uploading && <p role="status">{ru.upload.uploading}</p>}
+          <p role="status">{uploading ? ru.upload.uploading : ''}</p>
           <label>
             {ru.proof.note}
             <textarea

@@ -237,7 +237,7 @@ export const ru = {
     note: 'Заметка',
     submit: 'Отправить пруф',
     linkRequired: 'Добавьте ссылку или скрин либо выберите свидетеля.',
-    shot: 'Скрин (картинка до 15 МБ, GIF до 8 МБ)',
+    shot: 'Скрин (JPEG, PNG, WebP или GIF)',
     shotAlt: (n: number) => `Скрин ${n}`,
     removeShot: (n: number) => `Убрать скрин ${n}`,
     remove: 'Убрать',
@@ -257,7 +257,8 @@ export const ru = {
     errors: {
       'file.typeInvalid': 'Это не картинка: подходят JPEG, PNG, WebP и GIF.',
       'file.broken': 'Картинка повреждена или обрезана.',
-      'file.tooLarge': 'Файл слишком большой: картинка до 15 МБ, GIF до 8 МБ.',
+      'file.tooLarge': 'Файл слишком большой.',
+      'file.tooOften': 'Слишком много загрузок подряд. Подождите минуту.',
       'file.tooManyPixels': 'Картинка слишком большого разрешения.',
       'file.tooManyFrames': 'В GIF слишком много кадров.',
       'file.dailyLimit': 'На сегодня лимит загрузок исчерпан.',
