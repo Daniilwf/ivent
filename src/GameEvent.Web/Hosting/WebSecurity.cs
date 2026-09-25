@@ -37,7 +37,40 @@ public static class WebSecurity
         {
             context.RejectPrincipal();
             await context.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            return;
         }
+
+        context.HttpContext.Items[MustChangePasswordKey] = user!.MustChangePassword;
+    }
+
+    /// <summary>Set for a signed-in request whose account still has a temporary password (D-106).</summary>
+    public const string MustChangePasswordKey = "ge.mustChangePassword";
+
+    // A temporary password opens only what it takes to replace it (D-106).
+    private static readonly string[] s_openWithTemporaryPassword =
+        ["/api/auth/me", "/api/auth/password", "/api/auth/logout", "/api/auth/antiforgery", "/api/auth/login"];
+
+    /// <summary>
+    /// With a temporary password every API call but the password change is refused, the hub too: 403 with
+    /// <c>account.mustChangePassword</c> (A1, D-106).
+    /// </summary>
+    public static async Task RequirePasswordChangeAsync(HttpContext http, Func<Task> next)
+    {
+        ArgumentNullException.ThrowIfNull(http);
+        ArgumentNullException.ThrowIfNull(next);
+        if (http.Items.TryGetValue(MustChangePasswordKey, out var must) && must is true
+            && (http.Request.Path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase)
+                || http.Request.Path.StartsWithSegments("/hubs", StringComparison.OrdinalIgnoreCase))
+            && !s_openWithTemporaryPassword.Any(p => http.Request.Path.Equals(p, StringComparison.OrdinalIgnoreCase)))
+        {
+            http.Response.StatusCode = StatusCodes.Status403Forbidden;
+            await http.Response.WriteAsJsonAsync(
+                new { title = "Change the temporary password first.", status = 403, code = "account.mustChangePassword" },
+                http.RequestAborted);
+            return;
+        }
+
+        await next();
     }
 
     /// <summary>

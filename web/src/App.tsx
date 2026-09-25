@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api, refreshCsrf, type Schemas } from './api/client';
+import { ChangePasswordForm } from './app/ChangePasswordForm';
 import { LoginForm } from './app/LoginForm';
 import { ru } from './i18n/ru';
 import { SeasonScreen } from './season/SeasonScreen';
@@ -8,6 +9,7 @@ type State =
   | { kind: 'loading' }
   | { kind: 'failed' }
   | { kind: 'signedOut' }
+  | { kind: 'changePassword' }
   | { kind: 'signedIn'; user: Schemas['CurrentUser']; seasonId: string | null };
 
 export function App() {
@@ -18,6 +20,12 @@ export function App() {
   }, []);
 
   const enter = useCallback(async (user: Schemas['CurrentUser']) => {
+    // A temporary password opens nothing but its change (D-106)
+    if (user.mustChangePassword) {
+      setState({ kind: 'changePassword' });
+      return;
+    }
+
     const { data, response } = await api.GET('/api/seasons/current');
     if (data) setState({ kind: 'signedIn', user, seasonId: data.id });
     else if (response.status === 404) setState({ kind: 'signedIn', user, seasonId: null });
@@ -50,6 +58,21 @@ export function App() {
 
   if (state.kind === 'loading') return <p>{ru.app.loading}</p>;
   if (state.kind === 'failed') return <p role="alert">{ru.app.loadError}</p>;
+  if (state.kind === 'changePassword')
+    return (
+      <>
+        <ChangePasswordForm
+          onChanged={(user) => {
+            void enter(user).catch(() => {
+              setState({ kind: 'failed' });
+            });
+          }}
+        />
+        <button data-testid="logout" onClick={() => void logout()}>
+          {ru.login.logout}
+        </button>
+      </>
+    );
   if (state.kind === 'signedOut')
     return (
       <LoginForm

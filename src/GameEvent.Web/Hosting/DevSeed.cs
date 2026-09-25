@@ -7,15 +7,14 @@ using GameEvent.Infrastructure.Accounts;
 using GameEvent.Infrastructure.Database;
 using GameEvent.Infrastructure.Pool;
 using GameEvent.Infrastructure.Queue;
-using GameEvent.Web.Accounts;
 using Microsoft.EntityFrameworkCore;
 
 namespace GameEvent.Web.Hosting;
 
 /// <summary>
 /// Small seed for local development (`dotnet run -- seed-dev`, Development only): an admin, three players,
-/// a spectator, the pool from content/pool.dev.json and a season. Accounts and the pool are written directly
-/// (there are no account or pool commands yet, tasks D8 and E2); the season goes through the command queue.
+/// a spectator, the pool from content/pool.dev.json and a season. Accounts and the season go through the command queue;
+/// the pool is written directly (there are no pool commands yet, task E2).
 /// </summary>
 public static class DevSeed
 {
@@ -41,30 +40,27 @@ public static class DevSeed
         IServiceProvider services, IDbContextFactory<GameEventDbContext> factory, string contentRoot, CancellationToken ct)
     {
         await using var db = await factory.CreateDbContextAsync(ct);
-        if (await db.Users.AnyAsync(ct))
-        {
-            return;
-        }
+        var seedAccounts = !await db.Users.AnyAsync(ct);
 
         var password = services.GetRequiredService<IConfiguration>()["DevSeed:Password"]
             ?? throw new InvalidOperationException("DevSeed:Password is not set (appsettings.Development.json).");
-        var passwords = services.GetRequiredService<Passwords>();
-        var clock = services.GetRequiredService<IClock>();
-        foreach (var (login, name, role) in s_users)
+
+        // Accounts go through the queue like any account (D-106), with a known password and no change required
+        var bus = services.GetRequiredService<CommandBus>();
+        foreach (var (login, name, role) in seedAccounts ? s_users : [])
         {
-            var user = new UserRecord
+            var outcome = await bus.SendAsync(
+                new CommandEnvelope(Guid.CreateVersion7(), Guid.Empty, new SeedAccount(login, name, role, password), AuthorId: null), ct);
+            if (!outcome.IsAccepted)
             {
-                Id = Guid.CreateVersion7(),
-                Login = login,
-                NormalizedLogin = UserRecord.Normalize(login),
-                Name = name,
-                PasswordHash = "",
-                SecurityStamp = Guid.NewGuid().ToString("N"),
-                Role = role,
-                CreatedAt = clock.UtcNow,
-            };
-            user.PasswordHash = passwords.Hash(user, password);
-            db.Users.Add(user);
+                throw new InvalidOperationException($"Seed account {login} was rejected: {outcome.Rejection}");
+            }
+        }
+
+        // The pool on its own check: a failed pool load is seeded on the next run even with the accounts in place
+        if (await db.Games.AnyAsync(ct))
+        {
+            return;
         }
 
         var pool = JsonSerializer.Deserialize<PoolFile>(

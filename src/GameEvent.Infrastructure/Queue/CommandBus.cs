@@ -9,8 +9,11 @@ namespace GameEvent.Infrastructure.Queue;
 /// </summary>
 public sealed record CommandEnvelope(Guid CommandId, Guid SeasonId, ICommand Command, Guid? AuthorId);
 
-/// <summary>Result of a command: accepted with its events, rejected, or a duplicate of an earlier command.</summary>
-public sealed record CommandOutcome(bool IsAccepted, bool IsDuplicate, Rejection? Rejection, IReadOnlyList<LoggedEvent> Events);
+/// <summary>
+/// Result of a command: accepted with its events, rejected, or a duplicate of an earlier command. <see cref="Secret"/>
+/// is a temporary password an account command made (D-106): given back once, never stored or repeated.
+/// </summary>
+public sealed record CommandOutcome(bool IsAccepted, bool IsDuplicate, Rejection? Rejection, IReadOnlyList<LoggedEvent> Events, string? Secret = null);
 
 /// <summary>An event after commit, with its place in the season log.</summary>
 public sealed record LoggedEvent(Guid SeasonId, long Sequence, Guid CommandId, IGameEvent Event, DateTimeOffset OccurredAt);

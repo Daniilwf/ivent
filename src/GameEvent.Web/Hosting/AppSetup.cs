@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 using GameEvent.Engine.Kernel;
+using GameEvent.Infrastructure.Accounts;
 using GameEvent.Infrastructure.Database;
 using GameEvent.Infrastructure.Kernel;
 using GameEvent.Infrastructure.Queue;
@@ -43,6 +44,8 @@ public static class AppSetup
         services.AddSingleton<CommandBus>();
         services.AddSingleton<SeasonBroadcaster>();
         services.AddSingleton<ICommittedEventsListener>(sp => sp.GetRequiredService<SeasonBroadcaster>());
+        services.AddSingleton<HubSessions>();
+        services.AddSingleton<ICommittedEventsListener>(sp => sp.GetRequiredService<HubSessions>());
         services.AddHostedService<SeasonBroadcastWorker>();
         services.AddHostedService<CommandProcessor>();
         // Checked at startup: a bad interval stops the site before it serves anything (D-101).
@@ -69,6 +72,7 @@ public static class AppSetup
         var securePolicy = local ? CookieSecurePolicy.SameAsRequest : CookieSecurePolicy.Always;
 
         services.AddSingleton<Passwords>();
+        services.AddSingleton<IPasswords>(sp => sp.GetRequiredService<Passwords>());
         services.AddSingleton<LoginThrottle>();
         services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
             .AddCookie(o =>
@@ -138,6 +142,7 @@ public static class AppSetup
         app.UseExceptionHandler();
         app.UseStatusCodePages();
         app.UseAuthentication();
+        app.Use((http, next) => WebSecurity.RequirePasswordChangeAsync(http, () => next(http)));
         app.UseAuthorization();
         app.UseRateLimiter();
 
@@ -155,6 +160,7 @@ public static class AppSetup
         api.MapAdminRuns();
         api.MapAdminProofs();
         api.MapAdminSeasons();
+        api.MapAdminAccounts();
         app.MapHub<SeasonHub>(SeasonHub.Path);
 
         if (frontend is not null)
