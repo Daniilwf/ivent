@@ -18,7 +18,25 @@ vi.mock('../api/realtime', () => ({
 const seasonId = '5ea50000-0000-0000-0000-000000000001';
 const me = '10000000-0000-0000-0000-000000000001';
 
+// Cells to the finish on the fixture map start → c1 → finish (the server computes them, D-100)
+const cellsToFinish: Record<string, number> = { start: 2, c1: 1, finish: 0 };
+
+/** The server's leaderboard for fixture players already listed in place order (one player per place). */
+function leaderboardOf(players: Schemas['PlayerView'][]): Schemas['LeaderboardRowView'][] {
+  return players.map((p, i) => ({
+    playerId: p.id,
+    place: i + 1,
+    points: p.points,
+    cellsToFinish: cellsToFinish[p.cellId] ?? null,
+    isFirst: false,
+    provisional: false,
+  }));
+}
+
 function season(overrides: Partial<Schemas['SeasonView']> = {}): Schemas['SeasonView'] {
+  const players = overrides.players ?? [
+    { id: me, name: 'Вася', cellId: 'start', points: 0, phase: 'idle', finishOrder: null },
+  ];
   return {
     id: seasonId,
     cells: [
@@ -26,9 +44,7 @@ function season(overrides: Partial<Schemas['SeasonView']> = {}): Schemas['Season
       { id: 'c1', type: 'empty' },
       { id: 'finish', type: 'finish' },
     ],
-    players: [
-      { id: me, name: 'Вася', cellId: 'start', points: 0, phase: 'idle', finishOrder: null },
-    ],
+    players,
     me: {
       playerId: me,
       phase: 'idle',
@@ -46,6 +62,7 @@ function season(overrides: Partial<Schemas['SeasonView']> = {}): Schemas['Season
     },
     lastSequence: 3,
     ...overrides,
+    leaderboard: overrides.leaderboard ?? leaderboardOf(players),
   };
 }
 
@@ -141,7 +158,7 @@ describe('SeasonScreen', () => {
     });
 
     expect(await screen.findByTestId(`leader-${me}`)).toHaveTextContent(
-      ru.leaderboard.row('Вася', 4),
+      ru.leaderboard.row(1, 'Вася', 4, 1),
     );
     expect(screen.getByTestId('cell-c1')).toHaveTextContent('Вася');
   });

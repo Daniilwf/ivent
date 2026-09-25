@@ -2279,6 +2279,22 @@ export interface components {
             enabled: boolean;
             steps: components["schemas"]["EquatableArrayOfLengthFilterStep"];
         };
+        /**
+         * @description A leaderboard row in place order (D-100): tied players share `place`; `isFirst` — the first finisher, on top
+         *     whatever the points, `provisional` until frozen; `cellsToFinish` — fewest forward steps to the finish.
+         */
+        LeaderboardRowView: {
+            /** Format: uuid */
+            playerId: string;
+            /** Format: int32 */
+            place: number;
+            /** Format: int32 */
+            points: number;
+            /** Format: int32 */
+            cellsToFinish: null | number;
+            isFirst: boolean;
+            provisional: boolean;
+        };
         LoggedEventView: {
             /** Format: int64 */
             sequence: number;
@@ -2631,6 +2647,7 @@ export interface components {
             id: string;
             cells: components["schemas"]["CellView"][];
             players: components["schemas"]["PlayerView"][];
+            leaderboard: components["schemas"]["LeaderboardRowView"][];
             me: null | components["schemas"]["MyTurnView"];
             /** Format: int64 */
             lastSequence: number;

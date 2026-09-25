@@ -5,6 +5,7 @@ using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Map;
 using GameEvent.Engine.Players;
 using GameEvent.Engine.Proofs;
+using GameEvent.Engine.Ranking;
 using GameEvent.Engine.Rolls;
 using GameEvent.Engine.Rulesets;
 using GameEvent.Engine.Runs;
@@ -81,6 +82,16 @@ public class PlayerAdminInvariantTests
     /// The finish variant (C9a, D-99) plays on a map of <see cref="ShortMapLength"/> steps, so finishes, bonuses, freezes and
     /// revokes happen often, with more games in the pool; <c>finish.requireApprovalForFirst</c> is off for every third seed.
     /// </remarks>
+    private static EquatableArray<Tiebreaker> TiebreakersFor(int seed) =>
+        (((seed % 5) + 5) % 5) switch
+        {
+            0 => [Tiebreaker.CompletedRuns, Tiebreaker.EarliestFinalScore],
+            1 => [Tiebreaker.EarliestFinalScore, Tiebreaker.CompletedRuns],
+            2 => [Tiebreaker.CompletedRuns],
+            3 => [Tiebreaker.EarliestFinalScore],
+            _ => [],
+        };
+
     private static Scenario NewSeason(int seed, bool withChoice = false, RerollMode rerolls = RerollMode.None, bool finishes = false)
     {
         var s = Scenario.New(seed: seed)
@@ -95,6 +106,8 @@ public class PlayerAdminInvariantTests
             .WithGame("Unknown Length", null, "Puzzle")
             .WithCategory("Action", weight: 1)
             .WithGame("Doom", 4, "Action");
+        // Invariant 10: the tiebreakers vary by the seed — default, swapped, one of each alone, none
+        s.WithRuleset(r => r with { Ranking = new RankingRules { Tiebreakers = TiebreakersFor(seed) } });
         if (finishes)
         {
             s.WithRuleset(r => r with { Finish = r.Finish with { RequireApprovalForFirst = ((seed % 3) + 3) % 3 != 1 } })
@@ -443,6 +456,32 @@ public class PlayerAdminInvariantTests
         Assert.Contains(typeof(PlayerFinishRevoked), seen);
         Assert.True(bonus, "No finish bonus in the finish variant.");
         Assert.True(revokedBonus, "No finish bonus taken back in the finish variant.");
+    }
+
+    [Fact]
+    public void Finish_variant_reaches_shared_places_and_ties_broken_by_a_tiebreaker()
+    {
+        // Invariant 10 must meet the cases it is about: over fixed scripts, rows sharing a place (not the first) and rows
+        // with equal points but different places (a tiebreaker decided) both come out, and every tiebreak setting is used
+        var shared = 0;
+        var broken = 0;
+        var settings = new HashSet<string>();
+        for (var seed = 0; seed < 60; seed++)
+        {
+            var x = (uint)seed + 7;
+            var script = Enumerable.Range(0, 400).Select(_ => (byte)((x = (x * 1103515245) + 12345) >> 16)).ToArray();
+            Play(seed, script, (s, _, _, _) =>
+            {
+                var rows = Leaderboard.Build(s.State).Where(r => !r.IsFirst).ToList();
+                shared += rows.GroupBy(r => r.Place).Count(g => g.Count() > 1);
+                broken += rows.GroupBy(r => r.Points).Count(g => g.Select(r => r.Place).Distinct().Count() > 1);
+                settings.Add(string.Join(",", s.State.Rules.Ranking.Tiebreakers));
+            }, withDrops: true, withCorrections: true, withProofs: true, finishes: true);
+        }
+
+        Assert.True(shared > 0, "No shared place in the finish variant.");
+        Assert.True(broken > 0, "No tie broken by a tiebreaker in the finish variant.");
+        Assert.Equal(5, settings.Count);
     }
 
     [Property(MaxTest = 50)]
@@ -1011,6 +1050,104 @@ public class PlayerAdminInvariantTests
             .Concat(s.State.Runs.Values.Where(r => r.Status == RunStatus.Playing).Select(r => r.GameId))
             .ToList();
         Assert.Equal(busy.Count, busy.Distinct().Count());
+
+        // D-100: points changes are numbered by the fold of the log — every non-zero change the next number, each player
+        // keeps his last one
+        var ticks = new Dictionary<Guid, long>();
+        long changes = 0;
+        foreach (var e in s.Log.OfType<PointsChanged>().Where(e => e.Delta != 0))
+        {
+            ticks[e.PlayerId] = ++changes;
+        }
+
+        Assert.Equal(changes, s.State.PointsChanges);
+        Assert.All(s.State.Players.Values, p => Assert.Equal(ticks.GetValueOrDefault(p.PlayerId), p.PointsTick));
+
+        // 10 / P5, P7, P8, P11: the entries the engine ranks are the log's (points, cell, standing finish, freeze, counted
+        // runs, tick), and the leaderboard equals a reference ranked here from them by the season's tiebreakers
+        var entries = ReferenceEntries(s, expected, ticks);
+        Assert.Equal(entries.OrderBy(e => e.PlayerId), Leaderboard.Entries(s.State).OrderBy(e => e.PlayerId));
+        Assert.Equal(ReferenceLeaderboard(entries, s.State.Rules.Ranking, s.State.Map), Leaderboard.Build(s.State));
+    }
+
+    /// <summary>
+    /// Invariant 10 reference entries (D-100), from the log only: points and cell by <see cref="Fold"/>, standing finishes
+    /// and freezes by <see cref="FoldFinishes"/>, counted runs = completions minus rejects, ticks by numbering the non-zero
+    /// points changes.
+    /// </summary>
+    private static List<RankingEntry> ReferenceEntries(Scenario s, Reference folded, Dictionary<Guid, long> ticks)
+    {
+        var completed = s.Log.OfType<RunCompleted>().Select(e => (e.RunId, e.PlayerId)).ToHashSet();
+        completed.ExceptWith(s.Log.OfType<ProofRejected>().Select(e => (e.RunId, e.PlayerId)));
+        var runs = completed.GroupBy(r => r.PlayerId).ToDictionary(g => g.Key, g => g.Count());
+        var standing = FoldFinishes(s.Log).Standing;
+
+        return [.. folded.Players.Select(p => new RankingEntry(
+            p.Key,
+            p.Value.Points,
+            p.Value.CellId,
+            standing.TryGetValue(p.Key, out var finish) ? finish.Order : null,
+            finish?.Frozen ?? false,
+            runs.GetValueOrDefault(p.Key),
+            ticks.GetValueOrDefault(p.Key)))];
+    }
+
+    /// <summary>
+    /// Invariant 10 reference ranking (D-100), independent of the engine: the standing finish with the lowest order is
+    /// place 1; every other player's place is 1 + the number of other non-first players strictly better by (points
+    /// descending, then the configured tiebreak keys), plus 1 when there is a first; rows by place, then by id. Cells to
+    /// the finish by a backward breadth-first search from the finish cells.
+    /// </summary>
+    private static List<LeaderboardRow> ReferenceLeaderboard(List<RankingEntry> entries, RankingRules rules, MapGraph map)
+    {
+        var distance = map.Cells.Where(c => c.Type == CellType.Finish).ToDictionary(c => c.Id, _ => 0);
+        var queue = new Queue<string>(distance.Keys);
+        while (queue.TryDequeue(out var cell))
+        {
+            foreach (var edge in map.Edges.Where(e => e.To == cell && !distance.ContainsKey(e.From)))
+            {
+                distance[edge.From] = distance[cell] + 1;
+                queue.Enqueue(edge.From);
+            }
+        }
+
+        // The key compared lexicographically, larger is better: points, then each tiebreaker in the configured order
+        long[] Key(RankingEntry e) =>
+            [e.Points, .. rules.Tiebreakers.Select(t => t == Tiebreaker.CompletedRuns ? e.CompletedRuns : -e.PointsTick)];
+
+        static bool Better(long[] a, long[] b)
+        {
+            for (var i = 0; i < a.Length; i++)
+            {
+                if (a[i] != b[i])
+                {
+                    return a[i] > b[i];
+                }
+            }
+
+            return false;
+        }
+
+        var first = entries.Where(e => e.FinishOrder is not null).MinBy(e => e.FinishOrder);
+        var others = entries.Where(e => e != first).ToList();
+        var rows = new List<LeaderboardRow>();
+        if (first is not null)
+        {
+            rows.Add(new LeaderboardRow(first.PlayerId, 1, first.Points, distance.TryGetValue(first.CellId, out var d) ? d : null, true, !first.Frozen));
+        }
+
+        var shift = first is null ? 0 : 1;
+        rows.AddRange(others
+            .Select(e => new LeaderboardRow(
+                e.PlayerId,
+                1 + shift + others.Count(o => Better(Key(o), Key(e))),
+                e.Points,
+                distance.TryGetValue(e.CellId, out var cells) ? cells : null,
+                false,
+                false))
+            .OrderBy(r => r.Place)
+            .ThenBy(r => r.PlayerId));
+        return rows;
     }
 
     /// <summary>Per-command rules for accepted administration commands.</summary>

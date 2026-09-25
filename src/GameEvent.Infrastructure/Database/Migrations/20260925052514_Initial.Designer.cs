@@ -11,7 +11,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace GameEvent.Infrastructure.Database.Migrations
 {
     [DbContext(typeof(GameEventDbContext))]
-    [Migration("20260925033904_Initial")]
+    [Migration("20260925052514_Initial")]
     partial class Initial
     {
         /// <inheritdoc />
@@ -442,6 +442,9 @@ namespace GameEvent.Infrastructure.Database.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<int>("Points")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("PointsTick")
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("RerollsThisRoll")

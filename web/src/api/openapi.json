@@ -2956,6 +2956,45 @@
           }
         }
       },
+      "LeaderboardRowView": {
+        "required": [
+          "playerId",
+          "place",
+          "points",
+          "cellsToFinish",
+          "isFirst",
+          "provisional"
+        ],
+        "type": "object",
+        "properties": {
+          "playerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "place": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "points": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "cellsToFinish": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "isFirst": {
+            "type": "boolean"
+          },
+          "provisional": {
+            "type": "boolean"
+          }
+        },
+        "description": "A leaderboard row in place order (D-100): tied players share `place`; `isFirst` — the first finisher, on top\nwhatever the points, `provisional` until frozen; `cellsToFinish` — fewest forward steps to the finish."
+      },
       "LoggedEventView": {
         "required": [
           "sequence",
@@ -4128,6 +4167,7 @@
           "id",
           "cells",
           "players",
+          "leaderboard",
           "me",
           "lastSequence"
         ],
@@ -4147,6 +4187,12 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/PlayerView"
+            }
+          },
+          "leaderboard": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LeaderboardRowView"
             }
           },
           "me": {

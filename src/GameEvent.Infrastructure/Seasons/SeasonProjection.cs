@@ -105,6 +105,7 @@ internal static class SeasonProjection
             record.Frozen = player.Finish?.Frozen ?? false;
             record.FinishBonus = player.Finish?.Bonus ?? 0;
             record.FinishSurplus = player.Finish?.Surplus ?? 0;
+            record.PointsTick = player.PointsTick;
 
             // Exclusions only grow within a season (D-08); a tech reroll turned into a drop changes its reason (D-11).
             var known = old?.Exclusions.ToDictionary(x => x.GameId, x => x.Reason) ?? [];
@@ -220,7 +221,8 @@ internal static class SeasonProjection
 
     /// <summary>
     /// Rebuilds the state a projection describes, for the integrity check: it must equal the fold of the log.
-    /// The map and the count of finishes so far are not projected; they are taken from <paramref name="replayed"/>.
+    /// The map, the count of finishes so far and the count of points changes are not projected; they are taken from
+    /// <paramref name="replayed"/>.
     /// </summary>
     public static async Task<SeasonState> ReadAsync(GameEventDbContext db, SeasonState replayed, CancellationToken ct)
     {
@@ -254,7 +256,8 @@ internal static class SeasonProjection
                     p.FinishOrder is { } order
                         ? new Engine.Finish.FinishState(order, p.FinishRunId!.Value, p.FinishedAt!.Value, p.Frozen, p.FinishBonus, p.FinishSurplus)
                         : null,
-                    p.ActiveRunId)),
+                    p.ActiveRunId,
+                    p.PointsTick)),
             Runs = runs.ToImmutableSortedDictionary(
                 r => r.Id,
                 r => new RunState(
