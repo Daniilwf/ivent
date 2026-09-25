@@ -81,13 +81,13 @@ public class HoursSourceTests
     [Fact]
     public void Source_over_the_limit_is_rejected()
     {
-        // The contract has no own code for a too-long source: the closest existing «text too long» code is used
+        // D-96 (4): a too-long source has its own code
         var s = Playing(null);
 
         ScenarioAssert.RejectsWithoutChanges(
             s,
             x => x.Complete("Вася", Difficulty.Normal, estimatedHours: 4, hoursSource: new string('я', Limits.MaxHoursSourceLength + 1)),
-            RejectionCodes.CommentTooLong);
+            RejectionCodes.HoursSourceTooLong);
     }
 
     [Fact]

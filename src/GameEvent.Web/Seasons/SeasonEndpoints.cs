@@ -75,7 +75,8 @@ public sealed record PlayerView(Guid Id, string Name, string CellId, int Points,
 /// <summary>
 /// The signed-in player's own turn. While playing: <c>dropHintMinutes</c> is <c>roll.minPlayMinutesBeforeDrop</c> until
 /// that much has been played by the server clock (only a hint: D-09), then null; <c>dropPenalty</c> is what a drop costs
-/// under the rules in force; <c>techRerollOpen</c> says whether the player may still tech-reroll themselves (D-94).
+/// under the rules in force; <c>techRerollOpen</c> says whether the player may still tech-reroll themselves (D-94);
+/// <c>challengesEnabled</c> says whether a challenge may be claimed on completion (<c>features.challenges</c>, D-96).
 /// </summary>
 public sealed record MyTurnView(
     Guid PlayerId,
@@ -88,7 +89,8 @@ public sealed record MyTurnView(
     IReadOnlyList<ManualEffectView> ManualEffects,
     int? DropHintMinutes,
     DropPenaltyView? DropPenalty,
-    bool TechRerollOpen);
+    bool TechRerollOpen,
+    bool ChallengesEnabled);
 
 /// <summary>The drop penalty: <c>count</c> dice of <c>sides</c>, what they take, and whether a bad event follows.</summary>
 public sealed record DropPenaltyView(int Count, int Sides, bool AffectsPoints, bool AffectsPosition, bool BadEvent);
@@ -413,7 +415,8 @@ public static class SeasonEndpoints
                 playing
                     ? new DropPenaltyView(drop.PenaltyDice.Count, drop.PenaltyDice.Sides, drop.AffectsPoints, drop.AffectsPosition, drop.MandatoryEvent == MandatoryEvent.Bad)
                     : null,
-                playing && now - run!.RolledAt <= TimeSpan.FromHours(snapshot!.TechRerollWindowHours));
+                playing && now - run!.RolledAt <= TimeSpan.FromHours(snapshot!.TechRerollWindowHours),
+                rules.Features.Challenges);
         }
 
         return TypedResults.Ok(new SeasonView(

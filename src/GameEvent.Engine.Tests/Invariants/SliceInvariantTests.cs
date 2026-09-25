@@ -28,9 +28,11 @@ public class SliceInvariantTests
 
     private const int ChoiceCount = 3;
 
-    private static Scenario NewSeason(int seed, bool withChoice = false) =>
+    /// <remarks>The script claims challenges, so the season turns <c>features.challenges</c> on (D-96 (1)) unless stated.</remarks>
+    private static Scenario NewSeason(int seed, bool withChoice = false, bool challenges = true) =>
         Scenario.New(seed: seed)
             .WithRuleset(r => withChoice ? r with { Roll = r.Roll with { ChoiceCount = ChoiceCount } } : r)
+            .WithRuleset(r => r with { Features = r.Features with { Challenges = challenges } })
             .WithMapLength(MapLength)
             .WithCategory("Horror", weight: 3)
             .WithGame("Silent Hill", 12, "Horror")
@@ -57,7 +59,7 @@ public class SliceInvariantTests
             2 => new CompleteRun(player, difficulty, EstimatedHours: 1 + ((b / 48) % 9), HoursSource: "HLTB", ChallengeDone: b % 2 == 1),
 
             // half of these carry a review, its rating 0..11 is sometimes out of range and then refuses the completion
-            _ => new CompleteRun(player, difficulty, ChallengeDone: b % 2 == 0, Review: b % 4 < 2 ? new RunReview(b % 12, b % 8 == 0 ? " " : "отзыв") : null),
+            _ => new CompleteRun(player, difficulty, ChallengeDone: b % 2 == 0, Review: b % 4 < 2 ? new RunReview(b % 12, (b % 8) switch { 0 => " ", 4 => " отзыв  ", _ => "отзыв" }) : null),
         };
     }
 
@@ -104,15 +106,33 @@ public class SliceInvariantTests
     }
 
     private static Scenario Play(
-        int seed, byte[] script, Action<Scenario, SeasonState, int>? afterEach = null, bool withChoice = false, bool withExclusions = false)
+        int seed,
+        byte[] script,
+        Action<Scenario, SeasonState, int>? afterEach = null,
+        bool withChoice = false,
+        bool withExclusions = false,
+        bool challenges = true)
     {
-        var s = NewSeason(seed, withChoice);
+        var s = NewSeason(seed, withChoice, challenges);
         foreach (var b in script)
         {
             var before = s.State;
             var logLength = s.Log.Count;
-            s.Act(withExclusions ? ExclusionCommandFor(s, b, withChoice) : withChoice ? ChoiceCommandFor(s, b) : CommandFor(s, b));
+            var command = withExclusions ? ExclusionCommandFor(s, b, withChoice) : withChoice ? ChoiceCommandFor(s, b) : CommandFor(s, b);
+            s.Act(command);
             afterEach?.Invoke(s, before, logLength);
+
+            // W3 / D-96 (1): with features.challenges off a claim is never accepted
+            if (!challenges && command is CompleteRun { ChallengeDone: true })
+            {
+                Assert.False(s.Last.IsAccepted, "A challenge was claimed while features.challenges is off.");
+            }
+        }
+
+        if (!challenges)
+        {
+            Assert.DoesNotContain(s.Log.OfType<RunCompleted>(), e => e.ChallengeDone);
+            Assert.All(s.Log.OfType<CompletionRolled>(), e => Assert.Empty(e.ChallengeDice));
         }
 
         return s;
@@ -133,6 +153,10 @@ public class SliceInvariantTests
     [Property(MaxTest = 200)]
     public void Invariants_hold_with_already_played_and_a_choice_of_games(int seed, byte[] script) =>
         Play(seed, script, CheckInvariants, withChoice: true, withExclusions: true);
+
+    [Property(MaxTest = 200)]
+    public void Invariants_hold_with_challenges_off(int seed, byte[] script) =>
+        Play(seed, script, CheckInvariants, challenges: false);
 
     [Property(MaxTest = 50)]
     public void Same_seed_and_commands_give_the_same_log_with_already_played(int seed, byte[] script)
@@ -283,7 +307,7 @@ public class SliceInvariantTests
             Assert.Equal(s.Log.OfType<CoinsChanged>().Where(e => e.PlayerId == player.PlayerId).Sum(e => e.Delta), player.Coins);
             var expectedCoins = s.State.Runs.Values
                 .Where(r => r.PlayerId == player.PlayerId && r.Status == RunStatus.Completed)
-                .Sum(r => ExpectedCoins(r.Snapshot.Coins, r.Hours!.Value));
+                .Sum(r => ExpectedCoins(r.Snapshot, r.Hours!.Value));
             Assert.Equal(expectedCoins, player.Coins);
 
             // G8 / D-92: exclusions are the player's GameExcluded events, one per game, ordered by game id
@@ -412,6 +436,7 @@ public class SliceInvariantTests
             {
                 Assert.InRange(review.Rating, 1, 10);
                 Assert.False(review.Text is { } text && string.IsNullOrWhiteSpace(text), "A blank review text is stored.");
+                Assert.Equal(review.Text?.Trim(), review.Text); // D-96 (4): stored trimmed
             }
         }
 
@@ -434,11 +459,13 @@ public class SliceInvariantTests
         return Math.Clamp((int)rounded, rule.Min, rule.Max);
     }
 
-    /// <summary>Reference formula from D-96: <c>max(min, ⌊hours × perHour⌋)</c>.</summary>
-    private static int ExpectedCoins(CoinReward? rule, decimal hours)
+    /// <summary>Reference formula from D-96 (2): <c>max(min, ⌊min(hours, diceCount.max × hoursPerDie) × perHour⌋)</c>.</summary>
+    private static int ExpectedCoins(RunSnapshot snapshot, decimal hours)
     {
+        var rule = snapshot.Coins;
         Assert.NotNull(rule);
-        return Math.Max(rule.Min, (int)Math.Floor(hours * rule.PerHour));
+        var counted = Math.Min(hours, snapshot.DiceCount.Max * snapshot.DiceCount.HoursPerDie);
+        return Math.Max(rule.Min, (int)Math.Floor(counted * rule.PerHour));
     }
 
     private static EventKind? GrantFor(DieByDifficulty rule, Difficulty difficulty) =>

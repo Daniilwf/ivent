@@ -15,14 +15,16 @@ const ratings = Array.from({ length: 10 }, (_, i) => i + 1);
 
 /**
  * Completing the active run (D-96): difficulty; an hours estimate with its source only when the game has no hours;
- * the challenge claim; an optional review. Fields left unset are not sent.
+ * the challenge claim when the season has challenges on (D-96); an optional review. Fields left unset are not sent.
  */
 export function CompleteForm({
   needsHours,
+  challengesEnabled = false,
   pending,
   onComplete,
 }: {
   needsHours: boolean;
+  challengesEnabled?: boolean;
   pending: boolean;
   onComplete: (completion: Completion) => void;
 }) {
@@ -116,16 +118,18 @@ export function CompleteForm({
           </label>
         </>
       )}
-      <label>
-        <input
-          type="checkbox"
-          checked={challengeDone}
-          onChange={(e) => {
-            setChallengeDone(e.target.checked);
-          }}
-        />
-        {ru.turn.challengeDone}
-      </label>
+      {challengesEnabled && (
+        <label>
+          <input
+            type="checkbox"
+            checked={challengeDone}
+            onChange={(e) => {
+              setChallengeDone(e.target.checked);
+            }}
+          />
+          {ru.turn.challengeDone}
+        </label>
+      )}
       <label>
         {ru.turn.reviewRating}
         <select

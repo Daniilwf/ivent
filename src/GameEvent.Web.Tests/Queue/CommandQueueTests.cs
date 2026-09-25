@@ -425,7 +425,8 @@ public class CommandQueueTests
         await using var h = await QueueHarness.StartAsync();
         var ct = TestContext.Current.CancellationToken;
         const string Source = "https://howlongtobeat.com/game/2231";
-        await AcceptedAsync(h, new CreateSeason(s_season, "Осень", RulesetJson.Default()));
+        var rules = RulesetJson.Default();
+        await AcceptedAsync(h, new CreateSeason(s_season, "Осень", rules with { Features = rules.Features with { Challenges = true } }));
         await AcceptedAsync(h, new ChangeSeasonStatus(SeasonStatus.Active));
         await AcceptedAsync(h, new AddSeasonPlayer(s_vasya, s_vasya, "Вася"));
 

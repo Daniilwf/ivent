@@ -33,7 +33,6 @@
 | Тег | метка жанра или свойства игры | `Tag` |
 | Категория | тег с весом на колесе категорий | `Category` |
 | Часы | длина игры по HowLongToBeat, основной сюжет | `Game.Hours`, `RunSnapshot.Hours` |
-| Челлендж | дополнительное условие из заметки к игре с наградой | `Game.Challenge` |
 | Условие прохождения | что считается прохождением для бесконечной игры | `Game.CompletionCondition` |
 | Колесо | взвешенный список записей | `Wheel`, `WheelEntry` |
 | Колесо категорий | колесо, по которому выбирается категория для ролла | `Wheel` с видом `Categories` |
@@ -69,7 +68,9 @@
 | Пометка игры | у предложенной игры: кто из других дропнул или тех-рерольнул её и почему | `GameMarkView` (`marks`) |
 | Кооп | общее прохождение двух игроков | `Run.PartnerId` |
 | Отзыв | оценка 1–10 и текст к прохождению | `RunReview`, команда `ReviewRun`, событие `RunReviewed`, таблица `Review` |
-| Челлендж | условие из заметки к игре, за которое даются дополнительные кубики | `CompleteRun.ChallengeDone`, `CompletionRolled.ChallengeDice`, `RunSnapshot.ChallengeExtraDice` |
+| Челлендж | условие из заметки к игре, за которое даются дополнительные кубики; заявка — под флагом `features.challenges` | `CompleteRun.ChallengeDone`, `CompletionRolled.ChallengeDice`, `RunSnapshot.ChallengeExtraDice` |
+| Источник оценки | откуда игрок взял часы, если в пуле их нет: ссылка или пометка | `CompleteRun.HoursSource`, `RunState.HoursSource` |
+| Ивент за сложность | ручной эффект, который даёт сложность с `grantEvent` («выше сложной» — хороший) | `ManualEffectSource.Difficulty` |
 | Монетки за прохождение | награда по длине игры | `CoinsReason.CompletionReward`, `RunSnapshot.Coins` |
 | Бонус финиша | очки за финиш не первым, выдаются один раз | `FinishBonus` |
 

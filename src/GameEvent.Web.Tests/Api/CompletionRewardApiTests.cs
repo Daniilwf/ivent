@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using GameEvent.Engine.Rulesets;
 using GameEvent.Web.Seasons;
 using Microsoft.EntityFrameworkCore;
 
@@ -34,6 +35,7 @@ public sealed class CompletionRewardApiTests : IAsyncLifetime
     [Fact]
     public async Task Completion_with_challenge_and_review_logs_every_part_and_the_view_shows_them()
     {
+        await EnableChallengesAsync();
         var vasya = await _site.SignedInAsync("vasya");
         await PostAsync(vasya, Url("roll"), new { commandId = Guid.NewGuid() });
         await PostAsync(vasya, Url("start"), new { commandId = Guid.NewGuid() });
@@ -66,6 +68,92 @@ public sealed class CompletionRewardApiTests : IAsyncLifetime
         // The good event of «выше сложной» waits among the manual effects
         var effect = Assert.Single(me.GetProperty("manualEffects").EnumerateArray());
         Assert.Equal(("good", "difficulty"), (effect.GetProperty("drawEvent").GetString(), effect.GetProperty("source").GetString()));
+    }
+
+    [Fact]
+    public async Task Challenge_with_the_feature_off_is_a_conflict_and_changes_nothing()
+    {
+        // D-96 (1): the default ruleset has features.challenges off
+        var vasya = await _site.SignedInAsync("vasya");
+        await PostAsync(vasya, Url("roll"), new { commandId = Guid.NewGuid() });
+        await PostAsync(vasya, Url("start"), new { commandId = Guid.NewGuid() });
+        await using (var before = _site.NewDb())
+        {
+            var logLength = await before.Events.CountAsync(Ct);
+
+            var response = await vasya.PostAsJsonAsync(
+                Url("complete"), new { commandId = Guid.NewGuid(), difficulty = "normal", challengeDone = true }, Ct);
+
+            await AssertConflictAsync(response, "feature.disabled");
+            await using var after = _site.NewDb();
+            Assert.Equal(logLength, await after.Events.CountAsync(Ct));
+        }
+
+        var me = await MeJsonAsync(vasya);
+        Assert.Equal("playing", me.GetProperty("phase").GetString());
+        Assert.Equal(0, await PointsOfAsync(vasya, "vasya"));
+    }
+
+    [Fact]
+    public async Task Challenges_are_disabled_in_the_view_by_default()
+    {
+        var vasya = await _site.SignedInAsync("vasya");
+
+        Assert.False((await MeJsonAsync(vasya)).GetProperty("challengesEnabled").GetBoolean());
+    }
+
+    [Fact]
+    public async Task Challenges_are_enabled_in_the_view_with_the_flag()
+    {
+        await EnableChallengesAsync();
+        var vasya = await _site.SignedInAsync("vasya");
+
+        Assert.True((await MeJsonAsync(vasya)).GetProperty("challengesEnabled").GetBoolean());
+    }
+
+    [Fact]
+    public async Task Completion_without_a_claim_carries_challenge_done_false_with_the_feature_off()
+    {
+        // db9dc14: the form always sends challengeDone; false must pass while challenges are off
+        var vasya = await _site.SignedInAsync("vasya");
+        await PostAsync(vasya, Url("roll"), new { commandId = Guid.NewGuid() });
+        await PostAsync(vasya, Url("start"), new { commandId = Guid.NewGuid() });
+
+        var complete = await PostAsync(vasya, Url("complete"), new { commandId = Guid.NewGuid(), difficulty = "normal", challengeDone = false });
+
+        Assert.Contains("run-completed", await TypesAsync(complete));
+        Assert.Equal(0, (await MeJsonAsync(vasya)).GetProperty("lastCompleted").GetProperty("challengeDice").GetArrayLength());
+    }
+
+    [Fact]
+    public async Task Review_text_is_trimmed_on_the_server()
+    {
+        // D-96 (4)
+        var vasya = await _site.SignedInAsync("vasya");
+        await PostAsync(vasya, Url("roll"), new { commandId = Guid.NewGuid() });
+        await PostAsync(vasya, Url("start"), new { commandId = Guid.NewGuid() });
+
+        await PostAsync(vasya, Url("complete"), new { commandId = Guid.NewGuid(), difficulty = "normal", review = new { rating = 8, text = "  Отлично  " } });
+
+        var review = (await MeJsonAsync(vasya)).GetProperty("lastCompleted").GetProperty("review");
+        Assert.Equal("Отлично", review.GetProperty("text").GetString());
+        await using var db = _site.NewDb();
+        Assert.Equal("Отлично", Assert.Single(await db.Reviews.AsNoTracking().ToListAsync(Ct)).Text);
+    }
+
+    [Fact]
+    public async Task Later_review_text_is_trimmed_and_blank_is_no_text()
+    {
+        var vasya = await _site.SignedInAsync("vasya");
+        var runId = await CompletedRunAsync(vasya);
+
+        await PostAsync(vasya, ReviewUrl(runId), new { commandId = Guid.NewGuid(), rating = 6, text = "  Отлично  " });
+        var trimmed = (await MeJsonAsync(vasya)).GetProperty("lastCompleted").GetProperty("review");
+        Assert.Equal("Отлично", trimmed.GetProperty("text").GetString());
+
+        await PostAsync(vasya, ReviewUrl(runId), new { commandId = Guid.NewGuid(), rating = 6, text = "   " });
+        var blank = (await MeJsonAsync(vasya)).GetProperty("lastCompleted").GetProperty("review");
+        Assert.Equal(JsonValueKind.Null, blank.GetProperty("text").ValueKind);
     }
 
     [Fact]
@@ -340,6 +428,13 @@ public sealed class CompletionRewardApiTests : IAsyncLifetime
         await PostAsync(client, Url("start"), new { commandId = Guid.NewGuid() });
         await PostAsync(client, Url("complete"), new { commandId = Guid.NewGuid(), difficulty = "normal" });
         return Guid.Parse((await MeJsonAsync(client)).GetProperty("lastCompleted").GetProperty("id").GetString()!);
+    }
+
+    /// <summary>Turns <c>features.challenges</c> on in the seeded season (D-96 (1)).</summary>
+    private Task EnableChallengesAsync()
+    {
+        var ruleset = RulesetJson.Default();
+        return _site.SendAsync(new ChangeRuleset(ruleset with { Features = ruleset.Features with { Challenges = true } }));
     }
 
     private async Task RemovePoolHoursAsync()

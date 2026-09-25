@@ -17,8 +17,9 @@ public class CompletionEventOrderTests
     [Fact]
     public void Full_completion_logs_every_part_in_the_decided_order()
     {
-        // Given Вася plays a game without pool hours
+        // Given Вася plays a game without pool hours, challenges on (D-96 (1))
         var s = Scenario.New()
+            .WithRuleset(r => r with { Features = r.Features with { Challenges = true } })
             .WithCategory("Horror").WithGame("Silent Hill", null, "Horror")
             .WithPlayers("Вася")
             .Roll("Вася").Start("Вася");

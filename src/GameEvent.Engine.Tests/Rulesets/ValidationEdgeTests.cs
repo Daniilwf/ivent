@@ -45,6 +45,9 @@ public class ValidationEdgeTests
         { "gigantic map", r => r with { Map = r.Map with { LinearLength = int.MaxValue } }, "map.linearLength" },
         { "millions of dice", r => r with { Reward = r.Reward with { DiceCount = r.Reward.DiceCount with { Max = 5_000_000 } } }, "reward.diceCount.max" },
         { "gigantic die", r => r with { Drop = r.Drop with { PenaltyDice = r.Drop.PenaltyDice with { Sides = 1_000_000 } } }, "drop.penaltyDice.sides" },
+        // D-96 (3): a typo in the coin reward must not break every completion
+        { "millions of coins per hour", r => r with { Reward = r.Reward with { Coins = r.Reward.Coins with { PerHour = 1_000_001 } } }, "reward.coins.perHour" },
+        { "millions of minimum coins", r => r with { Reward = r.Reward with { Coins = r.Reward.Coins with { Min = 1_000_001 } } }, "reward.coins.min" },
         {
             "length filter not implemented",
             r => r with { Roll = r.Roll with { LastDaysLengthFilter = r.Roll.LastDaysLengthFilter with { Enabled = true } } },
@@ -67,6 +70,25 @@ public class ValidationEdgeTests
         var generous = TestRuleset.Create() with { Map = new MapRules { LinearLength = 10_000 } };
 
         Assert.Empty(RulesetValidator.Validate(generous));
+    }
+
+    [Fact]
+    public void Coin_reward_at_its_ceilings_is_accepted()
+    {
+        // D-96 (3): 1 000 000 is the ceiling itself for both reward.coins.perHour and reward.coins.min
+        var r = TestRuleset.Create();
+        var atCeiling = r with { Reward = r.Reward with { Coins = new CoinReward { PerHour = 1_000_000, Min = 1_000_000 } } };
+
+        Assert.Empty(RulesetValidator.Validate(atCeiling));
+    }
+
+    [Fact]
+    public void Coin_reward_over_its_ceilings_is_refused_by_the_engine()
+    {
+        var s = Scenario.New().WithPlayers("Вася");
+        var typo = s.Ruleset with { Reward = s.Ruleset.Reward with { Coins = s.Ruleset.Reward.Coins with { PerHour = 1_000_001 } } };
+
+        ScenarioAssert.RejectsWithoutChanges(s, x => x.Act(new ChangeRuleset(typo)), RejectionCodes.RulesetInvalid);
     }
 
     [Fact]

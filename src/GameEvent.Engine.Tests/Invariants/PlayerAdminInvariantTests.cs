@@ -63,9 +63,14 @@ public class PlayerAdminInvariantTests
                 },
             };
 
+    /// <remarks>
+    /// The script claims challenges; <c>features.challenges</c> (D-96 (1)) is on for even seeds and off for odd ones, so
+    /// both the claim and its refusal are exercised.
+    /// </remarks>
     private static Scenario NewSeason(int seed, bool withChoice = false, RerollMode rerolls = RerollMode.None) =>
         Scenario.New(seed: seed)
             .WithRuleset(r => WithRerolls(withChoice ? r with { Roll = r.Roll with { ChoiceCount = ChoiceCount } } : r, seed, rerolls))
+            .WithRuleset(r => r with { Features = r.Features with { Challenges = seed % 2 == 0 } })
             .WithMapLength(MapLength)
             .WithCategory("Horror", weight: 3)
             .WithGame("Silent Hill", 12, "Horror")
@@ -112,7 +117,7 @@ public class PlayerAdminInvariantTests
                 EstimatedHours: 1 + arg,
                 HoursSource: "HLTB",
                 ChallengeDone: arg >= 4,
-                Review: arg == 5 ? new RunReview(b % 12, b % 3 == 0 ? " " : "отзыв") : null),
+                Review: arg == 5 ? new RunReview(b % 12, (b % 3) switch { 0 => " ", 1 => "  отзыв ", _ => "отзыв" }) : null),
             3 => new AdjustPlayer(player, comment, PointsDelta: arg - 3),
             4 => new AdjustPlayer(player, comment, CoinsDelta: 3 - arg, ResourceDeltas: [new ResourceDelta(withRerolls ? Coupon : "tickets", (arg % 3) - 1)]),
             5 => new AdjustPlayer(player, comment, CellId: CellAt(s, arg * 4), DiscardOffer: arg % 2 == 1),
@@ -142,7 +147,7 @@ public class PlayerAdminInvariantTests
             1 when runs.Count > 0 => runs[b % runs.Count].RunId,
             _ => own?.RunId ?? SequentialIds.Make(0x60000000, b),
         };
-        return new ReviewRun(player, runId, new RunReview(b % 12, b % 5 == 0 ? "  " : "перепрошёл"));
+        return new ReviewRun(player, runId, new RunReview(b % 12, (b % 5) switch { 0 => "  ", 1 => " перепрошёл  ", _ => "перепрошёл" }));
     }
 
     private static MakeChoice ChoiceFor(Scenario s, Guid player, int arg)
@@ -641,6 +646,9 @@ public class PlayerAdminInvariantTests
         Assert.Equal(fromPool ? run.Snapshot.Hours : complete.EstimatedHours, completed.Hours);
         Assert.Equal(fromPool ? null : complete.HoursSource, completed.HoursSource);
 
+        // W3 / D-96 (1): a claim is accepted only with features.challenges on
+        Assert.False(complete.ChallengeDone && !before.Rules.Features.Challenges, "A challenge was claimed while features.challenges is off.");
+
         // W3: as many challenge dice as the snapshot says, of the difficulty's type
         Assert.Equal(complete.ChallengeDone, completed.ChallengeDone);
         Assert.Equal(complete.ChallengeDone ? run.Snapshot.ChallengeExtraDice : 0, rolled.ChallengeDice.Count);
@@ -650,9 +658,10 @@ public class PlayerAdminInvariantTests
         Assert.Equal(sum, events.OfType<PointsChanged>().Sum(e => e.Delta));
         Assert.Equal(was.Points + sum, s.State.Players[complete.PlayerId].Points);
 
-        // W10 / Q-2: coins by the snapshot's rule and the counted hours
+        // W10 / Q-2 / D-96 (2): coins by the snapshot's rule and the counted hours, capped by the dice ceiling
         Assert.NotNull(run.Snapshot.Coins);
-        var coins = Math.Max(run.Snapshot.Coins.Min, (int)Math.Floor(completed.Hours * run.Snapshot.Coins.PerHour));
+        var counted = Math.Min(completed.Hours, run.Snapshot.DiceCount.Max * run.Snapshot.DiceCount.HoursPerDie);
+        var coins = Math.Max(run.Snapshot.Coins.Min, (int)Math.Floor(counted * run.Snapshot.Coins.PerHour));
         Assert.Equal(
             coins == 0 ? [] : [new CoinsChanged(complete.PlayerId, coins, CoinsReason.CompletionReward, run.RunId)],
             events.OfType<CoinsChanged>());
@@ -678,12 +687,12 @@ public class PlayerAdminInvariantTests
             Assert.Empty(effects);
         }
 
-        // W9: the review, if any, is valid and stored with blank text as none
+        // W9 / D-96 (4): the review, if any, is valid and stored trimmed, with blank text as none
         var reviews = events.OfType<RunReviewed>().ToList();
         if (complete.Review is { } review)
         {
             Assert.InRange(review.Rating, 1, 10);
-            var text = string.IsNullOrWhiteSpace(review.Text) ? null : review.Text;
+            var text = string.IsNullOrWhiteSpace(review.Text) ? null : review.Text.Trim();
             Assert.Equal([new RunReviewed(run.RunId, complete.PlayerId, review.Rating, text, s.Clock.UtcNow)], reviews);
             Assert.Equal(new RunReview(review.Rating, text), s.State.Runs[run.RunId].Review);
         }
@@ -701,7 +710,7 @@ public class PlayerAdminInvariantTests
         Assert.Equal(review.PlayerId, run.PlayerId);
         Assert.Equal(RunStatus.Completed, run.Status);
         Assert.InRange(review.Review.Rating, 1, 10);
-        var text = string.IsNullOrWhiteSpace(review.Review.Text) ? null : review.Review.Text;
+        var text = string.IsNullOrWhiteSpace(review.Review.Text) ? null : review.Review.Text.Trim();
         Assert.Equal([new RunReviewed(run.RunId, review.PlayerId, review.Review.Rating, text, s.Clock.UtcNow)], s.Last.Events);
         Assert.Equal(before.Players, s.State.Players);
         Assert.Equal(run with { Review = new RunReview(review.Review.Rating, text) }, s.State.Runs[run.RunId]);

@@ -23,6 +23,7 @@
 | --- | --- |
 | `mapMode` | `linear` — цепочка клеток из `map.linearLength`, `graph` — карта из редактора |
 | `shop`, `items`, `events`, `bets`, `polls`, `achievements`, `weeklyChallenge`, `partnerBoard`, `reactions`, `comments`, `gallery` | соответствующие механики; выключенная механика не видна в интерфейсе и отклоняется движком |
+| `challenges` | заявка челленджа при завершении (D-96); необязательное поле, по умолчанию выключено, пока у игр нет заметки-челленджа и проверки пруфом |
 
 ### `season`
 
@@ -50,9 +51,9 @@
 | --- | --- |
 | `diceCount` | число кубов: часы / `hoursPerDie`, округление `nearest`, `floor` или `ceil`, пределы `min` и `max` |
 | `dieByDifficulty` | грани кубика по сложности; `grantEvent` — ивент в придачу |
-| `challengeBonus` | награда за выполненный челлендж игры |
+| `challengeBonus` | награда за выполненный челлендж игры: `extraDice` — сколько кубиков того же типа добавляется после предела `max` (D-13); фиксируется в снапшоте при ролле |
 | `unmetConditionPolicy` | невыполненное условие ивента: `noDiceKeepCoins`, `countAsDrop` или `ignore` |
-| `coins` | монетки за прохождение: за час и минимум |
+| `coins` | монетки за прохождение: `max(min, ⌊min(часы, diceCount.max × hoursPerDie) × perHour⌋)`; фиксируется в снапшоте при ролле (D-96) |
 | `coop` | доля очков в коопе и кому достаётся округление |
 
 ### `drop`

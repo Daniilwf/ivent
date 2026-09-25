@@ -228,6 +228,7 @@ export function SeasonScreen({
             <p data-testid="active-run">{ru.turn.playing(me.activeRun.game.title)}</p>
             <CompleteForm
               needsHours={me.activeRun.game.hours == null}
+              challengesEnabled={me.challengesEnabled}
               pending={pending}
               onComplete={(completion) => void act({ kind: 'complete', completion })}
             />
@@ -259,7 +260,7 @@ export function SeasonScreen({
             <p data-testid="last-dice">
               {ru.turn.lastDice(
                 me.lastCompleted.game.title,
-                me.lastCompleted.dice.map((d) => d.value),
+                [...me.lastCompleted.dice, ...me.lastCompleted.challengeDice].map((d) => d.value),
                 me.lastCompleted.total,
               )}
             </p>

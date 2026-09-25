@@ -8,7 +8,7 @@ namespace GameEvent.Engine.Tests.Runs;
 /// <summary>
 /// A review of a completed run (W9; SPEC «Отзыв»: «необязательная оценка 1–10 и текст»; D-96): with the completion
 /// (<see cref="CompleteRun.Review"/>) or later with <see cref="ReviewRun"/> on the player's own completed run; a newer
-/// review replaces the earlier one. Text up to <see cref="Limits.MaxReviewLength"/>, blank text is no text. Allowed
+/// review replaces the earlier one. Text up to <see cref="Limits.MaxReviewLength"/>, blank text is no text, text is trimmed at the edges (D-96 (4)). Allowed
 /// until the season is archived.
 /// </summary>
 public class ReviewTests
@@ -122,6 +122,23 @@ public class ReviewTests
         Assert.Equal(new RunReview(6, null), s.State.Runs[runId].Review);
     }
 
+    [Theory]
+    [InlineData("  Отлично  ", "Отлично")]
+    [InlineData("\n Отлично\t", "Отлично")]
+    [InlineData("Туман  и радио", "Туман  и радио")] // only the edges, not the inside
+    public void Text_is_trimmed_at_the_edges(string text, string stored)
+    {
+        // D-96 (4): the server trims the review text
+        var s = Playing();
+        var runId = s.Player("Вася").ActiveRunId!.Value;
+
+        s.Complete("Вася", review: new RunReview(9, text));
+
+        ScenarioAssert.Accepted(s);
+        Assert.Equal(stored, Assert.Single(s.LastEvents<RunReviewed>()).Text);
+        Assert.Equal(new RunReview(9, stored), s.State.Runs[runId].Review);
+    }
+
     // ---- ReviewRun ----
 
     [Fact]
@@ -207,6 +224,18 @@ public class ReviewTests
 
         ScenarioAssert.Accepted(s);
         Assert.Null(Assert.Single(s.LastEvents<RunReviewed>()).Text);
+    }
+
+    [Fact]
+    public void Later_review_text_is_trimmed_at_the_edges()
+    {
+        var (s, runId) = Completed();
+
+        s.Review("Вася", runId, 5, "  Отлично  ");
+
+        ScenarioAssert.Accepted(s);
+        Assert.Equal("Отлично", Assert.Single(s.LastEvents<RunReviewed>()).Text);
+        Assert.Equal(new RunReview(5, "Отлично"), s.State.Runs[runId].Review);
     }
 
     [Fact]

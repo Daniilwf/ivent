@@ -1,3 +1,4 @@
+using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Map;
 using GameEvent.Engine.Rulesets;
 using GameEvent.Engine.Runs;
@@ -11,12 +12,18 @@ namespace GameEvent.Engine.Tests.Runs;
 /// <c>reward.challengeBonus.extraDice</c> dice of the same type as the difficulty die, fixed in the snapshot at the roll.
 /// They are rolled after the dice by hours and stored apart (<see cref="CompletionRolled.ChallengeDice"/>); points and
 /// steps are the sum of all dice. Test ruleset: hoursPerDie 3, normal d4, hard/extreme d6, easy d2, extraDice 1.
+/// The claim is closed by <c>features.challenges</c> (D-96 (1)); these scenarios turn it on unless stated otherwise.
 /// </summary>
 public class ChallengeTests
 {
-    private static Scenario Playing(decimal? hours = 6, Func<Ruleset, Ruleset>? ruleset = null)
+    private static Scenario Playing(decimal? hours = 6, Func<Ruleset, Ruleset>? ruleset = null, bool challenges = true)
     {
         var s = Scenario.New();
+        if (challenges)
+        {
+            s.WithRuleset(ChallengesOn);
+        }
+
         if (ruleset is not null)
         {
             s.WithRuleset(ruleset);
@@ -28,6 +35,9 @@ public class ChallengeTests
         ScenarioAssert.Accepted(s);
         return s;
     }
+
+    /// <summary>D-96 (1): claiming a challenge is closed by <c>features.challenges</c>, off by default.</summary>
+    private static Ruleset ChallengesOn(Ruleset r) => r with { Features = r.Features with { Challenges = true } };
 
     private static Func<Ruleset, Ruleset> ExtraDice(int extraDice) =>
         r => r with { Reward = r.Reward with { ChallengeBonus = new ChallengeBonus { ExtraDice = extraDice } } };
@@ -170,5 +180,46 @@ public class ChallengeTests
         Assert.Equal([new Die(4, 4)], DiceOf(s).Dice);
         Assert.Equal([new Die(4, 2)], DiceOf(s).ChallengeDice);
         Assert.Equal(6, s.Player("Вася").Points);
+    }
+    [Fact]
+    public void Challenges_are_off_by_default()
+    {
+        Assert.False(TestRuleset.Create().Features.Challenges);
+        Assert.False(RulesetJson.Default().Features.Challenges);
+    }
+
+    [Fact]
+    public void Claimed_challenge_with_the_feature_off_is_refused_without_events()
+    {
+        // D-96 (1): with features.challenges off the engine refuses ChallengeDone as feature.disabled
+        var s = Playing(6, challenges: false);
+        var runId = s.Player("Вася").ActiveRunId!.Value;
+
+        ScenarioAssert.RejectsWithoutChanges(
+            s, x => x.Complete("Вася", Difficulty.Normal, challengeDone: true), RejectionCodes.FeatureDisabled);
+        Assert.Equal(runId, s.Player("Вася").ActiveRunId);
+        Assert.Equal(0, s.Player("Вася").Points);
+    }
+
+    [Fact]
+    public void Feature_off_is_checked_before_the_hours()
+    {
+        // No hours in the pool and no estimate: the flag is reported, not the missing hours
+        var s = Playing(null, challenges: false);
+
+        ScenarioAssert.RejectsWithoutChanges(
+            s, x => x.Complete("Вася", Difficulty.Normal, challengeDone: true), RejectionCodes.FeatureDisabled);
+    }
+
+    [Fact]
+    public void Completion_without_a_claim_works_with_the_feature_off()
+    {
+        var s = Playing(6, challenges: false);
+
+        s.NextRandom(2, 3).Complete("Вася", Difficulty.Normal);
+
+        ScenarioAssert.Accepted(s);
+        Assert.Empty(DiceOf(s).ChallengeDice);
+        Assert.Equal(5, s.Player("Вася").Points);
     }
 }

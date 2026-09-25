@@ -9,8 +9,9 @@ namespace GameEvent.Engine.Tests.Runs;
 
 /// <summary>
 /// Coins for a completed run (W10; SPEC «Экономика»: «прохождение — чем длиннее игра, тем больше»; Q-2, D-96):
-/// <c>max(coins.min, ⌊hours × coins.perHour⌋)</c> by the counted hours, from the snapshot at the roll, as
-/// <c>CoinsChanged(+, CompletionReward, RunId)</c> after the points and the move. Test ruleset: perHour 1, min 3.
+/// <c>max(coins.min, ⌊min(hours, diceCount.max × hoursPerDie) × coins.perHour⌋)</c> by the counted hours, capped by the
+/// dice ceiling (D-96 (2)), from the snapshot at the roll, as <c>CoinsChanged(+, CompletionReward, RunId)</c> after the
+/// points and the move. Test ruleset: perHour 1, min 3, diceCount max 10 × hoursPerDie 3 → ceiling 30 hours.
 /// </summary>
 public class CoinsRewardTests
 {
@@ -51,7 +52,9 @@ public class CoinsRewardTests
     [InlineData(7.99, 7)]
     [InlineData(2.0, 3)] // min 3
     [InlineData(0.5, 3)]
-    [InlineData(100.0, 100)] // no cap: the dice have one, coins do not
+    [InlineData(30.0, 30)] // exactly the ceiling of 10 dice × 3 hours
+    [InlineData(30.5, 30)] // just over it
+    [InlineData(100.0, 30)] // D-96 (2): coins share the dice ceiling
     public void Coins_are_hours_times_rate_floored_but_not_below_the_minimum(double hours, int coins)
     {
         var s = Playing((decimal)hours);
@@ -79,6 +82,84 @@ public class CoinsRewardTests
 
         ScenarioAssert.Accepted(s);
         Assert.Equal(coins, Assert.Single(s.LastEvents<CoinsChanged>()).Delta);
+    }
+
+    [Fact]
+    public void Estimate_above_the_ceiling_gives_the_ceiling()
+    {
+        // D-96 (2): a player's estimate of 1000 hours must not give 1000 coins
+        var s = Playing(null);
+
+        s.Complete("Вася", Difficulty.Normal, estimatedHours: 1000, hoursSource: "HLTB");
+
+        ScenarioAssert.Accepted(s);
+        Assert.Equal(30, Assert.Single(s.LastEvents<CoinsChanged>()).Delta);
+        Assert.Equal(30, s.Player("Вася").Coins);
+    }
+
+    [Fact]
+    public void Pool_hours_above_the_ceiling_give_the_ceiling()
+    {
+        var s = Playing(1000);
+
+        s.Complete("Вася");
+
+        ScenarioAssert.Accepted(s);
+        Assert.Equal(30, Assert.Single(s.LastEvents<CoinsChanged>()).Delta);
+    }
+
+    [Fact]
+    public void Ceiling_is_multiplied_by_the_rate()
+    {
+        // 100 hours → capped at 30, × 2 per hour
+        var s = Playing(100, Coins(2, 3));
+
+        s.Complete("Вася");
+
+        ScenarioAssert.Accepted(s);
+        Assert.Equal(60, Assert.Single(s.LastEvents<CoinsChanged>()).Delta);
+    }
+
+    [Theory]
+    [InlineData(5.0, 4, 20)] // 4 dice × 5 hours
+    [InlineData(2.5, 3, 7)] // 7.5 hours → floor 7
+    public void Ceiling_follows_the_dice_count_config(double hoursPerDie, int maxDice, int coins)
+    {
+        var s = Playing(100, r => r with
+        {
+            Reward = r.Reward with { DiceCount = r.Reward.DiceCount with { HoursPerDie = (decimal)hoursPerDie, Max = maxDice } },
+        });
+
+        s.Complete("Вася");
+
+        ScenarioAssert.Accepted(s);
+        Assert.Equal(coins, Assert.Single(s.LastEvents<CoinsChanged>()).Delta);
+    }
+
+    [Fact]
+    public void Minimum_above_the_ceiling_still_wins()
+    {
+        // max(min, …): a minimum of 50 is paid even though the ceiling gives 30
+        var s = Playing(100, Coins(1, 50));
+
+        s.Complete("Вася");
+
+        ScenarioAssert.Accepted(s);
+        Assert.Equal(50, Assert.Single(s.LastEvents<CoinsChanged>()).Delta);
+    }
+
+    [Fact]
+    public void Ceiling_comes_from_the_roll_snapshot()
+    {
+        // S1: the dice ceiling is fixed at the roll (10 × 3 = 30); the admin lowers diceCount.max to 2 while Вася plays
+        var s = Playing(100);
+        s.WithRuleset(r => r with { Reward = r.Reward with { DiceCount = r.Reward.DiceCount with { Max = 2 } } });
+
+        s.Complete("Вася");
+
+        ScenarioAssert.Accepted(s);
+        Assert.Equal(30, Assert.Single(s.LastEvents<CoinsChanged>()).Delta);
+        Assert.Equal(10, Assert.Single(s.LastEvents<CompletionRolled>()).Dice.Count);
     }
 
     [Fact]
@@ -119,7 +200,7 @@ public class CoinsRewardTests
     [Fact]
     public void Coins_do_not_depend_on_difficulty_or_the_challenge()
     {
-        var s = Playing(6);
+        var s = Playing(6, r => r with { Features = r.Features with { Challenges = true } });
 
         s.Complete("Вася", Difficulty.Extreme, challengeDone: true);
 

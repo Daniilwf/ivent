@@ -29,6 +29,12 @@ internal static class RunLifecycle
             return rejection;
         }
 
+        if (command.ChallengeDone && !state.Rules.Features.Challenges)
+        {
+            // Games carry no challenge note yet and the proof does not check it: claims are off (D-96).
+            return Decision.Reject(RejectionCodes.FeatureDisabled, "Challenges are off in this season.");
+        }
+
         var player = state.Players[command.PlayerId];
         var run = state.Runs[player.ActiveRunId ?? throw new InvalidOperationException($"Player {player.PlayerId} is Playing without a run.")];
 
@@ -54,7 +60,7 @@ internal static class RunLifecycle
 
         if (source?.Length > Limits.MaxHoursSourceLength)
         {
-            return Decision.Reject(RejectionCodes.CommentTooLong, $"The source is limited to {Limits.MaxHoursSourceLength} characters.");
+            return Decision.Reject(RejectionCodes.HoursSourceTooLong, $"The source is limited to {Limits.MaxHoursSourceLength} characters.");
         }
 
         if (command.Review is { } review && ReviewProblem(review) is { } badReview)
@@ -89,10 +95,12 @@ internal static class RunLifecycle
             events.Add(new PlayerMoved(player.PlayerId, player.CellId, path[^1], sum, [.. path], MoveReason.CompletionRoll, run.RunId));
         }
 
-        // Coins by the counted hours, from the rules fixed at the roll (Q-2, D-96).
+        // Coins by the counted hours, from the rules fixed at the roll (Q-2, D-96), up to the hours the dice top out at:
+        // a player's estimate cannot mint coins without limit.
         if (run.Snapshot.Coins is { } reward)
         {
-            var coins = Math.Max(reward.Min, (int)Math.Floor(hours.Value * reward.PerHour));
+            var ceiling = run.Snapshot.DiceCount.Max * run.Snapshot.DiceCount.HoursPerDie;
+            var coins = Math.Max(reward.Min, (int)Math.Floor(Math.Min(hours.Value, ceiling) * reward.PerHour));
             if (coins != 0)
             {
                 events.Add(new CoinsChanged(player.PlayerId, coins, CoinsReason.CompletionReward, run.RunId));
@@ -159,9 +167,9 @@ internal static class RunLifecycle
                 ? Decision.Reject(RejectionCodes.ReviewTooLong, $"A review is limited to {Limits.MaxReviewLength} characters.")
                 : null;
 
-    // Blank text is no text.
+    // The text is trimmed; blank text is no text.
     private static RunReviewed Reviewed(RunState run, RunReview review, DateTimeOffset at) =>
-        new(run.RunId, run.PlayerId, review.Rating, string.IsNullOrWhiteSpace(review.Text) ? null : review.Text, at);
+        new(run.RunId, run.PlayerId, review.Rating, string.IsNullOrWhiteSpace(review.Text) ? null : review.Text.Trim(), at);
 
     public static SeasonState Apply(SeasonState state, RunStarted e)
     {

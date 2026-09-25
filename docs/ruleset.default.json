@@ -12,7 +12,8 @@
     "partnerBoard": false,
     "reactions": false,
     "comments": false,
-    "gallery": false
+    "gallery": false,
+    "challenges": false
   },
   "season": {
     "timezone": "Europe/Moscow",

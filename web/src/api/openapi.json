@@ -2130,6 +2130,10 @@
           },
           "gallery": {
             "type": "boolean"
+          },
+          "challenges": {
+            "type": "boolean",
+            "description": "Claiming a game's challenge on completion (D-96). Off until games carry a challenge note and the proof checks it;\noptional, so older configs without it still read."
           }
         },
         "description": "Feature flags: a disabled mechanic is invisible in the interface and refused by the engine."
@@ -2386,7 +2390,8 @@
           "manualEffects",
           "dropHintMinutes",
           "dropPenalty",
-          "techRerollOpen"
+          "techRerollOpen",
+          "challengesEnabled"
         ],
         "type": "object",
         "properties": {
@@ -2472,9 +2477,12 @@
           },
           "techRerollOpen": {
             "type": "boolean"
+          },
+          "challengesEnabled": {
+            "type": "boolean"
           }
         },
-        "description": "The signed-in player's own turn. While playing: `dropHintMinutes` is `roll.minPlayMinutesBeforeDrop` until\nthat much has been played by the server clock (only a hint: D-09), then null; `dropPenalty` is what a drop costs\nunder the rules in force; `techRerollOpen` says whether the player may still tech-reroll themselves (D-94)."
+        "description": "The signed-in player's own turn. While playing: `dropHintMinutes` is `roll.minPlayMinutesBeforeDrop` until\nthat much has been played by the server clock (only a hint: D-09), then null; `dropPenalty` is what a drop costs\nunder the rules in force; `techRerollOpen` says whether the player may still tech-reroll themselves (D-94);\n`challengesEnabled` says whether a challenge may be claimed on completion (`features.challenges`, D-96)."
       },
       "NominationRules": {
         "required": [

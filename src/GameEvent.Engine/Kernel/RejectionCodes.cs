@@ -40,6 +40,8 @@ public static class RejectionCodes
     public const string RunUnknown = "run.unknown";
     public const string NotTechRerolled = "run.notTechRerolled";
     public const string HoursSourceRequired = "run.hoursSourceRequired";
+    public const string HoursSourceTooLong = "run.hoursSourceTooLong";
+    public const string FeatureDisabled = "feature.disabled";
     public const string NotYourRun = "run.notYours";
     public const string RunNotCompleted = "run.notCompleted";
     public const string InvalidRating = "review.invalidRating";

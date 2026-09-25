@@ -1699,6 +1699,11 @@ export interface components {
             reactions: boolean;
             comments: boolean;
             gallery: boolean;
+            /**
+             * @description Claiming a game's challenge on completion (D-96). Off until games carry a challenge note and the proof checks it;
+             *     optional, so older configs without it still read.
+             */
+            challenges?: boolean;
         };
         FinishRules: {
             requireApprovalForFirst: boolean;
@@ -1776,7 +1781,8 @@ export interface components {
         /**
          * @description The signed-in player's own turn. While playing: `dropHintMinutes` is `roll.minPlayMinutesBeforeDrop` until
          *     that much has been played by the server clock (only a hint: D-09), then null; `dropPenalty` is what a drop costs
-         *     under the rules in force; `techRerollOpen` says whether the player may still tech-reroll themselves (D-94).
+         *     under the rules in force; `techRerollOpen` says whether the player may still tech-reroll themselves (D-94);
+         *     `challengesEnabled` says whether a challenge may be claimed on completion (`features.challenges`, D-96).
          */
         MyTurnView: {
             /** Format: uuid */
@@ -1792,6 +1798,7 @@ export interface components {
             dropHintMinutes: null | number;
             dropPenalty: null | components["schemas"]["DropPenaltyView"];
             techRerollOpen: boolean;
+            challengesEnabled: boolean;
         };
         NominationRules: {
             auto: components["schemas"]["EquatableArrayOfAutoNomination"];

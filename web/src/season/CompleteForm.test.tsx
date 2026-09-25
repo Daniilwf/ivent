@@ -64,9 +64,34 @@ describe('CompleteForm', () => {
 
   // ---- C7a (D-96): challenge, hours source, review ----
 
+  it('shows no challenge box by default', () => {
+    // D-96 (1): the claim is closed by features.challenges, off by default
+    render(<CompleteForm needsHours={false} pending={false} onComplete={vi.fn()} />);
+
+    expect(screen.queryByLabelText(ru.turn.challengeDone)).not.toBeInTheDocument();
+  });
+
+  it('shows no challenge box when challenges are off', async () => {
+    const onComplete = vi.fn();
+    render(
+      <CompleteForm
+        needsHours={false}
+        pending={false}
+        challengesEnabled={false}
+        onComplete={onComplete}
+      />,
+    );
+
+    expect(screen.queryByLabelText(ru.turn.challengeDone)).not.toBeInTheDocument();
+    await userEvent.click(screen.getByTestId('complete-submit'));
+    expect(onComplete).toHaveBeenCalledWith({ difficulty: 'normal' });
+  });
+
   it('claims the challenge only when the box is checked', async () => {
     const onComplete = vi.fn();
-    render(<CompleteForm needsHours={false} pending={false} onComplete={onComplete} />);
+    render(
+      <CompleteForm needsHours={false} pending={false} challengesEnabled onComplete={onComplete} />,
+    );
 
     const box = screen.getByLabelText(ru.turn.challengeDone);
     expect(box).toHaveAttribute('type', 'checkbox');
@@ -104,7 +129,7 @@ describe('CompleteForm', () => {
 
   it('sends a link as the source of the estimate', async () => {
     const onComplete = vi.fn();
-    render(<CompleteForm needsHours pending={false} onComplete={onComplete} />);
+    render(<CompleteForm needsHours pending={false} challengesEnabled onComplete={onComplete} />);
 
     await userEvent.type(screen.getByTestId('complete-hours'), '12');
     await userEvent.type(
