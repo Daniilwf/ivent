@@ -70,3 +70,5 @@ Thumbs.db
 
 # Logs and data next to the web project's content root
 src/GameEvent.Web/var/
+# --- Verify snapshots: only *.verified.* are kept (C13) ---
+*.received.*

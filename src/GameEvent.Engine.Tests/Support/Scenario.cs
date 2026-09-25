@@ -266,6 +266,7 @@ public sealed class Scenario
         using var _ = Recording(() => $"s.AppendCraftedEvents({string.Join(", ", events.Select(e => ScenarioCode.Value(e, CodeName)))});");
         _log.AddRange(events);
         _history.Add(new LoggedCommand(SequentialIds.Make(0x7E000000, _history.Count), [.. events]));
+        _commands.Add(null);
         State = SeasonEngine.Replay(_log);
         return this;
     }
@@ -283,6 +284,7 @@ public sealed class Scenario
             State = Last.State;
             LastCommandId = SequentialIds.Make(0x7C000000, _history.Count);
             _history.Add(new LoggedCommand(LastCommandId, [.. Last.Events]));
+            _commands.Add(command);
         }
 
         return this;
@@ -293,6 +295,11 @@ public sealed class Scenario
 
     /// <summary>The season's log by command, as the queue gives it to an undo.</summary>
     public IReadOnlyList<LoggedCommand> History => _history;
+
+    /// <summary>The accepted command behind each entry of <see cref="History"/> (null for crafted events).</summary>
+    public IReadOnlyList<ICommand?> Commands => _commands;
+
+    private readonly List<ICommand?> _commands = [];
 
     /// <summary>
     /// The log as the rules see it (D-104, invariant 13): the events of the commands that are not undone, without the
