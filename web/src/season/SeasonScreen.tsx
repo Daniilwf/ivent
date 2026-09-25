@@ -40,7 +40,11 @@ function send(seasonId: string, command: Command) {
     case 'complete':
       return api.POST('/api/seasons/{seasonId}/complete', {
         params,
-        body: { commandId, ...command.completion },
+        body: {
+          commandId,
+          ...command.completion,
+          challengeDone: command.completion.challengeDone ?? false,
+        },
       });
     case 'choose':
       return api.POST('/api/seasons/{seasonId}/choose', {
