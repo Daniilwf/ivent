@@ -20,9 +20,14 @@ export function AvatarSection({ onChanged }: { onChanged: () => void }) {
   const [version, setVersion] = useState(0);
   useEffect(() => {
     let active = true;
-    void api.GET('/api/auth/me').then(({ data }) => {
-      if (active) setAvatar(data?.avatar ?? null);
-    });
+    api
+      .GET('/api/auth/me')
+      .then(({ data }) => {
+        if (active) setAvatar(data?.avatar ?? null);
+      })
+      .catch(() => {
+        // No answer leaves the avatar as it was shown: the season screen reports the lost connection itself
+      });
     return () => {
       active = false;
     };
