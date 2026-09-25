@@ -104,9 +104,14 @@ public static class Movement
         var player = state.Players[e.PlayerId];
         state = state with { Players = state.Players.SetItem(e.PlayerId, player with { CellId = e.To, Path = player.Path.After(e) }) };
 
-        // A run whose move lands on the finish is marked: its proof goes on top of the queue (SPEC «Уточнения»).
-        return e.RunId is { } runId && e.Steps > 0 && state.Map.CellById(e.To).Type == CellType.Finish
-            ? state with { Runs = state.Runs.SetItem(runId, state.Runs[runId] with { ReachedFinish = true }) }
-            : state;
+        if (e.RunId is not { } runId)
+        {
+            return state;
+        }
+
+        // The run keeps its net steps (a reject takes them back) and whether it reached the finish (its proof goes on top).
+        var run = state.Runs[runId];
+        var reached = run.ReachedFinish || (e.Steps > 0 && state.Map.CellById(e.To).Type == CellType.Finish);
+        return state with { Runs = state.Runs.SetItem(runId, run with { Moved = run.Moved + e.Steps, ReachedFinish = reached }) };
     }
 }

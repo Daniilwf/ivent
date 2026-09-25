@@ -11,7 +11,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace GameEvent.Infrastructure.Database.Migrations
 {
     [DbContext(typeof(GameEventDbContext))]
-    [Migration("20260925014541_Initial")]
+    [Migration("20260925021230_Initial")]
     partial class Initial
     {
         /// <inheritdoc />
@@ -342,6 +342,9 @@ namespace GameEvent.Infrastructure.Database.Migrations
 
                     b.Property<string>("HoursSource")
                         .HasColumnType("TEXT");
+
+                    b.Property<int>("Moved")
+                        .HasColumnType("INTEGER");
 
                     b.Property<Guid>("PlayerId")
                         .HasColumnType("TEXT");

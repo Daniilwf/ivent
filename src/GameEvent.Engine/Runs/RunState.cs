@@ -45,7 +45,8 @@ public sealed record RunReview(int Rating, string? Text);
 
 /// <summary>
 /// An attempt to complete one rolled game. <see cref="CompletedAt"/> orders the proof queue; <see cref="ReachedFinish"/>
-/// says a move of this run brought its player to the finish (SPEC: such proofs go on top).
+/// says a move of this run brought its player to the finish (SPEC: such proofs go on top); <see cref="Moved"/> is the net
+/// steps its moves took, which a reject takes back (D-98).
 /// </summary>
 public sealed record RunState(
     Guid RunId,
@@ -63,4 +64,5 @@ public sealed record RunState(
     RunReview? Review = null,
     DateTimeOffset? CompletedAt = null,
     bool ReachedFinish = false,
-    Proofs.ProofState? Proof = null);
+    Proofs.ProofState? Proof = null,
+    int Moved = 0);

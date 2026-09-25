@@ -6,6 +6,7 @@ using GameEvent.Infrastructure.Database;
 using GameEvent.Infrastructure.Kernel;
 using GameEvent.Infrastructure.Queue;
 using GameEvent.Web.Accounts;
+using GameEvent.Web.Proofs;
 using GameEvent.Web.Realtime;
 using GameEvent.Web.Rolls;
 using GameEvent.Web.Rulesets;
@@ -146,6 +147,7 @@ public static class AppSetup
         api.MapRules();
         api.MapPoolStats();
         api.MapAdminRuns();
+        api.MapAdminProofs();
         app.MapHub<SeasonHub>(SeasonHub.Path);
 
         if (frontend is not null)

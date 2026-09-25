@@ -1,6 +1,7 @@
 using GameEvent.Engine.Effects;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Players;
+using GameEvent.Engine.Proofs;
 using GameEvent.Engine.Rolls;
 using GameEvent.Engine.Rulesets;
 using GameEvent.Engine.Runs;
@@ -521,6 +522,86 @@ public class CommandQueueTests
         var finalRun = await final.Runs.AsNoTracking().SingleAsync(ct);
         Assert.Equal(Difficulty.Normal, finalRun.Difficulty);
         Assert.Equal(changed.Players[s_vasya].Points, (await final.SeasonPlayers.AsNoTracking().SingleAsync(ct)).Points);
+    }
+
+    [Fact]
+    public async Task Projection_of_proofs_approvals_and_a_reject_equals_the_fold_of_the_log()
+    {
+        await using var h = await QueueHarness.StartAsync();
+        var ct = TestContext.Current.CancellationToken;
+        var petya = Guid.Parse("10000000-0000-0000-0000-000000000002");
+        var rules = RulesetJson.Default();
+
+        // A map of 2 steps: every completion reaches the finish, so ReachedFinish is set (D-98, SE6)
+        await AcceptedAsync(h, new CreateSeason(s_season, "Осень", rules with { Map = rules.Map with { LinearLength = 2 } }));
+        await AcceptedAsync(h, new ChangeSeasonStatus(SeasonStatus.Active));
+        await AcceptedAsync(h, new AddSeasonPlayer(s_vasya, s_vasya, "Вася"));
+        await AcceptedAsync(h, new AddSeasonPlayer(petya, petya, "Петя"));
+
+        // Given Вася completed two runs on «выше сложной» (a good event waits for each) and Петя one
+        await AcceptedAsync(h, new RollGame(s_vasya));
+        await AcceptedAsync(h, new StartRun(s_vasya));
+        await AcceptedAsync(h, new CompleteRun(s_vasya, Difficulty.Extreme));
+        await AcceptedAsync(h, new RollGame(petya));
+        await AcceptedAsync(h, new StartRun(petya));
+        await AcceptedAsync(h, new CompleteRun(petya, Difficulty.Normal));
+        h.Clock.UtcNow = h.Clock.UtcNow.AddHours(1);
+        await AcceptedAsync(h, new RollGame(s_vasya));
+        await AcceptedAsync(h, new StartRun(s_vasya));
+        await AcceptedAsync(h, new CompleteRun(s_vasya, Difficulty.Extreme));
+        var completed = await AssertProjectionEqualsReplayAsync(h, ct);
+        var vasyaRuns = completed.Runs.Values.Where(r => r.PlayerId == s_vasya).OrderBy(r => r.CompletedAt).ToList();
+        var (first, second) = (vasyaRuns[0], vasyaRuns[1]);
+        var petyaRun = completed.Runs.Values.Single(r => r.PlayerId == petya);
+        Assert.True(first.ReachedFinish);
+        await using (var db = h.NewDb())
+        {
+            var row = await db.Runs.AsNoTracking().SingleAsync(r => r.Id == first.RunId, ct);
+            Assert.Equal((first.CompletedAt, true), (row.CompletedAt, row.ReachedFinish));
+        }
+
+        // When Вася sends a proof with a witness, then replaces it with links and a note
+        await AcceptedAsync(h, new SubmitProof(s_vasya, first.RunId, [], WitnessId: petya));
+        await AcceptedAsync(h, new SubmitProof(s_vasya, first.RunId, ["https://imgur.com/a/credits", "https://youtu.be/ending"], "Титры"));
+
+        // Then one Proof row, pending, with what was sent last
+        var submitted = await AssertProjectionEqualsReplayAsync(h, ct);
+        await using (var db = h.NewDb())
+        {
+            var proof = Assert.Single(await db.Proofs.AsNoTracking().ToListAsync(ct));
+            Assert.Equal(
+                (first.RunId, s_season, s_vasya, ProofStatus.Pending, (string?)"Титры", (Guid?)null, submitted.Runs[first.RunId].Proof!.SubmittedAt),
+                (proof.RunId, proof.SeasonId, proof.PlayerId, proof.Status, proof.Note, proof.WitnessId, proof.SubmittedAt));
+            Assert.Contains("https://youtu.be/ending", proof.LinksJson, StringComparison.Ordinal);
+        }
+
+        // When, after a restart, the admin approves it at hard (a lower difficulty: the good event is not applicable),
+        // approves Петя's run without a proof and rejects Вася's second run
+        await h.RestartAsync();
+        await AcceptedAsync(h, new ApproveProof(first.RunId, Difficulty.Hard));
+        await AcceptedAsync(h, new ApproveProof(petyaRun.RunId, Comment: "Видел на стриме"));
+        await AcceptedAsync(h, new RejectProof(second.RunId, "На скрине другая игра"));
+
+        // Then the projection equals the fold: two approved rows, one rejected, the rejected run and Вася's standing
+        var reviewed = await AssertProjectionEqualsReplayAsync(h, ct);
+        Assert.Equal(RunStatus.Rejected, reviewed.Runs[second.RunId].Status);
+        Assert.Equal(Difficulty.Hard, reviewed.Runs[first.RunId].Difficulty);
+        Assert.Empty(reviewed.ManualEffects);
+        await using var final = h.NewDb();
+        var rows = await final.Proofs.AsNoTracking().ToDictionaryAsync(p => p.RunId, ct);
+        Assert.Equal(3, rows.Count);
+        Assert.Equal(ProofStatus.Approved, rows[first.RunId].Status);
+        Assert.Equal(
+            (ProofStatus.Approved, (string?)"Видел на стриме", (DateTimeOffset?)null),
+            (rows[petyaRun.RunId].Status, rows[petyaRun.RunId].Comment, rows[petyaRun.RunId].SubmittedAt));
+        Assert.Equal(
+            (ProofStatus.Rejected, (string?)"На скрине другая игра"),
+            (rows[second.RunId].Status, rows[second.RunId].Comment));
+        Assert.Equal(RunStatus.Rejected, (await final.Runs.AsNoTracking().SingleAsync(r => r.Id == second.RunId, ct)).Status);
+        var vasya = await final.SeasonPlayers.AsNoTracking().SingleAsync(p => p.Id == s_vasya, ct);
+        var state = reviewed.Players[s_vasya];
+        Assert.Equal((state.Points, state.CellId, state.Coins), (vasya.Points, vasya.CellId, vasya.Coins));
+        Assert.Equal(0, await final.ManualEffects.CountAsync(ct));
     }
 
     private static Guid OfferedIn(Infrastructure.Queue.CommandOutcome outcome) =>

@@ -3,6 +3,7 @@ using System.Text.Json;
 using GameEvent.Engine.Effects;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Map;
+using GameEvent.Engine.Proofs;
 using GameEvent.Engine.Rolls;
 using GameEvent.Engine.Rulesets;
 using GameEvent.Engine.Runs;
@@ -55,6 +56,9 @@ public sealed record CompleteRequest(
 
 /// <summary>A review: a rating 1–10 and an optional text (D-96).</summary>
 public sealed record ReviewInput(int Rating, string? Text = null);
+
+/// <summary>The proof of the player's own completed run: links (http/https), a note, or a witness (D-98).</summary>
+public sealed record ProofRequest(Guid CommandId, IReadOnlyList<string?>? Links, string? Note = null, Guid? WitnessId = null);
 
 /// <summary>A review of the player's own completed run, written later or changed.</summary>
 public sealed record ReviewRequest(Guid CommandId, int Rating, string? Text = null);
@@ -129,7 +133,11 @@ public sealed record CompletedRunView(
     IReadOnlyList<DieView> Dice,
     IReadOnlyList<DieView> ChallengeDice,
     int Total,
-    ReviewView? Review);
+    ReviewView? Review,
+    ProofView? Proof);
+
+/// <summary>The proof of a run and how the admin checked it.</summary>
+public sealed record ProofView(ProofStatus Status, IReadOnlyList<string> Links, string? Note, string? Comment);
 
 public sealed record ReviewView(int Rating, string? Text);
 
@@ -229,6 +237,20 @@ public static class SeasonEndpoints
             .RequireAuthorization(Policies.Player)
             .WithActionErrors();
 
+        seasons.MapPost("/runs/{runId:guid}/proof", (Guid seasonId, Guid runId, ProofRequest request, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, CancellationToken ct) =>
+            ProofInvalid(request) is { } invalid
+                ? Task.FromResult<ActionResult>(invalid)
+                : ActAsync(
+                    seasonId,
+                    request.CommandId,
+                    user,
+                    db,
+                    bus,
+                    playerId => new SubmitProof(playerId, runId, [.. request.Links!.OfType<string>()], request.Note, request.WitnessId),
+                    ct))
+            .RequireAuthorization(Policies.Player)
+            .WithActionErrors();
+
         seasons.MapPost("/runs/{runId:guid}/review", (Guid seasonId, Guid runId, ReviewRequest request, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, CancellationToken ct) =>
             ReviewInvalid(request.Rating, request.Text) is { } invalid
                 ? Task.FromResult<ActionResult>(invalid)
@@ -246,6 +268,13 @@ public static class SeasonEndpoints
                 : request.Review is { } review
                     ? ReviewInvalid(review.Rating, review.Text)
                     : null;
+
+    private static ValidationProblem? ProofInvalid(ProofRequest request) =>
+        request.Links is not { } links || links.Count > Limits.MaxProofLinks || links.Any(link => !ProofLinks.IsValid(link))
+            ? Invalid("links", $"Up to {Limits.MaxProofLinks} http or https links of at most {Limits.MaxProofLinkLength} characters.")
+            : request.Note?.Length > Limits.MaxCommentLength
+                ? Invalid("note", $"At most {Limits.MaxCommentLength} characters.")
+                : null;
 
     private static ValidationProblem? ReviewInvalid(int rating, string? text) =>
         rating is < 1 or > 10
@@ -361,10 +390,11 @@ public static class SeasonEndpoints
             // One active run per player (C4 keeps it that way), so the latest started completed run is the latest
             // completed one. Revisit with a completion time column if several active runs are ever allowed.
             var last = await db.Runs.AsNoTracking()
-                .Where(r => r.PlayerId == mine.Id && r.Status == RunStatus.Completed)
+                .Where(r => r.PlayerId == mine.Id && (r.Status == RunStatus.Completed || r.Status == RunStatus.Rejected))
                 .OrderByDescending(r => r.StartedAt)
                 .FirstOrDefaultAsync(ct);
             var lastReview = last is null ? null : await db.Reviews.AsNoTracking().SingleOrDefaultAsync(x => x.RunId == last.Id, ct);
+            var lastProof = last is null ? null : await db.Proofs.AsNoTracking().SingleOrDefaultAsync(x => x.RunId == last.Id, ct);
             var gameIds = new[] { offer?.GameId, run?.GameId, last?.GameId }
                 .Concat(choice?.Options.Select(o => o.Game?.GameId) ?? [])
                 .OfType<Guid>()
@@ -410,7 +440,7 @@ public static class SeasonEndpoints
                     [.. choice.Options.Select(o => new ChoiceOptionView(o.Id, o.Game is null ? null : Offered(o.Game)))]),
                 mine.Phase == TurnPhase.Rolling ? new RerollPriceView(price.Payment, price.Coins) : null,
                 run is null ? null : new RunView(run.Id, Game(run, games[run.GameId]), run.StartedAt),
-                last is null ? null : Completed(last, games[last.GameId], lastReview),
+                last is null ? null : Completed(last, games[last.GameId], lastReview, lastProof),
                 effects,
                 playing && played < TimeSpan.FromMinutes(rules.Roll.MinPlayMinutesBeforeDrop) ? rules.Roll.MinPlayMinutesBeforeDrop : null,
                 playing
@@ -433,7 +463,10 @@ public static class SeasonEndpoints
         new(run.GameId, game.Title, run.Hours ?? game.Hours);
 
     private static CompletedRunView Completed(
-        Infrastructure.Seasons.RunRecord run, Infrastructure.Pool.GameRecord game, Infrastructure.Seasons.ReviewRecord? review)
+        Infrastructure.Seasons.RunRecord run,
+        Infrastructure.Pool.GameRecord game,
+        Infrastructure.Seasons.ReviewRecord? review,
+        Infrastructure.Seasons.ProofRecord? proof)
     {
         var dice = JsonSerializer.Deserialize<EquatableArray<Die>>(run.DiceJson, EngineJson.Options);
         var challenge = JsonSerializer.Deserialize<EquatableArray<Die>>(run.ChallengeDiceJson, EngineJson.Options);
@@ -444,7 +477,14 @@ public static class SeasonEndpoints
             [.. dice.Select(d => new DieView(d.Sides, d.Value))],
             [.. challenge.Select(d => new DieView(d.Sides, d.Value))],
             dice.Sum(d => d.Value) + challenge.Sum(d => d.Value),
-            review is null ? null : new ReviewView(review.Rating, review.Text));
+            review is null ? null : new ReviewView(review.Rating, review.Text),
+            proof is null
+                ? null
+                : new ProofView(
+                    proof.Status,
+                    JsonSerializer.Deserialize<EquatableArray<string>>(proof.LinksJson, EngineJson.Options).ToArray(),
+                    proof.Note,
+                    proof.Comment));
     }
 
     /// <summary>The latest season the user plays in; for spectators and admins, the latest season.</summary>

@@ -146,6 +146,7 @@ internal static class SeasonProjection
             record.HoursSource = run.HoursSource;
             record.CompletedAt = run.CompletedAt;
             record.ReachedFinish = run.ReachedFinish;
+            record.Moved = run.Moved;
 
             if (run.Proof is { } proof && proof != before.Runs.GetValueOrDefault(id)?.Proof)
             {
@@ -263,7 +264,8 @@ internal static class SeasonProjection
                             proof.WitnessId,
                             proof.SubmittedAt,
                             proof.Comment)
-                        : null)),
+                        : null,
+                    r.Moved)),
             ManualEffects = effects.ToImmutableSortedDictionary(
                 x => x.Id,
                 x => new PendingManualEffect(x.Id, x.PlayerId, x.DrawEvent, x.Source, x.RunId)),

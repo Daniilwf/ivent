@@ -340,6 +340,9 @@ namespace GameEvent.Infrastructure.Database.Migrations
                     b.Property<string>("HoursSource")
                         .HasColumnType("TEXT");
 
+                    b.Property<int>("Moved")
+                        .HasColumnType("INTEGER");
+
                     b.Property<Guid>("PlayerId")
                         .HasColumnType("TEXT");
 

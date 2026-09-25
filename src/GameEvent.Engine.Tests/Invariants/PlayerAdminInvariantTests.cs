@@ -3,6 +3,7 @@ using GameEvent.Engine.Effects;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Map;
 using GameEvent.Engine.Players;
+using GameEvent.Engine.Proofs;
 using GameEvent.Engine.Rolls;
 using GameEvent.Engine.Rulesets;
 using GameEvent.Engine.Runs;
@@ -29,6 +30,9 @@ namespace GameEvent.Engine.Tests.Invariants;
 /// The correction variants (C7b, D-97) add the admin's <see cref="CorrectRunHours"/> and <see cref="ChangeRunDifficulty"/>
 /// of completed runs (and of runs that are not, and of made-up ones), so dice are appended, taken off the end and
 /// recalculated, and the difficulty's good event is created and resolved.
+/// The proof variants (C8, D-98) add <see cref="SubmitProof"/> (valid and invalid links, witnesses, other players' runs),
+/// <see cref="ApproveProof"/> (with and without a proof, at a lower, the same or a higher difficulty) and
+/// <see cref="RejectProof"/>, and check the review queue (<see cref="ProofReviewOrder.Order"/>) after every command.
 /// </summary>
 public class PlayerAdminInvariantTests
 {
@@ -239,6 +243,59 @@ public class PlayerAdminInvariantTests
     /// </summary>
     private static int HoursIndex(int arg, byte b) => ((arg - 4) * 2) + (b % 4);
 
+    private static readonly string[] s_proofLinks =
+        ["https://imgur.com/a/credits", "http://example.com/ending.png", "javascript:alert(1)", "ftp://example.com/x.png"];
+
+    /// <summary>
+    /// With proofs, a coins adjustment with an argument of 3 and up is a proof command instead (bits 5–7): 3 a proof with
+    /// links (sometimes a bad one, sometimes six), 4 a proof by a witness (sometimes the player themself), 5 an approval
+    /// (with or without a comment, at no, a lower, the same or a higher difficulty), 6 a reject (sometimes with a blank
+    /// comment), 7 an approval of any run of the season. The run is the player's latest completed one, or any run of the
+    /// season, or a made-up one. The variant inside a kind comes from the log length, since bits 2–7 are fixed.
+    /// </summary>
+    private static ICommand ProofCommandFor(Scenario s, byte b, Func<ICommand> otherwise)
+    {
+        var arg = b / 32;
+        if ((b / 4) % 8 != 4 || arg < 3)
+        {
+            return otherwise();
+        }
+
+        var runs = s.State.Runs.Values.ToList();
+        var index = b % 4;
+        var player = index < s_players.Length ? s.PlayerId(s_players[index]) : s_late;
+        var variant = s.Log.Count;
+        var runId = (variant % 5) switch
+        {
+            _ when arg == 7 && runs.Count > 0 => runs[variant % runs.Count].RunId,
+            1 when runs.Count > 0 => runs[b % runs.Count].RunId,
+            4 => SequentialIds.Make(0x60000000, b),
+            _ => runs.LastOrDefault(r => r.PlayerId == player && r.Status == RunStatus.Completed)?.RunId
+                ?? runs.LastOrDefault(r => r.PlayerId == player)?.RunId
+                ?? SequentialIds.Make(0x60000000, b),
+        };
+        var witness = s.PlayerId(s_players[(index + 1) % s_players.Length]);
+        return arg switch
+        {
+            3 => new SubmitProof(
+                player,
+                runId,
+                (variant % 7) switch
+                {
+                    0 => [s_proofLinks[variant % s_proofLinks.Length]],
+                    1 => [.. Enumerable.Range(0, 6).Select(i => $"https://imgur.com/a/{i}")],
+                    _ => [s_proofLinks[0], s_proofLinks[1]],
+                },
+                variant % 3 == 0 ? "титры" : null),
+            4 => new SubmitProof(player, runId, [], variant % 4 == 0 ? null : "видел", variant % 5 == 0 ? player : witness),
+            5 or 7 => new ApproveProof(
+                runId,
+                (variant % 5) switch { 0 => null, var d => (Difficulty)(d - 1) },
+                variant % 2 == 0 ? "без скрина" : null),
+            _ => new RejectProof(runId, variant % 5 == 0 ? " " : "на скрине другая игра"),
+        };
+    }
+
     private static Guid RunToConvert(Scenario s, Guid player, byte b)
     {
         var runs = s.State.Runs.Values.Where(r => r.PlayerId == player).ToList();
@@ -253,7 +310,8 @@ public class PlayerAdminInvariantTests
         bool withChoice = false,
         RerollMode rerolls = RerollMode.None,
         bool withDrops = false,
-        bool withCorrections = false)
+        bool withCorrections = false,
+        bool withProofs = false)
     {
         var s = NewSeason(seed, withChoice, rerolls);
         foreach (var b in script)
@@ -266,9 +324,10 @@ public class PlayerAdminInvariantTests
 
             var before = s.State;
             var logLength = s.Log.Count;
-            ICommand Other() => withDrops
+            ICommand Base() => withDrops
                 ? DropCommandFor(s, b, withChoice, rerolls != RerollMode.None)
                 : CommandFor(s, b, withChoice, rerolls != RerollMode.None);
+            ICommand Other() => withProofs ? ProofCommandFor(s, b, Base) : Base();
             var command = withCorrections ? CorrectionCommandFor(s, b, Other) : Other();
             s.Act(command);
             afterEach?.Invoke(s, command, before, logLength);
@@ -312,6 +371,36 @@ public class PlayerAdminInvariantTests
     [Property(MaxTest = 200)]
     public void Invariants_hold_with_run_corrections_drops_and_rerolls(int seed, byte[] script) =>
         Play(seed, script, CheckInvariants, withChoice: true, rerolls: RerollMode.BadEvent, withDrops: true, withCorrections: true);
+
+    [Property(MaxTest = 200)]
+    public void Invariants_hold_with_proofs(int seed, byte[] script) =>
+        Play(seed, script, CheckProofInvariants, withProofs: true);
+
+    [Property(MaxTest = 200)]
+    public void Invariants_hold_with_proofs_corrections_drops_and_rerolls(int seed, byte[] script) =>
+        Play(seed, script, CheckProofInvariants, withChoice: true, rerolls: RerollMode.Coins, withDrops: true, withCorrections: true, withProofs: true);
+
+    [Property(MaxTest = 50)]
+    public void Same_seed_and_commands_give_the_same_log_with_proofs(int seed, byte[] script)
+    {
+        var first = Play(seed, script, withDrops: true, withCorrections: true, withProofs: true);
+        var second = Play(seed, script, withDrops: true, withCorrections: true, withProofs: true);
+
+        Assert.Equal(first.Log, second.Log);
+        Assert.Equal(first.State, second.State);
+    }
+
+    [Fact]
+    public void Every_proof_command_is_reachable_from_the_script()
+    {
+        // Bits 2–7 pick a proof command for five arguments; each kind must come out of the generator
+        var s = NewSeason(0);
+        var kinds = Enumerable.Range(0, 256)
+            .Select(b => ProofCommandFor(s, (byte)b, () => new RollGame(Guid.Empty)).GetType())
+            .ToHashSet();
+
+        Assert.Superset(new HashSet<Type> { typeof(SubmitProof), typeof(ApproveProof), typeof(RejectProof) }, kinds);
+    }
 
     [Fact]
     public void Every_corrected_hours_value_is_reachable_from_the_script()
@@ -398,6 +487,38 @@ public class PlayerAdminInvariantTests
                 Assert.Equal(new CellVisit(moved.To, CellVisitKind.Stop), visits[^1]);
             }
         });
+
+    /// <summary>
+    /// SE6 / D-98: the review queue is exactly the completed runs neither approved nor rejected, finishes first, then
+    /// by completion time, ties by run id; a proof only on a completed or rejected run; plus every invariant of
+    /// <see cref="CheckInvariants"/>.
+    /// </summary>
+    private static void CheckProofInvariants(Scenario s, ICommand command, SeasonState before, int logLengthBefore)
+    {
+        CheckInvariants(s, command, before, logLengthBefore);
+
+        var expected = s.State.Runs.Values
+            .Where(r => r.Status == RunStatus.Completed && r.Proof?.Status is null or ProofStatus.Pending)
+            .OrderByDescending(r => r.ReachedFinish)
+            .ThenBy(r => r.CompletedAt)
+            .ThenBy(r => r.RunId)
+            .Select(r => r.RunId);
+        Assert.Equal(expected, ProofReviewOrder.Order(s.State));
+
+        var finish = s.State.Map.Cells.Single(c => c.Type == CellType.Finish).Id;
+        foreach (var run in s.State.Runs.Values)
+        {
+            // A proof only on a run that was completed; a rejected run always has a rejected proof and back
+            Assert.True(run.Proof is null || run.Status is RunStatus.Completed or RunStatus.Rejected, $"A proof on a {run.Status} run.");
+            Assert.Equal(run.Status == RunStatus.Rejected, run.Proof?.Status == ProofStatus.Rejected);
+            Assert.Equal(run.Status is RunStatus.Completed or RunStatus.Rejected, run.CompletedAt is not null);
+
+            // ReachedFinish: some forward move of this run ended on the finish
+            Assert.Equal(
+                s.Log.OfType<PlayerMoved>().Any(m => m.RunId == run.RunId && m.Steps > 0 && m.To == finish),
+                run.ReachedFinish);
+        }
+    }
 
     private static void CheckInvariants(Scenario s, ICommand command, SeasonState before, int logLengthBefore)
     {
@@ -613,6 +734,15 @@ public class PlayerAdminInvariantTests
                 break;
             case ChangeRunDifficulty change:
                 CheckAcceptedDifficultyChange(s, change, before);
+                break;
+            case SubmitProof submit:
+                CheckAcceptedProof(s, submit, before);
+                break;
+            case ApproveProof approve:
+                CheckAcceptedApproval(s, approve, before);
+                break;
+            case RejectProof reject:
+                CheckAcceptedReject(s, reject, before);
                 break;
             case MakeChoice choose:
                 // Choosing --> Playing (D-91): the chosen option starts at once with its roll-time snapshot
@@ -848,9 +978,10 @@ public class PlayerAdminInvariantTests
     /// along the walked path; none when no cell is entered), each only when not zero, all linked to the run. The owner's
     /// turn is untouched and nobody else changes.
     /// </summary>
-    private static void CheckCorrectionDifference(Scenario s, RunState run, int diff, SeasonState before)
+    private static void CheckCorrectionDifference(
+        Scenario s, RunState run, int diff, SeasonState before, IReadOnlyList<IGameEvent>? only = null)
     {
-        var events = s.Last.Events;
+        var events = only ?? s.Last.Events;
         var was = before.Players[run.PlayerId];
         Assert.Equal(
             diff == 0 ? [] : [new PointsChanged(run.PlayerId, diff, PointsReason.RunCorrection, run.RunId)],
@@ -928,9 +1059,10 @@ public class PlayerAdminInvariantTests
     }
 
     /// <summary>W8 / Q-5 / D-97: every die ⌈old × new sides / old sides⌉, both kept; the difficulty's event follows.</summary>
-    private static void CheckAcceptedDifficultyChange(Scenario s, ChangeRunDifficulty change, SeasonState before)
+    private static void CheckAcceptedDifficultyChange(
+        Scenario s, ChangeRunDifficulty change, SeasonState before, IReadOnlyList<IGameEvent>? only = null)
     {
-        var events = s.Last.Events;
+        var events = only ?? s.Last.Events;
         Assert.True(before.Status is SeasonStatus.Active or SeasonStatus.Closing, $"Changed while {before.Status}.");
         Assert.False(string.IsNullOrWhiteSpace(change.Comment), "A difficulty change without a comment.");
         var run = before.Runs[change.RunId];
@@ -955,7 +1087,7 @@ public class PlayerAdminInvariantTests
 
         Type[] allowed = [typeof(RunDifficultyChanged), typeof(PointsChanged), typeof(PlayerMoved), typeof(ManualEffectResolved), typeof(ManualEffectCreated)];
         Assert.All(events, e => Assert.Contains(e.GetType(), allowed));
-        CheckCorrectionDifference(s, run, dice.Concat(challenge).Sum(d => d.After.Value - d.Before.Value), before);
+        CheckCorrectionDifference(s, run, dice.Concat(challenge).Sum(d => d.After.Value - d.Before.Value), before, events);
 
         // Any pending event of the run's difficulty is resolved «not applicable» with the comment; the new one's is created
         var pending = before.ManualEffects.Values.Where(e => e.RunId == run.RunId && e.Source == ManualEffectSource.Difficulty);
@@ -973,6 +1105,143 @@ public class PlayerAdminInvariantTests
         {
             Assert.Empty(created);
         }
+    }
+
+    private static bool IsHttpLink(string link) =>
+        link.Length <= Limits.MaxProofLinkLength
+        && Uri.TryCreate(link, UriKind.Absolute, out var uri)
+        && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps)
+        && !string.IsNullOrEmpty(uri.Host);
+
+    /// <summary>W4 / D-98: only one's own completed unchecked run, a valid proof; only the proof changes.</summary>
+    private static void CheckAcceptedProof(Scenario s, SubmitProof submit, SeasonState before)
+    {
+        Assert.True(before.Status is SeasonStatus.Active or SeasonStatus.Closing, $"A proof while {before.Status}.");
+        var run = before.Runs[submit.RunId];
+        Assert.Equal(submit.PlayerId, run.PlayerId);
+        Assert.Equal(RunStatus.Completed, run.Status);
+        Assert.True(run.Proof?.Status is null or ProofStatus.Pending, "A checked proof was replaced.");
+        Assert.InRange(submit.Links.Count, 0, Limits.MaxProofLinks);
+        Assert.All(submit.Links, link => Assert.True(IsHttpLink(link), $"Link «{link}» was accepted."));
+        Assert.True(submit.Links.Count > 0 || submit.WitnessId is not null, "An empty proof was accepted.");
+        Assert.True(
+            submit.WitnessId is null || (submit.WitnessId != submit.PlayerId && before.Players.ContainsKey(submit.WitnessId.Value)),
+            "An invalid witness was accepted.");
+        Assert.True((submit.Note?.Length ?? 0) <= Limits.MaxCommentLength, "A note over the limit was accepted.");
+
+        Assert.Equal(
+            [new ProofSubmitted(run.RunId, submit.PlayerId, submit.Links, submit.Note, submit.WitnessId, s.Clock.UtcNow)],
+            s.Last.Events);
+        Assert.Equal(
+            run with { Proof = new ProofState(ProofStatus.Pending, submit.Links, submit.Note, submit.WitnessId, s.Clock.UtcNow, null) },
+            s.State.Runs[run.RunId]);
+        Assert.Equal(before.Players, s.State.Players);
+    }
+
+    /// <summary>
+    /// W4 / W8 / Q-5 / D-98: only a completed unchecked run; without a proof a comment is needed; a lower difficulty is a
+    /// difficulty change in the same command, a higher one never; the approval is the last event.
+    /// </summary>
+    private static void CheckAcceptedApproval(Scenario s, ApproveProof approve, SeasonState before)
+    {
+        var events = s.Last.Events;
+        Assert.True(before.Status is SeasonStatus.Active or SeasonStatus.Closing, $"Approved while {before.Status}.");
+        var run = before.Runs[approve.RunId];
+        Assert.Equal(RunStatus.Completed, run.Status);
+        Assert.True(run.Proof?.Status is null or ProofStatus.Pending, "A checked run was approved again.");
+        var withoutProof = run.Proof is null;
+        Assert.True(!withoutProof || !string.IsNullOrWhiteSpace(approve.Comment), "Approved without a proof and without a comment.");
+        Assert.True(approve.Difficulty is null || approve.Difficulty <= run.Difficulty, "The proof raised the difficulty.");
+
+        Assert.Equal(new ProofApproved(run.RunId, run.PlayerId, withoutProof, approve.Comment, s.Clock.UtcNow), events[^1]);
+        Assert.Single(events.OfType<ProofApproved>());
+        var change = events.Take(events.Count - 1).ToList();
+        if (approve.Difficulty is { } difficulty && difficulty < run.Difficulty)
+        {
+            var changed = Assert.IsType<RunDifficultyChanged>(change[0]);
+            Assert.False(string.IsNullOrWhiteSpace(changed.Comment));
+            CheckAcceptedDifficultyChange(s, new ChangeRunDifficulty(run.RunId, difficulty, changed.Comment), before, change);
+        }
+        else
+        {
+            Assert.Empty(change);
+            Assert.Equal(before.Players, s.State.Players);
+            Assert.Equal(before.ManualEffects, s.State.ManualEffects);
+        }
+
+        Assert.Equal(
+            run.Proof is { } sent
+                ? sent with { Status = ProofStatus.Approved, Comment = approve.Comment }
+                : new ProofState(ProofStatus.Approved, [], null, null, null, approve.Comment),
+            s.State.Runs[run.RunId].Proof);
+        Assert.Equal(RunStatus.Completed, s.State.Runs[run.RunId].Status);
+    }
+
+    /// <summary>
+    /// W5 / D-15 / D-98: only a completed unchecked run, with a comment; minus everything the run gave — points and
+    /// coins by the sum of its logged changes, steps back by its net steps from the current cell along the walked path,
+    /// its pending difficulty event «не применимо»; the run is rejected; nobody else and the owner's turn untouched.
+    /// </summary>
+    private static void CheckAcceptedReject(Scenario s, RejectProof reject, SeasonState before)
+    {
+        var events = s.Last.Events;
+        Assert.True(before.Status is SeasonStatus.Active or SeasonStatus.Closing, $"Rejected while {before.Status}.");
+        Assert.False(string.IsNullOrWhiteSpace(reject.Comment), "A reject without a comment.");
+        var run = before.Runs[reject.RunId];
+        Assert.Equal(RunStatus.Completed, run.Status);
+        Assert.True(run.Proof?.Status is null or ProofStatus.Pending, "A checked run was rejected.");
+        var player = run.PlayerId;
+        var was = before.Players[player];
+
+        Assert.Equal(new ProofRejected(run.RunId, player, reject.Comment, s.Clock.UtcNow), events[0]);
+        var order = new[] { typeof(ProofRejected), typeof(PointsChanged), typeof(PlayerMoved), typeof(CoinsChanged), typeof(ManualEffectResolved) };
+        var positions = events.Select(e => Array.IndexOf(order, e.GetType())).ToList();
+        Assert.DoesNotContain(-1, positions);
+        Assert.Equal(positions.Order(), positions);
+
+        var earlier = s.Log.Take(s.Log.Count - events.Count).ToList();
+        var points = earlier.OfType<PointsChanged>().Where(e => e.RunId == run.RunId).Sum(e => e.Delta);
+        Assert.Equal(
+            points == 0 ? [] : [new PointsChanged(player, -points, PointsReason.ProofRejected, run.RunId)],
+            events.OfType<PointsChanged>());
+        var coins = earlier.OfType<CoinsChanged>().Where(e => e.RunId == run.RunId).Sum(e => e.Delta);
+        Assert.Equal(
+            coins == 0 ? [] : [new CoinsChanged(player, -coins, CoinsReason.ProofRejected, run.RunId)],
+            events.OfType<CoinsChanged>());
+
+        // Back by the net steps of the run; when they are not above zero (a completion on the finish writes no move,
+        // D-47) the direction is left open here
+        var steps = earlier.OfType<PlayerMoved>().Where(e => e.RunId == run.RunId).Sum(e => e.Steps);
+        if (steps > 0)
+        {
+            var path = Movement.Backward(before.Map, was.Path, steps);
+            Assert.Equal(
+                path.Count == 0 ? [] : [new PlayerMoved(player, was.CellId, path[^1], -steps, [.. path], MoveReason.ProofRejected, run.RunId)],
+                events.OfType<PlayerMoved>());
+        }
+
+        var pending = before.ManualEffects.Values.Where(e => e.RunId == run.RunId && e.Source == ManualEffectSource.Difficulty).ToList();
+        Assert.Equal(
+            pending.Select(e => (e.EffectId, player, (Guid?)run.RunId, ManualEffectOutcome.NotApplicable)),
+            events.OfType<ManualEffectResolved>().Select(e => (e.EffectId, e.PlayerId, e.RunId, e.Outcome)));
+
+        var after = s.State.Runs[run.RunId];
+        Assert.Equal(RunStatus.Rejected, after.Status);
+        Assert.Equal(
+            run.Proof is { } sent
+                ? sent with { Status = ProofStatus.Rejected, Comment = reject.Comment }
+                : new ProofState(ProofStatus.Rejected, [], null, null, null, reject.Comment),
+            after.Proof);
+        Assert.Equal((run.Dice, run.ChallengeDice, run.Hours, run.Difficulty), (after.Dice, after.ChallengeDice, after.Hours, after.Difficulty));
+
+        var now = s.State.Players[player];
+        Assert.Equal(was.Points - points, now.Points);
+        Assert.Equal(was.Coins - coins, now.Coins);
+        Assert.Equal(
+            (was.Phase, was.Offer, was.Choice, was.ActiveRunId, was.RerollsThisRoll, was.Resources, was.Exclusions),
+            (now.Phase, now.Offer, now.Choice, now.ActiveRunId, now.RerollsThisRoll, now.Resources, now.Exclusions));
+        Assert.All(s.State.Players.Values.Where(p => p.PlayerId != player), p => Assert.Equal(before.Players[p.PlayerId], p));
+        Assert.All(s.State.Runs.Values.Where(r => r.RunId != run.RunId), r => Assert.Equal(before.Runs[r.RunId], r));
     }
 
     /// <summary>RR1 / D-93: «not enough coins» only when the free rerolls and coupons are used up and the coins fall short.</summary>
@@ -1169,6 +1438,9 @@ public class PlayerAdminInvariantTests
             RunReviewed x => x.PlayerId,
             RunHoursCorrected x => x.PlayerId,
             RunDifficultyChanged x => x.PlayerId,
+            ProofSubmitted x => x.PlayerId,
+            ProofApproved x => x.PlayerId,
+            ProofRejected x => x.PlayerId,
             _ => null,
         };
 
@@ -1196,6 +1468,8 @@ public class PlayerAdminInvariantTests
         var players = new Dictionary<Guid, ReferencePlayer>();
         var runs = new Dictionary<Guid, (Guid Player, Guid Game)>();
         var pendingEffects = new Dictionary<Guid, (Guid Player, Guid? Run)>();
+        var proofs = new Dictionary<Guid, ProofStatus>();
+        var completedGames = new HashSet<Guid>();
         foreach (var e in log)
         {
             switch (e)
@@ -1215,18 +1489,60 @@ public class PlayerAdminInvariantTests
                     Assert.Equal(SeasonStatus.Active, status);
                     Assert.DoesNotContain(rolled.GameId, players[rolled.PlayerId].Exclusions.Keys);
                     Assert.DoesNotContain(rolled.Misses, m => players[rolled.PlayerId].Exclusions.ContainsKey(m.GameId));
+
+                    // G7 / D-15: «уже прошёл» only for a game completed and not rejected; such a game is never offered
+                    Assert.All(
+                        rolled.Misses.Where(m => m.Reason == RollMissReason.CompletedInSeason),
+                        m => Assert.Contains(m.GameId, completedGames));
+                    Assert.DoesNotContain(rolled.GameId, completedGames);
                     break;
                 case GameChoiceRolled choiceRolled:
                     Assert.Equal(SeasonStatus.Active, status);
                     Assert.DoesNotContain(choiceRolled.Offers, o => players[choiceRolled.PlayerId].Exclusions.ContainsKey(o.GameId));
                     Assert.DoesNotContain(choiceRolled.Misses, m => players[choiceRolled.PlayerId].Exclusions.ContainsKey(m.GameId));
+                    Assert.All(
+                        choiceRolled.Misses.Where(m => m.Reason == RollMissReason.CompletedInSeason),
+                        m => Assert.Contains(m.GameId, completedGames));
+                    Assert.DoesNotContain(choiceRolled.Offers, o => completedGames.Contains(o.GameId));
                     break;
                 case RunStarted started:
                     Assert.Equal(SeasonStatus.Active, status);
                     Assert.DoesNotContain(started.GameId, players[started.PlayerId].Exclusions.Keys);
                     runs[started.RunId] = (started.PlayerId, started.GameId);
                     break;
-                case GameRerolled or ChoiceMade or RunCompleted or CompletionRolled or RunDropped or RunTechRerolled:
+                case RunCompleted completedRun:
+                    Assert.Equal(SeasonStatus.Active, status);
+                    Assert.True(completedGames.Add(runs[completedRun.RunId].Game), "A game completed twice in the season.");
+                    break;
+                case ProofSubmitted submitted:
+                    // D-98: a proof of one's own run, until the season is finished, replacing only an unchecked one
+                    Assert.True(status is SeasonStatus.Active or SeasonStatus.Closing, $"A proof while {status}.");
+                    Assert.Equal(runs[submitted.RunId].Player, submitted.PlayerId);
+                    Assert.True(!proofs.TryGetValue(submitted.RunId, out var shown) || shown == ProofStatus.Pending, "A checked proof was replaced.");
+                    proofs[submitted.RunId] = ProofStatus.Pending;
+                    break;
+                case ProofApproved approved:
+                    // Pending → approved (with a proof), none → approved (without one); never twice
+                    Assert.True(status is SeasonStatus.Active or SeasonStatus.Closing, $"Approved while {status}.");
+                    Assert.Equal(runs[approved.RunId].Player, approved.PlayerId);
+                    var hadProof = proofs.TryGetValue(approved.RunId, out var approvedFrom);
+                    Assert.True(!hadProof || approvedFrom == ProofStatus.Pending, $"Approved a {approvedFrom} proof.");
+                    Assert.Equal(!hadProof, approved.WithoutProof);
+                    Assert.True(hadProof || !string.IsNullOrWhiteSpace(approved.Comment), "Approved without a proof and without a comment.");
+                    proofs[approved.RunId] = ProofStatus.Approved;
+                    break;
+                case ProofRejected rejectedProof:
+                    // Pending or none → rejected; the game is not completed in the season any more (D-15)
+                    Assert.True(status is SeasonStatus.Active or SeasonStatus.Closing, $"Rejected while {status}.");
+                    Assert.Equal(runs[rejectedProof.RunId].Player, rejectedProof.PlayerId);
+                    Assert.True(
+                        !proofs.TryGetValue(rejectedProof.RunId, out var rejectedFrom) || rejectedFrom == ProofStatus.Pending,
+                        $"Rejected a {rejectedFrom} proof.");
+                    Assert.False(string.IsNullOrWhiteSpace(rejectedProof.Comment), "A reject without a comment.");
+                    proofs[rejectedProof.RunId] = ProofStatus.Rejected;
+                    Assert.True(completedGames.Remove(runs[rejectedProof.RunId].Game), "A rejected game was not completed.");
+                    break;
+                case GameRerolled or ChoiceMade or CompletionRolled or RunDropped or RunTechRerolled:
                     // SE1/SE2: no game actions outside a running season
                     Assert.Equal(SeasonStatus.Active, status);
                     break;
@@ -1262,12 +1578,15 @@ public class PlayerAdminInvariantTests
                     break;
                 case PointsChanged points:
                     Assert.True(points.Reason == PointsReason.CompletionRoll || points.Delta != 0, "Zero changes are not logged.");
+                    Assert.True(points.Reason != PointsReason.ProofRejected || points.Delta < 0, "A reject gave points.");
                     players[points.PlayerId].Points += points.Delta;
                     break;
                 case CoinsChanged coins:
                     // RR2: no coins from drops (coins have no drop reason at all)
                     Assert.NotEqual(0, coins.Delta);
                     players[coins.PlayerId].Coins += coins.Delta;
+
+                    Assert.True(coins.Reason != CoinsReason.ProofRejected || coins.Delta < 0, "A reject gave coins.");
 
                     // W10 / D-96: the completion reward is always a gain
                     Assert.True(coins.Reason != CoinsReason.CompletionReward || coins.Delta > 0, "A completion took coins.");
@@ -1291,6 +1610,13 @@ public class PlayerAdminInvariantTests
                     {
                         // RR3: a drop only moves back, never past the start
                         Assert.True(moved.Steps < 0, "A drop penalty moved forward.");
+                        Assert.InRange(moved.Path.Count, 1, -moved.Steps);
+                    }
+
+                    if (moved.Reason == MoveReason.ProofRejected)
+                    {
+                        // D-98: a reject only moves back, never past the start
+                        Assert.True(moved.Steps < 0, "A reject moved forward.");
                         Assert.InRange(moved.Path.Count, 1, -moved.Steps);
                     }
 

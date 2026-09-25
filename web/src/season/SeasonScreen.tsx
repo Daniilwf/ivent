@@ -5,6 +5,7 @@ import { ru } from '../i18n/ru';
 import { CompleteForm, type Completion } from './CompleteForm';
 import { RerollButton } from './RerollButton';
 import { GameMarks } from './GameMarks';
+import { ProofSection } from './ProofForm';
 import { RunActions } from './RunActions';
 
 type Season = Schemas['SeasonView'];
@@ -13,6 +14,7 @@ type Command =
   | { kind: 'start' }
   | { kind: 'reroll' }
   | { kind: 'drop' }
+  | { kind: 'proof'; runId: string; links: string[]; note: string | null }
   | { kind: 'techReroll'; reason: NonNullable<Schemas['TechRerollReason']>; comment: string | null }
   | { kind: 'complete'; completion: Completion }
   | { kind: 'choose'; choiceId: string; optionId: string }
@@ -32,6 +34,11 @@ function send(seasonId: string, command: Command) {
       return api.POST('/api/seasons/{seasonId}/reroll', { params, body: { commandId } });
     case 'drop':
       return api.POST('/api/seasons/{seasonId}/drop', { params, body: { commandId } });
+    case 'proof':
+      return api.POST('/api/seasons/{seasonId}/runs/{runId}/proof', {
+        params: { path: { seasonId, runId: command.runId } },
+        body: { commandId, links: command.links, note: command.note },
+      });
     case 'techReroll':
       return api.POST('/api/seasons/{seasonId}/tech-reroll', {
         params,
@@ -277,6 +284,15 @@ export function SeasonScreen({
                 )}
               </p>
             )}
+            <ProofSection
+              proof={me.lastCompleted.proof ?? null}
+              pending={pending}
+              onSubmit={(links, note) => {
+                if (me.lastCompleted) {
+                  void act({ kind: 'proof', runId: me.lastCompleted.id, links, note });
+                }
+              }}
+            />
           </>
         )}
       </section>

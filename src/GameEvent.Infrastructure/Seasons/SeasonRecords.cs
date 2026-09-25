@@ -141,6 +141,9 @@ public sealed class RunRecord
 
     /// <summary>A move of this run brought its player to the finish: its proof goes on top of the queue.</summary>
     public bool ReachedFinish { get; set; }
+
+    /// <summary>Net steps the run's moves took; a reject takes them back.</summary>
+    public int Moved { get; set; }
 }
 
 /// <summary>The proof of a run (SPEC «Модель данных»: Proof), one per run; the admin's queue reads pending rows.</summary>

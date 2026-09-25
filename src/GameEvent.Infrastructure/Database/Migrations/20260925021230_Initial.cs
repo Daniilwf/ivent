@@ -187,7 +187,8 @@ namespace GameEvent.Infrastructure.Database.Migrations
                     ChallengeDiceJson = table.Column<string>(type: "TEXT", nullable: false),
                     HoursSource = table.Column<string>(type: "TEXT", nullable: true),
                     CompletedAt = table.Column<long>(type: "INTEGER", nullable: true),
-                    ReachedFinish = table.Column<bool>(type: "INTEGER", nullable: false)
+                    ReachedFinish = table.Column<bool>(type: "INTEGER", nullable: false),
+                    Moved = table.Column<int>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
