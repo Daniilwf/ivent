@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 using GameEvent.Engine.Accounts;
 using GameEvent.Engine.Kernel;
@@ -22,8 +23,11 @@ public sealed record CreateAccount(string Login, string Name, Role Role) : IAcco
 /// <summary>The admin gives an account a new temporary password (given back once); the owner must change it.</summary>
 public sealed record ResetPassword(Guid UserId) : IAccountCommand;
 
-/// <summary>The owner sets a new password, the current one already checked by the endpoint.</summary>
-public sealed record ChangeOwnPassword(Guid UserId, string NewPassword) : IAccountCommand, ISecretCommand
+/// <summary>
+/// The owner sets a new password, the current one already checked by the endpoint against the account whose security
+/// stamp is <see cref="ExpectedStamp"/>: a reset or another change in between makes the command stale (D-106).
+/// </summary>
+public sealed record ChangeOwnPassword(Guid UserId, string NewPassword, string ExpectedStamp) : IAccountCommand, ISecretCommand
 {
     public ICommand WithoutSecret() => this with { NewPassword = "" };
 }
@@ -65,6 +69,8 @@ public static partial class AccountRules
     public const string LastAdmin = "account.lastAdmin";
     public const string PasswordInvalid = "account.passwordInvalid";
     public const string NothingToChange = "account.nothingToChange";
+    public const string Stale = "account.stale";
+    public const string RoleInvalid = "account.roleInvalid";
 
     /// <summary>Latin letters, digits, dot, dash, underscore; 2–32 characters (logins are typed on phones too).</summary>
     public static bool IsValidLogin(string? login) =>
@@ -76,13 +82,32 @@ public static partial class AccountRules
         password is not null && password.Length is >= MinPasswordLength and <= MaxPasswordLength
         && !string.Equals(password, login, StringComparison.OrdinalIgnoreCase);
 
-    public static string TemporaryPassword(IRandomSource random)
-    {
-        ArgumentNullException.ThrowIfNull(random);
-        return string.Concat(Enumerable.Range(0, TemporaryPasswordLength).Select(_ => TemporaryAlphabet[random.NextInt(0, TemporaryAlphabet.Length)]));
-    }
+    /// <summary>A temporary password from the system's cryptographic generator, never the game's random source (D-106).</summary>
+    public static string TemporaryPassword() =>
+        string.Concat(Enumerable.Range(0, TemporaryPasswordLength).Select(_ => TemporaryAlphabet[RandomNumberGenerator.GetInt32(TemporaryAlphabet.Length)]));
 
-    public static AccountRole ToLog(Role role) => (AccountRole)(int)role;
+    /// <summary>A new security stamp: 128 random bits.</summary>
+    public static string NewStamp() => Convert.ToHexString(RandomNumberGenerator.GetBytes(16));
+
+    /// <summary>
+    /// Hashes no password matches: an imported placeholder and a restored account until its reset (D-105, D-106). The
+    /// sign-in treats them as a wrong password without asking the hasher.
+    /// </summary>
+    public const string DisabledHashPrefix = "disabled:";
+
+    public static string DisabledHash() => DisabledHashPrefix + Convert.ToHexString(RandomNumberGenerator.GetBytes(16));
+
+    public static bool IsDisabledHash(string hash) =>
+        hash.StartsWith(DisabledHashPrefix, StringComparison.Ordinal) || hash.StartsWith(Seasons.SeasonTransfer.PlaceholderHashPrefix, StringComparison.Ordinal);
+
+    public static AccountRole ToLog(Role role) =>
+        role switch
+        {
+            Role.Player => AccountRole.Player,
+            Role.Admin => AccountRole.Admin,
+            Role.Spectator => AccountRole.Spectator,
+            _ => throw new ArgumentOutOfRangeException(nameof(role), role, "Unknown role."),
+        };
 
     [GeneratedRegex("^[A-Za-z0-9._-]+$", RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 1000)]
     private static partial Regex LoginPattern();

@@ -83,11 +83,20 @@ public static class AdminAccountEndpoints
             .WithTags("Auth")
             .RequireAuthorization()
             .RequireRateLimiting(AppSetup.LoginRateLimit)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests)
             .WithAccountErrors();
     }
 
     private static async Task<AccountResult> ChangePasswordAsync(
-        ChangePasswordRequest request, ClaimsPrincipal principal, HttpContext http, GameEventDbContext db, Passwords passwords, CommandBus bus, CancellationToken ct)
+        ChangePasswordRequest request,
+        ClaimsPrincipal principal,
+        HttpContext http,
+        GameEventDbContext db,
+        Passwords passwords,
+        LoginThrottle throttle,
+        ILoggerFactory loggers,
+        CommandBus bus,
+        CancellationToken ct)
     {
         if (request.CommandId == Guid.Empty || request.CurrentPassword is null || request.NewPassword is null
             || request.NewPassword.Length > AccountRules.MaxPasswordLength || request.CurrentPassword.Length > AccountRules.MaxPasswordLength)
@@ -100,8 +109,23 @@ public static class AdminAccountEndpoints
             return TypedResults.Forbid();
         }
 
+        // A request already handled (its answer lost, a double click) is said so before anything else: the password in it
+        // may have changed since, and a secret is never confirmed (D-106)
+        if (await db.Events.AnyAsync(e => e.SeasonId == Guid.Empty && e.CommandId == request.CommandId, ct))
+        {
+            return Repeat();
+        }
+
+        // The current password is guessed like a sign-in: the same limits per login and address, the same log (D-67)
+        var address = WebSecurity.ClientKey(http.Connection.RemoteIpAddress);
+        if (!throttle.TryBegin(user.NormalizedLogin, address))
+        {
+            return TypedResults.Problem(statusCode: StatusCodes.Status429TooManyRequests, title: "Too many attempts.");
+        }
+
         if (!passwords.Verify(user, request.CurrentPassword))
         {
+            AccountEndpoints.LogPasswordCheckFailed(loggers.CreateLogger(typeof(AdminAccountEndpoints)), user.NormalizedLogin, address);
             return TypedResults.Problem(
                 statusCode: StatusCodes.Status409Conflict,
                 title: "The command was rejected.",
@@ -109,7 +133,8 @@ public static class AdminAccountEndpoints
                 extensions: new Dictionary<string, object?> { ["code"] = "account.currentPasswordWrong" });
         }
 
-        var result = await SendAsync(request.CommandId, userId, id => new ChangeOwnPassword(id, request.NewPassword), principal, db, bus, ct);
+        throttle.Succeeded(user.NormalizedLogin, address);
+        var result = await SendAsync(request.CommandId, userId, id => new ChangeOwnPassword(id, request.NewPassword, user.SecurityStamp), principal, db, bus, ct);
 
         // The new security stamp ends every session, this one too: sign it in again with the new stamp (D-67)
         if (result.Result is Ok<AccountActionResponse>)
@@ -132,6 +157,12 @@ public static class AdminAccountEndpoints
     {
         var sent = command(userId);
         var outcome = await bus.SendAsync(new CommandEnvelope(commandId, Guid.Empty, sent, principal.UserId()), ct);
+
+        // A repeat of a command with a secret cannot tell whether the secret was the same: never confirm it (D-106)
+        if (outcome.IsDuplicate && sent is ISecretCommand)
+        {
+            return Repeat();
+        }
         if (!outcome.IsAccepted)
         {
             var code = outcome.Rejection!.Code;
@@ -154,6 +185,13 @@ public static class AdminAccountEndpoints
             new AccountView(account.Id, account.Login, account.Name, account.Role, account.MustChangePassword, account.IsDeleted, account.CreatedAt),
             outcome.Secret));
     }
+
+    private static ProblemHttpResult Repeat() =>
+        TypedResults.Problem(
+            statusCode: StatusCodes.Status409Conflict,
+            title: "The command was rejected.",
+            detail: "This request was already handled; send a new one if the password still has to change.",
+            extensions: new Dictionary<string, object?> { ["code"] = "account.repeat" });
 
     private static ValidationProblem Invalid(string field, string message) =>
         TypedResults.ValidationProblem(new Dictionary<string, string[]> { [field] = [message] });

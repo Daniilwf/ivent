@@ -23,8 +23,8 @@ public sealed class Passwords : IPasswords
             return false;
         }
 
-        // An imported placeholder has no password at all (D-105): nothing matches it, and the hasher is not asked
-        if (user.PasswordHash.StartsWith(Infrastructure.Seasons.SeasonTransfer.PlaceholderHashPrefix, StringComparison.Ordinal))
+        // A disabled hash — an imported placeholder, a restored account before its reset — matches nothing (D-105, D-106)
+        if (AccountRules.IsDisabledHash(user.PasswordHash))
         {
             _hasher.VerifyHashedPassword(null!, _dummyHash, password);
             return false;

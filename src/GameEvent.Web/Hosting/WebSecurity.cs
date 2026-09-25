@@ -51,15 +51,16 @@ public static class WebSecurity
         ["/api/auth/me", "/api/auth/password", "/api/auth/logout", "/api/auth/antiforgery", "/api/auth/login"];
 
     /// <summary>
-    /// With a temporary password every API call but the password change is refused: 403 with
-    /// <c>account.mustChangePassword</c> (A1, D-106). The hub is left alone: it only sends updates.
+    /// With a temporary password every API call but the password change is refused, the hub too: 403 with
+    /// <c>account.mustChangePassword</c> (A1, D-106).
     /// </summary>
     public static async Task RequirePasswordChangeAsync(HttpContext http, Func<Task> next)
     {
         ArgumentNullException.ThrowIfNull(http);
         ArgumentNullException.ThrowIfNull(next);
         if (http.Items.TryGetValue(MustChangePasswordKey, out var must) && must is true
-            && http.Request.Path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase)
+            && (http.Request.Path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase)
+                || http.Request.Path.StartsWithSegments("/hubs", StringComparison.OrdinalIgnoreCase))
             && !s_openWithTemporaryPassword.Any(p => http.Request.Path.Equals(p, StringComparison.OrdinalIgnoreCase)))
         {
             http.Response.StatusCode = StatusCodes.Status403Forbidden;

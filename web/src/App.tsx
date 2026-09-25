@@ -60,13 +60,18 @@ export function App() {
   if (state.kind === 'failed') return <p role="alert">{ru.app.loadError}</p>;
   if (state.kind === 'changePassword')
     return (
-      <ChangePasswordForm
-        onChanged={(user) => {
-          void enter(user).catch(() => {
-            setState({ kind: 'failed' });
-          });
-        }}
-      />
+      <>
+        <ChangePasswordForm
+          onChanged={(user) => {
+            void enter(user).catch(() => {
+              setState({ kind: 'failed' });
+            });
+          }}
+        />
+        <button data-testid="logout" onClick={() => void logout()}>
+          {ru.login.logout}
+        </button>
+      </>
     );
   if (state.kind === 'signedOut')
     return (

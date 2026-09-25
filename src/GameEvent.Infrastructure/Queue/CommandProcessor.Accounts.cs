@@ -82,7 +82,7 @@ public sealed partial class CommandProcessor
 
                     if (!Enum.IsDefined(role))
                     {
-                        return Reject(AccountRules.NothingToChange, "Unknown role.");
+                        return Reject(AccountRules.RoleInvalid, "Unknown role.");
                     }
 
                     var normalized = UserRecord.Normalize(login);
@@ -96,7 +96,7 @@ public sealed partial class CommandProcessor
                         return Reject(AccountRules.PasswordInvalid, $"A password is {AccountRules.MinPasswordLength}–{AccountRules.MaxPasswordLength} characters and not the login.");
                     }
 
-                    var temporary = password is null ? AccountRules.TemporaryPassword(random) : null;
+                    var temporary = password is null ? AccountRules.TemporaryPassword() : null;
                     var userId = ids.NewId();
                     var user = new UserRecord
                     {
@@ -106,7 +106,7 @@ public sealed partial class CommandProcessor
                         Name = name.Trim(),
                         Role = role,
                         PasswordHash = "",
-                        SecurityStamp = NewStamp(),
+                        SecurityStamp = AccountRules.NewStamp(),
                         MustChangePassword = password is null,
                         CreatedAt = now,
                     };
@@ -121,12 +121,12 @@ public sealed partial class CommandProcessor
                         return Reject(AccountRules.Unknown, $"Account {reset.UserId} does not exist.");
                     }
 
-                    var temporary = AccountRules.TemporaryPassword(random);
+                    var temporary = AccountRules.TemporaryPassword();
                     return ([new AccountPasswordReset(user.Id)], () =>
                     {
                         user.PasswordHash = passwords.Hash(user, temporary);
                         user.MustChangePassword = true;
-                        user.SecurityStamp = NewStamp();
+                        user.SecurityStamp = AccountRules.NewStamp();
                     }, temporary, null);
                 }
 
@@ -135,6 +135,12 @@ public sealed partial class CommandProcessor
                     if (await db.Users.SingleOrDefaultAsync(u => u.Id == change.UserId && !u.IsDeleted, ct) is not { } user)
                     {
                         return Reject(AccountRules.Unknown, $"Account {change.UserId} does not exist.");
+                    }
+
+                    // Checked against this stamp; a reset or another change since makes it stale (D-106)
+                    if (user.SecurityStamp != change.ExpectedStamp)
+                    {
+                        return Reject(AccountRules.Stale, "The account changed since the current password was checked; sign in again.");
                     }
 
                     if (!AccountRules.IsValidPassword(change.NewPassword, user.Login) || passwords.Verify(user, change.NewPassword))
@@ -146,7 +152,7 @@ public sealed partial class CommandProcessor
                     {
                         user.PasswordHash = passwords.Hash(user, change.NewPassword);
                         user.MustChangePassword = false;
-                        user.SecurityStamp = NewStamp();
+                        user.SecurityStamp = AccountRules.NewStamp();
                     }, null, null);
                 }
 
@@ -157,9 +163,14 @@ public sealed partial class CommandProcessor
                         return Reject(AccountRules.Unknown, $"Account {edit.UserId} does not exist.");
                     }
 
-                    if (!AccountRules.IsValidName(edit.Name) || !Enum.IsDefined(edit.Role))
+                    if (!AccountRules.IsValidName(edit.Name))
                     {
-                        return Reject(AccountRules.NameInvalid, $"A name is 1–{AccountRules.MaxNameLength} characters and the role one of the three.");
+                        return Reject(AccountRules.NameInvalid, $"A name is 1–{AccountRules.MaxNameLength} characters.");
+                    }
+
+                    if (!Enum.IsDefined(edit.Role))
+                    {
+                        return Reject(AccountRules.RoleInvalid, "Unknown role.");
                     }
 
                     if (user.Name == edit.Name.Trim() && user.Role == edit.Role)
@@ -177,7 +188,7 @@ public sealed partial class CommandProcessor
                         // A new role ends the account's sessions (D-67)
                         if (user.Role != edit.Role)
                         {
-                            user.SecurityStamp = NewStamp();
+                            user.SecurityStamp = AccountRules.NewStamp();
                         }
 
                         user.Name = edit.Name.Trim();
@@ -205,7 +216,7 @@ public sealed partial class CommandProcessor
                     return ([new AccountDeleted(user.Id)], () =>
                     {
                         user.IsDeleted = true;
-                        user.SecurityStamp = NewStamp();
+                        user.SecurityStamp = AccountRules.NewStamp();
                     }, null, null);
                 }
 
@@ -220,8 +231,11 @@ public sealed partial class CommandProcessor
                         ? Reject(AccountRules.NotDeleted, "The account is not deleted.")
                         : ([new AccountRestored(user.Id)], () =>
                         {
+                            // Whatever password it had stays behind: only a reset lets it in again (D-106)
                             user.IsDeleted = false;
-                            user.SecurityStamp = NewStamp();
+                            user.PasswordHash = AccountRules.DisabledHash();
+                            user.MustChangePassword = true;
+                            user.SecurityStamp = AccountRules.NewStamp();
                         }, null, null);
                 }
 
@@ -233,5 +247,4 @@ public sealed partial class CommandProcessor
     private static Task<bool> IsLastAdminAsync(GameEventDbContext db, Guid userId, CancellationToken ct) =>
         db.Users.AllAsync(u => u.Id == userId || u.Role != Role.Admin || u.IsDeleted, ct);
 
-    private string NewStamp() => string.Concat(Enumerable.Range(0, 32).Select(_ => "0123456789abcdef"[random.NextInt(0, 16)]));
 }

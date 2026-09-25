@@ -104,6 +104,9 @@ public static partial class AccountEndpoints
     [LoggerMessage(Level = LogLevel.Warning, Message = "Failed sign-in for {Login} from {Address}")]
     private static partial void LogLoginFailed(ILogger logger, string login, string address);
 
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Wrong current password of {Login} from {Address} at a password change")]
+    internal static partial void LogPasswordCheckFailed(ILogger logger, string login, string address);
+
     [LoggerMessage(Level = LogLevel.Warning, Message = "Sign-in for {Login} from {Address} throttled after repeated failures")]
     private static partial void LogLoginThrottled(ILogger logger, string login, string address);
 

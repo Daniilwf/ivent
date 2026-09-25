@@ -40,17 +40,14 @@ public static class DevSeed
         IServiceProvider services, IDbContextFactory<GameEventDbContext> factory, string contentRoot, CancellationToken ct)
     {
         await using var db = await factory.CreateDbContextAsync(ct);
-        if (await db.Users.AnyAsync(ct))
-        {
-            return;
-        }
+        var seedAccounts = !await db.Users.AnyAsync(ct);
 
         var password = services.GetRequiredService<IConfiguration>()["DevSeed:Password"]
             ?? throw new InvalidOperationException("DevSeed:Password is not set (appsettings.Development.json).");
 
         // Accounts go through the queue like any account (D-106), with a known password and no change required
         var bus = services.GetRequiredService<CommandBus>();
-        foreach (var (login, name, role) in s_users)
+        foreach (var (login, name, role) in seedAccounts ? s_users : [])
         {
             var outcome = await bus.SendAsync(
                 new CommandEnvelope(Guid.CreateVersion7(), Guid.Empty, new SeedAccount(login, name, role, password), AuthorId: null), ct);
@@ -58,6 +55,12 @@ public static class DevSeed
             {
                 throw new InvalidOperationException($"Seed account {login} was rejected: {outcome.Rejection}");
             }
+        }
+
+        // The pool on its own check: a failed pool load is seeded on the next run even with the accounts in place
+        if (await db.Games.AnyAsync(ct))
+        {
+            return;
         }
 
         var pool = JsonSerializer.Deserialize<PoolFile>(

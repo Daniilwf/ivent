@@ -62,7 +62,11 @@ const rejection = {
   'season.closed': 'Сезон закрыт для этого действия.',
   'effect.notPending': 'Этот эффект уже разрешён.',
   'account.mustChangePassword': 'Сначала смените временный пароль.',
-  'account.currentPasswordWrong': 'Временный пароль введён неверно.',
+  'account.currentPasswordWrong': 'Текущий пароль введён неверно.',
+  'account.repeat':
+    'Этот запрос уже выполнен. Если пароль ещё нужно сменить — отправьте форму заново.',
+  'account.stale': 'Аккаунт изменился, пока шёл запрос. Войдите заново.',
+  'account.roleInvalid': 'Неизвестная роль.',
   'account.passwordInvalid': 'Пароль — от 8 символов, не совпадает с логином и с текущим паролем.',
   'account.loginInvalid':
     'Логин — от 2 до 32 латинских букв, цифр, точек, дефисов и подчёркиваний.',

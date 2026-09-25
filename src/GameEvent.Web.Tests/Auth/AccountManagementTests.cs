@@ -148,7 +148,11 @@ public sealed class AccountManagementTests : IAsyncLifetime
         Assert.Equal("account.deleted", await CodeAsync(again));
 
         await PostOkAsync(admin, $"/api/admin/accounts/{id}/restore", new { commandId = Guid.NewGuid() });
-        Assert.Equal(HttpStatusCode.OK, (await TrySignInAsync("vasya", SiteFactory.Password)).StatusCode);
+
+        // The old password stays behind: only a reset lets the account in again (security review of D8)
+        Assert.Equal(HttpStatusCode.Unauthorized, (await TrySignInAsync("vasya", SiteFactory.Password)).StatusCode);
+        var reset = await PostOkAsync(admin, $"/api/admin/accounts/{id}/reset-password", new { commandId = Guid.NewGuid() });
+        Assert.Equal(HttpStatusCode.OK, (await TrySignInAsync("vasya", reset.GetProperty("temporaryPassword").GetString()!)).StatusCode);
     }
 
     [Fact]
@@ -192,6 +196,32 @@ public sealed class AccountManagementTests : IAsyncLifetime
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
         Assert.Equal(code, await CodeAsync(response));
+    }
+
+    [Fact]
+    public async Task A_repeated_password_change_is_not_confirmed()
+    {
+        var vasya = await _site.SignedInAsync("vasya");
+        var commandId = Guid.NewGuid();
+        await PostOkAsync(vasya, "/api/auth/password", new { commandId, currentPassword = SiteFactory.Password, newPassword = "новый-пароль-1" });
+        await SiteFactory.RefreshCsrfAsync(vasya);
+
+        var again = await vasya.PostAsJsonAsync("/api/auth/password", new { commandId, currentPassword = "новый-пароль-1", newPassword = "другой-пароль-2" }, Ct);
+
+        Assert.Equal("account.repeat", await CodeAsync(again));
+        Assert.Equal(HttpStatusCode.OK, (await TrySignInAsync("vasya", "новый-пароль-1")).StatusCode);
+    }
+
+    [Fact]
+    public async Task A_temporary_password_does_not_open_the_hub()
+    {
+        var admin = await _site.SignedInAsync("admin");
+        var created = await CreateAsync(admin, "lyosha", "Лёша", "player");
+        var lyosha = await SignInAsync("lyosha", created.GetProperty("temporaryPassword").GetString()!);
+
+        var negotiate = await lyosha.PostAsync($"{SeasonHub.Path}/negotiate?negotiateVersion=1", null, Ct);
+
+        Assert.Equal(HttpStatusCode.Forbidden, negotiate.StatusCode);
     }
 
     [Fact]
@@ -271,8 +301,11 @@ public sealed class AccountManagementTests : IAsyncLifetime
 
     // ---- Hub connections ----
 
-    [Fact]
-    public async Task A_reset_closes_the_accounts_hub_connections()
+    public static TheoryData<string> StampChanges() => ["reset", "role", "delete", "ownPassword"];
+
+    [Theory]
+    [MemberData(nameof(StampChanges))]
+    public async Task A_new_stamp_closes_the_accounts_hub_connections(string action)
     {
         var cookie = await SessionCookieAsync("petya");
         await using var connection = new HubConnectionBuilder()
@@ -291,12 +324,141 @@ public sealed class AccountManagementTests : IAsyncLifetime
         };
         await connection.StartAsync(Ct);
         var sessions = _site.Services.GetRequiredService<HubSessions>();
-        Assert.Equal(1, sessions.CountFor(_site.Users["petya"]));
+        var petya = _site.Users["petya"];
+        Assert.Equal(1, sessions.CountFor(petya));
 
         var admin = await _site.SignedInAsync("admin");
-        await PostOkAsync(admin, $"/api/admin/accounts/{_site.Users["petya"]}/reset-password", new { commandId = Guid.NewGuid() });
+        switch (action)
+        {
+            case "reset":
+                await PostOkAsync(admin, $"/api/admin/accounts/{petya}/reset-password", new { commandId = Guid.NewGuid() });
+                break;
+            case "role":
+                await PostOkAsync(admin, $"/api/admin/accounts/{petya}", new { commandId = Guid.NewGuid(), name = "petya", role = "spectator" });
+                break;
+            case "delete":
+                await PostOkAsync(admin, $"/api/admin/accounts/{petya}/delete", new { commandId = Guid.NewGuid() });
+                break;
+            default:
+                var own = await _site.SignedInAsync("petya");
+                await PostOkAsync(own, "/api/auth/password", new { commandId = Guid.NewGuid(), currentPassword = SiteFactory.Password, newPassword = "новый-пароль-1" });
+                break;
+        }
 
-        await closed.Task.WaitAsync(TimeSpan.FromSeconds(20), Ct);
+        // The server aborts at once: no waiting for the next long poll, which would notice the stamp by itself
+        await closed.Task.WaitAsync(TimeSpan.FromSeconds(5), Ct);
+        Assert.Equal(0, sessions.CountFor(petya));
+    }
+
+    [Fact]
+    public async Task Changing_the_own_password_ends_the_accounts_other_sessions()
+    {
+        var phone = await _site.SignedInAsync("vasya");
+        var laptop = await _site.SignedInAsync("vasya");
+
+        await PostOkAsync(laptop, "/api/auth/password", new { commandId = Guid.NewGuid(), currentPassword = SiteFactory.Password, newPassword = "новый-пароль-1" });
+
+        Assert.Equal(HttpStatusCode.Unauthorized, (await phone.GetAsync("/api/auth/me", Ct)).StatusCode);
+        await SiteFactory.RefreshCsrfAsync(laptop);
+        Assert.Equal(HttpStatusCode.OK, (await laptop.GetAsync("/api/auth/me", Ct)).StatusCode);
+    }
+
+    [Theory]
+    [InlineData("vasya")]
+    [InlineData("zritel")]
+    public async Task Players_and_spectators_cannot_change_delete_or_restore(string login)
+    {
+        var client = await _site.SignedInAsync(login);
+        var target = _site.Users["masha"];
+
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync($"/api/admin/accounts/{target}", new { commandId = Guid.NewGuid(), name = "X", role = "admin" }, Ct)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync($"/api/admin/accounts/{target}/delete", new { commandId = Guid.NewGuid() }, Ct)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync($"/api/admin/accounts/{target}/restore", new { commandId = Guid.NewGuid() }, Ct)).StatusCode);
+    }
+
+    public static TheoryData<string, string> BadRequests() => new()
+    {
+        { "/api/admin/accounts/{id}", "{\"commandId\":\"{cmd}\",\"role\":\"player\"}" },
+        { "/api/admin/accounts/{id}", "{\"commandId\":\"{cmd}\",\"name\":\"X\",\"role\":\"king\"}" },
+        { "/api/admin/accounts/{id}/reset-password", "{\"commandId\":\"00000000-0000-0000-0000-000000000000\"}" },
+        { "/api/admin/accounts/{id}/delete", "{\"commandId\":\"00000000-0000-0000-0000-000000000000\"}" },
+        { "/api/admin/accounts/{id}/restore", "{\"commandId\":\"00000000-0000-0000-0000-000000000000\"}" },
+        { "/api/auth/password", "{\"commandId\":\"{cmd}\"}" },
+        { "/api/auth/password", "{\"currentPassword\":\"x\",\"newPassword\":\"yyyyyyyy\"}" },
+    };
+
+    [Theory]
+    [MemberData(nameof(BadRequests))]
+    public async Task Missing_or_malformed_input_is_a_bad_request(string url, string body)
+    {
+        var admin = await _site.SignedInAsync("admin");
+
+        var response = await admin.PostAsync(
+            url.Replace("{id}", _site.Users["masha"].ToString(), StringComparison.Ordinal),
+            new StringContent(body.Replace("{cmd}", Guid.NewGuid().ToString(), StringComparison.Ordinal), System.Text.Encoding.UTF8, "application/json"),
+            Ct);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Theory]
+    [InlineData(" ", "player", "account.nameInvalid")]
+    [InlineData("masha", "player", "account.nothingToChange")]
+    public async Task A_change_that_changes_nothing_or_breaks_the_name_is_refused(string name, string role, string code)
+    {
+        var admin = await _site.SignedInAsync("admin");
+
+        var response = await admin.PostAsJsonAsync($"/api/admin/accounts/{_site.Users["masha"]}", new { commandId = Guid.NewGuid(), name, role }, Ct);
+
+        Assert.Equal(code, await CodeAsync(response));
+    }
+
+    [Fact]
+    public async Task A_name_longer_than_64_characters_is_refused()
+    {
+        var admin = await _site.SignedInAsync("admin");
+
+        var response = await admin.PostAsJsonAsync("/api/admin/accounts", new { commandId = Guid.NewGuid(), login = "long1", name = new string('я', 65), role = "player" }, Ct);
+
+        Assert.Equal("account.nameInvalid", await CodeAsync(response));
+    }
+
+    [Fact]
+    public async Task Restoring_an_account_that_is_not_deleted_is_refused()
+    {
+        var admin = await _site.SignedInAsync("admin");
+
+        var response = await admin.PostAsJsonAsync($"/api/admin/accounts/{_site.Users["masha"]}/restore", new { commandId = Guid.NewGuid() }, Ct);
+
+        Assert.Equal("account.notDeleted", await CodeAsync(response));
+    }
+
+    [Fact]
+    public async Task A_repeated_reset_names_the_account_without_a_password()
+    {
+        var admin = await _site.SignedInAsync("admin");
+        var commandId = Guid.NewGuid();
+        var url = $"/api/admin/accounts/{_site.Users["masha"]}/reset-password";
+
+        var first = await PostOkAsync(admin, url, new { commandId });
+        var again = await PostOkAsync(admin, url, new { commandId });
+
+        Assert.NotEqual(JsonValueKind.Null, first.GetProperty("temporaryPassword").ValueKind);
+        Assert.True(again.GetProperty("duplicate").GetBoolean());
+        Assert.Equal(JsonValueKind.Null, again.GetProperty("temporaryPassword").ValueKind);
+    }
+
+    [Fact]
+    public async Task A_temporary_password_refuses_actions_too()
+    {
+        var admin = await _site.SignedInAsync("admin");
+        var reset = await PostOkAsync(admin, $"/api/admin/accounts/{_site.Users["vasya"]}/reset-password", new { commandId = Guid.NewGuid() });
+        var vasya = await SignInAsync("vasya", reset.GetProperty("temporaryPassword").GetString()!);
+
+        var roll = await vasya.PostAsJsonAsync($"/api/seasons/{SiteFactory.SeasonId}/roll", new { commandId = Guid.NewGuid() }, Ct);
+
+        Assert.Equal(HttpStatusCode.Forbidden, roll.StatusCode);
+        Assert.Equal("account.mustChangePassword", await CodeAsync(roll));
     }
 
     // ---- Helpers ----
