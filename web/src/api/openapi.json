@@ -2242,6 +2242,92 @@
         }
       }
     },
+    "/api/admin/seasons/{seasonId}/integrity": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "parameters": [
+          {
+            "name": "seasonId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IntegrityReport"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/seasons/{seasonId}/export": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "parameters": [
+          {
+            "name": "seasonId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/admin/seasons/{seasonId}/commands": {
       "get": {
         "tags": [
@@ -3575,6 +3661,38 @@
             }
           }
         }
+      },
+      "IntegrityReport": {
+        "required": [
+          "seasonId",
+          "lastSequence",
+          "differences"
+        ],
+        "type": "object",
+        "properties": {
+          "seasonId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "lastSequence": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "differences": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "settled": {
+            "type": "boolean",
+            "default": true
+          },
+          "isIntact": {
+            "type": "boolean"
+          }
+        },
+        "description": "The result of an integrity check: the log's last event, what the stored state has that the log does not, and whether\nthe log stood still while it was read (bool IntegrityReport.Settled false: commands kept coming — check again)."
       },
       "InteractionRules": {
         "required": [

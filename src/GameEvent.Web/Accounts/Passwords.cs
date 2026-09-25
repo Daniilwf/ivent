@@ -23,6 +23,13 @@ public sealed class Passwords
             return false;
         }
 
+        // An imported placeholder has no password at all (D-105): nothing matches it, and the hasher is not asked
+        if (user.PasswordHash.StartsWith(Infrastructure.Seasons.SeasonTransfer.PlaceholderHashPrefix, StringComparison.Ordinal))
+        {
+            _hasher.VerifyHashedPassword(null!, _dummyHash, password);
+            return false;
+        }
+
         return _hasher.VerifyHashedPassword(user, user.PasswordHash, password) != PasswordVerificationResult.Failed;
     }
 }

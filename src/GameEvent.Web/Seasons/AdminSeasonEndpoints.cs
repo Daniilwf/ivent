@@ -64,6 +64,35 @@ public static class AdminSeasonEndpoints
                     : SendAsync(seasonId, request.CommandId, new Engine.Undo.UndoCommand(request.TargetCommandId, request.Comment), user, db, bus, ct))
             .WithActionErrors();
 
+        // The integrity check (L4, D-105): the log's state against the stored one, differences listed.
+        season.MapGet("/integrity", async Task<Microsoft.AspNetCore.Http.HttpResults.Results<
+            Microsoft.AspNetCore.Http.HttpResults.Ok<Infrastructure.Seasons.IntegrityReport>,
+            Microsoft.AspNetCore.Http.HttpResults.NotFound>> (Guid seasonId, GameEventDbContext db, CancellationToken ct) =>
+                await Infrastructure.Seasons.SeasonIntegrity.CheckAsync(db, seasonId, ct) is { } report
+                    ? TypedResults.Ok(report)
+                    : TypedResults.NotFound())
+            .RequireRateLimiting(AppSetup.AdminReadRateLimit)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
+
+        // The season archive (D-32, D-105): the log, users by login, the pool; loaded by `npm run season:import`.
+        season.MapGet("/export", async Task<IResult> (Guid seasonId, GameEventDbContext db, Engine.Kernel.IClock clock, CancellationToken ct) =>
+            {
+                var archive = await Infrastructure.Seasons.SeasonTransfer.ExportAsync(db, seasonId, clock.UtcNow, ct);
+                if (archive is null)
+                {
+                    return TypedResults.NotFound();
+                }
+
+                var zip = new MemoryStream();
+                await Infrastructure.Seasons.SeasonTransfer.WriteZipAsync(archive, zip, ct);
+                zip.Position = 0;
+                return TypedResults.File(zip, "application/zip", $"season-{seasonId:N}-{clock.UtcNow:yyyyMMdd-HHmm}.zip");
+            })
+            .RequireRateLimiting(AppSetup.AdminReadRateLimit)
+            .Produces(StatusCodes.Status200OK, contentType: "application/zip")
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
+
         season.MapGet("/commands", GetCommandsAsync)
             .RequireRateLimiting(AppSetup.AdminReadRateLimit)
             .ProducesProblem(StatusCodes.Status429TooManyRequests);
