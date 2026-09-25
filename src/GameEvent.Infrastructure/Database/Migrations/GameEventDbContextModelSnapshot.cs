@@ -188,6 +188,11 @@ namespace GameEvent.Infrastructure.Database.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("MediaType")
                         .IsRequired()
                         .HasMaxLength(20)

@@ -214,6 +214,7 @@
 | Скрин пруфа | загруженная игроком картинка, приложенная к пруфу (до 5) | `ProofState.Files`, `SubmitProof.Files`, `FileLinkView` |
 | Журнал ошибок, страница «Ошибки» | последние необработанные исключения запросов с запросом и пользователем, для админа | `ErrorJournal`, `ErrorEntry` |
 | Режим обслуживания | на время выкладки сайт только читает: запись в API — 503 с кодом `site.maintenance`, очередь отклоняет команды, на страницах баннер | `MaintenanceMode` (флаг-файл `maintenance` рядом с базой), `GET /api/status`, `PUT /api/admin/maintenance`, `MaintenanceBanner` |
+| Вид файла | загрузка, которую сайт показывает (скрин пруфа, аватарка, обложка), или скриншот отчёта о баге, который видит только админ | `FileKind` (`Upload`, `BugScreenshot`), `FileRecord.Kind`, `FileStored.Kind` |
 | Отчёт о баге | сообщение с кнопки «Сообщить о баге»: страница, описание, контекст, скриншот, статус | `BugReport`, команда `ReportBug`, событие `BugReported`, `BugReportButton` |
 | Статус отчёта о баге | новый, в работе (перенесён в `docs/BUGS.md`), закрыт | `BugReportStatus` (`New`, `InWork`, `Closed`), `SetBugReportStatus`, `BugReportStatusChanged` |
 | Контекст отчёта | что страница собрала сама: последние действия (нажатия, запросы с ответами), ошибки браузера, браузер и размер окна; введённое в поля не собирается | `BugReportContext`, `BugContextEntry`, `web/src/app/bugContext.ts` |

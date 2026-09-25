@@ -3,19 +3,9 @@ import { api, rejectionCode } from '../api/client';
 import { uploadFile } from '../api/files';
 import { ru } from '../i18n/ru';
 import { bugContext } from './bugContext';
+import { captureScreenshot } from './screenshot';
 
 type Phase = 'closed' | 'capturing' | 'open' | 'sending' | 'sent';
-
-/** A picture of the page as it is now, before the form covers it; null when the browser cannot draw it. */
-async function captureScreenshot(): Promise<Blob | null> {
-  try {
-    // Loaded on the first report only: most visits never need it
-    const { toBlob } = await import('html-to-image');
-    return await toBlob(document.body, { pixelRatio: 1, cacheBust: true });
-  } catch {
-    return null;
-  }
-}
 
 /**
  * The «Сообщить о баге» button (SPEC, A9, D-121): a screenshot of the page is taken first, then the user describes what
@@ -66,7 +56,7 @@ export function BugReportButton() {
       const { error: refused, response } = await api.POST('/api/bug-reports', {
         body: {
           commandId: commandId.current,
-          page: `${globalThis.location.pathname}${globalThis.location.search}`,
+          page: globalThis.location.pathname,
           text,
           context: bugContext(),
           screenshotFileId,

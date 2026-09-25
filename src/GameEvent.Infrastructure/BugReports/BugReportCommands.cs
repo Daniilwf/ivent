@@ -35,11 +35,19 @@ public static class BugReportRules
 {
     public const int MaxPageLength = 500;
     public const int MaxTextLength = 4000;
-    public const int MaxActions = 50;
+
+    // As much as the page gathers (web/src/app/bugContext.ts), no more: the log keeps every report for good
+    public const int MaxActions = 30;
     public const int MaxErrors = 20;
-    public const int MaxEntryLength = 1000;
+    public const int MaxEntryLength = 300;
     public const int MaxUserAgentLength = 500;
     public const int MaxViewportLength = 50;
+
+    /// <summary>Screenshots a user stores in 24 hours, apart from the upload limit: a user at that limit still reports.</summary>
+    public const int ScreenshotsPerDay = 20;
+
+    /// <summary>A screenshot is a still picture of a page: a few megabytes at most.</summary>
+    public const long ScreenshotMaxBytes = 3 * 1024 * 1024;
 
     public const string Invalid = "bugReport.invalid";
     public const string AuthorUnknown = "bugReport.authorUnknown";
@@ -54,9 +62,9 @@ public static class BugReportRules
         var page = report.Page?.Trim() ?? "";
         var text = report.Text?.Trim() ?? "";
         var context = report.Context ?? new BugReportContext(null, null, [], []);
-        if (page.Length is 0 or > MaxPageLength)
+        if (page.Length is 0 or > MaxPageLength || !page.StartsWith('/') || page.StartsWith("//", StringComparison.Ordinal) || page.Any(char.IsControl))
         {
-            return (null, $"A page is 1–{MaxPageLength} characters.");
+            return (null, $"A page is a path of this site (starting with «/»), 1–{MaxPageLength} characters.");
         }
 
         if (text.Length is 0 or > MaxTextLength)

@@ -161,7 +161,7 @@ public sealed partial class CommandProcessor
     }
 
     private static async Task<Rejection?> CoverProblemAsync(GameEventDbContext db, Guid? coverFileId, CancellationToken ct) =>
-        coverFileId is { } fileId && !await db.Files.AnyAsync(f => f.Id == fileId && !f.IsDeleted, ct)
+        coverFileId is { } fileId && !await db.Files.AnyAsync(f => f.Id == fileId && !f.IsDeleted && f.Kind == Engine.Files.FileKind.Upload, ct)
             ? new Rejection(PoolRules.CoverUnknown, $"File {fileId} is not stored.")
             : null;
 

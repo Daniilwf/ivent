@@ -2,6 +2,7 @@ using System.Security.Claims;
 using System.Threading.RateLimiting;
 using GameEvent.Engine.Files;
 using GameEvent.Engine.Kernel;
+using GameEvent.Infrastructure.BugReports;
 using GameEvent.Infrastructure.Database;
 using GameEvent.Infrastructure.Files;
 using GameEvent.Infrastructure.Queue;
@@ -149,14 +150,15 @@ public static class FileEndpoints
     }
 
     private static Task<IResult> UploadAsync(HttpRequest request, ClaimsPrincipal principal, [AsParameters] FileServices services, CancellationToken ct) =>
-        UploadPictureAsync(request, principal, services, countTowardsLimit: true, ct);
+        UploadPictureAsync(request, principal, services, FileKind.Upload, ct);
 
     /// <summary>
-    /// An upload as <c>POST /api/files</c> takes it; <paramref name="countTowardsLimit"/> false — outside the daily limit
-    /// (a bug report's screenshot, D-121: a user at the limit still reports), the endpoint's own rate limit keeps it small.
+    /// An upload as <c>POST /api/files</c> takes it, of the given kind (D-121): a bug report's screenshot has its own daily
+    /// limit, so a user at the upload limit still reports, and is a still picture of at most
+    /// <see cref="BugReportRules.ScreenshotMaxBytes"/>; nothing else on the site may show it.
     /// </summary>
     internal static async Task<IResult> UploadPictureAsync(
-        HttpRequest request, ClaimsPrincipal principal, FileServices services, bool countTowardsLimit, CancellationToken ct)
+        HttpRequest request, ClaimsPrincipal principal, FileServices services, FileKind kind, CancellationToken ct)
     {
         if (principal.UserId() is not { } ownerId)
         {
@@ -185,12 +187,12 @@ public static class FileEndpoints
             return Invalid("file", "Exactly one picture is required.");
         }
 
-        if (file.Length > services.Limits.MaxUploadBytes)
+        if (file.Length > MaxBytes(kind, services.Limits))
         {
-            return TooLarge(services.Limits);
+            return TooLarge(MaxBytes(kind, services.Limits));
         }
 
-        if (countTowardsLimit && await OverDailyLimitAsync(ownerId, services, ct) is { } limited)
+        if (await OverDailyLimitAsync(ownerId, services, kind, ct) is { } limited)
         {
             return limited;
         }
@@ -202,7 +204,7 @@ public static class FileEndpoints
             await stream.ReadExactlyAsync(content, ct);
         }
 
-        return (await StoreFileAsync(content, commandId, ownerId, services, ct, countTowardsLimit)).Answer;
+        return (await StoreFileAsync(content, commandId, ownerId, services, ct, kind: kind)).Answer;
     }
 
     /// <summary>
@@ -232,7 +234,7 @@ public static class FileEndpoints
             return Invalid("url", "A link is required.");
         }
 
-        if (await OverDailyLimitAsync(ownerId, services, ct) is { } limited)
+        if (await OverDailyLimitAsync(ownerId, services, FileKind.Upload, ct) is { } limited)
         {
             return limited;
         }
@@ -252,13 +254,20 @@ public static class FileEndpoints
     }
 
     // Before any decoding or download: a user at the daily limit costs a count, not a picture (the queue decides for sure)
-    private static async Task<IResult?> OverDailyLimitAsync(Guid ownerId, FileServices services, CancellationToken ct)
+    private static async Task<IResult?> OverDailyLimitAsync(Guid ownerId, FileServices services, FileKind kind, CancellationToken ct)
     {
         var since = services.Clock.UtcNow - FileRules.Day;
-        return await services.Db.Files.CountAsync(f => f.OwnerId == ownerId && f.CreatedAt > since, ct) >= services.Limits.UploadsPerDay
-            ? DailyLimit($"At most {services.Limits.UploadsPerDay} uploads in 24 hours.")
+        var limit = DailyLimitOf(kind, services.Limits);
+        return await services.Db.Files.CountAsync(f => f.OwnerId == ownerId && f.Kind == kind && f.CreatedAt > since, ct) >= limit
+            ? DailyLimit($"At most {limit} uploads of this kind in 24 hours.")
             : null;
     }
+
+    private static int DailyLimitOf(FileKind kind, FileLimits limits) =>
+        kind == FileKind.BugScreenshot ? BugReportRules.ScreenshotsPerDay : limits.UploadsPerDay;
+
+    private static long MaxBytes(FileKind kind, FileLimits limits) =>
+        kind == FileKind.BugScreenshot ? Math.Min(limits.MaxUploadBytes, BugReportRules.ScreenshotMaxBytes) : limits.MaxUploadBytes;
 
     private static async Task<IResult> StoreAsync(byte[] content, Guid commandId, Guid ownerId, FileServices services, CancellationToken ct) =>
         (await StoreFileAsync(content, commandId, ownerId, services, ct)).Answer;
@@ -268,7 +277,7 @@ public static class FileEndpoints
     /// file's id when there is one (a cover found for the pool, D-118, uses it).
     /// </summary>
     internal static async Task<(IResult Answer, Guid? FileId)> StoreFileAsync(
-        byte[] content, Guid commandId, Guid ownerId, FileServices services, CancellationToken ct, bool countTowardsLimit = true)
+        byte[] content, Guid commandId, Guid ownerId, FileServices services, CancellationToken ct, bool countTowardsLimit = true, FileKind kind = FileKind.Upload)
     {
         var (db, storage, limits, ids, _, bus) = services;
         if (!await s_processing.WaitAsync(s_processingWait, ct))
@@ -294,6 +303,11 @@ public static class FileEndpoints
                 : Problem(StatusCodes.Status422UnprocessableEntity, "The picture was refused.", rejection.Detail, rejection.Code), null);
         }
 
+        if (kind == FileKind.BugScreenshot && processed.Frames > 1)
+        {
+            return (Problem(StatusCodes.Status422UnprocessableEntity, "The picture was refused.", "A screenshot is a still picture.", FileRules.NotStill), null);
+        }
+
         // The bytes go to disk first; the queue then records whose they are. From here the request is not cancelled: a
         // command in the queue is executed anyway, and its files must be there. Only a clear "no" takes them back; after a
         // failure they stay, an orphan at worst, never a record without its file.
@@ -305,7 +319,7 @@ public static class FileEndpoints
             new CommandEnvelope(
                 commandId,
                 Guid.Empty,
-                new RecordFile(fileId, ownerId, processed.MediaType, processed.Main.LongLength, processed.Width, processed.Height, processed.Frames, countTowardsLimit ? limits.UploadsPerDay : int.MaxValue),
+                new RecordFile(fileId, ownerId, processed.MediaType, processed.Main.LongLength, processed.Width, processed.Height, processed.Frames, countTowardsLimit ? DailyLimitOf(kind, limits) : int.MaxValue, kind),
                 ownerId),
             CancellationToken.None);
         var stored = outcome.Events.Select(e => e.Event).OfType<FileStored>().SingleOrDefault()?.FileId;
@@ -383,6 +397,9 @@ public static class FileEndpoints
             "The file is too large.",
             $"A picture is at most {limits.MaxUploadBytes / 1024 / 1024} MB, a GIF at most {limits.MaxGifBytes / 1024 / 1024} MB.",
             ImageProcessor.TooLarge);
+
+    private static ProblemHttpResult TooLarge(long maxBytes) =>
+        Problem(StatusCodes.Status413PayloadTooLarge, "The file is too large.", $"This picture is at most {maxBytes / 1024 / 1024} MB.", ImageProcessor.TooLarge);
 
     private static ProblemHttpResult DailyLimit(string detail) =>
         Problem(StatusCodes.Status429TooManyRequests, "Too many uploads today.", detail, FileRules.DailyLimit);

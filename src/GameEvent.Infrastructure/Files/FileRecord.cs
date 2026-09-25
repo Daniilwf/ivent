@@ -1,3 +1,4 @@
+using GameEvent.Engine.Files;
 using GameEvent.Engine.Kernel;
 
 namespace GameEvent.Infrastructure.Files;
@@ -27,13 +28,17 @@ public sealed class FileRecord
     public bool IsDeleted { get; set; }
 
     public DateTimeOffset CreatedAt { get; set; }
+
+    /// <summary>An upload the site shows, or a bug report's screenshot only the admin sees (D-121).</summary>
+    public FileKind Kind { get; set; }
 }
 
 /// <summary>
 /// The server stored an uploaded file already written to disk (D-108): the queue records whose it is. The id is given
-/// by the endpoint that wrote the file.
+/// by the endpoint that wrote the file. <see cref="DailyLimit"/> counts the owner's files of the same <see cref="Kind"/>.
 /// </summary>
-public sealed record RecordFile(Guid FileId, Guid OwnerId, string MediaType, long Bytes, int Width, int Height, int Frames, int DailyLimit)
+public sealed record RecordFile(
+    Guid FileId, Guid OwnerId, string MediaType, long Bytes, int Width, int Height, int Frames, int DailyLimit, FileKind Kind = FileKind.Upload)
     : Queue.IGlobalCommand;
 
 /// <summary>File names on disk (D-108): the id in lower-case hex, never anything the user sent.</summary>
@@ -60,6 +65,8 @@ public static class FileRules
     public const string AlreadyStored = "file.alreadyStored";
     public const string DailyLimit = "file.dailyLimit";
     public const string MediaTypeInvalid = "file.mediaTypeInvalid";
+    public const string KindInvalid = "file.kindInvalid";
+    public const string NotStill = "file.notStill";
 
     /// <summary>The window of the daily upload limit: the last 24 hours, not a calendar day.</summary>
     public static readonly TimeSpan Day = TimeSpan.FromDays(1);
@@ -67,5 +74,7 @@ public static class FileRules
     public static Rejection? Check(RecordFile command) =>
         command.MediaType is not (FileNames.Webp or FileNames.Gif)
             ? new Rejection(MediaTypeInvalid, "Only WebP and GIF are stored.")
-            : null;
+            : !Enum.IsDefined(command.Kind)
+                ? new Rejection(KindInvalid, "Unknown kind of file.")
+                : null;
 }

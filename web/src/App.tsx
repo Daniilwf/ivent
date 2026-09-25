@@ -58,12 +58,13 @@ export function App() {
     }
   }
 
-  // Every screen: the maintenance banner on top; a signed-in user also gets the bug report button (the API needs one)
+  // Every screen: the maintenance banner on top; a signed-in user also gets the bug report button (the API needs one;
+  // with a temporary password only its change is open)
   return (
     <>
       <MaintenanceBanner />
       {screen()}
-      {state.kind === 'signedIn' || state.kind === 'changePassword' ? <BugReportButton /> : null}
+      {state.kind === 'signedIn' ? <BugReportButton /> : null}
     </>
   );
 

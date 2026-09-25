@@ -241,7 +241,7 @@ public sealed partial class CommandProcessor
                         return Reject(AccountRules.Deleted, "The account is deleted.");
                     }
 
-                    if (avatar.FileId is { } fileId && !await db.Files.AnyAsync(f => f.Id == fileId && !f.IsDeleted, ct))
+                    if (avatar.FileId is { } fileId && !await db.Files.AnyAsync(f => f.Id == fileId && !f.IsDeleted && f.Kind == Engine.Files.FileKind.Upload, ct))
                     {
                         return Reject(AccountRules.AvatarFileUnknown, $"File {fileId} is not stored.");
                     }
