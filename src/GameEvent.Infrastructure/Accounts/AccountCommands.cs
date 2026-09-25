@@ -37,6 +37,12 @@ public sealed record ChangeAccount(Guid UserId, string Name, Role Role) : IAccou
 
 public sealed record DeleteAccount(Guid UserId) : IAccountCommand;
 
+/// <summary>
+/// The account's avatar becomes a stored file (a picture or a GIF, D-108), or none (D-117). The site checks who may set it
+/// and whose the file is; the queue checks that the account and the file exist.
+/// </summary>
+public sealed record SetAvatar(Guid UserId, Guid? FileId) : IAccountCommand;
+
 public sealed record RestoreAccount(Guid UserId) : IAccountCommand;
 
 /// <summary>
@@ -60,6 +66,7 @@ public static partial class AccountRules
     // No look-alikes (0/o, 1/l/i): the admin reads it out to a friend.
     private const string TemporaryAlphabet = "abcdefghjkmnpqrstuvwxyz23456789";
 
+    public const string AvatarFileUnknown = "account.avatarFileUnknown";
     public const string LoginInvalid = "account.loginInvalid";
     public const string LoginTaken = "account.loginTaken";
     public const string NameInvalid = "account.nameInvalid";

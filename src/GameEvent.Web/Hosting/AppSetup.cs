@@ -172,6 +172,7 @@ public static class AppSetup
         api.MapAdminSeasons();
         api.MapAdminAccounts();
         api.MapFiles();
+        api.MapAvatars();
 
         // Last: the OpenAPI document keeps the order its shared schemas were first met in (a nullable first use of an
         // enum would make the enum itself nullable for every client)

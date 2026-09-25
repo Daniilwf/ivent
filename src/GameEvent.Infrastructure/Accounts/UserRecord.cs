@@ -35,6 +35,9 @@ public sealed class UserRecord
 
     public bool IsDeleted { get; set; }
 
+    /// <summary>The avatar: a stored file (D-117), or none.</summary>
+    public Guid? AvatarFileId { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; }
 
     public static string Normalize(string login) => login.Trim().ToLowerInvariant();

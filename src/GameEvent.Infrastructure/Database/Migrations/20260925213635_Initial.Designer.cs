@@ -11,7 +11,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace GameEvent.Infrastructure.Database.Migrations
 {
     [DbContext(typeof(GameEventDbContext))]
-    [Migration("20260925211519_Initial")]
+    [Migration("20260925213635_Initial")]
     partial class Initial
     {
         /// <inheritdoc />
@@ -24,6 +24,9 @@ namespace GameEvent.Infrastructure.Database.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("AvatarFileId")
                         .HasColumnType("TEXT");
 
                     b.Property<long>("CreatedAt")

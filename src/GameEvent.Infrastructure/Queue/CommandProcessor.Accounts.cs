@@ -226,6 +226,28 @@ public sealed partial class CommandProcessor
                     }, null, null);
                 }
 
+            case SetAvatar avatar:
+                {
+                    if (await db.Users.SingleOrDefaultAsync(u => u.Id == avatar.UserId, ct) is not { } user)
+                    {
+                        return Reject(AccountRules.Unknown, $"Account {avatar.UserId} does not exist.");
+                    }
+
+                    if (user.IsDeleted)
+                    {
+                        return Reject(AccountRules.Deleted, "The account is deleted.");
+                    }
+
+                    if (avatar.FileId is { } fileId && !await db.Files.AnyAsync(f => f.Id == fileId && !f.IsDeleted, ct))
+                    {
+                        return Reject(AccountRules.AvatarFileUnknown, $"File {fileId} is not stored.");
+                    }
+
+                    return user.AvatarFileId == avatar.FileId
+                        ? Reject(AccountRules.NothingToChange, "The avatar is already this one.")
+                        : ([new AccountAvatarChanged(user.Id, avatar.FileId)], () => user.AvatarFileId = avatar.FileId, null, null);
+                }
+
             case RestoreAccount restore:
                 {
                     if (await db.Users.SingleOrDefaultAsync(u => u.Id == restore.UserId, ct) is not { } user)

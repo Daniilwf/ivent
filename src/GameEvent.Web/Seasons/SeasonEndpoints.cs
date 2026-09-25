@@ -103,7 +103,8 @@ public sealed record LeaderboardRowView(Guid PlayerId, int Place, int Points, in
 public sealed record CellView(string Id, CellType Type);
 
 /// <summary>A player on the map and the leaderboard; <c>finishOrder</c> is their order among the finishers, null before the finish.</summary>
-public sealed record PlayerView(Guid Id, string Name, string CellId, int Points, TurnPhase Phase, int? FinishOrder);
+/// <summary>A player of the season; <c>avatar</c> — the account's picture (D-117), or none.</summary>
+public sealed record PlayerView(Guid Id, string Name, string CellId, int Points, TurnPhase Phase, int? FinishOrder, Files.FileLinkView? Avatar);
 
 /// <summary>
 /// The signed-in player's own turn. While playing: <c>dropHintMinutes</c> is <c>roll.minPlayMinutesBeforeDrop</c> until
@@ -549,12 +550,19 @@ public static class SeasonEndpoints
                 mine.FinishOrder is { } order ? new MyFinishView(order, mine.Frozen) : null);
         }
 
+        // Avatars live on the accounts, across seasons (SPEC «Сезоны»)
+        var userIds = players.Select(p => p.UserId).ToList();
+        var avatars = await db.Users.AsNoTracking()
+            .Where(u => userIds.Contains(u.Id) && u.AvatarFileId != null)
+            .ToDictionaryAsync(u => u.Id, u => u.AvatarFileId!.Value, ct);
+
         return TypedResults.Ok(new SeasonView(
             seasonId,
             seasonRecord.Status,
             seasonRecord.Deadline,
             [.. season.Map.Cells.Select(c => new CellView(c.Id, c.Type))],
-            [.. players.Select(p => new PlayerView(p.Id, p.Name, p.CellId, p.Points, p.Phase, p.FinishOrder))],
+            [.. players.Select(p => new PlayerView(
+                p.Id, p.Name, p.CellId, p.Points, p.Phase, p.FinishOrder, avatars.TryGetValue(p.UserId, out var avatar) ? Files.FileLinkView.Of(avatar) : null))],
             [.. leaderboard.Select(r => new LeaderboardRowView(r.PlayerId, r.Place, r.Points, r.CellsToFinish, r.IsFirst, r.Provisional))],
             me,
             lastSequence));

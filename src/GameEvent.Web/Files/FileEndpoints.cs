@@ -19,6 +19,12 @@ namespace GameEvent.Web.Files;
 /// </summary>
 public sealed record StoredFileView(Guid Id, string MediaType, int Width, int Height, int Frames, string Url, string ThumbnailUrl, bool Duplicate);
 
+/// <summary>The services a stored upload goes through (D-108, D-117).</summary>
+public sealed record FileServices(GameEventDbContext Db, FileStorage Storage, FileLimits Limits, IIdGenerator Ids, IClock Clock, CommandBus Bus);
+
+/// <summary>A picture by link (D-117): https from Tenor, Giphy or Klipy; the server downloads it and stores it as an upload.</summary>
+public sealed record FileFromUrlRequest(Guid CommandId, string? Url);
+
 /// <summary>A stored file where a proof or a page shows it (D-116): the picture and its thumbnail.</summary>
 public sealed record FileLinkView(Guid Id, string Url, string ThumbnailUrl)
 {
@@ -58,6 +64,9 @@ public static class FileEndpoints
             builder.Environment.ContentRootPath, builder.Configuration["Files:Path"] ?? Path.Combine("var", "files")));
         builder.Services.AddSingleton(limits);
         builder.Services.AddSingleton(new FileStorage(root));
+        builder.Services.AddSingleton(builder.Configuration.GetSection("Files:Download").Get<DownloadSettings>() ?? new DownloadSettings());
+        builder.Services.AddSingleton<IHostResolver, DnsHostResolver>();
+        builder.Services.AddSingleton<SafeDownloader>();
         builder.Services.Configure<FormOptions>(o =>
         {
             o.MultipartBodyLengthLimit = limits.MaxUploadBytes + FormOverheadBytes;
@@ -92,6 +101,16 @@ public static class FileEndpoints
             .Produces(StatusCodes.Status415UnsupportedMediaType)
             .ProducesValidationProblem();
 
+        files.MapPost("/from-url", FromUrlAsync)
+            .RequireRateLimiting(UploadRateLimit)
+            .Produces<StoredFileView>()
+            .Produces<Seasons.RejectionProblem>(StatusCodes.Status409Conflict, "application/problem+json")
+            .Produces<Seasons.RejectionProblem>(StatusCodes.Status413PayloadTooLarge, "application/problem+json")
+            .Produces<Seasons.RejectionProblem>(StatusCodes.Status422UnprocessableEntity, "application/problem+json")
+            .Produces<Seasons.RejectionProblem>(StatusCodes.Status429TooManyRequests, "application/problem+json")
+            .Produces<Seasons.RejectionProblem>(StatusCodes.Status503ServiceUnavailable, "application/problem+json")
+            .ProducesValidationProblem();
+
         files.MapGet("/{fileId:guid}", (Guid fileId, GameEventDbContext db, FileStorage storage, HttpContext http, CancellationToken ct) =>
                 ServeAsync(fileId, thumbnail: false, db, storage, http, ct))
             .Produces<byte[]>(StatusCodes.Status200OK, FileNames.Webp, FileNames.Gif)
@@ -103,8 +122,7 @@ public static class FileEndpoints
             .Produces(StatusCodes.Status404NotFound);
     }
 
-    private static async Task<IResult> UploadAsync(
-        HttpRequest request, ClaimsPrincipal principal, GameEventDbContext db, FileStorage storage, FileLimits limits, IIdGenerator ids, IClock clock, CommandBus bus, CancellationToken ct)
+    private static async Task<IResult> UploadAsync(HttpRequest request, ClaimsPrincipal principal, [AsParameters] FileServices services, CancellationToken ct)
     {
         if (principal.UserId() is not { } ownerId)
         {
@@ -123,7 +141,7 @@ public static class FileEndpoints
         }
 
         // A retry of an upload already stored gets the same file, without storing the picture again
-        if (await EarlierAsync(commandId, ownerId, db, ct) is { } earlier)
+        if (await EarlierAsync(commandId, ownerId, services.Db, ct) is { } earlier)
         {
             return earlier;
         }
@@ -133,16 +151,14 @@ public static class FileEndpoints
             return Invalid("file", "Exactly one picture is required.");
         }
 
-        if (file.Length > limits.MaxUploadBytes)
+        if (file.Length > services.Limits.MaxUploadBytes)
         {
-            return TooLarge(limits);
+            return TooLarge(services.Limits);
         }
 
-        // Before any decoding: a user at the daily limit costs a count, not a picture (the queue decides for sure)
-        var since = clock.UtcNow - FileRules.Day;
-        if (await db.Files.CountAsync(f => f.OwnerId == ownerId && f.CreatedAt > since, ct) >= limits.UploadsPerDay)
+        if (await OverDailyLimitAsync(ownerId, services, ct) is { } limited)
         {
-            return DailyLimit($"At most {limits.UploadsPerDay} uploads in 24 hours.");
+            return limited;
         }
 
         byte[] content;
@@ -152,6 +168,64 @@ public static class FileEndpoints
             await stream.ReadExactlyAsync(content, ct);
         }
 
+        return await StoreAsync(content, commandId, ownerId, services, ct);
+    }
+
+    /// <summary>
+    /// A picture by link (D-117): the link is checked and downloaded by <see cref="SafeDownloader"/>, then stored exactly
+    /// as an upload — the type by the content, WebP or GIF, the same limits and the same retry by command id.
+    /// </summary>
+    private static async Task<IResult> FromUrlAsync(
+        FileFromUrlRequest request, ClaimsPrincipal principal, SafeDownloader downloader, [AsParameters] FileServices services, CancellationToken ct)
+    {
+        if (principal.UserId() is not { } ownerId)
+        {
+            return TypedResults.Forbid();
+        }
+
+        if (request.CommandId == Guid.Empty)
+        {
+            return Invalid("commandId", "A command id is required.");
+        }
+
+        if (await EarlierAsync(request.CommandId, ownerId, services.Db, ct) is { } earlier)
+        {
+            return earlier;
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Url))
+        {
+            return Invalid("url", "A link is required.");
+        }
+
+        if (await OverDailyLimitAsync(ownerId, services, ct) is { } limited)
+        {
+            return limited;
+        }
+
+        var (content, refused) = await downloader.DownloadAsync(request.Url.Trim(), ct);
+        if (content is null)
+        {
+            return refused!.Code == ImageProcessor.TooLarge
+                ? TooLarge(services.Limits)
+                : Problem(StatusCodes.Status422UnprocessableEntity, "The link was refused.", refused.Detail, refused.Code);
+        }
+
+        return await StoreAsync(content, request.CommandId, ownerId, services, ct);
+    }
+
+    // Before any decoding or download: a user at the daily limit costs a count, not a picture (the queue decides for sure)
+    private static async Task<IResult?> OverDailyLimitAsync(Guid ownerId, FileServices services, CancellationToken ct)
+    {
+        var since = services.Clock.UtcNow - FileRules.Day;
+        return await services.Db.Files.CountAsync(f => f.OwnerId == ownerId && f.CreatedAt > since, ct) >= services.Limits.UploadsPerDay
+            ? DailyLimit($"At most {services.Limits.UploadsPerDay} uploads in 24 hours.")
+            : null;
+    }
+
+    private static async Task<IResult> StoreAsync(byte[] content, Guid commandId, Guid ownerId, FileServices services, CancellationToken ct)
+    {
+        var (db, storage, limits, ids, _, bus) = services;
         if (!await s_processing.WaitAsync(s_processingWait, ct))
         {
             return Problem(StatusCodes.Status503ServiceUnavailable, "The server is busy with other pictures.", "Try again in a minute.", "file.busy");
