@@ -2739,6 +2739,96 @@
         }
       }
     },
+    "/api/admin/seasons/{seasonId}/finish-bonuses/recalculate": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "parameters": [
+          {
+            "name": "seasonId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SeasonActionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RejectionProblem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/admin/accounts": {
       "get": {
         "tags": [
@@ -5679,15 +5769,23 @@
       },
       "RulesChangeResult": {
         "required": [
-          "version"
+          "version",
+          "warnings"
         ],
         "type": "object",
         "properties": {
           "version": {
             "type": "integer",
             "format": "int32"
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
-        }
+        },
+        "description": "The new version of the rules and what the admin should know about it: `finish.bonusesKept` — after this change\nsome finishers with a bonus (all but the first) hold a bonus list other than the one now in force; their bonuses stay\n(D-113) until «Пересчитать бонусы по текущим правилам»."
       },
       "Ruleset": {
         "required": [
@@ -5914,6 +6012,19 @@
             "format": "date-time"
           }
         }
+      },
+      "SeasonActionRequest": {
+        "required": [
+          "commandId"
+        ],
+        "type": "object",
+        "properties": {
+          "commandId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "description": "An admin action on the season with nothing else to say (D-113: recalculate the finish bonuses)."
       },
       "SeasonDeadlineRequest": {
         "required": [

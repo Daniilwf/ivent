@@ -778,10 +778,12 @@ public partial class PlayerAdminInvariantTests
         Assert.Equal(first?.PlayerId, FinishLine.First(s.State));
         Assert.All(standing.Where(p => p.Finish!.Frozen), p => Assert.Equal(first!.PlayerId, p.PlayerId));
 
-        // 9 / Q-4: each standing finisher holds the bonus of his place, by a reference table
+        // 9 / Q-4 / D-113: each standing finisher holds the bonus of his place now, by the table he finished under (the
+        // reference fold keeps it)
         for (var place = 1; place <= standing.Count; place++)
         {
-            Assert.Equal(ReferenceBonus(s.Ruleset.Finish, place), standing[place - 1].Finish!.Bonus);
+            var table = finishes.Standing[standing[place - 1].PlayerId].BonusRules!;
+            Assert.Equal(ReferenceBonus(table, place), standing[place - 1].Finish!.Bonus);
         }
 
         // Q-3: frozen exactly when all runs up to the finish are approved (or at once without required approval)
@@ -789,9 +791,14 @@ public partial class PlayerAdminInvariantTests
         {
             var allApproved = UpToFinishRuns(s.State, first).All(r => r.Proof?.Status == ProofStatus.Approved);
             Assert.True(!allApproved || first.Finish!.Frozen, $"{first.Name} is first with all runs approved but not frozen.");
-            if (s.Ruleset.Finish.RequireApprovalForFirst)
+            // D-115: the freeze follows the rule in force when the first finished; a later change of the rule changes nothing
+            if (RequiredApprovalAtFinish(s.EffectiveLog, first.PlayerId))
             {
                 Assert.True(!first.Finish!.Frozen || allApproved, $"{first.Name} is frozen before all his runs up to the finish are approved.");
+            }
+            else
+            {
+                Assert.True(first.Finish!.Frozen, $"{first.Name} finished first without required approval but is not frozen.");
             }
         }
 
@@ -803,7 +810,7 @@ public partial class PlayerAdminInvariantTests
             Assert.Equal(p.PlayerId, run.PlayerId);
             Assert.True(
                 run.Status == RunStatus.Completed
-                    || (run.Status == RunStatus.Rejected && p.Finish.Frozen && !s.Ruleset.Finish.RequireApprovalForFirst),
+                    || (run.Status == RunStatus.Rejected && p.Finish.Frozen && !RequiredApprovalAtFinish(s.EffectiveLog, p.PlayerId)),
                 $"{p.Name}'s finish stands on a {run.Status} run.");
         }
 
@@ -916,13 +923,41 @@ public partial class PlayerAdminInvariantTests
     }
 
     /// <summary>Q-4 reference: place 1 (the first) nothing, place 2 the first element of the list, …, past it the value after the list.</summary>
-    private static int ReferenceBonus(FinishRules rules, int place) =>
-        place == 1 ? 0 : place - 2 < rules.BonusByOrder.Count ? rules.BonusByOrder[place - 2] : rules.BonusAfterList;
+    /// <summary>Whether the first's approval was required by the rules in force at the player's last finish (D-115).</summary>
+    private static bool RequiredApprovalAtFinish(IEnumerable<IGameEvent> log, Guid playerId)
+    {
+        var required = true;
+        var atFinish = true;
+        foreach (var e in log)
+        {
+            switch (e)
+            {
+                case SeasonCreated created:
+                    required = created.Ruleset.Finish.RequireApprovalForFirst;
+                    break;
+                case RulesetChanged changed:
+                    required = changed.Ruleset.Finish.RequireApprovalForFirst;
+                    break;
+                case PlayerFinished finished when finished.PlayerId == playerId:
+                    atFinish = required;
+                    break;
+            }
+        }
+
+        return atFinish;
+    }
+
+    private static int ReferenceBonus(FinishBonusRules rules, int place) =>
+        place == 1 ? 0 : place - 2 < rules.ByOrder.Count ? rules.ByOrder[place - 2] : rules.AfterList;
 
     /// <summary>Q-3: the player's completed runs up to and including the finishing one (by completion time).</summary>
+    // Runs completed in the same instant are told apart by their ids, given in the order the runs were rolled (C13 long
+    // run: a run completed after the finish in the same second is not up to the finish)
     private static IEnumerable<RunState> UpToFinishRuns(SeasonState state, SeasonPlayer player) =>
         player.Finish is { } finish
-            ? state.Runs.Values.Where(r => r.PlayerId == player.PlayerId && r.Status == RunStatus.Completed && r.CompletedAt <= state.Runs[finish.RunId].CompletedAt)
+            ? state.Runs.Values.Where(r => r.PlayerId == player.PlayerId && r.Status == RunStatus.Completed
+                && (r.CompletedAt < state.Runs[finish.RunId].CompletedAt
+                    || (r.CompletedAt == state.Runs[finish.RunId].CompletedAt && r.RunId.CompareTo(finish.RunId) <= 0)))
             : [];
 
     /// <summary>Q-3: the run counts for the player's position — he has a finish and completed it at or before the finish.</summary>
@@ -996,16 +1031,36 @@ public partial class PlayerAdminInvariantTests
         var standing = new Dictionary<Guid, FinishState>();
         var orders = new List<int>();
         var bonus = new Dictionary<Guid, int>();
+
+        // D-113: a finisher keeps the bonus table in force at his finish, until the admin's recalculation
+        FinishBonusRules? table = null;
+        bool? approval = null;
         foreach (var e in log)
         {
             switch (e)
             {
+                case SeasonCreated created:
+                    table = new FinishBonusRules(created.Ruleset.Finish.BonusByOrder, created.Ruleset.Finish.BonusAfterList);
+                    approval = created.Ruleset.Finish.RequireApprovalForFirst;
+                    break;
+                case RulesetChanged changed:
+                    table = new FinishBonusRules(changed.Ruleset.Finish.BonusByOrder, changed.Ruleset.Finish.BonusAfterList);
+                    approval = changed.Ruleset.Finish.RequireApprovalForFirst;
+                    break;
+                case FinishBonusRulesRefreshed refreshed:
+                    Assert.Equal(table, refreshed.Rules);
+                    foreach (var id in standing.Keys.ToList())
+                    {
+                        standing[id] = standing[id] with { BonusRules = table };
+                    }
+
+                    break;
                 case PlayerFinished finished:
                     Assert.False(standing.ContainsKey(finished.PlayerId), "Finished twice without a revoke.");
                     Assert.True(finished.Surplus >= 0, "A negative surplus.");
                     orders.Add(finished.Order);
                     standing[finished.PlayerId] = new FinishState(
-                        finished.Order, finished.RunId, finished.FinishedAt, false, bonus.GetValueOrDefault(finished.PlayerId), finished.Surplus);
+                        finished.Order, finished.RunId, finished.FinishedAt, false, bonus.GetValueOrDefault(finished.PlayerId), finished.Surplus, table, approval);
                     break;
                 case FinishSurplusChanged surplus:
                     Assert.True(standing.TryGetValue(surplus.PlayerId, out var withSurplus), "A surplus change without a finish.");
@@ -2301,6 +2356,10 @@ public partial class PlayerAdminInvariantTests
         var finishOrders = new Dictionary<Guid, int>();
         var outOfRace = new HashSet<Guid>();
 
+        // A finish revoked by a reject: the move back that follows in the same command goes by the Q-3 surplus rule — it
+        // also takes back an earlier run's reduction the surplus had absorbed (C13 long run), not only this run's cells
+        var revokedByThisReject = new HashSet<Guid>();
+
         // D-16 / D-99: a game the first completed in free mode is completed for him only (until a reject), so his own roll
         // meets it as «уже прошёл» (C13 long run)
         var ownFree = new Dictionary<Guid, HashSet<Guid>>();
@@ -2365,6 +2424,7 @@ public partial class PlayerAdminInvariantTests
                     break;
                 case PlayerFinishRevoked revokedPlayer:
                     finishOrders.Remove(revokedPlayer.PlayerId);
+                    revokedByThisReject.Add(revokedPlayer.PlayerId);
                     break;
                 case ProofSubmitted submitted:
                     // D-98: a proof of one's own run, until the season is finished, replacing only an unchecked one
@@ -2384,6 +2444,7 @@ public partial class PlayerAdminInvariantTests
                     proofs[approved.RunId] = ProofStatus.Approved;
                     break;
                 case ProofRejected rejectedProof:
+                    revokedByThisReject.Clear();
                     // Pending or none → rejected; the game is not completed in the season any more (D-15)
                     Assert.True(status is SeasonStatus.Active or SeasonStatus.Closing, $"Rejected while {status}.");
                     Assert.Equal(runs[rejectedProof.RunId].Player, rejectedProof.PlayerId);
@@ -2482,7 +2543,8 @@ public partial class PlayerAdminInvariantTests
                         // D-98: back by the cells the run really moved, not by its steps rolled — for a player who has
                         // not finished; a finisher's revoke goes back by the Q-3 surplus rule (checked per command)
                         Assert.True(
-                            finishOrders.ContainsKey(moved.PlayerId) || cellsByRun.GetValueOrDefault(moved.RunId!.Value) == -moved.Steps,
+                            finishOrders.ContainsKey(moved.PlayerId) || revokedByThisReject.Contains(moved.PlayerId)
+                                || cellsByRun.GetValueOrDefault(moved.RunId!.Value) == -moved.Steps,
                             $"A reject moved {moved.Steps} for a run of {cellsByRun.GetValueOrDefault(moved.RunId!.Value)} cells.");
                     }
 

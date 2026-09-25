@@ -234,7 +234,7 @@ internal static class Undoing
 
         foreach (var e in events)
         {
-            if (e is PlayerFinished or PlayerFinishRevoked or PlayerFrozen or FinishSurplusChanged
+            if (e is PlayerFinished or PlayerFinishRevoked or PlayerFrozen or FinishSurplusChanged or FinishBonusRulesRefreshed
                 or Scoring.PointsChanged { Reason: Scoring.PointsReason.FinishBonus or Scoring.PointsReason.FinishBonusRevoked })
             {
                 keys.Add(FinishKey);

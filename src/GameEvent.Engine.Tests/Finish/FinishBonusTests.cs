@@ -12,7 +12,7 @@ namespace GameEvent.Engine.Tests.Finish;
 /// Finishers after the first hold a decreasing bonus (P6; SPEC «Финишировавшие не первыми получают убывающий бонус …
 /// бонус выдаётся один раз»; Q-4, D-99): among the standing finishers ordered by their order number, place 1 (the first)
 /// holds nothing, place 2 <c>finish.bonusByOrder[0]</c>, place 3 <c>[1]</c>…, past the list <c>finish.bonusAfterList</c>
-/// (<see cref="FinishLine.Bonus"/>). It is paid as <c>PointsChanged(+, FinishBonus)</c> in the command of the finish and
+/// (<see cref="FinishLine.Bonus(FinishRules, int)"/>). It is paid as <c>PointsChanged(+, FinishBonus)</c> in the command of the finish and
 /// kept in <see cref="FinishState.Bonus"/>: at any moment a player holds at most one bonus. Orders are 1, 2, 3… and are
 /// never reused. Recalculation after a revoke — <see cref="FirstPlaceReassignTests"/>.
 /// </summary>
@@ -33,7 +33,7 @@ public class FinishBonusTests
 
         // 4 for the dice and 10 for the finish; the position is the finish; the bonus is held in the finish
         Assert.Equal((14, LinearMap.FinishId), (s.Player("Петя").Points, s.Player("Петя").CellId));
-        Assert.Equal(new FinishState(2, runId, at, Frozen: false, Bonus: 10, Surplus: 0), FinishOf(s, "Петя"));
+        Assert.Equal(new FinishState(2, runId, at, Frozen: false, Bonus: 10, Surplus: 0, FinishBonusRules.Of(s.Ruleset.Finish), s.Ruleset.Finish.RequireApprovalForFirst), FinishOf(s, "Петя"));
     }
 
     [Fact]

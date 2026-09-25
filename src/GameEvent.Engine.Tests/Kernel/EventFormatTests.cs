@@ -292,6 +292,12 @@ public class EventFormatTests
             """{"userId":"40000000-0000-0000-0000-000000000001"}"""
         },
         {
+            "finish-bonus-rules-refreshed",
+            new FinishBonusRulesRefreshed(3, new FinishBonusRules([20, 15], 2)),
+            1,
+            """{"rulesetVersion":3,"rules":{"byOrder":[20,15],"afterList":2}}"""
+        },
+        {
             "file-stored",
             new Engine.Files.FileStored(Guid.Parse("50000000-0000-0000-0000-000000000001"), s_user, "image/webp", 123456, 2560, 1440, 1),
             1,

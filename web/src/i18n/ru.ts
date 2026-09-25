@@ -45,6 +45,8 @@ const rejection = {
   'proof.empty': 'Добавьте ссылку на пруф или выберите свидетеля.',
   'proof.witnessInvalid': 'Свидетелем может быть только другой игрок сезона.',
   'proof.alreadyReviewed': 'Пруф уже проверен.',
+  'finish.nothingToRecalculate':
+    'Пересчитывать нечего: у финишировавших уже бонусы по текущим правилам.',
   'proof.difficultyAboveClaimed': 'По пруфу нельзя поднять заявленную сложность.',
   'run.techRerollWindowClosed': 'Окно тех-реролла после ролла закрылось. Обратитесь к админу.',
   'run.reasonCommentRequired': 'Для причины «Другое» нужен комментарий.',

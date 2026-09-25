@@ -60,6 +60,9 @@ public partial class PlayerAdminInvariantTests
         var challengesOff = false;
         var unsupported = 0;
         var claimRefused = false;
+        var finishListChangedWithFinishers = 0;
+        var recalculated = 0;
+        var nothingToRecalculate = 0;
         for (var seed = 0; seed < 200; seed++)
         {
             var x = (uint)seed + 13;
@@ -83,6 +86,10 @@ public partial class PlayerAdminInvariantTests
                 }
 
                 unsupported += command is ChangeRuleset && s.Last.Rejection?.Code == RejectionCodes.RulesetInvalid ? 1 : 0;
+                finishListChangedWithFinishers += command is ChangeRuleset && s.Last.IsAccepted && before.FinishesSoFar > 0
+                    && FinishBonusRules.Of(before.Rules.Finish) != FinishBonusRules.Of(s.State.Rules.Finish) ? 1 : 0;
+                recalculated += command is RecalculateFinishBonuses && s.Last.IsAccepted ? 1 : 0;
+                nothingToRecalculate += command is RecalculateFinishBonuses && s.Last.Rejection?.Code == RejectionCodes.FinishNothingToRecalculate ? 1 : 0;
                 claimRefused |= command is CompleteRun { ChallengeDone: true } && !before.Rules.Features.Challenges
                     && before.Players.TryGetValue(((CompleteRun)command).PlayerId, out var p) && p.Phase == TurnPhase.Playing
                     && !s.Last.IsAccepted;
@@ -97,6 +104,11 @@ public partial class PlayerAdminInvariantTests
         Assert.True(challengesOn && challengesOff, "Challenges were not switched both ways.");
         Assert.True(unsupported > 5, $"Only {unsupported} unsupported rulesets refused.");
         Assert.True(claimRefused, "No challenge claim met disabled challenges.");
+        Assert.True(finishListChangedWithFinishers > 5, $"Only {finishListChangedWithFinishers} finish list changes with finishers in the season.");
+        // Two finishers are rare in these games (4 of 200 scripts): the bonus moves of a recalculation are covered by
+        // FinishBonusRecalculationTests; here the recalculation is reached both ways
+        Assert.True(recalculated > 0, "No recalculation was accepted.");
+        Assert.True(nothingToRecalculate > 0, "No recalculation was refused as having nothing to do.");
     }
 
     private static readonly (string Name, Func<Ruleset, Ruleset> Change)[] s_ruleChanges =
@@ -113,6 +125,11 @@ public partial class PlayerAdminInvariantTests
         ("drop penalty", r => r with { Drop = r.Drop with { PenaltyDice = r.Drop.PenaltyDice with { Count = r.Drop.PenaltyDice.Count == 2 ? 1 : 2 }, AffectsPosition = !r.Drop.AffectsPosition } }),
         ("drop event", r => r with { Drop = r.Drop with { MandatoryEvent = r.Drop.MandatoryEvent == MandatoryEvent.Bad ? MandatoryEvent.None : MandatoryEvent.Bad } }),
         ("tiebreakers", r => r with { Ranking = new RankingRules { Tiebreakers = [.. r.Ranking.Tiebreakers.Reverse()] } }),
+
+        // D-113: finish bonuses change mid-season; the finishers keep theirs until the admin recalculates
+        ("finish bonuses up", r => r with { Finish = r.Finish with { BonusByOrder = [.. r.Finish.BonusByOrder.Select(b => b + 5)], BonusAfterList = r.Finish.BonusAfterList + 1 } }),
+        ("finish bonuses down", r => r with { Finish = r.Finish with { BonusByOrder = [.. r.Finish.BonusByOrder.Take(1).Select(b => Math.Max(0, b - 3))], BonusAfterList = Math.Max(0, r.Finish.BonusAfterList - 1) } }),
+        ("approval for the first", r => r with { Finish = r.Finish with { RequireApprovalForFirst = !r.Finish.RequireApprovalForFirst } }),
 
         // 19: a mechanic switched on and off; one this build does not have is refused, as are no change and a bad value
         ("challenges", r => r with { Features = r.Features with { Challenges = !r.Features.Challenges } }),
@@ -144,8 +161,14 @@ public partial class PlayerAdminInvariantTests
         {
             case 5 when withUndo:
                 return UndoFor(s, b);
+            case 6 when withRulesetChanges && variant % 2 == 1
+                && s.State.Players.Values.Any(p => p.Finish is { } f && f.BonusRules != FinishBonusRules.Of(s.Ruleset.Finish)) && variant % 3 != 0:
+                return new RecalculateFinishBonuses();
             case 6 when withRulesetChanges:
-                var (_, change) = s_ruleChanges[(index + variant) % s_ruleChanges.Length];
+                // D-113: with finishers in the season the finish list itself changes more often than its share
+                var (_, change) = s.State.Players.Values.Count(p => p.Finish is not null) >= 2 && variant % 3 == 0
+                    ? s_ruleChanges.First(r => r.Name == (variant % 2 == 0 ? "finish bonuses up" : "finish bonuses down"))
+                    : s_ruleChanges[(index + variant) % s_ruleChanges.Length];
                 return new ChangeRuleset(change(s.Ruleset), variant % 9 == 0 ? s.State.RulesetVersion - 1 : null);
             case 7 when s.State.ManualEffects.Count > 0 && variant % 2 == 0:
                 var effects = s.State.ManualEffects.Values.ToList();
@@ -167,9 +190,12 @@ public partial class PlayerAdminInvariantTests
     {
         var history = s.History;
         var variant = s.Log.Count;
+        // A command that moved a finish is rare among the last few: one variant aims at the latest such command on purpose
+        var finishMoving = history.LastOrDefault(c => c.Events.Any(IsFinishEvent));
         return (((b % 4) + variant) % 8) switch
         {
             7 => new UndoCommand(SequentialIds.Make(0x7F000000, b), "ошибка админа"),
+            5 when finishMoving is not null => new UndoCommand(finishMoving.CommandId, "ошибка админа"),
             6 => new UndoCommand(history[variant % history.Count].CommandId, variant % 3 == 0 ? " " : "ошибка админа"),
             var back => new UndoCommand(history[history.Count - 1 - Math.Min(Math.Max(0, back - 3), history.Count - 1)].CommandId, "ошибка админа"),
         };
@@ -182,6 +208,31 @@ public partial class PlayerAdminInvariantTests
         CheckUndo(s, command, before);
         CheckRulesetVersions(s, before);
         CheckMechanics(s, command, before);
+        CheckRuleChangeKeepsWhatWasGiven(s, command, before);
+    }
+
+    /// <summary>
+    /// D-113: a change of the rules by itself gives and takes nothing — points, coins and every finisher's bonus and bonus
+    /// table stay as they were; only the admin's recalculation moves bonuses, to the current table.
+    /// </summary>
+    private static void CheckRuleChangeKeepsWhatWasGiven(Scenario s, ICommand command, SeasonState before)
+    {
+        if (command is ChangeRuleset && s.Last.IsAccepted)
+        {
+            Assert.DoesNotContain(s.Last.Events, e => e is PointsChanged or CoinsChanged);
+            foreach (var player in before.Players.Values)
+            {
+                var after = s.State.Players[player.PlayerId];
+                Assert.Equal((player.Points, player.Coins, player.Finish), (after.Points, after.Coins, after.Finish));
+            }
+        }
+
+        if (command is RecalculateFinishBonuses && s.Last.IsAccepted)
+        {
+            var current = FinishBonusRules.Of(s.State.Rules.Finish);
+            Assert.All(s.State.Players.Values.Where(p => p.Finish is not null), p => Assert.Equal(current, p.Finish!.BonusRules));
+            Assert.All(s.Last.Events.Skip(1), e => Assert.True(e is PointsChanged { Reason: PointsReason.FinishBonus or PointsReason.FinishBonusRevoked }, $"{e} in a recalculation."));
+        }
     }
 
     // The season as it matters to the game: the counters of finishes and points changes and the ruleset version only
@@ -337,7 +388,7 @@ public partial class PlayerAdminInvariantTests
                 or TechRerollConvertedToDrop or RunHoursCorrected or RunDifficultyChanged
                 or ProofSubmitted or ProofApproved or ProofRejected
                 or PointsChanged or CoinsChanged or ResourceChanged or PlayerMoved
-                or PlayerFinished or PlayerFrozen or PlayerFinishRevoked or FinishSurplusChanged
+                or PlayerFinished or PlayerFrozen or PlayerFinishRevoked or FinishSurplusChanged or FinishBonusRulesRefreshed
                 or ManualEffectCreated or ManualEffectResolved or CommandUndone
 
                 // Accounts (D8, D-106) and stored files (D4a, D-108) are the site's, not a season mechanic

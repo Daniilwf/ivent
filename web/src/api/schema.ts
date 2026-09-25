@@ -2725,6 +2725,92 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/seasons/{seasonId}/finish-bonuses/recalculate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SeasonActionRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CommandResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/accounts": {
         parameters: {
             query?: never;
@@ -4109,9 +4195,15 @@ export interface components {
         };
         /** @enum {unknown} */
         Rounding: "nearest" | "floor" | "ceil";
+        /**
+         * @description The new version of the rules and what the admin should know about it: `finish.bonusesKept` — after this change
+         *     some finishers with a bonus (all but the first) hold a bonus list other than the one now in force; their bonuses stay
+         *     (D-113) until «Пересчитать бонусы по текущим правилам».
+         */
         RulesChangeResult: {
             /** Format: int32 */
             version: number;
+            warnings: string[];
         };
         Ruleset: {
             /**
@@ -4182,6 +4274,11 @@ export interface components {
             game: components["schemas"]["GameView"];
             /** Format: date-time */
             startedAt: string;
+        };
+        /** @description An admin action on the season with nothing else to say (D-113: recalculate the finish bonuses). */
+        SeasonActionRequest: {
+            /** Format: uuid */
+            commandId: string;
         };
         /** @description The admin sets or removes (null) the deadline; only in draft or active (D-101). */
         SeasonDeadlineRequest: {
