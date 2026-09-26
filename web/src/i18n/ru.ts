@@ -1349,7 +1349,6 @@ export const ru = {
       witness: (name: string) => `Свидетель: ${name}`,
       note: (text: string) => `Заметка: ${text}`,
       link: (n: number) => `Ссылка ${n}`,
-      shot: (n: number) => `Скрин ${n}`,
       difficulty: 'Сложность по пруфу',
       difficultyHint: 'Ниже заявленной — кубики пересчитаются',
       approve: 'Одобрить',

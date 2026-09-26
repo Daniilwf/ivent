@@ -101,7 +101,7 @@ describe('The proof queue', () => {
       'href',
       'https://imgur.com/a/credits',
     );
-    expect(within(card).getByRole('img', { name: t.shot(1) })).toHaveAttribute(
+    expect(within(card).getByRole('img', { name: ru.proof.shotAlt(1) })).toHaveAttribute(
       'src',
       '/api/files/f1/thumbnail',
     );

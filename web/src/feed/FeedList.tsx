@@ -16,6 +16,7 @@ import { Link } from '../app/Link';
 import { paths } from '../app/router';
 import { moscowClock, moscowTime } from '../app/time';
 import { ru } from '../i18n/ru';
+import { textLink as nameLink } from './linkStyle';
 import { cx } from '../ui/cx';
 import { Skeleton } from '../ui/Progress';
 import { Sticker } from '../ui/Sticker';
@@ -35,10 +36,6 @@ const icons: Record<FeedIcon, ReactNode> = {
   admin: <ShieldCheck size={14} aria-hidden />,
   undo: <Undo2 size={14} aria-hidden />,
 };
-
-const nameLink = cx(
-  'rounded-sm underline decoration-2 decoration-muted underline-offset-4 is-hover:decoration-ink',
-);
 
 /** A name in a line: a link to the player's profile or the game's page, plain text when there is no page */
 function Ref({ part }: { part: FeedRef }) {

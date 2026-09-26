@@ -6,6 +6,7 @@ import { navigate, paths, usePageHeading } from '../app/router';
 import { moscowDay } from '../app/time';
 import { userToken } from '../design/players';
 import { ru } from '../i18n/ru';
+import { textLink as linkText } from './linkStyle';
 import { Button } from '../ui/Button';
 import { Badge, Chip, Tag } from '../ui/Marks';
 import { Skeleton } from '../ui/Progress';
@@ -16,9 +17,6 @@ import { Quote } from './Review';
 import { answerOf, useLoaded, type Answer } from '../app/useLoaded';
 
 type Profile = Schemas['ProfileView'];
-
-const linkText =
-  'rounded-sm underline decoration-2 decoration-muted underline-offset-4 is-hover:decoration-ink';
 
 /** A player's page (H5, SPEC «Профиль»): their name and avatar, how many games they completed, their seasons and reviews */
 export function ProfileScreen({

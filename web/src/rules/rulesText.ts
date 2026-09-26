@@ -1,11 +1,13 @@
 import type { Schemas } from '../api/client';
+import { difficultyValues } from '../api/schema';
 import { ru } from '../i18n/ru';
+
+type Difficulty = (typeof difficultyValues)[number];
 
 // H7: the rules page is built from the season's ruleset, so every number on it is the one in force (SPEC «Правила на
 // сайте»). This module turns the ruleset into the page's sentences and the history's «было/стало» into words.
 
 export type Ruleset = Schemas['Ruleset'];
-type Difficulty = 'easy' | 'normal' | 'hard' | 'extreme';
 
 const t = ru.rules;
 
@@ -87,8 +89,7 @@ export function rulesPage(rules: Ruleset): RulesPage {
     t.reward.limits(count.min, count.max),
     t.reward.example(exampleHours, diceFor(exampleHours, count), normal),
   ];
-  const difficulties: Difficulty[] = ['easy', 'normal', 'hard', 'extreme'];
-  const dice = difficulties.map((difficulty) => {
+  const dice = difficultyValues.map((difficulty) => {
     const rule = reward.dieByDifficulty[difficulty];
     return {
       difficulty,

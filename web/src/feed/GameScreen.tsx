@@ -15,7 +15,9 @@ import { api, type Schemas } from '../api/client';
 import { Link } from '../app/Link';
 import { navigate, paths, usePageHeading } from '../app/router';
 import { moscowDay } from '../app/time';
+import { Cover } from '../board/GameCards';
 import { ru } from '../i18n/ru';
+import { textLink as linkText } from './linkStyle';
 import { Button } from '../ui/Button';
 import { cx } from '../ui/cx';
 import { Chip, Tag } from '../ui/Marks';
@@ -36,10 +38,6 @@ const statusIcons: Record<string, ReactNode> = {
   techRerolled: <RotateCcw size={14} aria-hidden />,
   rejected: <Ban size={14} aria-hidden />,
 };
-
-const linkText = cx(
-  'rounded-sm underline decoration-2 decoration-muted underline-offset-4 is-hover:decoration-ink',
-);
 
 /** A game's page (H5, SPEC «Страница игры»): the pool's card and every run of it in every season, with the reviews */
 export function GameScreen({ gameId, onSignedOut }: { gameId: string; onSignedOut: () => void }) {
@@ -112,19 +110,8 @@ export function GameDetails({
   return (
     <>
       <header className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-4" data-testid="game">
-        {game.cover ? (
-          <img
-            src={game.cover.thumbnailUrl}
-            alt=""
-            width={96}
-            height={128}
-            className="h-32 w-24 rounded-md border-3 border-ink bg-muted object-cover"
-          />
-        ) : (
-          <span className="grid h-32 w-24 place-items-center rounded-md border-3 border-ink bg-muted text-ink-soft">
-            <Gamepad2 size={32} aria-hidden />
-          </span>
-        )}
+        {/* The pool's cover, as on the pool page and the roll's cards */}
+        <Cover game={{ title: game.title, cover: game.cover?.thumbnailUrl }} width={88} />
         <div className="grid min-w-0 justify-items-start gap-2">
           <h1
             ref={headingRef}

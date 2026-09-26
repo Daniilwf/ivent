@@ -2,20 +2,13 @@ import { useRef, useState, type SyntheticEvent } from 'react';
 import type { Schemas } from '../api/client';
 import { moscowTime } from '../app/time';
 import { ru } from '../i18n/ru';
+import { techRerollReasons } from './techRerollReasons';
 import { Button } from '../ui/Button';
 import { ConfirmDanger, FormDialog } from '../ui/Dialogs';
 import { Select, TextArea } from '../ui/Field';
 import { Notice } from '../ui/States';
 
 type Reason = NonNullable<Schemas['TechRerollReason']>;
-
-const reasons: readonly Reason[] = [
-  'weakPc',
-  'paidUnavailable',
-  'doesNotLaunch',
-  'emulatorTooSlow',
-  'other',
-];
 
 /**
  * Drop and tech reroll of the active run (D-94), quiet and apart from completing. A drop is confirmed in a window that
@@ -159,7 +152,7 @@ export function RunActions({
             <option value="" disabled>
               {ru.turn.techRerollReasonPlaceholder}
             </option>
-            {reasons.map((r) => (
+            {techRerollReasons.map((r) => (
               <option key={r} value={r}>
                 {ru.turn.techRerollReasons[r]}
               </option>

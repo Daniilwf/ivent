@@ -3,6 +3,7 @@ import { useCallback, useState, type SyntheticEvent } from 'react';
 import { api, type Schemas } from '../api/client';
 import { moscowTime } from '../app/time';
 import { ru } from '../i18n/ru';
+import { techRerollReasons } from '../season/techRerollReasons';
 import { Badge } from '../ui/Marks';
 import { Button } from '../ui/Button';
 import { ConfirmDanger } from '../ui/Dialogs';
@@ -367,14 +368,6 @@ function AdjustForm({
   );
 }
 
-const reasons: Reason[] = [
-  'weakPc',
-  'paidUnavailable',
-  'doesNotLaunch',
-  'emulatorTooSlow',
-  'other',
-];
-
 function TechRerollForm({
   seasonId,
   player,
@@ -439,7 +432,7 @@ function TechRerollForm({
         }}
       >
         <option value="">{ru.turn.techRerollReasonPlaceholder}</option>
-        {reasons.map((r) => (
+        {techRerollReasons.map((r) => (
           <option key={r} value={r}>
             {ru.turn.techRerollReasons[r]}
           </option>

@@ -2,6 +2,7 @@ import { ClipboardCheck, ExternalLink, Flag, Lock } from 'lucide-react';
 import { useState } from 'react';
 import { api, type Schemas } from '../api/client';
 import { moscowTime } from '../app/time';
+import { difficultyValues } from '../api/schema';
 import { ru } from '../i18n/ru';
 import { Button } from '../ui/Button';
 import { ConfirmDanger } from '../ui/Dialogs';
@@ -17,7 +18,7 @@ const t = ru.admin.proofs;
 type Item = Schemas['ProofQueueItemView'];
 type Difficulty = NonNullable<Schemas['Difficulty']>;
 
-const ladder: Difficulty[] = ['easy', 'normal', 'hard', 'extreme'];
+const ladder = difficultyValues;
 
 /** The runs to check, finishes on top (D-98): approve, approve without a screenshot, or reject */
 export function ProofQueue({
@@ -228,7 +229,7 @@ export function ProofCard({
                 >
                   <img
                     src={file.thumbnailUrl}
-                    alt={t.shot(i + 1)}
+                    alt={ru.proof.shotAlt(i + 1)}
                     width={96}
                     height={96}
                     className="size-24 rounded-md border-2 border-ink object-cover"

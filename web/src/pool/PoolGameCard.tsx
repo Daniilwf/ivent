@@ -3,6 +3,7 @@ import { moscowDay } from '../app/time';
 import { Cover } from '../board/GameCards';
 import { ru } from '../i18n/ru';
 import { Chip, Tag } from '../ui/Marks';
+import { GameMarks } from '../season/GameMarks';
 import type { PoolGame, SeasonGame } from './poolFilter';
 
 const t = ru.pool;
@@ -42,13 +43,7 @@ export function GameStatus({
       ) : (
         <Chip icon={<Ban size={16} aria-hidden className="text-ink-soft" />}>{t.offWheel}</Chip>
       )}
-      {marks.length > 0 ? (
-        <span className="grid gap-1 text-sm text-ink-soft">
-          {marks.map((mark, i) => (
-            <span key={i}>{ru.turn.gameMark(mark.playerName, mark.kind)}</span>
-          ))}
-        </span>
-      ) : null}
+      <GameMarks marks={marks} />
     </span>
   );
 }
