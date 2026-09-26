@@ -113,7 +113,11 @@ public sealed record PlayerView(Guid Id, string Name, string CellId, int Points,
 /// The signed-in player's own turn. While playing: <c>dropHintMinutes</c> is <c>roll.minPlayMinutesBeforeDrop</c> until
 /// that much has been played by the server clock (only a hint: D-09), then null; <c>dropPenalty</c> is what a drop costs
 /// under the rules in force; <c>techRerollOpen</c> says whether the player may still tech-reroll themselves (D-94);
-/// <c>challengesEnabled</c> says whether a challenge may be claimed on completion (<c>features.challenges</c>, D-96).
+/// <c>challengesEnabled</c> says whether a challenge may be claimed on completion (<c>features.challenges</c>, D-96);
+/// <c>techRerollUntil</c> is when the player's own tech reroll window closes (the roll time plus the run's snapshot of
+/// <c>roll.techRerollWindowHours</c>), null while not playing. The active run's game carries the hours of the roll's
+/// snapshot, the ones the completion counts (D-44): the pool may have got hours since (D-138). <c>difficultyDice</c> —
+/// while playing, the die each difficulty gives under the run's snapshot and the event it grants, if any.
 /// </summary>
 public sealed record MyTurnView(
     Guid PlayerId,
@@ -130,7 +134,12 @@ public sealed record MyTurnView(
     bool ChallengesEnabled,
     MyFinishView? Finish,
     UncheckedRunsView? Unchecked,
-    WheelRollView? Roll);
+    WheelRollView? Roll,
+    DateTimeOffset? TechRerollUntil = null,
+    IReadOnlyList<DifficultyDieView>? DifficultyDice = null);
+
+/// <summary>The die a difficulty gives on completion, and the event it grants (<c>good</c>, <c>bad</c>) or none.</summary>
+public sealed record DifficultyDieView(Difficulty Difficulty, int Sides, EventKind? GrantEvent);
 
 /// <summary>
 /// The wheel of the roll that offered what I see now (D-136), from the log: the categories that were on it, the one it
@@ -588,7 +597,15 @@ public static class SeasonEndpoints
                     choice.Kind,
                     [.. choice.Options.Select(o => new ChoiceOptionView(o.Id, o.Game is null ? null : Offered(o.Game)))]),
                 mine.Phase == TurnPhase.Rolling ? new RerollPriceView(price.Payment, price.Coins) : null,
-                run is null ? null : new RunView(run.Id, Game(run, games[run.GameId]), run.StartedAt),
+                run is null
+                    ? null
+                    : new RunView(
+                        run.Id,
+                        // Playing: the hours of the roll's snapshot, as the completion counts them (D-44, D-138)
+                        snapshot is null
+                            ? Game(run, games[run.GameId])
+                            : new GameView(run.GameId, games[run.GameId].Title, snapshot.Hours is > 0 ? snapshot.Hours : null),
+                        run.StartedAt),
                 last is null ? null : Completed(last, games[last.GameId], lastReview, lastProof),
                 effects,
                 playing && played < TimeSpan.FromMinutes(rules.Roll.MinPlayMinutesBeforeDrop) ? rules.Roll.MinPlayMinutesBeforeDrop : null,
@@ -605,7 +622,17 @@ public static class SeasonEndpoints
                 rules.Features.Challenges,
                 mine.FinishOrder is { } order ? new MyFinishView(order, mine.Frozen) : null,
                 waitingCheck,
-                roll);
+                roll,
+                playing ? run!.RolledAt + TimeSpan.FromHours(snapshot!.TechRerollWindowHours) : null,
+                snapshot is null
+                    ? null
+                    :
+                    [
+                        new DifficultyDieView(Difficulty.Easy, snapshot.DieByDifficulty.Easy.Sides, snapshot.DieByDifficulty.Easy.GrantEvent),
+                        new DifficultyDieView(Difficulty.Normal, snapshot.DieByDifficulty.Normal.Sides, snapshot.DieByDifficulty.Normal.GrantEvent),
+                        new DifficultyDieView(Difficulty.Hard, snapshot.DieByDifficulty.Hard.Sides, snapshot.DieByDifficulty.Hard.GrantEvent),
+                        new DifficultyDieView(Difficulty.Extreme, snapshot.DieByDifficulty.Extreme.Sides, snapshot.DieByDifficulty.Extreme.GrantEvent),
+                    ]);
         }
 
         // Avatars live on the accounts, across seasons (SPEC «Сезоны»)
