@@ -492,7 +492,7 @@ public class UndoTests
         Assert.Equal([("game", game)], GameIds.Of(new GameRerolled(Guid.NewGuid(), [game], RerollPayment.FreeThisRoll)));
 
         var witness = Guid.NewGuid();
-        var proof = new Engine.Proofs.ProofSubmitted(Guid.NewGuid(), Guid.NewGuid(), [], null, witness, DateTimeOffset.UnixEpoch);
+        var proof = new Engine.Proofs.ProofSubmitted(Guid.NewGuid(), Guid.NewGuid(), [], null, witness, DateTimeOffset.UnixEpoch, []);
         Assert.Equal([("player", witness)], GameIds.Of(proof));
     }
 

@@ -217,9 +217,9 @@ public class EventFormatTests
         },
         {
             "proof-submitted",
-            new ProofSubmitted(s_run, s_player, ["https://imgur.com/a/credits"], "Титры", s_other, s_at),
-            1,
-            """{"runId":"00000000-0000-0000-0000-000000000001","playerId":"10000000-0000-0000-0000-000000000001","links":["https://imgur.com/a/credits"],"note":"Титры","witnessId":"10000000-0000-0000-0000-000000000002","submittedAt":"2026-10-01T12:30:00+00:00"}"""
+            new ProofSubmitted(s_run, s_player, ["https://imgur.com/a/credits"], "Титры", s_other, s_at, [Guid.Parse("50000000-0000-0000-0000-000000000001")]),
+            2,
+            """{"runId":"00000000-0000-0000-0000-000000000001","playerId":"10000000-0000-0000-0000-000000000001","links":["https://imgur.com/a/credits"],"note":"Титры","witnessId":"10000000-0000-0000-0000-000000000002","submittedAt":"2026-10-01T12:30:00+00:00","files":["50000000-0000-0000-0000-000000000001"]}"""
         },
         {
             "proof-approved",
@@ -448,6 +448,38 @@ public class EventFormatTests
 
         Assert.Equal(["v-1", "v0"], steps);
         Assert.Equal(new PointsChanged(s_player, 6, PointsReason.CompletionRoll, null), decoded);
+    }
+
+    [Fact]
+    public void A_proof_in_a_snapshot_writes_its_screenshots_and_leaves_out_an_empty_list()
+    {
+        // D-116: undo snapshots carry ProofState; without screenshots its frozen form stays, with them it gains "files"
+        var withShots = new ProofState(ProofStatus.Pending, [], null, null, s_at, null, [Guid.Parse("50000000-0000-0000-0000-000000000001")]);
+        var without = withShots with { Files = [] };
+
+        var written = System.Text.Json.JsonSerializer.Serialize(withShots, EngineJson.Options);
+        var plain = System.Text.Json.JsonSerializer.Serialize(without, EngineJson.Options);
+
+        Assert.Equal(
+            """{"status":"pending","links":[],"note":null,"witnessId":null,"submittedAt":"2026-10-01T12:30:00+00:00","comment":null,"files":["50000000-0000-0000-0000-000000000001"]}""",
+            written);
+        Assert.Equal(
+            """{"status":"pending","links":[],"note":null,"witnessId":null,"submittedAt":"2026-10-01T12:30:00+00:00","comment":null}""",
+            plain);
+        Assert.Equal(withShots, System.Text.Json.JsonSerializer.Deserialize<ProofState>(written, EngineJson.Options));
+        Assert.Equal(without, System.Text.Json.JsonSerializer.Deserialize<ProofState>(plain, EngineJson.Options));
+    }
+
+    [Fact]
+    public void Proof_submitted_v1_reads_with_no_files()
+    {
+        // The frozen v1 of proof-submitted (before D-116): the log keeps it as it was, the upcaster adds no screenshots
+        var v1 = new StoredEvent(
+            "proof-submitted",
+            1,
+            """{"runId":"00000000-0000-0000-0000-000000000001","playerId":"10000000-0000-0000-0000-000000000001","links":["https://imgur.com/a/credits"],"note":"Титры","witnessId":"10000000-0000-0000-0000-000000000002","submittedAt":"2026-10-01T12:30:00+00:00"}""");
+
+        Assert.Equal(new ProofSubmitted(s_run, s_player, ["https://imgur.com/a/credits"], "Титры", s_other, s_at, []), EventCodec.Decode(v1));
     }
 
     [Fact]

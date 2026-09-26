@@ -19,6 +19,12 @@ namespace GameEvent.Web.Files;
 /// </summary>
 public sealed record StoredFileView(Guid Id, string MediaType, int Width, int Height, int Frames, string Url, string ThumbnailUrl, bool Duplicate);
 
+/// <summary>A stored file where a proof or a page shows it (D-116): the picture and its thumbnail.</summary>
+public sealed record FileLinkView(Guid Id, string Url, string ThumbnailUrl)
+{
+    public static FileLinkView Of(Guid id) => new(id, $"/api/files/{id}", $"/api/files/{id}/thumbnail");
+}
+
 /// <summary>
 /// An upload: <c>commandId</c> makes a retry safe, <c>file</c> is one JPEG, PNG, WebP or GIF. A refusal carries a
 /// <c>code</c>: <c>file.typeInvalid</c>, <c>file.broken</c>, <c>file.tooManyPixels</c> (422), <c>file.tooLarge</c> (413),

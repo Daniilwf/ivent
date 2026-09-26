@@ -135,7 +135,13 @@ describe('Proof of the last completed run', () => {
       if (isSeasonGet(r)) return json(200, current);
       if (isProofPost(r)) {
         bodies.push(await r.json());
-        current = season({ status: 'pending', links: [link], note: 'Титры', comment: null });
+        current = season({
+          status: 'pending',
+          files: [],
+          links: [link],
+          note: 'Титры',
+          comment: null,
+        });
         return json(200, { duplicate: false, events: [] });
       }
       return json(404, {});
@@ -290,7 +296,13 @@ describe('Proof of the last completed run', () => {
         ? json(
             200,
             season(
-              { status: 'rejected', links: [link], note: null, comment: 'На скрине другая игра' },
+              {
+                status: 'rejected',
+                files: [],
+                links: [link],
+                note: null,
+                comment: 'На скрине другая игра',
+              },
               'rejected',
             ),
           )
@@ -310,7 +322,10 @@ describe('Proof of the last completed run', () => {
   it('keeps the form for a pending proof, so a new one can replace it', async () => {
     serve((r) =>
       isSeasonGet(r)
-        ? json(200, season({ status: 'pending', links: [link], note: null, comment: null }))
+        ? json(
+            200,
+            season({ status: 'pending', files: [], links: [link], note: null, comment: null }),
+          )
         : json(404, {}),
     );
     render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
@@ -322,7 +337,10 @@ describe('Proof of the last completed run', () => {
   it('shows an approved proof without the form', async () => {
     serve((r) =>
       isSeasonGet(r)
-        ? json(200, season({ status: 'approved', links: [link], note: null, comment: null }))
+        ? json(
+            200,
+            season({ status: 'approved', files: [], links: [link], note: null, comment: null }),
+          )
         : json(404, {}),
     );
     render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
@@ -341,6 +359,7 @@ describe('Proof of the last completed run', () => {
               links: [link],
               note: null,
               comment: 'На скрине другая игра',
+              files: [],
             }),
           )
         : json(404, {}),

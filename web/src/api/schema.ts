@@ -3833,6 +3833,13 @@ export interface components {
              */
             challenges?: boolean;
         };
+        /** @description A stored file where a proof or a page shows it (D-116): the picture and its thumbnail. */
+        FileLinkView: {
+            /** Format: uuid */
+            id: string;
+            url: string;
+            thumbnailUrl: string;
+        };
         /**
          * @description An upload: `commandId` makes a retry safe, `file` is one JPEG, PNG, WebP or GIF. A refusal carries a
          *     `code`: `file.typeInvalid`, `file.broken`, `file.tooManyPixels` (422), `file.tooLarge` (413),
@@ -4062,8 +4069,12 @@ export interface components {
             /** Format: int32 */
             diceTotal: number;
             decidesFinish: boolean;
+            files: components["schemas"]["FileLinkView"][];
         };
-        /** @description The proof of the player's own completed run: links (http/https), a note, or a witness (D-98). */
+        /**
+         * @description The proof of the player's own completed run: links (http/https), screenshots the player uploaded (`files` — ids
+         *     from `POST /api/files`, D-116), a note, or a witness (D-98).
+         */
         ProofRequest: {
             /** Format: uuid */
             commandId: string;
@@ -4071,6 +4082,7 @@ export interface components {
             note?: null | string;
             /** Format: uuid */
             witnessId?: null | string;
+            files?: null | string[];
         };
         /**
          * @description Where a run's proof stands (SPEC «Очередь пруфов»).
@@ -4083,6 +4095,7 @@ export interface components {
             links: string[];
             note: null | string;
             comment: null | string;
+            files: components["schemas"]["FileLinkView"][];
         };
         RankingRules: {
             tiebreakers: components["schemas"]["EquatableArrayOfTiebreaker"];

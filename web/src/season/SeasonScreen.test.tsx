@@ -1448,7 +1448,13 @@ describe('SeasonScreen completion reward (C7a, D-96)', () => {
             completed(
               last({
                 status: 'rejected',
-                proof: { status: 'rejected', links: [], note: null, comment: 'Не та игра' },
+                proof: {
+                  status: 'rejected',
+                  files: [],
+                  links: [],
+                  note: null,
+                  comment: 'Не та игра',
+                },
               }),
             ),
           )

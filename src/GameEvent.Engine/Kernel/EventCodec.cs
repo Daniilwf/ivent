@@ -13,7 +13,15 @@ public sealed record StoredEvent(string Type, int Version, string Data);
 public static class EventCodec
 {
     /// <summary>Upcasters by (type name, version they read); each returns data of the next version.</summary>
-    private static readonly Dictionary<(string Type, int FromVersion), Func<JsonObject, JsonObject>> s_upcasters = [];
+    private static readonly Dictionary<(string Type, int FromVersion), Func<JsonObject, JsonObject>> s_upcasters = new()
+    {
+        // D-116: a proof of v1 had no uploaded screenshots
+        [("proof-submitted", 1)] = data =>
+        {
+            data["files"] = new JsonArray();
+            return data;
+        },
+    };
 
     public static StoredEvent Encode(IGameEvent gameEvent)
     {

@@ -33,7 +33,7 @@ public class SubmitProofTests
 
         // Then exactly one event, and the run's proof waits for the admin
         ScenarioAssert.Accepted(s);
-        Assert.Equal([new ProofSubmitted(runId, vasya, [Link], Note, petya, s.Clock.UtcNow)], s.Last.Events);
+        Assert.Equal([new ProofSubmitted(runId, vasya, [Link], Note, petya, s.Clock.UtcNow, [])], s.Last.Events);
         var run = s.State.Runs[runId];
         Assert.Equal(new ProofState(ProofStatus.Pending, [Link], Note, petya, s.Clock.UtcNow, null), run.Proof);
         Assert.Equal(RunStatus.Completed, run.Status);

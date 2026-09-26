@@ -11,7 +11,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace GameEvent.Infrastructure.Database.Migrations
 {
     [DbContext(typeof(GameEventDbContext))]
-    [Migration("20260925203134_Initial")]
+    [Migration("20260925211519_Initial")]
     partial class Initial
     {
         /// <inheritdoc />
@@ -265,6 +265,10 @@ namespace GameEvent.Infrastructure.Database.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Comment")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("FilesJson")
+                        .IsRequired()
                         .HasColumnType("TEXT");
 
                     b.Property<string>("LinksJson")

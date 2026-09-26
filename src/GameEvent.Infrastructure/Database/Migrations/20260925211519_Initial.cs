@@ -309,6 +309,7 @@ namespace GameEvent.Infrastructure.Database.Migrations
                     PlayerId = table.Column<Guid>(type: "TEXT", nullable: false),
                     Status = table.Column<string>(type: "TEXT", maxLength: 20, nullable: false),
                     LinksJson = table.Column<string>(type: "TEXT", nullable: false),
+                    FilesJson = table.Column<string>(type: "TEXT", nullable: false),
                     Note = table.Column<string>(type: "TEXT", nullable: true),
                     WitnessId = table.Column<Guid>(type: "TEXT", nullable: true),
                     SubmittedAt = table.Column<long>(type: "INTEGER", nullable: true),

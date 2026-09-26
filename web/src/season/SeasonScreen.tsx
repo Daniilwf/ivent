@@ -15,7 +15,14 @@ type Command =
   | { kind: 'start' }
   | { kind: 'reroll' }
   | { kind: 'drop' }
-  | { kind: 'proof'; runId: string; links: string[]; note: string | null; witnessId: string | null }
+  | {
+      kind: 'proof';
+      runId: string;
+      links: string[];
+      note: string | null;
+      witnessId: string | null;
+      files: string[];
+    }
   | { kind: 'techReroll'; reason: NonNullable<Schemas['TechRerollReason']>; comment: string | null }
   | { kind: 'complete'; completion: Completion }
   | { kind: 'choose'; choiceId: string; optionId: string }
@@ -39,7 +46,13 @@ function send(seasonId: string, command: Command) {
     case 'proof':
       return api.POST('/api/seasons/{seasonId}/runs/{runId}/proof', {
         params: { path: { seasonId, runId: command.runId } },
-        body: { commandId, links: command.links, note: command.note, witnessId: command.witnessId },
+        body: {
+          commandId,
+          links: command.links,
+          note: command.note,
+          witnessId: command.witnessId,
+          files: command.files,
+        },
       });
     case 'techReroll':
       return api.POST('/api/seasons/{seasonId}/tech-reroll', {
@@ -320,9 +333,16 @@ export function SeasonScreen({
               proof={me.lastCompleted.proof ?? null}
               pending={pending}
               witnesses={season.players.filter((p) => p.id !== me.playerId)}
-              onSubmit={(links, note, witnessId) => {
+              onSubmit={(links, note, witnessId, files) => {
                 if (me.lastCompleted) {
-                  void act({ kind: 'proof', runId: me.lastCompleted.id, links, note, witnessId });
+                  void act({
+                    kind: 'proof',
+                    runId: me.lastCompleted.id,
+                    links,
+                    note,
+                    witnessId,
+                    files,
+                  });
                 }
               }}
             />

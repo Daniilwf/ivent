@@ -204,5 +204,6 @@
 | Отложенная задача | таймер, хранящийся в БД | `ScheduledTask` |
 | Файл | загруженная картинка: скрин в WebP или GIF как есть, с миниатюрой | `FileRecord`, `StoredFile`, событие `FileStored`, команда `RecordFile` |
 | Миниатюра | уменьшенная копия файла для карты и списков, у GIF — анимированная | `FileNames.Thumbnail`, `thumbnailUrl` |
+| Скрин пруфа | загруженная игроком картинка, приложенная к пруфу (до 5) | `ProofState.Files`, `SubmitProof.Files`, `FileLinkView` |
 | Журнал ошибок, страница «Ошибки» | последние необработанные исключения запросов с запросом и пользователем, для админа | `ErrorJournal`, `ErrorEntry` |
 | Проверка здоровья | ответ `/health`: общий статус и статусы базы, диска и очереди | `HealthView`, `DatabaseHealthCheck`, `DiskHealthCheck`, `QueueHealthCheck` |

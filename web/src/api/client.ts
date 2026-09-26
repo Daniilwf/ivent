@@ -11,6 +11,11 @@ export async function refreshCsrf(): Promise<void> {
   csrf = data ? { header: data.headerName, token: data.token } : null;
 }
 
+/** The antiforgery header for a request made outside the typed client (a multipart upload), or none. */
+export function antiforgeryHeaders(): Record<string, string> {
+  return csrf ? { [csrf.header]: csrf.token } : {};
+}
+
 const antiforgery: Middleware = {
   onRequest({ request }) {
     if (request.method !== 'GET' && request.method !== 'HEAD' && csrf) {
