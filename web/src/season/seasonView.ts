@@ -1,6 +1,5 @@
 import type { Schemas } from '../api/client';
 import type { LeaderRow } from '../board/Leaderboard';
-import { linearBoard } from '../board/linearBoard';
 import type { Board, Player } from '../board/types';
 
 type Season = Schemas['SeasonView'];
@@ -14,8 +13,10 @@ export type SeasonPicture = {
 };
 
 /** What the season screen draws from the server's view: the board of its cells, the players on it, the leaderboard */
-export function seasonPicture(season: Season | null): SeasonPicture {
-  const { board, cellNumber } = linearBoard(season?.cells ?? []);
+export function seasonPicture(
+  season: Season | null,
+  { board, cellNumber }: Pick<SeasonPicture, 'board' | 'cellNumber'>,
+): SeasonPicture {
   if (!season) return { board, players: [], rows: [], cellNumber };
 
   const rowOf = new Map(season.leaderboard.map((r) => [r.playerId, r]));
@@ -27,11 +28,11 @@ export function seasonPicture(season: Season | null): SeasonPicture {
       name: p.name,
       token: i,
       avatar: p.avatar?.thumbnailUrl,
-      cell: cellNumber.get(p.cellId) ?? 1,
+      // A cell the chain does not know (it should not happen) draws no token rather than a wrong one at the start
+      cell: cellNumber.get(p.cellId) ?? 0,
       points: p.points,
       me: p.id === season.me?.playerId,
       first: row?.isFirst === true,
-      inactive: row !== undefined && row.cellsToFinish === null,
     };
   });
   const byId = new Map(players.map((p) => [p.id, p]));

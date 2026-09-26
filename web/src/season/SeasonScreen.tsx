@@ -12,6 +12,7 @@ import { ProofSection } from './ProofForm';
 import { ManualEffectItem, type EffectOutcome } from './ManualEffectItem';
 import { RunActions } from './RunActions';
 import { seasonPicture } from './seasonView';
+import { linearBoard } from '../board/linearBoard';
 import { RunCard } from '../board/GameCards';
 import { Leaderboard } from '../board/Leaderboard';
 import { MapView } from '../board/MapView';
@@ -183,7 +184,11 @@ export function SeasonScreen({
 
   // Turns end at the deadline even before the scheduler closes the season (D-101): no action the server would refuse.
   const pastDeadline = useIsPast(season?.deadline ?? null);
-  const view = useMemo(() => seasonPicture(season), [season]);
+  const cellsKey = season?.cells.map((c) => `${c.id}:${c.type}`).join('|') ?? '';
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- the key stands for the cells
+  const chain = useMemo(() => linearBoard(season?.cells ?? []), [cellsKey]);
+  const view = useMemo(() => seasonPicture(season, chain), [season, chain]);
+  const [retrying, setRetrying] = useState(false);
 
   if (loadFailed && !season)
     return (
@@ -193,7 +198,13 @@ export function SeasonScreen({
           title={ru.shell.loadErrorTitle}
           text={ru.shell.loadErrorText}
           onRetry={() => {
-            void fetchSeason(seasonId).then(apply);
+            if (retrying) return;
+            setRetrying(true);
+            void fetchSeason(seasonId)
+              .then(apply)
+              .finally(() => {
+                setRetrying(false);
+              });
           }}
         />
       </main>
@@ -207,7 +218,7 @@ export function SeasonScreen({
   const turnsOpen = season.status === 'active' && !pastDeadline;
   const choice = turnsOpen && me?.phase === 'rolling' ? me.choice : null;
   const offer = turnsOpen && me?.phase === 'rolling' ? me.offer : null;
-  const { board, players, rows, cellNumber } = view;
+  const { board, players, rows } = view;
   const mine = players.find((p) => p.me);
   const myRow = rows.find((r) => r.player.me);
   const routeLength = Math.max(board.cells.length - 1, 1);
@@ -339,7 +350,8 @@ export function SeasonScreen({
                 hours: me.activeRun.game.hours ?? null,
                 tags: [],
               }}
-              left={myRow?.cellsToFinish ?? routeLength}
+              left={myRow ? myRow.cellsToFinish : routeLength}
+              level={3}
               total={routeLength}
               actions={null}
             />
@@ -376,13 +388,13 @@ export function SeasonScreen({
         <MapView
           board={board}
           players={players}
-          focus={mine?.cell}
+          focus={mine && mine.cell > 0 ? mine.cell : undefined}
           tools="top"
           className="h-105 rounded-lg border-3 border-ink desk:h-190"
         />
         {/* The map in words: every cell and who stands there (also what the tests and screen readers read) */}
         <ol data-testid="cells" className="sr-only">
-          {season.cells.map((cell) => {
+          {season.cells.map((cell, i) => {
             const here = season.players.filter((p) => p.cellId === cell.id);
             return (
               <li key={cell.id} data-testid={`cell-${cell.id}`}>
@@ -390,7 +402,7 @@ export function SeasonScreen({
                   ? ru.map.start
                   : cell.type === 'finish'
                     ? ru.map.finish
-                    : ru.map.cellNumber(cellNumber.get(cell.id) ?? 0)}
+                    : ru.map.cellNumber(i + 1)}
                 {here.map((p) => (
                   <span key={p.id} data-testid={`token-${p.id}`}>
                     {' '}
@@ -403,19 +415,18 @@ export function SeasonScreen({
         </ol>
       </section>
 
-      <Panel
-        title={ru.leaderboard.title}
-        className="hidden desk:col-start-1 desk:grid desk:w-96"
-        aria-label={ru.leaderboard.title}
-      >
+      <Panel title={ru.leaderboard.title} className="hidden desk:col-start-1 desk:grid desk:w-96">
         <Leaderboard rows={rows} />
       </Panel>
 
       {me && (me.manualEffects.length > 0 || me.lastCompleted) ? (
         <section
-          aria-label={ru.turn.after}
+          aria-labelledby="after-title"
           className="grid min-w-0 grid-cols-1 gap-4 rounded-lg bg-card p-4 desk:col-start-1 desk:w-96"
         >
+          <h2 id="after-title" className="font-display text-lg font-heavy">
+            {ru.turn.after}
+          </h2>
           {me.manualEffects.length > 0 && (
             <section
               aria-labelledby="effects-title"
@@ -514,7 +525,7 @@ export function SeasonScreen({
             </button>
           }
         >
-          <Leaderboard rows={rows} />
+          <Leaderboard rows={rows} marked={false} />
         </BottomSheet>
       </div>
     </main>

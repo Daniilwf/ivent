@@ -143,6 +143,7 @@ export const ru = {
   },
   turn: {
     after: 'После прохождения',
+    retrying: 'Пробуем ещё раз…',
     title: 'Твой ход',
     roll: 'Крутить колесо',
     offered: (title: string, gameHours: number | null) =>
@@ -324,6 +325,7 @@ export const ru = {
     first: 'Первый',
     firstProvisional: 'Первый, пока предварительно',
     inactive: 'не в игре',
+    noWay: 'нет пути до финиша',
     place: (place: number) => `${place} место`,
     points: (points: number) => `${points} очк.`,
     sheet: (place: number, points: number) => `Ты на ${place} месте, ${points} очк.`,
@@ -569,7 +571,6 @@ export const ru = {
     title: 'Карта',
     start: 'Старт',
     finish: 'Финиш',
-    cell: '·',
     cellNumber: (n: number) => `Клетка ${n}`,
   },
   season: {
