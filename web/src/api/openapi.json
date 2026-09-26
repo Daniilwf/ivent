@@ -1339,6 +1339,45 @@
         }
       }
     },
+    "/api/admin/rules/schema": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/schema+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JsonObject"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/admin/seasons/{seasonId}/pool-stats": {
       "get": {
         "tags": [
@@ -4397,7 +4436,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/GameView"
+                    "$ref": "#/components/schemas/PoolGameView"
                   }
                 }
               }
@@ -4435,7 +4474,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GameView"
+                  "$ref": "#/components/schemas/PoolGameView"
                 }
               }
             }
@@ -4551,7 +4590,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GameView"
+                  "$ref": "#/components/schemas/PoolGameView"
                 }
               }
             }
@@ -4594,7 +4633,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GameView"
+                  "$ref": "#/components/schemas/PoolGameView"
                 }
               }
             }
@@ -4657,7 +4696,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GameView"
+                  "$ref": "#/components/schemas/PoolGameView"
                 }
               }
             }
@@ -4720,7 +4759,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GameView"
+                  "$ref": "#/components/schemas/PoolGameView"
                 }
               }
             }
@@ -7362,6 +7401,9 @@
         }
       },
       "JsonElement": { },
+      "JsonObject": {
+        "type": "object"
+      },
       "LastDaysLengthFilter": {
         "required": [
           "enabled",
@@ -7818,6 +7860,93 @@
           }
         }
       },
+      "PoolGameView": {
+        "required": [
+          "id",
+          "title",
+          "tags",
+          "hours",
+          "year",
+          "steamAppId",
+          "cover",
+          "note",
+          "isCoop",
+          "author",
+          "isDeleted",
+          "completionCondition"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "hours": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "year": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "steamAppId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "cover": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/FileLinkView"
+              }
+            ]
+          },
+          "note": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "isCoop": {
+            "type": "boolean"
+          },
+          "author": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "isDeleted": {
+            "type": "boolean"
+          },
+          "completionCondition": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "A game of the pool as everyone sees it (D-119); `author` — the name of the account that added it, or the author as\nthe imported table names them (D-125); none for the seed."
+      },
       "PoolStatsView": {
         "required": [
           "categories",
@@ -8054,7 +8183,8 @@
           "hours",
           "diceTotal",
           "decidesFinish",
-          "files"
+          "files",
+          "rollClosed"
         ],
         "type": "object",
         "properties": {
@@ -8139,9 +8269,12 @@
             "items": {
               "$ref": "#/components/schemas/FileLinkView"
             }
+          },
+          "rollClosed": {
+            "type": "boolean"
           }
         },
-        "description": "A run to check, in queue order (D-98, Q-3): the runs that decide a finish on top (`decidesFinish`), then by\ncompletion time; with the claimed difficulty, the counted hours and the dice total, what an approval at a lower\ndifficulty or a reject changes. `reachedFinish`: this run's latest move stands on the finish."
+        "description": "A run to check, in queue order (D-98, Q-3): the runs that decide a finish on top (`decidesFinish`), then by\ncompletion time; with the claimed difficulty, the counted hours and the dice total, what an approval at a lower\ndifficulty or a reject changes. `reachedFinish`: this run's latest move stands on the finish.\n`rollClosed`: the player's next roll is closed by the limit of unchecked runs (D-134) until the admin checks one."
       },
       "ProofRequest": {
         "required": [

@@ -22,6 +22,7 @@ namespace GameEvent.Web.Proofs;
 /// A run to check, in queue order (D-98, Q-3): the runs that decide a finish on top (<c>decidesFinish</c>), then by
 /// completion time; with the claimed difficulty, the counted hours and the dice total, what an approval at a lower
 /// difficulty or a reject changes. <c>reachedFinish</c>: this run's latest move stands on the finish.
+/// <c>rollClosed</c>: the player's next roll is closed by the limit of unchecked runs (D-134) until the admin checks one.
 /// </summary>
 public sealed record ProofQueueItemView(
     Guid RunId,
@@ -38,7 +39,8 @@ public sealed record ProofQueueItemView(
     decimal? Hours,
     int DiceTotal,
     bool DecidesFinish,
-    IReadOnlyList<Files.FileLinkView> Files);
+    IReadOnlyList<Files.FileLinkView> Files,
+    bool RollClosed);
 
 /// <summary>Approve a run: with its proof, or without one («без скрина», a comment then); a lower proven difficulty.</summary>
 public sealed record ApproveProofRequest(Guid CommandId, Difficulty? Difficulty = null, string? Comment = null);
@@ -86,6 +88,7 @@ public static class AdminProofEndpoints
 
         var order = ProofReviewOrder.Order(state);
         var gameIds = order.Select(id => state.Runs[id].GameId).Distinct().ToList();
+        var limit = state.Rules.Season.MaxUncheckedRuns;
         var titles = await db.Games.AsNoTracking().Where(g => gameIds.Contains(g.Id)).ToDictionaryAsync(g => g.Id, g => g.Title, ct);
         IReadOnlyList<ProofQueueItemView> items =
         [
@@ -108,7 +111,8 @@ public static class AdminProofEndpoints
                     run.Hours,
                     run.Dice.Sum(d => d.Value) + run.ChallengeDice.Sum(d => d.Value),
                     ProofReviewOrder.DecidesFinish(state, run),
-                    proof is null ? [] : [.. proof.Files.Select(Files.FileLinkView.Of)]);
+                    proof is null ? [] : [.. proof.Files.Select(Files.FileLinkView.Of)],
+                    limit is { } max && Engine.Rolls.UncheckedRuns.Count(state, run.PlayerId) >= max);
             }),
         ];
         return TypedResults.Ok(items);
