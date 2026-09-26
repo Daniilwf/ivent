@@ -216,7 +216,6 @@ public class ValidationTests
 
     public static TheoryData<string, Func<Ruleset, Ruleset>, string> NotImplementedYet() => new()
     {
-        { "graph map", Flags(f => f with { MapMode = MapMode.Graph }), "features.mapMode" },
         { "two active runs", r => r with { Season = r.Season with { MaxActiveRunsPerPlayer = 2 } }, "season.maxActiveRunsPerPlayer" },
         { "shop", Flags(f => f with { Shop = true }), "features.shop" },
         { "items", Flags(f => f with { Items = true }), "features.items" },

@@ -55,7 +55,7 @@ internal static class TurnRules
         }
 
         // «Уже проходил» may name any option of a pending choice (D-92); a reroll gives up the whole choice (D-93).
-        if (player.Choice is not null && command is not (DeclareAlreadyPlayed or Reroll))
+        if (player.Choice is not null && !(player.Choice.Kind == ChoiceKind.Game && command is DeclareAlreadyPlayed or Reroll))
         {
             return Decision.Reject(RejectionCodes.ChoicePending, "The player must make the pending choice first.");
         }

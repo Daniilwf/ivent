@@ -5,10 +5,12 @@ using GameEvent.Engine.Rulesets;
 namespace GameEvent.Engine.Seasons;
 
 /// <summary>
-/// Create a season in the Draft status playing by <paramref name="Ruleset"/>; the map comes from it.
+/// Create a season in the Draft status playing by <paramref name="Ruleset"/>. The map: generated from
+/// <c>map.linearLength</c> in the linear mode, <paramref name="Map"/> — required and checked — in the graph mode (D-300).
 /// Players can be added while it is a draft; the game starts with <see cref="ChangeSeasonStatus"/> to Active.
 /// </summary>
-public sealed record CreateSeason(Guid SeasonId, string Name, Ruleset Ruleset, DateTimeOffset? Deadline = null) : ICommand;
+public sealed record CreateSeason(
+    Guid SeasonId, string Name, Ruleset Ruleset, DateTimeOffset? Deadline = null, MapGraph? Map = null) : ICommand;
 
 /// <summary>Move the season along its lifecycle. Only the next status is allowed (SE1).</summary>
 public sealed record ChangeSeasonStatus(SeasonStatus To) : ICommand;
@@ -67,7 +69,29 @@ internal static class SeasonSetup
             return rejection;
         }
 
-        var map = LinearMap.Generate(command.Ruleset.Map.LinearLength);
+        MapGraph map;
+        if (command.Ruleset.Features.MapMode == MapMode.Linear)
+        {
+            if (command.Map is not null)
+            {
+                return Decision.Reject(RejectionCodes.MapNotInLinearMode, "A linear season generates its map from map.linearLength.");
+            }
+
+            map = LinearMap.Generate(command.Ruleset.Map.LinearLength);
+        }
+        else if (command.Map is null)
+        {
+            return Decision.Reject(RejectionCodes.MapRequired, "A season with a graph map is created with its map.");
+        }
+        else if (MapValidator.Check(command.Map, command.Ruleset) is { } badMap)
+        {
+            return badMap;
+        }
+        else
+        {
+            map = command.Map;
+        }
+
         return Decision.Accept(new SeasonCreated(command.SeasonId, command.Name.Trim(), command.Ruleset, map, command.Deadline?.ToUniversalTime()));
     }
 

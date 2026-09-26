@@ -73,14 +73,16 @@ internal static class Corrections
         }
 
         // The count stage only (D-14): missing dice are rolled and appended, extra ones leave from the end.
-        var count = CompletionRoll.Count(command.Hours, run.Snapshot.DiceCount);
+        var count = CompletionRoll.Count(command.Hours, run.Snapshot);
         var sides = CompletionRoll.DieFor(run.Difficulty!.Value, run.Snapshot.DieByDifficulty).Sides;
         var added = count > run.Dice.Count ? CompletionRoll.Roll(count - run.Dice.Count, sides, context.Random) : [];
         EquatableArray<Die> removed = [.. run.Dice.Skip(count)];
-        var delta = added.Sum(d => d.Value) - removed.Sum(d => d.Value);
 
         var corrected = new RunHoursCorrected(
             run.RunId, run.PlayerId, oldHours, command.Hours, added, removed, command.Comment, context.Clock.UtcNow);
+
+        // By the run's total, so a zone's addition counts once and the total never goes below 0 (D-307)
+        var delta = CompletionRoll.Total(SeasonEngine.Apply(state, corrected).Runs[run.RunId]) - CompletionRoll.Total(run);
         var coins = Finishes.IsFrozen(state.Players[run.PlayerId]) ? 0 : Coins(run.Snapshot, command.Hours) - Coins(run.Snapshot, oldHours);
         return Decision.Accept(
         [
@@ -124,10 +126,9 @@ internal static class Corrections
             [.. dice.Select(d => new DieChange(d, new Die(newRule.Sides, (int)Math.Ceiling((decimal)d.Value * newRule.Sides / d.Sides))))];
         var dice = Recalculate(run.Dice);
         var challenge = Recalculate(run.ChallengeDice);
-        var delta = dice.Concat(challenge).Sum(c => c.After.Value - c.Before.Value);
-
         var changed = new RunDifficultyChanged(
             run.RunId, run.PlayerId, old, difficulty, dice, challenge, comment, context.Clock.UtcNow);
+        var delta = CompletionRoll.Total(SeasonEngine.Apply(state, changed).Runs[run.RunId]) - CompletionRoll.Total(run);
         var events = new List<IGameEvent> { changed };
         events.AddRange(Difference(SeasonEngine.Apply(state, changed), run.RunId, delta));
         var frozen = Finishes.IsFrozen(state.Players[run.PlayerId]);
@@ -237,7 +238,7 @@ internal static class Corrections
 
         // Forward: from where the player stands, extra steps burn at the finish. Back: only what the run really gave
         // beyond its new dice sum — steps that burned at the finish gave no cells to take back (D-47, D-97).
-        var newSum = run.Dice.Sum(d => d.Value) + run.ChallengeDice.Sum(d => d.Value);
+        var newSum = CompletionRoll.Total(run);
         var steps = delta > 0 ? delta : -Math.Max(0, run.Moved - newSum);
         var path = steps > 0 ? Movement.Forward(state.Map, player.CellId, steps) : Movement.Backward(state.Map, player.Path, -steps);
 

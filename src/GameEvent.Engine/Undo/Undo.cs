@@ -84,9 +84,10 @@ internal static class Undoing
         }
 
         var target = history[index];
-        if (target.Events.Any(e => e is SeasonCreated or CommandUndone))
+        // D-308: a map is taken back by publishing the previous version again
+        if (target.Events.Any(e => e is SeasonCreated or CommandUndone or Map.MapPublished))
         {
-            return Decision.Reject(RejectionCodes.UndoNotUndoable, "The season's creation and undos are not undone; do the action again instead.");
+            return Decision.Reject(RejectionCodes.UndoNotUndoable, "The season's creation, map publications and undos are not undone; do the action again instead.");
         }
 
         var undone = UndoneCommands(history);
@@ -128,6 +129,13 @@ internal static class Undoing
         }
 
         var compensation = Compensation(beforeTarget!, state, target, command.Comment);
+
+        // D-308: a map published since may have removed the cells the undo would bring a player back to
+        if (compensation.Players.FirstOrDefault(p => !Map.MapPublishing.LiesOn(p.Path, state.Map) || !state.Map.HasCell(p.CellId)) is { } stranded)
+        {
+            return Decision.Reject(
+                RejectionCodes.UndoCellNotOnMap, $"The undo would bring player {stranded.PlayerId} back to cells the current map no longer has.");
+        }
         if (compensation.Season is { } season && season.Deadline != state.Deadline && season.Deadline is { } deadline
             && deadline <= context.Clock.UtcNow)
         {

@@ -2,12 +2,62 @@ using GameEvent.Engine.Seasons;
 
 namespace GameEvent.Engine.Map;
 
+/// <summary>
+/// A player's own walk forward (D-304): the cells entered, and — when it reached a fork with steps left — the steps still
+/// to walk after the branch is chosen (<see cref="Remaining"/> &gt; 0, then the walk stands on the fork).
+/// </summary>
+public sealed record Walk(IReadOnlyList<string> Path, int Remaining)
+{
+    public bool Paused => Remaining > 0;
+}
+
 /// <summary>Movement along the map graph.</summary>
 public static class Movement
 {
     /// <summary>
-    /// Cells entered, in order, on <paramref name="steps"/> forward steps from <paramref name="from"/>
-    /// along default forward edges. The finish is a stop cell: extra steps burn.
+    /// The player's own walk of <paramref name="steps"/> from <paramref name="from"/> (D-304): along the only exit of each
+    /// cell; at a fork with steps left it stops and waits for the branch, unless <paramref name="branch"/> — the cell the
+    /// player chose — is the first step out of it. The finish is a stop cell: extra steps burn.
+    /// </summary>
+    public static Walk WalkOwn(MapGraph map, string from, int steps, string? branch = null)
+    {
+        ArgumentNullException.ThrowIfNull(map);
+
+        var path = new List<string>();
+        var current = map.CellById(from);
+        for (var i = 0; i < steps && current.Type != CellType.Finish; i++)
+        {
+            var exits = map.Exits(current.Id);
+            string next;
+            if (i == 0 && branch is not null)
+            {
+                next = exits.FirstOrDefault(e => e.To == branch)?.To
+                    ?? throw new ArgumentException($"'{branch}' is not a branch out of '{current.Id}'.", nameof(branch));
+            }
+            else if (exits.Count > 1)
+            {
+                return new Walk(path, steps - i);
+            }
+            else if (exits.Count == 1)
+            {
+                next = exits[0].To;
+            }
+            else
+            {
+                break;
+            }
+
+            current = map.CellById(next);
+            path.Add(current.Id);
+        }
+
+        return new Walk(path, 0);
+    }
+
+    /// <summary>
+    /// Cells entered, in order, on <paramref name="steps"/> forced forward steps from <paramref name="from"/>
+    /// along default forward edges: a fork is passed by its default branch (SPEC «Чужой толчок через развилку», D-304).
+    /// The finish is a stop cell: extra steps burn.
     /// </summary>
     public static IReadOnlyList<string> Forward(MapGraph map, string from, int steps)
     {
@@ -33,9 +83,10 @@ public static class Movement
     /// <summary>
     /// Cells entered, in order, on <paramref name="steps"/> steps back from where <paramref name="path"/> stands:
     /// first back along the walked edges of the last segment, then along primary backward edges (the edge a cell
-    /// is entered by when history runs out). Never past the start: missing steps are lost (M2, RR3).
+    /// is entered by when history runs out). Never past the start: missing steps are lost (M2, RR3). A push
+    /// (<paramref name="checkpoints"/>) never leaves a checkpoint either: it stops on the first one (D-306).
     /// </summary>
-    public static IReadOnlyList<string> Backward(MapGraph map, PlayerPath path, int steps)
+    public static IReadOnlyList<string> Backward(MapGraph map, PlayerPath path, int steps, bool checkpoints = false)
     {
         ArgumentNullException.ThrowIfNull(map);
         ArgumentNullException.ThrowIfNull(path);
@@ -43,7 +94,7 @@ public static class Movement
         var entered = new List<string>();
         var walked = path.Segments[^1].Cells.ToList();
         var current = map.CellById(path.Current);
-        for (var i = 0; i < steps && current.Type != CellType.Start; i++)
+        for (var i = 0; i < steps && current.Type != CellType.Start && !(checkpoints && current.Type == CellType.Checkpoint); i++)
         {
             string? previous;
             if (walked.Count >= 2)
@@ -77,8 +128,9 @@ public static class Movement
 
     /// <summary>
     /// The trigger points of a move, in path order: for each entered cell a <see cref="CellVisitKind.MoveStep"/>,
-    /// then <see cref="CellVisitKind.Pass"/>, or <see cref="CellVisitKind.Stop"/> for the last cell. A transfer
-    /// (<c>Steps == 0</c>) has none, and a move that entered no cell (blocked at the finish or the start) stops nowhere.
+    /// then <see cref="CellVisitKind.Pass"/>, or <see cref="CellVisitKind.Stop"/> for the last cell — unless the move is
+    /// paused at a fork, where the fork is passed (D-304). A transfer (<c>Steps == 0</c>) has none, and a move that entered
+    /// no cell (blocked at the finish or the start) stops nowhere.
     /// </summary>
     public static IReadOnlyList<CellVisit> Visits(PlayerMoved moved)
     {
@@ -93,7 +145,7 @@ public static class Movement
         for (var i = 0; i < moved.Path.Count; i++)
         {
             visits.Add(new CellVisit(moved.Path[i], CellVisitKind.MoveStep));
-            visits.Add(new CellVisit(moved.Path[i], i == moved.Path.Count - 1 ? CellVisitKind.Stop : CellVisitKind.Pass));
+            visits.Add(new CellVisit(moved.Path[i], i == moved.Path.Count - 1 && !moved.Paused ? CellVisitKind.Stop : CellVisitKind.Pass));
         }
 
         return visits;

@@ -15,6 +15,9 @@ public partial class ContentExamplesTests
 {
     private static readonly Lazy<IReadOnlyList<string>> s_examples = new(ReadExamples);
 
+    /// <summary>The one example of CONTENT.md of <paramref name="kind"/> (<c>zone</c>, <c>cells</c>, …), for acceptance tests of other stages.</summary>
+    internal static string Example(string kind) => s_examples.Value.Single(j => Classify(j) == kind);
+
     [Fact]
     public void Every_example_loads()
     {

@@ -244,7 +244,7 @@ internal static class ProofReview
             return Decision.Accept(events);
         }
 
-        var points = run.Dice.Sum(d => d.Value) + run.ChallengeDice.Sum(d => d.Value);
+        var points = CompletionRoll.Total(run);
         if (points != 0)
         {
             events.Add(new PointsChanged(run.PlayerId, -points, PointsReason.ProofRejected, run.RunId));
