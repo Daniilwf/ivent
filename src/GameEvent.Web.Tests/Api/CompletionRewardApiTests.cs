@@ -232,6 +232,31 @@ public sealed class CompletionRewardApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Playing_view_lists_the_die_of_every_difficulty_and_its_event_from_the_snapshot()
+    {
+        var vasya = await _site.SignedInAsync("vasya");
+        Assert.Equal(JsonValueKind.Null, (await MeJsonAsync(vasya)).GetProperty("difficultyDice").ValueKind);
+        await PostAsync(vasya, Url("roll"), new { commandId = Guid.NewGuid() });
+        await PostAsync(vasya, Url("start"), new { commandId = Guid.NewGuid() });
+
+        var dice = (await MeJsonAsync(vasya)).GetProperty("difficultyDice").EnumerateArray()
+            .Select(d => (
+                d.GetProperty("difficulty").GetString(),
+                d.GetProperty("sides").GetInt32(),
+                d.GetProperty("grantEvent").ValueKind == JsonValueKind.Null ? null : d.GetProperty("grantEvent").GetString()))
+            .ToList();
+        var rules = RulesetJson.Default().Reward.DieByDifficulty;
+        Assert.Equal(
+            [
+                ("easy", rules.Easy.Sides, null),
+                ("normal", rules.Normal.Sides, null),
+                ("hard", rules.Hard.Sides, null),
+                ("extreme", rules.Extreme.Sides, "good"),
+            ],
+            dice);
+    }
+
+    [Fact]
     public async Task Tech_reroll_window_end_is_the_roll_time_plus_the_snapshot_hours_and_only_while_playing()
     {
         var vasya = await _site.SignedInAsync("vasya");
