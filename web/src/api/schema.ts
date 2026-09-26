@@ -6050,7 +6050,10 @@ export interface components {
          * @description The signed-in player's own turn. While playing: `dropHintMinutes` is `roll.minPlayMinutesBeforeDrop` until
          *     that much has been played by the server clock (only a hint: D-09), then null; `dropPenalty` is what a drop costs
          *     under the rules in force; `techRerollOpen` says whether the player may still tech-reroll themselves (D-94);
-         *     `challengesEnabled` says whether a challenge may be claimed on completion (`features.challenges`, D-96).
+         *     `challengesEnabled` says whether a challenge may be claimed on completion (`features.challenges`, D-96);
+         *     `techRerollUntil` is when the player's own tech reroll window closes (the roll time plus the run's snapshot of
+         *     `roll.techRerollWindowHours`), null while not playing. The active run's game carries the hours of the roll's
+         *     snapshot, the ones the completion counts (D-44): the pool may have got hours since (D-138).
          */
         MyTurnView: {
             /** Format: uuid */
@@ -6070,6 +6073,8 @@ export interface components {
             finish: null | components["schemas"]["MyFinishView"];
             unchecked: null | components["schemas"]["UncheckedRunsView"];
             roll: null | components["schemas"]["WheelRollView"];
+            /** Format: date-time */
+            techRerollUntil?: null | string;
         };
         NominationRules: {
             auto: components["schemas"]["EquatableArrayOfAutoNomination"];

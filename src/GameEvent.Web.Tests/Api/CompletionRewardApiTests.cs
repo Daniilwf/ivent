@@ -194,6 +194,58 @@ public sealed class CompletionRewardApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Active_run_shows_the_hours_of_the_roll_even_when_the_pool_gets_hours_after_it()
+    {
+        // D-138: the completion counts the snapshot's hours, so the view must not hide the estimate the engine asks for
+        await RemovePoolHoursAsync();
+        var vasya = await _site.SignedInAsync("vasya");
+        await PostAsync(vasya, Url("roll"), new { commandId = Guid.NewGuid() });
+        await PostAsync(vasya, Url("start"), new { commandId = Guid.NewGuid() });
+        await using (var db = _site.NewDb())
+        {
+            await db.Games.ExecuteUpdateAsync(g => g.SetProperty(x => x.Hours, 12m), Ct);
+        }
+
+        var game = (await MeJsonAsync(vasya)).GetProperty("activeRun").GetProperty("game");
+        Assert.Equal(JsonValueKind.Null, game.GetProperty("hours").ValueKind);
+
+        // The engine still wants the estimate with its source, as the view says
+        var refused = await vasya.PostAsJsonAsync(Url("complete"), new { commandId = Guid.NewGuid(), difficulty = "normal" }, Ct);
+        await AssertConflictAsync(refused, "run.hoursRequired");
+        await PostAsync(vasya, Url("complete"), new { commandId = Guid.NewGuid(), difficulty = "normal", estimatedHours = 6, hoursSource = Source });
+    }
+
+    [Fact]
+    public async Task Active_run_keeps_the_hours_of_the_roll_when_the_pool_changes_them()
+    {
+        var vasya = await _site.SignedInAsync("vasya");
+        await PostAsync(vasya, Url("roll"), new { commandId = Guid.NewGuid() });
+        await PostAsync(vasya, Url("start"), new { commandId = Guid.NewGuid() });
+        var rolled = (await MeJsonAsync(vasya)).GetProperty("activeRun").GetProperty("game").GetProperty("hours").GetDecimal();
+        await using (var db = _site.NewDb())
+        {
+            await db.Games.ExecuteUpdateAsync(g => g.SetProperty(x => x.Hours, (decimal?)null), Ct);
+        }
+
+        var game = (await MeJsonAsync(vasya)).GetProperty("activeRun").GetProperty("game");
+        Assert.Equal(rolled, game.GetProperty("hours").GetDecimal());
+    }
+
+    [Fact]
+    public async Task Tech_reroll_window_end_is_the_roll_time_plus_the_snapshot_hours_and_only_while_playing()
+    {
+        var vasya = await _site.SignedInAsync("vasya");
+        Assert.Equal(JsonValueKind.Null, (await MeJsonAsync(vasya)).GetProperty("techRerollUntil").ValueKind);
+        await PostAsync(vasya, Url("roll"), new { commandId = Guid.NewGuid() });
+        await PostAsync(vasya, Url("start"), new { commandId = Guid.NewGuid() });
+
+        var until = (await MeJsonAsync(vasya)).GetProperty("techRerollUntil").GetDateTimeOffset();
+        await using var db = _site.NewDb();
+        var run = await db.Runs.AsNoTracking().SingleAsync(Ct);
+        Assert.Equal(run.RolledAt + TimeSpan.FromHours(RulesetJson.Default().Roll.TechRerollWindowHours), until);
+    }
+
+    [Fact]
     public async Task Completion_with_an_invalid_review_changes_nothing()
     {
         var vasya = await _site.SignedInAsync("vasya");
