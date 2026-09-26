@@ -112,7 +112,7 @@ public static class AdminPlayerEndpoints
         return TypedResults.Ok(views);
     }
 
-    private static async Task<ActionResult> CreateAsync(CreateSeasonRequest request, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, CancellationToken ct)
+    private static async Task<ActionResult> CreateAsync(CreateSeasonRequest request, ClaimsPrincipal user, CommandBus bus, CancellationToken ct)
     {
         if (request.CommandId == Guid.Empty || request.SeasonId == Guid.Empty)
         {
@@ -137,6 +137,11 @@ public static class AdminPlayerEndpoints
             return refused;
         }
 
+        if (request.UserId == Guid.Empty)
+        {
+            return Invalid("userId", "An account id is required.");
+        }
+
         if (await db.Users.AsNoTracking().SingleOrDefaultAsync(u => u.Id == request.UserId && !u.IsDeleted, ct) is not { } account)
         {
             return Rejected("account.unknown", $"Account {request.UserId} does not exist.");
@@ -155,9 +160,14 @@ public static class AdminPlayerEndpoints
     private static async Task<ActionResult> AdjustAsync(
         Guid seasonId, Guid playerId, AdjustPlayerRequest request, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, CancellationToken ct)
     {
-        if (request.Comment is null || (request.ResourceDeltas ?? []).Any(r => r is null || r.Resource is null))
+        if (request.Comment is null)
         {
-            return Invalid("comment", "A comment is required, and every resource change names its resource.");
+            return Invalid("comment", "A comment is required.");
+        }
+
+        if ((request.ResourceDeltas ?? []).Any(r => r is null || r.Resource is null))
+        {
+            return Invalid("resourceDeltas", "Every resource change names its resource.");
         }
 
         var command = new AdjustPlayer(
@@ -184,19 +194,30 @@ public static class AdminPlayerEndpoints
         var userIds = players.Select(p => (Guid?)p.UserId).ToList();
 
         // A player's own actions are the commands they authored in this season; the admin's corrections do not count
-        var lastActions = (await db.Events.AsNoTracking()
-                .Where(e => e.SeasonId == seasonId && userIds.Contains(e.AuthorId))
-                .Select(e => new { e.AuthorId, e.OccurredAt })
-                .ToListAsync(ct))
-            .GroupBy(e => e.AuthorId!.Value)
-            .ToDictionary(g => g.Key, g => g.Max(e => e.OccurredAt));
+        var lastSequences = await db.Events.AsNoTracking()
+            .Where(e => e.SeasonId == seasonId && userIds.Contains(e.AuthorId))
+            .GroupBy(e => e.AuthorId)
+            .Select(g => g.Max(e => e.Sequence))
+            .ToListAsync(ct);
+        var lastActions = await db.Events.AsNoTracking()
+            .Where(e => e.SeasonId == seasonId && lastSequences.Contains(e.Sequence))
+            .ToDictionaryAsync(e => e.AuthorId!.Value, e => e.OccurredAt, ct);
+
+        // The quiet time counts from the start of the season, or from the player's joining when later (SE4)
+        var milestones = await db.Events.AsNoTracking()
+            .Where(e => e.SeasonId == seasonId && (e.Type == "season-status-changed" || e.Type == "season-player-added"))
+            .OrderBy(e => e.Sequence)
+            .ToListAsync(ct);
+        var decoded = milestones.Select(e => (e.OccurredAt, Event: EventCodec.Decode(new StoredEvent(e.Type, e.Version, e.Data)))).ToList();
+        var started = decoded.FirstOrDefault(e => e.Event is SeasonStatusChanged { To: SeasonStatus.Active }).OccurredAt;
+        var joined = decoded.Where(e => e.Event is SeasonPlayerAdded).GroupBy(e => ((SeasonPlayerAdded)e.Event).PlayerId).ToDictionary(g => g.Key, g => g.Max(e => e.OccurredAt));
         var now = clock.UtcNow;
         IReadOnlyList<AdminPlayerView> views = [.. players
-            .OrderBy(p => p.Name, StringComparer.CurrentCulture)
+            .OrderBy(p => p.Name, StringComparer.Ordinal)
             .Select(p =>
             {
                 DateTimeOffset? last = lastActions.TryGetValue(p.UserId, out var at) ? at : null;
-                var quietSince = last ?? season.CreatedAt;
+                var quietSince = new[] { started, joined.GetValueOrDefault(p.Id), last ?? default }.Max();
                 return new AdminPlayerView(
                     p.Id,
                     p.UserId,
@@ -209,7 +230,7 @@ public static class AdminPlayerEndpoints
                     p.Phase == TurnPhase.Playing,
                     p.IsInactive,
                     last,
-                    season.Status == SeasonStatus.Active && !p.IsInactive && now - quietSince >= TimeSpan.FromDays(hintDays));
+                    season.Status == SeasonStatus.Active && !p.IsInactive && !p.Frozen && now - quietSince >= TimeSpan.FromDays(hintDays));
             })];
         return TypedResults.Ok(views);
     }
