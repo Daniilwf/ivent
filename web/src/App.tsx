@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api, refreshCsrf, type Schemas } from './api/client';
-import { BugReportButton } from './app/BugReportButton';
+import { CalendarClock, LoaderCircle } from 'lucide-react';
 import { ChangePasswordForm } from './app/ChangePasswordForm';
-import { LoginForm } from './app/LoginForm';
+import { LoginForm, TablePage } from './app/LoginForm';
 import { MaintenanceBanner } from './app/MaintenanceBanner';
+import { Shell } from './app/Shell';
 import { ru } from './i18n/ru';
+import { Button } from './ui/Button';
+import { EmptyState, ErrorState } from './ui/States';
 import { SeasonScreen } from './season/SeasonScreen';
 
 type State =
@@ -12,7 +15,12 @@ type State =
   | { kind: 'failed' }
   | { kind: 'signedOut' }
   | { kind: 'changePassword' }
-  | { kind: 'signedIn'; user: Schemas['CurrentUser']; seasonId: string | null };
+  | {
+      kind: 'signedIn';
+      user: Schemas['CurrentUser'];
+      seasonId: string | null;
+      ownPassword?: boolean;
+    };
 
 export function App() {
   const [state, setState] = useState<State>({ kind: 'loading' });
@@ -58,34 +66,64 @@ export function App() {
     }
   }
 
-  // Every screen: the maintenance banner on top; a signed-in user also gets the bug report button (the API needs one;
-  // with a temporary password only its change is open)
+  // Every screen: the maintenance banner on top; a signed-in page stands in the shell (the bug report is in its header)
   return (
     <>
       <MaintenanceBanner />
-      {/* Until stage H rebuilds these screens from the design system, they keep plain form styles (tokens.css) */}
-      <div className="legacy-screens">{screen()}</div>
-      {state.kind === 'signedIn' ? <BugReportButton /> : null}
+      {screen()}
     </>
   );
 
+  // Back from the password form, the focus returns to the menu that opened it
+  function focusMenu() {
+    requestAnimationFrame(() => {
+      document.querySelector<HTMLElement>('[data-testid="user-menu"]')?.focus();
+    });
+  }
+
   function screen() {
-    if (state.kind === 'loading') return <p>{ru.app.loading}</p>;
-    if (state.kind === 'failed') return <p role="alert">{ru.app.loadError}</p>;
+    if (state.kind === 'loading')
+      return (
+        // On the table, like the sign-in that most likely comes next: no grey flash before it
+        <main className="table-surface grid min-h-dvh place-items-center" aria-busy="true">
+          <p className="flex items-center gap-2 rounded-full bg-card px-4 py-2 font-medium">
+            <LoaderCircle
+              size={20}
+              className="animate-spin motion-reduce:animate-none"
+              aria-hidden
+            />
+            {ru.app.loading}
+          </p>
+        </main>
+      );
+    if (state.kind === 'failed')
+      return (
+        <main className="mx-auto grid min-h-dvh max-w-110 place-items-center px-4">
+          <ErrorState
+            level={1}
+            title={ru.shell.loadErrorTitle}
+            text={ru.shell.loadErrorText}
+            onRetry={() => {
+              globalThis.location.reload();
+            }}
+          />
+        </main>
+      );
     if (state.kind === 'changePassword')
       return (
-        <>
+        <TablePage>
           <ChangePasswordForm
             onChanged={(user) => {
               void enter(user).catch(() => {
                 setState({ kind: 'failed' });
               });
             }}
-          />
-          <button data-testid="logout" onClick={() => void logout()}>
-            {ru.login.logout}
-          </button>
-        </>
+          >
+            <Button variant="link" data-testid="logout" onClick={() => void logout()}>
+              {ru.login.logout}
+            </Button>
+          </ChangePasswordForm>
+        </TablePage>
       );
     if (state.kind === 'signedOut')
       return (
@@ -98,20 +136,51 @@ export function App() {
         />
       );
 
+    const signedIn = state;
     return (
-      <>
-        <header>
-          <span data-testid="current-user">{state.user.name}</span>{' '}
-          <button data-testid="logout" onClick={() => void logout()}>
-            {ru.login.logout}
-          </button>
-        </header>
-        {state.seasonId ? (
-          <SeasonScreen seasonId={state.seasonId} onSignedOut={signedOut} />
+      <Shell
+        user={signedIn.user}
+        onChangePassword={() => {
+          setState({ ...signedIn, ownPassword: true });
+        }}
+        onLogout={() => void logout()}
+      >
+        {signedIn.ownPassword ? (
+          <main className="mx-auto grid max-w-110 gap-4 px-4 py-6">
+            <ChangePasswordForm
+              temporary={false}
+              onChanged={(user) => {
+                setState({ ...signedIn, user, ownPassword: false });
+                focusMenu();
+              }}
+            >
+              <Button
+                variant="link"
+                onClick={() => {
+                  setState({ ...signedIn, ownPassword: false });
+                  focusMenu();
+                }}
+              >
+                {ru.password.back}
+              </Button>
+            </ChangePasswordForm>
+          </main>
+        ) : signedIn.seasonId ? (
+          // Until stage H2 rebuilds it from the design system, the season screen keeps plain form styles
+          <div className="legacy-screens">
+            <SeasonScreen seasonId={signedIn.seasonId} onSignedOut={signedOut} />
+          </div>
         ) : (
-          <p data-testid="no-season">{ru.app.noSeason}</p>
+          <main className="mx-auto grid max-w-110 px-4 py-10" data-testid="no-season">
+            <EmptyState
+              level={1}
+              icon={<CalendarClock size={28} aria-hidden />}
+              title={ru.shell.noSeasonTitle}
+              text={ru.shell.noSeasonText}
+            />
+          </main>
         )}
-      </>
+      </Shell>
     );
   }
 }

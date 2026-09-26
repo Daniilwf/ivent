@@ -93,7 +93,7 @@ describe('Season lifecycle', () => {
 
     expect(shown).toHaveTextContent('МСК');
     expect(shown).toHaveTextContent('00:00');
-    expect(shown).toHaveTextContent('01.01.2027');
+    expect(shown).toHaveTextContent('1 января');
     expect(shown).not.toHaveTextContent('21:00');
   });
 

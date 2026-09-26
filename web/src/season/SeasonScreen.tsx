@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { api, rejectionCode, type Schemas } from '../api/client';
 import { watchSeason } from '../api/realtime';
+import { moscowTime } from '../app/time';
 import { ru } from '../i18n/ru';
 import { CompleteForm, type Completion } from './CompleteForm';
 import { RerollButton } from './RerollButton';
@@ -405,18 +406,6 @@ export function SeasonScreen({
       </section>
     </main>
   );
-}
-
-/** A UTC instant as the Moscow date and time: deadlines are shown in Moscow time with an explicit label (SPEC). */
-function moscowTime(utc: string): string {
-  return new Date(utc).toLocaleString('ru-RU', {
-    timeZone: 'Europe/Moscow',
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
 }
 
 // The longest delay setTimeout takes; a farther deadline is checked again when the timer fires.

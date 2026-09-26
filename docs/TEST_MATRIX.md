@@ -258,3 +258,13 @@
 | DS8 | Карта — граф с развилками, путь до финиша по графу | `web/src/board/geometry.test.ts`; полоса пути — `ui.test.tsx` («the route bar counts…») | ✅ |
 | DS9 | Карта без чёрных полос в Chromium, Firefox и WebKit (баг D-132) | `e2e/visual/map.visual.spec.ts` («the map has no dark bands…», проверка пикселей, 6 проектов) | ✅ |
 | DS10 | Ключевые экраны защищены скриншот-тестами | `e2e/visual/map.visual.spec.ts` (карта и разделы стайлгайда, 6 проектов) | ✅ |
+
+## Каркас (H1)
+
+| ID | Правило | Тесты | Статус |
+| --- | --- | --- | --- |
+| SH1 | Потеря связи видна ненавязчиво и уходит вместе с подпиской | `web/src/api/realtime.test.ts` («tells the page…», «takes its no connection back…», «is offline while any…»), `web/src/app/Shell.test.tsx` («shows no connection…») | ✅ |
+| SH2 | Добровольная смена пароля из меню, возврат к игре без изменений | `Shell.test.tsx` («changes my own password…», «goes back to the game…») | ✅ |
+| SH3 | Ошибка проверки — у поля | `Shell.test.tsx` («says a too short new password at its field»), `ChangePasswordForm.test.tsx`, `BugReportButton.test.tsx` | ✅ |
+| SH4 | Время по Москве с подписью | `web/src/app/time.test.ts`, `season/SeasonLifecycle.test.tsx` («shows the deadline in Moscow time…») | ✅ |
+| SH5 | Состояния загрузки, ошибки и «нет сезона» | `web/src/App.test.tsx` | ✅ |

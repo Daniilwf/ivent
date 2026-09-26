@@ -5,6 +5,7 @@ import {
   type HubConnection,
 } from '@microsoft/signalr';
 import type { Schemas } from './client';
+import { registerConnection } from './connection';
 
 export type SeasonUpdate = Schemas['SeasonUpdate'];
 export type SeasonJoin = Schemas['SeasonJoin'];
@@ -20,29 +21,49 @@ function connect(): HubConnection {
     .build();
 }
 
-/** Starts the connection, retrying for as long as the page is open, then runs `ready`. */
+/**
+ * Starts the connection, retrying for as long as the page is open, then runs `ready`. Reports the connection's state to
+ * the page while not stopped; returns the release of that report, for the moment the subscription stops.
+ */
 function keepConnected(
   connection: HubConnection,
   ready: () => Promise<void>,
   stopped: () => boolean,
-) {
+): () => void {
+  const voice = registerConnection();
+  const report = (next: 'online' | 'offline') => {
+    if (!stopped()) voice.report(next);
+  };
   const start = async () => {
     while (!stopped()) {
       try {
         await connection.start();
+        report('online');
         await ready();
         return;
       } catch {
+        report('offline');
         await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
       }
     }
   };
 
-  connection.onreconnected(() => void ready());
+  connection.onreconnecting(() => {
+    report('offline');
+  });
+  connection.onreconnected(() => {
+    report('online');
+    void ready();
+  });
   connection.onclose(() => {
-    if (!stopped()) void start();
+    if (stopped()) return;
+    report('offline');
+    void start();
   });
   void start();
+  return () => {
+    voice.release();
+  };
 }
 
 /**
@@ -123,13 +144,14 @@ export function watchSeason(
     onChange([update]);
   });
 
-  keepConnected(
+  const release = keepConnected(
     connection,
     () => catchUp(true),
     () => stopped,
   );
   return () => {
     stopped = true;
+    release();
     void connection.stop();
   };
 }
@@ -150,9 +172,10 @@ export function watchPool(onChange: () => void): () => void {
   connection.on('poolUpdated', () => {
     onChange();
   });
-  keepConnected(connection, join, () => stopped);
+  const release = keepConnected(connection, join, () => stopped);
   return () => {
     stopped = true;
+    release();
     void connection.stop();
   };
 }
