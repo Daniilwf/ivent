@@ -113,6 +113,7 @@ function season(
       finish: null,
     },
     lastSequence: 3,
+    name: 'Тестовый сезон',
   };
 }
 

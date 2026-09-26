@@ -1402,6 +1402,28 @@
         }
       }
     },
+    "/api/seasons": {
+      "get": {
+        "tags": [
+          "Seasons"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SeasonListItemView"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/auth/password": {
       "post": {
         "tags": [
@@ -3009,6 +3031,407 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/SeasonActionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RejectionProblem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/seasons": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSeasonRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RejectionProblem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/seasons/{seasonId}/players": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "parameters": [
+          {
+            "name": "seasonId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AdminPlayerView"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "parameters": [
+          {
+            "name": "seasonId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddPlayerRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RejectionProblem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/seasons/{seasonId}/players/{playerId}/adjust": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "parameters": [
+          {
+            "name": "seasonId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "playerId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdjustPlayerRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RejectionProblem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/seasons/{seasonId}/players/{playerId}/inactive": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "parameters": [
+          {
+            "name": "seasonId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "playerId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InactivityRequest"
               }
             }
           },
@@ -4704,6 +5127,89 @@
         },
         "description": "An account as the admin sees it (D-106)."
       },
+      "AddPlayerRequest": {
+        "required": [
+          "commandId",
+          "userId"
+        ],
+        "type": "object",
+        "properties": {
+          "commandId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "cellId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "points": {
+            "type": "integer",
+            "format": "int32",
+            "default": 0
+          },
+          "coins": {
+            "type": "integer",
+            "format": "int32",
+            "default": 0
+          }
+        },
+        "description": "The admin adds an account with the player role to the season (SE4): by default on the start with zero points and\ncoins; mid-season the admin sets them."
+      },
+      "AdjustPlayerRequest": {
+        "required": [
+          "commandId",
+          "comment"
+        ],
+        "type": "object",
+        "properties": {
+          "commandId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "comment": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "cellId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "pointsDelta": {
+            "type": "integer",
+            "format": "int32",
+            "default": 0
+          },
+          "coinsDelta": {
+            "type": "integer",
+            "format": "int32",
+            "default": 0
+          },
+          "resourceDeltas": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/ResourceDeltaRequest"
+            }
+          },
+          "discardOffer": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "description": "The admin corrects a player (D-21): position, points, coins, resources, dropping an offered game; always with a comment."
+      },
       "AdminCommandView": {
         "required": [
           "commandId",
@@ -4781,6 +5287,74 @@
           }
         },
         "description": "A pending manual effect of any player, oldest first, for the admin to resolve (D-102)."
+      },
+      "AdminPlayerView": {
+        "required": [
+          "id",
+          "userId",
+          "name",
+          "cellId",
+          "points",
+          "coins",
+          "resources",
+          "phase",
+          "playing",
+          "isInactive",
+          "lastActionAt",
+          "inactiveHint"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "cellId": {
+            "type": "string"
+          },
+          "points": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "coins": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "resources": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          "phase": {
+            "$ref": "#/components/schemas/TurnPhase"
+          },
+          "playing": {
+            "type": "boolean"
+          },
+          "isInactive": {
+            "type": "boolean"
+          },
+          "lastActionAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "inactiveHint": {
+            "type": "boolean"
+          }
+        },
+        "description": "A player as the admin sees them (SE5, D-123): the balance and the place in the turn, the inactivity flag, when they\nlast acted themselves and the hint — no action of their own for the rules' `inactiveHintDays` while not marked\ninactive. `playing` — a run is going on: a long game is a reason to be quiet, not a sign of leaving."
       },
       "AlreadyPlayedRequest": {
         "required": [
@@ -5610,6 +6184,38 @@
         },
         "description": "The admin creates an account: login, name, role; the answer carries the temporary password once."
       },
+      "CreateSeasonRequest": {
+        "required": [
+          "commandId",
+          "seasonId",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "commandId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "seasonId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "deadline": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        },
+        "description": "The admin creates a season (SE1, D-123) with the default rules (`docs/ruleset.default.json`), changed later on the\nrules page. `seasonId` is chosen by the client like the command id, so a retry creates the same season once."
+      },
       "CurrentSeasonView": {
         "required": [
           "id"
@@ -6417,6 +7023,23 @@
       "IFormFile": {
         "type": "string",
         "format": "binary"
+      },
+      "InactivityRequest": {
+        "required": [
+          "commandId",
+          "isInactive"
+        ],
+        "type": "object",
+        "properties": {
+          "commandId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "isInactive": {
+            "type": "boolean"
+          }
+        },
+        "description": "The admin marks a player inactive (out of the active game) or brings them back (SE5)."
       },
       "IntegrityReport": {
         "required": [
@@ -7354,6 +7977,25 @@
         },
         "description": "Resolve a pending manual effect (D-102): `outcome` «applied» or «notApplicable»; `comment` is required for\n«notApplicable» and for the admin, at most 500 characters."
       },
+      "ResourceDeltaRequest": {
+        "required": [
+          "resource",
+          "delta"
+        ],
+        "type": "object",
+        "properties": {
+          "resource": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "delta": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "ReviewInput": {
         "required": [
           "rating"
@@ -7845,6 +8487,40 @@
         },
         "description": "The answer to joining a season (E3, D-122): the last sequence of its log now, and what was committed after the\nsequence the client last saw — one update per command, in log order. `Reload` — too much was missed to list:\nrefetch everything."
       },
+      "SeasonListItemView": {
+        "required": [
+          "id",
+          "name",
+          "status",
+          "deadline",
+          "createdAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SeasonStatus"
+          },
+          "deadline": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "description": "A season in the list everyone signed in sees: newest first."
+      },
       "SeasonRules": {
         "required": [
           "timezone",
@@ -7939,7 +8615,8 @@
           "players",
           "leaderboard",
           "me",
-          "lastSequence"
+          "lastSequence",
+          "name"
         ],
         "type": "object",
         "properties": {
@@ -7988,6 +8665,9 @@
           "lastSequence": {
             "type": "integer",
             "format": "int64"
+          },
+          "name": {
+            "type": "string"
           }
         },
         "description": "The season screen's data. `status` and `deadline` (UTC; the screen shows it in Moscow time) follow the\nlifecycle (D-101); after the finish `leaderboard` is the recorded result."
