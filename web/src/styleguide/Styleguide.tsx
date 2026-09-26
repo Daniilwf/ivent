@@ -1,6 +1,7 @@
 import { CalendarClock, Inbox, Plus, Trophy } from 'lucide-react';
 import { useEffect, type ReactNode } from 'react';
 import { Shell } from '../app/Shell';
+import { ReleaseList } from '../app/WhatsNew';
 import { RunCard } from '../board/GameCards';
 import { ChoiceCard, OfferCard } from '../season/RollResult';
 import { Leaderboard } from '../board/Leaderboard';
@@ -15,7 +16,16 @@ import { RouteProgress, Skeleton } from '../ui/Progress';
 import { ConnectionLost, EmptyState, ErrorState, Notice } from '../ui/States';
 import { Sticker } from '../ui/Sticker';
 import { Panel } from '../ui/Surface';
-import { demoChoice, demoGames, demoMe, demoOffer, demoRoll, demoRows, demoUser } from './fixtures';
+import {
+  demoChoice,
+  demoGames,
+  demoMe,
+  demoOffer,
+  demoRoll,
+  demoRows,
+  demoUser,
+  demoReleases,
+} from './fixtures';
 import { DiceDemo, FinishDemo, MapDemo, MoveDemo, WheelDemo } from './MomentDemos';
 
 // The styleguide's cards act on nothing
@@ -384,6 +394,12 @@ export function Styleguide() {
 
       <Section id="finish" title={t.finish.title} lead={t.finish.lead}>
         <FinishDemo />
+      </Section>
+
+      <Section id="whats-new" title={t.whatsNew.title} lead={t.whatsNew.lead}>
+        <div className="max-w-110 rounded-lg bg-card p-4">
+          <ReleaseList releases={demoReleases} />
+        </div>
       </Section>
     </main>
   );

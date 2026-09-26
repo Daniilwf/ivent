@@ -146,3 +146,16 @@ export const demoChoice: Schemas['ChoiceView'] = {
     { id: 'o3', game: { id: 'g3', title: 'Celeste', hours: null, marks: [] } },
   ],
 };
+
+// «Что нового»: a release with notes and one without
+export const demoReleases = [
+  {
+    version: 'v1.1.0',
+    date: '2026-10-12',
+    items: [
+      'Колесо показывает, кто уже прошёл выпавшую игру',
+      'Кубы и ход фишки после завершения игры видно на карте',
+    ],
+  },
+  { version: 'v1.0.1', date: '2026-10-05', items: [] },
+];

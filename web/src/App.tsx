@@ -4,6 +4,7 @@ import { CalendarClock, LoaderCircle } from 'lucide-react';
 import { ChangePasswordForm } from './app/ChangePasswordForm';
 import { LoginForm, TablePage } from './app/LoginForm';
 import { MaintenanceBanner } from './app/MaintenanceBanner';
+import { UpdateBanner } from './app/WhatsNew';
 import { Shell } from './app/Shell';
 import { ru } from './i18n/ru';
 import { Button } from './ui/Button';
@@ -70,6 +71,7 @@ export function App() {
   return (
     <>
       <MaintenanceBanner />
+      <UpdateBanner />
       {screen()}
     </>
   );

@@ -28,6 +28,8 @@ RUN dotnet publish src/GameEvent.Web/GameEvent.Web.csproj -c Release --no-restor
 
 # ---- Runtime ----
 FROM mcr.microsoft.com/dotnet/aspnet:10.0@sha256:2d584d8147faddb0d678c5748d47953e5b8e18621ed4fb7049a91381d9d7746f AS runtime
+# The release tag (J4, D-201): the site reports it, a page that saw another one offers «Что нового»
+ARG VERSION=dev
 WORKDIR /app
 COPY --from=build /app ./
 COPY --from=web /src/web/dist ./frontend

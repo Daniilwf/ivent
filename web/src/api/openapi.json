@@ -9204,15 +9204,19 @@
       },
       "SiteStatusView": {
         "required": [
-          "maintenance"
+          "maintenance",
+          "version"
         ],
         "type": "object",
         "properties": {
           "maintenance": {
             "type": "boolean"
+          },
+          "version": {
+            "type": "string"
           }
         },
-        "description": "What every page asks the site: whether it only reads now (the maintenance banner)."
+        "description": "What every page asks the site: whether it only reads now (the maintenance banner) and which version it runs — a page\nthat saw another version before shows «Что нового» (J4, D-201)."
       },
       "SocialRules": {
         "required": [
