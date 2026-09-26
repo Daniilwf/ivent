@@ -3,10 +3,13 @@
 //   - git worktrees (the agents' copies of the repo) whose branch a pull request merged into origin/main; one with
 //     uncommitted changes, or one just created for a task that has not started, is kept and named;
 //   - local branches a pull request merged into origin/main (never main or the current one);
-//   - test artifacts (screenshots, traces, coverage) and throwaway databases (e2e, screenshots, the migration check).
+//   - test artifacts (screenshots, traces, coverage), throwaway databases (e2e, screenshots, the migration check) and
+//     the project's folders in the system temp (the API tests' sites, failed backup checks).
 // Kept: the development database var/dev.db and the demo one var/demo.db, and every unmerged branch and its worktree.
+// Run it when no tests are running: the API tests' site folders in the system temp go too.
 import { spawnSync } from 'node:child_process';
 import { existsSync, readdirSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { root } from './lib.mjs';
 
@@ -90,6 +93,13 @@ for (const log of existsSync(join(root, 'var')) ? readdirSync(join(root, 'var'))
   if (!log.endsWith('.log')) continue;
   if (!dryRun) rmSync(join(root, 'var', log), { force: true });
   said(join('var', log));
+}
+
+// 4. The project's folders in the system temp: the API tests' sites and databases, failed backup checks
+for (const entry of readdirSync(tmpdir())) {
+  if (entry !== 'game-event-tests' && !entry.startsWith('game-event-verify-')) continue;
+  if (!dryRun) rmSync(join(tmpdir(), entry), { recursive: true, force: true });
+  said(join(tmpdir(), entry));
 }
 
 console.log(dryRun ? 'Dry run: nothing was removed.' : 'Clean.');
