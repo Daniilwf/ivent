@@ -138,3 +138,8 @@
 - Локально браузер предупредит о сертификате Caddy для localhost — это ожидаемо.
 - Версии: `SITE_VERSION` — боевой сайт, `STAGING_VERSION` — тестовая копия; при выкладке называть сервисы (`up -d staging-migrate staging` или `up -d migrate site`), чтобы не задеть другой.
 - В `/data/keys` — ключи, которыми подписаны сессии: бэкап `/data` — секрет (шифровать, права 0600); в тестовую копию `keys/` не копировать никогда.
+
+## Дымовые тесты
+
+- Против любого адреса, только чтение: `npm run test:smoke -- https://<адрес>`. С учёткой зрителя проверяется ещё и вход: `SMOKE_LOGIN=… SMOKE_PASSWORD=… npm run test:smoke -- https://<адрес>`.
+- Против Docker на своём компьютере: `E2E_IGNORE_HTTPS_ERRORS=1 npm run test:smoke -- https://localhost` (у Caddy свой сертификат для localhost).
