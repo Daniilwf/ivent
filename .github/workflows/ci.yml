@@ -1,5 +1,5 @@
 # Every push: build, analyzers, architecture tests, fast tests with coverage, API client check, gitleaks.
-# Pull requests into main: E2E (and, from task J5, migrations on the previous release's demo database).
+# Pull requests into any branch (the stacked PRs too): E2E (and, from task J5, migrations on the previous release's demo database).
 # Push and pull_request runs do different work, so a branch with an open PR is not tested twice.
 name: CI
 
@@ -7,7 +7,7 @@ on:
   push:
     branches: ['**']
   pull_request:
-    branches: [main]
+    branches: ['**']
   workflow_dispatch:
 
 concurrency:
