@@ -1424,6 +1424,135 @@
         }
       }
     },
+    "/api/seasons/{seasonId}/feed": {
+      "get": {
+        "tags": [
+          "Seasons"
+        ],
+        "parameters": [
+          {
+            "name": "seasonId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users/{userId}": {
+      "get": {
+        "tags": [
+          "Accounts"
+        ],
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/pool/{gameId}/runs": {
+      "get": {
+        "tags": [
+          "Pool"
+        ],
+        "parameters": [
+          {
+            "name": "gameId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/GameRunView"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
     "/api/auth/password": {
       "post": {
         "tags": [
@@ -6654,6 +6783,71 @@
         },
         "description": "Feature flags: a disabled mechanic is invisible in the interface and refused by the engine."
       },
+      "FeedEntryView": {
+        "required": [
+          "sequence",
+          "commandId",
+          "occurredAt",
+          "type",
+          "data",
+          "author",
+          "undone"
+        ],
+        "type": "object",
+        "properties": {
+          "sequence": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "commandId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "type": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/JsonElement"
+          },
+          "author": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "undone": {
+            "type": "boolean"
+          }
+        },
+        "description": "One event of the season's feed (GLOSSARY «Лента», D-124): its place in the log, the command it came from, when, the\nevent type and its data as the current format reads it (older versions upcast), who sent the command (none for the\nscheduler) and whether the admin undid it. The screen turns a type and its data into a line of text."
+      },
+      "FeedView": {
+        "required": [
+          "entries",
+          "nextBefore"
+        ],
+        "type": "object",
+        "properties": {
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FeedEntryView"
+            }
+          },
+          "nextBefore": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          }
+        },
+        "description": "A page of the feed, newest first; `nextBefore` — the sequence to ask before for the next page, none at the start of the log."
+      },
       "FileFromUrlRequest": {
         "required": [
           "commandId",
@@ -6907,6 +7101,88 @@
         },
         "description": "A game card from a player or the admin (D-119). `force` — add although the pool has an alike title (the site showed\nit); the same title is never added twice. `coverFileId` — the author's own upload or a found cover (D-118)."
       },
+      "GameRunView": {
+        "required": [
+          "runId",
+          "seasonId",
+          "seasonName",
+          "playerId",
+          "userId",
+          "playerName",
+          "status",
+          "difficulty",
+          "hours",
+          "completedAt",
+          "rating",
+          "reviewText"
+        ],
+        "type": "object",
+        "properties": {
+          "runId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "seasonId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "seasonName": {
+            "type": "string"
+          },
+          "playerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "playerName": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RunStatus"
+          },
+          "difficulty": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Difficulty"
+              }
+            ]
+          },
+          "hours": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "completedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "rating": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "reviewText": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "A run of a game in any season, with its review if there is one (the game page, D-124)."
+      },
       "GameView": {
         "required": [
           "id",
@@ -7085,6 +7361,7 @@
           }
         }
       },
+      "JsonElement": { },
       "LastDaysLengthFilter": {
         "required": [
           "enabled",
@@ -7601,6 +7878,143 @@
             ]
           }
         }
+      },
+      "ProfileReviewView": {
+        "required": [
+          "runId",
+          "gameId",
+          "gameTitle",
+          "seasonId",
+          "seasonName",
+          "rating",
+          "text",
+          "completedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "runId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "gameId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "gameTitle": {
+            "type": "string"
+          },
+          "seasonId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "seasonName": {
+            "type": "string"
+          },
+          "rating": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "text": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "completedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        },
+        "description": "A review the user left: the game, the season, the rating and the text (SPEC «Отзыв»)."
+      },
+      "ProfileSeasonView": {
+        "required": [
+          "seasonId",
+          "seasonName",
+          "status",
+          "playerId",
+          "points",
+          "place"
+        ],
+        "type": "object",
+        "properties": {
+          "seasonId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "seasonName": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SeasonStatus"
+          },
+          "playerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "points": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "place": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          }
+        },
+        "description": "A season a user took part in, with their points and, once the season finished, their place."
+      },
+      "ProfileView": {
+        "required": [
+          "id",
+          "name",
+          "avatar",
+          "seasons",
+          "reviews",
+          "completed"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "avatar": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/FileLinkView"
+              }
+            ]
+          },
+          "seasons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProfileSeasonView"
+            }
+          },
+          "reviews": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProfileReviewView"
+            }
+          },
+          "completed": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "A user's profile (D-124): the name, the avatar, the seasons they played and their reviews. `completed` — games\ncompleted and not rejected, over all seasons."
       },
       "ProofQueueItemView": {
         "required": [
@@ -8924,13 +9338,16 @@
       "name": "Admin"
     },
     {
+      "name": "Accounts"
+    },
+    {
+      "name": "Pool"
+    },
+    {
       "name": "Site"
     },
     {
       "name": "Files"
-    },
-    {
-      "name": "Pool"
     },
     {
       "name": "BugReports"

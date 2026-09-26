@@ -183,6 +183,7 @@ public static class AppSetup
         api.MapAdminProofs();
         api.MapAdminSeasons();
         api.MapSeasonsAndPlayers();
+        api.MapFeed();
         api.MapAdminAccounts();
         api.MapFiles();
         api.MapAvatars();
