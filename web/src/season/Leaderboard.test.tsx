@@ -77,6 +77,7 @@ function season(leaderboard: Row[]): Schemas['SeasonView'] {
       finish: { order: 1, frozen: false },
     },
     lastSequence: 3,
+    name: 'Тестовый сезон',
     leaderboard,
   };
 }

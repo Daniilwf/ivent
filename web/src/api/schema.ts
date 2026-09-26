@@ -1436,6 +1436,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/seasons": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SeasonListItemView"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/password": {
         parameters: {
             query?: never;
@@ -3036,6 +3071,378 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": components["schemas"]["SeasonActionRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CommandResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/seasons": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["CreateSeasonRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CommandResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/seasons/{seasonId}/players": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminPlayerView"][];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["AddPlayerRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CommandResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/seasons/{seasonId}/players/{playerId}/adjust": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                    playerId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["AdjustPlayerRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CommandResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/seasons/{seasonId}/players/{playerId}/inactive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                    playerId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["InactivityRequest"];
                 };
             };
             responses: {
@@ -4740,6 +5147,47 @@ export interface components {
             createdAt: string;
         };
         /**
+         * @description The admin adds an account with the player role to the season (SE4): by default on the start with zero points and
+         *     coins; mid-season the admin sets them.
+         */
+        AddPlayerRequest: {
+            /** Format: uuid */
+            commandId: string;
+            /** Format: uuid */
+            userId: string;
+            cellId?: null | string;
+            /**
+             * Format: int32
+             * @default 0
+             */
+            points: number;
+            /**
+             * Format: int32
+             * @default 0
+             */
+            coins: number;
+        };
+        /** @description The admin corrects a player (D-21): position, points, coins, resources, dropping an offered game; always with a comment. */
+        AdjustPlayerRequest: {
+            /** Format: uuid */
+            commandId: string;
+            comment: null | string;
+            cellId?: null | string;
+            /**
+             * Format: int32
+             * @default 0
+             */
+            pointsDelta: number;
+            /**
+             * Format: int32
+             * @default 0
+             */
+            coinsDelta: number;
+            resourceDeltas?: null | components["schemas"]["ResourceDeltaRequest"][];
+            /** @default false */
+            discardOffer: boolean;
+        };
+        /**
          * @description A command of the season log, newest first (D-104): what the admin picks to undo. `undone` — undone already;
          *     `events` — the types of its events in order.
          */
@@ -4764,6 +5212,32 @@ export interface components {
             source: components["schemas"]["ManualEffectSource"];
             /** Format: uuid */
             runId: null | string;
+        };
+        /**
+         * @description A player as the admin sees them (SE5, D-123): the balance and the place in the turn, the inactivity flag, when they
+         *     last acted themselves and the hint — no action of their own for the rules' `inactiveHintDays` while not marked
+         *     inactive. `playing` — a run is going on: a long game is a reason to be quiet, not a sign of leaving.
+         */
+        AdminPlayerView: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            userId: string;
+            name: string;
+            cellId: string;
+            /** Format: int32 */
+            points: number;
+            /** Format: int32 */
+            coins: number;
+            resources: {
+                [key: string]: number;
+            };
+            phase: components["schemas"]["TurnPhase"];
+            playing: boolean;
+            isInactive: boolean;
+            /** Format: date-time */
+            lastActionAt: null | string;
+            inactiveHint: boolean;
         };
         /** @description «Уже проходил» on the offered game or an option of the pending choice (D-92). */
         AlreadyPlayedRequest: {
@@ -5005,6 +5479,19 @@ export interface components {
             login: null | string;
             name: null | string;
             role: null | components["schemas"]["Role"];
+        };
+        /**
+         * @description The admin creates a season (SE1, D-123) with the default rules (`docs/ruleset.default.json`), changed later on the
+         *     rules page. `seasonId` is chosen by the client like the command id, so a retry creates the same season once.
+         */
+        CreateSeasonRequest: {
+            /** Format: uuid */
+            commandId: string;
+            /** Format: uuid */
+            seasonId: string;
+            name: null | string;
+            /** Format: date-time */
+            deadline?: null | string;
         };
         /** @description The season the signed-in user sees by default (D-18). */
         CurrentSeasonView: {
@@ -5285,6 +5772,12 @@ export interface components {
         };
         /** Format: binary */
         IFormFile: string;
+        /** @description The admin marks a player inactive (out of the active game) or brings them back (SE5). */
+        InactivityRequest: {
+            /** Format: uuid */
+            commandId: string;
+            isInactive: boolean;
+        };
         /**
          * @description The result of an integrity check: the log's last event, what the stored state has that the log does not, and whether
          *     the log stood still while it was read (bool IntegrityReport.Settled false: commands kept coming — check again).
@@ -5564,6 +6057,11 @@ export interface components {
             outcome: null | components["schemas"]["ManualEffectOutcome"];
             comment?: null | string;
         };
+        ResourceDeltaRequest: {
+            resource: null | string;
+            /** Format: int32 */
+            delta: number;
+        };
         /** @description A review: a rating 1–10 and an optional text (D-96). */
         ReviewInput: {
             /** Format: int32 */
@@ -5727,6 +6225,17 @@ export interface components {
             }[];
             reload: boolean;
         };
+        /** @description A season in the list everyone signed in sees: newest first. */
+        SeasonListItemView: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            status: components["schemas"]["SeasonStatus"];
+            /** Format: date-time */
+            deadline: null | string;
+            /** Format: date-time */
+            createdAt: string;
+        };
         SeasonRules: {
             timezone: string;
             /** Format: int32 */
@@ -5774,6 +6283,7 @@ export interface components {
             me: null | components["schemas"]["MyTurnView"];
             /** Format: int64 */
             lastSequence: number;
+            name: string;
         };
         ShopRules: {
             /** Format: int32 */

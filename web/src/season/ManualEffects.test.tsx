@@ -54,6 +54,7 @@ function season(status: Schemas['SeasonView']['status'] = 'active'): Schemas['Se
       finish: null,
     },
     lastSequence: 3,
+    name: 'Тестовый сезон',
   };
 }
 

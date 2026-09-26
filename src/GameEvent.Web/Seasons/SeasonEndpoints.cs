@@ -92,7 +92,8 @@ public sealed record SeasonView(
     IReadOnlyList<PlayerView> Players,
     IReadOnlyList<LeaderboardRowView> Leaderboard,
     MyTurnView? Me,
-    long LastSequence);
+    long LastSequence,
+    string Name);
 
 /// <summary>
 /// A leaderboard row in place order (D-100): tied players share <c>place</c>; <c>isFirst</c> — the first finisher, on top
@@ -579,7 +580,8 @@ public static class SeasonEndpoints
                 p.Id, p.Name, p.CellId, p.Points, p.Phase, p.FinishOrder, avatars.TryGetValue(p.UserId, out var avatar) ? Files.FileLinkView.Of(avatar) : null))],
             [.. leaderboard.Select(r => new LeaderboardRowView(r.PlayerId, r.Place, r.Points, r.CellsToFinish, r.IsFirst, r.Provisional))],
             me,
-            lastSequence));
+            lastSequence,
+            seasonRecord.Name));
     }
 
     /// <summary>A run's game: the run's own hours when known, otherwise the pool's.</summary>

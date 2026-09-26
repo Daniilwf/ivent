@@ -72,6 +72,7 @@ function season(overrides: Partial<Schemas['SeasonView']> = {}): Schemas['Season
       finish: null,
     },
     lastSequence: 3,
+    name: 'Тестовый сезон',
     ...overrides,
     leaderboard: overrides.leaderboard ?? leaderboardOf(players),
   };
