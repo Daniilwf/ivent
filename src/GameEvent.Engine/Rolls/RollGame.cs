@@ -31,27 +31,34 @@ public sealed record RollMiss(Guid GameId, RollMissReason Reason, Guid ByPlayerI
 /// <summary>The rolled game waiting for the player to start it, with rules fixed at roll time.</summary>
 public sealed record RollOffer(Guid GameId, RunSnapshot Snapshot, DateTimeOffset RolledAt);
 
-[EventType("game-rolled")]
+/// <summary>
+/// A plain roll. <c>Sectors</c> — the categories that were on the wheel, in its order (ordinal by name): the page draws
+/// the wheel from the log, not from today's pool (D-136). v1 had no wheel; it reads as the picked category alone.
+/// </summary>
+[EventType("game-rolled", 2)]
 public sealed record GameRolled(
     Guid PlayerId,
     string Category,
     EquatableArray<RollMiss> Misses,
     Guid GameId,
     RunSnapshot Snapshot,
-    DateTimeOffset RolledAt) : IGameEvent;
+    DateTimeOffset RolledAt,
+    EquatableArray<string> Sectors) : IGameEvent;
 
 /// <summary>
 /// The wheel with <c>roll.choiceCount</c> &gt; 1 (D-06): up to that many available games of one category, drawn without
 /// replacement, reserved until the player picks one with <see cref="Turns.MakeChoice"/>. When the category has only
 /// one available game the roll is a plain <see cref="GameRolled"/>.
 /// </summary>
-[EventType("game-choice-rolled")]
+/// <remarks><c>Sectors</c> as in <see cref="GameRolled"/> (D-136, v2).</remarks>
+[EventType("game-choice-rolled", 2)]
 public sealed record GameChoiceRolled(
     Guid PlayerId,
     string Category,
     EquatableArray<RollMiss> Misses,
     Guid ChoiceId,
-    EquatableArray<RollOffer> Offers) : IGameEvent;
+    EquatableArray<RollOffer> Offers,
+    EquatableArray<string> Sectors) : IGameEvent;
 
 internal static class Rolling
 {
@@ -185,6 +192,7 @@ internal static class Rolling
         }
 
         var category = SpinWheel(wheel, context.Random);
+        EquatableArray<string> sectors = [.. wheel.Select(c => c.Name)];
 
         // Draw games of the category without replacement until choiceCount are available or the category runs out;
         // misses are logged (D-46). The wheel and the draw share one predicate, so at least one game is found.
@@ -218,8 +226,8 @@ internal static class Rolling
         return offers.Count switch
         {
             0 => throw new InvalidOperationException($"Category '{category.Name}' was on the wheel without an available game."),
-            1 => new GameRolled(playerId, category.Name, [.. misses], offers[0].GameId, offers[0].Snapshot, now),
-            _ => new GameChoiceRolled(playerId, category.Name, [.. misses], context.Ids.NewId(), [.. offers]),
+            1 => new GameRolled(playerId, category.Name, [.. misses], offers[0].GameId, offers[0].Snapshot, now, sectors),
+            _ => new GameChoiceRolled(playerId, category.Name, [.. misses], context.Ids.NewId(), [.. offers], sectors),
         };
     }
 

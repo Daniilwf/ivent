@@ -74,6 +74,7 @@ function season(leaderboard: Row[]): Schemas['SeasonView'] {
       dropPenalty: null,
       techRerollOpen: false,
       challengesEnabled: false,
+      roll: null,
       unchecked: null,
       finish: { order: 1, frozen: false },
     },

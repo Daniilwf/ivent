@@ -2,6 +2,7 @@ import { CalendarClock, Inbox, Plus, Trophy } from 'lucide-react';
 import { useEffect, type ReactNode } from 'react';
 import { Shell } from '../app/Shell';
 import { RunCard } from '../board/GameCards';
+import { ChoiceCard, OfferCard } from '../season/RollResult';
 import { Leaderboard } from '../board/Leaderboard';
 import { cellsToFinish } from '../board/geometry';
 import { demoBoard } from '../board/demoBoard';
@@ -14,8 +15,11 @@ import { RouteProgress, Skeleton } from '../ui/Progress';
 import { ConnectionLost, EmptyState, ErrorState, Notice } from '../ui/States';
 import { Sticker } from '../ui/Sticker';
 import { Panel } from '../ui/Surface';
-import { demoGames, demoMe, demoRows, demoUser } from './fixtures';
+import { demoChoice, demoGames, demoMe, demoOffer, demoRoll, demoRows, demoUser } from './fixtures';
 import { DiceDemo, FinishDemo, MapDemo, MoveDemo, WheelDemo } from './MomentDemos';
+
+// The styleguide's cards act on nothing
+const noop = () => undefined;
 
 const t = ru.styleguide;
 
@@ -310,6 +314,33 @@ export function Styleguide() {
             dropConsequences={t.run.dropConsequences}
             busy
           />
+        </div>
+      </Section>
+
+      <Section id="offer" title={t.offer.title} lead={t.offer.lead}>
+        <div className="grid items-start gap-4 desk:grid-cols-2">
+          <div className="rounded-lg bg-card p-4">
+            <OfferCard
+              offer={demoOffer}
+              roll={demoRoll}
+              price={{ payment: 'coins', coins: 5 }}
+              pending={false}
+              onStart={noop}
+              onAlreadyPlayed={noop}
+              onReroll={noop}
+            />
+          </div>
+          <div className="rounded-lg bg-card p-4">
+            <ChoiceCard
+              choice={demoChoice}
+              roll={{ ...demoRoll, misses: [] }}
+              price={{ payment: 'freeThisRoll', coins: 0 }}
+              pending={false}
+              onChoose={noop}
+              onAlreadyPlayed={noop}
+              onReroll={noop}
+            />
+          </div>
         </div>
       </Section>
 

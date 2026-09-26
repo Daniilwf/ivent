@@ -7552,7 +7552,8 @@
           "techRerollOpen",
           "challengesEnabled",
           "finish",
-          "unchecked"
+          "unchecked",
+          "roll"
         ],
         "type": "object",
         "properties": {
@@ -7659,6 +7660,16 @@
               },
               {
                 "$ref": "#/components/schemas/UncheckedRunsView"
+              }
+            ]
+          },
+          "roll": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/WheelRollView"
               }
             ]
           }
@@ -8522,6 +8533,41 @@
         ],
         "description": "Role of an account. An admin who also plays has two accounts (SPEC «Аккаунты»)."
       },
+      "RollMissReason": {
+        "enum": [
+          "completedInSeason",
+          "beingPlayed"
+        ],
+        "description": "Why the wheel landed on a game the player cannot take."
+      },
+      "RollMissView": {
+        "required": [
+          "game",
+          "reason",
+          "player",
+          "at"
+        ],
+        "type": "object",
+        "properties": {
+          "game": {
+            "type": "string"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/RollMissReason"
+          },
+          "player": {
+            "type": "string"
+          },
+          "at": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        },
+        "description": "A game the wheel landed on and passed: «Уже прошёл Вася, 12.10» (`at` — when that run was completed, SPEC\n«Статусы игры в сезоне»), «Сейчас играет Петя» (no date)."
+      },
       "RollRequest": {
         "required": [
           "commandId"
@@ -9357,6 +9403,37 @@
             "format": "int32"
           }
         }
+      },
+      "WheelRollView": {
+        "required": [
+          "sequence",
+          "category",
+          "sectors",
+          "misses"
+        ],
+        "type": "object",
+        "properties": {
+          "sequence": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "category": {
+            "type": "string"
+          },
+          "sectors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "misses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RollMissView"
+            }
+          }
+        },
+        "description": "The wheel of the roll that offered what I see now (D-136), from the log: the categories that were on it, the one it\npicked and the games it missed on the way, with who holds each. `sequence` tells one roll from the next, so the\npage spins only for a new one. Null when nothing is offered or the offer did not come from my own roll."
       }
     }
   },

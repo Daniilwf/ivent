@@ -110,6 +110,7 @@ function season(
       dropPenalty: null,
       techRerollOpen: false,
       challengesEnabled: false,
+      roll: null,
       unchecked: null,
       finish: null,
     },
@@ -152,6 +153,10 @@ describe('Proof of the last completed run', () => {
     expect(within(form).getByTestId('proof-note')).toBeInTheDocument();
     expect(within(form).getByTestId('proof-submit')).toHaveTextContent(proofRu().submit);
     expect(screen.queryByTestId('proof-status')).not.toBeInTheDocument();
+    // H3: the form folds into one line that says the proof is not sent yet
+    const folded = screen.getByTestId('proof-details');
+    expect(folded).not.toHaveAttribute('open');
+    expect(within(folded).getByText(ru.turn.proofToSend)).toBeInTheDocument();
   });
 
   it('sends the links and the note of the proof, then shows it is waiting for the admin', async () => {

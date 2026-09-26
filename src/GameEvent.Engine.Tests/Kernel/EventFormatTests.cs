@@ -130,17 +130,17 @@ public class EventFormatTests
         },
         {
             "game-rolled",
-            new GameRolled(s_player, "Horror", [new RollMiss(s_game, RollMissReason.CompletedInSeason, s_other)], s_game, Snapshot(), s_at),
-            1,
+            new GameRolled(s_player, "Horror", [new RollMiss(s_game, RollMissReason.CompletedInSeason, s_other)], s_game, Snapshot(), s_at, ["Horror", "RPG"]),
+            2,
             """{"playerId":"10000000-0000-0000-0000-000000000001","category":"Horror","misses":[{"gameId":"20000000-0000-0000-0000-000000000001","reason":"completedInSeason","byPlayerId":"10000000-0000-0000-0000-000000000002"}],"gameId":"20000000-0000-0000-0000-000000000001","snapshot":"""
-            + SnapshotJson + ""","rolledAt":"2026-10-01T12:30:00+00:00"}"""
+            + SnapshotJson + ""","rolledAt":"2026-10-01T12:30:00+00:00","sectors":["Horror","RPG"]}"""
         },
         {
             "game-choice-rolled",
-            new GameChoiceRolled(s_player, "Horror", [], s_run, [new RollOffer(s_game, Snapshot(), s_at)]),
-            1,
+            new GameChoiceRolled(s_player, "Horror", [], s_run, [new RollOffer(s_game, Snapshot(), s_at)], ["Horror"]),
+            2,
             """{"playerId":"10000000-0000-0000-0000-000000000001","category":"Horror","misses":[],"choiceId":"00000000-0000-0000-0000-000000000001","offers":[{"gameId":"20000000-0000-0000-0000-000000000001","snapshot":"""
-            + SnapshotJson + ""","rolledAt":"2026-10-01T12:30:00+00:00"}]}"""
+            + SnapshotJson + ""","rolledAt":"2026-10-01T12:30:00+00:00"}],"sectors":["Horror"]}"""
         },
         {
             "choice-made",
@@ -548,6 +548,30 @@ public class EventFormatTests
             """{"runId":"00000000-0000-0000-0000-000000000001","playerId":"10000000-0000-0000-0000-000000000001","links":["https://imgur.com/a/credits"],"note":"Титры","witnessId":"10000000-0000-0000-0000-000000000002","submittedAt":"2026-10-01T12:30:00+00:00"}""");
 
         Assert.Equal(new ProofSubmitted(s_run, s_player, ["https://imgur.com/a/credits"], "Титры", s_other, s_at, []), EventCodec.Decode(v1));
+    }
+
+    [Fact]
+    public void Game_rolled_v1_reads_with_the_picked_category_as_its_wheel()
+    {
+        // The frozen v1 of game-rolled (before D-136): the log did not keep the wheel, only the category it picked
+        var v1 = new StoredEvent(
+            "game-rolled",
+            1,
+            """{"playerId":"10000000-0000-0000-0000-000000000001","category":"Horror","misses":[],"gameId":"20000000-0000-0000-0000-000000000001","snapshot":"""
+            + SnapshotJson + ""","rolledAt":"2026-10-01T12:30:00+00:00"}""");
+
+        Assert.Equal(new GameRolled(s_player, "Horror", [], s_game, Snapshot(), s_at, ["Horror"]), EventCodec.Decode(v1));
+    }
+
+    [Fact]
+    public void Game_choice_rolled_v1_reads_with_the_picked_category_as_its_wheel()
+    {
+        var v1 = new StoredEvent(
+            "game-choice-rolled",
+            1,
+            """{"playerId":"10000000-0000-0000-0000-000000000001","category":"Horror","misses":[],"choiceId":"00000000-0000-0000-0000-000000000001","offers":[]}""");
+
+        Assert.Equal(new GameChoiceRolled(s_player, "Horror", [], s_run, [], ["Horror"]), EventCodec.Decode(v1));
     }
 
     [Fact]

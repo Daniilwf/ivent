@@ -6,7 +6,7 @@ import { cx } from './cx';
 export type ButtonVariant = 'main' | 'quiet' | 'danger' | 'dangerMain' | 'link' | 'dangerLink';
 
 const base = cx(
-  'inline-flex cursor-pointer items-center justify-center gap-2 font-bold whitespace-nowrap transition duration-(--duration-fast) ease-out select-none is-focus:focus-ring disabled:cursor-default disabled:opacity-50 aria-busy:cursor-progress',
+  'inline-flex cursor-pointer items-center justify-center gap-2 font-bold whitespace-nowrap transition duration-(--duration-fast) ease-out select-none is-focus:focus-ring disabled:cursor-default disabled:not-aria-busy:opacity-50 aria-busy:cursor-progress',
 );
 
 const variants: Record<ButtonVariant, string> = {
@@ -37,6 +37,7 @@ export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   icon?: ReactNode;
   /** Styleguide only: shows a state without the pointer («hover», «focus», «active») */
   force?: string;
+  ref?: Ref<HTMLButtonElement> | undefined;
 };
 
 export function Button({

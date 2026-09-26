@@ -63,7 +63,8 @@ describe('the main moments with reduced motion', () => {
       expect(phase).toHaveBeenCalledWith('done');
     });
     const said = screen.getByText(new RegExp(ru.moments.wheel.result('Dead Cells')));
-    expect(said).toHaveTextContent(ru.moments.wheel.miss('Сова'));
+    // The wheel stands: the miss is told as done
+    expect(said).toHaveTextContent(ru.moments.wheel.missedCompleted('Hollow Knight', 'Сова', null));
     expect(said).toHaveTextContent(ru.moments.wheel.category('RPG'));
   });
 

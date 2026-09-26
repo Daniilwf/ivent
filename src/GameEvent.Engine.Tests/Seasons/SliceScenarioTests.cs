@@ -185,7 +185,8 @@ public class SliceScenarioTests
              new RollMiss(SequentialIds.Make(2, 2), RollMissReason.CompletedInSeason, SequentialIds.Make(1, 3))],
             SequentialIds.Make(2, 3),
             new RunSnapshot(ruleset.Version, 7.5m, ruleset.Reward.DiceCount, ruleset.Reward.DieByDifficulty, ruleset.Roll.TechRerollWindowHours),
-            FixedClock.SeasonStart);
+            FixedClock.SeasonStart,
+            ["Horror", "RPG"]);
 
         Assert.Equal(rolled, EventCodec.Decode(EventCodec.Encode(rolled)));
     }
