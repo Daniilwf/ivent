@@ -1,0 +1,383 @@
+/* A — «Игровое поле». Tokens first: the palette and its roles, the type scale, spacing in steps of 4. */
+.a-root {
+  --table: #e6edf5; /* the table under the board */
+  --board: #ffffff; /* the board, cards */
+  --ink: #1f3160; /* outlines, text */
+  --ink-soft: #52618a; /* secondary text, 5.9:1 on white */
+  --sun: #f5b700; /* the one action, my cell */
+  --track: #cfe0f5; /* the path's tiles */
+  --check: #b9e3cb; /* checkpoints */
+  --danger: #c23a2b;
+  --shadow: 4px 4px 0 var(--ink);
+  --radius: 10px;
+  --font: 'Rubik', system-ui, sans-serif;
+
+  min-height: 100vh;
+  background: var(--table);
+  color: var(--ink);
+  font-family: var(--font);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.a-root h1,
+.a-root h2,
+.a-root p {
+  margin: 0;
+}
+
+.a-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding: 12px 16px;
+  font-size: 14px;
+  color: var(--ink-soft);
+}
+
+.a-season {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.a-layout {
+  display: grid;
+  gap: 16px;
+  padding: 0 16px 24px;
+}
+
+.a-turn,
+.a-panel,
+.a-map {
+  background: var(--board);
+  border: 3px solid var(--ink);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.a-turn {
+  display: grid;
+  gap: 4px;
+  padding: 16px;
+}
+
+.a-label {
+  font-size: 14px;
+  color: var(--ink-soft);
+}
+
+.a-game {
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.a-meta {
+  font-size: 14px;
+  color: var(--ink-soft);
+}
+
+.a-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.a-primary,
+.a-secondary {
+  min-height: 48px;
+  padding: 0 20px;
+  border: 3px solid var(--ink);
+  border-radius: var(--radius);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.a-primary {
+  flex: 1;
+  background: var(--sun);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+}
+
+.a-secondary {
+  background: var(--board);
+  color: var(--danger);
+}
+
+.a-last {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  font-size: 14px;
+  color: var(--ink-soft);
+}
+
+.a-die {
+  display: inline-grid;
+  grid-template-columns: repeat(3, 6px);
+  gap: 2px;
+  padding: 4px;
+  background: var(--board);
+  border: 2px solid var(--ink);
+  border-radius: 6px;
+}
+
+.a-die span {
+  width: 6px;
+  height: 6px;
+}
+
+.a-pip {
+  border-radius: 50%;
+  background: var(--ink);
+}
+
+.a-map {
+  padding: 12px;
+}
+
+.a-board {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.a-cell {
+  position: relative;
+  aspect-ratio: 1;
+  display: grid;
+  align-content: space-between;
+  padding: 3px;
+  background: var(--track);
+  border: 2px solid var(--ink);
+  border-radius: 6px;
+}
+
+.a-check {
+  background: var(--check);
+}
+
+.a-start,
+.a-finish {
+  background: var(--ink);
+  color: var(--board);
+}
+
+.a-mine {
+  background: var(--sun);
+  box-shadow: 2px 2px 0 var(--ink);
+}
+
+.a-n {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.a-tokens {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+}
+
+.a-token {
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+}
+
+.a-token-lg {
+  width: 16px;
+  height: 16px;
+}
+
+.a-side {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+}
+
+.a-panel {
+  padding: 16px;
+}
+
+.a-panel h2 {
+  margin-bottom: 8px;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.a-leaders {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.a-leaders li {
+  display: grid;
+  grid-template-columns: 24px 16px 1fr auto;
+  grid-template-areas: 'place token name points' '. . left left';
+  align-items: center;
+  column-gap: 8px;
+  padding: 6px 8px;
+  border-radius: 8px;
+}
+
+.a-place {
+  grid-area: place;
+  font-weight: 800;
+}
+
+.a-leaders .a-token {
+  grid-area: token;
+}
+
+.a-name {
+  grid-area: name;
+}
+
+.a-points {
+  grid-area: points;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.a-left {
+  grid-area: left;
+  justify-self: end;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.a-me {
+  background: #fff4cc;
+  outline: 2px solid var(--ink);
+}
+
+.a-muted {
+  color: var(--ink-soft);
+}
+
+.a-badge {
+  margin-left: 6px;
+  padding: 1px 6px;
+  background: var(--sun);
+  border: 2px solid var(--ink);
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.a-badge-me {
+  background: var(--board);
+}
+
+.a-link {
+  margin-top: 8px;
+  min-height: 44px;
+  background: none;
+  border: none;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+.a-feed {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 14px;
+}
+
+.a-feed li {
+  display: grid;
+  gap: 4px;
+}
+
+.a-feed time {
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.a-feed-dice {
+  display: flex;
+  gap: 4px;
+}
+
+.a-sheet {
+  position: fixed;
+  inset: auto 0 0;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 8px 16px 16px;
+  background: var(--board);
+  border: 3px solid var(--ink);
+  border-bottom: none;
+  border-radius: var(--radius) var(--radius) 0 0;
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+}
+
+.a-sheet strong {
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.a-handle {
+  width: 40px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--ink);
+}
+
+.a-layout {
+  padding-bottom: 96px;
+}
+
+.a-desk {
+  display: none;
+}
+
+@media (min-width: 900px) {
+  .a-phone,
+  .a-sheet {
+    display: none;
+  }
+
+  .a-desk {
+    display: grid;
+  }
+
+  .a-top {
+    padding: 16px 32px;
+  }
+
+  .a-layout {
+    grid-template-columns: 320px 1fr 320px;
+    align-items: start;
+    gap: 24px;
+    padding: 0 32px 32px;
+  }
+
+  .a-board.a-desk {
+    display: grid;
+  }
+
+  .a-n {
+    font-size: 13px;
+  }
+}
