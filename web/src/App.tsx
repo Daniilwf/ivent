@@ -166,10 +166,7 @@ export function App() {
             </ChangePasswordForm>
           </main>
         ) : signedIn.seasonId ? (
-          // Until stage H2 rebuilds it from the design system, the season screen keeps plain form styles
-          <div className="legacy-screens">
-            <SeasonScreen seasonId={signedIn.seasonId} onSignedOut={signedOut} />
-          </div>
+          <SeasonScreen seasonId={signedIn.seasonId} onSignedOut={signedOut} />
         ) : (
           <main className="mx-auto grid max-w-110 px-4 py-10" data-testid="no-season">
             <EmptyState

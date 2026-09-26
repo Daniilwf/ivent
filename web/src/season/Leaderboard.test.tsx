@@ -131,6 +131,11 @@ const firstOnTop: Row[] = [
   row(masha, 3, 7, 2),
 ];
 
+/** A row's sentence: what a screen reader says for it (the rest of the row is its picture) */
+function said(item: HTMLElement) {
+  return item.querySelector('[data-testid="leader-sentence"]')?.textContent ?? null;
+}
+
 describe('Leaderboard', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -155,7 +160,7 @@ describe('Leaderboard', () => {
 
     const shown = await items();
 
-    expect(shown.map((i) => i.textContent)).toEqual(firstOnTop.map(text));
+    expect(shown.map(said)).toEqual(firstOnTop.map(text));
   });
 
   it('marks the first finisher as provisional and nobody else', async () => {
@@ -177,7 +182,7 @@ describe('Leaderboard', () => {
 
     const [first] = await items();
 
-    expect(first?.textContent).toBe(text(row(vasya, 1, 4, 0, 'final')));
+    expect(first && said(first)).toBe(text(row(vasya, 1, 4, 0, 'final')));
     expect(first).not.toHaveTextContent(ru.leaderboard.provisional);
   });
 
@@ -189,7 +194,7 @@ describe('Leaderboard', () => {
 
     const shown = await items();
 
-    expect(shown.map((i) => i.textContent)).toEqual(shared.map(text));
+    expect(shown.map(said)).toEqual(shared.map(text));
     for (const item of shown) {
       expect(item).not.toHaveTextContent(ru.leaderboard.first);
     }
@@ -202,6 +207,6 @@ describe('Leaderboard', () => {
 
     const [first] = await items();
 
-    expect(first?.textContent).toBe(ru.leaderboard.row(1, 'Петя', 50, null));
+    expect(first && said(first)).toBe(ru.leaderboard.row(1, 'Петя', 50, null));
   });
 });

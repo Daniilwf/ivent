@@ -730,7 +730,7 @@ describe('SeasonScreen', () => {
     );
     render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(ru.app.loadError);
+    expect(await screen.findByRole('alert')).toHaveTextContent(ru.shell.loadErrorTitle);
   });
 });
 

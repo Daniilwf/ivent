@@ -142,6 +142,7 @@ export const ru = {
     logout: 'Выйти',
   },
   turn: {
+    after: 'После прохождения',
     title: 'Твой ход',
     roll: 'Крутить колесо',
     offered: (title: string, gameHours: number | null) =>
@@ -321,6 +322,7 @@ export const ru = {
     toMe: 'К моей фишке',
     leaderboard: 'Лидерборд',
     first: 'Первый',
+    firstProvisional: 'Первый, пока предварительно',
     inactive: 'не в игре',
     place: (place: number) => `${place} место`,
     points: (points: number) => `${points} очк.`,
@@ -568,6 +570,7 @@ export const ru = {
     start: 'Старт',
     finish: 'Финиш',
     cell: '·',
+    cellNumber: (n: number) => `Клетка ${n}`,
   },
   season: {
     deadline: (text: string) => `Дедлайн: ${text}`,

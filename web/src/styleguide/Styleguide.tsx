@@ -14,7 +14,7 @@ import { RouteProgress, Skeleton } from '../ui/Progress';
 import { ConnectionLost, EmptyState, ErrorState, Notice } from '../ui/States';
 import { Sticker } from '../ui/Sticker';
 import { Panel } from '../ui/Surface';
-import { demoGames, demoMe, demoPlayers, demoUser } from './fixtures';
+import { demoGames, demoMe, demoRows, demoUser } from './fixtures';
 import { DiceDemo, FinishDemo, MapDemo, MoveDemo, WheelDemo } from './MomentDemos';
 
 const t = ru.styleguide;
@@ -290,7 +290,7 @@ export function Styleguide() {
             <RouteProgress left={0} total={routeLength} />
           </div>
           <Panel title={ru.board.leaderboard}>
-            <Leaderboard players={demoPlayers} cellsLeft={cellsLeft} limit={6} />
+            <Leaderboard rows={demoRows} limit={6} />
           </Panel>
         </div>
       </Section>
@@ -330,7 +330,7 @@ export function Styleguide() {
             }
             title={ru.board.leaderboard}
           >
-            <Leaderboard players={demoPlayers} cellsLeft={cellsLeft} />
+            <Leaderboard rows={demoRows} />
           </BottomSheet>
         </div>
       </Section>
