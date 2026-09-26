@@ -88,7 +88,7 @@ export function Field({
         aria-invalid={error ? true : undefined}
         aria-describedby={cx(hint && hintId, error && errorId) || undefined}
         className={cx(
-          'min-h-12 rounded-md border-2 bg-card px-3 text-base text-ink transition duration-(--duration-fast) placeholder:text-ink-soft disabled:bg-page disabled:opacity-60',
+          'min-h-12 w-full min-w-0 rounded-md border-2 bg-card px-3 text-base text-ink transition duration-(--duration-fast) placeholder:text-ink-soft disabled:bg-page disabled:opacity-60',
           'is-focus:outline-3 is-focus:outline-offset-2 is-focus:outline-ink',
           error ? 'border-danger' : 'border-ink',
         )}

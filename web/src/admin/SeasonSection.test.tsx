@@ -199,6 +199,33 @@ describe('The season section', () => {
     expect(onPick).toHaveBeenCalledWith(created);
   });
 
+  it('creates one season when the first answer was lost and the admin tries again', async () => {
+    let lost = true;
+    const server = open('active', {
+      'POST /api/admin/seasons': () => {
+        if (lost) {
+          lost = false;
+          throw new TypeError('Failed to fetch');
+        }
+        return { body: ok };
+      },
+    });
+
+    await userEvent.type(await screen.findByTestId('season-name'), 'Зима');
+    await userEvent.click(screen.getByTestId('season-create'));
+    await screen.findByText(ru.admin.failed);
+    await userEvent.click(screen.getByTestId('season-create'));
+
+    await waitFor(() => {
+      expect(server.sent('POST', '/api/admin/seasons')).toHaveLength(2);
+    });
+    const [first, again] = server
+      .sent('POST', '/api/admin/seasons')
+      .map((c) => c.body as { commandId: string; seasonId: string });
+    expect(again?.seasonId).toBe(first?.seasonId);
+    expect(again?.commandId).toBe(first?.commandId);
+  });
+
   it('without a season offers only the list and a new season', async () => {
     fakeServer({ 'GET /api/seasons': [] });
     render(<SeasonSection seasonId={null} version={0} onPick={vi.fn()} />);

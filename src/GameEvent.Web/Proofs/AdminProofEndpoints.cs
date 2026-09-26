@@ -88,7 +88,6 @@ public static class AdminProofEndpoints
 
         var order = ProofReviewOrder.Order(state);
         var gameIds = order.Select(id => state.Runs[id].GameId).Distinct().ToList();
-        var limit = state.Rules.Season.MaxUncheckedRuns;
         var titles = await db.Games.AsNoTracking().Where(g => gameIds.Contains(g.Id)).ToDictionaryAsync(g => g.Id, g => g.Title, ct);
         IReadOnlyList<ProofQueueItemView> items =
         [
@@ -112,7 +111,7 @@ public static class AdminProofEndpoints
                     run.Dice.Sum(d => d.Value) + run.ChallengeDice.Sum(d => d.Value),
                     ProofReviewOrder.DecidesFinish(state, run),
                     proof is null ? [] : [.. proof.Files.Select(Files.FileLinkView.Of)],
-                    limit is { } max && Engine.Rolls.UncheckedRuns.Count(state, run.PlayerId) >= max);
+                    Engine.Rolls.UncheckedRuns.ClosesRoll(state, run.PlayerId));
             }),
         ];
         return TypedResults.Ok(items);

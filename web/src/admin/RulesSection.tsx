@@ -257,6 +257,7 @@ function Recalculate({ seasonId, highlighted }: { seasonId: string; highlighted:
 
   return (
     <Panel
+      title={t.bonuses}
       className={highlighted ? 'border-2 border-warning' : undefined}
       data-testid="recalculate-panel"
     >
@@ -266,7 +267,11 @@ function Recalculate({ seasonId, highlighted }: { seasonId: string; highlighted:
         <ConfirmDanger
           open={open}
           onOpenChange={setOpen}
-          trigger={<Button data-testid="recalculate">{t.recalc}</Button>}
+          trigger={
+            <Button data-testid="recalculate" className="text-center whitespace-normal!">
+              {t.recalc}
+            </Button>
+          }
           title={t.recalcTitle}
           consequences={t.recalcConsequences}
           confirm={t.recalcConfirm}

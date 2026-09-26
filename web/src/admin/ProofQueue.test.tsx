@@ -172,8 +172,9 @@ describe('The proof queue', () => {
 
     await userEvent.click(await screen.findByTestId('reject'));
     const dialog = await screen.findByRole('alertdialog');
-    for (const line of t.rejectConsequences(11))
+    for (const line of t.rejectConsequences(11, false))
       expect(within(dialog).getByText(line)).toBeInTheDocument();
+    expect(within(dialog).queryByText(/финиш и место/)).toBeNull();
 
     await userEvent.click(within(dialog).getByRole('button', { name: t.rejectConfirm }));
     expect(await within(dialog).findByText(ru.admin.commentRequired)).toBeInTheDocument();
@@ -188,6 +189,67 @@ describe('The proof queue', () => {
       });
     });
     expect(await screen.findByText(t.rejected('Hollow Knight'))).toBeInTheDocument();
+  });
+
+  it('warns that rejecting a run that decides a finish may take the finish away', async () => {
+    open([finishing]);
+
+    await userEvent.click(await screen.findByTestId('reject'));
+    const dialog = await screen.findByRole('alertdialog');
+
+    for (const line of t.rejectConsequences(11, true))
+      expect(within(dialog).getByText(line)).toBeInTheDocument();
+    expect(within(dialog).getByText(/финиш и место снимутся/)).toBeInTheDocument();
+  });
+
+  it('keeps a refused reject in its dialog', async () => {
+    open([item({})], {
+      'POST /api/admin/seasons/*/runs/*/reject': answer(409, {
+        title: 'Rejected',
+        status: 409,
+        code: 'proof.alreadyReviewed',
+      }),
+    });
+
+    await userEvent.click(await screen.findByTestId('reject'));
+    const dialog = await screen.findByRole('alertdialog');
+    await userEvent.type(within(dialog).getByTestId('reject-comment'), 'Другая игра');
+    await userEvent.click(within(dialog).getByRole('button', { name: t.rejectConfirm }));
+
+    expect(
+      await within(dialog).findByText(ru.rejection['proof.alreadyReviewed']),
+    ).toBeInTheDocument();
+  });
+
+  it('sends a retry after a lost answer with the same command id, and a new action with its own', async () => {
+    let lost = true;
+    const server = open([item({}), item({ runId: 'r2' })], {
+      'POST /api/admin/seasons/*/runs/*/approve': () => {
+        if (lost) {
+          lost = false;
+          throw new TypeError('Failed to fetch');
+        }
+        return { body: ok };
+      },
+    });
+
+    const card = await screen.findByTestId('proof-r1');
+    await userEvent.click(within(card).getByTestId('approve'));
+    expect(await within(card).findByText(ru.admin.failed)).toBeInTheDocument();
+    await userEvent.click(within(card).getByTestId('approve'));
+    await waitFor(() => {
+      expect(server.sent('POST', '/r1/approve')).toHaveLength(2);
+    });
+    await userEvent.click(within(screen.getByTestId('proof-r2')).getByTestId('approve'));
+    await waitFor(() => {
+      expect(server.sent('POST', '/r2/approve')).toHaveLength(1);
+    });
+
+    const id = (call: { body: unknown } | undefined) =>
+      (call?.body as { commandId?: string } | undefined)?.commandId;
+    const [first, again] = server.sent('POST', '/r1/approve');
+    expect(id(again)).toBe(id(first));
+    expect(id(server.sent('POST', '/r2/approve')[0])).not.toBe(id(first));
   });
 
   it('cancelling the reject sends nothing', async () => {

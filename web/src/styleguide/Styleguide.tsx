@@ -17,6 +17,7 @@ import { Sticker } from '../ui/Sticker';
 import { Panel } from '../ui/Surface';
 import { demoChoice, demoGames, demoMe, demoOffer, demoRoll, demoRows, demoUser } from './fixtures';
 import { DiceDemo, FinishDemo, MapDemo, MoveDemo, WheelDemo } from './MomentDemos';
+import { AdminDemos } from './AdminDemos';
 
 // The styleguide's cards act on nothing
 const noop = () => undefined;
@@ -364,6 +365,10 @@ export function Styleguide() {
             <Leaderboard rows={demoRows} />
           </BottomSheet>
         </div>
+      </Section>
+
+      <Section id="admin" title={t.admin.title} lead={t.admin.lead}>
+        <AdminDemos />
       </Section>
 
       <Section id="map" title={t.map.title} lead={t.map.lead}>

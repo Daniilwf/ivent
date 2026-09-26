@@ -187,35 +187,39 @@ export function AdminScreen({
           <p className="mb-2 px-3 font-display text-lg font-heavy">{t.title}</p>
           {links()}
         </nav>
-      ) : (
-        <div className="flex items-center justify-between gap-3">
-          <p className="font-display text-lg font-heavy">{t.title}</p>
-          <BottomSheet
-            title={t.nav}
-            open={sheet}
-            onOpenChange={setSheet}
-            returnFocus={() => {
-              const back = !picked.current;
-              picked.current = false;
-              return back;
-            }}
-            trigger={
-              <Button icon={<MenuIcon size={20} aria-hidden />} data-testid="admin-sections">
-                {t.sectionsButton}
-                {waiting ? (
-                  <span className="rounded-full bg-ink px-2 text-sm text-on-color tabular-nums">
-                    {waiting}
-                  </span>
-                ) : null}
-              </Button>
-            }
-          >
-            <nav aria-label={t.nav}>{links()}</nav>
-          </BottomSheet>
-        </div>
-      )}
+      ) : null}
       <div className="grid min-w-0 content-start gap-6">
-        <SectionHead id="admin-heading" title={t.sections[section]} lead={t.leads[section]} />
+        <SectionHead
+          id="admin-heading"
+          title={t.sections[section]}
+          lead={t.leads[section]}
+          action={
+            desk ? null : (
+              <BottomSheet
+                title={t.nav}
+                open={sheet}
+                onOpenChange={setSheet}
+                returnFocus={() => {
+                  const back = !picked.current;
+                  picked.current = false;
+                  return back;
+                }}
+                trigger={
+                  <Button icon={<MenuIcon size={20} aria-hidden />} data-testid="admin-sections">
+                    {t.sectionsButton}
+                    {waiting ? (
+                      <span className="rounded-full bg-ink px-2 text-sm text-on-color tabular-nums">
+                        {waiting}
+                      </span>
+                    ) : null}
+                  </Button>
+                }
+              >
+                <nav aria-label={t.nav}>{links()}</nav>
+              </BottomSheet>
+            )
+          }
+        />
         {needsSeason && !seasonId ? (
           <EmptyState
             level={2}

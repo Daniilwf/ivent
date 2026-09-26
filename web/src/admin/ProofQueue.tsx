@@ -89,6 +89,7 @@ export function ProofCard({
   const [rejecting, setRejecting] = useState(false);
   const [rejectComment, setRejectComment] = useState('');
   const [rejectError, setRejectError] = useState<string>();
+  const [rejectRefusal, setRejectRefusal] = useState<string>();
 
   const claimed = item.difficulty ?? null;
   const lower = claimed ? ladder.slice(0, ladder.indexOf(claimed)) : [];
@@ -130,18 +131,19 @@ export function ProofCard({
     setRejectError(problem);
     if (problem) return;
     setBusy('reject');
-    setError(undefined);
+    setRejectRefusal(undefined);
     try {
       const answer = await api.POST('/api/admin/seasons/{seasonId}/runs/{runId}/reject', {
         params: { path },
         body: { commandId: newCommandId(), comment: rejectComment.trim() },
       });
-      setRejecting(false);
-      if (answer.data) onDone(t.rejected(item.gameTitle));
-      else setError(refusal(answer));
+      // A refusal stays in the dialog, like the undo's
+      if (answer.data) {
+        setRejecting(false);
+        onDone(t.rejected(item.gameTitle));
+      } else setRejectRefusal(refusal(answer));
     } catch {
-      setRejecting(false);
-      setError(ru.admin.failed);
+      setRejectRefusal(ru.admin.failed);
     } finally {
       setBusy(null);
     }
@@ -175,9 +177,11 @@ export function ProofCard({
           {item.gameTitle}
         </h2>
         <p className="font-bold">{item.playerName}</p>
+        {item.completedAt ? (
+          <p className="text-sm text-ink-soft">{t.completed(moscowTime(item.completedAt))}</p>
+        ) : null}
         <p className="text-sm text-ink-soft">
           {[
-            item.completedAt ? t.completed(moscowTime(item.completedAt)) : null,
             claimed ? t.claimed(ru.difficulty[claimed]) : null,
             t.hours(item.hours),
             t.dice(item.diceTotal),
@@ -282,7 +286,10 @@ export function ProofCard({
           open={rejecting}
           onOpenChange={(open) => {
             setRejecting(open);
-            if (!open) setRejectError(undefined);
+            if (!open) {
+              setRejectError(undefined);
+              setRejectRefusal(undefined);
+            }
           }}
           trigger={
             <Button variant="danger" data-testid="reject" disabled={busy === 'approve'}>
@@ -290,7 +297,7 @@ export function ProofCard({
             </Button>
           }
           title={t.rejectTitle(item.gameTitle, item.playerName)}
-          consequences={t.rejectConsequences(item.diceTotal)}
+          consequences={t.rejectConsequences(item.diceTotal, item.decidesFinish)}
           confirm={t.rejectConfirm}
           busy={busy === 'reject'}
           onConfirm={() => void reject()}
@@ -307,6 +314,7 @@ export function ProofCard({
               setRejectComment(e.target.value);
             }}
           />
+          {rejectRefusal ? <Notice tone="danger">{rejectRefusal}</Notice> : null}
         </ConfirmDanger>
       </div>
     </article>

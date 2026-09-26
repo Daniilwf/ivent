@@ -1,5 +1,5 @@
 import { Download } from 'lucide-react';
-import { useState, type SyntheticEvent } from 'react';
+import { useRef, useState, type SyntheticEvent } from 'react';
 import { api, type Schemas } from '../api/client';
 import { moscowTime } from '../app/time';
 import { ru } from '../i18n/ru';
@@ -317,6 +317,7 @@ function CreateSeason({ onCreated }: { onCreated: (id: string, name: string) => 
   const [error, setError] = useState<string>();
   const [failure, setFailure] = useState<string>();
   const [busy, setBusy] = useState(false);
+  const pending = useRef<{ name: string; id: string } | null>(null);
 
   async function submit(e: SyntheticEvent) {
     e.preventDefault();
@@ -328,11 +329,14 @@ function CreateSeason({ onCreated }: { onCreated: (id: string, name: string) => 
     setError(undefined);
     setFailure(undefined);
     setBusy(true);
-    const seasonId = crypto.randomUUID();
+    // The new season's id stays until the server answers: a retry after a lost answer creates one season (D-68)
+    const seasonId = pending.current?.name === clean ? pending.current.id : crypto.randomUUID();
+    pending.current = { name: clean, id: seasonId };
     try {
       const answer = await api.POST('/api/admin/seasons', {
         body: { commandId: newCommandId(), seasonId, name: clean },
       });
+      pending.current = null;
       if (answer.data) {
         setName('');
         onCreated(seasonId, clean);
