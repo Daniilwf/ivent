@@ -75,6 +75,7 @@ export function CompletionMoment({
             ref={moment}
             roll={roll}
             announce={false}
+            stay={!path}
             onPhase={(phase) => {
               if (phase !== 'done' || ended.current) return;
               if (!path) {

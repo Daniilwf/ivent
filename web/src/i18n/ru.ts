@@ -210,7 +210,7 @@ export const ru = {
       if (!penalty) return [always];
       const takes = [
         penalty.affectsPoints ? 'очки' : null,
-        penalty.affectsPosition ? 'клетки (не дальше старта)' : null,
+        penalty.affectsPosition ? 'клетки (не дальше чекпоинта и старта)' : null,
       ]
         .filter((part) => part !== null)
         .join(' и ');
@@ -227,7 +227,6 @@ export const ru = {
     dropConfirmYes: 'Дропнуть игру',
     techReroll: 'Тех-реролл',
     techRerollTitle: (title: string) => `Тех-реролл «${title}»`,
-    techRerollLead: 'Если игра не идёт у тебя по технической причине:',
     techRerollConsequences: [
       'Бесплатно: очки и клетки не меняются',
       'Игра больше не выпадет тебе в этом сезоне',
@@ -260,7 +259,7 @@ export const ru = {
     throwing: (title: string) =>
       `Пройдено: ${title}. Кубы летят на карте — потом фишка сделает ход.`,
     complete: 'Завершить прохождение',
-    completeTitle: 'Прошёл? Отметь прохождение',
+    completeTitle: 'Игра пройдена? Отметь прохождение',
     difficulty: 'Сложность',
     difficultyHint: 'На какой сложности проходил: от неё зависят грани кубов',
     hours: 'Часы (оценка)',
@@ -424,6 +423,8 @@ export const ru = {
       challengeDie: 'челлендж',
       result: (plain: number[], challenge: number[], total: number) =>
         `${plain.join(' + ')}${challenge.length === 0 ? '' : ` + ${challenge.join(' + ')} за челлендж`}. Итого +${total}: столько клеток вперёд и очков`,
+      resultStay: (plain: number[], challenge: number[], total: number) =>
+        `${plain.join(' + ')}${challenge.length === 0 ? '' : ` + ${challenge.join(' + ')} за челлендж`}. Итого +${total} очков, фишка стоит на месте`,
       // The completion's moment, said once when the token stands: the game, the dice and where the token is now
       announce: (title: string, dice: string, at: string) => `Пройдено: ${title}. ${dice}. ${at}`,
       at: (cell: number, finish: boolean) =>

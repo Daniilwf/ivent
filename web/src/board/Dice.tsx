@@ -139,12 +139,15 @@ export function DiceMoment({
   onPhase,
   ref,
   announce = true,
+  stay = false,
 }: {
   roll: DiceRoll | null;
   onPhase?: ((phase: MomentPhase) => void) | undefined;
   ref?: Ref<MomentHandle> | undefined;
   /** False when the page has its own live region for the result (it outlives the dice) */
   announce?: boolean;
+  /** The token stays where it is (a later finisher): the dice give points only */
+  stay?: boolean;
 }) {
   const reduce = useReducedMotion() ?? false;
   const [shown, setShown] = useState(roll === null);
@@ -216,7 +219,7 @@ export function DiceMoment({
         className="min-h-5 text-center text-sm text-balance text-ink-soft"
         aria-live={announce ? 'polite' : undefined}
       >
-        {shown && roll ? t.result(plain, challenge, total) : ''}
+        {shown && roll ? (stay ? t.resultStay : t.result)(plain, challenge, total) : ''}
       </p>
     </div>
   );

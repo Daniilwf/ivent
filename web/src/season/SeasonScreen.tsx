@@ -145,7 +145,9 @@ export function SeasonScreen({
   const [announced, setAnnounced] = useState('');
   // The last completed run and my cell of the last view shown; undefined until the first load. A new completed run
   // brings its dice and my token's move (H4); the one the page opened with is shown at once.
-  const seen = useRef<{ run: string | null; cell: string | null } | undefined>(undefined);
+  const seen = useRef<
+    { run: string | null; cell: string | null; points: number; shown: Set<string> } | undefined
+  >(undefined);
   const [thrown, setThrown] = useState<Thrown | null>(null);
   const desk = useDesk();
   const apply = useCallback(
@@ -162,11 +164,27 @@ export function SeasonScreen({
         setLanded((landed) => (landed === undefined ? opened : landed));
         const view = loaded.season;
         const last = view.me?.lastCompleted ?? null;
-        const cell = view.players.find((p) => p.id === view.me?.playerId)?.cellId ?? null;
+        const mine = view.players.find((p) => p.id === view.me?.playerId);
+        const cell = mine?.cellId ?? null;
+        const points = mine?.points ?? 0;
         const before = seen.current;
-        seen.current = { run: last?.id ?? null, cell };
-        if (before && before.cell && last && last.id !== before.run && last.status !== 'rejected')
+        const shown = before?.shown ?? new Set<string>();
+        const at = (id: string | null) => view.cells.findIndex((c) => c.id === id);
+        // Only a completion new to this page plays: not the one it opened with, not an older run an admin's rollback
+        // brings back (the token goes back and the points drop), not a run already shown
+        if (
+          before?.cell &&
+          last &&
+          last.id !== before.run &&
+          !shown.has(last.id) &&
+          last.status !== 'rejected' &&
+          at(cell) >= at(before.cell) &&
+          points >= before.points
+        )
           setThrown({ run: last.id, from: before.cell });
+        else if (last?.id !== before?.run || last?.status === 'rejected') setThrown(null);
+        if (last) shown.add(last.id);
+        seen.current = { run: last?.id ?? null, cell, points, shown };
         setLoadFailed(false);
       }
     },
@@ -417,6 +435,9 @@ export function SeasonScreen({
   ) : null;
 
   // The completion's stage: on a desktop over the map, on a phone in the turn card; it goes when the token stands
+  const throwFrom = thrown && mine ? (cellNumber.get(thrown.from) ?? mine.cell) : 0;
+  // A later finisher's token stands still: the dice give points only
+  const throwStays = mine ? throwFrom === mine.cell : false;
   const diceStage =
     throwing && thrown && mine ? (
       <CompletionMoment
@@ -429,16 +450,17 @@ export function SeasonScreen({
         board={board}
         players={players}
         mover={mine}
-        from={cellNumber.get(thrown.from) ?? mine.cell}
+        from={throwFrom}
         to={mine.cell}
         fill={desk}
         onDone={() => {
           setThrown(null);
           const finishCell = board.cells.find((c) => c.id === mine.cell)?.kind === 'finish';
+          const result = throwStays ? ru.moments.dice.resultStay : ru.moments.dice.result;
           setAnnounced(
             ru.moments.dice.announce(
               throwing.game.title,
-              ru.moments.dice.result(
+              result(
                 throwing.dice.map((d) => d.value),
                 throwing.challengeDice.map((d) => d.value),
                 throwing.total,
@@ -446,9 +468,13 @@ export function SeasonScreen({
               ru.moments.dice.at(mine.cell, finishCell),
             ),
           );
-          requestAnimationFrame(() => {
-            document.getElementById(lastDiceId)?.focus();
-          });
+          // The focus follows only from the moment itself (its skip button) or from nowhere: a player who has
+          // moved on to the map or the leaderboard keeps their place
+          const active = document.activeElement;
+          if (!active || active === document.body || active.closest('[data-testid="dice"]'))
+            requestAnimationFrame(() => {
+              document.getElementById(lastDiceId)?.focus();
+            });
         }}
       />
     ) : null;

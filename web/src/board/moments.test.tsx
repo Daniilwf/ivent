@@ -46,6 +46,23 @@ describe('the main moments with reduced motion', () => {
     expect(screen.getByText(ru.moments.dice.result([2, 5, 3], [6], 16))).toBeInTheDocument();
   });
 
+  it('a die of more than six sides shows its number, a die of six its pips', async () => {
+    const phase = vi.fn();
+    const { container } = render(
+      <DiceMoment roll={{ id: 1, values: [8, 3], challenge: 0 }} onPhase={phase} />,
+    );
+    await waitFor(() => {
+      expect(phase).toHaveBeenCalledWith('done');
+    });
+    expect(container.querySelector('[data-die="8"]')).toHaveTextContent('8');
+    expect(container.querySelector('[data-die="3"]')).not.toHaveTextContent('3');
+  });
+
+  it('says only points when the token stays', async () => {
+    render(<DiceMoment roll={{ id: 1, values: [2, 3], challenge: 0 }} stay />);
+    expect(await screen.findByText(ru.moments.dice.resultStay([2, 3], [], 5))).toBeInTheDocument();
+  });
+
   it('the wheel stands on the pick at once and still tells the miss and who completed it', async () => {
     const phase = vi.fn();
     render(

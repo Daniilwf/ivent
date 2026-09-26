@@ -33,7 +33,7 @@ const { board } = linearBoard([
 const me = { id: 'me', name: 'Вася', token: 0, cell: 4, points: 3, me: true };
 
 describe('CompletionMoment (H4)', () => {
-  it('with reduced motion ends by itself: the dice stand and the token is on its cell', async () => {
+  it('with reduced motion ends by itself, once, without waiting for a skip', async () => {
     const done = vi.fn();
     render(
       <CompletionMoment

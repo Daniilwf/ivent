@@ -2170,8 +2170,11 @@ describe('SeasonScreen completion moment (H4)', () => {
   }
 
   /** The page opens with the run in play; completing it brings the dice */
-  function serveCompletion(after: Schemas['SeasonView'] = view(done, 6)) {
-    let current = view(null);
+  function serveCompletion(
+    after: Schemas['SeasonView'] = view(done, 6),
+    opened: Schemas['SeasonView'] = view(null),
+  ) {
+    let current = opened;
     serve(async (r) => {
       if (isSeasonGet(r)) return json(200, current);
       await r.text();
@@ -2315,6 +2318,9 @@ describe('SeasonScreen completion moment (H4)', () => {
     render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
     await complete();
     await screen.findByTestId('dice');
+    // The player moves on meanwhile: the end does not take the focus away from them
+    const sheet = screen.getByRole('button', { name: new RegExp(ru.leaderboard.title) });
+    sheet.focus();
 
     // Within the moments' budget: the dice, the rest on the total and the walk
     await vi.waitFor(
@@ -2324,6 +2330,48 @@ describe('SeasonScreen completion moment (H4)', () => {
       { timeout: 6000 },
     );
     expect(screen.queryByTestId('dice')).not.toBeInTheDocument();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(sheet).toHaveFocus();
+  });
+
+  it('does not throw the dice of an older run an admin rollback brings back', async () => {
+    const older: Schemas['CompletedRunView'] = {
+      ...done,
+      id: 'b1000000-0000-0000-0000-000000000019',
+      game: { id: 'a1000000-0000-0000-0000-000000000002', title: 'Outlast', hours: 4 },
+      dice: [{ sides: 4, value: 1 }],
+      challengeDice: [],
+      total: 1,
+    };
+    let current = view(done);
+    serve((r) => (isSeasonGet(r) ? json(200, current) : json(404, {})));
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+    await screen.findByTestId('last-dice');
+
+    // The rollback of Silent Hill: the token goes back to the start, the points drop to Outlast's
+    current = view(older, 14, 'start');
+    const players = current.players.map((p) => ({ ...p, points: 1 }));
+    current = { ...current, players, leaderboard: leaderboardOf(players) };
+    act(() => {
+      hubChange?.();
+    });
+
+    expect(await screen.findByText(ru.turn.lastDice('Outlast', [1], 1))).toBeInTheDocument();
+    expect(screen.queryByTestId('dice')).not.toBeInTheDocument();
+  });
+
+  it('gives a later finisher points only: the token stands and the words say so', async () => {
+    // The run was played on the finish: a later finisher plays on
+    serveCompletion(view(done, 6, 'finish'), view(null, 5, 'finish'));
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+    await complete();
+
+    const dice = await screen.findByTestId('dice');
+    await userEvent.click(within(dice).getByRole('button', { name: ru.moments.skip }));
+
+    const said = screen.getByTestId('roll-announce');
+    expect(said).toHaveTextContent(ru.moments.dice.resultStay([1], [2], 3));
+    expect(said).not.toHaveTextContent(/клеток вперёд/);
   });
 
   // Reduced motion: CompletionMoment.test.tsx (motion reads the preference once per module)
