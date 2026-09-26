@@ -54,6 +54,9 @@ async function fetchStatuses(seasonId: string): Promise<SeasonGame[] | null> {
   }
 }
 
+/** Cards shown at first and added by «Показать ещё» */
+export const pageSize = 60;
+
 /** How long the page waits after a season update before it asks for the statuses again */
 export const statusDelayMs = 300;
 
@@ -84,6 +87,7 @@ export function PoolScreen({
   const [adding, setAdding] = useState(false);
   const [added, setAdded] = useState<string | null>(null);
   const [retrying, setRetrying] = useState(false);
+  const [showing, setShowing] = useState({ key: '', count: pageSize });
   const desk = useDesk();
   const heading = useRef<HTMLHeadingElement>(null);
   // Only the latest answer is shown: an older one that comes late must not undo a newer one
@@ -175,6 +179,10 @@ export function PoolScreen({
     [games, statuses, filter, known, wheel],
   );
   const filters = activeFilters(filter);
+
+  // Hundreds of cards at once slow a phone down: the list grows by a page, a new filter starts from the first page
+  const filterKey = JSON.stringify(filter);
+  const visible = showing.key === filterKey ? showing.count : pageSize;
 
   function change(next: Partial<PoolFilter>) {
     setFilter((now) => ({ ...now, ...next }));
@@ -337,17 +345,29 @@ export function PoolScreen({
             }
           />
         ) : (
-          <ul className="grid gap-3 desk:grid-cols-2" data-testid="pool-list">
-            {shown.map((game) => (
-              <PoolGameCard
-                key={game.id}
-                game={game}
-                status={statuses?.get(game.id)}
-                inSeason={Boolean(seasonId) && known}
-                inWheel={onWheel(game, wheel)}
-              />
-            ))}
-          </ul>
+          <>
+            <ul className="grid gap-3 desk:grid-cols-2" data-testid="pool-list">
+              {shown.slice(0, visible).map((game) => (
+                <PoolGameCard
+                  key={game.id}
+                  game={game}
+                  status={statuses?.get(game.id)}
+                  inSeason={Boolean(seasonId) && known}
+                  inWheel={onWheel(game, wheel)}
+                />
+              ))}
+            </ul>
+            {shown.length > visible ? (
+              <Button
+                className="justify-self-center"
+                onClick={() => {
+                  setShowing({ key: filterKey, count: visible + pageSize });
+                }}
+              >
+                {t.more(Math.min(pageSize, shown.length - visible), shown.length - visible)}
+              </Button>
+            ) : null}
+          </>
         )}
       </section>
 

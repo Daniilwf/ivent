@@ -2,7 +2,7 @@ import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ru } from '../i18n/ru';
 import { demoCategories, demoGame, demoPoolGames, demoStatuses } from './demoPool';
-import { PoolScreen } from './PoolScreen';
+import { pageSize, PoolScreen } from './PoolScreen';
 
 // H6: the pool page — covers, search and filters, the game's status in the season, adding a game with a warning
 // about alike titles (SPEC «Пул игр», «Статусы игры в сезоне», «Дубли»).
@@ -331,6 +331,28 @@ describe('the pool page', () => {
       await new Promise((resolve) => setTimeout(resolve, 20));
     });
     expect(card('Alan Wake')).toHaveTextContent('Уже прошёл Вася');
+  });
+
+  it('shows a big pool page by page, and a new search starts from the first page', async () => {
+    const many = Array.from({ length: 130 }, (_, i) => ({
+      ...demoGame,
+      id: `game-${String(i).padStart(3, '0')}`,
+      title: `Игра ${String(i).padStart(3, '0')}`,
+    }));
+    serve({ ...base, 'GET /api/pool': () => json(200, many) });
+    renderPool();
+    await waitFor(() => {
+      expect(cards()).toHaveLength(pageSize);
+    });
+
+    await userEvent.click(screen.getByRole('button', { name: t.more(60, 70) }));
+    expect(cards()).toHaveLength(120);
+    await userEvent.click(screen.getByRole('button', { name: t.more(10, 10) }));
+    expect(cards()).toHaveLength(130);
+    expect(screen.queryByRole('button', { name: /Показать ещё/ })).toBeNull();
+
+    await userEvent.type(screen.getByLabelText(t.search), 'игра');
+    expect(cards()).toHaveLength(pageSize);
   });
 
   it('a spectator sees no «add a game»', async () => {

@@ -698,6 +698,8 @@ export const ru = {
     free: 'Свободна',
     offWheel: 'Не выпадет: ни одной её категории нет на колесе',
     listLabel: 'Игры пула',
+    more: (next: number, left: number) =>
+      next === left ? `Показать ещё ${games(left)}` : `Показать ещё ${next} из ${left}`,
     completed: (player: string, day: string | null) =>
       day ? `Уже прошёл ${player}, ${day}` : `Уже прошёл ${player}`,
     playing: (player: string) => `Сейчас играет ${player}`,
