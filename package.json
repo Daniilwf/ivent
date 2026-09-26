@@ -16,6 +16,7 @@
     "test:fast": "npm run -s test:dotnet:fast && npm --prefix web run -s test",
     "test": "npm run -s test:dotnet && npm --prefix web run -s test",
     "test:e2e": "node scripts/e2e.mjs e2e",
+    "test:visual": "node scripts/visual.mjs",
     "test:smoke": "node scripts/e2e.mjs smoke",
     "test:invariants:long": "node scripts/invariants-long.mjs",
     "test:mutation": "dotnet tool run dotnet-stryker --config-file stryker-config.json --output test-artifacts/stryker",

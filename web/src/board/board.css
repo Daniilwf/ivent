@@ -1,0 +1,24 @@
+/* The six faces of a die around its centre: a 64 px cube (size-16) */
+.die-f1 {
+  transform: translateZ(32px);
+}
+
+.die-f6 {
+  transform: rotateY(180deg) translateZ(32px);
+}
+
+.die-f3 {
+  transform: rotateY(90deg) translateZ(32px);
+}
+
+.die-f4 {
+  transform: rotateY(-90deg) translateZ(32px);
+}
+
+.die-f2 {
+  transform: rotateX(90deg) translateZ(32px);
+}
+
+.die-f5 {
+  transform: rotateX(-90deg) translateZ(32px);
+}

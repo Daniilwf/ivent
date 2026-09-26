@@ -1,0 +1,176 @@
+/* The design system's tokens (G3, docs/DESIGN.md): the only place in the frontend with colours, type sizes,
+   radii, shadows and durations. Direction C «Компания», palette «Кухонный стол» (D-130, D-131): a wooden
+   table under a lamp, colourful meeples. Tailwind's own palette and scales are switched off, so a class
+   outside these tokens produces nothing; the linters forbid values outside them (eslint-rules, stylelint). */
+
+@import 'tailwindcss';
+
+@theme static {
+  /* ---- Colour: surfaces and text ---- */
+  --color-*: initial;
+  --color-page: #eef2f7;
+  --color-card: #ffffff;
+  --color-ink: #1e2030; /* text and every outline: 14.3:1 on the page */
+  --color-ink-soft: #545870; /* secondary text: 6.2:1 on the page, 7:1 on a card */
+  --color-on-color: #ffffff; /* text on the action, «me» and danger fills */
+
+  /* ---- Colour: the one main action and the player's own things ---- */
+  --color-action: #2f6be4; /* a blue meeple: the main button, 4.8:1 with white */
+  --color-action-strong: #2459c7; /* the main button under the pointer */
+  --color-me: #c2410c; /* my sticker ring, my cell, my bars: burnt orange, apart from the blue action */
+  --color-gold: #ffc43d; /* first place, event cells, the challenge die */
+
+  /* ---- Colour: meaning (always with an icon or words too) ---- */
+  --color-danger: #b42318; /* drop, undo, reject, delete: 6.6:1 on white */
+  --color-danger-soft: #fdecea;
+  --color-success: #1f7a45;
+  --color-success-soft: #e6f4ea;
+  --color-warning: #9a5200;
+  --color-warning-soft: #fff4e0;
+  --color-info: #1d5f8f;
+  --color-info-soft: #e5f0f8;
+
+  /* ---- Colour: the table and the map ---- */
+  --color-table: #c0834a; /* the map's ground: the wooden table */
+  --color-table-dots: #cb925d;
+  --color-table-deep: #a86e3a;
+  --color-route: #ffffff;
+  --color-zone-meadow: #a6dd72;
+  --color-zone-forest: #4fb07a;
+  --color-zone-mountains: #c9c1b6;
+  --color-zone-swamp: #7cc6c0;
+  --color-zone-city: #ffb36b;
+  --color-zone-castle: #b9a7f2;
+  --color-snow: #ffffff;
+
+  /* ---- Colour: 16 player tokens, told apart with colour blindness too (Okabe–Ito and kin).
+     The letter colour on each is picked by contrast in src/design/players.ts; a test keeps both lists equal. */
+  --color-token-1: #e69f00;
+  --color-token-2: #56b4e9;
+  --color-token-3: #009e73;
+  --color-token-4: #f0e442;
+  --color-token-5: #0072b2;
+  --color-token-6: #d55e00;
+  --color-token-7: #cc79a7;
+  --color-token-8: #3b3b3b;
+  --color-token-9: #9a6a00;
+  --color-token-10: #1f6f9f;
+  --color-token-11: #006c4f;
+  --color-token-12: #b8a800;
+  --color-token-13: #004a75;
+  --color-token-14: #8f3f00;
+  --color-token-15: #8c4a73;
+  --color-token-16: #8a8a8a;
+
+  /* ---- Type: two faces with full Cyrillic, served from our own server (woff2) ---- */
+  --font-*: initial;
+  --font-display: 'Unbounded', system-ui, sans-serif; /* headings, numbers that matter, the map */
+  --font-text: 'Onest', system-ui, sans-serif; /* everything else */
+
+  --font-weight-*: initial;
+  --font-weight-regular: 400;
+  --font-weight-medium: 600;
+  --font-weight-bold: 700;
+  --font-weight-heavy: 800;
+
+  /* Seven sizes, each with its line height */
+  --text-*: initial;
+  --text-xs: 12px;
+  --text-xs--line-height: 16px;
+  --text-sm: 14px;
+  --text-sm--line-height: 20px;
+  --text-base: 16px;
+  --text-base--line-height: 24px;
+  --text-lg: 18px;
+  --text-lg--line-height: 24px;
+  --text-xl: 24px;
+  --text-xl--line-height: 32px;
+  --text-2xl: 32px;
+  --text-2xl--line-height: 40px;
+  --text-3xl: 44px;
+  --text-3xl--line-height: 48px;
+
+  /* ---- Space: Tailwind's 4 px step; the linter allows whole steps only ---- */
+  --spacing: 4px;
+
+  /* ---- Radii by level: a tag, a row, a card, a pill ---- */
+  --radius-*: initial;
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-full: 9999px;
+
+  /* ---- Shadows: a hard offset like a cardboard piece, only on the main action and the moments' cards ---- */
+  --shadow-*: initial;
+  --shadow-press: 0 4px 0 var(--color-ink);
+  --shadow-press-up: 0 5px 0 var(--color-ink);
+  --shadow-press-down: 0 1px 0 var(--color-ink);
+  --shadow-lift: 0 6px 0 var(--color-ink);
+
+  /* ---- Motion: 150–250 ms outside the main moments ---- */
+  --ease-*: initial;
+  --ease-out: cubic-bezier(0.2, 0.7, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --duration-fast: 150ms;
+  --duration-base: 200ms;
+  --duration-slow: 250ms;
+
+  --breakpoint-*: initial;
+  --breakpoint-desk: 900px;
+}
+
+/* Every state a component has can also be forced with data-force="hover focus active", so the styleguide shows
+   them side by side. Components use these variants instead of hover:, focus-visible: and active:. */
+@custom-variant is-hover {
+  &:hover:not(:disabled, [aria-disabled='true']),
+  &[data-force~='hover'] {
+    @slot;
+  }
+}
+
+@custom-variant is-focus {
+  &:focus-visible,
+  &[data-force~='focus'] {
+    @slot;
+  }
+}
+
+@custom-variant is-active {
+  &:active:not(:disabled, [aria-disabled='true']),
+  &[data-force~='active'] {
+    @slot;
+  }
+}
+
+/* The wooden table with felt dots that the map and the moments stand on */
+@utility table-surface {
+  background-color: var(--color-table);
+  background-image: radial-gradient(var(--color-table-dots) 1.6px, transparent 1.6px);
+  background-size: 14px 14px;
+}
+
+@layer base {
+  html {
+    background: var(--color-page);
+    color: var(--color-ink);
+    font-family: var(--font-text);
+    font-size: var(--text-base);
+    line-height: var(--text-base--line-height);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* One visible focus everywhere: an ink ring, clear of the element */
+  :focus-visible {
+    outline: 3px solid var(--color-ink);
+    outline-offset: 3px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 1ms !important;
+      transition-duration: 1ms !important;
+    }
+  }
+}
