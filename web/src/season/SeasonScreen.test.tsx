@@ -713,6 +713,19 @@ describe('SeasonScreen', () => {
     expect(screen.queryByTestId('roll')).not.toBeInTheDocument();
   });
 
+  it.each<[string, Partial<Schemas['SeasonView']>, string]>([
+    ['a spectator', { me: null }, ru.turn.spectatorTitle],
+    ['a finished season', { status: 'finished' }, ru.turn.finishedTitle],
+    ['a closing season', { status: 'closing' }, ru.turn.closingTitle],
+    ['an open turn', {}, ru.turn.title],
+  ])('names the turn card by the state: %s (H2)', async (_, overrides, title) => {
+    serve(() => json(200, season(overrides)));
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    const turn = await screen.findByTestId('turn');
+    expect(within(turn).getByRole('heading', { level: 2 })).toHaveTextContent(title);
+  });
+
   it('returns to sign-in when the session is gone', async () => {
     serve(() => json(401, {}));
     const onSignedOut = vi.fn();
@@ -869,6 +882,22 @@ describe('SeasonScreen reroll price and manual effects (D-93)', () => {
         ru.effects.drawEvent('bad', 'paidReroll'),
       );
     }
+  });
+
+  it('puts pending effects in the turn card above the roll, with their count (H2)', async () => {
+    const effects: Schemas['ManualEffectView'][] = [
+      { id: 'e1000000-0000-0000-0000-000000000001', drawEvent: 'bad', source: 'paidReroll' },
+    ];
+    serveRolling(rolling({ payment: 'badEvent', coins: 0 }, effects));
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    const turn = await screen.findByTestId('turn');
+    const todo = within(turn).getByTestId('after');
+    expect(within(todo).getByRole('heading', { name: ru.turn.todo(1) })).toBeInTheDocument();
+    expect(within(todo).getByTestId('manual-effects')).toBeInTheDocument();
+    // The to-do comes before what the turn offers
+    const reroll = within(turn).getByTestId('reroll');
+    expect(todo.compareDocumentPosition(reroll) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it('shows no manual effects section when there are none', async () => {

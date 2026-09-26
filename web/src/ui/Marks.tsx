@@ -1,10 +1,10 @@
 import type { ReactNode } from 'react';
 import { cx } from './cx';
 
-/** A small fact in a pill: the deadline, a status */
+/** A small fact in a pill: the deadline, a status. No ink outline: only what can be pressed has one */
 export function Chip({ icon, children }: { icon?: ReactNode; children: ReactNode }) {
   return (
-    <span className="inline-flex items-center gap-2 rounded-full border-2 border-ink bg-card px-3 py-1 text-sm font-medium">
+    <span className="inline-flex items-center gap-2 rounded-full bg-muted px-3 py-1 text-sm font-medium">
       {icon}
       {children}
     </span>

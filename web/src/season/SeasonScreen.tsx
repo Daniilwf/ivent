@@ -221,6 +221,7 @@ export function SeasonScreen({
   const { board, players, rows } = view;
   const mine = players.find((p) => p.me);
   const myRow = rows.find((r) => r.player.me);
+  const leader = rows[0];
   const routeLength = Math.max(board.cells.length - 1, 1);
   const closing = season.status === 'closing' || (season.status === 'active' && pastDeadline);
   const finished = season.status === 'finished' || season.status === 'archived';
@@ -258,9 +259,95 @@ export function SeasonScreen({
         className="grid min-w-0 grid-cols-1 gap-4 rounded-lg bg-card p-4 desk:col-start-1 desk:w-96"
       >
         <h2 id="turn-title" className="font-display text-lg font-heavy">
-          {ru.turn.title}
+          {!me
+            ? ru.turn.spectatorTitle
+            : finished
+              ? ru.turn.finishedTitle
+              : closing
+                ? ru.turn.closingTitle
+                : ru.turn.title}
         </h2>
         {!me && <p className="text-ink-soft">{ru.turn.spectator}</p>}
+        {me && finished && <p className="text-ink-soft">{ru.turn.finishedText}</p>}
+        {me && closing && <p className="text-ink-soft">{ru.turn.closingText}</p>}
+        {me && (me.manualEffects.length > 0 || me.lastCompleted) ? (
+          <section
+            aria-labelledby="after-title"
+            data-testid="after"
+            className="grid min-w-0 grid-cols-1 gap-4 border-b-2 border-muted pb-4"
+          >
+            <h3 id="after-title" className="font-display font-heavy">
+              {me.manualEffects.length > 0 ? ru.turn.todo(me.manualEffects.length) : ru.turn.after}
+            </h3>
+            {me.manualEffects.length > 0 && (
+              <section
+                aria-labelledby="effects-title"
+                data-testid="manual-effects"
+                className="legacy-screens"
+              >
+                <h4 id="effects-title">{ru.effects.title}</h4>
+                <ul>
+                  {me.manualEffects.map((effect) => (
+                    <ManualEffectItem
+                      key={effect.id}
+                      effect={effect}
+                      pending={pending}
+                      resolvable={season.status === 'active' || season.status === 'closing'}
+                      onResolve={(outcome, comment) =>
+                        void act({ kind: 'resolveEffect', effectId: effect.id, outcome, comment })
+                      }
+                    />
+                  ))}
+                </ul>
+              </section>
+            )}
+            {me.lastCompleted && (
+              <div className="legacy-screens">
+                <p data-testid="last-dice">
+                  {me.lastCompleted.status === 'rejected'
+                    ? ru.turn.lastRejected(me.lastCompleted.game.title)
+                    : ru.turn.lastDice(
+                        me.lastCompleted.game.title,
+                        [...me.lastCompleted.dice, ...me.lastCompleted.challengeDice].map(
+                          (d) => d.value,
+                        ),
+                        me.lastCompleted.total,
+                      )}
+                </p>
+                {me.lastCompleted.challengeDice.length > 0 && (
+                  <p data-testid="last-challenge-dice">
+                    {ru.turn.lastChallengeDice(me.lastCompleted.challengeDice.map((d) => d.value))}
+                  </p>
+                )}
+                {me.lastCompleted.review && (
+                  <p data-testid="last-review">
+                    {ru.turn.lastReview(
+                      me.lastCompleted.review.rating,
+                      me.lastCompleted.review.text ?? null,
+                    )}
+                  </p>
+                )}
+                <ProofSection
+                  proof={me.lastCompleted.proof ?? null}
+                  pending={pending}
+                  witnesses={season.players.filter((p) => p.id !== me.playerId)}
+                  onSubmit={(links, note, witnessId, files) => {
+                    if (me.lastCompleted) {
+                      void act({
+                        kind: 'proof',
+                        runId: me.lastCompleted.id,
+                        links,
+                        note,
+                        witnessId,
+                        files,
+                      });
+                    }
+                  }}
+                />
+              </div>
+            )}
+          </section>
+        ) : null}
         {waiting && (
           <div className="grid gap-2" aria-busy="true">
             <Skeleton className="h-6 w-2/3" />
@@ -389,7 +476,7 @@ export function SeasonScreen({
           board={board}
           players={players}
           focus={mine && mine.cell > 0 ? mine.cell : undefined}
-          tools="top"
+          tools="auto"
           className="h-105 rounded-lg border-3 border-ink desk:h-190"
         />
         {/* The map in words: every cell and who stands there (also what the tests and screen readers read) */}
@@ -416,86 +503,9 @@ export function SeasonScreen({
       </section>
 
       <Panel title={ru.leaderboard.title} className="hidden desk:col-start-1 desk:grid desk:w-96">
+        <p className="text-sm text-ink-soft">{ru.board.rule}</p>
         <Leaderboard rows={rows} />
       </Panel>
-
-      {me && (me.manualEffects.length > 0 || me.lastCompleted) ? (
-        <section
-          aria-labelledby="after-title"
-          className="grid min-w-0 grid-cols-1 gap-4 rounded-lg bg-card p-4 desk:col-start-1 desk:w-96"
-        >
-          <h2 id="after-title" className="font-display text-lg font-heavy">
-            {ru.turn.after}
-          </h2>
-          {me.manualEffects.length > 0 && (
-            <section
-              aria-labelledby="effects-title"
-              data-testid="manual-effects"
-              className="legacy-screens"
-            >
-              <h3 id="effects-title">{ru.effects.title}</h3>
-              <ul>
-                {me.manualEffects.map((effect) => (
-                  <ManualEffectItem
-                    key={effect.id}
-                    effect={effect}
-                    pending={pending}
-                    resolvable={season.status === 'active' || season.status === 'closing'}
-                    onResolve={(outcome, comment) =>
-                      void act({ kind: 'resolveEffect', effectId: effect.id, outcome, comment })
-                    }
-                  />
-                ))}
-              </ul>
-            </section>
-          )}
-          {me.lastCompleted && (
-            <div className="legacy-screens">
-              <p data-testid="last-dice">
-                {me.lastCompleted.status === 'rejected'
-                  ? ru.turn.lastRejected(me.lastCompleted.game.title)
-                  : ru.turn.lastDice(
-                      me.lastCompleted.game.title,
-                      [...me.lastCompleted.dice, ...me.lastCompleted.challengeDice].map(
-                        (d) => d.value,
-                      ),
-                      me.lastCompleted.total,
-                    )}
-              </p>
-              {me.lastCompleted.challengeDice.length > 0 && (
-                <p data-testid="last-challenge-dice">
-                  {ru.turn.lastChallengeDice(me.lastCompleted.challengeDice.map((d) => d.value))}
-                </p>
-              )}
-              {me.lastCompleted.review && (
-                <p data-testid="last-review">
-                  {ru.turn.lastReview(
-                    me.lastCompleted.review.rating,
-                    me.lastCompleted.review.text ?? null,
-                  )}
-                </p>
-              )}
-              <ProofSection
-                proof={me.lastCompleted.proof ?? null}
-                pending={pending}
-                witnesses={season.players.filter((p) => p.id !== me.playerId)}
-                onSubmit={(links, note, witnessId, files) => {
-                  if (me.lastCompleted) {
-                    void act({
-                      kind: 'proof',
-                      runId: me.lastCompleted.id,
-                      links,
-                      note,
-                      witnessId,
-                      files,
-                    });
-                  }
-                }}
-              />
-            </div>
-          )}
-        </section>
-      ) : null}
 
       <div className="legacy-screens min-w-0 desk:col-start-1 desk:w-96">
         <AvatarSection
@@ -516,20 +526,36 @@ export function SeasonScreen({
               {mine ? <Sticker player={mine} size={36} /> : <Trophy size={24} aria-hidden />}
               <span className="grid">
                 <strong className="font-display">{ru.leaderboard.title}</strong>
-                {myRow ? (
+                {myRow && leader ? (
                   <span className="text-sm text-ink-soft">
-                    {ru.board.sheet(myRow.place, myRow.points)}
+                    {leader.player.me
+                      ? ru.board.sheet(myRow.place, myRow.points)
+                      : ru.board.sheetPeek(leader.player.name, myRow.place)}
+                  </span>
+                ) : leader ? (
+                  <span className="text-sm text-ink-soft">
+                    {ru.board.sheetLeader(leader.player.name)}
                   </span>
                 ) : null}
               </span>
             </button>
           }
         >
-          <Leaderboard rows={rows} marked={false} />
+          <p className="text-sm text-ink-soft">{ru.board.rule}</p>
+          <div ref={showMe}>
+            <Leaderboard rows={rows} marked={false} />
+          </div>
         </BottomSheet>
       </div>
     </main>
   );
+}
+
+/** The sheet opens on my row: with 16 players it may be below the fold */
+function showMe(node: HTMLDivElement | null) {
+  const row = node?.querySelector<HTMLElement>('[data-me]');
+  // jsdom has no scrolling
+  if (row && typeof row.scrollIntoView === 'function') row.scrollIntoView({ block: 'center' });
 }
 
 /** The season's first load: the same frame, grey, so nothing jumps when it comes */

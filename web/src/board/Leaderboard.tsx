@@ -1,4 +1,3 @@
-import { playerToken } from '../design/players';
 import { ru } from '../i18n/ru';
 import { cx } from '../ui/cx';
 import { Badge } from '../ui/Marks';
@@ -39,6 +38,7 @@ export function Leaderboard({
           <li
             key={p.id}
             data-testid={marked ? `leader-${p.id}` : undefined}
+            data-me={p.me ? true : undefined}
             className={cx(
               'grid grid-cols-[auto_auto_minmax(0,1fr)_auto] items-center gap-3 rounded-md px-2 py-2',
               p.me && 'bg-page outline-2 outline-me',
@@ -72,7 +72,7 @@ export function Leaderboard({
               <ScoreBar
                 points={row.points}
                 top={top}
-                fill={p.me ? 'var(--color-me)' : playerToken(p.token).fill}
+                fill={p.me ? 'var(--color-me)' : 'var(--color-ink-soft)'}
               />
             </span>
             <span className="font-display text-lg font-heavy" aria-hidden>
