@@ -44,6 +44,8 @@ public sealed record RulesetProblem(string Title, int Status, IReadOnlyList<Rule
 
 public static class RulesEndpoints
 {
+    private static readonly Lazy<string> s_schema = new(RulesetSchema.Generate);
+
     public static void MapRules(this RouteGroupBuilder api)
     {
         api.MapGet("/seasons/{seasonId:guid}/rules", GetRulesAsync)
@@ -61,6 +63,14 @@ public static class RulesEndpoints
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound)
             .Produces<Seasons.RejectionProblem>(StatusCodes.Status409Conflict, "application/problem+json");
+
+        // The JSON schema of the ruleset (docs/ruleset.schema.json) for the admin's editor to check against as it types (H8)
+        api.MapGet("/admin/rules/schema", () => TypedResults.Text(s_schema.Value, "application/schema+json"))
+            .WithTags("Admin")
+            .RequireAuthorization(Policies.Admin)
+            .Produces<JsonObject>(StatusCodes.Status200OK, "application/schema+json")
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden);
     }
 
     private static async Task<Results<Ok<RulesView>, NotFound>> GetRulesAsync(Guid seasonId, GameEventDbContext db, CancellationToken ct)

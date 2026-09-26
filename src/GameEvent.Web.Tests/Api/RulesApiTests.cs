@@ -130,6 +130,54 @@ public sealed class RulesApiTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Unauthorized, (await PutAsync(client, RulesetJson.DefaultJson())).StatusCode);
     }
 
+    // ---- The schema for the admin's editor (H8) ----
+
+    private const string Schema = "/api/admin/rules/schema";
+
+    [Fact]
+    public async Task Admin_gets_the_ruleset_schema_as_committed_in_the_docs()
+    {
+        var admin = await _site.SignedInAsync("admin");
+
+        var response = await admin.GetAsync(Schema, Ct);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("application/schema+json", response.Content.Headers.ContentType?.MediaType);
+        Assert.Equal(RulesetSchema.Generate(), await response.Content.ReadAsStringAsync(Ct));
+        using var schema = JsonDocument.Parse(await response.Content.ReadAsStringAsync(Ct));
+        Assert.Equal("object", schema.RootElement.GetProperty("type").GetString());
+        Assert.True(schema.RootElement.GetProperty("properties").TryGetProperty("season", out _));
+    }
+
+    [Theory]
+    [InlineData("vasya")]
+    [InlineData("zritel")]
+    public async Task Only_the_admin_gets_the_schema(string login)
+    {
+        var client = await _site.SignedInAsync(login);
+
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync(Schema, Ct)).StatusCode);
+    }
+
+    [Fact]
+    public async Task Anonymous_does_not_get_the_schema()
+    {
+        var client = await _site.AnonymousAsync();
+
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync(Schema, Ct)).StatusCode);
+    }
+
+    [Fact]
+    public async Task Schema_takes_no_input_and_ignores_a_stray_query()
+    {
+        var admin = await _site.SignedInAsync("admin");
+
+        var response = await admin.GetAsync($"{Schema}?season=nonsense", Ct);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(RulesetSchema.Generate(), await response.Content.ReadAsStringAsync(Ct));
+    }
+
     [Fact]
     public async Task Typo_in_a_field_is_refused_naming_the_field()
     {

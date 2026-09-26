@@ -191,7 +191,7 @@ export const demoProfileEmpty: Schemas['ProfileView'] = {
 };
 
 /** The pool's longest title, no cover, with its runs of every kind */
-export const demoGameCard: Schemas['GameView'] = {
+export const demoGameCard: Schemas['PoolGameView'] = {
   id: game(0)?.id ?? '',
   title: game(0)?.title ?? '',
   tags: demoGames[0]?.tags ?? [],

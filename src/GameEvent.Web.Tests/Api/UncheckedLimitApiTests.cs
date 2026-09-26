@@ -86,7 +86,61 @@ public sealed class UncheckedLimitApiTests : IAsyncLifetime
         await PostOkAsync(vasya, $"{Season}/roll");
     }
 
+    // ---- The admin's proof queue marks the players whose roll is closed (H8, D-134) ----
+
+    [Fact]
+    public async Task Queue_marks_the_runs_of_a_player_whose_roll_the_limit_closed()
+    {
+        var vasya = await _site.SignedInAsync("vasya");
+        var petya = await _site.SignedInAsync("petya");
+        var admin = await _site.SignedInAsync("admin");
+        await PlayOneAsync(vasya);
+        await PlayOneAsync(petya);
+
+        // Below the limit nobody is marked
+        Assert.All(await QueueAsync(admin), item => Assert.False(item.GetProperty("rollClosed").GetBoolean()));
+
+        await PlayOneAsync(vasya);
+        var queue = await QueueAsync(admin);
+
+        Assert.Equal(3, queue.Count);
+        var vasyaId = (await MeAsync(vasya)).GetProperty("playerId").GetGuid();
+        Assert.All(queue, item => Assert.Equal(item.GetProperty("playerId").GetGuid() == vasyaId, item.GetProperty("rollClosed").GetBoolean()));
+    }
+
+    [Fact]
+    public async Task Queue_marks_nobody_without_a_limit()
+    {
+        var vasya = await _site.SignedInAsync("vasya");
+        var admin = await _site.SignedInAsync("admin");
+        await ChangeLimitAsync(admin, null);
+        await PlayOneAsync(vasya);
+        await PlayOneAsync(vasya);
+
+        var queue = await QueueAsync(admin);
+
+        Assert.Equal(2, queue.Count);
+        Assert.All(queue, item => Assert.False(item.GetProperty("rollClosed").GetBoolean()));
+    }
+
+    [Fact]
+    public async Task The_check_takes_the_mark_off()
+    {
+        var vasya = await _site.SignedInAsync("vasya");
+        var admin = await _site.SignedInAsync("admin");
+        var first = await PlayOneAsync(vasya);
+        await PlayOneAsync(vasya);
+
+        await PostOkAsync(admin, $"/api/admin/seasons/{SiteFactory.SeasonId}/runs/{first}/approve", new { commandId = Guid.NewGuid(), comment = "Видел на стриме" });
+
+        var left = Assert.Single(await QueueAsync(admin));
+        Assert.False(left.GetProperty("rollClosed").GetBoolean());
+    }
+
     // ---- Helpers ----
+
+    private static async Task<IReadOnlyList<JsonElement>> QueueAsync(HttpClient admin) =>
+        [.. (await OkAsync(await admin.GetAsync($"/api/admin/seasons/{SiteFactory.SeasonId}/proofs", Ct))).EnumerateArray()];
 
     private static async Task ChangeLimitAsync(HttpClient admin, int? limit)
     {

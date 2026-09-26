@@ -4,8 +4,8 @@ using System.Text.Json;
 namespace GameEvent.Web.Tests.Api;
 
 /// <summary>
-/// The API description the frontend's client is generated from (D-150): two records of one name share one OpenAPI schema,
-/// and the client then gets one of them for both — the pool card lost its tags and cover that way.
+/// The API description the frontend's client is generated from (D-150, D-161, D-182): two records of one name share one
+/// OpenAPI schema, and the client then gets one of them for both — the pool card lost its tags and cover that way.
 /// </summary>
 public sealed class OpenApiContractTests : IAsyncLifetime
 {
@@ -33,11 +33,16 @@ public sealed class OpenApiContractTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
 
-        var properties = document.RootElement.GetProperty("components").GetProperty("schemas").GetProperty("GameView").GetProperty("properties");
+        var schemas = document.RootElement.GetProperty("components").GetProperty("schemas");
+        var properties = schemas.GetProperty("PoolGameView").GetProperty("properties");
 
-        foreach (var name in new[] { "title", "tags", "cover", "year", "isDeleted" })
+        foreach (var name in new[] { "title", "tags", "cover", "year", "author", "note", "isDeleted" })
         {
             Assert.True(properties.TryGetProperty(name, out _), name);
         }
+
+        // The run's game is a schema of its own, and no schema keeps the shared old name
+        Assert.True(schemas.TryGetProperty("RunGameView", out _));
+        Assert.False(schemas.TryGetProperty("GameView", out _));
     }
 }

@@ -10,16 +10,19 @@ export type Route =
   | { kind: 'game'; gameId: string }
   | { kind: 'pool' }
   | { kind: 'rules' }
+  /** The admin's pages (H8), for the admin only: App shows anyone else the game. `section` null is the proof queue */
+  | { kind: 'admin'; section: string | null }
   | { kind: 'notFound' };
 
 const id = '([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})';
 const seasonFeed = new RegExp(`^/seasons/${id}/feed$`);
 const profile = new RegExp(`^/users/${id}$`);
 const game = new RegExp(`^/games/${id}$`);
+const admin = /^\/admin(?:\/([a-z]+))?$/;
 
 /**
  * What page an address opens: `/`, `/feed` (the current season), `/seasons/{id}/feed`, `/users/{id}`, `/games/{id}`,
- * `/pool`, `/rules`
+ * `/pool`, `/rules`, `/admin` and `/admin/{section}`
  */
 export function routeOf(path: string): Route {
   const clean = path.replace(/\/+$/, '') || '/';
@@ -33,6 +36,8 @@ export function routeOf(path: string): Route {
   if (match?.[1]) return { kind: 'profile', userId: match[1] };
   match = game.exec(clean);
   if (match?.[1]) return { kind: 'game', gameId: match[1] };
+  match = admin.exec(clean);
+  if (match) return { kind: 'admin', section: match[1] ?? null };
   return { kind: 'notFound' };
 }
 
@@ -43,6 +48,7 @@ export const paths = {
   game: (gameId: string) => `/games/${gameId}`,
   pool: () => '/pool',
   rules: () => '/rules',
+  admin: (section?: string) => (section ? `/admin/${section}` : '/admin'),
 };
 
 const listeners = new Set<() => void>();

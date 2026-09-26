@@ -47,6 +47,7 @@ import {
   demoProfile,
   demoProfileEmpty,
 } from './feedFixtures';
+import { AdminDemos } from './AdminDemos';
 
 // The styleguide's cards act on nothing
 const noop = () => undefined;
@@ -583,6 +584,10 @@ export function Styleguide() {
             <Leaderboard rows={demoRows} />
           </BottomSheet>
         </div>
+      </Section>
+
+      <Section id="admin" title={t.admin.title} lead={t.admin.lead}>
+        <AdminDemos />
       </Section>
 
       <Section id="map" title={t.map.title} lead={t.map.lead}>

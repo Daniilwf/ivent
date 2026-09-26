@@ -1365,6 +1365,59 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/rules/schema": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/schema+json": components["schemas"]["JsonObject"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/seasons/{seasonId}/pool-stats": {
         parameters: {
             query?: never;
@@ -4479,7 +4532,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["GameView"][];
+                        "application/json": components["schemas"]["PoolGameView"][];
                     };
                 };
             };
@@ -4504,7 +4557,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["GameView"];
+                        "application/json": components["schemas"]["PoolGameView"];
                     };
                 };
                 /** @description Bad Request */
@@ -4654,7 +4707,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["GameView"];
+                        "application/json": components["schemas"]["PoolGameView"];
                     };
                 };
                 /** @description Not Found */
@@ -4703,7 +4756,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["GameView"];
+                        "application/json": components["schemas"]["PoolGameView"];
                     };
                 };
                 /** @description Bad Request */
@@ -4770,7 +4823,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["GameView"];
+                        "application/json": components["schemas"]["PoolGameView"];
                     };
                 };
                 /** @description Bad Request */
@@ -4836,7 +4889,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["GameView"];
+                        "application/json": components["schemas"]["PoolGameView"];
                     };
                 };
                 /** @description Bad Request */
@@ -6110,6 +6163,7 @@ export interface components {
             inviteTtlHours: number;
         };
         JsonElement: unknown;
+        JsonObject: Record<string, never>;
         LastDaysLengthFilter: {
             enabled: boolean;
             steps: components["schemas"]["EquatableArrayOfLengthFilterStep"];
@@ -6247,6 +6301,27 @@ export interface components {
             /** Format: uuid */
             commandId: string;
         };
+        /**
+         * @description A game of the pool as everyone sees it (D-119); `author` — the name of the account that added it, or the author as
+         *     the imported table names them (D-125); none for the seed.
+         */
+        PoolGameView: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            tags: string[];
+            /** Format: double */
+            hours: null | number;
+            /** Format: int32 */
+            year: null | number;
+            steamAppId: null | string;
+            cover: null | components["schemas"]["FileLinkView"];
+            note: null | string;
+            isCoop: boolean;
+            author: null | string;
+            isDeleted: boolean;
+            completionCondition: null | string;
+        };
         /** @description Pool health of a season for the admin (G10, G11, D-92). */
         PoolStatsView: {
             categories: components["schemas"]["CategoryStatView"][];
@@ -6320,6 +6395,7 @@ export interface components {
          * @description A run to check, in queue order (D-98, Q-3): the runs that decide a finish on top (`decidesFinish`), then by
          *     completion time; with the claimed difficulty, the counted hours and the dice total, what an approval at a lower
          *     difficulty or a reject changes. `reachedFinish`: this run's latest move stands on the finish.
+         *     `rollClosed`: the player's next roll is closed by the limit of unchecked runs (D-134) until the admin checks one.
          */
         ProofQueueItemView: {
             /** Format: uuid */
@@ -6342,6 +6418,7 @@ export interface components {
             diceTotal: number;
             decidesFinish: boolean;
             files: components["schemas"]["FileLinkView"][];
+            rollClosed: boolean;
         };
         /**
          * @description The proof of the player's own completed run: links (http/https), screenshots the player uploaded (`files` — ids

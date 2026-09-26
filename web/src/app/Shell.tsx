@@ -5,6 +5,7 @@ import {
   LogOut,
   Map as MapIcon,
   MessagesSquare,
+  ShieldCheck,
   UserRound,
 } from 'lucide-react';
 import { useSyncExternalStore, type ReactNode } from 'react';
@@ -65,12 +66,16 @@ function SiteNav() {
   );
 }
 
-/** The frame of every signed-in page: the name of the game, the sections, the connection mark, the bug report and my menu */
+/**
+ * The frame of every signed-in page: the name of the game, the sections, the connection mark, the bug report and my
+ * menu (my profile, the admin's pages for the admin, my password, sign out)
+ */
 export function Shell({
   user,
   onChangePassword,
   onLogout,
   offline,
+  admin = false,
   children,
 }: {
   user: Schemas['CurrentUser'];
@@ -78,6 +83,8 @@ export function Shell({
   onLogout: () => void;
   /** The styleguide shows the lost connection without losing it */
   offline?: boolean;
+  /** The admin's menu also opens the admin's pages (H8) */
+  admin?: boolean;
   children: ReactNode;
 }) {
   const live = useSyncExternalStore(connectionStatus.subscribe, connectionStatus.get) === 'online';
@@ -129,6 +136,18 @@ export function Shell({
                 },
                 testId: 'my-profile',
               },
+              ...(admin
+                ? [
+                    {
+                      label: ru.nav.admin,
+                      icon: <ShieldCheck size={18} aria-hidden />,
+                      onSelect: () => {
+                        navigate(paths.admin());
+                      },
+                      testId: 'to-admin',
+                    },
+                  ]
+                : []),
               {
                 label: ru.shell.changePassword,
                 icon: <KeyRound size={18} aria-hidden />,

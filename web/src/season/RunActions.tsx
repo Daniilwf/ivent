@@ -112,19 +112,18 @@ export function RunActions({
           }
           title={ru.turn.dropTitle(game)}
           consequences={ru.turn.dropConsequences(dropPenalty, frozen)}
-          note={
-            dropHintMinutes !== null ? (
-              <div data-testid="drop-hint">
-                <Notice tone="warning">{ru.turn.dropHint(dropHintMinutes)}</Notice>
-              </div>
-            ) : null
-          }
           confirm={ru.turn.dropConfirmYes}
           onConfirm={() => {
             setDropping(false);
             onDrop();
           }}
-        />
+        >
+          {dropHintMinutes !== null ? (
+            <div data-testid="drop-hint">
+              <Notice tone="warning">{ru.turn.dropHint(dropHintMinutes)}</Notice>
+            </div>
+          ) : null}
+        </ConfirmDanger>
       </div>
       <FormDialog
         open={rerolling}

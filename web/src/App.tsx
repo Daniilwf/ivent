@@ -6,6 +6,7 @@ import { LoginForm, TablePage } from './app/LoginForm';
 import { MaintenanceBanner } from './app/MaintenanceBanner';
 import { navigate, paths, routeOf, usePath } from './app/router';
 import { Shell } from './app/Shell';
+import { AdminScreen } from './admin/AdminScreen';
 import { FeedScreen } from './feed/FeedScreen';
 import { GameScreen } from './feed/GameScreen';
 import { ProfileScreen } from './feed/ProfileScreen';
@@ -146,9 +147,12 @@ export function App() {
       );
 
     const signedIn = state;
+    // The admin's pages (H8) open for the admin only; anyone else at their address sees the game
+    const admin = signedIn.user.role === 'admin';
     return (
       <Shell
         user={signedIn.user}
+        admin={admin}
         onChangePassword={() => {
           setState({ ...signedIn, ownPassword: path });
         }}
@@ -174,6 +178,8 @@ export function App() {
               </Button>
             </ChangePasswordForm>
           </main>
+        ) : route.kind === 'admin' && admin ? (
+          <AdminScreen path={path} currentSeasonId={signedIn.seasonId} user={signedIn.user} />
         ) : route.kind === 'profile' ? (
           <ProfileScreen
             key={route.userId}

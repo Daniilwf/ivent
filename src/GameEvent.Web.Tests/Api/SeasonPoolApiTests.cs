@@ -206,19 +206,4 @@ public sealed class SeasonPoolApiTests : IAsyncLifetime
 
         Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/api/seasons/not-a-guid/games", Ct)).StatusCode);
     }
-
-    // ---- The contract ----
-
-    [Fact]
-    public async Task Pool_game_schema_keeps_its_own_fields()
-    {
-        // D-161: two records named GameView became one OpenAPI schema and the pool's lost its tags, cover and author
-        var client = await _site.AnonymousAsync();
-        using var doc = JsonDocument.Parse(await client.GetStringAsync("/openapi/v1.json", Ct));
-        var schemas = doc.RootElement.GetProperty("components").GetProperty("schemas");
-
-        var game = schemas.GetProperty("GameView").GetProperty("properties");
-        Assert.All(["tags", "cover", "author", "note", "isDeleted"], name => Assert.True(game.TryGetProperty(name, out _), name));
-        Assert.True(schemas.TryGetProperty("RunGameView", out _));
-    }
 }

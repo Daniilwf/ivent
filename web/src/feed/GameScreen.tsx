@@ -26,7 +26,7 @@ import { Panel } from '../ui/Surface';
 import { Quote } from './Review';
 import { useLoaded, type Answer } from './useLoaded';
 
-type Game = Schemas['GameView'];
+type Game = Schemas['PoolGameView'];
 type Run = Schemas['GameRunView'];
 
 const statusIcons: Record<string, ReactNode> = {

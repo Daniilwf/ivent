@@ -28,7 +28,9 @@ describe('router', () => {
     expect(routeOf('/pool/')).toEqual({ kind: 'pool' });
     expect(routeOf('/rules')).toEqual({ kind: 'rules' });
     expect(routeOf('/whatever')).toEqual({ kind: 'notFound' });
-    expect(routeOf('/admin')).toEqual({ kind: 'notFound' });
+    expect(routeOf('/admin')).toEqual({ kind: 'admin', section: null });
+    expect(routeOf('/admin/players/')).toEqual({ kind: 'admin', section: 'players' });
+    expect(routeOf('/admin/players/1')).toEqual({ kind: 'notFound' });
   });
 
   it('builds the addresses the links point to', () => {
@@ -38,6 +40,8 @@ describe('router', () => {
     expect(paths.game(id)).toBe(`/games/${id}`);
     expect(paths.pool()).toBe('/pool');
     expect(paths.rules()).toBe('/rules');
+    expect(paths.admin()).toBe('/admin');
+    expect(paths.admin('log')).toBe('/admin/log');
     expect(routeOf(paths.profile(id))).toEqual({ kind: 'profile', userId: id });
   });
 

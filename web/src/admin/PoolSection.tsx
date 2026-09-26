@@ -1,0 +1,572 @@
+import { Dices, Library, Plus } from 'lucide-react';
+import { useDeferredValue, useState, type SyntheticEvent } from 'react';
+import { api, type Schemas } from '../api/client';
+import { ru } from '../i18n/ru';
+import { Button } from '../ui/Button';
+import { ConfirmDanger } from '../ui/Dialogs';
+import { Checkbox, Field } from '../ui/Field';
+import { Tag } from '../ui/Marks';
+import { EmptyState, Notice } from '../ui/States';
+import { Panel } from '../ui/Surface';
+import { newCommandId, refusal } from './actions';
+import { Loading } from './common';
+import { useLoad } from './useLoad';
+
+const t = ru.admin.pool;
+
+type Game = Schemas['PoolGameView'];
+type Message = { tone: 'success' | 'danger'; text: string } | null;
+
+const shownGames = 50;
+
+/** A category weight typed by the admin: a whole number 1–1000 */
+function parseWeight(text: string): number | null {
+  const clean = text.trim();
+  if (!/^\d+$/.test(clean)) return null;
+  const weight = Number(clean);
+  return weight >= 1 && weight <= 1000 ? weight : null;
+}
+
+/** The category wheel with weights and available games, and the pool's games */
+export function PoolSection({ seasonId }: { seasonId: string | null }) {
+  const [message, setMessage] = useState<Message>(null);
+  return (
+    <div className="grid gap-6" data-testid="admin-pool">
+      {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
+      <Categories seasonId={seasonId} onMessage={setMessage} />
+      <Games onMessage={setMessage} />
+    </div>
+  );
+}
+
+function Categories({
+  seasonId,
+  onMessage,
+}: {
+  seasonId: string | null;
+  onMessage: (message: Message) => void;
+}) {
+  const loaded = useLoad(async () => {
+    const [categories, stats] = await Promise.all([
+      api.GET('/api/pool/categories'),
+      seasonId
+        ? api.GET('/api/admin/seasons/{seasonId}/pool-stats', { params: { path: { seasonId } } })
+        : Promise.resolve(null),
+    ]);
+    if (!categories.data) return undefined;
+    return { categories: categories.data, stats: stats?.data ?? null };
+  }, [seasonId]);
+
+  return (
+    <Panel title={t.categories} data-testid="admin-categories">
+      <p className="max-w-prose text-ink-soft">{t.categoriesLead}</p>
+      <Loading loaded={loaded} rows={2}>
+        {({ categories, stats }, reload) => {
+          const done = (text: string) => {
+            onMessage({ tone: 'success', text });
+            reload();
+          };
+          const failed = (text: string) => {
+            onMessage({ tone: 'danger', text });
+          };
+          const available = new Map(stats?.categories.map((c) => [c.category, c.available]));
+          const starving = stats?.playersWithoutGames ?? [];
+          return (
+            <>
+              {starving.length > 0 ? (
+                <Notice tone="warning">{t.starving(starving.map((p) => p.name).join(', '))}</Notice>
+              ) : null}
+              {categories.length === 0 ? (
+                <EmptyState
+                  icon={<Dices size={28} aria-hidden />}
+                  title={t.categoriesEmptyTitle}
+                  text={t.categoriesEmptyText}
+                />
+              ) : (
+                <ul className="grid gap-2">
+                  {categories.map((c) => (
+                    <li key={c.name}>
+                      <CategoryRow
+                        category={c}
+                        available={available.get(c.name) ?? null}
+                        onDone={done}
+                        onFailed={failed}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <AddCategory onDone={done} onFailed={failed} />
+            </>
+          );
+        }}
+      </Loading>
+    </Panel>
+  );
+}
+
+function CategoryRow({
+  category,
+  available,
+  onDone,
+  onFailed,
+}: {
+  category: Schemas['CategoryView'];
+  available: number | null;
+  onDone: (text: string) => void;
+  onFailed: (text: string) => void;
+}) {
+  const [weight, setWeight] = useState(String(category.weight));
+  const [error, setError] = useState<string>();
+  const [busy, setBusy] = useState<'save' | 'remove' | null>(null);
+  const [confirming, setConfirming] = useState(false);
+
+  async function save(e: SyntheticEvent) {
+    e.preventDefault();
+    const value = parseWeight(weight);
+    if (value === null) {
+      setError(t.weightInvalid);
+      return;
+    }
+    setError(undefined);
+    setBusy('save');
+    try {
+      const answer = await api.PUT('/api/admin/pool/categories/{name}', {
+        params: { path: { name: category.name } },
+        body: { commandId: newCommandId(), weight: value },
+      });
+      if (answer.data) onDone(t.weightSaved(category.name));
+      else onFailed(refusal(answer));
+    } catch {
+      onFailed(ru.admin.failed);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function remove() {
+    setBusy('remove');
+    try {
+      const answer = await api.POST('/api/admin/pool/categories/{name}/remove', {
+        params: { path: { name: category.name } },
+        body: { commandId: newCommandId() },
+      });
+      setConfirming(false);
+      if (answer.data) onDone(t.removed(category.name));
+      else onFailed(refusal(answer));
+    } catch {
+      setConfirming(false);
+      onFailed(ru.admin.failed);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <form
+      className="grid gap-2 rounded-md bg-page p-3 desk:grid-cols-[minmax(0,1fr)_auto] desk:items-end"
+      data-testid={`category-${category.name}`}
+      onSubmit={(e) => void save(e)}
+      noValidate
+    >
+      <div className="grid gap-1">
+        <p className="font-bold break-all">{category.name}</p>
+        <p className="text-sm text-ink-soft">
+          {t.inPool(category.games)}
+          {available === null ? null : (
+            <>
+              {', '}
+              <span className={available === 0 ? 'font-bold text-danger' : undefined}>
+                {available === 0 ? t.noneAvailable : t.available(available)}
+              </span>
+            </>
+          )}
+        </p>
+      </div>
+      <div className="flex flex-wrap items-end gap-3">
+        <Field
+          label={t.categoryWeight}
+          aria-label={t.weight(category.name)}
+          inputMode="numeric"
+          value={weight}
+          error={error}
+          className="w-28"
+          data-testid="category-weight"
+          onChange={(e) => {
+            setWeight(e.target.value);
+          }}
+        />
+        <Button
+          type="submit"
+          loading={busy === 'save'}
+          disabled={busy === 'remove' || weight === String(category.weight)}
+          data-testid="category-save"
+        >
+          {t.saveWeight}
+        </Button>
+        <ConfirmDanger
+          open={confirming}
+          onOpenChange={setConfirming}
+          trigger={
+            <Button variant="dangerLink" data-testid="category-remove">
+              {t.remove}
+            </Button>
+          }
+          title={t.removeTitle(category.name)}
+          consequences={t.removeConsequences}
+          confirm={t.removeConfirm}
+          busy={busy === 'remove'}
+          onConfirm={() => void remove()}
+        />
+      </div>
+    </form>
+  );
+}
+
+function AddCategory({
+  onDone,
+  onFailed,
+}: {
+  onDone: (text: string) => void;
+  onFailed: (text: string) => void;
+}) {
+  const [name, setName] = useState('');
+  const [weight, setWeight] = useState('1');
+  const [errors, setErrors] = useState<{ name?: string | undefined; weight?: string | undefined }>(
+    {},
+  );
+  const [busy, setBusy] = useState(false);
+
+  async function submit(e: SyntheticEvent) {
+    e.preventDefault();
+    const value = parseWeight(weight);
+    const found = {
+      name: name.trim() === '' ? t.tagRequired : undefined,
+      weight: value === null ? t.weightInvalid : undefined,
+    };
+    setErrors(found);
+    if (found.name || value === null) return;
+    setBusy(true);
+    try {
+      const answer = await api.PUT('/api/admin/pool/categories/{name}', {
+        params: { path: { name: name.trim() } },
+        body: { commandId: newCommandId(), weight: value },
+      });
+      if (answer.data) {
+        setName('');
+        setWeight('1');
+        onDone(t.weightSaved(name.trim()));
+      } else onFailed(refusal(answer));
+    } catch {
+      onFailed(ru.admin.failed);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form
+      className="grid gap-3 desk:grid-cols-[minmax(0,1fr)_auto_auto] desk:items-end"
+      onSubmit={(e) => void submit(e)}
+      aria-label={t.addCategory}
+      noValidate
+    >
+      <Field
+        label={t.categoryTag}
+        hint={t.categoryTagHint}
+        value={name}
+        maxLength={50}
+        error={errors.name}
+        data-testid="category-new-name"
+        onChange={(e) => {
+          setName(e.target.value);
+        }}
+      />
+      <Field
+        label={t.categoryWeight}
+        inputMode="numeric"
+        value={weight}
+        error={errors.weight}
+        className="desk:w-28"
+        data-testid="category-new-weight"
+        onChange={(e) => {
+          setWeight(e.target.value);
+        }}
+      />
+      <div>
+        <Button
+          type="submit"
+          icon={<Plus size={20} aria-hidden />}
+          loading={busy}
+          data-testid="category-add"
+        >
+          {t.addCategory}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+function Games({ onMessage }: { onMessage: (message: Message) => void }) {
+  const [query, setQuery] = useState('');
+  const [deleted, setDeleted] = useState(false);
+  const search = useDeferredValue(query.trim());
+  const loaded = useLoad(
+    async () =>
+      (
+        await api.GET('/api/pool', {
+          params: { query: search === '' ? { deleted } : { query: search, deleted } },
+        })
+      ).data,
+    [search, deleted],
+  );
+
+  return (
+    <Panel title={t.games} data-testid="admin-games">
+      <div className="grid gap-3 desk:grid-cols-[minmax(0,1fr)_auto] desk:items-end">
+        <Field
+          type="search"
+          label={t.search}
+          value={query}
+          data-testid="games-search"
+          onChange={(e) => {
+            setQuery(e.target.value);
+          }}
+        />
+        <Checkbox
+          label={t.showDeleted}
+          checked={deleted}
+          data-testid="games-deleted"
+          onChange={(e) => {
+            setDeleted(e.target.checked);
+          }}
+        />
+      </div>
+      <Loading loaded={loaded} rows={3}>
+        {(games, reload) =>
+          games.length === 0 ? (
+            <EmptyState
+              icon={<Library size={28} aria-hidden />}
+              title={search === '' ? t.gamesEmptyTitle : t.notFoundTitle}
+              text={search === '' ? t.gamesEmptyText : t.notFoundText}
+            />
+          ) : (
+            <ul className="grid gap-2">
+              {games.slice(0, shownGames).map((game) => (
+                <li key={game.id}>
+                  <GameRow
+                    game={game}
+                    onDone={(text) => {
+                      onMessage({ tone: 'success', text });
+                      reload();
+                    }}
+                    onFailed={(text) => {
+                      onMessage({ tone: 'danger', text });
+                    }}
+                  />
+                </li>
+              ))}
+            </ul>
+          )
+        }
+      </Loading>
+    </Panel>
+  );
+}
+
+function GameRow({
+  game,
+  onDone,
+  onFailed,
+}: {
+  game: Game;
+  onDone: (text: string) => void;
+  onFailed: (text: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  async function act(action: 'delete' | 'restore') {
+    setBusy(true);
+    try {
+      const params = { path: { gameId: game.id } };
+      const body = { commandId: newCommandId() };
+      const answer =
+        action === 'delete'
+          ? await api.POST('/api/admin/pool/{gameId}/delete', { params, body })
+          : await api.POST('/api/admin/pool/{gameId}/restore', { params, body });
+      setConfirming(false);
+      if (answer.data)
+        onDone(action === 'delete' ? t.deletedOk(game.title) : t.restored(game.title));
+      else onFailed(refusal(answer));
+    } catch {
+      setConfirming(false);
+      onFailed(ru.admin.failed);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <article
+      className="grid gap-2 rounded-md bg-page p-3 wrap-anywhere"
+      data-testid={`game-${game.id}`}
+    >
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <p className="mr-auto font-bold">{game.title}</p>
+        {game.isDeleted ? (
+          <span className="rounded-full bg-muted px-2 text-xs font-bold">{t.deleted}</span>
+        ) : null}
+      </div>
+      <p className="flex flex-wrap items-center gap-2 text-sm text-ink-soft">
+        {t.hours(game.hours)}
+        {game.tags.map((tag) => (
+          <Tag key={tag}>{tag}</Tag>
+        ))}
+      </p>
+      <div className="flex flex-wrap items-center gap-3">
+        {game.isDeleted ? (
+          <Button loading={busy} data-testid="game-restore" onClick={() => void act('restore')}>
+            {t.restore}
+          </Button>
+        ) : (
+          <>
+            <Button
+              variant="link"
+              aria-expanded={editing}
+              data-testid="game-edit"
+              onClick={() => {
+                setEditing(!editing);
+              }}
+            >
+              {ru.admin.edit}
+            </Button>
+            <ConfirmDanger
+              open={confirming}
+              onOpenChange={setConfirming}
+              trigger={
+                <Button variant="dangerLink" data-testid="game-delete">
+                  {t.delete}
+                </Button>
+              }
+              title={t.deleteTitle(game.title)}
+              consequences={t.deleteConsequences}
+              confirm={t.deleteConfirm}
+              busy={busy}
+              onConfirm={() => void act('delete')}
+            />
+          </>
+        )}
+      </div>
+      {editing ? (
+        <GameForm
+          game={game}
+          onDone={(text) => {
+            setEditing(false);
+            onDone(text);
+          }}
+        />
+      ) : null}
+    </article>
+  );
+}
+
+function GameForm({ game, onDone }: { game: Game; onDone: (text: string) => void }) {
+  const [title, setTitle] = useState(game.title);
+  const [tags, setTags] = useState(game.tags.join(', '));
+  const [hours, setHours] = useState(game.hours === null ? '' : String(game.hours));
+  const [errors, setErrors] = useState<{
+    title?: string | undefined;
+    hours?: string | undefined;
+    form?: string | undefined;
+  }>({});
+  const [busy, setBusy] = useState(false);
+
+  async function submit(e: SyntheticEvent) {
+    e.preventDefault();
+    const typed = hours.trim().replace(',', '.');
+    const value = typed === '' ? null : Number(typed);
+    const found = {
+      title: title.trim() === '' ? t.titleRequired : undefined,
+      hours: value !== null && (!Number.isFinite(value) || value <= 0) ? t.hoursInvalid : undefined,
+    };
+    setErrors(found);
+    if (found.title || found.hours) return;
+    setBusy(true);
+    try {
+      // The card is replaced whole: what this form does not show is sent as it is
+      const answer = await api.PUT('/api/admin/pool/{gameId}', {
+        params: { path: { gameId: game.id } },
+        body: {
+          commandId: newCommandId(),
+          title: title.trim(),
+          tags: tags
+            .split(',')
+            .map((tag) => tag.trim())
+            .filter((tag) => tag !== ''),
+          hours: value,
+          year: game.year,
+          steamAppId: game.steamAppId,
+          coverFileId: game.cover?.id ?? null,
+          note: game.note,
+          isCoop: game.isCoop,
+          completionCondition: game.completionCondition,
+          force: false,
+        },
+      });
+      if (answer.data) onDone(t.saved(answer.data.title));
+      else setErrors({ form: refusal(answer) });
+    } catch {
+      setErrors({ form: ru.admin.failed });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form
+      className="grid gap-3 rounded-md border-2 border-muted bg-card p-3"
+      onSubmit={(e) => void submit(e)}
+      aria-label={t.editTitle(game.title)}
+      data-testid="game-form"
+      noValidate
+    >
+      <Field
+        label={t.gameTitle}
+        value={title}
+        error={errors.title}
+        data-testid="game-title"
+        onChange={(e) => {
+          setTitle(e.target.value);
+        }}
+      />
+      <Field
+        label={t.gameTags}
+        hint={t.gameTagsHint}
+        value={tags}
+        data-testid="game-tags"
+        onChange={(e) => {
+          setTags(e.target.value);
+        }}
+      />
+      <Field
+        label={t.gameHours}
+        hint={t.gameHoursHint}
+        inputMode="decimal"
+        value={hours}
+        error={errors.hours}
+        data-testid="game-hours"
+        onChange={(e) => {
+          setHours(e.target.value);
+        }}
+      />
+      {errors.form ? <Notice tone="danger">{errors.form}</Notice> : null}
+      <div>
+        <Button type="submit" loading={busy} data-testid="game-save">
+          {ru.admin.save}
+        </Button>
+      </div>
+    </form>
+  );
+}

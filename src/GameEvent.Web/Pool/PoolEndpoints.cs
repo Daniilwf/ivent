@@ -16,7 +16,7 @@ namespace GameEvent.Web.Pool;
 /// A game of the pool as everyone sees it (D-119); <c>author</c> — the name of the account that added it, or the author as
 /// the imported table names them (D-125); none for the seed.
 /// </summary>
-public sealed record GameView(
+public sealed record PoolGameView(
     Guid Id,
     string Title,
     IReadOnlyList<string> Tags,
@@ -116,7 +116,7 @@ public static class PoolEndpoints
     }
 
     /// <summary>The pool, by title words and a tag; deleted games only for the admin who asks for them.</summary>
-    private static async Task<Ok<IReadOnlyList<GameView>>> ListAsync(
+    private static async Task<Ok<IReadOnlyList<PoolGameView>>> ListAsync(
         ClaimsPrincipal user, GameEventDbContext db, CancellationToken ct, string? query = null, string? tag = null, bool deleted = false)
     {
         var withDeleted = deleted && user.IsInRole(nameof(Role.Admin));
@@ -127,11 +127,11 @@ public static class PoolEndpoints
                 && (string.IsNullOrWhiteSpace(tag) || PoolReader.Tags(g.TagsJson).Any(t => string.Equals(t, tag.Trim(), StringComparison.OrdinalIgnoreCase))))
             .ToList();
         var authors = await AuthorsAsync(db, matching, ct);
-        IReadOnlyList<GameView> views = [.. matching.Select(g => View(g, authors))];
+        IReadOnlyList<PoolGameView> views = [.. matching.Select(g => View(g, authors))];
         return TypedResults.Ok(views);
     }
 
-    private static async Task<Results<Ok<GameView>, NotFound>> GetAsync(Guid gameId, ClaimsPrincipal user, GameEventDbContext db, CancellationToken ct)
+    private static async Task<Results<Ok<PoolGameView>, NotFound>> GetAsync(Guid gameId, ClaimsPrincipal user, GameEventDbContext db, CancellationToken ct)
     {
         // Like the list: a deleted game is the admin's to see
         if (await db.Games.AsNoTracking().SingleOrDefaultAsync(g => g.Id == gameId, ct) is not { } game || (game.IsDeleted && !user.IsInRole(nameof(Role.Admin))))
@@ -228,7 +228,7 @@ public static class PoolEndpoints
         return ids.Count == 0 ? [] : await db.Users.AsNoTracking().Where(u => ids.Contains(u.Id)).ToDictionaryAsync(u => u.Id, u => u.Name, ct);
     }
 
-    private static GameView View(GameRecord game, Dictionary<Guid, string> authors) =>
+    private static PoolGameView View(GameRecord game, Dictionary<Guid, string> authors) =>
         new(
             game.Id,
             game.Title,
@@ -251,7 +251,7 @@ public static class PoolEndpoints
 
     private static RouteHandlerBuilder WithPoolErrors(this RouteHandlerBuilder builder) =>
         builder
-            .Produces<GameView>()
+            .Produces<PoolGameView>()
             .Produces<Seasons.RejectionProblem>(StatusCodes.Status409Conflict, "application/problem+json")
             .Produces(StatusCodes.Status404NotFound)
             .ProducesValidationProblem();

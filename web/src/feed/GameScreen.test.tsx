@@ -10,7 +10,7 @@ import { GameScreen } from './GameScreen';
 const gameId = '33333333-3333-3333-3333-333333333333';
 const vasya = 'aaaaaaaa-0000-0000-0000-000000000001';
 
-const card: Schemas['GameView'] = {
+const card: Schemas['PoolGameView'] = {
   id: gameId,
   title: 'Hollow Knight',
   tags: ['Метроидвании', 'Инди'],

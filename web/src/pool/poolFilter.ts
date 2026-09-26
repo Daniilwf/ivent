@@ -1,6 +1,6 @@
 import type { Schemas } from '../api/client';
 
-export type PoolGame = Schemas['GameView'];
+export type PoolGame = Schemas['PoolGameView'];
 export type SeasonGame = Schemas['SeasonGameView'];
 
 /** Length buckets of the filter by HowLongToBeat hours: a way to look through the pool, not a rule of the game */

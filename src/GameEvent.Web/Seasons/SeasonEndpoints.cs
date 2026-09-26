@@ -215,7 +215,7 @@ public sealed record DieView(int Sides, int Value);
 public sealed record CurrentSeasonView(Guid Id);
 
 /// <summary>
-/// The game of a run: its title and hours. Named apart from the pool's <see cref="Pool.GameView"/>: the OpenAPI document
+/// The game of a run: its title and hours. Named apart from the pool's <see cref="Pool.PoolGameView"/>: the OpenAPI document
 /// keys schemas by type name, so two records called GameView became one schema and the pool lost its fields (D-161).
 /// </summary>
 public sealed record RunGameView(Guid Id, string Title, decimal? Hours);
