@@ -1,0 +1,3091 @@
+{
+  "categories": [
+    {
+      "name": "Action",
+      "weight": 1
+    },
+    {
+      "name": "Online Co-Op",
+      "weight": 1
+    },
+    {
+      "name": "Adventure",
+      "weight": 1
+    },
+    {
+      "name": "Platformer",
+      "weight": 1
+    },
+    {
+      "name": "Cozy",
+      "weight": 1
+    },
+    {
+      "name": "Indie",
+      "weight": 1
+    },
+    {
+      "name": "Racing",
+      "weight": 1
+    },
+    {
+      "name": "Horror",
+      "weight": 1
+    },
+    {
+      "name": "Shooter",
+      "weight": 1
+    },
+    {
+      "name": "RPG",
+      "weight": 1
+    },
+    {
+      "name": "Difficult",
+      "weight": 1
+    },
+    {
+      "name": "Puzzle",
+      "weight": 1
+    },
+    {
+      "name": "Visual Novel",
+      "weight": 1
+    },
+    {
+      "name": "Rogue-like",
+      "weight": 1
+    }
+  ],
+  "games": [
+    {
+      "title": "Казаки 1",
+      "tags": ["Action", "Online Co-Op"],
+      "author": "Автор 1"
+    },
+    {
+      "title": "Мадагаскар",
+      "tags": ["Adventure", "Platformer", "Cozy"],
+      "author": "Автор 1"
+    },
+    {
+      "title": "Ядерный титбит",
+      "tags": ["Adventure", "Indie"],
+      "author": "Автор 1"
+    },
+    {
+      "title": "Garfield Kart - Furious Racing",
+      "tags": ["Racing"],
+      "author": "Автор 1"
+    },
+    {
+      "title": "Northern Journey",
+      "tags": ["Adventure", "Horror", "Action", "Shooter"],
+      "author": "Автор 1"
+    },
+    {
+      "title": "Rayman 3",
+      "tags": ["Platformer", "Action", "Adventure"],
+      "author": "Автор 1"
+    },
+    {
+      "title": "Serious Sam 1 (HD)",
+      "tags": ["Shooter", "Action"],
+      "author": "Автор 1"
+    },
+    {
+      "title": "Worms: Ultimate Mayhem",
+      "tags": ["Shooter", "Action", "Online Co-Op"],
+      "author": "Автор 1"
+    },
+    {
+      "title": "Готика 1",
+      "tags": ["RPG", "Action", "Adventure", "Difficult"],
+      "author": "Автор 2"
+    },
+    {
+      "title": "ACE COMBAT™ 7: SKIES UNKNOWN",
+      "tags": ["Action", "Shooter"],
+      "author": "Автор 3"
+    },
+    {
+      "title": "Dishonored",
+      "tags": ["Action", "Adventure", "RPG", "Shooter"],
+      "author": "Автор 3"
+    },
+    {
+      "title": "Hitman: Blood Money",
+      "tags": ["Action", "Puzzle", "Shooter", "Difficult"],
+      "author": "Автор 3"
+    },
+    {
+      "title": "Hollow Knight",
+      "tags": ["Action", "Adventure", "Indie", "Platformer", "Difficult"],
+      "author": "Автор 3"
+    },
+    {
+      "title": "Yakuza 0",
+      "tags": ["Action", "RPG", "Adventure"],
+      "author": "Автор 3"
+    },
+    {
+      "title": "Dishonored 2",
+      "tags": ["Action", "Adventure"],
+      "author": "Автор 4"
+    },
+    {
+      "title": "Альтушка для скуфа",
+      "tags": ["Visual Novel", "Indie"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Ведьмак 3",
+      "tags": ["RPG", "Adventure", "Action"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Death of the Outsider",
+      "tags": ["Action", "Adventure", "Difficult"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Alan Wake",
+      "tags": ["Action", "Adventure", "Horror", "Shooter"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Amnesia The Dark Descent",
+      "tags": ["Horror", "Puzzle", "Difficult"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Anna's Quest",
+      "tags": ["Adventure", "Indie", "Horror", "Puzzle"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "ANNO: Mutationem",
+      "tags": ["Action", "Adventure", "Indie", "RPG"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Assassin's Creed III",
+      "tags": ["Action", "Adventure"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "ATLYSS",
+      "tags": ["RPG", "Action", "Indie"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Barony",
+      "tags": ["Action", "Adventure", "Indie", "RPG", "Online Co-Op", "Rogue-like", "Difficult"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "BattleBlock",
+      "tags": ["Platformer", "Action", "Indie", "Online Co-Op"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Bayonetta",
+      "tags": ["Action", "Difficult"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Beholder",
+      "tags": ["Puzzle", "Adventure", "Indie"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Beyond Citadel",
+      "tags": ["Action", "Indie", "Shooter"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Bioshock",
+      "tags": ["Shooter", "Horror", "Action", "RPG"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Bloody Trapland 2",
+      "tags": ["Platformer", "Difficult", "Indie", "Action"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "BoneTown",
+      "tags": ["Adventure", "Action"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Castle Crasher",
+      "tags": ["Action", "Indie", "Online Co-Op", "Cozy"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Catherine Classic",
+      "tags": ["Puzzle", "Difficult", "Indie"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "celesta",
+      "tags": ["Platformer", "Difficult", "Indie"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Crossing Souls",
+      "tags": ["Adventure", "Action", "Indie"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Cry of Fear",
+      "tags": ["Action", "Adventure", "Indie", "Horror", "Online Co-Op", "Shooter"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Cult of the Lamb",
+      "tags": ["Rogue-like", "Action", "Indie"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Darkest Dungeon",
+      "tags": ["RPG", "Rogue-like", "Difficult", "Indie"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Darksiders",
+      "tags": ["Action", "Adventure", "RPG", "Cozy"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Dead Island",
+      "tags": ["Shooter", "Action", "Horror"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Deponia",
+      "tags": ["Adventure", "Indie", "Puzzle"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Doom",
+      "tags": ["Action", "Horror", "Shooter", "Difficult"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Doom 2",
+      "tags": ["Shooter", "Action", "Difficult"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Drug Dealer Simulator 2",
+      "tags": ["Adventure", "Action", "Indie"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Easy Delivery Co.",
+      "tags": ["Indie", "Cozy"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Edna Harvey Harvey's New Eyes",
+      "tags": ["Adventure", "Puzzle", "Indie", "Cozy"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Eraser",
+      "tags": ["Shooter", "Action"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "EverHood",
+      "tags": ["Action", "Adventure", "Indie", "RPG"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "FlipWitch",
+      "tags": ["Action", "Indie", "Platformer"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Ghost 1.0",
+      "tags": ["Action", "Adventure", "Indie", "Platformer", "Rogue-like", "Difficult"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Gunpoint",
+      "tags": ["Puzzle", "Platformer", "Indie", "Action", "Cozy"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Half-Life",
+      "tags": ["Action", "Adventure", "Shooter", "Difficult"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Half-Life 2",
+      "tags": ["Action", "Horror", "Adventure", "Puzzle", "Shooter"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Hatred",
+      "tags": ["Action", "Indie", "Horror", "Shooter", "Difficult"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Hellblade",
+      "tags": ["Action", "Adventure", "Horror"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Helltaker",
+      "tags": ["Puzzle", "Indie"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Hotline Miami",
+      "tags": ["Action", "Indie", "Shooter", "Difficult"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Human Fall Flat",
+      "tags": ["Puzzle", "Online Co-Op", "Indie"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Jotun: Valhalla Edition",
+      "tags": ["Action", "Adventure", "Indie", "Difficult"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Katana Zero",
+      "tags": ["Action", "Indie", "Platformer", "Difficult"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Life is Strange",
+      "tags": ["Adventure"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "LIMBO",
+      "tags": ["Action", "Adventure", "Indie", "Horror", "Puzzle", "Platformer", "Cozy"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Loop hero",
+      "tags": ["RPG", "Rogue-like", "Indie"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Lost Castle",
+      "tags": ["Rogue-like", "Action", "Indie"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Mark of the Ninja",
+      "tags": ["Action", "Platformer", "Indie"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "METAL GEAR RISING: REVENGEANCE",
+      "tags": ["Action", "Adventure", "Difficult"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Milk outside a bag of milk outside a bag of milk",
+      "tags": ["Indie", "Horror", "Visual Novel"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "MineCraft",
+      "tags": ["Adventure", "Online Co-Op"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Mirror's Edge",
+      "tags": ["Action", "Adventure", "Platformer"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Momodora Reverie Under The Moonlight",
+      "tags": ["Action", "Platformer", "Indie", "Difficult"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Moonlighter",
+      "tags": ["Action", "Adventure", "Indie", "Rogue-like", "RPG"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Nine Sols",
+      "tags": ["Action", "Adventure", "Indie", "Platformer", "Difficult"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "no more hero",
+      "tags": ["Action", "Adventure"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Noita",
+      "tags": ["Action", "Rogue-like", "Indie", "Difficult"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Octodad: Dadliest Catch",
+      "tags": ["Action", "Adventure", "Indie", "Puzzle", "Cozy"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "OneShot",
+      "tags": ["Adventure", "Indie", "Puzzle", "RPG"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Ori and the Blind Forest",
+      "tags": ["Action", "Adventure", "Puzzle", "Platformer", "RPG", "Difficult"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Overlord",
+      "tags": ["Action", "Adventure", "RPG", "Difficult"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Overlord 2",
+      "tags": ["Action", "Adventure", "RPG", "Cozy"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Papers,Please",
+      "tags": ["Adventure", "Indie", "Puzzle", "Difficult"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Pizza Tower",
+      "tags": ["Action", "Indie", "Adventure", "Platformer", "Difficult"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Plants vs. Zombies",
+      "tags": ["Puzzle", "Indie", "Cozy"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Potion Craft: Alchemist Simulator",
+      "tags": ["Indie", "Puzzle", "Cozy"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Resident Evil 5",
+      "tags": ["Action", "Adventure", "Horror", "Online Co-Op", "Shooter"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "RimWorld",
+      "tags": ["RPG", "Indie", "Difficult"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Risen",
+      "tags": ["RPG", "Adventure", "Action", "Difficult"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Rogue Legacy 2",
+      "tags": ["Action", "Adventure", "Indie", "RPG", "Platformer", "Rogue-like", "Difficult"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "ROMEO IS A DEAD MAN",
+      "tags": ["Shooter", "Action"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "RONIN",
+      "tags": ["Action", "Indie", "Puzzle", "Platformer", "Cozy"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Ryse: Son of Rome",
+      "tags": ["Action", "Adventure", "RPG"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Saints Row 3",
+      "tags": ["Action", "Adventure", "Shooter"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Scorn",
+      "tags": ["Horror", "Adventure", "Puzzle"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Shovel Knight",
+      "tags": ["Platformer", "Action", "Indie", "Difficult"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Sifu",
+      "tags": ["Action", "Difficult"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Sleeping Dogs",
+      "tags": ["Action", "Adventure"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "SOMA",
+      "tags": ["Action", "Adventure", "Indie", "Horror", "Puzzle"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Sons Of The Forest",
+      "tags": ["Horror", "Action", "Online Co-Op", "Difficult"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Spelunky 2",
+      "tags": ["Action", "Indie", "Online Co-Op", "Platformer", "Rogue-like", "Difficult"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Starbound",
+      "tags": ["Action", "Adventure", "Indie", "RPG", "Online Co-Op"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Subnautica",
+      "tags": ["Adventure", "Indie", "Horror", "Action"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Super Meat Boy",
+      "tags": ["Indie", "Platformer", "Action", "Difficult"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Teardown",
+      "tags": ["Puzzle", "Action", "Indie"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Teslagrad",
+      "tags": ["Indie", "Adventure", "Puzzle", "Platformer", "Action", "Difficult"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "The Farmer Was Replaced",
+      "tags": ["Indie", "Puzzle"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "The Talos Principle",
+      "tags": ["Action", "Adventure", "Indie", "Puzzle", "Difficult"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "The Witness",
+      "tags": ["Adventure", "Indie", "Puzzle", "Difficult"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Titan Souls",
+      "tags": ["Action", "Adventure", "Indie", "Puzzle", "Rogue-like", "Difficult"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Transistor",
+      "tags": ["Action", "Indie", "RPG", "Adventure", "Cozy"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Undertale",
+      "tags": ["Indie", "RPG", "Horror", "Cozy"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Unepic",
+      "tags": ["Action", "Indie", "RPG", "Adventure", "Online Co-Op", "Platformer"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Watch_Dogs",
+      "tags": ["Action", "Adventure", "Shooter"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Zero Clash 2",
+      "tags": ["Shooter", "Action"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "A way out",
+      "tags": ["Action", "Adventure", "Online Co-Op"],
+      "author": "Автор 6"
+    },
+    {
+      "title": "Bendy and the ink machine",
+      "tags": ["Horror", "Adventure", "Puzzle", "Indie"],
+      "author": "Автор 6"
+    },
+    {
+      "title": "Bread and Fred",
+      "tags": ["Platformer", "Difficult", "Indie", "Online Co-Op"],
+      "author": "Автор 6"
+    },
+    {
+      "title": "Factorio",
+      "tags": ["Puzzle", "Indie", "Difficult"],
+      "author": "Автор 6"
+    },
+    {
+      "title": "It Takes Two",
+      "tags": ["Adventure", "Puzzle", "Online Co-Op", "Cozy"],
+      "author": "Автор 6"
+    },
+    {
+      "title": "Power wash simulator",
+      "tags": ["Cozy", "Indie"],
+      "author": "Автор 6"
+    },
+    {
+      "title": "Power wash simulator 2",
+      "tags": ["Cozy", "Indie"],
+      "author": "Автор 6"
+    },
+    {
+      "title": "Project Zomboid",
+      "tags": ["Horror", "RPG", "Action", "Difficult"],
+      "author": "Автор 6"
+    },
+    {
+      "title": "Raft",
+      "tags": ["Adventure", "Online Co-Op", "Indie"],
+      "author": "Автор 6"
+    },
+    {
+      "title": "Samurai warriors 2",
+      "tags": ["Action", "Adventure"],
+      "author": "Автор 6"
+    },
+    {
+      "title": "SCP: Containment Breach Remastered",
+      "tags": ["Horror", "Action", "Indie"],
+      "author": "Автор 6"
+    },
+    {
+      "title": "The Coffin Of Andy and Leyley",
+      "tags": ["Horror", "Adventure", "Indie", "Visual Novel", "Cozy"],
+      "author": "Автор 6"
+    },
+    {
+      "title": "The Sinking City Remastered",
+      "tags": ["Action", "Adventure", "Horror", "RPG"],
+      "author": "Автор 6"
+    },
+    {
+      "title": "Warcraft 3",
+      "tags": ["RPG", "Action", "Online Co-Op"],
+      "author": "Автор 6"
+    },
+    {
+      "title": "We were here expeditions",
+      "tags": ["Puzzle", "Adventure", "Online Co-Op"],
+      "author": "Автор 6"
+    },
+    {
+      "title": "We were here forever",
+      "tags": ["Puzzle", "Adventure", "Online Co-Op"],
+      "author": "Автор 6"
+    },
+    {
+      "title": "We were here together",
+      "tags": ["Puzzle", "Adventure", "Online Co-Op"],
+      "author": "Автор 6"
+    },
+    {
+      "title": "Danganronpa 2: Goodbye Despair",
+      "tags": ["Adventure", "Horror", "Puzzle", "Visual Novel"],
+      "author": "Автор 7"
+    },
+    {
+      "title": "Pokémon Sword and Shield",
+      "tags": ["RPG", "Adventure"],
+      "author": "Автор 7"
+    },
+    {
+      "title": "RUINER",
+      "tags": ["Action", "Indie", "Shooter", "Difficult"],
+      "author": "Автор 7"
+    },
+    {
+      "title": "SHUTEN ORDER",
+      "tags": ["Adventure", "Visual Novel", "Indie"],
+      "author": "Автор 7"
+    },
+    {
+      "title": "Космические Рейнджеры HD",
+      "tags": ["RPG", "Adventure", "Indie"],
+      "author": "Автор 8"
+    },
+    {
+      "title": "Dragon's Dogma: Dark Arisen",
+      "tags": ["Action", "Adventure", "RPG", "Difficult"],
+      "author": "Автор 8"
+    },
+    {
+      "title": "Final Fantasy IX",
+      "tags": ["RPG", "Adventure", "Action"],
+      "author": "Автор 8"
+    },
+    {
+      "title": "Jedi Knight: Jedi Academy",
+      "tags": ["Action", "Adventure", "Shooter"],
+      "author": "Автор 8"
+    },
+    {
+      "title": "King's Bounty (1990)",
+      "tags": ["RPG", "Adventure"],
+      "author": "Автор 8"
+    },
+    {
+      "title": "Kingdom Come: Deliverance 2",
+      "tags": ["RPG", "Action", "Adventure", "Difficult"],
+      "author": "Автор 8"
+    },
+    {
+      "title": "Middle-Earth: Shadow of Mordor",
+      "tags": ["Action", "Adventure", "RPG"],
+      "author": "Автор 8"
+    },
+    {
+      "title": "Raging Loop",
+      "tags": ["Visual Novel", "Adventure"],
+      "author": "Автор 8"
+    },
+    {
+      "title": "Red Orchestra 2: Heroes of Stalingrad",
+      "tags": ["Shooter", "Action", "Difficult"],
+      "author": "Автор 8"
+    },
+    {
+      "title": "ULTRAKILL",
+      "tags": ["Shooter", "Action", "Difficult", "Indie"],
+      "author": "Автор 8"
+    },
+    {
+      "title": "Victoria 2",
+      "tags": ["RPG", "Indie", "Difficult"],
+      "author": "Автор 8"
+    },
+    {
+      "title": "Assassin's Creed 2",
+      "tags": ["Action", "Adventure"],
+      "author": "Автор 9"
+    },
+    {
+      "title": "Batman: Arkham City",
+      "tags": ["Action", "Adventure"],
+      "author": "Автор 9"
+    },
+    {
+      "title": "Batman: Arkham Knight",
+      "tags": ["Action", "Adventure"],
+      "author": "Автор 9"
+    },
+    {
+      "title": "Bioshock 2",
+      "tags": ["Shooter", "Horror", "Action", "RPG"],
+      "author": "Автор 9"
+    },
+    {
+      "title": "Bioshock Infinite",
+      "tags": ["Action", "Adventure", "RPG", "Shooter"],
+      "author": "Автор 9"
+    },
+    {
+      "title": "Cuphead",
+      "tags": ["Action", "Indie", "Platformer", "Difficult"],
+      "author": "Автор 9"
+    },
+    {
+      "title": "Deus Ex (2000)",
+      "tags": ["RPG", "Shooter", "Action", "Adventure"],
+      "author": "Автор 9"
+    },
+    {
+      "title": "DiRT 2",
+      "tags": ["Racing"],
+      "author": "Автор 9"
+    },
+    {
+      "title": "Flatout",
+      "tags": ["Racing", "Action"],
+      "author": "Автор 9"
+    },
+    {
+      "title": "Flatout 2",
+      "tags": ["Racing", "Action", "Cozy"],
+      "author": "Автор 9"
+    },
+    {
+      "title": "God of War (2018)",
+      "tags": ["Action", "Adventure"],
+      "author": "Автор 9"
+    },
+    {
+      "title": "God of War: Ragnarök",
+      "tags": ["Action", "Adventure"],
+      "author": "Автор 9"
+    },
+    {
+      "title": "GTA San Andreas",
+      "tags": ["Action", "Adventure", "Shooter"],
+      "author": "Автор 9"
+    },
+    {
+      "title": "Mafia (оригинал)",
+      "tags": ["Action", "Adventure"],
+      "author": "Автор 9"
+    },
+    {
+      "title": "Mafia 2",
+      "tags": ["Action", "Adventure", "Shooter"],
+      "author": "Автор 9"
+    },
+    {
+      "title": "Marvel's Guardians of the Galaxy",
+      "tags": ["Action", "Adventure", "RPG", "Shooter"],
+      "author": "Автор 9"
+    },
+    {
+      "title": "Max Payne",
+      "tags": ["Action", "Horror", "Adventure", "Shooter"],
+      "author": "Автор 9"
+    },
+    {
+      "title": "Max Payne 2",
+      "tags": ["Shooter", "Action", "Adventure"],
+      "author": "Автор 9"
+    },
+    {
+      "title": "Max Payne 3",
+      "tags": ["Action", "Adventure", "Shooter"],
+      "author": "Автор 9"
+    },
+    {
+      "title": "Medal of Honor: Allied Assault",
+      "tags": ["Shooter", "Action"],
+      "author": "Автор 9"
+    },
+    {
+      "title": "Metro Exodus",
+      "tags": ["Action", "Horror", "Adventure", "Shooter"],
+      "author": "Автор 9"
+    },
+    {
+      "title": "Metro Last Light",
+      "tags": ["Shooter", "Horror", "Action"],
+      "author": "Автор 9"
+    },
+    {
+      "title": "Need For Speed Carbon",
+      "tags": ["Racing", "Action"],
+      "author": "Автор 9"
+    },
+    {
+      "title": "Need For Speed Most Wanted",
+      "tags": ["Racing", "Action"],
+      "author": "Автор 9"
+    },
+    {
+      "title": "Outer Wilds",
+      "tags": ["Action", "Adventure", "Horror", "Puzzle"],
+      "author": "Автор 9"
+    },
+    {
+      "title": "Prince of Persia: The Sands of Time",
+      "tags": ["Action", "Adventure", "Platformer"],
+      "author": "Автор 9"
+    },
+    {
+      "title": "Prince of Persia: The Two Thrones",
+      "tags": ["Action", "Adventure", "Platformer"],
+      "author": "Автор 9"
+    },
+    {
+      "title": "Prince of Persia: Warrior Within",
+      "tags": ["Action", "Adventure", "Platformer", "Difficult"],
+      "author": "Автор 9"
+    },
+    {
+      "title": "Race Driver: Grid (2008)",
+      "tags": ["Racing"],
+      "author": "Автор 9"
+    },
+    {
+      "title": "Rayman: Legends",
+      "tags": ["Platformer", "Action", "Indie"],
+      "author": "Автор 9"
+    },
+    {
+      "title": "Resident Evil 2 (Remake)",
+      "tags": ["Horror", "Action", "Shooter", "Adventure"],
+      "author": "Автор 9"
+    },
+    {
+      "title": "Resident Evil 3 (Remake)",
+      "tags": ["Horror", "Action", "Shooter"],
+      "author": "Автор 9"
+    },
+    {
+      "title": "Resident Evil 4 (Remake)",
+      "tags": ["Horror", "Action", "Shooter", "Adventure"],
+      "author": "Автор 9"
+    },
+    {
+      "title": "Silent Hill 2 (remake)",
+      "tags": ["Horror", "Adventure", "Action"],
+      "author": "Автор 9"
+    },
+    {
+      "title": "The last of us",
+      "tags": ["Action", "Adventure", "Horror", "Shooter"],
+      "author": "Автор 9"
+    },
+    {
+      "title": "The last of us 2",
+      "tags": ["Action", "Adventure", "Horror", "Shooter"],
+      "author": "Автор 9"
+    },
+    {
+      "title": "Tomb Raider (2013)",
+      "tags": ["Action", "Adventure", "Shooter"],
+      "author": "Автор 9"
+    },
+    {
+      "title": "Valiant Hearts: The Great War",
+      "tags": ["Adventure", "Puzzle"],
+      "author": "Автор 9"
+    },
+    {
+      "title": "Wolfenstein II: The New Colossus",
+      "tags": ["Action", "Adventure", "Shooter"],
+      "author": "Автор 9"
+    },
+    {
+      "title": "Wolfenstein: The New Order",
+      "tags": ["Action", "Adventure", "Shooter"],
+      "author": "Автор 9"
+    },
+    {
+      "title": "Hogwarts Legacy",
+      "tags": ["Action", "Adventure", "RPG", "Puzzle"],
+      "author": "Автор 10"
+    },
+    {
+      "title": "Shinobido Tales of the Ninja",
+      "tags": ["Action", "Adventure"],
+      "author": "Автор 10"
+    },
+    {
+      "title": "Star Wars: Battlefront 2",
+      "tags": ["Shooter", "Action", "Online Co-Op"],
+      "author": "Автор 10"
+    },
+    {
+      "title": "Assassin's Creed IV: Black Flag",
+      "tags": ["Action", "Adventure"],
+      "author": "Автор 11"
+    },
+    {
+      "title": "Portal 2",
+      "tags": ["Action", "Adventure", "Puzzle", "Online Co-Op"],
+      "author": "Автор 11"
+    },
+    {
+      "title": "Блицкриг 2",
+      "tags": ["Action", "Online Co-Op"],
+      "author": "Автор 12"
+    },
+    {
+      "title": "Дорога На Рейхстаг",
+      "tags": ["Action", "Online Co-Op"],
+      "author": "Автор 12"
+    },
+    {
+      "title": "Afraid Of Monsters",
+      "tags": ["Horror", "Shooter", "Action"],
+      "author": "Автор 12"
+    },
+    {
+      "title": "Aliens vs. Predator (1999)",
+      "tags": ["Shooter", "Horror", "Action"],
+      "author": "Автор 12"
+    },
+    {
+      "title": "Aliens vs. Predator 2",
+      "tags": ["Shooter", "Horror", "Action"],
+      "author": "Автор 12"
+    },
+    {
+      "title": "Balatro",
+      "tags": ["Puzzle", "Rogue-like", "Indie"],
+      "author": "Автор 12"
+    },
+    {
+      "title": "BloodRayne: Terminal Cut",
+      "tags": ["Action", "Adventure", "Shooter"],
+      "author": "Автор 12"
+    },
+    {
+      "title": "bully scholarship edition",
+      "tags": ["Action", "Adventure"],
+      "author": "Автор 12"
+    },
+    {
+      "title": "C&C: Generals",
+      "tags": ["Action", "Online Co-Op"],
+      "author": "Автор 12"
+    },
+    {
+      "title": "C&C: Red Alert 2: Yuri's Revenge",
+      "tags": ["Action", "Online Co-Op"],
+      "author": "Автор 12"
+    },
+    {
+      "title": "C&C: Tiberian Sun",
+      "tags": ["Action", "Online Co-Op"],
+      "author": "Автор 12"
+    },
+    {
+      "title": "Call of Cthulhu: Dark Corners of the Earth",
+      "tags": ["Horror", "Adventure", "Shooter"],
+      "author": "Автор 12"
+    },
+    {
+      "title": "Call Of Duty: Ghosts",
+      "tags": ["Shooter", "Action"],
+      "author": "Автор 12"
+    },
+    {
+      "title": "Clive Barker's Jericho",
+      "tags": ["Horror", "Shooter", "Action"],
+      "author": "Автор 12"
+    },
+    {
+      "title": "Cold Fear",
+      "tags": ["Horror", "Action", "Shooter"],
+      "author": "Автор 12"
+    },
+    {
+      "title": "Condemned: Criminal Origins",
+      "tags": ["Horror", "Action", "Adventure"],
+      "author": "Автор 12"
+    },
+    {
+      "title": "E.Y.E.: Divine Cybermancy",
+      "tags": ["Shooter", "RPG", "Action", "Difficult"],
+      "author": "Автор 12"
+    },
+    {
+      "title": "Filcher",
+      "tags": ["Horror", "Indie", "Action"],
+      "author": "Автор 12"
+    },
+    {
+      "title": "Gloomwood",
+      "tags": ["Horror", "Action", "Indie", "Shooter"],
+      "author": "Автор 12"
+    },
+    {
+      "title": "Heroes of Might & Magic III",
+      "tags": ["RPG", "Adventure"],
+      "author": "Автор 12"
+    },
+    {
+      "title": "Hitman 2: Silent Assassin",
+      "tags": ["Action", "Adventure", "Shooter", "Difficult"],
+      "author": "Автор 12"
+    },
+    {
+      "title": "Hitman: Codename 47",
+      "tags": ["Action", "Adventure", "Shooter", "Difficult"],
+      "author": "Автор 12"
+    },
+    {
+      "title": "Hitman: Contracts",
+      "tags": ["Action", "Puzzle", "Shooter", "Difficult"],
+      "author": "Автор 12"
+    },
+    {
+      "title": "Hotline Miami 2",
+      "tags": ["Action", "Shooter", "Difficult", "Indie"],
+      "author": "Автор 12"
+    },
+    {
+      "title": "Intravenous",
+      "tags": ["Action", "Indie", "Shooter", "Difficult"],
+      "author": "Автор 12"
+    },
+    {
+      "title": "Jagged Alliance",
+      "tags": ["RPG", "Action", "Difficult"],
+      "author": "Автор 12"
+    },
+    {
+      "title": "Men Of War (В Тылу Врага)",
+      "tags": ["Action", "Online Co-Op"],
+      "author": "Автор 12"
+    },
+    {
+      "title": "Pathologic",
+      "tags": ["Adventure", "Horror", "RPG", "Difficult"],
+      "author": "Автор 12"
+    },
+    {
+      "title": "Prey (2017)",
+      "tags": ["Shooter", "Action", "Horror", "RPG"],
+      "author": "Автор 12"
+    },
+    {
+      "title": "Psycho Patrol R",
+      "tags": ["Action", "Shooter", "Indie"],
+      "author": "Автор 12"
+    },
+    {
+      "title": "Shadow Warrior 2",
+      "tags": ["Action", "Adventure", "Shooter"],
+      "author": "Автор 12"
+    },
+    {
+      "title": "Starcraft 2",
+      "tags": ["Action", "Online Co-Op"],
+      "author": "Автор 12"
+    },
+    {
+      "title": "Starcraft: Brood War",
+      "tags": ["Action", "Online Co-Op"],
+      "author": "Автор 12"
+    },
+    {
+      "title": "Still Wakes the Deep",
+      "tags": ["Horror", "Adventure", "Indie"],
+      "author": "Автор 12"
+    },
+    {
+      "title": "SWAT 4",
+      "tags": ["Shooter", "Action", "Difficult"],
+      "author": "Автор 12"
+    },
+    {
+      "title": "Synthetik",
+      "tags": ["Shooter", "Action", "Rogue-like", "Indie"],
+      "author": "Автор 12"
+    },
+    {
+      "title": "System Shock 2",
+      "tags": ["Horror", "RPG", "Shooter", "Action"],
+      "author": "Автор 12"
+    },
+    {
+      "title": "The Case of the Golden Idol",
+      "tags": ["Adventure", "Indie", "Puzzle"],
+      "author": "Автор 12"
+    },
+    {
+      "title": "The Darkside Detective",
+      "tags": ["Adventure", "Indie", "Puzzle"],
+      "author": "Автор 12"
+    },
+    {
+      "title": "The Rise of the Golden Idol",
+      "tags": ["Adventure", "Indie", "Puzzle"],
+      "author": "Автор 12"
+    },
+    {
+      "title": "The Suffering",
+      "tags": ["Horror", "Action", "Shooter"],
+      "author": "Автор 12"
+    },
+    {
+      "title": "The Thing (2002)",
+      "tags": ["Horror", "Shooter", "Action"],
+      "author": "Автор 12"
+    },
+    {
+      "title": "The Wrath of Malach",
+      "tags": ["Horror", "Action", "Adventure", "Indie"],
+      "author": "Автор 12"
+    },
+    {
+      "title": "Thief II: The Metal Age",
+      "tags": ["Action", "Adventure", "Indie", "Difficult"],
+      "author": "Автор 12"
+    },
+    {
+      "title": "Thief: The Dark Project",
+      "tags": ["Action", "Adventure", "Indie", "Difficult"],
+      "author": "Автор 12"
+    },
+    {
+      "title": "TimeShift",
+      "tags": ["Shooter", "Action"],
+      "author": "Автор 12"
+    },
+    {
+      "title": "Tom Clancy's Splinter Cell: Chaos Theory",
+      "tags": ["Action", "Adventure", "Shooter"],
+      "author": "Автор 12"
+    },
+    {
+      "title": "Vampire: The Masquerade Bloodlines",
+      "tags": ["RPG", "Action", "Horror"],
+      "author": "Автор 12"
+    },
+    {
+      "title": "You Are EMPTY",
+      "tags": ["Shooter", "Action", "Adventure"],
+      "author": "Автор 12"
+    },
+    {
+      "title": "AI: The Somnium Files",
+      "tags": ["Adventure", "Visual Novel"],
+      "author": "Автор 13"
+    },
+    {
+      "title": "Aragami",
+      "tags": ["Action", "Adventure", "Indie", "Online Co-Op"],
+      "author": "Автор 13"
+    },
+    {
+      "title": "Armored Core VI: Fires of Rubicon",
+      "tags": ["Action", "Shooter", "Difficult"],
+      "author": "Автор 13"
+    },
+    {
+      "title": "Blazblue Entropy Effect",
+      "tags": ["Action", "Adventure", "Indie", "Platformer"],
+      "author": "Автор 13"
+    },
+    {
+      "title": "Blue Prince",
+      "tags": ["Puzzle", "Adventure", "Indie"],
+      "author": "Автор 13"
+    },
+    {
+      "title": "Bomb Rush Cyberfunk",
+      "tags": ["Action", "Adventure", "Indie"],
+      "author": "Автор 13"
+    },
+    {
+      "title": "Borderlands 2",
+      "tags": ["Action", "RPG", "Adventure", "Online Co-Op", "Shooter"],
+      "author": "Автор 13"
+    },
+    {
+      "title": "Catherine: Full Body",
+      "tags": ["Puzzle", "Difficult", "Indie"],
+      "author": "Автор 13"
+    },
+    {
+      "title": "Chef RPG",
+      "tags": ["RPG", "Indie", "Adventure"],
+      "author": "Автор 13"
+    },
+    {
+      "title": "Chrono Trigger",
+      "tags": ["RPG", "Adventure"],
+      "author": "Автор 13"
+    },
+    {
+      "title": "Clair Obscur: Expidition 33",
+      "tags": ["RPG", "Adventure", "Action", "Difficult"],
+      "author": "Автор 13"
+    },
+    {
+      "title": "Clover Pit",
+      "tags": ["Horror", "Indie", "Puzzle", "Cozy"],
+      "author": "Автор 13"
+    },
+    {
+      "title": "Code Vein",
+      "tags": ["Action", "RPG", "Adventure", "Online Co-Op", "Difficult"],
+      "author": "Автор 13"
+    },
+    {
+      "title": "Crypt of the NecroDancer",
+      "tags": ["Action", "Indie", "RPG", "Adventure", "Rogue-like", "Difficult"],
+      "author": "Автор 13"
+    },
+    {
+      "title": "Disco Elysium",
+      "tags": ["RPG", "Adventure", "Indie"],
+      "author": "Автор 13"
+    },
+    {
+      "title": "Dispatch",
+      "tags": ["Indie", "Cozy"],
+      "author": "Автор 13"
+    },
+    {
+      "title": "Enter the Gungeon",
+      "tags": ["Action", "Adventure", "Indie", "Rogue-like", "Shooter", "Difficult"],
+      "author": "Автор 13"
+    },
+    {
+      "title": "Escape Simulator",
+      "tags": ["Puzzle", "Indie", "Cozy"],
+      "author": "Автор 13"
+    },
+    {
+      "title": "Fahrenheit Indigo",
+      "tags": ["Adventure", "Action", "Indie"],
+      "author": "Автор 13"
+    },
+    {
+      "title": "FTL: Faster Than Light",
+      "tags": ["Rogue-like", "Indie", "Difficult"],
+      "author": "Автор 13"
+    },
+    {
+      "title": "Furi",
+      "tags": ["Action", "Indie", "Difficult"],
+      "author": "Автор 13"
+    },
+    {
+      "title": "Game dev tycoon",
+      "tags": ["Indie", "Cozy"],
+      "author": "Автор 13"
+    },
+    {
+      "title": "Ghost Trick",
+      "tags": ["Puzzle", "Adventure", "Indie", "Cozy"],
+      "author": "Автор 13"
+    },
+    {
+      "title": "Grim Dawn",
+      "tags": ["Action", "Adventure", "Indie", "RPG"],
+      "author": "Автор 13"
+    },
+    {
+      "title": "Hades",
+      "tags": ["Action", "Indie", "RPG", "Rogue-like", "Difficult"],
+      "author": "Автор 13"
+    },
+    {
+      "title": "Kingdom Come",
+      "tags": ["RPG", "Action", "Adventure"],
+      "author": "Автор 13"
+    },
+    {
+      "title": "Lies of P",
+      "tags": ["Action", "Adventure", "RPG", "Difficult"],
+      "author": "Автор 13"
+    },
+    {
+      "title": "Little Nightmares",
+      "tags": ["Adventure", "Horror", "Puzzle", "Platformer", "Action"],
+      "author": "Автор 13"
+    },
+    {
+      "title": "Metaphor: ReFantazio",
+      "tags": ["Action", "Adventure", "RPG"],
+      "author": "Автор 13"
+    },
+    {
+      "title": "Metro 2033",
+      "tags": ["Shooter", "Horror", "Action"],
+      "author": "Автор 13"
+    },
+    {
+      "title": "Morrowind",
+      "tags": ["RPG", "Adventure", "Action"],
+      "author": "Автор 13"
+    },
+    {
+      "title": "Nier: Automata",
+      "tags": ["Action", "RPG", "Adventure", "Difficult"],
+      "author": "Автор 13"
+    },
+    {
+      "title": "NIGHT-RUNNERS Prologue",
+      "tags": ["Racing", "Action", "Indie"],
+      "author": "Автор 13"
+    },
+    {
+      "title": "No,I'm not a Human",
+      "tags": ["Horror", "Indie", "Cozy"],
+      "author": "Автор 13"
+    },
+    {
+      "title": "Oblivion Remastered",
+      "tags": ["RPG", "Adventure", "Action"],
+      "author": "Автор 13"
+    },
+    {
+      "title": "Ori and the Will of the Wisps",
+      "tags": ["Action", "Adventure", "Puzzle", "Platformer", "Difficult"],
+      "author": "Автор 13"
+    },
+    {
+      "title": "PARANORMASIGHT: The Seven Mysteries of Honjo",
+      "tags": ["Adventure", "Visual Novel", "Horror", "Puzzle"],
+      "author": "Автор 13"
+    },
+    {
+      "title": "Professor Layton Curious Village",
+      "tags": ["Puzzle", "Adventure"],
+      "author": "Автор 13"
+    },
+    {
+      "title": "Scarlet Nexus",
+      "tags": ["Action", "RPG", "Adventure"],
+      "author": "Автор 13"
+    },
+    {
+      "title": "Sea of Stars",
+      "tags": ["Adventure", "Indie", "RPG"],
+      "author": "Автор 13"
+    },
+    {
+      "title": "Shadowrun Hong Kong",
+      "tags": ["RPG", "Adventure", "Indie"],
+      "author": "Автор 13"
+    },
+    {
+      "title": "Shadowrun Returns",
+      "tags": ["RPG", "Adventure", "Indie"],
+      "author": "Автор 13"
+    },
+    {
+      "title": "Shdowrun DragonFall",
+      "tags": ["RPG", "Adventure", "Indie"],
+      "author": "Автор 13"
+    },
+    {
+      "title": "sherlock holmes crimes & punishments",
+      "tags": ["Adventure", "Puzzle"],
+      "author": "Автор 13"
+    },
+    {
+      "title": "Signalis",
+      "tags": ["Action", "Adventure", "Indie", "Puzzle", "Shooter"],
+      "author": "Автор 13"
+    },
+    {
+      "title": "SMT 4",
+      "tags": ["RPG", "Adventure", "Difficult"],
+      "author": "Автор 13"
+    },
+    {
+      "title": "Super Bunny Man",
+      "tags": ["Action", "Indie", "Adventure", "Online Co-Op", "Platformer"],
+      "author": "Автор 13"
+    },
+    {
+      "title": "Tainted Grail: The Fall of Avalon",
+      "tags": ["Action", "Adventure", "Indie", "RPG"],
+      "author": "Автор 13"
+    },
+    {
+      "title": "Tales of Berseria",
+      "tags": ["RPG", "Adventure", "Action"],
+      "author": "Автор 13"
+    },
+    {
+      "title": "The Great Ace Attorney Chronicles",
+      "tags": ["Adventure", "Puzzle", "Visual Novel"],
+      "author": "Автор 13"
+    },
+    {
+      "title": "The Life and Suffering of Sir Brante",
+      "tags": ["RPG", "Adventure", "Indie"],
+      "author": "Автор 13"
+    },
+    {
+      "title": "To the moon",
+      "tags": ["Adventure", "Indie", "RPG"],
+      "author": "Автор 13"
+    },
+    {
+      "title": "Urban Myth Dissolution Center",
+      "tags": ["Adventure", "Horror", "Visual Novel"],
+      "author": "Автор 13"
+    },
+    {
+      "title": "VA-11 Hall-A: Cyberpunk Bartender Action",
+      "tags": ["Visual Novel", "Indie", "Cozy"],
+      "author": "Автор 13"
+    },
+    {
+      "title": "We were here",
+      "tags": ["Puzzle", "Adventure", "Online Co-Op"],
+      "author": "Автор 13"
+    },
+    {
+      "title": "XCOM 2",
+      "tags": ["RPG", "Difficult"],
+      "author": "Автор 13"
+    },
+    {
+      "title": "Cyberpunk 2077",
+      "tags": ["RPG", "Adventure", "Action"],
+      "author": "Автор 14"
+    },
+    {
+      "title": "Amnesia: A Machine for Pigs",
+      "tags": ["Action", "Adventure", "Indie", "Horror", "Puzzle"],
+      "author": "Автор 15"
+    },
+    {
+      "title": "Amnesia: The Bunker",
+      "tags": ["Action", "Adventure", "Indie", "Horror", "Difficult"],
+      "author": "Автор 15"
+    },
+    {
+      "title": "Battlefleet Gothic: Armada 2",
+      "tags": ["Action", "Online Co-Op"],
+      "author": "Автор 15"
+    },
+    {
+      "title": "Blasphemous 1",
+      "tags": ["Platformer", "Action", "Indie", "Difficult"],
+      "author": "Автор 15"
+    },
+    {
+      "title": "Blasphemous 2",
+      "tags": ["Action", "Adventure", "Indie", "Horror", "Platformer", "Difficult"],
+      "author": "Автор 15"
+    },
+    {
+      "title": "Dark souls 2",
+      "tags": ["RPG", "Action", "Difficult", "Adventure"],
+      "author": "Автор 15"
+    },
+    {
+      "title": "Dawn of War 2 Retribution",
+      "tags": ["Action", "RPG", "Online Co-Op"],
+      "author": "Автор 15"
+    },
+    {
+      "title": "Death's Gambit: Afterlife",
+      "tags": ["Action", "Adventure", "Indie", "RPG", "Platformer", "Difficult"],
+      "author": "Автор 15"
+    },
+    {
+      "title": "Ender Lilies 1",
+      "tags": ["Platformer", "Action", "Indie", "Difficult"],
+      "author": "Автор 15"
+    },
+    {
+      "title": "Ender Lilies 2",
+      "tags": ["Platformer", "Action", "Indie", "Difficult"],
+      "author": "Автор 15"
+    },
+    {
+      "title": "Fear and Hunger 2",
+      "tags": ["RPG", "Horror", "Difficult", "Indie"],
+      "author": "Автор 15"
+    },
+    {
+      "title": "From The Darkness",
+      "tags": ["Horror", "Indie", "Adventure"],
+      "author": "Автор 15"
+    },
+    {
+      "title": "GRIME",
+      "tags": ["Action", "Indie", "RPG", "Adventure", "Platformer", "Difficult"],
+      "author": "Автор 15"
+    },
+    {
+      "title": "Halo 1",
+      "tags": ["Shooter", "Action", "Adventure"],
+      "author": "Автор 15"
+    },
+    {
+      "title": "Halo 2",
+      "tags": ["Shooter", "Action", "Adventure"],
+      "author": "Автор 15"
+    },
+    {
+      "title": "Halo 3",
+      "tags": ["Shooter", "Action", "Adventure", "Online Co-Op"],
+      "author": "Автор 15"
+    },
+    {
+      "title": "Halo 4",
+      "tags": ["Shooter", "Action", "Adventure"],
+      "author": "Автор 15"
+    },
+    {
+      "title": "Halo: Reach",
+      "tags": ["Shooter", "Action", "Adventure", "Online Co-Op"],
+      "author": "Автор 15"
+    },
+    {
+      "title": "Home Sweet Home",
+      "tags": ["Horror", "Action", "Adventure"],
+      "author": "Автор 15"
+    },
+    {
+      "title": "Labyrinthine",
+      "tags": ["Action", "Adventure", "Indie", "Horror", "Puzzle", "Online Co-Op"],
+      "author": "Автор 15"
+    },
+    {
+      "title": "Layers of Fear",
+      "tags": ["Horror", "Adventure", "Indie"],
+      "author": "Автор 15"
+    },
+    {
+      "title": "Little Nightmares 2",
+      "tags": ["Platformer", "Horror", "Adventure", "Indie"],
+      "author": "Автор 15"
+    },
+    {
+      "title": "MADiSON",
+      "tags": ["Horror", "Adventure", "Puzzle", "Indie"],
+      "author": "Автор 15"
+    },
+    {
+      "title": "Necropolis",
+      "tags": ["Action", "Rogue-like", "Indie", "Difficult"],
+      "author": "Автор 15"
+    },
+    {
+      "title": "Psychopomp GOLD",
+      "tags": ["Action", "Shooter", "Indie"],
+      "author": "Автор 15"
+    },
+    {
+      "title": "Quake 2",
+      "tags": ["Shooter", "Action", "Difficult"],
+      "author": "Автор 15"
+    },
+    {
+      "title": "REANIMAL",
+      "tags": ["Horror", "Adventure", "Puzzle", "Online Co-Op"],
+      "author": "Автор 15"
+    },
+    {
+      "title": "Resident evil 7",
+      "tags": ["Horror", "Action", "Shooter", "Adventure"],
+      "author": "Автор 15"
+    },
+    {
+      "title": "Sekiro: Shadows Die Twice",
+      "tags": ["Action", "RPG", "Difficult", "Adventure"],
+      "author": "Автор 15"
+    },
+    {
+      "title": "Shattered - Tale of the Forgotten king",
+      "tags": ["Action", "Adventure", "Platformer", "Indie"],
+      "author": "Автор 15"
+    },
+    {
+      "title": "Stalker clear sky",
+      "tags": ["Shooter", "Horror", "Action", "RPG"],
+      "author": "Автор 15"
+    },
+    {
+      "title": "Stygian: Reign of the Old Ones",
+      "tags": ["RPG", "Horror", "Adventure", "Indie"],
+      "author": "Автор 15"
+    },
+    {
+      "title": "Sunless Sea",
+      "tags": ["Adventure", "Indie", "RPG", "Horror", "Rogue-like"],
+      "author": "Автор 15"
+    },
+    {
+      "title": "The evil within 1",
+      "tags": ["Horror", "Action", "Adventure", "Shooter"],
+      "author": "Автор 15"
+    },
+    {
+      "title": "The evil within 2",
+      "tags": ["Action", "Adventure", "Horror", "Shooter"],
+      "author": "Автор 15"
+    },
+    {
+      "title": "The suffering 2",
+      "tags": ["Horror", "Action", "Shooter"],
+      "author": "Автор 15"
+    },
+    {
+      "title": "Total War: Warhammer III",
+      "tags": ["RPG", "Action", "Online Co-Op"],
+      "author": "Автор 15"
+    },
+    {
+      "title": "Visage",
+      "tags": ["Horror", "Adventure", "Indie"],
+      "author": "Автор 15"
+    },
+    {
+      "title": "Warhammer 40,000: Dawn of War - Definitive Edition",
+      "tags": ["Action", "Online Co-Op"],
+      "author": "Автор 15"
+    },
+    {
+      "title": "Warhammer 40,000: Inquisitor - Martyr",
+      "tags": ["Action", "Adventure", "Indie", "RPG", "Online Co-Op"],
+      "author": "Автор 15"
+    },
+    {
+      "title": "Warhammer 40,000: Mechanicus",
+      "tags": ["RPG", "Indie", "Difficult"],
+      "author": "Автор 15"
+    },
+    {
+      "title": "Dungeons of Blood and Dream",
+      "tags": ["Rogue-like", "RPG", "Indie", "Action"],
+      "author": "Автор 16"
+    },
+    {
+      "title": "Dying light",
+      "tags": ["Action", "RPG", "Horror", "Online Co-Op"],
+      "author": "Автор 16"
+    },
+    {
+      "title": "Fallout 4",
+      "tags": ["RPG", "Adventure", "Action", "Shooter"],
+      "author": "Автор 16"
+    },
+    {
+      "title": "Fallout New Vegas",
+      "tags": ["RPG", "Shooter", "Action", "Adventure"],
+      "author": "Автор 16"
+    },
+    {
+      "title": "Postal 2",
+      "tags": ["Action", "Adventure", "Indie", "Shooter", "Cozy"],
+      "author": "Автор 16"
+    },
+    {
+      "title": "Prototype",
+      "tags": ["Action", "Adventure", "Shooter"],
+      "author": "Автор 16"
+    },
+    {
+      "title": "Prototype 2",
+      "tags": ["Action", "Adventure", "Horror", "RPG"],
+      "author": "Автор 16"
+    },
+    {
+      "title": "Skyrim",
+      "tags": ["RPG", "Adventure", "Action"],
+      "author": "Автор 16"
+    },
+    {
+      "title": "Stalker 2",
+      "tags": ["Shooter", "Horror", "Action", "RPG"],
+      "author": "Автор 16"
+    },
+    {
+      "title": "Stalker call",
+      "tags": ["Shooter", "Horror", "Action", "RPG"],
+      "author": "Автор 16"
+    },
+    {
+      "title": "Stalker shadow",
+      "tags": ["Shooter", "Horror", "Action", "RPG"],
+      "author": "Автор 16"
+    },
+    {
+      "title": "Terraria",
+      "tags": ["Action", "Adventure", "Indie", "RPG", "Online Co-Op", "Platformer"],
+      "author": "Автор 16"
+    },
+    {
+      "title": "Need for Speed Undeground",
+      "tags": ["Racing", "Action"],
+      "author": "Автор 17"
+    },
+    {
+      "title": "Persona 3 Reload",
+      "tags": ["RPG", "Adventure", "Difficult"],
+      "author": "Автор 17"
+    },
+    {
+      "title": "Anonymous:Code",
+      "tags": ["Visual Novel", "Adventure", "Indie"],
+      "author": "Автор 18"
+    },
+    {
+      "title": "Jet Set Radio",
+      "tags": ["Action", "Platformer", "Indie"],
+      "author": "Автор 18"
+    },
+    {
+      "title": "SMT3: Nocturne (или ремастер)",
+      "tags": ["RPG", "Adventure", "Difficult"],
+      "author": "Автор 18"
+    },
+    {
+      "title": "Петька и Василий Иванович 2: Судный день. Перезагрузка",
+      "tags": ["Adventure", "Puzzle", "Indie"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "Петька и Василий Иванович 3: Возвращение Аляски. Перезагрузка",
+      "tags": ["Adventure", "Puzzle", "Indie"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "Снусмумрик: Мелодия Муми-дола",
+      "tags": ["Adventure", "Indie"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "штырлиц",
+      "tags": ["Adventure", "Indie"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "A Hat in Time",
+      "tags": ["Adventure", "Indie", "Platformer", "Action", "Cozy"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "A Little to the Left",
+      "tags": ["Indie", "Puzzle", "Cozy"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "A Plague Tale: Innocence",
+      "tags": ["Action", "Adventure", "Horror", "Puzzle"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "A Total War Saga: FALL OF THE SAMURAI",
+      "tags": ["Action", "Online Co-Op"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "Arcanum: Of Steamworks and Magick Obscura",
+      "tags": ["RPG", "Adventure", "Action"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "Assassin's Creed",
+      "tags": ["Action", "Adventure"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "Baba Is You",
+      "tags": ["Indie", "Puzzle", "Difficult"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "BABBDI",
+      "tags": ["Horror", "Adventure", "Indie", "Cozy"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "Chaos on Deponia",
+      "tags": ["Adventure", "Indie", "Puzzle"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "Company of Heroes",
+      "tags": ["Action", "Online Co-Op"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "Company of Heroes 2",
+      "tags": ["Action", "Online Co-Op"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "Company of Heroes 3",
+      "tags": ["Action", "Online Co-Op"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "Crime Scene Cleaner",
+      "tags": ["Indie", "Cozy"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "Cruelty squads",
+      "tags": ["Shooter", "Action", "Indie", "Difficult"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "Crysis",
+      "tags": ["Shooter", "Action", "Adventure"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "Crysis 2",
+      "tags": ["Shooter", "Action", "Adventure"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "Crysis 3",
+      "tags": ["Shooter", "Action", "Adventure"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "DARK SOULS",
+      "tags": ["RPG", "Action", "Difficult", "Adventure"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "DARK SOULS 3",
+      "tags": ["RPG", "Action", "Difficult", "Adventure"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "Darkwood",
+      "tags": ["Horror", "Indie", "Difficult"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "Dead Space",
+      "tags": ["Action", "Adventure", "Horror", "Shooter"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "Devil May Cry 3 Special Edition",
+      "tags": ["Action", "Difficult", "Adventure"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "Devil May Cry 4 Special Edition",
+      "tags": ["Action", "Adventure", "Difficult"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "Diablo 2",
+      "tags": ["RPG", "Action", "Adventure", "Difficult"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "Dice & Fold",
+      "tags": ["Puzzle", "Rogue-like", "Indie", "Cozy"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "Do Not Feed the Monkeys",
+      "tags": ["Adventure", "Indie"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "Don't look outside",
+      "tags": ["Horror", "Indie", "Adventure"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "Dusk",
+      "tags": ["Action", "Indie", "Horror", "Shooter"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "edna and harvey",
+      "tags": ["Adventure", "Puzzle", "Indie", "Cozy"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "F.E.A.R.",
+      "tags": ["Action", "Horror", "Shooter"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "fable",
+      "tags": ["RPG", "Action", "Adventure", "Cozy"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "fable 2",
+      "tags": ["RPG", "Action", "Adventure"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "fallout",
+      "tags": ["RPG", "Action", "Adventure", "Shooter"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "fallout 2",
+      "tags": ["RPG", "Action", "Adventure", "Difficult"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "Far Cry 1",
+      "tags": ["Shooter", "Action", "Adventure"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "Far Cry 3",
+      "tags": ["Action", "Adventure", "Online Co-Op", "RPG", "Shooter"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "Felvidek",
+      "tags": ["Indie", "RPG"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "Final Fantasy X",
+      "tags": ["RPG", "Adventure", "Action"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "Grim fandango",
+      "tags": ["Adventure", "Puzzle"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "Heroes of Might & Magic V",
+      "tags": ["RPG", "Adventure"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "Hylics",
+      "tags": ["Indie", "RPG", "Adventure"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "Hylics 2",
+      "tags": ["RPG", "Adventure", "Platformer"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "LISA: The Painful",
+      "tags": ["Adventure", "Indie", "RPG", "Horror"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "Magicka",
+      "tags": ["Action", "RPG", "Adventure", "Online Co-Op", "Difficult"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "Might and magic dark messiah",
+      "tags": ["Action", "Adventure", "RPG", "Difficult"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "Patapon 2",
+      "tags": ["Action", "Indie", "Cozy"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "Pathologic 2",
+      "tags": ["Adventure", "Indie", "RPG", "Difficult"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "Pathologic 3",
+      "tags": ["Adventure", "Horror", "RPG", "Difficult"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "penumbra",
+      "tags": ["Horror", "Puzzle", "Adventure", "Indie"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "planescape torment",
+      "tags": ["RPG", "Adventure", "Indie"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "Space Warlord Organ Trading Simulator",
+      "tags": ["Puzzle", "Indie"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "tom clancy's ghost recon future soldier",
+      "tags": ["Shooter", "Action", "Adventure"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "Vagante",
+      "tags": [
+        "Action",
+        "Adventure",
+        "Indie",
+        "RPG",
+        "Online Co-Op",
+        "Platformer",
+        "Rogue-like",
+        "Difficult"
+      ],
+      "author": "Автор 19"
+    },
+    {
+      "title": "voices of the void",
+      "tags": ["Horror", "Indie", "Adventure"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "white knuckle",
+      "tags": ["Horror", "Action", "Indie", "Difficult"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "wings of vi",
+      "tags": ["Platformer", "Action", "Difficult", "Indie"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "Yakuza: Like a Dragon",
+      "tags": ["RPG", "Action", "Adventure"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "Готика 2 Ночь Ворона",
+      "tags": ["RPG", "Action", "Adventure", "Difficult"],
+      "author": "Автор 20"
+    },
+    {
+      "title": "Dragon Age Origins",
+      "tags": ["RPG", "Action", "Adventure", "Difficult"],
+      "author": "Автор 20"
+    },
+    {
+      "title": "Peripeteia",
+      "tags": ["Shooter", "Action", "RPG", "Indie"],
+      "author": "Автор 20"
+    },
+    {
+      "title": "XCOM EW",
+      "tags": ["RPG", "Difficult"],
+      "author": "Автор 20"
+    },
+    {
+      "title": "Cloudpunk",
+      "tags": ["Adventure", "Indie", "RPG", "Action", "Cozy"],
+      "author": "Автор 21"
+    },
+    {
+      "title": "Dead Cells",
+      "tags": ["Action", "Adventure", "Indie", "Platformer", "Rogue-like", "Difficult"],
+      "author": "Автор 21"
+    },
+    {
+      "title": "Deathloop",
+      "tags": ["Shooter", "Action", "Adventure", "Indie"],
+      "author": "Автор 21"
+    },
+    {
+      "title": "Firewatch",
+      "tags": ["Adventure", "Indie", "Horror", "Cozy"],
+      "author": "Автор 21"
+    },
+    {
+      "title": "Frostpunk",
+      "tags": ["RPG", "Difficult", "Indie"],
+      "author": "Автор 21"
+    },
+    {
+      "title": "Ghostrunner 2",
+      "tags": ["Action", "Platformer", "Shooter", "Difficult"],
+      "author": "Автор 21"
+    },
+    {
+      "title": "Katawa Shoujo",
+      "tags": ["Indie", "Visual Novel"],
+      "author": "Автор 21"
+    },
+    {
+      "title": "Risk of Rain 2",
+      "tags": ["Action", "Indie", "Online Co-Op", "Rogue-like", "Shooter", "Difficult"],
+      "author": "Автор 21"
+    },
+    {
+      "title": "Satisfactory",
+      "tags": ["Indie", "Online Co-Op"],
+      "author": "Автор 21"
+    },
+    {
+      "title": "Superhot",
+      "tags": ["Action", "Indie", "Adventure", "Puzzle", "Shooter", "Difficult"],
+      "author": "Автор 21"
+    },
+    {
+      "title": "while True: learn()",
+      "tags": ["Puzzle", "Indie"],
+      "author": "Автор 21"
+    },
+    {
+      "title": "gta 4",
+      "tags": ["Action", "Adventure", "Shooter"],
+      "author": "Автор 22"
+    },
+    {
+      "title": "gta 5",
+      "tags": ["Action", "Adventure", "Shooter"],
+      "author": "Автор 22"
+    },
+    {
+      "title": "Свен - Овечья любовь",
+      "tags": ["Adventure", "Indie"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "DuneCrawl",
+      "tags": ["Action", "Adventure", "Indie"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Death Machine",
+      "tags": ["Action", "Indie"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Профессор Галактионов и начало робоапокалипсиса",
+      "tags": ["Adventure", "Indie"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "ODDCORE",
+      "tags": ["Horror", "Indie", "Action"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "One Turn Kill",
+      "tags": ["RPG", "Indie"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Psycho (2026)",
+      "tags": ["Horror", "Action", "Indie"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Tabulo",
+      "tags": ["Puzzle", "Indie"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Project KILLDANCE",
+      "tags": ["Action", "Indie"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Toilet 8",
+      "tags": ["Horror", "Indie"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Cairn",
+      "tags": ["Adventure", "Indie", "Action"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Dark Auction",
+      "tags": ["Adventure", "RPG", "Indie"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Nioh 3",
+      "tags": ["Action", "RPG", "Difficult"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Tearscape",
+      "tags": ["RPG", "Adventure", "Indie"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Lovish",
+      "tags": ["Visual Novel", "Indie"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "UMIGARI",
+      "tags": ["Adventure", "Indie"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Master of Piece",
+      "tags": ["Puzzle", "Indie"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Luhor's Memory",
+      "tags": ["Adventure", "Indie", "Puzzle"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Weeny Wise",
+      "tags": ["Adventure", "Indie"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Ritual Party",
+      "tags": ["Horror", "Indie", "Adventure"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Towerbolt",
+      "tags": ["Action", "Indie", "Platformer"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Esoteric Ebb",
+      "tags": ["RPG", "Adventure", "Indie"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Homura Hime",
+      "tags": ["Action", "Indie", "Shooter"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Legacy of Kain: Defiance Remastered",
+      "tags": ["Action", "Adventure", "RPG"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Scott Pilgrim EX",
+      "tags": ["Action", "Indie", "Platformer"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Banquet for Fools",
+      "tags": ["RPG", "Adventure", "Indie", "Horror"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Never Grave: The Witch and The Curse",
+      "tags": ["Action", "Rogue-like", "Indie", "Platformer"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "GreedFall: The Dying World",
+      "tags": ["RPG", "Action", "Adventure"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Solasta II",
+      "tags": ["RPG", "Adventure", "Indie"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Fatal Frame II: Crimson Butterfly Remake",
+      "tags": ["Horror", "Adventure", "Action"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "1348 Ex Voto",
+      "tags": ["Horror", "Adventure", "Indie"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Dragonkin: The Banished",
+      "tags": ["RPG", "Action", "Indie"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Project Songbird",
+      "tags": ["Shooter", "Action", "Indie"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Screamer (2026)",
+      "tags": ["Racing", "Action", "Indie"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Super Meat Boy 3D",
+      "tags": ["Platformer", "Action", "Difficult", "Indie"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Grime II",
+      "tags": ["Action", "RPG", "Indie", "Difficult"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Aether & Iron",
+      "tags": ["Action", "Indie"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "The Posthumous Investigation",
+      "tags": ["Adventure", "Puzzle", "Indie"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "ЯР: Забытый Чертог",
+      "tags": ["Horror", "Adventure", "Indie"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Guns and Nuns: Storming Hell",
+      "tags": ["Action", "Shooter", "Indie"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Samson",
+      "tags": ["Action", "Indie", "Platformer"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Morbid Metal",
+      "tags": ["Action", "Indie", "Shooter"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "The Occultist",
+      "tags": ["Horror", "Adventure", "Action", "Indie"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "NO MORE WORK FOR ITO",
+      "tags": ["Action", "Indie", "Shooter"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Replaced",
+      "tags": ["Action", "Adventure", "Indie", "Platformer"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "MOUSE: P.I. For Hire",
+      "tags": ["Shooter", "Action", "Adventure", "Indie"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Cthulhu: The Cosmic Abyss",
+      "tags": ["Horror", "Adventure", "Puzzle", "Indie"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Ground Zero",
+      "tags": ["Horror", "Action", "Indie"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Былина",
+      "tags": ["RPG", "Adventure", "Indie"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "inKONBINI: One Store. Many Stories.",
+      "tags": ["Adventure", "Indie", "Visual Novel"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Dead as Disco",
+      "tags": ["Action", "Indie", "Cozy"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Celestial Return",
+      "tags": ["Adventure", "Indie", "Puzzle"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Call of the Elder Gods",
+      "tags": ["Horror", "Adventure", "Indie"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "LEGO Batman: Legacy of the Dark Knight",
+      "tags": ["Action", "Adventure"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Coffee Talk Tokyo",
+      "tags": ["Visual Novel", "Indie"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Bubsy 4D",
+      "tags": ["Platformer", "Action", "Indie"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "ZERO PARADES: For Dead Spies",
+      "tags": ["Puzzle", "Indie"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Luna Abyss",
+      "tags": ["Shooter", "Action", "Adventure", "Indie"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Phonopolis",
+      "tags": ["Adventure", "Puzzle", "Indie"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Mina the Hollower",
+      "tags": ["Action", "Adventure", "Indie", "Platformer"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Fatekeeper",
+      "tags": ["RPG", "Adventure", "Indie"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Sister Ray",
+      "tags": ["Shooter", "Action", "Indie"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Killer Bean",
+      "tags": ["Shooter", "Action", "Indie", "Cozy"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Witchspire",
+      "tags": ["RPG", "Action", "Indie", "Platformer"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "The Adventures of Elliot: The Millennium Tales",
+      "tags": ["Adventure", "Indie"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Rhythm Heaven Groove",
+      "tags": ["Indie"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Denshattack!",
+      "tags": ["Action", "Indie"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Tears of Metal",
+      "tags": ["Action", "RPG", "Indie"],
+      "author": "Автор 5"
+    },
+    {
+      "title": "Witchfire",
+      "tags": ["Shooter", "Action", "RPG", "Indie"],
+      "author": "Автор 23"
+    },
+    {
+      "title": "Odin Sphere",
+      "tags": ["Action", "RPG", "Adventure", "Indie"],
+      "author": "Автор 24"
+    },
+    {
+      "title": "Mahou Shoujo no Mahou Saiban",
+      "tags": ["Adventure", "Visual Novel", "Indie"],
+      "author": "Автор 24"
+    },
+    {
+      "title": "Готика Ремейк",
+      "tags": ["RPG", "Action", "Adventure", "Difficult"],
+      "author": "Автор 20"
+    },
+    {
+      "title": "Nehrim",
+      "tags": ["RPG", "Action", "Adventure", "Indie"],
+      "author": "Автор 8"
+    },
+    {
+      "title": "Terra Invicta",
+      "tags": ["RPG", "Indie", "Difficult"],
+      "author": "Автор 8"
+    },
+    {
+      "title": "Knights of the Old Republic",
+      "tags": ["RPG", "Adventure", "Action"],
+      "author": "Автор 8"
+    },
+    {
+      "title": "Knights of the Old Republic II",
+      "tags": ["RPG", "Adventure", "Action"],
+      "author": "Автор 8"
+    },
+    {
+      "title": "Prophesy of Pendor",
+      "tags": ["RPG", "Action", "Adventure", "Difficult"],
+      "author": "Автор 8"
+    },
+    {
+      "title": "salt and sanctuary",
+      "tags": ["Action", "Indie", "RPG", "Horror", "Adventure", "Platformer", "Difficult"],
+      "author": "Автор 25"
+    },
+    {
+      "title": "metal hellsinger",
+      "tags": ["Shooter", "Action", "Indie", "Difficult"],
+      "author": "Автор 25"
+    },
+    {
+      "title": "enclave",
+      "tags": ["Action", "RPG", "Adventure"],
+      "author": "Автор 25"
+    },
+    {
+      "title": "granny 3",
+      "tags": ["Horror", "Action", "Indie"],
+      "author": "Автор 25"
+    },
+    {
+      "title": "murdered soul suspect",
+      "tags": ["Adventure", "Action", "Horror", "Indie"],
+      "author": "Автор 25"
+    },
+    {
+      "title": "fears to fathom scratch creek",
+      "tags": ["Horror", "Adventure", "Indie"],
+      "author": "Автор 25"
+    },
+    {
+      "title": "Dwarf Fortress",
+      "tags": ["RPG", "Indie", "Difficult"],
+      "author": "Автор 24"
+    },
+    {
+      "title": "trepang2",
+      "tags": ["Action", "Indie", "Horror", "Shooter", "Difficult"],
+      "author": "Автор 25"
+    },
+    {
+      "title": "trine 2",
+      "tags": ["Puzzle", "Platformer", "Adventure", "Indie", "Online Co-Op"],
+      "author": "Автор 25"
+    },
+    {
+      "title": "outer worlds",
+      "tags": ["RPG", "Shooter", "Action", "Adventure"],
+      "author": "Автор 25"
+    },
+    {
+      "title": "road 96",
+      "tags": ["Adventure", "Indie", "Cozy"],
+      "author": "Автор 25"
+    },
+    {
+      "title": "Red Dead Redemption 2",
+      "tags": ["Action", "Adventure", "Shooter"],
+      "author": "Автор 8"
+    },
+    {
+      "title": "south park the stick of truth",
+      "tags": ["RPG", "Adventure", "Indie"],
+      "author": "Автор 25"
+    },
+    {
+      "title": "observer",
+      "tags": ["Horror", "Adventure", "Indie", "Action"],
+      "author": "Автор 25"
+    },
+    {
+      "title": "Magicka 2",
+      "tags": ["Action", "Adventure", "Online Co-Op", "RPG"],
+      "author": "Автор 8"
+    },
+    {
+      "title": "METAL GEAR SOLID V: THE PHANTOM PAIN",
+      "tags": ["Action", "Adventure", "Shooter"],
+      "author": "Автор 8"
+    },
+    {
+      "title": "Блицкриг 1",
+      "tags": ["Action", "Online Co-Op"],
+      "author": "Автор 23"
+    },
+    {
+      "title": "Path of exile 2",
+      "tags": ["RPG", "Action", "Adventure", "Difficult"],
+      "author": "Автор 23"
+    },
+    {
+      "title": "Little Nightmares 3",
+      "tags": ["Platformer", "Horror", "Adventure", "Indie"],
+      "author": "Автор 23"
+    },
+    {
+      "title": "resident evil requiem",
+      "tags": ["Horror", "Action", "Adventure", "Indie"],
+      "author": "Автор 23"
+    },
+    {
+      "title": "resident evil village",
+      "tags": ["Horror", "Action", "Shooter", "Adventure"],
+      "author": "Автор 23"
+    },
+    {
+      "title": "The Kindeman Remedy",
+      "tags": ["Horror", "Adventure", "Indie"],
+      "author": "Автор 23"
+    },
+    {
+      "title": "Total War: Warhammer II",
+      "tags": ["RPG", "Action", "Online Co-Op"],
+      "author": "Автор 23"
+    },
+    {
+      "title": "Total War: Warhammer I",
+      "tags": ["RPG", "Action", "Online Co-Op"],
+      "author": "Автор 23"
+    },
+    {
+      "title": "Dawn of War 2",
+      "tags": ["Action", "RPG", "Online Co-Op"],
+      "author": "Автор 23"
+    },
+    {
+      "title": "Dawn of War 2 Chaos Rising",
+      "tags": ["Action", "RPG", "Online Co-Op"],
+      "author": "Автор 23"
+    },
+    {
+      "title": "Warhammer Space Marine 1",
+      "tags": ["Shooter", "Action", "Adventure"],
+      "author": "Автор 23"
+    },
+    {
+      "title": "CARRION",
+      "tags": ["Action", "Adventure", "Indie", "Horror", "Puzzle", "Platformer"],
+      "author": "Автор 23"
+    },
+    {
+      "title": "Escape the Backrooms",
+      "tags": ["Action", "Horror", "Adventure", "Online Co-Op"],
+      "author": "Автор 23"
+    },
+    {
+      "title": "DREDGE",
+      "tags": ["Adventure", "RPG", "Horror"],
+      "author": "Автор 23"
+    },
+    {
+      "title": "Assassin's Creed Rogue",
+      "tags": ["Action", "Adventure"],
+      "author": "Автор 23"
+    },
+    {
+      "title": "Darkest Dungeon 2",
+      "tags": ["RPG", "Rogue-like", "Difficult", "Indie"],
+      "author": "Автор 23"
+    },
+    {
+      "title": "Whispers of the Eyeless",
+      "tags": ["RPG", "Rogue-like", "Indie", "Horror"],
+      "author": "Автор 23"
+    },
+    {
+      "title": "neverending nightmares",
+      "tags": ["Action", "Adventure", "Indie", "Horror"],
+      "author": "Автор 23"
+    },
+    {
+      "title": "Total Chaos",
+      "tags": ["Horror", "Action", "Shooter", "Indie"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "Silent Hill 4",
+      "tags": ["Horror", "Adventure", "Action"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "The Procession to Calvary",
+      "tags": ["Adventure", "Puzzle", "Indie"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "Creature Kitchen",
+      "tags": ["Indie", "Puzzle", "Cozy"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "Burden Street Station",
+      "tags": ["Horror", "Adventure", "Indie"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "I Am Jesus Christ",
+      "tags": ["Adventure", "Indie"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "Dating 4 girls",
+      "tags": ["Visual Novel", "Indie"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "About Fishing",
+      "tags": ["Indie", "Cozy"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "Space Warlord Baby Trading Simulator",
+      "tags": ["Puzzle", "Indie"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "Half Sword",
+      "tags": ["Action", "Indie", "Difficult"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "Hi-Fi RUSH",
+      "tags": ["Action", "Adventure", "Platformer"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "Out of Hands",
+      "tags": ["Puzzle", "Indie", "Horror"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "Four Last Things",
+      "tags": ["Adventure", "Puzzle", "Indie"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "Blood Money: Lethal Eden",
+      "tags": ["Action", "Adventure", "Indie"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "Winter Burrow",
+      "tags": ["Adventure", "Indie", "Cozy"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "CARIMARA: Beneath the forlorn limbs",
+      "tags": ["Horror", "Adventure", "Indie"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "The Operator",
+      "tags": ["Puzzle", "Adventure", "Indie"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "While We Wait Here",
+      "tags": ["Horror", "Adventure", "Indie"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "BRAZILIAN DRUG DEALER 3: I OPENED A PORTAL TO HELL IN THE FAVELA TRYING TO REVIVE MIT AIA",
+      "tags": ["Horror", "Action", "Shooter", "Indie"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "Static Dread: The Lighthouse",
+      "tags": ["Horror", "Adventure", "Indie"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "Hard Time III",
+      "tags": ["Action", "Indie"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "Yes,Your Grace",
+      "tags": ["RPG", "Adventure", "Indie"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "Labyrinth of The Demon King",
+      "tags": ["RPG", "Action", "Horror", "Indie", "Difficult"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "Secret Agent Wizard Boy and the International Crime Syndicate",
+      "tags": ["Action", "Adventure", "Indie"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "arctic eggs",
+      "tags": ["Indie", "Puzzle"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "Thank Goodness You're Here!",
+      "tags": ["Adventure", "Indie", "Puzzle", "Platformer"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "Чел я просто хочу домой",
+      "tags": ["Horror", "Adventure", "Indie"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "Fallen Aces",
+      "tags": ["Shooter", "Action", "Indie"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "MULLET MAD JACK",
+      "tags": ["Shooter", "Action", "Indie", "Difficult"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "The Choice of Life: Middle Ages 2",
+      "tags": ["RPG", "Indie"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "Neyasnoe",
+      "tags": ["Adventure", "Indie"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "super crazy rhythm castle",
+      "tags": ["Puzzle", "Indie", "Online Co-Op"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "sanabi",
+      "tags": ["Action", "Adventure", "Indie", "Platformer", "Difficult"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "no case should remain unsolved",
+      "tags": ["Adventure", "Indie", "Puzzle", "Visual Novel"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "agatha christie: hercule poirot - the first cases",
+      "tags": ["Adventure", "Puzzle"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "luminenight",
+      "tags": ["Puzzle", "Adventure", "Indie"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "agatha christie: murder on the orient express",
+      "tags": ["Adventure", "Puzzle"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "bugs bunny & taz: time busters",
+      "tags": ["Platformer", "Adventure", "Action"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "Beyond Good&Evil",
+      "tags": ["Action", "Adventure", "Puzzle", "Cozy"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "bokura",
+      "tags": ["Adventure", "Puzzle", "Online Co-Op", "Indie"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "chained echoes",
+      "tags": ["Indie", "RPG", "Adventure"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "corpse party",
+      "tags": ["Horror", "Adventure", "Visual Novel", "Indie"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "crypt custodian",
+      "tags": ["Action", "Rogue-like", "Indie"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "death of the reprobate",
+      "tags": ["Adventure", "Puzzle", "Indie"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "downfall",
+      "tags": ["Horror", "Adventure", "Indie", "Visual Novel"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "dropsy",
+      "tags": ["Adventure", "Indie", "Puzzle"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "en garde!",
+      "tags": ["Action", "Adventure", "Indie"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "forbidden siren",
+      "tags": ["Horror", "Action", "Adventure", "Difficult"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "homesick",
+      "tags": ["Puzzle", "Adventure", "Indie"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "kalimba",
+      "tags": ["Platformer", "Puzzle", "Indie"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "Athanasy",
+      "tags": ["Visual Novel", "Adventure", "Indie", "Horror"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "Тварюк",
+      "tags": ["Adventure", "Horror", "Indie"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "Lost Infinity",
+      "tags": ["Adventure", "RPG", "Indie"],
+      "author": "Автор 19"
+    },
+    {
+      "title": "Torchlight 2",
+      "tags": ["RPG", "Action", "Indie"],
+      "author": "Автор 17"
+    },
+    {
+      "title": "Hammerwatch 2",
+      "tags": ["Action", "RPG", "Indie", "Online Co-Op"],
+      "author": "Автор 17"
+    },
+    {
+      "title": "Untitled Goose Game",
+      "tags": ["Action", "Indie", "Adventure", "Puzzle"],
+      "author": "Автор 17"
+    },
+    {
+      "title": "ANIMAL WELL",
+      "tags": ["Action", "Adventure", "Indie", "Horror", "Puzzle", "Platformer"],
+      "author": "Автор 17"
+    },
+    {
+      "title": "OMORI",
+      "tags": ["Adventure", "Indie", "RPG", "Horror"],
+      "author": "Автор 3"
+    },
+    {
+      "title": "Earthbound",
+      "tags": ["Adventure", "RPG", "Horror"],
+      "author": "Автор 3"
+    },
+    {
+      "title": "Deltarune",
+      "tags": ["Action", "Adventure", "Indie", "Horror", "Puzzle", "Platformer"],
+      "author": "Автор 3"
+    },
+    {
+      "title": "Super Mario 64",
+      "tags": ["Action", "Adventure", "Platformer"],
+      "author": "Автор 3"
+    }
+  ]
+}

@@ -116,6 +116,12 @@
 - Выгрузить незакрытые: админом `GET /api/admin/bug-reports/export` (скачивается `bug-reports-….json`; `?all=true` — все), затем в Claude Code `/import-bugs <путь к файлу>`.
 - Перенесённые в `docs/BUGS.md` отметить «в работе»: `PUT /api/admin/bug-reports/{id}/status {"commandId": "<новый guid>", "status": "inWork"}`, исправленные — `"closed"`.
 
+## Демо-сезон и локальные сиды
+
+- `npm run dev` — маленький сид в `var/dev.db` (admin, vasya, petya, masha, kolya, dasha, zritel; пароль — `DevSeed:Password` в `appsettings.Development.json`).
+- `npm run seed:demo` — демо-сезон заново в `var/demo.db` (admin, zritel, player01…player16), `npm run dev:demo` — сайт на нём. Проверка: `npm run season:check -- de300000-0000-0000-0000-000000000001 --db var/demo.db`.
+- Демо-пул из таблицы (после её обновления): `dotnet run --project src/GameEvent.Tools.Import -- pool-demo data/import/games.xlsx content/pool.demo.json`; затем `npm run format:file -- content/pool.demo.json` (Prettier); перед коммитом убедиться, что в файле нет ников.
+
 ## Импорт пула из таблицы
 
 - Файл — в `data/import/` (не в git). Сначала отчёт: `npm run import:xlsx -- data/import/games.xlsx --report-only --db <путь к базе>` — сколько игр и категорий добавится, повторы в таблице, уже имеющиеся в пуле, похожие названия (проверить руками), строки с ошибками.

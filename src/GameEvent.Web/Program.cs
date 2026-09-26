@@ -1,12 +1,12 @@
 using GameEvent.Web.Hosting;
 
 // Commands: (none) — run the site; `migrate` — apply migrations and exit (a separate deployment step, D-27);
-// `seed-dev` — fill a local database for development and exit.
+// `seed-dev` — fill a local database for development and exit; `seed-demo` — the demo season (16 players, bots, F2).
 var command = args.FirstOrDefault();
 
 var builder = WebApplication.CreateBuilder(args);
 builder.AddGameEvent();
-if (command == "seed-dev")
+if (command is "seed-dev" or "seed-demo")
 {
     builder.WebHost.UseUrls("http://127.0.0.1:0");
 }
@@ -20,16 +20,25 @@ switch (command)
         await AppSetup.MigrateAsync(app.Configuration);
         return 0;
 
-    case "seed-dev":
+    case "seed-dev" or "seed-demo":
         if (!app.Environment.IsDevelopment())
         {
-            await Console.Error.WriteLineAsync("seed-dev runs only in the Development environment.");
+            await Console.Error.WriteLineAsync($"{command} runs only in the Development environment.");
             return 1;
         }
 
         await AppSetup.MigrateAsync(app.Configuration);
         await app.StartAsync();
-        await DevSeed.RunAsync(app.Services, Path.GetFullPath(Path.Combine(app.Environment.ContentRootPath, "..", "..")));
+        var contentRoot = Path.GetFullPath(Path.Combine(app.Environment.ContentRootPath, "..", ".."));
+        if (command == "seed-demo")
+        {
+            await DemoSeed.RunAsync(app.Services, contentRoot);
+        }
+        else
+        {
+            await DevSeed.RunAsync(app.Services, contentRoot);
+        }
+
         await app.StopAsync();
         return 0;
 

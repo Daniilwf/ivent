@@ -33,6 +33,21 @@ public sealed record PoolImportPlan(
 /// <summary>What the import did: games and categories written, and refusals by the queue.</summary>
 public sealed record PoolImportResult(int GamesAdded, int CategoriesSet, IReadOnlyList<string> Refused);
 
+/// <summary>A game of a pool file in <c>content/</c>: the seeds load these through the queue (D-126).</summary>
+public sealed record PoolFileGame(string Title, IReadOnlyList<string> Tags, decimal? Hours = null, string? Note = null, string? Author = null);
+
+public sealed record PoolFileCategory(string Name, int Weight);
+
+/// <summary>
+/// A pool as a file in <c>content/</c> (pool.dev.json, pool.demo.json). <c>NotesDropped</c> — how many notes of the table
+/// a demo pool left out (not written to the file).
+/// </summary>
+public sealed record PoolFile(IReadOnlyList<PoolFileCategory> Categories, IReadOnlyList<PoolFileGame> Games)
+{
+    [System.Text.Json.Serialization.JsonIgnore]
+    public int NotesDropped { get; init; }
+}
+
 /// <summary>
 /// The one-time import of the pool from the table «Игры крутить» (SPEC «Импорт», F1, D-125): sheet «Игры» — A the title,
 /// B the tags (the computed values of their formulas, separated by commas), C who added it, D the note; sheet «Категории»
@@ -180,6 +195,47 @@ public static class PoolImport
         }
 
         return new PoolImportResult(added, set, refused);
+    }
+
+    /// <summary>How the pool files in <c>content/</c> are written: camelCase, Cyrillic as it is, indented.</summary>
+    public static readonly System.Text.Json.JsonSerializerOptions DemoJson = new(System.Text.Json.JsonSerializerDefaults.Web)
+    {
+        WriteIndented = true,
+        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
+    };
+
+    /// <summary>
+    /// The table as a demo pool for git (D-30, D-126): the cards as the import would store them, a title once, the
+    /// authors as «Автор N» in the order they first appear, and no notes — a note may name a player the author column
+    /// does not (one did), and the table's nicknames never reach the public repository.
+    /// </summary>
+    public static PoolFile DemoPool(ImportedTable table)
+    {
+        ArgumentNullException.ThrowIfNull(table);
+        var authors = table.Games.Select(g => g.Author).OfType<string>().Select(a => a.Trim()).Where(a => a.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        var games = new List<PoolFileGame>();
+        var dropped = 0;
+        foreach (var game in table.Games)
+        {
+            var (card, _) = PoolRules.Normalize(new GameCard(game.Title, [.. game.Tags], null, null, null, null, game.Note, false));
+            if (card is null || games.Any(g => PoolRules.IsSame(g.Title, card.Title)))
+            {
+                continue;
+            }
+
+            if (card.Note is not null)
+            {
+                dropped++;
+            }
+
+            var author = game.Author is { } name ? $"Автор {authors.FindIndex(a => string.Equals(a, name.Trim(), StringComparison.OrdinalIgnoreCase)) + 1}" : null;
+            games.Add(new PoolFileGame(card.Title, [.. card.Tags], null, null, author));
+        }
+
+        var categories = table.Categories.GroupBy(c => c.Name, StringComparer.OrdinalIgnoreCase).Select(g => new PoolFileCategory(g.Last().Name, g.Last().Weight)).ToList();
+        return new PoolFile(categories, games) { NotesDropped = dropped };
     }
 
     /// <summary>The plan as a report for a person: what will be added and every reason something is left out.</summary>
