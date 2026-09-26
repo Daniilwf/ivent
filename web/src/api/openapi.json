@@ -7416,93 +7416,6 @@
         },
         "description": "A run of a game in any season, with its review if there is one (the game page, D-124). `token` — the player's place\nin that season's list of players, their token colour there (D-150)."
       },
-      "GameView": {
-        "required": [
-          "id",
-          "title",
-          "tags",
-          "hours",
-          "year",
-          "steamAppId",
-          "cover",
-          "note",
-          "isCoop",
-          "author",
-          "isDeleted",
-          "completionCondition"
-        ],
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "title": {
-            "type": "string"
-          },
-          "tags": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "hours": {
-            "type": [
-              "null",
-              "number"
-            ],
-            "format": "double"
-          },
-          "year": {
-            "type": [
-              "null",
-              "integer"
-            ],
-            "format": "int32"
-          },
-          "steamAppId": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "cover": {
-            "oneOf": [
-              {
-                "type": "null"
-              },
-              {
-                "$ref": "#/components/schemas/FileLinkView"
-              }
-            ]
-          },
-          "note": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "isCoop": {
-            "type": "boolean"
-          },
-          "author": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "isDeleted": {
-            "type": "boolean"
-          },
-          "completionCondition": {
-            "type": [
-              "null",
-              "string"
-            ]
-          }
-        },
-        "description": "A game of the pool as everyone sees it (D-119); `author` — the name of the account that added it, or the author as\nthe imported table names them (D-125); none for the seed."
-      },
       "HostileCap": {
         "required": [
           "enabled",
@@ -9290,7 +9203,7 @@
             "format": "double"
           }
         },
-        "description": "The game of a run: its title and hours. Named apart from the pool's GameView: the OpenAPI document\nkeys schemas by type name, so two records called GameView became one schema and the pool lost its fields (D-161)."
+        "description": "The game of a run: its title and hours. Named apart from the pool's PoolGameView: the OpenAPI document\nkeys schemas by type name, so two records called GameView became one schema and the pool lost its fields (D-161)."
       },
       "RunStatus": {
         "enum": [

@@ -6091,27 +6091,6 @@ export interface components {
             /** Format: int32 */
             token: number;
         };
-        /**
-         * @description A game of the pool as everyone sees it (D-119); `author` — the name of the account that added it, or the author as
-         *     the imported table names them (D-125); none for the seed.
-         */
-        GameView: {
-            /** Format: uuid */
-            id: string;
-            title: string;
-            tags: string[];
-            /** Format: double */
-            hours: null | number;
-            /** Format: int32 */
-            year: null | number;
-            steamAppId: null | string;
-            cover: null | components["schemas"]["FileLinkView"];
-            note: null | string;
-            isCoop: boolean;
-            author: null | string;
-            isDeleted: boolean;
-            completionCondition: null | string;
-        };
         HostileCap: {
             enabled: boolean;
             /** Format: int32 */
@@ -6659,7 +6638,7 @@ export interface components {
             deadline?: null | string;
         };
         /**
-         * @description The game of a run: its title and hours. Named apart from the pool's GameView: the OpenAPI document
+         * @description The game of a run: its title and hours. Named apart from the pool's PoolGameView: the OpenAPI document
          *     keys schemas by type name, so two records called GameView became one schema and the pool lost its fields (D-161).
          */
         RunGameView: {
