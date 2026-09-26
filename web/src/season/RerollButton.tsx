@@ -45,6 +45,11 @@ export function RerollButton({
         aria-label={ru.turn.reroll}
         data-testid="reroll-confirm"
         className="grid w-full scroll-mb-28 gap-3 rounded-md bg-muted p-3"
+        onKeyDown={(e) => {
+          if (e.key !== 'Escape') return;
+          back.current = true;
+          setConfirming(false);
+        }}
       >
         <p ref={question} tabIndex={-1} className="focus:outline-none">
           {ru.turn.rerollConfirm(price.payment, price.coins)}

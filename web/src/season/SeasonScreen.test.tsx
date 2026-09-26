@@ -907,6 +907,17 @@ describe('SeasonScreen reroll price and manual effects (D-93)', () => {
     await vi.waitFor(() => {
       expect(screen.getByTestId('reroll')).toHaveFocus();
     });
+
+    // Escape cancels it too
+    await userEvent.click(screen.getByTestId('reroll'));
+    await vi.waitFor(() => {
+      expect(screen.getByText(ru.turn.rerollConfirm('coins', 5))).toHaveFocus();
+    });
+    await userEvent.keyboard('{Escape}');
+    expect(screen.queryByTestId('reroll-confirm')).not.toBeInTheDocument();
+    await vi.waitFor(() => {
+      expect(screen.getByTestId('reroll')).toHaveFocus();
+    });
   });
 
   it('lists pending manual effects of the player', async () => {
@@ -2015,6 +2026,10 @@ describe('SeasonScreen wheel (H3, D-136)', () => {
     const landed = screen.getByTestId('wheel');
     await userEvent.click(within(landed).getByRole('button', { name: ru.moments.wheel.toMap }));
     expect(screen.queryByTestId('wheel')).not.toBeInTheDocument();
+    // The button went with the stage: the focus is on the rolled game
+    await vi.waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Silent Hill' })).toHaveFocus();
+    });
   });
 
   it('spins again for a reroll', async () => {

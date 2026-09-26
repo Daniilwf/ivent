@@ -305,23 +305,29 @@ export function SeasonScreen({
                 )}
               </p>
             )}
-            <ProofSection
-              proof={me.lastCompleted.proof ?? null}
-              pending={pending}
-              witnesses={season.players.filter((p) => p.id !== me.playerId)}
-              onSubmit={(links, note, witnessId, files) => {
-                if (me.lastCompleted) {
-                  void act({
-                    kind: 'proof',
-                    runId: me.lastCompleted.id,
-                    links,
-                    note,
-                    witnessId,
-                    files,
-                  });
-                }
-              }}
-            />
+            {/* The proof form folds into one line: it is not a to-do that holds the roll (H3 design review) */}
+            <details data-testid="proof-details" className="grid gap-2">
+              <summary className="min-h-11 cursor-pointer content-center rounded-md font-bold is-focus:focus-ring">
+                {me.lastCompleted.proof ? ru.turn.proofSummary : ru.turn.proofToSend}
+              </summary>
+              <ProofSection
+                proof={me.lastCompleted.proof ?? null}
+                pending={pending}
+                witnesses={season.players.filter((p) => p.id !== me.playerId)}
+                onSubmit={(links, note, witnessId, files) => {
+                  if (me.lastCompleted) {
+                    void act({
+                      kind: 'proof',
+                      runId: me.lastCompleted.id,
+                      links,
+                      note,
+                      witnessId,
+                      files,
+                    });
+                  }
+                }}
+              />
+            </details>
           </div>
         )}
       </section>
@@ -333,9 +339,13 @@ export function SeasonScreen({
   const onStage = spin ?? (staging ? wheelRoll(staging, offer, choice) : null);
   const stage = onStage ? (
     <div
-      ref={showStage}
+      ref={desk ? undefined : showStage}
       data-testid="wheel"
-      className="grid w-full content-center justify-items-center gap-3"
+      className={
+        desk
+          ? 'grid h-full w-full grid-rows-[minmax(0,1fr)_auto] justify-items-center gap-3'
+          : 'grid w-full content-center justify-items-center gap-3'
+      }
     >
       <WheelMoment
         key={onStage.id}
@@ -343,6 +353,7 @@ export function SeasonScreen({
         sectors={(fresh ?? staging)?.sectors ?? []}
         roll={onStage}
         announce={false}
+        fill={desk}
         onPhase={(phase) => {
           if (phase !== 'done') return;
           setLanded(onStage.id);
@@ -366,6 +377,10 @@ export function SeasonScreen({
         <Button
           onClick={() => {
             setStaged(null);
+            // The stage goes with the button: the focus goes to the rolled game
+            requestAnimationFrame(() => {
+              document.getElementById(rollResultTitle)?.focus();
+            });
           }}
         >
           {ru.moments.wheel.toMap}
@@ -531,7 +546,7 @@ export function SeasonScreen({
             className="h-105 rounded-lg border-3 border-ink desk:h-190"
           />
           {desk && stage ? (
-            <div className="absolute inset-0 z-10 grid overflow-auto rounded-lg border-3 border-ink bg-card p-6">
+            <div className="absolute inset-0 z-10 grid overflow-hidden rounded-lg border-3 border-ink bg-card p-4">
               {stage}
             </div>
           ) : null}

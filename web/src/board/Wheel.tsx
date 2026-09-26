@@ -35,7 +35,10 @@ export function WheelMoment({
   onPhase,
   ref,
   announce = true,
+  fill = false,
 }: {
+  /** The wheel fills its frame (the map's stage on a desktop); the miss and the result lie over the table */
+  fill?: boolean;
   /** False when the page has its own live region for the result (it outlives the wheel) */
   announce?: boolean;
   sectors: string[];
@@ -136,20 +139,32 @@ export function WheelMoment({
   const r = size / 2;
   const missSays = (m: WheelRoll['misses'][number]) =>
     m.playing ? t.missPlaying(m.by) : t.miss(m.by);
-  const missLine = (m: WheelRoll['misses'][number]) => `${t.missNote(m.game.title)} ${missSays(m)}`;
+  // Once the wheel stands, the misses are told as done, the way the turn card tells them
+  const missedLine = (m: WheelRoll['misses'][number]) =>
+    m.playing ? t.missedPlaying(m.game.title, m.by) : t.missedCompleted(m.game.title, m.by, null);
+  const over = fill ? 'absolute inset-x-4 bottom-4 grid justify-items-center' : undefined;
   const picked = (pick: WheelRoll['pick']) =>
     pick.game ? t.result(pick.game.title) : t.choice(pick.choices ?? 0);
 
   return (
     <div className="grid w-full justify-items-center gap-3">
       <Table
-        className="grid w-full max-w-190 cursor-default place-items-center gap-4 p-4 desk:grid-cols-2"
+        className={
+          fill
+            ? 'relative grid h-full w-full cursor-default place-items-center p-4'
+            : 'grid w-full max-w-190 cursor-default place-items-center gap-4 p-4 desk:grid-cols-2'
+        }
         onClick={() => {
           if (playing) finish();
         }}
       >
-        <div className="w-75 max-w-full">
-          <svg viewBox={`-10 -22 ${size + 20} ${size + 32}`} width="100%" aria-hidden>
+        <div className={fill ? 'aspect-square h-full max-h-full max-w-full' : 'w-75 max-w-full'}>
+          <svg
+            viewBox={`-10 -22 ${size + 20} ${size + 32}`}
+            width="100%"
+            height={fill ? '100%' : undefined}
+            aria-hidden
+          >
             <motion.g style={{ rotate: rotation, originX: `${r}px`, originY: `${r}px` }}>
               {sectors.map((name, i) => {
                 const a0 = ((i * sector - 90) * Math.PI) / 180;
@@ -203,6 +218,7 @@ export function WheelMoment({
         </div>
         {stage === 'miss' && miss ? (
           <motion.div
+            className={over}
             initial={{ scale: 0.6, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ duration: 0.18 }}
@@ -224,6 +240,7 @@ export function WheelMoment({
         ) : null}
         {stage === 'done' && roll ? (
           <motion.div
+            className={over}
             initial={reduce ? false : { rotateY: 90, opacity: 0 }}
             animate={{ rotateY: 0, opacity: 1 }}
             transition={{ duration: 0.25 }}
@@ -244,11 +261,9 @@ export function WheelMoment({
               <span className="text-sm text-ink-soft">
                 {t.category(sectors[roll.pick.sector] ?? '')}
               </span>
-              {roll.misses.map((m) => (
-                <span key={m.game.title} className="line-clamp-2 text-xs text-ink-soft">
-                  {missLine(m)}
-                </span>
-              ))}
+              {roll.misses.length > 0 ? (
+                <span className="text-xs text-ink-soft">{t.missed(roll.misses.length)}</span>
+              ) : null}
             </MomentCard>
           </motion.div>
         ) : null}
@@ -257,7 +272,7 @@ export function WheelMoment({
       <p className="sr-only" aria-live={announce ? 'polite' : 'off'}>
         {announce && stage === 'done' && roll
           ? [
-              ...roll.misses.map((miss) => `${missLine(miss)}.`),
+              ...roll.misses.map((miss) => `${missedLine(miss)}.`),
               `${t.category(sectors[roll.pick.sector] ?? '')}. ${picked(roll.pick)}`,
             ].join(' ')
           : ''}

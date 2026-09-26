@@ -1,4 +1,3 @@
-import { ChevronRight } from 'lucide-react';
 import type { Schemas } from '../api/client';
 import { moscowDay } from '../app/time';
 import { Cover } from '../board/GameCards';
@@ -162,9 +161,12 @@ export function ChoiceCard({
                 <strong className="font-display wrap-anywhere">{game.title}</strong>
                 <span className="text-sm text-ink-soft">{ru.board.hours(game.hours ?? null)}</span>
                 <GameMarks marks={game.marks} />
-                <span className="inline-flex items-center gap-1 font-bold text-action" aria-hidden>
+                {/* A label, not a link: the whole card is the button */}
+                <span
+                  className="justify-self-start rounded-full border-2 border-ink px-3 py-1 text-sm font-bold"
+                  aria-hidden
+                >
                   {ru.turn.pickShort}
-                  <ChevronRight size={18} />
                 </span>
               </span>
             </button>

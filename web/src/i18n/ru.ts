@@ -168,6 +168,8 @@ export const ru = {
   },
   turn: {
     after: 'После прохождения',
+    proofToSend: 'Пруф: ещё не отправлен',
+    proofSummary: 'Пруф и проверка',
     uncheckedWaiting: (count: number, limit: number) =>
       `На проверке ${count} из ${limit}: на ${limit}-м новый ролл закроется до проверки`,
     uncheckedBlocked: (count: number, limit: number) =>
