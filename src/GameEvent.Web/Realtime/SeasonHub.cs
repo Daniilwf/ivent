@@ -56,12 +56,13 @@ public sealed class SeasonHub(HubSessions sessions, IDbContextFactory<GameEventD
     public static string Group(Guid seasonId) => $"season:{seasonId}";
 
     /// <summary>Starts watching a season: nothing is missed yet, the answer only says where the log is.</summary>
-    public Task<SeasonJoin> Join(Guid seasonId) => Resume(seasonId, long.MaxValue);
+    public async Task<SeasonJoin> Join(Guid seasonId) => (await Resume(seasonId, long.MaxValue)) with { Reload = false };
 
     /// <summary>
     /// Watches a season again after a lost connection (or a gap in the updates): what was committed after
-    /// <paramref name="after"/>. The client is in the group before the log is read, so nothing falls between the two; an
-    /// update both listed here and broadcast is told apart by its sequence.
+    /// <paramref name="after"/> up to the last sequence read. The client is in the group before the log is read, so
+    /// nothing falls between the two; an update both listed here and broadcast is told apart by its sequence. A client
+    /// ahead of the log (a restored season) is told to reload.
     /// </summary>
     public async Task<SeasonJoin> Resume(Guid seasonId, long after)
     {
@@ -74,14 +75,20 @@ public sealed class SeasonHub(HubSessions sessions, IDbContextFactory<GameEventD
         await Groups.AddToGroupAsync(Context.ConnectionId, Group(seasonId));
         await using var db = await dbFactory.CreateDbContextAsync(Context.ConnectionAborted);
         var last = await db.Events.Where(e => e.SeasonId == seasonId).MaxAsync(e => (long?)e.Sequence, Context.ConnectionAborted) ?? 0;
-        if (after >= last)
+        if (after == last)
         {
             return new SeasonJoin(last, [], false);
         }
 
+        if (after > last)
+        {
+            // The client saw more than the log holds: the season was restored from a backup or imported again
+            return new SeasonJoin(last, [], true);
+        }
+
         // One read, bounded: a command has a few events, so the first commands past the limit say "reload"
         var missed = await db.Events.AsNoTracking()
-            .Where(e => e.SeasonId == seasonId && e.Sequence > after)
+            .Where(e => e.SeasonId == seasonId && e.Sequence > after && e.Sequence <= last)
             .OrderBy(e => e.Sequence)
             .Select(e => new { e.Sequence, e.CommandId, e.Type })
             .Take((MaxMissedCommands + 1) * 50)
@@ -164,7 +171,7 @@ public sealed partial class SeasonBroadcastWorker(
                 catch (Exception e) when (e is not OperationCanceledException)
 #pragma warning restore CA1031
                 {
-                    LogBroadcastFailed(logger, e, update);
+                    LogBroadcastFailed(logger, e, update.GetType().Name);
                 }
             }
         }
@@ -174,6 +181,6 @@ public sealed partial class SeasonBroadcastWorker(
         }
     }
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Broadcast of {Update} failed")]
-    private static partial void LogBroadcastFailed(ILogger logger, Exception exception, object update);
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Broadcast of a {Update} failed")]
+    private static partial void LogBroadcastFailed(ILogger logger, Exception exception, string update);
 }

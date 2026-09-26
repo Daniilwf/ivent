@@ -1,14 +1,17 @@
 import type { SeasonJoin, SeasonUpdate } from './realtime';
 
-// E3, D-122: the client keeps the last sequence it saw, skips repeats, resumes after a gap or a lost connection.
+// E3, D-122: the client keeps the last sequence it saw, skips repeats, catches up after a gap or a lost connection —
+// one catch-up at a time, a failed join again after a pause, the server's number after a restore.
 
 type Handler = (...args: unknown[]) => void;
+type Answer = SeasonJoin | Error | Promise<SeasonJoin>;
 
 class FakeConnection {
+  state = 'Connected';
   handlers = new Map<string, Handler>();
   reconnected: (() => void) | null = null;
   invoked: unknown[][] = [];
-  answers: SeasonJoin[] = [];
+  answers: Answer[] = [];
 
   on(name: string, handler: Handler) {
     this.handlers.set(name, handler);
@@ -32,11 +35,12 @@ class FakeConnection {
 
   invoke(...args: unknown[]) {
     this.invoked.push(args);
-    return Promise.resolve(this.answers.shift() ?? { lastSequence: 0, missed: [], reload: false });
+    const answer = this.answers.shift() ?? { lastSequence: 0, missed: [], reload: false };
+    return answer instanceof Error ? Promise.reject(answer) : Promise.resolve(answer);
   }
 
-  push(update: SeasonUpdate) {
-    this.handlers.get('seasonUpdated')?.(update);
+  push(name: string, update?: SeasonUpdate) {
+    this.handlers.get(name)?.(update);
   }
 }
 
@@ -44,6 +48,7 @@ let connection = new FakeConnection();
 
 vi.mock('@microsoft/signalr', () => ({
   LogLevel: { Warning: 3 },
+  HubConnectionState: { Connected: 'Connected' },
   HubConnectionBuilder: class {
     withUrl() {
       return this;
@@ -60,7 +65,7 @@ vi.mock('@microsoft/signalr', () => ({
   },
 }));
 
-const { watchSeason } = await import('./realtime');
+const { watchPool, watchSeason } = await import('./realtime');
 
 const update = (from: number, to: number): SeasonUpdate => ({
   seasonId: 's',
@@ -69,69 +74,173 @@ const update = (from: number, to: number): SeasonUpdate => ({
   types: ['game-rolled'],
 });
 
-async function settle() {
-  for (let i = 0; i < 5; i++) await Promise.resolve();
+const joined = (lastSequence: number, missed: SeasonUpdate[] = [], reload = false): SeasonJoin => ({
+  lastSequence,
+  missed,
+  reload,
+});
+
+async function watching(first: SeasonJoin) {
+  connection.answers.push(first);
+  const onChange = vi.fn();
+  const stop = watchSeason('s', onChange);
+  await vi.waitFor(() => {
+    expect(onChange).toHaveBeenCalledTimes(1);
+  });
+  return { onChange, stop };
 }
 
 beforeEach(() => {
   connection = new FakeConnection();
 });
 
+afterEach(() => {
+  vi.useRealTimers();
+});
+
 describe('watchSeason', () => {
   it('joins, then passes each new update once and in order', async () => {
-    connection.answers.push({ lastSequence: 10, missed: [], reload: false });
-    const onChange = vi.fn();
-    const stop = watchSeason('s', onChange);
-    await settle();
+    const { onChange, stop } = await watching(joined(10));
 
-    connection.push(update(11, 12));
-    connection.push(update(11, 12));
-    connection.push(update(9, 10));
-    connection.push(update(13, 13));
+    connection.push('seasonUpdated', update(11, 12));
+    connection.push('seasonUpdated', update(11, 12));
+    connection.push('seasonUpdated', update(9, 10));
+    connection.push('seasonUpdated', update(13, 13));
 
     expect(connection.invoked[0]).toEqual(['Join', 's']);
     expect(onChange.mock.calls).toEqual([[[]], [[update(11, 12)]], [[update(13, 13)]]]);
     stop();
   });
 
-  it('resumes from the last sequence after a gap and passes what was missed', async () => {
-    connection.answers.push({ lastSequence: 10, missed: [], reload: false });
-    const onChange = vi.fn();
-    watchSeason('s', onChange);
-    await settle();
+  it('catches up from the last sequence after a gap and passes what was missed', async () => {
+    const { onChange } = await watching(joined(10));
 
-    connection.answers.push({
-      lastSequence: 14,
-      missed: [update(11, 12), update(13, 14)],
-      reload: false,
+    connection.answers.push(joined(14, [update(11, 12), update(13, 14)]));
+    connection.push('seasonUpdated', update(13, 14));
+    await vi.waitFor(() => {
+      expect(onChange).toHaveBeenCalledTimes(2);
     });
-    connection.push(update(13, 14));
-    await settle();
 
     expect(connection.invoked[1]).toEqual(['Resume', 's', 10]);
     expect(onChange).toHaveBeenLastCalledWith([update(11, 12), update(13, 14)]);
-    connection.push(update(13, 14));
+    connection.push('seasonUpdated', update(13, 14));
     expect(onChange).toHaveBeenCalledTimes(2);
   });
 
-  it('resumes after a lost connection and stays quiet when nothing was missed', async () => {
-    connection.answers.push({ lastSequence: 10, missed: [], reload: false });
+  it('refreshes after every reconnection, with what was missed if anything', async () => {
+    const { onChange } = await watching(joined(10));
+
+    connection.answers.push(joined(10));
+    connection.reconnected?.();
+    await vi.waitFor(() => {
+      expect(onChange).toHaveBeenCalledTimes(2);
+    });
+    expect(connection.invoked[1]).toEqual(['Resume', 's', 10]);
+    expect(onChange).toHaveBeenLastCalledWith([]);
+
+    connection.answers.push(joined(12, [update(11, 12)]));
+    connection.reconnected?.();
+    await vi.waitFor(() => {
+      expect(onChange).toHaveBeenCalledTimes(3);
+    });
+    expect(onChange).toHaveBeenLastCalledWith([update(11, 12)]);
+  });
+
+  it('takes the server number after a restore put the log behind the client', async () => {
+    const { onChange } = await watching(joined(500));
+
+    connection.answers.push(joined(40, [], true));
+    connection.reconnected?.();
+    await vi.waitFor(() => {
+      expect(onChange).toHaveBeenCalledTimes(2);
+    });
+
+    connection.push('seasonUpdated', update(41, 41));
+    expect(onChange).toHaveBeenLastCalledWith([update(41, 41)]);
+  });
+
+  it('keeps the numbers of a catch-up that listed past the last sequence', async () => {
+    const { onChange } = await watching(joined(10));
+
+    connection.answers.push(joined(11, [update(11, 11), update(12, 12)]));
+    connection.push('seasonUpdated', update(12, 12));
+    await vi.waitFor(() => {
+      expect(onChange).toHaveBeenCalledTimes(2);
+    });
+    connection.push('seasonUpdated', update(12, 12));
+
+    expect(onChange).toHaveBeenCalledTimes(2);
+  });
+
+  it('runs one catch-up at a time and one more for whatever asked meanwhile', async () => {
+    const { onChange } = await watching(joined(10));
+    let answer: (join: SeasonJoin) => void = () => undefined;
+    connection.answers.push(new Promise<SeasonJoin>((resolve) => (answer = resolve)));
+    connection.answers.push(joined(16, [update(15, 16)]));
+
+    connection.push('seasonUpdated', update(13, 13));
+    connection.push('seasonUpdated', update(14, 14));
+    connection.push('seasonUpdated', update(15, 16));
+    answer(joined(14, [update(11, 12), update(13, 14)]));
+    await vi.waitFor(() => {
+      expect(onChange).toHaveBeenCalledTimes(3);
+    });
+
+    expect(connection.invoked).toEqual([
+      ['Join', 's'],
+      ['Resume', 's', 10],
+      ['Resume', 's', 14],
+    ]);
+    expect(onChange).toHaveBeenLastCalledWith([update(15, 16)]);
+  });
+
+  it('asks again after a failed join, and catches up an update that came before the answer', async () => {
+    vi.useFakeTimers();
+    connection.answers.push(new Error('database down'));
     const onChange = vi.fn();
     watchSeason('s', onChange);
-    await settle();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(onChange).not.toHaveBeenCalled();
 
-    connection.answers.push({ lastSequence: 10, missed: [], reload: false });
-    connection.reconnected?.();
-    await settle();
-    expect(connection.invoked[1]).toEqual(['Resume', 's', 10]);
+    connection.answers.push(joined(10));
+    await vi.advanceTimersByTimeAsync(5000);
     expect(onChange).toHaveBeenCalledTimes(1);
+    expect(connection.invoked.map((call) => call[0])).toEqual(['Join', 'Join']);
+  });
 
-    connection.answers.push({ lastSequence: 500, missed: [], reload: true });
-    connection.reconnected?.();
-    await settle();
+  it('turns an update before the join into a join', async () => {
+    let answer: (join: SeasonJoin) => void = () => undefined;
+    connection.answers.push(new Promise<SeasonJoin>((resolve) => (answer = resolve)));
+    const onChange = vi.fn();
+    watchSeason('s', onChange);
+
+    connection.answers.push(joined(11, [update(11, 11)]));
+    connection.push('seasonUpdated', update(11, 11));
+    answer(joined(10));
+    await vi.waitFor(() => {
+      expect(onChange).toHaveBeenCalledTimes(2);
+    });
+
+    expect(connection.invoked).toEqual([
+      ['Join', 's'],
+      ['Resume', 's', 10],
+    ]);
+    expect(onChange).toHaveBeenLastCalledWith([update(11, 11)]);
+  });
+});
+
+describe('watchPool', () => {
+  it('joins the pool and passes every change', async () => {
+    const onChange = vi.fn();
+    const stop = watchPool(onChange);
+    await vi.waitFor(() => {
+      expect(onChange).toHaveBeenCalledTimes(1);
+    });
+
+    connection.push('poolUpdated');
+
+    expect(connection.invoked[0]).toEqual(['JoinPool']);
     expect(onChange).toHaveBeenCalledTimes(2);
-
-    connection.push(update(501, 501));
-    expect(onChange).toHaveBeenLastCalledWith([update(501, 501)]);
+    stop();
   });
 });
