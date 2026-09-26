@@ -186,7 +186,7 @@ public sealed record ChoiceOptionView(string Id, OfferedGameView? Game);
 /// </summary>
 public sealed record CompletedRunView(
     Guid Id,
-    GameView Game,
+    RunGameView Game,
     Difficulty Difficulty,
     IReadOnlyList<DieView> Dice,
     IReadOnlyList<DieView> ChallengeDice,
@@ -205,9 +205,11 @@ public sealed record DieView(int Sides, int Value);
 /// <summary>The season the signed-in user sees by default (D-18).</summary>
 public sealed record CurrentSeasonView(Guid Id);
 
-public sealed record GameView(Guid Id, string Title, decimal? Hours);
+/// <summary>The game of a run on the season screen. Not <c>GameView</c>: that name is the pool card's, and two records of one name
+/// share one OpenAPI schema (D-150).</summary>
+public sealed record RunGameView(Guid Id, string Title, decimal? Hours);
 
-public sealed record RunView(Guid Id, GameView Game, DateTimeOffset StartedAt);
+public sealed record RunView(Guid Id, RunGameView Game, DateTimeOffset StartedAt);
 
 public static class SeasonEndpoints
 {
@@ -703,7 +705,7 @@ public static class SeasonEndpoints
     private const int MaxRollsAfterMine = 32;
 
     /// <summary>A run's game: the run's own hours when known, otherwise the pool's.</summary>
-    private static GameView Game(Infrastructure.Seasons.RunRecord run, Infrastructure.Pool.GameRecord game) =>
+    private static RunGameView Game(Infrastructure.Seasons.RunRecord run, Infrastructure.Pool.GameRecord game) =>
         new(run.GameId, game.Title, run.Hours ?? game.Hours);
 
     private static CompletedRunView Completed(

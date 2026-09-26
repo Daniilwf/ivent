@@ -76,6 +76,46 @@ public sealed class FeedApiTests : IAsyncLifetime
         Assert.Equal(roll, rolled.GetProperty("commandId").GetGuid());
     }
 
+    [Fact]
+    public async Task A_feed_page_names_the_players_runs_and_games_its_events_point_to()
+    {
+        var vasya = await _site.SignedInAsync("vasya");
+        var (runId, gameId) = await CompletedWithReviewAsync(vasya, 7, null);
+
+        var feed = await OkAsync(await (await _site.SignedInAsync("zritel")).GetAsync(Feed, Ct));
+
+        var players = feed.GetProperty("players").EnumerateArray().ToList();
+        var names = players.Select(p => p.GetProperty("name").GetString()).ToList();
+        Assert.Equal(names.Order(StringComparer.Ordinal), names);
+        var player = players.Single(p => p.GetProperty("id").GetGuid() == _site.Players["vasya"]);
+        Assert.Equal((_site.Users["vasya"], "vasya", true), (player.GetProperty("userId").GetGuid(), player.GetProperty("name").GetString(), player.GetProperty("hasProfile").GetBoolean()));
+        var run = Assert.Single(feed.GetProperty("runs").EnumerateArray(), r => r.GetProperty("id").GetGuid() == runId);
+        Assert.Equal(gameId, run.GetProperty("gameId").GetGuid());
+        var game = Assert.Single(feed.GetProperty("games").EnumerateArray(), g => g.GetProperty("id").GetGuid() == gameId);
+        Assert.False(string.IsNullOrEmpty(game.GetProperty("title").GetString()));
+        Assert.True(game.GetProperty("hasPage").GetBoolean());
+    }
+
+    [Fact]
+    public async Task A_deleted_game_and_account_keep_their_names_in_the_feed_without_links()
+    {
+        var vasya = await _site.SignedInAsync("vasya");
+        var (_, gameId) = await CompletedWithReviewAsync(vasya, 4, null);
+        var admin = await _site.SignedInAsync("admin");
+        await PostOkAsync(admin, $"/api/admin/pool/{gameId}/delete", new { commandId = Guid.NewGuid() });
+        await PostOkAsync(admin, $"/api/admin/accounts/{_site.Users["vasya"]}/delete", new { commandId = Guid.NewGuid() });
+
+        var feed = await OkAsync(await (await _site.SignedInAsync("petya")).GetAsync(Feed, Ct));
+        var adminFeed = await OkAsync(await admin.GetAsync(Feed, Ct));
+
+        var player = feed.GetProperty("players").EnumerateArray().Single(p => p.GetProperty("id").GetGuid() == _site.Players["vasya"]);
+        Assert.Equal("vasya", player.GetProperty("name").GetString());
+        Assert.False(player.GetProperty("hasProfile").GetBoolean());
+        var game = feed.GetProperty("games").EnumerateArray().Single(g => g.GetProperty("id").GetGuid() == gameId);
+        Assert.False(game.GetProperty("hasPage").GetBoolean());
+        Assert.True(adminFeed.GetProperty("games").EnumerateArray().Single(g => g.GetProperty("id").GetGuid() == gameId).GetProperty("hasPage").GetBoolean());
+    }
+
     [Theory]
     [InlineData("?limit=0")]
     [InlineData("?limit=101")]

@@ -19,8 +19,29 @@ namespace GameEvent.Web.Seasons;
 public sealed record FeedEntryView(
     long Sequence, Guid CommandId, DateTimeOffset OccurredAt, string Type, JsonElement Data, string? Author, bool Undone);
 
-/// <summary>A page of the feed, newest first; <c>nextBefore</c> — the sequence to ask before for the next page, none at the start of the log.</summary>
-public sealed record FeedView(IReadOnlyList<FeedEntryView> Entries, long? NextBefore);
+/// <summary>
+/// A player of the season, for the feed's lines (H5, D-150): the name, the account for the profile link (<c>hasProfile</c> —
+/// false once the account is deleted) and the avatar. The list is in the season screen's order, so a player's token colour
+/// is their place in it.
+/// </summary>
+public sealed record FeedPlayerView(Guid Id, Guid UserId, string Name, FileLinkView? Avatar, bool HasProfile);
+
+/// <summary>A game an event of the page names; <c>hasPage</c> — the viewer may open its page (a deleted game is the admin's).</summary>
+public sealed record FeedGameView(Guid Id, string Title, bool HasPage);
+
+/// <summary>A run an event of the page names, with its game: most events of a run carry only its id.</summary>
+public sealed record FeedRunView(Guid Id, Guid GameId);
+
+/// <summary>
+/// A page of the feed, newest first; <c>nextBefore</c> — the sequence to ask before for the next page, none at the start of
+/// the log. <c>players</c> — every player of the season; <c>games</c> and <c>runs</c> — those the page's events name (D-150).
+/// </summary>
+public sealed record FeedView(
+    IReadOnlyList<FeedEntryView> Entries,
+    long? NextBefore,
+    IReadOnlyList<FeedPlayerView> Players,
+    IReadOnlyList<FeedGameView> Games,
+    IReadOnlyList<FeedRunView> Runs);
 
 /// <summary>A season a user took part in, with their points and, once the season finished, their place.</summary>
 public sealed record ProfileSeasonView(Guid SeasonId, string SeasonName, SeasonStatus Status, Guid PlayerId, int Points, int? Place);
@@ -115,7 +136,90 @@ public static class FeedEndpoints
                     r.UndoneByEventId is not null);
         }).OfType<FeedEntryView>()];
         var nextBefore = rows.Count == limit && rows[^1].Sequence > 1 ? rows[^1].Sequence : (long?)null;
-        return TypedResults.Ok(new FeedView(entries, nextBefore));
+        var (players, games, runs) = await ReferencesAsync(db, seasonId, entries, admin, ct);
+        return TypedResults.Ok(new FeedView(entries, nextBefore, players, games, runs));
+    }
+
+    /// <summary>
+    /// The names the page's events point to by id (D-150): the season's players in the season screen's order, the runs the
+    /// events name with their games, and the titles of those games.
+    /// </summary>
+    private static async Task<(IReadOnlyList<FeedPlayerView> Players, IReadOnlyList<FeedGameView> Games, IReadOnlyList<FeedRunView> Runs)> ReferencesAsync(
+        GameEventDbContext db, Guid seasonId, IReadOnlyList<FeedEntryView> entries, bool admin, CancellationToken ct)
+    {
+        var seasonPlayers = await db.SeasonPlayers.AsNoTracking().Where(p => p.SeasonId == seasonId).OrderBy(p => p.Name).ToListAsync(ct);
+        var userIds = seasonPlayers.Select(p => p.UserId).Distinct().ToList();
+        var users = await db.Users.AsNoTracking().Where(u => userIds.Contains(u.Id)).ToDictionaryAsync(u => u.Id, ct);
+        IReadOnlyList<FeedPlayerView> players = [.. seasonPlayers.Select(p =>
+        {
+            var user = users.GetValueOrDefault(p.UserId);
+            return new FeedPlayerView(
+                p.Id,
+                p.UserId,
+                p.Name,
+                user?.AvatarFileId is { } file ? FileLinkView.Of(file) : null,
+                user is { IsDeleted: false });
+        })];
+
+        var runIds = new HashSet<Guid>();
+        var gameIds = new HashSet<Guid>();
+        foreach (var entry in entries)
+        {
+            Collect(entry.Data, runIds, gameIds);
+        }
+
+        var runs = await db.Runs.AsNoTracking().Where(r => runIds.Contains(r.Id)).Select(r => new FeedRunView(r.Id, r.GameId)).ToListAsync(ct);
+        gameIds.UnionWith(runs.Select(r => r.GameId));
+        var games = await db.Games.AsNoTracking()
+            .Where(g => gameIds.Contains(g.Id))
+            .Select(g => new FeedGameView(g.Id, g.Title, admin || !g.IsDeleted))
+            .ToListAsync(ct);
+        return (players, games, runs);
+    }
+
+    /// <summary>Every <c>runId</c>, <c>gameId</c> and <c>gameIds</c> in an event's data, at any depth (misses, offers).</summary>
+    private static void Collect(JsonElement data, HashSet<Guid> runIds, HashSet<Guid> gameIds)
+    {
+        if (data.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in data.EnumerateArray())
+            {
+                Collect(item, runIds, gameIds);
+            }
+
+            return;
+        }
+
+        if (data.ValueKind != JsonValueKind.Object)
+        {
+            return;
+        }
+
+        foreach (var property in data.EnumerateObject())
+        {
+            if (property.Name == "runId" && property.Value.ValueKind == JsonValueKind.String && property.Value.TryGetGuid(out var run))
+            {
+                runIds.Add(run);
+            }
+            else if (property.Name == "gameId" && property.Value.ValueKind == JsonValueKind.String && property.Value.TryGetGuid(out var game))
+            {
+                gameIds.Add(game);
+            }
+            else if (property.Name == "gameIds" && property.Value.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in property.Value.EnumerateArray())
+                {
+                    if (item.ValueKind == JsonValueKind.String && item.TryGetGuid(out var listed))
+                    {
+                        gameIds.Add(listed);
+                    }
+                }
+            }
+            else
+            {
+                Collect(property.Value, runIds, gameIds);
+            }
+        }
     }
 
     private static async Task<Results<Ok<ProfileView>, NotFound>> ProfileAsync(

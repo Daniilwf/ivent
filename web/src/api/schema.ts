@@ -5581,7 +5581,7 @@ export interface components {
         CompletedRunView: {
             /** Format: uuid */
             id: string;
-            game: components["schemas"]["GameView"];
+            game: components["schemas"]["RunGameView"];
             difficulty: components["schemas"]["Difficulty"];
             dice: components["schemas"]["DieView"][];
             challengeDice: components["schemas"]["DieView"][];
@@ -5820,11 +5820,45 @@ export interface components {
             author: null | string;
             undone: boolean;
         };
-        /** @description A page of the feed, newest first; `nextBefore` — the sequence to ask before for the next page, none at the start of the log. */
+        /** @description A game an event of the page names; `hasPage` — the viewer may open its page (a deleted game is the admin's). */
+        FeedGameView: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            hasPage: boolean;
+        };
+        /**
+         * @description A player of the season, for the feed's lines (H5, D-150): the name, the account for the profile link (`hasProfile` —
+         *     false once the account is deleted) and the avatar. The list is in the season screen's order, so a player's token colour
+         *     is their place in it.
+         */
+        FeedPlayerView: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            userId: string;
+            name: string;
+            avatar: null | components["schemas"]["FileLinkView"];
+            hasProfile: boolean;
+        };
+        /** @description A run an event of the page names, with its game: most events of a run carry only its id. */
+        FeedRunView: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            gameId: string;
+        };
+        /**
+         * @description A page of the feed, newest first; `nextBefore` — the sequence to ask before for the next page, none at the start of
+         *     the log. `players` — every player of the season; `games` and `runs` — those the page's events name (D-150).
+         */
         FeedView: {
             entries: components["schemas"]["FeedEntryView"][];
             /** Format: int64 */
             nextBefore: null | number;
+            players: components["schemas"]["FeedPlayerView"][];
+            games: components["schemas"]["FeedGameView"][];
+            runs: components["schemas"]["FeedRunView"][];
         };
         /** @description A picture by link (D-117): https from Tenor, Giphy or Klipy; the server downloads it and stores it as an upload. */
         FileFromUrlRequest: {
@@ -5928,12 +5962,26 @@ export interface components {
             rating: null | number;
             reviewText: null | string;
         };
+        /**
+         * @description A game of the pool as everyone sees it (D-119); `author` — the name of the account that added it, or the author as
+         *     the imported table names them (D-125); none for the seed.
+         */
         GameView: {
             /** Format: uuid */
             id: string;
             title: string;
+            tags: string[];
             /** Format: double */
             hours: null | number;
+            /** Format: int32 */
+            year: null | number;
+            steamAppId: null | string;
+            cover: null | components["schemas"]["FileLinkView"];
+            note: null | string;
+            isCoop: boolean;
+            author: null | string;
+            isDeleted: boolean;
+            completionCondition: null | string;
         };
         HostileCap: {
             enabled: boolean;
@@ -6436,12 +6484,23 @@ export interface components {
             ruleset: components["schemas"]["Ruleset"];
             history: components["schemas"]["RulesVersionView"][];
         };
+        /**
+         * @description The game of a run on the season screen. Not `GameView`: that name is the pool card's, and two records of one name
+         *         share one OpenAPI schema (D-150).
+         */
+        RunGameView: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            /** Format: double */
+            hours: null | number;
+        };
         /** @enum {unknown} */
         RunStatus: "playing" | "completed" | "dropped" | "techRerolled" | "rejected";
         RunView: {
             /** Format: uuid */
             id: string;
-            game: components["schemas"]["GameView"];
+            game: components["schemas"]["RunGameView"];
             /** Format: date-time */
             startedAt: string;
         };
