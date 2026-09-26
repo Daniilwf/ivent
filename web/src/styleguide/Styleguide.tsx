@@ -17,6 +17,16 @@ import { Sticker } from '../ui/Sticker';
 import { Panel } from '../ui/Surface';
 import { demoChoice, demoGames, demoMe, demoOffer, demoRoll, demoRows, demoUser } from './fixtures';
 import { DiceDemo, FinishDemo, MapDemo, MoveDemo, WheelDemo } from './MomentDemos';
+import { FeedList, FeedSkeleton } from '../feed/FeedList';
+import { GameDetails } from '../feed/GameScreen';
+import { ProfileDetails } from '../feed/ProfileScreen';
+import {
+  demoFeedDays,
+  demoGameCard,
+  demoGameRuns,
+  demoProfile,
+  demoProfileEmpty,
+} from './feedFixtures';
 
 // The styleguide's cards act on nothing
 const noop = () => undefined;
@@ -112,7 +122,7 @@ export function Styleguide() {
 
       <Section id="shell" title={t.shell.title} lead={t.shell.lead}>
         <div className="grid gap-4">
-          <div className="h-16 w-full max-w-98 overflow-hidden rounded-lg border-2 border-muted">
+          <div className="h-30 w-full max-w-98 overflow-hidden rounded-lg border-2 border-muted desk:h-16">
             <Shell
               user={demoUser}
               offline
@@ -122,7 +132,7 @@ export function Styleguide() {
               {null}
             </Shell>
           </div>
-          <div className="h-16 overflow-hidden rounded-lg border-2 border-muted">
+          <div className="h-30 overflow-hidden rounded-lg border-2 border-muted desk:h-16">
             <Shell
               user={demoUser}
               offline={false}
@@ -384,6 +394,51 @@ export function Styleguide() {
 
       <Section id="finish" title={t.finish.title} lead={t.finish.lead}>
         <FinishDemo />
+      </Section>
+
+      <Section id="feed" title={t.feed.title} lead={t.feed.lead}>
+        <div className="grid items-start gap-4 desk:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+          <Panel>
+            <FeedList days={demoFeedDays} />
+            <div className="grid justify-items-center gap-3 border-t-2 border-muted pt-4">
+              <Button>{ru.feed.more}</Button>
+              <Button loading>{ru.feed.more}</Button>
+              <p className="text-sm text-ink-soft">{ru.feed.start}</p>
+            </div>
+          </Panel>
+          <Panel title={t.feed.loading}>
+            <FeedSkeleton rows={4} />
+          </Panel>
+        </div>
+      </Section>
+
+      <Section id="profile" title={t.profile.title} lead={t.profile.lead}>
+        <div className="grid max-w-180 gap-4">
+          <ProfileDetails profile={demoProfile} mine={false} />
+        </div>
+        <div className="grid max-w-180 gap-4 border-t-2 border-dashed border-muted pt-4">
+          <ProfileDetails profile={demoProfileEmpty} mine />
+        </div>
+      </Section>
+
+      <Section id="game" title={t.gamePage.title} lead={t.gamePage.lead}>
+        <div className="grid max-w-180 gap-4">
+          <GameDetails game={demoGameCard} runs={demoGameRuns} />
+        </div>
+        <div className="grid max-w-180 gap-4 border-t-2 border-dashed border-muted pt-4">
+          <GameDetails
+            game={{
+              ...demoGameCard,
+              id: 'empty',
+              title: 'Hollow Knight',
+              isCoop: false,
+              year: null,
+              completionCondition: null,
+              tags: ['Platformer'],
+            }}
+            runs={[]}
+          />
+        </div>
       </Section>
     </main>
   );

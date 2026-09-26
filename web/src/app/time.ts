@@ -36,3 +36,29 @@ const dayMonth = new Intl.DateTimeFormat('ru-RU', {
 export function moscowDay(utc: string | Date): string {
   return dayMonth.format(typeof utc === 'string' ? new Date(utc) : utc);
 }
+
+const dayKey = new Intl.DateTimeFormat('en-CA', {
+  timeZone: zone,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
+/** The Moscow calendar day of a UTC instant as «2026-09-26»: the feed groups its lines by it */
+export function moscowDayKey(utc: string | Date): string {
+  return dayKey.format(typeof utc === 'string' ? new Date(utc) : utc);
+}
+
+/** A day's heading: «Сегодня», «Вчера» or «25 сентября» (with the year when it is not now's) */
+export function moscowDayLabel(utc: string | Date, now: Date = new Date()): string {
+  const at = typeof utc === 'string' ? new Date(utc) : utc;
+  const key = moscowDayKey(at);
+  if (key === moscowDayKey(now)) return ru.feed.today;
+  if (key === moscowDayKey(new Date(now.getTime() - 86_400_000))) return ru.feed.yesterday;
+  return (year.format(at) === year.format(now) ? day : dayWithYear).format(at);
+}
+
+/** The Moscow clock of a UTC instant: «14:05» */
+export function moscowClock(utc: string | Date): string {
+  return clock.format(typeof utc === 'string' ? new Date(utc) : utc);
+}

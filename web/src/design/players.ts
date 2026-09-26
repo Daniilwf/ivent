@@ -44,3 +44,10 @@ export function playerToken(index: number) {
     contrast(color, white) >= contrast(color, ink) ? 'var(--color-on-color)' : 'var(--color-ink)';
   return { fill: `var(--color-token-${n + 1})`, ink: onColor, hex: color };
 }
+
+/** A stable token colour for a user outside a season (the header, a profile, a game page): by their id */
+export function userToken(id: string) {
+  let hash = 0;
+  for (const ch of id) hash = (hash * 31 + ch.charCodeAt(0)) | 0;
+  return Math.abs(hash) % tokenColors.length;
+}

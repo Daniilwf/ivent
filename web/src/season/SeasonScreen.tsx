@@ -14,6 +14,7 @@ import { seasonPicture } from './seasonView';
 import { linearBoard } from '../board/linearBoard';
 import { RunCard } from '../board/GameCards';
 import { Leaderboard } from '../board/Leaderboard';
+import { FeedPreview } from '../feed/FeedPreview';
 import { MapView } from '../board/MapView';
 import type { MomentHandle } from '../board/moment';
 import { WheelMoment, type WheelRoll } from '../board/Wheel';
@@ -578,6 +579,14 @@ export function SeasonScreen({
         <p className="text-sm text-ink-soft">{ru.board.rule}</p>
         <Leaderboard rows={rows} />
       </Panel>
+      {/* The latest of the feed beside the map on a desktop; a phone opens the feed from the header */}
+      {desk ? (
+        <FeedPreview
+          seasonId={seasonId}
+          version={season.lastSequence}
+          className="desk:col-start-1 desk:w-96"
+        />
+      ) : null}
 
       <div className="legacy-screens min-w-0 desk:col-start-1 desk:w-96">
         <AvatarSection
