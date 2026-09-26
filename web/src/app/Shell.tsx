@@ -1,4 +1,12 @@
-import { KeyRound, LogOut, Map as MapIcon, MessagesSquare, UserRound } from 'lucide-react';
+import {
+  BookOpen,
+  KeyRound,
+  Library,
+  LogOut,
+  Map as MapIcon,
+  MessagesSquare,
+  UserRound,
+} from 'lucide-react';
 import { useSyncExternalStore, type ReactNode } from 'react';
 import { connectionStatus } from '../api/connection';
 import type { Schemas } from '../api/client';
@@ -10,44 +18,48 @@ import { ConnectionLost } from '../ui/States';
 import { Sticker } from '../ui/Sticker';
 import { BugReportButton } from './BugReportButton';
 import { Link } from './Link';
-import { navigate, paths, routeOf, usePath } from './router';
+import { navigate, paths, routeOf, usePath, type Route } from './router';
 
-/** The site's sections: the season (map, turn, leaderboard) and its feed (H5) */
-function SiteNav({ className }: { className?: string }) {
+const sections: { kind: Route['kind'] & keyof typeof ru.nav; to: string; icon: ReactNode }[] = [
+  { kind: 'season', to: paths.season(), icon: <MapIcon size={18} aria-hidden /> },
+  { kind: 'feed', to: paths.feed(), icon: <MessagesSquare size={18} aria-hidden /> },
+  { kind: 'pool', to: paths.pool(), icon: <Library size={18} aria-hidden /> },
+  { kind: 'rules', to: paths.rules(), icon: <BookOpen size={18} aria-hidden /> },
+];
+
+/**
+ * The site's sections (H5–H7): the season (map, turn, leaderboard), its feed, the pool and the rules. One row: under
+ * the name on a phone (the icons stay out, the four words fit 390 px), between the name and my menu on a desktop
+ */
+function SiteNav() {
   const route = routeOf(usePath());
-  const items = [
-    {
-      to: paths.season(),
-      label: ru.feed.nav.season,
-      icon: <MapIcon size={18} aria-hidden />,
-      current: route.kind === 'season',
-    },
-    {
-      to: paths.feed(),
-      label: ru.feed.nav.feed,
-      icon: <MessagesSquare size={18} aria-hidden />,
-      current: route.kind === 'feed',
-    },
-  ];
   return (
-    <nav aria-label={ru.feed.nav.label} className={className}>
+    <nav
+      aria-label={ru.nav.label}
+      data-testid="site-nav"
+      className="order-last -mx-1 w-full overflow-x-auto p-1 desk:order-none desk:mx-0 desk:mr-auto desk:w-auto"
+    >
       <ul className="flex gap-1">
-        {items.map((item) => (
-          <li key={item.to}>
-            <Link
-              to={item.to}
-              aria-current={item.current ? 'page' : undefined}
-              className={cx(
-                'inline-flex min-h-11 items-center gap-2 rounded-full px-3 whitespace-nowrap is-hover:bg-muted',
-                // The current section: filled and bold, not by colour alone
-                item.current ? 'bg-muted font-bold text-ink' : 'font-medium text-ink-soft',
-              )}
-            >
-              {item.icon}
-              {item.label}
-            </Link>
-          </li>
-        ))}
+        {sections.map((section) => {
+          const current = route.kind === section.kind;
+          return (
+            <li key={section.kind} className="shrink-0">
+              <Link
+                to={section.to}
+                aria-current={current ? 'page' : undefined}
+                data-testid={`nav-${section.kind}`}
+                className={cx(
+                  'inline-flex min-h-11 items-center gap-2 rounded-full px-4 font-medium whitespace-nowrap transition duration-(--duration-fast) desk:px-3',
+                  // The current section: filled, not by colour alone
+                  current ? 'bg-ink text-on-color' : 'text-ink is-hover:bg-muted',
+                )}
+              >
+                <span className="hidden desk:contents">{section.icon}</span>
+                {ru.nav[section.kind]}
+              </Link>
+            </li>
+          );
+        })}
       </ul>
     </nav>
   );
@@ -73,15 +85,14 @@ export function Shell({
   return (
     <div className="min-h-dvh">
       <header className="sticky top-0 z-10 border-b-2 border-muted bg-page/95 backdrop-blur-sm">
-        <div className="mx-auto flex max-w-300 items-center gap-2 px-4 py-2 desk:gap-3 desk:px-8">
+        <div className="mx-auto flex max-w-300 flex-wrap items-center gap-x-2 gap-y-1 px-4 pt-2 pb-1 desk:flex-nowrap desk:gap-3 desk:px-8 desk:py-2">
           <Link
             to={paths.season()}
-            className="mr-auto rounded-md px-1 font-display text-lg font-heavy whitespace-nowrap desk:mr-0"
+            className="mr-auto rounded-md px-1 font-display text-lg font-heavy whitespace-nowrap desk:mr-2"
           >
             {ru.app.title}
           </Link>
-          {/* A desktop's sections stand next to the name; a phone's get a row of their own below */}
-          <SiteNav className="mr-auto hidden desk:block" />
+          <SiteNav />
           {online ? null : <ConnectionLost compact />}
           <BugReportButton />
           <Menu
@@ -111,7 +122,7 @@ export function Shell({
             }
             items={[
               {
-                label: ru.feed.nav.profile,
+                label: ru.nav.profile,
                 icon: <UserRound size={18} aria-hidden />,
                 onSelect: () => {
                   navigate(paths.profile(user.id));
@@ -134,9 +145,6 @@ export function Shell({
           />
         </div>
       </header>
-      {/* Below the sticky header on a phone: the sections scroll away with the page, the header stays small */}
-      <SiteNav className="mx-auto max-w-300 border-b-2 border-muted px-4 py-1 desk:hidden" />
-
       {children}
     </div>
   );

@@ -1,5 +1,11 @@
 import { CalendarClock, Inbox, Plus, Trophy } from 'lucide-react';
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
+import { AddGameForm } from '../pool/AddGameForm';
+import { demoCategories, demoPoolGames, demoStatuses } from '../pool/demoPool';
+import { PoolGameCard } from '../pool/PoolGameCard';
+import { onWheel, wheelOf } from '../pool/poolFilter';
+import { demoRules } from '../rules/demoRules';
+import { RulesContent } from '../rules/RulesScreen';
 import { Shell } from '../app/Shell';
 import { RunCard } from '../board/GameCards';
 import { CompleteForm } from '../season/CompleteForm';
@@ -11,7 +17,7 @@ import { cellsToFinish } from '../board/geometry';
 import { demoBoard } from '../board/demoBoard';
 import { ru } from '../i18n/ru';
 import { Button, IconButton, type ButtonVariant } from '../ui/Button';
-import { BottomSheet, ConfirmDanger } from '../ui/Dialogs';
+import { BottomSheet, ConfirmDanger, FormDialog } from '../ui/Dialogs';
 import { ChoiceGroup, Field, FilePicker, Select } from '../ui/Field';
 import { Badge, Chip, Tag } from '../ui/Marks';
 import { RouteProgress, Skeleton } from '../ui/Progress';
@@ -111,6 +117,28 @@ const difficulties = (['easy', 'normal', 'hard', 'extreme'] as const).map((d) =>
   value: d,
   label: ru.difficulty[d],
 }));
+
+// The demo pool's wheel: the RPG category has weight 0 here, so its game shows «not on the wheel»
+const poolWheel = wheelOf(demoCategories.map((c) => (c.name === 'РПГ' ? { ...c, weight: 0 } : c)));
+
+/** The form over the page: a sheet from the bottom on a phone, a card on a desktop */
+function FormDemo() {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <Button
+        onClick={() => {
+          setOpen(true);
+        }}
+      >
+        {t.dialogs.form}
+      </Button>
+      <FormDialog open={open} onOpenChange={setOpen} title={ru.pool.form.title} wide>
+        <AddGameForm categories={demoCategories} onAdded={noop} onSignedOut={noop} />
+      </FormDialog>
+    </>
+  );
+}
 
 export function Styleguide() {
   // The page loads after the address: a link to a section scrolls there once the sections exist
@@ -260,6 +288,9 @@ export function Styleguide() {
       <Section id="marks" title={t.marks.title}>
         <div className="flex flex-wrap items-center gap-3">
           <Chip icon={<CalendarClock size={16} aria-hidden />}>{t.marks.deadline}</Chip>
+          <Chip tone="success">{ru.pool.completed('Вася', '12.10')}</Chip>
+          <Chip tone="info">{ru.pool.playing('Петя')}</Chip>
+          <Chip tone="warning">{t.marks.deadline}</Chip>
           <Badge>{ru.board.first}</Badge>
           <Badge tone="me">{ru.board.you}</Badge>
           <Tag>Platformer</Tag>
@@ -284,6 +315,9 @@ export function Styleguide() {
           </Select>
           <Select label={t.fields.select} error={t.fields.selectError} defaultValue="">
             <option value="">{ru.turn.techRerollReasonPlaceholder}</option>
+          </Select>
+          <Select label={t.fields.select} defaultValue="weakPc" force="focus">
+            <option value="weakPc">{ru.turn.techRerollReasons.weakPc}</option>
           </Select>
           <ChoiceGroup
             label={t.fields.choice}
@@ -503,8 +537,34 @@ export function Styleguide() {
         </div>
       </Section>
 
+      <Section id="pool" title={t.pool.title} lead={t.pool.lead}>
+        <div className="grid items-start gap-4 desk:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+          <ul className="grid gap-3">
+            {demoPoolGames.map((game) => (
+              <PoolGameCard
+                key={game.id}
+                game={game}
+                status={demoStatuses.find((s) => s.gameId === game.id)}
+                inSeason
+                inWheel={onWheel(game, poolWheel)}
+              />
+            ))}
+          </ul>
+          <div className="rounded-lg bg-card p-4">
+            <AddGameForm categories={demoCategories} onAdded={noop} onSignedOut={noop} />
+          </div>
+        </div>
+      </Section>
+
+      <Section id="rules" title={t.rules.title} lead={t.rules.lead}>
+        <div className="grid gap-4 desk:grid-cols-[auto_minmax(0,1fr)] desk:items-start desk:gap-x-8">
+          <RulesContent rules={demoRules} />
+        </div>
+      </Section>
+
       <Section id="dialogs" title={t.dialogs.title} lead={t.dialogs.lead}>
         <div className="flex flex-wrap gap-3">
+          <FormDemo />
           <ConfirmDanger
             trigger={<Button variant="danger">{ru.board.drop}</Button>}
             title={ru.board.dropTitle(run.title)}

@@ -1924,6 +1924,68 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/seasons/{seasonId}/games": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SeasonGameView"][];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Too Many Requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/status": {
         parameters: {
             query?: never;
@@ -5790,6 +5852,8 @@ export interface components {
         };
         /** @enum {unknown} */
         EventKind: "good" | "bad";
+        /** @enum {unknown} */
+        ExclusionReason: "alreadyPlayed" | "dropped" | "techRerolled" | null;
         /** @description Feature flags: a disabled mechanic is invisible in the interface and refused by the engine. */
         Features: {
             mapMode: components["schemas"]["MapMode"];
@@ -6491,7 +6555,10 @@ export interface components {
             status: number;
             errors: components["schemas"]["RulesetError"][];
         };
-        /** @description One version of the rules: when, by whom (null for the season's creation by the system), and what changed. */
+        /**
+         * @description One version of the rules: when, by whom (null for the season's creation by the system), and what changed.
+         *     `authorName` — the author's name for the rules page (H7, D-170); null with no author.
+         */
         RulesVersionView: {
             /** Format: int32 */
             version: number;
@@ -6500,17 +6567,23 @@ export interface components {
             /** Format: uuid */
             authorId: null | string;
             changes: components["schemas"]["RulesetChange"][];
+            authorName?: null | string;
         };
-        /** @description The rules in force and their history: who changed what and when (C3). Numbers on the rules page are real. */
+        /**
+         * @description The rules in force and their history: who changed what and when (C3). Numbers on the rules page are real.
+         *     `deadline` — the season's deadline, set apart from the rules by the admin (H7, D-170); null while not set.
+         */
         RulesView: {
             /** Format: int32 */
             version: number;
             ruleset: components["schemas"]["Ruleset"];
             history: components["schemas"]["RulesVersionView"][];
+            /** Format: date-time */
+            deadline?: null | string;
         };
         /**
-         * @description The game of a run on the season screen. Not `GameView`: that name is the pool card's, and two records of one name
-         *         share one OpenAPI schema (D-150).
+         * @description The game of a run: its title and hours. Named apart from the pool's GameView: the OpenAPI document
+         *     keys schemas by type name, so two records called GameView became one schema and the pool lost its fields (D-161).
          */
         RunGameView: {
             /** Format: uuid */
@@ -6539,6 +6612,22 @@ export interface components {
             commandId: string;
             /** Format: date-time */
             deadline: null | string;
+        };
+        /**
+         * @description A game's status in the season as the pool page shows it (SPEC «Статусы игры в сезоне», H6, D-160): `taken` —
+         *     completed in the season or being played (an offer and a pending option count), with the player and, for a completed
+         *     game, when; `marks` — other players who dropped or tech-rerolled it (the game is free again);
+         *     `excludedForMe` — why it never comes to the viewer again. Only games with something to show are listed.
+         */
+        SeasonGameView: {
+            /** Format: uuid */
+            gameId: string;
+            taken: null | components["schemas"]["RollMissReason"];
+            takenBy: null | string;
+            /** Format: date-time */
+            completedAt: null | string;
+            marks: components["schemas"]["GameMarkView"][];
+            excludedForMe: null | components["schemas"]["ExclusionReason"];
         };
         /**
          * @description The answer to joining a season (E3, D-122): the last sequence of its log now, and what was committed after the

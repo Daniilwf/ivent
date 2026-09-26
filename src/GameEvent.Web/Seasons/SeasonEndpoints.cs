@@ -214,8 +214,10 @@ public sealed record DieView(int Sides, int Value);
 /// <summary>The season the signed-in user sees by default (D-18).</summary>
 public sealed record CurrentSeasonView(Guid Id);
 
-/// <summary>The game of a run on the season screen. Not <c>GameView</c>: that name is the pool card's, and two records of one name
-/// share one OpenAPI schema (D-150).</summary>
+/// <summary>
+/// The game of a run: its title and hours. Named apart from the pool's <see cref="Pool.GameView"/>: the OpenAPI document
+/// keys schemas by type name, so two records called GameView became one schema and the pool lost its fields (D-161).
+/// </summary>
 public sealed record RunGameView(Guid Id, string Title, decimal? Hours);
 
 public sealed record RunView(Guid Id, RunGameView Game, DateTimeOffset StartedAt);

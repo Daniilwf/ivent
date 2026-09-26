@@ -63,12 +63,13 @@ describe('the pages of the site', () => {
     expect(
       await screen.findByRole('heading', { level: 1, name: ru.feed.title }),
     ).toBeInTheDocument();
-    const nav = screen.getAllByRole('navigation', { name: ru.feed.nav.label })[0] as HTMLElement;
-    expect(within(nav).getByRole('link', { name: ru.feed.nav.feed })).toHaveAttribute(
+    // One row of sections for a phone and a desktop (D-202)
+    const nav = screen.getByRole('navigation', { name: ru.nav.label });
+    expect(within(nav).getByRole('link', { name: ru.nav.feed })).toHaveAttribute(
       'aria-current',
       'page',
     );
-    expect(within(nav).getByRole('link', { name: ru.feed.nav.season })).not.toHaveAttribute(
+    expect(within(nav).getByRole('link', { name: ru.nav.season })).not.toHaveAttribute(
       'aria-current',
     );
   });
@@ -76,11 +77,9 @@ describe('the pages of the site', () => {
   it('goes to the feed from the header’s sections without a reload', async () => {
     serve(site);
     render(<App />);
-    const nav = (
-      await screen.findAllByRole('navigation', { name: ru.feed.nav.label })
-    )[0] as HTMLElement;
+    const nav = await screen.findByRole('navigation', { name: ru.nav.label });
 
-    await userEvent.click(within(nav).getByRole('link', { name: ru.feed.nav.feed }));
+    await userEvent.click(within(nav).getByRole('link', { name: ru.nav.feed }));
 
     expect(globalThis.location.pathname).toBe('/feed');
     expect(

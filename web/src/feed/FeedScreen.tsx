@@ -146,7 +146,7 @@ export function FeedScreen({
                 navigate(paths.feed());
               }}
             >
-              {ru.feed.nav.feed}
+              {ru.nav.feed}
             </Button>
           }
         />

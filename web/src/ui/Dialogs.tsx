@@ -4,6 +4,7 @@ import { X } from 'lucide-react';
 import type { ReactNode, RefObject } from 'react';
 import { ru } from '../i18n/ru';
 import { Button, IconButton } from './Button';
+import { cx } from './cx';
 
 const overlay = 'fixed inset-0 z-20 bg-ink/40';
 
@@ -75,12 +76,16 @@ export function ConfirmDanger({
   );
 }
 
-/** A short form in a window over the page: the tech reroll's reason and what it will do */
+/**
+ * A form in a window over the page, opened by the page: the tech reroll's reason, a new game for the pool. A sheet
+ * from the bottom on a phone, a card in the middle on a desktop; closing returns the focus to what opened it
+ */
 export function FormDialog({
   open,
   onOpenChange,
   title,
   description,
+  wide = false,
   children,
   testId,
   returnFocus,
@@ -91,7 +96,9 @@ export function FormDialog({
   onOpenChange: (open: boolean) => void;
   title: string;
   /** What the action will do, as a list: the window is its confirmation too */
-  description: readonly string[];
+  description?: readonly string[];
+  /** A long form (the pool's new game): a wider card on a desktop */
+  wide?: boolean;
   children: ReactNode;
   testId?: string;
 }) {
@@ -101,23 +108,41 @@ export function FormDialog({
         <Dialog.Overlay className={overlay} />
         <Dialog.Content
           data-testid={testId}
+          {...(description ? {} : { 'aria-describedby': undefined })}
           onCloseAutoFocus={(e) => {
             if (!returnFocus?.current) return;
             e.preventDefault();
             returnFocus.current.focus();
           }}
-          className="fixed inset-x-4 top-1/2 z-20 mx-auto grid max-h-9/10 max-w-110 -translate-y-1/2 gap-4 overflow-auto rounded-lg border-3 border-ink bg-card p-5 shadow-lift"
+          className={cx(
+            'fixed inset-x-0 bottom-0 z-20 grid max-h-11/12 gap-4 overflow-auto rounded-t-lg border-t-3 border-ink bg-card px-4 pt-3 pb-6',
+            'desk:inset-x-4 desk:top-1/2 desk:bottom-auto desk:mx-auto desk:-translate-y-1/2 desk:rounded-lg desk:border-3 desk:p-6 desk:shadow-lift',
+            wide ? 'desk:max-w-140' : 'desk:max-w-110',
+          )}
         >
-          <Dialog.Title className="font-display text-lg font-heavy text-balance wrap-anywhere">
-            {title}
-          </Dialog.Title>
-          <Dialog.Description asChild>
-            <ul className="grid list-disc gap-1 pl-5 text-base">
-              {description.map((c) => (
-                <li key={c}>{c}</li>
-              ))}
-            </ul>
-          </Dialog.Description>
+          <span
+            className="h-1 w-11 justify-self-center rounded-full bg-ink desk:hidden"
+            aria-hidden
+          />
+          <div className="flex items-start justify-between gap-3">
+            <Dialog.Title className="font-display text-lg font-heavy text-balance wrap-anywhere">
+              {title}
+            </Dialog.Title>
+            <Dialog.Close asChild>
+              <IconButton label={ru.ui.close}>
+                <X size={20} />
+              </IconButton>
+            </Dialog.Close>
+          </div>
+          {description ? (
+            <Dialog.Description asChild>
+              <ul className="grid list-disc gap-1 pl-5 text-base">
+                {description.map((c) => (
+                  <li key={c}>{c}</li>
+                ))}
+              </ul>
+            </Dialog.Description>
+          ) : null}
           {children}
         </Dialog.Content>
       </Dialog.Portal>

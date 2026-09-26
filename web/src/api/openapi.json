@@ -1843,6 +1843,62 @@
         }
       }
     },
+    "/api/seasons/{seasonId}/games": {
+      "get": {
+        "tags": [
+          "Pool"
+        ],
+        "parameters": [
+          {
+            "name": "seasonId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SeasonGameView"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/status": {
       "get": {
         "tags": [
@@ -6751,6 +6807,14 @@
           "bad"
         ]
       },
+      "ExclusionReason": {
+        "enum": [
+          "alreadyPlayed",
+          "dropped",
+          "techRerolled",
+          null
+        ]
+      },
       "Features": {
         "required": [
           "mapMode",
@@ -9029,9 +9093,15 @@
             "items": {
               "$ref": "#/components/schemas/RulesetChange"
             }
+          },
+          "authorName": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         },
-        "description": "One version of the rules: when, by whom (null for the season's creation by the system), and what changed."
+        "description": "One version of the rules: when, by whom (null for the season's creation by the system), and what changed.\n`authorName` — the author's name for the rules page (H7, D-170); null with no author."
       },
       "RulesView": {
         "required": [
@@ -9053,9 +9123,16 @@
             "items": {
               "$ref": "#/components/schemas/RulesVersionView"
             }
+          },
+          "deadline": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
           }
         },
-        "description": "The rules in force and their history: who changed what and when (C3). Numbers on the rules page are real."
+        "description": "The rules in force and their history: who changed what and when (C3). Numbers on the rules page are real.\n`deadline` — the season's deadline, set apart from the rules by the admin (H7, D-170); null while not set."
       },
       "RunGameView": {
         "required": [
@@ -9080,7 +9157,7 @@
             "format": "double"
           }
         },
-        "description": "The game of a run on the season screen. Not `GameView`: that name is the pool card's, and two records of one name\n    share one OpenAPI schema (D-150)."
+        "description": "The game of a run: its title and hours. Named apart from the pool's GameView: the OpenAPI document\nkeys schemas by type name, so two records called GameView became one schema and the pool lost its fields (D-161)."
       },
       "RunStatus": {
         "enum": [
@@ -9145,6 +9222,63 @@
           }
         },
         "description": "The admin sets or removes (null) the deadline; only in draft or active (D-101)."
+      },
+      "SeasonGameView": {
+        "required": [
+          "gameId",
+          "taken",
+          "takenBy",
+          "completedAt",
+          "marks",
+          "excludedForMe"
+        ],
+        "type": "object",
+        "properties": {
+          "gameId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "taken": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/RollMissReason"
+              }
+            ]
+          },
+          "takenBy": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "completedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "marks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GameMarkView"
+            }
+          },
+          "excludedForMe": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ExclusionReason"
+              }
+            ]
+          }
+        },
+        "description": "A game's status in the season as the pool page shows it (SPEC «Статусы игры в сезоне», H6, D-160): `taken` —\ncompleted in the season or being played (an offer and a pending option count), with the player and, for a completed\ngame, when; `marks` — other players who dropped or tech-rerolled it (the game is free again);\n`excludedForMe` — why it never comes to the viewer again. Only games with something to show are listed."
       },
       "SeasonJoin": {
         "required": [

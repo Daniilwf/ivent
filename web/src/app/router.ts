@@ -1,13 +1,15 @@
-import { useSyncExternalStore } from 'react';
+import { useEffect, useRef, useSyncExternalStore } from 'react';
 
-// The site's pages by address (H5, D-150): a few paths, so no router library. A link changes the address without
-// reloading the page (Link.tsx); the browser's back and forward buttons work as usual.
+// The site's pages by address (H5, D-150; one router for every page, D-202): a few paths, so no router library. A
+// link changes the address without reloading the page (Link.tsx); the browser's back and forward buttons work as usual.
 
 export type Route =
   | { kind: 'season' }
   | { kind: 'feed'; seasonId: string | null }
   | { kind: 'profile'; userId: string }
   | { kind: 'game'; gameId: string }
+  | { kind: 'pool' }
+  | { kind: 'rules' }
   | { kind: 'notFound' };
 
 const id = '([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})';
@@ -15,11 +17,16 @@ const seasonFeed = new RegExp(`^/seasons/${id}/feed$`);
 const profile = new RegExp(`^/users/${id}$`);
 const game = new RegExp(`^/games/${id}$`);
 
-/** What page an address opens: `/`, `/feed` (the current season), `/seasons/{id}/feed`, `/users/{id}`, `/games/{id}` */
+/**
+ * What page an address opens: `/`, `/feed` (the current season), `/seasons/{id}/feed`, `/users/{id}`, `/games/{id}`,
+ * `/pool`, `/rules`
+ */
 export function routeOf(path: string): Route {
   const clean = path.replace(/\/+$/, '') || '/';
   if (clean === '/') return { kind: 'season' };
   if (clean === '/feed') return { kind: 'feed', seasonId: null };
+  if (clean === '/pool') return { kind: 'pool' };
+  if (clean === '/rules') return { kind: 'rules' };
   let match = seasonFeed.exec(clean);
   if (match?.[1]) return { kind: 'feed', seasonId: match[1] };
   match = profile.exec(clean);
@@ -34,9 +41,18 @@ export const paths = {
   feed: (seasonId?: string) => (seasonId ? `/seasons/${seasonId}/feed` : '/feed'),
   profile: (userId: string) => `/users/${userId}`,
   game: (gameId: string) => `/games/${gameId}`,
+  pool: () => '/pool',
+  rules: () => '/rules',
 };
 
 const listeners = new Set<() => void>();
+
+// A page that mounts after the address changed inside the site (a link, back or forward) was opened by the reader;
+// the first page of a visit was not
+let navigated = false;
+globalThis.addEventListener('popstate', () => {
+  navigated = true;
+});
 
 function subscribe(listener: () => void) {
   listeners.add(listener);
@@ -56,7 +72,21 @@ export function usePath(): string {
 export function navigate(to: string) {
   if (to === globalThis.location.pathname) return;
   globalThis.history.pushState(null, '', to);
+  navigated = true;
   // jsdom has no scrolling
   if (!globalThis.navigator.userAgent.includes('jsdom')) globalThis.scrollTo(0, 0);
   for (const listener of listeners) listener();
+}
+
+/**
+ * The page's heading (`tabIndex={-1}`): a page opened from inside the site gives it the focus, so a screen reader
+ * starts reading at the new page and the keyboard goes on from there (H6, H7). The heading must be there from the
+ * first render (in the skeleton too) and stay the same element.
+ */
+export function usePageHeading<T extends HTMLElement = HTMLHeadingElement>() {
+  const heading = useRef<T>(null);
+  useEffect(() => {
+    if (navigated) heading.current?.focus({ preventScroll: true });
+  }, []);
+  return heading;
 }

@@ -13,6 +13,8 @@ import { ru } from './i18n/ru';
 import { Button } from './ui/Button';
 import { EmptyState, ErrorState } from './ui/States';
 import { SeasonScreen } from './season/SeasonScreen';
+import { PoolScreen } from './pool/PoolScreen';
+import { RulesScreen } from './rules/RulesScreen';
 
 type State =
   | { kind: 'loading' }
@@ -206,6 +208,14 @@ export function App() {
             seasonId={(route.seasonId ?? signedIn.seasonId) as string}
             onSignedOut={signedOut}
           />
+        ) : route.kind === 'pool' ? (
+          <PoolScreen
+            seasonId={signedIn.seasonId}
+            canAdd={signedIn.user.role !== 'spectator'}
+            onSignedOut={signedOut}
+          />
+        ) : route.kind === 'rules' ? (
+          <RulesScreen seasonId={signedIn.seasonId} onSignedOut={signedOut} />
         ) : signedIn.seasonId ? (
           <SeasonScreen seasonId={signedIn.seasonId} onSignedOut={signedOut} />
         ) : (

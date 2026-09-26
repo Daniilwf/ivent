@@ -24,6 +24,10 @@ describe('router', () => {
     expect(routeOf(`/users/${id}`)).toEqual({ kind: 'profile', userId: id });
     expect(routeOf(`/games/${id}`)).toEqual({ kind: 'game', gameId: id });
     expect(routeOf('/games/not-an-id')).toEqual({ kind: 'notFound' });
+    expect(routeOf('/pool')).toEqual({ kind: 'pool' });
+    expect(routeOf('/pool/')).toEqual({ kind: 'pool' });
+    expect(routeOf('/rules')).toEqual({ kind: 'rules' });
+    expect(routeOf('/whatever')).toEqual({ kind: 'notFound' });
     expect(routeOf('/admin')).toEqual({ kind: 'notFound' });
   });
 
@@ -32,6 +36,8 @@ describe('router', () => {
     expect(paths.feed(id)).toBe(`/seasons/${id}/feed`);
     expect(paths.profile(id)).toBe(`/users/${id}`);
     expect(paths.game(id)).toBe(`/games/${id}`);
+    expect(paths.pool()).toBe('/pool');
+    expect(paths.rules()).toBe('/rules');
     expect(routeOf(paths.profile(id))).toEqual({ kind: 'profile', userId: id });
   });
 

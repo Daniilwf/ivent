@@ -1,10 +1,33 @@
 import type { ReactNode } from 'react';
 import { cx } from './cx';
 
-/** A small fact in a pill: the deadline, a status. No ink outline: only what can be pressed has one */
-export function Chip({ icon, children }: { icon?: ReactNode; children: ReactNode }) {
+const chipTones = {
+  muted: 'bg-muted',
+  success: 'bg-success-soft',
+  info: 'bg-info-soft',
+  warning: 'bg-warning-soft',
+} as const;
+
+/**
+ * A small fact in a pill: the deadline, a status. No ink outline: only what can be pressed has one. A tone tints the
+ * pill for a status; the words (and an icon) carry the meaning, the colour only helps
+ */
+export function Chip({
+  icon,
+  tone = 'muted',
+  children,
+}: {
+  icon?: ReactNode;
+  tone?: keyof typeof chipTones;
+  children: ReactNode;
+}) {
   return (
-    <span className="inline-flex items-center gap-2 rounded-full bg-muted px-3 py-1 text-sm font-medium">
+    <span
+      className={cx(
+        'inline-flex max-w-full items-center gap-2 rounded-full px-3 py-1 text-sm font-medium text-ink',
+        chipTones[tone],
+      )}
+    >
       {icon}
       {children}
     </span>
