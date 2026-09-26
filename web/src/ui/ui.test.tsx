@@ -5,7 +5,7 @@ import { ru } from '../i18n/ru';
 import { Button } from './Button';
 import { ConfirmDanger } from './Dialogs';
 import { ChoiceGroup, Field, FilePicker, Select } from './Field';
-import { RouteProgress } from './Progress';
+import { RouteProgress, Skeleton } from './Progress';
 import { ErrorState, Notice } from './States';
 
 describe('the design system components', () => {
@@ -151,5 +151,19 @@ describe('the design system components', () => {
       'aria-busy',
       'true',
     );
+  });
+
+  it('keeps the rounding a skeleton is given: a round sticker stays round (H5)', () => {
+    const { container } = render(
+      <>
+        <Skeleton className="size-10 rounded-full" />
+        <Skeleton className="h-5 w-20" />
+      </>,
+    );
+    const [round, plain] = [...container.querySelectorAll('span')];
+
+    expect(round?.className).toContain('rounded-full');
+    expect(round?.className).not.toContain('rounded-sm');
+    expect(plain?.className).toContain('rounded-sm');
   });
 });

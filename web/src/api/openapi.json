@@ -6143,7 +6143,7 @@
             "format": "uuid"
           },
           "game": {
-            "$ref": "#/components/schemas/GameView"
+            "$ref": "#/components/schemas/RunGameView"
           },
           "difficulty": {
             "$ref": "#/components/schemas/Difficulty"
@@ -6853,10 +6853,89 @@
         },
         "description": "One event of the season's feed (GLOSSARY «Лента», D-124): its place in the log, the command it came from, when, the\nevent type and its data as the current format reads it (older versions upcast), who sent the command (none for the\nscheduler) and whether the admin undid it. The screen turns a type and its data into a line of text."
       },
+      "FeedGameView": {
+        "required": [
+          "id",
+          "title",
+          "hasPage"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "hasPage": {
+            "type": "boolean"
+          }
+        },
+        "description": "A game an event of the page names; `hasPage` — the viewer may open its page (a deleted game is the admin's)."
+      },
+      "FeedPlayerView": {
+        "required": [
+          "id",
+          "userId",
+          "name",
+          "avatar",
+          "hasProfile"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "avatar": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/FileLinkView"
+              }
+            ]
+          },
+          "hasProfile": {
+            "type": "boolean"
+          }
+        },
+        "description": "A player of the season, for the feed's lines (H5, D-150): the name, the account for the profile link (`hasProfile` —\nfalse once the account is deleted) and the avatar. The list is in the season screen's order, so a player's token colour\nis their place in it."
+      },
+      "FeedRunView": {
+        "required": [
+          "id",
+          "gameId"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "gameId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "description": "A run an event of the page names, with its game: most events of a run carry only its id."
+      },
       "FeedView": {
         "required": [
           "entries",
-          "nextBefore"
+          "nextBefore",
+          "players",
+          "games",
+          "runs"
         ],
         "type": "object",
         "properties": {
@@ -6872,9 +6951,27 @@
               "integer"
             ],
             "format": "int64"
+          },
+          "players": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FeedPlayerView"
+            }
+          },
+          "games": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FeedGameView"
+            }
+          },
+          "runs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FeedRunView"
+            }
           }
         },
-        "description": "A page of the feed, newest first; `nextBefore` — the sequence to ask before for the next page, none at the start of the log."
+        "description": "A page of the feed, newest first; `nextBefore` — the sequence to ask before for the next page, none at the start of\nthe log. `players` — every player of the season; `games` and `runs` — those the page's events name (D-150)."
       },
       "FileFromUrlRequest": {
         "required": [
@@ -7142,7 +7239,8 @@
           "hours",
           "completedAt",
           "rating",
-          "reviewText"
+          "reviewText",
+          "token"
         ],
         "type": "object",
         "properties": {
@@ -7207,15 +7305,28 @@
               "null",
               "string"
             ]
+          },
+          "token": {
+            "type": "integer",
+            "format": "int32"
           }
         },
-        "description": "A run of a game in any season, with its review if there is one (the game page, D-124)."
+        "description": "A run of a game in any season, with its review if there is one (the game page, D-124). `token` — the player's place\nin that season's list of players, their token colour there (D-150)."
       },
       "GameView": {
         "required": [
           "id",
           "title",
-          "hours"
+          "tags",
+          "hours",
+          "year",
+          "steamAppId",
+          "cover",
+          "note",
+          "isCoop",
+          "author",
+          "isDeleted",
+          "completionCondition"
         ],
         "type": "object",
         "properties": {
@@ -7226,14 +7337,68 @@
           "title": {
             "type": "string"
           },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "hours": {
             "type": [
               "null",
               "number"
             ],
             "format": "double"
+          },
+          "year": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "steamAppId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "cover": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/FileLinkView"
+              }
+            ]
+          },
+          "note": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "isCoop": {
+            "type": "boolean"
+          },
+          "author": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "isDeleted": {
+            "type": "boolean"
+          },
+          "completionCondition": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
-        }
+        },
+        "description": "A game of the pool as everyone sees it (D-119); `author` — the name of the account that added it, or the author as\nthe imported table names them (D-125); none for the seed."
       },
       "HostileCap": {
         "required": [
@@ -8003,7 +8168,8 @@
           "status",
           "playerId",
           "points",
-          "place"
+          "place",
+          "token"
         ],
         "type": "object",
         "properties": {
@@ -8031,9 +8197,13 @@
               "integer"
             ],
             "format": "int32"
+          },
+          "token": {
+            "type": "integer",
+            "format": "int32"
           }
         },
-        "description": "A season a user took part in, with their points and, once the season finished, their place."
+        "description": "A season a user took part in, with their points and, once the season finished, their place. `token` — their place in\nthe season's list of players (by name), which the screens colour their token by (D-150)."
       },
       "ProfileView": {
         "required": [
@@ -8887,6 +9057,31 @@
         },
         "description": "The rules in force and their history: who changed what and when (C3). Numbers on the rules page are real."
       },
+      "RunGameView": {
+        "required": [
+          "id",
+          "title",
+          "hours"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "hours": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          }
+        },
+        "description": "The game of a run on the season screen. Not `GameView`: that name is the pool card's, and two records of one name\n    share one OpenAPI schema (D-150)."
+      },
       "RunStatus": {
         "enum": [
           "playing",
@@ -8909,7 +9104,7 @@
             "format": "uuid"
           },
           "game": {
-            "$ref": "#/components/schemas/GameView"
+            "$ref": "#/components/schemas/RunGameView"
           },
           "startedAt": {
             "type": "string",

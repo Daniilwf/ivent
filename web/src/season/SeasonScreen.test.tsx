@@ -101,9 +101,19 @@ const account = {
   avatar: null,
 };
 
+// The feed beside the map on a desktop (H5) reads its own page; the cases here are about the season, so it is empty
+const isFeedGet = (r: Request) => r.method === 'GET' && new URL(r.url).pathname.endsWith('/feed');
+const emptyFeed = { entries: [], nextBefore: null, players: [], games: [], runs: [] };
+
 function serve(handler: Handler) {
   const fetch = vi.fn((request: Request) =>
-    Promise.resolve(isAccountGet(request) ? json(200, account) : handler(request)),
+    Promise.resolve(
+      isAccountGet(request)
+        ? json(200, account)
+        : isFeedGet(request)
+          ? json(200, emptyFeed)
+          : handler(request),
+    ),
   );
   vi.stubGlobal('fetch', fetch);
   return fetch;

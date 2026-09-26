@@ -137,6 +137,118 @@ const rejection = {
   unknown: 'Действие отклонено. Попробуй ещё раз.',
 } as const;
 
+// H5: the feed, the profile and the game page
+
+// A Russian noun after a number: 1 очко, 2 очка, 5 очков
+const plural = (n: number, one: string, few: string, many: string) => {
+  const tens = Math.abs(n) % 100;
+  const ones = Math.abs(n) % 10;
+  if (tens >= 11 && tens <= 14) return many;
+  if (ones === 1) return one;
+  if (ones >= 2 && ones <= 4) return few;
+  return many;
+};
+// A change with its sign: +7, −3 (a real minus)
+const signed = (n: number) => (n < 0 ? `−${Math.abs(n)}` : `+${n}`);
+const hoursText = (n: number) => `${n.toLocaleString('ru-RU')} ч`;
+
+// Why points or coins changed, when that is the whole line
+const pointsReasons: Record<string, string> = {
+  startingBalance: ' на старте',
+  adminAdjustment: ' от админа',
+  finishBonus: ' — бонус за финиш',
+  finishBonusRevoked: ' — бонус за финиш снят',
+  runCorrection: ' после правки прохождения',
+};
+const coinsReasons: Record<string, string> = {
+  startingBalance: ' на старте',
+  adminAdjustment: ' от админа',
+  completionReward: ' за прохождение',
+  reroll: ' за реролл',
+  runCorrection: ' после правки прохождения',
+};
+
+/** A line of the feed: words and the player's and the game's names, which the screen turns into links */
+type Line<T> = readonly (string | T)[];
+
+const feedLines = {
+  seasonCreated: <T>(name: string): Line<T> => [`Сезон «${name}» создан`],
+  seasonStatus: <T>(to: 'draft' | 'active' | 'closing' | 'finished' | 'archived'): Line<T> => [
+    {
+      draft: 'Сезон снова в подготовке',
+      active: 'Сезон начался! Крути колесо',
+      closing: 'Дедлайн прошёл: броски закрыты, пруфы ещё принимаются',
+      finished: 'Сезон завершён',
+      archived: 'Сезон ушёл в архив',
+    }[to],
+  ],
+  deadlineSet: <T>(when: string): Line<T> => [`Дедлайн сезона: ${when}`],
+  deadlineRemoved: <T>(): Line<T> => ['Дедлайн сезона снят'],
+  results: <T>(): Line<T> => ['Итоги сезона подведены'],
+  rulesChanged: <T>(version: number): Line<T> => [`Правила сезона обновлены, версия ${version}`],
+  finishBonuses: <T>(): Line<T> => ['Бонусы за финиш пересчитаны по новым правилам'],
+  joined: <T>(p: T): Line<T> => [p, ' в игре'],
+  paused: <T>(p: T): Line<T> => [p, ' на паузе'],
+  back: <T>(p: T): Line<T> => [p, ' снова в игре'],
+  adjusted: <T>(p: T): Line<T> => [p, ': правка админа'],
+  offerDiscarded: <T>(p: T, g: T): Line<T> => [p, ': админ снимает ', g],
+  choiceDiscarded: <T>(p: T): Line<T> => [p, ': админ снимает выбор игры'],
+  rolled: <T>(p: T, g: T): Line<T> => [p, ' выкручивает ', g],
+  choiceRolled: <T>(p: T, count: number): Line<T> => [
+    p,
+    ` выкручивает выбор из ${count} ${plural(count, 'игры', 'игр', 'игр')}`,
+  ],
+  rerolled: <T>(p: T): Line<T> => [p, ' крутит колесо заново'],
+  alreadyPlayed: <T>(p: T, g: T): Line<T> => [p, ' отмечает ', g, ': «Уже проходил»'],
+  chose: <T>(p: T): Line<T> => [p, ' выбирает игру'],
+  started: <T>(p: T, g: T): Line<T> => [p, ' начинает ', g],
+  completed: <T>(p: T, g: T): Line<T> => [p, ' проходит ', g],
+  reviewed: <T>(p: T, g: T): Line<T> => [p, ' оценивает ', g],
+  dropped: <T>(p: T, g: T): Line<T> => [p, ' дропает ', g],
+  techRerolled: <T>(p: T, g: T): Line<T> => [p, ': тех-реролл ', g],
+  techToDrop: <T>(p: T, g: T): Line<T> => [p, ': тех-реролл ', g, ' засчитан как дроп'],
+  hoursCorrected: <T>(p: T, g: T, from: number, to: number): Line<T> => [
+    p,
+    ': часы ',
+    g,
+    ` — ${hoursText(from)} → ${hoursText(to)}`,
+  ],
+  difficultyChanged: <T>(p: T, g: T, from: string, to: string): Line<T> => [
+    p,
+    ': сложность ',
+    g,
+    ` — ${from} → ${to}`,
+  ],
+  proofSent: <T>(p: T, g: T): Line<T> => [p, ' отправляет пруф по ', g],
+  proofApproved: <T>(p: T, g: T, withoutProof: boolean): Line<T> => [
+    p,
+    withoutProof ? ': прохождение ' : ': пруф по ',
+    g,
+    withoutProof ? ' принято без скрина' : ' принят',
+  ],
+  proofRejected: <T>(p: T, g: T): Line<T> => [p, ': прохождение ', g, ' отклонено'],
+  finished: <T>(p: T, order: number): Line<T> => [p, ` финиширует ${order}-м!`],
+  finishRevoked: <T>(p: T): Line<T> => [p, ': финиш отменён'],
+  effectDrawn: <T>(p: T, kind: 'good' | 'bad'): Line<T> => [
+    p,
+    kind === 'bad' ? ' тянет плохой ивент' : ' тянет хороший ивент',
+  ],
+  effectResolved: <T>(p: T, applied: boolean): Line<T> => [
+    p,
+    applied ? ': ивент разыгран' : ': ивент не применим',
+  ],
+  points: <T>(p: T, delta: number, reason: string | null): Line<T> => [
+    p,
+    `: ${signed(delta)} ${plural(delta, 'очко', 'очка', 'очков')}${pointsReasons[reason ?? ''] ?? ''}`,
+  ],
+  coins: <T>(p: T, delta: number, reason: string | null): Line<T> => [
+    p,
+    `: ${signed(delta)} ${plural(delta, 'монетка', 'монетки', 'монеток')}${coinsReasons[reason ?? ''] ?? ''}`,
+  ],
+  moved: <T>(p: T): Line<T> => [p, ': фишка переставлена'],
+  undone: <T>(): Line<T> => ['Админ откатывает действие'],
+};
+
 export const ru = {
   app: {
     title: 'Игровой ивент',
@@ -493,6 +605,9 @@ export const ru = {
       ['dice', 'Кубики'],
       ['move', 'Ход фишки'],
       ['finish', 'Финиш'],
+      ['feed', 'Лента'],
+      ['profile', 'Профиль'],
+      ['game', 'Страница игры'],
     ] as [string, string][],
     zones: {
       meadow: 'Поляна новичков',
@@ -653,6 +768,21 @@ export const ru = {
       go: (steps: number) => `Сходить на ${steps}`,
       reset: 'Вернуть фишку',
     },
+    // H5
+    feed: {
+      title: 'Лента',
+      lead: 'Одна строка — одно действие: стикер того, о ком строка, со значком события, имена игрока и игры — ссылки, факты — плашками, отзыв и комментарий — цитатой. Отменённое зачёркнуто и подписано. Дни — по московскому времени.',
+      loading: 'Загрузка',
+      end: 'Конец ленты и следующая страница',
+    },
+    profile: {
+      title: 'Профиль',
+      lead: 'Имя, аватарка целиком, число пройденных игр, сезоны с очками и местом, отзывы. Ниже — мой профиль без сезонов и отзывов.',
+    },
+    gamePage: {
+      title: 'Страница игры',
+      lead: 'Карточка из пула и все прохождения во всех сезонах: статус словом и значком, сложность, часы и отзыв. Ниже — игра, которую ещё никто не брал.',
+    },
     finish: {
       title: 'Финиш',
       lead: 'Первый дошедший до финиша. Место предварительное, пока админ не проверит пруфы.',
@@ -710,6 +840,117 @@ export const ru = {
           : `, до финиша ${cellsToFinish} кл.`),
     first: '— первое место',
     provisional: '— первое место (предварительно)',
+  },
+  // H5: the season's feed, a player's profile and a game's page
+  feed: {
+    title: 'Лента сезона',
+    pageNotFoundTitle: 'Такой страницы нет',
+    pageNotFoundText: 'Проверь адрес или вернись к сезону.',
+    nav: { label: 'Разделы сайта', season: 'Сезон', feed: 'Лента', profile: 'Мой профиль' },
+    preview: 'Свежее в ленте',
+    all: 'Вся лента',
+    more: 'Показать ещё',
+    start: 'Это самое начало сезона',
+    today: 'Сегодня',
+    yesterday: 'Вчера',
+    undone: 'Отменено',
+    undoneHint: 'Админ откатил это действие: оно больше не считается',
+    someone: 'Игрок',
+    someGame: 'игра',
+    fresh: (n: number) =>
+      `${n} ${plural(n, 'новая запись', 'новые записи', 'новых записей')} в ленте`,
+    emptyTitle: 'В ленте пока пусто',
+    emptyText: 'Здесь появятся роллы, прохождения и дропы всех игроков. Начни с первого ролла!',
+    emptyAction: 'К карте',
+    errorTitle: 'Лента не загрузилась',
+    errorText: 'Сервер не ответил. Проверь интернет и попробуй ещё раз.',
+    moreError: 'Следующие записи не загрузились. Попробуй ещё раз.',
+    noSeasonTitle: 'Такого сезона нет',
+    noSeasonText: 'Возможно, ссылка устарела. Открой ленту текущего сезона.',
+    lines: feedLines,
+    facts: {
+      points: (n: number) => `${signed(n)} ${plural(n, 'очко', 'очка', 'очков')}`,
+      cells: (n: number) => `${signed(n)} ${plural(n, 'клетка', 'клетки', 'клеток')}`,
+      pointsAndCells: (n: number) =>
+        `${signed(n)} ${plural(n, 'очко', 'очка', 'очков')} и ${plural(n, 'клетка', 'клетки', 'клеток')}`,
+      coins: (n: number) => `${signed(n)} ${plural(n, 'монетка', 'монетки', 'монеток')}`,
+      dice: (values: number[]) =>
+        values.length === 1
+          ? `Кубик: ${values[0] ?? 0}`
+          : `Кубы: ${values.join(' + ')} = ${values.reduce((a, b) => a + b, 0)}`,
+      challenge: (values: number[]) => `За челлендж: ${values.join(' + ')}`,
+      penalty: (values: number[]) =>
+        `Штраф: ${values.join(' + ')} = ${values.reduce((a, b) => a + b, 0)}`,
+      hours: hoursText,
+      category: (name: string) => `Категория: ${name}`,
+      misses: (n: number) => `${n} ${plural(n, 'промах', 'промаха', 'промахов')} колеса`,
+      reroll: {
+        freeThisRoll: 'Бесплатный реролл',
+        freeRerollResource: 'Реролл по купону',
+        coins: 'Реролл за монетки',
+        badEvent: 'Реролл за плохой ивент',
+        freeMode: 'Реролл в свободном режиме',
+      } as Record<string, string>,
+      finish: (order: number) => `Финиш: ${order}-е место`,
+      frozen: 'Очки заморожены: первый финиш',
+      chainCut: 'Цепочка эффектов оборвана',
+      afterFinish: 'После финиша',
+      moved: 'Фишка переставлена',
+    },
+    rating: (n: number) => `${n} из 10`,
+    ratingLabel: (n: number) => `Оценка: ${n} из 10`,
+  },
+  profile: {
+    completed: (n: number) =>
+      n === 0
+        ? 'Пока без пройденных игр'
+        : `${plural(n, 'Пройдена', 'Пройдены', 'Пройдено')} ${games(n)}`,
+    seasons: 'Сезоны',
+    reviews: 'Отзывы',
+    place: (n: number) => `${n} место`,
+    noPlace: 'Место — после итогов',
+    points: (n: number) => `${n.toLocaleString('ru-RU')} ${plural(n, 'очко', 'очка', 'очков')}`,
+    status: {
+      draft: 'Готовится',
+      active: 'Идёт',
+      closing: 'Дедлайн прошёл',
+      finished: 'Завершён',
+      archived: 'В архиве',
+    } as Record<string, string>,
+    seasonFeed: 'Лента сезона',
+    noSeasonsTitle: 'Сезонов пока нет',
+    noSeasonsText: 'Сезоны появятся здесь, когда админ добавит игрока.',
+    noReviewsTitle: 'Отзывов пока нет',
+    noReviewsText:
+      'Отзыв пишется после прохождения — его увидят в ленте, профиле и на странице игры.',
+    noReviewsMine: 'Пройди игру и напиши отзыв — его увидят в ленте, профиле и на странице игры.',
+    you: 'ты',
+    errorTitle: 'Профиль не загрузился',
+    notFoundTitle: 'Такого игрока нет',
+    notFoundText: 'Возможно, аккаунт удалён или ссылка неверная.',
+    toSeason: 'К сезону',
+  },
+  gamePage: {
+    runsTitle: (n: number) => (n === 0 ? 'Прохождения' : `Прохождения: ${n}`),
+    tags: 'Категории',
+    year: (n: number) => `${n} г.`,
+    hours: (n: number | null) => (n === null ? 'Нет оценки по HLTB' : `≈ ${hoursText(n)} по HLTB`),
+    coop: 'Кооператив',
+    deleted: 'Удалена из пула',
+    condition: (text: string) => `Условие прохождения: ${text}`,
+    status: {
+      playing: 'Проходит',
+      completed: 'Пройдена',
+      dropped: 'Дроп',
+      techRerolled: 'Тех-реролл',
+      rejected: 'Отклонено',
+    } as Record<string, string>,
+    played: (hours: number) => `${hoursText(hours)} в игре`,
+    noRunsTitle: 'Эту игру ещё никто не брал',
+    noRunsText: 'Когда она выпадет на колесе, прохождения и отзывы появятся здесь.',
+    errorTitle: 'Страница игры не загрузилась',
+    notFoundTitle: 'Такой игры нет',
+    notFoundText: 'Возможно, её удалили из пула или ссылка неверная.',
   },
   rejection: rejection as Readonly<Record<string, string>> & typeof rejection,
 } as const;

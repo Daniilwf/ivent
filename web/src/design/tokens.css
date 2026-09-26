@@ -116,6 +116,15 @@
   --duration-fast: 150ms;
   --duration-base: 200ms;
   --duration-slow: 250ms;
+  /* A new line of the feed from another player comes in softly on top (DESIGN.md «Обновления в реальном времени») */
+  --animate-arrive: arrive var(--duration-base) var(--ease-out);
+
+  @keyframes arrive {
+    from {
+      opacity: 0;
+      transform: translateY(-8px);
+    }
+  }
 
   --breakpoint-*: initial;
   --breakpoint-desk: 900px;

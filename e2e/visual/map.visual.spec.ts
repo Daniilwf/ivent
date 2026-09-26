@@ -136,6 +136,9 @@ for (const section of [
   'offer',
   'complete',
   'proof',
+  'feed',
+  'profile',
+  'game',
 ]) {
   test(`the styleguide section «${section}» looks as approved`, async ({ page }) => {
     await openStyleguide(page, section);
