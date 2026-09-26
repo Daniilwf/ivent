@@ -1,6 +1,8 @@
+import { RefreshCw } from 'lucide-react';
 import { useState } from 'react';
 import type { Schemas } from '../api/client';
 import { ru } from '../i18n/ru';
+import { Button } from '../ui/Button';
 
 type Price = Schemas['RerollPriceView'];
 
@@ -22,33 +24,42 @@ export function RerollButton({
 
   if (confirming && price) {
     return (
-      <div role="group" data-testid="reroll-confirm">
+      <div
+        role="group"
+        aria-label={ru.turn.reroll}
+        data-testid="reroll-confirm"
+        className="grid gap-3 rounded-md bg-muted p-3"
+      >
         <p>{ru.turn.rerollConfirm(price.payment, price.coins)}</p>
-        <button
-          data-testid="reroll-confirm-yes"
-          disabled={pending}
-          onClick={() => {
-            setConfirming(false);
-            onReroll();
-          }}
-        >
-          {ru.turn.rerollConfirmYes}
-        </button>
-        <button
-          data-testid="reroll-confirm-no"
-          onClick={() => {
-            setConfirming(false);
-          }}
-        >
-          {ru.turn.rerollConfirmNo}
-        </button>
+        <div className="flex flex-wrap gap-3">
+          <Button
+            variant="main"
+            data-testid="reroll-confirm-yes"
+            disabled={pending}
+            onClick={() => {
+              setConfirming(false);
+              onReroll();
+            }}
+          >
+            {ru.turn.rerollConfirmYes}
+          </Button>
+          <Button
+            data-testid="reroll-confirm-no"
+            onClick={() => {
+              setConfirming(false);
+            }}
+          >
+            {ru.turn.rerollConfirmNo}
+          </Button>
+        </div>
       </div>
     );
   }
 
   return (
-    <button
+    <Button
       data-testid="reroll"
+      icon={<RefreshCw size={18} aria-hidden />}
       disabled={pending}
       onClick={() => {
         if (isPaid(price)) setConfirming(true);
@@ -56,6 +67,6 @@ export function RerollButton({
       }}
     >
       {price ? ru.turn.rerollFor(price.payment, price.coins) : ru.turn.reroll}
-    </button>
+    </Button>
   );
 }

@@ -8,11 +8,12 @@ const t = ru.moments.wheel;
 
 export type WheelGame = { title: string; cover?: string | undefined };
 
-/** The server's answer, whole: the misses on the way (games someone already completed) and the pick */
+/** The server's answer, whole: the misses on the way (games someone completed or plays now) and the pick */
 export type WheelRoll = {
   id: number;
-  misses: { sector: number; game: WheelGame; by: string }[];
-  pick: { sector: number; game: WheelGame };
+  misses: { sector: number; game: WheelGame; by: string; playing?: boolean | undefined }[];
+  /** The game, or none when the roll offers a choice of `choices` games of the category */
+  pick: { sector: number; game: WheelGame | null; choices?: number | undefined };
 };
 
 const sectorFills = [
@@ -127,8 +128,11 @@ export function WheelMoment({
   const miss = roll?.misses[missShown];
   const size = 300;
   const r = size / 2;
-  const missLine = (m: WheelRoll['misses'][number]) =>
-    `${t.missNote(m.game.title)} ${t.miss(m.by)}`;
+  const missSays = (m: WheelRoll['misses'][number]) =>
+    m.playing ? t.missPlaying(m.by) : t.miss(m.by);
+  const missLine = (m: WheelRoll['misses'][number]) => `${t.missNote(m.game.title)} ${missSays(m)}`;
+  const picked = (pick: WheelRoll['pick']) =>
+    pick.game ? t.result(pick.game.title) : t.choice(pick.choices ?? 0);
 
   return (
     <div className="grid w-full justify-items-center gap-3">
@@ -208,7 +212,7 @@ export function WheelMoment({
                 />
               ) : null}
               <span className="line-clamp-2 text-sm text-ink-soft">{miss.game.title}</span>
-              <strong>{t.miss(miss.by)}</strong>
+              <strong>{missSays(miss)}</strong>
             </MomentCard>
           </motion.div>
         ) : null}
@@ -219,7 +223,7 @@ export function WheelMoment({
             transition={{ duration: 0.25 }}
           >
             <MomentCard className="w-full max-w-105">
-              {roll.pick.game.cover ? (
+              {roll.pick.game?.cover ? (
                 <img
                   src={roll.pick.game.cover}
                   alt=""
@@ -229,7 +233,7 @@ export function WheelMoment({
                 />
               ) : null}
               <strong className="font-display text-xl font-heavy text-balance">
-                {roll.pick.game.title}
+                {roll.pick.game ? roll.pick.game.title : picked(roll.pick)}
               </strong>
               <span className="text-sm text-ink-soft">
                 {t.category(sectors[roll.pick.sector] ?? '')}
@@ -248,7 +252,7 @@ export function WheelMoment({
         {stage === 'done' && roll
           ? [
               ...roll.misses.map((miss) => `${missLine(miss)}.`),
-              `${t.category(sectors[roll.pick.sector] ?? '')}. ${t.result(roll.pick.game.title)}`,
+              `${t.category(sectors[roll.pick.sector] ?? '')}. ${picked(roll.pick)}`,
             ].join(' ')
           : ''}
       </p>

@@ -5,8 +5,7 @@ import { watchSeason } from '../api/realtime';
 import { moscowTime } from '../app/time';
 import { ru } from '../i18n/ru';
 import { CompleteForm, type Completion } from './CompleteForm';
-import { RerollButton } from './RerollButton';
-import { GameMarks } from './GameMarks';
+import { ChoiceCard, OfferCard } from './RollResult';
 import { AvatarSection } from './AvatarSection';
 import { ProofSection } from './ProofForm';
 import { ManualEffectItem, type EffectOutcome } from './ManualEffectItem';
@@ -16,6 +15,8 @@ import { linearBoard } from '../board/linearBoard';
 import { RunCard } from '../board/GameCards';
 import { Leaderboard } from '../board/Leaderboard';
 import { MapView } from '../board/MapView';
+import type { MomentHandle } from '../board/moment';
+import { WheelMoment, type WheelRoll } from '../board/Wheel';
 import { Button } from '../ui/Button';
 import { BottomSheet } from '../ui/Dialogs';
 import { Chip } from '../ui/Marks';
@@ -129,6 +130,9 @@ export function SeasonScreen({
   // Answers may arrive out of order: never replace newer data with an older view of the log.
   const lastSequence = useRef(-1);
 
+  // The last roll whose wheel has stopped (or the one the page opened with); undefined until the first load
+  const [landed, setLanded] = useState<number | null | undefined>(undefined);
+  const wheel = useRef<MomentHandle>(null);
   const apply = useCallback(
     (loaded: Loaded) => {
       if (loaded.kind === 'signedOut') {
@@ -138,6 +142,9 @@ export function SeasonScreen({
       } else if (loaded.season.lastSequence >= lastSequence.current) {
         lastSequence.current = loaded.season.lastSequence;
         setSeason(loaded.season);
+        // The roll the page opened with is shown at once; only a roll that comes while it is open spins (D-136)
+        const opened = loaded.season.me?.roll?.sequence ?? null;
+        setLanded((landed) => (landed === undefined ? opened : landed));
         setLoadFailed(false);
       }
     },
@@ -218,6 +225,13 @@ export function SeasonScreen({
   const turnsOpen = season.status === 'active' && !pastDeadline;
   const choice = turnsOpen && me?.phase === 'rolling' ? me.choice : null;
   const offer = turnsOpen && me?.phase === 'rolling' ? me.offer : null;
+  // A roll that came while the page is open spins its wheel first; the server chose everything, the page only shows it
+  const fresh =
+    (offer ?? choice) && me?.roll && landed !== undefined && me.roll.sequence !== landed
+      ? me.roll
+      : null;
+  const spinSectors = fresh ? fresh.wheel : [];
+  const spin: WheelRoll | null = fresh ? wheelRoll(fresh, offer, choice) : null;
   const uncheckedBlocked = me?.unchecked != null && me.unchecked.count >= me.unchecked.limit;
   const { board, players, rows } = view;
   const mine = players.find((p) => p.me);
@@ -379,68 +393,42 @@ export function SeasonScreen({
             ) : null}
           </div>
         )}
-        {/* The offer, the choice and the run's forms keep plain styles until H3 (the wheel) and H4 (the run) */}
-        {choice && (
-          <fieldset data-testid="choice" className="legacy-screens">
-            <legend>{ru.turn.choose}</legend>
-            {choice.options
-              .flatMap(({ id, game }) => (game ? [{ id, game }] : []))
-              .map((option) => (
-                <button
-                  key={option.id}
-                  data-testid={`option-${option.id}`}
-                  disabled={pending}
-                  onClick={() =>
-                    void act({ kind: 'choose', choiceId: choice.id, optionId: option.id })
-                  }
-                >
-                  {ru.turn.option(option.game.title, option.game.hours ?? null)}
-                  <GameMarks marks={option.game.marks} />
-                </button>
-              ))}
-            {choice.options.map(({ id, game }) =>
-              game ? (
-                <button
-                  key={`played-${id}`}
-                  data-testid={`already-played-${id}`}
-                  disabled={pending}
-                  onClick={() => void act({ kind: 'alreadyPlayed', gameId: game.id })}
-                >
-                  {ru.turn.alreadyPlayedGame(game.title)}
-                </button>
-              ) : null,
-            )}
-            <RerollButton
-              price={me?.nextReroll ?? null}
-              pending={pending}
-              onReroll={() => void act({ kind: 'reroll' })}
+        {spin && (
+          <div data-testid="wheel" className="grid gap-3">
+            <WheelMoment
+              key={spin.id}
+              ref={wheel}
+              sectors={spinSectors}
+              roll={spin}
+              onPhase={(phase) => {
+                if (phase === 'done') setLanded(spin.id);
+              }}
             />
-          </fieldset>
-        )}
-        {offer && (
-          <div className="legacy-screens">
-            <p data-testid="offer">{ru.turn.offered(offer.title, offer.hours ?? null)}</p>
-            <GameMarks marks={offer.marks} />
-            <button
-              data-testid="start"
-              disabled={pending}
-              onClick={() => void act({ kind: 'start' })}
-            >
-              {ru.turn.start}
-            </button>
-            <button
-              data-testid="already-played"
-              disabled={pending}
-              onClick={() => void act({ kind: 'alreadyPlayed', gameId: offer.id })}
-            >
-              {ru.turn.alreadyPlayed}
-            </button>
-            <RerollButton
-              price={me?.nextReroll ?? null}
-              pending={pending}
-              onReroll={() => void act({ kind: 'reroll' })}
-            />
+            <Button onClick={() => wheel.current?.skip()}>{ru.moments.skip}</Button>
           </div>
+        )}
+        {/* The run's forms keep plain styles until H4 (the run page) */}
+        {choice && !spin && (
+          <ChoiceCard
+            choice={choice}
+            roll={me?.roll ?? null}
+            price={me?.nextReroll ?? null}
+            pending={pending}
+            onChoose={(optionId) => void act({ kind: 'choose', choiceId: choice.id, optionId })}
+            onAlreadyPlayed={(gameId) => void act({ kind: 'alreadyPlayed', gameId })}
+            onReroll={() => void act({ kind: 'reroll' })}
+          />
+        )}
+        {offer && !spin && (
+          <OfferCard
+            offer={offer}
+            roll={me?.roll ?? null}
+            price={me?.nextReroll ?? null}
+            pending={pending}
+            onStart={() => void act({ kind: 'start' })}
+            onAlreadyPlayed={() => void act({ kind: 'alreadyPlayed', gameId: offer.id })}
+            onReroll={() => void act({ kind: 'reroll' })}
+          />
         )}
         {me?.phase === 'playing' && me.activeRun && (
           <div data-testid="active-run" className="grid gap-4">
@@ -563,6 +551,27 @@ export function SeasonScreen({
       </div>
     </main>
   );
+}
+
+/** The server's roll as the wheel plays it: each miss is a stop on the picked category, then the pick */
+function wheelRoll(
+  roll: Schemas['WheelRollView'],
+  offer: Schemas['OfferedGameView'] | null,
+  choice: Schemas['ChoiceView'] | null,
+): WheelRoll {
+  const sector = Math.max(roll.wheel.indexOf(roll.category), 0);
+  return {
+    id: roll.sequence,
+    misses: roll.misses.map((miss) => ({
+      sector,
+      game: { title: miss.game },
+      by: miss.player,
+      playing: miss.reason === 'beingPlayed',
+    })),
+    pick: offer
+      ? { sector, game: { title: offer.title } }
+      : { sector, game: null, choices: choice?.options.filter((o) => o.game).length ?? 0 },
+  };
 }
 
 /** The sheet opens on my row: with 16 players it may be below the fold */

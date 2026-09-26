@@ -267,7 +267,11 @@ describe('SeasonScreen', () => {
 
     expect(await screen.findByTestId('choice')).toHaveTextContent(ru.turn.choose);
     expect(screen.queryByTestId('start')).not.toBeInTheDocument();
-    expect(screen.getByTestId('option-a1')).toHaveTextContent(ru.turn.option('Silent Hill', 12));
+    // H3: the option card names the game and its hours the way the run card does
+    const option = screen.getByTestId('option-a1');
+    expect(option).toHaveTextContent('Silent Hill');
+    expect(option).toHaveTextContent(ru.board.hours(12));
+    expect(option).toHaveAccessibleName(ru.turn.pick('Silent Hill'));
 
     await userEvent.click(screen.getByTestId('option-b2'));
 
@@ -1826,5 +1830,88 @@ describe('SeasonScreen: runs waiting for the admin (D-134)', () => {
 
     await userEvent.click(await screen.findByTestId('roll'));
     expect(await screen.findByText(ru.rejection['roll.tooManyUnchecked'])).toBeInTheDocument();
+  });
+});
+
+describe('SeasonScreen wheel (H3, D-136)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const offered = {
+    id: 'a1000000-0000-0000-0000-000000000001',
+    title: 'Silent Hill',
+    hours: 12,
+    marks: [],
+  };
+  const roll: Schemas['WheelRollView'] = {
+    sequence: 7,
+    category: 'Horror',
+    wheel: ['Action', 'Horror', 'RPG'],
+    misses: [
+      { game: 'Outlast', reason: 'completedInSeason', player: 'Петя' },
+      { game: 'Alan Wake', reason: 'beingPlayed', player: 'Маша' },
+    ],
+  };
+  const rolled = (sequence = 7): Schemas['SeasonView'] => {
+    const base = season({ lastSequence: sequence });
+    if (!base.me) throw new Error('the fixture has a player');
+    return {
+      ...base,
+      me: {
+        ...base.me,
+        phase: 'rolling',
+        offer: offered,
+        nextReroll: { payment: 'freeThisRoll', coins: 0 },
+        roll: { ...roll, sequence },
+      },
+    };
+  };
+
+  it('shows a roll the page opened with at once, its misses in words', async () => {
+    serve((r) => (isSeasonGet(r) ? json(200, rolled()) : json(404, {})));
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    const offer = await screen.findByTestId('offer');
+    expect(screen.queryByTestId('wheel')).not.toBeInTheDocument();
+    expect(offer).toHaveTextContent('Silent Hill');
+    expect(offer).toHaveTextContent(ru.moments.wheel.category('Horror'));
+    const misses = within(offer).getByTestId('roll-misses');
+    expect(misses).toHaveTextContent(ru.moments.wheel.miss('Петя'));
+    expect(misses).toHaveTextContent(ru.moments.wheel.missPlaying('Маша'));
+  });
+
+  it('spins the wheel for a new roll, then offers the game; the moment can be skipped', async () => {
+    let current = season();
+    serve(async (r) => {
+      if (isSeasonGet(r)) return json(200, current);
+      await r.text();
+      current = rolled();
+      return json(200, { duplicate: false, events: [] });
+    });
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    await userEvent.click(await screen.findByTestId('roll'));
+
+    const wheel = await screen.findByTestId('wheel');
+    expect(screen.queryByTestId('start')).not.toBeInTheDocument();
+    await userEvent.click(within(wheel).getByRole('button', { name: ru.moments.skip }));
+    expect(await screen.findByTestId('start')).toBeInTheDocument();
+    expect(screen.queryByTestId('wheel')).not.toBeInTheDocument();
+  });
+
+  it('spins again for a reroll', async () => {
+    let current = rolled(7);
+    serve(async (r) => {
+      if (isSeasonGet(r)) return json(200, current);
+      await r.text();
+      current = rolled(9);
+      return json(200, { duplicate: false, events: [] });
+    });
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    await userEvent.click(await screen.findByTestId('reroll'));
+
+    expect(await screen.findByTestId('wheel')).toBeInTheDocument();
   });
 });

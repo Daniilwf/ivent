@@ -1,7 +1,5 @@
 // The single dictionary of interface texts. Terms come from docs/GLOSSARY.md.
 
-const hours = (value: number) => `${value.toLocaleString('ru-RU')} ч`;
-
 // монетка / монетки / монеток
 const coins = (n: number) => {
   const tens = n % 100;
@@ -173,8 +171,6 @@ export const ru = {
     closingText: 'Броски закрыты. Пруфы ещё можно дослать — итоги после проверки всех.',
     todo: (count: number) => `Сначала дела: ${count}`,
     roll: 'Крутить колесо',
-    offered: (title: string, gameHours: number | null) =>
-      gameHours == null ? `Выпала игра: ${title}` : `Выпала игра: ${title} (${hours(gameHours)})`,
     start: 'Начать',
     alreadyPlayed: 'Уже проходил',
     reroll: 'Реролл',
@@ -234,8 +230,8 @@ export const ru = {
       kind === 'dropped' ? `Дропнул ${player}` : `Тех-реролл у ${player}`,
     alreadyPlayedGame: (title: string) => `Уже проходил: ${title}`,
     choose: 'Выбери одну из выпавших игр',
-    option: (title: string, gameHours: number | null) =>
-      gameHours == null ? title : `${title} (${hours(gameHours)})`,
+    pick: (title: string) => `Выбрать ${title}`,
+    rolled: 'Выпала игра',
     playing: (title: string) => `Сейчас играешь: ${title}`,
     complete: 'Завершить',
     difficulty: 'Сложность',
@@ -379,6 +375,8 @@ export const ru = {
     wheel: {
       category: (name: string) => `Категория: ${name}`,
       miss: (who: string) => `Уже прошёл ${who}, крутим дальше`,
+      missPlaying: (who: string) => `Сейчас играет ${who}, крутим дальше`,
+      choice: (count: number) => `На выбор: ${count} ${count < 5 ? 'игры' : 'игр'}`,
       missNote: (title: string) => `Промах: ${title}.`,
       result: (title: string) => `Выпала игра: ${title}`,
     },
@@ -410,6 +408,7 @@ export const ru = {
       ['states', 'Состояния'],
       ['progress', 'Прогресс и лидерборд'],
       ['run', 'Текущая игра'],
+      ['offer', 'Результат ролла'],
       ['dialogs', 'Окна'],
       ['map', 'Карта'],
       ['wheel', 'Колесо'],
@@ -522,6 +521,10 @@ export const ru = {
     progress: {
       title: 'Прогресс и лидерборд',
       lead: 'Полоса пути до финиша в моём цвете, полосы очков относительно лидера: серые, моя — моим цветом.',
+    },
+    offer: {
+      title: 'Результат ролла',
+      lead: 'После колеса: выпавшая игра с категорией, промахами и пометками других игроков, одно главное действие «Начать». Вторая карточка — выбор из нескольких игр одной категории: вся карточка — кнопка.',
     },
     run: {
       title: 'Текущая игра',

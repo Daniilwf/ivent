@@ -127,7 +127,7 @@ test('the map looks as approved', async ({ page }) => {
   await expect(map).toHaveScreenshot('map.png');
 });
 
-for (const section of ['buttons', 'fields', 'states', 'progress', 'run']) {
+for (const section of ['buttons', 'fields', 'states', 'progress', 'run', 'offer']) {
   test(`the styleguide section «${section}» looks as approved`, async ({ page }) => {
     await openStyleguide(page, section);
     await expect(page.locator(`#${section}`)).toHaveScreenshot(`${section}.png`);

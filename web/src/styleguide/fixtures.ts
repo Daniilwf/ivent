@@ -1,3 +1,4 @@
+import type { Schemas } from '../api/client';
 // Demo data for the styleguide and the visual tests: made-up players (the longest nicknames are as long as the real
 // table's longest: 20, 16, 15 and 14 characters), the longest titles of the pool, no covers (others' works stay out
 // of the public repository). Two avatars are our own SVG drawings.
@@ -104,3 +105,39 @@ export const demoRows: LeaderRow[] = demoPlayers.map((player, i) => ({
   isFirst: player.first === true,
   provisional: true,
 }));
+
+// The roll's result: a long title with a mark from another player, and misses of both kinds
+export const demoOffer: Schemas['OfferedGameView'] = {
+  id: 'offer-1',
+  title: demoGames[1]?.title ?? '',
+  hours: 6,
+  marks: [{ playerName: 'Сова', kind: 'dropped' }],
+};
+
+export const demoRoll: Schemas['WheelRollView'] = {
+  sequence: 1,
+  category: 'Adventure',
+  wheel: ['Action', 'Adventure', 'Horror', 'RPG'],
+  misses: [
+    { game: 'Hollow Knight', reason: 'completedInSeason', player: 'Капитан_Пельмень' },
+    { game: 'Dead Cells', reason: 'beingPlayed', player: 'Лиса' },
+  ],
+};
+
+export const demoChoice: Schemas['ChoiceView'] = {
+  id: 'choice-1',
+  kind: 'game',
+  options: [
+    { id: 'o1', game: { id: 'g1', title: 'Hollow Knight', hours: 27, marks: [] } },
+    {
+      id: 'o2',
+      game: {
+        id: 'g2',
+        title: demoGames[0]?.title ?? '',
+        hours: 2,
+        marks: [{ playerName: 'Крот', kind: 'techRerolled' }],
+      },
+    },
+    { id: 'o3', game: { id: 'g3', title: 'Celeste', hours: null, marks: [] } },
+  ],
+};
