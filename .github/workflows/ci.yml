@@ -59,7 +59,7 @@ jobs:
               - '!data/**'
             # One pattern: with `every` a file must match all the patterns of a filter
             backend:
-              - '{src/**,global.json,Directory.Packages.props,dotnet-tools.json,scripts/migration-check.mjs}'
+              - '{src/**,global.json,Directory.Packages.props,Directory.Build.props,nuget.config,dotnet-tools.json,package.json,scripts/migration-check.mjs,scripts/lib.mjs}'
           predicate-quantifier: every
 
   build-test:
@@ -198,7 +198,8 @@ jobs:
   migrations:
     name: Migrations
     needs: changes
-    if: needs.changes.outputs.backend == 'true' && github.event_name == 'pull_request'
+    # Once, on the pull request into main: the stacked PRs below it would pay the same minutes again
+    if: needs.changes.outputs.backend == 'true' && github.event_name == 'pull_request' && github.base_ref == 'main'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -221,6 +222,14 @@ jobs:
         run: dotnet tool restore
       - name: Migrations over the previous release's demo database
         run: npm run -s test:migrations
+      - name: The databases (demo data, no secrets)
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: migration-check
+          path: var/migration-check/*.db*
+          if-no-files-found: ignore
+          retention-days: 7
 
   # Visual regression tests (G3): the map and the design system in Chromium, Firefox and WebKit, phone and desktop.
   # They run in the same Playwright container as `npm run test:visual` locally, so the baselines match; the image

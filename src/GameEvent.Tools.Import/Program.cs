@@ -16,6 +16,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 //   season-export <season id> <archive.zip> [--db <path>]
 //   season-import <archive.zip> [--db <path>] [--allow-role-mismatch] [--with-pool]
 //   season-check <season id> | --all [--db <path>]   — --all: every season (the migration check, J5)
+//   db-census [--db <path>]   — rows per table, the seasons, the last migration and the schema (the migration check, J5)
 //   pool-import <games.xlsx> [--db <path>] [--report-only]   — with the site stopped: the import runs its own queue
 // The database defaults to the development one (var/dev.db) or GAMEEVENT_DB. Never point an import at production.
 var arguments = args.ToList();
@@ -117,6 +118,15 @@ try
                 return worst;
             }
 
+        case "db-census" when arguments.Count == 1:
+            {
+                // Raw SQLite, not the model: the census must read an older schema (a rolled-back copy) as it is
+                await using var connection = new SqliteConnection(connectionString);
+                await connection.OpenAsync(cancel.Token);
+                Console.WriteLine(JsonSerializer.Serialize(await DatabaseCensus.TakeAsync(connection, cancel.Token), DatabaseCensus.Json));
+                return 0;
+            }
+
         case "season-check" when arguments.Count == 2 && Guid.TryParse(arguments[1], out var seasonId):
             {
                 await using var db = Open(connectionString);
@@ -206,7 +216,7 @@ try
 
         default:
             Console.Error.WriteLine(
-                "Usage: season-export <season id> <archive.zip> | season-import <archive.zip> [--allow-role-mismatch] [--with-pool] | season-check <season id> | pool-import <games.xlsx> [--report-only]; each takes [--db <path>]");
+                "Usage: season-export <season id> <archive.zip> | season-import <archive.zip> [--allow-role-mismatch] [--with-pool] | season-check <season id> | season-check --all | db-census | pool-import <games.xlsx> [--report-only]; each takes [--db <path>]");
             return 2;
     }
 }
@@ -222,7 +232,6 @@ catch (OperationCanceledException)
     return 130;
 }
 
-// The site holds this lock while it runs on the database (D-127): a writing command refuses meanwhile
 // The integrity check of one season: replays its log and compares with the projection (C12b); exit 0, 1 or 3
 static async Task<int> CheckSeasonAsync(GameEventDbContext db, Guid seasonId, string dbPath, CancellationToken ct)
 {
@@ -244,6 +253,7 @@ static async Task<int> CheckSeasonAsync(GameEventDbContext db, Guid seasonId, st
     return report.IsIntact ? 0 : 3;
 }
 
+// The site holds this lock while it runs on the database (D-127): a writing command refuses meanwhile
 static SiteLock LockSite(string dbPath) =>
     SiteLock.TryAcquire(Path.Combine(Path.GetDirectoryName(dbPath)!, "site.lock"))
     ?? throw new InvalidOperationException("The site is running on this database: stop it first, the import has its own queue.");
