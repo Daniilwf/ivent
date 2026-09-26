@@ -257,6 +257,8 @@ export const ru = {
     pickShort: 'Выбрать',
     rolled: 'Выпала игра',
     playing: (title: string) => `Сейчас играешь: ${title}`,
+    throwing: (title: string) =>
+      `Пройдено: ${title}. Кубы летят на карте — потом фишка сделает ход.`,
     complete: 'Завершить прохождение',
     completeTitle: 'Прошёл? Отметь прохождение',
     difficulty: 'Сложность',

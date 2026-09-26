@@ -2302,8 +2302,11 @@ describe('SeasonScreen completion moment (H4)', () => {
 
     const dice = await screen.findByTestId('dice');
     expect(within(screen.getByTestId('turn')).queryByTestId('dice')).not.toBeInTheDocument();
+    // The turn card says where to look meanwhile
+    expect(screen.getByTestId('throwing')).toHaveTextContent(ru.turn.throwing('Silent Hill'));
     await userEvent.click(within(dice).getByRole('button', { name: ru.moments.skip }));
     expect(screen.queryByTestId('dice')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('throwing')).not.toBeInTheDocument();
     expect(screen.getByTestId('roll-announce')).toHaveTextContent(announce);
   });
 

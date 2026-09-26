@@ -498,7 +498,13 @@ export function SeasonScreen({
         {!me && <p className="text-ink-soft">{ru.turn.spectator}</p>}
         {me && finished && <p className="text-ink-soft">{ru.turn.finishedText}</p>}
         {me && closing && <p className="text-ink-soft">{ru.turn.closingText}</p>}
-        {desk ? null : diceStage}
+        {/* A phone scrolls the dice into view: the completion button was low on the screen */}
+        {!desk && diceStage ? <div ref={showStage}>{diceStage}</div> : null}
+        {desk && throwing ? (
+          <p data-testid="throwing" className="text-ink-soft">
+            {ru.turn.throwing(throwing.game.title)}
+          </p>
+        ) : null}
         {stepFirst || throwing ? null : afterRun}
         {waiting && (
           <div className="grid gap-2" aria-busy="true">
