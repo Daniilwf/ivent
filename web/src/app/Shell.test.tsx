@@ -122,6 +122,10 @@ describe('the shell', () => {
     await screen.findByTestId('no-season');
     await person.click(screen.getByTestId('user-menu'));
     await person.click(await screen.findByTestId('change-password'));
+    // The form takes the focus on the next frame; typing starts after it, as a person's would
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { level: 1, name: ru.password.title })).toHaveFocus();
+    });
 
     await person.type(screen.getByTestId('password-current'), 'old-password');
     await person.type(screen.getByTestId('password-new'), 'short');
