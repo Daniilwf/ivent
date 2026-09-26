@@ -24,6 +24,8 @@ appsettings.*.local.json
 design-time.db*
 *.bak
 backups/
+# …but not the code of the backups mechanic (Windows matches names case-insensitively)
+!src/**/Backups/
 logs/
 *.log
 

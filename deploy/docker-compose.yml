@@ -55,7 +55,8 @@ services:
     mem_limit: 1g
     memswap_limit: 1g
     cpus: 2
-    volumes: [site-data:/data]
+    # Backups apart from the data (J3, D-210): deploy/backup.sh makes them, a restore reads them
+    volumes: [site-data:/data, site-backups:/backups]
     depends_on:
       migrate: { condition: service_completed_successfully }
     environment:
@@ -82,7 +83,7 @@ services:
     mem_limit: 512m
     memswap_limit: 512m
     cpus: 1
-    volumes: [staging-data:/data]
+    volumes: [staging-data:/data, staging-backups:/backups]
     depends_on:
       staging-migrate: { condition: service_completed_successfully }
     environment:
@@ -116,6 +117,8 @@ networks:
 
 volumes:
   site-data:
+  site-backups:
   staging-data:
+  staging-backups:
   caddy-data:
   caddy-config:
