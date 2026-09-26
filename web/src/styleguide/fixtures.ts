@@ -155,7 +155,6 @@ export const demoPenalty: Schemas['DropPenaltyView'] = {
   affectsPosition: true,
   badEvent: true,
 };
-
 /** Other players of the season who may have seen a run */
 export const demoWitnesses: Schemas['PlayerView'][] = demoPlayers.slice(1, 5).map((p) => ({
   id: p.id,
@@ -166,10 +165,22 @@ export const demoWitnesses: Schemas['PlayerView'][] = demoPlayers.slice(1, 5).ma
   finishOrder: null,
   avatar: null,
 }));
-
 /** A proof's screenshots: our own drawings stand for them */
 export const demoProofFiles: Schemas['FileLinkView'][] = avatars.map((url, i) => ({
   id: `shot-${String(i + 1)}`,
   url,
   thumbnailUrl: url,
 }));
+
+// «Что нового»: a release with notes and one without
+export const demoReleases = [
+  {
+    version: 'v1.1.0',
+    date: '2026-10-12',
+    items: [
+      'Колесо показывает, кто уже прошёл выпавшую игру',
+      'Кубы и ход фишки после завершения игры видно на карте',
+    ],
+  },
+  { version: 'v1.0.1', date: '2026-10-05', items: [] },
+];

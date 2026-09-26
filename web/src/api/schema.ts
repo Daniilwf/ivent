@@ -6570,9 +6570,13 @@ export interface components {
             title: string;
             same: boolean;
         };
-        /** @description What every page asks the site: whether it only reads now (the maintenance banner). */
+        /**
+         * @description What every page asks the site: whether it only reads now (the maintenance banner) and which version it runs — a page
+         *     that saw another version before shows «Что нового» (J4, D-201).
+         */
         SiteStatusView: {
             maintenance: boolean;
+            version: string;
         };
         SocialRules: {
             reactions: components["schemas"]["EquatableArrayOfstring"];
