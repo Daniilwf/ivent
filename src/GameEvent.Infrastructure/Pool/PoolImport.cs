@@ -216,11 +216,11 @@ public static class PoolImport
                 dropped++;
             }
 
-            var author = game.Author is { } name ? $"Автор {authors.FindIndex(a => string.Equals(a, name.Trim(), StringComparison.OrdinalIgnoreCase)) + 1}" : null;
+            var author = string.IsNullOrWhiteSpace(game.Author) ? null : $"Автор {authors.FindIndex(a => string.Equals(a, game.Author.Trim(), StringComparison.OrdinalIgnoreCase)) + 1}";
             games.Add(new PoolFileGame(card.Title, [.. card.Tags], null, null, author));
         }
 
-        var categories = table.Categories.GroupBy(c => c.Name, StringComparer.OrdinalIgnoreCase).Select(g => new PoolFileCategory(g.Last().Name, g.Last().Weight)).ToList();
+        var categories = table.Categories.GroupBy(c => c.Name, StringComparer.OrdinalIgnoreCase).Select(g => new PoolFileCategory(g.First().Name, g.First().Weight)).ToList();
         return new PoolFile(categories, games) { NotesDropped = dropped };
     }
 

@@ -32,7 +32,16 @@ switch (command)
         var contentRoot = Path.GetFullPath(Path.Combine(app.Environment.ContentRootPath, "..", ".."));
         if (command == "seed-demo")
         {
-            await DemoSeed.RunAsync(app.Services, contentRoot);
+            try
+            {
+                await DemoSeed.RunAsync(app.Services, contentRoot);
+            }
+            catch (InvalidOperationException e)
+            {
+                await Console.Error.WriteLineAsync(e.Message);
+                await app.StopAsync();
+                return 1;
+            }
         }
         else
         {
