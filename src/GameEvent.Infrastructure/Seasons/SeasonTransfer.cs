@@ -45,7 +45,8 @@ public sealed record ExportedGame(
     string? CompletionCondition = null,
     bool IsCoop = false,
     Guid? AuthorId = null,
-    DateTimeOffset? CreatedAt = null);
+    DateTimeOffset? CreatedAt = null,
+    string? AuthorName = null);
 
 public sealed record ExportedCategory(string Name, int Weight);
 
@@ -112,7 +113,7 @@ public static class SeasonTransfer
         var users = await db.Users.AsNoTracking().Where(u => userIds.Contains(u.Id)).OrderBy(u => u.Login)
             .Select(u => new ExportedUser(u.Id, u.Login, u.Name, u.Role)).ToListAsync(ct);
         var games = await db.Games.AsNoTracking().OrderBy(g => g.Id)
-            .Select(g => new ExportedGame(g.Id, g.Title, g.TagsJson, g.Hours, g.IsDeleted, g.Year, g.SteamAppId, g.Note, g.CompletionCondition, g.IsCoop, g.AuthorId, g.CreatedAt))
+            .Select(g => new ExportedGame(g.Id, g.Title, g.TagsJson, g.Hours, g.IsDeleted, g.Year, g.SteamAppId, g.Note, g.CompletionCondition, g.IsCoop, g.AuthorId, g.CreatedAt, g.AuthorName))
             .ToListAsync(ct);
         var categories = await db.Categories.AsNoTracking().OrderBy(c => c.Name).Select(c => new ExportedCategory(c.Name, c.Weight)).ToListAsync(ct);
 
@@ -259,6 +260,7 @@ public static class SeasonTransfer
                     CompletionCondition = game.CompletionCondition,
                     IsCoop = game.IsCoop,
                     AuthorId = game.AuthorId is { } author && userMap.TryGetValue(author, out var localAuthor) ? localAuthor : null,
+                    AuthorName = game.AuthorName,
                     CreatedAt = game.CreatedAt,
                 });
             }

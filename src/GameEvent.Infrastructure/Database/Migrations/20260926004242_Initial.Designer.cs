@@ -11,7 +11,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace GameEvent.Infrastructure.Database.Migrations
 {
     [DbContext(typeof(GameEventDbContext))]
-    [Migration("20260925233828_Initial")]
+    [Migration("20260926004242_Initial")]
     partial class Initial
     {
         /// <inheritdoc />
@@ -235,6 +235,10 @@ namespace GameEvent.Infrastructure.Database.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<Guid?>("AuthorId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("AuthorName")
+                        .HasMaxLength(64)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("CompletionCondition")

@@ -25,7 +25,7 @@
     "dev:demo": "node scripts/todo.mjs dev:demo F2",
     "seed:demo": "node scripts/todo.mjs seed:demo F2",
     "gen:api": "node scripts/gen-api.mjs",
-    "import:xlsx": "node scripts/todo.mjs import:xlsx F1",
+    "import:xlsx": "dotnet run --project src/GameEvent.Tools.Import -- pool-import",
     "season:export": "dotnet run --project src/GameEvent.Tools.Import -- season-export",
     "season:import": "dotnet run --project src/GameEvent.Tools.Import -- season-import",
     "season:check": "dotnet run --project src/GameEvent.Tools.Import -- season-check",

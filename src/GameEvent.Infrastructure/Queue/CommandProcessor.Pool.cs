@@ -37,10 +37,16 @@ public sealed partial class CommandProcessor
                         return ([], null, null, coverProblem);
                     }
 
+                    var authorName = string.IsNullOrWhiteSpace(add.AuthorName) ? null : PoolRules.Tidy(add.AuthorName);
+                    if (authorName?.Length > PoolRules.MaxAuthorNameLength)
+                    {
+                        return Reject(PoolRules.CardInvalid, $"An author is at most {PoolRules.MaxAuthorNameLength} characters.");
+                    }
+
                     var gameId = ids.NewId();
-                    var record = new GameRecord { Id = gameId, Title = card.Title, TagsJson = "[]", AuthorId = add.AuthorId, CreatedAt = now };
+                    var record = new GameRecord { Id = gameId, Title = card.Title, TagsJson = "[]", AuthorId = add.AuthorId, AuthorName = authorName, CreatedAt = now };
                     Fill(record, card);
-                    return ([new GameAdded(gameId, card, add.AuthorId)], () => db.Games.Add(record), null, null);
+                    return ([new GameAdded(gameId, card, add.AuthorId, authorName)], () => db.Games.Add(record), null, null);
                 }
 
             case ChangeGame change:

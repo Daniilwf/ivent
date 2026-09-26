@@ -170,6 +170,7 @@ public sealed class GameEventDbContext(DbContextOptions<GameEventDbContext> opti
             e.Property(x => x.SteamAppId).HasMaxLength(12);
             e.Property(x => x.Note).HasMaxLength(1000);
             e.Property(x => x.CompletionCondition).HasMaxLength(1000);
+            e.Property(x => x.AuthorName).HasMaxLength(64);
         });
 
         modelBuilder.Entity<CategoryRecord>(e =>
