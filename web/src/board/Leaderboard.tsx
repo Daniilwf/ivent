@@ -1,4 +1,3 @@
-import { playerToken } from '../design/players';
 import { ru } from '../i18n/ru';
 import { cx } from '../ui/cx';
 import { Badge } from '../ui/Marks';
@@ -11,7 +10,7 @@ export type LeaderRow = {
   player: Player;
   place: number;
   points: number;
-  /** null: not in the race (inactive, or nothing to count) */
+  /** null: no way to the finish from where the token stands (API `cellsToFinish`) */
   cellsToFinish: number | null;
   isFirst: boolean;
   provisional: boolean;
@@ -20,16 +19,26 @@ export type LeaderRow = {
 const t = ru.board;
 
 /** The leaderboard with score bars against the leader; each row is also one sentence for screen readers */
-export function Leaderboard({ rows, limit }: { rows: LeaderRow[]; limit?: number }) {
+export function Leaderboard({
+  rows,
+  limit,
+  marked = true,
+}: {
+  rows: LeaderRow[];
+  limit?: number;
+  /** The test ids (`leaderboard`, `leader-*`): on one copy only when a page shows the leaderboard twice */
+  marked?: boolean;
+}) {
   const top = Math.max(...rows.map((r) => r.points), 1);
   return (
-    <ol className="grid gap-1" data-testid="leaderboard">
+    <ol className="grid gap-1" data-testid={marked ? 'leaderboard' : undefined}>
       {(limit ? rows.slice(0, limit) : rows).map((row) => {
         const p = row.player;
         return (
           <li
             key={p.id}
-            data-testid={`leader-${p.id}`}
+            data-testid={marked ? `leader-${p.id}` : undefined}
+            data-me={p.me ? true : undefined}
             className={cx(
               'grid grid-cols-[auto_auto_minmax(0,1fr)_auto] items-center gap-3 rounded-md px-2 py-2',
               p.me && 'bg-page outline-2 outline-me',
@@ -58,12 +67,12 @@ export function Leaderboard({ rows, limit }: { rows: LeaderRow[]; limit?: number
                 {p.me ? <Badge tone="me">{t.you}</Badge> : null}
               </span>
               <span className="block text-xs font-regular text-ink-soft">
-                {row.cellsToFinish === null ? t.inactive : ru.ui.toFinish(row.cellsToFinish)}
+                {row.cellsToFinish === null ? t.noWay : ru.ui.toFinish(row.cellsToFinish)}
               </span>
               <ScoreBar
                 points={row.points}
                 top={top}
-                fill={p.me ? 'var(--color-me)' : playerToken(p.token).fill}
+                fill={p.me ? 'var(--color-me)' : 'var(--color-ink-soft)'}
               />
             </span>
             <span className="font-display text-lg font-heavy" aria-hidden>
