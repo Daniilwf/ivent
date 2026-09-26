@@ -21,10 +21,13 @@ export type GameCard = {
 export function Cover({
   game,
   width = 88,
+  lazy = false,
   className,
 }: {
   game: Pick<GameCard, 'title' | 'cover'>;
   width?: number;
+  /** In a long list (the pool): the picture loads when it comes near the screen */
+  lazy?: boolean;
   className?: string;
 }) {
   const style = { width, height: width * 1.5 };
@@ -35,6 +38,7 @@ export function Cover({
       alt=""
       width={width}
       height={width * 1.5}
+      loading={lazy ? 'lazy' : undefined}
       className={cx(frame, 'object-cover')}
       style={style}
     />

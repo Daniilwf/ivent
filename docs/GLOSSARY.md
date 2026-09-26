@@ -173,6 +173,10 @@
 | Исключение игры | игра, которая больше не выпадает этому игроку в сезоне | `GameExclusion`, `SeasonPlayer.Exclusions`, таблица `PlayerGameExclusion` |
 | Фильтр ролла | предикат по играм с приоритетом: эффект > зона > обычный | `RollFilter`, `RollFilterPriority`, `RollFilters.Apply` |
 | Доступные игры категории | сколько игр категории можно выкинуть сейчас (для админки) | `CategoryStat`, `PoolStats.Categories` |
+| Статус игры в сезоне | что с игрой пула в сезоне: «уже прошёл», «сейчас играет» (с предложенными и вариантами выбора), пометки дропов других, исключение для меня; тот же предикат, что у колеса (D-160) | `SeasonGameView`, `PoolStats.Taken`, `GET /api/seasons/{id}/games` |
+| Пул игр (страница) | все игры пула с поиском, фильтрами, статусами в сезоне и добавлением (D-162, D-163) | `PoolScreen`, `PoolGameCard`, `AddGameForm` |
+| Игра прохождения | название и часы игры в карточке прохождения; не путать с игрой пула `GameView` (D-161) | `RunGameView` |
+| Разделы сайта | страницы после входа по адресам: главная, пул, правила (D-164) | `Page`, `usePage`, `navigate` (`web/src/app/nav.ts`) |
 | Ожидание выбора | ход ждёт решения игрока | `PendingChoice` (`ChoiceKind`, варианты `ChoiceOption`) |
 | Выбор из нескольких игр | ролл при `choiceCount` > 1: игрок выбирает одну из выпавших | `GameChoiceRolled`, команда `MakeChoice`, событие `ChoiceMade` |
 | Сброс выбора | админ снимает ожидание выбора тем же флагом, что и сброс предложенной игры; игры снова свободны | `ChoiceDiscarded` (по `AdjustPlayer.DiscardOffer`) |
@@ -210,6 +214,7 @@
 | Флаг функции | включение механики в конфиге сезона | `Ruleset.Features` |
 | Версия правил | номер версии конфига сезона: 1 при создании, +1 при каждой правке админом | `SeasonState.RulesetVersion`, `RulesetChanged.Version` |
 | История правил | список версий с датой, автором и изменениями «было/стало» | `RulesetChange`, `RulesVersionView` |
+| Страница правил | правила сезона словами из текущего конфига и история их изменений (D-171) | `RulesScreen`, `rulesPage`, `GET /api/seasons/{id}/rules` (`RulesView.Deadline`, `RulesVersionView.AuthorName`) |
 | Отложенная задача | таймер, хранящийся в БД | `ScheduledTask` |
 | Файл | загруженная картинка: скрин в WebP или GIF как есть, с миниатюрой | `FileRecord`, `StoredFile`, событие `FileStored`, команда `RecordFile` |
 | Миниатюра | уменьшенная копия файла для карты и списков, у GIF — анимированная | `FileNames.Thumbnail`, `thumbnailUrl` |

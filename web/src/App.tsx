@@ -9,6 +9,9 @@ import { ru } from './i18n/ru';
 import { Button } from './ui/Button';
 import { EmptyState, ErrorState } from './ui/States';
 import { SeasonScreen } from './season/SeasonScreen';
+import { usePage } from './app/nav';
+import { PoolScreen } from './pool/PoolScreen';
+import { RulesScreen } from './rules/RulesScreen';
 
 type State =
   | { kind: 'loading' }
@@ -24,6 +27,7 @@ type State =
 
 export function App() {
   const [state, setState] = useState<State>({ kind: 'loading' });
+  const [page] = usePage();
 
   const signedOut = useCallback(() => {
     setState({ kind: 'signedOut' });
@@ -140,6 +144,7 @@ export function App() {
     return (
       <Shell
         user={signedIn.user}
+        page={page}
         onChangePassword={() => {
           setState({ ...signedIn, ownPassword: true });
         }}
@@ -165,6 +170,14 @@ export function App() {
               </Button>
             </ChangePasswordForm>
           </main>
+        ) : page === 'pool' ? (
+          <PoolScreen
+            seasonId={signedIn.seasonId}
+            canAdd={signedIn.user.role !== 'spectator'}
+            onSignedOut={signedOut}
+          />
+        ) : page === 'rules' ? (
+          <RulesScreen seasonId={signedIn.seasonId} onSignedOut={signedOut} />
         ) : signedIn.seasonId ? (
           <SeasonScreen seasonId={signedIn.seasonId} onSignedOut={signedOut} />
         ) : (

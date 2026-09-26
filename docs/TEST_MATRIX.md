@@ -272,3 +272,28 @@
 | SH4 | Время по Москве с подписью | `web/src/app/time.test.ts`, `season/SeasonLifecycle.test.tsx` («shows the deadline in Moscow time…») | ✅ |
 | SH5 | Состояния загрузки, ошибки и «нет сезона» | `web/src/App.test.tsx` | ✅ |
 | W1 | Колесо ролла из лога (D-136): событие ролла хранит категории, что были на колесе (только с доступными играми, в порядке движка); v1 читается с колесом из выпавшей категории; экран сезона отдаёт колесо, выбор и промахи (игра, кто её держит, причина) только для моего текущего предложения | `Rolls/RollTests.Logged_wheel_lists_the_categories_with_available_games_in_ordinal_order`, `Wheel_spins_only_over_categories_with_available_games`; `Kernel/EventFormatTests` (golden samples v2 и чтение v1 обоих событий ролла); интеграционные — `WheelRollApiTests` (обычный ролл, выбор, промахи с датой, новая `sequence`, после дедлайна, чужой ролл и ролл другого игрока после моего, тех-реролл админом, откат нового ролла); движок — `RollTests.A_choice_roll_logs_every_category_on_the_wheel_not_just_its_pick`; экран — `web/src/board/Wheel.test.tsx` (секторы, без перезапуска при обновлении), `SeasonScreen.test.tsx` «SeasonScreen wheel» (ролл, реролл, «Уже проходил», старый ролл после отката, результат при загрузке, объявление и фокус, сцена на десктопе), порядок дел и ролла, фокус в подтверждении реролла | ✅ |
+
+## Пул (H6)
+
+| ID | Правило | Тесты | Статус |
+| --- | --- | --- | --- |
+| PL1 | Статус игры в сезоне считается тем же предикатом, что и колесо: предложенная и варианты выбора — «сейчас играет», пройденная — «уже прошёл», дроп, тех-реролл и реджект освобождают (SPEC «Статусы игры в сезоне», D-160) | `src/GameEvent.Engine.Tests/Rolls/TakenGamesTests.cs` | ✅ |
+| PL2 | `GET /api/seasons/{id}/games`: кто играет, кто и когда прошёл, пометки дропов других, своё исключение; вход обязателен, чужой и пустой сезон — 404 (D-160) | `src/GameEvent.Web.Tests/Api/SeasonPoolApiTests.cs` | ✅ |
+| PL3 | Схема игры пула в OpenAPI не сливается с игрой прохождения (D-161) | `SeasonPoolApiTests.cs` («Pool_game_schema_keeps_its_own_fields») | ✅ |
+| PL4 | Поиск по словам названия, фильтры по категории, длине и «только свободные» (D-162) | `web/src/pool/poolFilter.test.ts`, `web/src/pool/PoolScreen.test.tsx` («searches…», «filters…», «offers to reset…») | ✅ |
+| PL5 | Страница пула: обложка или заглушка, часы, год, теги, кооп, заметка, автор, статус в сезоне словами; без сезона — без статусов | `PoolScreen.test.tsx` («shows a skeleton…», «shows the cover…», «marks each game…», «shows the author…», «without a season…») | ✅ |
+| PL6 | Состояния: загрузка, пустой пул с призывом, «ничего не нашлось» со сбросом, ошибка с повтором, упавшие статусы не прячут пул, выход при 401 | `PoolScreen.test.tsx` | ✅ |
+| PL7 | Пул и статусы обновляются по хабу без перезагрузки | `PoolScreen.test.tsx` («follows the hub…») | ✅ |
+| PL8 | Добавление: проверка полей, та же игра блокирует, похожая — предупреждение и `force` только после «Всё равно добавить», гонка `pool.duplicate`/`pool.similar`, лимит, своя обложка (SPEC «Дубли», D-163) | `PoolScreen.test.tsx` («adding a game») | ✅ |
+| PL9 | Зритель пул читает, но не добавляет | `PoolScreen.test.tsx` («a spectator…»), `web/src/app/nav.test.tsx` («a spectator reads the pool…»); сервер — `src/GameEvent.Web.Tests/Pool/PoolApiTests.cs` | ✅ |
+| PL10 | Разделы сайта по адресам, текущий помечен, переход без перезагрузки, фокус на заголовке, «назад» работает (D-164) | `web/src/app/nav.test.tsx` | ✅ |
+
+## Правила (H7)
+
+| ID | Правило | Тесты | Статус |
+| --- | --- | --- | --- |
+| RL1 | Страница правил собирается из текущего конфига: кубики за часы и пример, кубик по сложности, рероллы и цена, лимит непроверенных, дроп и тех-реролл, бонусы финиша со 2-го места, тайбрейки, челлендж только при флаге (SPEC «Правила на сайте», D-171) | `web/src/rules/rulesText.test.ts` | ✅ |
+| RL2 | Число кубиков в примере — то же правило, что в движке (округление и пределы) | `rulesText.test.ts` («the dice count») | ✅ |
+| RL3 | История: версии от новой к старой, автор и дата по Москве, «Было/Стало» словами (D-170, D-171) | `rulesText.test.ts` («the history in words»), `web/src/rules/RulesScreen.test.tsx` («lists the changes…», «says the rules have not changed…») | ✅ |
+| RL4 | API правил отдаёт имя автора версии и дедлайн сезона (D-170) | `src/GameEvent.Web.Tests/Api/RulesApiTests.cs` («History_names_the_author…», «Rules_carry_the_season_deadline…») | ✅ |
+| RL5 | Состояния страницы: загрузка, ошибка с повтором, нет сезона, выход при 401; правка правил видна без перезагрузки | `RulesScreen.test.tsx` | ✅ |

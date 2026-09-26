@@ -643,5 +643,274 @@ export const ru = {
     first: '— первое место',
     provisional: '— первое место (предварительно)',
   },
+  // H6, H7: the sections of the site in the header
+  nav: {
+    label: 'Разделы',
+    home: 'Главная',
+    pool: 'Пул игр',
+    rules: 'Правила',
+  },
+  // H6: the pool of games (SPEC «Пул игр», «Статусы игры в сезоне», «Дубли»)
+  pool: {
+    title: 'Пул игр',
+    found: (n: number, total: number) =>
+      n === total ? `В пуле ${games(total)}` : `Нашлось ${games(n)} из ${total}`,
+    add: 'Добавить игру',
+    search: 'Поиск по названию',
+    searchRegion: 'Поиск и фильтры',
+    filters: (n: number) => (n === 0 ? 'Фильтры' : `Фильтры: ${n}`),
+    category: 'Категория',
+    anyCategory: 'Все категории',
+    categoryOption: (name: string, n: number) => `${name} (${n})`,
+    length: 'Длина по HowLongToBeat',
+    lengths: {
+      any: 'Любая',
+      short: 'До 5 ч',
+      medium: '5–15 ч',
+      long: 'Больше 15 ч',
+    },
+    freeOnly: 'Только свободные для меня',
+    reset: 'Сбросить фильтры',
+    hours: (h: number) => `${h.toLocaleString('ru-RU')} ч`,
+    noHours: 'Часов нет',
+    coop: 'Кооп',
+    author: (name: string) => `Добавил ${name}`,
+    free: 'Свободна',
+    completed: (player: string, day: string | null) =>
+      day ? `Уже прошёл ${player}, ${day}` : `Уже прошёл ${player}`,
+    playing: (player: string) => `Сейчас играет ${player}`,
+    excluded: {
+      alreadyPlayed: 'Тебе не выпадет: ты уже проходил',
+      dropped: 'Тебе не выпадет: ты дропнул',
+      techRerolled: 'Тебе не выпадет: у тебя был тех-реролл',
+    },
+    emptyTitle: 'В пуле пока нет игр',
+    emptyText: 'Добавь первую — колесо крутится только по играм из пула.',
+    emptyTextViewer: 'Игры добавляют игроки и админ.',
+    nothingTitle: 'Ничего не нашлось',
+    nothingText: 'Попробуй другое название или сбрось фильтры.',
+    loadErrorTitle: 'Пул не загрузился',
+    loadErrorText: 'Сервер не ответил. Проверь интернет и попробуй ещё раз.',
+    statusError: 'Статусы игр в сезоне не загрузились: видно только сам пул.',
+    added: (title: string) => `«${title}» теперь в пуле.`,
+    form: {
+      title: 'Новая игра',
+      name: 'Название',
+      nameHint: 'Как в Steam или на HowLongToBeat',
+      nameRequired: 'Напиши название.',
+      nameTooLong: 'Название — не длиннее 200 символов.',
+      categories: 'Категории',
+      categoriesHint: 'Колесо выбирает игру по категории: отметь хотя бы одну.',
+      categoriesRequired: 'Отметь хотя бы одну категорию.',
+      noCategories: 'Категорий пока нет: их заводит админ.',
+      hours: 'Часы по HowLongToBeat, основной сюжет',
+      hoursHint: 'Шаг — полчаса, например 12,5. Не знаешь — оставь пустым.',
+      hoursInvalid: 'Часы — от 0,5 до 1000 с шагом в полчаса.',
+      year: 'Год выхода',
+      yearInvalid: 'Год — от 1950 до 2100.',
+      note: 'Заметка',
+      noteHint: 'Челлендж или условие прохождения для бесконечных игр',
+      noteTooLong: 'Заметка — не длиннее 1000 символов.',
+      coop: 'Кооп-игра',
+      cover: 'Обложка',
+      coverHint: 'Картинка с устройства, необязательно',
+      coverPick: 'Загрузить обложку',
+      coverReplace: 'Другая обложка',
+      coverRemove: 'Убрать обложку',
+      checking: 'Ищем похожие названия…',
+      similarTitle: 'В пуле уже есть похожие',
+      similarText: 'Проверь, что это не та же игра под другим названием.',
+      same: (title: string) => `«${title}» уже в пуле — второй раз её не добавить.`,
+      submit: 'Добавить в пул',
+      submitAnyway: 'Всё равно добавить',
+      failed: 'Игра не добавилась. Попробуй ещё раз.',
+      tooOften: 'Слишком много игр за минуту. Подожди немного.',
+    },
+    rejection: {
+      'pool.duplicate': 'Такая игра уже есть в пуле.',
+      'pool.similar': 'В пуле есть похожее название: проверь и подтверди.',
+      'pool.cardInvalid': 'Проверь поля: что-то заполнено не так.',
+      'pool.coverUnknown': 'Обложка не найдена. Загрузи её ещё раз.',
+    } as Readonly<Record<string, string>>,
+  },
+  // H7: the rules page, built from the season's current ruleset (SPEC «Правила на сайте»)
+  rules: {
+    title: 'Правила сезона',
+    lead: 'Все числа здесь — из текущих правил сезона. Поменяет админ — поменяются и тут.',
+    version: (n: number) => `Версия правил ${n}`,
+    loadErrorTitle: 'Правила не загрузились',
+    loadErrorText: 'Сервер не ответил. Проверь интернет и попробуй ещё раз.',
+    noSeasonTitle: 'Правил пока нет',
+    noSeasonText: 'Правила появятся вместе с сезоном.',
+    contents: 'На этой странице',
+    sections: {
+      win: 'Как победить',
+      roll: 'Ролл игры',
+      reward: 'Награда за прохождение',
+      drop: 'Дроп и тех-реролл',
+      finish: 'Финиш',
+      deadline: 'Сроки',
+      history: 'История изменений',
+    },
+    win: {
+      twoScores:
+        'У тебя два показателя: позиция на карте решает первое место, очки — все остальные.',
+      map: (cells: number) => `От старта до финиша — ${cells} клеток.`,
+      first: 'Первое место — первый, кто дошёл до финиша.',
+      firstApproval:
+        'Пока админ не проверил пруфы прохождений, которые довели до финиша, первое место предварительное.',
+      firstFrozen:
+        'После финиша первым очки замораживаются: дальше играешь без зачёта и не влияешь на других.',
+      others: 'Остальные места — по очкам на момент дедлайна.',
+      nobody: 'Если до финиша никто не дошёл, все места распределяются по очкам.',
+      tiebreakers: (list: string) => `При равных очках выше тот, у кого ${list}.`,
+      tiebreaker: {
+        completedRuns: 'больше пройденных игр',
+        earliestFinalScore: 'раньше набраны итоговые очки',
+      } as Readonly<Record<string, string>>,
+      then: ', затем — ',
+    },
+    roll: {
+      wheel: 'Колесо выбирает категорию, потом сервер — игру из пула с этим тегом.',
+      choice: (n: number) => `После ролла выбираешь одну из ${n} выпавших игр.`,
+      free: (n: number) =>
+        n === 1
+          ? 'Первый реролл после каждого ролла — бесплатно.'
+          : `Бесплатных рероллов после каждого ролла: ${n}.`,
+      noFree: 'Бесплатных рероллов нет.',
+      costCoins: (n: number) => `Дальше реролл стоит ${coins(n)}.`,
+      costBadEvent: 'Дальше реролл — за плохой ивент.',
+      alreadyPlayed:
+        'Проходил игру до ивента — жми «Уже проходил»: новый ролл бесплатный, игра тебе больше не выпадет.',
+      busy: 'Занятые и пройденные в сезоне игры не выпадают: колесо покажет промах и выберет другую.',
+      unchecked: (n: number) =>
+        `Если проверки админом ждут ${runs(n)}, новый ролл закрыт, пока их не станет меньше.`,
+      active: (n: number) =>
+        n === 1 ? 'Одновременно идёт одно прохождение.' : `Прохождений одновременно: до ${n}.`,
+    },
+    reward: {
+      dice: (hoursPerDie: number, rounding: 'nearest' | 'floor' | 'ceil') =>
+        `Один кубик за каждые ${hoursPerDie.toLocaleString('ru-RU')} ч по HowLongToBeat, ${
+          rounding === 'nearest'
+            ? 'с округлением до ближайшего'
+            : rounding === 'floor'
+              ? 'с округлением вниз'
+              : 'с округлением вверх'
+        }.`,
+      limits: (min: number, max: number) => `Не меньше ${min} и не больше ${max} кубиков.`,
+      example: (hours: number, count: number, sides: number) =>
+        `Например, игра на ${hours} ч на нормальной сложности — ${count}d${sides}.`,
+      byDifficulty: 'Кубик зависит от сложности',
+      difficulty: 'Сложность',
+      die: 'Кубик',
+      withEvent: (sides: number, kind: 'good' | 'bad') =>
+        `d${sides} и ${kind === 'good' ? 'хороший' : 'плохой'} ивент`,
+      difficulties: {
+        easy: 'Лёгкая',
+        normal: 'Нормальная или сложностей нет',
+        hard: 'Сложная',
+        extreme: 'Выше сложной',
+      },
+      points: 'Сумма кубиков идёт и в очки, и в клетки: фишка двигается на столько же.',
+      proofFirst: 'Кубы кидаются сразу, пруф проверяется позже. Сложность засчитывается по пруфу.',
+      reject: 'Если пруф отклонят, снимутся очки и клетки за это прохождение.',
+      challenge: (n: number) => `Выполнил челлендж из заметки к игре — кубиков сверху: +${n}.`,
+      coins: (perHour: number, min: number) =>
+        `Монетки: ${coins(perHour)} за час игры, минимум — ${coins(min)} за прохождение.`,
+    },
+    drop: {
+      after: (minutes: number) =>
+        minutes % 60 === 0
+          ? `Дропнуть можно не раньше чем через ${minutes / 60} ч игры — на совести.`
+          : `Дропнуть можно не раньше чем через ${minutes} мин игры — на совести.`,
+      penalty: (count: number, sides: number, points: boolean, position: boolean) =>
+        `Штраф: −${count}d${sides} ${
+          points && position
+            ? 'очков и клеток'
+            : points
+              ? 'очков'
+              : position
+                ? 'клеток'
+                : '— ничего не отнимает'
+        }.`,
+      badEvent: 'И обязательный плохой ивент.',
+      floor: 'Назад дальше чекпоинта и старта не откатывает. Монеток за дроп нет.',
+      tech: (hours: number) =>
+        `Тех-реролл — бесплатно, с причиной: слабый ПК, игра платная, не запускается, эмулятор не тянет или другое. Доступен ${hours} ч после ролла, позже — через админа.`,
+    },
+    finish: {
+      bonus: 'Финишировавшие не первыми один раз получают бонус:',
+      place: (place: number) => `${place}-е место`,
+      points: (n: number) => `+${n} очк.`,
+      after: (place: number) => `${place}-е и дальше`,
+      noBonus: 'Бонуса за финиш не первым нет.',
+      later: 'Финишировавшие не первыми продолжают набирать очки, но их фишка больше не двигается.',
+      surplus: 'Лишние шаги после финиша сгорают.',
+    },
+    deadline: {
+      at: (text: string) => `Дедлайн: ${text}.`,
+      none: 'Дедлайн админ ещё не назначил.',
+      after:
+        'После дедлайна броски закрыты, пруфы принимаются. Засчитывается бросок, сделанный до дедлайна.',
+      results: 'Итоги — когда админ проверит все пруфы.',
+    },
+    history: {
+      empty: 'Правила ещё не менялись с начала сезона.',
+      created: 'Сезон начался с этими правилами',
+      by: (name: string) => `Поменял ${name}`,
+      byAdmin: 'Поменял админ',
+      version: (n: number) => `Версия ${n}`,
+      was: 'Было',
+      now: 'Стало',
+      none: 'нет',
+      yes: 'да',
+      no: 'нет',
+    },
+    fields: {
+      'season.maxUncheckedRuns': 'Лимит прохождений на проверке',
+      'season.maxActiveRunsPerPlayer': 'Прохождений одновременно',
+      'season.timezone': 'Часовой пояс сезона',
+      'season.inactiveHintDays': 'Дней без действий до подсказки админу',
+      'roll.choiceCount': 'Игр на выбор после ролла',
+      'roll.freeRerollsPerRoll': 'Бесплатных рероллов после ролла',
+      'roll.rerollCost.kind': 'Чем платить за реролл',
+      'roll.rerollCost.amount': 'Цена реролла, монеток',
+      'roll.techRerollWindowHours': 'Окно тех-реролла, часов',
+      'roll.minPlayMinutesBeforeDrop': 'Минут игры до дропа',
+      'reward.diceCount.hoursPerDie': 'Часов на один кубик',
+      'reward.diceCount.rounding': 'Округление числа кубиков',
+      'reward.diceCount.min': 'Минимум кубиков',
+      'reward.diceCount.max': 'Максимум кубиков',
+      'reward.dieByDifficulty.easy.sides': 'Кубик на лёгкой',
+      'reward.dieByDifficulty.normal.sides': 'Кубик на нормальной',
+      'reward.dieByDifficulty.hard.sides': 'Кубик на сложной',
+      'reward.dieByDifficulty.extreme.sides': 'Кубик выше сложной',
+      'reward.dieByDifficulty.extreme.grantEvent': 'Ивент выше сложной',
+      'reward.challengeBonus.extraDice': 'Кубиков за челлендж',
+      'reward.coins.perHour': 'Монеток за час',
+      'reward.coins.min': 'Минимум монеток за прохождение',
+      'drop.penaltyDice.count': 'Штрафных кубиков за дроп',
+      'drop.penaltyDice.sides': 'Грани штрафного кубика',
+      'drop.affectsPoints': 'Дроп отнимает очки',
+      'drop.affectsPosition': 'Дроп отнимает клетки',
+      'drop.mandatoryEvent': 'Ивент за дроп',
+      'finish.requireApprovalForFirst': 'Первое место — после проверки пруфов',
+      'finish.bonusAfterList': 'Бонус за финиш после списка',
+      'map.linearLength': 'Клеток до финиша',
+    } as Readonly<Record<string, string>>,
+    bonusField: (place: number) => `Бонус за финиш: ${place}-е место`,
+    values: {
+      coins: 'монетки',
+      badEvent: 'плохой ивент',
+      bad: 'плохой',
+      good: 'хороший',
+      none: 'нет',
+      nearest: 'до ближайшего',
+      floor: 'вниз',
+      ceil: 'вверх',
+      linear: 'линейная',
+      graph: 'граф',
+    } as Readonly<Record<string, string>>,
+  },
   rejection: rejection as Readonly<Record<string, string>> & typeof rejection,
 } as const;
