@@ -1471,6 +1471,150 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/seasons/{seasonId}/feed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    before?: number;
+                    limit?: number;
+                };
+                header?: never;
+                path: {
+                    seasonId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["FeedView"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/users/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    userId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ProfileView"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/pool/{gameId}/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    gameId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["GameRunView"][];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/password": {
         parameters: {
             query?: never;
@@ -5659,6 +5803,29 @@ export interface components {
              */
             challenges?: boolean;
         };
+        /**
+         * @description One event of the season's feed (GLOSSARY «Лента», D-124): its place in the log, the command it came from, when, the
+         *     event type and its data as the current format reads it (older versions upcast), who sent the command (none for the
+         *     scheduler) and whether the admin undid it. The screen turns a type and its data into a line of text.
+         */
+        FeedEntryView: {
+            /** Format: int64 */
+            sequence: number;
+            /** Format: uuid */
+            commandId: string;
+            /** Format: date-time */
+            occurredAt: string;
+            type: string;
+            data: components["schemas"]["JsonElement"];
+            author: null | string;
+            undone: boolean;
+        };
+        /** @description A page of the feed, newest first; `nextBefore` — the sequence to ask before for the next page, none at the start of the log. */
+        FeedView: {
+            entries: components["schemas"]["FeedEntryView"][];
+            /** Format: int64 */
+            nextBefore: null | number;
+        };
         /** @description A picture by link (D-117): https from Tenor, Giphy or Klipy; the server downloads it and stores it as an upload. */
         FileFromUrlRequest: {
             /** Format: uuid */
@@ -5739,6 +5906,28 @@ export interface components {
             force: boolean;
             completionCondition?: null | string;
         };
+        /** @description A run of a game in any season, with its review if there is one (the game page, D-124). */
+        GameRunView: {
+            /** Format: uuid */
+            runId: string;
+            /** Format: uuid */
+            seasonId: string;
+            seasonName: string;
+            /** Format: uuid */
+            playerId: string;
+            /** Format: uuid */
+            userId: string;
+            playerName: string;
+            status: components["schemas"]["RunStatus"];
+            difficulty: null | components["schemas"]["Difficulty"];
+            /** Format: double */
+            hours: null | number;
+            /** Format: date-time */
+            completedAt: null | string;
+            /** Format: int32 */
+            rating: null | number;
+            reviewText: null | string;
+        };
         GameView: {
             /** Format: uuid */
             id: string;
@@ -5796,6 +5985,7 @@ export interface components {
             /** Format: int32 */
             inviteTtlHours: number;
         };
+        JsonElement: unknown;
         LastDaysLengthFilter: {
             enabled: boolean;
             steps: components["schemas"]["EquatableArrayOfLengthFilterStep"];
@@ -5944,6 +6134,49 @@ export interface components {
             status?: null | number;
             detail?: null | string;
             instance?: null | string;
+        };
+        /** @description A review the user left: the game, the season, the rating and the text (SPEC «Отзыв»). */
+        ProfileReviewView: {
+            /** Format: uuid */
+            runId: string;
+            /** Format: uuid */
+            gameId: string;
+            gameTitle: string;
+            /** Format: uuid */
+            seasonId: string;
+            seasonName: string;
+            /** Format: int32 */
+            rating: number;
+            text: null | string;
+            /** Format: date-time */
+            completedAt: null | string;
+        };
+        /** @description A season a user took part in, with their points and, once the season finished, their place. */
+        ProfileSeasonView: {
+            /** Format: uuid */
+            seasonId: string;
+            seasonName: string;
+            status: components["schemas"]["SeasonStatus"];
+            /** Format: uuid */
+            playerId: string;
+            /** Format: int32 */
+            points: number;
+            /** Format: int32 */
+            place: null | number;
+        };
+        /**
+         * @description A user's profile (D-124): the name, the avatar, the seasons they played and their reviews. `completed` — games
+         *     completed and not rejected, over all seasons.
+         */
+        ProfileView: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            avatar: null | components["schemas"]["FileLinkView"];
+            seasons: components["schemas"]["ProfileSeasonView"][];
+            reviews: components["schemas"]["ProfileReviewView"][];
+            /** Format: int32 */
+            completed: number;
         };
         /**
          * @description A run to check, in queue order (D-98, Q-3): the runs that decide a finish on top (`decidesFinish`), then by
