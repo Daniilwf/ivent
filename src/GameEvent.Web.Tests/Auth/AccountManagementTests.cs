@@ -325,6 +325,14 @@ public sealed class AccountManagementTests : IAsyncLifetime
         await connection.StartAsync(Ct);
         var sessions = _site.Services.GetRequiredService<HubSessions>();
         var petya = _site.Users["petya"];
+
+        // The client's start may return before the server has run OnConnectedAsync: wait for the session to be known
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (sessions.CountFor(petya) == 0 && DateTime.UtcNow < deadline)
+        {
+            await Task.Delay(10, Ct);
+        }
+
         Assert.Equal(1, sessions.CountFor(petya));
 
         var admin = await _site.SignedInAsync("admin");

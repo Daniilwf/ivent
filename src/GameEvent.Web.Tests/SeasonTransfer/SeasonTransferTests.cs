@@ -5,6 +5,7 @@ using GameEvent.Engine.Seasons;
 using GameEvent.Infrastructure.Accounts;
 using GameEvent.Infrastructure.Database;
 using GameEvent.Infrastructure.EventLog;
+using GameEvent.Infrastructure.Queue;
 using GameEvent.Infrastructure.Seasons;
 using GameEvent.Web.Tests.Api;
 using Microsoft.EntityFrameworkCore;
@@ -392,6 +393,30 @@ public sealed class SeasonTransferTests : IAsyncLifetime
         var placeholders = await other.Users.Where(u => result.CreatedUsers.Contains(u.Login)).ToListAsync(Ct);
         Assert.Equal(archive.Users.Count, placeholders.Count);
         Assert.All(placeholders, u => Assert.Equal((Role.Spectator, true), (u.Role, u.IsDeleted)));
+    }
+
+    [Fact]
+    public async Task A_copy_keeps_the_whole_game_card_and_its_author()
+    {
+        // D-119: the card's fields and the author travel in the archive; the cover is a file the archive does not carry
+        await PlayAsync();
+        var added = await _site.Services.GetRequiredService<CommandBus>().SendAsync(
+            new CommandEnvelope(
+                Guid.NewGuid(),
+                Guid.Empty,
+                new Infrastructure.Pool.AddGame(new Engine.Pool.GameCard("Dead Space", ["Horror"], 12m, 2008, "17470", null, "Челлендж: без смертей", IsCoop: true, "Финальные титры"), _site.Users["vasya"], Force: true),
+                _site.Users["vasya"]),
+            Ct);
+        var gameId = Assert.IsType<Engine.Pool.GameAdded>(Assert.Single(added.Events).Event).GameId;
+        var archive = await ExportAsync();
+
+        await using var other = OpenOther();
+        await Infrastructure.Seasons.SeasonTransfer.ImportAsync(other, archive, _site.Clock.UtcNow, new ImportOptions(WithPool: true), Ct);
+
+        var game = await other.Games.SingleAsync(g => g.Id == gameId, Ct);
+        var author = await other.Users.SingleAsync(u => u.Id == game.AuthorId, Ct);
+        Assert.Equal((2008, "17470", "Челлендж: без смертей", "Финальные титры", true, "vasya"), (game.Year!.Value, game.SteamAppId, game.Note, game.CompletionCondition, game.IsCoop, author.Login));
+        Assert.Null(game.CoverFileId);
     }
 
     [Fact]

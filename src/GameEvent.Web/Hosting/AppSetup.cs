@@ -63,6 +63,7 @@ public static class AppSetup
         builder.AddObservability();
         builder.AddFiles();
         builder.AddGameLookup();
+        builder.AddPool();
         services.AddOpenApi(o => o.AddDocumentTransformer(async (document, context, ct) =>
         {
             // Hub messages are part of the contract too: the frontend gets their types from the same document.
@@ -176,6 +177,7 @@ public static class AppSetup
         api.MapFiles();
         api.MapAvatars();
         api.MapGameLookup();
+        api.MapPool();
 
         // Last: the OpenAPI document keeps the order its shared schemas were first met in (a nullable first use of an
         // enum would make the enum itself nullable for every client)

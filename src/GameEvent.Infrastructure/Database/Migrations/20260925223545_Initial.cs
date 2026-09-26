@@ -31,6 +31,14 @@ namespace GameEvent.Infrastructure.Database.Migrations
                     Title = table.Column<string>(type: "TEXT", maxLength: 300, nullable: false),
                     TagsJson = table.Column<string>(type: "TEXT", nullable: false),
                     Hours = table.Column<decimal>(type: "TEXT", nullable: true),
+                    Year = table.Column<int>(type: "INTEGER", nullable: true),
+                    SteamAppId = table.Column<string>(type: "TEXT", maxLength: 12, nullable: true),
+                    CoverFileId = table.Column<Guid>(type: "TEXT", nullable: true),
+                    Note = table.Column<string>(type: "TEXT", maxLength: 1000, nullable: true),
+                    CompletionCondition = table.Column<string>(type: "TEXT", maxLength: 1000, nullable: true),
+                    IsCoop = table.Column<bool>(type: "INTEGER", nullable: false),
+                    AuthorId = table.Column<Guid>(type: "TEXT", nullable: true),
+                    CreatedAt = table.Column<long>(type: "INTEGER", nullable: true),
                     IsDeleted = table.Column<bool>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>

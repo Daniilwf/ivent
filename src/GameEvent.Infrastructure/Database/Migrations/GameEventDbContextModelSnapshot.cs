@@ -185,11 +185,35 @@ namespace GameEvent.Infrastructure.Database.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("TEXT");
 
+                    b.Property<Guid?>("AuthorId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CompletionCondition")
+                        .HasMaxLength(1000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("CoverFileId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("CreatedAt")
+                        .HasColumnType("INTEGER");
+
                     b.Property<decimal?>("Hours")
                         .HasColumnType("TEXT");
 
+                    b.Property<bool>("IsCoop")
+                        .HasColumnType("INTEGER");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(1000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SteamAppId")
+                        .HasMaxLength(12)
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("TagsJson")
                         .IsRequired()
@@ -199,6 +223,9 @@ namespace GameEvent.Infrastructure.Database.Migrations
                         .IsRequired()
                         .HasMaxLength(300)
                         .HasColumnType("TEXT");
+
+                    b.Property<int?>("Year")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
