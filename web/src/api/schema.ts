@@ -5436,6 +5436,14 @@ export interface components {
             categories: components["schemas"]["CategoryStatView"][];
             playersWithoutGames: components["schemas"]["PlayerWithoutGamesView"][];
         };
+        /** @description Sent to everyone watching the pool after a committed change of the pool or the category wheel (D-122). */
+        PoolUpdate: {
+            /** Format: int64 */
+            fromSequence: number;
+            /** Format: int64 */
+            toSequence: number;
+            types: string[];
+        };
         ProblemDetails: {
             type?: null | string;
             title?: null | string;
@@ -5700,6 +5708,25 @@ export interface components {
             /** Format: date-time */
             deadline: null | string;
         };
+        /**
+         * @description The answer to joining a season (E3, D-122): the last sequence of its log now, and what was committed after the
+         *     sequence the client last saw — one update per command, in log order. `Reload` — too much was missed to list:
+         *     refetch everything.
+         */
+        SeasonJoin: {
+            /** Format: int64 */
+            lastSequence: number;
+            missed: {
+                /** Format: uuid */
+                seasonId: string;
+                /** Format: int64 */
+                fromSequence: number;
+                /** Format: int64 */
+                toSequence: number;
+                types: string[];
+            }[];
+            reload: boolean;
+        };
         SeasonRules: {
             timezone: string;
             /** Format: int32 */
@@ -5718,7 +5745,10 @@ export interface components {
             commandId: string;
             to: null | components["schemas"]["SeasonStatus"];
         };
-        /** @description Sent to everyone watching a season after each committed command: refetch what you show. */
+        /**
+         * @description Sent to everyone watching a season after each committed command: refetch what you show. The sequences are the
+         *     command's place in the season log: a client that last saw `FromSequence - 1` missed nothing.
+         */
         SeasonUpdate: {
             /** Format: uuid */
             seasonId: string;

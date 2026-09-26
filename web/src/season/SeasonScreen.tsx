@@ -129,8 +129,8 @@ export function SeasonScreen({
     [onSignedOut],
   );
 
-  // Load now, after every committed command of the season (another player's move included) and after
-  // every (re)connection to the hub.
+  // Load now, after every committed command of the season (another player's move included), after every
+  // reconnection to the hub (names and avatars live outside the season log) and after a catch-up (D-122).
   useEffect(() => {
     let active = true;
     const refresh = () => {

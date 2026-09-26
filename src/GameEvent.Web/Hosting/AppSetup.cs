@@ -73,10 +73,12 @@ public static class AppSetup
         services.AddOpenApi(o => o.AddDocumentTransformer(async (document, context, ct) =>
         {
             // Hub messages are part of the contract too: the frontend gets their types from the same document.
-            var schema = await context.GetOrCreateSchemaAsync(typeof(SeasonUpdate), null, ct);
             document.Components ??= new();
             document.Components.Schemas ??= new Dictionary<string, Microsoft.OpenApi.IOpenApiSchema>();
-            document.Components.Schemas[nameof(SeasonUpdate)] = schema;
+            foreach (var type in new[] { typeof(SeasonUpdate), typeof(SeasonJoin), typeof(PoolUpdate) })
+            {
+                document.Components.Schemas[type.Name] = await context.GetOrCreateSchemaAsync(type, null, ct);
+            }
         }));
 
         // Local http only in Development and Test; everywhere else (staging too) cookies are Secure and __Host-.
