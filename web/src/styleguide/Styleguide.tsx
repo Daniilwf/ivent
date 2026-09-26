@@ -1,4 +1,4 @@
-import { CalendarClock, Inbox, Plus, Trophy } from 'lucide-react';
+import { CalendarClock, Inbox, Lock, Plus, Trophy } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { AddGameForm } from '../pool/AddGameForm';
 import { demoCategories, demoPoolGames, demoStatuses } from '../pool/demoPool';
@@ -296,6 +296,11 @@ export function Styleguide() {
           <Chip tone="warning">{t.marks.deadline}</Chip>
           <Badge>{ru.board.first}</Badge>
           <Badge tone="me">{ru.board.you}</Badge>
+          <Badge tone="muted">{ru.admin.accounts.roles.player}</Badge>
+          <Badge tone="warning" icon={<Lock size={12} aria-hidden className="text-warning" />}>
+            {ru.admin.proofs.rollClosed}
+          </Badge>
+          <Badge tone="danger">{ru.admin.accounts.deleted}</Badge>
           <Tag>Platformer</Tag>
           <Tag>Online Co-Op</Tag>
           <ConnectionLost />

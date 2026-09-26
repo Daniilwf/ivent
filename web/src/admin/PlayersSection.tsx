@@ -3,6 +3,7 @@ import { useCallback, useState, type SyntheticEvent } from 'react';
 import { api, type Schemas } from '../api/client';
 import { moscowTime } from '../app/time';
 import { ru } from '../i18n/ru';
+import { Badge } from '../ui/Marks';
 import { Button } from '../ui/Button';
 import { ConfirmDanger } from '../ui/Dialogs';
 import { Checkbox, Field, Select, TextArea } from '../ui/Field';
@@ -143,9 +144,7 @@ function PlayerRow({
       <div className="grid gap-1">
         <div className="flex flex-wrap items-center gap-2">
           <h2 className="font-display text-lg font-heavy">{player.name}</h2>
-          {player.isInactive ? (
-            <span className="rounded-full bg-muted px-2 text-xs font-bold">{t.inactive}</span>
-          ) : null}
+          {player.isInactive ? <Badge tone="muted">{t.inactive}</Badge> : null}
         </div>
         <p className="tabular-nums">
           {[t.points(player.points), t.coins(player.coins), t.cell(index < 0 ? null : index)].join(

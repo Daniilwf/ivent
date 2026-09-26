@@ -3,6 +3,7 @@ import { useCallback, useState } from 'react';
 import { api, rejectionCode, type Schemas } from '../api/client';
 import { moscowTime } from '../app/time';
 import { ru } from '../i18n/ru';
+import { Badge } from '../ui/Marks';
 import { Button } from '../ui/Button';
 import { ConfirmDanger } from '../ui/Dialogs';
 import { TextArea } from '../ui/Field';
@@ -144,10 +145,9 @@ function LogRow({
         <p className="flex flex-wrap items-center gap-2 font-bold">
           {label}
           {command.undone ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 text-xs font-bold">
-              <Undo2 size={12} aria-hidden />
+            <Badge tone="muted" icon={<Undo2 size={12} aria-hidden />}>
               {t.undone}
-            </span>
+            </Badge>
           ) : null}
         </p>
         <p className="text-sm text-ink-soft">

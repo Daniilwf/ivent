@@ -170,13 +170,13 @@ export function ProofCard({
             </Badge>
           ) : null}
           {item.rollClosed ? (
-            <span
+            <Badge
+              tone="warning"
               data-testid="roll-closed"
-              className="inline-flex items-center gap-1 rounded-full bg-warning-soft px-2 text-xs font-bold text-ink"
+              icon={<Lock size={12} aria-hidden className="text-warning" />}
             >
-              <Lock size={12} aria-hidden className="text-warning" />
               {t.rollClosed}
-            </span>
+            </Badge>
           ) : null}
         </div>
         <h2 id={`proof-title-${item.runId}`} className="font-display text-lg font-heavy">

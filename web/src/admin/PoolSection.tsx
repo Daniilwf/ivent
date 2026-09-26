@@ -5,7 +5,7 @@ import { ru } from '../i18n/ru';
 import { Button } from '../ui/Button';
 import { ConfirmDanger } from '../ui/Dialogs';
 import { Checkbox, Field } from '../ui/Field';
-import { Tag } from '../ui/Marks';
+import { Badge, Tag } from '../ui/Marks';
 import { EmptyState, Notice } from '../ui/States';
 import { Panel } from '../ui/Surface';
 import { newCommandId, refusal } from './actions';
@@ -422,9 +422,7 @@ function GameRow({
     >
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <p className="mr-auto font-bold">{game.title}</p>
-        {game.isDeleted ? (
-          <span className="rounded-full bg-muted px-2 text-xs font-bold">{t.deleted}</span>
-        ) : null}
+        {game.isDeleted ? <Badge tone="muted">{t.deleted}</Badge> : null}
       </div>
       <p className="flex flex-wrap items-center gap-2 text-sm text-ink-soft">
         {t.hours(game.hours)}

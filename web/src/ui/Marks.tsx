@@ -34,15 +34,38 @@ export function Chip({
   );
 }
 
-/** A mark next to a name: «Первый» in gold, «ты» in my colour */
-export function Badge({ tone = 'gold', children }: { tone?: 'gold' | 'me'; children: ReactNode }) {
+const badgeTones = {
+  gold: 'bg-gold text-ink',
+  me: 'bg-me text-on-color',
+  muted: 'bg-muted text-ink',
+  warning: 'bg-warning-soft text-ink',
+  danger: 'bg-danger-soft text-ink',
+} as const;
+
+/**
+ * A mark next to a name: «Первый» in gold, «ты» in my colour, an account's role, «удалена», «ролл закрыт» (the admin's
+ * pages). The words (and an icon) carry the meaning, the colour only helps
+ */
+export function Badge({
+  tone = 'gold',
+  icon,
+  children,
+  'data-testid': testId,
+}: {
+  tone?: keyof typeof badgeTones;
+  icon?: ReactNode;
+  children: ReactNode;
+  'data-testid'?: string;
+}) {
   return (
     <span
+      data-testid={testId}
       className={cx(
-        'inline-flex shrink-0 items-center rounded-full px-2 text-xs font-bold',
-        tone === 'gold' ? 'bg-gold text-ink' : 'bg-me text-on-color',
+        'inline-flex shrink-0 items-center gap-1 rounded-full px-2 text-xs font-bold',
+        badgeTones[tone],
       )}
     >
+      {icon}
       {children}
     </span>
   );

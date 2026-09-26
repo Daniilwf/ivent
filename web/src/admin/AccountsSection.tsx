@@ -2,6 +2,7 @@ import { KeyRound, UserCog, UserPlus } from 'lucide-react';
 import { useCallback, useState, type SyntheticEvent } from 'react';
 import { api, type Schemas } from '../api/client';
 import { ru } from '../i18n/ru';
+import { Badge } from '../ui/Marks';
 import { Button } from '../ui/Button';
 import { ConfirmDanger } from '../ui/Dialogs';
 import { Field, Select } from '../ui/Field';
@@ -271,14 +272,8 @@ function AccountRow({
       <div className="grid gap-1">
         <div className="flex flex-wrap items-center gap-2">
           <h2 className="font-display text-lg font-heavy">{account.name}</h2>
-          <span className="rounded-full bg-muted px-2 text-xs font-bold">
-            {t.roles[account.role]}
-          </span>
-          {account.isDeleted ? (
-            <span className="rounded-full bg-danger-soft px-2 text-xs font-bold text-ink">
-              {t.deleted}
-            </span>
-          ) : null}
+          <Badge tone="muted">{t.roles[account.role]}</Badge>
+          {account.isDeleted ? <Badge tone="danger">{t.deleted}</Badge> : null}
         </div>
         <p className="text-sm text-ink-soft">
           {account.login}

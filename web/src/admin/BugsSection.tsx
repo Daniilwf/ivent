@@ -3,6 +3,7 @@ import { useCallback, useState } from 'react';
 import { api, type Schemas } from '../api/client';
 import { moscowTime } from '../app/time';
 import { ru } from '../i18n/ru';
+import { Badge } from '../ui/Marks';
 import { Button } from '../ui/Button';
 import { EmptyState, Notice } from '../ui/States';
 import { cx } from '../ui/cx';
@@ -145,9 +146,7 @@ function ReportCard({
     >
       <div className="grid gap-1">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-full bg-muted px-2 text-xs font-bold">
-            {t.statuses[report.status]}
-          </span>
+          <Badge tone="muted">{t.statuses[report.status]}</Badge>
           <span className="text-sm text-ink-soft">
             {t.from(report.author, moscowTime(report.createdAt))}
           </span>
