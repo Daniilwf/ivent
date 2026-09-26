@@ -29,6 +29,27 @@ updates:
       default-days: 7
     open-pull-requests-limit: 3
 
+  # The base images of deploy/ are pinned by digest: monthly fresh ones bring the security patches
+  - package-ecosystem: docker
+    directories: [/deploy]
+    schedule:
+      interval: monthly
+    groups:
+      docker:
+        patterns: ['*']
+    cooldown:
+      default-days: 7
+
+  - package-ecosystem: docker-compose
+    directory: /deploy
+    schedule:
+      interval: monthly
+    groups:
+      compose:
+        patterns: ['*']
+    cooldown:
+      default-days: 7
+
   - package-ecosystem: github-actions
     directory: /
     schedule:

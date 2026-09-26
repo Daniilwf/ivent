@@ -20,6 +20,12 @@ public interface ISecretCommand
 /// </summary>
 public sealed record CreateAccount(string Login, string Name, Role Role) : IAccountCommand;
 
+/// <summary>
+/// The first admin of a new site, from the server's command line (D-127): refused once the site has an active admin, a
+/// check the queue makes, so two runs at once cannot make two.
+/// </summary>
+public sealed record CreateFirstAdmin(string Login, string Name) : IAccountCommand;
+
 /// <summary>The admin gives an account a new temporary password (given back once); the owner must change it.</summary>
 public sealed record ResetPassword(Guid UserId) : IAccountCommand;
 
@@ -78,6 +84,7 @@ public static partial class AccountRules
     public const string NothingToChange = "account.nothingToChange";
     public const string Stale = "account.stale";
     public const string RoleInvalid = "account.roleInvalid";
+    public const string AdminExists = "account.adminExists";
 
     /// <summary>Latin letters, digits, dot, dash, underscore; 2–32 characters (logins are typed on phones too).</summary>
     public static bool IsValidLogin(string? login) =>

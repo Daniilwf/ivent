@@ -71,14 +71,20 @@ public sealed partial class CommandProcessor
 
         switch (command)
         {
-            case CreateAccount or SeedAccount:
+            case CreateAccount or SeedAccount or CreateFirstAdmin:
                 {
                     var (login, name, role, password) = command switch
                     {
                         CreateAccount c => (c.Login, c.Name, c.Role, (string?)null),
                         SeedAccount c => (c.Login, c.Name, c.Role, c.Password),
+                        CreateFirstAdmin c => (c.Login, c.Name, Role.Admin, (string?)null),
                         _ => throw new InvalidOperationException(),
                     };
+                    if (command is CreateFirstAdmin && await db.Users.AnyAsync(u => u.Role == Role.Admin && !u.IsDeleted, ct))
+                    {
+                        return Reject(AccountRules.AdminExists, "The site has an admin already: new accounts are made on the admin page.");
+                    }
+
                     if (!AccountRules.IsValidLogin(login))
                     {
                         return Reject(AccountRules.LoginInvalid, $"A login is {AccountRules.MinLoginLength}–{AccountRules.MaxLoginLength} Latin letters, digits, «.», «-» or «_».");

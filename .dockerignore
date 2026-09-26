@@ -1,0 +1,24 @@
+# The image is built from the repository root (deploy/Dockerfile): only the sources it copies are sent to Docker.
+# Patterns with **/ match at any depth: a log or an .env inside a project folder stays out too.
+**/bin
+**/obj
+**/node_modules
+**/dist
+**/var
+**/test-artifacts
+**/*.log
+**/*.db
+**/*.db-*
+**/.env
+**/.env.*
+**/appsettings.*.local.json
+.git
+.github
+.claude
+.husky
+.tools
+.vscode
+data
+e2e
+docs
+!docs/ruleset.default.json

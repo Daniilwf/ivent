@@ -21,6 +21,8 @@ export default defineConfig({
   ],
   use: {
     baseURL,
+    // The Docker site on https://localhost has Caddy's own certificate: E2E_IGNORE_HTTPS_ERRORS=1 there, never elsewhere
+    ignoreHTTPSErrors: process.env['E2E_IGNORE_HTTPS_ERRORS'] === '1',
     locale: 'ru-RU',
     timezoneId: 'Europe/Moscow',
     trace: 'retain-on-failure',
