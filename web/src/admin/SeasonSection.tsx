@@ -1,5 +1,5 @@
 import { Download } from 'lucide-react';
-import { useRef, useState, type SyntheticEvent } from 'react';
+import { useCallback, useRef, useState, type SyntheticEvent } from 'react';
 import { api, type Schemas } from '../api/client';
 import { moscowTime } from '../app/time';
 import { ru } from '../i18n/ru';
@@ -10,7 +10,7 @@ import { Notice } from '../ui/States';
 import { Panel } from '../ui/Surface';
 import { newCommandId, refusal, moscowInput } from './actions';
 import { Loading } from './common';
-import { useLoad } from './useLoad';
+import { answerOf, useLoaded } from '../app/useLoaded';
 
 const t = ru.admin.season;
 
@@ -34,19 +34,22 @@ export function SeasonSection({
   version: number;
   onPick: (seasonId: string) => void;
 }) {
-  const loaded = useLoad(
-    async () => {
+  const loaded = useLoaded(
+    useCallback(async () => {
       const [list, season] = await Promise.all([
         api.GET('/api/seasons'),
         seasonId
           ? api.GET('/api/seasons/{seasonId}', { params: { path: { seasonId } } })
           : Promise.resolve(null),
       ]);
-      if (!list.data || (season && !season.data)) return undefined;
-      return { list: list.data, season: season?.data ?? null };
-    },
-    [seasonId],
-    version,
+      if (!list.data) return answerOf(list);
+      if (season && !season.data) return answerOf(season);
+      return {
+        kind: 'ready' as const,
+        value: { list: list.data, season: season?.data ?? null },
+      };
+    }, [seasonId]),
+    { version },
   );
   const [message, setMessage] = useState<Message>(null);
 

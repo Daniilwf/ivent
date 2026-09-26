@@ -1,9 +1,10 @@
 import { BookOpen, CalendarClock } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { api, type Schemas } from '../api/client';
 import { watchSeason } from '../api/realtime';
 import { usePageHeading } from '../app/router';
 import { moscowTime } from '../app/time';
+import { answerOf, useLoaded, type Answer } from '../app/useLoaded';
 import { ru } from '../i18n/ru';
 import { Chip } from '../ui/Marks';
 import { Skeleton } from '../ui/Progress';
@@ -11,23 +12,6 @@ import { EmptyState, ErrorState } from '../ui/States';
 import { fieldName, rulesPage, valueText } from './rulesText';
 
 const t = ru.rules;
-
-type Loaded =
-  { kind: 'loading' } | { kind: 'failed' } | { kind: 'ready'; rules: Schemas['RulesView'] };
-
-type RulesResult = Schemas['RulesView'] | 'signedOut' | null;
-
-async function fetchRules(seasonId: string): Promise<RulesResult> {
-  try {
-    const { data, response } = await api.GET('/api/seasons/{seasonId}/rules', {
-      params: { path: { seasonId } },
-    });
-    if (response.status === 401) return 'signedOut';
-    return data ?? null;
-  } catch {
-    return null;
-  }
-}
 
 type SectionId = keyof typeof t.sections;
 const order: SectionId[] = ['win', 'roll', 'reward', 'drop', 'finish', 'deadline', 'history'];
@@ -43,39 +27,28 @@ export function RulesScreen({
   seasonId: string | null;
   onSignedOut: () => void;
 }) {
-  const [loaded, setLoaded] = useState<Loaded>({ kind: 'loading' });
-  const [retrying, setRetrying] = useState(false);
   const heading = usePageHeading();
-  const asked = useRef(0);
-
-  const apply = useCallback(
-    (result: RulesResult) => {
-      if (result === 'signedOut') onSignedOut();
-      else if (result) setLoaded({ kind: 'ready', rules: result });
-      // A failed refresh keeps the rules on the screen; only the first load turns into the error
-      else setLoaded((now) => (now.kind === 'ready' ? now : { kind: 'failed' }));
-    },
-    [onSignedOut],
-  );
-
-  // Load now and after every command of the season: a change of the rules is one of them
+  // Load now and again after every command of the season: a change of the rules is one of them. A failed refresh
+  // keeps the rules on the screen; only the first load turns into the error
+  const [version, setVersion] = useState(0);
   useEffect(() => {
     if (!seasonId) return;
-    let active = true;
-    const refresh = () => {
-      // Only the latest answer is shown: an older one that comes late must not undo a newer one
-      const mine = ++asked.current;
-      void fetchRules(seasonId).then((result) => {
-        if (active && mine === asked.current) apply(result);
-      });
-    };
-    refresh();
-    const stop = watchSeason(seasonId, refresh);
-    return () => {
-      active = false;
-      stop();
-    };
-  }, [seasonId, apply]);
+    return watchSeason(seasonId, () => {
+      setVersion((v) => v + 1);
+    });
+  }, [seasonId]);
+  const loaded = useLoaded(
+    useCallback(
+      async (): Promise<Answer<Schemas['RulesView']>> =>
+        seasonId
+          ? answerOf(
+              await api.GET('/api/seasons/{seasonId}/rules', { params: { path: { seasonId } } }),
+            )
+          : { kind: 'loading' },
+      [seasonId],
+    ),
+    { onSignedOut, version },
+  );
 
   const title = (
     <h1
@@ -105,7 +78,7 @@ export function RulesScreen({
     <header className="grid justify-items-start gap-2 desk:col-span-2">
       {title}
       <p className="max-w-prose text-ink-soft">{t.lead}</p>
-      {loaded.kind === 'ready' ? <Chip>{t.version(loaded.rules.version)}</Chip> : null}
+      {loaded.kind === 'ready' ? <Chip>{t.version(loaded.value.version)}</Chip> : null}
     </header>
   );
 
@@ -126,16 +99,7 @@ export function RulesScreen({
               level={2}
               title={t.loadErrorTitle}
               text={t.loadErrorText}
-              onRetry={() => {
-                if (retrying) return;
-                setRetrying(true);
-                setLoaded({ kind: 'loading' });
-                void fetchRules(seasonId)
-                  .then(apply)
-                  .finally(() => {
-                    setRetrying(false);
-                  });
-              }}
+              onRetry={loaded.reload}
             />
           </div>
         )}
@@ -145,7 +109,7 @@ export function RulesScreen({
   return (
     <main className={`${frame} desk:grid-cols-[auto_minmax(0,1fr)] desk:items-start desk:gap-x-8`}>
       {header}
-      <RulesContent rules={loaded.rules} />
+      <RulesContent rules={loaded.value} />
     </main>
   );
 }

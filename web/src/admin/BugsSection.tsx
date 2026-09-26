@@ -1,5 +1,5 @@
 import { Bug, Download } from 'lucide-react';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { api, type Schemas } from '../api/client';
 import { moscowTime } from '../app/time';
 import { ru } from '../i18n/ru';
@@ -8,7 +8,7 @@ import { EmptyState, Notice } from '../ui/States';
 import { cx } from '../ui/cx';
 import { newCommandId, refusal } from './actions';
 import { Loading } from './common';
-import { useLoad } from './useLoad';
+import { answerOf, useLoaded } from '../app/useLoaded';
 
 const t = ru.admin.bugs;
 
@@ -28,14 +28,16 @@ const moves: Record<Status, { to: Status; label: string }> = {
 /** The bug reports from the «Сообщить о баге» button, by status, with the export for the agent */
 export function BugsSection() {
   const [filter, setFilter] = useState<Filter>('new');
-  const loaded = useLoad(
-    async () =>
-      (
-        await api.GET('/api/admin/bug-reports', {
-          params: { query: filter === 'all' ? {} : { status: filter } },
-        })
-      ).data,
-    [filter],
+  const loaded = useLoaded(
+    useCallback(
+      async () =>
+        answerOf(
+          await api.GET('/api/admin/bug-reports', {
+            params: { query: filter === 'all' ? {} : { status: filter } },
+          }),
+        ),
+      [filter],
+    ),
   );
   const [message, setMessage] = useState<{ tone: 'success' | 'danger'; text: string } | null>(null);
 

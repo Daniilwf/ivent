@@ -10,7 +10,7 @@ import { Badge } from '../ui/Marks';
 import { EmptyState, Notice } from '../ui/States';
 import { commentProblem, newCommandId, refusal } from './actions';
 import { Loading } from './common';
-import { type Loaded } from './useLoad';
+import type { Loaded } from '../app/useLoaded';
 
 const t = ru.admin.proofs;
 
@@ -20,7 +20,13 @@ type Difficulty = NonNullable<Schemas['Difficulty']>;
 const ladder: Difficulty[] = ['easy', 'normal', 'hard', 'extreme'];
 
 /** The runs to check, finishes on top (D-98): approve, approve without a screenshot, or reject */
-export function ProofQueue({ seasonId, loaded }: { seasonId: string; loaded: Loaded<Item[]> }) {
+export function ProofQueue({
+  seasonId,
+  loaded,
+}: {
+  seasonId: string;
+  loaded: Loaded<Item[]> & { reload: () => void };
+}) {
   const [done, setDone] = useState<string | null>(null);
   return (
     <Loading loaded={loaded}>

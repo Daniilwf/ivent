@@ -1,5 +1,5 @@
 import { Moon, UserPlus, Users } from 'lucide-react';
-import { useState, type SyntheticEvent } from 'react';
+import { useCallback, useState, type SyntheticEvent } from 'react';
 import { api, type Schemas } from '../api/client';
 import { moscowTime } from '../app/time';
 import { ru } from '../i18n/ru';
@@ -10,7 +10,7 @@ import { EmptyState, Notice } from '../ui/States';
 import { Panel } from '../ui/Surface';
 import { commentProblem, newCommandId, parseWhole, refusal } from './actions';
 import { Loading } from './common';
-import { useLoad } from './useLoad';
+import { answerOf, useLoaded } from '../app/useLoaded';
 
 const t = ru.admin.players;
 
@@ -28,17 +28,17 @@ function cellOptions(cells: readonly Cell[]) {
 
 /** The season's players: balances, turn, the inactivity hint, and the admin's corrections */
 export function PlayersSection({ seasonId, version }: { seasonId: string; version: number }) {
-  const loaded = useLoad(
-    async () => {
+  const loaded = useLoaded(
+    useCallback(async () => {
       const [players, season] = await Promise.all([
         api.GET('/api/admin/seasons/{seasonId}/players', { params: { path: { seasonId } } }),
         api.GET('/api/seasons/{seasonId}', { params: { path: { seasonId } } }),
       ]);
-      if (!players.data || !season.data) return undefined;
-      return { players: players.data, cells: season.data.cells };
-    },
-    [seasonId],
-    version,
+      if (!players.data) return answerOf(players);
+      if (!season.data) return answerOf(season);
+      return { kind: 'ready' as const, value: { players: players.data, cells: season.data.cells } };
+    }, [seasonId]),
+    { version },
   );
   const [done, setDone] = useState<string | null>(null);
 
@@ -521,7 +521,9 @@ function AddPlayerForm({
   players: readonly Player[];
   onDone: (message: string) => void;
 }) {
-  const accounts = useLoad(async () => (await api.GET('/api/admin/accounts')).data, []);
+  const accounts = useLoaded(
+    useCallback(async () => answerOf(await api.GET('/api/admin/accounts')), []),
+  );
   const [userId, setUserId] = useState('');
   const [cellId, setCellId] = useState('');
   const [points, setPoints] = useState('');

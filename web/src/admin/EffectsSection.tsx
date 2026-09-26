@@ -1,5 +1,5 @@
 import { Sparkles } from 'lucide-react';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { api, type Schemas } from '../api/client';
 import { ru } from '../i18n/ru';
 import { Button } from '../ui/Button';
@@ -7,7 +7,7 @@ import { TextArea } from '../ui/Field';
 import { EmptyState, Notice } from '../ui/States';
 import { commentProblem, newCommandId, refusal } from './actions';
 import { Loading } from './common';
-import { useLoad } from './useLoad';
+import { answerOf, useLoaded } from '../app/useLoaded';
 
 const t = ru.admin.effects;
 
@@ -16,12 +16,17 @@ type Outcome = 'applied' | 'notApplicable';
 
 /** Pending manual effects of every player, oldest first: the admin resolves them for a player (D-102) */
 export function EffectsSection({ seasonId, version }: { seasonId: string; version: number }) {
-  const loaded = useLoad(
-    async () =>
-      (await api.GET('/api/admin/seasons/{seasonId}/effects', { params: { path: { seasonId } } }))
-        .data,
-    [seasonId],
-    version,
+  const loaded = useLoaded(
+    useCallback(
+      async () =>
+        answerOf(
+          await api.GET('/api/admin/seasons/{seasonId}/effects', {
+            params: { path: { seasonId } },
+          }),
+        ),
+      [seasonId],
+    ),
+    { version },
   );
   const [done, setDone] = useState<string | null>(null);
   return (

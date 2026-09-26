@@ -1,5 +1,5 @@
 import { History, Undo2 } from 'lucide-react';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { api, rejectionCode, type Schemas } from '../api/client';
 import { moscowTime } from '../app/time';
 import { ru } from '../i18n/ru';
@@ -9,7 +9,7 @@ import { TextArea } from '../ui/Field';
 import { EmptyState, Notice } from '../ui/States';
 import { commentProblem, newCommandId, refusal, related, commandLabel } from './actions';
 import { Loading } from './common';
-import { useLoad } from './useLoad';
+import { answerOf, useLoaded } from '../app/useLoaded';
 
 const t = ru.admin.log;
 
@@ -24,15 +24,17 @@ const final = new Set(['CreateSeason', 'UndoCommand']);
 /** The season log, newest first, with undo of a whole command (D-104) */
 export function LogSection({ seasonId, version }: { seasonId: string; version: number }) {
   const [limit, setLimit] = useState(step);
-  const loaded = useLoad(
-    async () =>
-      (
-        await api.GET('/api/admin/seasons/{seasonId}/commands', {
-          params: { path: { seasonId }, query: { limit } },
-        })
-      ).data,
-    [seasonId, limit],
-    version,
+  const loaded = useLoaded(
+    useCallback(
+      async () =>
+        answerOf(
+          await api.GET('/api/admin/seasons/{seasonId}/commands', {
+            params: { path: { seasonId }, query: { limit } },
+          }),
+        ),
+      [seasonId, limit],
+    ),
+    { version },
   );
   const [done, setDone] = useState<string | null>(null);
 

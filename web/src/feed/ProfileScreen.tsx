@@ -13,7 +13,7 @@ import { EmptyState, ErrorState } from '../ui/States';
 import { Sticker } from '../ui/Sticker';
 import { Panel } from '../ui/Surface';
 import { Quote } from './Review';
-import { useLoaded, type Answer } from './useLoaded';
+import { answerOf, useLoaded, type Answer } from '../app/useLoaded';
 
 type Profile = Schemas['ProfileView'];
 
@@ -33,17 +33,12 @@ export function ProfileScreen({
 }) {
   const load = useCallback(async (): Promise<Answer<Profile>> => {
     try {
-      const { data, response } = await api.GET('/api/users/{userId}', {
-        params: { path: { userId } },
-      });
-      if (data) return { kind: 'ready', value: data };
-      if (response.status === 401) return { kind: 'signedOut' };
-      return { kind: response.status === 404 ? 'notFound' : 'failed' };
+      return answerOf(await api.GET('/api/users/{userId}', { params: { path: { userId } } }));
     } catch {
       return { kind: 'failed' };
     }
   }, [userId]);
-  const [state, retry] = useLoaded(load, onSignedOut);
+  const state = useLoaded(load, { onSignedOut });
 
   return (
     <main className="mx-auto grid max-w-180 content-start gap-4 px-4 pt-4 pb-10 desk:px-8 desk:pt-8">
@@ -54,7 +49,7 @@ export function ProfileScreen({
           level={1}
           title={ru.profile.errorTitle}
           text={ru.feed.errorText}
-          onRetry={retry}
+          onRetry={state.reload}
         />
       ) : state.kind === 'notFound' ? (
         <EmptyState

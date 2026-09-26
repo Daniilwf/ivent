@@ -2,7 +2,7 @@ import type { ReactNode, Ref } from 'react';
 import { ru } from '../i18n/ru';
 import { Skeleton } from '../ui/Progress';
 import { ErrorState } from '../ui/States';
-import type { Loaded } from './useLoad';
+import type { Loaded } from '../app/useLoaded';
 
 const t = ru.admin;
 
@@ -12,11 +12,11 @@ export function Loading<T>({
   rows = 3,
   children,
 }: {
-  loaded: Loaded<T>;
+  loaded: Loaded<T> & { reload: () => void };
   rows?: number;
   children: (data: T, reload: () => void) => ReactNode;
 }) {
-  if (loaded.status === 'loading')
+  if (loaded.kind === 'loading')
     return (
       <div className="grid gap-3" aria-busy="true" data-testid="admin-loading">
         <span className="sr-only">{ru.ui.loading}</span>
@@ -25,7 +25,8 @@ export function Loading<T>({
         ))}
       </div>
     );
-  if (loaded.status === 'failed')
+  // An admin's section that is not there (a season deleted meanwhile) is a failure to load it too
+  if (loaded.kind !== 'ready')
     return (
       <ErrorState
         level={2}
@@ -34,7 +35,7 @@ export function Loading<T>({
         onRetry={loaded.reload}
       />
     );
-  return <>{children(loaded.data, loaded.reload)}</>;
+  return <>{children(loaded.value, loaded.reload)}</>;
 }
 
 /** A section's heading row: the title, a short lead and the count, if any */

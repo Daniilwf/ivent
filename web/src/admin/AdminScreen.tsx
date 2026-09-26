@@ -12,7 +12,7 @@ import {
   Users,
   Wrench,
 } from 'lucide-react';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { api, type Schemas } from '../api/client';
 import { watchSeason } from '../api/realtime';
 import { Link } from '../app/Link';
@@ -35,7 +35,7 @@ import { RulesSection } from './RulesSection';
 import { SeasonSection } from './SeasonSection';
 import { SiteSection } from './SiteSection';
 import { SectionHead } from './common';
-import { useLoad } from './useLoad';
+import { answerOf, useLoaded } from '../app/useLoaded';
 
 const t = ru.admin;
 
@@ -116,18 +116,16 @@ export function AdminScreen({
   // A section picked in the sheet takes the focus to its heading, not back to the «Разделы» button
   const picked = useRef(false);
 
-  const proofs = useLoad(
-    async () => {
-      if (!seasonId) return [];
-      const { data } = await api.GET('/api/admin/seasons/{seasonId}/proofs', {
-        params: { path: { seasonId } },
-      });
-      return data;
-    },
-    [seasonId],
-    version,
+  const proofs = useLoaded(
+    useCallback(async () => {
+      if (!seasonId) return { kind: 'ready' as const, value: [] };
+      return answerOf(
+        await api.GET('/api/admin/seasons/{seasonId}/proofs', { params: { path: { seasonId } } }),
+      );
+    }, [seasonId]),
+    { version },
   );
-  const waiting = proofs.status === 'ready' ? proofs.data.length : null;
+  const waiting = proofs.kind === 'ready' ? proofs.value.length : null;
 
   // The admin's pages opened from the menu, and a new section, take the focus to the heading, so a screen reader and
   // the keyboard start there

@@ -1,5 +1,5 @@
 import { KeyRound, UserCog, UserPlus } from 'lucide-react';
-import { useState, type SyntheticEvent } from 'react';
+import { useCallback, useState, type SyntheticEvent } from 'react';
 import { api, type Schemas } from '../api/client';
 import { ru } from '../i18n/ru';
 import { Button } from '../ui/Button';
@@ -9,7 +9,7 @@ import { EmptyState, Notice } from '../ui/States';
 import { Panel } from '../ui/Surface';
 import { newCommandId, refusal } from './actions';
 import { Loading } from './common';
-import { useLoad } from './useLoad';
+import { answerOf, useLoaded } from '../app/useLoaded';
 
 const t = ru.admin.accounts;
 
@@ -22,7 +22,9 @@ const roles: Role[] = ['player', 'admin', 'spectator'];
 
 /** Accounts live between seasons (SPEC «Аккаунты»): create, rename, change the role, reset the password, delete */
 export function AccountsSection({ me }: { me: string }) {
-  const loaded = useLoad(async () => (await api.GET('/api/admin/accounts')).data, []);
+  const loaded = useLoaded(
+    useCallback(async () => answerOf(await api.GET('/api/admin/accounts')), []),
+  );
   const [message, setMessage] = useState<Message>(null);
   const [secret, setSecret] = useState<Secret>(null);
 

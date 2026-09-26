@@ -1,5 +1,5 @@
 import { Dices, Library, Plus } from 'lucide-react';
-import { useDeferredValue, useState, type SyntheticEvent } from 'react';
+import { useCallback, useDeferredValue, useState, type SyntheticEvent } from 'react';
 import { api, type Schemas } from '../api/client';
 import { ru } from '../i18n/ru';
 import { Button } from '../ui/Button';
@@ -10,7 +10,7 @@ import { EmptyState, Notice } from '../ui/States';
 import { Panel } from '../ui/Surface';
 import { newCommandId, refusal } from './actions';
 import { Loading } from './common';
-import { useLoad } from './useLoad';
+import { answerOf, useLoaded } from '../app/useLoaded';
 
 const t = ru.admin.pool;
 
@@ -46,16 +46,21 @@ function Categories({
   seasonId: string | null;
   onMessage: (message: Message) => void;
 }) {
-  const loaded = useLoad(async () => {
-    const [categories, stats] = await Promise.all([
-      api.GET('/api/pool/categories'),
-      seasonId
-        ? api.GET('/api/admin/seasons/{seasonId}/pool-stats', { params: { path: { seasonId } } })
-        : Promise.resolve(null),
-    ]);
-    if (!categories.data) return undefined;
-    return { categories: categories.data, stats: stats?.data ?? null };
-  }, [seasonId]);
+  const loaded = useLoaded(
+    useCallback(async () => {
+      const [categories, stats] = await Promise.all([
+        api.GET('/api/pool/categories'),
+        seasonId
+          ? api.GET('/api/admin/seasons/{seasonId}/pool-stats', { params: { path: { seasonId } } })
+          : Promise.resolve(null),
+      ]);
+      if (!categories.data) return answerOf(categories);
+      return {
+        kind: 'ready' as const,
+        value: { categories: categories.data, stats: stats?.data ?? null },
+      };
+    }, [seasonId]),
+  );
 
   return (
     <Panel title={t.categories} data-testid="admin-categories">
@@ -311,14 +316,16 @@ function Games({ onMessage }: { onMessage: (message: Message) => void }) {
   const [query, setQuery] = useState('');
   const [deleted, setDeleted] = useState(false);
   const search = useDeferredValue(query.trim());
-  const loaded = useLoad(
-    async () =>
-      (
-        await api.GET('/api/pool', {
-          params: { query: search === '' ? { deleted } : { query: search, deleted } },
-        })
-      ).data,
-    [search, deleted],
+  const loaded = useLoaded(
+    useCallback(
+      async () =>
+        answerOf(
+          await api.GET('/api/pool', {
+            params: { query: search === '' ? { deleted } : { query: search, deleted } },
+          }),
+        ),
+      [search, deleted],
+    ),
   );
 
   return (

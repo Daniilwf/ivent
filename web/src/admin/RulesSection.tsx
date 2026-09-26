@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { api, rejectionCode, type Schemas } from '../api/client';
 import { moscowTime } from '../app/time';
 import { ru } from '../i18n/ru';
@@ -9,7 +9,7 @@ import { Notice } from '../ui/States';
 import { Panel } from '../ui/Surface';
 import { newCommandId, refusal } from './actions';
 import { Loading } from './common';
-import { useLoad } from './useLoad';
+import { answerOf, useLoaded } from '../app/useLoaded';
 import { checkSchema, isSchema, type JsonSchema, type SchemaProblem } from './ruleSchema';
 
 const t = ru.admin.rules;
@@ -44,16 +44,22 @@ function inspect(text: string, schema: JsonSchema | null) {
 
 /** The rules of the season as JSON, checked by the schema, saved with the server's warnings (D-113) */
 export function RulesSection({ seasonId, version }: { seasonId: string; version: number }) {
-  const loaded = useLoad(
-    async () =>
-      (await api.GET('/api/seasons/{seasonId}/rules', { params: { path: { seasonId } } })).data,
-    [seasonId],
-    version,
+  const loaded = useLoaded(
+    useCallback(
+      async () =>
+        answerOf(
+          await api.GET('/api/seasons/{seasonId}/rules', { params: { path: { seasonId } } }),
+        ),
+      [seasonId],
+    ),
+    { version },
   );
-  const schema = useLoad(async () => {
-    const { data } = await api.GET('/api/admin/rules/schema');
-    return isSchema(data) ? data : undefined;
-  }, []);
+  const schema = useLoaded(
+    useCallback(async () => {
+      const { data } = await api.GET('/api/admin/rules/schema');
+      return isSchema(data) ? { kind: 'ready' as const, value: data } : { kind: 'failed' as const };
+    }, []),
+  );
   // The outcome of the last save outlives the editor, which is rebuilt for the new version
   const [outcome, setOutcome] = useState<Outcome>(null);
 
@@ -64,8 +70,8 @@ export function RulesSection({ seasonId, version }: { seasonId: string; version:
           key={`${seasonId}-${rules.version}`}
           seasonId={seasonId}
           rules={rules}
-          schema={schema.status === 'ready' ? schema.data : null}
-          schemaFailed={schema.status === 'failed'}
+          schema={schema.kind === 'ready' ? schema.value : null}
+          schemaFailed={schema.kind === 'failed'}
           outcome={outcome}
           onSaved={(next) => {
             setOutcome(next);

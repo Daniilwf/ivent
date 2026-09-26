@@ -24,7 +24,7 @@ import { EmptyState, ErrorState } from '../ui/States';
 import { Sticker } from '../ui/Sticker';
 import { Panel } from '../ui/Surface';
 import { Quote } from './Review';
-import { useLoaded, type Answer } from './useLoaded';
+import { useLoaded, type Answer } from '../app/useLoaded';
 
 type Game = Schemas['PoolGameView'];
 type Run = Schemas['GameRunView'];
@@ -60,7 +60,7 @@ export function GameScreen({ gameId, onSignedOut }: { gameId: string; onSignedOu
       return { kind: 'failed' };
     }
   }, [gameId]);
-  const [state, retry] = useLoaded(load, onSignedOut);
+  const state = useLoaded(load, { onSignedOut });
 
   return (
     <main className="mx-auto grid max-w-180 content-start gap-4 px-4 pt-4 pb-10 desk:px-8 desk:pt-8">
@@ -71,7 +71,7 @@ export function GameScreen({ gameId, onSignedOut }: { gameId: string; onSignedOu
           level={1}
           title={ru.gamePage.errorTitle}
           text={ru.feed.errorText}
-          onRetry={retry}
+          onRetry={state.reload}
         />
       ) : state.kind === 'notFound' ? (
         <EmptyState

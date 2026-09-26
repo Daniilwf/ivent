@@ -1,16 +1,19 @@
+import { useCallback } from 'react';
 import { ServerCrash } from 'lucide-react';
 import { api } from '../api/client';
 import { moscowTime } from '../app/time';
 import { ru } from '../i18n/ru';
 import { EmptyState } from '../ui/States';
 import { Loading } from './common';
-import { useLoad } from './useLoad';
+import { answerOf, useLoaded } from '../app/useLoaded';
 
 const t = ru.admin.errors;
 
 /** The error journal (D7): the latest unhandled exceptions with the request and the user */
 export function ErrorsSection() {
-  const loaded = useLoad(async () => (await api.GET('/api/admin/errors')).data, []);
+  const loaded = useLoaded(
+    useCallback(async () => answerOf(await api.GET('/api/admin/errors')), []),
+  );
   return (
     <Loading loaded={loaded}>
       {(entries) =>

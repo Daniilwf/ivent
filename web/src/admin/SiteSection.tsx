@@ -1,5 +1,5 @@
 import { Wrench } from 'lucide-react';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { api, MAINTENANCE_EVENT } from '../api/client';
 import { ru } from '../i18n/ru';
 import { Button } from '../ui/Button';
@@ -8,13 +8,13 @@ import { Notice } from '../ui/States';
 import { Panel } from '../ui/Surface';
 import { refusal } from './actions';
 import { Loading } from './common';
-import { useLoad } from './useLoad';
+import { answerOf, useLoaded } from '../app/useLoaded';
 
 const t = ru.admin.site;
 
 /** Maintenance mode (D-121): the site only reads while it is on; the banner tells everyone */
 export function SiteSection() {
-  const loaded = useLoad(async () => (await api.GET('/api/status')).data, []);
+  const loaded = useLoaded(useCallback(async () => answerOf(await api.GET('/api/status')), []));
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ tone: 'success' | 'danger'; text: string } | null>(null);
