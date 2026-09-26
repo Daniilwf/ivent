@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { ru } from '../i18n/ru';
 import { Button } from './Button';
 import { ConfirmDanger } from './Dialogs';
-import { Field } from './Field';
+import { ChoiceGroup, Field, FilePicker, Select } from './Field';
 import { RouteProgress } from './Progress';
 import { ErrorState, Notice } from './States';
 
@@ -112,5 +112,44 @@ describe('the design system components', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Лента не загрузилась');
     await userEvent.click(screen.getByRole('button', { name: ru.ui.retry }));
     expect(retry).toHaveBeenCalledOnce();
+  });
+
+  it('a choice group shows every answer as a radio button and picks one', async () => {
+    const change = vi.fn();
+    render(
+      <ChoiceGroup
+        label="Сложность"
+        options={[
+          { value: 'easy', label: 'Лёгкая' },
+          { value: 'hard', label: 'Сложная' },
+        ]}
+        value="easy"
+        onChange={change}
+      />,
+    );
+    expect(screen.getByRole('group', { name: 'Сложность' })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Лёгкая' })).toBeChecked();
+    await userEvent.click(screen.getByText('Сложная'));
+    expect(change).toHaveBeenCalledWith('hard');
+  });
+
+  it('a select has its label and says its error', () => {
+    render(
+      <Select label="Причина" error="Выбери причину">
+        <option value="">—</option>
+      </Select>,
+    );
+    const select = screen.getByLabelText('Причина');
+    expect(select).toHaveAttribute('aria-invalid', 'true');
+    expect(select).toHaveAccessibleDescription('Выбери причину');
+  });
+
+  it('a busy file picker takes no new file and says it is busy', () => {
+    render(<FilePicker label="Добавить скрин" busy />);
+    expect(screen.getByLabelText('Добавить скрин')).toBeDisabled();
+    expect(screen.getByText('Добавить скрин').closest('label')).toHaveAttribute(
+      'aria-busy',
+      'true',
+    );
   });
 });

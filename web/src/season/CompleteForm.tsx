@@ -2,6 +2,8 @@ import { useState, type SyntheticEvent } from 'react';
 import type { Schemas } from '../api/client';
 import { difficultyValues } from '../api/schema';
 import { ru } from '../i18n/ru';
+import { Button } from '../ui/Button';
+import { Checkbox, ChoiceGroup, Field, Select, TextArea } from '../ui/Field';
 
 export type Completion = {
   difficulty: Schemas['Difficulty'];
@@ -12,10 +14,14 @@ export type Completion = {
 };
 
 const ratings = Array.from({ length: 10 }, (_, i) => i + 1);
+const difficulties = difficultyValues.map((d) => ({ value: d, label: ru.difficulty[d] }));
+
+type Problem = { field: 'hours' | 'source' | 'rating'; text: string };
 
 /**
- * Completing the active run (D-96): difficulty; an hours estimate with its source only when the game has no hours;
- * the challenge claim when the season has challenges on (D-96); an optional review. Fields left unset are not sent.
+ * Completing the active run (D-96): difficulty as pills in sight; an hours estimate with its source only when the game
+ * has no hours; the challenge claim when the season has challenges on (D-96); an optional review, folded. Fields left
+ * unset are not sent. A mistake is told under its field, one at a time.
  */
 export function CompleteForm({
   needsHours,
@@ -34,7 +40,14 @@ export function CompleteForm({
   const [challengeDone, setChallengeDone] = useState(false);
   const [rating, setRating] = useState('');
   const [reviewText, setReviewText] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [problem, setProblem] = useState<Problem | null>(null);
+  const [reviewOpen, setReviewOpen] = useState(false);
+
+  function refuse(found: Problem) {
+    setProblem(found);
+    // The review folds: a mistake in it opens it
+    if (found.field === 'rating') setReviewOpen(true);
+  }
 
   function submit(event: SyntheticEvent) {
     event.preventDefault();
@@ -42,12 +55,12 @@ export function CompleteForm({
 
     if (needsHours) {
       const estimatedHours = Number(hours.replace(',', '.'));
-      if (!Number.isFinite(estimatedHours) || estimatedHours <= 0) {
-        setError(ru.turn.hoursInvalid);
+      if (hours.trim() === '' || !Number.isFinite(estimatedHours) || estimatedHours <= 0) {
+        refuse({ field: 'hours', text: ru.turn.hoursInvalid });
         return;
       }
       if (source.trim() === '') {
-        setError(ru.turn.hoursSourceRequired);
+        refuse({ field: 'source', text: ru.turn.hoursSourceRequired });
         return;
       }
       completion.estimatedHours = estimatedHours;
@@ -56,7 +69,7 @@ export function CompleteForm({
 
     const text = reviewText.trim();
     if (rating === '' && text !== '') {
-      setError(ru.turn.reviewRatingRequired);
+      refuse({ field: 'rating', text: ru.turn.reviewRatingRequired });
       return;
     }
 
@@ -66,102 +79,114 @@ export function CompleteForm({
         text === '' ? { rating: Number(rating) } : { rating: Number(rating), text };
     }
 
-    setError(null);
+    setProblem(null);
     onComplete(completion);
   }
 
+  const errorOf = (field: Problem['field']) =>
+    problem?.field === field ? problem.text : undefined;
+
   return (
-    <form onSubmit={submit} data-testid="complete-form">
-      <label>
-        {ru.turn.difficulty}
-        <select
-          data-testid="complete-difficulty"
-          value={difficulty}
-          onChange={(e) => {
-            setDifficulty(e.target.value as Schemas['Difficulty']);
-          }}
-        >
-          {difficultyValues.map((d) => (
-            <option key={d} value={d}>
-              {ru.difficulty[d]}
-            </option>
-          ))}
-        </select>
-      </label>
+    <form
+      onSubmit={submit}
+      noValidate
+      data-testid="complete-form"
+      aria-labelledby="complete-title"
+      className="grid min-w-0 gap-4"
+    >
+      <h3 id="complete-title" className="font-display font-heavy">
+        {ru.turn.completeTitle}
+      </h3>
+      <ChoiceGroup
+        data-testid="complete-difficulty"
+        label={ru.turn.difficulty}
+        hint={ru.turn.difficultyHint}
+        options={difficulties}
+        value={difficulty}
+        onChange={setDifficulty}
+      />
       {needsHours && (
         <>
-          <label>
-            {ru.turn.hours}
-            <input
-              data-testid="complete-hours"
-              inputMode="decimal"
-              value={hours}
-              onChange={(e) => {
-                setHours(e.target.value);
-              }}
-              aria-describedby="hours-hint"
-            />
-            <small id="hours-hint">{ru.turn.hoursHint}</small>
-          </label>
-          <label>
-            {ru.turn.hoursSource}
-            <input
-              data-testid="complete-hours-source"
-              maxLength={300}
-              value={source}
-              onChange={(e) => {
-                setSource(e.target.value);
-              }}
-              aria-describedby="hours-source-hint"
-            />
-            <small id="hours-source-hint">{ru.turn.hoursSourceHint}</small>
-          </label>
+          <Field
+            data-testid="complete-hours"
+            label={ru.turn.hours}
+            hint={ru.turn.hoursHint}
+            inputMode="decimal"
+            value={hours}
+            error={errorOf('hours')}
+            onChange={(e) => {
+              setHours(e.target.value);
+            }}
+          />
+          <Field
+            data-testid="complete-hours-source"
+            label={ru.turn.hoursSource}
+            hint={ru.turn.hoursSourceHint}
+            maxLength={300}
+            value={source}
+            error={errorOf('source')}
+            onChange={(e) => {
+              setSource(e.target.value);
+            }}
+          />
         </>
       )}
       {challengesEnabled && (
-        <label>
-          <input
-            type="checkbox"
-            checked={challengeDone}
-            onChange={(e) => {
-              setChallengeDone(e.target.checked);
-            }}
-          />
-          {ru.turn.challengeDone}
-        </label>
-      )}
-      <label>
-        {ru.turn.reviewRating}
-        <select
-          data-testid="complete-review-rating"
-          value={rating}
+        <Checkbox
+          label={ru.turn.challengeDone}
+          checked={challengeDone}
           onChange={(e) => {
-            setRating(e.target.value);
-          }}
-        >
-          <option value="">{ru.turn.reviewNoRating}</option>
-          {ratings.map((r) => (
-            <option key={r} value={String(r)}>
-              {r}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label>
-        {ru.turn.reviewText}
-        <textarea
-          data-testid="complete-review-text"
-          maxLength={2000}
-          value={reviewText}
-          onChange={(e) => {
-            setReviewText(e.target.value);
+            setChallengeDone(e.target.checked);
           }}
         />
-      </label>
-      {error && <p role="alert">{error}</p>}
-      <button data-testid="complete-submit" type="submit" disabled={pending}>
+      )}
+      <details
+        open={reviewOpen}
+        onToggle={(e) => {
+          setReviewOpen(e.currentTarget.open);
+        }}
+        className="grid gap-3"
+      >
+        <summary className="min-h-11 cursor-pointer content-center rounded-md font-bold is-focus:focus-ring">
+          {ru.turn.review}
+        </summary>
+        <div className="grid gap-4 pt-2">
+          <Select
+            data-testid="complete-review-rating"
+            label={ru.turn.reviewRating}
+            value={rating}
+            error={errorOf('rating')}
+            onChange={(e) => {
+              setRating(e.target.value);
+            }}
+          >
+            <option value="">{ru.turn.reviewNoRating}</option>
+            {ratings.map((r) => (
+              <option key={r} value={String(r)}>
+                {r}
+              </option>
+            ))}
+          </Select>
+          <TextArea
+            data-testid="complete-review-text"
+            label={ru.turn.reviewText}
+            maxLength={2000}
+            value={reviewText}
+            onChange={(e) => {
+              setReviewText(e.target.value);
+            }}
+          />
+        </div>
+      </details>
+      <Button
+        variant="main"
+        data-testid="complete-submit"
+        type="submit"
+        loading={pending}
+        disabled={pending}
+      >
         {ru.turn.complete}
-      </button>
+      </Button>
     </form>
   );
 }

@@ -8,8 +8,8 @@ import type { MomentHandle, MomentPhase } from './moment';
 
 const t = ru.moments.dice;
 
-/** The server's throw: every die's value; the challenge die, if any, is the last one */
-export type DiceRoll = { id: number; values: number[]; challenge: boolean };
+/** The server's throw: every die's value; the last `challenge` of them are the challenge dice */
+export type DiceRoll = { id: number; values: number[]; challenge: number };
 
 const pips: Record<number, number[]> = {
   1: [4],
@@ -37,7 +37,30 @@ const faces = [
   { value: 5, place: 'die-f5' },
 ];
 
-function Face({ value, place, challenge }: { value: number; place: string; challenge: boolean }) {
+function Face({
+  value,
+  place,
+  challenge,
+  number,
+}: {
+  value: number;
+  place: string;
+  challenge: boolean;
+  /** A die of more than six sides shows its number instead of pips */
+  number?: number | undefined;
+}) {
+  if (number !== undefined)
+    return (
+      <span
+        className={cx(
+          'absolute inset-0 grid place-items-center rounded-md border-3 border-ink font-display text-2xl font-heavy backface-hidden',
+          challenge ? 'bg-gold' : 'bg-card',
+          place,
+        )}
+      >
+        {number}
+      </span>
+    );
   return (
     <span
       className={cx(
@@ -92,7 +115,13 @@ export function Die({
           transition={thrown ? { duration: 1.2, delay, ease: [0.2, 0.7, 0.3, 1] } : { duration: 0 }}
         >
           {faces.map((f) => (
-            <Face key={f.value} value={f.value} place={f.place} challenge={challenge} />
+            <Face
+              key={f.value}
+              value={f.value}
+              place={f.place}
+              challenge={challenge}
+              number={value in pips || f.value !== 1 ? undefined : value}
+            />
           ))}
         </motion.span>
       </motion.span>
@@ -109,10 +138,13 @@ export function DiceMoment({
   roll,
   onPhase,
   ref,
+  announce = true,
 }: {
   roll: DiceRoll | null;
   onPhase?: ((phase: MomentPhase) => void) | undefined;
   ref?: Ref<MomentHandle> | undefined;
+  /** False when the page has its own live region for the result (it outlives the dice) */
+  announce?: boolean;
 }) {
   const reduce = useReducedMotion() ?? false;
   const [shown, setShown] = useState(roll === null);
@@ -147,8 +179,9 @@ export function DiceMoment({
 
   const values = roll?.values ?? [6, 6, 6];
   const total = values.reduce((a, b) => a + b, 0);
-  const plain = roll?.challenge ? values.slice(0, -1) : values;
-  const challenge = roll?.challenge ? (values.at(-1) ?? null) : null;
+  const extra = roll?.challenge ?? 0;
+  const plain = values.slice(0, values.length - extra);
+  const challenge = values.slice(values.length - extra);
   const thrown = roll !== null && !skipped && !reduce;
 
   return (
@@ -164,7 +197,7 @@ export function DiceMoment({
               value={v}
               index={i}
               thrown={thrown}
-              challenge={roll?.challenge === true && i === values.length - 1}
+              challenge={i >= values.length - extra}
             />
           ))}
         </div>
@@ -179,7 +212,10 @@ export function DiceMoment({
           </motion.span>
         ) : null}
       </Table>
-      <p className="min-h-5 text-center text-sm text-balance text-ink-soft" aria-live="polite">
+      <p
+        className="min-h-5 text-center text-sm text-balance text-ink-soft"
+        aria-live={announce ? 'polite' : undefined}
+      >
         {shown && roll ? t.result(plain, challenge, total) : ''}
       </p>
     </div>

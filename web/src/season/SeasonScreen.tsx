@@ -6,6 +6,7 @@ import { moscowTime } from '../app/time';
 import { ru } from '../i18n/ru';
 import { CompleteForm, type Completion } from './CompleteForm';
 import { ChoiceCard, OfferCard, rollResultTitle } from './RollResult';
+import { CompletionMoment } from './CompletionMoment';
 import { AvatarSection } from './AvatarSection';
 import { ProofSection } from './ProofForm';
 import { ManualEffectItem, type EffectOutcome } from './ManualEffectItem';
@@ -46,6 +47,11 @@ type Command =
   | { kind: 'alreadyPlayed'; gameId: string }
   | { kind: 'resolveEffect'; effectId: string; outcome: EffectOutcome; comment: string | null };
 type Loaded = { kind: 'season'; season: Season } | { kind: 'signedOut' } | { kind: 'failed' };
+/** A completion that came while the page is open: its run and the cell my token left */
+type Thrown = { run: string; from: string };
+
+/** The last completed run's dice line takes the focus when its moment ends */
+const lastDiceId = 'last-dice';
 
 /** Sends one game action; a new command id each time, so a retried request acts once (D-68). */
 function send(seasonId: string, command: Command) {
@@ -137,6 +143,10 @@ export function SeasonScreen({
   // Desktop: the roll whose landed wheel still stands on the map's stage; and the result said to screen readers
   const [staged, setStaged] = useState<number | null>(null);
   const [announced, setAnnounced] = useState('');
+  // The last completed run and my cell of the last view shown; undefined until the first load. A new completed run
+  // brings its dice and my token's move (H4); the one the page opened with is shown at once.
+  const seen = useRef<{ run: string | null; cell: string | null } | undefined>(undefined);
+  const [thrown, setThrown] = useState<Thrown | null>(null);
   const desk = useDesk();
   const apply = useCallback(
     (loaded: Loaded) => {
@@ -150,6 +160,13 @@ export function SeasonScreen({
         // The roll the page opened with is shown at once; only a roll that comes while it is open spins (D-136)
         const opened = loaded.season.me?.roll?.sequence ?? null;
         setLanded((landed) => (landed === undefined ? opened : landed));
+        const view = loaded.season;
+        const last = view.me?.lastCompleted ?? null;
+        const cell = view.players.find((p) => p.id === view.me?.playerId)?.cellId ?? null;
+        const before = seen.current;
+        seen.current = { run: last?.id ?? null, cell };
+        if (before && before.cell && last && last.id !== before.run && last.status !== 'rejected')
+          setThrown({ run: last.id, from: before.cell });
         setLoadFailed(false);
       }
     },
@@ -237,7 +254,12 @@ export function SeasonScreen({
       : null;
   const spin: WheelRoll | null = fresh ? wheelRoll(fresh, offer, choice) : null;
   const uncheckedBlocked = me?.unchecked != null && me.unchecked.count >= me.unchecked.limit;
-  const { board, players, rows } = view;
+  const { board, players, rows, cellNumber } = view;
+  // A completion that came while the page is open throws its dice first; the rest of the turn waits for it
+  const throwing =
+    thrown && me?.lastCompleted?.id === thrown.run && me.lastCompleted.status !== 'rejected'
+      ? me.lastCompleted
+      : null;
   const mine = players.find((p) => p.me);
   const myRow = rows.find((r) => r.player.me);
   const leader = rows[0];
@@ -280,8 +302,13 @@ export function SeasonScreen({
           </section>
         )}
         {me.lastCompleted && (
-          <div className="legacy-screens">
-            <p data-testid="last-dice">
+          <div className="grid min-w-0 gap-2">
+            <p
+              id={lastDiceId}
+              data-testid="last-dice"
+              tabIndex={-1}
+              className="font-medium focus:outline-none"
+            >
               {me.lastCompleted.status === 'rejected'
                 ? ru.turn.lastRejected(me.lastCompleted.game.title)
                 : ru.turn.lastDice(
@@ -293,12 +320,12 @@ export function SeasonScreen({
                   )}
             </p>
             {me.lastCompleted.challengeDice.length > 0 && (
-              <p data-testid="last-challenge-dice">
+              <p data-testid="last-challenge-dice" className="text-sm text-ink-soft">
                 {ru.turn.lastChallengeDice(me.lastCompleted.challengeDice.map((d) => d.value))}
               </p>
             )}
             {me.lastCompleted.review && (
-              <p data-testid="last-review">
+              <p data-testid="last-review" className="text-sm text-ink-soft wrap-anywhere">
                 {ru.turn.lastReview(
                   me.lastCompleted.review.rating,
                   me.lastCompleted.review.text ?? null,
@@ -389,6 +416,44 @@ export function SeasonScreen({
     </div>
   ) : null;
 
+  // The completion's stage: on a desktop over the map, on a phone in the turn card; it goes when the token stands
+  const diceStage =
+    throwing && thrown && mine ? (
+      <CompletionMoment
+        key={throwing.id}
+        dice={{
+          id: 1,
+          values: [...throwing.dice, ...throwing.challengeDice].map((d) => d.value),
+          challenge: throwing.challengeDice.length,
+        }}
+        board={board}
+        players={players}
+        mover={mine}
+        from={cellNumber.get(thrown.from) ?? mine.cell}
+        to={mine.cell}
+        fill={desk}
+        onDone={() => {
+          setThrown(null);
+          const finishCell = board.cells.find((c) => c.id === mine.cell)?.kind === 'finish';
+          setAnnounced(
+            ru.moments.dice.announce(
+              throwing.game.title,
+              ru.moments.dice.result(
+                throwing.dice.map((d) => d.value),
+                throwing.challengeDice.map((d) => d.value),
+                throwing.total,
+              ),
+              ru.moments.dice.at(mine.cell, finishCell),
+            ),
+          );
+          requestAnimationFrame(() => {
+            document.getElementById(lastDiceId)?.focus();
+          });
+        }}
+      />
+    ) : null;
+  const onMap = desk ? (stage ?? diceStage) : null;
+
   return (
     <main className="mx-auto grid max-w-300 grid-cols-1 gap-4 px-4 pt-4 pb-28 desk:grid-cols-[auto_minmax(0,1fr)] desk:items-start desk:gap-6 desk:px-8 desk:pb-8">
       <header className="grid gap-2 min-w-0 desk:col-start-1 desk:w-96">
@@ -433,14 +498,15 @@ export function SeasonScreen({
         {!me && <p className="text-ink-soft">{ru.turn.spectator}</p>}
         {me && finished && <p className="text-ink-soft">{ru.turn.finishedText}</p>}
         {me && closing && <p className="text-ink-soft">{ru.turn.closingText}</p>}
-        {stepFirst ? null : afterRun}
+        {desk ? null : diceStage}
+        {stepFirst || throwing ? null : afterRun}
         {waiting && (
           <div className="grid gap-2" aria-busy="true">
             <Skeleton className="h-6 w-2/3" />
             <Skeleton className="h-12 w-full" />
           </div>
         )}
-        {me?.phase === 'idle' && turnsOpen && (
+        {me?.phase === 'idle' && turnsOpen && !throwing && (
           // D-134: at the limit of runs waiting for the admin's check the roll is closed, and the page says why
           <div className="grid gap-2">
             {uncheckedBlocked ? (
@@ -465,7 +531,6 @@ export function SeasonScreen({
           </div>
         )}
         {desk ? null : stage}
-        {/* The run's forms keep plain styles until H4 (the run page) */}
         {choice && !spin && (
           <ChoiceCard
             choice={choice}
@@ -510,7 +575,7 @@ export function SeasonScreen({
           </div>
         )}
         {turnsOpen && me?.phase === 'playing' && me.activeRun && (
-          <div className="legacy-screens">
+          <div className="grid min-w-0 gap-4">
             <CompleteForm
               needsHours={me.activeRun.game.hours == null}
               challengesEnabled={me.challengesEnabled}
@@ -518,6 +583,7 @@ export function SeasonScreen({
               onComplete={(completion) => void act({ kind: 'complete', completion })}
             />
             <RunActions
+              game={me.activeRun.game.title}
               dropHintMinutes={me.dropHintMinutes}
               dropPenalty={me.dropPenalty}
               techRerollOpen={me.techRerollOpen}
@@ -545,9 +611,9 @@ export function SeasonScreen({
             tools="auto"
             className="h-105 rounded-lg border-3 border-ink desk:h-190"
           />
-          {desk && stage ? (
+          {onMap ? (
             <div className="absolute inset-0 z-10 grid overflow-hidden rounded-lg border-3 border-ink bg-card p-4">
-              {stage}
+              {onMap}
             </div>
           ) : null}
         </div>

@@ -202,28 +202,38 @@ export const ru = {
         : `Реролл стоит ${coins(price)}. Потратить?`,
     rerollConfirmYes: 'Да, реролл',
     rerollConfirmNo: 'Отмена',
-    drop: 'Дроп',
-    dropConfirm: (penalty: DropPenalty | null) => {
-      if (!penalty) return 'Дропнуть игру?';
+    drop: 'Дропнуть',
+    dropTitle: (title: string) => `Дропнуть «${title}»?`,
+    // What a drop does, as the confirmation lists it: the penalty from the server's rules, then what always happens
+    dropConsequences: (penalty: DropPenalty | null): string[] => {
+      const always = 'Игра больше не выпадет тебе в этом сезоне, дальше — новый ролл';
+      if (!penalty) return [always];
       const takes = [
         penalty.affectsPoints ? 'очки' : null,
-        penalty.affectsPosition ? 'клетки' : null,
+        penalty.affectsPosition ? 'клетки (не дальше старта)' : null,
       ]
         .filter((part) => part !== null)
         .join(' и ');
-      const parts = [
+      return [
         takes === ''
-          ? 'штрафа кубами нет'
-          : `штраф — кубы за дроп (${String(penalty.count)}d${String(penalty.sides)}) отнимут ${takes}`,
-        penalty.badEvent ? 'тебе достанется плохой ивент' : null,
-      ].filter((part) => part !== null);
-      return `Дроп: ${parts.join(', ')}. Дропнуть игру?`;
+          ? 'Штрафа кубами нет'
+          : `Штраф — кубы за дроп ${String(penalty.count)}d${String(penalty.sides)}: отнимут ${takes}`,
+        ...(penalty.badEvent ? ['Тебе достанется плохой ивент'] : []),
+        always,
+      ];
     },
     dropHint: (minutes: number) =>
       `По правилам дропать стоит не раньше чем через ${minutes} мин. игры.`,
-    dropConfirmYes: 'Да, дропнуть',
-    dropConfirmNo: 'Отмена',
+    dropConfirmYes: 'Дропнуть игру',
     techReroll: 'Тех-реролл',
+    techRerollTitle: (title: string) => `Тех-реролл «${title}»`,
+    techRerollLead: 'Если игра не идёт у тебя по технической причине:',
+    techRerollConsequences: [
+      'Бесплатно: очки и клетки не меняются',
+      'Игра больше не выпадет тебе в этом сезоне',
+      'Сразу новый ролл',
+      'Админ может превратить тех-реролл в дроп со штрафом',
+    ],
     techRerollReason: 'Причина',
     techRerollReasonPlaceholder: 'Выбери причину',
     techRerollReasons: {
@@ -234,8 +244,9 @@ export const ru = {
       other: 'Другое',
     },
     techRerollComment: 'Комментарий',
+    techRerollCommentHint: 'Для причины «Другое» — обязательно',
     techRerollCommentRequired: 'Для причины «Другое» напиши комментарий.',
-    techRerollSubmit: 'Тех-реролл',
+    techRerollSubmit: 'Сделать тех-реролл',
     techRerollCancel: 'Отмена',
     techRerollClosed: 'Окно тех-реролла закрылось. Если игра не запускается, напиши админу.',
     gameMark: (player: string, kind: 'dropped' | 'techRerolled') =>
@@ -246,8 +257,10 @@ export const ru = {
     pickShort: 'Выбрать',
     rolled: 'Выпала игра',
     playing: (title: string) => `Сейчас играешь: ${title}`,
-    complete: 'Завершить',
+    complete: 'Завершить прохождение',
+    completeTitle: 'Прошёл? Отметь прохождение',
     difficulty: 'Сложность',
+    difficultyHint: 'На какой сложности проходил: от неё зависят грани кубов',
     hours: 'Часы (оценка)',
     hoursHint: 'У игры нет данных о длине: укажи оценку.',
     hoursInvalid: 'Укажи число часов больше нуля.',
@@ -255,6 +268,7 @@ export const ru = {
     hoursSourceHint: 'Ссылка, например на HowLongToBeat, или короткая пометка.',
     hoursSourceRequired: 'Укажи источник оценки: ссылку или пометку.',
     challengeDone: 'Челлендж выполнен',
+    review: 'Отзыв — по желанию',
     reviewRating: 'Оценка игры',
     reviewNoRating: 'Без отзыва',
     reviewText: 'Отзыв',
@@ -264,7 +278,7 @@ export const ru = {
     lastReview: (rating: number, text: string | null) =>
       text
         ? `Твой отзыв: ${rating.toString()}/10 — ${text}`
-        : `Ваша оценка: ${rating.toString()}/10`,
+        : `Твоя оценка: ${rating.toString()}/10`,
     lastDice: (title: string, dice: number[], total: number) =>
       `Кубы за прохождение (${title}): ${dice.join(' + ')} — итого ${total.toLocaleString('ru-RU')}`,
     spectator: 'Ты смотришь сезон как зритель.',
@@ -277,16 +291,20 @@ export const ru = {
   },
   proof: {
     title: 'Пруф',
+    lead: 'Хватит одного: ссылки, скрины или свидетель.',
     link: 'Ссылка на скрин или видео',
+    linkNumber: (n: number) => `Ссылка ${n}: скрин или видео`,
     addLink: 'Ещё ссылка',
     note: 'Заметка',
     submit: 'Отправить пруф',
     linkRequired: 'Добавь ссылку или скрин либо выбери свидетеля.',
-    shot: 'Скрин (JPEG, PNG, WebP или GIF)',
+    shot: 'Добавить скрин',
+    shotHint: (left: number) => `JPEG, PNG, WebP или GIF, можно ещё ${left}`,
     shotAlt: (n: number) => `Скрин ${n}`,
     removeShot: (n: number) => `Убрать скрин ${n}`,
     remove: 'Убрать',
-    witness: 'Свидетель (видел прохождение)',
+    witness: 'Свидетель',
+    witnessHint: 'Игрок, который видел прохождение',
     noWitness: 'Без свидетеля',
     linkInvalid: 'Ссылка должна начинаться с http:// или https://.',
     status: {
@@ -300,7 +318,7 @@ export const ru = {
     title: 'Моя аватарка',
     current: 'Текущая аватарка',
     none: 'Аватарки пока нет.',
-    file: 'Картинка с устройства',
+    file: 'Загрузить картинку',
     link: 'Или ссылка на гифку (Tenor, Giphy, Klipy)',
     useLink: 'Взять по ссылке',
     linkRequired: 'Вставь ссылку.',
@@ -402,8 +420,12 @@ export const ru = {
     },
     dice: {
       challengeDie: 'челлендж',
-      result: (plain: number[], challenge: number | null, total: number) =>
-        `${plain.join(' + ')}${challenge === null ? '' : ` + ${challenge} за челлендж`}. Итого +${total}: столько клеток вперёд и очков`,
+      result: (plain: number[], challenge: number[], total: number) =>
+        `${plain.join(' + ')}${challenge.length === 0 ? '' : ` + ${challenge.join(' + ')} за челлендж`}. Итого +${total}: столько клеток вперёд и очков`,
+      // The completion's moment, said once when the token stands: the game, the dice and where the token is now
+      announce: (title: string, dice: string, at: string) => `Пройдено: ${title}. ${dice}. ${at}`,
+      at: (cell: number, finish: boolean) =>
+        finish ? 'Фишка на финише' : `Фишка на клетке ${cell}`,
     },
     finish: {
       first: (name: string) => `${name} финиширует первым!`,
@@ -429,6 +451,8 @@ export const ru = {
       ['progress', 'Прогресс и лидерборд'],
       ['run', 'Текущая игра'],
       ['offer', 'Результат ролла'],
+      ['complete', 'Завершение'],
+      ['proof', 'Пруф'],
       ['dialogs', 'Окна'],
       ['map', 'Карта'],
       ['wheel', 'Колесо'],
@@ -523,6 +547,11 @@ export const ru = {
       hoursHint: 'Число, можно с дробью: 27 или 12,5',
       link: 'Ссылка на пруф',
       linkError: 'Нужна ссылка целиком, с https://',
+      select: 'Причина',
+      selectError: 'Выбери причину',
+      choice: 'Сложность',
+      file: 'Добавить скрин',
+      fileHint: 'JPEG, PNG, WebP или GIF',
     },
     feedback: {
       title: 'Состояния',
@@ -549,11 +578,16 @@ export const ru = {
     run: {
       title: 'Текущая игра',
       lead: 'Самое длинное название пула, путь до финиша, одно главное действие и тихий дроп в стороне. Вторая карточка — без обложки и во время отправки.',
-      dropConsequences: [
-        '−2d4 очков и клеток, но не ниже чекпоинта',
-        'Плохой ивент',
-        'Игра станет недоступна тебе в этом сезоне',
-      ],
+    },
+    complete: {
+      title: 'Завершение прохождения',
+      lead: 'Сложность — пилюлями на виду, часы с источником — только у игры без часов, челлендж, отзыв свёрнут. Одно главное действие; тех-реролл и дроп — тихо внизу. Вторая карточка — во время отправки: окно тех-реролла закрылось.',
+      message: 'Сервер не ответил. Проверь интернет и попробуй ещё раз.',
+    },
+    proof: {
+      title: 'Пруф',
+      lead: 'Ссылки, скрины через свою кнопку, свидетель и заметка; ошибка — у своего поля. Дальше — пруф на проверке, одобренный со скринами и отклонённый с комментарием админа.',
+      comment: 'На скрине не видно титров',
     },
     dialogs: {
       title: 'Окна',

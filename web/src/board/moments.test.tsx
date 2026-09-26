@@ -38,12 +38,12 @@ vi.hoisted(() => {
 describe('the main moments with reduced motion', () => {
   it('the dice show the total at once and say every die, the challenge one apart', async () => {
     const phase = vi.fn();
-    render(<DiceMoment roll={{ id: 1, values: [2, 5, 3, 6], challenge: true }} onPhase={phase} />);
+    render(<DiceMoment roll={{ id: 1, values: [2, 5, 3, 6], challenge: 1 }} onPhase={phase} />);
     await waitFor(() => {
       expect(phase).toHaveBeenCalledWith('done');
     });
     expect(screen.getByText('+16')).toBeInTheDocument();
-    expect(screen.getByText(ru.moments.dice.result([2, 5, 3], 6, 16))).toBeInTheDocument();
+    expect(screen.getByText(ru.moments.dice.result([2, 5, 3], [6], 16))).toBeInTheDocument();
   });
 
   it('the wheel stands on the pick at once and still tells the miss and who completed it', async () => {
@@ -72,11 +72,7 @@ describe('the main moments with reduced motion', () => {
     const phase = vi.fn();
     const handle = createRef<MomentHandle>();
     render(
-      <DiceMoment
-        ref={handle}
-        roll={{ id: 1, values: [1, 1], challenge: false }}
-        onPhase={phase}
-      />,
+      <DiceMoment ref={handle} roll={{ id: 1, values: [1, 1], challenge: 0 }} onPhase={phase} />,
     );
     handle.current?.skip();
     handle.current?.skip();
