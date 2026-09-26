@@ -1,4 +1,5 @@
 import { Gamepad2 } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { ru } from '../i18n/ru';
 import { Button } from '../ui/Button';
 import { cx } from '../ui/cx';
@@ -54,20 +55,27 @@ export function RunCard({
   game,
   left,
   total,
-  dropConsequences,
+  dropConsequences = [],
+  actions,
   onComplete,
   onDrop,
   busy = false,
+  level = 2,
 }: {
   game: GameCard;
-  /** Cells left to the finish and the whole way's length */
-  left: number;
+  /** Cells left to the finish (null: no way to it) and the whole way's length */
+  left: number | null;
   total: number;
-  dropConsequences: readonly string[];
+  dropConsequences?: readonly string[];
+  /** Instead of the complete and drop buttons (null: none, the page has its own forms) */
+  actions?: ReactNode;
   onComplete?: () => void;
   onDrop?: () => void;
   busy?: boolean;
+  /** The heading's level: 3 inside a section that has its own heading */
+  level?: 2 | 3;
 }) {
+  const Heading = `h${level}` as const;
   return (
     <section
       className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-3 rounded-lg bg-card p-4"
@@ -76,9 +84,9 @@ export function RunCard({
       <Cover game={game} />
       <div className="grid content-start gap-1">
         <p className="text-sm text-ink-soft">{t.nowPlaying}</p>
-        <h2 className="font-display text-lg font-heavy wrap-anywhere" title={game.title}>
+        <Heading className="font-display text-lg font-heavy wrap-anywhere" title={game.title}>
           {game.title}
-        </h2>
+        </Heading>
         <p className="text-sm text-ink-soft">{t.hours(game.hours)}</p>
         <div className="flex flex-wrap gap-1">
           {game.tags.map((tag) => (
@@ -87,29 +95,37 @@ export function RunCard({
         </div>
       </div>
       <div className="col-span-2">
-        <RouteProgress left={left} total={total} />
+        {left === null ? (
+          <p className="text-sm text-ink-soft">{ru.board.noWay}</p>
+        ) : (
+          <RouteProgress left={left} total={total} />
+        )}
       </div>
-      <div className="col-span-2 flex flex-wrap items-center justify-between gap-x-5 gap-y-1">
-        <Button
-          variant="main"
-          className="flex-1 whitespace-nowrap"
-          loading={busy}
-          {...(onComplete ? { onClick: onComplete } : {})}
-        >
-          {t.complete}
-        </Button>
-        <ConfirmDanger
-          trigger={
-            <Button variant="dangerLink" className="ml-auto">
-              {t.drop}
-            </Button>
-          }
-          title={t.dropTitle(game.title)}
-          consequences={dropConsequences}
-          confirm={t.dropConfirm}
-          onConfirm={() => onDrop?.()}
-        />
-      </div>
+      {actions !== undefined ? (
+        actions
+      ) : (
+        <div className="col-span-2 flex flex-wrap items-center justify-between gap-x-5 gap-y-1">
+          <Button
+            variant="main"
+            className="flex-1 whitespace-nowrap"
+            loading={busy}
+            {...(onComplete ? { onClick: onComplete } : {})}
+          >
+            {t.complete}
+          </Button>
+          <ConfirmDanger
+            trigger={
+              <Button variant="dangerLink" className="ml-auto">
+                {t.drop}
+              </Button>
+            }
+            title={t.dropTitle(game.title)}
+            consequences={dropConsequences}
+            confirm={t.dropConfirm}
+            onConfirm={() => onDrop?.()}
+          />
+        </div>
+      )}
     </section>
   );
 }

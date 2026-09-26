@@ -5,7 +5,7 @@ import type { ReactNode } from 'react';
 import { ru } from '../i18n/ru';
 import { Button, IconButton } from './Button';
 
-const overlay = 'fixed inset-0 bg-ink/40';
+const overlay = 'fixed inset-0 z-20 bg-ink/40';
 
 /** Confirms a dangerous action and shows what it costs: «Дроп: −2d4 очков и клеток и плохой ивент» */
 export function ConfirmDanger({
@@ -35,7 +35,7 @@ export function ConfirmDanger({
       {trigger ? <AlertDialog.Trigger asChild>{trigger}</AlertDialog.Trigger> : null}
       <AlertDialog.Portal>
         <AlertDialog.Overlay className={overlay} />
-        <AlertDialog.Content className="fixed inset-x-4 top-1/2 mx-auto grid max-w-110 -translate-y-1/2 gap-4 rounded-lg border-3 border-ink bg-card p-5 shadow-lift">
+        <AlertDialog.Content className="fixed inset-x-4 top-1/2 z-20 mx-auto grid max-w-110 -translate-y-1/2 gap-4 rounded-lg border-3 border-ink bg-card p-5 shadow-lift">
           <AlertDialog.Title className="font-display text-xl font-heavy text-balance">
             {title}
           </AlertDialog.Title>
@@ -75,7 +75,7 @@ export function BottomSheet({
       <Dialog.Trigger asChild>{trigger}</Dialog.Trigger>
       <Dialog.Portal>
         <Dialog.Overlay className={overlay} />
-        <Dialog.Content className="fixed inset-x-0 bottom-0 grid max-h-4/5 gap-3 overflow-auto rounded-t-lg border-t-3 border-ink bg-card px-4 pt-3 pb-6">
+        <Dialog.Content className="fixed inset-x-0 bottom-0 z-20 grid max-h-4/5 gap-3 overflow-auto rounded-t-lg border-t-3 border-ink bg-card px-4 pt-3 pb-6">
           <span className="h-1 w-11 justify-self-center rounded-full bg-ink" aria-hidden />
           <div className="flex items-center justify-between gap-3">
             <Dialog.Title className="font-display text-lg font-heavy">{title}</Dialog.Title>

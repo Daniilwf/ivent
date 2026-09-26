@@ -157,26 +157,33 @@
   background-size: 14px 14px;
 }
 
-/* The screens built before the design system (login, the season) get plain, readable controls until stage H
-   rebuilds them from src/ui. :where keeps these rules weaker than any utility class. */
+/* The controls built before the design system (the offer, the run's forms, the proof) keep plain, readable styles until
+   stages H3 and H4 rebuild them from src/ui. :where keeps these rules weaker than any utility class. */
 @layer base {
   .legacy-screens {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: 12px;
-    max-width: 720px;
-    margin: 0 auto;
-    padding: 16px;
   }
 
   .legacy-screens :where(form) {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: 12px;
+  }
+
+  .legacy-screens :where(fieldset) {
+    min-width: 0;
   }
 
   .legacy-screens :where(h1, h2, h3) {
     font-family: var(--font-display);
     font-weight: var(--font-weight-heavy);
     font-size: var(--text-lg);
+  }
+
+  .legacy-screens :where(input:not([type='checkbox'], [type='radio']), select, textarea) {
+    max-width: 100%;
   }
 
   .legacy-screens :where(input, select, textarea) {
@@ -204,6 +211,7 @@
 
   .legacy-screens :where(label) {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: 4px;
   }
 }

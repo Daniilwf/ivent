@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { CalendarClock, Flag, Trophy } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { api, rejectionCode, type Schemas } from '../api/client';
 import { watchSeason } from '../api/realtime';
 import { moscowTime } from '../app/time';
@@ -10,6 +11,18 @@ import { AvatarSection } from './AvatarSection';
 import { ProofSection } from './ProofForm';
 import { ManualEffectItem, type EffectOutcome } from './ManualEffectItem';
 import { RunActions } from './RunActions';
+import { seasonPicture } from './seasonView';
+import { linearBoard } from '../board/linearBoard';
+import { RunCard } from '../board/GameCards';
+import { Leaderboard } from '../board/Leaderboard';
+import { MapView } from '../board/MapView';
+import { Button } from '../ui/Button';
+import { BottomSheet } from '../ui/Dialogs';
+import { Chip } from '../ui/Marks';
+import { Skeleton } from '../ui/Progress';
+import { ErrorState, Notice } from '../ui/States';
+import { Sticker } from '../ui/Sticker';
+import { Panel } from '../ui/Surface';
 
 type Season = Schemas['SeasonView'];
 type Command =
@@ -100,7 +113,8 @@ async function fetchSeason(seasonId: string): Promise<Loaded> {
   }
 }
 
-/** The slice screen (stage 1, no design yet): my turn, the cell line with tokens, the players. */
+/** The season's main screen (H2): my turn on top, the map with everyone's tokens, the leaderboard beside it on a desktop
+ *  and in a sheet at the bottom of a phone. */
 export function SeasonScreen({
   seasonId,
   onSignedOut,
@@ -170,9 +184,32 @@ export function SeasonScreen({
 
   // Turns end at the deadline even before the scheduler closes the season (D-101): no action the server would refuse.
   const pastDeadline = useIsPast(season?.deadline ?? null);
+  const cellsKey = season?.cells.map((c) => `${c.id}:${c.type}`).join('|') ?? '';
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- the key stands for the cells
+  const chain = useMemo(() => linearBoard(season?.cells ?? []), [cellsKey]);
+  const view = useMemo(() => seasonPicture(season, chain), [season, chain]);
+  const [retrying, setRetrying] = useState(false);
 
-  if (loadFailed && !season) return <p role="alert">{ru.app.loadError}</p>;
-  if (!season) return <p>{ru.app.loading}</p>;
+  if (loadFailed && !season)
+    return (
+      <main className="mx-auto grid max-w-110 px-4 py-10">
+        <ErrorState
+          level={1}
+          title={ru.shell.loadErrorTitle}
+          text={ru.shell.loadErrorText}
+          onRetry={() => {
+            if (retrying) return;
+            setRetrying(true);
+            void fetchSeason(seasonId)
+              .then(apply)
+              .finally(() => {
+                setRetrying(false);
+              });
+          }}
+        />
+      </main>
+    );
+  if (!season) return <SeasonSkeleton />;
 
   const me = season.me;
   const waiting =
@@ -181,30 +218,156 @@ export function SeasonScreen({
   const turnsOpen = season.status === 'active' && !pastDeadline;
   const choice = turnsOpen && me?.phase === 'rolling' ? me.choice : null;
   const offer = turnsOpen && me?.phase === 'rolling' ? me.offer : null;
+  const { board, players, rows } = view;
+  const mine = players.find((p) => p.me);
+  const myRow = rows.find((r) => r.player.me);
+  const leader = rows[0];
+  const routeLength = Math.max(board.cells.length - 1, 1);
+  const closing = season.status === 'closing' || (season.status === 'active' && pastDeadline);
+  const finished = season.status === 'finished' || season.status === 'archived';
+
   return (
-    <main>
-      <h1>{ru.app.title}</h1>
-      {loadFailed && <p role="alert">{ru.app.loadError}</p>}
-      {season.deadline && (
-        <p data-testid="season-deadline">{ru.season.deadline(moscowTime(season.deadline))}</p>
-      )}
-      {(season.status === 'closing' || (season.status === 'active' && pastDeadline)) && (
-        <p data-testid="season-status">{ru.season.closing}</p>
-      )}
-      {(season.status === 'finished' || season.status === 'archived') && (
-        <p data-testid="season-status">{ru.season.finished}</p>
-      )}
-      <section aria-labelledby="turn-title" data-testid="turn">
-        <h2 id="turn-title">{ru.turn.title}</h2>
-        {!me && <p>{ru.turn.spectator}</p>}
-        {waiting && <p>{ru.app.loading}</p>}
-        {me?.phase === 'idle' && turnsOpen && (
-          <button data-testid="roll" disabled={pending} onClick={() => void act({ kind: 'roll' })}>
-            {ru.turn.roll}
-          </button>
+    <main className="mx-auto grid max-w-300 grid-cols-1 gap-4 px-4 pt-4 pb-28 desk:grid-cols-[auto_minmax(0,1fr)] desk:items-start desk:gap-6 desk:px-8 desk:pb-8">
+      <header className="grid gap-2 min-w-0 desk:col-start-1 desk:w-96">
+        <h1 className="font-display text-xl font-heavy text-balance">{season.name}</h1>
+        <div className="flex flex-wrap gap-2">
+          {season.deadline ? (
+            <span data-testid="season-deadline">
+              <Chip icon={<CalendarClock size={16} aria-hidden />}>
+                {ru.season.deadline(moscowTime(season.deadline))}
+              </Chip>
+            </span>
+          ) : null}
+          {closing || finished ? (
+            <span data-testid="season-status">
+              <Chip icon={<Flag size={16} aria-hidden />}>
+                {finished ? ru.season.finished : ru.season.closing}
+              </Chip>
+            </span>
+          ) : null}
+        </div>
+      </header>
+      {loadFailed ? (
+        <div className="min-w-0 desk:col-start-1 desk:w-96">
+          <Notice tone="danger">{ru.app.loadError}</Notice>
+        </div>
+      ) : null}
+
+      <section
+        aria-labelledby="turn-title"
+        data-testid="turn"
+        className="grid min-w-0 grid-cols-1 gap-4 rounded-lg bg-card p-4 desk:col-start-1 desk:w-96"
+      >
+        <h2 id="turn-title" className="font-display text-lg font-heavy">
+          {!me
+            ? ru.turn.spectatorTitle
+            : finished
+              ? ru.turn.finishedTitle
+              : closing
+                ? ru.turn.closingTitle
+                : ru.turn.title}
+        </h2>
+        {!me && <p className="text-ink-soft">{ru.turn.spectator}</p>}
+        {me && finished && <p className="text-ink-soft">{ru.turn.finishedText}</p>}
+        {me && closing && <p className="text-ink-soft">{ru.turn.closingText}</p>}
+        {me && (me.manualEffects.length > 0 || me.lastCompleted) ? (
+          <section
+            aria-labelledby="after-title"
+            data-testid="after"
+            className="grid min-w-0 grid-cols-1 gap-4 border-b-2 border-muted pb-4"
+          >
+            <h3 id="after-title" className="font-display font-heavy">
+              {me.manualEffects.length > 0 ? ru.turn.todo(me.manualEffects.length) : ru.turn.after}
+            </h3>
+            {me.manualEffects.length > 0 && (
+              <section
+                aria-labelledby="effects-title"
+                data-testid="manual-effects"
+                className="legacy-screens"
+              >
+                <h4 id="effects-title">{ru.effects.title}</h4>
+                <ul>
+                  {me.manualEffects.map((effect) => (
+                    <ManualEffectItem
+                      key={effect.id}
+                      effect={effect}
+                      pending={pending}
+                      resolvable={season.status === 'active' || season.status === 'closing'}
+                      onResolve={(outcome, comment) =>
+                        void act({ kind: 'resolveEffect', effectId: effect.id, outcome, comment })
+                      }
+                    />
+                  ))}
+                </ul>
+              </section>
+            )}
+            {me.lastCompleted && (
+              <div className="legacy-screens">
+                <p data-testid="last-dice">
+                  {me.lastCompleted.status === 'rejected'
+                    ? ru.turn.lastRejected(me.lastCompleted.game.title)
+                    : ru.turn.lastDice(
+                        me.lastCompleted.game.title,
+                        [...me.lastCompleted.dice, ...me.lastCompleted.challengeDice].map(
+                          (d) => d.value,
+                        ),
+                        me.lastCompleted.total,
+                      )}
+                </p>
+                {me.lastCompleted.challengeDice.length > 0 && (
+                  <p data-testid="last-challenge-dice">
+                    {ru.turn.lastChallengeDice(me.lastCompleted.challengeDice.map((d) => d.value))}
+                  </p>
+                )}
+                {me.lastCompleted.review && (
+                  <p data-testid="last-review">
+                    {ru.turn.lastReview(
+                      me.lastCompleted.review.rating,
+                      me.lastCompleted.review.text ?? null,
+                    )}
+                  </p>
+                )}
+                <ProofSection
+                  proof={me.lastCompleted.proof ?? null}
+                  pending={pending}
+                  witnesses={season.players.filter((p) => p.id !== me.playerId)}
+                  onSubmit={(links, note, witnessId, files) => {
+                    if (me.lastCompleted) {
+                      void act({
+                        kind: 'proof',
+                        runId: me.lastCompleted.id,
+                        links,
+                        note,
+                        witnessId,
+                        files,
+                      });
+                    }
+                  }}
+                />
+              </div>
+            )}
+          </section>
+        ) : null}
+        {waiting && (
+          <div className="grid gap-2" aria-busy="true">
+            <Skeleton className="h-6 w-2/3" />
+            <Skeleton className="h-12 w-full" />
+          </div>
         )}
+        {me?.phase === 'idle' && turnsOpen && (
+          <Button
+            variant="main"
+            data-testid="roll"
+            loading={pending}
+            disabled={pending}
+            onClick={() => void act({ kind: 'roll' })}
+          >
+            {ru.turn.roll}
+          </Button>
+        )}
+        {/* The offer, the choice and the run's forms keep plain styles until H3 (the wheel) and H4 (the run) */}
         {choice && (
-          <fieldset data-testid="choice">
+          <fieldset data-testid="choice" className="legacy-screens">
             <legend>{ru.turn.choose}</legend>
             {choice.options
               .flatMap(({ id, game }) => (game ? [{ id, game }] : []))
@@ -241,7 +404,7 @@ export function SeasonScreen({
           </fieldset>
         )}
         {offer && (
-          <>
+          <div className="legacy-screens">
             <p data-testid="offer">{ru.turn.offered(offer.title, offer.hours ?? null)}</p>
             <GameMarks marks={offer.marks} />
             <button
@@ -263,13 +426,26 @@ export function SeasonScreen({
               pending={pending}
               onReroll={() => void act({ kind: 'reroll' })}
             />
-          </>
+          </div>
         )}
         {me?.phase === 'playing' && me.activeRun && (
-          <p data-testid="active-run">{ru.turn.playing(me.activeRun.game.title)}</p>
+          <div data-testid="active-run" className="grid gap-4">
+            <p className="sr-only">{ru.turn.playing(me.activeRun.game.title)}</p>
+            <RunCard
+              game={{
+                title: me.activeRun.game.title,
+                hours: me.activeRun.game.hours ?? null,
+                tags: [],
+              }}
+              left={myRow ? myRow.cellsToFinish : routeLength}
+              level={3}
+              total={routeLength}
+              actions={null}
+            />
+          </div>
         )}
         {turnsOpen && me?.phase === 'playing' && me.activeRun && (
-          <>
+          <div className="legacy-screens">
             <CompleteForm
               needsHours={me.activeRun.game.hours == null}
               challengesEnabled={me.challengesEnabled}
@@ -284,87 +460,28 @@ export function SeasonScreen({
               onDrop={() => void act({ kind: 'drop' })}
               onTechReroll={(reason, comment) => void act({ kind: 'techReroll', reason, comment })}
             />
-          </>
+          </div>
         )}
-        {message && <p role="alert">{message}</p>}
-        {me && me.manualEffects.length > 0 && (
-          <section aria-labelledby="effects-title" data-testid="manual-effects">
-            <h3 id="effects-title">{ru.effects.title}</h3>
-            <ul>
-              {me.manualEffects.map((effect) => (
-                <ManualEffectItem
-                  key={effect.id}
-                  effect={effect}
-                  pending={pending}
-                  resolvable={season.status === 'active' || season.status === 'closing'}
-                  onResolve={(outcome, comment) =>
-                    void act({ kind: 'resolveEffect', effectId: effect.id, outcome, comment })
-                  }
-                />
-              ))}
-            </ul>
-          </section>
-        )}
-        {me?.lastCompleted && (
-          <>
-            <p data-testid="last-dice">
-              {me.lastCompleted.status === 'rejected'
-                ? ru.turn.lastRejected(me.lastCompleted.game.title)
-                : ru.turn.lastDice(
-                    me.lastCompleted.game.title,
-                    [...me.lastCompleted.dice, ...me.lastCompleted.challengeDice].map(
-                      (d) => d.value,
-                    ),
-                    me.lastCompleted.total,
-                  )}
-            </p>
-            {me.lastCompleted.challengeDice.length > 0 && (
-              <p data-testid="last-challenge-dice">
-                {ru.turn.lastChallengeDice(me.lastCompleted.challengeDice.map((d) => d.value))}
-              </p>
-            )}
-            {me.lastCompleted.review && (
-              <p data-testid="last-review">
-                {ru.turn.lastReview(
-                  me.lastCompleted.review.rating,
-                  me.lastCompleted.review.text ?? null,
-                )}
-              </p>
-            )}
-            <ProofSection
-              proof={me.lastCompleted.proof ?? null}
-              pending={pending}
-              witnesses={season.players.filter((p) => p.id !== me.playerId)}
-              onSubmit={(links, note, witnessId, files) => {
-                if (me.lastCompleted) {
-                  void act({
-                    kind: 'proof',
-                    runId: me.lastCompleted.id,
-                    links,
-                    note,
-                    witnessId,
-                    files,
-                  });
-                }
-              }}
-            />
-          </>
-        )}
+        {message && <Notice tone="danger">{message}</Notice>}
       </section>
 
-      <AvatarSection
-        onChanged={() => {
-          void fetchSeason(seasonId).then(apply);
-        }}
-      />
-
-      <section aria-labelledby="map-title">
-        <h2 id="map-title">{ru.map.title}</h2>
-        <ol
-          data-testid="cells"
-          style={{ display: 'flex', flexWrap: 'wrap', listStyle: 'none', gap: 4, padding: 0 }}
-        >
-          {season.cells.map((cell) => {
+      <section
+        aria-labelledby="map-title"
+        className="grid min-w-0 gap-2 desk:sticky desk:top-20 desk:col-start-2 desk:row-span-6 desk:row-start-1"
+      >
+        <h2 id="map-title" className="sr-only">
+          {ru.map.title}
+        </h2>
+        <MapView
+          board={board}
+          players={players}
+          focus={mine && mine.cell > 0 ? mine.cell : undefined}
+          tools="auto"
+          className="h-105 rounded-lg border-3 border-ink desk:h-190"
+        />
+        {/* The map in words: every cell and who stands there (also what the tests and screen readers read) */}
+        <ol data-testid="cells" className="sr-only">
+          {season.cells.map((cell, i) => {
             const here = season.players.filter((p) => p.cellId === cell.id);
             return (
               <li key={cell.id} data-testid={`cell-${cell.id}`}>
@@ -372,11 +489,10 @@ export function SeasonScreen({
                   ? ru.map.start
                   : cell.type === 'finish'
                     ? ru.map.finish
-                    : ru.map.cell}
+                    : ru.map.cellNumber(i + 1)}
                 {here.map((p) => (
                   <span key={p.id} data-testid={`token-${p.id}`}>
                     {' '}
-                    {p.avatar && <img src={p.avatar.thumbnailUrl} alt="" width={20} height={20} />}
                     {p.name}
                   </span>
                 ))}
@@ -386,24 +502,75 @@ export function SeasonScreen({
         </ol>
       </section>
 
-      <section aria-labelledby="leaders-title">
-        <h2 id="leaders-title">{ru.leaderboard.title}</h2>
-        {/* In the server's place order (D-100): the first finisher on top whatever the points. */}
-        <ol data-testid="leaderboard">
-          {season.leaderboard.map((row) => (
-            <li key={row.playerId} data-testid={`leader-${row.playerId}`}>
-              {ru.leaderboard.row(
-                row.place,
-                season.players.find((p) => p.id === row.playerId)?.name ?? '',
-                row.points,
-                row.cellsToFinish ?? null,
-              )}
-              {row.isFirst &&
-                ` ${row.provisional ? ru.leaderboard.provisional : ru.leaderboard.first}`}
-            </li>
-          ))}
-        </ol>
-      </section>
+      <Panel title={ru.leaderboard.title} className="hidden desk:col-start-1 desk:grid desk:w-96">
+        <p className="text-sm text-ink-soft">{ru.board.rule}</p>
+        <Leaderboard rows={rows} />
+      </Panel>
+
+      <div className="legacy-screens min-w-0 desk:col-start-1 desk:w-96">
+        <AvatarSection
+          onChanged={() => {
+            void fetchSeason(seasonId).then(apply);
+          }}
+        />
+      </div>
+      {/* On a phone the leaderboard waits in a sheet at the bottom of the screen */}
+      <div className="fixed inset-x-0 bottom-0 z-10 border-t-2 border-muted bg-card px-4 pt-2 pb-3 desk:hidden">
+        <BottomSheet
+          title={ru.leaderboard.title}
+          trigger={
+            <button
+              type="button"
+              className="flex min-h-12 w-full cursor-pointer items-center gap-3 rounded-md text-left is-focus:focus-ring"
+            >
+              {mine ? <Sticker player={mine} size={36} /> : <Trophy size={24} aria-hidden />}
+              <span className="grid">
+                <strong className="font-display">{ru.leaderboard.title}</strong>
+                {myRow && leader ? (
+                  <span className="text-sm text-ink-soft">
+                    {leader.player.me
+                      ? ru.board.sheet(myRow.place, myRow.points)
+                      : ru.board.sheetPeek(leader.player.name, myRow.place)}
+                  </span>
+                ) : leader ? (
+                  <span className="text-sm text-ink-soft">
+                    {ru.board.sheetLeader(leader.player.name)}
+                  </span>
+                ) : null}
+              </span>
+            </button>
+          }
+        >
+          <p className="text-sm text-ink-soft">{ru.board.rule}</p>
+          <div ref={showMe}>
+            <Leaderboard rows={rows} marked={false} />
+          </div>
+        </BottomSheet>
+      </div>
+    </main>
+  );
+}
+
+/** The sheet opens on my row: with 16 players it may be below the fold */
+function showMe(node: HTMLDivElement | null) {
+  const row = node?.querySelector<HTMLElement>('[data-me]');
+  // jsdom has no scrolling
+  if (row && typeof row.scrollIntoView === 'function') row.scrollIntoView({ block: 'center' });
+}
+
+/** The season's first load: the same frame, grey, so nothing jumps when it comes */
+function SeasonSkeleton() {
+  return (
+    <main
+      className="mx-auto grid max-w-300 gap-4 px-4 pt-4 desk:grid-cols-[auto_minmax(0,1fr)] desk:px-8"
+      aria-busy="true"
+    >
+      <p className="sr-only">{ru.app.loading}</p>
+      <div className="grid content-start gap-4 desk:w-96">
+        <Skeleton className="h-8 w-2/3" />
+        <Skeleton className="h-48 w-full rounded-lg" />
+      </div>
+      <Skeleton className="h-105 w-full rounded-lg desk:h-190" />
     </main>
   );
 }

@@ -162,7 +162,7 @@ export function MapSticker({
   const r = size / 2;
   // Several players on one cell fan out above it instead of piling up
   const angle = count === 1 ? -90 : -150 + (120 / (Math.min(count, 3) - 1)) * index;
-  const reach = count === 1 ? lift : lift + 4;
+  const reach = count === 1 ? lift : lift + 14;
   const dx = at.x + Math.cos((angle * Math.PI) / 180) * reach;
   const dy = at.y + Math.sin((angle * Math.PI) / 180) * reach;
   // Two maps on one page must not share clip ids
@@ -248,6 +248,8 @@ const signWidth = (text: string) => text.length * 16 * 0.72 + 28;
 function signSpots(board: Board): Map<string, Point> {
   const spots = new Map<string, Point>();
   for (const z of board.zones) {
+    // A zone without a name (stage 1's decoration) gets no sign
+    if (!z.name) continue;
     const half = signWidth(z.name) / 2;
     let best: { p: Point; score: number } | null = null;
     for (let x = 30 + half; x < board.width - 30 - half; x += 10) {
@@ -276,9 +278,10 @@ function signSpots(board: Board): Map<string, Point> {
 type View = { cx: number; cy: number; w: number };
 type Box = { width: number; height: number };
 
-function usePanZoom(board: Board, initial: View | null, anchor: Point | null) {
+/** `focus`: open around this point, about one world unit to a pixel of the frame; `anchor`: where a tall frame centres */
+function usePanZoom(board: Board, focus: Point | null, anchor: Point | null) {
   // null until the user moves the map: the whole world, fitted to the frame
-  const [moved, setView] = useState<View | null>(initial);
+  const [moved, setView] = useState<View | null>(null);
   const [box, setBox] = useState<Box>({ width: board.width, height: board.height });
   const pointers = useRef(new Map<number, Point>());
   const svg = useRef<SVGSVGElement | null>(null);
@@ -309,8 +312,21 @@ function usePanZoom(board: Board, initial: View | null, anchor: Point | null) {
     cy: board.height / 2,
     w: fitWidth,
   };
-  const view = moved ?? fit;
-  const current = (v: View | null) => v ?? fit;
+  // Around the focus, but never past the board's edge while the board is bigger than the view
+  const clampTo = (at: number, half: number, size: number) =>
+    half * 2 >= size ? size / 2 : Math.min(Math.max(at, half), size - half);
+  const openWidth = Math.min(Math.max(box.width, 320), fit.w);
+  const wide = box.width >= 600;
+  const opening: View =
+    focus && !wide
+      ? {
+          w: openWidth,
+          cx: clampTo(focus.x, openWidth / 2, board.width),
+          cy: clampTo(focus.y, (openWidth * ratio) / 2, board.height),
+        }
+      : fit;
+  const view = moved ?? opening;
+  const current = (v: View | null) => v ?? opening;
 
   const toWorld = (clientX: number, clientY: number, v: View) => {
     const r = svg.current?.getBoundingClientRect();
@@ -445,7 +461,7 @@ export type MapViewProps = {
   /** The first view: the whole world, or a close look around this cell */
   focus?: number | undefined;
   /** Where the zoom buttons stand: at the bottom on a desktop, at the top over a phone's bottom sheet */
-  tools?: 'top' | 'bottom' | 'none';
+  tools?: 'top' | 'bottom' | 'auto' | 'none';
   children?: ReactNode;
   /** The camera, for a moment that follows a token */
   ref?: Ref<MapApi> | undefined;
@@ -466,7 +482,7 @@ export function MapView({
   const meAt = players.find((p) => p.me);
   const { viewBox, svg, handlers, zoomAt, centerOn } = usePanZoom(
     board,
-    start ? { w: 380, cx: start.x, cy: start.y } : null,
+    start,
     meAt ? cellById(board, meAt.cell) : null,
   );
   useImperativeHandle(ref, () => ({ centerOn }));
@@ -687,7 +703,16 @@ export function MapView({
       </svg>
 
       {tools === 'none' ? null : (
-        <div className={cx('absolute right-3 flex gap-2', tools === 'top' ? 'top-3' : 'bottom-3')}>
+        <div
+          className={cx(
+            'absolute right-3 flex gap-2',
+            tools === 'top'
+              ? 'top-3'
+              : tools === 'bottom'
+                ? 'bottom-3'
+                : 'top-3 desk:top-auto desk:bottom-3',
+          )}
+        >
           <IconButton
             label={t.zoomIn}
             onClick={() => {

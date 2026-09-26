@@ -142,7 +142,15 @@ export const ru = {
     logout: 'Выйти',
   },
   turn: {
+    after: 'После прохождения',
+    retrying: 'Пробуем ещё раз…',
     title: 'Твой ход',
+    spectatorTitle: 'Ты зритель',
+    finishedTitle: 'Сезон завершён',
+    finishedText: 'Ходы закончились, итоги — в лидерборде.',
+    closingTitle: 'Ждём проверку пруфов',
+    closingText: 'Броски закрыты. Пруфы ещё можно дослать — итоги после проверки всех.',
+    todo: (count: number) => `Сначала дела: ${count}`,
     roll: 'Крутить колесо',
     offered: (title: string, gameHours: number | null) =>
       gameHours == null ? `Выпала игра: ${title}` : `Выпала игра: ${title} (${hours(gameHours)})`,
@@ -321,10 +329,15 @@ export const ru = {
     toMe: 'К моей фишке',
     leaderboard: 'Лидерборд',
     first: 'Первый',
+    firstProvisional: 'Первый, пока предварительно',
     inactive: 'не в игре',
+    noWay: 'нет пути до финиша',
     place: (place: number) => `${place} место`,
     points: (points: number) => `${points} очк.`,
     sheet: (place: number, points: number) => `Ты на ${place} месте, ${points} очк.`,
+    sheetPeek: (leader: string, place: number) => `Лидирует ${leader} · ты ${place}-й`,
+    sheetLeader: (leader: string) => `Лидирует ${leader}`,
+    rule: 'Первый — кто первым дошёл до финиша, дальше по очкам',
     nowPlaying: 'Сейчас проходишь',
     hours: (value: number | null) =>
       value === null ? 'без оценки по HLTB' : `≈ ${value} ч по HLTB`,
@@ -487,7 +500,7 @@ export const ru = {
     },
     progress: {
       title: 'Прогресс и лидерборд',
-      lead: 'Полоса пути до финиша в моём цвете, полосы очков в цвете фишек относительно лидера.',
+      lead: 'Полоса пути до финиша в моём цвете, полосы очков относительно лидера: серые, моя — моим цветом.',
     },
     run: {
       title: 'Текущая игра',
@@ -567,7 +580,7 @@ export const ru = {
     title: 'Карта',
     start: 'Старт',
     finish: 'Финиш',
-    cell: '·',
+    cellNumber: (n: number) => `Клетка ${n}`,
   },
   season: {
     deadline: (text: string) => `Дедлайн: ${text}`,

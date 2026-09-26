@@ -1,7 +1,10 @@
 // Demo data for the styleguide and the visual tests: made-up players (the longest nicknames are as long as the real
 // table's longest: 20, 16, 15 and 14 characters), the longest titles of the pool, no covers (others' works stay out
 // of the public repository). Two avatars are our own SVG drawings.
+import { demoBoard } from '../board/demoBoard';
 import type { GameCard } from '../board/GameCards';
+import { cellsToFinish } from '../board/geometry';
+import type { LeaderRow } from '../board/Leaderboard';
 import type { Player } from '../board/types';
 
 const avatars = [
@@ -91,3 +94,13 @@ export const demoUser = {
   mustChangePassword: false,
   avatar: null,
 };
+
+/** The leaderboard of the demo season: the first finisher on top (still provisional), the inactive one out of the race */
+export const demoRows: LeaderRow[] = demoPlayers.map((player, i) => ({
+  player,
+  place: i + 1,
+  points: player.points,
+  cellsToFinish: player.inactive ? null : cellsToFinish(demoBoard, player.cell),
+  isFirst: player.first === true,
+  provisional: true,
+}));
