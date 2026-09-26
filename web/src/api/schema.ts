@@ -1688,6 +1688,63 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/pool/lookup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["GameLookupRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["GameLookupView"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Too Many Requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/errors": {
         parameters: {
             query?: never;
@@ -4126,6 +4183,27 @@ export interface components {
             bonusByOrder: components["schemas"]["EquatableArrayOfint"];
             /** Format: int32 */
             bonusAfterList: number;
+        };
+        /** @description What the admin looks up for a game by its title (D-118). */
+        GameLookupRequest: {
+            /** Format: uuid */
+            commandId: string;
+            title: null | string;
+        };
+        /**
+         * @description What the external bases say about a game (SPEC «Обложки игр», «Длина игры», D-28, D-29, D-118): the main story hours
+         *     (HowLongToBeat, when on), the release year and Steam app, and the cover — already downloaded and stored on our server.
+         *     Anything not found is null; `unavailable` names the services that failed, so the admin knows to fill it by hand.
+         */
+        GameLookupView: {
+            /** Format: double */
+            hours: null | number;
+            /** Format: int32 */
+            year: null | number;
+            steamAppId: null | string;
+            cover: null | components["schemas"]["FileLinkView"];
+            coverSource: null | string;
+            unavailable: string[];
         };
         /** @enum {unknown} */
         GameMarkKind: "dropped" | "techRerolled";
