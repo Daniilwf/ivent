@@ -178,9 +178,9 @@ export function AddGameForm({
           params: { query: { title: title.trim() } },
         });
         if (fresh) setSimilar({ title: title.trim(), games: fresh });
-        setFailure(ru.pool.rejection[code] ?? t.failed);
+        setFailure(ru.rejection[code]);
       } else if (response.status === 429) setFailure(t.tooOften);
-      else setFailure((code && ru.pool.rejection[code]) ?? t.failed);
+      else setFailure((code && ru.rejection[code]) ?? t.failed);
     } catch {
       setFailure(t.failed);
     } finally {

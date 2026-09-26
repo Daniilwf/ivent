@@ -71,7 +71,7 @@ export function GameScreen({ gameId, onSignedOut }: { gameId: string; onSignedOu
         <ErrorState
           level={1}
           title={ru.gamePage.errorTitle}
-          text={ru.feed.errorText}
+          text={ru.shell.loadErrorText}
           onRetry={state.reload}
         />
       ) : state.kind === 'notFound' ? (

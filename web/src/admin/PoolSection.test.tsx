@@ -215,6 +215,6 @@ describe('The pool section', () => {
   it('invites to load the pool when it is empty', async () => {
     open({ 'GET /api/pool': [] });
 
-    expect(await screen.findByText(t.gamesEmptyTitle)).toBeInTheDocument();
+    expect(await screen.findByText(ru.pool.emptyTitle)).toBeInTheDocument();
   });
 });

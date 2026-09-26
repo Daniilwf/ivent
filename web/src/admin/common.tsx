@@ -31,7 +31,7 @@ export function Loading<T>({
       <ErrorState
         level={2}
         title={t.loadErrorTitle}
-        text={t.loadErrorText}
+        text={ru.shell.loadErrorText}
         onRetry={loaded.reload}
       />
     );

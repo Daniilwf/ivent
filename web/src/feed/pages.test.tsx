@@ -103,7 +103,7 @@ describe('the pages of the site', () => {
     await waitFor(() => {
       expect(screen.getByRole('heading', { level: 1 })).toHaveFocus();
     });
-    expect(screen.getByText(ru.profile.you)).toBeInTheDocument();
+    expect(screen.getByText(ru.board.you)).toBeInTheDocument();
     expect(screen.getByTestId('profile-completed')).toHaveTextContent(ru.profile.completed(0));
     expect(ru.profile.completed(0)).toBe('Пока без пройденных игр');
   });

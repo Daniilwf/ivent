@@ -57,6 +57,10 @@ type DropPenalty = {
 type RerollPayment = 'freeThisRoll' | 'freeRerollResource' | 'coins' | 'badEvent' | 'freeMode';
 
 const rejection = {
+  'pool.duplicate': 'Такая игра уже есть в пуле.',
+  'pool.similar': 'В пуле есть похожее название: проверь и подтверди.',
+  'pool.cardInvalid': 'Проверь поля: что-то заполнено не так.',
+  'pool.coverUnknown': 'Обложка не найдена. Загрузи её ещё раз.',
   'turn.wrongPhase': 'Это действие сейчас недоступно: обнови страницу.',
   'turn.choicePending': 'Сначала сделай выбор.',
   'turn.noPendingChoice': 'Этот выбор уже сделан или снят. Обнови страницу.',
@@ -490,6 +494,7 @@ export const ru = {
     retry: 'Попробовать ещё раз',
     cancel: 'Отмена',
     close: 'Закрыть',
+    showMore: 'Показать ещё',
     connectionLost: 'Нет связи с сервером, переподключаемся',
     toFinish: (cells: number) => (cells <= 0 ? 'на финише' : `до финиша ${cells} кл.`),
     routeProgress: 'Путь от старта до финиша',
@@ -701,6 +706,7 @@ export const ru = {
       linkError: 'Нужна ссылка целиком, с https://',
       select: 'Причина',
       selectError: 'Выбери причину',
+      selectHint: 'Список работает с клавиатуры и на телефоне',
       choice: 'Сложность',
       file: 'Добавить скрин',
       fileHint: 'JPEG, PNG, WebP или GIF',
@@ -743,10 +749,7 @@ export const ru = {
     },
     admin: {
       title: 'Админка',
-      lead: 'Прохождение в очереди пруфов: финиш сверху с золотой меткой, закрытый лимитом ролл — предупреждением. Одобрение — главное действие только у первой карточки, реджект подтверждается. Ниже — выбор из списка.',
-      select: 'Перенести на клетку',
-      selectHint: 'Список работает с клавиатуры и на телефоне',
-      selectError: 'Выбери причину.',
+      lead: 'Прохождение в очереди пруфов: финиш сверху с золотой меткой, закрытый лимитом ролл — предупреждением. Одобрение — главное действие только у первой карточки, реджект подтверждается.',
     },
     dialogs: {
       title: 'Окна',
@@ -754,12 +757,6 @@ export const ru = {
       form: 'Форма поверх страницы',
     },
     // H6, H7: new sections of the styleguide
-    choices: {
-      title: 'Выбор',
-      lead: 'Список — системный выбор телефона; несколько коротких вариантов — ряд пилюль-радиокнопок. Второй ряд — с фокусом.',
-      list: 'Категория',
-      pills: 'Длина по HowLongToBeat',
-    },
     pool: {
       title: 'Игры пула',
       lead: 'Карточка игры пула со статусом в сезоне: уже прошёл, сейчас играет, дроп другого игрока, исключена для меня, свободна. Ниже — форма добавления игры.',
@@ -875,7 +872,6 @@ export const ru = {
     pageNotFoundText: 'Проверь адрес или вернись к сезону.',
     preview: 'Свежее в ленте',
     all: 'Вся лента',
-    more: 'Показать ещё',
     start: 'Это самое начало сезона',
     today: 'Сегодня',
     yesterday: 'Вчера',
@@ -889,7 +885,6 @@ export const ru = {
     emptyText: 'Здесь появятся роллы, прохождения и дропы всех игроков. Начни с первого ролла!',
     emptyAction: 'К карте',
     errorTitle: 'Лента не загрузилась',
-    errorText: 'Сервер не ответил. Проверь интернет и попробуй ещё раз.',
     moreError: 'Следующие записи не загрузились. Попробуй ещё раз.',
     noSeasonTitle: 'Такого сезона нет',
     noSeasonText: 'Возможно, ссылка устарела. Открой ленту текущего сезона.',
@@ -943,14 +938,12 @@ export const ru = {
       finished: 'Завершён',
       archived: 'В архиве',
     } as Record<string, string>,
-    seasonFeed: 'Лента сезона',
     noSeasonsTitle: 'Сезонов пока нет',
     noSeasonsText: 'Сезоны появятся здесь, когда админ добавит игрока.',
     noReviewsTitle: 'Отзывов пока нет',
     noReviewsText:
       'Отзыв пишется после прохождения — его увидят в ленте, профиле и на странице игры.',
     noReviewsMine: 'Пройди игру и напиши отзыв — его увидят в ленте, профиле и на странице игры.',
-    you: 'ты',
     errorTitle: 'Профиль не загрузился',
     notFoundTitle: 'Такого игрока нет',
     notFoundText: 'Возможно, аккаунт удалён или ссылка неверная.',
@@ -1032,7 +1025,6 @@ export const ru = {
     nothingTitle: 'Ничего не нашлось',
     nothingText: 'Попробуй другое название или сбрось фильтры.',
     loadErrorTitle: 'Пул не загрузился',
-    loadErrorText: 'Сервер не ответил. Проверь интернет и попробуй ещё раз.',
     statusError: 'Статусы игр в сезоне не загрузились: видно только сам пул.',
     added: (title: string) => `«${title}» теперь в пуле.`,
     form: {
@@ -1068,12 +1060,6 @@ export const ru = {
       failed: 'Игра не добавилась. Попробуй ещё раз.',
       tooOften: 'Слишком много игр за минуту. Подожди немного.',
     },
-    rejection: {
-      'pool.duplicate': 'Такая игра уже есть в пуле.',
-      'pool.similar': 'В пуле есть похожее название: проверь и подтверди.',
-      'pool.cardInvalid': 'Проверь поля: что-то заполнено не так.',
-      'pool.coverUnknown': 'Обложка не найдена. Загрузи её ещё раз.',
-    } as Readonly<Record<string, string>>,
   },
   // H7: the rules page, built from the season's current ruleset (SPEC «Правила на сайте»)
   rules: {
@@ -1081,7 +1067,6 @@ export const ru = {
     lead: 'Все числа здесь — из текущих правил сезона. Поменяет админ — поменяются и тут; уже выпавшая игра живёт по правилам на момент своего ролла.',
     version: (n: number) => `Версия правил ${n}`,
     loadErrorTitle: 'Правила не загрузились',
-    loadErrorText: 'Сервер не ответил. Проверь интернет и попробуй ещё раз.',
     noSeasonTitle: 'Правил пока нет',
     noSeasonText: 'Правила появятся вместе с сезоном.',
     contents: 'На этой странице',
@@ -1293,7 +1278,6 @@ export const ru = {
     noSeasonText: 'Создай сезон в разделе «Сезон», и здесь появятся игроки и пруфы.',
     toSeason: 'Открыть «Сезон»',
     loadErrorTitle: 'Не загрузилось',
-    loadErrorText: 'Сервер не ответил. Проверь интернет и попробуй ещё раз.',
     failed: 'Не получилось. Попробуй ещё раз.',
     invalid: 'Сервер не принял значения: проверь поля.',
     forbidden: 'Это может только админ. Войди под админским аккаунтом.',
@@ -1303,10 +1287,8 @@ export const ru = {
     commentRequired: 'Напиши комментарий: он попадёт в лог.',
     commentTooLong: 'Комментарий — не длиннее 500 символов.',
     system: 'Система',
-    cancel: 'Отмена',
     save: 'Сохранить',
     edit: 'Изменить',
-    showMore: 'Показать ещё',
     // Refusals only the admin meets; the rest are in ru.rejection
     rejection: {
       'account.adminExists': 'Админ уже есть.',
@@ -1322,7 +1304,6 @@ export const ru = {
       'pool.categoryInvalid': 'Вес — целое число от 1 до 1000, тег — до 50 символов.',
       'account.notAPlayer': 'В сезоне играют только аккаунты с ролью «Игрок».',
       'pool.categoryUnknown': 'Такой категории нет на колесе.',
-      'pool.coverUnknown': 'Обложка не найдена. Загрузи её ещё раз.',
       'pool.deleted': 'Игра удалена: сначала верни её в пул.',
       'pool.duplicate': 'Игра с таким названием уже есть в пуле.',
       'pool.notDeleted': 'Игра и так в пуле.',
@@ -1517,24 +1498,19 @@ export const ru = {
       starving: (names: string) =>
         `Следующий ролл не найдёт игр у: ${names}. Добавь игры или категории.`,
       games: 'Игры',
-      search: 'Поиск по названию',
       showDeleted: 'Показать удалённые',
-      gamesEmptyTitle: 'В пуле пока нет игр',
       gamesEmptyText:
         'Загрузи таблицу командой npm run import:xlsx или добавь игры на странице пула.',
-      notFoundTitle: 'Ничего не нашлось',
       notFoundText: 'Попробуй другое название.',
       hours: (hours: number | null) =>
         hours === null ? 'без часов' : `${hours.toLocaleString('ru-RU')} ч`,
       deleted: 'Удалена',
       editTitle: (title: string) => `Изменить «${title}»`,
-      gameTitle: 'Название',
       gameTags: 'Теги',
       gameTagsHint: 'Через запятую: roguelike, coop',
       gameHours: 'Часы',
       gameHoursHint: 'Число, можно с дробью; пусто — нет данных',
       hoursInvalid: 'Часы — число больше нуля или пусто.',
-      titleRequired: 'Напиши название.',
       saved: (title: string) => `Сохранено: ${title}`,
       delete: 'Удалить',
       deleteTitle: (title: string) => `Удалить «${title}» из пула?`,
@@ -1669,7 +1645,6 @@ export const ru = {
       emptyTitle: 'Аккаунтов нет',
       emptyText: 'Создай первый аккаунт.',
       create: 'Создать аккаунт',
-      login: 'Логин',
       loginHint: '2–32 латинские буквы, цифры, точки, дефисы',
       name: 'Имя',
       nameHint: 'Так игрока видят все',

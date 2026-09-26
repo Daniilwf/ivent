@@ -306,7 +306,7 @@ export function PoolScreen({
           <ErrorState
             level={2}
             title={t.loadErrorTitle}
-            text={t.loadErrorText}
+            text={ru.shell.loadErrorText}
             onRetry={() => {
               if (retrying) return;
               setRetrying(true);

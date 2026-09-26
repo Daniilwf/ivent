@@ -75,7 +75,7 @@ export function LogSection({ seasonId, version }: { seasonId: string; version: n
                   setLimit((l) => Math.min(l + step, most));
                 }}
               >
-                {ru.admin.showMore}
+                {ru.ui.showMore}
               </Button>
             </div>
           ) : null}

@@ -139,7 +139,7 @@ function CreateAccount({ onDone, onFailed }: { onDone: Done; onFailed: (text: st
         noValidate
       >
         <Field
-          label={t.login}
+          label={ru.login.login}
           hint={t.loginHint}
           value={login}
           autoCapitalize="off"

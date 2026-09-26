@@ -81,7 +81,7 @@ describe('ProfileScreen', () => {
 
     expect(screen.getByTestId('profile-loading')).toHaveAttribute('aria-busy', 'true');
     expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent('Капитан_Пельмень');
-    expect(screen.queryByText(ru.profile.you)).toBeNull();
+    expect(screen.queryByText(ru.board.you)).toBeNull();
     // The sticker has the colour of the token in the latest season (the first listed), as on its map
     expect(screen.getByTestId('profile').querySelector('span')).toHaveStyle({
       background: 'var(--color-token-7)',
@@ -119,7 +119,7 @@ describe('ProfileScreen', () => {
 
     render(<ProfileScreen userId={userId} meId={userId} onSignedOut={vi.fn()} />);
 
-    expect(await screen.findByText(ru.profile.you)).toBeInTheDocument();
+    expect(await screen.findByText(ru.board.you)).toBeInTheDocument();
     expect(screen.getByTestId('profile-completed')).toHaveTextContent('Пройдена 1 игра');
     expect(screen.getByRole('heading', { name: ru.profile.noSeasonsTitle })).toBeInTheDocument();
     expect(screen.getByText(ru.profile.noReviewsMine)).toBeInTheDocument();

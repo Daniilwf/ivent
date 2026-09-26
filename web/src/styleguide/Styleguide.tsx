@@ -311,7 +311,7 @@ export function Styleguide() {
           <Field label={t.fields.hours} force="focus" defaultValue="27" />
           <Field label={t.fields.link} error={t.fields.linkError} defaultValue="steam" />
           <Field label={t.fields.link} disabled defaultValue="https://youtu.be/…" />
-          <Select label={t.fields.select} defaultValue="weakPc">
+          <Select label={t.fields.select} hint={t.fields.selectHint} defaultValue="weakPc">
             <option value="weakPc">{ru.turn.techRerollReasons.weakPc}</option>
           </Select>
           <Select label={t.fields.select} error={t.fields.selectError} defaultValue="">
@@ -615,8 +615,8 @@ export function Styleguide() {
           <Panel>
             <FeedList days={demoFeedDays} />
             <div className="grid justify-items-center gap-3 border-t-2 border-muted pt-4">
-              <Button>{ru.feed.more}</Button>
-              <Button loading>{ru.feed.more}</Button>
+              <Button>{ru.ui.showMore}</Button>
+              <Button loading>{ru.ui.showMore}</Button>
               <p className="text-sm text-ink-soft">{ru.feed.start}</p>
             </div>
           </Panel>

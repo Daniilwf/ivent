@@ -49,7 +49,7 @@ export function ProfileScreen({
         <ErrorState
           level={1}
           title={ru.profile.errorTitle}
-          text={ru.feed.errorText}
+          text={ru.shell.loadErrorText}
           onRetry={state.reload}
         />
       ) : state.kind === 'notFound' ? (
@@ -110,7 +110,7 @@ export function ProfileDetails({
             className="flex flex-wrap items-center gap-2 font-display text-xl font-heavy wrap-anywhere outline-none"
           >
             {profile.name}
-            {mine ? <Badge tone="me">{ru.profile.you}</Badge> : null}
+            {mine ? <Badge tone="me">{ru.board.you}</Badge> : null}
           </h1>
           <span data-testid="profile-completed">
             <Chip icon={<Trophy size={16} aria-hidden />}>

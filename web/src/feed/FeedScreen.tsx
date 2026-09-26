@@ -130,7 +130,7 @@ export function FeedScreen({
         <ErrorState
           level={2}
           title={ru.feed.errorTitle}
-          text={ru.feed.errorText}
+          text={ru.shell.loadErrorText}
           onRetry={() => {
             show({ kind: 'loading' });
             void load();
@@ -185,7 +185,7 @@ export function FeedScreen({
                 loading={more === 'loading'}
                 onClick={() => void loadMore()}
               >
-                {ru.feed.more}
+                {ru.ui.showMore}
               </Button>
             )}
           </div>

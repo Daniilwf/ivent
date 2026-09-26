@@ -333,7 +333,7 @@ function Games({ onMessage }: { onMessage: (message: Message) => void }) {
       <div className="grid gap-3 desk:grid-cols-[minmax(0,1fr)_auto] desk:items-end">
         <Field
           type="search"
-          label={t.search}
+          label={ru.pool.search}
           value={query}
           data-testid="games-search"
           onChange={(e) => {
@@ -354,7 +354,7 @@ function Games({ onMessage }: { onMessage: (message: Message) => void }) {
           games.length === 0 ? (
             <EmptyState
               icon={<Library size={28} aria-hidden />}
-              title={search === '' ? t.gamesEmptyTitle : t.notFoundTitle}
+              title={search === '' ? ru.pool.emptyTitle : ru.pool.nothingTitle}
               text={search === '' ? t.gamesEmptyText : t.notFoundText}
             />
           ) : (
@@ -495,7 +495,7 @@ function GameForm({ game, onDone }: { game: Game; onDone: (text: string) => void
     const typed = hours.trim().replace(',', '.');
     const value = typed === '' ? null : Number(typed);
     const found = {
-      title: title.trim() === '' ? t.titleRequired : undefined,
+      title: title.trim() === '' ? ru.pool.form.nameRequired : undefined,
       hours: value !== null && (!Number.isFinite(value) || value <= 0) ? t.hoursInvalid : undefined,
     };
     setErrors(found);
@@ -540,7 +540,7 @@ function GameForm({ game, onDone }: { game: Game; onDone: (text: string) => void
       noValidate
     >
       <Field
-        label={t.gameTitle}
+        label={ru.pool.form.name}
         value={title}
         error={errors.title}
         data-testid="game-title"
