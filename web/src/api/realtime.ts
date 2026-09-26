@@ -5,6 +5,7 @@ import {
   type HubConnection,
 } from '@microsoft/signalr';
 import type { Schemas } from './client';
+import { reportConnection as report } from './connection';
 
 export type SeasonUpdate = Schemas['SeasonUpdate'];
 export type SeasonJoin = Schemas['SeasonJoin'];
@@ -30,17 +31,27 @@ function keepConnected(
     while (!stopped()) {
       try {
         await connection.start();
+        report('online');
         await ready();
         return;
       } catch {
+        report('offline');
         await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
       }
     }
   };
 
-  connection.onreconnected(() => void ready());
+  connection.onreconnecting(() => {
+    report('offline');
+  });
+  connection.onreconnected(() => {
+    report('online');
+    void ready();
+  });
   connection.onclose(() => {
-    if (!stopped()) void start();
+    if (stopped()) return;
+    report('offline');
+    void start();
   });
   void start();
 }

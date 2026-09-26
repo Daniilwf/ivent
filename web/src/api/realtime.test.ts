@@ -1,3 +1,4 @@
+import { connectionStatus } from './connection';
 import type { SeasonJoin, SeasonUpdate } from './realtime';
 
 // E3, D-122: the client keeps the last sequence it saw, skips repeats, catches up after a gap or a lost connection —
@@ -10,6 +11,7 @@ class FakeConnection {
   state = 'Connected';
   handlers = new Map<string, Handler>();
   reconnected: (() => void) | null = null;
+  reconnecting: (() => void) | null = null;
   invoked: unknown[][] = [];
   answers: Answer[] = [];
 
@@ -19,6 +21,10 @@ class FakeConnection {
 
   onreconnected(handler: () => void) {
     this.reconnected = handler;
+  }
+
+  onreconnecting(handler: () => void) {
+    this.reconnecting = handler;
   }
 
   onclose() {
@@ -125,6 +131,20 @@ describe('watchSeason', () => {
     expect(onChange).toHaveBeenLastCalledWith([update(11, 12), update(13, 14)]);
     connection.push('seasonUpdated', update(13, 14));
     expect(onChange).toHaveBeenCalledTimes(2);
+  });
+
+  it('tells the page when the live connection drops and when it is back', async () => {
+    const { watchSeason } = await import('./realtime');
+    const stop = watchSeason('s1', () => undefined);
+    await vi.waitFor(() => {
+      expect(connection.invoked.length).toBeGreaterThan(0);
+    });
+    expect(connectionStatus.get()).toBe('online');
+    connection.reconnecting?.();
+    expect(connectionStatus.get()).toBe('offline');
+    connection.reconnected?.();
+    expect(connectionStatus.get()).toBe('online');
+    stop();
   });
 
   it('refreshes after every reconnection, with what was missed if anything', async () => {

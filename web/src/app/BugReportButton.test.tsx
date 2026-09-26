@@ -123,7 +123,7 @@ describe('BugReportButton', () => {
       () => json(200, { id: 'r2' }),
       () => json(422, { code: 'file.broken' }),
     );
-    await user.click(screen.getByRole('button', { name: ru.bugReport.cancel }));
+    await user.click(screen.getByRole('button', { name: ru.bugReport.done }));
     await user.click(screen.getByTestId('bug-report'));
     await user.type(await screen.findByTestId('bug-report-text'), 'Скрин не принят');
     await user.click(screen.getByTestId('bug-report-send'));

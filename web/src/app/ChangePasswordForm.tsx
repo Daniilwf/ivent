@@ -1,6 +1,9 @@
-import { useState, type SyntheticEvent } from 'react';
+import { useState, type ReactNode, type SyntheticEvent } from 'react';
 import { api, refreshCsrf, rejectionCode, type Schemas } from '../api/client';
 import { ru } from '../i18n/ru';
+import { Button } from '../ui/Button';
+import { Field } from '../ui/Field';
+import { Notice } from '../ui/States';
 
 // The engine's rules (AccountRules): at least 8 characters, up to 256.
 const minPassword = 8;
@@ -12,8 +15,14 @@ const maxPassword = 256;
  */
 export function ChangePasswordForm({
   onChanged,
+  temporary = true,
+  children,
 }: {
   onChanged: (user: Schemas['CurrentUser']) => void;
+  /** Signed in with a temporary password (nothing else opens), or changing my own from the menu */
+  temporary?: boolean;
+  /** Under the main button: a way out (sign out, or back to the game) */
+  children?: ReactNode;
 }) {
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
@@ -58,55 +67,60 @@ export function ChangePasswordForm({
   }
 
   return (
-    <form data-private onSubmit={(e) => void submit(e)} aria-labelledby="password-title">
-      <h1 id="password-title">{ru.password.title}</h1>
-      <p>{ru.password.why}</p>
-      <label>
-        {ru.password.current}
-        <input
-          data-testid="password-current"
-          type="password"
-          value={current}
-          maxLength={maxPassword}
-          onChange={(e) => {
-            setCurrent(e.target.value);
-          }}
-          autoComplete="current-password"
-          required
-        />
-      </label>
-      <label>
-        {ru.password.next}
-        <input
-          data-testid="password-new"
-          type="password"
-          value={next}
-          maxLength={maxPassword}
-          onChange={(e) => {
-            setNext(e.target.value);
-          }}
-          autoComplete="new-password"
-          required
-        />
-      </label>
-      <label>
-        {ru.password.repeat}
-        <input
-          data-testid="password-repeat"
-          type="password"
-          value={repeat}
-          maxLength={maxPassword}
-          onChange={(e) => {
-            setRepeat(e.target.value);
-          }}
-          autoComplete="new-password"
-          required
-        />
-      </label>
-      {error && <p role="alert">{error}</p>}
-      <button data-testid="password-submit" type="submit" disabled={pending}>
+    <form
+      data-private
+      onSubmit={(e) => void submit(e)}
+      aria-labelledby="password-title"
+      className="grid gap-4 rounded-lg border-3 border-ink bg-card p-5 shadow-lift"
+    >
+      <div className="grid gap-1">
+        <h1 id="password-title" className="font-display text-2xl font-heavy">
+          {ru.password.title}
+        </h1>
+        <p className="text-ink-soft">{temporary ? ru.password.why : ru.password.whyOwn}</p>
+      </div>
+      <Field
+        label={temporary ? ru.password.current : ru.password.currentOwn}
+        data-testid="password-current"
+        type="password"
+        value={current}
+        maxLength={maxPassword}
+        onChange={(e) => {
+          setCurrent(e.target.value);
+        }}
+        autoComplete="current-password"
+        required
+      />
+      <Field
+        label={ru.password.next}
+        hint={ru.password.rule(minPassword)}
+        data-testid="password-new"
+        type="password"
+        value={next}
+        maxLength={maxPassword}
+        onChange={(e) => {
+          setNext(e.target.value);
+        }}
+        autoComplete="new-password"
+        required
+      />
+      <Field
+        label={ru.password.repeat}
+        data-testid="password-repeat"
+        type="password"
+        value={repeat}
+        maxLength={maxPassword}
+        onChange={(e) => {
+          setRepeat(e.target.value);
+        }}
+        autoComplete="new-password"
+        required
+      />
+      {error ? <Notice tone="danger">{error}</Notice> : null}
+      <Button data-testid="password-submit" type="submit" variant="main" loading={pending}>
         {ru.password.submit}
-      </button>
+      </Button>
+      {children}
     </form>
   );
 }

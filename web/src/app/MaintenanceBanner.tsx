@@ -1,3 +1,4 @@
+import { Wrench } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { api, MAINTENANCE_EVENT } from '../api/client';
 import { ru } from '../i18n/ru';
@@ -35,7 +36,12 @@ export function MaintenanceBanner() {
 
   if (!on) return null;
   return (
-    <div role="status" data-testid="maintenance-banner">
+    <div
+      role="status"
+      data-testid="maintenance-banner"
+      className="flex items-start justify-center gap-2 border-b-2 border-warning bg-warning-soft px-4 py-2 text-sm font-medium text-ink"
+    >
+      <Wrench size={18} aria-hidden className="mt-px shrink-0 text-warning" />
       {ru.maintenance.banner}
     </div>
   );

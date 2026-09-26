@@ -44,7 +44,7 @@ describe('App', () => {
 
     render(<App />);
 
-    expect(await screen.findByTestId('no-season')).toHaveTextContent(ru.app.noSeason);
+    expect(await screen.findByTestId('no-season')).toHaveTextContent(ru.shell.noSeasonTitle);
   });
 
   it('reports a server failure instead of pretending there is no season', async () => {
@@ -55,6 +55,6 @@ describe('App', () => {
 
     render(<App />);
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(ru.app.loadError);
+    expect(await screen.findByRole('alert')).toHaveTextContent(ru.shell.loadErrorTitle);
   });
 });
