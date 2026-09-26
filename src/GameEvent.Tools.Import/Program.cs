@@ -181,6 +181,21 @@ try
                 }
             }
 
+        case "pool-demo" when arguments.Count == 3:
+            {
+                // content/pool.demo.json for the demo season and CI (D-30, D-126): the table's games without its authors
+                ImportedTable table;
+                await using (var file = File.OpenRead(arguments[1]))
+                {
+                    table = XlsxPoolReader.Read(file);
+                }
+
+                var demo = PoolImport.DemoPool(table);
+                await File.WriteAllTextAsync(arguments[2], JsonSerializer.Serialize(demo, PoolImport.DemoJson) + "\n", cancel.Token);
+                Console.WriteLine($"{demo.Games.Count} games, {demo.Categories.Count} categories → {arguments[2]}; {demo.NotesDropped} notes left out.");
+                return 0;
+            }
+
         default:
             Console.Error.WriteLine(
                 "Usage: season-export <season id> <archive.zip> | season-import <archive.zip> [--allow-role-mismatch] [--with-pool] | season-check <season id> | pool-import <games.xlsx> [--report-only]; each takes [--db <path>]");
