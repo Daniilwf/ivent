@@ -22,6 +22,10 @@ public static class EventCodec
             return data;
         },
 
+        // D-136: before the wheel was logged a roll knew only the category it picked
+        [("game-rolled", 1)] = WheelOfOne,
+        [("game-choice-rolled", 1)] = WheelOfOne,
+
         // D-121: before bug report screenshots every stored file was an upload
         [("file-stored", 1)] = data =>
         {
@@ -29,6 +33,12 @@ public static class EventCodec
             return data;
         },
     };
+
+    private static JsonObject WheelOfOne(JsonObject data)
+    {
+        data["wheel"] = new JsonArray(data["category"]?.DeepClone());
+        return data;
+    }
 
     public static StoredEvent Encode(IGameEvent gameEvent)
     {

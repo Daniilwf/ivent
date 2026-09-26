@@ -129,7 +129,18 @@ public sealed record MyTurnView(
     bool TechRerollOpen,
     bool ChallengesEnabled,
     MyFinishView? Finish,
-    UncheckedRunsView? Unchecked);
+    UncheckedRunsView? Unchecked,
+    WheelRollView? Roll);
+
+/// <summary>
+/// The wheel of the roll that offered what I see now (D-136), from the log: the categories that were on it, the one it
+/// picked and the games it missed on the way, with who holds each. <c>sequence</c> tells one roll from the next, so the
+/// page spins only for a new one. Null when nothing is offered or the offer did not come from my own roll.
+/// </summary>
+public sealed record WheelRollView(long Sequence, string Category, IReadOnlyList<string> Wheel, IReadOnlyList<RollMissView> Misses);
+
+/// <summary>A game the wheel landed on and passed: «Уже прошёл Вася», «Сейчас играет Петя».</summary>
+public sealed record RollMissView(string Game, RollMissReason Reason, string Player);
 
 /// <summary>
 /// My runs waiting for the admin's check and the rules' limit (D-134): at the limit a new roll is refused, so the page
@@ -539,6 +550,7 @@ public static class SeasonEndpoints
                 waitingCheck = new UncheckedRunsView(waiting, limit);
             }
 
+            var roll = offer is null && choice is null ? null : await RollOf(db, seasonId, userId, mine.Id, offer, choice, players, ct);
             var price = mine.Frozen ? (Payment: RerollPayment.FreeMode, Coins: 0) : RerollPrice.Next(mine.RerollsThisRoll, coupons, rules.Roll);
             var now = clock.UtcNow;
 
@@ -585,7 +597,8 @@ public static class SeasonEndpoints
                 playing && now - run!.RolledAt <= TimeSpan.FromHours(snapshot!.TechRerollWindowHours),
                 rules.Features.Challenges,
                 mine.FinishOrder is { } order ? new MyFinishView(order, mine.Frozen) : null,
-                waitingCheck);
+                waitingCheck,
+                roll);
         }
 
         // Avatars live on the accounts, across seasons (SPEC «Сезоны»)
@@ -605,6 +618,55 @@ public static class SeasonEndpoints
             me,
             lastSequence,
             seasonRecord.Name));
+    }
+
+    private static readonly string[] s_rollTypes =
+        [EventCatalog.Describe(typeof(GameRolled)).Name, EventCatalog.Describe(typeof(GameChoiceRolled)).Name];
+
+    /// <summary>
+    /// The roll behind my current offer or choice (D-136): my latest roll events, newest first, the first that is mine
+    /// and matches what is offered. Found by the event type and the author, never by the JSON data (invariant 9).
+    /// </summary>
+    private static async Task<WheelRollView?> RollOf(
+        GameEventDbContext db,
+        Guid seasonId,
+        Guid? userId,
+        Guid playerId,
+        RollOffer? offer,
+        PendingChoice? choice,
+        IReadOnlyList<Infrastructure.Seasons.SeasonPlayerRecord> players,
+        CancellationToken ct)
+    {
+        var rows = await db.Events.AsNoTracking()
+            .Where(e => e.SeasonId == seasonId && e.AuthorId == userId && e.UndoneByEventId == null && s_rollTypes.Contains(e.Type))
+            .OrderByDescending(e => e.Sequence)
+            .Take(4)
+            .ToListAsync(ct);
+        foreach (var row in rows)
+        {
+            var (category, misses, wheel) = EventCodec.Decode(new StoredEvent(row.Type, row.Version, row.Data)) switch
+            {
+                GameRolled g when g.PlayerId == playerId && g.GameId == offer?.GameId => (g.Category, g.Misses, g.Wheel),
+                GameChoiceRolled c when c.PlayerId == playerId && c.ChoiceId == choice?.ChoiceId => (c.Category, c.Misses, c.Wheel),
+                _ => default,
+            };
+            if (category is null)
+            {
+                continue;
+            }
+
+            var missed = misses.Select(m => m.GameId).ToList();
+            var titles = await db.Games.AsNoTracking().Where(g => missed.Contains(g.Id)).ToDictionaryAsync(g => g.Id, g => g.Title, ct);
+            var names = players.ToDictionary(p => p.Id, p => p.Name);
+            return new WheelRollView(
+                row.Sequence,
+                category,
+                [.. wheel],
+                [.. misses.Select(m => new RollMissView(
+                    titles.GetValueOrDefault(m.GameId, ""), m.Reason, names.GetValueOrDefault(m.ByPlayerId, "")))]);
+        }
+
+        return null;
     }
 
     /// <summary>A run's game: the run's own hours when known, otherwise the pool's.</summary>

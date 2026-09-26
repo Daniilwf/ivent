@@ -486,7 +486,7 @@ public class UndoTests
     {
         var game = Guid.NewGuid();
         var missed = Guid.NewGuid();
-        var rolled = new GameRolled(Guid.NewGuid(), "Horror", [new RollMiss(missed, RollMissReason.CompletedInSeason, Guid.NewGuid())], game, null!, DateTimeOffset.UnixEpoch);
+        var rolled = new GameRolled(Guid.NewGuid(), "Horror", [new RollMiss(missed, RollMissReason.CompletedInSeason, Guid.NewGuid())], game, null!, DateTimeOffset.UnixEpoch, ["Horror"]);
 
         Assert.Equal(new[] { ("game", missed), ("game", game) }.Order(), GameIds.Of(rolled).Order());
         Assert.Equal([("game", game)], GameIds.Of(new GameRerolled(Guid.NewGuid(), [game], RerollPayment.FreeThisRoll)));

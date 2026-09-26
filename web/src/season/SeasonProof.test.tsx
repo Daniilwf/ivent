@@ -110,6 +110,7 @@ function season(
       dropPenalty: null,
       techRerollOpen: false,
       challengesEnabled: false,
+      roll: null,
       unchecked: null,
       finish: null,
     },

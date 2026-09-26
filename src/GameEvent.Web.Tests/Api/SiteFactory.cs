@@ -67,6 +67,9 @@ internal sealed class SiteFactory : WebApplicationFactory<Program>
     private static readonly Lazy<string> s_passwordHash = new(() =>
         new PasswordHasher<UserRecord>(Options.Create(new PasswordHasherOptions { IterationCount = 1000 })).HashPassword(null!, Password));
 
+    /// <summary>The site's randomness: seeded by default; a test that needs one exact draw gives its own.</summary>
+    public IRandomSource Random { get; init; } = new SeededRandom(11);
+
     public string ConnectionString { get; }
 
     /// <summary>Where this site stores uploaded files (D-108): inside its own temp folder.</summary>
@@ -194,7 +197,7 @@ internal sealed class SiteFactory : WebApplicationFactory<Program>
             services.RemoveAll<IClock>();
             services.AddSingleton<IClock>(Clock);
             services.RemoveAll<IRandomSource>();
-            services.AddSingleton<IRandomSource>(new SeededRandom(11));
+            services.AddSingleton(Random);
         });
     }
 
