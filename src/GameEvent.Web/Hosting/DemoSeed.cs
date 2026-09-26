@@ -42,27 +42,37 @@ public static class DemoSeed
         Difficulty.Hard, Difficulty.Hard, Difficulty.Hard, Difficulty.Extreme,
     ];
 
-    private static readonly string[] s_reviews =
+    private static readonly string?[] s_reviews =
     [
         "Отличная игра, не ожидал", "Затянуто, но финал хороший", "Прошёл с удовольствием", "Не моё",
-        "Сложно, но честно", null!, null!,
+        "Сложно, но честно", null, null,
     ];
 
-    public static async Task RunAsync(IServiceProvider services, string contentRoot, CancellationToken ct = default)
+    /// <summary>Builds the demo season once; true when it is there (built now or before).</summary>
+    public static async Task<bool> RunAsync(IServiceProvider services, string contentRoot, CancellationToken ct = default)
     {
         var factory = services.GetRequiredService<IDbContextFactory<GameEventDbContext>>();
         var bus = services.GetRequiredService<CommandBus>();
         var clock = services.GetRequiredService<IClock>() as IAdjustableClock
             ?? throw new InvalidOperationException("The demo season needs the movable clock of Development.");
-        (services.GetRequiredService<IRandomSource>() as IReseedableRandom)?.Seed(Seed);
+        var random = services.GetRequiredService<IRandomSource>() as IReseedableRandom;
         var password = services.GetRequiredService<IConfiguration>()["DevSeed:Password"]
             ?? throw new InvalidOperationException("DevSeed:Password is not set (appsettings.Development.json).");
 
         await using (var db = await factory.CreateDbContextAsync(ct))
         {
+            // The deadline is the bots' last command: a season without it was cut short and is not the demo season
             if (await db.Seasons.AnyAsync(s => s.Id == SeasonId, ct))
             {
-                return;
+                return await db.Events.AnyAsync(e => e.SeasonId == SeasonId && e.Type == "season-deadline-set", ct)
+                    ? true
+                    : throw new InvalidOperationException("The demo season was cut short: build it again with npm run seed:demo.");
+            }
+
+            // Not over another database: the demo accounts and the whole pool would land in it
+            if (await db.Seasons.AnyAsync(ct))
+            {
+                throw new InvalidOperationException("This database has other seasons: the demo season goes into its own (npm run seed:demo).");
             }
         }
 
@@ -71,16 +81,22 @@ public static class DemoSeed
         await DevSeed.SeedAccountsAsync(bus, factory, users, password, ct);
         await DevSeed.SeedPoolAsync(bus, factory, Path.Combine(contentRoot, "content", "pool.demo.json"), ct);
 
+        // The play takes the days before today, mornings to evenings: every event is in the past when the clock is back
         var realNow = clock.UtcNow;
-        clock.MoveTo(realNow.AddDays(-Days));
+        clock.MoveTo(new DateTimeOffset(realNow.UtcDateTime.Date, TimeSpan.Zero).AddDays(-Days).AddHours(9));
+        random?.Seed(Seed);
         try
         {
-            await new Bots(factory, bus, clock, ct).PlayAsync(realNow);
+            await new Bots(factory, bus, clock, ct).PlayAsync();
         }
         finally
         {
             clock.Reset();
+            random?.Seed(null);
         }
+
+        await new Bots(factory, bus, clock, ct).FinishAsync(realNow.AddDays(5));
+        return true;
     }
 
     private sealed class Bots(IDbContextFactory<GameEventDbContext> factory, CommandBus bus, IAdjustableClock clock, CancellationToken ct)
@@ -92,30 +108,41 @@ public static class DemoSeed
         private Guid _lastCommand;
         private bool _undone;
 
-        public async Task PlayAsync(DateTimeOffset realNow)
+        /// <summary>The last command, after the play with the real clock back: the deadline, five days from now.</summary>
+        public async Task FinishAsync(DateTimeOffset deadline)
         {
-            Dictionary<Guid, Guid> players;
+            await using (var db = await factory.CreateDbContextAsync(ct))
+            {
+                _admin = await db.Users.Where(u => u.Login == "admin").Select(u => u.Id).SingleAsync(ct);
+            }
+
+            await SendAsync(new SetSeasonDeadline(deadline), _admin);
+        }
+
+        public async Task PlayAsync()
+        {
+            List<Guid> players;
             await using (var db = await factory.CreateDbContextAsync(ct))
             {
                 _admin = await db.Users.Where(u => u.Login == "admin").Select(u => u.Id).SingleAsync(ct);
                 players = await db.Users.Where(u => u.Role == Role.Player && u.Login.StartsWith("player"))
                     .OrderBy(u => u.Login)
-                    .ToDictionaryAsync(u => u.Id, u => u.Id, ct);
+                    .Select(u => u.Id)
+                    .ToListAsync(ct);
             }
 
             await SendAsync(new CreateSeason(SeasonId, "Демо-сезон", RulesetJson.Default()), _admin);
-            foreach (var userId in players.Keys)
+            for (var i = 0; i < players.Count; i++)
             {
-                var name = s_names[players.Keys.ToList().IndexOf(userId)];
-                await SendAsync(new AddSeasonPlayer(Guid.CreateVersion7(), userId, name), _admin);
+                await SendAsync(new AddSeasonPlayer(Guid.CreateVersion7(), players[i], s_names[i]), _admin);
             }
 
             await SendAsync(new ChangeSeasonStatus(SeasonStatus.Active), _admin);
-            var quiet = players.Keys.Last();
+            var quiet = players[^1];
 
             for (var day = 0; day < Days; day++)
             {
-                foreach (var userId in players.Keys.OrderBy(_ => _random.Next()))
+                foreach (var userId in players.OrderBy(_ => _random.Next()))
                 {
                     // One player goes quiet in the second week: the admin marks him inactive a few days later
                     if (userId == quiet && day >= 8)
@@ -129,11 +156,9 @@ public static class DemoSeed
 
                 clock.Advance(TimeSpan.FromMinutes(30));
                 await AdminTurnAsync(day, quiet);
-                var nextMorning = clock.UtcNow.Date.AddDays(1).AddHours(9);
+                var nextMorning = clock.UtcNow.UtcDateTime.Date.AddDays(1).AddHours(9);
                 clock.MoveTo(new DateTimeOffset(nextMorning, TimeSpan.Zero));
             }
-
-            await SendAsync(new SetSeasonDeadline(realNow.AddDays(5)), _admin);
         }
 
         private async Task PlayerTurnAsync(Guid userId)
@@ -143,6 +168,20 @@ public static class DemoSeed
                 || player.IsInactive)
             {
                 return;
+            }
+
+            // A finisher proves every run: the first place is final only when all its runs are approved (Q-3)
+            if (player.FinishOrder is not null)
+            {
+                var sent = await db.Proofs.AsNoTracking().Where(p => p.SeasonId == SeasonId && p.PlayerId == player.Id && p.SubmittedAt != null).Select(p => p.RunId).ToListAsync(ct);
+                var unproved = await db.Runs.AsNoTracking()
+                    .Where(r => r.SeasonId == SeasonId && r.PlayerId == player.Id && r.Status == RunStatus.Completed && !sent.Contains(r.Id))
+                    .Select(r => r.Id)
+                    .ToListAsync(ct);
+                foreach (var runId in unproved)
+                {
+                    await TryAsync(new SubmitProof(player.Id, runId, [$"https://imgur.com/a/demo{_random.Next(100000, 999999)}"], "Титры"), userId);
+                }
             }
 
             switch (player.Phase)
@@ -207,10 +246,12 @@ public static class DemoSeed
             await using var db = await factory.CreateDbContextAsync(ct);
             var day1 = clock.UtcNow.AddDays(-1);
             var proofs = await db.Proofs.AsNoTracking().Where(p => p.SeasonId == SeasonId && p.Status == ProofStatus.Pending && p.SubmittedAt != null).ToListAsync(ct);
-            foreach (var proof in proofs.Where(p => p.SubmittedAt <= day1))
+            var finishers = await db.SeasonPlayers.AsNoTracking().Where(p => p.SeasonId == SeasonId && p.FinishOrder != null).Select(p => p.Id).ToListAsync(ct);
+            // The finishers' proofs are checked the same day: the first place freezes before the season ends
+            foreach (var proof in proofs.Where(p => p.SubmittedAt <= day1 || finishers.Contains(p.PlayerId)))
             {
                 var roll = _random.NextDouble();
-                if (roll < 0.82)
+                if (roll < 0.82 || finishers.Contains(proof.PlayerId))
                 {
                     await TryAsync(new ApproveProof(proof.RunId), _admin);
                 }

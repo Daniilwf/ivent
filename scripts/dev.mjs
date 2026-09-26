@@ -18,9 +18,15 @@ const env = {
 };
 
 // The demo season is built once per database: seed:demo starts from an empty one
-if (demo && seedOnly)
-  for (const suffix of ['', '-wal', '-shm'])
-    rmSync(join(root, 'var', `demo.db${suffix}`), { force: true });
+if (demo && seedOnly) {
+  try {
+    for (const suffix of ['', '-wal', '-shm'])
+      rmSync(join(root, 'var', `demo.db${suffix}`), { force: true });
+  } catch {
+    process.stderr.write('var/demo.db is in use: stop npm run dev:demo first.\n');
+    process.exit(1);
+  }
+}
 
 if (!run('dotnet', ['run', '--project', web, '--', demo ? 'seed-demo' : 'seed-dev'], { env }))
   process.exit(1);
