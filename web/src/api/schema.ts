@@ -6587,16 +6587,6 @@ export interface components {
          * @enum {unknown}
          */
         TurnPhase: "idle" | "rolling" | "playing";
-        /** @description Undo a whole earlier command (D-104); `comment` is required, at most 500 characters. */
-        UndoRequest: {
-            /** Format: uuid */
-            commandId: string;
-            /** Format: uuid */
-            targetCommandId: string;
-            comment?: null | string;
-        };
-        /** @enum {unknown} */
-        UnmetConditionPolicy: "noDiceKeepCoins" | "countAsDrop" | "ignore";
         /**
          * @description My runs waiting for the admin's check and the rules' limit (D-134): at the limit a new roll is refused, so the page
          *     says so before the button is pressed. Null when the season has no limit.
@@ -6607,6 +6597,16 @@ export interface components {
             /** Format: int32 */
             limit: number;
         };
+        /** @description Undo a whole earlier command (D-104); `comment` is required, at most 500 characters. */
+        UndoRequest: {
+            /** Format: uuid */
+            commandId: string;
+            /** Format: uuid */
+            targetCommandId: string;
+            comment?: null | string;
+        };
+        /** @enum {unknown} */
+        UnmetConditionPolicy: "noDiceKeepCoins" | "countAsDrop" | "ignore";
         WeeklyChallengeRules: {
             /** Format: int32 */
             defaultRewardCoins: number;
