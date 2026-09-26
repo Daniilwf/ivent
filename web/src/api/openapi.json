@@ -7551,7 +7551,8 @@
           "dropPenalty",
           "techRerollOpen",
           "challengesEnabled",
-          "finish"
+          "finish",
+          "unchecked"
         ],
         "type": "object",
         "properties": {
@@ -7648,6 +7649,16 @@
               },
               {
                 "$ref": "#/components/schemas/MyFinishView"
+              }
+            ]
+          },
+          "unchecked": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/UncheckedRunsView"
               }
             ]
           }
@@ -8953,6 +8964,13 @@
           "inactiveHintDays": {
             "type": "integer",
             "format": "int32"
+          },
+          "maxUncheckedRuns": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
           }
         }
       },
@@ -9309,6 +9327,24 @@
           "countAsDrop",
           "ignore"
         ]
+      },
+      "UncheckedRunsView": {
+        "required": [
+          "count",
+          "limit"
+        ],
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "limit": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "My runs waiting for the admin's check and the rules' limit (D-134): at the limit a new roll is refused, so the page\nsays so before the button is pressed. Null when the season has no limit."
       },
       "WeeklyChallengeRules": {
         "required": [

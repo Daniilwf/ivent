@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using GameEvent.Engine.Rulesets;
+using GameEvent.Engine.Tests.Support;
 
 namespace GameEvent.Engine.Tests.Rulesets;
 
@@ -29,6 +30,40 @@ public class ParseTests
         Assert.Null(ruleset.Reward.DieByDifficulty.Extreme.GrantEvent);
     }
 
+    [Fact]
+    public void Ruleset_without_max_unchecked_runs_has_no_limit()
+    {
+        // D-134: the field came later and is optional, so the seasons created before it keep working without a limit
+        var json = SchemaTests.Mutate(root => root["season"]!.AsObject().Remove("maxUncheckedRuns"));
+
+        var ruleset = RulesetJson.Parse(json);
+
+        Assert.Null(ruleset.Season.MaxUncheckedRuns);
+    }
+
+    [Fact]
+    public void Explicit_null_max_unchecked_runs_means_no_limit()
+    {
+        var json = SchemaTests.Mutate(root => root["season"]!["maxUncheckedRuns"] = null);
+
+        Assert.Null(RulesetJson.Parse(json).Season.MaxUncheckedRuns);
+    }
+
+    [Fact]
+    public void Max_unchecked_runs_is_read_from_the_json()
+    {
+        var json = SchemaTests.Mutate(root => root["season"]!["maxUncheckedRuns"] = 5);
+
+        Assert.Equal(5, RulesetJson.Parse(json).Season.MaxUncheckedRuns);
+    }
+
+    [Fact]
+    public void Pinned_test_ruleset_has_no_unchecked_limit()
+    {
+        // The pinned ruleset has no such field: mechanics tests are not limited unless they ask for it
+        Assert.Null(TestRuleset.Create().Season.MaxUncheckedRuns);
+    }
+
     public static TheoryData<string, Action<JsonObject>, string> BrokenRulesets() => new()
     {
         { "unknown top-level field", root => root["featurez"] = new JsonObject(), "featurez" },
@@ -55,6 +90,7 @@ public class ParseTests
         { "decimal as a string", root => root["reward"]!["coop"]!["pointsShare"] = "0.5", "pointsShare" },
         { "flag as a string", root => root["features"]!["shop"] = "false", "shop" },
         { "null for a required number", root => root["map"]!["linearLength"] = null, "linearLength" },
+        { "unchecked limit as a string", root => root["season"]!["maxUncheckedRuns"] = "2", "maxUncheckedRuns" },
     };
 
     [Theory]

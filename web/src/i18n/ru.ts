@@ -17,6 +17,21 @@ const coins = (n: number) => {
   return `${n.toLocaleString('ru-RU')} ${word}`;
 };
 
+// прохождение / прохождения / прохождений
+const runs = (n: number) => {
+  const tens = n % 100;
+  const ones = n % 10;
+  const word =
+    tens >= 11 && tens <= 14
+      ? 'прохождений'
+      : ones === 1
+        ? 'прохождение'
+        : ones >= 2 && ones <= 4
+          ? 'прохождения'
+          : 'прохождений';
+  return `${n} ${word}`;
+};
+
 const effectSources = {
   paidReroll: '(за реролл)',
   drop: '(за дроп)',
@@ -40,6 +55,8 @@ const rejection = {
   'turn.unknownOption': 'Такого варианта нет. Обнови страницу.',
   'roll.noAvailableGames': 'Нет доступных игр для ролла. Сообщи админу.',
   'roll.notEnoughCoins': 'Не хватает монеток на реролл.',
+  'roll.tooManyUnchecked':
+    'Слишком много прохождений ждут проверки админом. Новый ролл откроется, когда их станет меньше лимита сезона.',
   'roll.gameNotOffered': 'Эта игра тебе сейчас не предложена. Обнови страницу.',
   'proof.invalidLink': 'Ссылка должна начинаться с http:// или https://, ссылок не больше пяти.',
   'proof.empty': 'Добавь ссылку на пруф или выбери свидетеля.',
@@ -143,6 +160,10 @@ export const ru = {
   },
   turn: {
     after: 'После прохождения',
+    uncheckedWaiting: (count: number, limit: number) =>
+      `На проверке ${count} из ${limit}: на ${limit}-м новый ролл закроется до проверки`,
+    uncheckedBlocked: (count: number, limit: number) =>
+      `Проверки ждут уже ${runs(count)}: новый ролл откроется, когда их станет меньше ${limit}. Пока можно дослать пруфы.`,
     title: 'Твой ход',
     roll: 'Крутить колесо',
     offered: (title: string, gameHours: number | null) =>

@@ -128,7 +128,14 @@ public sealed record MyTurnView(
     DropPenaltyView? DropPenalty,
     bool TechRerollOpen,
     bool ChallengesEnabled,
-    MyFinishView? Finish);
+    MyFinishView? Finish,
+    UncheckedRunsView? Unchecked);
+
+/// <summary>
+/// My runs waiting for the admin's check and the rules' limit (D-134): at the limit a new roll is refused, so the page
+/// says so before the button is pressed. Null when the season has no limit.
+/// </summary>
+public sealed record UncheckedRunsView(int Count, int Limit);
 
 /// <summary>The player's own finish (D-99): order among the finishers and whether the first place is final and frozen.</summary>
 public sealed record MyFinishView(int Order, bool Frozen);
@@ -517,6 +524,21 @@ public static class SeasonEndpoints
                 .OrderBy(x => x.Id)
                 .Select(x => new ManualEffectView(x.Id, x.DrawEvent, x.Source))
                 .ToListAsync(ct);
+            // D-134: the same count the engine checks (UncheckedRuns) — completed, the proof neither approved nor rejected;
+            // the frozen first is never held
+            UncheckedRunsView? waitingCheck = null;
+            if (rules.Season.MaxUncheckedRuns is { } limit)
+            {
+                var waiting = mine.Frozen
+                    ? 0
+                    : await db.Runs.AsNoTracking()
+                        .Where(r => r.PlayerId == mine.Id && r.Status == RunStatus.Completed
+                            && !db.Proofs.Any(x => x.RunId == r.Id
+                                && (x.Status == Engine.Proofs.ProofStatus.Approved || x.Status == Engine.Proofs.ProofStatus.Rejected)))
+                        .CountAsync(ct);
+                waitingCheck = new UncheckedRunsView(waiting, limit);
+            }
+
             var price = mine.Frozen ? (Payment: RerollPayment.FreeMode, Coins: 0) : RerollPrice.Next(mine.RerollsThisRoll, coupons, rules.Roll);
             var now = clock.UtcNow;
 
@@ -562,7 +584,8 @@ public static class SeasonEndpoints
                     : null,
                 playing && now - run!.RolledAt <= TimeSpan.FromHours(snapshot!.TechRerollWindowHours),
                 rules.Features.Challenges,
-                mine.FinishOrder is { } order ? new MyFinishView(order, mine.Frozen) : null);
+                mine.FinishOrder is { } order ? new MyFinishView(order, mine.Frozen) : null,
+                waitingCheck);
         }
 
         // Avatars live on the accounts, across seasons (SPEC «Сезоны»)

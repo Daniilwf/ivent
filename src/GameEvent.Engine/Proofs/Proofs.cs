@@ -83,7 +83,7 @@ public static class ProofReviewOrder
 
         // A finisher's runs up to the finish decide the first place (Q-3): they go on top, with the run that reached it.
         return [.. state.Runs.Values
-            .Where(r => r.Status == RunStatus.Completed && r.Proof?.Status is null or ProofStatus.Pending)
+            .Where(Rolls.UncheckedRuns.Waits)
             .OrderByDescending(r => DecidesFinish(state, r))
             .ThenBy(r => r.CompletedAt)
             .ThenBy(r => r.RunId)

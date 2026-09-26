@@ -6068,6 +6068,7 @@ export interface components {
             techRerollOpen: boolean;
             challengesEnabled: boolean;
             finish: null | components["schemas"]["MyFinishView"];
+            unchecked: null | components["schemas"]["UncheckedRunsView"];
         };
         NominationRules: {
             auto: components["schemas"]["EquatableArrayOfAutoNomination"];
@@ -6475,6 +6476,8 @@ export interface components {
             maxActiveRunsPerPlayer: number;
             /** Format: int32 */
             inactiveHintDays: number;
+            /** Format: int32 */
+            maxUncheckedRuns?: null | number;
         };
         /**
          * @description Season lifecycle (GLOSSARY «Статус сезона»): draft → active → closing → finished → archived.
@@ -6594,6 +6597,16 @@ export interface components {
         };
         /** @enum {unknown} */
         UnmetConditionPolicy: "noDiceKeepCoins" | "countAsDrop" | "ignore";
+        /**
+         * @description My runs waiting for the admin's check and the rules' limit (D-134): at the limit a new roll is refused, so the page
+         *     says so before the button is pressed. Null when the season has no limit.
+         */
+        UncheckedRunsView: {
+            /** Format: int32 */
+            count: number;
+            /** Format: int32 */
+            limit: number;
+        };
         WeeklyChallengeRules: {
             /** Format: int32 */
             defaultRewardCoins: number;
