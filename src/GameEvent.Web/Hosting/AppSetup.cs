@@ -41,6 +41,13 @@ public static class AppSetup
     {
         ArgumentNullException.ThrowIfNull(builder);
         var services = builder.Services;
+
+        // First of the hosted services: the site's lock is held before the queue handles anything (D-127)
+        if (builder.Configuration["Site:LockFile"] is { Length: > 0 } && builder.Configuration["Site:OneOff"] != "true")
+        {
+            services.AddHostedService<SiteLockService>();
+        }
+
         var connectionString = ResolveDataSource(builder.Configuration.ConnectionString(), builder.Environment.ContentRootPath);
         builder.Configuration["ConnectionStrings:Main"] = connectionString;
 
@@ -89,7 +96,8 @@ public static class AppSetup
 
         // The keys that sign sessions and antiforgery tokens: kept with the data (DataProtection:KeysPath, /data/keys in
         // the image), so a new container or a deploy does not sign everyone out (D-127)
-        var dataProtection = services.AddDataProtection().SetApplicationName("GameEvent");
+        // One name per environment: keys copied with a backup from the live site never sign sessions on the test copy
+        var dataProtection = services.AddDataProtection().SetApplicationName($"GameEvent-{builder.Environment.EnvironmentName}");
         if (builder.Configuration["DataProtection:KeysPath"] is { Length: > 0 } keys)
         {
             dataProtection.PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(builder.Environment.ContentRootPath, keys)));

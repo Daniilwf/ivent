@@ -4,15 +4,15 @@
 (site_headers) {
 	encode zstd gzip
 	# The details of /health (database, disk, queue) are for the server, not for the internet: outside, only its status
-	@health path /health
+	@health path /health /health/*
 	handle @health {
 		reverse_proxy {args[0]}:8080 {
-			@unhealthy status 5xx
-			handle_response @unhealthy {
-				respond "Unhealthy" 503
+			@healthy status 2xx
+			handle_response @healthy {
+				respond "Healthy" 200
 			}
 			handle_response {
-				respond "Healthy" 200
+				respond "Unhealthy" 503
 			}
 		}
 	}

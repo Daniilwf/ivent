@@ -5,6 +5,7 @@ using GameEvent.Infrastructure.Kernel;
 using GameEvent.Infrastructure.Pool;
 using GameEvent.Infrastructure.Queue;
 using GameEvent.Infrastructure.Seasons;
+using GameEvent.Infrastructure.Site;
 using GameEvent.Tools.Import;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -72,6 +73,8 @@ try
                 {
                     archive = await SeasonTransfer.ReadZipAsync(file, cancel.Token);
                 }
+
+                using var siteLock = LockSite(dbPath);
 
                 // A new database gets its tables; an existing one is imported into as it is.
                 if (!File.Exists(dbPath))
@@ -150,7 +153,8 @@ try
                     return 0;
                 }
 
-                // The same queue as the site's, in this process: the site must be stopped meanwhile (one consumer, D-125)
+                // The same queue as the site's, in this process: the site must be stopped meanwhile (one consumer, D-125, D-127)
+                using var siteLock = LockSite(dbPath);
                 var options = new DbContextOptionsBuilder<GameEventDbContext>();
                 SqliteDatabase.Configure(options, connectionString);
                 var bus = new CommandBus();
@@ -213,6 +217,11 @@ catch (OperationCanceledException)
     Console.Error.WriteLine("Stopped: whatever was written before stays, a new run goes on from there.");
     return 130;
 }
+
+// The site holds this lock while it runs on the database (D-127): a writing command refuses meanwhile
+static SiteLock LockSite(string dbPath) =>
+    SiteLock.TryAcquire(Path.Combine(Path.GetDirectoryName(dbPath)!, "site.lock"))
+    ?? throw new InvalidOperationException("The site is running on this database: stop it first, the import has its own queue.");
 
 static GameEventDbContext Open(string connectionString)
 {

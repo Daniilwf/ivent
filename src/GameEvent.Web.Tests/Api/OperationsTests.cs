@@ -1,8 +1,12 @@
 using System.Net.Http.Json;
 using GameEvent.Infrastructure.Accounts;
+using GameEvent.Infrastructure.Queue;
+using GameEvent.Infrastructure.Site;
 using GameEvent.Web.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace GameEvent.Web.Tests.Api;
 
@@ -50,6 +54,48 @@ public sealed class OperationsTests : IAsyncLifetime
         _ = _site.Server;
 
         Assert.Equal(1, await Operations.CreateFirstAdminAsync(_site.Services, "no spaces allowed", "Главный", Ct));
+    }
+
+    [Fact]
+    public async Task The_queue_itself_refuses_a_second_first_admin()
+    {
+        await _site.SeedAsync(withSeason: false);
+
+        var outcome = await _site.Services.GetRequiredService<CommandBus>()
+            .SendAsync(new CommandEnvelope(Guid.NewGuid(), Guid.Empty, new CreateFirstAdmin("boss", "Главный"), null), Ct);
+
+        Assert.Equal(AccountRules.AdminExists, outcome.Rejection?.Code);
+    }
+
+    [Fact]
+    public void The_site_lock_is_held_by_one_process_at_a_time()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "game-event-tests", "lock-" + Guid.NewGuid().ToString("N"), "site.lock");
+
+        using (var first = SiteLock.TryAcquire(path))
+        {
+            Assert.NotNull(first);
+            Assert.Null(SiteLock.TryAcquire(path));
+        }
+
+        using var again = SiteLock.TryAcquire(path);
+        Assert.NotNull(again);
+    }
+
+    [Fact]
+    public async Task A_one_off_command_refuses_while_the_site_holds_its_lock()
+    {
+        var file = Path.Combine(Path.GetTempPath(), "game-event-tests", "lock-" + Guid.NewGuid().ToString("N"), "site.lock");
+        using var site = _site.WithWebHostBuilder(b => b.UseSetting("Site:LockFile", file));
+        _ = site.Server;
+
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["Site:LockFile"] = file }).Build();
+        var error = Assert.Throws<InvalidOperationException>(() => Operations.LockForOneOff(configuration, Path.GetTempPath()));
+
+        Assert.Contains("stop it first", error.Message, StringComparison.Ordinal);
+        await site.DisposeAsync();
+        using var free = Operations.LockForOneOff(configuration, Path.GetTempPath());
+        Assert.NotNull(free);
     }
 
     [Fact]

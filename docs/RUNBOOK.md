@@ -132,7 +132,9 @@
 
 1. Скопировать `.env.example` в `.env`, указать домены (локально оставить `localhost`).
 2. `docker compose -f deploy/docker-compose.yml --env-file .env up -d --build` — соберётся образ, выполнятся миграции (сервис `migrate`), поднимутся сайт и Caddy. Тестовая копия: добавить `--profile staging`.
-3. Первый админ (один раз, на новом сайте): `docker compose -f deploy/docker-compose.yml --env-file .env stop site`, затем `docker compose -f deploy/docker-compose.yml --env-file .env run --rm site create-admin admin "Админ"` — временный пароль показывается один раз, при первом входе его нужно сменить; потом `... start site`.
+3. Первый админ (один раз, на новом сайте): `docker compose -f deploy/docker-compose.yml --env-file .env stop site`, затем `docker compose -f deploy/docker-compose.yml --env-file .env run --rm site create-admin admin "Админ"` — временный пароль показывается один раз, при первом входе его нужно сменить; потом `... start site`. Только через `run --rm` (не `exec` и не `up`): так пароль не остаётся в логах контейнера. При работающем сайте команда откажет — это защита от второй очереди.
 4. Проверить: `https://<домен>/health` → «Healthy»; `docker compose -f deploy/docker-compose.yml ps` — у `site` статус `healthy`.
 - Данные сайта — в томе `ivent_site-data` (`/data` в контейнере: база, файлы, логи, ключи сессий); тестовой копии — `ivent_staging-data`. `docker compose down` тома не трогает.
 - Локально браузер предупредит о сертификате Caddy для localhost — это ожидаемо.
+- Версии: `SITE_VERSION` — боевой сайт, `STAGING_VERSION` — тестовая копия; при выкладке называть сервисы (`up -d staging-migrate staging` или `up -d migrate site`), чтобы не задеть другой.
+- В `/data/keys` — ключи, которыми подписаны сессии: бэкап `/data` — секрет (шифровать, права 0600); в тестовую копию `keys/` не копировать никогда.

@@ -1,3 +1,4 @@
+using GameEvent.Infrastructure.Site;
 using GameEvent.Web.Hosting;
 
 // Commands: (none) — run the site; `migrate` — apply migrations and exit (a separate deployment step, D-27);
@@ -12,11 +13,17 @@ if (command == "healthcheck")
 }
 
 var builder = WebApplication.CreateBuilder(args);
-builder.AddGameEvent();
-if (command is "seed-dev" or "seed-demo" or "create-admin")
+var oneOff = command is "seed-dev" or "seed-demo" or "create-admin";
+if (oneOff)
 {
+    // A one-off command runs its own queue for its commands only: no deadlines, no site lock of its own (it takes the
+    // site's instead), no public port
+    builder.Configuration["Scheduler:Enabled"] = "false";
+    builder.Configuration["Site:OneOff"] = "true";
     builder.WebHost.UseUrls("http://127.0.0.1:0");
 }
+
+builder.AddGameEvent();
 
 var app = builder.Build();
 app.UseGameEvent();
@@ -34,10 +41,24 @@ switch (command)
             return 2;
         }
 
-        await app.StartAsync();
-        var exit = await Operations.CreateFirstAdminAsync(app.Services, args[1], args[2]);
-        await app.StopAsync();
-        return exit;
+        SiteLock? siteLock;
+        try
+        {
+            siteLock = Operations.LockForOneOff(app.Configuration, app.Environment.ContentRootPath);
+        }
+        catch (InvalidOperationException e)
+        {
+            await Console.Error.WriteLineAsync(e.Message);
+            return 1;
+        }
+
+        using (siteLock)
+        {
+            await app.StartAsync();
+            var exit = await Operations.CreateFirstAdminAsync(app.Services, args[1], args[2]);
+            await app.StopAsync();
+            return exit;
+        }
 
     case "seed-dev" or "seed-demo":
         if (!app.Environment.IsDevelopment())
