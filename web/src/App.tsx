@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api, refreshCsrf, type Schemas } from './api/client';
+import { BugReportButton } from './app/BugReportButton';
 import { ChangePasswordForm } from './app/ChangePasswordForm';
 import { LoginForm } from './app/LoginForm';
+import { MaintenanceBanner } from './app/MaintenanceBanner';
 import { ru } from './i18n/ru';
 import { SeasonScreen } from './season/SeasonScreen';
 
@@ -56,47 +58,59 @@ export function App() {
     }
   }
 
-  if (state.kind === 'loading') return <p>{ru.app.loading}</p>;
-  if (state.kind === 'failed') return <p role="alert">{ru.app.loadError}</p>;
-  if (state.kind === 'changePassword')
-    return (
-      <>
-        <ChangePasswordForm
-          onChanged={(user) => {
+  // Every screen: the maintenance banner on top; a signed-in user also gets the bug report button (the API needs one;
+  // with a temporary password only its change is open)
+  return (
+    <>
+      <MaintenanceBanner />
+      {screen()}
+      {state.kind === 'signedIn' ? <BugReportButton /> : null}
+    </>
+  );
+
+  function screen() {
+    if (state.kind === 'loading') return <p>{ru.app.loading}</p>;
+    if (state.kind === 'failed') return <p role="alert">{ru.app.loadError}</p>;
+    if (state.kind === 'changePassword')
+      return (
+        <>
+          <ChangePasswordForm
+            onChanged={(user) => {
+              void enter(user).catch(() => {
+                setState({ kind: 'failed' });
+              });
+            }}
+          />
+          <button data-testid="logout" onClick={() => void logout()}>
+            {ru.login.logout}
+          </button>
+        </>
+      );
+    if (state.kind === 'signedOut')
+      return (
+        <LoginForm
+          onSignedIn={(user) => {
             void enter(user).catch(() => {
               setState({ kind: 'failed' });
             });
           }}
         />
-        <button data-testid="logout" onClick={() => void logout()}>
-          {ru.login.logout}
-        </button>
+      );
+
+    return (
+      <>
+        <header>
+          <span data-testid="current-user">{state.user.name}</span>{' '}
+          <button data-testid="logout" onClick={() => void logout()}>
+            {ru.login.logout}
+          </button>
+        </header>
+        {state.seasonId ? (
+          <SeasonScreen seasonId={state.seasonId} onSignedOut={signedOut} />
+        ) : (
+          <p data-testid="no-season">{ru.app.noSeason}</p>
+        )}
       </>
     );
-  if (state.kind === 'signedOut')
-    return (
-      <LoginForm
-        onSignedIn={(user) => {
-          void enter(user).catch(() => {
-            setState({ kind: 'failed' });
-          });
-        }}
-      />
-    );
-
-  return (
-    <>
-      <header>
-        <span data-testid="current-user">{state.user.name}</span>{' '}
-        <button data-testid="logout" onClick={() => void logout()}>
-          {ru.login.logout}
-        </button>
-      </header>
-      {state.seasonId ? (
-        <SeasonScreen seasonId={state.seasonId} onSignedOut={signedOut} />
-      ) : (
-        <p data-testid="no-season">{ru.app.noSeason}</p>
-      )}
-    </>
-  );
+  }
 }

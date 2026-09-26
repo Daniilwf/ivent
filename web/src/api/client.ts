@@ -1,4 +1,5 @@
 import createClient, { type Middleware } from 'openapi-fetch';
+import { recordRequest } from '../app/bugContext';
 import type { components, paths } from './schema';
 
 export type Schemas = components['schemas'];
@@ -25,6 +26,22 @@ const antiforgery: Middleware = {
   },
 };
 
+/** Fired when a write meets maintenance (503): the banner asks the site at once instead of waiting for its next look. */
+export const MAINTENANCE_EVENT = 'site:maintenance';
+
+/** Every answer goes into the bug report's context; a 503 tells the banner the site only reads now (D-121). */
+export function noteResponse(method: string, url: string, status: number) {
+  recordRequest(method, url, status);
+  if (status === 503) globalThis.dispatchEvent(new Event(MAINTENANCE_EVENT));
+}
+
+const observed: Middleware = {
+  onResponse({ request, response }) {
+    noteResponse(request.method, request.url, response.status);
+    return response;
+  },
+};
+
 /** Typed client of the backend; types are generated from OpenAPI (`npm run gen:api`), never written by hand. */
 export const api = createClient<paths>({
   baseUrl: globalThis.location.origin,
@@ -32,7 +49,7 @@ export const api = createClient<paths>({
   // Looked up per call, so tests can stub the global fetch.
   fetch: (request) => globalThis.fetch(request),
 });
-api.use(antiforgery);
+api.use(antiforgery, observed);
 
 /** Engine rejection code from a 409 answer, or null. */
 export function rejectionCode(error: unknown): string | null {

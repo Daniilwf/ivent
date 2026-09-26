@@ -24,6 +24,7 @@ public sealed partial class CommandProcessor
             Files.RecordFile file => await DecideFileAsync(db, file, now, ct),
             Pool.AddGame or Pool.ChangeGame or Pool.DeleteGame or Pool.RestoreGame or Pool.SetCategory or Pool.RemoveCategory
                 => await DecidePoolAsync(db, command, now, ct),
+            BugReports.ReportBug or BugReports.SetBugReportStatus => await DecideBugReportAsync(db, command, now, ct),
             _ => throw new InvalidOperationException($"No rules for the global command {commandType}."),
         };
         if (rejection is not null)
@@ -240,7 +241,7 @@ public sealed partial class CommandProcessor
                         return Reject(AccountRules.Deleted, "The account is deleted.");
                     }
 
-                    if (avatar.FileId is { } fileId && !await db.Files.AnyAsync(f => f.Id == fileId && !f.IsDeleted, ct))
+                    if (avatar.FileId is { } fileId && !await db.Files.AnyAsync(f => f.Id == fileId && !f.IsDeleted && f.Kind == Engine.Files.FileKind.Upload, ct))
                     {
                         return Reject(AccountRules.AvatarFileUnknown, $"File {fileId} is not stored.");
                     }

@@ -398,6 +398,9 @@ public partial class PlayerAdminInvariantTests
 
                 // The pool lives across seasons (D-119)
                 or GameAdded or GameChanged or GameDeleted or GameRestored or CategorySet or CategoryRemoved
+
+                // Bug reports are the site's too (D-121)
+                or BugReports.BugReported or BugReports.BugReportStatusChanged
                 or Files.FileStored => null,
             _ => throw new Xunit.Sdk.XunitException($"{e.GetType().Name} is not mapped to a mechanic: add it to the core or to its feature flag."),
         };

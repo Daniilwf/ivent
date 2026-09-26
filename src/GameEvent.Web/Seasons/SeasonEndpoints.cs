@@ -337,7 +337,7 @@ public static class SeasonEndpoints
 
         var owner = user.UserId();
         var distinct = files.Distinct().ToList();
-        var own = await db.Files.AsNoTracking().CountAsync(f => distinct.Contains(f.Id) && f.OwnerId == owner && !f.IsDeleted, ct);
+        var own = await db.Files.AsNoTracking().CountAsync(f => distinct.Contains(f.Id) && f.OwnerId == owner && !f.IsDeleted && f.Kind == Engine.Files.FileKind.Upload, ct);
         return own == distinct.Count
             ? null
             : TypedResults.Problem(

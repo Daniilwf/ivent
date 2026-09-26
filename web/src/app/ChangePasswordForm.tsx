@@ -58,7 +58,7 @@ export function ChangePasswordForm({
   }
 
   return (
-    <form onSubmit={(e) => void submit(e)} aria-labelledby="password-title">
+    <form data-private onSubmit={(e) => void submit(e)} aria-labelledby="password-title">
       <h1 id="password-title">{ru.password.title}</h1>
       <p>{ru.password.why}</p>
       <label>

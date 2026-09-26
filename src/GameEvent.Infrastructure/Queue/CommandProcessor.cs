@@ -25,7 +25,8 @@ public sealed partial class CommandProcessor(
     IIdGenerator ids,
     Accounts.IPasswords passwords,
     IEnumerable<ICommittedEventsListener> listeners,
-    ILogger<CommandProcessor> logger) : BackgroundService
+    ILogger<CommandProcessor> logger,
+    Site.MaintenanceMode? maintenance = null) : BackgroundService
 {
     private readonly Dictionary<Guid, (SeasonState State, long LastSequence)> _cache = [];
 
@@ -95,6 +96,12 @@ public sealed partial class CommandProcessor(
 
     private async Task<CommandOutcome> ProcessAsync(CommandEnvelope envelope, CancellationToken ct)
     {
+        // While the site only reads (D-121) nothing is written: not a player's action, not the scheduler's, not the admin's
+        if (maintenance?.IsOn == true)
+        {
+            return Rejected(Site.MaintenanceMode.Code, "The site is under maintenance and only reads; try again in a minute.");
+        }
+
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var commandType = envelope.Command.GetType().Name;
         if (Hash(envelope.Command) is not { } commandHash)

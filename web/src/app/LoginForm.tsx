@@ -35,7 +35,7 @@ export function LoginForm({ onSignedIn }: { onSignedIn: (user: Schemas['CurrentU
   }
 
   return (
-    <form onSubmit={(e) => void submit(e)} aria-labelledby="login-title">
+    <form data-private onSubmit={(e) => void submit(e)} aria-labelledby="login-title">
       <h1 id="login-title">{ru.login.title}</h1>
       <label>
         {ru.login.login}

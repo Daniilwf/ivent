@@ -23,10 +23,10 @@ public sealed class FileQueueTests
         var outcome = await SendAsync(h, Record(fileId, owner));
 
         Assert.True(outcome.IsAccepted);
-        Assert.Equal(new FileStored(fileId, owner, FileNames.Webp, 1000, 640, 480, 1), Assert.Single(outcome.Events).Event);
+        Assert.Equal(new FileStored(fileId, owner, FileNames.Webp, 1000, 640, 480, 1, FileKind.Upload), Assert.Single(outcome.Events).Event);
         await using var db = h.NewDb();
         var record = await db.Files.SingleAsync(Ct);
-        Assert.Equal((fileId, owner, FileNames.Webp, h.Clock.UtcNow), (record.Id, record.OwnerId, record.MediaType, record.CreatedAt));
+        Assert.Equal((fileId, owner, FileNames.Webp, h.Clock.UtcNow, FileKind.Upload), (record.Id, record.OwnerId, record.MediaType, record.CreatedAt, record.Kind));
         Assert.Equal(Guid.Empty, (await db.Events.SingleAsync(e => e.Type == "file-stored", Ct)).SeasonId);
     }
 

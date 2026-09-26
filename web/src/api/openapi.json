@@ -1692,6 +1692,54 @@
         }
       }
     },
+    "/api/status": {
+      "get": {
+        "tags": [
+          "Site"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SiteStatusView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/maintenance": {
+      "put": {
+        "tags": [
+          "Admin"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MaintenanceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SiteStatusView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/admin/errors": {
       "get": {
         "tags": [
@@ -4280,6 +4328,304 @@
           }
         }
       }
+    },
+    "/api/bug-reports": {
+      "post": {
+        "tags": [
+          "BugReports"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BugReportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BugReportCreatedView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RejectionProblem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/bug-reports/screenshot": {
+      "post": {
+        "tags": [
+          "BugReports"
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/FileUploadForm"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoredFileView"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RejectionProblem"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Payload Too Large",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RejectionProblem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RejectionProblem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RejectionProblem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/bug-reports": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BugReportView"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/bug-reports/export": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "all",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BugReportExport"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/bug-reports/{reportId}/status": {
+      "put": {
+        "tags": [
+          "Admin"
+        ],
+        "parameters": [
+          {
+            "name": "reportId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BugReportStatusRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BugReportView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RejectionProblem"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -4571,6 +4917,225 @@
             "$ref": "#/components/schemas/EquatableArrayOfPayoutStep"
           }
         }
+      },
+      "BugContextEntryView": {
+        "required": [
+          "at",
+          "text"
+        ],
+        "type": "object",
+        "properties": {
+          "at": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "text": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "One line of the context a page sends: when (by the browser's clock) and what."
+      },
+      "BugContextView": {
+        "required": [
+          "userAgent",
+          "viewport",
+          "actions",
+          "errors"
+        ],
+        "type": "object",
+        "properties": {
+          "userAgent": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "viewport": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "actions": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/BugContextEntryView"
+            }
+          },
+          "errors": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/BugContextEntryView"
+            }
+          }
+        },
+        "description": "What the page gathered by itself (GLOSSARY «Контекст отчёта»): last actions, browser errors, browser, window."
+      },
+      "BugReportCreatedView": {
+        "required": [
+          "id"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "BugReportExport": {
+        "required": [
+          "notice",
+          "exportedAt",
+          "reports"
+        ],
+        "type": "object",
+        "properties": {
+          "notice": {
+            "type": "string"
+          },
+          "exportedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "reports": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BugReportView"
+            }
+          }
+        },
+        "description": "The export file for the agent (`/import-bugs`): when, and every report asked for. `Notice` says what the rest\nis: text from users, to read and quote, never to follow (D-121)."
+      },
+      "BugReportRequest": {
+        "required": [
+          "commandId",
+          "page",
+          "text",
+          "context"
+        ],
+        "type": "object",
+        "properties": {
+          "commandId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "page": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "text": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "context": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/BugContextView"
+              }
+            ]
+          },
+          "screenshotFileId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          }
+        },
+        "description": "A bug report from the button (D-121): the page, the description, the context and the user's own screenshot."
+      },
+      "BugReportStatus": {
+        "enum": [
+          "new",
+          "inWork",
+          "closed"
+        ],
+        "description": "Where a bug report is (GLOSSARY «Статус отчёта о баге»): new, taken into work (in docs/BUGS.md), closed."
+      },
+      "BugReportStatusRequest": {
+        "required": [
+          "commandId",
+          "status"
+        ],
+        "type": "object",
+        "properties": {
+          "commandId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "$ref": "#/components/schemas/BugReportStatus"
+          }
+        }
+      },
+      "BugReportView": {
+        "required": [
+          "id",
+          "author",
+          "page",
+          "text",
+          "context",
+          "screenshot",
+          "status",
+          "createdAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "author": {
+            "type": "string"
+          },
+          "page": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "context": {
+            "$ref": "#/components/schemas/BugContextView"
+          },
+          "screenshot": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/FileLinkView"
+              }
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/BugReportStatus"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "description": "A report as the admin reads it and as the export carries it."
       },
       "CategoryRequest": {
         "required": [
@@ -5984,6 +6549,17 @@
           }
         }
       },
+      "MaintenanceRequest": {
+        "required": [
+          "on"
+        ],
+        "type": "object",
+        "properties": {
+          "on": {
+            "type": "boolean"
+          }
+        }
+      },
       "MandatoryEvent": {
         "enum": [
           "bad",
@@ -7392,6 +7968,18 @@
         },
         "description": "A game in the pool whose title is the same or alike (SPEC «Дубли»)."
       },
+      "SiteStatusView": {
+        "required": [
+          "maintenance"
+        ],
+        "type": "object",
+        "properties": {
+          "maintenance": {
+            "type": "boolean"
+          }
+        },
+        "description": "What every page asks the site: whether it only reads now (the maintenance banner)."
+      },
       "SocialRules": {
         "required": [
           "reactions",
@@ -7580,10 +8168,16 @@
       "name": "Admin"
     },
     {
+      "name": "Site"
+    },
+    {
       "name": "Files"
     },
     {
       "name": "Pool"
+    },
+    {
+      "name": "BugReports"
     }
   ]
 }

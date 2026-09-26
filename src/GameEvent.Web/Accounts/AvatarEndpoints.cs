@@ -53,7 +53,7 @@ public static class AvatarEndpoints
         // Only a picture the account's owner (or the admin setting it) uploaded: nobody wears someone else's upload. Checked
         // before the queue, so a repeat after the file changed hands is refused rather than answered as a duplicate — no
         // file changes hands today (no deletion yet)
-        if (request.FileId is { } fileId && !await db.Files.AsNoTracking().AnyAsync(f => f.Id == fileId && !f.IsDeleted && owners.Contains(f.OwnerId), ct))
+        if (request.FileId is { } fileId && !await db.Files.AsNoTracking().AnyAsync(f => f.Id == fileId && !f.IsDeleted && f.Kind == Engine.Files.FileKind.Upload && owners.Contains(f.OwnerId), ct))
         {
             return Rejected(NotYours, "The avatar is one of your own uploads.");
         }

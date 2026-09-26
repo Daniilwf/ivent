@@ -48,7 +48,7 @@ public static class WebSecurity
 
     // A temporary password opens only what it takes to replace it (D-106).
     private static readonly string[] s_openWithTemporaryPassword =
-        ["/api/auth/me", "/api/auth/password", "/api/auth/logout", "/api/auth/antiforgery", "/api/auth/login"];
+        ["/api/auth/me", "/api/auth/password", "/api/auth/logout", "/api/auth/antiforgery", "/api/auth/login", "/api/status"];
 
     /// <summary>
     /// With a temporary password every API call but the password change is refused, the hub too: 403 with

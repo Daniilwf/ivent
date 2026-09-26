@@ -177,7 +177,7 @@ public static class PoolEndpoints
 
         // A cover is the author's own upload (or, for the admin, his own found cover): nobody shows someone else's file
         if (request.CoverFileId is { } cover
-            && !await db.Files.AsNoTracking().AnyAsync(f => f.Id == cover && !f.IsDeleted && f.OwnerId == user.UserId(), ct)
+            && !await db.Files.AsNoTracking().AnyAsync(f => f.Id == cover && !f.IsDeleted && f.Kind == Engine.Files.FileKind.Upload && f.OwnerId == user.UserId(), ct)
             && (gameId is null || !await db.Games.AsNoTracking().AnyAsync(g => g.Id == gameId && g.CoverFileId == cover, ct)))
         {
             return Rejected(PoolRules.CoverUnknown, "The cover is one of your own uploads.");
