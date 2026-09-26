@@ -5,6 +5,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="DocumentFormat.OpenXml" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\GameEvent.Engine\GameEvent.Engine.csproj" />
     <ProjectReference Include="..\GameEvent.Infrastructure\GameEvent.Infrastructure.csproj" />
   </ItemGroup>
