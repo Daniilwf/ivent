@@ -63,7 +63,8 @@ export function App() {
   return (
     <>
       <MaintenanceBanner />
-      {screen()}
+      {/* Until stage H rebuilds these screens from the design system, they keep plain form styles (tokens.css) */}
+      <div className="legacy-screens">{screen()}</div>
       {state.kind === 'signedIn' ? <BugReportButton /> : null}
     </>
   );
