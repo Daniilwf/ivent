@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api, refreshCsrf, type Schemas } from './api/client';
-import { CalendarClock, LoaderCircle } from 'lucide-react';
+import { CalendarClock, Gamepad2, LoaderCircle, ShieldCheck } from 'lucide-react';
 import { ChangePasswordForm } from './app/ChangePasswordForm';
 import { LoginForm, TablePage } from './app/LoginForm';
 import { MaintenanceBanner } from './app/MaintenanceBanner';
+import { navigate, usePath } from './app/route';
+import { AdminScreen } from './admin/AdminScreen';
 import { Shell } from './app/Shell';
 import { ru } from './i18n/ru';
 import { Button } from './ui/Button';
@@ -24,6 +26,7 @@ type State =
 
 export function App() {
   const [state, setState] = useState<State>({ kind: 'loading' });
+  const path = usePath();
 
   const signedOut = useCallback(() => {
     setState({ kind: 'signedOut' });
@@ -137,9 +140,35 @@ export function App() {
       );
 
     const signedIn = state;
+    // The admin's pages (H8) open for the admin only; anyone else at their address sees the game
+    const admin = signedIn.user.role === 'admin';
+    const inAdmin = admin && /^\/admin(\/|$)/.test(path);
     return (
       <Shell
         user={signedIn.user}
+        items={
+          admin
+            ? [
+                inAdmin
+                  ? {
+                      label: ru.admin.toGame,
+                      icon: <Gamepad2 size={18} aria-hidden />,
+                      onSelect: () => {
+                        navigate('/');
+                      },
+                      testId: 'to-game',
+                    }
+                  : {
+                      label: ru.admin.open,
+                      icon: <ShieldCheck size={18} aria-hidden />,
+                      onSelect: () => {
+                        navigate('/admin');
+                      },
+                      testId: 'to-admin',
+                    },
+              ]
+            : []
+        }
         onChangePassword={() => {
           setState({ ...signedIn, ownPassword: true });
         }}
@@ -165,6 +194,8 @@ export function App() {
               </Button>
             </ChangePasswordForm>
           </main>
+        ) : inAdmin ? (
+          <AdminScreen path={path} currentSeasonId={signedIn.seasonId} user={signedIn.user} />
         ) : signedIn.seasonId ? (
           <SeasonScreen seasonId={signedIn.seasonId} onSignedOut={signedOut} />
         ) : (

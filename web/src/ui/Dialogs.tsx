@@ -17,6 +17,7 @@ export function ConfirmDanger({
   busy = false,
   open,
   onOpenChange,
+  children,
 }: {
   trigger?: ReactNode;
   title: string;
@@ -26,6 +27,8 @@ export function ConfirmDanger({
   busy?: boolean;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  /** What the action needs besides a yes: a comment for the log, a reason; checked by onConfirm */
+  children?: ReactNode;
 }) {
   return (
     <AlertDialog.Root
@@ -46,6 +49,7 @@ export function ConfirmDanger({
               ))}
             </ul>
           </AlertDialog.Description>
+          {children}
           <div className="flex flex-wrap justify-end gap-3">
             <AlertDialog.Cancel asChild>
               <Button>{ru.ui.cancel}</Button>
@@ -65,17 +69,33 @@ export function BottomSheet({
   trigger,
   title,
   children,
+  open,
+  onOpenChange,
+  returnFocus,
 }: {
   trigger: ReactNode;
   title: string;
   children: ReactNode;
+  /** Held by the page when a choice inside closes the sheet: the admin's list of sections */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  /** Whether closing gives the focus back to the trigger; a choice that opened a new page places it there itself */
+  returnFocus?: () => boolean;
 }) {
   return (
-    <Dialog.Root>
+    <Dialog.Root
+      {...(open === undefined ? {} : { open })}
+      {...(onOpenChange ? { onOpenChange } : {})}
+    >
       <Dialog.Trigger asChild>{trigger}</Dialog.Trigger>
       <Dialog.Portal>
         <Dialog.Overlay className={overlay} />
-        <Dialog.Content className="fixed inset-x-0 bottom-0 z-20 grid max-h-4/5 gap-3 overflow-auto rounded-t-lg border-t-3 border-ink bg-card px-4 pt-3 pb-6">
+        <Dialog.Content
+          onCloseAutoFocus={(event) => {
+            if (returnFocus && !returnFocus()) event.preventDefault();
+          }}
+          className="fixed inset-x-0 bottom-0 z-20 grid max-h-4/5 gap-3 overflow-auto rounded-t-lg border-t-3 border-ink bg-card px-4 pt-3 pb-6"
+        >
           <span className="h-1 w-11 justify-self-center rounded-full bg-ink" aria-hidden />
           <div className="flex items-center justify-between gap-3">
             <Dialog.Title className="font-display text-lg font-heavy">{title}</Dialog.Title>

@@ -4,7 +4,7 @@ import { connectionStatus } from '../api/connection';
 import type { Schemas } from '../api/client';
 import { tokenColors } from '../design/players';
 import { ru } from '../i18n/ru';
-import { Menu } from '../ui/Menu';
+import { Menu, type MenuItem } from '../ui/Menu';
 import { ConnectionLost } from '../ui/States';
 import { Sticker } from '../ui/Sticker';
 import { BugReportButton } from './BugReportButton';
@@ -22,6 +22,7 @@ export function Shell({
   onChangePassword,
   onLogout,
   offline,
+  items = [],
   children,
 }: {
   user: Schemas['CurrentUser'];
@@ -29,6 +30,8 @@ export function Shell({
   onLogout: () => void;
   /** The styleguide shows the lost connection without losing it */
   offline?: boolean;
+  /** Pages of the site before my own items: the admin's pages for the admin */
+  items?: MenuItem[];
   children: ReactNode;
 }) {
   const live = useSyncExternalStore(connectionStatus.subscribe, connectionStatus.get) === 'online';
@@ -71,6 +74,7 @@ export function Shell({
               </button>
             }
             items={[
+              ...items,
               {
                 label: ru.shell.changePassword,
                 icon: <KeyRound size={18} aria-hidden />,

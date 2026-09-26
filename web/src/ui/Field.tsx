@@ -1,5 +1,58 @@
-import { useId, type InputHTMLAttributes, type TextareaHTMLAttributes } from 'react';
+import {
+  useId,
+  type InputHTMLAttributes,
+  type SelectHTMLAttributes,
+  type TextareaHTMLAttributes,
+} from 'react';
 import { cx } from './cx';
+
+/** A choice from a list: the label above, like Field; the native list works on a phone and with a keyboard */
+export function SelectField({
+  label,
+  hint,
+  error,
+  className,
+  children,
+  ...select
+}: SelectHTMLAttributes<HTMLSelectElement> & {
+  label: string;
+  hint?: string;
+  error?: string | undefined;
+}) {
+  const id = useId();
+  const hintId = `${id}-hint`;
+  const errorId = `${id}-error`;
+  return (
+    <div className={cx('grid gap-1', className)}>
+      <label htmlFor={id} className="text-sm font-bold">
+        {label}
+      </label>
+      {hint ? (
+        <span id={hintId} className="text-sm text-ink-soft">
+          {hint}
+        </span>
+      ) : null}
+      <select
+        id={id}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={cx(hint && hintId, error && errorId) || undefined}
+        className={cx(
+          'min-h-12 w-full min-w-0 cursor-pointer rounded-md border-2 bg-card px-3 text-base text-ink disabled:cursor-default disabled:bg-page disabled:opacity-60',
+          'is-focus:outline-3 is-focus:outline-offset-2 is-focus:outline-ink',
+          error ? 'border-danger' : 'border-ink',
+        )}
+        {...select}
+      >
+        {children}
+      </select>
+      {error ? (
+        <span id={errorId} role="alert" className="text-sm font-medium text-danger">
+          {error}
+        </span>
+      ) : null}
+    </div>
+  );
+}
 
 /** A form field: the label above, a hint about the format, the error right under the field */
 export function Field({
