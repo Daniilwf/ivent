@@ -399,7 +399,7 @@ const headlines: [string, (d: Data, c: Context) => Headline][] = [
     (d, c) => ({
       icon: 'admin',
       actor: c.player(d),
-      line: L.points(c.playerRef(d), number(d, 'delta') ?? 0),
+      line: L.points(c.playerRef(d), number(d, 'delta') ?? 0, text(d, 'reason')),
     }),
   ],
   [
@@ -407,7 +407,7 @@ const headlines: [string, (d: Data, c: Context) => Headline][] = [
     (d, c) => ({
       icon: 'admin',
       actor: c.player(d),
-      line: L.coins(c.playerRef(d), number(d, 'delta') ?? 0),
+      line: L.coins(c.playerRef(d), number(d, 'delta') ?? 0, text(d, 'reason')),
     }),
   ],
   [

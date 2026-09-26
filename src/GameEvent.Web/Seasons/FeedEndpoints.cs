@@ -43,8 +43,11 @@ public sealed record FeedView(
     IReadOnlyList<FeedGameView> Games,
     IReadOnlyList<FeedRunView> Runs);
 
-/// <summary>A season a user took part in, with their points and, once the season finished, their place.</summary>
-public sealed record ProfileSeasonView(Guid SeasonId, string SeasonName, SeasonStatus Status, Guid PlayerId, int Points, int? Place);
+/// <summary>
+/// A season a user took part in, with their points and, once the season finished, their place. <c>token</c> — their place in
+/// the season's list of players (by name), which the screens colour their token by (D-150).
+/// </summary>
+public sealed record ProfileSeasonView(Guid SeasonId, string SeasonName, SeasonStatus Status, Guid PlayerId, int Points, int? Place, int Token);
 
 /// <summary>A review the user left: the game, the season, the rating and the text (SPEC «Отзыв»).</summary>
 public sealed record ProfileReviewView(Guid RunId, Guid GameId, string GameTitle, Guid SeasonId, string SeasonName, int Rating, string? Text, DateTimeOffset? CompletedAt);
@@ -56,7 +59,10 @@ public sealed record ProfileReviewView(Guid RunId, Guid GameId, string GameTitle
 public sealed record ProfileView(
     Guid Id, string Name, FileLinkView? Avatar, IReadOnlyList<ProfileSeasonView> Seasons, IReadOnlyList<ProfileReviewView> Reviews, int Completed);
 
-/// <summary>A run of a game in any season, with its review if there is one (the game page, D-124).</summary>
+/// <summary>
+/// A run of a game in any season, with its review if there is one (the game page, D-124). <c>token</c> — the player's place
+/// in that season's list of players, their token colour there (D-150).
+/// </summary>
 public sealed record GameRunView(
     Guid RunId,
     Guid SeasonId,
@@ -69,7 +75,8 @@ public sealed record GameRunView(
     decimal? Hours,
     DateTimeOffset? CompletedAt,
     int? Rating,
-    string? ReviewText);
+    string? ReviewText,
+    int Token);
 
 /// <summary>
 /// The public reads built from the log and its projection (SPEC «Лента», «Отзыв … виден в ленте, профиле и на странице
@@ -177,6 +184,20 @@ public static class FeedEndpoints
         return (players, games, runs);
     }
 
+    /// <summary>
+    /// Each player's place in their season's list of players by name — the order of the season screen, whose token colours
+    /// follow it (D-150).
+    /// </summary>
+    private static async Task<Dictionary<Guid, int>> TokensAsync(GameEventDbContext db, IReadOnlyCollection<Guid> seasonIds, CancellationToken ct)
+    {
+        var players = await db.SeasonPlayers.AsNoTracking()
+            .Where(p => seasonIds.Contains(p.SeasonId))
+            .OrderBy(p => p.Name)
+            .Select(p => new { p.Id, p.SeasonId })
+            .ToListAsync(ct);
+        return players.GroupBy(p => p.SeasonId).SelectMany(g => g.Select((p, i) => (p.Id, Token: i))).ToDictionary(x => x.Id, x => x.Token);
+    }
+
     /// <summary>Every <c>runId</c>, <c>gameId</c> and <c>gameIds</c> in an event's data, at any depth (misses, offers).</summary>
     private static void Collect(JsonElement data, HashSet<Guid> runIds, HashSet<Guid> gameIds)
     {
@@ -235,6 +256,7 @@ public static class FeedEndpoints
         var playerIds = players.Select(p => p.Id).ToList();
         var seasonIds = players.Select(p => p.SeasonId).Distinct().ToList();
         var seasons = await db.Seasons.AsNoTracking().Where(s => seasonIds.Contains(s.Id)).ToDictionaryAsync(s => s.Id, ct);
+        var tokens = await TokensAsync(db, seasonIds, ct);
         var places = await db.SeasonResults.AsNoTracking().Where(r => playerIds.Contains(r.PlayerId)).ToDictionaryAsync(r => r.PlayerId, r => r.Place, ct);
         var reviews = await db.Reviews.AsNoTracking().Where(r => playerIds.Contains(r.PlayerId)).ToListAsync(ct);
         var runs = await db.Runs.AsNoTracking().Where(r => playerIds.Contains(r.PlayerId)).ToListAsync(ct);
@@ -247,7 +269,14 @@ public static class FeedEndpoints
         IReadOnlyList<ProfileSeasonView> seasonViews = [.. players
             .Where(p => seasons.ContainsKey(p.SeasonId))
             .OrderByDescending(p => seasons[p.SeasonId].CreatedAt)
-            .Select(p => new ProfileSeasonView(p.SeasonId, seasons[p.SeasonId].Name, seasons[p.SeasonId].Status, p.Id, p.Points, places.TryGetValue(p.Id, out var place) ? place : null))];
+            .Select(p => new ProfileSeasonView(
+                p.SeasonId,
+                seasons[p.SeasonId].Name,
+                seasons[p.SeasonId].Status,
+                p.Id,
+                p.Points,
+                places.TryGetValue(p.Id, out var place) ? place : null,
+                tokens.GetValueOrDefault(p.Id)))];
         var completedAt = runs.ToDictionary(r => r.Id, r => r.CompletedAt);
         IReadOnlyList<ProfileReviewView> reviewViews = [.. reviews
             .Select(r => new ProfileReviewView(
@@ -280,6 +309,7 @@ public static class FeedEndpoints
         var players = await db.SeasonPlayers.AsNoTracking().Where(p => playerIds.Contains(p.Id)).ToDictionaryAsync(p => p.Id, ct);
         var seasonIds = runs.Select(r => r.SeasonId).Distinct().ToList();
         var seasons = await db.Seasons.AsNoTracking().Where(s => seasonIds.Contains(s.Id)).ToDictionaryAsync(s => s.Id, s => s.Name, ct);
+        var tokens = await TokensAsync(db, seasonIds, ct);
         var runIds = runs.Select(r => r.Id).ToList();
         var reviews = await db.Reviews.AsNoTracking().Where(r => runIds.Contains(r.RunId)).ToDictionaryAsync(r => r.RunId, ct);
         IReadOnlyList<GameRunView> views = [.. runs
@@ -300,7 +330,8 @@ public static class FeedEndpoints
                     r.Hours,
                     r.CompletedAt,
                     review?.Rating,
-                    review?.Text);
+                    review?.Text,
+                    tokens.GetValueOrDefault(r.PlayerId));
             })];
         return TypedResults.Ok(views);
     }

@@ -17,7 +17,15 @@ const profile: Schemas['ProfileView'] = {
   avatar: { id: 'f', url: '/api/files/f', thumbnailUrl: '/api/files/f/thumbnail' },
   completed: 5,
   seasons: [
-    { seasonId, seasonName: 'Осень', status: 'finished', playerId: 'p1', points: 42, place: 2 },
+    {
+      seasonId,
+      seasonName: 'Осень',
+      status: 'finished',
+      playerId: 'p1',
+      points: 42,
+      place: 2,
+      token: 6,
+    },
     {
       seasonId: 's2',
       seasonName: 'Зима',
@@ -25,6 +33,7 @@ const profile: Schemas['ProfileView'] = {
       playerId: 'p2',
       points: 7,
       place: null,
+      token: 3,
     },
   ],
   reviews: [
@@ -73,6 +82,10 @@ describe('ProfileScreen', () => {
     expect(screen.getByTestId('profile-loading')).toHaveAttribute('aria-busy', 'true');
     expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent('Капитан_Пельмень');
     expect(screen.queryByText(ru.profile.you)).toBeNull();
+    // The sticker has the colour of the token in the latest season (the first listed), as on its map
+    expect(screen.getByTestId('profile').querySelector('span')).toHaveStyle({
+      background: 'var(--color-token-7)',
+    });
     expect(screen.getByTestId('profile').querySelector('img')).toHaveAttribute(
       'src',
       '/api/files/f',

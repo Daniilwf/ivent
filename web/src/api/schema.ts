@@ -5940,7 +5940,10 @@ export interface components {
             force: boolean;
             completionCondition?: null | string;
         };
-        /** @description A run of a game in any season, with its review if there is one (the game page, D-124). */
+        /**
+         * @description A run of a game in any season, with its review if there is one (the game page, D-124). `token` — the player's place
+         *     in that season's list of players, their token colour there (D-150).
+         */
         GameRunView: {
             /** Format: uuid */
             runId: string;
@@ -5961,6 +5964,8 @@ export interface components {
             /** Format: int32 */
             rating: null | number;
             reviewText: null | string;
+            /** Format: int32 */
+            token: number;
         };
         /**
          * @description A game of the pool as everyone sees it (D-119); `author` — the name of the account that added it, or the author as
@@ -6201,7 +6206,10 @@ export interface components {
             /** Format: date-time */
             completedAt: null | string;
         };
-        /** @description A season a user took part in, with their points and, once the season finished, their place. */
+        /**
+         * @description A season a user took part in, with their points and, once the season finished, their place. `token` — their place in
+         *     the season's list of players (by name), which the screens colour their token by (D-150).
+         */
         ProfileSeasonView: {
             /** Format: uuid */
             seasonId: string;
@@ -6213,6 +6221,8 @@ export interface components {
             points: number;
             /** Format: int32 */
             place: null | number;
+            /** Format: int32 */
+            token: number;
         };
         /**
          * @description A user's profile (D-124): the name, the avatar, the seasons they played and their reviews. `completed` — games

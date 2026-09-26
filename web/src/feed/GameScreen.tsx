@@ -15,7 +15,6 @@ import { api, type Schemas } from '../api/client';
 import { Link } from '../app/Link';
 import { navigate, paths } from '../app/router';
 import { moscowDay } from '../app/time';
-import { userToken } from '../design/players';
 import { ru } from '../i18n/ru';
 import { Button } from '../ui/Button';
 import { cx } from '../ui/cx';
@@ -117,7 +116,7 @@ export function GameDetails({ game, runs }: { game: Game; runs: Run[] }) {
           </span>
         )}
         <div className="grid min-w-0 justify-items-start gap-2">
-          <h1 className="font-display text-xl font-heavy text-balance wrap-anywhere">
+          <h1 className="font-display text-lg font-heavy text-balance wrap-anywhere desk:text-xl">
             {game.title}
           </h1>
           <div className="flex flex-wrap gap-2">
@@ -161,10 +160,7 @@ export function GameDetails({ game, runs }: { game: Game; runs: Run[] }) {
                 key={run.runId}
                 className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-3 py-3"
               >
-                <Sticker
-                  player={{ name: run.playerName, token: userToken(run.userId) }}
-                  size={40}
-                />
+                <Sticker player={{ name: run.playerName, token: run.token }} size={40} />
                 <div className="grid min-w-0 gap-2">
                   <div className="flex flex-wrap items-baseline justify-between gap-x-3">
                     <Link

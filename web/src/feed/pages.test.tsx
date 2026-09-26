@@ -99,6 +99,8 @@ describe('the pages of the site', () => {
     expect(globalThis.location.pathname).toBe(`/users/${userId}`);
     expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent('Вася');
     expect(screen.getByText(ru.profile.you)).toBeInTheDocument();
+    expect(screen.getByTestId('profile-completed')).toHaveTextContent(ru.profile.completed(0));
+    expect(ru.profile.completed(0)).toBe('Пока без пройденных игр');
   });
 
   it('leaves my password form for the page a link opens', async () => {

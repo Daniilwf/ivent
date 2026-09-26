@@ -7211,7 +7211,8 @@
           "hours",
           "completedAt",
           "rating",
-          "reviewText"
+          "reviewText",
+          "token"
         ],
         "type": "object",
         "properties": {
@@ -7276,9 +7277,13 @@
               "null",
               "string"
             ]
+          },
+          "token": {
+            "type": "integer",
+            "format": "int32"
           }
         },
-        "description": "A run of a game in any season, with its review if there is one (the game page, D-124)."
+        "description": "A run of a game in any season, with its review if there is one (the game page, D-124). `token` — the player's place\nin that season's list of players, their token colour there (D-150)."
       },
       "GameView": {
         "required": [
@@ -8119,7 +8124,8 @@
           "status",
           "playerId",
           "points",
-          "place"
+          "place",
+          "token"
         ],
         "type": "object",
         "properties": {
@@ -8147,9 +8153,13 @@
               "integer"
             ],
             "format": "int32"
+          },
+          "token": {
+            "type": "integer",
+            "format": "int32"
           }
         },
-        "description": "A season a user took part in, with their points and, once the season finished, their place."
+        "description": "A season a user took part in, with their points and, once the season finished, their place. `token` — their place in\nthe season's list of players (by name), which the screens colour their token by (D-150)."
       },
       "ProfileView": {
         "required": [

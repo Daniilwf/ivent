@@ -155,6 +155,7 @@ public sealed class FeedApiTests : IAsyncLifetime
         var season = Assert.Single(profile.GetProperty("seasons").EnumerateArray());
         Assert.Equal((SiteFactory.SeasonId, "Тестовый сезон", "active", _site.Players["vasya"]), (season.GetProperty("seasonId").GetGuid(), season.GetProperty("seasonName").GetString(), season.GetProperty("status").GetString(), season.GetProperty("playerId").GetGuid()));
         Assert.Equal(JsonValueKind.Null, season.GetProperty("place").ValueKind);
+        Assert.Equal(await SeasonTokenAsync(vasya, "vasya"), season.GetProperty("token").GetInt32());
         var review = Assert.Single(profile.GetProperty("reviews").EnumerateArray());
         Assert.Equal((runId, gameId, 8, "Отличная игра"), (review.GetProperty("runId").GetGuid(), review.GetProperty("gameId").GetGuid(), review.GetProperty("rating").GetInt32(), review.GetProperty("text").GetString()));
         Assert.False(string.IsNullOrEmpty(review.GetProperty("gameTitle").GetString()));
@@ -186,6 +187,7 @@ public sealed class FeedApiTests : IAsyncLifetime
         Assert.Equal((runId, "vasya", "completed", "normal", 6), (run.GetProperty("runId").GetGuid(), run.GetProperty("playerName").GetString(), run.GetProperty("status").GetString(), run.GetProperty("difficulty").GetString(), run.GetProperty("rating").GetInt32()));
         Assert.Equal(_site.Users["vasya"], run.GetProperty("userId").GetGuid());
         Assert.Equal(JsonValueKind.Null, run.GetProperty("reviewText").ValueKind);
+        Assert.Equal(await SeasonTokenAsync(vasya, "vasya"), run.GetProperty("token").GetInt32());
     }
 
     [Fact]
@@ -201,6 +203,15 @@ public sealed class FeedApiTests : IAsyncLifetime
     }
 
     // ---- Helpers ----
+
+    /// <summary>The player's place in the season screen's list: the token colour every page gives them (D-150).</summary>
+    private static async Task<int> SeasonTokenAsync(HttpClient client, string name)
+    {
+        var players = (await OkAsync(await client.GetAsync($"/api/seasons/{SiteFactory.SeasonId}", Ct))).GetProperty("players").EnumerateArray().ToList();
+        var index = players.FindIndex(p => p.GetProperty("name").GetString() == name);
+        Assert.True(index > 0, "the test needs a player who is not first in the list");
+        return index;
+    }
 
     private static async Task<(Guid RunId, Guid GameId)> CompletedWithReviewAsync(HttpClient player, int rating, string? text)
     {

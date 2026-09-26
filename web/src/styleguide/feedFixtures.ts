@@ -141,6 +141,7 @@ export const demoProfile: Schemas['ProfileView'] = {
       playerId: id(2),
       points: 61,
       place: null,
+      token: 0,
     },
     {
       seasonId: id(3),
@@ -149,6 +150,7 @@ export const demoProfile: Schemas['ProfileView'] = {
       playerId: id(4),
       points: 44,
       place: 1,
+      token: 2,
     },
   ],
   reviews: [
@@ -217,6 +219,7 @@ const run = (i: number, over: Partial<Schemas['GameRunView']>): Schemas['GameRun
   completedAt: '2026-10-12T15:40:00Z',
   rating: null,
   reviewText: null,
+  token: i,
   ...over,
 });
 

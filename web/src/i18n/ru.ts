@@ -152,6 +152,22 @@ const plural = (n: number, one: string, few: string, many: string) => {
 const signed = (n: number) => (n < 0 ? `−${Math.abs(n)}` : `+${n}`);
 const hoursText = (n: number) => `${n.toLocaleString('ru-RU')} ч`;
 
+// Why points or coins changed, when that is the whole line
+const pointsReasons: Record<string, string> = {
+  startingBalance: ' на старте',
+  adminAdjustment: ' от админа',
+  finishBonus: ' — бонус за финиш',
+  finishBonusRevoked: ' — бонус за финиш снят',
+  runCorrection: ' после правки прохождения',
+};
+const coinsReasons: Record<string, string> = {
+  startingBalance: ' на старте',
+  adminAdjustment: ' от админа',
+  completionReward: ' за прохождение',
+  reroll: ' за реролл',
+  runCorrection: ' после правки прохождения',
+};
+
 /** A line of the feed: words and the player's and the game's names, which the screen turns into links */
 type Line<T> = readonly (string | T)[];
 
@@ -221,13 +237,13 @@ const feedLines = {
     p,
     applied ? ': ивент разыгран' : ': ивент не применим',
   ],
-  points: <T>(p: T, delta: number): Line<T> => [
+  points: <T>(p: T, delta: number, reason: string | null): Line<T> => [
     p,
-    `: ${signed(delta)} ${plural(delta, 'очко', 'очка', 'очков')}`,
+    `: ${signed(delta)} ${plural(delta, 'очко', 'очка', 'очков')}${pointsReasons[reason ?? ''] ?? ''}`,
   ],
-  coins: <T>(p: T, delta: number): Line<T> => [
+  coins: <T>(p: T, delta: number, reason: string | null): Line<T> => [
     p,
-    `: ${signed(delta)} ${plural(delta, 'монетка', 'монетки', 'монеток')}`,
+    `: ${signed(delta)} ${plural(delta, 'монетка', 'монетки', 'монеток')}${coinsReasons[reason ?? ''] ?? ''}`,
   ],
   moved: <T>(p: T): Line<T> => [p, ': фишка переставлена'],
   undone: <T>(): Line<T> => ['Админ откатывает действие'],
@@ -817,7 +833,10 @@ export const ru = {
     ratingLabel: (n: number) => `Оценка: ${n} из 10`,
   },
   profile: {
-    completed: (n: number) => `${plural(n, 'Пройдена', 'Пройдены', 'Пройдено')} ${games(n)}`,
+    completed: (n: number) =>
+      n === 0
+        ? 'Пока без пройденных игр'
+        : `${plural(n, 'Пройдена', 'Пройдены', 'Пройдено')} ${games(n)}`,
     seasons: 'Сезоны',
     reviews: 'Отзывы',
     place: (n: number) => `${n} место`,

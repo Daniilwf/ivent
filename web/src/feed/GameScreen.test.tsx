@@ -38,6 +38,7 @@ const run = (over: Partial<Schemas['GameRunView']>): Schemas['GameRunView'] => (
   completedAt: '2026-09-12T10:00:00Z',
   rating: 9,
   reviewText: 'Лучшая метроидвания',
+  token: 4,
   ...over,
 });
 
@@ -100,6 +101,8 @@ describe('GameScreen', () => {
     expect(screen.getByRole('heading', { name: ru.gamePage.runsTitle(2) })).toBeInTheDocument();
 
     const [done, dropped] = [...screen.getByTestId('game-runs').children] as HTMLElement[];
+    // The player's sticker has their token colour in that season
+    expect(done?.querySelector('span')).toHaveStyle({ background: 'var(--color-token-5)' });
     expect(within(done as HTMLElement).getByRole('link', { name: 'Вася' })).toHaveAttribute(
       'href',
       `/users/${vasya}`,

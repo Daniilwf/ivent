@@ -48,7 +48,9 @@ export function Skeleton({ className }: { className?: string }) {
   return (
     <span
       className={cx(
-        'block animate-pulse rounded-sm bg-muted motion-reduce:animate-none',
+        'block animate-pulse bg-muted motion-reduce:animate-none',
+        // The page's own rounding wins: two rounded-* classes are decided by the CSS order, and rounded-sm comes last
+        className?.includes('rounded-') ? null : 'rounded-sm',
         className,
       )}
       aria-hidden

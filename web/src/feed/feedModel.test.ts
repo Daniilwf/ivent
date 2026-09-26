@@ -296,6 +296,28 @@ describe('feed lines', () => {
     expect(item?.facts).toEqual([ru.feed.facts.moved, '+3 монетки']);
   });
 
+  it('says why points or coins changed when that is the whole line', () => {
+    const reward = one([
+      entry('c11', 'coins-changed', {
+        playerId: vasya,
+        delta: 6,
+        reason: 'completionReward',
+        runId: run1,
+      }),
+    ]);
+    const bonus = one([
+      entry('c12', 'points-changed', {
+        playerId: petya,
+        delta: 5,
+        reason: 'finishBonus',
+        runId: null,
+      }),
+    ]);
+
+    expect(text(reward)).toBe('Вася: +6 монеток за прохождение');
+    expect(text(bonus)).toBe('Петя: +5 очков — бонус за финиш');
+  });
+
   it('leaves out a command with nothing a line would say', () => {
     expect(
       feedDays([entry('c10', 'finish-surplus-changed', { playerId: vasya, delta: 1 })], refs, now),
