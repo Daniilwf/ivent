@@ -1,5 +1,6 @@
 # Every push: build, analyzers, architecture tests, fast tests with coverage, API client check, gitleaks.
-# Pull requests into any branch (the stacked PRs too): E2E (and, from task J5, migrations on the previous release's demo database).
+# Pull requests into any branch (the stacked PRs too): E2E, visual tests and, when the backend changed, migrations on the
+# previous release's demo database (J5).
 # Push and pull_request runs do different work, so a branch with an open PR is not tested twice.
 name: CI
 
@@ -32,6 +33,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       code: ${{ steps.filter.outputs.code }}
+      backend: ${{ steps.filter.outputs.backend }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -55,6 +57,9 @@ jobs:
               - '!**/*.md'
               - '!.claude/**'
               - '!data/**'
+            # One pattern: with `every` a file must match all the patterns of a filter
+            backend:
+              - '{src/**,global.json,Directory.Packages.props,Directory.Build.props,nuget.config,dotnet-tools.json,package.json,scripts/migration-check.mjs,scripts/lib.mjs}'
           predicate-quantifier: every
 
   build-test:
@@ -187,6 +192,44 @@ jobs:
           name: playwright
           path: test-artifacts/playwright
           retention-days: 14
+
+  # The migration check (J5): the previous release's demo season goes through this version's migrations and their
+  # rollback, and replays intact (npm run test:migrations). Only when the backend changed: it builds two versions.
+  migrations:
+    name: Migrations
+    needs: changes
+    # Once, on the pull request into main: the stacked PRs below it would pay the same minutes again
+    if: needs.changes.outputs.backend == 'true' && github.event_name == 'pull_request' && github.base_ref == 'main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0 # the previous release: a v* tag or where the branch left main
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ env.NUGET_PACKAGES }}
+          key: nuget-${{ runner.os }}-${{ hashFiles('Directory.Packages.props', '**/*.csproj', 'dotnet-tools.json') }}
+          restore-keys: nuget-${{ runner.os }}-
+      - name: Tools
+        run: dotnet tool restore
+      - name: Migrations over the previous release's demo database
+        run: npm run -s test:migrations
+      - name: The databases (demo data, no secrets)
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: migration-check
+          path: var/migration-check/*.db*
+          if-no-files-found: ignore
+          retention-days: 7
 
   # Visual regression tests (G3): the map and the design system in Chromium, Firefox and WebKit, phone and desktop.
   # They run in the same Playwright container as `npm run test:visual` locally, so the baselines match; the image

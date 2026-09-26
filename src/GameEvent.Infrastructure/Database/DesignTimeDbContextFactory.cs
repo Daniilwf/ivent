@@ -3,7 +3,10 @@ using Microsoft.EntityFrameworkCore.Design;
 
 namespace GameEvent.Infrastructure.Database;
 
-/// <summary>Used only by <c>dotnet ef migrations add</c>; the file is never opened.</summary>
+/// <summary>
+/// Used by <c>dotnet ef</c>: <c>migrations add</c> never opens the file; the migration check (J5) passes <c>--connection</c>
+/// to <c>database update</c>, which replaces this data source.
+/// </summary>
 public sealed class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<GameEventDbContext>
 {
     public GameEventDbContext CreateDbContext(string[] args) =>

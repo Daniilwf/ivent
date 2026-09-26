@@ -5,6 +5,7 @@ import { ChangePasswordForm } from './app/ChangePasswordForm';
 import { LoginForm, TablePage } from './app/LoginForm';
 import { MaintenanceBanner } from './app/MaintenanceBanner';
 import { navigate, paths, routeOf, usePath } from './app/router';
+import { UpdateBanner } from './app/WhatsNew';
 import { Shell } from './app/Shell';
 import { AdminScreen } from './admin/AdminScreen';
 import { FeedScreen } from './feed/FeedScreen';
@@ -80,6 +81,7 @@ export function App() {
   return (
     <>
       <MaintenanceBanner />
+      <UpdateBanner />
       {screen()}
     </>
   );

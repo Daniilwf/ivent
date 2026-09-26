@@ -7,6 +7,7 @@ import { onWheel, wheelOf } from '../pool/poolFilter';
 import { demoRules } from '../rules/demoRules';
 import { RulesContent } from '../rules/RulesScreen';
 import { Shell } from '../app/Shell';
+import { ReleaseList } from '../app/WhatsNew';
 import { RunCard } from '../board/GameCards';
 import { CompleteForm } from '../season/CompleteForm';
 import { ProofSection } from '../season/ProofForm';
@@ -31,6 +32,7 @@ import {
   demoOffer,
   demoPenalty,
   demoProofFiles,
+  demoReleases,
   demoRoll,
   demoRows,
   demoUser,
@@ -652,6 +654,12 @@ export function Styleguide() {
             }}
             runs={[]}
           />
+        </div>
+      </Section>
+
+      <Section id="whats-new" title={t.whatsNew.title} lead={t.whatsNew.lead}>
+        <div className="max-w-110 rounded-lg bg-card p-4">
+          <ReleaseList releases={demoReleases} />
         </div>
       </Section>
     </main>
