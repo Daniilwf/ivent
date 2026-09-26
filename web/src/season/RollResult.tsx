@@ -141,18 +141,23 @@ export function ChoiceCard({
       ) : null}
       <ul className="grid gap-4">
         {options.map(({ id, game }) => (
-          <li key={id} className="grid rounded-md border-2 border-ink bg-card">
+          <li
+            key={id}
+            // The ring goes round the whole card, «Уже проходил» included, not the button's half of it
+            className="grid rounded-md border-2 border-ink bg-card has-[button[data-pick]:focus-visible]:focus-ring"
+          >
             {/* The card picks the game: a big target on a phone */}
             <button
               type="button"
               data-testid={`option-${id}`}
+              data-pick
               aria-label={optionName(game)}
               disabled={pending}
               onClick={() => {
                 onChoose(id);
               }}
               className={cx(
-                'grid w-full cursor-pointer grid-cols-[auto_minmax(0,1fr)] items-center gap-x-4 rounded-md text-left transition duration-(--duration-fast) ease-out is-hover:bg-page is-focus:focus-ring disabled:cursor-default disabled:opacity-50',
+                'grid w-full cursor-pointer grid-cols-[auto_minmax(0,1fr)] items-center gap-x-4 rounded-md text-left transition duration-(--duration-fast) ease-out is-hover:bg-page focus-visible:outline-none disabled:cursor-default disabled:opacity-50',
                 dense ? 'p-2' : 'p-3',
               )}
             >
