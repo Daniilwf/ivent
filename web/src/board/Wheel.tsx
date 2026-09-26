@@ -78,6 +78,9 @@ export function WheelMoment({
   };
   useImperativeHandle(ref, () => ({ skip: finish }));
 
+  // One roll per mount (the parent keys the wheel by it): a page refresh hands in an equal roll as a new object,
+  // which must not restart the spin
+  const rollId = roll?.id;
   useEffect(() => {
     if (!roll) return;
     if (reduce) {
@@ -122,7 +125,7 @@ export function WheelMoment({
     };
     // The rotation and the turns are fixed for one roll: the component is keyed by it
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roll, reduce]);
+  }, [rollId, reduce]);
 
   const playing = stage === 'spinning' || stage === 'miss';
   const miss = roll?.misses[missShown];

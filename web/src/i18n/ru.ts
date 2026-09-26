@@ -1,5 +1,15 @@
 // The single dictionary of interface texts. Terms come from docs/GLOSSARY.md.
 
+// игра / игры / игр
+const games = (n: number) => {
+  const tens = n % 100;
+  const ones = n % 10;
+  if (tens >= 11 && tens <= 14) return `${n} игр`;
+  if (ones === 1) return `${n} игра`;
+  if (ones >= 2 && ones <= 4) return `${n} игры`;
+  return `${n} игр`;
+};
+
 // монетка / монетки / монеток
 const coins = (n: number) => {
   const tens = n % 100;
@@ -230,7 +240,7 @@ export const ru = {
       kind === 'dropped' ? `Дропнул ${player}` : `Тех-реролл у ${player}`,
     alreadyPlayedGame: (title: string) => `Уже проходил: ${title}`,
     choose: 'Выбери одну из выпавших игр',
-    pick: (title: string) => `Выбрать ${title}`,
+    pick: 'Выбрать:',
     rolled: 'Выпала игра',
     playing: (title: string) => `Сейчас играешь: ${title}`,
     complete: 'Завершить',
@@ -376,7 +386,7 @@ export const ru = {
       category: (name: string) => `Категория: ${name}`,
       miss: (who: string) => `Уже прошёл ${who}, крутим дальше`,
       missPlaying: (who: string) => `Сейчас играет ${who}, крутим дальше`,
-      choice: (count: number) => `На выбор: ${count} ${count < 5 ? 'игры' : 'игр'}`,
+      choice: (count: number) => `На выбор: ${games(count)}`,
       missNote: (title: string) => `Промах: ${title}.`,
       result: (title: string) => `Выпала игра: ${title}`,
     },

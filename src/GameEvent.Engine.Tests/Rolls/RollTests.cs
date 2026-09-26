@@ -86,7 +86,7 @@ public class RollTests
             Assert.Equal(s.GameId("Silent Hill"), rolled.GameId);
             Assert.Empty(rolled.Misses);
             // D-136: the logged wheel is the one that spun — the empty categories were not on it
-            Assert.Equal(["Horror"], rolled.Wheel);
+            Assert.Equal(["Horror"], rolled.Sectors);
         }
     }
 
@@ -109,8 +109,8 @@ public class RollTests
 
         ScenarioAssert.Accepted(s);
         var rolled = Assert.Single(s.LastEvents<GameRolled>());
-        Assert.Equal(["Horror", "Puzzle"], rolled.Wheel);
-        Assert.Contains(rolled.Category, rolled.Wheel);
+        Assert.Equal(["Horror", "Puzzle"], rolled.Sectors);
+        Assert.Contains(rolled.Category, rolled.Sectors);
     }
 
     [Fact]

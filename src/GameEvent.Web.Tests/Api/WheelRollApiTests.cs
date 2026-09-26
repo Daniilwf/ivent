@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace GameEvent.Web.Tests.Api;
 
@@ -31,7 +32,7 @@ public sealed class WheelRollApiTests : IAsyncLifetime
 
         var roll = (await MeAsync(vasya)).GetProperty("roll");
         Assert.Equal("Horror", roll.GetProperty("category").GetString());
-        Assert.Equal(["Horror"], roll.GetProperty("wheel").EnumerateArray().Select(c => c.GetString()));
+        Assert.Equal(["Horror"], roll.GetProperty("sectors").EnumerateArray().Select(c => c.GetString()));
         Assert.Empty(roll.GetProperty("misses").EnumerateArray());
         Assert.True(roll.GetProperty("sequence").GetInt64() > 0);
     }
@@ -68,6 +69,34 @@ public sealed class WheelRollApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_choice_of_games_carries_its_wheel_too()
+    {
+        var vasya = await _site.SignedInAsync("vasya");
+        var admin = await _site.SignedInAsync("admin");
+        await ChangeRulesAsync(admin, ruleset => ruleset["roll"]!["choiceCount"] = 2);
+
+        await PostOkAsync(vasya, $"{Season}/roll");
+
+        var me = await MeAsync(vasya);
+        Assert.Equal(JsonValueKind.Object, me.GetProperty("choice").ValueKind);
+        var roll = me.GetProperty("roll");
+        Assert.Equal("Horror", roll.GetProperty("category").GetString());
+        Assert.Equal(["Horror"], roll.GetProperty("sectors").EnumerateArray().Select(c => c.GetString()));
+    }
+
+    [Fact]
+    public async Task No_wheel_after_the_deadline()
+    {
+        var vasya = await _site.SignedInAsync("vasya");
+        await PostOkAsync(vasya, $"{Season}/roll");
+        await _site.SendAsync(new GameEvent.Engine.Seasons.SetSeasonDeadline(_site.Clock.UtcNow.AddHours(1)));
+
+        _site.Clock.Advance(TimeSpan.FromHours(2));
+
+        Assert.Equal(JsonValueKind.Null, (await MeAsync(vasya)).GetProperty("roll").ValueKind);
+    }
+
+    [Fact]
     public async Task No_wheel_while_idle_or_playing()
     {
         var vasya = await _site.SignedInAsync("vasya");
@@ -91,6 +120,18 @@ public sealed class WheelRollApiTests : IAsyncLifetime
     }
 
     // ---- Helpers ----
+
+    private static async Task ChangeRulesAsync(HttpClient admin, Action<JsonNode> change)
+    {
+        using var current = JsonDocument.Parse(await admin.GetStringAsync($"{Season}/rules", Ct));
+        var ruleset = JsonNode.Parse(current.RootElement.GetProperty("ruleset").GetRawText())!;
+        change(ruleset);
+        var response = await admin.PutAsJsonAsync(
+            $"/api/admin/seasons/{SiteFactory.SeasonId}/rules",
+            new { commandId = Guid.NewGuid(), expectedVersion = current.RootElement.GetProperty("version").GetInt32(), ruleset },
+            Ct);
+        Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync(Ct));
+    }
 
     /// <summary>Rolls, starts and completes one game; returns its title</summary>
     private static async Task<string> PlayOneAsync(HttpClient player)

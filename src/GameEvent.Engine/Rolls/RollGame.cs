@@ -32,7 +32,7 @@ public sealed record RollMiss(Guid GameId, RollMissReason Reason, Guid ByPlayerI
 public sealed record RollOffer(Guid GameId, RunSnapshot Snapshot, DateTimeOffset RolledAt);
 
 /// <summary>
-/// A plain roll. <c>Wheel</c> — the categories that were on the wheel, in its order (ordinal by name): the page draws
+/// A plain roll. <c>Sectors</c> — the categories that were on the wheel, in its order (ordinal by name): the page draws
 /// the wheel from the log, not from today's pool (D-136). v1 had no wheel; it reads as the picked category alone.
 /// </summary>
 [EventType("game-rolled", 2)]
@@ -43,14 +43,14 @@ public sealed record GameRolled(
     Guid GameId,
     RunSnapshot Snapshot,
     DateTimeOffset RolledAt,
-    EquatableArray<string> Wheel) : IGameEvent;
+    EquatableArray<string> Sectors) : IGameEvent;
 
 /// <summary>
 /// The wheel with <c>roll.choiceCount</c> &gt; 1 (D-06): up to that many available games of one category, drawn without
 /// replacement, reserved until the player picks one with <see cref="Turns.MakeChoice"/>. When the category has only
 /// one available game the roll is a plain <see cref="GameRolled"/>.
 /// </summary>
-/// <remarks><c>Wheel</c> as in <see cref="GameRolled"/> (D-136, v2).</remarks>
+/// <remarks><c>Sectors</c> as in <see cref="GameRolled"/> (D-136, v2).</remarks>
 [EventType("game-choice-rolled", 2)]
 public sealed record GameChoiceRolled(
     Guid PlayerId,
@@ -58,7 +58,7 @@ public sealed record GameChoiceRolled(
     EquatableArray<RollMiss> Misses,
     Guid ChoiceId,
     EquatableArray<RollOffer> Offers,
-    EquatableArray<string> Wheel) : IGameEvent;
+    EquatableArray<string> Sectors) : IGameEvent;
 
 internal static class Rolling
 {

@@ -5,7 +5,7 @@ import { watchSeason } from '../api/realtime';
 import { moscowTime } from '../app/time';
 import { ru } from '../i18n/ru';
 import { CompleteForm, type Completion } from './CompleteForm';
-import { ChoiceCard, OfferCard } from './RollResult';
+import { ChoiceCard, OfferCard, rollResultTitle } from './RollResult';
 import { AvatarSection } from './AvatarSection';
 import { ProofSection } from './ProofForm';
 import { ManualEffectItem, type EffectOutcome } from './ManualEffectItem';
@@ -227,10 +227,10 @@ export function SeasonScreen({
   const offer = turnsOpen && me?.phase === 'rolling' ? me.offer : null;
   // A roll that came while the page is open spins its wheel first; the server chose everything, the page only shows it
   const fresh =
-    (offer ?? choice) && me?.roll && landed !== undefined && me.roll.sequence !== landed
+    (offer ?? choice) && me?.roll && landed !== undefined && me.roll.sequence > (landed ?? 0)
       ? me.roll
       : null;
-  const spinSectors = fresh ? fresh.wheel : [];
+  const spinSectors = fresh ? fresh.sectors : [];
   const spin: WheelRoll | null = fresh ? wheelRoll(fresh, offer, choice) : null;
   const uncheckedBlocked = me?.unchecked != null && me.unchecked.count >= me.unchecked.limit;
   const { board, players, rows } = view;
@@ -401,7 +401,11 @@ export function SeasonScreen({
               sectors={spinSectors}
               roll={spin}
               onPhase={(phase) => {
-                if (phase === 'done') setLanded(spin.id);
+                if (phase !== 'done') return;
+                setLanded(spin.id);
+                requestAnimationFrame(() => {
+                  document.getElementById(rollResultTitle)?.focus();
+                });
               }}
             />
             <Button onClick={() => wheel.current?.skip()}>{ru.moments.skip}</Button>
@@ -559,7 +563,7 @@ function wheelRoll(
   offer: Schemas['OfferedGameView'] | null,
   choice: Schemas['ChoiceView'] | null,
 ): WheelRoll {
-  const sector = Math.max(roll.wheel.indexOf(roll.category), 0);
+  const sector = Math.max(roll.sectors.indexOf(roll.category), 0);
   return {
     id: roll.sequence,
     misses: roll.misses.map((miss) => ({

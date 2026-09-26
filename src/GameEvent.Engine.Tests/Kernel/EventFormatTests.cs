@@ -133,14 +133,14 @@ public class EventFormatTests
             new GameRolled(s_player, "Horror", [new RollMiss(s_game, RollMissReason.CompletedInSeason, s_other)], s_game, Snapshot(), s_at, ["Horror", "RPG"]),
             2,
             """{"playerId":"10000000-0000-0000-0000-000000000001","category":"Horror","misses":[{"gameId":"20000000-0000-0000-0000-000000000001","reason":"completedInSeason","byPlayerId":"10000000-0000-0000-0000-000000000002"}],"gameId":"20000000-0000-0000-0000-000000000001","snapshot":"""
-            + SnapshotJson + ""","rolledAt":"2026-10-01T12:30:00+00:00","wheel":["Horror","RPG"]}"""
+            + SnapshotJson + ""","rolledAt":"2026-10-01T12:30:00+00:00","sectors":["Horror","RPG"]}"""
         },
         {
             "game-choice-rolled",
             new GameChoiceRolled(s_player, "Horror", [], s_run, [new RollOffer(s_game, Snapshot(), s_at)], ["Horror"]),
             2,
             """{"playerId":"10000000-0000-0000-0000-000000000001","category":"Horror","misses":[],"choiceId":"00000000-0000-0000-0000-000000000001","offers":[{"gameId":"20000000-0000-0000-0000-000000000001","snapshot":"""
-            + SnapshotJson + ""","rolledAt":"2026-10-01T12:30:00+00:00"}],"wheel":["Horror"]}"""
+            + SnapshotJson + ""","rolledAt":"2026-10-01T12:30:00+00:00"}],"sectors":["Horror"]}"""
         },
         {
             "choice-made",

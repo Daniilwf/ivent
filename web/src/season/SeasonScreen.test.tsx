@@ -271,7 +271,8 @@ describe('SeasonScreen', () => {
     const option = screen.getByTestId('option-a1');
     expect(option).toHaveTextContent('Silent Hill');
     expect(option).toHaveTextContent(ru.board.hours(12));
-    expect(option).toHaveAccessibleName(ru.turn.pick('Silent Hill'));
+    // The card's name is its content: the action, the game and its hours
+    expect(option).toHaveAccessibleName(`${ru.turn.pick} Silent Hill. ${ru.board.hours(12)}`);
 
     await userEvent.click(screen.getByTestId('option-b2'));
 
@@ -1451,6 +1452,10 @@ describe('SeasonScreen marks on offered games (G8, D-94 (6))', () => {
       within(screen.getByTestId('option-b2')).queryByTestId('game-marks'),
     ).not.toBeInTheDocument();
     expect(screen.getAllByTestId('game-marks')).toHaveLength(1);
+    // A screen reader hears the mark in the card's name too (H3 review)
+    expect(marked).toHaveAccessibleName(
+      expect.stringContaining(ru.turn.gameMark('Петя', 'techRerolled')) as string,
+    );
   });
 });
 
@@ -1847,7 +1852,7 @@ describe('SeasonScreen wheel (H3, D-136)', () => {
   const roll: Schemas['WheelRollView'] = {
     sequence: 7,
     category: 'Horror',
-    wheel: ['Action', 'Horror', 'RPG'],
+    sectors: ['Action', 'Horror', 'RPG'],
     misses: [
       { game: 'Outlast', reason: 'completedInSeason', player: 'Петя' },
       { game: 'Alan Wake', reason: 'beingPlayed', player: 'Маша' },
@@ -1897,6 +1902,45 @@ describe('SeasonScreen wheel (H3, D-136)', () => {
     expect(screen.queryByTestId('start')).not.toBeInTheDocument();
     await userEvent.click(within(wheel).getByRole('button', { name: ru.moments.skip }));
     expect(await screen.findByTestId('start')).toBeInTheDocument();
+    expect(screen.queryByTestId('wheel')).not.toBeInTheDocument();
+  });
+
+  it('spins for the new roll «Уже проходил» brings, on the wheel the server sent', async () => {
+    let current = rolled(7);
+    serve(async (r) => {
+      if (isSeasonGet(r)) return json(200, current);
+      await r.text();
+      current = rolled(8);
+      return json(200, { duplicate: false, events: [] });
+    });
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    await userEvent.click(await screen.findByTestId('already-played'));
+
+    const wheel = await screen.findByTestId('wheel');
+    for (const sector of roll.sectors) {
+      expect(within(wheel).getByText(sector)).toBeInTheDocument();
+    }
+  });
+
+  it('does not spin again for an older roll the admin brought back by undoing a reroll', async () => {
+    let current = rolled(9);
+    serve((r) => (isSeasonGet(r) ? json(200, current) : json(404, {})));
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+    await screen.findByTestId('offer');
+
+    const older = rolled(7);
+    if (!older.me) throw new Error('the fixture has a player');
+    current = {
+      ...older,
+      lastSequence: 12,
+      me: { ...older.me, offer: { ...offered, title: 'Outlast' } },
+    };
+    act(() => {
+      hubChange?.();
+    });
+    expect(await screen.findByText('Outlast', { selector: 'h3' })).toBeInTheDocument();
+
     expect(screen.queryByTestId('wheel')).not.toBeInTheDocument();
   });
 

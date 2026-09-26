@@ -9400,7 +9400,7 @@
         "required": [
           "sequence",
           "category",
-          "wheel",
+          "sectors",
           "misses"
         ],
         "type": "object",
@@ -9412,7 +9412,7 @@
           "category": {
             "type": "string"
           },
-          "wheel": {
+          "sectors": {
             "type": "array",
             "items": {
               "type": "string"

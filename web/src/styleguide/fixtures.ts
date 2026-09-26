@@ -117,7 +117,7 @@ export const demoOffer: Schemas['OfferedGameView'] = {
 export const demoRoll: Schemas['WheelRollView'] = {
   sequence: 1,
   category: 'Adventure',
-  wheel: ['Action', 'Adventure', 'Horror', 'RPG'],
+  sectors: ['Action', 'Adventure', 'Horror', 'RPG'],
   misses: [
     { game: 'Hollow Knight', reason: 'completedInSeason', player: 'Капитан_Пельмень' },
     { game: 'Dead Cells', reason: 'beingPlayed', player: 'Лиса' },

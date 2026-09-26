@@ -36,7 +36,7 @@ public static class EventCodec
 
     private static JsonObject WheelOfOne(JsonObject data)
     {
-        data["wheel"] = new JsonArray(data["category"]?.DeepClone());
+        data["sectors"] = new JsonArray(data["category"]?.DeepClone());
         return data;
     }
 

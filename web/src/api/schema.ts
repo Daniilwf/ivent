@@ -6632,7 +6632,7 @@ export interface components {
             /** Format: int64 */
             sequence: number;
             category: string;
-            wheel: string[];
+            sectors: string[];
             misses: components["schemas"]["RollMissView"][];
         };
     };

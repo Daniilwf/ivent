@@ -11,6 +11,9 @@ type Roll = Schemas['WheelRollView'];
 
 const w = ru.moments.wheel;
 
+/** The result's heading takes the focus when the wheel stops */
+export const rollResultTitle = 'roll-result-title';
+
 /** What the wheel passed on the way, in words: «Промах: Hollow Knight. Уже прошёл Вася, крутим дальше» */
 function Misses({ roll }: { roll: Roll | null }) {
   if (!roll || roll.misses.length === 0) return null;
@@ -24,6 +27,15 @@ function Misses({ roll }: { roll: Roll | null }) {
       ))}
     </ul>
   );
+}
+
+/** A choice card's name says all it shows: the action, the game, its hours and the other players' marks */
+function optionName(game: Offered) {
+  return [
+    `${ru.turn.pick} ${game.title}`,
+    ru.board.hours(game.hours ?? null),
+    ...game.marks.map((mark) => ru.turn.gameMark(mark.playerName, mark.kind)),
+  ].join('. ');
 }
 
 function Category({ roll }: { roll: Roll | null }) {
@@ -53,7 +65,13 @@ export function OfferCard({
       <Cover game={offer} />
       <div className="grid content-start gap-1">
         <p className="text-sm text-ink-soft">{ru.turn.rolled}</p>
-        <h3 className="font-display text-lg font-heavy wrap-anywhere">{offer.title}</h3>
+        <h3
+          id={rollResultTitle}
+          tabIndex={-1}
+          className="font-display text-lg font-heavy wrap-anywhere focus:outline-none"
+        >
+          {offer.title}
+        </h3>
         <p className="text-sm text-ink-soft">{ru.board.hours(offer.hours ?? null)}</p>
         <div className="flex flex-wrap gap-1">
           <Category roll={roll} />
@@ -99,7 +117,11 @@ export function ChoiceCard({
   const options = choice.options.flatMap(({ id, game }) => (game ? [{ id, game }] : []));
   return (
     <fieldset data-testid="choice" className="grid min-w-0 gap-3">
-      <legend className="mb-2 font-display font-heavy">{ru.turn.choose}</legend>
+      <legend className="mb-2 font-display font-heavy">
+        <span id={rollResultTitle} tabIndex={-1} className="focus:outline-none">
+          {ru.turn.choose}
+        </span>
+      </legend>
       <div className="flex flex-wrap gap-1">
         <Category roll={roll} />
       </div>
@@ -111,7 +133,7 @@ export function ChoiceCard({
             <button
               type="button"
               data-testid={`option-${id}`}
-              aria-label={ru.turn.pick(game.title)}
+              aria-label={optionName(game)}
               disabled={pending}
               onClick={() => {
                 onChoose(id);
