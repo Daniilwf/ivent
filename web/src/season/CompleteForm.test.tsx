@@ -8,7 +8,11 @@ describe('CompleteForm', () => {
     const onComplete = vi.fn();
     render(<CompleteForm needsHours={false} pending={false} onComplete={onComplete} />);
 
-    await userEvent.selectOptions(screen.getByTestId('complete-difficulty'), 'hard');
+    await userEvent.click(
+      within(screen.getByTestId('complete-difficulty')).getByRole('radio', {
+        name: ru.difficulty.hard,
+      }),
+    );
     await userEvent.click(screen.getByTestId('complete-submit'));
 
     expect(onComplete).toHaveBeenCalledWith({ difficulty: 'hard' });
@@ -45,9 +49,16 @@ describe('CompleteForm', () => {
   it('shows every difficulty from the API contract in Russian', () => {
     render(<CompleteForm needsHours={false} pending={false} onComplete={vi.fn()} />);
 
-    const options = within(screen.getByTestId('complete-difficulty'))
-      .getAllByRole('option')
-      .map((o) => o.textContent);
+    // H4: every difficulty in sight as a radio button, «Нормальная» picked by default
+    const radios = within(screen.getByTestId('complete-difficulty')).getAllByRole('radio');
+    expect(radios.map((r) => (r as HTMLInputElement).value)).toEqual([
+      'easy',
+      'normal',
+      'hard',
+      'extreme',
+    ]);
+    expect(radios.filter((r) => (r as HTMLInputElement).checked)).toEqual([radios[1]]);
+    const options = radios.map((r) => r.closest('label')?.textContent);
     expect(options).toEqual([
       ru.difficulty.easy,
       ru.difficulty.normal,
@@ -199,5 +210,94 @@ describe('CompleteForm', () => {
 
     expect(onComplete).not.toHaveBeenCalled();
     expect(screen.getByRole('alert')).toHaveTextContent(ru.turn.reviewRatingRequired);
+  });
+
+  // ---- H4: the form on the design system ----
+
+  it('tells every mistake under its field at once and puts the focus on the first', async () => {
+    const onComplete = vi.fn();
+    render(<CompleteForm needsHours pending={false} onComplete={onComplete} />);
+
+    await userEvent.click(screen.getByTestId('complete-submit'));
+
+    expect(onComplete).not.toHaveBeenCalled();
+    const hours = screen.getByTestId('complete-hours');
+    expect(hours).toHaveAccessibleDescription(`${ru.turn.hoursHint} ${ru.turn.hoursInvalid}`);
+    expect(screen.getByTestId('complete-hours-source')).toHaveAccessibleDescription(
+      `${ru.turn.hoursSourceHint} ${ru.turn.hoursSourceRequired}`,
+    );
+    expect(screen.getAllByRole('alert')).toHaveLength(2);
+    await vi.waitFor(() => {
+      expect(hours).toHaveFocus();
+    });
+  });
+
+  it('tells a mistake under its own field and marks only that field', async () => {
+    render(<CompleteForm needsHours pending={false} onComplete={vi.fn()} />);
+
+    await userEvent.type(screen.getByTestId('complete-hours'), '6');
+    await userEvent.click(screen.getByTestId('complete-submit'));
+
+    const source = screen.getByTestId('complete-hours-source');
+    expect(source).toHaveAttribute('aria-invalid', 'true');
+    expect(source).toHaveAccessibleDescription(
+      `${ru.turn.hoursSourceHint} ${ru.turn.hoursSourceRequired}`,
+    );
+    expect(screen.getByTestId('complete-hours')).not.toHaveAttribute('aria-invalid');
+    expect(screen.getAllByRole('alert')).toHaveLength(1);
+  });
+
+  it('keeps the review folded and opens it to show its mistake', async () => {
+    const onComplete = vi.fn();
+    const { container } = render(
+      <CompleteForm needsHours={false} pending={false} onComplete={onComplete} />,
+    );
+    const review = container.querySelector('details');
+    expect(review).not.toHaveAttribute('open');
+    expect(within(review as HTMLElement).getByText(ru.turn.review)).toBeInTheDocument();
+
+    await userEvent.type(screen.getByTestId('complete-review-text'), 'Туман');
+    await userEvent.click(screen.getByTestId('complete-submit'));
+
+    expect(onComplete).not.toHaveBeenCalled();
+    expect(review).toHaveAttribute('open');
+    expect(screen.getByTestId('complete-review-rating')).toHaveAttribute('aria-invalid', 'true');
+  });
+
+  it('names the one main action and shows it busy while the command runs', () => {
+    render(<CompleteForm needsHours={false} pending onComplete={vi.fn()} />);
+
+    const submit = screen.getByTestId('complete-submit');
+    expect(submit).toHaveTextContent(ru.turn.complete);
+    expect(submit).toHaveAttribute('data-variant', 'main');
+    expect(submit).toHaveAttribute('aria-busy', 'true');
+  });
+
+  it('names the die of every difficulty and the event it grants in the hint', () => {
+    render(
+      <CompleteForm
+        needsHours={false}
+        pending={false}
+        onComplete={vi.fn()}
+        dice={[
+          { difficulty: 'easy', sides: 2, grantEvent: null },
+          { difficulty: 'normal', sides: 4, grantEvent: null },
+          { difficulty: 'hard', sides: 6, grantEvent: null },
+          { difficulty: 'extreme', sides: 6, grantEvent: 'good' },
+        ]}
+      />,
+    );
+
+    const group = screen.getByRole('group', { name: ru.turn.difficulty });
+    expect(group).toHaveAccessibleDescription(
+      `${ru.turn.difficultyHint}. ${ru.turn.difficultyDice([
+        { label: ru.difficulty.easy, sides: 2, grant: null },
+        { label: ru.difficulty.normal, sides: 4, grant: null },
+        { label: ru.difficulty.hard, sides: 6, grant: null },
+        { label: ru.difficulty.extreme, sides: 6, grant: 'good' },
+      ])}`,
+    );
+    expect(group).toHaveAccessibleDescription(/пруф/);
+    expect(group).toHaveAccessibleDescription(/Выше сложной — d6 и хороший ивент/);
   });
 });

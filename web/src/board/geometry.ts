@@ -100,6 +100,15 @@ export function walk(
   return path;
 }
 
+/** The cells a token passes from one cell to another along the edges, both included; none when it stays. A move
+ *  back or one the edges do not lead to (it should not happen after a completion) is a single jump. */
+export function movePath(board: Board, from: number, to: number): number[] | null {
+  if (from === to) return null;
+  if (to < from) return [from, to];
+  const path = walk(board, from, to - from);
+  return path.at(-1) === to ? path : [from, to];
+}
+
 /** Cells left to the finish along the shortest way (breadth-first over the edges) */
 export function cellsToFinish(board: Board, from: number): number {
   const finish = board.cells.find((c) => c.kind === 'finish');

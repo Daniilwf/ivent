@@ -2,20 +2,34 @@ import { CalendarClock, Inbox, Plus, Trophy } from 'lucide-react';
 import { useEffect, type ReactNode } from 'react';
 import { Shell } from '../app/Shell';
 import { RunCard } from '../board/GameCards';
+import { CompleteForm } from '../season/CompleteForm';
+import { ProofSection } from '../season/ProofForm';
 import { ChoiceCard, OfferCard } from '../season/RollResult';
+import { RunActions } from '../season/RunActions';
 import { Leaderboard } from '../board/Leaderboard';
 import { cellsToFinish } from '../board/geometry';
 import { demoBoard } from '../board/demoBoard';
 import { ru } from '../i18n/ru';
 import { Button, IconButton, type ButtonVariant } from '../ui/Button';
 import { BottomSheet, ConfirmDanger } from '../ui/Dialogs';
-import { Field } from '../ui/Field';
+import { ChoiceGroup, Field, FilePicker, Select } from '../ui/Field';
 import { Badge, Chip, Tag } from '../ui/Marks';
 import { RouteProgress, Skeleton } from '../ui/Progress';
 import { ConnectionLost, EmptyState, ErrorState, Notice } from '../ui/States';
 import { Sticker } from '../ui/Sticker';
 import { Panel } from '../ui/Surface';
-import { demoChoice, demoGames, demoMe, demoOffer, demoRoll, demoRows, demoUser } from './fixtures';
+import {
+  demoChoice,
+  demoGames,
+  demoMe,
+  demoOffer,
+  demoPenalty,
+  demoProofFiles,
+  demoRoll,
+  demoRows,
+  demoUser,
+  demoWitnesses,
+} from './fixtures';
 import { DiceDemo, FinishDemo, MapDemo, MoveDemo, WheelDemo } from './MomentDemos';
 
 // The styleguide's cards act on nothing
@@ -82,6 +96,11 @@ const variants: { variant: ButtonVariant; label: string; text: string }[] = [
 ];
 
 const cellsLeft = (p: { cell: number }) => cellsToFinish(demoBoard, p.cell);
+const dropConsequences = ru.turn.dropConsequences(demoPenalty);
+const difficulties = (['easy', 'normal', 'hard', 'extreme'] as const).map((d) => ({
+  value: d,
+  label: ru.difficulty[d],
+}));
 
 export function Styleguide() {
   // The page loads after the address: a link to a section scrolls there once the sections exist
@@ -250,6 +269,49 @@ export function Styleguide() {
           <Field label={t.fields.hours} force="focus" defaultValue="27" />
           <Field label={t.fields.link} error={t.fields.linkError} defaultValue="steam" />
           <Field label={t.fields.link} disabled defaultValue="https://youtu.be/…" />
+          <Select label={t.fields.select} defaultValue="weakPc">
+            <option value="weakPc">{ru.turn.techRerollReasons.weakPc}</option>
+          </Select>
+          <Select label={t.fields.select} error={t.fields.selectError} defaultValue="">
+            <option value="">{ru.turn.techRerollReasonPlaceholder}</option>
+          </Select>
+          <ChoiceGroup
+            label={t.fields.choice}
+            options={difficulties}
+            value="normal"
+            onChange={noop}
+          />
+          <ChoiceGroup
+            label={t.fields.choice}
+            options={difficulties}
+            value="hard"
+            force="focus"
+            onChange={noop}
+          />
+          <ChoiceGroup
+            label={t.fields.choice}
+            options={difficulties}
+            value="easy"
+            disabled
+            onChange={noop}
+          />
+          <ul className="flex flex-wrap gap-x-4 gap-y-3">
+            {buttonStates
+              .filter((state) => state.label !== t.states.active)
+              .map((state) => (
+                <li key={state.label} className="grid justify-items-start gap-1">
+                  <span className="text-xs text-ink-soft">{state.label}</span>
+                  <FilePicker
+                    label={t.fields.file}
+                    accept="image/png"
+                    {...(state.props.force ? { force: state.props.force } : {})}
+                    disabled={state.props.disabled}
+                    busy={state.props.loading ?? false}
+                  />
+                </li>
+              ))}
+          </ul>
+          <FilePicker label={t.fields.file} hint={t.fields.fileHint} accept="image/png" />
         </div>
       </Section>
 
@@ -305,13 +367,13 @@ export function Styleguide() {
             game={run}
             left={cellsLeft(me)}
             total={routeLength}
-            dropConsequences={t.run.dropConsequences}
+            dropConsequences={dropConsequences}
           />
           <RunCard
             game={demoGames[4] ?? run}
             left={routeLength - 2}
             total={routeLength}
-            dropConsequences={t.run.dropConsequences}
+            dropConsequences={dropConsequences}
             busy
           />
         </div>
@@ -344,12 +406,99 @@ export function Styleguide() {
         </div>
       </Section>
 
+      <Section id="complete" title={t.complete.title} lead={t.complete.lead}>
+        <div className="grid items-start gap-4 desk:grid-cols-2">
+          <div className="grid min-w-0 gap-4 rounded-lg bg-card p-4">
+            <CompleteForm
+              needsHours
+              challengesEnabled
+              dice={[
+                { difficulty: 'easy', sides: 2, grantEvent: null },
+                { difficulty: 'normal', sides: 4, grantEvent: null },
+                { difficulty: 'hard', sides: 6, grantEvent: null },
+                { difficulty: 'extreme', sides: 6, grantEvent: 'good' },
+              ]}
+              pending={false}
+              onComplete={noop}
+            />
+            <RunActions
+              game={run.title}
+              dropHintMinutes={null}
+              dropPenalty={demoPenalty}
+              techRerollOpen
+              pending={false}
+              onDrop={noop}
+              onTechReroll={noop}
+            />
+          </div>
+          <div className="grid min-w-0 gap-4 rounded-lg bg-card p-4">
+            <CompleteForm needsHours={false} pending onComplete={noop} />
+            <RunActions
+              game={run.title}
+              dropHintMinutes={60}
+              dropPenalty={demoPenalty}
+              techRerollOpen={false}
+              pending
+              onDrop={noop}
+              onTechReroll={noop}
+            />
+            <Notice tone="danger">{t.complete.message}</Notice>
+          </div>
+        </div>
+      </Section>
+
+      <Section id="proof" title={t.proof.title} lead={t.proof.lead}>
+        <div className="grid items-start gap-4 desk:grid-cols-2">
+          <div className="rounded-lg bg-card p-4">
+            <ProofSection proof={null} witnesses={demoWitnesses} pending={false} onSubmit={noop} />
+          </div>
+          <div className="grid content-start gap-4">
+            <div className="rounded-lg bg-card p-4">
+              <ProofSection
+                proof={{
+                  status: 'approved',
+                  files: demoProofFiles,
+                  links: [],
+                  note: null,
+                  comment: null,
+                }}
+                witnesses={demoWitnesses}
+                pending={false}
+                onSubmit={noop}
+              />
+            </div>
+            <div className="rounded-lg bg-card p-4">
+              <ProofSection
+                proof={{
+                  status: 'rejected',
+                  files: [],
+                  links: [],
+                  note: null,
+                  comment: t.proof.comment,
+                }}
+                witnesses={demoWitnesses}
+                pending={false}
+                onSubmit={noop}
+              />
+            </div>
+            <div className="rounded-lg bg-card p-4">
+              <ProofSection
+                proof={{ status: 'pending', files: [], links: [], note: null, comment: null }}
+                witnesses={[]}
+                pending
+                onSubmit={noop}
+              />
+            </div>
+          </div>
+        </div>
+      </Section>
+
       <Section id="dialogs" title={t.dialogs.title} lead={t.dialogs.lead}>
         <div className="flex flex-wrap gap-3">
           <ConfirmDanger
             trigger={<Button variant="danger">{ru.board.drop}</Button>}
             title={ru.board.dropTitle(run.title)}
-            consequences={t.run.dropConsequences}
+            consequences={dropConsequences}
             confirm={ru.board.dropConfirm}
             onConfirm={() => undefined}
           />

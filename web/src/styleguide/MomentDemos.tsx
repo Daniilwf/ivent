@@ -110,7 +110,7 @@ export function DiceDemo() {
     setRoll({
       id: (roll?.id ?? 0) + 1,
       values: [0, 0, 0, 0].map(() => 1 + Math.floor(Math.random() * 6)),
-      challenge: true,
+      challenge: 1,
     });
     setPhase('playing');
   };

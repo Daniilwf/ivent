@@ -8,8 +8,14 @@ import type { MomentHandle, MomentPhase } from './moment';
 
 const t = ru.moments.dice;
 
-/** The server's throw: every die's value; the challenge die, if any, is the last one */
-export type DiceRoll = { id: number; values: number[]; challenge: boolean };
+/** The server's throw: every die's value; the last `challenge` of them are the challenge dice; `sides` of each die
+ *  (a d6 without it) */
+export type DiceRoll = {
+  id: number;
+  values: number[];
+  challenge: number;
+  sides?: number[] | undefined;
+};
 
 const pips: Record<number, number[]> = {
   1: [4],
@@ -37,7 +43,30 @@ const faces = [
   { value: 5, place: 'die-f5' },
 ];
 
-function Face({ value, place, challenge }: { value: number; place: string; challenge: boolean }) {
+function Face({
+  value,
+  place,
+  challenge,
+  number,
+}: {
+  value: number;
+  place: string;
+  challenge: boolean;
+  /** A die of more than six sides shows its number instead of pips */
+  number?: number | undefined;
+}) {
+  if (number !== undefined)
+    return (
+      <span
+        className={cx(
+          'absolute inset-0 grid place-items-center rounded-md border-3 border-ink font-display text-2xl font-heavy backface-hidden',
+          challenge ? 'bg-gold' : 'bg-card',
+          place,
+        )}
+      >
+        {number}
+      </span>
+    );
   return (
     <span
       className={cx(
@@ -65,13 +94,17 @@ export function Die({
   index = 0,
   thrown = false,
   challenge = false,
+  sides = 6,
 }: {
   value: number;
   index?: number;
   thrown?: boolean;
   challenge?: boolean;
+  /** Not a d6 (a d2, a d4…): every face shows the number, and the die says its sides */
+  sides?: number;
 }) {
-  const [x, y] = faceTurn[value] ?? [0, 0];
+  const numeric = sides !== 6 || !(value in pips);
+  const [x, y] = numeric ? [0, 0] : (faceTurn[value] ?? [0, 0]);
   const delay = index * 0.09;
   return (
     <span className="inline-grid justify-items-center gap-2" data-die={value}>
@@ -92,12 +125,25 @@ export function Die({
           transition={thrown ? { duration: 1.2, delay, ease: [0.2, 0.7, 0.3, 1] } : { duration: 0 }}
         >
           {faces.map((f) => (
-            <Face key={f.value} value={f.value} place={f.place} challenge={challenge} />
+            <Face
+              key={f.value}
+              value={f.value}
+              place={f.place}
+              challenge={challenge}
+              number={numeric ? value : undefined}
+            />
           ))}
         </motion.span>
       </motion.span>
-      {challenge ? (
-        <span className="rounded-full bg-card px-2 text-xs font-bold">{t.challengeDie}</span>
+      {challenge || sides !== 6 ? (
+        <span className="flex gap-1">
+          {sides !== 6 ? (
+            <span className="rounded-full bg-card px-2 text-xs font-bold">{t.sides(sides)}</span>
+          ) : null}
+          {challenge ? (
+            <span className="rounded-full bg-card px-2 text-xs font-bold">{t.challengeDie}</span>
+          ) : null}
+        </span>
       ) : null}
     </span>
   );
@@ -109,10 +155,19 @@ export function DiceMoment({
   roll,
   onPhase,
   ref,
+  announce = true,
+  mode = 'move',
+  fill = false,
 }: {
+  /** The dice fill their frame (the map's stage on a desktop): the table is the whole frame */
+  fill?: boolean;
   roll: DiceRoll | null;
   onPhase?: ((phase: MomentPhase) => void) | undefined;
   ref?: Ref<MomentHandle> | undefined;
+  /** False when the page has its own live region for the result (it outlives the dice) */
+  announce?: boolean;
+  /** What the dice give: points and steps, points only (the token stays), or nothing (free mode of the frozen first) */
+  mode?: 'move' | 'stay' | 'free';
 }) {
   const reduce = useReducedMotion() ?? false;
   const [shown, setShown] = useState(roll === null);
@@ -147,9 +202,62 @@ export function DiceMoment({
 
   const values = roll?.values ?? [6, 6, 6];
   const total = values.reduce((a, b) => a + b, 0);
-  const plain = roll?.challenge ? values.slice(0, -1) : values;
-  const challenge = roll?.challenge ? (values.at(-1) ?? null) : null;
+  const extra = roll?.challenge ?? 0;
+  const plain = values.slice(0, values.length - extra);
+  const challenge = values.slice(values.length - extra);
   const thrown = roll !== null && !skipped && !reduce;
+
+  const content = (
+    <>
+      <div className="flex flex-wrap items-start justify-center gap-3">
+        {values.map((v, i) => (
+          <Die
+            key={`${skipped ? 's' : 'r'}-${i}`}
+            value={v}
+            index={i}
+            thrown={thrown}
+            challenge={i >= values.length - extra}
+            sides={roll?.sides?.[i] ?? 6}
+          />
+        ))}
+      </div>
+      {shown && roll && mode !== 'free' ? (
+        <motion.span
+          className="rounded-full border-3 border-ink bg-card px-6 font-display text-3xl font-heavy"
+          initial={reduce ? false : { scale: 0.5, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ type: 'spring', stiffness: 400, damping: 18 }}
+        >
+          +{total}
+        </motion.span>
+      ) : null}
+    </>
+  );
+  const words = (
+    <p
+      className={cx(
+        'min-h-5 text-center text-sm text-balance',
+        fill ? 'rounded-md bg-card px-3 py-1 text-ink empty:hidden' : 'text-ink-soft',
+      )}
+      aria-live={announce ? 'polite' : undefined}
+    >
+      {shown && roll
+        ? mode === 'free'
+          ? t.resultFree(plain, challenge)
+          : (mode === 'stay' ? t.resultStay : t.result)(plain, challenge, total)
+        : ''}
+    </p>
+  );
+  if (fill)
+    return (
+      <div
+        className="table-surface grid h-full w-full content-center justify-items-center gap-6 px-4 pt-6 pb-24 perspective-distant"
+        onClick={finish}
+      >
+        {content}
+        {words}
+      </div>
+    );
 
   return (
     <div className="grid w-full justify-items-center gap-3">
@@ -157,31 +265,9 @@ export function DiceMoment({
         className="grid min-h-90 w-full max-w-140 content-center justify-items-center gap-6 px-4 py-6 perspective-distant"
         onClick={finish}
       >
-        <div className="flex flex-wrap items-start justify-center gap-3">
-          {values.map((v, i) => (
-            <Die
-              key={`${skipped ? 's' : 'r'}-${i}`}
-              value={v}
-              index={i}
-              thrown={thrown}
-              challenge={roll?.challenge === true && i === values.length - 1}
-            />
-          ))}
-        </div>
-        {shown && roll ? (
-          <motion.span
-            className="rounded-full border-3 border-ink bg-card px-6 font-display text-3xl font-heavy"
-            initial={reduce ? false : { scale: 0.5, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ type: 'spring', stiffness: 400, damping: 18 }}
-          >
-            +{total}
-          </motion.span>
-        ) : null}
+        {content}
       </Table>
-      <p className="min-h-5 text-center text-sm text-balance text-ink-soft" aria-live="polite">
-        {shown && roll ? t.result(plain, challenge, total) : ''}
-      </p>
+      {words}
     </div>
   );
 }
