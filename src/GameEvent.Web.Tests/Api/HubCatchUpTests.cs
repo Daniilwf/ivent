@@ -102,10 +102,8 @@ public sealed class HubCatchUpTests : IAsyncLifetime
         var resumed = await connection.InvokeAsync<SeasonJoin>(nameof(SeasonHub.Resume), SiteFactory.SeasonId, last, Ct);
         var joined = await connection.InvokeAsync<SeasonJoin>(nameof(SeasonHub.Join), SiteFactory.SeasonId, Ct);
 
-        Assert.Equal(new SeasonJoin(last, [], false), resumed with { Missed = [] });
-        Assert.Empty(resumed.Missed);
-        Assert.Empty(joined.Missed);
-        Assert.Equal(last, joined.LastSequence);
+        Assert.Equal((last, 0, false), (resumed.LastSequence, resumed.Missed.Count, resumed.Reload));
+        Assert.Equal((last, 0, false), (joined.LastSequence, joined.Missed.Count, joined.Reload));
         await connection.DisposeAsync();
     }
 
@@ -128,11 +126,55 @@ public sealed class HubCatchUpTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Exactly_the_limit_of_missed_commands_is_still_listed()
+    {
+        var (connection, _) = await WatcherAsync("petya");
+        var seen = await LastSequenceAsync();
+        for (var i = 0; i < SeasonHub.MaxMissedCommands; i++)
+        {
+            await _site.SendAsync(new SetSeasonDeadline(_site.Clock.UtcNow.AddDays(7).AddMinutes(i)));
+        }
+
+        var resumed = await connection.InvokeAsync<SeasonJoin>(nameof(SeasonHub.Resume), SiteFactory.SeasonId, seen, Ct);
+
+        Assert.False(resumed.Reload);
+        Assert.Equal(SeasonHub.MaxMissedCommands, resumed.Missed.Count);
+        await connection.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task A_client_ahead_of_the_log_is_told_to_reload()
+    {
+        // A season restored from a backup: the client saw more than the log holds now
+        var (connection, _) = await WatcherAsync("petya");
+        var last = await LastSequenceAsync();
+
+        var resumed = await connection.InvokeAsync<SeasonJoin>(nameof(SeasonHub.Resume), SiteFactory.SeasonId, last + 50, Ct);
+
+        Assert.Equal((last, 0, true), (resumed.LastSequence, resumed.Missed.Count, resumed.Reload));
+        await connection.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task An_unknown_season_has_an_empty_log()
+    {
+        var (connection, _) = await WatcherAsync("petya");
+
+        var joined = await connection.InvokeAsync<SeasonJoin>(nameof(SeasonHub.Join), Guid.NewGuid(), Ct);
+        var resumed = await connection.InvokeAsync<SeasonJoin>(nameof(SeasonHub.Resume), Guid.NewGuid(), 0L, Ct);
+
+        Assert.Equal((0L, 0, false), (joined.LastSequence, joined.Missed.Count, joined.Reload));
+        Assert.Equal((0L, 0, false), (resumed.LastSequence, resumed.Missed.Count, resumed.Reload));
+        await connection.DisposeAsync();
+    }
+
+    [Fact]
     public async Task The_global_log_is_not_a_season_to_join()
     {
         var (connection, _) = await WatcherAsync("petya");
 
         await Assert.ThrowsAsync<HubException>(() => connection.InvokeAsync<SeasonJoin>(nameof(SeasonHub.Join), Guid.Empty, Ct));
+        await Assert.ThrowsAsync<HubException>(() => connection.InvokeAsync<SeasonJoin>(nameof(SeasonHub.Resume), Guid.Empty, 0L, Ct));
         await connection.DisposeAsync();
     }
 
@@ -143,7 +185,7 @@ public sealed class HubCatchUpTests : IAsyncLifetime
         var pool = new ConcurrentQueue<PoolUpdate>();
         poolWatcher.On<PoolUpdate>(SeasonHub.PoolUpdateMethod, pool.Enqueue);
         await poolWatcher.InvokeAsync(nameof(SeasonHub.JoinPool), Ct);
-        var (seasonOnly, _) = await WatcherAsync("vasya");
+        var (seasonOnly, seasonUpdates) = await WatcherAsync("vasya");
         var strayPool = new ConcurrentQueue<PoolUpdate>();
         seasonOnly.On<PoolUpdate>(SeasonHub.PoolUpdateMethod, strayPool.Enqueue);
         await seasonOnly.InvokeAsync<SeasonJoin>(nameof(SeasonHub.Join), SiteFactory.SeasonId, Ct);
@@ -155,9 +197,22 @@ public sealed class HubCatchUpTests : IAsyncLifetime
         var update = await WaitForAsync(pool);
         Assert.Equal(["game-added"], update.Types);
         Assert.Equal(update.FromSequence, update.ToSequence);
-        await Task.Delay(200, Ct);
-        Assert.Single(pool);
+
+        // One more pool change and one season change as markers: whatever the account change sent would have come before
+        (await admin.PostAsJsonAsync("/api/pool", new { commandId = Guid.NewGuid(), title = "Soma", tags = new[] { "Horror" }, hours = 10 }, Ct)).EnsureSuccessStatusCode();
+        await _site.SendAsync(new SetSeasonDeadline(_site.Clock.UtcNow.AddDays(7)));
+        await UntilAsync(seasonUpdates, await LastSequenceAsync());
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while (pool.Count < 2)
+        {
+            Assert.True(DateTime.UtcNow < deadline, "The second pool update did not come.");
+            await Task.Delay(20, Ct);
+        }
+
+        Assert.Equal([["game-added"], ["game-added"]], pool.Select(p => p.Types));
         Assert.Empty(strayPool);
+        Assert.All(seasonUpdates, u => Assert.Equal(SiteFactory.SeasonId, u.SeasonId));
+        Assert.DoesNotContain(seasonUpdates, u => u.Types.Any(t => t.StartsWith("account-", StringComparison.Ordinal)));
         await poolWatcher.DisposeAsync();
         await seasonOnly.DisposeAsync();
     }
