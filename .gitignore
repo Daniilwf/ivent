@@ -72,3 +72,6 @@ Thumbs.db
 src/GameEvent.Web/var/
 # --- Verify snapshots: only *.verified.* are kept (C13) ---
 *.received.*
+
+# Design previews: covers, GIFs and nicknames fetched locally (copyrighted or private), never in git
+web/public/design-preview/local/
