@@ -8,8 +8,14 @@ import type { MomentHandle, MomentPhase } from './moment';
 
 const t = ru.moments.dice;
 
-/** The server's throw: every die's value; the last `challenge` of them are the challenge dice */
-export type DiceRoll = { id: number; values: number[]; challenge: number };
+/** The server's throw: every die's value; the last `challenge` of them are the challenge dice; `sides` of each die
+ *  (a d6 without it) */
+export type DiceRoll = {
+  id: number;
+  values: number[];
+  challenge: number;
+  sides?: number[] | undefined;
+};
 
 const pips: Record<number, number[]> = {
   1: [4],
@@ -88,13 +94,17 @@ export function Die({
   index = 0,
   thrown = false,
   challenge = false,
+  sides = 6,
 }: {
   value: number;
   index?: number;
   thrown?: boolean;
   challenge?: boolean;
+  /** Not a d6 (a d2, a d4…): every face shows the number, and the die says its sides */
+  sides?: number;
 }) {
-  const [x, y] = faceTurn[value] ?? [0, 0];
+  const numeric = sides !== 6 || !(value in pips);
+  const [x, y] = numeric ? [0, 0] : (faceTurn[value] ?? [0, 0]);
   const delay = index * 0.09;
   return (
     <span className="inline-grid justify-items-center gap-2" data-die={value}>
@@ -120,13 +130,20 @@ export function Die({
               value={f.value}
               place={f.place}
               challenge={challenge}
-              number={value in pips || f.value !== 1 ? undefined : value}
+              number={numeric ? value : undefined}
             />
           ))}
         </motion.span>
       </motion.span>
-      {challenge ? (
-        <span className="rounded-full bg-card px-2 text-xs font-bold">{t.challengeDie}</span>
+      {challenge || sides !== 6 ? (
+        <span className="flex gap-1">
+          {sides !== 6 ? (
+            <span className="rounded-full bg-card px-2 text-xs font-bold">{t.sides(sides)}</span>
+          ) : null}
+          {challenge ? (
+            <span className="rounded-full bg-card px-2 text-xs font-bold">{t.challengeDie}</span>
+          ) : null}
+        </span>
       ) : null}
     </span>
   );
@@ -139,7 +156,7 @@ export function DiceMoment({
   onPhase,
   ref,
   announce = true,
-  stay = false,
+  mode = 'move',
   fill = false,
 }: {
   /** The dice fill their frame (the map's stage on a desktop): the table is the whole frame */
@@ -149,8 +166,8 @@ export function DiceMoment({
   ref?: Ref<MomentHandle> | undefined;
   /** False when the page has its own live region for the result (it outlives the dice) */
   announce?: boolean;
-  /** The token stays where it is (a later finisher): the dice give points only */
-  stay?: boolean;
+  /** What the dice give: points and steps, points only (the token stays), or nothing (free mode of the frozen first) */
+  mode?: 'move' | 'stay' | 'free';
 }) {
   const reduce = useReducedMotion() ?? false;
   const [shown, setShown] = useState(roll === null);
@@ -200,10 +217,11 @@ export function DiceMoment({
             index={i}
             thrown={thrown}
             challenge={i >= values.length - extra}
+            sides={roll?.sides?.[i] ?? 6}
           />
         ))}
       </div>
-      {shown && roll ? (
+      {shown && roll && mode !== 'free' ? (
         <motion.span
           className="rounded-full border-3 border-ink bg-card px-6 font-display text-3xl font-heavy"
           initial={reduce ? false : { scale: 0.5, opacity: 0 }}
@@ -223,7 +241,11 @@ export function DiceMoment({
       )}
       aria-live={announce ? 'polite' : undefined}
     >
-      {shown && roll ? (stay ? t.resultStay : t.result)(plain, challenge, total) : ''}
+      {shown && roll
+        ? mode === 'free'
+          ? t.resultFree(plain, challenge)
+          : (mode === 'stay' ? t.resultStay : t.result)(plain, challenge, total)
+        : ''}
     </p>
   );
   if (fill)

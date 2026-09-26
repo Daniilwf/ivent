@@ -272,4 +272,32 @@ describe('CompleteForm', () => {
     expect(submit).toHaveAttribute('data-variant', 'main');
     expect(submit).toHaveAttribute('aria-busy', 'true');
   });
+
+  it('names the die of every difficulty and the event it grants in the hint', () => {
+    render(
+      <CompleteForm
+        needsHours={false}
+        pending={false}
+        onComplete={vi.fn()}
+        dice={[
+          { difficulty: 'easy', sides: 2, grantEvent: null },
+          { difficulty: 'normal', sides: 4, grantEvent: null },
+          { difficulty: 'hard', sides: 6, grantEvent: null },
+          { difficulty: 'extreme', sides: 6, grantEvent: 'good' },
+        ]}
+      />,
+    );
+
+    const group = screen.getByRole('group', { name: ru.turn.difficulty });
+    expect(group).toHaveAccessibleDescription(
+      `${ru.turn.difficultyHint}. ${ru.turn.difficultyDice([
+        { label: ru.difficulty.easy, sides: 2, grant: null },
+        { label: ru.difficulty.normal, sides: 4, grant: null },
+        { label: ru.difficulty.hard, sides: 6, grant: null },
+        { label: ru.difficulty.extreme, sides: 6, grant: 'good' },
+      ])}`,
+    );
+    expect(group).toHaveAccessibleDescription(/пруф/);
+    expect(group).toHaveAccessibleDescription(/Выше сложной — d6 и хороший ивент/);
+  });
 });

@@ -1,5 +1,6 @@
 import { useRef, useState, type SyntheticEvent } from 'react';
 import type { Schemas } from '../api/client';
+import { moscowTime } from '../app/time';
 import { ru } from '../i18n/ru';
 import { Button } from '../ui/Button';
 import { ConfirmDanger, FormDialog } from '../ui/Dialogs';
@@ -27,10 +28,16 @@ export function RunActions({
   dropHintMinutes,
   dropPenalty,
   techRerollOpen,
+  techRerollUntil = null,
+  frozen = false,
   pending,
   onDrop,
   onTechReroll,
 }: {
+  /** When the player's own tech reroll window closes (UTC), if the server says */
+  techRerollUntil?: string | null;
+  /** The frozen first: a drop costs nothing (D-99) */
+  frozen?: boolean;
   game: string;
   dropHintMinutes: number | null;
   dropPenalty: Schemas['DropPenaltyView'] | null;
@@ -104,7 +111,7 @@ export function RunActions({
             </Button>
           }
           title={ru.turn.dropTitle(game)}
-          consequences={ru.turn.dropConsequences(dropPenalty)}
+          consequences={ru.turn.dropConsequences(dropPenalty, frozen)}
           note={
             dropHintMinutes !== null ? (
               <div data-testid="drop-hint">
@@ -126,6 +133,11 @@ export function RunActions({
         description={ru.turn.techRerollConsequences}
         returnFocus={opener}
       >
+        {techRerollUntil ? (
+          <p data-testid="tech-reroll-until" className="text-sm text-ink-soft">
+            {ru.turn.techRerollUntil(moscowTime(techRerollUntil))}
+          </p>
+        ) : null}
         <form
           onSubmit={submitTechReroll}
           noValidate

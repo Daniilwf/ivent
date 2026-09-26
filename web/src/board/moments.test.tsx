@@ -58,8 +58,27 @@ describe('the main moments with reduced motion', () => {
     expect(container.querySelector('[data-die="3"]')).not.toHaveTextContent('3');
   });
 
+  it('draws a d4 with its number and says its sides', async () => {
+    const phase = vi.fn();
+    const { container } = render(
+      <DiceMoment roll={{ id: 1, values: [3], challenge: 0, sides: [4] }} onPhase={phase} />,
+    );
+    await waitFor(() => {
+      expect(phase).toHaveBeenCalledWith('done');
+    });
+    const die = container.querySelector('[data-die="3"]');
+    expect(die).toHaveTextContent('3');
+    expect(die).toHaveTextContent(ru.moments.dice.sides(4));
+  });
+
+  it('says free mode and shows no total when the dice give no points', async () => {
+    render(<DiceMoment roll={{ id: 1, values: [2, 3], challenge: 0 }} mode="free" />);
+    expect(await screen.findByText(ru.moments.dice.resultFree([2, 3], []))).toBeInTheDocument();
+    expect(screen.queryByText('+5')).not.toBeInTheDocument();
+  });
+
   it('says only points when the token stays', async () => {
-    render(<DiceMoment roll={{ id: 1, values: [2, 3], challenge: 0 }} stay />);
+    render(<DiceMoment roll={{ id: 1, values: [2, 3], challenge: 0 }} mode="stay" />);
     expect(await screen.findByText(ru.moments.dice.resultStay([2, 3], [], 5))).toBeInTheDocument();
   });
 

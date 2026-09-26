@@ -31,9 +31,12 @@ const fieldIds: Record<Problem['field'], string> = {
 export function CompleteForm({
   needsHours,
   challengesEnabled = false,
+  dice = null,
   pending,
   onComplete,
 }: {
+  /** The die of each difficulty under the run's snapshot, and its event */
+  dice?: readonly Schemas['DifficultyDieView'][] | null;
   needsHours: boolean;
   challengesEnabled?: boolean;
   pending: boolean;
@@ -105,7 +108,17 @@ export function CompleteForm({
       <ChoiceGroup
         data-testid="complete-difficulty"
         label={ru.turn.difficulty}
-        hint={ru.turn.difficultyHint}
+        hint={
+          dice && dice.length > 0
+            ? `${ru.turn.difficultyHint}. ${ru.turn.difficultyDice(
+                dice.map((d) => ({
+                  label: ru.difficulty[d.difficulty],
+                  sides: d.sides,
+                  grant: d.grantEvent ?? null,
+                })),
+              )}`
+            : `${ru.turn.difficultyHint}.`
+        }
         options={difficulties}
         value={difficulty}
         onChange={setDifficulty}

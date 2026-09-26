@@ -409,7 +409,18 @@ export function Styleguide() {
       <Section id="complete" title={t.complete.title} lead={t.complete.lead}>
         <div className="grid items-start gap-4 desk:grid-cols-2">
           <div className="grid min-w-0 gap-4 rounded-lg bg-card p-4">
-            <CompleteForm needsHours challengesEnabled pending={false} onComplete={noop} />
+            <CompleteForm
+              needsHours
+              challengesEnabled
+              dice={[
+                { difficulty: 'easy', sides: 2, grantEvent: null },
+                { difficulty: 'normal', sides: 4, grantEvent: null },
+                { difficulty: 'hard', sides: 6, grantEvent: null },
+                { difficulty: 'extreme', sides: 6, grantEvent: 'good' },
+              ]}
+              pending={false}
+              onComplete={noop}
+            />
             <RunActions
               game={run.title}
               dropHintMinutes={null}

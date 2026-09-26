@@ -206,12 +206,14 @@ export const ru = {
     drop: 'Дропнуть',
     dropTitle: (title: string) => `Дропнуть «${title}»?`,
     // What a drop does, as the confirmation lists it: the penalty from the server's rules, then what always happens
-    dropConsequences: (penalty: DropPenalty | null): string[] => {
+    dropConsequences: (penalty: DropPenalty | null, frozen = false): string[] => {
       const always = 'Игра больше не выпадет тебе в этом сезоне, дальше — новый ролл';
+      // The frozen first drops with no penalty (D-99)
+      if (frozen) return ['Штрафа нет: ты уже финишировал первым', always];
       if (!penalty) return [always];
       const takes = [
         penalty.affectsPoints ? 'очки' : null,
-        penalty.affectsPosition ? 'клетки (не дальше чекпоинта и старта)' : null,
+        penalty.affectsPosition ? 'клетки (не дальше старта)' : null,
       ]
         .filter((part) => part !== null)
         .join(' и ');
@@ -249,7 +251,9 @@ export const ru = {
     techRerollCommentRequired: 'Для причины «Другое» напиши комментарий.',
     techRerollSubmit: 'Сделать тех-реролл',
     techRerollCancel: 'Отмена',
-    techRerollClosed: 'Окно тех-реролла закрылось. Если игра не запускается, напиши админу.',
+    techRerollClosed:
+      'Окно тех-реролла закрылось. Если с игрой техническая проблема, напиши админу.',
+    techRerollUntil: (time: string) => `Тех-реролл сам можно сделать до ${time}.`,
     gameMark: (player: string, kind: 'dropped' | 'techRerolled') =>
       kind === 'dropped' ? `Дропнул ${player}` : `Тех-реролл у ${player}`,
     alreadyPlayedGame: (title: string) => `Уже проходил: ${title}`,
@@ -263,7 +267,15 @@ export const ru = {
     complete: 'Завершить прохождение',
     completeTitle: 'Игра пройдена? Отметь прохождение',
     difficulty: 'Сложность',
-    difficultyHint: 'На какой сложности проходил: от неё зависят грани кубов',
+    difficultyHint: 'На какой сложности проходил. Админ сверит её с пруфом',
+    // The die of each difficulty and the event it grants, from the run's snapshot
+    difficultyDice: (dice: { label: string; sides: number; grant: 'good' | 'bad' | null }[]) =>
+      `Кубы: ${dice
+        .map(
+          (d) =>
+            `${d.label} — d${String(d.sides)}${d.grant === 'good' ? ' и хороший ивент' : d.grant === 'bad' ? ' и плохой ивент' : ''}`,
+        )
+        .join(', ')}.`,
     hours: 'Часы (оценка)',
     hoursHint: 'У игры нет данных о длине: укажи оценку.',
     hoursInvalid: 'Укажи число часов больше нуля.',
@@ -282,8 +294,8 @@ export const ru = {
       text
         ? `Твой отзыв: ${rating.toString()}/10 — ${text}`
         : `Твоя оценка: ${rating.toString()}/10`,
-    lastDice: (title: string, dice: number[], total: number) =>
-      `Кубы за прохождение (${title}): ${dice.join(' + ')} — итого ${total.toLocaleString('ru-RU')}`,
+    lastDice: (title: string, dice: number[], total: number, sides: number[] = []) =>
+      `Кубы за прохождение (${title}): ${dice.join(' + ')} — итого ${total.toLocaleString('ru-RU')}${sides.length === 0 ? '' : ` (${sides.map((n) => `d${String(n)}`).join(' и ')})`}`,
     spectator: 'Ты смотришь сезон как зритель.',
   },
   difficulty: {
@@ -423,18 +435,31 @@ export const ru = {
     },
     dice: {
       challengeDie: 'челлендж',
+      sides: (n: number) => `d${String(n)}`,
+      // «до»: steps past the finish burn, the points do not
       result: (plain: number[], challenge: number[], total: number) =>
-        `${plain.join(' + ')}${challenge.length === 0 ? '' : ` + ${challenge.join(' + ')} за челлендж`}. Итого +${total}: столько клеток вперёд и очков`,
+        `${plain.join(' + ')}${challenge.length === 0 ? '' : ` + ${challenge.join(' + ')} за челлендж`}. Итого +${total} очков и до ${total} клеток вперёд`,
+      // The frozen first plays in free mode: dice only, no points (Q-3)
+      resultFree: (plain: number[], challenge: number[]) =>
+        `${plain.join(' + ')}${challenge.length === 0 ? '' : ` + ${challenge.join(' + ')} за челлендж`}. Свободный режим: очки не начисляются`,
       resultStay: (plain: number[], challenge: number[], total: number) =>
         `${plain.join(' + ')}${challenge.length === 0 ? '' : ` + ${challenge.join(' + ')} за челлендж`}. Итого +${total} очков, фишка стоит на месте`,
       // The dice's result, shown big once the token stands
-      after: (total: number, cell: number, finish: boolean) =>
-        `+${total} очков, ${finish ? 'фишка на финише' : `фишка на клетке ${cell}`}`,
+      after: (total: number, at: string) => `+${total} очков. ${at}`,
       afterStay: (total: number) => `+${total} очков, фишка стоит на месте`,
+      afterFree: 'Свободный режим: очки не начисляются',
       // The completion's moment, said once when the token stands: the game, the dice and where the token is now
-      announce: (title: string, dice: string, at: string) => `Пройдено: ${title}. ${dice}. ${at}`,
+      announce: (title: string, dice: string, at: string) =>
+        [`Пройдено: ${title}`, dice, at].filter((part) => part !== '').join('. '),
       at: (cell: number, finish: boolean) =>
         finish ? 'Фишка на финише' : `Фишка на клетке ${cell}`,
+      // The first finish stands only when the proofs are approved (SPEC: provisional until then)
+      atFirst: (provisional: boolean) =>
+        provisional
+          ? 'Фишка на финише — ты первый! Предварительно: ждём проверку пруфов'
+          : 'Фишка на финише — ты первый!',
+      atLater: (order: number) =>
+        `Фишка на финише — ты ${order}-й. Позиция закреплена, очки ещё растут`,
     },
     finish: {
       first: (name: string) => `${name} финиширует первым!`,

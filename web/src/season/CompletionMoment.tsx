@@ -27,8 +27,11 @@ export function CompletionMoment({
   from,
   to,
   fill = false,
+  free = false,
   onDone,
 }: {
+  /** The frozen first plays in free mode: the dice give no points */
+  free?: boolean;
   dice: DiceRoll;
   board: Board;
   players: Player[];
@@ -78,7 +81,7 @@ export function CompletionMoment({
             ref={moment}
             roll={roll}
             announce={false}
-            stay={!path}
+            mode={free ? 'free' : path ? 'move' : 'stay'}
             onPhase={(phase) => {
               if (phase !== 'done' || ended.current) return;
               if (!path) {

@@ -367,6 +367,13 @@ export function SeasonScreen({
                       (d) => d.value,
                     ),
                     me.lastCompleted.total,
+                    [
+                      ...new Set(
+                        [...me.lastCompleted.dice, ...me.lastCompleted.challengeDice].map(
+                          (d) => d.sides,
+                        ),
+                      ),
+                    ],
                   )}
             </p>
             {me.lastCompleted.challengeDice.length > 0 && (
@@ -468,8 +475,10 @@ export function SeasonScreen({
 
   // The completion's stage: on a desktop over the map, on a phone in the turn card; it goes when the token stands
   const throwFrom = thrown && mine ? (cellNumber.get(thrown.from) ?? mine.cell) : 0;
-  // A later finisher's token stands still: the dice give points only
+  // A later finisher's token stands still: the dice give points only; the frozen first gets no points (free mode)
   const throwStays = mine ? throwFrom === mine.cell : false;
+  const throwFree = me?.finish?.frozen === true;
+  const myActualRow = rows.find((r) => r.player.me);
   const diceStage =
     throwing && thrown && mine ? (
       <CompletionMoment
@@ -478,7 +487,9 @@ export function SeasonScreen({
           id: 1,
           values: [...throwing.dice, ...throwing.challengeDice].map((d) => d.value),
           challenge: throwing.challengeDice.length,
+          sides: [...throwing.dice, ...throwing.challengeDice].map((d) => d.sides),
         }}
+        free={throwFree}
         board={board}
         players={held?.players ?? players}
         mover={mine}
@@ -488,22 +499,34 @@ export function SeasonScreen({
         onDone={() => {
           setThrown(null);
           const finishCell = board.cells.find((c) => c.id === mine.cell)?.kind === 'finish';
+          const at = throwFree
+            ? ''
+            : finishCell
+              ? me?.finish?.order === 1
+                ? ru.moments.dice.atFirst(myActualRow?.provisional ?? true)
+                : me?.finish
+                  ? ru.moments.dice.atLater(me.finish.order)
+                  : ru.moments.dice.at(mine.cell, true)
+              : ru.moments.dice.at(mine.cell, false);
+          const plain = throwing.dice.map((d) => d.value);
+          const extra = throwing.challengeDice.map((d) => d.value);
           setThrownResult({
             run: throwing.id,
-            text: throwStays
-              ? ru.moments.dice.afterStay(throwing.total)
-              : ru.moments.dice.after(throwing.total, mine.cell, finishCell),
+            text: throwFree
+              ? ru.moments.dice.afterFree
+              : throwStays
+                ? ru.moments.dice.afterStay(throwing.total)
+                : ru.moments.dice.after(throwing.total, at),
           });
-          const result = throwStays ? ru.moments.dice.resultStay : ru.moments.dice.result;
           setAnnounced(
             ru.moments.dice.announce(
               throwing.game.title,
-              result(
-                throwing.dice.map((d) => d.value),
-                throwing.challengeDice.map((d) => d.value),
-                throwing.total,
-              ),
-              ru.moments.dice.at(mine.cell, finishCell),
+              throwFree
+                ? ru.moments.dice.resultFree(plain, extra)
+                : throwStays
+                  ? ru.moments.dice.resultStay(plain, extra, throwing.total)
+                  : ru.moments.dice.result(plain, extra, throwing.total),
+              at,
             ),
           );
           // The focus follows only from the moment itself (its skip button) or from nowhere: a player who has
@@ -650,6 +673,7 @@ export function SeasonScreen({
             <CompleteForm
               needsHours={me.activeRun.game.hours == null}
               challengesEnabled={me.challengesEnabled}
+              dice={me.difficultyDice ?? null}
               pending={pending}
               onComplete={(completion) => void act({ kind: 'complete', completion })}
             />
@@ -658,6 +682,8 @@ export function SeasonScreen({
               dropHintMinutes={me.dropHintMinutes}
               dropPenalty={me.dropPenalty}
               techRerollOpen={me.techRerollOpen}
+              techRerollUntil={me.techRerollUntil ?? null}
+              frozen={me.finish?.frozen === true}
               pending={pending}
               onDrop={() => void act({ kind: 'drop' })}
               onTechReroll={(reason, comment) => void act({ kind: 'techReroll', reason, comment })}
