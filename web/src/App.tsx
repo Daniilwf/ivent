@@ -74,11 +74,19 @@ export function App() {
     </>
   );
 
+  // Back from the password form, the focus returns to the menu that opened it
+  function focusMenu() {
+    requestAnimationFrame(() => {
+      document.querySelector<HTMLElement>('[data-testid="user-menu"]')?.focus();
+    });
+  }
+
   function screen() {
     if (state.kind === 'loading')
       return (
-        <main className="grid min-h-dvh place-items-center" aria-busy="true">
-          <p className="flex items-center gap-2 text-ink-soft">
+        // On the table, like the sign-in that most likely comes next: no grey flash before it
+        <main className="table-surface grid min-h-dvh place-items-center" aria-busy="true">
+          <p className="flex items-center gap-2 rounded-full bg-card px-4 py-2 font-medium">
             <LoaderCircle
               size={20}
               className="animate-spin motion-reduce:animate-none"
@@ -92,6 +100,7 @@ export function App() {
       return (
         <main className="mx-auto grid min-h-dvh max-w-110 place-items-center px-4">
           <ErrorState
+            level={1}
             title={ru.shell.loadErrorTitle}
             text={ru.shell.loadErrorText}
             onRetry={() => {
@@ -142,12 +151,14 @@ export function App() {
               temporary={false}
               onChanged={(user) => {
                 setState({ ...signedIn, user, ownPassword: false });
+                focusMenu();
               }}
             >
               <Button
                 variant="link"
                 onClick={() => {
                   setState({ ...signedIn, ownPassword: false });
+                  focusMenu();
                 }}
               >
                 {ru.password.back}
@@ -162,6 +173,7 @@ export function App() {
         ) : (
           <main className="mx-auto grid max-w-110 px-4 py-10" data-testid="no-season">
             <EmptyState
+              level={1}
               icon={<CalendarClock size={28} aria-hidden />}
               title={ru.shell.noSeasonTitle}
               text={ru.shell.noSeasonText}

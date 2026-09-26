@@ -28,7 +28,7 @@ export function Notice({ tone, children }: { tone: Tone; children: ReactNode }) 
     <p
       role={tone === 'danger' ? 'alert' : 'status'}
       className={cx(
-        'flex items-start gap-2 rounded-md border-l-4 px-3 py-2 text-sm font-medium',
+        'flex items-start gap-2 rounded-md px-3 py-2 text-sm font-medium',
         tones[tone].box,
       )}
     >
@@ -44,18 +44,22 @@ export function EmptyState({
   title,
   text,
   action,
+  level = 3,
 }: {
   icon: ReactNode;
   title: string;
   text?: string;
   action?: ReactNode;
+  /** The heading's level: 1 when the state is the whole page */
+  level?: 1 | 2 | 3;
 }) {
+  const Heading = `h${level}` as const;
   return (
     <div className="grid justify-items-center gap-3 rounded-lg bg-card p-6 text-center">
       <span className="grid size-14 place-items-center rounded-full bg-muted text-ink-soft">
         {icon}
       </span>
-      <h3 className="font-display text-lg font-heavy text-balance">{title}</h3>
+      <Heading className="font-display text-lg font-heavy text-balance">{title}</Heading>
       {text ? <p className="max-w-prose text-ink-soft">{text}</p> : null}
       {action}
     </div>
@@ -67,20 +71,23 @@ export function ErrorState({
   title,
   text,
   onRetry,
+  level = 3,
 }: {
   title: string;
   text: string;
   onRetry?: () => void;
+  level?: 1 | 2 | 3;
 }) {
+  const Heading = `h${level}` as const;
   return (
     <div
       role="alert"
-      className="grid justify-items-center gap-3 rounded-lg border-l-4 border-danger bg-card p-6 text-center"
+      className="grid justify-items-center gap-3 rounded-lg bg-card p-6 text-center"
     >
       <span className="grid size-14 place-items-center rounded-full bg-danger-soft text-danger">
         <CircleAlert size={28} aria-hidden />
       </span>
-      <h3 className="font-display text-lg font-heavy text-balance">{title}</h3>
+      <Heading className="font-display text-lg font-heavy text-balance">{title}</Heading>
       <p className="max-w-prose text-ink-soft">{text}</p>
       {onRetry ? <Button onClick={onRetry}>{ru.ui.retry}</Button> : null}
     </div>
@@ -88,14 +95,21 @@ export function ErrorState({
 }
 
 /** The connection to the server dropped: a quiet chip, not a wall (DESIGN.md «Обновления в реальном времени») */
-export function ConnectionLost() {
+export function ConnectionLost({ compact = false }: { compact?: boolean }) {
   return (
     <p
       role="status"
-      className="inline-flex items-center gap-2 rounded-full border-2 border-warning bg-warning-soft px-3 py-1 text-sm font-medium text-ink"
+      title={ru.ui.connectionLost}
+      className={cx(
+        'inline-flex shrink-0 items-center gap-2 rounded-full border-2 border-warning bg-warning-soft py-1 text-sm font-medium text-ink',
+        compact ? 'min-h-11 min-w-11 justify-center px-2 desk:px-3' : 'px-3',
+      )}
     >
       <WifiOff size={16} aria-hidden className="text-warning" />
-      {ru.ui.connectionLost}
+      {/* In a phone's header only the icon shows; the words stay for screen readers */}
+      <span className={compact ? 'sr-only desk:not-sr-only' : undefined}>
+        {ru.ui.connectionLost}
+      </span>
     </p>
   );
 }

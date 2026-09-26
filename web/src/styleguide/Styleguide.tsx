@@ -1,5 +1,6 @@
 import { CalendarClock, Inbox, Plus, Trophy } from 'lucide-react';
 import { useEffect, type ReactNode } from 'react';
+import { Shell } from '../app/Shell';
 import { RunCard } from '../board/GameCards';
 import { Leaderboard } from '../board/Leaderboard';
 import { cellsToFinish } from '../board/geometry';
@@ -13,7 +14,7 @@ import { RouteProgress, Skeleton } from '../ui/Progress';
 import { ConnectionLost, EmptyState, ErrorState, Notice } from '../ui/States';
 import { Sticker } from '../ui/Sticker';
 import { Panel } from '../ui/Surface';
-import { demoGames, demoMe, demoPlayers } from './fixtures';
+import { demoGames, demoMe, demoPlayers, demoUser } from './fixtures';
 import { DiceDemo, FinishDemo, MapDemo, MoveDemo, WheelDemo } from './MomentDemos';
 
 const t = ru.styleguide;
@@ -104,6 +105,31 @@ export function Styleguide() {
           ))}
         </nav>
       </header>
+
+      <Section id="shell" title={t.shell.title} lead={t.shell.lead}>
+        <div className="grid gap-4">
+          <div className="h-16 w-full max-w-98 overflow-hidden rounded-lg border-2 border-muted">
+            <Shell
+              user={demoUser}
+              offline
+              onChangePassword={() => undefined}
+              onLogout={() => undefined}
+            >
+              {null}
+            </Shell>
+          </div>
+          <div className="h-16 overflow-hidden rounded-lg border-2 border-muted">
+            <Shell
+              user={demoUser}
+              offline={false}
+              onChangePassword={() => undefined}
+              onLogout={() => undefined}
+            >
+              {null}
+            </Shell>
+          </div>
+        </div>
+      </Section>
 
       <Section id="colors" title={t.colors.title} lead={t.colors.lead}>
         <ul className="grid gap-4 desk:grid-cols-3">

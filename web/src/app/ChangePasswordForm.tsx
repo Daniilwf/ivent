@@ -1,4 +1,4 @@
-import { useState, type ReactNode, type SyntheticEvent } from 'react';
+import { useEffect, useRef, useState, type ReactNode, type SyntheticEvent } from 'react';
 import { api, refreshCsrf, rejectionCode, type Schemas } from '../api/client';
 import { ru } from '../i18n/ru';
 import { Button } from '../ui/Button';
@@ -28,19 +28,36 @@ export function ChangePasswordForm({
   const [next, setNext] = useState('');
   const [repeat, setRepeat] = useState('');
   const [error, setError] = useState<string | null>(null);
+  // A check of the form itself is said at its field; the server's refusal stands above the button
+  const [fieldError, setFieldError] = useState<{ next?: string; repeat?: string }>({});
   const [pending, setPending] = useState(false);
+  const title = useRef<HTMLHeadingElement>(null);
+
+  // Opened from the menu, the form takes the focus: the page under the reader changed
+  // (on the next frame: the menu that opened the form lets go of the focus first)
+  useEffect(() => {
+    if (temporary) return;
+    const frame = requestAnimationFrame(() => {
+      title.current?.focus();
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+    };
+  }, [temporary]);
 
   async function submit(event: SyntheticEvent) {
     event.preventDefault();
     if (next.length < minPassword) {
-      setError(ru.password.tooShort(minPassword));
+      setFieldError({ next: ru.password.tooShort(minPassword) });
       return;
     }
 
     if (next !== repeat) {
-      setError(ru.password.mismatch);
+      setFieldError({ repeat: ru.password.mismatch });
       return;
     }
+
+    setFieldError({});
 
     setPending(true);
     setError(null);
@@ -74,7 +91,12 @@ export function ChangePasswordForm({
       className="grid gap-4 rounded-lg border-3 border-ink bg-card p-5 shadow-lift"
     >
       <div className="grid gap-1">
-        <h1 id="password-title" className="font-display text-2xl font-heavy">
+        <h1
+          id="password-title"
+          ref={title}
+          tabIndex={-1}
+          className="rounded-sm font-display text-2xl font-heavy outline-none"
+        >
           {ru.password.title}
         </h1>
         <p className="text-ink-soft">{temporary ? ru.password.why : ru.password.whyOwn}</p>
@@ -94,6 +116,7 @@ export function ChangePasswordForm({
       <Field
         label={ru.password.next}
         hint={ru.password.rule(minPassword)}
+        error={fieldError.next}
         data-testid="password-new"
         type="password"
         value={next}
@@ -106,6 +129,7 @@ export function ChangePasswordForm({
       />
       <Field
         label={ru.password.repeat}
+        error={fieldError.repeat}
         data-testid="password-repeat"
         type="password"
         value={repeat}

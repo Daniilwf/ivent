@@ -22,8 +22,10 @@ export function BugReportButton() {
   const [text, setText] = useState('');
   const [attach, setAttach] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [missingText, setMissingText] = useState(false);
   const [screenshot, setScreenshot] = useState<Blob | null>(null);
   const commandId = useRef('');
+  const button = useRef<HTMLButtonElement>(null);
 
   async function open() {
     setPhase('capturing');
@@ -33,13 +35,14 @@ export function BugReportButton() {
     setText('');
     setAttach(picture !== null);
     setError(null);
+    setMissingText(false);
     setPhase('open');
   }
 
   async function send(event: SyntheticEvent) {
     event.preventDefault();
     if (!text.trim()) {
-      setError(ru.bugReport.textRequired);
+      setMissingText(true);
       return;
     }
 
@@ -96,9 +99,10 @@ export function BugReportButton() {
   return (
     <>
       <IconButton
+        ref={button}
         label={ru.bugReport.open}
         data-testid="bug-report"
-        disabled={phase === 'capturing'}
+        loading={phase === 'capturing'}
         onClick={() => void open()}
       >
         <Bug size={20} />
@@ -112,6 +116,11 @@ export function BugReportButton() {
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 z-20 bg-ink/40" />
           <Dialog.Content
+            onCloseAutoFocus={(event) => {
+              // The dialog opens from state, not from a trigger: focus goes back to the button by hand
+              event.preventDefault();
+              button.current?.focus();
+            }}
             data-testid="bug-report-dialog"
             className="fixed inset-x-4 top-1/2 z-20 mx-auto grid max-h-dvh max-w-120 -translate-y-1/2 gap-4 overflow-auto rounded-lg border-3 border-ink bg-card p-5 shadow-lift"
           >
@@ -139,8 +148,10 @@ export function BugReportButton() {
                   data-testid="bug-report-text"
                   value={text}
                   maxLength={4000}
+                  error={missingText ? ru.bugReport.textRequired : undefined}
                   onChange={(event) => {
                     setText(event.target.value);
+                    setMissingText(false);
                   }}
                 />
                 {screenshot ? (

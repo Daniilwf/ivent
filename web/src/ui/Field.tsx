@@ -42,7 +42,7 @@ export function Field({
         {...input}
       />
       {error ? (
-        <span id={errorId} className="text-sm font-medium text-danger">
+        <span id={errorId} role="alert" className="text-sm font-medium text-danger">
           {error}
         </span>
       ) : null}
@@ -87,7 +87,7 @@ export function TextArea({
         {...input}
       />
       {error ? (
-        <span id={errorId} className="text-sm font-medium text-danger">
+        <span id={errorId} role="alert" className="text-sm font-medium text-danger">
           {error}
         </span>
       ) : null}

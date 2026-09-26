@@ -10,8 +10,8 @@ import { Sticker } from '../ui/Sticker';
 function Meeples() {
   return (
     <div className="flex justify-center -space-x-2" aria-hidden>
-      {['И', 'В', 'Е', 'Н', 'Т'].map((letter, i) => (
-        <span key={letter} className={i % 2 ? 'rotate-6' : '-rotate-6'}>
+      {Array.from(ru.shell.meeples).map((letter, i) => (
+        <span key={i} className={i % 2 ? 'rotate-6' : '-rotate-6'}>
           <Sticker player={{ name: letter, token: [0, 4, 2, 6, 3][i] ?? 0 }} size={48} />
         </span>
       ))}

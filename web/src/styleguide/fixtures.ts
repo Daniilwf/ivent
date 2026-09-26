@@ -81,3 +81,13 @@ function pick(test: (p: Player) => boolean): Player {
 /** The player looking at the screen, and the first finisher */
 export const demoMe = pick((p) => p.me === true);
 export const demoLeader = pick((p) => p.first === true);
+
+/** The signed-in account in the shell's example: the longest nickname */
+export const demoUser = {
+  id: 'u-demo',
+  login: 'demo',
+  name: 'ОченьДлинныйНикнейм1',
+  role: 'player' as const,
+  mustChangePassword: false,
+  avatar: null,
+};

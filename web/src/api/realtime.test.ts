@@ -27,12 +27,15 @@ class FakeConnection {
     this.reconnecting = handler;
   }
 
-  onclose() {
-    // Not used here
+  onclose(handler: () => void) {
+    this.closed = handler;
   }
 
+  starting: Promise<void> = Promise.resolve();
+  closed: (() => void) | null = null;
+
   start() {
-    return Promise.resolve();
+    return this.starting;
   }
 
   stop() {
@@ -145,6 +148,60 @@ describe('watchSeason', () => {
     connection.reconnected?.();
     expect(connectionStatus.get()).toBe('online');
     stop();
+  });
+
+  it('takes its «no connection» back when it stops, whatever it was doing', async () => {
+    const { watchSeason } = await import('./realtime');
+    // Dropped in a reconnect, then the page leaves: the mark goes with it
+    const one = watchSeason('s1', () => undefined);
+    await vi.waitFor(() => {
+      expect(connection.invoked.length).toBeGreaterThan(0);
+    });
+    connection.reconnecting?.();
+    expect(connectionStatus.get()).toBe('offline');
+    one();
+    expect(connectionStatus.get()).toBe('online');
+
+    // A start that fails reports the loss; a stop while the start is still pending reports nothing after it
+    connection = new FakeConnection();
+    let fail: (reason: Error) => void = () => undefined;
+    connection.starting = new Promise((_, reject) => {
+      fail = reject;
+    });
+    const two = watchSeason('s2', () => undefined);
+    two();
+    fail(new Error('stopped before it started'));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(connectionStatus.get()).toBe('online');
+
+    connection = new FakeConnection();
+    connection.starting = Promise.reject(new Error('no server'));
+    const three = watchSeason('s3', () => undefined);
+    await vi.waitFor(() => {
+      expect(connectionStatus.get()).toBe('offline');
+    });
+    three();
+    expect(connectionStatus.get()).toBe('online');
+  });
+
+  it('is offline while any live subscription is', async () => {
+    const { watchPool, watchSeason } = await import('./realtime');
+    const season = watchSeason('s1', () => undefined);
+    const seasonConnection = connection;
+    connection = new FakeConnection();
+    const pool = watchPool(() => undefined);
+    const poolConnection = connection;
+    await vi.waitFor(() => {
+      expect(seasonConnection.invoked.length).toBeGreaterThan(0);
+    });
+    seasonConnection.reconnecting?.();
+    poolConnection.reconnecting?.();
+    seasonConnection.reconnected?.();
+    expect(connectionStatus.get()).toBe('offline');
+    poolConnection.reconnected?.();
+    expect(connectionStatus.get()).toBe('online');
+    season();
+    pool();
   });
 
   it('refreshes after every reconnection, with what was missed if anything', async () => {
