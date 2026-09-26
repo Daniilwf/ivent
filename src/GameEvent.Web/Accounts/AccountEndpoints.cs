@@ -13,7 +13,7 @@ namespace GameEvent.Web.Accounts;
 
 public sealed record LoginRequest([property: Required, MaxLength(64)] string Login, [property: Required, MaxLength(256)] string Password);
 
-public sealed record CurrentUser(Guid Id, string Login, string Name, Role Role, bool MustChangePassword);
+public sealed record CurrentUser(Guid Id, string Login, string Name, Role Role, bool MustChangePassword, Files.FileLinkView? Avatar);
 
 public sealed record AntiforgeryToken(string Token, string HeaderName);
 
@@ -123,5 +123,6 @@ public static partial class AccountEndpoints
             ? await db.Users.AsNoTracking().SingleOrDefaultAsync(u => u.Id == id && !u.IsDeleted, ct)
             : null;
 
-    private static CurrentUser ToCurrent(UserRecord user) => new(user.Id, user.Login, user.Name, user.Role, user.MustChangePassword);
+    private static CurrentUser ToCurrent(UserRecord user) =>
+        new(user.Id, user.Login, user.Name, user.Role, user.MustChangePassword, user.AvatarFileId is { } avatar ? Files.FileLinkView.Of(avatar) : null);
 }

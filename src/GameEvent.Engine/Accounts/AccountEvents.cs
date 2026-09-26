@@ -33,6 +33,10 @@ public sealed record AccountChanged(Guid UserId, string Name, AccountRole Role) 
 [EventType("account-deleted")]
 public sealed record AccountDeleted(Guid UserId) : IGameEvent;
 
+/// <summary>The account's avatar became a stored file, or none (D-117); the file's bytes are on disk, see FileStored.</summary>
+[EventType("account-avatar-changed")]
+public sealed record AccountAvatarChanged(Guid UserId, Guid? FileId) : IGameEvent;
+
 /// <summary>The admin restored a deleted account; it signs in again after a password reset.</summary>
 [EventType("account-restored")]
 public sealed record AccountRestored(Guid UserId) : IGameEvent;

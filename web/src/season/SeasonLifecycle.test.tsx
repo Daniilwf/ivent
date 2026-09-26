@@ -33,7 +33,15 @@ function season(
       { id: 'finish', type: 'finish' },
     ],
     players: [
-      { id: me, name: 'Вася', cellId: 'start', points: 0, phase: 'idle', finishOrder: null },
+      {
+        id: me,
+        name: 'Вася',
+        cellId: 'start',
+        points: 0,
+        phase: 'idle',
+        finishOrder: null,
+        avatar: null,
+      },
     ],
     leaderboard: [
       { playerId: me, place: 1, points: 0, cellsToFinish: 2, isFirst: false, provisional: false },

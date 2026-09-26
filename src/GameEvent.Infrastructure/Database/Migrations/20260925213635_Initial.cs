@@ -110,6 +110,7 @@ namespace GameEvent.Infrastructure.Database.Migrations
                     Role = table.Column<string>(type: "TEXT", maxLength: 20, nullable: false),
                     MustChangePassword = table.Column<bool>(type: "INTEGER", nullable: false),
                     IsDeleted = table.Column<bool>(type: "INTEGER", nullable: false),
+                    AvatarFileId = table.Column<Guid>(type: "TEXT", nullable: true),
                     CreatedAt = table.Column<long>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>

@@ -5,6 +5,7 @@ import { ru } from '../i18n/ru';
 import { CompleteForm, type Completion } from './CompleteForm';
 import { RerollButton } from './RerollButton';
 import { GameMarks } from './GameMarks';
+import { AvatarSection } from './AvatarSection';
 import { ProofSection } from './ProofForm';
 import { ManualEffectItem, type EffectOutcome } from './ManualEffectItem';
 import { RunActions } from './RunActions';
@@ -350,6 +351,12 @@ export function SeasonScreen({
         )}
       </section>
 
+      <AvatarSection
+        onChanged={() => {
+          void fetchSeason(seasonId).then(apply);
+        }}
+      />
+
       <section aria-labelledby="map-title">
         <h2 id="map-title">{ru.map.title}</h2>
         <ol
@@ -368,6 +375,7 @@ export function SeasonScreen({
                 {here.map((p) => (
                   <span key={p.id} data-testid={`token-${p.id}`}>
                     {' '}
+                    {p.avatar && <img src={p.avatar.thumbnailUrl} alt="" width={20} height={20} />}
                     {p.name}
                   </span>
                 ))}

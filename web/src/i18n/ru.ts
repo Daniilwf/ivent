@@ -45,6 +45,8 @@ const rejection = {
   'proof.empty': 'Добавьте ссылку на пруф или выберите свидетеля.',
   'proof.witnessInvalid': 'Свидетелем может быть только другой игрок сезона.',
   'proof.alreadyReviewed': 'Пруф уже проверен.',
+  'account.avatarNotYours': 'Аватаркой может быть только ваша загрузка.',
+  'account.avatarFileUnknown': 'Картинка не найдена. Загрузите её ещё раз.',
   'proof.invalidFile': 'Можно прикрепить до 5 своих разных скринов.',
   'finish.nothingToRecalculate':
     'Пересчитывать нечего: у финишировавших уже бонусы по текущим правилам.',
@@ -251,6 +253,16 @@ export const ru = {
     },
     reviewComment: (comment: string) => `Комментарий админа: ${comment}`,
   },
+  avatar: {
+    title: 'Моя аватарка',
+    current: 'Текущая аватарка',
+    none: 'Аватарки пока нет.',
+    file: 'Картинка с устройства',
+    link: 'Или ссылка на гифку (Tenor, Giphy, Klipy)',
+    useLink: 'Взять по ссылке',
+    linkRequired: 'Вставьте ссылку.',
+    remove: 'Убрать аватарку',
+  },
   upload: {
     uploading: 'Загружаем…',
     failed: 'Не удалось загрузить файл. Попробуйте ещё раз.',
@@ -263,6 +275,11 @@ export const ru = {
       'file.tooManyFrames': 'В GIF слишком много кадров.',
       'file.dailyLimit': 'На сегодня лимит загрузок исчерпан.',
       'file.busy': 'Сервер занят другими картинками. Попробуйте через минуту.',
+      'file.downloadsPerHour': 'Лимит скачиваний по ссылке на этот час исчерпан.',
+      'file.urlInvalid': 'Нужна ссылка, начинающаяся с https://.',
+      'file.hostNotAllowed': 'Ссылки принимаются только с Tenor, Giphy и Klipy.',
+      'file.addressNotPublic': 'По этой ссылке картинку взять нельзя.',
+      'file.downloadFailed': 'Не удалось скачать картинку по ссылке.',
     },
   },
   effects: {

@@ -49,9 +49,33 @@ function season(
       { id: 'finish', type: 'finish' },
     ],
     players: [
-      { id: me, name: 'Вася', cellId: 'c1', points: 4, phase: 'idle', finishOrder: null },
-      { id: petya, name: 'Петя', cellId: 'start', points: 0, phase: 'idle', finishOrder: null },
-      { id: masha, name: 'Маша', cellId: 'start', points: 0, phase: 'idle', finishOrder: null },
+      {
+        id: me,
+        name: 'Вася',
+        cellId: 'c1',
+        points: 4,
+        phase: 'idle',
+        finishOrder: null,
+        avatar: null,
+      },
+      {
+        id: petya,
+        name: 'Петя',
+        cellId: 'start',
+        points: 0,
+        phase: 'idle',
+        finishOrder: null,
+        avatar: null,
+      },
+      {
+        id: masha,
+        name: 'Маша',
+        cellId: 'start',
+        points: 0,
+        phase: 'idle',
+        finishOrder: null,
+        avatar: null,
+      },
     ],
     // The server's leaderboard (D-100): Вася by points, Петя and Маша share place 2
     leaderboard: [
