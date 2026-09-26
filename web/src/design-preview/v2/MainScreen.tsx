@@ -1,4 +1,4 @@
-import { CalendarClock } from 'lucide-react';
+import { CalendarClock, Flag } from 'lucide-react';
 import { ru } from '../../i18n/ru';
 import type { Content, Player } from './content';
 import { graph } from './graph';
@@ -25,6 +25,8 @@ export function Sticker({ player, size }: { player: Player; size: number }) {
 }
 
 export function Leaderboard({ players, limit }: { players: Player[]; limit?: number }) {
+  // Score bars from direction B: each against the leader's points, in the player's token colour
+  const top = Math.max(...players.map((p) => p.points), 1);
   return (
     <ol className="board-list">
       {(limit ? players.slice(0, limit) : players).map((p, i) => (
@@ -38,6 +40,14 @@ export function Leaderboard({ players, limit }: { players: Player[]; limit?: num
               {p.me ? <span className="badge">{t.you}</span> : null}
             </span>
             <span className="sub">{p.inactive ? t.inactive : t.toFinish(finishDistance(p))}</span>
+            <span className="score-bar" aria-hidden>
+              <span
+                style={{
+                  width: `${(p.points / top) * 100}%`,
+                  background: p.me ? 'var(--me)' : p.color,
+                }}
+              />
+            </span>
           </span>
           <span className="pts">{p.points}</span>
         </li>
@@ -87,6 +97,22 @@ export function MainScreen({
                 <span key={tag}>{tag}</span>
               ))}
             </div>
+          </div>
+          <div className="to-finish">
+            <span className="to-finish-head">
+              <span>{t.toFinish(finishDistance(me))}</span>
+              <Flag size={16} aria-hidden />
+            </span>
+            <span
+              className="track"
+              role="progressbar"
+              aria-label={t.routeProgress}
+              aria-valuemin={0}
+              aria-valuemax={graph.cells.length}
+              aria-valuenow={me.cell}
+            >
+              <span style={{ width: `${(me.cell / graph.cells.length) * 100}%` }} />
+            </span>
           </div>
           <div className="run-actions">
             <button type="button" className="btn-main">

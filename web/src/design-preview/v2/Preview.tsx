@@ -19,7 +19,7 @@ import { DiceMoment, FinishMoment, MoveMoment, WheelMoment } from './Moments';
 const t = ru.designPreview;
 
 // The previews of the second round (G2), one page each, chosen by a plain anchor: design-preview.html#wheel. The anchor
-// works in the site and in a published copy of the page alike. «-kitchen» at the end takes the second palette.
+// works in the site and in a published copy of the page alike. The chosen palette «Кухонный стол» is the default; «-felt» at the end shows «Зелёное сукно».
 
 function useAnchor() {
   const read = () => globalThis.location.hash.replace(/^#/, '');
@@ -77,8 +77,8 @@ function Index({ content }: { content: Content }) {
 function Palettes() {
   // Each palette in a phone of its own: the frames are the same page at 390 px, so the phone layout applies inside
   const frames: [string, string, string][] = [
-    ['main-world', t.palette.felt, t.palette.feltWhy],
-    ['main-world-kitchen', t.palette.kitchen, t.palette.kitchenWhy],
+    ['main-world', t.palette.kitchen, t.palette.kitchenWhy],
+    ['main-world-felt', t.palette.felt, t.palette.feltWhy],
   ];
   return (
     <div className="proto palettes">
@@ -111,12 +111,12 @@ function Palettes() {
 export function Preview() {
   const content = useContent();
   const anchor = useAnchor();
-  const kitchen = anchor.endsWith('-kitchen');
-  const page = anchor.replace(/-kitchen$/, '');
+  const felt = anchor.endsWith('-felt');
+  const page = anchor.replace(/-felt$/, '');
   useEffect(() => {
     document.title = `${t.index.title}${page ? `: ${page}` : ''}`;
   }, [page]);
-  if (!content) return <div className={`dp ${kitchen ? 'pal-kitchen' : 'pal-felt'}`} />;
+  if (!content) return <div className={`dp ${felt ? 'pal-felt' : 'pal-kitchen'}`} />;
   const screen = (() => {
     switch (page) {
       case 'main-world':
@@ -141,5 +141,5 @@ export function Preview() {
         return <Index content={content} />;
     }
   })();
-  return <div className={`dp ${kitchen ? 'pal-kitchen' : 'pal-felt'}`}>{screen}</div>;
+  return <div className={`dp ${felt ? 'pal-felt' : 'pal-kitchen'}`}>{screen}</div>;
 }

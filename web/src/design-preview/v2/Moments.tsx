@@ -55,14 +55,14 @@ export function WheelMoment({ content }: { content: Content }) {
   const live = categories.filter((c) => c.games > 0);
   const rotation = useMotionValue(0);
   const running = useRef<ReturnType<typeof animate> | null>(null);
-  const [phase, setPhase] = useState<'idle' | 'spinning' | 'miss' | 'done'>('idle');
+  const [phase, setPhase] = useState<'idle' | 'spinning' | 'miss' | 'again' | 'done'>('idle');
   const [pick, setPick] = useState(0);
   const sector = 360 / live.length;
   const miss = content.games[1];
   const game = content.games[10];
   const taker = content.players[1] as Player;
   const timer = useRef<number | undefined>(undefined);
-  const playing = phase === 'spinning' || phase === 'miss';
+  const playing = phase === 'spinning' || phase === 'miss' || phase === 'again';
 
   const finish = () => {
     running.current?.stop();
@@ -71,23 +71,36 @@ export function WheelMoment({ content }: { content: Content }) {
     setPhase('done');
   };
 
+  // The server's answer arrives whole: a miss (a game someone already completed this season) and then the pick.
+  // The wheel shows both: it lands on the miss, says who completed it, and spins on to the pick.
   const spin = () => {
-    const next = (pick + 3 + Math.floor(Math.random() * (live.length - 1))) % live.length;
+    const missAt = (pick + 2 + Math.floor(Math.random() * (live.length - 1))) % live.length;
+    const next = (missAt + 2 + Math.floor(Math.random() * (live.length - 3))) % live.length;
     setPick(next);
-    const target = -(next * sector + sector / 2) - 360 * 6;
+    const turn = (at: number, laps: number) => -(at * sector + sector / 2) - 360 * laps;
     if (reduce) {
-      rotation.set(target);
+      rotation.set(turn(next, 6));
       setPhase('done');
       return;
     }
     rotation.set(rotation.get() % 360);
     setPhase('spinning');
-    running.current = animate(rotation, target, { duration: 2.1, ease: [0.12, 0.8, 0.2, 1] });
+    running.current = animate(rotation, turn(missAt, 4), {
+      duration: 1.4,
+      ease: [0.12, 0.8, 0.2, 1],
+    });
     void running.current.then(() => {
       setPhase((p) => (p === 'spinning' ? 'miss' : p));
       timer.current = window.setTimeout(() => {
-        setPhase((p) => (p === 'miss' ? 'done' : p));
-      }, 900);
+        setPhase((p) => (p === 'miss' ? 'again' : p));
+        running.current = animate(rotation, turn(next, 6), {
+          duration: 0.7,
+          ease: [0.2, 0.7, 0.3, 1],
+        });
+        void running.current.then(() => {
+          setPhase((p) => (p === 'again' ? 'done' : p));
+        });
+      }, 1000);
     });
   };
 
@@ -164,7 +177,8 @@ export function WheelMoment({ content }: { content: Content }) {
             {miss.cover ? (
               <img src={miss.cover} alt="" width={90} height={135} className="missed" />
             ) : null}
-            <span className="clamp-2">{t.wheel.miss(miss.title, taker.name)}</span>
+            <span className="clamp-2 missed-title">{miss.title}</span>
+            <strong>{t.wheel.miss(taker.name)}</strong>
           </motion.div>
         ) : null}
         {phase === 'done' && game ? (
@@ -177,12 +191,17 @@ export function WheelMoment({ content }: { content: Content }) {
             {game.cover ? <img src={game.cover} alt="" width={110} height={165} /> : null}
             <strong>{game.title}</strong>
             <span className="hint">{t.wheel.category(category)}</span>
+            {miss ? (
+              <span className="miss-note">
+                {t.wheel.missNote(miss.title)} {t.wheel.miss(taker.name)}
+              </span>
+            ) : null}
           </motion.div>
         ) : null}
       </div>
       <p className="result" aria-live="polite">
         {phase === 'done' && game
-          ? `${t.wheel.category(category)}. ${t.wheel.result(game.title)}`
+          ? `${miss ? `${t.wheel.missNote(miss.title)} ${t.wheel.miss(taker.name)}. ` : ''}${t.wheel.category(category)}. ${t.wheel.result(game.title)}`
           : ' '}
       </p>
       <div className="row">

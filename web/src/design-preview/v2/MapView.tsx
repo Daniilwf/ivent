@@ -436,14 +436,8 @@ export function MapView({
         onPointerUp={handlers.onPointerUp}
         onPointerCancel={handlers.onPointerCancel}
       >
-        <defs>
-          <pattern id="felt" width="14" height="14" patternUnits="userSpaceOnUse">
-            <circle cx="7" cy="7" r="1.6" fill="var(--table-dots)" />
-          </pattern>
-        </defs>
-        <rect x={-2000} y={-2000} width={6000} height={6000} fill="var(--table)" />
-        <rect x={-2000} y={-2000} width={6000} height={6000} fill="url(#felt)" />
-
+        {/* The table itself is the frame's CSS background: no huge SVG layer under the map. A 6000×6000 patterned
+            rect used to exceed phone GPUs' texture limits and render in part, showing the black underlays. */}
         {variant === 'world' ? (
           <g>
             {/* The coast: every zone's outline drawn thick first, the fills over it, so only the outer edge shows */}

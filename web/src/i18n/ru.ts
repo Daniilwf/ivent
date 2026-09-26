@@ -306,6 +306,7 @@ export const ru = {
     zoomIn: 'Приблизить',
     zoomOut: 'Отдалить',
     toMe: 'К моей фишке',
+    routeProgress: 'Путь от старта до финиша',
     more: (count: number) => `+${count}`,
     zones: {
       meadow: 'Поляна новичков',
@@ -353,7 +354,8 @@ export const ru = {
       spin: 'Крутить колесо',
       again: 'Крутить ещё раз',
       category: (name: string) => `Категория: ${name}`,
-      miss: (title: string, who: string) => `${title} занята: её проходит ${who}`,
+      miss: (who: string) => `Уже прошёл ${who}, крутим дальше`,
+      missNote: (title: string) => `Промах: ${title}.`,
       result: (title: string) => `Выпала игра: ${title}`,
       empty: 'Без свободных игр, в колесе их нет',
       start: 'Начать прохождение',
