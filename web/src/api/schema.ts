@@ -5686,6 +5686,13 @@ export interface components {
             difficulty: null | components["schemas"]["Difficulty"];
             comment: null | string;
         };
+        /** @description The die a difficulty gives on completion, and the event it grants (`good`, `bad`) or none. */
+        DifficultyDieView: {
+            difficulty: components["schemas"]["Difficulty"];
+            /** Format: int32 */
+            sides: number;
+            grantEvent: null | components["schemas"]["EventKind"];
+        };
         /** @description The drop penalty: `count` dice of `sides`, what they take, and whether a bad event follows. */
         DropPenaltyView: {
             /** Format: int32 */
@@ -6050,7 +6057,11 @@ export interface components {
          * @description The signed-in player's own turn. While playing: `dropHintMinutes` is `roll.minPlayMinutesBeforeDrop` until
          *     that much has been played by the server clock (only a hint: D-09), then null; `dropPenalty` is what a drop costs
          *     under the rules in force; `techRerollOpen` says whether the player may still tech-reroll themselves (D-94);
-         *     `challengesEnabled` says whether a challenge may be claimed on completion (`features.challenges`, D-96).
+         *     `challengesEnabled` says whether a challenge may be claimed on completion (`features.challenges`, D-96);
+         *     `techRerollUntil` is when the player's own tech reroll window closes (the roll time plus the run's snapshot of
+         *     `roll.techRerollWindowHours`), null while not playing. The active run's game carries the hours of the roll's
+         *     snapshot, the ones the completion counts (D-44): the pool may have got hours since (D-138). `difficultyDice` —
+         *     while playing, the die each difficulty gives under the run's snapshot and the event it grants, if any.
          */
         MyTurnView: {
             /** Format: uuid */
@@ -6070,6 +6081,9 @@ export interface components {
             finish: null | components["schemas"]["MyFinishView"];
             unchecked: null | components["schemas"]["UncheckedRunsView"];
             roll: null | components["schemas"]["WheelRollView"];
+            /** Format: date-time */
+            techRerollUntil?: null | string;
+            difficultyDice?: null | components["schemas"]["DifficultyDieView"][];
         };
         NominationRules: {
             auto: components["schemas"]["EquatableArrayOfAutoNomination"];

@@ -8,7 +8,7 @@ import { cellsToFinish } from '../board/geometry';
 import type { LeaderRow } from '../board/Leaderboard';
 import type { Player } from '../board/types';
 
-const avatars = [
+export const avatars = [
   `${import.meta.env.BASE_URL}styleguide/avatar-cat.svg`,
   `${import.meta.env.BASE_URL}styleguide/avatar-frog.svg`,
 ];
@@ -146,6 +146,31 @@ export const demoChoice: Schemas['ChoiceView'] = {
     { id: 'o3', game: { id: 'g3', title: 'Celeste', hours: null, marks: [] } },
   ],
 };
+
+/** The penalty of the default ruleset (docs/ruleset.default.json): 2d4 on points and position and a bad event */
+export const demoPenalty: Schemas['DropPenaltyView'] = {
+  count: 2,
+  sides: 4,
+  affectsPoints: true,
+  affectsPosition: true,
+  badEvent: true,
+};
+/** Other players of the season who may have seen a run */
+export const demoWitnesses: Schemas['PlayerView'][] = demoPlayers.slice(1, 5).map((p) => ({
+  id: p.id,
+  name: p.name,
+  cellId: String(p.cell),
+  points: p.points,
+  phase: 'idle',
+  finishOrder: null,
+  avatar: null,
+}));
+/** A proof's screenshots: our own drawings stand for them */
+export const demoProofFiles: Schemas['FileLinkView'][] = avatars.map((url, i) => ({
+  id: `shot-${String(i + 1)}`,
+  url,
+  thumbnailUrl: url,
+}));
 
 // «Что нового»: a release with notes and one without
 export const demoReleases = [

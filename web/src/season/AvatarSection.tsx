@@ -2,6 +2,7 @@ import { useEffect, useState, type ChangeEvent, type SyntheticEvent } from 'reac
 import { api, rejectionCode, type Schemas } from '../api/client';
 import { uploadFile, UploadError } from '../api/files';
 import { ru } from '../i18n/ru';
+import { FilePicker } from '../ui/Field';
 
 const pictureTypes = 'image/png,image/jpeg,image/webp,image/gif';
 
@@ -118,16 +119,14 @@ export function AvatarSection({ onChanged }: { onChanged: () => void }) {
       ) : (
         <p>{ru.avatar.none}</p>
       )}
-      <label>
-        {ru.avatar.file}
-        <input
-          data-testid="avatar-file"
-          type="file"
-          accept={pictureTypes}
-          disabled={busy}
-          onChange={pick}
-        />
-      </label>
+      {/* A Russian button over the browser's own field (H4, the H2 design review) */}
+      <FilePicker
+        data-testid="avatar-file"
+        label={ru.avatar.file}
+        accept={pictureTypes}
+        busy={busy}
+        onChange={pick}
+      />
       <form onSubmit={byLink} noValidate>
         <label>
           {ru.avatar.link}

@@ -15,7 +15,8 @@ using Microsoft.Extensions.Logging.Abstractions;
 // Project tools (package.json): season export, import and the integrity check (C12b, D-105); the pool from xlsx (F1, D-125).
 //   season-export <season id> <archive.zip> [--db <path>]
 //   season-import <archive.zip> [--db <path>] [--allow-role-mismatch] [--with-pool]
-//   season-check <season id> [--db <path>]
+//   season-check <season id> | --all [--db <path>]   — --all: every season (the migration check, J5)
+//   db-census [--db <path>]   — rows per table, the seasons, the last migration and the schema (the migration check, J5)
 //   pool-import <games.xlsx> [--db <path>] [--report-only]   — with the site stopped: the import runs its own queue
 // The database defaults to the development one (var/dev.db) or GAMEEVENT_DB. Never point an import at production.
 var arguments = args.ToList();
@@ -98,25 +99,38 @@ try
                 return 0;
             }
 
-        case "season-check" when arguments.Count == 2 && Guid.TryParse(arguments[1], out var seasonId):
+        case "season-check" when arguments.Count == 2 && arguments[1] == "--all":
             {
                 await using var db = Open(connectionString);
-                var report = await SeasonIntegrity.CheckAsync(db, seasonId, cancel.Token);
-                if (report is null)
+                var seasons = await db.Seasons.AsNoTracking().OrderBy(x => x.CreatedAt).Select(x => x.Id).ToListAsync(cancel.Token);
+                if (seasons.Count == 0)
                 {
-                    Console.Error.WriteLine($"Season {seasonId} is not in {dbPath}.");
+                    Console.Error.WriteLine($"There are no seasons in {dbPath}.");
                     return 1;
                 }
 
-                Console.WriteLine(report.IsIntact
-                    ? $"Season {seasonId}: intact up to event {report.LastSequence}."
-                    : $"Season {seasonId}: {report.Differences.Count} difference(s) up to event {report.LastSequence}{(report.Settled ? "" : " (the log kept moving: check again)")}:");
-                foreach (var difference in report.Differences)
+                var worst = 0;
+                foreach (var id in seasons)
                 {
-                    Console.WriteLine("  " + difference);
+                    worst = Math.Max(worst, await CheckSeasonAsync(db, id, dbPath, cancel.Token));
                 }
 
-                return report.IsIntact ? 0 : 3;
+                return worst;
+            }
+
+        case "db-census" when arguments.Count == 1:
+            {
+                // Raw SQLite, not the model: the census must read an older schema (a rolled-back copy) as it is
+                await using var connection = new SqliteConnection(connectionString);
+                await connection.OpenAsync(cancel.Token);
+                Console.WriteLine(JsonSerializer.Serialize(await DatabaseCensus.TakeAsync(connection, cancel.Token), DatabaseCensus.Json));
+                return 0;
+            }
+
+        case "season-check" when arguments.Count == 2 && Guid.TryParse(arguments[1], out var seasonId):
+            {
+                await using var db = Open(connectionString);
+                return await CheckSeasonAsync(db, seasonId, dbPath, cancel.Token);
             }
 
         case "pool-import" when arguments.Count == 2:
@@ -202,7 +216,7 @@ try
 
         default:
             Console.Error.WriteLine(
-                "Usage: season-export <season id> <archive.zip> | season-import <archive.zip> [--allow-role-mismatch] [--with-pool] | season-check <season id> | pool-import <games.xlsx> [--report-only]; each takes [--db <path>]");
+                "Usage: season-export <season id> <archive.zip> | season-import <archive.zip> [--allow-role-mismatch] [--with-pool] | season-check <season id> | season-check --all | db-census | pool-import <games.xlsx> [--report-only]; each takes [--db <path>]");
             return 2;
     }
 }
@@ -216,6 +230,27 @@ catch (OperationCanceledException)
 {
     Console.Error.WriteLine("Stopped: whatever was written before stays, a new run goes on from there.");
     return 130;
+}
+
+// The integrity check of one season: replays its log and compares with the projection (C12b); exit 0, 1 or 3
+static async Task<int> CheckSeasonAsync(GameEventDbContext db, Guid seasonId, string dbPath, CancellationToken ct)
+{
+    var report = await SeasonIntegrity.CheckAsync(db, seasonId, ct);
+    if (report is null)
+    {
+        Console.Error.WriteLine($"Season {seasonId} is not in {dbPath}.");
+        return 1;
+    }
+
+    Console.WriteLine(report.IsIntact
+        ? $"Season {seasonId}: intact up to event {report.LastSequence}."
+        : $"Season {seasonId}: {report.Differences.Count} difference(s) up to event {report.LastSequence}{(report.Settled ? "" : " (the log kept moving: check again)")}:");
+    foreach (var difference in report.Differences)
+    {
+        Console.WriteLine("  " + difference);
+    }
+
+    return report.IsIntact ? 0 : 3;
 }
 
 // The site holds this lock while it runs on the database (D-127): a writing command refuses meanwhile

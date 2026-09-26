@@ -51,7 +51,11 @@ test('slice: roll → start → complete moves the token, and another browser se
     await hours.fill('5');
     await player.getByTestId('complete-hours-source').fill('HowLongToBeat');
   }
-  await player.getByTestId('complete-difficulty').selectOption('normal');
+  // The difficulty is a row of radio pills (H4): the pill's label is what takes the tap
+  await player.getByTestId('complete-difficulty').getByText('Нормальная', { exact: true }).click();
+  await expect(
+    player.getByTestId('complete-difficulty').getByRole('radio', { name: 'Нормальная' }),
+  ).toBeChecked();
   await player.getByTestId('complete-submit').click();
 
   // The dice are shown to the actor, and the token has moved

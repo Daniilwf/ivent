@@ -186,4 +186,47 @@ describe('Screenshots in the proof', () => {
     expect(screen.getByRole('alert')).toHaveTextContent(ru.proof.linkRequired);
     expect(onSubmit).not.toHaveBeenCalled();
   });
+
+  it('picks a file with a Russian button: the browser field stays hidden under it (H4)', async () => {
+    serveUploads([json(200, shot(1))]);
+    renderForm();
+
+    // The button's words are the field's name; the browser's own «Choose File» is not shown
+    const input = screen.getByLabelText(ru.proof.shot);
+    expect(input).toBe(screen.getByTestId('proof-file'));
+    expect(input).toHaveAttribute('type', 'file');
+    expect(input).toHaveClass('sr-only');
+    expect(input).toHaveAccessibleDescription(ru.proof.shotHint(5));
+    // The keyboard reaches the picker
+    for (let i = 0; i < 12 && document.activeElement !== input; i++) await userEvent.tab();
+    expect(input).toHaveFocus();
+
+    await userEvent.upload(input, picture());
+    await screen.findByRole('img', { name: ru.proof.shotAlt(1) });
+    expect(screen.getByTestId('proof-file')).toHaveAccessibleDescription(ru.proof.shotHint(4));
+  });
+
+  it('shows the status of a sent proof in words with an icon (H4)', () => {
+    renderForm({ status: 'approved', files: [], links: [], note: null, comment: null });
+
+    const status = screen.getByTestId('proof-status');
+    expect(status).toHaveTextContent(ru.proof.status.approved);
+    expect(status.querySelector('svg')).not.toBeNull();
+    expect(screen.queryByTestId('proof-form')).toBeNull();
+  });
+
+  it('tells a wrong link under that link, not the others (H4)', async () => {
+    const onSubmit = renderForm();
+    await userEvent.click(screen.getByRole('button', { name: ru.proof.addLink }));
+    const [first, second] = screen.getAllByTestId('proof-link');
+    if (!first || !second) throw new Error('Two link fields are expected.');
+    await userEvent.type(first, 'https://imgur.com/a/credits');
+    await userEvent.type(second, 'ftp://example.org');
+    await userEvent.click(screen.getByTestId('proof-submit'));
+
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(second).toHaveAttribute('aria-invalid', 'true');
+    expect(second).toHaveAccessibleDescription(ru.proof.linkInvalid);
+    expect(first).not.toHaveAttribute('aria-invalid');
+  });
 });
