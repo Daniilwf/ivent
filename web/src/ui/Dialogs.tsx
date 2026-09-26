@@ -1,7 +1,7 @@
 import * as AlertDialog from '@radix-ui/react-alert-dialog';
 import * as Dialog from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
-import type { ReactNode } from 'react';
+import type { ReactNode, RefObject } from 'react';
 import { ru } from '../i18n/ru';
 import { Button, IconButton } from './Button';
 
@@ -45,7 +45,7 @@ export function ConfirmDanger({
           data-testid={testId}
           className="fixed inset-x-4 top-1/2 z-20 mx-auto grid max-w-110 -translate-y-1/2 gap-4 rounded-lg border-3 border-ink bg-card p-5 shadow-lift"
         >
-          <AlertDialog.Title className="font-display text-xl font-heavy text-balance">
+          <AlertDialog.Title className="font-display text-lg font-heavy text-balance wrap-anywhere">
             {title}
           </AlertDialog.Title>
           <AlertDialog.Description asChild>
@@ -83,7 +83,10 @@ export function FormDialog({
   description,
   children,
   testId,
+  returnFocus,
 }: {
+  /** The button that opened the window: the focus goes back to it when the window closes */
+  returnFocus?: RefObject<HTMLElement | null>;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: string;
@@ -98,9 +101,14 @@ export function FormDialog({
         <Dialog.Overlay className={overlay} />
         <Dialog.Content
           data-testid={testId}
+          onCloseAutoFocus={(e) => {
+            if (!returnFocus?.current) return;
+            e.preventDefault();
+            returnFocus.current.focus();
+          }}
           className="fixed inset-x-4 top-1/2 z-20 mx-auto grid max-h-9/10 max-w-110 -translate-y-1/2 gap-4 overflow-auto rounded-lg border-3 border-ink bg-card p-5 shadow-lift"
         >
-          <Dialog.Title className="font-display text-xl font-heavy text-balance">
+          <Dialog.Title className="font-display text-lg font-heavy text-balance wrap-anywhere">
             {title}
           </Dialog.Title>
           <Dialog.Description asChild>

@@ -168,6 +168,7 @@ export const ru = {
   },
   turn: {
     after: 'После прохождения',
+    afterGame: (title: string) => `Прошлая игра: ${title}`,
     proofToSend: 'Пруф: ещё не отправлен',
     proofSummary: 'Пруф и проверка',
     uncheckedWaiting: (count: number, limit: number) =>
@@ -235,6 +236,7 @@ export const ru = {
     ],
     techRerollReason: 'Причина',
     techRerollReasonPlaceholder: 'Выбери причину',
+    techRerollReasonRequired: 'Выбери причину тех-реролла.',
     techRerollReasons: {
       weakPc: 'Слабый ПК',
       paidUnavailable: 'Игра платная, её нет',
@@ -271,7 +273,7 @@ export const ru = {
     challengeDone: 'Челлендж выполнен',
     review: 'Отзыв — по желанию',
     reviewRating: 'Оценка игры',
-    reviewNoRating: 'Без отзыва',
+    reviewNoRating: 'Без оценки',
     reviewText: 'Отзыв',
     reviewRatingRequired: 'Чтобы оставить отзыв, поставь оценку от 1 до 10.',
     lastRejected: (title: string) => `Прохождение отклонено (${title}): очки и клетки сняты.`,
@@ -425,6 +427,10 @@ export const ru = {
         `${plain.join(' + ')}${challenge.length === 0 ? '' : ` + ${challenge.join(' + ')} за челлендж`}. Итого +${total}: столько клеток вперёд и очков`,
       resultStay: (plain: number[], challenge: number[], total: number) =>
         `${plain.join(' + ')}${challenge.length === 0 ? '' : ` + ${challenge.join(' + ')} за челлендж`}. Итого +${total} очков, фишка стоит на месте`,
+      // The dice's result, shown big once the token stands
+      after: (total: number, cell: number, finish: boolean) =>
+        `+${total} очков, ${finish ? 'фишка на финише' : `фишка на клетке ${cell}`}`,
+      afterStay: (total: number) => `+${total} очков, фишка стоит на месте`,
       // The completion's moment, said once when the token stands: the game, the dice and where the token is now
       announce: (title: string, dice: string, at: string) => `Пройдено: ${title}. ${dice}. ${at}`,
       at: (cell: number, finish: boolean) =>

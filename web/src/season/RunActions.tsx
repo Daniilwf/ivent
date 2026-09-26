@@ -1,4 +1,4 @@
-import { useState, type SyntheticEvent } from 'react';
+import { useRef, useState, type SyntheticEvent } from 'react';
 import type { Schemas } from '../api/client';
 import { ru } from '../i18n/ru';
 import { Button } from '../ui/Button';
@@ -44,13 +44,25 @@ export function RunActions({
   const [reason, setReason] = useState<Reason | ''>('');
   const [comment, setComment] = useState('');
   const [commentMissing, setCommentMissing] = useState(false);
+  const [reasonMissing, setReasonMissing] = useState(false);
+  const opener = useRef<HTMLButtonElement>(null);
+  const reasonField = useRef<HTMLSelectElement>(null);
+  const commentField = useRef<HTMLTextAreaElement>(null);
 
   function submitTechReroll(event: SyntheticEvent) {
     event.preventDefault();
-    if (reason === '') return;
     const text = comment.trim();
-    if (reason === 'other' && text === '') {
-      setCommentMissing(true);
+    // Every mistake at once, the focus on the first (no silently disabled button)
+    const noReason = reason === '';
+    const noComment = reason === 'other' && text === '';
+    setReasonMissing(noReason);
+    setCommentMissing(noComment);
+    if (noReason) {
+      reasonField.current?.focus();
+      return;
+    }
+    if (noComment) {
+      commentField.current?.focus();
       return;
     }
     setRerolling(false);
@@ -59,9 +71,15 @@ export function RunActions({
 
   return (
     <div className="grid gap-1 border-t-2 border-muted pt-3">
+      {techRerollOpen ? null : (
+        <p data-testid="tech-reroll-closed" className="text-sm text-ink-soft">
+          {ru.turn.techRerollClosed}
+        </p>
+      )}
       <div className="flex flex-wrap items-center justify-between gap-x-5">
         {techRerollOpen ? (
           <Button
+            ref={opener}
             variant="link"
             data-testid="tech-reroll"
             disabled={pending}
@@ -69,6 +87,7 @@ export function RunActions({
               setReason('');
               setComment('');
               setCommentMissing(false);
+              setReasonMissing(false);
               setRerolling(true);
             }}
           >
@@ -100,16 +119,12 @@ export function RunActions({
           }}
         />
       </div>
-      {techRerollOpen ? null : (
-        <p data-testid="tech-reroll-closed" className="text-sm text-ink-soft">
-          {ru.turn.techRerollClosed}
-        </p>
-      )}
       <FormDialog
         open={rerolling}
         onOpenChange={setRerolling}
         title={ru.turn.techRerollTitle(game)}
         description={ru.turn.techRerollConsequences}
+        returnFocus={opener}
       >
         <form
           onSubmit={submitTechReroll}
@@ -118,12 +133,15 @@ export function RunActions({
           className="grid gap-4"
         >
           <Select
+            ref={reasonField}
+            error={reasonMissing ? ru.turn.techRerollReasonRequired : undefined}
             data-testid="tech-reroll-reason"
             label={ru.turn.techRerollReason}
             required
             value={reason}
             onChange={(e) => {
               setReason(e.target.value as Reason | '');
+              setReasonMissing(false);
               setCommentMissing(false);
             }}
           >
@@ -137,6 +155,7 @@ export function RunActions({
             ))}
           </Select>
           <TextArea
+            ref={commentField}
             data-testid="tech-reroll-comment"
             label={ru.turn.techRerollComment}
             hint={ru.turn.techRerollCommentHint}
@@ -148,7 +167,11 @@ export function RunActions({
               setCommentMissing(false);
             }}
           />
-          <div className="flex flex-wrap justify-end gap-3">
+          {/* On a phone the buttons stand full width, the action on top */}
+          <div className="grid gap-3 desk:flex desk:flex-row-reverse desk:justify-start">
+            <Button type="submit" variant="main" data-testid="tech-reroll-submit" loading={pending}>
+              {ru.turn.techRerollSubmit}
+            </Button>
             <Button
               data-testid="tech-reroll-cancel"
               onClick={() => {
@@ -156,14 +179,6 @@ export function RunActions({
               }}
             >
               {ru.turn.techRerollCancel}
-            </Button>
-            <Button
-              type="submit"
-              variant="main"
-              data-testid="tech-reroll-submit"
-              disabled={pending || reason === ''}
-            >
-              {ru.turn.techRerollSubmit}
             </Button>
           </div>
         </form>

@@ -2,7 +2,7 @@ import { useReducedMotion } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 import { DiceMoment, type DiceRoll } from '../board/Dice';
 import { movePath } from '../board/geometry';
-import type { MomentHandle } from '../board/moment';
+import { momentBudget, type MomentHandle } from '../board/moment';
 import { TokenMove } from '../board/TokenMove';
 import type { Board, Player } from '../board/types';
 import { ru } from '../i18n/ru';
@@ -10,7 +10,9 @@ import { Button } from '../ui/Button';
 import { cx } from '../ui/cx';
 
 /** How long the total stays on the table before the token sets off (not with reduced motion) */
-const totalRest = 600;
+const totalRest = 300;
+/** The dice settle in 1.5 s; the rest and the walk fit the moments' budget with them (docs/DESIGN.md: under 3 s) */
+const walkBudget = momentBudget - 1.5 - totalRest / 1000;
 
 /**
  * A completion that came while the page is open (H4): the run's dice roll across the table, the total rests a moment,
@@ -65,13 +67,14 @@ export function CompletionMoment({
     <div
       data-testid="dice"
       className={cx(
-        'grid w-full justify-items-center gap-3',
-        fill ? 'h-full grid-rows-[minmax(0,1fr)_auto] content-stretch' : 'content-center',
+        'grid w-full justify-items-center',
+        fill ? 'relative h-full' : 'content-center gap-3',
       )}
     >
       {step === 'dice' ? (
-        <div className={cx('grid w-full justify-items-center', fill && 'content-center')}>
+        <div className={cx('grid w-full justify-items-center', fill && 'h-full')}>
           <DiceMoment
+            fill={fill}
             ref={moment}
             roll={roll}
             announce={false}
@@ -98,13 +101,15 @@ export function CompletionMoment({
           players={players}
           mover={token}
           path={path}
-          className={cx('w-full rounded-lg border-3 border-ink', fill ? 'h-full' : 'h-90')}
+          budget={walkBudget}
+          className={cx('w-full', fill ? 'h-full' : 'h-90 rounded-lg border-3 border-ink')}
           onPhase={(phase) => {
             if (phase === 'done') end();
           }}
         />
       )}
       <Button
+        className={fill ? 'absolute bottom-4 left-1/2 z-10 -translate-x-1/2' : undefined}
         onClick={() => {
           // The result of both at once: the dice and the token's cell
           if (ended.current) return;

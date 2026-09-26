@@ -214,6 +214,24 @@ describe('CompleteForm', () => {
 
   // ---- H4: the form on the design system ----
 
+  it('tells every mistake under its field at once and puts the focus on the first', async () => {
+    const onComplete = vi.fn();
+    render(<CompleteForm needsHours pending={false} onComplete={onComplete} />);
+
+    await userEvent.click(screen.getByTestId('complete-submit'));
+
+    expect(onComplete).not.toHaveBeenCalled();
+    const hours = screen.getByTestId('complete-hours');
+    expect(hours).toHaveAccessibleDescription(`${ru.turn.hoursHint} ${ru.turn.hoursInvalid}`);
+    expect(screen.getByTestId('complete-hours-source')).toHaveAccessibleDescription(
+      `${ru.turn.hoursSourceHint} ${ru.turn.hoursSourceRequired}`,
+    );
+    expect(screen.getAllByRole('alert')).toHaveLength(2);
+    await vi.waitFor(() => {
+      expect(hours).toHaveFocus();
+    });
+  });
+
   it('tells a mistake under its own field and marks only that field', async () => {
     render(<CompleteForm needsHours pending={false} onComplete={vi.fn()} />);
 

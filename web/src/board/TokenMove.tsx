@@ -30,7 +30,10 @@ export function TokenMove({
   onPhase,
   ref,
   children,
+  budget = momentBudget,
 }: {
+  /** Seconds the whole move takes at most (a part of a longer moment gets less) */
+  budget?: number;
   board: Board;
   players: Player[];
   /** The moving player, drawn on the path instead of on their cell */
@@ -83,7 +86,7 @@ export function TokenMove({
     stopped.current = false;
     const halted = () => stopped.current;
     // The whole move fits the moments' budget: long moves hop faster
-    const hop = Math.min(momentHop, momentBudget / Math.max(path.length - 1, 1));
+    const hop = Math.min(momentHop, budget / Math.max(path.length - 1, 1));
     const run = async () => {
       for (let i = 1; i < path.length; i++) {
         const a = cellById(board, path[i - 1] as number);
@@ -110,7 +113,7 @@ export function TokenMove({
       stopped.current = true;
       controls.current?.stop();
     };
-  }, [board, path, reduce]);
+  }, [board, path, reduce, budget]);
 
   return (
     <MapView

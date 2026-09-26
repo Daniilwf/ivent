@@ -140,7 +140,10 @@ export function DiceMoment({
   ref,
   announce = true,
   stay = false,
+  fill = false,
 }: {
+  /** The dice fill their frame (the map's stage on a desktop): the table is the whole frame */
+  fill?: boolean;
   roll: DiceRoll | null;
   onPhase?: ((phase: MomentPhase) => void) | undefined;
   ref?: Ref<MomentHandle> | undefined;
@@ -187,40 +190,62 @@ export function DiceMoment({
   const challenge = values.slice(values.length - extra);
   const thrown = roll !== null && !skipped && !reduce;
 
+  const content = (
+    <>
+      <div className="flex flex-wrap items-start justify-center gap-3">
+        {values.map((v, i) => (
+          <Die
+            key={`${skipped ? 's' : 'r'}-${i}`}
+            value={v}
+            index={i}
+            thrown={thrown}
+            challenge={i >= values.length - extra}
+          />
+        ))}
+      </div>
+      {shown && roll ? (
+        <motion.span
+          className="rounded-full border-3 border-ink bg-card px-6 font-display text-3xl font-heavy"
+          initial={reduce ? false : { scale: 0.5, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ type: 'spring', stiffness: 400, damping: 18 }}
+        >
+          +{total}
+        </motion.span>
+      ) : null}
+    </>
+  );
+  const words = (
+    <p
+      className={cx(
+        'min-h-5 text-center text-sm text-balance',
+        fill ? 'rounded-md bg-card px-3 py-1 text-ink empty:hidden' : 'text-ink-soft',
+      )}
+      aria-live={announce ? 'polite' : undefined}
+    >
+      {shown && roll ? (stay ? t.resultStay : t.result)(plain, challenge, total) : ''}
+    </p>
+  );
+  if (fill)
+    return (
+      <div
+        className="table-surface grid h-full w-full content-center justify-items-center gap-6 px-4 pt-6 pb-24 perspective-distant"
+        onClick={finish}
+      >
+        {content}
+        {words}
+      </div>
+    );
+
   return (
     <div className="grid w-full justify-items-center gap-3">
       <Table
         className="grid min-h-90 w-full max-w-140 content-center justify-items-center gap-6 px-4 py-6 perspective-distant"
         onClick={finish}
       >
-        <div className="flex flex-wrap items-start justify-center gap-3">
-          {values.map((v, i) => (
-            <Die
-              key={`${skipped ? 's' : 'r'}-${i}`}
-              value={v}
-              index={i}
-              thrown={thrown}
-              challenge={i >= values.length - extra}
-            />
-          ))}
-        </div>
-        {shown && roll ? (
-          <motion.span
-            className="rounded-full border-3 border-ink bg-card px-6 font-display text-3xl font-heavy"
-            initial={reduce ? false : { scale: 0.5, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ type: 'spring', stiffness: 400, damping: 18 }}
-          >
-            +{total}
-          </motion.span>
-        ) : null}
+        {content}
       </Table>
-      <p
-        className="min-h-5 text-center text-sm text-balance text-ink-soft"
-        aria-live={announce ? 'polite' : undefined}
-      >
-        {shown && roll ? (stay ? t.resultStay : t.result)(plain, challenge, total) : ''}
-      </p>
+      {words}
     </div>
   );
 }

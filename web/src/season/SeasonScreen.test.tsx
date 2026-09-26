@@ -1317,9 +1317,19 @@ describe('SeasonScreen drop and tech reroll (RR2, RR4, RR5, D-94)', () => {
         .getAllByRole('listitem')
         .map((li) => li.textContent),
     ).toEqual(ru.turn.techRerollConsequences);
-    // Nothing to send before a reason is picked
-    expect(within(dialog).getByTestId('tech-reroll-submit')).toBeDisabled();
+    // Nothing is sent without a reason: the select says so and takes the focus
+    await userEvent.click(within(dialog).getByTestId('tech-reroll-submit'));
+    const reason = within(dialog).getByTestId('tech-reroll-reason');
+    expect(reason).toHaveAttribute('aria-invalid', 'true');
+    expect(reason).toHaveAccessibleDescription(ru.turn.techRerollReasonRequired);
+    expect(reason).toHaveFocus();
     expect(commands).toHaveLength(0);
+
+    // Closing the window gives the focus back to «Тех-реролл»
+    await userEvent.click(within(dialog).getByTestId('tech-reroll-cancel'));
+    await vi.waitFor(() => {
+      expect(screen.getByTestId('tech-reroll')).toHaveFocus();
+    });
   });
 
   it('keeps the drop apart from completing: a quiet red link, not a main button (H4)', async () => {
@@ -2236,6 +2246,58 @@ describe('SeasonScreen completion moment (H4)', () => {
     });
     expect(screen.getByTestId('last-dice')).toHaveTextContent(
       ru.turn.lastDice('Silent Hill', [1, 2], 3),
+    );
+  });
+
+  it('keeps the map and the leaderboard as they were until the moment ends, then shows the result big', async () => {
+    serveCompletion();
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+    await complete();
+    const dice = await screen.findByTestId('dice');
+
+    // The moment owns its result: the points and the place do not change under it
+    expect(screen.getAllByTestId(`leader-${me}`)[0]).toHaveTextContent(
+      ru.leaderboard.row(1, 'Вася', 0, 2),
+    );
+    expect(screen.queryByTestId('throw-result')).not.toBeInTheDocument();
+
+    await userEvent.click(within(dice).getByRole('button', { name: ru.moments.skip }));
+
+    expect(screen.getAllByTestId(`leader-${me}`)[0]).toHaveTextContent(
+      ru.leaderboard.row(1, 'Вася', 3, 1),
+    );
+    expect(screen.getByTestId('throw-result')).toHaveTextContent(
+      ru.moments.dice.after(3, 2, false),
+    );
+  });
+
+  it('puts the game in play first and the tails of the last run under it, named by that game', async () => {
+    const playing = view(null, 5);
+    if (!playing.me) throw new Error('the fixture has a player');
+    const previous = {
+      ...done,
+      id: 'b1000000-0000-0000-0000-000000000018',
+      game: { ...done.game, title: 'Outlast' },
+    };
+    serve((r) =>
+      isSeasonGet(r)
+        ? json(200, {
+            ...playing,
+            me: { ...playing.me, lastCompleted: previous },
+          })
+        : json(404, {}),
+    );
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    const run = await screen.findByTestId('active-run');
+    const after = screen.getByTestId('after');
+    expect(run.compareDocumentPosition(after) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(
+      screen.getByTestId('complete-submit').compareDocumentPosition(after) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(within(after).getByRole('heading', { level: 3 })).toHaveTextContent(
+      ru.turn.afterGame('Outlast'),
     );
   });
 

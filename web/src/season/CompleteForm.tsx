@@ -1,4 +1,4 @@
-import { useState, type SyntheticEvent } from 'react';
+import { useRef, useState, type SyntheticEvent } from 'react';
 import type { Schemas } from '../api/client';
 import { difficultyValues } from '../api/schema';
 import { ru } from '../i18n/ru';
@@ -17,11 +17,16 @@ const ratings = Array.from({ length: 10 }, (_, i) => i + 1);
 const difficulties = difficultyValues.map((d) => ({ value: d, label: ru.difficulty[d] }));
 
 type Problem = { field: 'hours' | 'source' | 'rating'; text: string };
+const fieldIds: Record<Problem['field'], string> = {
+  hours: 'complete-hours',
+  source: 'complete-hours-source',
+  rating: 'complete-review-rating',
+};
 
 /**
  * Completing the active run (D-96): difficulty as pills in sight; an hours estimate with its source only when the game
  * has no hours; the challenge claim when the season has challenges on (D-96); an optional review, folded. Fields left
- * unset are not sent. A mistake is told under its field, one at a time.
+ * unset are not sent. Every mistake is told under its field at once, and the focus goes to the first one.
  */
 export function CompleteForm({
   needsHours,
@@ -40,36 +45,38 @@ export function CompleteForm({
   const [challengeDone, setChallengeDone] = useState(false);
   const [rating, setRating] = useState('');
   const [reviewText, setReviewText] = useState('');
-  const [problem, setProblem] = useState<Problem | null>(null);
+  const [problems, setProblems] = useState<Problem[]>([]);
   const [reviewOpen, setReviewOpen] = useState(false);
-
-  function refuse(found: Problem) {
-    setProblem(found);
-    // The review folds: a mistake in it opens it
-    if (found.field === 'rating') setReviewOpen(true);
-  }
+  const form = useRef<HTMLFormElement>(null);
 
   function submit(event: SyntheticEvent) {
     event.preventDefault();
     const completion: Completion = { difficulty };
+    const found: Problem[] = [];
 
     if (needsHours) {
       const estimatedHours = Number(hours.replace(',', '.'));
-      if (hours.trim() === '' || !Number.isFinite(estimatedHours) || estimatedHours <= 0) {
-        refuse({ field: 'hours', text: ru.turn.hoursInvalid });
-        return;
-      }
-      if (source.trim() === '') {
-        refuse({ field: 'source', text: ru.turn.hoursSourceRequired });
-        return;
-      }
+      if (hours.trim() === '' || !Number.isFinite(estimatedHours) || estimatedHours <= 0)
+        found.push({ field: 'hours', text: ru.turn.hoursInvalid });
+      if (source.trim() === '') found.push({ field: 'source', text: ru.turn.hoursSourceRequired });
       completion.estimatedHours = estimatedHours;
       completion.hoursSource = source.trim();
     }
 
     const text = reviewText.trim();
-    if (rating === '' && text !== '') {
-      refuse({ field: 'rating', text: ru.turn.reviewRatingRequired });
+    if (rating === '' && text !== '')
+      found.push({ field: 'rating', text: ru.turn.reviewRatingRequired });
+
+    setProblems(found);
+    const first = found[0];
+    if (first) {
+      // The review folds: a mistake in it opens it; the focus goes to the first field to fix
+      if (found.some((f) => f.field === 'rating')) setReviewOpen(true);
+      requestAnimationFrame(() => {
+        form.current
+          ?.querySelector<HTMLElement>(`[data-testid="${fieldIds[first.field]}"]`)
+          ?.focus();
+      });
       return;
     }
 
@@ -78,16 +85,14 @@ export function CompleteForm({
       completion.review =
         text === '' ? { rating: Number(rating) } : { rating: Number(rating), text };
     }
-
-    setProblem(null);
     onComplete(completion);
   }
 
-  const errorOf = (field: Problem['field']) =>
-    problem?.field === field ? problem.text : undefined;
+  const errorOf = (field: Problem['field']) => problems.find((p) => p.field === field)?.text;
 
   return (
     <form
+      ref={form}
       onSubmit={submit}
       noValidate
       data-testid="complete-form"

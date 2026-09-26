@@ -196,7 +196,7 @@ export function ProofSection({
           {shots.length > 0 && (
             <ul data-testid="proof-shots" className="flex flex-wrap gap-3">
               {shots.map((s, i) => (
-                <li key={s.id} className="relative">
+                <li key={s.id} className="grid justify-items-center gap-1">
                   <img
                     src={s.thumbnailUrl}
                     alt={ru.proof.shotAlt(i + 1)}
@@ -206,7 +206,6 @@ export function ProofSection({
                   />
                   <IconButton
                     label={ru.proof.removeShot(i + 1)}
-                    className="absolute -top-3 -right-3"
                     onClick={() => {
                       setShots((current) => current.filter((x) => x.id !== s.id));
                       // The button is gone: the keyboard goes on from the file picker

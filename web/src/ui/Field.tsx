@@ -69,6 +69,7 @@ export function TextArea({
   label: string;
   hint?: string;
   error?: string | undefined;
+  ref?: Ref<HTMLTextAreaElement> | undefined;
 }) {
   const id = useId();
   const hintId = `${id}-hint`;
@@ -137,6 +138,7 @@ export function Select({
   error?: string | undefined;
   force?: string;
   children: ReactNode;
+  ref?: Ref<HTMLSelectElement> | undefined;
 }) {
   const id = useId();
   const hintId = `${id}-hint`;
