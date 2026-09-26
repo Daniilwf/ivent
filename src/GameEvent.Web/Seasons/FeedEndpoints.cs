@@ -125,8 +125,7 @@ public static class FeedEndpoints
             .OrderByDescending(e => e.Sequence)
             .Take(limit)
             .ToListAsync(ct);
-        var authorIds = rows.Select(r => r.AuthorId).OfType<Guid>().Distinct().ToList();
-        var authors = await db.Users.AsNoTracking().Where(u => authorIds.Contains(u.Id)).ToDictionaryAsync(u => u.Id, u => u.Name, ct);
+        var authors = await db.NamesAsync(rows.Select(r => r.AuthorId).OfType<Guid>(), ct);
         IReadOnlyList<FeedEntryView> entries = [.. rows.Select(r =>
         {
             var decoded = EventCodec.Decode(new StoredEvent(r.Type, r.Version, r.Data));

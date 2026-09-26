@@ -102,8 +102,7 @@ public static class RulesEndpoints
         }
 
         history.Reverse(); // newest first
-        var authorIds = rows.Select(r => r.AuthorId).OfType<Guid>().Distinct().ToList();
-        var authors = await db.Users.AsNoTracking().Where(u => authorIds.Contains(u.Id)).ToDictionaryAsync(u => u.Id, u => u.Name, ct);
+        var authors = await db.NamesAsync(rows.Select(r => r.AuthorId).OfType<Guid>(), ct);
         var named = history.Select(h => h with { AuthorName = h.AuthorId is { } id ? authors.GetValueOrDefault(id) : null }).ToList();
         var deadline = await db.Seasons.AsNoTracking().Where(s => s.Id == seasonId).Select(s => s.Deadline).SingleOrDefaultAsync(ct);
         return TypedResults.Ok(new RulesView(version, previous!, named, deadline));

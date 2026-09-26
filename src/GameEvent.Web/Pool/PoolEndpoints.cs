@@ -224,8 +224,7 @@ public static class PoolEndpoints
 
     private static async Task<Dictionary<Guid, string>> AuthorsAsync(GameEventDbContext db, IReadOnlyCollection<GameRecord> games, CancellationToken ct)
     {
-        var ids = games.Where(g => g.AuthorId is not null).Select(g => g.AuthorId!.Value).Distinct().ToList();
-        return ids.Count == 0 ? [] : await db.Users.AsNoTracking().Where(u => ids.Contains(u.Id)).ToDictionaryAsync(u => u.Id, u => u.Name, ct);
+        return await db.NamesAsync(games.Select(g => g.AuthorId).OfType<Guid>(), ct);
     }
 
     private static PoolGameView View(GameRecord game, Dictionary<Guid, string> authors) =>

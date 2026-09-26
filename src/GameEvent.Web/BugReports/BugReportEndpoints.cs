@@ -205,8 +205,7 @@ public static class BugReportEndpoints
                 .ToListAsync(ct))
             .OrderByDescending(r => r.CreatedAt)
             .ToList();
-        var authorIds = records.Select(r => r.AuthorId).Distinct().ToList();
-        var authors = await db.Users.AsNoTracking().Where(u => authorIds.Contains(u.Id)).ToDictionaryAsync(u => u.Id, u => u.Name, ct);
+        var authors = await db.NamesAsync(records.Select(r => r.AuthorId), ct);
         return [.. records.Select(r => View(r, authors.GetValueOrDefault(r.AuthorId) ?? "?"))];
     }
 
