@@ -1,0 +1,29 @@
+# HTTPS in front of the site and the test copy (J1, D-127). A real domain gets a Let's Encrypt certificate (no account
+# email needed); localhost gets Caddy's own. The site itself listens on plain HTTP inside the Docker network only.
+
+(site_headers) {
+	encode zstd gzip
+	# The details of /health (database, disk, queue) are for the server, not for the internet: outside, only its status
+	@health path /health
+	handle @health {
+		reverse_proxy {args[0]}:8080 {
+			@unhealthy status 5xx
+			handle_response @unhealthy {
+				respond "Unhealthy" 503
+			}
+			handle_response {
+				respond "Healthy" 200
+			}
+		}
+	}
+}
+
+{$SITE_DOMAIN} {
+	import site_headers site
+	reverse_proxy site:8080
+}
+
+{$STAGING_DOMAIN} {
+	import site_headers staging
+	reverse_proxy staging:8080
+}

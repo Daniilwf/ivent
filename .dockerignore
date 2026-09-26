@@ -1,0 +1,21 @@
+# The image is built from the repository root (deploy/Dockerfile): only the sources it copies are sent to Docker.
+**/bin
+**/obj
+**/node_modules
+**/dist
+.git
+.github
+.claude
+.husky
+.tools
+.vscode
+data
+var
+test-artifacts
+e2e
+docs
+!docs/ruleset.default.json
+**/*.db
+**/*.db-*
+.env
+.env.*
