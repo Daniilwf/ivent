@@ -1,8 +1,10 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Runs;
 using GameEvent.Engine.Seasons;
 using GameEvent.Infrastructure.Database;
+using GameEvent.Web.Accounts;
 using GameEvent.Web.Files;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
@@ -65,17 +67,30 @@ public static class FeedEndpoints
     }
 
     private static async Task<Results<Ok<FeedView>, NotFound, ValidationProblem>> FeedAsync(
-        Guid seasonId, GameEventDbContext db, CancellationToken ct, long? before = null, int limit = 50)
+        Guid seasonId, System.Security.Claims.ClaimsPrincipal user, GameEventDbContext db, CancellationToken ct, long? before = null, int limit = 50)
     {
-        if (limit is < 1 or > MaxFeedPage || before < 1)
+        if (limit is < 1 or > MaxFeedPage)
         {
-            return TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["limit"] = [$"A page is 1–{MaxFeedPage} events, before a sequence from 1."] });
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["limit"] = [$"A page is 1–{MaxFeedPage} events."] });
         }
 
-        if (!await db.Seasons.AnyAsync(s => s.Id == seasonId, ct))
+        if (before < 1)
+        {
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["before"] = ["A sequence starts from 1."] });
+        }
+
+        // The global log (accounts, files, bug reports) is nobody's season, whatever the tables hold
+        if (seasonId == Guid.Empty || !await db.Seasons.AnyAsync(s => s.Id == seasonId, ct))
         {
             return TypedResults.NotFound();
         }
+
+        var admin = user.IsInRole(nameof(Infrastructure.Accounts.Role.Admin));
+        var viewer = user.UserId();
+        var viewerPlayerId = await db.SeasonPlayers.AsNoTracking()
+            .Where(p => p.SeasonId == seasonId && p.UserId == viewer)
+            .Select(p => (Guid?)p.Id)
+            .SingleOrDefaultAsync(ct);
 
         var rows = await db.Events.AsNoTracking()
             .Where(e => e.SeasonId == seasonId && (before == null || e.Sequence < before))
@@ -87,20 +102,24 @@ public static class FeedEndpoints
         IReadOnlyList<FeedEntryView> entries = [.. rows.Select(r =>
         {
             var decoded = EventCodec.Decode(new StoredEvent(r.Type, r.Version, r.Data));
-            return new FeedEntryView(
-                r.Sequence,
-                r.CommandId,
-                r.OccurredAt,
-                r.Type,
-                JsonSerializer.SerializeToElement(decoded, decoded.GetType(), EngineJson.Options),
-                r.AuthorId is { } author ? authors.GetValueOrDefault(author) : null,
-                r.UndoneByEventId is not null);
-        })];
+            var data = (JsonObject)JsonSerializer.SerializeToNode(decoded, decoded.GetType(), EngineJson.Options)!;
+            return FeedVisibility.Shown(r.Type, data, admin, viewerPlayerId) is not { } shown
+                ? null
+                : new FeedEntryView(
+                    r.Sequence,
+                    r.CommandId,
+                    r.OccurredAt,
+                    r.Type,
+                    JsonSerializer.SerializeToElement(shown),
+                    r.AuthorId is { } author ? authors.GetValueOrDefault(author) : null,
+                    r.UndoneByEventId is not null);
+        }).OfType<FeedEntryView>()];
         var nextBefore = rows.Count == limit && rows[^1].Sequence > 1 ? rows[^1].Sequence : (long?)null;
         return TypedResults.Ok(new FeedView(entries, nextBefore));
     }
 
-    private static async Task<Results<Ok<ProfileView>, NotFound>> ProfileAsync(Guid userId, GameEventDbContext db, CancellationToken ct)
+    private static async Task<Results<Ok<ProfileView>, NotFound>> ProfileAsync(
+        Guid userId, System.Security.Claims.ClaimsPrincipal viewer, GameEventDbContext db, CancellationToken ct)
     {
         // A deleted account keeps its name in the seasons it played, but has no page of its own
         if (await db.Users.AsNoTracking().SingleOrDefaultAsync(u => u.Id == userId && !u.IsDeleted, ct) is not { } user)
@@ -116,7 +135,10 @@ public static class FeedEndpoints
         var reviews = await db.Reviews.AsNoTracking().Where(r => playerIds.Contains(r.PlayerId)).ToListAsync(ct);
         var runs = await db.Runs.AsNoTracking().Where(r => playerIds.Contains(r.PlayerId)).ToListAsync(ct);
         var gameIds = reviews.Select(r => r.GameId).Distinct().ToList();
-        var games = await db.Games.AsNoTracking().Where(g => gameIds.Contains(g.Id)).ToDictionaryAsync(g => g.Id, g => g.Title, ct);
+        // Like the game's own page: a deleted game is the admin's to see
+        var withDeleted = viewer.IsInRole(nameof(Infrastructure.Accounts.Role.Admin));
+        var games = await db.Games.AsNoTracking().Where(g => gameIds.Contains(g.Id) && (withDeleted || !g.IsDeleted)).ToDictionaryAsync(g => g.Id, g => g.Title, ct);
+        reviews = [.. reviews.Where(r => games.ContainsKey(r.GameId))];
 
         IReadOnlyList<ProfileSeasonView> seasonViews = [.. players
             .Where(p => seasons.ContainsKey(p.SeasonId))
@@ -127,7 +149,7 @@ public static class FeedEndpoints
             .Select(r => new ProfileReviewView(
                 r.RunId,
                 r.GameId,
-                games.GetValueOrDefault(r.GameId) ?? "?",
+                games[r.GameId],
                 r.SeasonId,
                 seasons.TryGetValue(r.SeasonId, out var season) ? season.Name : "?",
                 r.Rating,
