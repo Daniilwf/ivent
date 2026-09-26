@@ -14,11 +14,17 @@ using Microsoft.EntityFrameworkCore;
 
 namespace GameEvent.Web.Rulesets;
 
-/// <summary>The rules in force and their history: who changed what and when (C3). Numbers on the rules page are real.</summary>
-public sealed record RulesView(int Version, Ruleset Ruleset, IReadOnlyList<RulesVersionView> History);
+/// <summary>
+/// The rules in force and their history: who changed what and when (C3). Numbers on the rules page are real.
+/// <c>deadline</c> — the season's deadline, set apart from the rules by the admin (H7, D-170); null while not set.
+/// </summary>
+public sealed record RulesView(int Version, Ruleset Ruleset, IReadOnlyList<RulesVersionView> History, DateTimeOffset? Deadline = null);
 
-/// <summary>One version of the rules: when, by whom (null for the season's creation by the system), and what changed.</summary>
-public sealed record RulesVersionView(int Version, DateTimeOffset At, Guid? AuthorId, IReadOnlyList<RulesetChange> Changes);
+/// <summary>
+/// One version of the rules: when, by whom (null for the season's creation by the system), and what changed.
+/// <c>authorName</c> — the author's name for the rules page (H7, D-170); null with no author.
+/// </summary>
+public sealed record RulesVersionView(int Version, DateTimeOffset At, Guid? AuthorId, IReadOnlyList<RulesetChange> Changes, string? AuthorName = null);
 
 /// <summary>
 /// The new version of the rules and what the admin should know about it: <c>finish.bonusesKept</c> — after this change
@@ -86,7 +92,11 @@ public static class RulesEndpoints
         }
 
         history.Reverse(); // newest first
-        return TypedResults.Ok(new RulesView(version, previous!, history));
+        var authorIds = rows.Select(r => r.AuthorId).OfType<Guid>().Distinct().ToList();
+        var authors = await db.Users.AsNoTracking().Where(u => authorIds.Contains(u.Id)).ToDictionaryAsync(u => u.Id, u => u.Name, ct);
+        var named = history.Select(h => h with { AuthorName = h.AuthorId is { } id ? authors.GetValueOrDefault(id) : null }).ToList();
+        var deadline = await db.Seasons.AsNoTracking().Where(s => s.Id == seasonId).Select(s => s.Deadline).SingleOrDefaultAsync(ct);
+        return TypedResults.Ok(new RulesView(version, previous!, named, deadline));
     }
 
     private static async Task<Results<Ok<RulesChangeResult>, JsonHttpResult<RulesetProblem>, NotFound, ProblemHttpResult, ValidationProblem>> ChangeRulesAsync(

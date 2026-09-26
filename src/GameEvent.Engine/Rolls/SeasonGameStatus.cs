@@ -79,6 +79,9 @@ internal sealed class SeasonGameStatus
     /// <summary>Game statuses without anyone's personal exclusions (category counts for the admin).</summary>
     public static SeasonGameStatus ForNobody(SeasonState state) => new(state, Guid.Empty);
 
+    /// <summary>Every game taken in the season: completed (winning over played) or played, offered or among pending options.</summary>
+    public IEnumerable<RollMiss> Taken => _misses.Values;
+
     public GameAvailability Of(Game game, out RollMiss? miss)
     {
         miss = null;

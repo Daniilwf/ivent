@@ -26,6 +26,18 @@ public static class PoolStats
     }
 
     /// <summary>
+    /// The games nobody can roll now for a season reason, ordered by game id (H6: the pool page shows «Уже прошёл Вася» and
+    /// «Сейчас играет Вася» by the same predicate the wheel uses). An offered game and every option of a pending choice
+    /// count as being played; a free-mode run of the first does not complete the game (D-16). Deleted games and personal
+    /// exclusions are not the season's status and are not listed.
+    /// </summary>
+    public static IReadOnlyList<RollMiss> Taken(SeasonState state)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        return [.. SeasonGameStatus.ForNobody(state).Taken.OrderBy(m => m.GameId)];
+    }
+
+    /// <summary>
     /// Idle, active players of a running season whose roll would find no game now (their exclusions and the filters
     /// included), ordered by name: the signal for the admin (D-92). A player playing or holding an offer has a game.
     /// </summary>

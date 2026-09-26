@@ -206,6 +206,7 @@ public static class AppSetup
         api.MapAvatars();
         api.MapGameLookup();
         api.MapPool();
+        api.MapSeasonPool();
         api.MapMaintenance();
         api.MapBugReports();
 
