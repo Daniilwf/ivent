@@ -1,6 +1,3 @@
-using System.Globalization;
-using DocumentFormat.OpenXml.Packaging;
-using DocumentFormat.OpenXml.Spreadsheet;
 using GameEvent.Engine.Pool;
 using GameEvent.Infrastructure.Database;
 using GameEvent.Infrastructure.Queue;
@@ -19,8 +16,9 @@ public sealed record ImportedTable(IReadOnlyList<ImportedGame> Games, IReadOnlyL
 
 /// <summary>
 /// What an import will do (F1, D-125): the games to add (<c>Force</c> — the pool or the table has an alike title), the
-/// categories to put on the wheel, and what it leaves out — a title twice in the table, a title the pool has already,
-/// a row that is not a game card.
+/// categories new to the wheel, and what it leaves out — a title twice in the table, a title the pool has already, a title
+/// the admin deleted from the pool, a category the wheel has already (its weight is the admin's: kept, and told when the
+/// table says otherwise), a row that is not a game card.
 /// </summary>
 public sealed record PoolImportPlan(
     IReadOnlyList<(ImportedGame Game, GameCard Card, bool Force)> ToAdd,
@@ -28,7 +26,9 @@ public sealed record PoolImportPlan(
     IReadOnlyList<(ImportedGame Game, ImportedGame First)> SameInTable,
     IReadOnlyList<ImportedGame> InPool,
     IReadOnlyList<(ImportedGame Game, string Alike)> Alike,
-    IReadOnlyList<string> Problems);
+    IReadOnlyList<string> Problems,
+    IReadOnlyList<ImportedGame> Deleted,
+    IReadOnlyList<(ImportedCategory Category, int OnWheel)> WeightsKept);
 
 /// <summary>What the import did: games and categories written, and refusals by the queue.</summary>
 public sealed record PoolImportResult(int GamesAdded, int CategoriesSet, IReadOnlyList<string> Refused);
@@ -59,57 +59,16 @@ public static class PoolImport
     public const string GamesSheet = "Игры";
     public const string CategoriesSheet = "Категории";
 
-    private static readonly char[] s_tagSeparators = [',', ';'];
-
-    public static ImportedTable Read(Stream xlsx)
-    {
-        ArgumentNullException.ThrowIfNull(xlsx);
-        using var document = SpreadsheetDocument.Open(xlsx, false);
-        var workbook = document.WorkbookPart ?? throw new InvalidDataException("The file has no workbook.");
-        var strings = workbook.SharedStringTablePart?.SharedStringTable.Elements<SharedStringItem>().Select(s => s.InnerText).ToList() ?? [];
-        var problems = new List<string>();
-
-        var games = new List<ImportedGame>();
-        foreach (var (row, cells) in Rows(workbook, GamesSheet, strings, problems).Skip(1))
-        {
-            var title = cells.GetValueOrDefault("A");
-            if (string.IsNullOrWhiteSpace(title))
-            {
-                continue;
-            }
-
-            var tags = (cells.GetValueOrDefault("B") ?? "").Split(s_tagSeparators, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-            games.Add(new ImportedGame(row, title, tags, Blank(cells.GetValueOrDefault("C")), Blank(cells.GetValueOrDefault("D"))));
-        }
-
-        var categories = new List<ImportedCategory>();
-        foreach (var (row, cells) in Rows(workbook, CategoriesSheet, strings, problems).Skip(1))
-        {
-            var name = cells.GetValueOrDefault("A");
-            if (string.IsNullOrWhiteSpace(name))
-            {
-                continue;
-            }
-
-            if (!decimal.TryParse(cells.GetValueOrDefault("B"), NumberStyles.Number, CultureInfo.InvariantCulture, out var weight) || weight != decimal.Truncate(weight) || weight < 1)
-            {
-                problems.Add($"«{CategoriesSheet}», row {row}: the weight of «{name.Trim()}» is not a whole number above 0.");
-                continue;
-            }
-
-            categories.Add(new ImportedCategory(row, name.Trim(), (int)weight));
-        }
-
-        return new ImportedTable(games, categories, problems);
-    }
-
     /// <summary>Plans the import against the pool as it is: nothing is written.</summary>
     public static async Task<PoolImportPlan> PlanAsync(GameEventDbContext db, ImportedTable table, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(db);
         ArgumentNullException.ThrowIfNull(table);
-        var pool = await db.Games.AsNoTracking().Where(g => !g.IsDeleted).Select(g => g.Title).ToListAsync(ct);
+        var games = await db.Games.AsNoTracking().Select(g => new { g.Title, g.IsDeleted }).ToListAsync(ct);
+        var pool = games.Where(g => !g.IsDeleted).Select(g => g.Title).ToList();
+        var deletedTitles = games.Where(g => g.IsDeleted).Select(g => g.Title).ToList();
         var problems = new List<string>(table.Problems);
+        var deleted = new List<ImportedGame>();
         var toAdd = new List<(ImportedGame, GameCard, bool)>();
         var same = new List<(ImportedGame, ImportedGame)>();
         var inPool = new List<ImportedGame>();
@@ -125,7 +84,7 @@ public static class PoolImport
                 continue;
             }
 
-            if (game.Author?.Length > PoolRules.MaxAuthorNameLength)
+            if (game.Author is { } author && PoolRules.Tidy(author).Length > PoolRules.MaxAuthorNameLength)
             {
                 problems.Add($"«{GamesSheet}», row {game.Row}: the author of «{card.Title}» is longer than {PoolRules.MaxAuthorNameLength} characters.");
                 continue;
@@ -134,6 +93,13 @@ public static class PoolImport
             if (pool.Any(t => PoolRules.IsSame(t, card.Title)))
             {
                 inPool.Add(game);
+                continue;
+            }
+
+            // The admin took it out of the pool: an import does not bring it back as a new game
+            if (deletedTitles.Any(t => PoolRules.IsSame(t, card.Title)))
+            {
+                deleted.Add(game);
                 continue;
             }
 
@@ -153,14 +119,34 @@ public static class PoolImport
             taken.Add((card.Title, game));
         }
 
-        var categories = table.Categories
-            .GroupBy(c => c.Name, StringComparer.OrdinalIgnoreCase)
-            .Select(g => g.Last())
-            .ToList();
-        return new PoolImportPlan(toAdd, categories, same, inPool, alike, problems);
+        var wheel = await db.Categories.AsNoTracking().ToListAsync(ct);
+        var categories = new List<ImportedCategory>();
+        var kept = new List<(ImportedCategory, int)>();
+        foreach (var group in table.Categories.GroupBy(c => c.Name, StringComparer.OrdinalIgnoreCase))
+        {
+            var category = group.First();
+            problems.AddRange(group.Skip(1).Select(c => $"«{CategoriesSheet}», row {c.Row}: «{c.Name}» is in the table again (row {category.Row} counts)."));
+            if (PoolRules.CheckCategory(category.Name, category.Weight) is { } invalid)
+            {
+                problems.Add($"«{CategoriesSheet}», row {category.Row}: «{category.Name}» — {invalid.Detail}");
+            }
+            else if (wheel.FirstOrDefault(c => string.Equals(c.Name, category.Name, StringComparison.OrdinalIgnoreCase)) is { } onWheel)
+            {
+                if (onWheel.Weight != category.Weight)
+                {
+                    kept.Add((category, onWheel.Weight));
+                }
+            }
+            else
+            {
+                categories.Add(category);
+            }
+        }
+
+        return new PoolImportPlan(toAdd, categories, same, inPool, alike, problems, deleted, kept);
     }
 
-    /// <summary>Writes the plan through the queue; a category already on the wheel with the same weight is left as it is.</summary>
+    /// <summary>Writes the plan through the queue: the new games, then the categories new to the wheel.</summary>
     public static async Task<PoolImportResult> ApplyAsync(PoolImportPlan plan, CommandBus bus, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(plan);
@@ -188,9 +174,9 @@ public static class PoolImport
             {
                 set++;
             }
-            else if (outcome.Rejection!.Code != PoolRules.NothingToChange)
+            else
             {
-                refused.Add($"«{CategoriesSheet}», row {category.Row}: «{category.Name}» — {outcome.Rejection.Code}: {outcome.Rejection.Detail}");
+                refused.Add($"«{CategoriesSheet}», row {category.Row}: «{category.Name}» — {outcome.Rejection!.Code}: {outcome.Rejection.Detail}");
             }
         }
 
@@ -244,9 +230,11 @@ public static class PoolImport
         ArgumentNullException.ThrowIfNull(plan);
         var lines = new List<string>
         {
-            $"Games to add: {plan.ToAdd.Count}; categories: {plan.Categories.Count}.",
+            $"Games to add: {plan.ToAdd.Count}; categories new to the wheel: {plan.Categories.Count}.",
             $"Already in the pool (skipped): {plan.InPool.Count}.",
         };
+        Section("Deleted from the pool by the admin (skipped)", plan.Deleted.Select(d => $"row {d.Row} «{d.Title.Trim()}»"));
+        Section("On the wheel with another weight (the wheel's is kept)", plan.WeightsKept.Select(k => $"row {k.Category.Row} «{k.Category.Name}»: {k.Category.Weight} in the table, {k.OnWheel} on the wheel"));
         Section("Twice in the table (the later rows are skipped)", plan.SameInTable.Select(s => $"row {s.Game.Row} «{s.Game.Title.Trim()}» = row {s.First.Row}"));
         Section("Alike titles (added anyway, check by hand)", plan.Alike.Select(a => $"row {a.Game.Row} «{a.Game.Title.Trim()}» ~ «{a.Alike}»"));
         Section("Rows left out", plan.Problems);
@@ -263,42 +251,4 @@ public static class PoolImport
         }
     }
 
-    /// <summary>A sheet's rows by number, each as its cells by column letter, with the values the cells show.</summary>
-    private static IEnumerable<(int Row, Dictionary<string, string> Cells)> Rows(WorkbookPart workbook, string name, List<string> strings, List<string> problems)
-    {
-        var sheet = workbook.Workbook.Sheets?.Elements<Sheet>().FirstOrDefault(s => string.Equals(s.Name?.Value?.Trim(), name, StringComparison.OrdinalIgnoreCase));
-        if (sheet?.Id?.Value is not { } id || workbook.GetPartById(id) is not WorksheetPart part)
-        {
-            problems.Add($"The sheet «{name}» is not in the file.");
-            yield break;
-        }
-
-        foreach (var row in part.Worksheet.Descendants<Row>())
-        {
-            var cells = new Dictionary<string, string>(StringComparer.Ordinal);
-            foreach (var cell in row.Elements<Cell>())
-            {
-                var column = new string([.. (cell.CellReference?.Value ?? "").TakeWhile(char.IsLetter)]);
-                cells[column] = Value(cell, strings);
-            }
-
-            yield return ((int)(row.RowIndex?.Value ?? 0), cells);
-        }
-    }
-
-    // A formula's cell keeps its last computed value: that is what the table shows, and what is imported
-    private static string Value(Cell cell, List<string> strings)
-    {
-        if (cell.DataType?.Value == CellValues.InlineString)
-        {
-            return cell.InlineString?.InnerText ?? "";
-        }
-
-        var raw = cell.CellValue?.Text ?? "";
-        return cell.DataType?.Value == CellValues.SharedString && int.TryParse(raw, CultureInfo.InvariantCulture, out var index) && index < strings.Count
-            ? strings[index]
-            : raw;
-    }
-
-    private static string? Blank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

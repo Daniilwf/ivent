@@ -5,6 +5,7 @@ using GameEvent.Infrastructure.Kernel;
 using GameEvent.Infrastructure.Pool;
 using GameEvent.Infrastructure.Queue;
 using GameEvent.Infrastructure.Seasons;
+using GameEvent.Tools.Import;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -120,14 +121,22 @@ try
                 ImportedTable table;
                 await using (var file = File.OpenRead(arguments[1]))
                 {
-                    table = PoolImport.Read(file);
+                    table = XlsxPoolReader.Read(file);
                 }
 
+                // A report is about a database that is there: a mistyped path would report "everything is new"
                 if (!File.Exists(dbPath))
                 {
+                    if (reportOnly)
+                    {
+                        Console.Error.WriteLine($"There is no database at {dbPath}.");
+                        return 1;
+                    }
+
                     await SqliteDatabase.MigrateAsync(connectionString);
                 }
 
+                Console.WriteLine($"Database: {dbPath}");
                 PoolImportPlan plan;
                 await using (var db = Open(connectionString))
                 {
@@ -178,7 +187,7 @@ try
                 ImportedTable table;
                 await using (var file = File.OpenRead(arguments[1]))
                 {
-                    table = PoolImport.Read(file);
+                    table = XlsxPoolReader.Read(file);
                 }
 
                 var demo = PoolImport.DemoPool(table);
@@ -193,10 +202,16 @@ try
             return 2;
     }
 }
-catch (Exception e) when (e is InvalidDataException or InvalidOperationException or JsonException or IOException or DbUpdateException or SqliteException)
+catch (Exception e) when (e is InvalidDataException or InvalidOperationException or JsonException or IOException or DbUpdateException or SqliteException
+    or DocumentFormat.OpenXml.Packaging.OpenXmlPackageException)
 {
     Console.Error.WriteLine(e.Message);
     return 1;
+}
+catch (OperationCanceledException)
+{
+    Console.Error.WriteLine("Stopped: whatever was written before stays, a new run goes on from there.");
+    return 130;
 }
 
 static GameEventDbContext Open(string connectionString)
