@@ -114,6 +114,28 @@ public class RollTests
     }
 
     [Fact]
+    public void A_choice_roll_logs_every_category_on_the_wheel_not_just_its_pick()
+    {
+        foreach (var seed in s_seeds)
+        {
+            // D-136: a choice roll keeps the whole wheel too; a category without an available game stays off it
+            var s = Scenario.New(seed: seed)
+                .WithRuleset(r => r with { Roll = r.Roll with { ChoiceCount = 2 } })
+                .WithCategory("Horror").WithGame("Silent Hill", 12, "Horror").WithGame("Outlast", 5, "Horror")
+                .WithCategory("Puzzle").WithGame("Tetris", 2, "Puzzle").WithGame("Portal", 3, "Puzzle")
+                .WithCategory("OnlyDeleted").WithDeletedGame("Gone", 5, "OnlyDeleted")
+                .WithPlayers("Вася");
+
+            s.Roll("Вася");
+
+            ScenarioAssert.Accepted(s);
+            var rolled = Assert.Single(s.LastEvents<GameChoiceRolled>());
+            Assert.Equal(["Horror", "Puzzle"], rolled.Sectors);
+            Assert.Contains(rolled.Category, rolled.Sectors);
+        }
+    }
+
+    [Fact]
     public void Wheel_skips_category_whose_only_game_is_reserved_by_another_player()
     {
         foreach (var seed in s_seeds)

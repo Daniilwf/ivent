@@ -23,6 +23,7 @@ import { Chip } from '../ui/Marks';
 import { Skeleton } from '../ui/Progress';
 import { ErrorState, Notice } from '../ui/States';
 import { Sticker } from '../ui/Sticker';
+import { useDesk } from '../ui/useDesk';
 import { Panel } from '../ui/Surface';
 
 type Season = Schemas['SeasonView'];
@@ -133,6 +134,10 @@ export function SeasonScreen({
   // The last roll whose wheel has stopped (or the one the page opened with); undefined until the first load
   const [landed, setLanded] = useState<number | null | undefined>(undefined);
   const wheel = useRef<MomentHandle>(null);
+  // Desktop: the roll whose landed wheel still stands on the map's stage; and the result said to screen readers
+  const [staged, setStaged] = useState<number | null>(null);
+  const [announced, setAnnounced] = useState('');
+  const desk = useDesk();
   const apply = useCallback(
     (loaded: Loaded) => {
       if (loaded.kind === 'signedOut') {
@@ -230,7 +235,6 @@ export function SeasonScreen({
     (offer ?? choice) && me?.roll && landed !== undefined && me.roll.sequence > (landed ?? 0)
       ? me.roll
       : null;
-  const spinSectors = fresh ? fresh.sectors : [];
   const spin: WheelRoll | null = fresh ? wheelRoll(fresh, offer, choice) : null;
   const uncheckedBlocked = me?.unchecked != null && me.unchecked.count >= me.unchecked.limit;
   const { board, players, rows } = view;
@@ -240,6 +244,135 @@ export function SeasonScreen({
   const routeLength = Math.max(board.cells.length - 1, 1);
   const closing = season.status === 'closing' || (season.status === 'active' && pastDeadline);
   const finished = season.status === 'finished' || season.status === 'archived';
+
+  // While a roll waits for my answer, it comes first: the tails of the last run fold under it (H3 design review)
+  const stepFirst = Boolean(offer ?? choice);
+  const afterRun =
+    me && (me.manualEffects.length > 0 || me.lastCompleted) ? (
+      <section
+        aria-labelledby="after-title"
+        data-testid="after"
+        className="grid min-w-0 grid-cols-1 gap-4 border-b-2 border-muted pb-4"
+      >
+        <h3 id="after-title" className="font-display font-heavy">
+          {me.manualEffects.length > 0 ? ru.turn.todo(me.manualEffects.length) : ru.turn.after}
+        </h3>
+        {me.manualEffects.length > 0 && (
+          <section
+            aria-labelledby="effects-title"
+            data-testid="manual-effects"
+            className="legacy-screens"
+          >
+            <h4 id="effects-title">{ru.effects.title}</h4>
+            <ul>
+              {me.manualEffects.map((effect) => (
+                <ManualEffectItem
+                  key={effect.id}
+                  effect={effect}
+                  pending={pending}
+                  resolvable={season.status === 'active' || season.status === 'closing'}
+                  onResolve={(outcome, comment) =>
+                    void act({ kind: 'resolveEffect', effectId: effect.id, outcome, comment })
+                  }
+                />
+              ))}
+            </ul>
+          </section>
+        )}
+        {me.lastCompleted && (
+          <div className="legacy-screens">
+            <p data-testid="last-dice">
+              {me.lastCompleted.status === 'rejected'
+                ? ru.turn.lastRejected(me.lastCompleted.game.title)
+                : ru.turn.lastDice(
+                    me.lastCompleted.game.title,
+                    [...me.lastCompleted.dice, ...me.lastCompleted.challengeDice].map(
+                      (d) => d.value,
+                    ),
+                    me.lastCompleted.total,
+                  )}
+            </p>
+            {me.lastCompleted.challengeDice.length > 0 && (
+              <p data-testid="last-challenge-dice">
+                {ru.turn.lastChallengeDice(me.lastCompleted.challengeDice.map((d) => d.value))}
+              </p>
+            )}
+            {me.lastCompleted.review && (
+              <p data-testid="last-review">
+                {ru.turn.lastReview(
+                  me.lastCompleted.review.rating,
+                  me.lastCompleted.review.text ?? null,
+                )}
+              </p>
+            )}
+            <ProofSection
+              proof={me.lastCompleted.proof ?? null}
+              pending={pending}
+              witnesses={season.players.filter((p) => p.id !== me.playerId)}
+              onSubmit={(links, note, witnessId, files) => {
+                if (me.lastCompleted) {
+                  void act({
+                    kind: 'proof',
+                    runId: me.lastCompleted.id,
+                    links,
+                    note,
+                    witnessId,
+                    files,
+                  });
+                }
+              }}
+            />
+          </div>
+        )}
+      </section>
+    ) : null;
+  // The wheel's stage: on a desktop it takes the map's place and stays with the result until I answer or close it,
+  // on a phone it plays in the turn card and gives way to the result
+  const staging =
+    desk && (offer ?? choice) && me?.roll && staged === me.roll.sequence ? me.roll : null;
+  const onStage = spin ?? (staging ? wheelRoll(staging, offer, choice) : null);
+  const stage = onStage ? (
+    <div
+      ref={showStage}
+      data-testid="wheel"
+      className="grid w-full content-center justify-items-center gap-3"
+    >
+      <WheelMoment
+        key={onStage.id}
+        ref={wheel}
+        sectors={(fresh ?? staging)?.sectors ?? []}
+        roll={onStage}
+        announce={false}
+        onPhase={(phase) => {
+          if (phase !== 'done') return;
+          setLanded(onStage.id);
+          if (desk) setStaged(onStage.id);
+          setAnnounced(
+            ru.moments.wheel.announce(
+              me?.roll?.category ?? '',
+              offer
+                ? ru.moments.wheel.result(offer.title)
+                : ru.moments.wheel.choice(onStage.pick.choices ?? 0),
+            ),
+          );
+          requestAnimationFrame(() => {
+            document.getElementById(rollResultTitle)?.focus();
+          });
+        }}
+      />
+      {spin ? (
+        <Button onClick={() => wheel.current?.skip()}>{ru.moments.skip}</Button>
+      ) : (
+        <Button
+          onClick={() => {
+            setStaged(null);
+          }}
+        >
+          {ru.moments.wheel.toMap}
+        </Button>
+      )}
+    </div>
+  ) : null;
 
   return (
     <main className="mx-auto grid max-w-300 grid-cols-1 gap-4 px-4 pt-4 pb-28 desk:grid-cols-[auto_minmax(0,1fr)] desk:items-start desk:gap-6 desk:px-8 desk:pb-8">
@@ -285,84 +418,7 @@ export function SeasonScreen({
         {!me && <p className="text-ink-soft">{ru.turn.spectator}</p>}
         {me && finished && <p className="text-ink-soft">{ru.turn.finishedText}</p>}
         {me && closing && <p className="text-ink-soft">{ru.turn.closingText}</p>}
-        {me && (me.manualEffects.length > 0 || me.lastCompleted) ? (
-          <section
-            aria-labelledby="after-title"
-            data-testid="after"
-            className="grid min-w-0 grid-cols-1 gap-4 border-b-2 border-muted pb-4"
-          >
-            <h3 id="after-title" className="font-display font-heavy">
-              {me.manualEffects.length > 0 ? ru.turn.todo(me.manualEffects.length) : ru.turn.after}
-            </h3>
-            {me.manualEffects.length > 0 && (
-              <section
-                aria-labelledby="effects-title"
-                data-testid="manual-effects"
-                className="legacy-screens"
-              >
-                <h4 id="effects-title">{ru.effects.title}</h4>
-                <ul>
-                  {me.manualEffects.map((effect) => (
-                    <ManualEffectItem
-                      key={effect.id}
-                      effect={effect}
-                      pending={pending}
-                      resolvable={season.status === 'active' || season.status === 'closing'}
-                      onResolve={(outcome, comment) =>
-                        void act({ kind: 'resolveEffect', effectId: effect.id, outcome, comment })
-                      }
-                    />
-                  ))}
-                </ul>
-              </section>
-            )}
-            {me.lastCompleted && (
-              <div className="legacy-screens">
-                <p data-testid="last-dice">
-                  {me.lastCompleted.status === 'rejected'
-                    ? ru.turn.lastRejected(me.lastCompleted.game.title)
-                    : ru.turn.lastDice(
-                        me.lastCompleted.game.title,
-                        [...me.lastCompleted.dice, ...me.lastCompleted.challengeDice].map(
-                          (d) => d.value,
-                        ),
-                        me.lastCompleted.total,
-                      )}
-                </p>
-                {me.lastCompleted.challengeDice.length > 0 && (
-                  <p data-testid="last-challenge-dice">
-                    {ru.turn.lastChallengeDice(me.lastCompleted.challengeDice.map((d) => d.value))}
-                  </p>
-                )}
-                {me.lastCompleted.review && (
-                  <p data-testid="last-review">
-                    {ru.turn.lastReview(
-                      me.lastCompleted.review.rating,
-                      me.lastCompleted.review.text ?? null,
-                    )}
-                  </p>
-                )}
-                <ProofSection
-                  proof={me.lastCompleted.proof ?? null}
-                  pending={pending}
-                  witnesses={season.players.filter((p) => p.id !== me.playerId)}
-                  onSubmit={(links, note, witnessId, files) => {
-                    if (me.lastCompleted) {
-                      void act({
-                        kind: 'proof',
-                        runId: me.lastCompleted.id,
-                        links,
-                        note,
-                        witnessId,
-                        files,
-                      });
-                    }
-                  }}
-                />
-              </div>
-            )}
-          </section>
-        ) : null}
+        {stepFirst ? null : afterRun}
         {waiting && (
           <div className="grid gap-2" aria-busy="true">
             <Skeleton className="h-6 w-2/3" />
@@ -393,24 +449,7 @@ export function SeasonScreen({
             ) : null}
           </div>
         )}
-        {spin && (
-          <div data-testid="wheel" className="grid gap-3">
-            <WheelMoment
-              key={spin.id}
-              ref={wheel}
-              sectors={spinSectors}
-              roll={spin}
-              onPhase={(phase) => {
-                if (phase !== 'done') return;
-                setLanded(spin.id);
-                requestAnimationFrame(() => {
-                  document.getElementById(rollResultTitle)?.focus();
-                });
-              }}
-            />
-            <Button onClick={() => wheel.current?.skip()}>{ru.moments.skip}</Button>
-          </div>
-        )}
+        {desk ? null : stage}
         {/* The run's forms keep plain styles until H4 (the run page) */}
         {choice && !spin && (
           <ChoiceCard
@@ -434,6 +473,11 @@ export function SeasonScreen({
             onReroll={() => void act({ kind: 'reroll' })}
           />
         )}
+        {stepFirst ? afterRun : null}
+        {/* The result is said once, when the wheel stops, and outlives the wheel */}
+        <p className="sr-only" aria-live="polite" data-testid="roll-announce">
+          {announced}
+        </p>
         {me?.phase === 'playing' && me.activeRun && (
           <div data-testid="active-run" className="grid gap-4">
             <p className="sr-only">{ru.turn.playing(me.activeRun.game.title)}</p>
@@ -478,13 +522,20 @@ export function SeasonScreen({
         <h2 id="map-title" className="sr-only">
           {ru.map.title}
         </h2>
-        <MapView
-          board={board}
-          players={players}
-          focus={mine && mine.cell > 0 ? mine.cell : undefined}
-          tools="auto"
-          className="h-105 rounded-lg border-3 border-ink desk:h-190"
-        />
+        <div className="relative">
+          <MapView
+            board={board}
+            players={players}
+            focus={mine && mine.cell > 0 ? mine.cell : undefined}
+            tools="auto"
+            className="h-105 rounded-lg border-3 border-ink desk:h-190"
+          />
+          {desk && stage ? (
+            <div className="absolute inset-0 z-10 grid overflow-auto rounded-lg border-3 border-ink bg-card p-6">
+              {stage}
+            </div>
+          ) : null}
+        </div>
         {/* The map in words: every cell and who stands there (also what the tests and screen readers read) */}
         <ol data-testid="cells" className="sr-only">
           {season.cells.map((cell, i) => {
@@ -555,6 +606,12 @@ export function SeasonScreen({
       </div>
     </main>
   );
+}
+
+/** A phone scrolls the wheel into view when it starts: the roll button may have been low on the screen */
+function showStage(node: HTMLDivElement | null) {
+  // jsdom has no scrolling
+  if (node && typeof node.scrollIntoView === 'function') node.scrollIntoView({ block: 'center' });
 }
 
 /** The server's roll as the wheel plays it: each miss is a stop on the picked category, then the pick */

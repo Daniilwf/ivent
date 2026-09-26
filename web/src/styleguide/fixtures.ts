@@ -119,8 +119,13 @@ export const demoRoll: Schemas['WheelRollView'] = {
   category: 'Adventure',
   sectors: ['Action', 'Adventure', 'Horror', 'RPG'],
   misses: [
-    { game: 'Hollow Knight', reason: 'completedInSeason', player: 'Капитан_Пельмень' },
-    { game: 'Dead Cells', reason: 'beingPlayed', player: 'Лиса' },
+    {
+      game: 'Hollow Knight',
+      reason: 'completedInSeason',
+      player: 'Капитан_Пельмень',
+      at: '2026-10-12T09:00:00Z',
+    },
+    { game: 'Dead Cells', reason: 'beingPlayed', player: 'Лиса', at: null },
   ],
 };
 

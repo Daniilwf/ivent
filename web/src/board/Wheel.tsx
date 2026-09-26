@@ -34,7 +34,10 @@ export function WheelMoment({
   roll,
   onPhase,
   ref,
+  announce = true,
 }: {
+  /** False when the page has its own live region for the result (it outlives the wheel) */
+  announce?: boolean;
   sectors: string[];
   roll: WheelRoll | null;
   onPhase?: ((phase: MomentPhase) => void) | undefined;
@@ -251,8 +254,8 @@ export function WheelMoment({
         ) : null}
       </Table>
       {/* The card shows the result; the words are for screen readers */}
-      <p className="sr-only" aria-live="polite">
-        {stage === 'done' && roll
+      <p className="sr-only" aria-live={announce ? 'polite' : 'off'}>
+        {announce && stage === 'done' && roll
           ? [
               ...roll.misses.map((miss) => `${missLine(miss)}.`),
               `${t.category(sectors[roll.pick.sector] ?? '')}. ${picked(roll.pick)}`,

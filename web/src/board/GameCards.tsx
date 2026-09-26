@@ -40,7 +40,7 @@ export function Cover({
     />
   ) : (
     <span
-      className={cx(frame, 'grid place-items-center bg-table text-on-color')}
+      className={cx(frame, 'grid place-items-center bg-muted text-ink-soft')}
       style={style}
       role="img"
       aria-label={t.noCover}

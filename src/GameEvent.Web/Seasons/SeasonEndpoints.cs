@@ -139,8 +139,11 @@ public sealed record MyTurnView(
 /// </summary>
 public sealed record WheelRollView(long Sequence, string Category, IReadOnlyList<string> Sectors, IReadOnlyList<RollMissView> Misses);
 
-/// <summary>A game the wheel landed on and passed: «Уже прошёл Вася», «Сейчас играет Петя».</summary>
-public sealed record RollMissView(string Game, RollMissReason Reason, string Player);
+/// <summary>
+/// A game the wheel landed on and passed: «Уже прошёл Вася, 12.10» (<c>at</c> — when that run was completed, SPEC
+/// «Статусы игры в сезоне»), «Сейчас играет Петя» (no date).
+/// </summary>
+public sealed record RollMissView(string Game, RollMissReason Reason, string Player, DateTimeOffset? At);
 
 /// <summary>
 /// My runs waiting for the admin's check and the rules' limit (D-134): at the limit a new roll is refused, so the page
@@ -553,7 +556,7 @@ public static class SeasonEndpoints
             // Only while turns are open: after the deadline the page offers nothing to spin for (D-101)
             var turnsOpen = seasonRecord.Status == SeasonStatus.Active && (seasonRecord.Deadline is not { } end || clock.UtcNow < end);
             var roll = turnsOpen && (offer is not null || choice is not null)
-                ? await RollOf(db, seasonId, userId, mine.Id, offer, choice, players, ct)
+                ? await RollOf(db, seasonId, mine.Id, offer, choice, players, ct)
                 : null;
             var price = mine.Frozen ? (Payment: RerollPayment.FreeMode, Coins: 0) : RerollPrice.Next(mine.RerollsThisRoll, coupons, rules.Roll);
             var now = clock.UtcNow;
@@ -628,52 +631,76 @@ public static class SeasonEndpoints
         [EventCatalog.Describe(typeof(GameRolled)).Name, EventCatalog.Describe(typeof(GameChoiceRolled)).Name];
 
     /// <summary>
-    /// The roll behind my current offer or choice (D-136): my latest roll event that is in force, if it is mine and made
-    /// what is offered now. Found by the event type and the author, never by the JSON data (invariant 9); the season index
-    /// is walked from the end and stops at the first match. An offer that came from someone else's command has no wheel.
+    /// The roll behind my current offer or choice (D-136), whoever sent the command (me, the admin's tech reroll, later
+    /// an effect): the first roll event in force from the offer's roll time on that is mine and made what is offered now.
+    /// Found by the type and the time (an index), never by the JSON data (invariant 9). The roll event is written after
+    /// the offer takes its time, so it is never earlier; an undone reroll brings the earlier offer back, and with it
+    /// its own roll.
     /// </summary>
     private static async Task<WheelRollView?> RollOf(
         GameEventDbContext db,
         Guid seasonId,
-        Guid? userId,
         Guid playerId,
         RollOffer? offer,
         PendingChoice? choice,
         IReadOnlyList<Infrastructure.Seasons.SeasonPlayerRecord> players,
         CancellationToken ct)
     {
-        var row = await db.Events.AsNoTracking()
-            .Where(e => e.SeasonId == seasonId && e.AuthorId == userId && e.UndoneByEventId == null && s_rollTypes.Contains(e.Type))
-            .OrderByDescending(e => e.Sequence)
-            .FirstOrDefaultAsync(ct);
-        if (row is null)
+        var rolledAt = offer?.RolledAt ?? choice?.Options.Select(o => o.Game?.RolledAt).OfType<DateTimeOffset>().FirstOrDefault();
+        if (rolledAt is not { } from)
         {
             return null;
         }
 
-        var (category, misses, sectors) = EventCodec.Decode(new StoredEvent(row.Type, row.Version, row.Data)) switch
+        // Other players' rolls after mine come too, oldest first: mine is among the first of them
+        var rows = await db.Events.AsNoTracking()
+            .Where(e => e.SeasonId == seasonId && e.OccurredAt >= from && e.UndoneByEventId == null && s_rollTypes.Contains(e.Type))
+            .OrderBy(e => e.Sequence)
+            .Take(MaxRollsAfterMine)
+            .ToListAsync(ct);
+        foreach (var row in rows)
         {
-            GameRolled g when g.PlayerId == playerId && g.GameId == offer?.GameId => (g.Category, g.Misses, g.Sectors),
-            GameChoiceRolled c when c.PlayerId == playerId && c.ChoiceId == choice?.ChoiceId => (c.Category, c.Misses, c.Sectors),
-            _ => default,
-        };
-        if (category is null)
-        {
-            return null;
+            var (category, misses, sectors) = EventCodec.Decode(new StoredEvent(row.Type, row.Version, row.Data)) switch
+            {
+                GameRolled g when g.PlayerId == playerId && g.GameId == offer?.GameId && g.RolledAt == offer.RolledAt
+                    => (g.Category, g.Misses, g.Sectors),
+                GameChoiceRolled c when c.PlayerId == playerId && c.ChoiceId == choice?.ChoiceId => (c.Category, c.Misses, c.Sectors),
+                _ => default,
+            };
+            if (category is null)
+            {
+                continue;
+            }
+
+            var missed = misses.Select(m => m.GameId).ToList();
+            var titles = await db.Games.AsNoTracking().Where(g => missed.Contains(g.Id)).ToDictionaryAsync(g => g.Id, g => g.Title, ct);
+            // «Уже прошёл Вася, 12.10»: the day the run that took the game was completed
+            var completed = (await db.Runs.AsNoTracking()
+                    .Where(r => r.SeasonId == seasonId && missed.Contains(r.GameId) && r.Status == RunStatus.Completed)
+                    .Select(r => new { r.GameId, r.CompletedAt })
+                    .ToListAsync(ct))
+                .GroupBy(r => r.GameId)
+                .ToDictionary(g => g.Key, g => g.Max(r => r.CompletedAt));
+            var names = players.ToDictionary(p => p.Id, p => p.Name);
+            // Games and players are never deleted for real (invariant 11); a miss that names neither is left out, not shown blank
+            return new WheelRollView(
+                row.Sequence,
+                category,
+                [.. sectors],
+                [.. misses
+                    .Where(m => titles.ContainsKey(m.GameId) && names.ContainsKey(m.ByPlayerId))
+                    .Select(m => new RollMissView(
+                        titles[m.GameId],
+                        m.Reason,
+                        names[m.ByPlayerId],
+                        m.Reason == RollMissReason.CompletedInSeason ? completed.GetValueOrDefault(m.GameId) : null))]);
         }
 
-        var missed = misses.Select(m => m.GameId).ToList();
-        var titles = await db.Games.AsNoTracking().Where(g => missed.Contains(g.Id)).ToDictionaryAsync(g => g.Id, g => g.Title, ct);
-        var names = players.ToDictionary(p => p.Id, p => p.Name);
-        // Games and players are never deleted for real (invariant 11); a miss that names neither is left out, not shown blank
-        return new WheelRollView(
-            row.Sequence,
-            category,
-            [.. sectors],
-            [.. misses
-                .Where(m => titles.ContainsKey(m.GameId) && names.ContainsKey(m.ByPlayerId))
-                .Select(m => new RollMissView(titles[m.GameId], m.Reason, names[m.ByPlayerId]))]);
+        return null;
     }
+
+    /// <summary>How many roll events after the offer's time are read: mine comes first unless others rolled in the same tick.</summary>
+    private const int MaxRollsAfterMine = 32;
 
     /// <summary>A run's game: the run's own hours when known, otherwise the pool's.</summary>
     private static GameView Game(Infrastructure.Seasons.RunRecord run, Infrastructure.Pool.GameRecord game) =>

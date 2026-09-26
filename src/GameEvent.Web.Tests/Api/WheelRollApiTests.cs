@@ -53,6 +53,9 @@ public sealed class WheelRollApiTests : IAsyncLifetime
         Assert.Equal(
             [(completed, "completedInSeason", "vasya"), (held, "beingPlayed", "vasya")],
             misses.Select(m => (m.GetProperty("game").GetString(), m.GetProperty("reason").GetString(), m.GetProperty("player").GetString())));
+        // SPEC «Уже прошёл Вася, 12.10»: the completed miss says when; the one being played has no date
+        Assert.Equal(_site.Clock.UtcNow, misses[0].GetProperty("at").GetDateTimeOffset());
+        Assert.Equal(JsonValueKind.Null, misses[1].GetProperty("at").ValueKind);
     }
 
     [Fact]
@@ -106,6 +109,57 @@ public sealed class WheelRollApiTests : IAsyncLifetime
         await PostOkAsync(vasya, $"{Season}/start");
 
         Assert.Equal(JsonValueKind.Null, (await MeAsync(vasya)).GetProperty("roll").ValueKind);
+    }
+
+    [Fact]
+    public async Task My_wheel_stays_when_another_player_rolls_after_me()
+    {
+        var vasya = await _site.SignedInAsync("vasya");
+        var petya = await _site.SignedInAsync("petya");
+        await PostOkAsync(vasya, $"{Season}/roll");
+        var mine = (await MeAsync(vasya)).GetProperty("roll").GetProperty("sequence").GetInt64();
+
+        await PostOkAsync(petya, $"{Season}/roll");
+
+        Assert.Equal(mine, (await MeAsync(vasya)).GetProperty("roll").GetProperty("sequence").GetInt64());
+    }
+
+    [Fact]
+    public async Task The_admins_tech_reroll_brings_a_wheel_too()
+    {
+        // The roll after the admin's tech reroll is the admin's command, the offer is mine: the wheel follows the offer
+        var vasya = await _site.SignedInAsync("vasya");
+        var admin = await _site.SignedInAsync("admin");
+        await PostOkAsync(vasya, $"{Season}/roll");
+        await PostOkAsync(vasya, $"{Season}/start");
+        _site.Clock.UtcNow = _site.Clock.UtcNow.AddHours(100);
+
+        await PostOkAsync(
+            admin,
+            $"/api/admin/seasons/{SiteFactory.SeasonId}/players/{_site.Players["vasya"]}/tech-reroll",
+            new { commandId = Guid.NewGuid(), reason = "paidUnavailable", comment = "Игру убрали из Steam" });
+
+        var me = await MeAsync(vasya);
+        Assert.Equal(JsonValueKind.Object, me.GetProperty("offer").ValueKind);
+        Assert.Equal("Horror", me.GetProperty("roll").GetProperty("category").GetString());
+    }
+
+    [Fact]
+    public async Task Undoing_a_new_roll_brings_back_the_earlier_roll_and_its_wheel()
+    {
+        var vasya = await _site.SignedInAsync("vasya");
+        var admin = await _site.SignedInAsync("admin");
+        await PostOkAsync(vasya, $"{Season}/roll");
+        var first = await MeAsync(vasya);
+        var again = Guid.NewGuid();
+        _site.Clock.UtcNow = _site.Clock.UtcNow.AddMinutes(5);
+        await PostOkAsync(vasya, $"{Season}/already-played", new { commandId = again, gameId = first.GetProperty("offer").GetProperty("id").GetGuid() });
+
+        await PostOkAsync(admin, $"/api/admin/seasons/{SiteFactory.SeasonId}/undo", new { commandId = Guid.NewGuid(), targetCommandId = again, comment = "Ошибся кнопкой" });
+
+        var back = await MeAsync(vasya);
+        Assert.Equal(first.GetProperty("offer").GetProperty("id").GetGuid(), back.GetProperty("offer").GetProperty("id").GetGuid());
+        Assert.Equal(first.GetProperty("roll").GetProperty("sequence").GetInt64(), back.GetProperty("roll").GetProperty("sequence").GetInt64());
     }
 
     [Fact]

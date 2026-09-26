@@ -241,6 +241,7 @@ export const ru = {
     alreadyPlayedGame: (title: string) => `Уже проходил: ${title}`,
     choose: 'Выбери одну из выпавших игр',
     pick: 'Выбрать:',
+    pickShort: 'Выбрать',
     rolled: 'Выпала игра',
     playing: (title: string) => `Сейчас играешь: ${title}`,
     complete: 'Завершить',
@@ -386,6 +387,13 @@ export const ru = {
       category: (name: string) => `Категория: ${name}`,
       miss: (who: string) => `Уже прошёл ${who}, крутим дальше`,
       missPlaying: (who: string) => `Сейчас играет ${who}, крутим дальше`,
+      // The result, when the wheel stands: past tense, no «крутим дальше»
+      missed: (count: number) => `Колесо пропустило ${games(count)}`,
+      missedCompleted: (title: string, who: string, day: string | null) =>
+        `${title} — уже прошёл ${who}${day ? `, ${day}` : ''}`,
+      missedPlaying: (title: string, who: string) => `${title} — сейчас играет ${who}`,
+      announce: (category: string, result: string) => `Категория: ${category}. ${result}`,
+      toMap: 'К карте',
       choice: (count: number) => `На выбор: ${games(count)}`,
       missNote: (title: string) => `Промах: ${title}.`,
       result: (title: string) => `Выпала игра: ${title}`,

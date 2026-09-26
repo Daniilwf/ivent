@@ -8544,7 +8544,8 @@
         "required": [
           "game",
           "reason",
-          "player"
+          "player",
+          "at"
         ],
         "type": "object",
         "properties": {
@@ -8556,9 +8557,16 @@
           },
           "player": {
             "type": "string"
+          },
+          "at": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
           }
         },
-        "description": "A game the wheel landed on and passed: «Уже прошёл Вася», «Сейчас играет Петя»."
+        "description": "A game the wheel landed on and passed: «Уже прошёл Вася, 12.10» (`at` — when that run was completed, SPEC\n«Статусы игры в сезоне»), «Сейчас играет Петя» (no date)."
       },
       "RollRequest": {
         "required": [

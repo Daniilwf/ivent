@@ -25,3 +25,14 @@ export function moscowTime(utc: string | Date, now: Date = new Date()): string {
   const date = (year.format(at) === year.format(now) ? day : dayWithYear).format(at);
   return ru.time.moscow(date, clock.format(at));
 }
+
+const dayMonth = new Intl.DateTimeFormat('ru-RU', {
+  timeZone: zone,
+  day: '2-digit',
+  month: '2-digit',
+});
+
+/** A UTC instant as the Moscow day in short: «12.10» (SPEC «Уже прошёл Вася, 12.10») */
+export function moscowDay(utc: string | Date): string {
+  return dayMonth.format(typeof utc === 'string' ? new Date(utc) : utc);
+}
