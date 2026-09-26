@@ -1,8 +1,8 @@
 import { CalendarRange, MessageSquareQuote, Trophy, UserRoundX } from 'lucide-react';
-import { useCallback } from 'react';
+import { useCallback, type Ref } from 'react';
 import { api, type Schemas } from '../api/client';
 import { Link } from '../app/Link';
-import { navigate, paths } from '../app/router';
+import { navigate, paths, usePageHeading } from '../app/router';
 import { moscowDay } from '../app/time';
 import { userToken } from '../design/players';
 import { ru } from '../i18n/ru';
@@ -39,6 +39,7 @@ export function ProfileScreen({
     }
   }, [userId]);
   const state = useLoaded(load, { onSignedOut });
+  const heading = usePageHeading(state.kind === 'ready');
 
   return (
     <main className="mx-auto grid max-w-180 content-start gap-4 px-4 pt-4 pb-10 desk:px-8 desk:pt-8">
@@ -69,14 +70,23 @@ export function ProfileScreen({
           }
         />
       ) : (
-        <ProfileDetails profile={state.value} mine={state.value.id === meId} />
+        <ProfileDetails profile={state.value} mine={state.value.id === meId} headingRef={heading} />
       )}
     </main>
   );
 }
 
 /** A loaded profile: also what the styleguide shows */
-export function ProfileDetails({ profile, mine }: { profile: Profile; mine: boolean }) {
+export function ProfileDetails({
+  profile,
+  mine,
+  headingRef,
+}: {
+  profile: Profile;
+  mine: boolean;
+  /** The page's heading, for the focus when the page is opened (usePageHeading) */
+  headingRef?: Ref<HTMLHeadingElement>;
+}) {
   return (
     <>
       <header
@@ -94,7 +104,11 @@ export function ProfileDetails({ profile, mine }: { profile: Profile; mine: bool
           size={80}
         />
         <div className="grid min-w-0 justify-items-start gap-2">
-          <h1 className="flex flex-wrap items-center gap-2 font-display text-xl font-heavy wrap-anywhere">
+          <h1
+            ref={headingRef}
+            tabIndex={-1}
+            className="flex flex-wrap items-center gap-2 font-display text-xl font-heavy wrap-anywhere outline-none"
+          >
             {profile.name}
             {mine ? <Badge tone="me">{ru.profile.you}</Badge> : null}
           </h1>

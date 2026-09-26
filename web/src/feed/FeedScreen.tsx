@@ -2,7 +2,7 @@ import { MessagesSquare, SearchX } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Schemas } from '../api/client';
 import { watchSeason } from '../api/realtime';
-import { navigate, paths } from '../app/router';
+import { navigate, paths, usePageHeading } from '../app/router';
 import { ru } from '../i18n/ru';
 import { Button } from '../ui/Button';
 import { EmptyState, ErrorState, Notice } from '../ui/States';
@@ -26,6 +26,7 @@ export function FeedScreen({
   onSignedOut: () => void;
 }) {
   const [state, setState] = useState<State>({ kind: 'loading' });
+  const heading = usePageHeading();
   const [more, setMore] = useState<'idle' | 'loading' | 'failed'>('idle');
   const [fresh, setFresh] = useState<ReadonlySet<string>>(new Set());
   const [announced, setAnnounced] = useState('');
@@ -115,7 +116,9 @@ export function FeedScreen({
 
   return (
     <main className="mx-auto grid max-w-180 content-start gap-4 px-4 pt-4 pb-10 desk:px-8 desk:pt-8">
-      <h1 className="font-display text-xl font-heavy">{ru.feed.title}</h1>
+      <h1 ref={heading} tabIndex={-1} className="font-display text-xl font-heavy outline-none">
+        {ru.feed.title}
+      </h1>
       <p className="sr-only" aria-live="polite" data-testid="feed-announce">
         {announced}
       </p>

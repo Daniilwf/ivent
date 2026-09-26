@@ -10,10 +10,10 @@ import {
   RotateCcw,
   Ban,
 } from 'lucide-react';
-import { useCallback, type ReactNode } from 'react';
+import { useCallback, type ReactNode, type Ref } from 'react';
 import { api, type Schemas } from '../api/client';
 import { Link } from '../app/Link';
-import { navigate, paths } from '../app/router';
+import { navigate, paths, usePageHeading } from '../app/router';
 import { moscowDay } from '../app/time';
 import { ru } from '../i18n/ru';
 import { Button } from '../ui/Button';
@@ -61,6 +61,7 @@ export function GameScreen({ gameId, onSignedOut }: { gameId: string; onSignedOu
     }
   }, [gameId]);
   const state = useLoaded(load, { onSignedOut });
+  const heading = usePageHeading(state.kind === 'ready');
 
   return (
     <main className="mx-auto grid max-w-180 content-start gap-4 px-4 pt-4 pb-10 desk:px-8 desk:pt-8">
@@ -91,14 +92,23 @@ export function GameScreen({ gameId, onSignedOut }: { gameId: string; onSignedOu
           }
         />
       ) : (
-        <GameDetails game={state.value.game} runs={state.value.runs} />
+        <GameDetails game={state.value.game} runs={state.value.runs} headingRef={heading} />
       )}
     </main>
   );
 }
 
 /** A loaded game page: also what the styleguide shows */
-export function GameDetails({ game, runs }: { game: Game; runs: Run[] }) {
+export function GameDetails({
+  game,
+  runs,
+  headingRef,
+}: {
+  game: Game;
+  runs: Run[];
+  /** The page's heading, for the focus when the page is opened (usePageHeading) */
+  headingRef?: Ref<HTMLHeadingElement>;
+}) {
   return (
     <>
       <header className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-4" data-testid="game">
@@ -116,7 +126,11 @@ export function GameDetails({ game, runs }: { game: Game; runs: Run[] }) {
           </span>
         )}
         <div className="grid min-w-0 justify-items-start gap-2">
-          <h1 className="font-display text-lg font-heavy text-balance wrap-anywhere desk:text-xl">
+          <h1
+            ref={headingRef}
+            tabIndex={-1}
+            className="font-display text-lg font-heavy text-balance wrap-anywhere outline-none desk:text-xl"
+          >
             {game.title}
           </h1>
           <div className="flex flex-wrap gap-2">

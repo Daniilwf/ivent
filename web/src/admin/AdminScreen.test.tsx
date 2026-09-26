@@ -72,6 +72,10 @@ describe('The admin pages', () => {
     await userEvent.click(await screen.findByTestId('to-admin'));
     expect(await screen.findByTestId('admin')).toBeInTheDocument();
     expect(globalThis.location.pathname).toBe('/admin');
+    // Opened from the menu, the page gives its heading the focus (D-202)
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { level: 1 })).toHaveFocus();
+    });
 
     // Back to the game by the header's sections, as from any page of the site (D-202)
     await userEvent.click(

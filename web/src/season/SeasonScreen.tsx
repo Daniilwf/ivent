@@ -2,6 +2,7 @@ import { CalendarClock, Flag, Trophy } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { api, rejectionCode, type Schemas } from '../api/client';
 import { watchSeason } from '../api/realtime';
+import { usePageHeading } from '../app/router';
 import { moscowTime } from '../app/time';
 import { ru } from '../i18n/ru';
 import { CompleteForm, type Completion } from './CompleteForm';
@@ -134,6 +135,8 @@ export function SeasonScreen({
 }) {
   const [season, setSeason] = useState<Season | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
+  // Back to the season from another page of the site: the reader starts at its name
+  const heading = usePageHeading(season !== null);
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   // Answers may arrive out of order: never replace newer data with an older view of the log.
@@ -545,7 +548,13 @@ export function SeasonScreen({
   return (
     <main className="mx-auto grid max-w-300 grid-cols-1 gap-4 px-4 pt-4 pb-28 desk:grid-cols-[auto_minmax(0,1fr)] desk:items-start desk:gap-6 desk:px-8 desk:pb-8">
       <header className="grid gap-2 min-w-0 desk:col-start-1 desk:w-96">
-        <h1 className="font-display text-xl font-heavy text-balance">{season.name}</h1>
+        <h1
+          ref={heading}
+          tabIndex={-1}
+          className="font-display text-xl font-heavy text-balance outline-none"
+        >
+          {season.name}
+        </h1>
         <div className="flex flex-wrap gap-2">
           {season.deadline ? (
             <span data-testid="season-deadline">

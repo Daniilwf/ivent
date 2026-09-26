@@ -1,4 +1,4 @@
-import { act, render, screen, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { App } from '../App';
 import { navigate } from '../app/router';
@@ -82,9 +82,11 @@ describe('the pages of the site', () => {
     await userEvent.click(within(nav).getByRole('link', { name: ru.nav.feed }));
 
     expect(globalThis.location.pathname).toBe('/feed');
-    expect(
-      await screen.findByRole('heading', { level: 1, name: ru.feed.title }),
-    ).toBeInTheDocument();
+    // A page opened from inside the site gives its heading the focus (D-202)
+    const heading = await screen.findByRole('heading', { level: 1, name: ru.feed.title });
+    await waitFor(() => {
+      expect(heading).toHaveFocus();
+    });
   });
 
   it('opens my profile from my menu', async () => {
@@ -97,6 +99,10 @@ describe('the pages of the site', () => {
 
     expect(globalThis.location.pathname).toBe(`/users/${userId}`);
     expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent('Вася');
+    // The heading comes with the data and takes the focus then
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { level: 1 })).toHaveFocus();
+    });
     expect(screen.getByText(ru.profile.you)).toBeInTheDocument();
     expect(screen.getByTestId('profile-completed')).toHaveTextContent(ru.profile.completed(0));
     expect(ru.profile.completed(0)).toBe('Пока без пройденных игр');
