@@ -7,6 +7,8 @@
 #   --verify   check the new archive restores (backup-verify in the image)
 #   --copy-to  also copy it out of the volume, e.g. for the external storage (J3: set up with the owner at the end)
 set -eu
+# Git Bash on a Windows workstation would turn /backups/… into a Windows path; no effect on Linux
+export MSYS2_ARG_CONV_EXCL="/backups"
 
 service=site
 verify=no
