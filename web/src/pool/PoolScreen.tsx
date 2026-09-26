@@ -16,6 +16,8 @@ import {
   lengthFilters,
   matches,
   noFilter,
+  onWheel,
+  wheelOf,
   type LengthFilter,
   type PoolFilter,
   type PoolGame,
@@ -52,6 +54,9 @@ async function fetchStatuses(seasonId: string): Promise<SeasonGame[] | null> {
   }
 }
 
+/** How long the page waits after a season update before it asks for the statuses again */
+export const statusDelayMs = 300;
+
 type Loaded =
   | { kind: 'loading' }
   | { kind: 'failed' }
@@ -81,6 +86,9 @@ export function PoolScreen({
   const [retrying, setRetrying] = useState(false);
   const desk = useDesk();
   const heading = useRef<HTMLHeadingElement>(null);
+  // Only the latest answer is shown: an older one that comes late must not undo a newer one
+  const poolAsked = useRef(0);
+  const statusAsked = useRef(0);
 
   const applyPool = useCallback(
     (result: PoolResult) => {
@@ -97,32 +105,49 @@ export function PoolScreen({
     setStatusFailed(!result);
   }, []);
 
-  const loadPool = useCallback(() => fetchPool().then(applyPool), [applyPool]);
-  const loadStatuses = useCallback(
-    () => (seasonId ? fetchStatuses(seasonId).then(applyStatuses) : Promise.resolve()),
-    [seasonId, applyStatuses],
-  );
+  const loadPool = useCallback(() => {
+    const asked = ++poolAsked.current;
+    return fetchPool().then((result) => {
+      if (asked === poolAsked.current) applyPool(result);
+    });
+  }, [applyPool]);
+  const loadStatuses = useCallback(() => {
+    if (!seasonId) return Promise.resolve();
+    const asked = ++statusAsked.current;
+    return fetchStatuses(seasonId).then((result) => {
+      if (asked === statusAsked.current) applyStatuses(result);
+    });
+  }, [seasonId, applyStatuses]);
 
   // Load now, after every change of the pool and after every command of the season (someone rolled, dropped…)
   useEffect(() => {
     let active = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     const refreshPool = () => {
+      const asked = ++poolAsked.current;
       void fetchPool().then((result) => {
-        if (active) applyPool(result);
+        if (active && asked === poolAsked.current) applyPool(result);
       });
     };
     const refreshStatuses = () => {
       if (!seasonId) return;
+      const asked = ++statusAsked.current;
       void fetchStatuses(seasonId).then((result) => {
-        if (active) applyStatuses(result);
+        if (active && asked === statusAsked.current) applyStatuses(result);
       });
+    };
+    // Commands of the season come in bursts (a roll, its misses, a move): one read after the burst (D-160)
+    const statusesSoon = () => {
+      clearTimeout(timer);
+      timer = setTimeout(refreshStatuses, statusDelayMs);
     };
     refreshPool();
     refreshStatuses();
     const stopPool = watchPool(refreshPool);
-    const stopSeason = seasonId ? watchSeason(seasonId, refreshStatuses) : () => undefined;
+    const stopSeason = seasonId ? watchSeason(seasonId, statusesSoon) : () => undefined;
     return () => {
       active = false;
+      clearTimeout(timer);
       stopPool();
       stopSeason();
     };
@@ -134,9 +159,20 @@ export function PoolScreen({
   }, []);
 
   const games = useMemo(() => (loaded.kind === 'ready' ? loaded.games : []), [loaded]);
+  const wheel = useMemo(() => wheelOf(loaded.kind === 'ready' ? loaded.categories : []), [loaded]);
+  // «Only free» waits for the statuses: without them it would pass every game
+  const known = statuses !== null;
   const shown = useMemo(
-    () => games.filter((game) => matches(game, statuses?.get(game.id), filter)),
-    [games, statuses, filter],
+    () =>
+      games.filter((game) =>
+        matches(
+          game,
+          statuses?.get(game.id),
+          { ...filter, freeOnly: filter.freeOnly && known },
+          wheel,
+        ),
+      ),
+    [games, statuses, filter, known, wheel],
   );
   const filters = activeFilters(filter);
 
@@ -211,59 +247,55 @@ export function PoolScreen({
             {t.filters(filters)}
           </Button>
         )}
-        {desk || filtersOpen ? (
-          <div id="pool-filters" className="grid gap-4">
-            <Select
-              label={t.category}
-              value={filter.category}
-              options={[
-                { value: '', label: t.anyCategory },
-                ...(loaded.kind === 'ready' ? loaded.categories : []).map((c) => ({
-                  value: c.name,
-                  label: t.categoryOption(c.name, c.games),
-                })),
-              ]}
+        <div id="pool-filters" className="grid gap-4" hidden={!desk && !filtersOpen}>
+          <Select
+            label={t.category}
+            value={filter.category}
+            options={[
+              { value: '', label: t.anyCategory },
+              ...(loaded.kind === 'ready' ? loaded.categories : []).map((c) => ({
+                value: c.name,
+                label: t.categoryOption(c.name, c.games),
+              })),
+            ]}
+            onChange={(e) => {
+              change({ category: e.target.value });
+            }}
+          />
+          <ChoiceGroup<LengthFilter>
+            legend={t.length}
+            name="pool-length"
+            value={filter.length}
+            options={lengthFilters.map((value) => ({ value, label: t.lengths[value] }))}
+            onChange={(length) => {
+              change({ length });
+            }}
+          />
+          {seasonId ? (
+            <Checkbox
+              label={t.freeOnly}
+              disabled={!known}
+              checked={filter.freeOnly}
               onChange={(e) => {
-                change({ category: e.target.value });
+                change({ freeOnly: e.target.checked });
               }}
             />
-            <ChoiceGroup<LengthFilter>
-              legend={t.length}
-              name="pool-length"
-              value={filter.length}
-              options={lengthFilters.map((value) => ({ value, label: t.lengths[value] }))}
-              onChange={(length) => {
-                change({ length });
+          ) : null}
+          {filters > 0 || filter.query ? (
+            <Button
+              variant="link"
+              className="justify-self-start"
+              onClick={() => {
+                setFilter(noFilter);
               }}
-            />
-            {seasonId ? (
-              <Checkbox
-                label={t.freeOnly}
-                checked={filter.freeOnly}
-                onChange={(e) => {
-                  change({ freeOnly: e.target.checked });
-                }}
-              />
-            ) : null}
-            {filters > 0 || filter.query ? (
-              <Button
-                variant="link"
-                className="justify-self-start"
-                onClick={() => {
-                  setFilter(noFilter);
-                }}
-              >
-                {t.reset}
-              </Button>
-            ) : null}
-          </div>
-        ) : null}
+            >
+              {t.reset}
+            </Button>
+          ) : null}
+        </div>
       </div>
 
-      <section className="grid content-start gap-4" aria-labelledby="pool-list-title">
-        <h2 id="pool-list-title" className="sr-only">
-          {t.title}
-        </h2>
+      <section className="grid content-start gap-4" aria-label={t.listLabel}>
         {statusFailed ? <Notice tone="warning">{t.statusError}</Notice> : null}
         {loaded.kind === 'loading' ? (
           <PoolSkeleton />
@@ -311,7 +343,8 @@ export function PoolScreen({
                 key={game.id}
                 game={game}
                 status={statuses?.get(game.id)}
-                inSeason={Boolean(seasonId) && statuses !== null}
+                inSeason={Boolean(seasonId) && known}
+                inWheel={onWheel(game, wheel)}
               />
             ))}
           </ul>

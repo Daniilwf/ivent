@@ -39,7 +39,7 @@ describe('the rules page from the ruleset', () => {
 
   it('names the limit of runs waiting for the check (D-134) only when the season has one', () => {
     expect(rulesPage(demoRuleset).roll).toContain(
-      'Если проверки админом ждут 2 прохождения, новый ролл закрыт, пока их не станет меньше.',
+      'Если проверки админом ждут 2 прохождения или больше, новый ролл закрыт, пока их не станет меньше.',
     );
     const unlimited = rulesPage({
       ...demoRuleset,
@@ -94,11 +94,15 @@ describe('the rules page from the ruleset', () => {
     expect(win).toContain(
       'При равных очках выше тот, у кого больше пройденных игр, затем — раньше набраны итоговые очки.',
     );
+    // The first freezes when his proofs are checked (D-99), or at once when the rules need no check
+    expect(win).toContain(t.win.firstFrozenApproved);
+    expect(win).not.toContain(t.win.firstFrozen);
     const at = rulesPage({
       ...demoRuleset,
       finish: { ...demoRuleset.finish, requireApprovalForFirst: false },
     });
     expect(at.win).not.toContain(t.win.firstApproval);
+    expect(at.win).toContain(t.win.firstFrozen);
   });
 
   it('tells the challenge bonus only when challenges are on', () => {
@@ -112,7 +116,7 @@ describe('the rules page from the ruleset', () => {
 
   it('gives the coins for a run', () => {
     expect(rulesPage(demoRuleset).rewardAfter).toContain(
-      'Монетки: 1 монетка за час игры, минимум — 3 монетки за прохождение.',
+      'Монетки: 1 монетка за час по HowLongToBeat (считается не больше 30 ч), минимум — 3 монетки за прохождение.',
     );
   });
 });
@@ -125,6 +129,12 @@ describe('the dice count', () => {
     expect(diceFor(4.4, rule)).toBe(1);
     expect(diceFor(1, rule)).toBe(1);
     expect(diceFor(100, rule)).toBe(10);
+  });
+
+  it("counts a fractional hours per die like the engine's decimal, not a binary fraction", () => {
+    // 12 / 2.4 is 5 in decimal and 5.000000000000001 in a double: ceil must stay 5
+    expect(diceFor(12, { ...rule, hoursPerDie: 2.4, rounding: 'ceil' })).toBe(5);
+    expect(diceFor(7.2, { ...rule, hoursPerDie: 2.4, rounding: 'floor' })).toBe(3);
   });
 
   it('rounds down or up when the rule says so', () => {

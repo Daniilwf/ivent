@@ -11,7 +11,14 @@ const t = ru.pool;
  * A game's status in the season (SPEC «Статусы игры в сезоне»): completed or being played by someone, free, or never
  * coming to me again; other players' drops as marks. Words and an icon carry it, the tint only helps.
  */
-export function GameStatus({ status }: { status: SeasonGame | undefined }) {
+export function GameStatus({
+  status,
+  inWheel = true,
+}: {
+  status: SeasonGame | undefined;
+  /** False: no category of the game is on the wheel, so it never comes up */
+  inWheel?: boolean;
+}) {
   const marks = status?.marks ?? [];
   return (
     <span className="grid justify-items-start gap-1" data-testid="game-status">
@@ -30,8 +37,10 @@ export function GameStatus({ status }: { status: SeasonGame | undefined }) {
         <Chip icon={<Ban size={16} aria-hidden className="text-ink-soft" />}>
           {t.excluded[status.excludedForMe]}
         </Chip>
-      ) : (
+      ) : inWheel ? (
         <Chip icon={<Sparkle size={16} aria-hidden className="text-success" />}>{t.free}</Chip>
+      ) : (
+        <Chip icon={<Ban size={16} aria-hidden className="text-ink-soft" />}>{t.offWheel}</Chip>
       )}
       {marks.length > 0 ? (
         <span className="grid gap-1 text-sm text-ink-soft">
@@ -49,9 +58,11 @@ export function PoolGameCard({
   game,
   status,
   inSeason,
+  inWheel = true,
 }: {
   game: PoolGame;
   status: SeasonGame | undefined;
+  inWheel?: boolean;
   /** Without a season there are no statuses to show */
   inSeason: boolean;
 }) {
@@ -81,7 +92,7 @@ export function PoolGameCard({
             ))}
           </span>
         ) : null}
-        {inSeason ? <GameStatus status={status} /> : null}
+        {inSeason ? <GameStatus status={status} inWheel={inWheel} /> : null}
       </div>
       {note || game.author ? (
         <div className="col-span-2 grid gap-1 text-sm">

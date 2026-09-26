@@ -100,9 +100,12 @@ export function AddGameForm({
       void api
         .GET('/api/pool/similar', { params: { query: { title: asked } } })
         .then(({ data }) => {
-          if (current && data) setSimilar({ title: asked, games: data });
+          // Without an answer the check says nothing: the server still refuses the same title
+          if (current) setSimilar({ title: asked, games: data ?? [] });
         })
-        .catch(() => undefined);
+        .catch(() => {
+          if (current) setSimilar({ title: asked, games: [] });
+        });
     }, similarDelayMs);
     return () => {
       current = false;
@@ -111,6 +114,8 @@ export function AddGameForm({
   }, [title]);
 
   const known = similar?.title === title.trim() ? similar.games : [];
+  const checking =
+    title.trim().length > 0 && title.trim().length <= maxTitle && similar?.title !== title.trim();
   const same = known.find((g) => g.same);
   const alike = known.filter((g) => !g.same);
 
@@ -197,6 +202,9 @@ export function AddGameForm({
           setErrors((x) => ({ ...x, title: undefined }));
         }}
       />
+      <p className="text-sm text-ink-soft" aria-live="polite" data-testid="similar-checking">
+        {checking ? t.checking : null}
+      </p>
       {same ? (
         <Notice tone="danger">{t.same(same.title)}</Notice>
       ) : alike.length > 0 ? (

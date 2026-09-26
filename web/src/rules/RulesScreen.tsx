@@ -45,6 +45,7 @@ export function RulesScreen({
   const [loaded, setLoaded] = useState<Loaded>({ kind: 'loading' });
   const [retrying, setRetrying] = useState(false);
   const heading = useRef<HTMLHeadingElement>(null);
+  const asked = useRef(0);
 
   const apply = useCallback(
     (result: RulesResult) => {
@@ -61,8 +62,10 @@ export function RulesScreen({
     if (!seasonId) return;
     let active = true;
     const refresh = () => {
+      // Only the latest answer is shown: an older one that comes late must not undo a newer one
+      const mine = ++asked.current;
       void fetchRules(seasonId).then((result) => {
-        if (active) apply(result);
+        if (active && mine === asked.current) apply(result);
       });
     };
     refresh();
@@ -142,14 +145,20 @@ export function RulesScreen({
       </main>
     );
 
-  const { rules } = loaded;
-  const page = rulesPage(rules.ruleset);
-  const deadline = rules.deadline ?? null;
-
   return (
     <main className={`${frame} desk:grid-cols-[auto_minmax(0,1fr)] desk:items-start desk:gap-x-8`}>
       {header}
+      <RulesContent rules={loaded.rules} />
+    </main>
+  );
+}
 
+/** The rules in force, section by section, with the contents beside them and the history at the end */
+export function RulesContent({ rules }: { rules: Schemas['RulesView'] }) {
+  const page = rulesPage(rules.ruleset);
+  const deadline = rules.deadline ?? null;
+  return (
+    <>
       <nav
         aria-label={t.contents}
         className="rounded-lg bg-card p-4 desk:sticky desk:top-24 desk:w-64"
@@ -236,7 +245,7 @@ export function RulesScreen({
           <RulesHistory history={rules.history} />
         </RulesSection>
       </div>
-    </main>
+    </>
   );
 }
 
@@ -267,8 +276,9 @@ function Lines({ lines }: { lines: string[] }) {
 
 /** The versions of the rules, newest first: when, who, and each changed number as «было → стало» */
 export function RulesHistory({ history }: { history: Schemas['RulesVersionView'][] }) {
-  const changed = history.filter((v) => v.changes.length > 0);
-  const created = history.find((v) => v.changes.length === 0 && v.version === 1);
+  // A save that changed nothing is still a version: it stays in the list, marked so, and the number on the chip is there
+  const changed = history.filter((v) => v.version > 1);
+  const created = history.find((v) => v.version === 1);
   return (
     <div className="grid gap-4" data-testid="rules-history">
       {changed.length === 0 ? <p className="text-ink-soft">{t.history.empty}</p> : null}
@@ -282,6 +292,9 @@ export function RulesHistory({ history }: { history: Schemas['RulesVersionView']
                 {moscowTime(version.at)}
               </span>
             </h3>
+            {version.changes.length === 0 ? (
+              <p className="text-sm text-ink-soft">{t.history.unchanged}</p>
+            ) : null}
             <ul className="grid gap-2">
               {version.changes.map((change) => (
                 <li key={change.path} className="grid gap-1 rounded-md bg-page px-3 py-2">

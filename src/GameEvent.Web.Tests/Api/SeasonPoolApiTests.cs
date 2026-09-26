@@ -135,6 +135,51 @@ public sealed class SeasonPoolApiTests : IAsyncLifetime
         Assert.Equal("beingPlayed", row.GetProperty("taken").GetString());
     }
 
+    [Fact]
+    public async Task Already_played_is_my_exclusion_and_nobody_else_sees_it()
+    {
+        var vasya = _site.Players["vasya"];
+        await _site.SendAsync(new RollGame(vasya));
+        var game = await ActiveGameAsync("vasya");
+        await _site.SendAsync(new DeclareAlreadyPlayed(vasya, game));
+
+        Assert.Contains(Row(game, null, null, [], ExclusionReason.AlreadyPlayed), (await GamesAsync("vasya")).Select(Row));
+        Assert.DoesNotContain(await GamesAsync("zritel"), v => v.GameId == game);
+    }
+
+    [Fact]
+    public async Task Rejected_run_frees_the_game()
+    {
+        var vasya = _site.Players["vasya"];
+        await _site.SendAsync(new RollGame(vasya));
+        await _site.SendAsync(new StartRun(vasya));
+        var game = await ActiveGameAsync("vasya");
+        await _site.SendAsync(new CompleteRun(vasya, Difficulty.Normal, null, null, false, null));
+        await using (var db = _site.NewDb())
+        {
+            var run = db.Runs.Single(r => r.GameId == game).Id;
+            await _site.SendAsync(new Engine.Proofs.RejectProof(run, "Не та игра"));
+        }
+
+        Assert.DoesNotContain(await GamesAsync("petya"), v => v.GameId == game && v.Taken != null);
+    }
+
+    [Fact]
+    public async Task Reads_are_limited_per_user()
+    {
+        var client = await _site.SignedInAsync("zritel");
+        for (var i = 0; i < Hosting.AppSetup.SeasonReadsPerMinute; i++)
+        {
+            Assert.Equal(HttpStatusCode.OK, (await client.GetAsync(GamesUrl(SiteFactory.SeasonId), Ct)).StatusCode);
+        }
+
+        Assert.Equal(HttpStatusCode.TooManyRequests, (await client.GetAsync(GamesUrl(SiteFactory.SeasonId), Ct)).StatusCode);
+
+        // Another user has his own allowance
+        var other = await _site.SignedInAsync("petya");
+        Assert.Equal(HttpStatusCode.OK, (await other.GetAsync(GamesUrl(SiteFactory.SeasonId), Ct)).StatusCode);
+    }
+
     // ---- Refused ----
 
     [Fact]

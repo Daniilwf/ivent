@@ -31,6 +31,8 @@ public static class SeasonPoolEndpoints
         api.MapGet("/seasons/{seasonId:guid}/games", GetAsync)
             .WithTags("Pool")
             .RequireAuthorization()
+            .RequireRateLimiting(Hosting.AppSetup.SeasonReadRateLimit)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests)
             .ProducesProblem(StatusCodes.Status401Unauthorized);
     }
 
@@ -51,7 +53,7 @@ public static class SeasonPoolEndpoints
 
         var viewer = user.UserId();
         var me = state.Players.Values.FirstOrDefault(p => p.UserId == viewer);
-        var taken = PoolStats.Taken(state).ToDictionary(m => m.GameId);
+        var taken = PoolStats.Taken(state, me?.PlayerId ?? Guid.Empty).ToDictionary(m => m.GameId);
         var marks = state.Runs.Values
             .Where(r => r.PlayerId != me?.PlayerId && r.Status is RunStatus.Dropped or RunStatus.TechRerolled)
             .OrderBy(r => r.StartedAt)

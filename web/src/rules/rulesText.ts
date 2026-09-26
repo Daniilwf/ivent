@@ -22,7 +22,8 @@ const exampleHours = 12;
 
 /** How many dice a game of these hours brings, by the rule in force (the engine's CompletionRoll.Count) */
 export function diceFor(hours: number, rule: Ruleset['reward']['diceCount']): number {
-  const raw = hours / rule.hoursPerDie;
+  // Rounded to a billionth first: binary fractions (12 / 2.4) must not fall under a whole number the engine's decimal hits
+  const raw = Math.round((hours / rule.hoursPerDie) * 1e9) / 1e9;
   // Math.round goes half up, the engine half away from zero: equal for positive hours
   const rounded =
     rule.rounding === 'floor'
@@ -58,8 +59,9 @@ export function rulesPage(rules: Ruleset): RulesPage {
     t.win.twoScores,
     ...(features.mapMode === 'linear' ? [t.win.map(map.linearLength)] : []),
     t.win.first,
-    ...(finish.requireApprovalForFirst ? [t.win.firstApproval] : []),
-    t.win.firstFrozen,
+    ...(finish.requireApprovalForFirst
+      ? [t.win.firstApproval, t.win.firstFrozenApproved]
+      : [t.win.firstFrozen]),
     t.win.others,
     t.win.nobody,
     ...(tiebreakers.length > 0 ? [t.win.tiebreakers(tiebreakers.join(t.win.then))] : []),
@@ -101,7 +103,7 @@ export function rulesPage(rules: Ruleset): RulesPage {
     ...(features.challenges && reward.challengeBonus.extraDice > 0
       ? [t.reward.challenge(reward.challengeBonus.extraDice)]
       : []),
-    t.reward.coins(reward.coins.perHour, reward.coins.min),
+    t.reward.coins(reward.coins.perHour, reward.coins.min, count.max * count.hoursPerDie),
   ];
 
   const penalty = drop.penaltyDice;

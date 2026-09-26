@@ -264,6 +264,75 @@ describe('the pool page', () => {
     expect(seen.some((r) => r.key.endsWith('/games'))).toBe(false);
   });
 
+  it('a game none of whose categories is on the wheel is not called free', async () => {
+    serve({
+      ...base,
+      'GET /api/pool/categories': () =>
+        json(
+          200,
+          demoCategories.map((c) => (c.name === 'РПГ' ? { ...c, weight: 0 } : c)),
+        ),
+      [`GET /api/seasons/${seasonId}/games`]: () => json(200, []),
+    });
+    renderPool();
+    await waitFor(() => {
+      expect(cards()).toHaveLength(demoPoolGames.length);
+    });
+
+    expect(card('The Witcher 3: Wild Hunt')).toHaveTextContent(t.offWheel);
+    await userEvent.click(screen.getByRole('button', { name: t.filters(0) }));
+    await userEvent.click(screen.getByRole('checkbox', { name: t.freeOnly }));
+    expect(cards().map((c) => within(c).getByRole('heading').textContent)).not.toContain(
+      'The Witcher 3: Wild Hunt',
+    );
+  });
+
+  it('«only free» waits for the statuses instead of passing every game', async () => {
+    serve({
+      ...base,
+      [`GET /api/seasons/${seasonId}/games`]: () => new Promise<Response>(() => undefined),
+    });
+    renderPool();
+    await waitFor(() => {
+      expect(cards()).toHaveLength(demoPoolGames.length);
+    });
+
+    await userEvent.click(screen.getByRole('button', { name: t.filters(0) }));
+    expect(screen.getByRole('checkbox', { name: t.freeOnly })).toBeDisabled();
+  });
+
+  it('shows the latest statuses when an older answer comes late', async () => {
+    const answers: ((r: Response) => void)[] = [];
+    serve({
+      ...base,
+      [`GET /api/seasons/${seasonId}/games`]: () =>
+        new Promise<Response>((resolve) => answers.push(resolve)),
+    });
+    renderPool();
+    await waitFor(() => {
+      expect(answers).toHaveLength(1);
+    });
+    act(() => {
+      seasonChange?.();
+    });
+    await waitFor(() => {
+      expect(answers).toHaveLength(2);
+    });
+
+    await act(async () => {
+      answers[1]?.(json(200, demoStatuses));
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+    await waitFor(() => {
+      expect(card('Alan Wake')).toHaveTextContent('Уже прошёл Вася');
+    });
+    await act(async () => {
+      answers[0]?.(json(200, []));
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+    expect(card('Alan Wake')).toHaveTextContent('Уже прошёл Вася');
+  });
+
   it('a spectator sees no «add a game»', async () => {
     serve(base);
     renderPool({ canAdd: false });
@@ -416,6 +485,16 @@ describe('adding a game', () => {
     await waitFor(() => {
       expect(seen.find((r) => r.key === 'POST /api/pool')?.body).toMatchObject({ force: true });
     });
+  });
+
+  it('says while it looks for alike titles', async () => {
+    const { dialog } = await openForm({
+      'GET /api/pool/similar': () => new Promise<Response>(() => undefined),
+    });
+
+    await userEvent.type(within(dialog).getByLabelText(t.form.name), 'Celeste');
+
+    expect(within(dialog).getByTestId('similar-checking')).toHaveTextContent(t.form.checking);
   });
 
   it('refuses the same title before sending', async () => {

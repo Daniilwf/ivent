@@ -1,5 +1,6 @@
 using GameEvent.Engine.Rolls;
 using GameEvent.Engine.Runs;
+using GameEvent.Engine.Tests.Finish;
 using GameEvent.Engine.Tests.Lifecycle;
 using GameEvent.Engine.Tests.Proofs;
 using GameEvent.Engine.Tests.Support;
@@ -22,12 +23,12 @@ public class TakenGamesTests
             .WithGame("Dead Space", 9, "Horror")
             .WithPlayers("Вася", "Петя", "Маша");
 
-    private static IReadOnlyList<RollMiss> Taken(Scenario s) => PoolStats.Taken(s.State);
+    private static IReadOnlyList<RollMiss> Taken(Scenario s) => PoolStats.Taken(s.State, Guid.Empty);
 
     [Fact]
     public void Missing_state_is_an_argument_error()
     {
-        Assert.Throws<ArgumentNullException>(() => PoolStats.Taken(null!));
+        Assert.Throws<ArgumentNullException>(() => PoolStats.Taken(null!, Guid.Empty));
     }
 
     [Fact]
@@ -113,6 +114,22 @@ public class TakenGamesTests
         ScenarioAssert.Accepted(s);
 
         Assert.Empty(Taken(s));
+    }
+
+    [Fact]
+    public void Game_the_first_completed_in_free_mode_is_completed_for_him_alone()
+    {
+        // D-16: Вася finished first and completed another game in free mode; the wheel misses it for him only
+        var s = FinishSetup.New(players: 2, games: 3);
+        FinishSetup.FrozenFirst(s, "Вася");
+        var (freeRun, _) = FinishSetup.Complete(s, "Вася", [2, 2]);
+        var game = s.State.Runs[freeRun].GameId;
+
+        Assert.Contains(
+            new RollMiss(game, RollMissReason.CompletedInSeason, s.PlayerId("Вася")),
+            PoolStats.Taken(s.State, s.PlayerId("Вася")));
+        Assert.DoesNotContain(PoolStats.Taken(s.State, s.PlayerId("Петя")), m => m.GameId == game);
+        Assert.DoesNotContain(Taken(s), m => m.GameId == game);
     }
 
     [Fact]

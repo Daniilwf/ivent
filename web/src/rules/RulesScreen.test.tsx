@@ -126,6 +126,62 @@ describe('the rules page', () => {
     expect(limit).toHaveTextContent('Стало: 2');
   });
 
+  it('keeps a version saved without changes in the list, marked so', async () => {
+    serve(() =>
+      json(200, {
+        ...demoRules,
+        version: 4,
+        history: [
+          {
+            version: 4,
+            at: '2026-10-20T10:00:00Z',
+            authorId: 'a',
+            authorName: 'Админ',
+            changes: [],
+          },
+          ...demoRules.history,
+        ],
+      }),
+    );
+    renderRules();
+    await screen.findByText(t.version(4));
+
+    const history = within(screen.getByTestId('rules-history'));
+    const latest = history.getAllByRole('listitem')[0];
+    expect(latest).toHaveTextContent('Версия 4');
+    expect(latest).toHaveTextContent(t.history.unchanged);
+  });
+
+  it('shows the latest answer when an older one comes late', async () => {
+    const answers: ((r: Response) => void)[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => new Promise<Response>((resolve) => answers.push(resolve))),
+    );
+    renderRules();
+    await waitFor(() => {
+      expect(answers).toHaveLength(1);
+    });
+    act(() => {
+      seasonChange?.();
+    });
+    await waitFor(() => {
+      expect(answers).toHaveLength(2);
+    });
+
+    // The newer answer (version 4) comes first, the first request's (version 3) after it
+    await act(async () => {
+      answers[1]?.(json(200, { ...demoRules, version: 4 }));
+      await Promise.resolve();
+    });
+    expect(await screen.findByText(t.version(4))).toBeInTheDocument();
+    await act(async () => {
+      answers[0]?.(json(200, demoRules));
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+    expect(screen.getByText(t.version(4))).toBeInTheDocument();
+  });
+
   it('says the rules have not changed when there is only the start', async () => {
     serve(() => json(200, { ...demoRules, version: 1, history: demoRules.history.slice(2) }));
     renderRules();
