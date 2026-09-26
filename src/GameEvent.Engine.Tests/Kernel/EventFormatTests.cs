@@ -327,7 +327,7 @@ public class EventFormatTests
                 new GameCard("Silent Hill 2", ["Horror", "Classic"], 12.5m, 2001, "2124490", Guid.Parse("50000000-0000-0000-0000-000000000001"), "Концовка любая", IsCoop: false),
                 s_user),
             1,
-            """{"gameId":"20000000-0000-0000-0000-000000000001","card":{"title":"Silent Hill 2","tags":["Horror","Classic"],"hours":12.5,"year":2001,"steamAppId":"2124490","coverFileId":"50000000-0000-0000-0000-000000000001","note":"Концовка любая","isCoop":false,"completionCondition":null},"authorId":"40000000-0000-0000-0000-000000000001"}"""
+            """{"gameId":"20000000-0000-0000-0000-000000000001","card":{"title":"Silent Hill 2","tags":["Horror","Classic"],"hours":12.5,"year":2001,"steamAppId":"2124490","coverFileId":"50000000-0000-0000-0000-000000000001","note":"Концовка любая","isCoop":false,"completionCondition":null},"authorId":"40000000-0000-0000-0000-000000000001","authorName":null}"""
         },
         {
             "game-changed",

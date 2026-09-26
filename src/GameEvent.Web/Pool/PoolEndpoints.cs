@@ -12,7 +12,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace GameEvent.Web.Pool;
 
-/// <summary>A game of the pool as everyone sees it (D-119); <c>author</c> — the name of who added it, none for the seed and the import.</summary>
+/// <summary>
+/// A game of the pool as everyone sees it (D-119); <c>author</c> — the name of the account that added it, or the author as
+/// the imported table names them (D-125); none for the seed.
+/// </summary>
 public sealed record GameView(
     Guid Id,
     string Title,
@@ -236,7 +239,7 @@ public static class PoolEndpoints
             game.CoverFileId is { } cover ? FileLinkView.Of(cover) : null,
             game.Note,
             game.IsCoop,
-            game.AuthorId is { } author ? authors.GetValueOrDefault(author) : null,
+            (game.AuthorId is { } author ? authors.GetValueOrDefault(author) : null) ?? game.AuthorName,
             game.IsDeleted,
             game.CompletionCondition);
 

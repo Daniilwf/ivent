@@ -62,7 +62,8 @@ jobs:
     needs: changes
     if: needs.changes.outputs.code == 'true' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # The fast suite passed 20 minutes with the pool import (#39): a limit, not the usual time — a run takes what it needs
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

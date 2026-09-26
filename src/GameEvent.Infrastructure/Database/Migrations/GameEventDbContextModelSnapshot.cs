@@ -234,6 +234,10 @@ namespace GameEvent.Infrastructure.Database.Migrations
                     b.Property<Guid?>("AuthorId")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("AuthorName")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("CompletionCondition")
                         .HasMaxLength(1000)
                         .HasColumnType("TEXT");

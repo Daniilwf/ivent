@@ -39,6 +39,9 @@ public sealed class GameRecord
     /// <summary>The account that added the game; none for the seed and the import.</summary>
     public Guid? AuthorId { get; set; }
 
+    /// <summary>Who added the game as the imported table names them, when no account did (F1, D-125).</summary>
+    public string? AuthorName { get; set; }
+
     public DateTimeOffset? CreatedAt { get; set; }
 
     public bool IsDeleted { get; set; }

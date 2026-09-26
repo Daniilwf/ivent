@@ -21,9 +21,12 @@ public sealed record GameCard(
     bool IsCoop,
     string? CompletionCondition = null);
 
-/// <summary>A player or the admin added a game to the pool; <see cref="AuthorId"/> — the account that added it.</summary>
+/// <summary>
+/// A player or the admin added a game to the pool; <see cref="AuthorId"/> — the account that added it;
+/// <see cref="AuthorName"/> — who added it as the imported table names them, with no account (F1, D-125).
+/// </summary>
 [EventType("game-added")]
-public sealed record GameAdded(Guid GameId, GameCard Card, Guid? AuthorId) : IGameEvent;
+public sealed record GameAdded(Guid GameId, GameCard Card, Guid? AuthorId, string? AuthorName = null) : IGameEvent;
 
 /// <summary>The admin changed a game's card (the whole card, as it is now).</summary>
 [EventType("game-changed")]

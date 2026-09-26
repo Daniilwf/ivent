@@ -6,9 +6,10 @@ namespace GameEvent.Infrastructure.Pool;
 
 /// <summary>
 /// A player or the admin adds a game (D-119). The queue gives it an id, so a repeated request is the same command.
-/// <see cref="Force"/> — added although the pool has a similar title (the site warned, SPEC «Дубли»).
+/// <see cref="Force"/> — added although the pool has a similar title (the site warned, SPEC «Дубли»);
+/// <see cref="AuthorName"/> — the author as the imported table names them (F1, D-125).
 /// </summary>
-public sealed record AddGame(GameCard Card, Guid? AuthorId, bool Force) : Queue.IGlobalCommand;
+public sealed record AddGame(GameCard Card, Guid? AuthorId, bool Force, string? AuthorName = null) : Queue.IGlobalCommand;
 
 /// <summary>The admin changes a game's card.</summary>
 public sealed record ChangeGame(Guid GameId, GameCard Card, bool Force) : Queue.IGlobalCommand;
@@ -29,6 +30,7 @@ public static class PoolRules
     public const int MaxTags = 20;
     public const int MaxTagLength = 50;
     public const int MaxNoteLength = 1000;
+    public const int MaxAuthorNameLength = 64;
     public const decimal MinHours = 0.5m;
     public const decimal MaxHours = 1000m;
     public const int MinYear = 1950;
