@@ -5,3 +5,8 @@
 export type MomentPhase = 'idle' | 'playing' | 'done';
 
 export type MomentHandle = { skip: () => void };
+
+/** Every moment reaches its result within this many seconds (docs/DESIGN.md: no longer than 3 s) */
+export const momentBudget = 2.6;
+/** One hop of a token when the move is short; a long move hops faster to fit the budget */
+export const momentHop = 0.22;

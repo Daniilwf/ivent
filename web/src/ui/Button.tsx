@@ -6,7 +6,7 @@ import { cx } from './cx';
 export type ButtonVariant = 'main' | 'quiet' | 'danger' | 'dangerMain' | 'link' | 'dangerLink';
 
 const base = cx(
-  'inline-flex cursor-pointer items-center justify-center gap-2 font-bold whitespace-nowrap transition duration-(--duration-fast) ease-out select-none disabled:cursor-default disabled:opacity-50 aria-disabled:cursor-default aria-disabled:opacity-50',
+  'inline-flex cursor-pointer items-center justify-center gap-2 font-bold whitespace-nowrap transition duration-(--duration-fast) ease-out select-none is-focus:focus-ring disabled:cursor-default disabled:opacity-50 aria-busy:cursor-progress',
 );
 
 const variants: Record<ButtonVariant, string> = {
@@ -60,10 +60,20 @@ export function Button({
       data-force={force}
       data-variant={variant}
       {...rest}
-      onClick={loading ? undefined : rest.onClick}
+      onClick={
+        loading
+          ? (e) => {
+              e.preventDefault();
+            }
+          : rest.onClick
+      }
     >
       {loading ? (
-        <LoaderCircle size={20} className="animate-spin" aria-label={ru.ui.loading} />
+        <LoaderCircle
+          size={20}
+          className="animate-spin motion-reduce:animate-none"
+          aria-label={ru.ui.loading}
+        />
       ) : (
         icon
       )}
@@ -87,7 +97,7 @@ export function IconButton({
       title={label}
       data-force={force}
       className={cx(
-        'inline-grid size-11 cursor-pointer place-items-center rounded-full border-2 border-ink bg-card text-ink transition duration-(--duration-fast) is-hover:bg-page is-active:translate-y-px disabled:cursor-default disabled:opacity-50',
+        'inline-grid size-11 cursor-pointer place-items-center rounded-full border-2 border-ink bg-card text-ink transition duration-(--duration-fast) is-hover:bg-page is-focus:focus-ring is-active:translate-y-px disabled:cursor-default disabled:opacity-50',
         className,
       )}
       {...rest}

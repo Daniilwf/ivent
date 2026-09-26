@@ -4,6 +4,8 @@
 //   - in class names (className and cx() arguments): Tailwind arbitrary values (p-[13px], bg-[#fff]), half steps
 //     off the 4 px grid (p-2.5), raw durations (duration-300) and Tailwind's own palette (bg-red-500), which the
 //     theme switches off, so such a class would silently do nothing.
+// Its reach: colours in any string; classes only in className and cx() — a class string built elsewhere, or a size in
+// an inline style (kept for values computed at run time), is left to review.
 // Arbitrary variants (data-[state=open]:), token references (duration-(--duration-fast)) and grid templates without
 // absolute sizes (grid-cols-[auto_1fr]) are allowed.
 

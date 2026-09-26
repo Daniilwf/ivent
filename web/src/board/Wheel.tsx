@@ -2,7 +2,7 @@ import { animate, motion, useMotionValue, useReducedMotion } from 'motion/react'
 import { useEffect, useEffectEvent, useImperativeHandle, useRef, useState, type Ref } from 'react';
 import { ru } from '../i18n/ru';
 import { MomentCard, Table } from '../ui/Surface';
-import type { MomentHandle, MomentPhase } from './moment';
+import { momentBudget, type MomentHandle, type MomentPhase } from './moment';
 
 const t = ru.moments.wheel;
 
@@ -48,8 +48,12 @@ export function WheelMoment({
   const running = useRef<ReturnType<typeof animate> | null>(null);
   const timer = useRef<number | undefined>(undefined);
   const cancelled = useRef(false);
+  // The end is reported once, whether the wheel stops or the moment is skipped
+  const ended = useRef(false);
 
   const land = useEffectEvent(() => {
+    if (ended.current) return;
+    ended.current = true;
     setStage('done');
     onPhase?.('done');
   });
@@ -62,7 +66,8 @@ export function WheelMoment({
   });
 
   const finish = () => {
-    if (!roll || stage === 'done') return;
+    if (!roll || ended.current) return;
+    ended.current = true;
     cancelled.current = true;
     running.current?.stop();
     window.clearTimeout(timer.current);
@@ -83,12 +88,17 @@ export function WheelMoment({
     }
     cancelled.current = false;
     const stops = [...roll.misses.map((m) => m.sector), roll.pick.sector];
+    // The whole roll fits the moments' budget: the first spin, then for each miss a rest and a short spin
+    const firstSpin = 1.2;
+    const perMiss = Math.min(1.2, (momentBudget - firstSpin) / Math.max(roll.misses.length, 1));
+    const missRest = perMiss * 0.55;
+    const spinOnFor = perMiss * 0.45;
     // The first stop takes a long spin, each next one a short one; a miss rests on screen for a second
     const stopped = () => cancelled.current;
     const play = async () => {
       for (let i = 0; i < stops.length; i++) {
         running.current = animate(rotation, turn(stops[i] as number, 4 + i), {
-          duration: i === 0 ? 1.4 : 0.7,
+          duration: i === 0 ? firstSpin : spinOnFor,
           ease: [0.12, 0.8, 0.2, 1],
         });
         await running.current;
@@ -96,7 +106,7 @@ export function WheelMoment({
         if (i === stops.length - 1) break;
         showMiss(i);
         await new Promise<void>((resolve) => {
-          timer.current = window.setTimeout(resolve, 1000);
+          timer.current = window.setTimeout(resolve, missRest * 1000);
         });
         if (stopped()) return;
         spinOn();
@@ -174,7 +184,7 @@ export function WheelMoment({
             <circle cx={r} cy={r} r={r} fill="none" stroke="var(--color-ink)" strokeWidth={6} />
             <path
               d={`M${r - 16} -18 L${r + 16} -18 L${r} 16 Z`}
-              fill="var(--color-action)"
+              fill="var(--color-gold)"
               stroke="var(--color-ink)"
               strokeWidth={4}
               strokeLinejoin="round"
@@ -218,7 +228,9 @@ export function WheelMoment({
                   className="rounded-sm border-2 border-ink"
                 />
               ) : null}
-              <strong className="text-balance">{roll.pick.game.title}</strong>
+              <strong className="font-display text-xl font-heavy text-balance">
+                {roll.pick.game.title}
+              </strong>
               <span className="text-sm text-ink-soft">
                 {t.category(sectors[roll.pick.sector] ?? '')}
               </span>
@@ -231,7 +243,8 @@ export function WheelMoment({
           </motion.div>
         ) : null}
       </Table>
-      <p className="min-h-7 text-center font-bold" aria-live="polite">
+      {/* The card shows the result; the words are for screen readers */}
+      <p className="sr-only" aria-live="polite">
         {stage === 'done' && roll
           ? [
               ...roll.misses.map((miss) => `${missLine(miss)}.`),

@@ -3,7 +3,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { ru } from '../i18n/ru';
-import { Button } from './Button';
+import { Button, IconButton } from './Button';
 
 const overlay = 'fixed inset-0 bg-ink/40';
 
@@ -80,13 +80,9 @@ export function BottomSheet({
           <div className="flex items-center justify-between gap-3">
             <Dialog.Title className="font-display text-lg font-heavy">{title}</Dialog.Title>
             <Dialog.Close asChild>
-              <button
-                type="button"
-                aria-label={ru.ui.close}
-                className="inline-grid size-11 cursor-pointer place-items-center rounded-full is-hover:bg-page"
-              >
+              <IconButton label={ru.ui.close}>
                 <X size={20} />
-              </button>
+              </IconButton>
             </Dialog.Close>
           </div>
           <Dialog.Description className="sr-only">{title}</Dialog.Description>

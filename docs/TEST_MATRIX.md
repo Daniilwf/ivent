@@ -243,3 +243,18 @@
 | 11 | Зритель видит всё и не может действовать | `e2e/11-spectator.spec.ts` | ⬜ |
 | 12 | Правила показывают числа конфига, правка → новые числа и история | `e2e/12-rules.spec.ts` | ⬜ |
 | 13 | Скорость главной на демо-сезоне с мобильной сетью < 2,5 с | `e2e/13-performance.spec.ts` | ⬜ |
+
+## Дизайн-система (G3, docs/DESIGN.md)
+
+| ID | Правило | Тесты | Статус |
+| --- | --- | --- | --- |
+| DS1 | Контраст текста не ниже 4,5:1 на своём фоне | `web/src/design/tokens.test.ts` (16 пар текст/фон из токенов) | ✅ |
+| DS2 | 16 цветов фишек, буква на фишке читается | `tokens.test.ts`: списки в CSS и TS совпадают, контраст буквы не ниже 4:1 (AA для крупного текста — 3:1) | ✅ |
+| DS3 | Цвета, размеры и отступы только из токенов | `web/eslint-rules/design-tokens.test.js` (правило `design/tokens-only`), stylelint в `npm run lint` | ✅ |
+| DS4 | Опасное действие подтверждается с последствиями | `web/src/ui/ui.test.tsx` («a dangerous action shows its consequences», «cancelling… does nothing») | ✅ |
+| DS5 | Кнопка в загрузке не принимает нажатий и не отправляет форму | `ui.test.tsx` («a loading button…», «a loading submit button…») | ✅ |
+| DS6 | Статус — слова и иконка, ошибка с повтором; поле с ошибкой рядом | `ui.test.tsx` | ✅ |
+| DS7 | Главные моменты: при reduced motion результат сразу и словами, конец один раз, пропуск | `web/src/board/moments.test.tsx` (кубики, колесо с промахом, ход фишки) | ✅ |
+| DS8 | Карта — граф с развилками, путь до финиша по графу | `web/src/board/geometry.test.ts`; полоса пути — `ui.test.tsx` («the route bar counts…») | ✅ |
+| DS9 | Карта без чёрных полос в Chromium, Firefox и WebKit (баг D-132) | `e2e/visual/map.visual.spec.ts` («the map has no dark bands…», проверка пикселей, 6 проектов) | ✅ |
+| DS10 | Ключевые экраны защищены скриншот-тестами | `e2e/visual/map.visual.spec.ts` (карта и разделы стайлгайда, 6 проектов) | ✅ |

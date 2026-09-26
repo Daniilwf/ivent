@@ -9,10 +9,7 @@ export function Panel({
   ...rest
 }: HTMLAttributes<HTMLElement> & { title?: ReactNode }) {
   return (
-    <section
-      className={cx('grid gap-3 rounded-lg border-2 border-ink bg-card p-4', className)}
-      {...rest}
-    >
+    <section className={cx('grid gap-3 rounded-lg bg-card p-4', className)} {...rest}>
       {title ? <h2 className="font-display text-lg font-heavy">{title}</h2> : null}
       {children}
     </section>

@@ -27,5 +27,5 @@ export function Badge({ tone = 'gold', children }: { tone?: 'gold' | 'me'; child
 
 /** A game's genre or feature */
 export function Tag({ children }: { children: ReactNode }) {
-  return <span className="rounded-full bg-page px-2 text-xs">{children}</span>;
+  return <span className="rounded-full bg-muted px-2 text-xs">{children}</span>;
 }

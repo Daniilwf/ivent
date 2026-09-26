@@ -31,5 +31,5 @@ export default {
       },
     },
   ],
-  ignoreFiles: ['dist/**', 'coverage/**', 'node_modules/**', 'src/design-preview/**'],
+  ignoreFiles: ['dist/**', 'coverage/**', 'node_modules/**'],
 };

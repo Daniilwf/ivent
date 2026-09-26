@@ -1,6 +1,6 @@
-// Screenshots of the design previews (G2) or of any pages, at the two sizes of docs/DESIGN.md: 390×844 and 1440×900.
+// Screenshots of any pages (the styleguide, the screens), at the two sizes of docs/DESIGN.md: 390×844 and 1440×900.
 //   node e2e/design-shots.mjs <base address> <out dir> <path>...
-// A path may carry an anchor (design-preview.html#wheel); «!» at its end presses the main button (of the anchored section, if any) first and
+// A path may carry an anchor (/styleguide#wheel); «!» at its end presses the main button (of the anchored section, if any) first and
 // waits for the moment to end, so the shot shows the result; «!1700» waits that many milliseconds instead, and
 // SHOTS_MOTION=on keeps animations running, to catch a moment in the middle; SHOTS_FULL=on takes the whole page.
 // Uses the bundled Chromium when installed, Edge otherwise (PW_CHANNEL=msedge); PW_BROWSER=firefox or webkit takes

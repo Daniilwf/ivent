@@ -13,11 +13,13 @@
   --color-ink: #1e2030; /* text and every outline: 14.3:1 on the page */
   --color-ink-soft: #545870; /* secondary text: 6.2:1 on the page, 7:1 on a card */
   --color-on-color: #ffffff; /* text on the action, «me» and danger fills */
+  --color-muted: #dfe5ee; /* quiet fills on a card or the page: tags, skeletons, empty bars */
 
   /* ---- Colour: the one main action and the player's own things ---- */
   --color-action: #2f6be4; /* a blue meeple: the main button, 4.8:1 with white */
   --color-action-strong: #2459c7; /* the main button under the pointer */
-  --color-me: #c2410c; /* my sticker ring, my cell, my bars: burnt orange, apart from the blue action */
+  --color-me: #6d28d9; /* my sticker ring, my cell, my bars: violet, a hue none of the 16 tokens and no
+     meaning has; «me» is also marked by the «ты» label, never by colour alone */
   --color-gold: #ffc43d; /* first place, event cells, the challenge die */
 
   /* ---- Colour: meaning (always with an icon or words too) ---- */
@@ -142,11 +144,68 @@
   }
 }
 
+/* The one focus ring: the global :focus-visible and the forced state of the styleguide use the same */
+@utility focus-ring {
+  outline: 3px solid var(--color-ink);
+  outline-offset: 3px;
+}
+
 /* The wooden table with felt dots that the map and the moments stand on */
 @utility table-surface {
   background-color: var(--color-table);
   background-image: radial-gradient(var(--color-table-dots) 1.6px, transparent 1.6px);
   background-size: 14px 14px;
+}
+
+/* The screens built before the design system (login, the season) get plain, readable controls until stage H
+   rebuilds them from src/ui. :where keeps these rules weaker than any utility class. */
+@layer base {
+  .legacy-screens {
+    display: grid;
+    gap: 12px;
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 16px;
+  }
+
+  .legacy-screens :where(form) {
+    display: grid;
+    gap: 12px;
+  }
+
+  .legacy-screens :where(h1, h2, h3) {
+    font-family: var(--font-display);
+    font-weight: var(--font-weight-heavy);
+    font-size: var(--text-lg);
+  }
+
+  .legacy-screens :where(input, select, textarea) {
+    min-height: 44px;
+    padding: 0 12px;
+    border: 2px solid var(--color-ink);
+    border-radius: var(--radius-md);
+    background: var(--color-card);
+  }
+
+  .legacy-screens :where(button) {
+    min-height: 44px;
+    padding: 0 16px;
+    border: 2px solid var(--color-ink);
+    border-radius: var(--radius-full);
+    background: var(--color-card);
+    font-weight: var(--font-weight-bold);
+    cursor: pointer;
+  }
+
+  .legacy-screens :where(ul, ol) {
+    padding-left: 20px;
+    list-style: revert;
+  }
+
+  .legacy-screens :where(label) {
+    display: grid;
+    gap: 4px;
+  }
 }
 
 @layer base {
@@ -170,6 +229,7 @@
     *::before,
     *::after {
       animation-duration: 1ms !important;
+      animation-iteration-count: 1 !important;
       transition-duration: 1ms !important;
     }
   }

@@ -80,7 +80,15 @@ export function WheelDemo() {
           </Button>
         ) : phase === 'done' ? (
           <>
-            <Button variant="main">{t.wheel.start}</Button>
+            <Button
+              variant="main"
+              onClick={() => {
+                setRoll(null);
+                setPhase('idle');
+              }}
+            >
+              {t.wheel.start}
+            </Button>
             <Button onClick={spin}>{t.wheel.again}</Button>
           </>
         ) : (
@@ -160,7 +168,7 @@ export function MoveDemo() {
           </MomentCard>
         ) : null}
       </div>
-      <p className="min-h-7 text-center font-bold" aria-live="polite">
+      <p className="sr-only" aria-live="polite">
         {phase === 'done' ? t.move.landed(landed) : ''}
       </p>
       <div className="flex flex-wrap justify-center gap-3">
@@ -233,7 +241,7 @@ export function FinishDemo() {
           <span className="text-sm text-ink-soft">{m.finish.frozen}</span>
         </MomentCard>
       ) : null}
-      <p className="min-h-7 text-center font-bold" aria-live="polite">
+      <p className="sr-only" aria-live="polite">
         {phase === 'done' ? `${m.finish.first(winner.name)} ${m.finish.provisional}` : ''}
       </p>
       <Button

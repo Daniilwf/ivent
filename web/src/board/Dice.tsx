@@ -179,7 +179,7 @@ export function DiceMoment({
           </motion.span>
         ) : null}
       </Table>
-      <p className="min-h-7 text-center font-bold text-balance" aria-live="polite">
+      <p className="min-h-5 text-center text-sm text-balance text-ink-soft" aria-live="polite">
         {shown && roll ? t.result(plain, challenge, total) : ''}
       </p>
     </div>

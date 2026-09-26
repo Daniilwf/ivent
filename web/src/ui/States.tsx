@@ -28,7 +28,7 @@ export function Notice({ tone, children }: { tone: Tone; children: ReactNode }) 
     <p
       role={tone === 'danger' ? 'alert' : 'status'}
       className={cx(
-        'flex items-start gap-2 rounded-md border-2 px-3 py-2 text-sm font-medium',
+        'flex items-start gap-2 rounded-md border-l-4 px-3 py-2 text-sm font-medium',
         tones[tone].box,
       )}
     >
@@ -51,8 +51,8 @@ export function EmptyState({
   action?: ReactNode;
 }) {
   return (
-    <div className="grid justify-items-center gap-3 rounded-lg border-2 border-ink bg-card p-6 text-center">
-      <span className="grid size-14 place-items-center rounded-full bg-page text-ink-soft">
+    <div className="grid justify-items-center gap-3 rounded-lg bg-card p-6 text-center">
+      <span className="grid size-14 place-items-center rounded-full bg-muted text-ink-soft">
         {icon}
       </span>
       <h3 className="font-display text-lg font-heavy text-balance">{title}</h3>
@@ -75,7 +75,7 @@ export function ErrorState({
   return (
     <div
       role="alert"
-      className="grid justify-items-center gap-3 rounded-lg border-2 border-danger bg-card p-6 text-center"
+      className="grid justify-items-center gap-3 rounded-lg border-l-4 border-danger bg-card p-6 text-center"
     >
       <span className="grid size-14 place-items-center rounded-full bg-danger-soft text-danger">
         <CircleAlert size={28} aria-hidden />

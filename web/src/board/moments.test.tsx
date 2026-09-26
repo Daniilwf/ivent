@@ -2,12 +2,24 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { createRef } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { ru } from '../i18n/ru';
+import { demoBoard } from './demoBoard';
 import { DiceMoment } from './Dice';
+import { walk } from './geometry';
+import { TokenMove } from './TokenMove';
 import type { MomentHandle } from './moment';
 import { WheelMoment } from './Wheel';
 
 // The viewer asks for reduced motion: every moment shows its result at once, in words too (docs/DESIGN.md «Движение»)
 vi.hoisted(() => {
+  // jsdom has no ResizeObserver; the map only needs it to exist
+  Object.defineProperty(window, 'ResizeObserver', {
+    configurable: true,
+    value: class {
+      observe() {}
+      disconnect() {}
+      unobserve() {}
+    },
+  });
   Object.defineProperty(window, 'matchMedia', {
     configurable: true,
     value: (query: string) => ({
@@ -70,6 +82,50 @@ describe('the main moments with reduced motion', () => {
     await waitFor(() => {
       expect(phase).toHaveBeenCalledWith('done');
     });
+    expect(phase.mock.calls.filter(([p]) => p === 'done')).toHaveLength(1);
+  });
+
+  it('a skipped wheel ends once', async () => {
+    const phase = vi.fn();
+    const handle = createRef<MomentHandle>();
+    render(
+      <WheelMoment
+        ref={handle}
+        sectors={['Action', 'RPG']}
+        roll={{ id: 1, misses: [], pick: { sector: 1, game: { title: 'Dead Cells' } } }}
+        onPhase={phase}
+      />,
+    );
+    handle.current?.skip();
+    handle.current?.skip();
+    await waitFor(() => {
+      expect(phase).toHaveBeenCalledWith('done');
+    });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(phase.mock.calls.filter(([p]) => p === 'done')).toHaveLength(1);
+  });
+
+  it('a skipped move ends once', async () => {
+    const phase = vi.fn();
+    const handle = createRef<MomentHandle>();
+    const mover = { id: 'me', name: 'Лиса', token: 2, cell: 1, points: 0, me: true };
+    const path = walk(demoBoard, 1, 5);
+    render(
+      <TokenMove
+        ref={handle}
+        board={demoBoard}
+        players={[mover]}
+        mover={mover}
+        path={path}
+        onPhase={phase}
+      />,
+    );
+    handle.current?.skip();
+    handle.current?.skip();
+    await waitFor(() => {
+      expect(phase).toHaveBeenCalledWith('done');
+    });
+    await new Promise((resolve) => setTimeout(resolve, 20));
     expect(phase.mock.calls.filter(([p]) => p === 'done')).toHaveLength(1);
   });
 });

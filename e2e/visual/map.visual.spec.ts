@@ -19,7 +19,7 @@ async function openStyleguide(page: Page, anchor: string) {
  *  pixels from the map's top left corner */
 async function samplePoints(page: Page): Promise<Samples> {
   return page
-    .locator('#map svg[role="img"]')
+    .locator('#map svg[role="application"]')
     .first()
     .evaluate((node) => {
       const svg = node as SVGSVGElement;
@@ -89,8 +89,11 @@ test('the map has no dark bands: the road is light along its middle, every zone 
   page,
 }) => {
   await openStyleguide(page, 'map');
-  const map = page.locator('#map svg[role="img"]').first();
+  const map = page.locator('#map svg[role="application"]').first();
   await map.scrollIntoViewIfNeeded();
+  // The whole board in view, on a phone too (a tall frame opens around my token)
+  const zoomOut = page.locator('#map').getByRole('button', { name: 'Отдалить' }).first();
+  for (let i = 0; i < 6; i++) await zoomOut.click();
   const samples = await samplePoints(page);
   const box = await map.boundingBox();
   expect(box).not.toBeNull();
@@ -105,11 +108,13 @@ test('the map has no dark bands: the road is light along its middle, every zone 
   const darkOnRoad = road.filter((l) => l < 0.5).length / road.length;
   expect(darkOnRoad, 'share of dark pixels along the road').toBeLessThan(0.05);
 
+  // Every zone of the demo board is checked: none may slip through for lack of sample points
+  expect(samples.zones.length).toBe(6);
   for (const zone of samples.zones) {
     const light = zone.points
       .map((p) => luminance(shot, scale, p))
       .filter((l): l is number => l !== null);
-    if (light.length < 10) continue;
+    expect(light.length, `sample points in the zone «${zone.id}»`).toBeGreaterThanOrEqual(10);
     const dark = light.filter((l) => l < 0.2).length / light.length;
     expect(dark, `share of near-black pixels in the zone «${zone.id}»`).toBeLessThan(0.2);
   }
@@ -117,7 +122,7 @@ test('the map has no dark bands: the road is light along its middle, every zone 
 
 test('the map looks as approved', async ({ page }) => {
   await openStyleguide(page, 'map');
-  const map = page.locator('#map svg[role="img"]').first();
+  const map = page.locator('#map svg[role="application"]').first();
   await map.scrollIntoViewIfNeeded();
   await expect(map).toHaveScreenshot('map.png');
 });

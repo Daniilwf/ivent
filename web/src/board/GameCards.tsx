@@ -70,13 +70,13 @@ export function RunCard({
 }) {
   return (
     <section
-      className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-3 rounded-lg border-2 border-ink bg-card p-4"
+      className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-3 rounded-lg bg-card p-4"
       aria-label={t.nowPlaying}
     >
       <Cover game={game} />
       <div className="grid content-start gap-1">
         <p className="text-sm text-ink-soft">{t.nowPlaying}</p>
-        <h2 className="line-clamp-3 font-display text-lg font-heavy break-words" title={game.title}>
+        <h2 className="font-display text-lg font-heavy wrap-anywhere" title={game.title}>
           {game.title}
         </h2>
         <p className="text-sm text-ink-soft">{t.hours(game.hours)}</p>

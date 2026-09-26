@@ -22,6 +22,21 @@ describe('the design system components', () => {
     expect(click).not.toHaveBeenCalled();
   });
 
+  it('a loading submit button does not send its form twice', async () => {
+    const submit = vi.fn((e: { preventDefault: () => void }) => {
+      e.preventDefault();
+    });
+    render(
+      <form onSubmit={submit}>
+        <Button type="submit" variant="main" loading>
+          Отправить пруф
+        </Button>
+      </form>,
+    );
+    await userEvent.click(screen.getByRole('button', { name: /Отправить пруф/ }));
+    expect(submit).not.toHaveBeenCalled();
+  });
+
   it('a disabled button takes no clicks', async () => {
     const click = vi.fn();
     render(

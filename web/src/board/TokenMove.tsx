@@ -10,8 +10,14 @@ import {
 } from 'react';
 import { cellById } from './geometry';
 import { MapSticker, MapView, type MapApi } from './MapView';
-import type { MomentHandle, MomentPhase } from './moment';
+import { momentBudget, momentHop, type MomentHandle, type MomentPhase } from './moment';
 import type { Board, Player, Point } from './types';
+
+/** The start and the finish are big cells: a sticker on them stands higher, clear of the label */
+const atBigCell = (board: Board, p: Point) =>
+  board.cells.some(
+    (c) => (c.kind === 'start' || c.kind === 'finish') && Math.hypot(c.x - p.x, c.y - p.y) < 1,
+  );
 
 /** A token hopping along its path cell by cell, the camera following each hop. Give it `key` per move. */
 export function TokenMove({
@@ -45,27 +51,25 @@ export function TokenMove({
   const camera = useRef<MapApi | null>(null);
   const controls = useRef<ReturnType<typeof animate> | null>(null);
   const stopped = useRef(false);
+  // The end is reported once, whether the token arrives or the moment is skipped
+  const ended = useRef(false);
 
   const step = useEffectEvent((p: Point) => {
     setPos(p);
   });
-  const arrive = useEffectEvent(() => {
-    const end = cellById(board, last);
-    setPos(end);
-    camera.current?.centerOn(end, 420);
-    onPhase?.('done');
-  });
-
-  const finish = () => {
-    if (stopped.current) return;
+  const end = () => {
+    if (ended.current) return;
+    ended.current = true;
     stopped.current = true;
     controls.current?.stop();
-    const end = cellById(board, last);
-    setPos(end);
-    camera.current?.centerOn(end, 420);
+    const cell = cellById(board, last);
+    setPos(cell);
+    camera.current?.centerOn(cell, 420);
     onPhase?.('done');
   };
-  useImperativeHandle(ref, () => ({ skip: finish }));
+  const arrive = useEffectEvent(end);
+
+  useImperativeHandle(ref, () => ({ skip: end }));
 
   useEffect(() => {
     if (!path) return;
@@ -78,6 +82,8 @@ export function TokenMove({
     }
     stopped.current = false;
     const halted = () => stopped.current;
+    // The whole move fits the moments' budget: long moves hop faster
+    const hop = Math.min(momentHop, momentBudget / Math.max(path.length - 1, 1));
     const run = async () => {
       for (let i = 1; i < path.length; i++) {
         const a = cellById(board, path[i - 1] as number);
@@ -85,7 +91,7 @@ export function TokenMove({
         // The camera moves once a hop, not every frame
         camera.current?.centerOn(b, 420);
         controls.current = animate(0, 1, {
-          duration: 0.22,
+          duration: hop,
           ease: 'easeInOut',
           onUpdate: (k) => {
             step({
@@ -97,7 +103,6 @@ export function TokenMove({
         await controls.current;
         if (halted()) return;
       }
-      stopped.current = true;
       arrive();
     };
     void run();
@@ -115,11 +120,9 @@ export function TokenMove({
       focus={path?.[0] ?? mover.cell}
       tools="none"
       {...(className ? { className } : {})}
-      controls={(api) => {
-        camera.current = api;
-      }}
+      ref={camera}
     >
-      <MapSticker player={mover} at={pos} size={size} />
+      <MapSticker player={mover} at={pos} size={size} lift={atBigCell(board, pos) ? 52 : 32} />
       {children}
     </MapView>
   );

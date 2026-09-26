@@ -1,13 +1,16 @@
 import { Flag, LocateFixed, Minus, Plus, Sparkles } from 'lucide-react';
 import {
   useEffect,
+  useEffectEvent,
+  useId,
+  useImperativeHandle,
   useMemo,
   useRef,
   useState,
   type KeyboardEvent,
   type PointerEvent,
   type ReactNode,
-  type WheelEvent,
+  type Ref,
 } from 'react';
 import { playerToken } from '../design/players';
 import { ru } from '../i18n/ru';
@@ -95,7 +98,7 @@ function PropShape({ prop }: { prop: Prop }) {
           strokeLinejoin="round"
         >
           <rect x={-10} y={-6} width={20} height={16} fill="var(--color-card)" />
-          <path d="M-13 -6 L0 -18 L13 -6 Z" fill="var(--color-action)" />
+          <path d="M-13 -6 L0 -18 L13 -6 Z" fill="var(--color-table-deep)" />
           <rect x={-3} y={2} width={6} height={8} fill={ink} />
         </g>
       );
@@ -146,20 +149,24 @@ export function MapSticker({
   size = 36,
   index = 0,
   count = 1,
+  lift = 32,
 }: {
   player: Player;
   at: Point;
   size?: number;
   index?: number;
   count?: number;
+  /** How far above the cell's centre the sticker stands: more over the start and the finish */
+  lift?: number;
 }) {
   const r = size / 2;
   // Several players on one cell fan out above it instead of piling up
   const angle = count === 1 ? -90 : -150 + (120 / (Math.min(count, 3) - 1)) * index;
-  const reach = count === 1 ? 32 : 36;
+  const reach = count === 1 ? lift : lift + 4;
   const dx = at.x + Math.cos((angle * Math.PI) / 180) * reach;
   const dy = at.y + Math.sin((angle * Math.PI) / 180) * reach;
-  const clip = `sticker-clip-${player.id}`;
+  // Two maps on one page must not share clip ids
+  const clip = `sticker-${useId().replace(/:/g, '')}`;
   const token = playerToken(player.token);
   return (
     <g transform={`translate(${dx} ${dy}) rotate(${index % 2 ? 6 : -6})`} data-player={player.id}>
@@ -269,7 +276,7 @@ function signSpots(board: Board): Map<string, Point> {
 type View = { cx: number; cy: number; w: number };
 type Box = { width: number; height: number };
 
-function usePanZoom(board: Board, initial: View | null) {
+function usePanZoom(board: Board, initial: View | null, anchor: Point | null) {
   // null until the user moves the map: the whole world, fitted to the frame
   const [moved, setView] = useState<View | null>(initial);
   const [box, setBox] = useState<Box>({ width: board.width, height: board.height });
@@ -290,10 +297,17 @@ function usePanZoom(board: Board, initial: View | null) {
   }, []);
 
   const ratio = box.height / box.width;
+  const portrait = ratio > board.height / board.width;
+  // A wide frame shows the whole board; a tall one (a phone) fills its height and centres on me
+  const fitWidth = portrait
+    ? (board.height / ratio) * 1.04
+    : Math.max(board.width, board.height / ratio) * 1.04;
   const fit: View = {
-    cx: board.width / 2,
+    cx: portrait
+      ? Math.min(Math.max(anchor?.x ?? board.width / 2, fitWidth / 2), board.width - fitWidth / 2)
+      : board.width / 2,
     cy: board.height / 2,
-    w: Math.max(board.width, board.height / ratio) * 1.04,
+    w: fitWidth,
   };
   const view = moved ?? fit;
   const current = (v: View | null) => v ?? fit;
@@ -311,7 +325,10 @@ function usePanZoom(board: Board, initial: View | null) {
   const zoomAt = (factor: number, clientX?: number, clientY?: number) => {
     setView((raw) => {
       const v = current(raw);
-      const w = Math.min(Math.max(v.w * factor, 260), fit.w * 1.2);
+      const w = Math.min(
+        Math.max(v.w * factor, 260),
+        Math.max(board.width, board.height / ratio) * 1.25,
+      );
       const focus =
         clientX !== undefined && clientY !== undefined
           ? toWorld(clientX, clientY, v)
@@ -328,10 +345,23 @@ function usePanZoom(board: Board, initial: View | null) {
     });
   };
 
+  const onWheel = useEffectEvent((e: globalThis.WheelEvent) => {
+    e.preventDefault();
+    zoomAt(e.deltaY > 0 ? 1.15 : 0.87, e.clientX, e.clientY);
+  });
+  useEffect(() => {
+    const el = svg.current;
+    if (!el) return;
+    const listener = (e: globalThis.WheelEvent) => {
+      onWheel(e);
+    };
+    el.addEventListener('wheel', listener, { passive: false });
+    return () => {
+      el.removeEventListener('wheel', listener);
+    };
+  }, []);
+
   const handlers = {
-    onWheel: (e: WheelEvent) => {
-      zoomAt(e.deltaY > 0 ? 1.15 : 0.87, e.clientX, e.clientY);
-    },
     onPointerDown: (e: PointerEvent) => {
       e.currentTarget.setPointerCapture(e.pointerId);
       pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -417,7 +447,8 @@ export type MapViewProps = {
   /** Where the zoom buttons stand: at the bottom on a desktop, at the top over a phone's bottom sheet */
   tools?: 'top' | 'bottom' | 'none';
   children?: ReactNode;
-  controls?: (api: MapApi) => void;
+  /** The camera, for a moment that follows a token */
+  ref?: Ref<MapApi> | undefined;
 };
 
 /** The season's map: a board of zones with the route, the cells and the players' stickers; pan, zoom, keyboard */
@@ -429,14 +460,16 @@ export function MapView({
   focus,
   tools = 'bottom',
   children,
-  controls,
+  ref,
 }: MapViewProps) {
   const start = focus ? cellById(board, focus) : null;
+  const meAt = players.find((p) => p.me);
   const { viewBox, svg, handlers, zoomAt, centerOn } = usePanZoom(
     board,
     start ? { w: 380, cx: start.x, cy: start.y } : null,
+    meAt ? cellById(board, meAt.cell) : null,
   );
-  controls?.({ centerOn });
+  useImperativeHandle(ref, () => ({ centerOn }));
   const props = useMemo(() => scenery(board), [board]);
   const signs = useMemo(() => signSpots(board), [board]);
   const me = players.find((p) => p.me);
@@ -446,16 +479,21 @@ export function MapView({
   const onCell = (id: number) => players.filter((p) => p.cell === id && !hide.includes(p.id));
 
   return (
-    <div className={cx('table-surface relative touch-none overflow-hidden select-none', className)}>
+    <div
+      className={cx(
+        'table-surface relative touch-none overflow-hidden select-none has-[svg:focus-visible]:outline-3 has-[svg:focus-visible]:outline-offset-3 has-[svg:focus-visible]:outline-ink',
+        className,
+      )}
+    >
       <svg
         ref={svg}
         viewBox={viewBox}
         preserveAspectRatio="xMidYMid meet"
-        role="img"
+        role="application"
+        aria-roledescription={t.roleDescription}
         tabIndex={0}
-        aria-label={t.mapLabel(me?.cell ?? 0)}
-        className="block size-full cursor-grab active:cursor-grabbing"
-        onWheel={handlers.onWheel}
+        aria-label={me ? t.mapLabel(me.cell) : t.mapLabelNobody}
+        className="block size-full cursor-grab outline-none active:cursor-grabbing"
         onPointerDown={handlers.onPointerDown}
         onPointerMove={handlers.onPointerMove}
         onPointerUp={handlers.onPointerUp}
@@ -630,7 +668,14 @@ export function MapView({
             ...ordered
               .slice(0, 3)
               .map((p, i) => (
-                <MapSticker key={p.id} player={p} at={c} index={i} count={here.length} />
+                <MapSticker
+                  key={p.id}
+                  player={p}
+                  at={c}
+                  index={i}
+                  count={here.length}
+                  lift={c.kind === 'start' || c.kind === 'finish' ? 52 : 32}
+                />
               )),
             here.length > 3 ? (
               <MoreChip key={`more-${c.id}`} at={c} count={here.length - 3} />
@@ -642,7 +687,7 @@ export function MapView({
       </svg>
 
       {tools === 'none' ? null : (
-        <div className={cx('absolute right-3 grid gap-2', tools === 'top' ? 'top-3' : 'bottom-3')}>
+        <div className={cx('absolute right-3 flex gap-2', tools === 'top' ? 'top-3' : 'bottom-3')}>
           <IconButton
             label={t.zoomIn}
             onClick={() => {

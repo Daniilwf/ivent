@@ -1,5 +1,6 @@
 import { Flag } from 'lucide-react';
 import { ru } from '../i18n/ru';
+import { cx } from './cx';
 
 /** How far along the route: cells left against the whole way from start to finish, in my colour (direction B's
  *  bar). Counted in cells along the way, not by cell numbers: on a board with forks the numbers are not in order. */
@@ -18,7 +19,7 @@ export function RouteProgress({ left, total }: { left: number; total: number }) 
         aria-valuemin={0}
         aria-valuemax={total}
         aria-valuenow={done}
-        className="block h-3 overflow-hidden rounded-full border-2 border-ink bg-page"
+        className="block h-3 overflow-hidden rounded-full border-2 border-ink bg-muted"
       >
         <span
           className="block h-full border-r-2 border-ink bg-me transition-all duration-(--duration-slow)"
@@ -33,7 +34,7 @@ export function RouteProgress({ left, total }: { left: number; total: number }) 
 export function ScoreBar({ points, top, fill }: { points: number; top: number; fill: string }) {
   const share = top > 0 ? Math.min(Math.max(points / top, 0), 1) : 0;
   return (
-    <span className="mt-1 block h-2 overflow-hidden rounded-full bg-page" aria-hidden>
+    <span className="mt-1 block h-2 overflow-hidden rounded-full bg-muted" aria-hidden>
       <span
         className="block h-full rounded-full transition-all duration-(--duration-slow)"
         style={{ width: `${share * 100}%`, background: fill }}
@@ -45,6 +46,12 @@ export function ScoreBar({ points, top, fill }: { points: number; top: number; f
 /** A grey stand-in while data loads: the same size as what comes, so nothing jumps */
 export function Skeleton({ className }: { className?: string }) {
   return (
-    <span className={`block animate-pulse rounded-sm bg-page ${className ?? ''}`} aria-hidden />
+    <span
+      className={cx(
+        'block animate-pulse rounded-sm bg-muted motion-reduce:animate-none',
+        className,
+      )}
+      aria-hidden
+    />
   );
 }

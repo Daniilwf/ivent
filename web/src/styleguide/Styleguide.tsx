@@ -1,4 +1,4 @@
-import { CalendarClock, Inbox, Trophy } from 'lucide-react';
+import { CalendarClock, Inbox, Plus, Trophy } from 'lucide-react';
 import { useEffect, type ReactNode } from 'react';
 import { RunCard } from '../board/GameCards';
 import { Leaderboard } from '../board/Leaderboard';
@@ -30,7 +30,7 @@ function Section({
   children: ReactNode;
 }) {
   return (
-    <section id={id} className="grid scroll-mt-4 gap-4 border-t-2 border-ink pt-6">
+    <section id={id} className="grid scroll-mt-4 gap-4 border-t-2 border-muted pt-6">
       <div className="grid gap-1">
         <h2 className="font-display text-xl font-heavy">{title}</h2>
         {lead ? <p className="max-w-prose text-ink-soft">{lead}</p> : null}
@@ -48,7 +48,7 @@ function Swatch({ token, role }: { token: string; role: string }) {
         style={{ background: `var(--color-${token})` }}
       />
       <span className="min-w-0">
-        <code className="block text-sm font-bold break-all">--color-{token}</code>
+        <span className="block text-sm font-bold break-all">--color-{token}</span>
         <span className="text-sm text-ink-soft">{role}</span>
       </span>
     </li>
@@ -97,7 +97,7 @@ export function Styleguide() {
             <a
               key={id}
               href={`#${id}`}
-              className="rounded-full border-2 border-ink bg-card px-3 py-1 text-sm font-medium is-hover:bg-page"
+              className="inline-flex min-h-11 items-center rounded-full border-2 border-ink bg-card px-4 text-sm font-medium is-hover:bg-page"
             >
               {name}
             </a>
@@ -146,13 +146,13 @@ export function Styleguide() {
         </div>
         <div className="flex flex-wrap gap-4">
           <span className="grid size-24 place-items-center rounded-sm border-2 border-ink bg-card text-xs">
-            sm · 8
+            {t.shape.radius.sm}
           </span>
           <span className="grid size-24 place-items-center rounded-md border-2 border-ink bg-card text-xs">
-            md · 14
+            {t.shape.radius.md}
           </span>
           <span className="grid size-24 place-items-center rounded-lg border-2 border-ink bg-card text-xs">
-            lg · 20
+            {t.shape.radius.lg}
           </span>
           <span className="grid size-24 place-items-center rounded-lg border-3 border-ink bg-card text-xs shadow-lift">
             {t.shape.lift}
@@ -161,47 +161,40 @@ export function Styleguide() {
       </Section>
 
       <Section id="buttons" title={t.buttons.title} lead={t.buttons.lead}>
-        <div className="overflow-x-auto">
-          <table className="border-separate border-spacing-3">
-            <thead>
-              <tr>
-                <th />
-                {buttonStates.map((s) => (
-                  <th key={s.label} className="text-left text-sm font-medium text-ink-soft">
-                    {s.label}
-                  </th>
+        {/* Every variant in every state, wrapping on a phone instead of scrolling */}
+        <div className="grid gap-6">
+          {variants.map((v) => (
+            <div key={v.variant} className="grid gap-2">
+              <h3 className="text-sm font-bold">{v.label}</h3>
+              <ul className="flex flex-wrap gap-x-4 gap-y-3">
+                {buttonStates.map((state) => (
+                  <li key={state.label} className="grid justify-items-start gap-1">
+                    <span className="text-xs text-ink-soft">{state.label}</span>
+                    <Button variant={v.variant} {...state.props}>
+                      {v.text}
+                    </Button>
+                  </li>
                 ))}
-              </tr>
-            </thead>
-            <tbody>
-              {variants.map((v) => (
-                <tr key={v.variant}>
-                  <th className="text-left text-sm font-bold">{v.label}</th>
-                  {buttonStates.map((s) => (
-                    <td key={s.label}>
-                      <Button variant={v.variant} {...s.props}>
-                        {v.text}
-                      </Button>
-                    </td>
-                  ))}
-                </tr>
+              </ul>
+            </div>
+          ))}
+          <div className="grid gap-2">
+            <h3 className="text-sm font-bold">{t.buttons.icon}</h3>
+            <ul className="flex flex-wrap gap-x-4 gap-y-3">
+              {buttonStates.slice(0, 5).map((state) => (
+                <li key={state.label} className="grid justify-items-start gap-1">
+                  <span className="text-xs text-ink-soft">{state.label}</span>
+                  <IconButton
+                    label={ru.board.zoomIn}
+                    {...(state.props.force ? { force: state.props.force } : {})}
+                    disabled={state.props.disabled}
+                  >
+                    <Plus size={20} />
+                  </IconButton>
+                </li>
               ))}
-              <tr>
-                <th className="text-left text-sm font-bold">{t.buttons.icon}</th>
-                {buttonStates.slice(0, 5).map((s) => (
-                  <td key={s.label}>
-                    <IconButton
-                      label={ru.board.zoomIn}
-                      {...(s.props.force ? { force: s.props.force } : {})}
-                      disabled={s.props.disabled}
-                    >
-                      <CalendarClock size={20} />
-                    </IconButton>
-                  </td>
-                ))}
-              </tr>
-            </tbody>
-          </table>
+            </ul>
+          </div>
         </div>
       </Section>
 
