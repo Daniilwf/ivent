@@ -17,6 +17,7 @@ using GameEvent.Web.Rolls;
 using GameEvent.Web.Rulesets;
 using GameEvent.Web.Runs;
 using GameEvent.Web.Seasons;
+using GameEvent.Web.Testing;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Http.Json;
 using Microsoft.EntityFrameworkCore;
@@ -64,6 +65,7 @@ public static class AppSetup
         builder.AddFiles();
         builder.AddGameLookup();
         builder.AddPool();
+        builder.AddTestSupport();
         services.AddOpenApi(o => o.AddDocumentTransformer(async (document, context, ct) =>
         {
             // Hub messages are part of the contract too: the frontend gets their types from the same document.
@@ -182,6 +184,7 @@ public static class AppSetup
         // Last: the OpenAPI document keeps the order its shared schemas were first met in (a nullable first use of an
         // enum would make the enum itself nullable for every client)
         app.MapObservability(api);
+        app.MapTestEndpoints(api);
         app.MapHub<SeasonHub>(SeasonHub.Path);
 
         if (frontend is not null)

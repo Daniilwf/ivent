@@ -108,17 +108,57 @@ internal sealed class QueueHarness : IAsyncDisposable
     }
 }
 
-internal sealed class TestClock(DateTimeOffset start) : IClock
+/// <summary>
+/// The tests' clock: set by the tests, and movable by the test endpoints like the Development one (D-120). It stands
+/// still between moves, so a test sees exact moments; locked, since the endpoints move it from request threads.
+/// </summary>
+internal sealed class TestClock : GameEvent.Infrastructure.Kernel.IAdjustableClock
 {
-    public DateTimeOffset UtcNow { get; set; } = start;
+    private readonly Lock _lock = new();
+    private readonly DateTimeOffset _start;
+    private DateTimeOffset _now;
+
+    public TestClock(DateTimeOffset start)
+    {
+        _start = start;
+        _now = start;
+    }
+
+    public DateTimeOffset UtcNow
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return _now;
+            }
+        }
+
+        set
+        {
+            lock (_lock)
+            {
+                _now = value;
+            }
+        }
+    }
+
+    public void Advance(TimeSpan by) => UtcNow += by;
+
+    public void MoveTo(DateTimeOffset at) => UtcNow = at;
+
+    public void Reset() => UtcNow = _start;
 }
 
-internal sealed class SeededRandom(int seed) : IRandomSource
+internal sealed class SeededRandom(int seed) : GameEvent.Infrastructure.Kernel.IReseedableRandom
 {
 #pragma warning disable CA5394 // deterministic randomness is the point in tests
-    private readonly Random _random = new(seed);
+    private Random _random = new(seed);
 
     public int NextInt(int minInclusive, int maxExclusive) => _random.Next(minInclusive, maxExclusive);
+
+    // Unlike the site's, no seed is the tests' own seed again: the tests stay repeatable
+    public void Seed(int? value) => _random = new Random(value ?? seed);
 #pragma warning restore CA5394
 }
 
