@@ -87,6 +87,11 @@ public static class RulesetValidator
             Error("season.maxActiveRunsPerPlayer", "must be at least 1");
         }
 
+        if (ruleset.Season.MaxUncheckedRuns is < 1)
+        {
+            Error("season.maxUncheckedRuns", "must be at least 1, or null for no limit");
+        }
+
         if (ruleset.Map.LinearLength < 1)
         {
             Error("map.linearLength", "must be at least 1");

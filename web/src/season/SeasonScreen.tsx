@@ -218,6 +218,7 @@ export function SeasonScreen({
   const turnsOpen = season.status === 'active' && !pastDeadline;
   const choice = turnsOpen && me?.phase === 'rolling' ? me.choice : null;
   const offer = turnsOpen && me?.phase === 'rolling' ? me.offer : null;
+  const uncheckedBlocked = me?.unchecked != null && me.unchecked.count >= me.unchecked.limit;
   const { board, players, rows } = view;
   const mine = players.find((p) => p.me);
   const myRow = rows.find((r) => r.player.me);
@@ -355,15 +356,28 @@ export function SeasonScreen({
           </div>
         )}
         {me?.phase === 'idle' && turnsOpen && (
-          <Button
-            variant="main"
-            data-testid="roll"
-            loading={pending}
-            disabled={pending}
-            onClick={() => void act({ kind: 'roll' })}
-          >
-            {ru.turn.roll}
-          </Button>
+          // D-134: at the limit of runs waiting for the admin's check the roll is closed, and the page says why
+          <div className="grid gap-2">
+            {uncheckedBlocked ? (
+              <Notice tone="warning">
+                {ru.turn.uncheckedBlocked(me.unchecked?.count ?? 0, me.unchecked?.limit ?? 0)}
+              </Notice>
+            ) : null}
+            <Button
+              variant="main"
+              data-testid="roll"
+              loading={pending}
+              disabled={pending || uncheckedBlocked}
+              onClick={() => void act({ kind: 'roll' })}
+            >
+              {ru.turn.roll}
+            </Button>
+            {!uncheckedBlocked && me.unchecked && me.unchecked.count > 0 ? (
+              <p className="text-sm text-ink-soft" data-testid="unchecked">
+                {ru.turn.uncheckedWaiting(me.unchecked.count, me.unchecked.limit)}
+              </p>
+            ) : null}
+          </div>
         )}
         {/* The offer, the choice and the run's forms keep plain styles until H3 (the wheel) and H4 (the run) */}
         {choice && (

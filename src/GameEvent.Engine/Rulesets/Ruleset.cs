@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using GameEvent.Engine.Kernel;
 
 namespace GameEvent.Engine.Rulesets;
@@ -89,6 +90,13 @@ public sealed record SeasonRules
     public required int MaxActiveRunsPerPlayer { get; init; }
 
     public required int InactiveHintDays { get; init; }
+
+    /// How many of a player's runs may wait for the admin's check before a new roll is refused (D-134): completed, not
+    /// rejected, the proof not approved (pending or not sent). Null: no limit — so a season logged before this rule
+    /// reads without it and keeps its old behaviour. Not written when null: a season without the limit logs its ruleset
+    /// exactly as before the field existed.
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? MaxUncheckedRuns { get; init; }
 }
 
 public enum RerollCostKind

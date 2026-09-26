@@ -62,6 +62,16 @@ internal static class Rolling
             return rejection;
         }
 
+        // D-134: a new roll waits while too many of the player's runs wait for the admin's check. Only the next roll:
+        // a turn already started goes on, and proofs can be sent meanwhile.
+        if (state.Rules.Season.MaxUncheckedRuns is { } limit
+            && UncheckedRuns.Count(state, command.PlayerId) is var waiting && waiting >= limit)
+        {
+            return Decision.Reject(
+                RejectionCodes.TooManyUncheckedRuns,
+                $"{waiting} runs wait for the admin's check; a new roll opens below {limit}.");
+        }
+
         return Draw(state, command.PlayerId, context, Filters(state)) is { } roll
             ? Decision.Accept(roll)
             : Decision.Reject(RejectionCodes.NoAvailableGames, "No category has an available game.");

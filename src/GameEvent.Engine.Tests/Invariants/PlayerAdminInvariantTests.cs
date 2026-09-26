@@ -93,7 +93,8 @@ public partial class PlayerAdminInvariantTests
             _ => [],
         };
 
-    private static Scenario NewSeason(int seed, bool withChoice = false, RerollMode rerolls = RerollMode.None, bool finishes = false)
+    private static Scenario NewSeason(
+        int seed, bool withChoice = false, RerollMode rerolls = RerollMode.None, bool finishes = false, Func<Ruleset, Ruleset>? rules = null)
     {
         var s = Scenario.New(seed: seed)
             .WithRuleset(r => WithRerolls(withChoice ? r with { Roll = r.Roll with { ChoiceCount = ChoiceCount } } : r, seed, rerolls))
@@ -117,6 +118,11 @@ public partial class PlayerAdminInvariantTests
                 .WithGame("Limbo", null, "Puzzle")
                 .WithGame("Quake", 6, "Action")
                 .WithGame("Prey", 18, "Action");
+        }
+
+        if (rules is not null)
+        {
+            s.WithRuleset(rules);
         }
 
         return s.WithPlayers(s_players);
@@ -380,10 +386,11 @@ public partial class PlayerAdminInvariantTests
         bool finishes = false,
         bool lifecycle = false,
         bool withUndo = false,
-        bool withRulesetChanges = false)
+        bool withRulesetChanges = false,
+        Func<Ruleset, Ruleset>? rules = null)
     {
         // C13: a failure prints the (shrunk) game as builder code
-        return NewSeason(seed, withChoice, rerolls, finishes).Explained(s =>
+        return NewSeason(seed, withChoice, rerolls, finishes, rules).Explained(s =>
         {
             foreach (var b in script)
             {

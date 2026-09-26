@@ -18,7 +18,8 @@
   "season": {
     "timezone": "Europe/Moscow",
     "maxActiveRunsPerPlayer": 1,
-    "inactiveHintDays": 3
+    "inactiveHintDays": 3,
+    "maxUncheckedRuns": 2
   },
   "roll": {
     "choiceCount": 1,

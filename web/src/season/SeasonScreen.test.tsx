@@ -69,6 +69,7 @@ function season(overrides: Partial<Schemas['SeasonView']> = {}): Schemas['Season
       dropPenalty: null,
       techRerollOpen: false,
       challengesEnabled: false,
+      unchecked: null,
       finish: null,
     },
     lastSequence: 3,
@@ -251,6 +252,7 @@ describe('SeasonScreen', () => {
               dropPenalty: null,
               techRerollOpen: false,
               challengesEnabled: false,
+              unchecked: null,
               finish: null,
             },
           }),
@@ -313,6 +315,7 @@ describe('SeasonScreen', () => {
         dropPenalty: null,
         techRerollOpen: false,
         challengesEnabled: false,
+        unchecked: null,
         finish: null,
       },
     });
@@ -347,6 +350,7 @@ describe('SeasonScreen', () => {
         dropPenalty: null,
         techRerollOpen: false,
         challengesEnabled: false,
+        unchecked: null,
         finish: null,
       },
     });
@@ -403,6 +407,7 @@ describe('SeasonScreen', () => {
               dropPenalty: null,
               techRerollOpen: false,
               challengesEnabled: false,
+              unchecked: null,
               finish: null,
             },
           }),
@@ -466,6 +471,7 @@ describe('SeasonScreen', () => {
               dropPenalty: null,
               techRerollOpen: false,
               challengesEnabled: false,
+              unchecked: null,
               finish: null,
             },
           }),
@@ -516,6 +522,7 @@ describe('SeasonScreen', () => {
               dropPenalty: null,
               techRerollOpen: false,
               challengesEnabled: false,
+              unchecked: null,
               finish: null,
             },
           }),
@@ -587,6 +594,7 @@ describe('SeasonScreen', () => {
               dropPenalty: null,
               techRerollOpen: false,
               challengesEnabled: false,
+              unchecked: null,
               finish: null,
             },
           }),
@@ -648,6 +656,7 @@ describe('SeasonScreen', () => {
         dropPenalty: null,
         techRerollOpen: false,
         challengesEnabled: false,
+        unchecked: null,
         finish: null,
       },
     });
@@ -683,6 +692,7 @@ describe('SeasonScreen', () => {
                 dropPenalty: null,
                 techRerollOpen: false,
                 challengesEnabled: false,
+                unchecked: null,
                 finish: null,
               },
             }),
@@ -774,6 +784,7 @@ describe('SeasonScreen reroll price and manual effects (D-93)', () => {
         dropPenalty: null,
         techRerollOpen: false,
         challengesEnabled: false,
+        unchecked: null,
         finish: null,
       },
     });
@@ -978,6 +989,7 @@ describe('SeasonScreen drop and tech reroll (RR2, RR4, RR5, D-94)', () => {
         dropPenalty: turn.dropPenalty === undefined ? defaultPenalty : turn.dropPenalty,
         techRerollOpen: turn.techRerollOpen ?? true,
         challengesEnabled: false,
+        unchecked: null,
         finish: null,
       },
     });
@@ -1034,6 +1046,7 @@ describe('SeasonScreen drop and tech reroll (RR2, RR4, RR5, D-94)', () => {
           dropPenalty: null,
           techRerollOpen: false,
           challengesEnabled: false,
+          unchecked: null,
           finish: null,
         },
       }),
@@ -1279,6 +1292,7 @@ describe('SeasonScreen drop and tech reroll (RR2, RR4, RR5, D-94)', () => {
           dropPenalty: null,
           techRerollOpen: false,
           challengesEnabled: false,
+          unchecked: null,
           finish: null,
         },
       }),
@@ -1327,6 +1341,7 @@ describe('SeasonScreen marks on offered games (G8, D-94 (6))', () => {
         dropPenalty: null,
         techRerollOpen: false,
         challengesEnabled: false,
+        unchecked: null,
         finish: null,
         ...turn,
       },
@@ -1455,6 +1470,7 @@ describe('SeasonScreen completion reward (C7a, D-96)', () => {
         dropPenalty: null,
         techRerollOpen: false,
         challengesEnabled: false,
+        unchecked: null,
         finish: null,
       },
     });
@@ -1508,6 +1524,7 @@ describe('SeasonScreen completion reward (C7a, D-96)', () => {
         dropPenalty: null,
         techRerollOpen: true,
         challengesEnabled,
+        unchecked: null,
         finish: null,
       },
     });
@@ -1736,5 +1753,61 @@ describe('SeasonScreen completion reward (C7a, D-96)', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       ru.rejection['run.hoursSourceRequired'],
     );
+  });
+});
+
+describe('SeasonScreen: runs waiting for the admin (D-134)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const waiting = (count: number, limit: number) => {
+    const base = season();
+    return season({ me: base.me && { ...base.me, unchecked: { count, limit } } });
+  };
+
+  it('closes the roll at the limit and says why, offering to send the proofs meanwhile', async () => {
+    const fetch = serve((r) => (isSeasonGet(r) ? json(200, waiting(2, 2)) : json(200, {})));
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    const roll = await screen.findByTestId('roll');
+    expect(roll).toBeDisabled();
+    expect(screen.getByText(ru.turn.uncheckedBlocked(2, 2))).toBeInTheDocument();
+    await userEvent.click(roll);
+    expect(fetch.mock.calls.some(([r]) => r.method === 'POST')).toBe(false);
+  });
+
+  it('keeps the roll open below the limit with a quiet count', async () => {
+    serve((r) => (isSeasonGet(r) ? json(200, waiting(1, 2)) : json(200, {})));
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    expect(await screen.findByTestId('roll')).toBeEnabled();
+    expect(screen.getByTestId('unchecked')).toHaveTextContent(ru.turn.uncheckedWaiting(1, 2));
+    expect(screen.queryByText(ru.turn.uncheckedBlocked(1, 2))).toBeNull();
+  });
+
+  it('says nothing when the season has no limit or nothing waits', async () => {
+    serve((r) => (isSeasonGet(r) ? json(200, waiting(0, 2)) : json(200, {})));
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    expect(await screen.findByTestId('roll')).toBeEnabled();
+    expect(screen.queryByTestId('unchecked')).toBeNull();
+  });
+
+  it('shows the refusal in Russian if the server refuses the roll anyway', async () => {
+    serve((r) =>
+      isSeasonGet(r)
+        ? json(200, waiting(1, 2))
+        : json(409, {
+            title: 'rejected',
+            status: 409,
+            detail: null,
+            code: 'roll.tooManyUnchecked',
+          }),
+    );
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    await userEvent.click(await screen.findByTestId('roll'));
+    expect(await screen.findByText(ru.rejection['roll.tooManyUnchecked'])).toBeInTheDocument();
   });
 });

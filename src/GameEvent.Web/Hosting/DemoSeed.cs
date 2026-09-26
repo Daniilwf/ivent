@@ -170,8 +170,9 @@ public static class DemoSeed
                 return;
             }
 
-            // A finisher proves every run: the first place is final only when all its runs are approved (Q-3)
-            if (player.FinishOrder is not null)
+            // A finisher proves every run: the first place is final only when all its runs are approved (Q-3). An idle
+            // player often sends the proofs they owe too, so the unchecked limit (D-134) does not stall them for the month.
+            if (player.FinishOrder is not null || (player.Phase == TurnPhase.Idle && _random.NextDouble() < 0.6))
             {
                 var sent = await db.Proofs.AsNoTracking().Where(p => p.SeasonId == SeasonId && p.PlayerId == player.Id && p.SubmittedAt != null).Select(p => p.RunId).ToListAsync(ct);
                 var unproved = await db.Runs.AsNoTracking()

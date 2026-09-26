@@ -74,6 +74,7 @@ function season(leaderboard: Row[]): Schemas['SeasonView'] {
       dropPenalty: null,
       techRerollOpen: false,
       challengesEnabled: false,
+      unchecked: null,
       finish: { order: 1, frozen: false },
     },
     lastSequence: 3,

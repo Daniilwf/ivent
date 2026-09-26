@@ -51,6 +51,7 @@ function season(status: Schemas['SeasonView']['status'] = 'active'): Schemas['Se
       dropPenalty: null,
       techRerollOpen: false,
       challengesEnabled: false,
+      unchecked: null,
       finish: null,
     },
     lastSequence: 3,

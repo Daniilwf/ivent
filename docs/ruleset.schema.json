@@ -77,6 +77,12 @@
         },
         "inactiveHintDays": {
           "type": "integer"
+        },
+        "maxUncheckedRuns": {
+          "type": [
+            "integer",
+            "null"
+          ]
         }
       },
       "required": [

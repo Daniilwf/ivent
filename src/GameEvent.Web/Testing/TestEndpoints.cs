@@ -2,6 +2,7 @@ using System.Security.Claims;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Map;
 using GameEvent.Engine.Players;
+using GameEvent.Engine.Proofs;
 using GameEvent.Engine.Rolls;
 using GameEvent.Engine.Runs;
 using GameEvent.Engine.Seasons;
@@ -258,9 +259,16 @@ public static class TestEndpoints
             }
 
             var run = playing.Runs[runId];
-            return await SendAsync(run.Snapshot.Hours is null
-                ? new CompleteRun(playerId, Difficulty.Extreme, 1m, "Сценарий")
-                : new CompleteRun(playerId, Difficulty.Extreme));
+            if (await SendAsync(run.Snapshot.Hours is null
+                    ? new CompleteRun(playerId, Difficulty.Extreme, 1m, "Сценарий")
+                    : new CompleteRun(playerId, Difficulty.Extreme)) is { } completeRefused)
+            {
+                return completeRefused;
+            }
+
+            // The admin checks each run at once, so the next roll is not held by the unchecked limit (D-134); the
+            // good event of the extreme difficulty stays to be played
+            return await SendAsync(new ApproveProof(runId, Comment: "Сценарий: проверено сразу"));
         }
     }
 
