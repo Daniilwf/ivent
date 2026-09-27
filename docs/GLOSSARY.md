@@ -116,16 +116,21 @@
 | Термин | Что значит | В коде |
 | --- | --- | --- |
 | Очки | сумма кубов за прохождения плюс явные эффекты на очки | `Points` |
-| Причина изменения очков | за что начислены или сняты очки: кубы за прохождение, стартовый баланс, правка админа | `PointsReason` (`CompletionRoll`, `StartingBalance`, `AdminAdjustment`) |
-| Причина изменения монеток | стартовый баланс, правка админа | `CoinsReason` (`StartingBalance`, `AdminAdjustment`) |
-| Причина изменения ресурса | правка админа | `ResourceReason` (`AdminAdjustment`) |
+| Причина изменения очков | за что начислены или сняты очки: кубы за прохождение, стартовый баланс, правка админа, предмет, изменение броска предметом | `PointsReason` (`CompletionRoll`, `StartingBalance`, `AdminAdjustment`, …, `Item`, `DiceModified`) |
+| Причина изменения монеток | стартовый баланс, правка админа, предмет, ролл магазина, покупка, залог ставки, выигрыш и его отмена | `CoinsReason` (`StartingBalance`, `AdminAdjustment`, …, `Item`, `ShopRoll`, `Purchase`, `BetStake`, `BetPayout`, `BetPayoutRevoked`) |
+| Причина изменения ресурса | правка админа, реролл, предмет, ролл магазина | `ResourceReason` (`AdminAdjustment`, `Reroll`, `Item`, `ShopRoll`) |
 | Стартовый баланс | очки и монетки, с которыми админ добавил игрока посреди сезона | `StartingBalance` |
 | Монетки | единственная валюта | `Coins` |
 | Ресурс | любой счётчик игрока; очки и монетки — отдельные поля, остальные — словарь | `Resource`, `ResourceBag` |
+| Экономика игрока | всё, что у игрока есть кроме очков и монеток: инвентарь, изменения следующего ролла и броска, магазин, ставки | `PlayerEconomy` (`SeasonPlayer.Economy`, `Wallet`), колонка `EconomyJson` |
 | Магазин | личные лоты за монетки на ограниченное время | `Shop` |
-| Лот | товар в магазине | `ShopLot`, `ShopOffer` |
-| Купон | предмет, дающий бесплатный ролл магазина | `ObjectDefinition` с id `shop-coupon` |
-| Ставка | залог монеток на то, что игрок пройдёт игру до срока | `Bet` |
+| Ролл магазина | личные лоты за монетки или бесплатный ролл; каждый следующий в пределах игры дороже | команда `RollShop`, событие `ShopRolled`, `ShopPayment` (`FreeRoll`, `Coins`), счётчик `PlayerEconomy.ShopRolls` |
+| Сброс цены магазина | после прохождения или дропа ролл магазина снова стоит `rollCost` | `ShopPriceRestarted` |
+| Лот | товар в магазине | `ShopLot`, предложение — `ShopOffer`; покупка — `BuyLot`, `LotBought`; исчезновение — `ShopOfferExpired` |
+| Купон | предмет, дающий бесплатный ролл магазина | `ObjectDefinition` с id `shop-coupon`, ресурс `freeShopRolls` |
+| Ставка | залог монеток на то, что игрок пройдёт игру до срока | `Bet` (`BetStatus`: `Open`, `Won`, `Lost`, `Revoked`), команда `PlaceBet`, события `BetPlaced`, `BetSettled` |
+| Залог | монетки открытых ставок, отданные системе | `CoinsReason.BetStake` |
+| Наступление сроков | системная команда планировщика: лоты исчезают, эффекты на часы истекают, ставки по сроку проигрывают | `FireTimers`, `Timers.Next`, колонка `NextTimerAt` |
 
 ## Карта
 
@@ -147,7 +152,7 @@
 | Отрезок пути | клетки, пройденные подряд по стрелкам; перенос начинает новый | `PathSegment` |
 | Точка срабатывания | клетка и вид касания при движении (для триггеров клеток) | `CellVisit` |
 | Шаг движения, проход, остановка | виды точек срабатывания: каждая клетка шага, клетка, через которую прошли, клетка, где остановились | `CellVisitKind` (`MoveStep`, `Pass`, `Stop`), триггеры `moveStep`, `pass`, `stop` |
-| Причина движения | что сдвинуло фишку: кубы, стартовая клетка, перенос админом, штраф, правка, реджект, телепорт | `MoveReason` (`CompletionRoll`, `StartingCell`, `AdminAdjustment`, `DropPenalty`, `RunCorrection`, `ProofRejected`, `Teleport`) |
+| Причина движения | что сдвинуло фишку: кубы, стартовая клетка, перенос админом, штраф, правка, реджект, телепорт, толчок и перенос предметом, изменение броска предметом | `MoveReason` (`CompletionRoll`, `StartingCell`, `AdminAdjustment`, `DropPenalty`, `RunCorrection`, `ProofRejected`, `Teleport`, `Item`, `ItemTeleport`, `DiceModified`) |
 | Перенос | перемещение фишки без шагов (админом или телепортом): клетка назначения не срабатывает | `PlayerMoved` с `Steps = 0` |
 | Зона | область клеток со своими правилами | `Zone`, в контенте и в карте — `ZoneDefinition` (`MapGraph.Zones`, `Cell.Zone`) |
 | Зона прохождения | зона, где игрок стоял в момент ролла, с её правилами для этого прохождения | `RunSnapshot.Zone`, `RunZone` |
@@ -173,7 +178,17 @@
 | Общий ивент | ивент на всех, запускается админом | `GlobalEvent` |
 | Достижение | значок за выполнение условия по статистике | `ObjectKind.Achievement`, `PlayerAchievement` |
 | Определение объекта | шаблон предмета, эффекта, ивента или достижения | `ObjectDefinition`, блок эффекта — `EffectSpec`, разбор — `ContentJson`, проверка — `ContentValidator` |
-| Объект инвентаря | конкретный экземпляр у игрока | `InventoryObject` |
+| Объект инвентаря | конкретный экземпляр у игрока | `InventoryObject`; события `ObjectGiven`, `ObjectRemoved` (`ObjectRemoval`), `ObjectTransferred`, `ObjectChanged`, `ObjectLost`; откуда — `ObjectSource` |
+| Пакет контента | определения объектов и колёса лутбоксов, загружаемые в сезон; файлы `content/items`, `content/wheels` | `ContentPack`, `ContentFiles`, команда `PublishContent`, событие `ContentPublished`, в сезоне — `ContentCatalog` (`CatalogEntry.Deleted`) |
+| Колесо лутбокса | взвешенный список объектов для `spinWheel` | `WheelDefinition`, `WheelEntrySpec`, событие `WheelSpun` |
+| Использовать | применить свой предмет с целью и ответами | команда `UseItem`, событие `ItemUsed` |
+| Правка инвентаря | админ выдаёт или забирает объект с комментарием | команда `AdjustInventory`, событие `InventoryAdjusted` |
+| Срабатывание эффекта | эффект или спецролл игрока сработал на своём триггере | `EffectTriggered`, `Firing` |
+| Бросок эффекта | кубики из значения эффекта (`$roll`) | `EffectRolled` |
+| Изменение ролла | фильтр или выбор из N для следующего ролла; на ролл фиксируется до старта игры | `RollModifier`, `NextRollModified`, `RollModifiersApplied` (`PlayerEconomy.NextRoll`, `CurrentRoll`) |
+| Изменение броска | этап конвейера для следующего броска за прохождение | `DiceModifier`, `NextDiceModified` |
+| Модификаторы броска | что предметы сделали с броском прохождения: грани, лишние кубики, прибавка, множитель, пределы | `RunDiceMods` (`RunState.Mods`), `RunDiceModified`, переброс — `RunDiceRerolled` |
+| Полученные враждебные | сколько враждебных эффектов дошло до игрока | `HostileReceived`, `PlayerEconomy.HostileReceived` |
 | Редкость | обычный, эпический, легендарный | `Rarity` (`Common`, `Epic`, `Legendary`) |
 | Окно использования | момент хода, когда предмет можно применить | `UseWindow` |
 | Базовое действие | элементарная операция, из которых собираются эффекты (не больше 12) | `ActionSpec` (`MoveAction`, `ChangeResourceAction`…) |
@@ -182,7 +197,7 @@
 | Значение в действии | число, кубики («1d6») или ссылка («$roll») | `ContentValue` |
 | Селектор целей | правило выбора, на кого действует эффект | `TargetSelector` |
 | Враждебный эффект | эффект, наложенный другим игроком во вред | `IsHostile` |
-| Перехват | пассивная защита, гасящая враждебный эффект | `Intercept` |
+| Перехват | пассивная защита, гасящая враждебный эффект | `Intercept`, событие `HostileIntercepted` |
 | Ручной эффект | текстовый эффект, ждущий разрешения игроком или админом | `PendingManualEffect`, событие `ManualEffectCreated`, источник `ManualEffectSource`, разрешение `ManualEffectResolved` (`ManualEffectOutcome`: `Applied`, `NotApplicable`), разрешение — `ResolveManualEffect` |
 | Правка часов прохождения | админ меняет часы после броска: кубики докидываются или снимаются с конца | команда `CorrectRunHours`, событие `RunHoursCorrected`, причины `*.RunCorrection` |
 | Смена сложности прохождения | админ меняет сложность по пруфу: каждый кубик пересчитывается | команда `ChangeRunDifficulty`, событие `RunDifficultyChanged`, `DieChange` |

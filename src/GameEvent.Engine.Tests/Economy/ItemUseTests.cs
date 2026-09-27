@@ -580,6 +580,18 @@ public class ItemUseTests
     }
 
     [Fact]
+    public void A_push_through_a_fork_takes_the_default_branch_without_asking()
+    {
+        var s = OnMap(MapBuilder.New().Path("start", "f", "x", "finish").Path("f", "y", "finish").Build());
+        s.Give("Вася", "banana");
+
+        s.Used("Вася", "banana");
+
+        Assert.Equal(("x", (PendingChoice?)null), (s.Player("Вася").CellId, s.Player("Вася").Choice));
+        Assert.Empty(s.LastEvents<BranchChoiceRequested>());
+    }
+
+    [Fact]
     public void A_move_of_a_player_choosing_a_branch_is_refused()
     {
         var s = OnMap(MapBuilder.New().Path("start", "f", "x", "finish").Path("f", "y", "finish").Build());
