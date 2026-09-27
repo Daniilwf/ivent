@@ -245,6 +245,24 @@ describe('the map editor', () => {
     expect(screen.queryByTestId('map-changed')).not.toBeInTheDocument();
   });
 
+  it('warns about a zone with few games without blocking the publication', async () => {
+    desktop();
+    fakeServer({
+      'GET /api/admin/seasons/*/map': view({
+        map: { ...published, zones: [{ id: 'swamp', name: 'Болото ужаса' }] },
+      }),
+      'POST /api/admin/seasons/*/map/check': {
+        ...ok,
+        warnings: [{ zoneId: 'swamp', available: 4, wanted: 15 }],
+      },
+    });
+    render(<MapSection seasonId={seasonId} version={0} />);
+
+    expect(await screen.findByText(t.check.warning('Болото ужаса', 4, 15))).toBeInTheDocument();
+    expect(screen.getByText(t.check.ok)).toBeInTheDocument();
+    expect(screen.getByTestId('map-publish-button')).toBeEnabled();
+  });
+
   it('says a linear season needs the graph mode first', async () => {
     desktop();
     fakeServer({
