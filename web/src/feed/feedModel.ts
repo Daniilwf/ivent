@@ -138,6 +138,8 @@ type Headline = {
 };
 
 type Context = {
+  /** Whether the command has an event of this type: a choice with a move is a branch, not a game */
+  has: (type: string) => boolean;
   player: (d: Data) => FeedPlayer;
   playerRef: (d: Data) => FeedRef;
   gameRef: (d: Data) => FeedRef;
@@ -347,7 +349,22 @@ const headlines: [string, (d: Data, c: Context) => Headline][] = [
       line: L.alreadyPlayed(c.playerRef(d), c.gameRef(d)),
     }),
   ],
-  ['choice-made', (d, c) => ({ icon: 'roll', actor: c.player(d), line: L.chose(c.playerRef(d)) })],
+  [
+    'choice-made',
+    (d, c) =>
+      c.has('player-moved')
+        ? { icon: 'start', actor: c.player(d), line: L.choseBranch(c.playerRef(d)) }
+        : { icon: 'roll', actor: c.player(d), line: L.chose(c.playerRef(d)) },
+  ],
+  [
+    'map-published',
+    (d) => ({
+      icon: 'season',
+      actor: null,
+      line: L.mapPublished(),
+      quote: quoteOf(text(d, 'comment')),
+    }),
+  ],
   [
     'offer-discarded',
     (d, c) => ({
@@ -460,10 +477,14 @@ function factsOf(events: Event[], lead: Event): string[] {
         const steps = number(d, 'steps') ?? 0;
         const path = list(d, 'path').length;
         moved = true;
-        if (steps === 0) transferred = true;
+        if (text(d, 'reason') === 'teleport') facts.push(F.teleport);
+        else if (steps === 0) transferred = true;
         else cells += Math.sign(steps) * path;
         break;
       }
+      case 'branch-choice-requested':
+        facts.push(F.branchWaiting);
+        break;
       case 'player-finished':
         facts.push(F.finish(number(d, 'order') ?? 1));
         break;
@@ -519,6 +540,7 @@ function itemOf(entries: Entry[], refs: FeedRefs): FeedItem | null {
     );
   };
   const context: Context = {
+    has: (type) => events.some((e) => e.type === type),
     player,
     playerRef: (d) => ({ kind: 'player', player: player(d) }),
     gameRef: (d) => {

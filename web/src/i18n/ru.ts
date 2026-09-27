@@ -208,6 +208,8 @@ const feedLines = {
   rerolled: <T>(p: T): Line<T> => [p, ' крутит колесо заново'],
   alreadyPlayed: <T>(p: T, g: T): Line<T> => [p, ' отмечает ', g, ': «Уже проходил»'],
   chose: <T>(p: T): Line<T> => [p, ' выбирает игру'],
+  choseBranch: <T>(p: T): Line<T> => [p, ' выбирает ветку на развилке'],
+  mapPublished: <T>(): Line<T> => ['Карта сезона обновлена'],
   started: <T>(p: T, g: T): Line<T> => [p, ' начинает ', g],
   completed: <T>(p: T, g: T): Line<T> => [p, ' проходит ', g],
   reviewed: <T>(p: T, g: T): Line<T> => [p, ' оценивает ', g],
@@ -542,6 +544,7 @@ export const ru = {
     dropConfirm: 'Дропнуть игру',
     noCover: 'Без обложки',
     roleDescription: 'карта',
+    bonus: (amount: number) => signed(amount),
     mapLabelNobody:
       'Карта сезона: развилки и зоны. Стрелки двигают карту, плюс и минус меняют масштаб',
     mapLabel: (at: number) =>
@@ -877,6 +880,66 @@ export const ru = {
     start: 'Старт',
     finish: 'Финиш',
     cellNumber: (n: number) => `Клетка ${n}`,
+    // The graph map in words (2.10): what a cell does, after its number
+    cellKinds: {
+      start: '',
+      empty: '',
+      finish: '',
+      fork: 'развилка',
+      teleport: 'телепорт',
+      checkpoint: 'чекпоинт',
+      pointsBonus: 'бонус очков',
+      event: 'клетка ивента',
+      shop: 'магазин',
+    } as Record<string, string>,
+    teleportTo: (n: number) => `переносит на клетку ${n}`,
+    bonusAmount: (n: number) => `${signed(n)} ${plural(n, 'очко', 'очка', 'очков')}`,
+    inZone: (name: string) => `зона «${name}»`,
+    legend: {
+      title: 'Как читать карту',
+      fork: 'Развилка: твой ход на ней останавливается, и ты выбираешь ветку. Толчки идут по основной ветке.',
+      teleport:
+        'Телепорт: остановка на нём переносит по пунктирной стрелке. Клетка, куда перенесло, не срабатывает.',
+      checkpoint: 'Чекпоинт: дроп и толчки назад не откинут дальше него.',
+      bonus: 'Бонус: остановка даёт очки, как написано на клетке.',
+    },
+    zones: {
+      title: 'Зоны',
+      lead: 'Правила зоны берутся в момент ролла: где стоишь, когда крутишь колесо, те и действуют до конца прохождения.',
+      here: 'Ты здесь',
+      plain: 'Обычные правила',
+      filter: (parts: string) => `Ролл: ${parts}`,
+      tags: (tags: string[]) =>
+        tags.length === 1
+          ? `игры с тегом «${tags[0] ?? ''}»`
+          : `игры с тегами ${tags.map((t) => `«${t}»`).join(', ')}`,
+      hours: (min: number | null, max: number | null) =>
+        min !== null && max !== null
+          ? `от ${hoursText(min)} до ${hoursText(max)}`
+          : min !== null
+            ? `от ${hoursText(min)}`
+            : `до ${hoursText(max ?? 0)}`,
+      yearBefore: (year: number) => `вышедшие до ${year} года`,
+      diceCount: (n: number) =>
+        `Кубы: ${signed(n)} ${plural(n, 'кубик', 'кубика', 'кубиков')} за прохождение`,
+      diceAdd: (n: number) => `Кубы: ${signed(n)} к сумме броска`,
+      drop: (multiplier: number) => `Дроп: штраф ×${multiplier.toLocaleString('ru-RU')}`,
+    },
+    branch: {
+      title: 'Развилка: выбери ветку',
+      lead: (steps: number) =>
+        `Осталось ${steps} ${plural(steps, 'шаг', 'шага', 'шагов')}: фишка пойдёт по ветке, которую ты выберешь.`,
+      onMap: 'Ты на развилке: выбери ветку на карте',
+      option: (n: number) => `Ветка ${n}`,
+      firstCell: (cell: number) => `Первая клетка — ${cell}`,
+      endCell: (cell: number) => `Встанешь на клетку ${cell}`,
+      endTeleport: (cell: number, to: number) =>
+        `Встанешь на телепорт ${cell} и перенесёшься на клетку ${to}`,
+      endFork: (cell: number) => `Дойдёшь до развилки ${cell}: там снова выбор`,
+      endFinish: 'Дойдёшь до финиша',
+      go: (n: number) => `Пойти по ветке ${n}`,
+      announce: (cell: number) => `Фишка на клетке ${cell}`,
+    },
   },
   season: {
     deadline: (text: string) => `Дедлайн: ${text}`,
@@ -946,6 +1009,8 @@ export const ru = {
       chainCut: 'Цепочка эффектов оборвана',
       afterFinish: 'После финиша',
       moved: 'Фишка переставлена',
+      teleport: 'Телепорт',
+      branchWaiting: 'Развилка: ждёт выбора ветки',
     },
     rating: (n: number) => `${n} из 10`,
     ratingLabel: (n: number) => `Оценка: ${n} из 10`,

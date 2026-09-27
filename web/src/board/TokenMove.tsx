@@ -19,6 +19,9 @@ const atBigCell = (board: Board, p: Point) =>
     (c) => (c.kind === 'start' || c.kind === 'finish') && Math.hypot(c.x - p.x, c.y - p.y) < 1,
   );
 
+/** No flights: one array for every render, so the move does not restart */
+const noJumps: number[] = [];
+
 /** A token hopping along its path cell by cell, the camera following each hop. Give it `key` per move. */
 export function TokenMove({
   board,
@@ -31,7 +34,10 @@ export function TokenMove({
   ref,
   children,
   budget = momentBudget,
+  jumps = noJumps,
 }: {
+  /** Hops that are transfers, not steps (a teleport): by the index of the cell they land on; the token flies there */
+  jumps?: number[];
   /** Seconds the whole move takes at most (a part of a longer moment gets less) */
   budget?: number;
   board: Board;
@@ -85,21 +91,25 @@ export function TokenMove({
     }
     stopped.current = false;
     const halted = () => stopped.current;
-    // The whole move fits the moments' budget: long moves hop faster
-    const hop = Math.min(momentHop, budget / Math.max(path.length - 1, 1));
+    // The whole move fits the moments' budget: long moves hop faster; a flight takes two hops' time
+    const hops = path.length - 1 + jumps.filter((i) => i > 0 && i < path.length).length;
+    const hop = Math.min(momentHop, budget / Math.max(hops, 1));
     const run = async () => {
       for (let i = 1; i < path.length; i++) {
         const a = cellById(board, path[i - 1] as number);
         const b = cellById(board, path[i] as number);
         // The camera moves once a hop, not every frame
         camera.current?.centerOn(b, 420);
+        const flight = jumps.includes(i);
+        // A flight arcs high over the map, as far up as a third of its length
+        const height = flight ? Math.max(Math.hypot(b.x - a.x, b.y - a.y) / 3, 40) : 22;
         controls.current = animate(0, 1, {
-          duration: hop,
+          duration: flight ? hop * 2 : hop,
           ease: 'easeInOut',
           onUpdate: (k) => {
             step({
               x: a.x + (b.x - a.x) * k,
-              y: a.y + (b.y - a.y) * k - Math.sin(Math.PI * k) * 22,
+              y: a.y + (b.y - a.y) * k - Math.sin(Math.PI * k) * height,
             });
           },
         });
@@ -113,7 +123,7 @@ export function TokenMove({
       stopped.current = true;
       controls.current?.stop();
     };
-  }, [board, path, reduce, budget]);
+  }, [board, path, reduce, budget, jumps]);
 
   return (
     <MapView

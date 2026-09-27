@@ -6,9 +6,20 @@ export type Point = { x: number; y: number };
 /** How a zone looks; which zones a season has and their names come from the content */
 export type ZoneTheme = 'meadow' | 'forest' | 'mountains' | 'swamp' | 'city' | 'castle';
 
-export type CellKind = 'start' | 'finish' | 'plain' | 'event' | 'checkpoint' | 'fork';
+export type CellKind =
+  'start' | 'finish' | 'plain' | 'event' | 'checkpoint' | 'fork' | 'teleport' | 'bonus' | 'shop';
 
-export type BoardCell = Point & { id: number; kind: CellKind };
+/** A cell: its number on the board and what it does; a teleport knows where it leads, a points bonus how much it gives */
+export type BoardCell = Point & {
+  id: number;
+  kind: CellKind;
+  /** A teleport's destination (a cell's number) */
+  to?: number | undefined;
+  /** A points bonus */
+  amount?: number | undefined;
+  /** The zone the cell is in */
+  zone?: string | undefined;
+};
 
 export type BoardEdge = { from: number; to: number };
 
