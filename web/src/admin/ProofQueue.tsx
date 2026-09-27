@@ -5,7 +5,8 @@ import { moscowTime } from '../app/time';
 import { difficultyValues } from '../api/schema';
 import { ru } from '../i18n/ru';
 import { Button } from '../ui/Button';
-import { buttonClass } from '../ui/buttonStyles';
+import { inlineLink } from '../ui/buttonStyles';
+import { cx } from '../ui/cx';
 import { ConfirmDanger } from '../ui/Dialogs';
 import { Select, TextArea } from '../ui/Field';
 import { Badge } from '../ui/Marks';
@@ -210,10 +211,8 @@ export function ProofCard({
                   href={link}
                   target="_blank"
                   rel="noreferrer noopener"
-                  className={buttonClass(
-                    'link',
-                    'justify-start font-medium break-all whitespace-normal',
-                  )}
+                  // A long address in a card wraps: the inline link, not a button's look
+                  className={cx(inlineLink, 'inline-flex min-h-11 items-center gap-2 break-all')}
                 >
                   <ExternalLink size={16} aria-hidden className="shrink-0" />
                   {t.link(i + 1)}: {link}

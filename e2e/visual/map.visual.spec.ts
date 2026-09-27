@@ -149,3 +149,12 @@ for (const section of [
     await expect(page.locator(`#${section}`)).toHaveScreenshot(`${section}.png`);
   });
 }
+
+test('the styleguide has no horizontal scroll: every section fits the screen', async ({ page }) => {
+  await openStyleguide(page, 'whats-new');
+  const widths = await page.evaluate(() => ({
+    page: document.documentElement.scrollWidth,
+    screen: document.documentElement.clientWidth,
+  }));
+  expect(widths.page).toBeLessThanOrEqual(widths.screen);
+});
