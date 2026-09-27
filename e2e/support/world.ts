@@ -206,11 +206,13 @@ export async function complete(
   player: Api,
   seasonId: string,
   difficulty: Schemas['Difficulty'] = 'normal',
+  extra: { review?: { rating: number; text?: string } } = {},
 ) {
   const view = await seasonOf(player, seasonId);
   const hours = view.me?.activeRun?.game.hours ?? null;
   return player.post(`/api/seasons/${seasonId}/complete`, {
     difficulty,
+    ...extra,
     ...(hours === null ? { estimatedHours: 5, hoursSource: 'HowLongToBeat' } : {}),
   });
 }
