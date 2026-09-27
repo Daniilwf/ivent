@@ -2,6 +2,7 @@ using System.Data.Common;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 
 namespace GameEvent.Infrastructure.Database;
 
@@ -20,11 +21,18 @@ public static class SqliteDatabase
     }
 
     /// <summary>Applies migrations and switches the file to WAL (persistent per file).</summary>
-    public static async Task MigrateAsync(string connectionString, CancellationToken ct = default)
+    public static Task MigrateAsync(string connectionString, CancellationToken ct = default) =>
+        MigrateAsync(connectionString, targetMigration: null, ct);
+
+    /// <summary>
+    /// Applies migrations up to <paramref name="targetMigration"/> (all when null) and switches the file to WAL. A target
+    /// gives the exact schema an older version made: the backup check compares a restored database with it (D-214).
+    /// </summary>
+    public static async Task MigrateAsync(string connectionString, string? targetMigration, CancellationToken ct = default)
     {
         var options = Configure(new DbContextOptionsBuilder<GameEventDbContext>(), connectionString).Options;
         await using var db = new GameEventDbContext((DbContextOptions<GameEventDbContext>)options);
-        await db.Database.MigrateAsync(ct);
+        await db.GetService<Microsoft.EntityFrameworkCore.Migrations.IMigrator>().MigrateAsync(targetMigration, ct);
         await db.Database.ExecuteSqlRawAsync("PRAGMA journal_mode=WAL;", ct);
     }
 

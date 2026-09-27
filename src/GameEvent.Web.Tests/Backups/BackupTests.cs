@@ -287,14 +287,14 @@ public sealed class BackupTests : IAsyncLifetime
     {
         var settings = new BackupSettings(Sources, Folder, Keep: 5, LockFile: null);
         using var output = new StringWriter();
-        Assert.Equal(1, await BackupCommands.VerifyAsync(null, settings, output, Ct));
+        Assert.Equal(1, await BackupCommands.VerifyAsync(null, null, settings, output, Ct));
 
         await SiteBackup.CreateAsync(Sources, Folder, keep: 5, s_now, Ct);
         var newest = (await SiteBackup.CreateAsync(Sources, Folder, keep: 5, s_now.AddDays(1), Ct)).ArchivePath;
-        Assert.Equal(0, await BackupCommands.VerifyAsync(null, settings, output, Ct));
+        Assert.Equal(0, await BackupCommands.VerifyAsync(null, null, settings, output, Ct));
 
         Rewrite(newest, (name, bytes) => name == SiteBackup.DatabaseEntry ? Flip(bytes, 100) : bytes, fixManifest: false);
-        Assert.Equal(3, await BackupCommands.VerifyAsync(null, settings, output, Ct));
+        Assert.Equal(3, await BackupCommands.VerifyAsync(null, null, settings, output, Ct));
         Assert.Contains("NOT sound", output.ToString(), StringComparison.Ordinal);
     }
 
@@ -323,7 +323,7 @@ public sealed class BackupTests : IAsyncLifetime
         Directory.CreateDirectory(target.FilesPath);
         await File.WriteAllTextAsync(Path.Combine(target.FilesPath, "old.webp"), "old", Ct);
 
-        var result = await SiteRestore.RestoreAsync(archive, target, withKeys: true, s_now, Ct);
+        var result = await SiteRestore.RestoreAsync(archive, target, true, s_now, null, Ct);
 
         Assert.True(result.Report.IsSound, string.Join("\n", result.Report.Problems));
         Assert.Equal("the broken database", await File.ReadAllTextAsync(Path.Combine(result.ReplacedDataFolder!, "site.db"), Ct));
@@ -351,7 +351,7 @@ public sealed class BackupTests : IAsyncLifetime
         Directory.CreateDirectory(target.KeysPath!);
         await File.WriteAllTextAsync(Path.Combine(target.KeysPath!, "staging-key.xml"), "own", Ct);
 
-        var result = await SiteRestore.RestoreAsync(archive, target, withKeys: false, s_now, Ct);
+        var result = await SiteRestore.RestoreAsync(archive, target, false, s_now, null, Ct);
 
         Assert.True(result.Report.IsSound);
         Assert.Equal(["staging-key.xml"], Directory.EnumerateFiles(target.KeysPath!).Select(Path.GetFileName));
@@ -365,7 +365,7 @@ public sealed class BackupTests : IAsyncLifetime
         var target = NewTarget();
         await File.WriteAllTextAsync(target.DatabasePath, "current", Ct);
 
-        var result = await SiteRestore.RestoreAsync(archive, target, withKeys: true, s_now, Ct);
+        var result = await SiteRestore.RestoreAsync(archive, target, true, s_now, null, Ct);
 
         Assert.Null(result.ReplacedDataFolder);
         Assert.Equal("current", await File.ReadAllTextAsync(target.DatabasePath, Ct));
@@ -383,11 +383,11 @@ public sealed class BackupTests : IAsyncLifetime
 
         using (SiteLock.TryAcquire(lockFile))
         {
-            Assert.Equal(1, await BackupCommands.RestoreAsync(archive, withKeys: true, settings, s_now, output, Ct));
+            Assert.Equal(1, await BackupCommands.RestoreAsync(archive, null, true, settings, s_now, output, null, Ct));
             Assert.False(File.Exists(target.DatabasePath));
         }
 
-        Assert.Equal(0, await BackupCommands.RestoreAsync(archive, withKeys: true, settings, s_now, output, Ct));
+        Assert.Equal(0, await BackupCommands.RestoreAsync(archive, null, true, settings, s_now, output, null, Ct));
         Assert.True(File.Exists(target.DatabasePath));
     }
 
@@ -414,7 +414,8 @@ public sealed class BackupTests : IAsyncLifetime
         {
             ["ConnectionStrings:Main"] = "Data Source=var/game-event.db",
         }).Build(), _directory);
-        Assert.Equal((At("var/files"), null, At("var/backups"), BackupSettings.DefaultKeep, null), (defaults.Sources.FilesPath, defaults.Sources.KeysPath, defaults.Folder, defaults.Keep, defaults.LockFile));
+        // No Site:LockFile: the lock next to the database, as the site and the import tool take it (D-214)
+        Assert.Equal((At("var/files"), null, At("var/backups"), BackupSettings.DefaultKeep, At("var/site.lock")), (defaults.Sources.FilesPath, defaults.Sources.KeysPath, defaults.Folder, defaults.Keep, defaults.LockFile));
     }
 
     // ---- Helpers ----
@@ -422,7 +423,7 @@ public sealed class BackupTests : IAsyncLifetime
     private async Task<string> BackupAsync() => (await SiteBackup.CreateAsync(Sources, Folder, keep: 10, s_now, Ct)).ArchivePath;
 
     private async Task<BackupReport> VerifyAsync(string archive) =>
-        await BackupVerifier.VerifyAsync(archive, Path.Combine(_directory, "verify-" + Guid.NewGuid().ToString("N")), Ct);
+        await BackupVerifier.VerifyAsync(archive, Path.Combine(_directory, "verify-" + Guid.NewGuid().ToString("N")), null, Ct);
 
     private BackupSources NewTarget()
     {
@@ -506,7 +507,7 @@ public sealed class BackupTests : IAsyncLifetime
     /// Writes the archive again with its entries changed (null drops one) and optionally an extra one; with
     /// <paramref name="fixManifest"/> the manifest is made to agree with the new contents, like a careful forger would.
     /// </summary>
-    private static void Rewrite(string archive, Func<string, byte[], byte[]?> change, bool fixManifest, (string Name, byte[] Bytes)? extra = null)
+    internal static void Rewrite(string archive, Func<string, byte[], byte[]?> change, bool fixManifest, (string Name, byte[] Bytes)? extra = null)
     {
         var entries = new List<(string Name, byte[] Bytes)>();
         using (var zip = ZipFile.OpenRead(archive))
