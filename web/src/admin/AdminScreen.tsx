@@ -3,6 +3,7 @@ import {
   CalendarCog,
   ClipboardCheck,
   FileJson,
+  FlaskConical,
   History,
   Library,
   Menu as MenuIcon,
@@ -10,16 +11,19 @@ import {
   Sparkles,
   UserCog,
   Users,
+  SearchX,
   Wrench,
 } from 'lucide-react';
 import { useCallback, useRef, useState, type ReactNode } from 'react';
 import { api, type Schemas } from '../api/client';
 import { Link } from '../app/Link';
+import { NotFound } from '../app/NotFound';
 import { navigate, paths, usePageHeading } from '../app/router';
 import { ru } from '../i18n/ru';
 import { Badge } from '../ui/Marks';
 import { Button } from '../ui/Button';
 import { BottomSheet } from '../ui/Dialogs';
+import { AsyncState } from '../ui/AsyncState';
 import { EmptyState } from '../ui/States';
 import { cx } from '../ui/cx';
 import { useDesk } from '../ui/useDesk';
@@ -34,6 +38,7 @@ import { ProofQueue } from './ProofQueue';
 import { RulesSection } from './RulesSection';
 import { SeasonSection } from './SeasonSection';
 import { SiteSection } from './SiteSection';
+import { TestToolsSection } from './TestToolsSection';
 import { SectionHead } from './common';
 import { answerOf, useLoaded } from '../app/useLoaded';
 import { useSeasonVersion } from '../app/useSeasonVersion';
@@ -54,6 +59,8 @@ const sections: { id: AdminSectionId; icon: ReactNode; season: boolean }[] = [
   { id: 'bugs', icon: <Bug size={20} aria-hidden />, season: false },
   { id: 'errors', icon: <ServerCrash size={20} aria-hidden />, season: false },
   { id: 'site', icon: <Wrench size={20} aria-hidden />, season: false },
+  // Only where the test endpoints exist (Development and Test, H9): the live site never lists it nor opens it
+  { id: 'test', icon: <FlaskConical size={20} aria-hidden />, season: false },
 ];
 
 /** The section an address opens: /admin is the proof queue, the admin's most frequent job (App shows no page for an unknown one) */
@@ -97,13 +104,18 @@ export function AdminScreen({
   );
   const waiting = proofs.kind === 'ready' ? proofs.value.length : null;
 
+  // Which copy of the site this is: the test tools' section is there only where the test endpoints are
+  const status = useLoaded(useCallback(async () => answerOf(await api.GET('/api/status')), []));
+  const testTools = status.kind === 'ready' && status.value.testTools;
+  const shown = sections.filter((s) => s.id !== 'test' || testTools);
+
   // The admin's pages opened from the menu, and a new section, take the focus to the heading, so a screen reader and
   // the keyboard start there
   const heading = usePageHeading(true, section);
 
   const links = () => (
     <ul className="grid gap-1">
-      {sections.map((s) => {
+      {shown.map((s) => {
         return (
           <li key={s.id}>
             <Link
@@ -134,6 +146,25 @@ export function AdminScreen({
   );
 
   const needsSeason = sections.find((s) => s.id === section)?.season ?? false;
+
+  // The test tools' address on a copy without them is an address the site does not have; until the site answered,
+  // nothing is said about the section at all
+  if (section === 'test' && !testTools)
+    return status.kind === 'ready' || status.kind === 'notFound' ? (
+      <main className="mx-auto grid max-w-110 px-4 py-10" data-testid="page-not-found">
+        <NotFound
+          icon={<SearchX size={28} aria-hidden />}
+          title={ru.feed.pageNotFoundTitle}
+          text={ru.feed.pageNotFoundText}
+        />
+      </main>
+    ) : (
+      <main className="mx-auto grid max-w-110 px-4 py-10">
+        <AsyncState loaded={status} rows={2} errorTitle={t.loadErrorTitle} level={1}>
+          {() => null}
+        </AsyncState>
+      </main>
+    );
 
   return (
     <main
@@ -231,6 +262,15 @@ export function AdminScreen({
         return <ErrorsSection />;
       case 'site':
         return <SiteSection />;
+      case 'test':
+        return (
+          <TestToolsSection
+            seasonId={seasonId}
+            environment={
+              status.kind === 'ready' ? (status.value.environment ?? 'production') : 'production'
+            }
+          />
+        );
     }
   }
 }

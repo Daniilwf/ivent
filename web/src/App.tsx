@@ -3,6 +3,7 @@ import { api, refreshCsrf, type Schemas } from './api/client';
 import { CalendarClock, LoaderCircle, SearchX } from 'lucide-react';
 import { ChangePasswordForm } from './app/ChangePasswordForm';
 import { LoginForm, TablePage } from './app/LoginForm';
+import { EnvironmentBanner } from './app/EnvironmentBanner';
 import { MaintenanceBanner } from './app/MaintenanceBanner';
 import { routeOf, usePath } from './app/router';
 import { UpdateBanner } from './app/WhatsNew';
@@ -82,9 +83,11 @@ export function App() {
     }
   }
 
-  // Every screen: the maintenance banner on top; a signed-in page stands in the shell (the bug report is in its header)
+  // Every screen: which copy of the site this is (none on the live site) and the maintenance banner on top; a
+  // signed-in page stands in the shell (the bug report is in its header)
   return (
     <>
+      <EnvironmentBanner />
       <MaintenanceBanner />
       <UpdateBanner />
       {screen()}
