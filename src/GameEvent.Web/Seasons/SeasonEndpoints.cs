@@ -166,8 +166,11 @@ public sealed record MyFinishView(int Order, bool Frozen);
 /// <summary>The drop penalty: <c>count</c> dice of <c>sides</c>, what they take, and whether a bad event follows.</summary>
 public sealed record DropPenaltyView(int Count, int Sides, bool AffectsPoints, bool AffectsPosition, bool BadEvent);
 
-/// <summary>A game offered to the player, with the hours fixed at roll time and marks from other players (SPEC «Статусы игры»).</summary>
-public sealed record OfferedGameView(Guid Id, string Title, decimal? Hours, IReadOnlyList<GameMarkView> Marks);
+/// <summary>
+/// A game offered to the player, with the hours fixed at roll time, marks from other players (SPEC «Статусы игры») and
+/// the pool's cover, if it has one (D-222).
+/// </summary>
+public sealed record OfferedGameView(Guid Id, string Title, decimal? Hours, IReadOnlyList<GameMarkView> Marks, Files.FileLinkView? Cover = null);
 
 /// <summary>Another player gave the game up this season: dropped or tech-rerolled it; the game is free again.</summary>
 public sealed record GameMarkView(string PlayerName, GameMarkKind Kind);
@@ -215,10 +218,10 @@ public sealed record DieView(int Sides, int Value);
 public sealed record CurrentSeasonView(Guid Id);
 
 /// <summary>
-/// The game of a run: its title and hours. Named apart from the pool's <see cref="Pool.PoolGameView"/>: the OpenAPI document
+/// The game of a run: its title, hours and the pool's cover (none when the game has none, D-222). Named apart from the pool's <see cref="Pool.PoolGameView"/>: the OpenAPI document
 /// keys schemas by type name, so two records called GameView became one schema and the pool lost its fields (D-161).
 /// </summary>
-public sealed record RunGameView(Guid Id, string Title, decimal? Hours);
+public sealed record RunGameView(Guid Id, string Title, decimal? Hours, Files.FileLinkView? Cover = null);
 
 public sealed record RunView(Guid Id, RunGameView Game, DateTimeOffset StartedAt);
 
@@ -585,7 +588,7 @@ public static class SeasonEndpoints
                 .ToLookup(
                     x => x.GameId,
                     x => new GameMarkView(x.Name, x.Status == RunStatus.Dropped ? GameMarkKind.Dropped : GameMarkKind.TechRerolled));
-            OfferedGameView Offered(RollOffer o) => new(o.GameId, games[o.GameId].Title, o.Snapshot.Hours, [.. marks[o.GameId]]);
+            OfferedGameView Offered(RollOffer o) => new(o.GameId, games[o.GameId].Title, o.Snapshot.Hours, [.. marks[o.GameId]], CoverOf(games[o.GameId]));
 
             var playing = mine.Phase == TurnPhase.Playing && run is not null;
             var played = playing ? now - run!.StartedAt : TimeSpan.Zero;
@@ -608,7 +611,7 @@ public static class SeasonEndpoints
                         // Playing: the hours of the roll's snapshot, as the completion counts them (D-44, D-138)
                         snapshot is null
                             ? Game(run, games[run.GameId])
-                            : new RunGameView(run.GameId, games[run.GameId].Title, snapshot.Hours is > 0 ? snapshot.Hours : null),
+                            : new RunGameView(run.GameId, games[run.GameId].Title, snapshot.Hours is > 0 ? snapshot.Hours : null, CoverOf(games[run.GameId])),
                         run.StartedAt),
                 last is null ? null : Completed(last, games[last.GameId], lastReview, lastProof),
                 effects,
@@ -735,7 +738,11 @@ public static class SeasonEndpoints
 
     /// <summary>A run's game: the run's own hours when known, otherwise the pool's.</summary>
     private static RunGameView Game(Infrastructure.Seasons.RunRecord run, Infrastructure.Pool.GameRecord game) =>
-        new(run.GameId, game.Title, run.Hours ?? game.Hours);
+        new(run.GameId, game.Title, run.Hours ?? game.Hours, CoverOf(game));
+
+    /// <summary>The pool game's cover as the screens show it (the thumbnail), or none (D-222).</summary>
+    private static Files.FileLinkView? CoverOf(Infrastructure.Pool.GameRecord game) =>
+        game.CoverFileId is { } cover ? Files.FileLinkView.Of(cover) : null;
 
     private static CompletedRunView Completed(
         Infrastructure.Seasons.RunRecord run,

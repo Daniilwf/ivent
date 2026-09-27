@@ -12,6 +12,7 @@ import {
   X,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { Cover } from '../board/GameCards';
 import { Link } from '../app/Link';
 import { paths } from '../app/router';
 import { moscowClock, moscowTime } from '../app/time';
@@ -85,7 +86,8 @@ export function FeedLine({ item, fresh = false }: { item: FeedItem; fresh?: bool
       data-testid={`feed-item-${item.id}`}
       data-undone={item.undone || undefined}
       className={cx(
-        'grid grid-cols-[auto_minmax(0,1fr)] items-start gap-3 py-3',
+        'grid items-start gap-3 py-3',
+        item.cover ? 'grid-cols-[auto_minmax(0,1fr)_auto]' : 'grid-cols-[auto_minmax(0,1fr)]',
         fresh && 'animate-arrive',
       )}
     >
@@ -129,6 +131,8 @@ export function FeedLine({ item, fresh = false }: { item: FeedItem; fresh?: bool
         ) : null}
         {item.quote ? <Quote rating={item.quote.rating} text={item.quote.text} /> : null}
       </div>
+      {/* The completed game's cover: a card on the table beside the line, the title is in the line itself */}
+      {item.cover ? <Cover game={item.cover} width={40} lazy className="mt-1 mr-1" /> : null}
     </li>
   );
 }

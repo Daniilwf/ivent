@@ -25,8 +25,11 @@ public sealed record FeedEntryView(
 /// </summary>
 public sealed record FeedPlayerView(Guid Id, Guid UserId, string Name, FileLinkView? Avatar, bool HasProfile, int Token);
 
-/// <summary>A game an event of the page names; <c>hasPage</c> — the viewer may open its page (a deleted game is the admin's).</summary>
-public sealed record FeedGameView(Guid Id, string Title, bool HasPage);
+/// <summary>
+/// A game an event of the page names; <c>hasPage</c> — the viewer may open its page (a deleted game is the admin's);
+/// <c>cover</c> — the pool's cover, only with the page (D-222).
+/// </summary>
+public sealed record FeedGameView(Guid Id, string Title, bool HasPage, FileLinkView? Cover = null);
 
 /// <summary>A run an event of the page names, with its game: most events of a run carry only its id.</summary>
 public sealed record FeedRunView(Guid Id, Guid GameId);
@@ -176,10 +179,12 @@ public static class FeedEndpoints
 
         var runs = await db.Runs.AsNoTracking().Where(r => runIds.Contains(r.Id)).Select(r => new FeedRunView(r.Id, r.GameId)).ToListAsync(ct);
         gameIds.UnionWith(runs.Select(r => r.GameId));
-        var games = await db.Games.AsNoTracking()
-            .Where(g => gameIds.Contains(g.Id))
-            .Select(g => new FeedGameView(g.Id, g.Title, admin || !g.IsDeleted))
-            .ToListAsync(ct);
+        var games = (await db.Games.AsNoTracking()
+                .Where(g => gameIds.Contains(g.Id))
+                .Select(g => new { g.Id, g.Title, HasPage = admin || !g.IsDeleted, g.CoverFileId })
+                .ToListAsync(ct))
+            .Select(g => new FeedGameView(g.Id, g.Title, g.HasPage, g.HasPage && g.CoverFileId is { } cover ? FileLinkView.Of(cover) : null))
+            .ToList();
         return (players, games, runs);
     }
 
