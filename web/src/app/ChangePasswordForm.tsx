@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode, type SyntheticEvent } from 'react';
 import { api, refreshCsrf, rejectionCode, type Schemas } from '../api/client';
+import { newCommandId } from '../api/commands';
 import { ru } from '../i18n/ru';
 import { Button } from '../ui/Button';
 import { Field } from '../ui/Field';
@@ -63,7 +64,7 @@ export function ChangePasswordForm({
     setError(null);
     try {
       const { error: problem } = await api.POST('/api/auth/password', {
-        body: { commandId: crypto.randomUUID(), currentPassword: current, newPassword: next },
+        body: { commandId: newCommandId(), currentPassword: current, newPassword: next },
       });
       if (problem) {
         const code = rejectionCode(problem);

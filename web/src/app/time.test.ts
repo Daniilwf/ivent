@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { moscowTime } from './time';
+import { moscowInput, moscowTime } from './time';
 
 describe('Moscow time', () => {
   it('shows a UTC instant in Moscow time with the label', () => {
@@ -18,6 +18,12 @@ describe('Moscow time', () => {
   it('names the year only when it is not the current one', () => {
     expect(moscowTime('2027-01-05T09:00:00Z', new Date('2026-09-26T12:00:00Z'))).toBe(
       '5 января 2027 г., 12:00 МСК',
+    );
+  });
+
+  it('reads a time typed in a datetime-local field as Moscow time', () => {
+    expect(new Date(moscowInput('2026-12-20T23:59')).toISOString()).toBe(
+      '2026-12-20T20:59:00.000Z',
     );
   });
 });

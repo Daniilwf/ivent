@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ru } from '../i18n/ru';
 import { AvatarSection } from './AvatarSection';
+import { json } from '../test/fakeServer';
 
 // D-117: the player's avatar — a picture from the device or a GIF by link, set on the account; removed with none.
 
@@ -15,13 +16,6 @@ const stored = {
   thumbnailUrl: '/api/files/5/thumbnail',
   duplicate: false,
 };
-
-function json(status: number, body: unknown) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'Content-Type': status >= 400 ? 'application/problem+json' : 'application/json' },
-  });
-}
 
 type Sent = { url: string; method: string; body: unknown };
 

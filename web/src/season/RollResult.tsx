@@ -44,7 +44,7 @@ function Misses({ roll }: { roll: Roll | null }) {
 function optionName(game: Offered) {
   return [
     `${ru.turn.pick} ${game.title}`,
-    ru.board.hours(game.hours ?? null),
+    ru.hours.estimate(game.hours ?? null),
     ...game.marks.map((mark) => ru.turn.gameMark(mark.playerName, mark.kind)),
   ].join('. ');
 }
@@ -78,7 +78,7 @@ export function OfferCard({
         >
           {offer.title}
         </h3>
-        <p className="text-sm text-ink-soft">{ru.board.hours(offer.hours ?? null)}</p>
+        <p className="text-sm text-ink-soft">{ru.hours.estimate(offer.hours ?? null)}</p>
         {roll ? (
           <div className="flex flex-wrap gap-1">
             <Tag>{roll.category}</Tag>
@@ -164,7 +164,9 @@ export function ChoiceCard({
               <Cover game={game} width={dense ? 40 : 64} />
               <span className="grid content-start gap-1">
                 <strong className="font-display wrap-anywhere">{game.title}</strong>
-                <span className="text-sm text-ink-soft">{ru.board.hours(game.hours ?? null)}</span>
+                <span className="text-sm text-ink-soft">
+                  {ru.hours.estimate(game.hours ?? null)}
+                </span>
                 <GameMarks marks={game.marks} />
                 {/* A label, not a link: the whole card is the button */}
                 <span

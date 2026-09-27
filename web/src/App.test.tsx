@@ -1,26 +1,12 @@
 import { render, screen } from '@testing-library/react';
 import { App } from './App';
 import { ru } from './i18n/ru';
+import { fakeServer, json } from './test/fakeServer';
 
 vi.mock('./api/realtime', () => ({ watchSeason: () => () => undefined }));
 
-function respond(status: number, body: unknown) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'Content-Type': 'application/json' },
-  });
-}
-
 function serve(routes: Record<string, () => Response>) {
-  vi.stubGlobal(
-    'fetch',
-    vi.fn((request: Request) => {
-      const path = new URL(request.url).pathname;
-      if (path === '/api/auth/antiforgery')
-        return Promise.resolve(respond(200, { token: 't', headerName: 'X-CSRF-TOKEN' }));
-      return Promise.resolve(routes[path]?.() ?? new Response(null, { status: 404 }));
-    }),
-  );
+  fakeServer(routes);
 }
 
 const user = { id: 'u1', login: 'vasya', name: 'Вася', role: 'player', mustChangePassword: false };
@@ -40,7 +26,7 @@ describe('App', () => {
   });
 
   it('says there are no seasons when the site has none', async () => {
-    serve({ '/api/auth/me': () => respond(200, user) });
+    serve({ '/api/auth/me': () => json(200, user) });
 
     render(<App />);
 
@@ -49,7 +35,7 @@ describe('App', () => {
 
   it('reports a server failure instead of pretending there is no season', async () => {
     serve({
-      '/api/auth/me': () => respond(200, user),
+      '/api/auth/me': () => json(200, user),
       '/api/seasons/current': () => new Response(null, { status: 500 }),
     });
 

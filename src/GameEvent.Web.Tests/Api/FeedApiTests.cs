@@ -1,6 +1,6 @@
 using System.Net;
-using System.Net.Http.Json;
 using System.Text.Json;
+using static GameEvent.Web.Tests.Api.ApiCalls;
 
 namespace GameEvent.Web.Tests.Api;
 
@@ -76,6 +76,46 @@ public sealed class FeedApiTests : IAsyncLifetime
         Assert.Equal(roll, rolled.GetProperty("commandId").GetGuid());
     }
 
+    [Fact]
+    public async Task A_feed_page_names_the_players_runs_and_games_its_events_point_to()
+    {
+        var vasya = await _site.SignedInAsync("vasya");
+        var (runId, gameId) = await CompletedWithReviewAsync(vasya, 7, null);
+
+        var feed = await OkAsync(await (await _site.SignedInAsync("zritel")).GetAsync(Feed, Ct));
+
+        var players = feed.GetProperty("players").EnumerateArray().ToList();
+        var names = players.Select(p => p.GetProperty("name").GetString()).ToList();
+        Assert.Equal(names.Order(StringComparer.Ordinal), names);
+        var player = players.Single(p => p.GetProperty("id").GetGuid() == _site.Players["vasya"]);
+        Assert.Equal((_site.Users["vasya"], "vasya", true), (player.GetProperty("userId").GetGuid(), player.GetProperty("name").GetString(), player.GetProperty("hasProfile").GetBoolean()));
+        var run = Assert.Single(feed.GetProperty("runs").EnumerateArray(), r => r.GetProperty("id").GetGuid() == runId);
+        Assert.Equal(gameId, run.GetProperty("gameId").GetGuid());
+        var game = Assert.Single(feed.GetProperty("games").EnumerateArray(), g => g.GetProperty("id").GetGuid() == gameId);
+        Assert.False(string.IsNullOrEmpty(game.GetProperty("title").GetString()));
+        Assert.True(game.GetProperty("hasPage").GetBoolean());
+    }
+
+    [Fact]
+    public async Task A_deleted_game_and_account_keep_their_names_in_the_feed_without_links()
+    {
+        var vasya = await _site.SignedInAsync("vasya");
+        var (_, gameId) = await CompletedWithReviewAsync(vasya, 4, null);
+        var admin = await _site.SignedInAsync("admin");
+        await PostOkAsync(admin, $"/api/admin/pool/{gameId}/delete", new { commandId = Guid.NewGuid() });
+        await PostOkAsync(admin, $"/api/admin/accounts/{_site.Users["vasya"]}/delete", new { commandId = Guid.NewGuid() });
+
+        var feed = await OkAsync(await (await _site.SignedInAsync("petya")).GetAsync(Feed, Ct));
+        var adminFeed = await OkAsync(await admin.GetAsync(Feed, Ct));
+
+        var player = feed.GetProperty("players").EnumerateArray().Single(p => p.GetProperty("id").GetGuid() == _site.Players["vasya"]);
+        Assert.Equal("vasya", player.GetProperty("name").GetString());
+        Assert.False(player.GetProperty("hasProfile").GetBoolean());
+        var game = feed.GetProperty("games").EnumerateArray().Single(g => g.GetProperty("id").GetGuid() == gameId);
+        Assert.False(game.GetProperty("hasPage").GetBoolean());
+        Assert.True(adminFeed.GetProperty("games").EnumerateArray().Single(g => g.GetProperty("id").GetGuid() == gameId).GetProperty("hasPage").GetBoolean());
+    }
+
     [Theory]
     [InlineData("?limit=0")]
     [InlineData("?limit=101")]
@@ -115,9 +155,28 @@ public sealed class FeedApiTests : IAsyncLifetime
         var season = Assert.Single(profile.GetProperty("seasons").EnumerateArray());
         Assert.Equal((SiteFactory.SeasonId, "Тестовый сезон", "active", _site.Players["vasya"]), (season.GetProperty("seasonId").GetGuid(), season.GetProperty("seasonName").GetString(), season.GetProperty("status").GetString(), season.GetProperty("playerId").GetGuid()));
         Assert.Equal(JsonValueKind.Null, season.GetProperty("place").ValueKind);
+        Assert.Equal(await SeasonTokenAsync(vasya, "vasya"), season.GetProperty("token").GetInt32());
         var review = Assert.Single(profile.GetProperty("reviews").EnumerateArray());
         Assert.Equal((runId, gameId, 8, "Отличная игра"), (review.GetProperty("runId").GetGuid(), review.GetProperty("gameId").GetGuid(), review.GetProperty("rating").GetInt32(), review.GetProperty("text").GetString()));
         Assert.False(string.IsNullOrEmpty(review.GetProperty("gameTitle").GetString()));
+    }
+
+    [Fact]
+    public async Task One_player_has_one_token_on_the_season_screen_the_feed_the_header_and_the_profile()
+    {
+        var vasya = await _site.SignedInAsync("vasya");
+        await PostOkAsync(vasya, Url("roll"));
+        var token = await SeasonTokenAsync(vasya, "vasya");
+
+        var feed = await OkAsync(await vasya.GetAsync($"/api/seasons/{SiteFactory.SeasonId}/feed", Ct));
+        var inFeed = feed.GetProperty("players").EnumerateArray().Single(p => p.GetProperty("name").GetString() == "vasya");
+        var me = await OkAsync(await vasya.GetAsync("/api/auth/me", Ct));
+        var spectator = await OkAsync(await (await _site.SignedInAsync("zritel")).GetAsync("/api/auth/me", Ct));
+
+        Assert.Equal(token, inFeed.GetProperty("token").GetInt32());
+        Assert.Equal(token, me.GetProperty("token").GetInt32());
+        // Outside seasons there is no token: the site colours the sticker by the account (userToken)
+        Assert.Equal(JsonValueKind.Null, spectator.GetProperty("token").ValueKind);
     }
 
     [Fact]
@@ -146,6 +205,7 @@ public sealed class FeedApiTests : IAsyncLifetime
         Assert.Equal((runId, "vasya", "completed", "normal", 6), (run.GetProperty("runId").GetGuid(), run.GetProperty("playerName").GetString(), run.GetProperty("status").GetString(), run.GetProperty("difficulty").GetString(), run.GetProperty("rating").GetInt32()));
         Assert.Equal(_site.Users["vasya"], run.GetProperty("userId").GetGuid());
         Assert.Equal(JsonValueKind.Null, run.GetProperty("reviewText").ValueKind);
+        Assert.Equal(await SeasonTokenAsync(vasya, "vasya"), run.GetProperty("token").GetInt32());
     }
 
     [Fact]
@@ -162,6 +222,19 @@ public sealed class FeedApiTests : IAsyncLifetime
 
     // ---- Helpers ----
 
+    /// <summary>
+    /// The player's token on the season screen, where it is their place in the list (D-150): the colour every page gives
+    /// them (D-202).
+    /// </summary>
+    private static async Task<int> SeasonTokenAsync(HttpClient client, string name)
+    {
+        var players = (await OkAsync(await client.GetAsync($"/api/seasons/{SiteFactory.SeasonId}", Ct))).GetProperty("players").EnumerateArray().ToList();
+        var index = players.FindIndex(p => p.GetProperty("name").GetString() == name);
+        Assert.True(index > 0, "the test needs a player who is not first in the list");
+        Assert.Equal(index, players[index].GetProperty("token").GetInt32());
+        return index;
+    }
+
     private static async Task<(Guid RunId, Guid GameId)> CompletedWithReviewAsync(HttpClient player, int rating, string? text)
     {
         await PostOkAsync(player, Url("roll"));
@@ -173,16 +246,4 @@ public sealed class FeedApiTests : IAsyncLifetime
         return (runId, last.GetProperty("game").GetProperty("id").GetGuid());
     }
 
-    private static async Task PostOkAsync(HttpClient client, string url, object? body = null)
-    {
-        var response = await client.PostAsJsonAsync(url, body ?? new { commandId = Guid.NewGuid() }, Ct);
-        Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync(Ct));
-    }
-
-    private static async Task<JsonElement> OkAsync(HttpResponseMessage response)
-    {
-        var body = await response.Content.ReadAsStringAsync(Ct);
-        Assert.True(response.StatusCode == HttpStatusCode.OK, $"{response.StatusCode}: {body}");
-        return JsonDocument.Parse(body).RootElement.Clone();
-    }
 }

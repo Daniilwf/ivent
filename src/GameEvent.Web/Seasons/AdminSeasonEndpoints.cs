@@ -163,8 +163,7 @@ public static class AdminSeasonEndpoints
             .Where(e => e.SeasonId == seasonId && newest.Contains(e.CommandId))
             .OrderBy(e => e.Sequence)
             .ToListAsync(ct);
-        var authorIds = rows.Select(r => r.AuthorId).OfType<Guid>().Distinct().ToList();
-        var authors = await db.Users.AsNoTracking().Where(u => authorIds.Contains(u.Id)).ToDictionaryAsync(u => u.Id, u => u.Name, ct);
+        var authors = await db.NamesAsync(rows.Select(r => r.AuthorId).OfType<Guid>(), ct);
         IReadOnlyList<AdminCommandView> commands = [.. rows
             .GroupBy(r => r.CommandId)
             .OrderByDescending(g => g.Max(r => r.Sequence))

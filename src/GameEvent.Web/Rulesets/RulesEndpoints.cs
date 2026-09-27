@@ -14,11 +14,17 @@ using Microsoft.EntityFrameworkCore;
 
 namespace GameEvent.Web.Rulesets;
 
-/// <summary>The rules in force and their history: who changed what and when (C3). Numbers on the rules page are real.</summary>
-public sealed record RulesView(int Version, Ruleset Ruleset, IReadOnlyList<RulesVersionView> History);
+/// <summary>
+/// The rules in force and their history: who changed what and when (C3). Numbers on the rules page are real.
+/// <c>deadline</c> — the season's deadline, set apart from the rules by the admin (H7, D-170); null while not set.
+/// </summary>
+public sealed record RulesView(int Version, Ruleset Ruleset, IReadOnlyList<RulesVersionView> History, DateTimeOffset? Deadline = null);
 
-/// <summary>One version of the rules: when, by whom (null for the season's creation by the system), and what changed.</summary>
-public sealed record RulesVersionView(int Version, DateTimeOffset At, Guid? AuthorId, IReadOnlyList<RulesetChange> Changes);
+/// <summary>
+/// One version of the rules: when, by whom (null for the season's creation by the system), and what changed.
+/// <c>authorName</c> — the author's name for the rules page (H7, D-170); null with no author.
+/// </summary>
+public sealed record RulesVersionView(int Version, DateTimeOffset At, Guid? AuthorId, IReadOnlyList<RulesetChange> Changes, string? AuthorName = null);
 
 /// <summary>
 /// The new version of the rules and what the admin should know about it: <c>finish.bonusesKept</c> — after this change
@@ -38,6 +44,8 @@ public sealed record RulesetProblem(string Title, int Status, IReadOnlyList<Rule
 
 public static class RulesEndpoints
 {
+    private static readonly Lazy<string> s_schema = new(RulesetSchema.Generate);
+
     public static void MapRules(this RouteGroupBuilder api)
     {
         api.MapGet("/seasons/{seasonId:guid}/rules", GetRulesAsync)
@@ -55,6 +63,14 @@ public static class RulesEndpoints
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound)
             .Produces<Seasons.RejectionProblem>(StatusCodes.Status409Conflict, "application/problem+json");
+
+        // The JSON schema of the ruleset (docs/ruleset.schema.json) for the admin's editor to check against as it types (H8)
+        api.MapGet("/admin/rules/schema", () => TypedResults.Text(s_schema.Value, "application/schema+json"))
+            .WithTags("Admin")
+            .RequireAuthorization(Policies.Admin)
+            .Produces<JsonObject>(StatusCodes.Status200OK, "application/schema+json")
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden);
     }
 
     private static async Task<Results<Ok<RulesView>, NotFound>> GetRulesAsync(Guid seasonId, GameEventDbContext db, CancellationToken ct)
@@ -86,7 +102,10 @@ public static class RulesEndpoints
         }
 
         history.Reverse(); // newest first
-        return TypedResults.Ok(new RulesView(version, previous!, history));
+        var authors = await db.NamesAsync(rows.Select(r => r.AuthorId).OfType<Guid>(), ct);
+        var named = history.Select(h => h with { AuthorName = h.AuthorId is { } id ? authors.GetValueOrDefault(id) : null }).ToList();
+        var deadline = await db.Seasons.AsNoTracking().Where(s => s.Id == seasonId).Select(s => s.Deadline).SingleOrDefaultAsync(ct);
+        return TypedResults.Ok(new RulesView(version, previous!, named, deadline));
     }
 
     private static async Task<Results<Ok<RulesChangeResult>, JsonHttpResult<RulesetProblem>, NotFound, ProblemHttpResult, ValidationProblem>> ChangeRulesAsync(

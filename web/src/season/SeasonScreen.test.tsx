@@ -4,12 +4,17 @@ import type { Schemas } from '../api/client';
 import { moscowTime } from '../app/time';
 import { ru } from '../i18n/ru';
 import { SeasonScreen } from './SeasonScreen';
+import { json } from '../test/fakeServer';
 
 // The hub is replaced: tests trigger "another player acted" by calling the captured callback.
 let hubChange: (() => void) | null = null;
 vi.mock('../api/realtime', () => ({
-  watchSeason: (_seasonId: string, onChange: () => void) => {
-    hubChange = onChange;
+  watchSeason: (_seasonId: string, onChange: (updates: unknown[]) => void) => {
+    hubChange = () => {
+      onChange([]);
+    };
+    // The hub's first answer is the join: the page has just loaded and skips it (D-202)
+    onChange([]);
     return () => {
       hubChange = null;
     };
@@ -44,6 +49,7 @@ function season(overrides: Partial<Schemas['SeasonView']> = {}): Schemas['Season
       phase: 'idle',
       finishOrder: null,
       avatar: null,
+      token: 0,
     },
   ];
   return {
@@ -81,13 +87,6 @@ function season(overrides: Partial<Schemas['SeasonView']> = {}): Schemas['Season
   };
 }
 
-function json(status: number, body: unknown) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'Content-Type': status >= 400 ? 'application/problem+json' : 'application/json' },
-  });
-}
-
 type Handler = (request: Request) => Response | Promise<Response>;
 
 // The avatar section (D-117) asks for the account itself; the cases here are about the season, so it has none
@@ -101,9 +100,19 @@ const account = {
   avatar: null,
 };
 
+// The feed beside the map on a desktop (H5) reads its own page; the cases here are about the season, so it is empty
+const isFeedGet = (r: Request) => r.method === 'GET' && new URL(r.url).pathname.endsWith('/feed');
+const emptyFeed = { entries: [], nextBefore: null, players: [], games: [], runs: [] };
+
 function serve(handler: Handler) {
   const fetch = vi.fn((request: Request) =>
-    Promise.resolve(isAccountGet(request) ? json(200, account) : handler(request)),
+    Promise.resolve(
+      isAccountGet(request)
+        ? json(200, account)
+        : isFeedGet(request)
+          ? json(200, emptyFeed)
+          : handler(request),
+    ),
   );
   vi.stubGlobal('fetch', fetch);
   return fetch;
@@ -186,6 +195,7 @@ describe('SeasonScreen', () => {
           phase: 'idle',
           finishOrder: null,
           avatar: null,
+          token: 0,
         },
       ],
     });
@@ -211,6 +221,7 @@ describe('SeasonScreen', () => {
           phase: 'idle',
           finishOrder: null,
           avatar: null,
+          token: 0,
         },
       ],
     });
@@ -271,9 +282,9 @@ describe('SeasonScreen', () => {
     // H3: the option card names the game and its hours the way the run card does
     const option = screen.getByTestId('option-a1');
     expect(option).toHaveTextContent('Silent Hill');
-    expect(option).toHaveTextContent(ru.board.hours(12));
+    expect(option).toHaveTextContent(ru.hours.estimate(12));
     // The card's name is its content: the action, the game and its hours
-    expect(option).toHaveAccessibleName(`${ru.turn.pick} Silent Hill. ${ru.board.hours(12)}`);
+    expect(option).toHaveAccessibleName(`${ru.turn.pick} Silent Hill. ${ru.hours.estimate(12)}`);
 
     await userEvent.click(screen.getByTestId('option-b2'));
 
@@ -340,6 +351,7 @@ describe('SeasonScreen', () => {
           phase: 'playing',
           finishOrder: null,
           avatar: null,
+          token: 0,
         },
       ],
       me: {
@@ -651,6 +663,7 @@ describe('SeasonScreen', () => {
           phase: 'playing',
           finishOrder: null,
           avatar: null,
+          token: 0,
         },
       ],
       me: {
@@ -1034,6 +1047,7 @@ describe('SeasonScreen drop and tech reroll (RR2, RR4, RR5, D-94)', () => {
           phase: 'playing',
           finishOrder: null,
           avatar: null,
+          token: 0,
         },
       ],
       me: {
@@ -1492,6 +1506,7 @@ describe('SeasonScreen marks on offered games (G8, D-94 (6))', () => {
           phase: 'rolling',
           finishOrder: null,
           avatar: null,
+          token: 0,
         },
       ],
       me: {
@@ -1626,6 +1641,7 @@ describe('SeasonScreen completion reward (C7a, D-96)', () => {
           phase: 'idle',
           finishOrder: null,
           avatar: null,
+          token: 0,
         },
       ],
       me: {
@@ -1677,6 +1693,7 @@ describe('SeasonScreen completion reward (C7a, D-96)', () => {
           phase: 'playing',
           finishOrder: null,
           avatar: null,
+          token: 0,
         },
       ],
       me: {
@@ -2191,6 +2208,7 @@ describe('SeasonScreen completion moment (H4)', () => {
         phase: completed ? 'idle' : 'playing',
         finishOrder: extra.finish?.order ?? null,
         avatar: null,
+        token: 0,
       },
     ];
     const base = season({

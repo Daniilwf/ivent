@@ -55,7 +55,7 @@
 | Термин | Что значит | В коде |
 | --- | --- | --- |
 | Пул | общий список игр для ролла | `Game` (коллекция), в движке — `IPoolView` |
-| Игра | запись в пуле с тегами, часами, обложкой и заметкой | `Game`, `GameRecord`, карточка — `GameCard`; события `GameAdded`, `GameChanged`, `GameDeleted`, `GameRestored` |
+| Игра | запись в пуле с тегами, часами, обложкой и заметкой | `Game`, `GameRecord`, карточка — `GameCard`, в API — `PoolGameView` (D-182); события `GameAdded`, `GameChanged`, `GameDeleted`, `GameRestored` |
 | Похожее название | название, совпадающее по буквам и цифрам или отличающееся на 1–2 символа: добавление — после подтверждения | `PoolRules.IsAlike`, код `pool.similar`; то же название — `pool.duplicate` |
 | Тег | метка жанра или свойства игры | `Tag` |
 | Категория | тег с весом на колесе категорий | `Category`, `SetCategory`, `RemoveCategory`, события `CategorySet`, `CategoryRemoved` |
@@ -91,6 +91,7 @@
 | Реджект | отклонение пруфа админом: снимаются очки, клетки и монетки прохождения | команда `RejectProof`, событие `ProofRejected`, `RunStatus.Rejected` |
 | Очередь пруфов | непроверенные прохождения, финиши сверху | `ProofReviewOrder.Order` |
 | Ждёт проверки | прохождение завершено, пруф не одобрен и не отклонён (прислан или нет) | `UncheckedRuns.Waits` |
+| Ролл закрыт лимитом | у игрока ждут проверки не меньше `season.maxUncheckedRuns` прохождений: новый ролл откроется после проверки; пометка в очереди пруфов (D-134, D-180) | `ProofQueueItemView.RollClosed`, отказ `roll.tooManyUnchecked` |
 | Лимит непроверенных | сколько прохождений игрока может ждать проверки, прежде чем закроется новый ролл; замороженного первого не держит (D-134) | `SeasonRules.MaxUncheckedRuns` (`season.maxUncheckedRuns`), `UncheckedRuns.Count`, отказ `roll.tooManyUnchecked` |
 | Кубы за прохождение | бросок после прохождения | `CompletionRoll` |
 | Кубик | один бросок одной кости, хранится отдельно | `Die` |
@@ -205,6 +206,10 @@
 | Исключение игры | игра, которая больше не выпадает этому игроку в сезоне | `GameExclusion`, `SeasonPlayer.Exclusions`, таблица `PlayerGameExclusion` |
 | Фильтр ролла | предикат по играм с приоритетом: эффект > зона > обычный | `RollFilter`, `RollFilterPriority`, `RollFilters.Apply` |
 | Доступные игры категории | сколько игр категории можно выкинуть сейчас (для админки) | `CategoryStat`, `PoolStats.Categories` |
+| Статус игры в сезоне | что с игрой пула в сезоне: «уже прошёл», «сейчас играет» (с предложенными и вариантами выбора), пометки дропов других, исключение для меня; тот же предикат, что у колеса (D-160) | `SeasonGameView`, `PoolStats.Taken`, `GET /api/seasons/{id}/games` |
+| Пул игр (страница) | все игры пула с поиском, фильтрами, статусами в сезоне и добавлением (D-162, D-163) | `PoolScreen`, `PoolGameCard`, `GameForm` (добавление и правка админом), `usePaging` |
+| Игра прохождения | название и часы игры в карточке прохождения; не путать с игрой пула `PoolGameView` (D-161, D-182) | `RunGameView` |
+| Разделы сайта | страницы после входа по адресам — сезон, лента, пул, правила — одной строкой в шапке; профиль и админка — из моего меню (D-164, D-202) | `Route`, `routeOf`, `paths`, `navigate`, `Link`, `usePageHeading` (`web/src/app/router.ts`) |
 | Ожидание выбора | ход ждёт решения игрока | `PendingChoice` (`ChoiceKind`, варианты `ChoiceOption`) |
 | Выбор из нескольких игр | ролл при `choiceCount` > 1: игрок выбирает одну из выпавших | `GameChoiceRolled`, команда `MakeChoice`, событие `ChoiceMade` |
 | Сброс выбора | админ снимает ожидание выбора тем же флагом, что и сброс предложенной игры; игры снова свободны | `ChoiceDiscarded` (по `AdjustPlayer.DiscardOffer`) |
@@ -217,7 +222,7 @@
 | Лидерборд | список игроков по местам: первый финишировавший сверху, дальше по очкам и тайбрейкам | `Leaderboard`, `LeaderboardRow`, `RankingEntry` |
 | Лента | публичный поток событий сезона | `Feed`, `FeedEntryView`, `GET /api/seasons/{id}/feed` |
 | Профиль | страница пользователя: сезоны, отзывы, пройденные игры | `ProfileView`, `GET /api/users/{id}` |
-| Страница игры | карточка игры из пула и все её прохождения с отзывами | `GameView`, `GameRunView`, `GET /api/pool/{id}/runs` |
+| Страница игры | карточка игры из пула и все её прохождения с отзывами | `PoolGameView`, `GameRunView`, `GET /api/pool/{id}/runs`; экран — `GameScreen`, факты игры — `GameFacts` |
 | Реакция | эмодзи на запись ленты, отзыв или момент | `Reaction` |
 | Комментарий | текст к записи ленты или отзыву | `Comment` |
 | Галерея моментов | пруфы и смешные скрины сезона | `GalleryItem` |
@@ -242,6 +247,7 @@
 | Флаг функции | включение механики в конфиге сезона | `Ruleset.Features` |
 | Версия правил | номер версии конфига сезона: 1 при создании, +1 при каждой правке админом | `SeasonState.RulesetVersion`, `RulesetChanged.Version` |
 | История правил | список версий с датой, автором и изменениями «было/стало» | `RulesetChange`, `RulesVersionView` |
+| Страница правил | правила сезона словами из текущего конфига и история их изменений (D-171) | `RulesScreen`, `rulesPage`, `GET /api/seasons/{id}/rules` (`RulesView.Deadline`, `RulesVersionView.AuthorName`) |
 | Отложенная задача | таймер, хранящийся в БД | `ScheduledTask` |
 | Файл | загруженная картинка: скрин в WebP или GIF как есть, с миниатюрой | `FileRecord`, `StoredFile`, событие `FileStored`, команда `RecordFile` |
 | Миниатюра | уменьшенная копия файла для карты и списков, у GIF — анимированная | `FileNames.Thumbnail`, `thumbnailUrl` |

@@ -1,5 +1,11 @@
-import { CalendarClock, Inbox, Plus, Trophy } from 'lucide-react';
-import { useEffect, type ReactNode } from 'react';
+import { CalendarClock, Inbox, Lock, Plus, Trophy } from 'lucide-react';
+import { useEffect, useState, type ReactNode } from 'react';
+import { GameForm } from '../pool/GameForm';
+import { demoCategories, demoPoolGames, demoStatuses } from '../pool/demoPool';
+import { PoolGameCard } from '../pool/PoolGameCard';
+import { onWheel, wheelOf } from '../pool/poolFilter';
+import { demoRules } from '../rules/demoRules';
+import { RulesContent } from '../rules/RulesScreen';
 import { Shell } from '../app/Shell';
 import { ReleaseList } from '../app/WhatsNew';
 import { RunCard } from '../board/GameCards';
@@ -12,7 +18,7 @@ import { cellsToFinish } from '../board/geometry';
 import { demoBoard } from '../board/demoBoard';
 import { ru } from '../i18n/ru';
 import { Button, IconButton, type ButtonVariant } from '../ui/Button';
-import { BottomSheet, ConfirmDanger } from '../ui/Dialogs';
+import { BottomSheet, ConfirmDanger, FormDialog } from '../ui/Dialogs';
 import { ChoiceGroup, Field, FilePicker, Select } from '../ui/Field';
 import { Badge, Chip, Tag } from '../ui/Marks';
 import { RouteProgress, Skeleton } from '../ui/Progress';
@@ -33,6 +39,17 @@ import {
   demoWitnesses,
 } from './fixtures';
 import { DiceDemo, FinishDemo, MapDemo, MoveDemo, WheelDemo } from './MomentDemos';
+import { FeedList, FeedSkeleton } from '../feed/FeedList';
+import { GameDetails } from '../feed/GameScreen';
+import { ProfileDetails } from '../feed/ProfileScreen';
+import {
+  demoFeedDays,
+  demoGameCard,
+  demoGameRuns,
+  demoProfile,
+  demoProfileEmpty,
+} from './feedFixtures';
+import { AdminDemos } from './AdminDemos';
 
 // The styleguide's cards act on nothing
 const noop = () => undefined;
@@ -104,6 +121,28 @@ const difficulties = (['easy', 'normal', 'hard', 'extreme'] as const).map((d) =>
   label: ru.difficulty[d],
 }));
 
+// The demo pool's wheel: the RPG category has weight 0 here, so its game shows «not on the wheel»
+const poolWheel = wheelOf(demoCategories.map((c) => (c.name === 'РПГ' ? { ...c, weight: 0 } : c)));
+
+/** The form over the page: a sheet from the bottom on a phone, a card on a desktop */
+function FormDemo() {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <Button
+        onClick={() => {
+          setOpen(true);
+        }}
+      >
+        {t.dialogs.form}
+      </Button>
+      <FormDialog open={open} onOpenChange={setOpen} title={ru.pool.form.title} wide>
+        <GameForm categories={demoCategories} onSaved={noop} onSignedOut={noop} />
+      </FormDialog>
+    </>
+  );
+}
+
 export function Styleguide() {
   // The page loads after the address: a link to a section scrolls there once the sections exist
   useEffect(() => {
@@ -133,7 +172,7 @@ export function Styleguide() {
 
       <Section id="shell" title={t.shell.title} lead={t.shell.lead}>
         <div className="grid gap-4">
-          <div className="h-16 w-full max-w-98 overflow-hidden rounded-lg border-2 border-muted">
+          <div className="h-30 w-full max-w-98 overflow-hidden rounded-lg border-2 border-muted desk:h-16">
             <Shell
               user={demoUser}
               offline
@@ -143,7 +182,7 @@ export function Styleguide() {
               {null}
             </Shell>
           </div>
-          <div className="h-16 overflow-hidden rounded-lg border-2 border-muted">
+          <div className="h-30 overflow-hidden rounded-lg border-2 border-muted desk:h-16">
             <Shell
               user={demoUser}
               offline={false}
@@ -252,8 +291,16 @@ export function Styleguide() {
       <Section id="marks" title={t.marks.title}>
         <div className="flex flex-wrap items-center gap-3">
           <Chip icon={<CalendarClock size={16} aria-hidden />}>{t.marks.deadline}</Chip>
+          <Chip tone="success">{ru.pool.completed('Вася', '12.10')}</Chip>
+          <Chip tone="info">{ru.pool.playing('Петя')}</Chip>
+          <Chip tone="warning">{t.marks.deadline}</Chip>
           <Badge>{ru.board.first}</Badge>
           <Badge tone="me">{ru.board.you}</Badge>
+          <Badge tone="muted">{ru.admin.accounts.roles.player}</Badge>
+          <Badge tone="warning" icon={<Lock size={12} aria-hidden className="text-warning" />}>
+            {ru.admin.proofs.rollClosed}
+          </Badge>
+          <Badge tone="danger">{ru.admin.accounts.deleted}</Badge>
           <Tag>Platformer</Tag>
           <Tag>Online Co-Op</Tag>
           <ConnectionLost />
@@ -271,11 +318,14 @@ export function Styleguide() {
           <Field label={t.fields.hours} force="focus" defaultValue="27" />
           <Field label={t.fields.link} error={t.fields.linkError} defaultValue="steam" />
           <Field label={t.fields.link} disabled defaultValue="https://youtu.be/…" />
-          <Select label={t.fields.select} defaultValue="weakPc">
+          <Select label={t.fields.select} hint={t.fields.selectHint} defaultValue="weakPc">
             <option value="weakPc">{ru.turn.techRerollReasons.weakPc}</option>
           </Select>
           <Select label={t.fields.select} error={t.fields.selectError} defaultValue="">
             <option value="">{ru.turn.techRerollReasonPlaceholder}</option>
+          </Select>
+          <Select label={t.fields.select} defaultValue="weakPc" force="focus">
+            <option value="weakPc">{ru.turn.techRerollReasons.weakPc}</option>
           </Select>
           <ChoiceGroup
             label={t.fields.choice}
@@ -327,16 +377,16 @@ export function Styleguide() {
         <div className="grid gap-4 desk:grid-cols-3">
           <EmptyState
             icon={<Inbox size={28} aria-hidden />}
-            title={t.feedback.emptyTitle}
-            text={t.feedback.emptyText}
-            action={<Button variant="main">{t.feedback.emptyAction}</Button>}
+            title={ru.pool.emptyTitle}
+            text={ru.pool.emptyText}
+            action={<Button variant="main">{ru.pool.add}</Button>}
           />
           <ErrorState
-            title={t.feedback.errorTitle}
-            text={t.feedback.errorText}
+            title={ru.feed.errorTitle}
+            text={ru.shell.loadErrorText}
             onRetry={() => undefined}
           />
-          <Panel title={t.feedback.loading} aria-busy="true">
+          <Panel title={t.states.loading} aria-busy="true">
             {[0, 1, 2, 3].map((i) => (
               <span key={i} className="flex items-center gap-3">
                 <Skeleton className="size-9 rounded-full" />
@@ -444,7 +494,7 @@ export function Styleguide() {
               onDrop={noop}
               onTechReroll={noop}
             />
-            <Notice tone="danger">{t.complete.message}</Notice>
+            <Notice tone="danger">{ru.shell.loadErrorText}</Notice>
           </div>
         </div>
       </Section>
@@ -495,8 +545,34 @@ export function Styleguide() {
         </div>
       </Section>
 
+      <Section id="pool" title={t.pool.title} lead={t.pool.lead}>
+        <div className="grid items-start gap-4 desk:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+          <ul className="grid gap-3">
+            {demoPoolGames.map((game) => (
+              <PoolGameCard
+                key={game.id}
+                game={game}
+                status={demoStatuses.find((s) => s.gameId === game.id)}
+                inSeason
+                inWheel={onWheel(game, poolWheel)}
+              />
+            ))}
+          </ul>
+          <div className="rounded-lg bg-card p-4">
+            <GameForm categories={demoCategories} onSaved={noop} onSignedOut={noop} />
+          </div>
+        </div>
+      </Section>
+
+      <Section id="rules" title={t.rules.title} lead={t.rules.lead}>
+        <div className="grid gap-4 desk:grid-cols-[auto_minmax(0,1fr)] desk:items-start desk:gap-x-8">
+          <RulesContent rules={demoRules} />
+        </div>
+      </Section>
+
       <Section id="dialogs" title={t.dialogs.title} lead={t.dialogs.lead}>
         <div className="flex flex-wrap gap-3">
+          <FormDemo />
           <ConfirmDanger
             trigger={<Button variant="danger">{ru.board.drop}</Button>}
             title={ru.board.dropTitle(run.title)}
@@ -517,6 +593,10 @@ export function Styleguide() {
         </div>
       </Section>
 
+      <Section id="admin" title={t.admin.title} lead={t.admin.lead}>
+        <AdminDemos />
+      </Section>
+
       <Section id="map" title={t.map.title} lead={t.map.lead}>
         <MapDemo />
       </Section>
@@ -535,6 +615,51 @@ export function Styleguide() {
 
       <Section id="finish" title={t.finish.title} lead={t.finish.lead}>
         <FinishDemo />
+      </Section>
+
+      <Section id="feed" title={t.feed.title} lead={t.feed.lead}>
+        <div className="grid items-start gap-4 desk:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+          <Panel>
+            <FeedList days={demoFeedDays} />
+            <div className="grid justify-items-center gap-3 border-t-2 border-muted pt-4">
+              <Button>{ru.ui.showMore}</Button>
+              <Button loading>{ru.ui.showMore}</Button>
+              <p className="text-sm text-ink-soft">{ru.feed.start}</p>
+            </div>
+          </Panel>
+          <Panel title={t.states.loading}>
+            <FeedSkeleton rows={4} />
+          </Panel>
+        </div>
+      </Section>
+
+      <Section id="profile" title={t.profile.title} lead={t.profile.lead}>
+        <div className="grid max-w-180 gap-4">
+          <ProfileDetails profile={demoProfile} mine={false} />
+        </div>
+        <div className="grid max-w-180 gap-4 border-t-2 border-dashed border-muted pt-4">
+          <ProfileDetails profile={demoProfileEmpty} mine />
+        </div>
+      </Section>
+
+      <Section id="game" title={t.gamePage.title} lead={t.gamePage.lead}>
+        <div className="grid max-w-180 gap-4">
+          <GameDetails game={demoGameCard} runs={demoGameRuns} />
+        </div>
+        <div className="grid max-w-180 gap-4 border-t-2 border-dashed border-muted pt-4">
+          <GameDetails
+            game={{
+              ...demoGameCard,
+              id: 'empty',
+              title: 'Hollow Knight',
+              isCoop: false,
+              year: null,
+              completionCondition: null,
+              tags: ['Platformer'],
+            }}
+            runs={[]}
+          />
+        </div>
       </Section>
 
       <Section id="whats-new" title={t.whatsNew.title} lead={t.whatsNew.lead}>

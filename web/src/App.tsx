@@ -1,15 +1,27 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api, refreshCsrf, type Schemas } from './api/client';
-import { CalendarClock, LoaderCircle } from 'lucide-react';
+import { CalendarClock, LoaderCircle, SearchX } from 'lucide-react';
 import { ChangePasswordForm } from './app/ChangePasswordForm';
 import { LoginForm, TablePage } from './app/LoginForm';
 import { MaintenanceBanner } from './app/MaintenanceBanner';
+import { routeOf, usePath } from './app/router';
 import { UpdateBanner } from './app/WhatsNew';
+import { NotFound } from './app/NotFound';
 import { Shell } from './app/Shell';
+import { AdminScreen } from './admin/AdminScreen';
+import { FeedScreen } from './feed/FeedScreen';
+import { GameScreen } from './feed/GameScreen';
+import { ProfileScreen } from './feed/ProfileScreen';
 import { ru } from './i18n/ru';
 import { Button } from './ui/Button';
 import { EmptyState, ErrorState } from './ui/States';
 import { SeasonScreen } from './season/SeasonScreen';
+import { PoolScreen } from './pool/PoolScreen';
+import { RulesScreen } from './rules/RulesScreen';
+
+/** The admin's section of an address: none is the proof queue, an unknown one is «Такой страницы нет» */
+const knownAdminSection = (section: string | null) =>
+  section === null || Object.hasOwn(ru.admin.sections, section);
 
 type State =
   | { kind: 'loading' }
@@ -20,11 +32,14 @@ type State =
       kind: 'signedIn';
       user: Schemas['CurrentUser'];
       seasonId: string | null;
-      ownPassword?: boolean;
+      /** The password form opened over this page; another page closes it */
+      ownPassword?: string | null;
     };
 
 export function App() {
   const [state, setState] = useState<State>({ kind: 'loading' });
+  const path = usePath();
+  const route = routeOf(path);
 
   const signedOut = useCallback(() => {
     setState({ kind: 'signedOut' });
@@ -94,7 +109,7 @@ export function App() {
               className="animate-spin motion-reduce:animate-none"
               aria-hidden
             />
-            {ru.app.loading}
+            {ru.ui.loading}
           </p>
         </main>
       );
@@ -139,27 +154,29 @@ export function App() {
       );
 
     const signedIn = state;
+    // The admin's pages (H8) open for the admin only; anyone else at their address sees the game
+    const admin = signedIn.user.role === 'admin';
     return (
       <Shell
         user={signedIn.user}
         onChangePassword={() => {
-          setState({ ...signedIn, ownPassword: true });
+          setState({ ...signedIn, ownPassword: path });
         }}
         onLogout={() => void logout()}
       >
-        {signedIn.ownPassword ? (
+        {signedIn.ownPassword === path ? (
           <main className="mx-auto grid max-w-110 gap-4 px-4 py-6">
             <ChangePasswordForm
               temporary={false}
               onChanged={(user) => {
-                setState({ ...signedIn, user, ownPassword: false });
+                setState({ ...signedIn, user, ownPassword: null });
                 focusMenu();
               }}
             >
               <Button
                 variant="link"
                 onClick={() => {
-                  setState({ ...signedIn, ownPassword: false });
+                  setState({ ...signedIn, ownPassword: null });
                   focusMenu();
                 }}
               >
@@ -167,6 +184,44 @@ export function App() {
               </Button>
             </ChangePasswordForm>
           </main>
+        ) : route.kind === 'admin' && admin && knownAdminSection(route.section) ? (
+          <AdminScreen
+            section={route.section}
+            currentSeasonId={signedIn.seasonId}
+            user={signedIn.user}
+          />
+        ) : route.kind === 'profile' ? (
+          <ProfileScreen
+            key={route.userId}
+            userId={route.userId}
+            meId={signedIn.user.id}
+            onSignedOut={signedOut}
+          />
+        ) : route.kind === 'game' ? (
+          <GameScreen key={route.gameId} gameId={route.gameId} onSignedOut={signedOut} />
+        ) : route.kind === 'notFound' || (route.kind === 'admin' && admin) ? (
+          // An address the site does not have, the admin's unknown section included
+          <main className="mx-auto grid max-w-110 px-4 py-10" data-testid="page-not-found">
+            <NotFound
+              icon={<SearchX size={28} aria-hidden />}
+              title={ru.feed.pageNotFoundTitle}
+              text={ru.feed.pageNotFoundText}
+            />
+          </main>
+        ) : route.kind === 'feed' && (route.seasonId ?? signedIn.seasonId) ? (
+          <FeedScreen
+            key={route.seasonId ?? signedIn.seasonId}
+            seasonId={(route.seasonId ?? signedIn.seasonId) as string}
+            onSignedOut={signedOut}
+          />
+        ) : route.kind === 'pool' ? (
+          <PoolScreen
+            seasonId={signedIn.seasonId}
+            canAdd={signedIn.user.role !== 'spectator'}
+            onSignedOut={signedOut}
+          />
+        ) : route.kind === 'rules' ? (
+          <RulesScreen seasonId={signedIn.seasonId} onSignedOut={signedOut} />
         ) : signedIn.seasonId ? (
           <SeasonScreen seasonId={signedIn.seasonId} onSignedOut={signedOut} />
         ) : (
