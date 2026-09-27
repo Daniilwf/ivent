@@ -33,7 +33,8 @@ internal static class Inventories
             return new ManualEffectCreated(context.Ids.NewId(), playerId, DrawEvent: null, ManualEffectSource.Item, RunId: null) { ObjectId = definition.Id };
         }
 
-        return new ObjectGiven(playerId, New(state, context, playerId, definition, parameters, fromPlayerId), source, fromPlayerId);
+        var from = fromPlayerId == playerId ? null : fromPlayerId;
+        return new ObjectGiven(playerId, New(state, context, playerId, definition, parameters, from), source, from);
     }
 
     /// <summary>A new object of <paramref name="definition"/> for <paramref name="playerId"/>, its lifetime starting now.</summary>
