@@ -11,7 +11,7 @@ import { Badge } from '../ui/Marks';
 import { EmptyState, Notice } from '../ui/States';
 import { commentProblem, refusal } from './actions';
 import { newCommandId } from '../api/commands';
-import { Loading } from './common';
+import { AsyncState } from '../ui/AsyncState';
 import type { Loaded } from '../app/useLoaded';
 
 const t = ru.admin.proofs;
@@ -31,7 +31,7 @@ export function ProofQueue({
 }) {
   const [done, setDone] = useState<string | null>(null);
   return (
-    <Loading loaded={loaded}>
+    <AsyncState loaded={loaded} errorTitle={ru.admin.loadErrorTitle}>
       {(items, reload) => {
         const closed = [...new Set(items.filter((i) => i.rollClosed).map((i) => i.playerName))];
         return (
@@ -72,7 +72,7 @@ export function ProofQueue({
           </div>
         );
       }}
-    </Loading>
+    </AsyncState>
   );
 }
 

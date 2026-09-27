@@ -851,7 +851,7 @@ function SeasonSkeleton() {
       className="mx-auto grid max-w-300 gap-4 px-4 pt-4 desk:grid-cols-[auto_minmax(0,1fr)] desk:px-8"
       aria-busy="true"
     >
-      <p className="sr-only">{ru.app.loading}</p>
+      <p className="sr-only">{ru.ui.loading}</p>
       <div className="grid content-start gap-4 desk:w-96">
         <Skeleton className="h-8 w-2/3" />
         <Skeleton className="h-48 w-full rounded-lg" />

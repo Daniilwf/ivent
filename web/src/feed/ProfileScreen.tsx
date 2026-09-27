@@ -2,15 +2,16 @@ import { CalendarRange, MessageSquareQuote, Trophy, UserRoundX } from 'lucide-re
 import { useCallback, type Ref } from 'react';
 import { api, type Schemas } from '../api/client';
 import { Link } from '../app/Link';
-import { navigate, paths, usePageHeading } from '../app/router';
+import { paths, usePageHeading } from '../app/router';
 import { moscowDay } from '../app/time';
 import { userToken } from '../design/players';
+import { NotFound } from '../app/NotFound';
 import { ru } from '../i18n/ru';
+import { AsyncState } from '../ui/AsyncState';
 import { textLink as linkText } from './linkStyle';
-import { Button } from '../ui/Button';
 import { Badge, Chip, Tag } from '../ui/Marks';
 import { Skeleton } from '../ui/Progress';
-import { EmptyState, ErrorState } from '../ui/States';
+import { EmptyState } from '../ui/States';
 import { Sticker } from '../ui/Sticker';
 import { Panel } from '../ui/Surface';
 import { Quote } from './Review';
@@ -41,35 +42,23 @@ export function ProfileScreen({
 
   return (
     <main className="mx-auto grid max-w-180 content-start gap-4 px-4 pt-4 pb-10 desk:px-8 desk:pt-8">
-      {state.kind === 'loading' ? (
-        <ProfileSkeleton />
-      ) : state.kind === 'failed' ? (
-        <ErrorState
-          level={1}
-          title={ru.profile.errorTitle}
-          text={ru.shell.loadErrorText}
-          onRetry={state.reload}
-        />
-      ) : state.kind === 'notFound' ? (
-        <EmptyState
-          level={1}
-          icon={<UserRoundX size={28} aria-hidden />}
-          title={ru.profile.notFoundTitle}
-          text={ru.profile.notFoundText}
-          action={
-            <Button
-              variant="main"
-              onClick={() => {
-                navigate(paths.season());
-              }}
-            >
-              {ru.profile.toSeason}
-            </Button>
-          }
-        />
-      ) : (
-        <ProfileDetails profile={state.value} mine={state.value.id === meId} headingRef={heading} />
-      )}
+      <AsyncState
+        loaded={state}
+        skeleton={<ProfileSkeleton />}
+        level={1}
+        errorTitle={ru.profile.errorTitle}
+        notFound={
+          <NotFound
+            icon={<UserRoundX size={28} aria-hidden />}
+            title={ru.profile.notFoundTitle}
+            text={ru.profile.notFoundText}
+          />
+        }
+      >
+        {(profile) => (
+          <ProfileDetails profile={profile} mine={profile.id === meId} headingRef={heading} />
+        )}
+      </AsyncState>
     </main>
   );
 }
@@ -189,7 +178,7 @@ export function ProfileDetails({
 function ProfileSkeleton() {
   return (
     <div className="grid gap-4" aria-busy="true" data-testid="profile-loading">
-      <p className="sr-only">{ru.app.loading}</p>
+      <p className="sr-only">{ru.ui.loading}</p>
       <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-4">
         <Skeleton className="size-20 rounded-full" />
         <div className="grid gap-2">

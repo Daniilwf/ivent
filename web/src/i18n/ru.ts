@@ -256,7 +256,6 @@ const feedLines = {
 export const ru = {
   app: {
     title: 'Игровой ивент',
-    loading: 'Загружаем…',
     loadError: 'Не удалось загрузить данные. Проверь интернет и обнови страницу.',
   },
   password: {

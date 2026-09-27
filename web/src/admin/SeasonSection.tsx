@@ -10,7 +10,7 @@ import { Notice } from '../ui/States';
 import { Panel } from '../ui/Surface';
 import { refusal, moscowInput } from './actions';
 import { newCommandId } from '../api/commands';
-import { Loading } from './common';
+import { AsyncState } from '../ui/AsyncState';
 import { answerOf, useLoaded } from '../app/useLoaded';
 
 const t = ru.admin.season;
@@ -55,7 +55,7 @@ export function SeasonSection({
   const [message, setMessage] = useState<Message>(null);
 
   return (
-    <Loading loaded={loaded}>
+    <AsyncState loaded={loaded} errorTitle={ru.admin.loadErrorTitle}>
       {({ list, season }, reload) => {
         const done = (text: string) => {
           setMessage({ tone: 'success', text });
@@ -131,7 +131,7 @@ export function SeasonSection({
           </div>
         );
       }}
-    </Loading>
+    </AsyncState>
   );
 }
 

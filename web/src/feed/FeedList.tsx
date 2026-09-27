@@ -168,7 +168,7 @@ export function FeedList({
 export function FeedSkeleton({ rows = 5 }: { rows?: number }) {
   return (
     <div className="grid gap-4" aria-busy="true" data-testid="feed-loading">
-      <p className="sr-only">{ru.app.loading}</p>
+      <p className="sr-only">{ru.ui.loading}</p>
       <Skeleton className="h-6 w-24" />
       {Array.from({ length: rows }, (_, i) => (
         <div key={i} className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-3">

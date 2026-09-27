@@ -9,7 +9,7 @@ import { Notice } from '../ui/States';
 import { Panel } from '../ui/Surface';
 import { refusal } from './actions';
 import { newCommandId } from '../api/commands';
-import { Loading } from './common';
+import { AsyncState } from '../ui/AsyncState';
 import { answerOf, useLoaded } from '../app/useLoaded';
 import { checkSchema, isSchema, type JsonSchema, type SchemaProblem } from './ruleSchema';
 
@@ -65,7 +65,7 @@ export function RulesSection({ seasonId, version }: { seasonId: string; version:
   const [outcome, setOutcome] = useState<Outcome>(null);
 
   return (
-    <Loading loaded={loaded}>
+    <AsyncState loaded={loaded} errorTitle={ru.admin.loadErrorTitle}>
       {(rules, reload) => (
         <RulesEditor
           key={`${seasonId}-${rules.version}`}
@@ -80,7 +80,7 @@ export function RulesSection({ seasonId, version }: { seasonId: string; version:
           }}
         />
       )}
-    </Loading>
+    </AsyncState>
   );
 }
 

@@ -10,7 +10,7 @@ import { EmptyState, Notice } from '../ui/States';
 import { Panel } from '../ui/Surface';
 import { refusal } from './actions';
 import { newCommandId } from '../api/commands';
-import { Loading } from './common';
+import { AsyncState } from '../ui/AsyncState';
 import { answerOf, useLoaded } from '../app/useLoaded';
 
 const t = ru.admin.accounts;
@@ -31,7 +31,7 @@ export function AccountsSection({ me }: { me: string }) {
   const [secret, setSecret] = useState<Secret>(null);
 
   return (
-    <Loading loaded={loaded}>
+    <AsyncState loaded={loaded} errorTitle={ru.admin.loadErrorTitle}>
       {(accounts, reload) => {
         const done = (text: string, password?: { login: string; password: string | null }) => {
           setMessage({ tone: 'success', text });
@@ -90,7 +90,7 @@ export function AccountsSection({ me }: { me: string }) {
           </div>
         );
       }}
-    </Loading>
+    </AsyncState>
   );
 }
 

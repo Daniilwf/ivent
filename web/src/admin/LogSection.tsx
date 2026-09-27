@@ -10,7 +10,7 @@ import { TextArea } from '../ui/Field';
 import { EmptyState, Notice } from '../ui/States';
 import { commentProblem, refusal, related, commandLabel } from './actions';
 import { newCommandId } from '../api/commands';
-import { Loading } from './common';
+import { AsyncState } from '../ui/AsyncState';
 import { answerOf, useLoaded } from '../app/useLoaded';
 
 const t = ru.admin.log;
@@ -41,7 +41,7 @@ export function LogSection({ seasonId, version }: { seasonId: string; version: n
   const [done, setDone] = useState<string | null>(null);
 
   return (
-    <Loading loaded={loaded}>
+    <AsyncState loaded={loaded} errorTitle={ru.admin.loadErrorTitle}>
       {(commands, reload) => (
         <div className="grid gap-4" data-testid="admin-log">
           {done ? <Notice tone="success">{done}</Notice> : null}
@@ -83,7 +83,7 @@ export function LogSection({ seasonId, version }: { seasonId: string; version: n
           ) : null}
         </div>
       )}
-    </Loading>
+    </AsyncState>
   );
 }
 

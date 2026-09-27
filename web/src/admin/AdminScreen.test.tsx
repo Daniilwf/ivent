@@ -126,7 +126,10 @@ describe('The admin pages', () => {
       expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(t.sections.players);
     });
     expect(screen.queryByRole('dialog')).toBeNull();
-    expect(screen.getByRole('heading', { level: 1 })).toHaveFocus();
+    // The focus comes on the next frame (the router's usePageHeading)
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { level: 1 })).toHaveFocus();
+    });
   });
 
   it('show the count of runs waiting for a check on the sections button', async () => {

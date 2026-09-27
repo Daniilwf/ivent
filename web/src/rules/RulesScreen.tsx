@@ -9,7 +9,8 @@ import { useSeasonVersion } from '../app/useSeasonVersion';
 import { ru } from '../i18n/ru';
 import { Chip } from '../ui/Marks';
 import { Skeleton } from '../ui/Progress';
-import { EmptyState, ErrorState } from '../ui/States';
+import { AsyncState } from '../ui/AsyncState';
+import { EmptyState } from '../ui/States';
 import { fieldName, rulesPage, valueText } from './rulesText';
 
 const t = ru.rules;
@@ -87,23 +88,22 @@ export function RulesScreen({
     return (
       <main className={frame}>
         {header}
-        {loaded.kind === 'loading' ? (
-          <div className="grid max-w-200 gap-4" aria-busy="true" data-testid="rules-loading">
-            <p className="sr-only">{ru.app.loading}</p>
-            {[0, 1, 2].map((i) => (
-              <Skeleton key={i} className="h-40 w-full rounded-lg" />
-            ))}
-          </div>
-        ) : (
-          <div className="max-w-200">
-            <ErrorState
-              level={2}
-              title={t.loadErrorTitle}
-              text={ru.shell.loadErrorText}
-              onRetry={loaded.reload}
-            />
-          </div>
-        )}
+        <div className="grid max-w-200">
+          <AsyncState
+            loaded={loaded}
+            skeleton={
+              <div className="grid gap-4" aria-busy="true" data-testid="rules-loading">
+                <p className="sr-only">{ru.ui.loading}</p>
+                {[0, 1, 2].map((i) => (
+                  <Skeleton key={i} className="h-40 w-full rounded-lg" />
+                ))}
+              </div>
+            }
+            errorTitle={t.loadErrorTitle}
+          >
+            {() => null}
+          </AsyncState>
+        </div>
       </main>
     );
 

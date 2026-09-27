@@ -2,16 +2,17 @@ import { CheckCheck, Gamepad2, Play, SearchX, X, RotateCcw, Ban } from 'lucide-r
 import { useCallback, type ReactNode, type Ref } from 'react';
 import { api, type Schemas } from '../api/client';
 import { Link } from '../app/Link';
-import { navigate, paths, usePageHeading } from '../app/router';
+import { paths, usePageHeading } from '../app/router';
 import { moscowDay } from '../app/time';
 import { Cover } from '../board/GameCards';
 import { GameFacts } from '../pool/GameFacts';
+import { NotFound } from '../app/NotFound';
 import { ru } from '../i18n/ru';
+import { AsyncState } from '../ui/AsyncState';
 import { textLink as linkText } from './linkStyle';
-import { Button } from '../ui/Button';
 import { cx } from '../ui/cx';
 import { Skeleton } from '../ui/Progress';
-import { EmptyState, ErrorState } from '../ui/States';
+import { EmptyState } from '../ui/States';
 import { Sticker } from '../ui/Sticker';
 import { Panel } from '../ui/Surface';
 import { Quote } from './Review';
@@ -52,35 +53,21 @@ export function GameScreen({ gameId, onSignedOut }: { gameId: string; onSignedOu
 
   return (
     <main className="mx-auto grid max-w-180 content-start gap-4 px-4 pt-4 pb-10 desk:px-8 desk:pt-8">
-      {state.kind === 'loading' ? (
-        <GameSkeleton />
-      ) : state.kind === 'failed' ? (
-        <ErrorState
-          level={1}
-          title={ru.gamePage.errorTitle}
-          text={ru.shell.loadErrorText}
-          onRetry={state.reload}
-        />
-      ) : state.kind === 'notFound' ? (
-        <EmptyState
-          level={1}
-          icon={<SearchX size={28} aria-hidden />}
-          title={ru.gamePage.notFoundTitle}
-          text={ru.gamePage.notFoundText}
-          action={
-            <Button
-              variant="main"
-              onClick={() => {
-                navigate(paths.season());
-              }}
-            >
-              {ru.profile.toSeason}
-            </Button>
-          }
-        />
-      ) : (
-        <GameDetails game={state.value.game} runs={state.value.runs} headingRef={heading} />
-      )}
+      <AsyncState
+        loaded={state}
+        skeleton={<GameSkeleton />}
+        level={1}
+        errorTitle={ru.gamePage.errorTitle}
+        notFound={
+          <NotFound
+            icon={<SearchX size={28} aria-hidden />}
+            title={ru.gamePage.notFoundTitle}
+            text={ru.gamePage.notFoundText}
+          />
+        }
+      >
+        {({ game, runs }) => <GameDetails game={game} runs={runs} headingRef={heading} />}
+      </AsyncState>
     </main>
   );
 }
@@ -176,7 +163,7 @@ export function GameDetails({
 function GameSkeleton() {
   return (
     <div className="grid gap-4" aria-busy="true" data-testid="game-loading">
-      <p className="sr-only">{ru.app.loading}</p>
+      <p className="sr-only">{ru.ui.loading}</p>
       <div className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-4">
         <Skeleton className="h-32 w-24 rounded-md" />
         <div className="grid gap-2">

@@ -4,7 +4,7 @@ import { api } from '../api/client';
 import { moscowTime } from '../app/time';
 import { ru } from '../i18n/ru';
 import { EmptyState } from '../ui/States';
-import { Loading } from './common';
+import { AsyncState } from '../ui/AsyncState';
 import { answerOf, useLoaded } from '../app/useLoaded';
 
 const t = ru.admin.errors;
@@ -15,7 +15,7 @@ export function ErrorsSection() {
     useCallback(async () => answerOf(await api.GET('/api/admin/errors')), []),
   );
   return (
-    <Loading loaded={loaded}>
+    <AsyncState loaded={loaded} errorTitle={ru.admin.loadErrorTitle}>
       {(entries) =>
         entries.length === 0 ? (
           <EmptyState
@@ -55,6 +55,6 @@ export function ErrorsSection() {
           </ul>
         )
       }
-    </Loading>
+    </AsyncState>
   );
 }

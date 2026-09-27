@@ -12,7 +12,7 @@ import { EmptyState, Notice } from '../ui/States';
 import { Panel } from '../ui/Surface';
 import { commentProblem, parseWhole, refusal } from './actions';
 import { newCommandId } from '../api/commands';
-import { Loading } from './common';
+import { AsyncState } from '../ui/AsyncState';
 import { answerOf, useLoaded } from '../app/useLoaded';
 
 const t = ru.admin.players;
@@ -46,7 +46,7 @@ export function PlayersSection({ seasonId, version }: { seasonId: string; versio
   const [done, setDone] = useState<string | null>(null);
 
   return (
-    <Loading loaded={loaded}>
+    <AsyncState loaded={loaded} errorTitle={ru.admin.loadErrorTitle}>
       {({ players, cells }, reload) => {
         const finished = (message: string) => {
           setDone(message);
@@ -96,7 +96,7 @@ export function PlayersSection({ seasonId, version }: { seasonId: string; versio
           </div>
         );
       }}
-    </Loading>
+    </AsyncState>
   );
 }
 
@@ -530,7 +530,7 @@ function AddPlayerForm({
   const [busy, setBusy] = useState(false);
 
   return (
-    <Loading loaded={accounts} rows={1}>
+    <AsyncState loaded={accounts} rows={1} errorTitle={ru.admin.loadErrorTitle}>
       {(all) => {
         const inSeason = new Set(players.map((p) => p.userId));
         const free = all.filter((a) => a.role === 'player' && !a.isDeleted && !inSeason.has(a.id));
@@ -642,6 +642,6 @@ function AddPlayerForm({
           </form>
         );
       }}
-    </Loading>
+    </AsyncState>
   );
 }

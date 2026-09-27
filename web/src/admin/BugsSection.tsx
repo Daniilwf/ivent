@@ -9,7 +9,7 @@ import { EmptyState, Notice } from '../ui/States';
 import { cx } from '../ui/cx';
 import { refusal } from './actions';
 import { newCommandId } from '../api/commands';
-import { Loading } from './common';
+import { AsyncState } from '../ui/AsyncState';
 import { answerOf, useLoaded } from '../app/useLoaded';
 
 const t = ru.admin.bugs;
@@ -77,7 +77,7 @@ export function BugsSection() {
         </a>
       </div>
       {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
-      <Loading loaded={loaded}>
+      <AsyncState loaded={loaded} errorTitle={ru.admin.loadErrorTitle}>
         {(reports, reload) =>
           reports.length === 0 ? (
             <EmptyState
@@ -105,7 +105,7 @@ export function BugsSection() {
             </ul>
           )
         }
-      </Loading>
+      </AsyncState>
     </div>
   );
 }

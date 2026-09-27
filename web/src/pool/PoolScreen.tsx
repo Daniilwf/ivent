@@ -9,7 +9,8 @@ import { Button } from '../ui/Button';
 import { FormDialog } from '../ui/Dialogs';
 import { Checkbox, ChoiceGroup, Field, Select } from '../ui/Field';
 import { Skeleton } from '../ui/Progress';
-import { EmptyState, ErrorState, Notice } from '../ui/States';
+import { AsyncState } from '../ui/AsyncState';
+import { EmptyState, Notice } from '../ui/States';
 import { useDesk } from '../ui/useDesk';
 import { GameForm } from './GameForm';
 import { PoolGameCard } from './PoolGameCard';
@@ -141,6 +142,49 @@ export function PoolScreen({
     </Button>
   ) : null;
 
+  // The pool as it came: empty, nothing for the filters, or its cards page by page
+  function list() {
+    return games.length === 0 ? (
+      <EmptyState
+        level={2}
+        icon={<Library size={28} aria-hidden />}
+        title={t.emptyTitle}
+        text={canAdd ? t.emptyText : t.emptyTextViewer}
+      />
+    ) : shown.length === 0 ? (
+      <EmptyState
+        level={2}
+        icon={<SearchX size={28} aria-hidden />}
+        title={t.nothingTitle}
+        text={t.nothingText}
+        action={
+          <Button
+            onClick={() => {
+              setFilter(noFilter);
+            }}
+          >
+            {t.reset}
+          </Button>
+        }
+      />
+    ) : (
+      <>
+        <ul className="grid gap-3 desk:grid-cols-2" data-testid="pool-list">
+          {page.map((game) => (
+            <PoolGameCard
+              key={game.id}
+              game={game}
+              status={statuses?.get(game.id)}
+              inSeason={Boolean(seasonId) && known}
+              inWheel={onWheel(game, wheel)}
+            />
+          ))}
+        </ul>
+        {more}
+      </>
+    );
+  }
+
   return (
     <main className="mx-auto grid max-w-300 gap-4 px-4 pt-4 pb-10 desk:grid-cols-[auto_minmax(0,1fr)] desk:items-start desk:gap-x-8 desk:gap-y-6 desk:px-8 desk:pt-6">
       <header className="grid gap-3 desk:col-span-2 desk:flex desk:items-end desk:justify-between">
@@ -243,57 +287,20 @@ export function PoolScreen({
 
       <section className="grid content-start gap-4" aria-label={t.listLabel}>
         {statusFailed ? <Notice tone="warning">{t.statusError}</Notice> : null}
-        {loaded.kind === 'loading' ? (
-          <PoolSkeleton />
-        ) : loaded.kind !== 'ready' ? (
-          <ErrorState
-            level={2}
-            title={t.loadErrorTitle}
-            text={ru.shell.loadErrorText}
-            onRetry={() => {
+        <AsyncState
+          // A retry asks for the pool and its statuses again
+          loaded={{
+            ...loaded,
+            reload: () => {
               loaded.reload();
               statusLoad.reload();
-            }}
-          />
-        ) : games.length === 0 ? (
-          <EmptyState
-            level={2}
-            icon={<Library size={28} aria-hidden />}
-            title={t.emptyTitle}
-            text={canAdd ? t.emptyText : t.emptyTextViewer}
-          />
-        ) : shown.length === 0 ? (
-          <EmptyState
-            level={2}
-            icon={<SearchX size={28} aria-hidden />}
-            title={t.nothingTitle}
-            text={t.nothingText}
-            action={
-              <Button
-                onClick={() => {
-                  setFilter(noFilter);
-                }}
-              >
-                {t.reset}
-              </Button>
-            }
-          />
-        ) : (
-          <>
-            <ul className="grid gap-3 desk:grid-cols-2" data-testid="pool-list">
-              {page.map((game) => (
-                <PoolGameCard
-                  key={game.id}
-                  game={game}
-                  status={statuses?.get(game.id)}
-                  inSeason={Boolean(seasonId) && known}
-                  inWheel={onWheel(game, wheel)}
-                />
-              ))}
-            </ul>
-            {more}
-          </>
-        )}
+            },
+          }}
+          skeleton={<PoolSkeleton />}
+          errorTitle={t.loadErrorTitle}
+        >
+          {() => list()}
+        </AsyncState>
       </section>
 
       {canAdd && loaded.kind === 'ready' ? (
@@ -317,7 +324,7 @@ export function PoolScreen({
 function PoolSkeleton() {
   return (
     <div className="grid gap-3 desk:grid-cols-2" aria-busy="true" data-testid="pool-loading">
-      <p className="sr-only">{ru.app.loading}</p>
+      <p className="sr-only">{ru.ui.loading}</p>
       {[0, 1, 2, 3].map((i) => (
         <div key={i} className="grid grid-cols-[auto_minmax(0,1fr)] gap-4 rounded-lg bg-card p-4">
           <Skeleton className="h-24 w-16" />

@@ -9,7 +9,7 @@ import { EmptyState, Notice } from '../ui/States';
 import { Panel } from '../ui/Surface';
 import { refusal } from './actions';
 import { newCommandId } from '../api/commands';
-import { Loading } from './common';
+import { AsyncState } from '../ui/AsyncState';
 import { GameFacts } from '../pool/GameFacts';
 import { GameForm } from '../pool/GameForm';
 import { usePaging } from '../pool/usePaging';
@@ -66,7 +66,7 @@ function Categories({
   return (
     <Panel title={t.categories} data-testid="admin-categories">
       <p className="max-w-prose text-ink-soft">{t.categoriesLead}</p>
-      <Loading loaded={loaded} rows={2}>
+      <AsyncState loaded={loaded} rows={2} errorTitle={ru.admin.loadErrorTitle}>
         {({ categories, stats }, reload) => {
           const done = (text: string) => {
             onMessage({ tone: 'success', text });
@@ -106,7 +106,7 @@ function Categories({
             </>
           );
         }}
-      </Loading>
+      </AsyncState>
     </Panel>
   );
 }
@@ -353,7 +353,7 @@ function Games({ onMessage }: { onMessage: (message: Message) => void }) {
           }}
         />
       </div>
-      <Loading loaded={loaded} rows={3}>
+      <AsyncState loaded={loaded} rows={3} errorTitle={ru.admin.loadErrorTitle}>
         {(games, reload) => (
           <GameList
             games={games}
@@ -364,7 +364,7 @@ function Games({ onMessage }: { onMessage: (message: Message) => void }) {
             reload={reload}
           />
         )}
-      </Loading>
+      </AsyncState>
     </Panel>
   );
 }

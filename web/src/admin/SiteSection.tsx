@@ -7,7 +7,7 @@ import { ConfirmDanger } from '../ui/Dialogs';
 import { Notice } from '../ui/States';
 import { Panel } from '../ui/Surface';
 import { refusal } from './actions';
-import { Loading } from './common';
+import { AsyncState } from '../ui/AsyncState';
 import { answerOf, useLoaded } from '../app/useLoaded';
 
 const t = ru.admin.site;
@@ -38,7 +38,7 @@ export function SiteSection() {
   }
 
   return (
-    <Loading loaded={loaded} rows={1}>
+    <AsyncState loaded={loaded} rows={1} errorTitle={ru.admin.loadErrorTitle}>
       {(status, reload) => (
         <Panel title={t.maintenance} data-testid="admin-site">
           {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
@@ -75,6 +75,6 @@ export function SiteSection() {
           </div>
         </Panel>
       )}
-    </Loading>
+    </AsyncState>
   );
 }

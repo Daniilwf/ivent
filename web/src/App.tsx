@@ -4,8 +4,9 @@ import { CalendarClock, LoaderCircle, SearchX } from 'lucide-react';
 import { ChangePasswordForm } from './app/ChangePasswordForm';
 import { LoginForm, TablePage } from './app/LoginForm';
 import { MaintenanceBanner } from './app/MaintenanceBanner';
-import { navigate, paths, routeOf, usePath } from './app/router';
+import { routeOf, usePath } from './app/router';
 import { UpdateBanner } from './app/WhatsNew';
+import { NotFound } from './app/NotFound';
 import { Shell } from './app/Shell';
 import { AdminScreen } from './admin/AdminScreen';
 import { FeedScreen } from './feed/FeedScreen';
@@ -104,7 +105,7 @@ export function App() {
               className="animate-spin motion-reduce:animate-none"
               aria-hidden
             />
-            {ru.app.loading}
+            {ru.ui.loading}
           </p>
         </main>
       );
@@ -196,21 +197,10 @@ export function App() {
           <GameScreen key={route.gameId} gameId={route.gameId} onSignedOut={signedOut} />
         ) : route.kind === 'notFound' ? (
           <main className="mx-auto grid max-w-110 px-4 py-10" data-testid="page-not-found">
-            <EmptyState
-              level={1}
+            <NotFound
               icon={<SearchX size={28} aria-hidden />}
               title={ru.feed.pageNotFoundTitle}
               text={ru.feed.pageNotFoundText}
-              action={
-                <Button
-                  variant="main"
-                  onClick={() => {
-                    navigate(paths.season());
-                  }}
-                >
-                  {ru.profile.toSeason}
-                </Button>
-              }
             />
           </main>
         ) : route.kind === 'feed' && (route.seasonId ?? signedIn.seasonId) ? (
