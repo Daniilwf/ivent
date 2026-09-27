@@ -34,6 +34,7 @@
     "season:import": "dotnet run --project src/GameEvent.Tools.Import -- season-import",
     "season:check": "dotnet run --project src/GameEvent.Tools.Import -- season-check",
     "backup:verify": "dotnet run --project src/GameEvent.Tools.Import -- backup-verify",
+    "simulate": "dotnet run --project src/GameEvent.Simulator -c Release --",
     "deploy:staging": "node scripts/todo.mjs deploy:staging J2",
     "deploy:prod": "node scripts/todo.mjs deploy:prod J2"
   },
