@@ -24,8 +24,11 @@ appsettings.*.local.json
 design-time.db*
 *.bak
 backups/
+backup-*.zip
 # …but not the code of the backups mechanic (Windows matches names case-insensitively)
-!src/**/Backups/
+!src/GameEvent.Infrastructure/Backups/
+!src/GameEvent.Web/Backups/
+!src/GameEvent.Web.Tests/Backups/
 logs/
 *.log
 
