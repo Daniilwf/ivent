@@ -22,7 +22,7 @@ namespace GameEvent.Web.Testing;
 /// The site's clock as the test endpoints see it: now, whether it can be moved and how far it is from the real time
 /// (<c>shiftMinutes</c>, negative — in the past; H9, D-221).
 /// </summary>
-public sealed record TestClockView(DateTimeOffset Now, bool Adjustable, double ShiftMinutes = 0);
+public sealed record TestClockView(DateTimeOffset Now, bool Adjustable, double ShiftMinutes);
 
 /// <summary>The site's randomness: the seed in force, or null while it is unpredictable; whether it can be seeded.</summary>
 public sealed record TestRandomView(int? Seed, bool Seedable);

@@ -7185,7 +7185,7 @@
             ]
           }
         },
-        "description": "A game an event of the page names; `hasPage` — the viewer may open its page (a deleted game is the admin's);\n`cover` — the pool's cover, only with the page (D-222)."
+        "description": "A game an event of the page names; `hasPage` — the viewer may open its page (a deleted game is the admin's);\n`cover` — the pool's cover, as the season screen shows it (D-222)."
       },
       "FeedPlayerView": {
         "required": [
@@ -9876,13 +9876,14 @@
           "test",
           "other"
         ],
-        "description": "Which copy of the site this is (H9, D-220): every page shows a strip on anything but the live site, so nobody takes the\ntest copy for the real one. `Other` — an environment name the site does not know.",
-        "default": "production"
+        "description": "Which copy of the site this is (H9, D-220): every page shows a strip on anything but the live site, so nobody takes the\ntest copy for the real one. `Other` — an environment name the site does not know."
       },
       "SiteStatusView": {
         "required": [
           "maintenance",
-          "version"
+          "version",
+          "environment",
+          "testTools"
         ],
         "type": "object",
         "properties": {
@@ -9896,8 +9897,7 @@
             "$ref": "#/components/schemas/SiteEnvironment"
           },
           "testTools": {
-            "type": "boolean",
-            "default": false
+            "type": "boolean"
           }
         },
         "description": "What every page asks the site: whether it only reads now (the maintenance banner) and which version it runs — a page\nthat saw another version before shows «Что нового» (J4, D-201). `environment` — which copy of the site this is\n(anything but `production` shows a strip on every page); `testTools` — the test endpoints are there (only\nDevelopment and Test), so the admin gets the page of the test tools (H9, D-220)."
@@ -10050,7 +10050,8 @@
       "TestClockView": {
         "required": [
           "now",
-          "adjustable"
+          "adjustable",
+          "shiftMinutes"
         ],
         "type": "object",
         "properties": {
@@ -10063,8 +10064,7 @@
           },
           "shiftMinutes": {
             "type": "number",
-            "format": "double",
-            "default": 0
+            "format": "double"
           }
         },
         "description": "The site's clock as the test endpoints see it: now, whether it can be moved and how far it is from the real time\n(`shiftMinutes`, negative — in the past; H9, D-221)."

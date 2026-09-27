@@ -6171,7 +6171,7 @@ export interface components {
         };
         /**
          * @description A game an event of the page names; `hasPage` — the viewer may open its page (a deleted game is the admin's);
-         *     `cover` — the pool's cover, only with the page (D-222).
+         *     `cover` — the pool's cover, as the season screen shows it (D-222).
          */
         FeedGameView: {
             /** Format: uuid */
@@ -7026,7 +7026,6 @@ export interface components {
         /**
          * @description Which copy of the site this is (H9, D-220): every page shows a strip on anything but the live site, so nobody takes the
          *     test copy for the real one. `Other` — an environment name the site does not know.
-         * @default production
          * @enum {unknown}
          */
         SiteEnvironment: "production" | "staging" | "development" | "test" | "other";
@@ -7039,8 +7038,7 @@ export interface components {
         SiteStatusView: {
             maintenance: boolean;
             version: string;
-            environment?: components["schemas"]["SiteEnvironment"];
-            /** @default false */
+            environment: components["schemas"]["SiteEnvironment"];
             testTools: boolean;
         };
         SocialRules: {
@@ -7099,10 +7097,7 @@ export interface components {
             /** Format: date-time */
             now: string;
             adjustable: boolean;
-            /**
-             * Format: double
-             * @default 0
-             */
+            /** Format: double */
             shiftMinutes: number;
         };
         /** @description Seed the randomness (the same rolls and dice every time), or null for unpredictable randomness again. */

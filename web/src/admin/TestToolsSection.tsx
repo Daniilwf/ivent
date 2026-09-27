@@ -240,70 +240,76 @@ function ClockPanel({
       </div>
       <p className="max-w-prose text-sm text-ink-soft">{t.clockHint}</p>
       {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
-      <div className="flex flex-wrap gap-3">
-        <Button
-          loading={busy === 'hour'}
-          disabled={busy !== null && busy !== 'hour'}
-          data-testid="clock-plus-hour"
-          onClick={() => void move('hour', { advanceMinutes: 60, reset: false }, t.moved)}
-        >
-          {t.plusHour}
-        </Button>
-        <Button
-          loading={busy === 'day'}
-          disabled={busy !== null && busy !== 'day'}
-          data-testid="clock-plus-day"
-          onClick={() => void move('day', { advanceMinutes: 24 * 60, reset: false }, t.moved)}
-        >
-          {t.plusDay}
-        </Button>
-      </div>
-      <form
-        className="grid gap-3"
-        noValidate
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (moment === '') {
-            setError(t.moveToRequired);
-            return;
-          }
-          setError(undefined);
-          void move('moment', { moveTo: moscowInput(moment), reset: false }, t.moved);
-        }}
-      >
-        <Field
-          type="datetime-local"
-          label={t.moveTo}
-          hint={t.moveToHint}
-          value={moment}
-          error={error}
-          data-testid="clock-moment"
-          onChange={(e) => {
-            setMoment(e.target.value);
-          }}
-        />
-        <div className="flex flex-wrap items-center gap-3">
-          <Button
-            type="submit"
-            loading={busy === 'moment'}
-            disabled={busy !== null && busy !== 'moment'}
-            data-testid="clock-move"
-          >
-            {t.moveToButton}
-          </Button>
-          {shift ? (
+      {clock.adjustable ? (
+        <>
+          <div className="flex flex-wrap gap-3">
             <Button
-              variant="link"
-              loading={busy === 'reset'}
-              disabled={busy !== null && busy !== 'reset'}
-              data-testid="clock-reset"
-              onClick={() => void move('reset', { reset: true }, t.wasReset)}
+              loading={busy === 'hour'}
+              disabled={busy !== null && busy !== 'hour'}
+              data-testid="clock-plus-hour"
+              onClick={() => void move('hour', { advanceMinutes: 60, reset: false }, t.moved)}
             >
-              {t.reset}
+              {t.plusHour}
             </Button>
-          ) : null}
-        </div>
-      </form>
+            <Button
+              loading={busy === 'day'}
+              disabled={busy !== null && busy !== 'day'}
+              data-testid="clock-plus-day"
+              onClick={() => void move('day', { advanceMinutes: 24 * 60, reset: false }, t.moved)}
+            >
+              {t.plusDay}
+            </Button>
+          </div>
+          <form
+            className="grid gap-3"
+            noValidate
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (moment === '') {
+                setError(t.moveToRequired);
+                return;
+              }
+              setError(undefined);
+              void move('moment', { moveTo: moscowInput(moment), reset: false }, t.moved);
+            }}
+          >
+            <Field
+              type="datetime-local"
+              label={t.moveTo}
+              hint={t.moveToHint}
+              value={moment}
+              error={error}
+              data-testid="clock-moment"
+              onChange={(e) => {
+                setMoment(e.target.value);
+              }}
+            />
+            <div className="flex flex-wrap items-center gap-3">
+              <Button
+                type="submit"
+                loading={busy === 'moment'}
+                disabled={busy !== null && busy !== 'moment'}
+                data-testid="clock-move"
+              >
+                {t.moveToButton}
+              </Button>
+              {shift ? (
+                <Button
+                  variant="link"
+                  loading={busy === 'reset'}
+                  disabled={busy !== null && busy !== 'reset'}
+                  data-testid="clock-reset"
+                  onClick={() => void move('reset', { reset: true }, t.wasReset)}
+                >
+                  {t.reset}
+                </Button>
+              ) : null}
+            </div>
+          </form>
+        </>
+      ) : (
+        <Notice tone="info">{ru.admin.rejection['test.clockFixed']}</Notice>
+      )}
     </Panel>
   );
 }
@@ -353,54 +359,60 @@ function RandomPanel({
         {seed === null ? t.unseeded : t.seeded(seed)}
       </p>
       {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
-      <form
-        className="grid gap-3"
-        noValidate
-        onSubmit={(e) => {
-          e.preventDefault();
-          const value = parseSeed(text);
-          if (value === null) {
-            setError(t.seedInvalid);
-            return;
-          }
-          setError(undefined);
-          void send(value);
-        }}
-      >
-        <Field
-          label={t.seed}
-          hint={t.seedHint}
-          inputMode="numeric"
-          autoComplete="off"
-          value={text}
-          error={error}
-          data-testid="random-seed"
-          onChange={(e) => {
-            setText(e.target.value);
-          }}
-        />
-        <div className="flex flex-wrap items-center gap-3">
-          <Button
-            type="submit"
-            loading={busy === 'seed'}
-            disabled={busy === 'unseed'}
-            data-testid="random-set"
+      {random.seedable ? (
+        <>
+          <form
+            className="grid gap-3"
+            noValidate
+            onSubmit={(e) => {
+              e.preventDefault();
+              const value = parseSeed(text);
+              if (value === null) {
+                setError(t.seedInvalid);
+                return;
+              }
+              setError(undefined);
+              void send(value);
+            }}
           >
-            {t.setSeed}
-          </Button>
-          {seed === null ? null : (
-            <Button
-              variant="link"
-              loading={busy === 'unseed'}
-              disabled={busy === 'seed'}
-              data-testid="random-unseed"
-              onClick={() => void send(null)}
-            >
-              {t.unseed}
-            </Button>
-          )}
-        </div>
-      </form>
+            <Field
+              label={t.seed}
+              hint={t.seedHint}
+              inputMode="numeric"
+              autoComplete="off"
+              value={text}
+              error={error}
+              data-testid="random-seed"
+              onChange={(e) => {
+                setText(e.target.value);
+              }}
+            />
+            <div className="flex flex-wrap items-center gap-3">
+              <Button
+                type="submit"
+                loading={busy === 'seed'}
+                disabled={busy === 'unseed'}
+                data-testid="random-set"
+              >
+                {t.setSeed}
+              </Button>
+              {seed === null ? null : (
+                <Button
+                  variant="link"
+                  loading={busy === 'unseed'}
+                  disabled={busy === 'seed'}
+                  data-testid="random-unseed"
+                  onClick={() => void send(null)}
+                >
+                  {t.unseed}
+                </Button>
+              )}
+            </div>
+          </form>
+        </>
+      ) : (
+        <Notice tone="info">{ru.admin.rejection['test.randomFixed']}</Notice>
+      )}
     </Panel>
   );
 }

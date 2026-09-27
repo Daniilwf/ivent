@@ -2,6 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { ru } from '../i18n/ru';
 import { answer, fakeServer } from '../test/fakeServer';
 import { EnvironmentBanner } from './EnvironmentBanner';
+import { forgetSiteEnvironment } from './siteStatus';
 
 // H9, D-220: every page of a copy that is not the live site says so, so nobody takes the test copy for the real site;
 // the live site shows nothing, and neither does a site that did not answer.
@@ -52,6 +53,8 @@ describe('The environment strip', () => {
     });
     expect(screen.queryByTestId('environment-banner')).toBeNull();
     unmount();
+    // Another page: the site is asked again
+    forgetSiteEnvironment();
 
     const failing = fakeServer({ 'GET /api/status': answer(500) });
     render(<EnvironmentBanner />);

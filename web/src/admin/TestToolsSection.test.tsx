@@ -4,6 +4,7 @@ import { App } from '../App';
 import { ru } from '../i18n/ru';
 import { adminUser, answer, fakeServer, seasonId, type Handler } from '../test/fakeServer';
 import { AdminScreen } from './AdminScreen';
+import { forgetSiteEnvironment } from '../app/siteStatus';
 
 // H9, D-221: the test tools — scenarios, the site's clock and its randomness — for the admin, only where the test
 // endpoints exist (Development and Test); on the live site the section is neither listed nor opened.
@@ -152,6 +153,8 @@ describe('The test tools', () => {
     expect(await screen.findByText(t.noPlayers)).toBeInTheDocument();
     expect(screen.getByTestId('scenario-load')).toBeDisabled();
     unmount();
+    // Another page: the site is asked again
+    forgetSiteEnvironment();
 
     site();
     open(null);
@@ -243,6 +246,24 @@ describe('The test tools', () => {
     ]);
   });
 
+  it('offer no moves for a clock or randomness the site cannot change', async () => {
+    site({
+      'GET /api/test': {
+        ...tools(),
+        clock: { ...tools().clock, adjustable: false },
+        random: { seed: null, seedable: false },
+      },
+    });
+    open();
+
+    expect(
+      await screen.findByText(ru.admin.rejection['test.clockFixed'] ?? ''),
+    ).toBeInTheDocument();
+    expect(screen.getByText(ru.admin.rejection['test.randomFixed'] ?? '')).toBeInTheDocument();
+    expect(screen.queryByTestId('clock-plus-hour')).toBeNull();
+    expect(screen.queryByTestId('random-set')).toBeNull();
+  });
+
   it('say so when the tools do not load, with a retry', async () => {
     site({ 'GET /api/test': answer(500) });
     open();
@@ -276,6 +297,8 @@ describe('The test tools on the live site', () => {
     await userEvent.click(await screen.findByTestId('admin-sections'));
     expect(await screen.findByTestId('admin-nav-test')).toHaveTextContent(ru.admin.sections.test);
     unmount();
+    // Another page: the site is asked again
+    forgetSiteEnvironment();
 
     const live = app(false);
     render(<App />);

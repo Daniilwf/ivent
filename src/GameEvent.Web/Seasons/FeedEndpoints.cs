@@ -27,7 +27,7 @@ public sealed record FeedPlayerView(Guid Id, Guid UserId, string Name, FileLinkV
 
 /// <summary>
 /// A game an event of the page names; <c>hasPage</c> — the viewer may open its page (a deleted game is the admin's);
-/// <c>cover</c> — the pool's cover, only with the page (D-222).
+/// <c>cover</c> — the pool's cover, as the season screen shows it (D-222).
 /// </summary>
 public sealed record FeedGameView(Guid Id, string Title, bool HasPage, FileLinkView? Cover = null);
 
@@ -183,7 +183,7 @@ public static class FeedEndpoints
                 .Where(g => gameIds.Contains(g.Id))
                 .Select(g => new { g.Id, g.Title, HasPage = admin || !g.IsDeleted, g.CoverFileId })
                 .ToListAsync(ct))
-            .Select(g => new FeedGameView(g.Id, g.Title, g.HasPage, g.HasPage && g.CoverFileId is { } cover ? FileLinkView.Of(cover) : null))
+            .Select(g => new FeedGameView(g.Id, g.Title, g.HasPage, g.CoverFileId is { } cover ? FileLinkView.Of(cover) : null))
             .ToList();
         return (players, games, runs);
     }

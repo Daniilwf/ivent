@@ -96,7 +96,7 @@ public sealed class GameCoverApiTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task The_feeds_games_carry_their_covers_but_a_deleted_games_only_for_the_admin()
+    public async Task The_feeds_games_carry_their_covers_a_deleted_one_too()
     {
         var vasya = await _site.SignedInAsync("vasya");
         var admin = await _site.SignedInAsync("admin");
@@ -111,15 +111,15 @@ public sealed class GameCoverApiTests : IAsyncLifetime
             AssertCover(game);
         }
 
-        // A deleted game has no page for a player, and so no cover either; the admin keeps both
+        // A deleted game has no page for a player, but its cover stays, as on the season screen: covers are not secret
+        // (any signed-in user reads a file by its id, D-222)
         var gameId = (await MeAsync(vasya)).GetProperty("lastCompleted").GetProperty("game").GetProperty("id").GetGuid();
         await PostOkAsync(admin, $"/api/admin/pool/{gameId}/delete");
 
         var forPlayer = (await FeedGamesAsync(vasya)).Single(g => g.GetProperty("id").GetGuid() == gameId);
         Assert.False(forPlayer.GetProperty("hasPage").GetBoolean());
-        Assert.Equal(JsonValueKind.Null, forPlayer.GetProperty("cover").ValueKind);
-        var forAdmin = (await FeedGamesAsync(admin)).Single(g => g.GetProperty("id").GetGuid() == gameId);
-        AssertCover(forAdmin);
+        AssertCover(forPlayer);
+        AssertCover((await MeAsync(vasya)).GetProperty("lastCompleted").GetProperty("game"));
     }
 
     // ---- Helpers ----

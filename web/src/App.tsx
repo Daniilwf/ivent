@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api, refreshCsrf, type Schemas } from './api/client';
-import { CalendarClock, LoaderCircle, SearchX } from 'lucide-react';
+import { CalendarClock, LoaderCircle } from 'lucide-react';
 import { ChangePasswordForm } from './app/ChangePasswordForm';
 import { LoginForm, TablePage } from './app/LoginForm';
 import { EnvironmentBanner } from './app/EnvironmentBanner';
 import { MaintenanceBanner } from './app/MaintenanceBanner';
 import { routeOf, usePath } from './app/router';
 import { UpdateBanner } from './app/WhatsNew';
-import { NotFound } from './app/NotFound';
+import { NotFoundPage } from './app/NotFound';
 import { Shell } from './app/Shell';
 import { AdminScreen } from './admin/AdminScreen';
 import { FeedScreen } from './feed/FeedScreen';
@@ -204,13 +204,7 @@ export function App() {
           <GameScreen key={route.gameId} gameId={route.gameId} onSignedOut={signedOut} />
         ) : route.kind === 'notFound' || (route.kind === 'admin' && admin) ? (
           // An address the site does not have, the admin's unknown section included
-          <main className="mx-auto grid max-w-110 px-4 py-10" data-testid="page-not-found">
-            <NotFound
-              icon={<SearchX size={28} aria-hidden />}
-              title={ru.feed.pageNotFoundTitle}
-              text={ru.feed.pageNotFoundText}
-            />
-          </main>
+          <NotFoundPage />
         ) : route.kind === 'feed' && (route.seasonId ?? signedIn.seasonId) ? (
           <FeedScreen
             key={route.seasonId ?? signedIn.seasonId}

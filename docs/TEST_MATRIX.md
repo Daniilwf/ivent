@@ -389,6 +389,7 @@
 
 | ID | Правило | Тесты | Статус |
 | --- | --- | --- | --- |
+| TT0 | Настоящие часы разработки ведут сдвиг (`Offset`) при сдвиге, переводе и возврате; случайность называет своё зерно и повторяется с ним | `ShiftableClockTests.cs` («The_offset_follows…», «The_randomness_tells_its_seed…») | ✅ |
 | TT1 | `GET /api/test` отдаёт часы со сдвигом от настоящего времени, текущее зерно и сценарии; сдвиг и зерно меняются вместе с часами и случайностью (D-221) | `src/GameEvent.Web.Tests/Api/TestEndpointsTests.cs` («The_tools_page_reads…») | ✅ |
 | TT2 | Сценарий берёт игрока по id в сезоне; чужой id — 409 `test.playerUnknown`, ничего не двигается | `TestEndpointsTests.cs` («A_scenario_takes_the_player_by_their_id…») | ✅ |
 | TT3 | Невалидный ввод (зерно не целое или вне int, минуты строкой, id игрока не guid) — 400 | `TestEndpointsTests.cs` («A_malformed_test_request_is_invalid», «A_scenario_for_a_malformed_player_id…») | ✅ |
@@ -396,14 +397,14 @@
 | TT5 | На боевом сайте и тестовой копии (`Staging`) маршрутов нет (404), документа OpenAPI на боевом нет; в Development и Test описание API их называет | `TestEndpointsTests.cs` («In_production_the_test_routes_do_not_exist», «On_the_test_copy_the_admin_has_no_test_tools_either», «The_api_description_of_the_test_copy…») | ✅ |
 | TT6 | Статус называет окружение и наличие инструментов (Production, Staging, Development, Test) (D-220) | `TestEndpointsTests.cs` («The_status_names_the_copy_of_the_site…») | ✅ |
 | TT7 | Полоса «не настоящий сайт» на каждой странице не боевого окружения; на боевом и без ответа — нет | `web/src/app/EnvironmentBanner.test.tsx` | ✅ |
-| TT8 | Раздел «Тестовая копия» в админке только при `testTools`; по адресу без них — «Такой страницы нет» и ни одного запроса к `/api/test` | `web/src/admin/TestToolsSection.test.tsx` («The test tools on the live site») | ✅ |
-| TT9 | Страница: скелетон, ошибка с повтором, нет сезона, нет игроков; сценарий на выбранном игроке и «Дедлайн через час» без игрока, итог и отказ по-русски; +1 час, момент по Москве (с проверкой пустого), возврат к настоящему времени; зерно только целым, «Снова случайно» | `TestToolsSection.test.tsx` («The test tools») | ✅ |
+| TT8 | Раздел «Инструменты для тестов» в админке только при `testTools`; по адресу без них — «Такой страницы нет» и ни одного запроса к `/api/test` | `web/src/admin/TestToolsSection.test.tsx` («The test tools on the live site») | ✅ |
+| TT9 | Страница: скелетон, ошибка с повтором, нет сезона, нет игроков; сценарий на выбранном игроке и «Дедлайн через час» без игрока, итог и отказ по-русски; +1 час, момент по Москве (с проверкой пустого), возврат к настоящему времени; зерно только целым, «Снова случайно»; часы и случайность, которые сайт не меняет, — пояснение вместо кнопок | `TestToolsSection.test.tsx` («The test tools») | ✅ |
 
 ## Обложки игр на экранах (H9, D-222)
 
 | ID | Правило | Тесты | Статус |
 | --- | --- | --- | --- |
 | CV1 | Предложенная игра, каждый вариант выбора, текущее и последнее прохождение несут обложку игры пула; игра без обложки — `null` | `src/GameEvent.Web.Tests/Api/GameCoverApiTests.cs` | ✅ |
-| CV2 | Игры ленты несут обложку; у удалённой игры — только для админа (игроку страница игры не видна) | `GameCoverApiTests.cs` («The_feeds_games_carry_their_covers…») | ✅ |
-| CV3 | Экран сезона показывает обложку через `Cover` в предложении, вариантах выбора, карточке «играю» и у последнего прохождения; без обложки — нейтральная заглушка | `web/src/season/GameCovers.test.tsx` | ✅ |
+| CV2 | Игры ленты несут обложку, удалённая — тоже (страницы у неё для игрока нет), как на экране сезона | `GameCoverApiTests.cs` («The_feeds_games_carry_their_covers_a_deleted_one_too») | ✅ |
+| CV3 | Экран сезона показывает обложку через `Cover` в предложении, вариантах выбора, на колесе, в карточке «играю» и у последнего прохождения; без обложки — нейтральная заглушка | `web/src/season/GameCovers.test.tsx` | ✅ |
 | CV4 | Лента показывает обложку рядом со строкой прохождения, и только если она есть | `web/src/feed/feedModel.test.ts` («puts the cover of a completed game…»), `web/src/feed/FeedScreen.test.tsx` («shows the cover of a completed game…») | ✅ |

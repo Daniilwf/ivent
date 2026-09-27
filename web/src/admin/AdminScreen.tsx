@@ -11,13 +11,13 @@ import {
   Sparkles,
   UserCog,
   Users,
-  SearchX,
   Wrench,
 } from 'lucide-react';
 import { useCallback, useRef, useState, type ReactNode } from 'react';
 import { api, type Schemas } from '../api/client';
 import { Link } from '../app/Link';
-import { NotFound } from '../app/NotFound';
+import { NotFoundPage } from '../app/NotFound';
+import { siteEnvironment } from '../app/siteStatus';
 import { navigate, paths, usePageHeading } from '../app/router';
 import { ru } from '../i18n/ru';
 import { Badge } from '../ui/Marks';
@@ -105,7 +105,12 @@ export function AdminScreen({
   const waiting = proofs.kind === 'ready' ? proofs.value.length : null;
 
   // Which copy of the site this is: the test tools' section is there only where the test endpoints are
-  const status = useLoaded(useCallback(async () => answerOf(await api.GET('/api/status')), []));
+  const status = useLoaded(
+    useCallback(async () => {
+      const answer = await siteEnvironment();
+      return answer ? { kind: 'ready' as const, value: answer } : { kind: 'failed' as const };
+    }, []),
+  );
   const testTools = status.kind === 'ready' && status.value.testTools;
   const shown = sections.filter((s) => s.id !== 'test' || testTools);
 
@@ -150,14 +155,8 @@ export function AdminScreen({
   // The test tools' address on a copy without them is an address the site does not have; until the site answered,
   // nothing is said about the section at all
   if (section === 'test' && !testTools)
-    return status.kind === 'ready' || status.kind === 'notFound' ? (
-      <main className="mx-auto grid max-w-110 px-4 py-10" data-testid="page-not-found">
-        <NotFound
-          icon={<SearchX size={28} aria-hidden />}
-          title={ru.feed.pageNotFoundTitle}
-          text={ru.feed.pageNotFoundText}
-        />
-      </main>
+    return status.kind === 'ready' ? (
+      <NotFoundPage />
     ) : (
       <main className="mx-auto grid max-w-110 px-4 py-10">
         <AsyncState loaded={status} rows={2} errorTitle={t.loadErrorTitle} level={1}>

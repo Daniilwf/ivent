@@ -1,7 +1,8 @@
 import { FlaskConical } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { api, type Schemas } from '../api/client';
+import type { Schemas } from '../api/client';
 import { ru } from '../i18n/ru';
+import { siteEnvironment } from './siteStatus';
 
 type Environment = Schemas['SiteEnvironment'];
 
@@ -14,21 +15,22 @@ export function EnvironmentBanner() {
 
   useEffect(() => {
     let alive = true;
-    const ask = async () => {
-      try {
-        const { data } = await api.GET('/api/status');
-        if (alive && data) setEnvironment(data.environment ?? 'production');
-      } catch {
-        // No answer is no strip: the live site must never show one by mistake, and a copy says so on the next load
-      }
-    };
-    void ask();
+    // No answer is no strip: the live site must never show one by mistake, and a copy says so on the next load
+    void siteEnvironment().then((status) => {
+      if (alive && status) setEnvironment(status.environment);
+    });
     return () => {
       alive = false;
     };
   }, []);
 
-  if (environment === null || environment === 'production') return null;
+  // Only a copy the dictionary names: an answer without the environment is no strip either
+  if (
+    environment === null ||
+    environment === 'production' ||
+    !Object.hasOwn(ru.environment, environment)
+  )
+    return null;
   return (
     <aside
       aria-label={ru.environment.label}

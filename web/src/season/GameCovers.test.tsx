@@ -1,4 +1,5 @@
 import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { Schemas } from '../api/client';
 import { ru } from '../i18n/ru';
 import { fakeServer, seasonId } from '../test/fakeServer';
@@ -175,5 +176,46 @@ describe('Game covers on the season screen (D-222)', () => {
 
     const dice = await screen.findByTestId('last-dice');
     expect(pictures(dice.parentElement as HTMLElement)).toEqual([cover(1).thumbnailUrl]);
+  });
+
+  it('shows the cover of the game the wheel lands on', async () => {
+    // On a desktop the landed wheel stays on the map's stage with the result
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: query.includes('min-width'),
+      media: query,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+    }));
+    let current = season({});
+    fakeServer({
+      [`GET /api/seasons/${seasonId}`]: () => ({ body: current }),
+      [`GET /api/seasons/${seasonId}/feed`]: {
+        entries: [],
+        nextBefore: null,
+        players: [],
+        games: [],
+        runs: [],
+      },
+      [`POST /api/seasons/${seasonId}/roll`]: () => {
+        current = {
+          ...season({
+            phase: 'rolling',
+            offer: offered('Silent Hill', cover(1)),
+            nextReroll: { payment: 'freeThisRoll', coins: 0 },
+            roll: { sequence: 7, category: 'Horror', sectors: ['Action', 'Horror'], misses: [] },
+          }),
+          lastSequence: 7,
+        };
+        return { body: { duplicate: false, events: [] } };
+      },
+    });
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    await userEvent.click(await screen.findByTestId('roll'));
+
+    await userEvent.click(
+      within(await screen.findByTestId('wheel')).getByRole('button', { name: ru.moments.skip }),
+    );
+    expect(pictures(await screen.findByTestId('wheel'))).toContain(cover(1).thumbnailUrl);
   });
 });

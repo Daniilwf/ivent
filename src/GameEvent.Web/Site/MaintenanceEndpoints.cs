@@ -12,7 +12,7 @@ namespace GameEvent.Web.Site;
 /// (anything but <c>production</c> shows a strip on every page); <c>testTools</c> — the test endpoints are there (only
 /// Development and Test), so the admin gets the page of the test tools (H9, D-220).
 /// </summary>
-public sealed record SiteStatusView(bool Maintenance, string Version, SiteEnvironment Environment = SiteEnvironment.Production, bool TestTools = false);
+public sealed record SiteStatusView(bool Maintenance, string Version, SiteEnvironment Environment, bool TestTools);
 
 public sealed record MaintenanceRequest(bool On);
 
