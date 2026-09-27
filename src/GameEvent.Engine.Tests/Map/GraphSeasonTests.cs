@@ -247,4 +247,30 @@ public class GraphSeasonTests
             x => x.Act(new ChangeRuleset(x.Ruleset with { Features = x.Ruleset.Features with { MapMode = MapMode.Linear } })),
             RejectionCodes.MapModeFixed);
     }
+
+    // ---- What the editor shows before publishing ----
+
+    [Fact]
+    public void Publication_checks_list_every_occupied_cell_the_new_map_breaks()
+    {
+        // The editor shows them all at once (2.11); PublishMap refuses on the first kind
+        var s = Scenario.New().WithMap(ForkMap()).WithPlayers("Вася", "Петя", "Маша");
+        s.Act(new AdjustPlayer(s.PlayerId("Вася"), "Перенос", CellId: "c1"));
+        s.Act(new AdjustPlayer(s.PlayerId("Петя"), "Перенос", CellId: "k"));
+        var broken = MapBuilder.New().Path("start", "a", "f", "b1", "j", "k").Path("f", "c2", "j").Cell("k", CellType.Finish).Build();
+
+        var problems = MapPublicationChecks.For(s.State, broken);
+
+        Assert.Equal(
+            [(RejectionCodes.MapOccupiedCellRemoved, "c1"), (RejectionCodes.MapOccupiedCellRetyped, "k")],
+            problems.Select(p => (p.Code, p.Subject)));
+    }
+
+    [Fact]
+    public void Publication_checks_are_empty_when_every_player_keeps_their_cell()
+    {
+        var s = Scenario.New().WithMap(ForkMap()).WithPlayers("Вася");
+
+        Assert.Empty(MapPublicationChecks.For(s.State, MapBuilder.New().Path("start", "x", "finish").Build()));
+    }
 }

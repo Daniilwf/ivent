@@ -82,6 +82,9 @@ function season(leaderboard: Row[]): Schemas['SeasonView'] {
       finish: { order: 1, frozen: false },
     },
     lastSequence: 3,
+    edges: [],
+    zones: [],
+    mapMode: 'linear',
     name: 'Тестовый сезон',
     leaderboard,
   };

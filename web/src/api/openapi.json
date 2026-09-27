@@ -3324,6 +3324,199 @@
         }
       }
     },
+    "/api/admin/seasons/{seasonId}/map": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "parameters": [
+          {
+            "name": "seasonId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminMapView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/seasons/{seasonId}/map/check": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "parameters": [
+          {
+            "name": "seasonId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MapGraphView"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MapCheckView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/seasons/{seasonId}/map/publish": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "parameters": [
+          {
+            "name": "seasonId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublishMapRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RejectionProblem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/admin/seasons": {
       "post": {
         "tags": [
@@ -5696,6 +5889,33 @@
         },
         "description": "A pending manual effect of any player, oldest first, for the admin to resolve (D-102)."
       },
+      "AdminMapView": {
+        "required": [
+          "mode",
+          "status",
+          "map",
+          "players"
+        ],
+        "type": "object",
+        "properties": {
+          "mode": {
+            "$ref": "#/components/schemas/MapMode"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SeasonStatus"
+          },
+          "map": {
+            "$ref": "#/components/schemas/MapGraphView"
+          },
+          "players": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MapPlayerView"
+            }
+          }
+        },
+        "description": "The season's map in the editor (2.11): the map in force, the players on it, the mode (the editor publishes only in\n`graph`, D-301) and the status (only a draft or a running season takes a new map)."
+      },
       "AdminPlayerView": {
         "required": [
           "id",
@@ -6206,8 +6426,54 @@
           },
           "type": {
             "$ref": "#/components/schemas/CellType"
+          },
+          "zone": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "to": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "amount": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "deck": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "grants": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "x": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "y": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
           }
-        }
+        },
+        "description": "A cell of the season's map (D-300, D-302): its type and the parameters of that type (`to` of a teleport,\n`amount` of a points bonus, `deck` of an event, `grants` of a shop), its zone and where the editor\nplaced it (`x`, `y`; none on a linear map). The same shape goes back to the editor's check and publication."
       },
       "ChallengeBonus": {
         "required": [
@@ -6350,9 +6616,16 @@
             "items": {
               "$ref": "#/components/schemas/ChoiceOptionView"
             }
+          },
+          "steps": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
           }
         },
-        "description": "The pending choice, kept on the server: a reloaded page shows the same options (T2)."
+        "description": "The pending choice, kept on the server: a reloaded page shows the same options (T2). A branch choice (D-304): each\noption's id is the cell the branch leads to, `steps` — the steps of the throw still to walk from the fork."
       },
       "ChooseRequest": {
         "required": [
@@ -6718,6 +6991,18 @@
           }
         }
       },
+      "DiceStage": {
+        "enum": [
+          "count",
+          "sides",
+          "add",
+          "multiply",
+          "reroll",
+          "min",
+          "max"
+        ],
+        "description": "A stage of the dice pipeline (D-14)."
+      },
       "DieByDifficulty": {
         "required": [
           "easy",
@@ -6936,6 +7221,30 @@
             "$ref": "#/components/schemas/ShopRules"
           }
         }
+      },
+      "EdgeView": {
+        "required": [
+          "from",
+          "to",
+          "isDefaultForward",
+          "isPrimaryBackward"
+        ],
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          },
+          "isDefaultForward": {
+            "type": "boolean"
+          },
+          "isPrimaryBackward": {
+            "type": "boolean"
+          }
+        },
+        "description": "An arrow of the map: `isDefaultForward` — the default branch (every exit of a plain cell, one exit of a fork);\n`isPrimaryBackward` — the main incoming edge a move back takes into a cell with several entries."
       },
       "EffectRules": {
         "required": [
@@ -7929,11 +8238,124 @@
         },
         "description": "A manual effect the player still has to play out (D-10, D-93); the player resolves it (D-102)."
       },
+      "MapCheckView": {
+        "required": [
+          "canPublish",
+          "problems",
+          "warnings"
+        ],
+        "type": "object",
+        "properties": {
+          "canPublish": {
+            "type": "boolean"
+          },
+          "problems": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MapProblemView"
+            }
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ZoneGamesWarningView"
+            }
+          }
+        },
+        "description": "The check of a map before publication (SPEC «Редактор»): every problem at once — the map's own (MapValidator) and\nthe ones of the season now (occupied cells, pending branch choices) — and the zone warnings. `canPublish` — no\nproblems and the season takes a map now."
+      },
+      "MapGraphView": {
+        "required": [
+          "cells",
+          "edges",
+          "zones"
+        ],
+        "type": "object",
+        "properties": {
+          "cells": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/CellView"
+            }
+          },
+          "edges": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/EdgeView"
+            }
+          },
+          "zones": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/ZoneView"
+            }
+          }
+        },
+        "description": "A whole map: what the editor loads, checks and publishes."
+      },
       "MapMode": {
         "enum": [
           "linear",
           "graph"
         ]
+      },
+      "MapPlayerView": {
+        "required": [
+          "playerId",
+          "name",
+          "cellId",
+          "finished",
+          "choosingBranch"
+        ],
+        "type": "object",
+        "properties": {
+          "playerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "cellId": {
+            "type": "string"
+          },
+          "finished": {
+            "type": "boolean"
+          },
+          "choosingBranch": {
+            "type": "boolean"
+          }
+        },
+        "description": "A player on the map as the editor needs them: the cell they stand on (it cannot be removed, D-308), whether they\nhave finished (their cell stays a finish) and whether they are choosing a branch (publication waits, D-305)."
+      },
+      "MapProblemView": {
+        "required": [
+          "code",
+          "subject",
+          "message"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "subject": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "description": "A problem of a map: the engine's stable code (`map.…`; the editor's dictionary words it), what it is about — a\ncell id, an arrow `from→to`, a zone id or `map` — and the engine's English message for the log."
       },
       "MapRules": {
         "required": [
@@ -7953,6 +8375,61 @@
             "format": "int32"
           }
         }
+      },
+      "MoveLegView": {
+        "required": [
+          "from",
+          "path",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string"
+          },
+          "path": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "reason": {
+            "$ref": "#/components/schemas/MoveReason"
+          }
+        },
+        "description": "One leg of my latest move: the cells entered from `from` in order. `reason` `teleport` is a transfer,\nnot a walk (D-303); a leg that stopped at a fork with steps left is followed by a branch choice (D-304)."
+      },
+      "MoveReason": {
+        "enum": [
+          "completionRoll",
+          "startingCell",
+          "adminAdjustment",
+          "dropPenalty",
+          "runCorrection",
+          "proofRejected",
+          "teleport"
+        ],
+        "description": "What moved the token. Rejecting a run takes back the cells of moves linked to it."
+      },
+      "MoveView": {
+        "required": [
+          "sequence",
+          "legs"
+        ],
+        "type": "object",
+        "properties": {
+          "sequence": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "legs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MoveLegView"
+            }
+          }
+        },
+        "description": "My latest move, from the log: the legs of the one command that moved my token last, so the page walks the token\nalong the real branch and teleport. `sequence` tells one move from the next."
       },
       "MyFinishView": {
         "required": [
@@ -8122,6 +8599,16 @@
             "items": {
               "$ref": "#/components/schemas/DifficultyDieView"
             }
+          },
+          "lastMove": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/MoveView"
+              }
+            ]
           }
         },
         "description": "The signed-in player's own turn. While playing: `dropHintMinutes` is `roll.minPlayMinutesBeforeDrop` until\nthat much has been played by the server clock (only a hint: D-09), then null; `dropPenalty` is what a drop costs\nunder the rules in force; `techRerollOpen` says whether the player may still tech-reroll themselves (D-94);\n`challengesEnabled` says whether a challenge may be claimed on completion (`features.challenges`, D-96);\n`techRerollUntil` is when the player's own tech reroll window closes (the roll time plus the run's snapshot of\n`roll.techRerollWindowHours`), null while not playing. The active run's game carries the hours of the roll's\nsnapshot, the ones the completion counts (D-44): the pool may have got hours since (D-138). `difficultyDice` —\nwhile playing, the die each difficulty gives under the run's snapshot and the event it grants, if any."
@@ -8797,6 +9284,36 @@
           }
         },
         "description": "The proof of a run and how the admin checked it."
+      },
+      "PublishMapRequest": {
+        "required": [
+          "commandId",
+          "map"
+        ],
+        "type": "object",
+        "properties": {
+          "commandId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "map": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/MapGraphView"
+              }
+            ]
+          },
+          "comment": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "Publish a new version of the map (D-300, D-308); `comment` goes to the public log, at most 500 characters."
       },
       "RankingRules": {
         "required": [
@@ -9760,7 +10277,10 @@
           "leaderboard",
           "me",
           "lastSequence",
-          "name"
+          "name",
+          "edges",
+          "zones",
+          "mapMode"
         ],
         "type": "object",
         "properties": {
@@ -9812,9 +10332,24 @@
           },
           "name": {
             "type": "string"
+          },
+          "edges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EdgeView"
+            }
+          },
+          "zones": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ZoneView"
+            }
+          },
+          "mapMode": {
+            "$ref": "#/components/schemas/MapMode"
           }
         },
-        "description": "The season screen's data. `status` and `deadline` (UTC; the screen shows it in Moscow time) follow the\nlifecycle (D-101); after the finish `leaderboard` is the recorded result."
+        "description": "The season screen's data. `status` and `deadline` (UTC; the screen shows it in Moscow time) follow the\nlifecycle (D-101); after the finish `leaderboard` is the recorded result. The map is the one in force (the\nlatest published, D-300): `cells`, `edges` and `zones`; `mapMode` says whether the season plays\non the linear chain of stage 1 or on the graph (D-301)."
       },
       "ShopRules": {
         "required": [
@@ -10265,6 +10800,137 @@
           }
         },
         "description": "The wheel of the roll that offered what I see now (D-136), from the log: the categories that were on it, the one it\npicked and the games it missed on the way, with who holds each. `sequence` tells one roll from the next, so the\npage spins only for a new one. Null when nothing is offered or the offer did not come from my own roll."
+      },
+      "ZoneDiceView": {
+        "required": [
+          "stage",
+          "value"
+        ],
+        "type": "object",
+        "properties": {
+          "stage": {
+            "$ref": "#/components/schemas/DiceStage"
+          },
+          "value": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "A zone's change of the completion dice (D-307): `count` — more dice (less when negative), `add` — to the sum."
+      },
+      "ZoneFilterView": {
+        "type": "object",
+        "properties": {
+          "tags": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "minHours": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "maxHours": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "releaseYearBefore": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          }
+        },
+        "description": "A zone's roll filter (CONTENT.md «Зона»): any of the tags, hours between, released before the year."
+      },
+      "ZoneGamesWarningView": {
+        "required": [
+          "zoneId",
+          "available",
+          "wanted"
+        ],
+        "type": "object",
+        "properties": {
+          "zoneId": {
+            "type": "string"
+          },
+          "available": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "wanted": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "A zone whose roll filter leaves fewer available games than the rules want (D-307); it never blocks publication."
+      },
+      "ZoneView": {
+        "required": [
+          "id",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "rollFilter": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ZoneFilterView"
+              }
+            ]
+          },
+          "diceModifier": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ZoneDiceView"
+              }
+            ]
+          },
+          "dropPenaltyMultiplier": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "deck": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "shopPriceMultiplier": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          }
+        },
+        "description": "A zone of the map and its rules (CONTENT.md «Зона», D-307): the roll filter while a player stands in it, the dice\nchange and the drop penalty multiplier fixed at the roll; the deck and the shop prices wait for their mechanics."
       }
     }
   },

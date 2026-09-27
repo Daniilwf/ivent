@@ -10,6 +10,7 @@ using GameEvent.Infrastructure.Seasons;
 using GameEvent.Web.Accounts;
 using GameEvent.Web.BugReports;
 using GameEvent.Web.Files;
+using GameEvent.Web.Map;
 using GameEvent.Web.Observability;
 using GameEvent.Web.Pool;
 using GameEvent.Web.Proofs;
@@ -210,6 +211,7 @@ public static class AppSetup
         api.MapAdminRuns();
         api.MapAdminProofs();
         api.MapAdminSeasons();
+        api.MapAdminMap();
         api.MapSeasonsAndPlayers();
         api.MapFeed();
         api.MapAdminAccounts();

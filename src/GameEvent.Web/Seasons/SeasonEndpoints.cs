@@ -2,7 +2,6 @@ using System.Security.Claims;
 using System.Text.Json;
 using GameEvent.Engine.Effects;
 using GameEvent.Engine.Kernel;
-using GameEvent.Engine.Map;
 using GameEvent.Engine.Proofs;
 using GameEvent.Engine.Ranking;
 using GameEvent.Engine.Rolls;
@@ -14,6 +13,7 @@ using GameEvent.Infrastructure.Database;
 using GameEvent.Infrastructure.Queue;
 using GameEvent.Web.Accounts;
 using GameEvent.Web.Hosting;
+using GameEvent.Web.Map;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 
@@ -82,7 +82,9 @@ public sealed record LoggedEventView(long Sequence, string Type);
 
 /// <summary>
 /// The season screen's data. <c>status</c> and <c>deadline</c> (UTC; the screen shows it in Moscow time) follow the
-/// lifecycle (D-101); after the finish <c>leaderboard</c> is the recorded result.
+/// lifecycle (D-101); after the finish <c>leaderboard</c> is the recorded result. The map is the one in force (the
+/// latest published, D-300): <c>cells</c>, <c>edges</c> and <c>zones</c>; <c>mapMode</c> says whether the season plays
+/// on the linear chain of stage 1 or on the graph (D-301).
 /// </summary>
 public sealed record SeasonView(
     Guid Id,
@@ -93,15 +95,16 @@ public sealed record SeasonView(
     IReadOnlyList<LeaderboardRowView> Leaderboard,
     MyTurnView? Me,
     long LastSequence,
-    string Name);
+    string Name,
+    IReadOnlyList<EdgeView> Edges,
+    IReadOnlyList<ZoneView> Zones,
+    MapMode MapMode);
 
 /// <summary>
 /// A leaderboard row in place order (D-100): tied players share <c>place</c>; <c>isFirst</c> — the first finisher, on top
 /// whatever the points, <c>provisional</c> until frozen; <c>cellsToFinish</c> — fewest forward steps to the finish.
 /// </summary>
 public sealed record LeaderboardRowView(Guid PlayerId, int Place, int Points, int? CellsToFinish, bool IsFirst, bool Provisional);
-
-public sealed record CellView(string Id, CellType Type);
 
 /// <summary>
 /// A player on the map and the leaderboard; <c>finishOrder</c> is their order among the finishers, null before the finish;
@@ -136,7 +139,8 @@ public sealed record MyTurnView(
     UncheckedRunsView? Unchecked,
     WheelRollView? Roll,
     DateTimeOffset? TechRerollUntil = null,
-    IReadOnlyList<DifficultyDieView>? DifficultyDice = null);
+    IReadOnlyList<DifficultyDieView>? DifficultyDice = null,
+    MoveView? LastMove = null);
 
 /// <summary>The die a difficulty gives on completion, and the event it grants (<c>good</c>, <c>bad</c>) or none.</summary>
 public sealed record DifficultyDieView(Difficulty Difficulty, int Sides, EventKind? GrantEvent);
@@ -187,8 +191,11 @@ public sealed record RerollPriceView(RerollPayment Payment, int Coins);
 /// <summary>A manual effect the player still has to play out (D-10, D-93); the player resolves it (D-102).</summary>
 public sealed record ManualEffectView(Guid Id, EventKind DrawEvent, ManualEffectSource Source);
 
-/// <summary>The pending choice, kept on the server: a reloaded page shows the same options (T2).</summary>
-public sealed record ChoiceView(Guid Id, ChoiceKind Kind, IReadOnlyList<ChoiceOptionView> Options);
+/// <summary>
+/// The pending choice, kept on the server: a reloaded page shows the same options (T2). A branch choice (D-304): each
+/// option's id is the cell the branch leads to, <c>steps</c> — the steps of the throw still to walk from the fork.
+/// </summary>
+public sealed record ChoiceView(Guid Id, ChoiceKind Kind, IReadOnlyList<ChoiceOptionView> Options, int? Steps = null);
 
 public sealed record ChoiceOptionView(string Id, OfferedGameView? Game);
 
@@ -513,6 +520,7 @@ public static class SeasonEndpoints
         var players = await db.SeasonPlayers.AsNoTracking().Where(p => p.SeasonId == seasonId).InTokenOrder().ToListAsync(ct);
         var seasonRecord = await db.Seasons.AsNoTracking().SingleAsync(s => s.Id == seasonId, ct);
         var rules = JsonSerializer.Deserialize<Ruleset>(seasonRecord.RulesetJson, EngineJson.Options)!;
+        var map = await SeasonMaps.CurrentAsync(db, seasonId, season.Map, ct);
         var completedRuns = await db.Runs.AsNoTracking()
             .Where(r => r.SeasonId == seasonId && r.Status == RunStatus.Completed)
             .GroupBy(r => r.PlayerId)
@@ -525,7 +533,7 @@ public static class SeasonEndpoints
             players.Select(p => new RankingEntry(
                 p.Id, p.Points, p.CellId, p.FinishOrder, p.Frozen, completedRuns.GetValueOrDefault(p.Id), p.PointsTick)),
             rules.Ranking,
-            season.Map);
+            map);
 
         MyTurnView? me = null;
         var userId = user.UserId();
@@ -602,7 +610,8 @@ public static class SeasonEndpoints
                 choice is null ? null : new ChoiceView(
                     choice.ChoiceId,
                     choice.Kind,
-                    [.. choice.Options.Select(o => new ChoiceOptionView(o.Id, o.Game is null ? null : Offered(o.Game)))]),
+                    [.. choice.Options.Select(o => new ChoiceOptionView(o.Id, o.Game is null ? null : Offered(o.Game)))],
+                    choice.Move?.Steps),
                 mine.Phase == TurnPhase.Rolling ? new RerollPriceView(price.Payment, price.Coins) : null,
                 run is null
                     ? null
@@ -639,7 +648,9 @@ public static class SeasonEndpoints
                         new DifficultyDieView(Difficulty.Normal, snapshot.DieByDifficulty.Normal.Sides, snapshot.DieByDifficulty.Normal.GrantEvent),
                         new DifficultyDieView(Difficulty.Hard, snapshot.DieByDifficulty.Hard.Sides, snapshot.DieByDifficulty.Hard.GrantEvent),
                         new DifficultyDieView(Difficulty.Extreme, snapshot.DieByDifficulty.Extreme.Sides, snapshot.DieByDifficulty.Extreme.GrantEvent),
-                    ]);
+                    ],
+                // The token walks the real branch and teleport on the graph map; the chain of stage 1 needs no path
+                rules.Features.MapMode == MapMode.Graph ? await SeasonMaps.LastMoveAsync(db, seasonId, mine.Id, ct) : null);
         }
 
         // Avatars live on the accounts, across seasons (SPEC «Сезоны»)
@@ -652,13 +663,16 @@ public static class SeasonEndpoints
             seasonId,
             seasonRecord.Status,
             seasonRecord.Deadline,
-            [.. season.Map.Cells.Select(c => new CellView(c.Id, c.Type))],
+            [.. map.Cells.Select(SeasonMaps.ToView)],
             [.. players.Select((p, token) => new PlayerView(
                 p.Id, p.Name, p.CellId, p.Points, p.Phase, p.FinishOrder, avatars.TryGetValue(p.UserId, out var avatar) ? Files.FileLinkView.Of(avatar) : null, token))],
             [.. leaderboard.Select(r => new LeaderboardRowView(r.PlayerId, r.Place, r.Points, r.CellsToFinish, r.IsFirst, r.Provisional))],
             me,
             lastSequence,
-            seasonRecord.Name));
+            seasonRecord.Name,
+            [.. map.Edges.Select(SeasonMaps.ToView)],
+            [.. map.Zones.Select(SeasonMaps.ToView)],
+            rules.Features.MapMode));
     }
 
     private static readonly string[] s_rollTypes =
