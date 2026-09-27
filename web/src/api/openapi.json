@@ -5508,6 +5508,12 @@
               "string"
             ],
             "format": "uuid"
+          },
+          "objectId": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         },
         "description": "A pending manual effect of any player, oldest first, for the admin to resolve (D-102)."
@@ -7710,7 +7716,8 @@
         "enum": [
           "paidReroll",
           "drop",
-          "difficulty"
+          "difficulty",
+          "item"
         ],
         "description": "What created a manual effect; C11 adds item, cell and event sources."
       },
@@ -7731,6 +7738,12 @@
           },
           "source": {
             "$ref": "#/components/schemas/ManualEffectSource"
+          },
+          "objectId": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         },
         "description": "A manual effect the player still has to play out (D-10, D-93); the player resolves it (D-102)."

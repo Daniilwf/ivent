@@ -5471,6 +5471,7 @@ export interface components {
             source: components["schemas"]["ManualEffectSource"];
             /** Format: uuid */
             runId: null | string;
+            objectId?: null | string;
         };
         /**
          * @description A player as the admin sees them (SE5, D-123): the balance and the place in the turn, the inactivity flag, when they
@@ -6194,13 +6195,14 @@ export interface components {
          * @description What created a manual effect; C11 adds item, cell and event sources.
          * @enum {unknown}
          */
-        ManualEffectSource: "paidReroll" | "drop" | "difficulty";
+        ManualEffectSource: "paidReroll" | "drop" | "difficulty" | "item";
         /** @description A manual effect the player still has to play out (D-10, D-93); the player resolves it (D-102). */
         ManualEffectView: {
             /** Format: uuid */
             id: string;
             drawEvent: components["schemas"]["EventKind"];
             source: components["schemas"]["ManualEffectSource"];
+            objectId?: null | string;
         };
         /** @enum {unknown} */
         MapMode: "linear" | "graph";
@@ -6912,7 +6914,7 @@ export const emptyPoolFallbackValues: ReadonlyArray<FlattenedDeepRequired<compon
 export const eventKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["EventKind"]> = ["good", "bad"];
 export const gameMarkKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["GameMarkKind"]> = ["dropped", "techRerolled"];
 export const mandatoryEventValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["MandatoryEvent"]> = ["bad", "none"];
-export const manualEffectSourceValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ManualEffectSource"]> = ["paidReroll", "drop", "difficulty"];
+export const manualEffectSourceValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ManualEffectSource"]> = ["paidReroll", "drop", "difficulty", "item"];
 export const mapModeValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["MapMode"]> = ["linear", "graph"];
 export const proofStatusValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ProofStatus"]> = ["pending", "approved", "rejected"];
 export const rerollCostKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["RerollCostKind"]> = ["coins", "badEvent"];

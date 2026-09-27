@@ -417,7 +417,9 @@ const headlines: [string, (d: Data, c: Context) => Headline][] = [
 ];
 
 const effectSource = (value: string | null) =>
-  value === 'paidReroll' || value === 'drop' || value === 'difficulty' ? value : 'drop';
+  value === 'paidReroll' || value === 'drop' || value === 'difficulty' || value === 'item'
+    ? value
+    : 'drop';
 
 /** The facts the rest of a command's events add to its line: dice, points and cells, coins, the finish, events drawn */
 function factsOf(events: Event[], lead: Event): string[] {
