@@ -208,7 +208,7 @@ function CategoryRow({
           disabled={busy === 'remove' || weight === String(category.weight)}
           data-testid="category-save"
         >
-          {t.saveWeight}
+          {ru.admin.save}
         </Button>
         <ConfirmDanger
           open={confirming}

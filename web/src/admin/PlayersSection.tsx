@@ -3,7 +3,7 @@ import { useCallback, useState, type SyntheticEvent } from 'react';
 import { api, type Schemas } from '../api/client';
 import { moscowTime } from '../app/time';
 import { ru } from '../i18n/ru';
-import { techRerollReasons } from '../season/techRerollReasons';
+import { techRerollReasons, type TechRerollReason } from '../season/techRerollReasons';
 import { Badge } from '../ui/Marks';
 import { Button } from '../ui/Button';
 import { ConfirmDanger } from '../ui/Dialogs';
@@ -19,7 +19,7 @@ const t = ru.admin.players;
 
 type Player = Schemas['AdminPlayerView'];
 type Cell = Schemas['SeasonView']['cells'][number];
-type Reason = NonNullable<Schemas['TechRerollReason']>;
+type Reason = TechRerollReason;
 
 /** The cells as the admin picks them: by their number along the chain, the start and the finish named */
 function cellOptions(cells: readonly Cell[]) {

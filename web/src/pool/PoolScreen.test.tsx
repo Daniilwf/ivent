@@ -147,6 +147,17 @@ describe('the pool page', () => {
     expect(card('Baba Is You')).toHaveTextContent(t.free);
   });
 
+  it('leads from a card to the game page', async () => {
+    serve(base);
+    renderPool();
+
+    await waitFor(() => {
+      expect(cards()).toHaveLength(demoPoolGames.length);
+    });
+    const link = within(card('Alan Wake')).getByRole('link', { name: 'Alan Wake' });
+    expect(link).toHaveAttribute('href', `/games/${demoGame.id}`);
+  });
+
   it('shows the author and the note or the completion condition', async () => {
     serve(base);
     renderPool();
@@ -429,7 +440,7 @@ describe('adding a game', () => {
 
     await userEvent.click(within(dialog).getByRole('button', { name: t.form.submit }));
 
-    expect(within(dialog).getByText(t.form.nameRequired)).toBeInTheDocument();
+    expect(within(dialog).getByText(ru.ui.nameRequired)).toBeInTheDocument();
     expect(within(dialog).getByText(t.form.categoriesRequired)).toBeInTheDocument();
     expect(seen.some((r) => r.key === 'POST /api/pool')).toBe(false);
   });

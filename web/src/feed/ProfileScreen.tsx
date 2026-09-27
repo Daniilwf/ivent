@@ -131,7 +131,7 @@ export function ProfileDetails({
                   {ru.profile.points(season.points)}
                 </span>
                 <span className="flex flex-wrap gap-2 text-sm">
-                  <Tag>{ru.profile.status[season.status] ?? season.status}</Tag>
+                  <Tag>{ru.seasonStatus[season.status] ?? season.status}</Tag>
                 </span>
                 <span className="text-sm text-ink-soft tabular-nums">
                   {season.place === null ? ru.profile.noPlace : ru.profile.place(season.place)}

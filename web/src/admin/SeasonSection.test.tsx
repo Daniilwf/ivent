@@ -57,7 +57,7 @@ describe('The season section', () => {
     const server = open('active', { 'POST /api/admin/seasons/*/status': ok });
 
     const status = await screen.findByTestId('season-status');
-    expect(status).toHaveTextContent(t.statuses.active);
+    expect(status).toHaveTextContent(ru.seasonStatus['active'] ?? '');
     await userEvent.click(within(status).getByTestId('season-next'));
     const dialog = await screen.findByRole('alertdialog');
     for (const line of t.next.active.consequences)
@@ -67,7 +67,7 @@ describe('The season section', () => {
     await waitFor(() => {
       expect(server.sent('POST', '/status')[0]?.body).toMatchObject({ to: 'closing' });
     });
-    expect(await screen.findByText(t.moved(t.statuses.closing))).toBeInTheDocument();
+    expect(await screen.findByText(t.moved(ru.seasonStatus['closing'] ?? ''))).toBeInTheDocument();
   });
 
   it('offers no next status for an archived season', async () => {
@@ -187,7 +187,7 @@ describe('The season section', () => {
     const server = open('active', { 'POST /api/admin/seasons': ok }, onPick);
 
     await userEvent.click(await screen.findByTestId('season-create'));
-    expect(screen.getByText(t.nameRequired)).toBeInTheDocument();
+    expect(screen.getByText(ru.ui.nameRequired)).toBeInTheDocument();
     await userEvent.type(screen.getByTestId('season-name'), 'Зима');
     await userEvent.click(screen.getByTestId('season-create'));
 

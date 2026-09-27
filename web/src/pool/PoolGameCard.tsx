@@ -1,7 +1,10 @@
 import { Ban, CircleCheck, Gamepad2, Sparkle } from 'lucide-react';
 import { moscowDay } from '../app/time';
 import { Cover } from '../board/GameCards';
+import { Link } from '../app/Link';
+import { paths } from '../app/router';
 import { ru } from '../i18n/ru';
+import { inlineLink } from '../ui/buttonStyles';
 import { Chip } from '../ui/Marks';
 import { GameMarks } from '../season/GameMarks';
 import { GameFacts } from './GameFacts';
@@ -70,7 +73,12 @@ export function PoolGameCard({
     >
       <Cover game={{ title: game.title, cover: game.cover?.thumbnailUrl }} width={64} lazy />
       <div className="grid min-w-0 content-start justify-items-start gap-2">
-        <h2 className="font-display text-lg font-heavy text-balance wrap-anywhere">{game.title}</h2>
+        <h2 className="font-display text-lg font-heavy text-balance wrap-anywhere">
+          {/* The game's page: its runs and reviews in every season */}
+          <Link to={paths.game(game.id)} className={inlineLink}>
+            {game.title}
+          </Link>
+        </h2>
         <GameFacts game={game} />
         {inSeason ? <GameStatus status={status} inWheel={inWheel} /> : null}
       </div>

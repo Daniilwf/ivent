@@ -62,3 +62,8 @@ export function moscowDayLabel(utc: string | Date, now: Date = new Date()): stri
 export function moscowClock(utc: string | Date): string {
   return clock.format(typeof utc === 'string' ? new Date(utc) : utc);
 }
+
+/** A time typed in a «datetime-local» field is Moscow time (the site's clock, SH4) */
+export function moscowInput(value: string): string {
+  return `${value}:00+03:00`;
+}

@@ -9,7 +9,8 @@ import { ConfirmDanger } from '../ui/Dialogs';
 import { Field } from '../ui/Field';
 import { Notice } from '../ui/States';
 import { Panel } from '../ui/Surface';
-import { refusal, moscowInput } from './actions';
+import { refusal } from './actions';
+import { moscowInput } from '../app/time';
 import { newCommandId } from '../api/commands';
 import { AsyncState } from '../ui/AsyncState';
 import { answerOf, useLoaded } from '../app/useLoaded';
@@ -104,7 +105,7 @@ export function SeasonSection({
                   >
                     <span className="mr-auto grid">
                       <span className="font-bold">{s.name}</span>
-                      <span className="text-sm text-ink-soft">{t.statuses[s.status]}</span>
+                      <span className="text-sm text-ink-soft">{ru.seasonStatus[s.status]}</span>
                     </span>
                     {s.id === seasonId ? (
                       <span className="text-sm font-medium">{t.viewing}</span>
@@ -157,7 +158,7 @@ function StatusPanel({ seasonId, season, onDone, onFailed }: Props) {
         params: { path: { seasonId } },
         body: { commandId: newCommandId(), to },
       });
-      if (answer.data) onDone(t.moved(t.statuses[to]));
+      if (answer.data) onDone(t.moved(ru.seasonStatus[to] ?? to));
       else onFailed(refusal(answer));
     } catch {
       onFailed(ru.admin.failed);
@@ -170,7 +171,7 @@ function StatusPanel({ seasonId, season, onDone, onFailed }: Props) {
   return (
     <Panel title={t.current(season.name)} data-testid="season-status">
       <p>
-        {t.status}: <span className="font-bold">{t.statuses[season.status]}</span>
+        {t.status}: <span className="font-bold">{ru.seasonStatus[season.status]}</span>
       </p>
       {step && to ? (
         <div>
@@ -328,7 +329,7 @@ function CreateSeason({ onCreated }: { onCreated: (id: string, name: string) => 
     e.preventDefault();
     const clean = name.trim();
     if (clean === '') {
-      setError(t.nameRequired);
+      setError(ru.ui.nameRequired);
       return;
     }
     setError(undefined);

@@ -175,6 +175,9 @@ const coinsReasons: Record<string, string> = {
 /** A line of the feed: words and the player's and the game's names, which the screen turns into links */
 type Line<T> = readonly (string | T)[];
 
+/** One word for the tech reroll, whatever map names it (D-202) */
+const techReroll = 'Тех-реролл';
+
 const feedLines = {
   seasonCreated: <T>(name: string): Line<T> => [`Сезон «${name}» создан`],
   seasonStatus: <T>(to: 'draft' | 'active' | 'closing' | 'finished' | 'archived'): Line<T> => [
@@ -343,7 +346,7 @@ export const ru = {
     dropHint: (minutes: number) =>
       `По правилам дропать стоит не раньше чем через ${minutes} мин. игры.`,
     dropConfirmYes: 'Дропнуть игру',
-    techReroll: 'Тех-реролл',
+    techReroll,
     techRerollTitle: (title: string) => `Тех-реролл «${title}»`,
     techRerollConsequences: [
       'Бесплатно: очки и клетки не меняются',
@@ -488,6 +491,14 @@ export const ru = {
     meeples: 'ИВЕНТ',
   },
   // G3: the design system's components (src/ui, src/board)
+  // A season's status, one word for the profile and the admin (D-202)
+  seasonStatus: {
+    draft: 'Готовится',
+    active: 'Идёт',
+    closing: 'Ждёт проверки пруфов',
+    finished: 'Завершён',
+    archived: 'В архиве',
+  } as Readonly<Record<string, string>>,
   // A game's length, one way everywhere (D-202): the estimate of HowLongToBeat, or hours played
   hours: {
     value: hoursText,
@@ -499,6 +510,7 @@ export const ru = {
     retry: 'Попробовать ещё раз',
     cancel: 'Отмена',
     close: 'Закрыть',
+    nameRequired: 'Напиши название.',
     showMore: 'Показать ещё',
     connectionLost: 'Нет связи с сервером, переподключаемся',
     toFinish: (cells: number) => (cells <= 0 ? 'на финише' : `до финиша ${cells} кл.`),
@@ -948,13 +960,6 @@ export const ru = {
     place: (n: number) => `${n} место`,
     noPlace: 'Место — после итогов',
     points: (n: number) => `${n.toLocaleString('ru-RU')} ${plural(n, 'очко', 'очка', 'очков')}`,
-    status: {
-      draft: 'Готовится',
-      active: 'Идёт',
-      closing: 'Дедлайн прошёл',
-      finished: 'Завершён',
-      archived: 'В архиве',
-    } as Record<string, string>,
     noSeasonsTitle: 'Сезонов пока нет',
     noSeasonsText: 'Сезоны появятся здесь, когда админ добавит игрока.',
     noReviewsTitle: 'Отзывов пока нет',
@@ -977,7 +982,7 @@ export const ru = {
       playing: 'Проходит',
       completed: 'Пройдена',
       dropped: 'Дроп',
-      techRerolled: 'Тех-реролл',
+      techRerolled: techReroll,
       rejected: 'Отклонено',
     } as Record<string, string>,
     played: (hours: number) => `${hoursText(hours)} в игре`,
@@ -1045,7 +1050,6 @@ export const ru = {
       title: 'Новая игра',
       name: 'Название',
       nameHint: 'Как в Steam или на HowLongToBeat',
-      nameRequired: 'Напиши название.',
       nameTooLong: 'Название — не длиннее 200 символов.',
       categories: 'Категории',
       categoriesHint: 'Колесо выбирает игру по категории: отметь хотя бы одну.',
@@ -1148,12 +1152,7 @@ export const ru = {
       die: 'Кубик',
       withEvent: (sides: number, kind: 'good' | 'bad') =>
         `d${sides} и ${kind === 'good' ? 'хороший' : 'плохой'} ивент`,
-      difficulties: {
-        easy: 'Лёгкая',
-        normal: 'Нормальная или сложностей нет',
-        hard: 'Сложная',
-        extreme: 'Выше сложной',
-      },
+      normalOrNone: 'Нормальная или сложностей нет',
       points: 'Сумма кубиков идёт и в очки, и в клетки: фишка двигается на столько же.',
       proofFirst: 'Кубы кидаются сразу, пруф проверяется позже. Сложность засчитывается по пруфу.',
       reject: 'Если пруф отклонят, снимутся очки, клетки и монетки за это прохождение.',
@@ -1206,9 +1205,7 @@ export const ru = {
       version: (n: number) => `Версия ${n}`,
       was: 'Было',
       now: 'Стало',
-      none: 'нет',
       yes: 'да',
-      no: 'нет',
     },
     fields: {
       'season.maxUncheckedRuns': 'Лимит прохождений на проверке',
@@ -1421,7 +1418,7 @@ export const ru = {
       added: (name: string) => `${name} теперь в сезоне`,
       nobodyToAdd: 'Все игроки уже в сезоне. Новый аккаунт — в разделе «Аккаунты».',
       accountRequired: 'Выбери аккаунт.',
-      techReroll: 'Тех-реролл',
+      techReroll,
       techRerollTitle: (name: string) => `Тех-реролл за ${name}`,
       techRerollLead:
         'Игра снимается без штрафа, игрок сразу получает новый ролл. Для случаев после окна тех-реролла.',
@@ -1463,7 +1460,7 @@ export const ru = {
         ApproveProof: 'Одобрение',
         RejectProof: 'Реджект',
         DropRun: 'Дроп',
-        TechReroll: 'Тех-реролл',
+        TechReroll: techReroll,
         ConvertTechRerollToDrop: 'Тех-реролл в дроп',
         CorrectRunHours: 'Правка часов',
         ChangeRunDifficulty: 'Смена сложности',
@@ -1485,7 +1482,6 @@ export const ru = {
       available: (n: number) => `доступно ${games(n)}`,
       inPool: (n: number) => `в пуле ${games(n)}`,
       noneAvailable: 'нет доступных игр',
-      saveWeight: 'Сохранить',
       weightInvalid: 'Вес — целое число от 1 до 1000.',
       weightSaved: (name: string) => `Вес сохранён: ${name}`,
       remove: 'Убрать',
@@ -1566,13 +1562,6 @@ export const ru = {
       recalculated: 'Бонусы за финиш пересчитаны.',
     },
     season: {
-      statuses: {
-        draft: 'Черновик',
-        active: 'Идёт',
-        closing: 'Ждёт проверки пруфов',
-        finished: 'Завершён',
-        archived: 'В архиве',
-      },
       status: 'Статус',
       current: (name: string) => `Сезон «${name}»`,
       next: {
@@ -1631,7 +1620,6 @@ export const ru = {
       createLead:
         'Сезон создаётся черновиком с правилами по умолчанию; начнёшь его кнопкой «Начать сезон».',
       name: 'Название',
-      nameRequired: 'Напиши название.',
       createSubmit: 'Создать сезон',
       created: (name: string) => `Сезон создан: ${name}`,
     },
@@ -1689,6 +1677,7 @@ export const ru = {
       screenshot: 'Скриншот',
       toWork: 'Взять в работу',
       close: 'Закрыть',
+      nameRequired: 'Напиши название.',
       reopen: 'Открыть снова',
       moved: (status: string) => `Отчёт: ${status}`,
       export: 'Скачать для агента',

@@ -93,7 +93,7 @@ export function rulesPage(rules: Ruleset): RulesPage {
     const rule = reward.dieByDifficulty[difficulty];
     return {
       difficulty,
-      label: t.reward.difficulties[difficulty],
+      label: difficulty === 'normal' ? t.reward.normalOrNone : ru.difficulty[difficulty],
       die: rule.grantEvent ? t.reward.withEvent(rule.sides, rule.grantEvent) : `d${rule.sides}`,
     };
   });
@@ -156,9 +156,9 @@ export function fieldName(path: string): string {
 
 /** A value of the history in words: numbers as they are, yes and no, known words translated; absent is «нет» */
 export function valueText(json: string | null): string {
-  if (json === null || json === 'null') return t.history.none;
+  if (json === null || json === 'null') return t.values.none ?? String(json);
   if (json === 'true') return t.history.yes;
-  if (json === 'false') return t.history.no;
+  if (json === 'false') return t.values.none ?? json;
   let value: unknown;
   try {
     value = JSON.parse(json);

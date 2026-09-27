@@ -38,10 +38,5 @@ export function parseWhole(text: string): number | null {
   return /^[-+]?\d+$/.test(clean) ? Number(clean) : null;
 }
 
-/** A time typed in a «datetime-local» field is Moscow time (the site's clock, SH4) */
-export function moscowInput(value: string): string {
-  return `${value}:00+03:00`;
-}
-
 /** A command of the season log by its meaning; an unknown type as it is */
 export const commandLabel = (type: string) => t.log.commands[type] ?? type;

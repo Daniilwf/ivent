@@ -44,7 +44,7 @@ function check(
   note: string,
 ) {
   const errors: Errors = {};
-  if (!title.trim()) errors.title = t.nameRequired;
+  if (!title.trim()) errors.title = ru.ui.nameRequired;
   else if (title.trim().length > maxTitle) errors.title = t.nameTooLong;
   if (tags.length === 0) errors.tags = t.categoriesRequired;
   if (

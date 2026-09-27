@@ -2,13 +2,13 @@ import { useRef, useState, type SyntheticEvent } from 'react';
 import type { Schemas } from '../api/client';
 import { moscowTime } from '../app/time';
 import { ru } from '../i18n/ru';
-import { techRerollReasons } from './techRerollReasons';
+import { techRerollReasons, type TechRerollReason } from './techRerollReasons';
 import { Button } from '../ui/Button';
 import { ConfirmDanger, FormDialog } from '../ui/Dialogs';
 import { Select, TextArea } from '../ui/Field';
 import { Notice } from '../ui/States';
 
-type Reason = NonNullable<Schemas['TechRerollReason']>;
+type Reason = TechRerollReason;
 
 /**
  * Drop and tech reroll of the active run (D-94), quiet and apart from completing. A drop is confirmed in a window that
