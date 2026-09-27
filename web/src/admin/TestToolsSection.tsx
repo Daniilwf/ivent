@@ -1,4 +1,4 @@
-import { CalendarCog, Clock, Dices, FlaskConical } from 'lucide-react';
+import { CalendarCog, Clock, Dices } from 'lucide-react';
 import { useCallback, useState, type SyntheticEvent } from 'react';
 import { api, type Schemas } from '../api/client';
 import { navigate, paths } from '../app/router';
@@ -15,7 +15,6 @@ import { commandLabel, refusal } from './actions';
 const t = ru.admin.test;
 
 type Message = { tone: 'success' | 'danger'; text: string };
-type Environment = Schemas['SiteEnvironment'];
 
 /** The scenario that does not need a player: the deadline is the season's */
 const seasonWide = 'deadline-in-hour';
@@ -41,25 +40,14 @@ function shiftText(minutes: number): string | null {
 /**
  * The test tools (H9, D-221; SPEC «Тестовые эндпоинты», «Сценарии для ручной проверки»): load a ready situation onto
  * the season, move the site's clock, seed its randomness. Only where the test endpoints exist (Development and Test):
- * the admin screen does not offer the section anywhere else. Loading a scenario is the main action.
+ * the admin screen does not offer the section anywhere else, and the strip on top of every page names the copy of the
+ * site. Loading a scenario is the main action.
  */
-export function TestToolsSection({
-  seasonId,
-  environment,
-}: {
-  seasonId: string | null;
-  environment: Environment;
-}) {
+export function TestToolsSection({ seasonId }: { seasonId: string | null }) {
   const loaded = useLoaded(useCallback(async () => answerOf(await api.GET('/api/test')), []));
 
   return (
     <div className="grid gap-4" data-testid="admin-test">
-      {environment !== 'production' ? (
-        <p className="flex items-start gap-2 rounded-md border-2 border-info bg-info-soft px-3 py-2 text-sm font-bold">
-          <FlaskConical size={20} aria-hidden className="shrink-0 text-info" />
-          {ru.environment[environment]}
-        </p>
-      ) : null}
       <AsyncState loaded={loaded} rows={3} errorTitle={ru.admin.loadErrorTitle}>
         {(tools, reload) => (
           <>
@@ -173,6 +161,7 @@ function ScenarioForm({ seasonId, scenarios }: { seasonId: string; scenarios: st
               list.length > 0 ? (
                 <Select
                   label={t.player}
+                  className="max-w-100"
                   value={player?.id ?? ''}
                   data-testid="scenario-player"
                   onChange={(e) => {

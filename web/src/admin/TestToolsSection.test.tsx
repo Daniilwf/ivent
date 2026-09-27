@@ -69,7 +69,6 @@ describe('The test tools', () => {
     expect(screen.getByTestId('loading')).toHaveAttribute('aria-busy', 'true');
     expect(await screen.findByTestId('test-clock-now')).toHaveTextContent('1 октября, 12:00 МСК');
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(ru.admin.sections.test);
-    expect(screen.getByTestId('admin-test')).toHaveTextContent(ru.environment.development);
     expect(screen.getByTestId('test-clock-shift')).toHaveTextContent(t.realTime);
     expect(screen.queryByTestId('clock-reset')).toBeNull();
     expect(screen.getByTestId('test-random-state')).toHaveTextContent(t.unseeded);

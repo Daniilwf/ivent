@@ -263,14 +263,7 @@ export function AdminScreen({
       case 'site':
         return <SiteSection />;
       case 'test':
-        return (
-          <TestToolsSection
-            seasonId={seasonId}
-            environment={
-              status.kind === 'ready' ? (status.value.environment ?? 'production') : 'production'
-            }
-          />
-        );
+        return <TestToolsSection seasonId={seasonId} />;
     }
   }
 }
