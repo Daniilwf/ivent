@@ -301,3 +301,45 @@ export function zoneRules(zone: MapZone): string[] {
     rules.push(t.zones.drop(zone.dropPenaltyMultiplier));
   return rules.length > 0 ? rules : [t.zones.plain];
 }
+
+export type BranchOption = {
+  /** The server's cell the branch leads to: what the choice sends back */
+  id: string;
+  /** The board's number of that cell, as the map marks it */
+  cell: number;
+  /** Where the steps left would take the token, in words */
+  end: string;
+  /** The zone of the first cell, if any */
+  zone: string | null;
+};
+
+/** The options of a branch choice as the page shows them: numbered as on the map, with where each leads */
+export function branchOptions(
+  choice: components['schemas']['ChoiceView'],
+  map: GraphMap,
+  cellNumber: Map<string, number>,
+): BranchOption[] {
+  const steps = choice.steps ?? 1;
+  const t = ru.map.branch;
+  const number = (id: string) => cellNumber.get(id) ?? 0;
+  const zoneName = (id: string) => {
+    const zone = map.cells.find((c) => c.id === id)?.zone;
+    return map.zones.find((z) => z.id === zone)?.name ?? null;
+  };
+  return choice.options.map((o) => {
+    const end = branchEnd(map, o.id, steps);
+    return {
+      id: o.id,
+      cell: number(o.id),
+      zone: zoneName(o.id),
+      end:
+        end.kind === 'finish'
+          ? t.endFinish
+          : end.kind === 'fork'
+            ? t.endFork(number(end.cell))
+            : end.kind === 'teleport'
+              ? t.endTeleport(number(end.cell), number(end.to))
+              : t.endCell(number(end.cell)),
+    };
+  });
+}
