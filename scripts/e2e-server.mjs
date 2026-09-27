@@ -15,6 +15,8 @@ const env = {
   // Every E2E test signs in its own accounts from one address: the per-minute sign-in limit is for people, not for the
   // suite. The failed-attempt throttle (D-67) stays as it is.
   Security__LoginAttemptsPerMinute: '10000',
+  // The deadline scenario waits for the scheduler to close the season: a second, not five
+  Scheduler__IntervalSeconds: '1',
 };
 
 for (const suffix of ['', '-wal', '-shm']) rmSync(database + suffix, { force: true });
