@@ -27,6 +27,7 @@ const phone = {
 
 export default defineConfig({
   testDir: './tests',
+  globalSetup: './support/global-setup.ts',
   outputDir: '../test-artifacts/playwright/results',
   fullyParallel: true,
   // A scenario plays several people through a whole cycle

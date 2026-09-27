@@ -37,6 +37,15 @@ type State =
       ownPassword?: string | null;
     };
 
+type CurrentSeason = ReturnType<typeof askCurrentSeason>;
+
+/** The season the signed-in user sees by default; a lost answer reads as a failed one */
+function askCurrentSeason() {
+  return api
+    .GET('/api/seasons/current')
+    .catch(() => ({ data: undefined, response: new Response(null, { status: 503 }) }));
+}
+
 export function App() {
   const [state, setState] = useState<State>({ kind: 'loading' });
   const path = usePath();
@@ -46,14 +55,14 @@ export function App() {
     setState({ kind: 'signedOut' });
   }, []);
 
-  const enter = useCallback(async (user: Schemas['CurrentUser']) => {
+  const enter = useCallback(async (user: Schemas['CurrentUser'], asked?: CurrentSeason) => {
     // A temporary password opens nothing but its change (D-106)
     if (user.mustChangePassword) {
       setState({ kind: 'changePassword' });
       return;
     }
 
-    const { data, response } = await api.GET('/api/seasons/current');
+    const { data, response } = await (asked ?? askCurrentSeason());
     if (data) setState({ kind: 'signedIn', user, seasonId: data.id });
     else if (response.status === 404) setState({ kind: 'signedIn', user, seasonId: null });
     else if (response.status === 401) setState({ kind: 'signedOut' });
@@ -63,9 +72,11 @@ export function App() {
   useEffect(() => {
     void (async () => {
       try {
-        await refreshCsrf();
-        const { data, response } = await api.GET('/api/auth/me');
-        if (data) await enter(data);
+        // At once, not one after another (I1-1): on a slow mobile network each is a round trip before the season loads.
+        // The season is asked on the chance of a session; without one its 401 is never read.
+        const season = askCurrentSeason();
+        const [, { data, response }] = await Promise.all([refreshCsrf(), api.GET('/api/auth/me')]);
+        if (data) await enter(data, season);
         else if (response.status === 401) setState({ kind: 'signedOut' });
         else setState({ kind: 'failed' });
       } catch {

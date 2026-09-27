@@ -50,7 +50,13 @@ function rootAdmin(): Promise<Api> {
 }
 
 /** An account made by an admin; its temporary password is changed at once, as its owner would on the first visit */
-export async function createAccount(
+export function createAccount(admin: Api, role: Role, login: string, name: string) {
+  return createAccountAt(baseURL(), admin, role, login, name);
+}
+
+/** The same outside a test (the global setup): the site's address given */
+export async function createAccountAt(
+  site: string,
   admin: Api,
   role: Role,
   login: string,
@@ -63,7 +69,7 @@ export async function createAccount(
   });
   const temporary = created.temporaryPassword;
   if (!temporary) throw new Error(`No temporary password for ${login}.`);
-  const owner = await Api.signIn(baseURL(), login, temporary);
+  const owner = await Api.signIn(site, login, temporary);
   await owner.post('/api/auth/password', { currentPassword: temporary, newPassword: testPassword });
   await owner.dispose();
   return { id: created.account.id, login, name, password: testPassword, role };
