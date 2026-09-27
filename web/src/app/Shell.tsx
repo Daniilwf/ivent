@@ -32,8 +32,10 @@ const sections: { kind: Route['kind'] & keyof typeof ru.nav; to: string; icon: R
  * The site's sections (H5–H7): the season (map, turn, leaderboard), its feed, the pool and the rules. One row: under
  * the name on a phone (the icons stay out, the four words fit 390 px), between the name and my menu on a desktop
  */
-function SiteNav() {
-  const route = routeOf(usePath());
+function SiteNav({ admin }: { admin: boolean }) {
+  const found = routeOf(usePath());
+  // Anyone but the admin at the admin's address sees the game: its section is the current one
+  const route: Route = found.kind === 'admin' && !admin ? { kind: 'season' } : found;
   return (
     <nav
       aria-label={ru.nav.label}
@@ -75,7 +77,6 @@ export function Shell({
   onChangePassword,
   onLogout,
   offline,
-  admin = false,
   children,
 }: {
   user: Schemas['CurrentUser'];
@@ -83,10 +84,10 @@ export function Shell({
   onLogout: () => void;
   /** The styleguide shows the lost connection without losing it */
   offline?: boolean;
-  /** The admin's menu also opens the admin's pages (H8) */
-  admin?: boolean;
   children: ReactNode;
 }) {
+  // The admin's menu also opens the admin's pages (H8)
+  const admin = user.role === 'admin';
   const live = useSyncExternalStore(connectionStatus.subscribe, connectionStatus.get) === 'online';
   const online = offline === undefined ? live : !offline;
   return (
@@ -99,7 +100,7 @@ export function Shell({
           >
             {ru.app.title}
           </Link>
-          <SiteNav />
+          <SiteNav admin={admin} />
           {online ? null : <ConnectionLost compact />}
           <BugReportButton />
           <Menu

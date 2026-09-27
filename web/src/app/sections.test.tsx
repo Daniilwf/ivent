@@ -1,4 +1,4 @@
-import { act, render, screen, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { App } from '../App';
 import { ru } from '../i18n/ru';
@@ -89,7 +89,10 @@ describe('the sections in the header', () => {
 
     const rules = await screen.findByRole('heading', { level: 1, name: ru.rules.title });
     expect(window.location.pathname).toBe('/rules');
-    expect(rules).toHaveFocus();
+    // The focus comes on the next frame (the router's usePageHeading)
+    await waitFor(() => {
+      expect(rules).toHaveFocus();
+    });
     expect(await screen.findByText(ru.rules.version(3))).toBeInTheDocument();
 
     act(() => {

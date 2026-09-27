@@ -12,7 +12,7 @@ import {
   Users,
   Wrench,
 } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useRef, useState, type ReactNode } from 'react';
 import { api, type Schemas } from '../api/client';
 import { Link } from '../app/Link';
 import { navigate, paths, usePageHeading } from '../app/router';
@@ -55,9 +55,8 @@ const sections: { id: AdminSectionId; icon: ReactNode; season: boolean }[] = [
   { id: 'site', icon: <Wrench size={20} aria-hidden />, season: false },
 ];
 
-/** The section an address opens: /admin is the proof queue, the admin's most frequent job */
-function adminSection(path: string): AdminSectionId {
-  const name = path.replace(/^\/admin\/?/, '').split('/')[0] ?? '';
+/** The section an address opens (the router's `admin` route): /admin is the proof queue, the admin's most frequent job */
+function adminSection(name: string | null): AdminSectionId {
   return sections.find((s) => s.id === name)?.id ?? 'proofs';
 }
 
@@ -69,15 +68,16 @@ const refreshEveryMs = 10_000;
 
 /** The admin's pages: a list of sections (a side column on a desktop, a sheet on a phone) and the open section */
 export function AdminScreen({
-  path,
+  section: sectionName,
   currentSeasonId,
   user,
 }: {
-  path: string;
+  /** The router's `admin` route's section */
+  section: string | null;
   currentSeasonId: string | null;
   user: Schemas['CurrentUser'];
 }) {
-  const section = adminSection(path);
+  const section = adminSection(sectionName);
   const desk = useDesk();
   const [seasonId, setSeasonId] = useState(currentSeasonId);
   const version = useSeasonVersion(seasonId, { throttleMs: refreshEveryMs });
@@ -98,12 +98,7 @@ export function AdminScreen({
 
   // The admin's pages opened from the menu, and a new section, take the focus to the heading, so a screen reader and
   // the keyboard start there
-  const heading = usePageHeading();
-  const opened = useRef(false);
-  useEffect(() => {
-    if (opened.current) heading.current?.focus();
-    opened.current = true;
-  }, [section, heading]);
+  const heading = usePageHeading(true, section);
 
   const links = () => (
     <ul className="grid gap-1">
@@ -117,9 +112,6 @@ export function AdminScreen({
               onClick={() => {
                 picked.current = true;
                 setSheet(false);
-                requestAnimationFrame(() => {
-                  heading.current?.focus();
-                });
               }}
               className={cx(
                 'flex min-h-11 items-center gap-3 rounded-md px-3 font-medium is-hover:bg-muted',

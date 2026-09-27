@@ -62,6 +62,15 @@ describe('The admin pages', () => {
     });
     expect(screen.queryByTestId('admin')).toBeNull();
     expect(server.calls.some((c) => c.path.startsWith('/api/admin'))).toBe(false);
+    // The game's section is the current one in the header, and the menu offers no admin's pages (D-202)
+    const nav = screen.getByRole('navigation', { name: ru.nav.label });
+    expect(within(nav).getByRole('link', { name: ru.nav.season })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    await userEvent.click(screen.getByTestId('user-menu'));
+    expect(await screen.findByTestId('my-profile')).toBeInTheDocument();
+    expect(screen.queryByTestId('to-admin')).toBeNull();
   });
 
   it('open from the admin’s menu and lead back to the game', async () => {
@@ -143,14 +152,14 @@ describe('The admin pages', () => {
         },
       ],
     });
-    render(<AdminScreen path="/admin/log" currentSeasonId={seasonId} user={adminUser} />);
+    render(<AdminScreen section="log" currentSeasonId={seasonId} user={adminUser} />);
 
     expect(await screen.findByTestId('admin-sections')).toHaveTextContent('1');
   });
 
   it('without a season send the season pages to «Сезон»', async () => {
     fakeServer({ 'GET /api/seasons': [] });
-    render(<AdminScreen path="/admin/players" currentSeasonId={null} user={adminUser} />);
+    render(<AdminScreen section="players" currentSeasonId={null} user={adminUser} />);
 
     expect(await screen.findByText(t.noSeasonTitle)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: t.toSeason }));
@@ -160,12 +169,12 @@ describe('The admin pages', () => {
   it('open the section named in the address and the queue for an unknown one', () => {
     fakeServer({ 'GET /api/admin/seasons/*/proofs': [] });
     const { unmount } = render(
-      <AdminScreen path="/admin/errors" currentSeasonId={seasonId} user={adminUser} />,
+      <AdminScreen section="errors" currentSeasonId={seasonId} user={adminUser} />,
     );
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(t.sections.errors);
     unmount();
 
-    render(<AdminScreen path="/admin/nonsense" currentSeasonId={seasonId} user={adminUser} />);
+    render(<AdminScreen section="nonsense" currentSeasonId={seasonId} user={adminUser} />);
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(t.sections.proofs);
   });
 });

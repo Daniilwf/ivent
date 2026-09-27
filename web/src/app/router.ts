@@ -87,25 +87,29 @@ export function navigate(to: string) {
 /**
  * The page's heading (`tabIndex={-1}`): a page opened from inside the site gives it the focus, so a screen reader
  * starts reading at the new page and the keyboard goes on from there (H5–H8). `shown` is false while the heading is
- * not there yet (a page whose title comes with its data): it takes the focus when it comes, once.
+ * not there yet (a page whose title comes with its data): it takes the focus when it comes, once. `page` names a part
+ * of the page that has its own address (the admin's section): opening another one takes the focus again.
  */
-export function usePageHeading<T extends HTMLElement = HTMLHeadingElement>(shown = true) {
+export function usePageHeading<T extends HTMLElement = HTMLHeadingElement>(
+  shown = true,
+  page: string | null = null,
+) {
   const heading = useRef<T>(null);
-  const done = useRef(false);
+  const done = useRef<string | null | undefined>(undefined);
   useEffect(() => {
-    if (done.current || !shown) return;
+    if (done.current === page || !shown) return;
     if (!navigated) {
-      done.current = true;
+      done.current = page;
       return;
     }
     // On the next frame: a menu that opened the page lets go of the focus first
     const frame = requestAnimationFrame(() => {
-      done.current = true;
+      done.current = page;
       heading.current?.focus({ preventScroll: true });
     });
     return () => {
       cancelAnimationFrame(frame);
     };
-  }, [shown]);
+  }, [shown, page]);
   return heading;
 }

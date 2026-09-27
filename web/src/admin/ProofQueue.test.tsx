@@ -46,7 +46,7 @@ const finishing = item({
 
 function open(queue: Schemas['ProofQueueItemView'][], routes: Record<string, unknown> = {}) {
   const server = fakeServer({ 'GET /api/admin/seasons/*/proofs': queue, ...routes });
-  render(<AdminScreen path="/admin" currentSeasonId={seasonId} user={adminUser} />);
+  render(<AdminScreen section={null} currentSeasonId={seasonId} user={adminUser} />);
   return server;
 }
 

@@ -154,7 +154,6 @@ export function App() {
     return (
       <Shell
         user={signedIn.user}
-        admin={admin}
         onChangePassword={() => {
           setState({ ...signedIn, ownPassword: path });
         }}
@@ -181,7 +180,11 @@ export function App() {
             </ChangePasswordForm>
           </main>
         ) : route.kind === 'admin' && admin ? (
-          <AdminScreen path={path} currentSeasonId={signedIn.seasonId} user={signedIn.user} />
+          <AdminScreen
+            section={route.section}
+            currentSeasonId={signedIn.seasonId}
+            user={signedIn.user}
+          />
         ) : route.kind === 'profile' ? (
           <ProfileScreen
             key={route.userId}
