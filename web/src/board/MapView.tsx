@@ -277,7 +277,7 @@ function OptionMark({ at, number }: { at: Point; number: number }) {
   return (
     <g data-option={number} pointerEvents="none">
       <circle cx={at.x} cy={at.y} r={27} fill="none" stroke="var(--color-me)" strokeWidth={5} />
-      <g transform={`translate(${at.x + 24} ${at.y - 24})`}>
+      <g transform={`translate(${at.x + 24} ${at.y + 24})`}>
         <circle r={15} fill="var(--color-me)" stroke={ink} strokeWidth={2.5} />
         <text
           className="pointer-events-none font-display text-sm font-heavy"

@@ -18,12 +18,12 @@ import { linearBoard } from '../board/linearBoard';
 import { Cover, RunCard } from '../board/GameCards';
 import { branchOptions, graphBoard, legsPath } from '../board/graphBoard';
 import { MapLegend } from '../board/MapLegend';
-import { cellsToFinish } from '../board/geometry';
+import { cellById, cellsToFinish } from '../board/geometry';
 import { TokenMove } from '../board/TokenMove';
 import { BranchChoice, branchTitle } from './BranchChoice';
 import { Leaderboard } from '../board/Leaderboard';
 import { FeedPreview } from '../feed/FeedPreview';
-import { MapView } from '../board/MapView';
+import { MapView, type MapApi } from '../board/MapView';
 import type { MomentHandle } from '../board/moment';
 import { WheelMoment, type WheelRoll } from '../board/Wheel';
 import { Button } from '../ui/Button';
@@ -306,6 +306,19 @@ export function SeasonScreen({
   // A branch choice that comes while the page is open takes the focus, as a rolled game does
   const branchId = season?.me?.choice?.kind === 'branch' ? season.me.choice.id : null;
   const branchSeen = useRef<string | null | undefined>(undefined);
+  // On a desktop the choice stands at the bottom of the map: the camera shows the fork and its branches above it
+  const camera = useRef<MapApi>(null);
+  const forkCell =
+    branchId && season
+      ? chain.cellNumber.get(season.players.find((p) => p.id === season.me?.playerId)?.cellId ?? '')
+      : undefined;
+  useEffect(() => {
+    if (!desk || forkCell === undefined) return;
+    const fork = cellById(chain.board, forkCell);
+    requestAnimationFrame(() => {
+      camera.current?.centerOn({ x: fork.x, y: fork.y + 140 }, 900);
+    });
+  }, [desk, forkCell, chain, branchId]);
   useEffect(() => {
     if (branchSeen.current !== undefined && branchId && branchId !== branchSeen.current)
       requestAnimationFrame(() => {
@@ -663,6 +676,7 @@ export function SeasonScreen({
   const branchCard =
     branch && options ? (
       <BranchChoice
+        wide={desk}
         steps={branch.steps ?? 1}
         options={options}
         pending={pending}
@@ -849,6 +863,7 @@ export function SeasonScreen({
         </h2>
         <div className="relative">
           <MapView
+            ref={camera}
             board={board}
             players={shownPlayers}
             focus={shownMine && shownMine.cell > 0 ? shownMine.cell : undefined}
@@ -857,7 +872,7 @@ export function SeasonScreen({
             className="h-105 rounded-lg border-3 border-ink desk:h-190"
           />
           {desk && branchCard && !onMap ? (
-            <div className="absolute bottom-3 left-3 z-10 w-96 rounded-lg border-3 border-ink bg-card p-4 shadow-lift">
+            <div className="absolute inset-x-3 bottom-3 z-10 rounded-lg border-3 border-ink bg-card p-4 shadow-lift">
               {branchCard}
             </div>
           ) : null}

@@ -20,7 +20,10 @@ export function BranchChoice({
   pending,
   onChoose,
   className,
+  wide = false,
 }: {
+  /** On the map's stage: the options side by side, so the map above stays in sight */
+  wide?: boolean;
   steps: number;
   options: BranchOption[];
   pending: boolean;
@@ -40,7 +43,7 @@ export function BranchChoice({
         </span>
       </legend>
       <p className="text-ink-soft">{t.lead(steps)}</p>
-      <ul className="grid gap-3">
+      <ul className={cx('grid gap-3', wide && 'grid-cols-2')}>
         {options.map((option, i) => (
           <li key={option.id}>
             <button

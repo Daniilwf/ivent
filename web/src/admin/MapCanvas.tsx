@@ -140,6 +140,10 @@ export function MapCanvas({
         source: e.from,
         target: e.to,
         label: tags.length > 0 ? tags.join(', ') : undefined,
+        labelStyle: { fill: 'var(--color-ink)', fontWeight: 700 },
+        labelBgStyle: { fill: 'var(--color-card)' },
+        labelBgPadding: [6, 3] as [number, number],
+        labelBgBorderRadius: 4,
         markerEnd: { type: 'arrowclosed' as const, color: 'var(--color-ink)' },
         style: {
           stroke: 'var(--color-ink)',

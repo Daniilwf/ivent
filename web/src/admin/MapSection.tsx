@@ -172,7 +172,7 @@ function MapEditor({
   return (
     <div className="grid gap-6" data-testid="map-editor">
       {notices}
-      <div className="grid items-start gap-4 desk:grid-cols-[minmax(0,1fr)_auto]">
+      <div className="grid items-start gap-4">
         <div className="grid min-w-0 gap-2">
           <MapCanvas
             draft={draft}
@@ -189,7 +189,7 @@ function MapEditor({
           />
           <p className="text-sm text-ink-soft">{t.canvasHint}</p>
         </div>
-        <div className="grid w-96 content-start gap-4">
+        <div className="grid items-start gap-4 desk:grid-cols-2">
           <Panel>
             <div className="flex flex-wrap gap-3">
               <Button
@@ -651,7 +651,8 @@ function ZoneForm({
   );
 }
 
-function CheckPanel({
+/** The check of the draft in words: the problems (a cell's problem selects the cell), the zone warnings */
+export function CheckPanel({
   check,
   draft,
   onRetry,
