@@ -95,10 +95,12 @@ public static class SeasonEngine
         var settlements = Settlements.After(after, decision.Events);
         after = settlements.Aggregate(after, Apply);
         IReadOnlyList<IGameEvent> own = [.. decision.Events, .. settlements];
-        var (reactions, final) = EffectChain.Run(after, own, context);
-        return reactions.Count == 0 && settlements.Count == 0
+        var (reactions, reacted) = EffectChain.Run(after, own, context);
+        var lifetimes = Settlements.Lifetimes(reacted, own);
+        var final = lifetimes.Aggregate(reacted, Apply);
+        return reactions.Count == 0 && settlements.Count == 0 && lifetimes.Count == 0
             ? new CommandResult(decision, after)
-            : new CommandResult(Decision.Accept([.. own, .. reactions]), final);
+            : new CommandResult(Decision.Accept([.. own, .. reactions, .. lifetimes]), final);
     }
 
     // D-305: a player choosing a branch is not moved by other commands, and the run whose steps wait is not corrected or

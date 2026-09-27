@@ -82,8 +82,7 @@ internal static class RunLifecycle
         // Items and effects change the throw (D-408): what waits for it, then the beforeDice effects firing now.
         var pending = player.Wallet.NextDice.Count;
         var (fired, afterFiring, changes) = DicePipeline.BeforeDice(state, player.PlayerId, run.RunId, context);
-        state = afterFiring;
-        player = state.Players[player.PlayerId];
+        player = afterFiring.Players[player.PlayerId];
         var thrown = DicePipeline.Throw(count, die, command.ChallengeDone ? run.Snapshot.ChallengeExtraDice : 0, changes, context.Random);
         var dice = thrown.Dice;
         var challengeDice = thrown.ChallengeDice;

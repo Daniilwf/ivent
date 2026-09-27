@@ -69,12 +69,22 @@ public static class Timers
 /// </summary>
 internal static class Settlements
 {
-    public static IReadOnlyList<IGameEvent> After(SeasonState state, IReadOnlyList<IGameEvent> events)
+    public static IReadOnlyList<IGameEvent> After(SeasonState state, IReadOnlyList<IGameEvent> events) =>
+        Each(state, events, (s, e) => Betting.Settle(s, e).Concat(ShopReset(s, e)));
+
+    /// <summary>
+    /// After the effects fired: an object living for some runs counts one down when a run of its owner ends, so it still
+    /// fires on its last run (SPEC «на N игр»).
+    /// </summary>
+    public static IReadOnlyList<IGameEvent> Lifetimes(SeasonState state, IReadOnlyList<IGameEvent> events) =>
+        Each(state, events, RunsLived);
+
+    private static List<IGameEvent> Each(SeasonState state, IReadOnlyList<IGameEvent> events, Func<SeasonState, IGameEvent, IEnumerable<IGameEvent>> follow)
     {
         var settled = new List<IGameEvent>();
         foreach (var e in events)
         {
-            foreach (var next in Betting.Settle(state, e).Concat(RunEnded(state, e)))
+            foreach (var next in follow(state, e))
             {
                 settled.Add(next);
                 state = SeasonEngine.Apply(state, next);
@@ -84,31 +94,35 @@ internal static class Settlements
         return settled;
     }
 
-    // A run of the player ended: the shop price starts over (economy.shop.resetOn), objects of «runs» count one down.
-    private static IEnumerable<IGameEvent> RunEnded(SeasonState state, IGameEvent e)
-    {
-        var (playerId, reset) = e switch
+    private static (Guid PlayerId, Rulesets.ShopPriceReset Reset)? Ended(IGameEvent e) =>
+        e switch
         {
-            Runs.RunCompleted c => (c.PlayerId, (Rulesets.ShopPriceReset?)Rulesets.ShopPriceReset.RunCompleted),
+            Runs.RunCompleted c => (c.PlayerId, Rulesets.ShopPriceReset.RunCompleted),
             Runs.RunDropped d => (d.PlayerId, Rulesets.ShopPriceReset.RunDropped),
-            _ => (Guid.Empty, null),
+            _ => null,
         };
-        if (reset is null)
+
+    // A run of the player ended: the shop price starts over (economy.shop.resetOn).
+    private static IEnumerable<IGameEvent> ShopReset(SeasonState state, IGameEvent e)
+    {
+        if (Ended(e) is { } ended && state.Players[ended.PlayerId].Wallet.ShopRolls > 0 && state.Rules.Economy.Shop.ResetOn.Contains(ended.Reset))
+        {
+            yield return new ShopPriceRestarted(ended.PlayerId);
+        }
+    }
+
+    private static IEnumerable<IGameEvent> RunsLived(SeasonState state, IGameEvent e)
+    {
+        if (Ended(e) is not { } ended)
         {
             yield break;
         }
 
-        var wallet = state.Players[playerId].Wallet;
-        if (wallet.ShopRolls > 0 && state.Rules.Economy.Shop.ResetOn.Contains(reset.Value))
-        {
-            yield return new ShopPriceRestarted(playerId);
-        }
-
-        foreach (var item in wallet.Inventory.Where(o => o.RunsLeft is not null && o.Kind != ObjectKind.Item))
+        foreach (var item in state.Players[ended.PlayerId].Wallet.Inventory.Where(o => o.RunsLeft is not null && o.Kind != ObjectKind.Item))
         {
             yield return item.RunsLeft <= 1
-                ? new ObjectRemoved(playerId, item.InstanceId, item.ObjectId, ObjectRemoval.Expired)
-                : new ObjectChanged(playerId, item with { RunsLeft = item.RunsLeft - 1 });
+                ? new ObjectRemoved(ended.PlayerId, item.InstanceId, item.ObjectId, ObjectRemoval.Expired)
+                : new ObjectChanged(ended.PlayerId, item with { RunsLeft = item.RunsLeft - 1 });
         }
     }
 }
