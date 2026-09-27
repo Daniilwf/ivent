@@ -2,7 +2,7 @@ namespace GameEvent.Engine.Rulesets;
 
 /// <summary>
 /// Values this build cannot play yet (D-22, D-53): a season must not start or continue with a mechanic that is not
-/// implemented. Each check goes away when its task lands: graph map — stage 2, each feature flag — its stage.
+/// implemented. Each check goes away when its task lands: each feature flag — its stage (the graph map is playable since stage 2).
 /// Several active runs need a turn per run; SPEC keeps one, the limit is in the config for later (D-91).
 /// </summary>
 public static class RulesetSupport
@@ -12,11 +12,6 @@ public static class RulesetSupport
         ArgumentNullException.ThrowIfNull(ruleset);
         var errors = new List<RulesetError>();
         const string NotYet = "is not implemented in this build yet";
-
-        if (ruleset.Features.MapMode != MapMode.Linear)
-        {
-            errors.Add(new("features.mapMode", $"'{ruleset.Features.MapMode}' {NotYet} (only linear)"));
-        }
 
         if (ruleset.Season.MaxActiveRunsPerPlayer > 1)
         {

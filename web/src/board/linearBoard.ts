@@ -1,3 +1,4 @@
+import type { components } from '../api/schema';
 import { catmullRom } from './geometry';
 import type { Board, BoardCell, CellKind, Point, ZoneTheme } from './types';
 
@@ -22,7 +23,9 @@ function zonesFor(rows: number): ZoneTheme[] {
   return ['meadow', ...between, 'castle'];
 }
 
-export type ChainCell = { id: string; type: 'start' | 'empty' | 'finish' };
+// Every cell type of the API (stage 2 adds forks, teleports and others, D-302); until the graph board (2.10) the chain
+// draws them as plain cells.
+export type ChainCell = { id: string; type: components['schemas']['CellType'] };
 
 function kindOf(type: ChainCell['type']): CellKind {
   return type === 'start' ? 'start' : type === 'finish' ? 'finish' : 'plain';

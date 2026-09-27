@@ -76,13 +76,13 @@ internal static class RunLifecycle
         }
 
         var now = context.Clock.UtcNow;
-        var count = CompletionRoll.Count(hours.Value, run.Snapshot.DiceCount);
+        var count = CompletionRoll.Count(hours.Value, run.Snapshot);
         var die = CompletionRoll.DieFor(command.Difficulty, run.Snapshot.DieByDifficulty);
         var dice = CompletionRoll.Roll(count, die.Sides, context.Random);
         var challengeDice = command.ChallengeDone
             ? CompletionRoll.Roll(run.Snapshot.ChallengeExtraDice, die.Sides, context.Random)
             : [];
-        var sum = dice.Sum(d => d.Value) + challengeDice.Sum(d => d.Value);
+        var sum = CompletionRoll.Total(dice, challengeDice, run.Snapshot);
 
         var events = new List<IGameEvent>
         {
@@ -116,12 +116,14 @@ internal static class RunLifecycle
             events.Add(new PointsChanged(player.PlayerId, sum, PointsReason.CompletionRoll, run.RunId));
         }
 
-        // A finisher's position is fixed (Q-3); otherwise the token moves and may reach the finish (D-99).
+        // A finisher's position is fixed (Q-3); otherwise the token moves and may reach the finish (D-99). The player's
+        // own walk stops at a fork with steps left and waits for the branch (D-304).
         PlayerMoved? moved = null;
-        var path = player.Finish is null ? Movement.Forward(state.Map, player.CellId, sum) : [];
-        if (path.Count > 0)
+        var walk = player.Finish is null ? Movement.WalkOwn(state.Map, player.CellId, sum) : new Walk([], 0);
+        if (walk.Path.Count > 0)
         {
-            moved = new PlayerMoved(player.PlayerId, player.CellId, path[^1], sum, [.. path], MoveReason.CompletionRoll, run.RunId);
+            moved = new PlayerMoved(
+                player.PlayerId, player.CellId, walk.Path[^1], sum, [.. walk.Path], MoveReason.CompletionRoll, run.RunId, walk.Paused);
             events.Add(moved);
         }
 
@@ -141,11 +143,9 @@ internal static class RunLifecycle
             events.Add(new ManualEffectCreated(context.Ids.NewId(), player.PlayerId, granted, ManualEffectSource.Difficulty, run.RunId));
         }
 
-        // The finish comes after the run's own rewards, so a first frozen at once is frozen after them (D-99).
-        if (moved is not null)
-        {
-            events.AddRange(Finishes.AfterCompletionMove(events.Aggregate(state, SeasonEngine.Apply), player, run, moved, now));
-        }
+        // The finish comes after the run's own rewards, so a first frozen at once is frozen after them (D-99); then the
+        // cell of the stop, or the branch choice of a paused walk (D-303, D-304).
+        events.AddRange(AfterOwnMove(events.Aggregate(state, SeasonEngine.Apply), player, run, moved, walk, context));
 
         if (command.Review is { } given)
         {
@@ -153,6 +153,32 @@ internal static class RunLifecycle
         }
 
         return Decision.Accept(events);
+    }
+
+    /// <summary>
+    /// After the player's own move of a run (<paramref name="moved"/>, null when no cell was entered) with
+    /// <paramref name="state"/> the state after it: the finish and its settlement, or else the stop on the cell; when the
+    /// walk paused at a fork, the branch choice with the steps left (D-99, D-303, D-304).
+    /// </summary>
+    public static IEnumerable<IGameEvent> AfterOwnMove(
+        SeasonState state, SeasonPlayer player, RunState run, PlayerMoved? moved, Walk walk, EngineContext context)
+    {
+        var events = new List<IGameEvent>();
+        if (moved is not null && !walk.Paused)
+        {
+            var finished = Finishes.AfterCompletionMove(state, player, run, moved, context.Clock.UtcNow).ToList();
+            events.AddRange(finished.Count > 0 ? finished : CellStops.After(state, moved));
+        }
+
+        if (walk.Paused)
+        {
+            var fork = moved?.To ?? player.CellId;
+            events.Add(new BranchChoiceRequested(
+                player.PlayerId, context.Ids.NewId(), fork, [.. state.Map.Exits(fork).Select(e => e.To)], walk.Remaining,
+                MoveReason.CompletionRoll, run.RunId));
+        }
+
+        return events;
     }
 
     /// <summary>Coins for completing (Q-2, D-96): by the hours, up to the hours the dice top out at, at least the minimum.</summary>

@@ -60,6 +60,8 @@ public static class FeedVisibility
         ["coins-changed"] = Access.Public,
         ["resource-changed"] = Access.Public,
         ["player-moved"] = Access.Public,
+        ["branch-choice-requested"] = Access.Public,
+        ["map-published"] = Access.Public,
         ["player-finished"] = Access.Public,
         ["player-frozen"] = Access.Public,
         ["player-finish-revoked"] = Access.Public,

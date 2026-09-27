@@ -751,7 +751,7 @@ public static class SeasonEndpoints
             run.Difficulty ?? throw new InvalidOperationException($"Completed run {run.Id} has no difficulty."),
             [.. dice.Select(d => new DieView(d.Sides, d.Value))],
             [.. challenge.Select(d => new DieView(d.Sides, d.Value))],
-            dice.Sum(d => d.Value) + challenge.Sum(d => d.Value),
+            RunTotal.Of(dice, challenge, JsonSerializer.Deserialize<RunSnapshot>(run.SnapshotJson, EngineJson.Options)!),
             review is null ? null : new ReviewView(review.Rating, review.Text),
             proof is null
                 ? null

@@ -52,9 +52,8 @@ public static class PoolStats
             return [];
         }
 
-        var filters = Rolling.Filters(state);
         return [.. state.Players.Values
-            .Where(p => p is { Phase: TurnPhase.Idle, IsInactive: false } && !Rolling.CanRoll(state, p.PlayerId, pool, filters))
+            .Where(p => p is { Phase: TurnPhase.Idle, IsInactive: false } && !Rolling.CanRoll(state, p.PlayerId, pool, Rolling.Filters(state, p.PlayerId)))
             .OrderBy(p => p.Name, StringComparer.Ordinal)
             .Select(p => p.PlayerId)];
     }

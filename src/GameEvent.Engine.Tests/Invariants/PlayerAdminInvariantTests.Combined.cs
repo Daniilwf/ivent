@@ -371,6 +371,7 @@ public partial class PlayerAdminInvariantTests
         {
             "challenges" => features.Challenges,
             "effects" => features.Items || features.Events,
+            "graphMap" => features.MapMode == MapMode.Graph,
             _ => throw new ArgumentOutOfRangeException(nameof(mechanic), mechanic, "Unknown mechanic."),
         };
 
@@ -379,6 +380,10 @@ public partial class PlayerAdminInvariantTests
         e switch
         {
             RunCompleted { ChallengeDone: true } or CompletionRolled { ChallengeDice.Count: > 0 } => "challenges",
+
+            // The graph map of stage 2 (D-300…D-308): publications, forks, teleports and cell bonuses
+            MapPublished or BranchChoiceRequested or PlayerMoved { Paused: true } or PlayerMoved { Reason: MoveReason.Teleport }
+                or PointsChanged { Reason: PointsReason.CellBonus } => "graphMap",
 
             // The effect dispatcher reacts to content (items, events); stage 1 has no content effects in play (D-24, D-103)
             EffectChainCut => "effects",

@@ -446,6 +446,12 @@
       "properties": {
         "linearLength": {
           "type": "integer"
+        },
+        "minZoneGames": {
+          "type": [
+            "integer",
+            "null"
+          ]
         }
       },
       "required": [

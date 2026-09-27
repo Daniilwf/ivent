@@ -6000,8 +6000,15 @@
         "enum": [
           "start",
           "empty",
-          "finish"
-        ]
+          "finish",
+          "fork",
+          "teleport",
+          "checkpoint",
+          "pointsBonus",
+          "event",
+          "shop"
+        ],
+        "description": "What a cell does (SPEC «Карта»). The linear map of stage 1 uses CellType.Start, CellType.Empty and\nCellType.Finish; the graph map adds the rest (D-302). New values are appended: the log stores them by name."
       },
       "CellView": {
         "required": [
@@ -6112,9 +6119,10 @@
       },
       "ChoiceKind": {
         "enum": [
-          "game"
+          "game",
+          "branch"
         ],
-        "description": "What the player is choosing. Stage 1 has games only; branches, targets and outcomes come later (K-5)."
+        "description": "What the player is choosing (K-5): a game, a branch at a fork; targets and outcomes come later."
       },
       "ChoiceOptionView": {
         "required": [
@@ -7741,6 +7749,13 @@
         "properties": {
           "linearLength": {
             "type": "integer",
+            "format": "int32"
+          },
+          "minZoneGames": {
+            "type": [
+              "null",
+              "integer"
+            ],
             "format": "int32"
           }
         }
