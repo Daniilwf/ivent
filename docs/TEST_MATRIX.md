@@ -178,11 +178,26 @@
 | MP14 | Снапшот лога ключевого сценария карты | `Snapshots/MapLogSnapshotTests.Fork_teleport_bonus_checkpoint_and_zone` | ✅ |
 | MP15 | Редактор карты, карта игрока (зум, выбор ветки), API карты | — | ⬜ 2.9–2.11 |
 
+## Симулятор (этап 3, ветка `feat/simulator`)
+
+Тесты — `Simulator.Tests/…`. Прогоны и выводы — `docs/SIMULATION.md`, решения — D-350…D-361.
+
+| ID | Правило | Тесты | Статус |
+| --- | --- | --- | --- |
+| SM1 | Одно зерно — один и тот же отчёт при любом числе потоков, на линейной карте и на графе; другое зерно — другие сезоны (D-351) | `Play/DeterminismTests.Same_seed_gives_the_same_report`, `Threads_do_not_change_the_seasons`, `Another_seed_gives_other_seasons`, `A_graph_map_season_is_deterministic_too` | ✅ |
+| SM2 | Отказ движка не зацикливает бота: ожидание админа при лимите непроверенных, конец сессии при пустом пуле, старт игры при отказе платного реролла; предохранитель не срабатывает (D-355) | `Play/RejectedCommandTests.Bots_wait_for_an_admin_who_never_checks_instead_of_looping`, `Bots_give_up_the_session_when_the_pool_runs_out`, `Bots_start_the_game_when_a_paid_reroll_is_refused` | ✅ |
+| SM3 | Боты играют через движок: сезон заканчивается итоговой таблицей движка, очки каждого бота равны сумме увиденного по прохождениям, штрафам, бонусам клеток и финиша; активные играют больше занятых и не больше своего свободного времени (D-350) | `Play/SeasonPlayTests.A_linear_season_ends_with_a_full_result_that_matches_what_the_bots_saw`, `Active_bots_play_more_than_busy_ones` | ✅ |
+| SM4 | Карта-граф: выбор веток на обеих развилках, телепорты, бонусы, роллы в зонах; пример карты из CONTENT.md играется до итога; каждая политика ветки у каждого профиля (D-352, D-354) | `Play/SeasonPlayTests.Graph_map_season_chooses_branches_stops_on_cells_and_rolls_in_zones`, `The_content_example_map_plays_to_a_result`, `Every_branch_policy_is_played_by_every_profile_over_the_runs` | ✅ |
+| SM5 | Агрегаты отчёта на двух маленьких сезонах, посчитанных руками: очки в час по длинам, дроп, финиш, профили, разрыв, зоны, развилки, счётчики (D-356) | `Report/ReportBuilderTests.*` | ✅ |
+| SM6 | Входы: часы пула свои или сгенерированные одинаково, карта включает режим графа, ошибки входов все сразу, строгие настройки, карта-пример совпадает с CONTENT.md, командная строка (D-353, D-354) | `Setup/InputsTests.*` | ✅ |
+| SM7 | SPEC «Симулятор»: очки в час по длинам игр, выгода дропа, частота финиша, разрыв активных и занятых, тысячи прогонов | прогоны `npm run simulate` в `docs/SIMULATION.md` | ✅ |
+| SM8 | SPEC «Длина карты подбирается так, чтобы до финиша доходил только самый активный и ближе к концу. Проверяется симуляцией» | `docs/SIMULATION.md` «Финиш», предложение D-358 | 🟨 ждёт решения заказчика |
+
 ## Проверка на дыры
 
 | Дыра | Как закрыта | Тесты | Статус |
 | --- | --- | --- | --- |
-| Выгодно дропать длинные игры | почти линейные кубы, штраф по очкам | W1, RR2 (штраф дропа есть и в минус: `Runs/DropTests.Drop_takes_points_and_position_by_the_penalty_dice_and_creates_a_bad_event`, `Points_can_go_negative`); выгодно ли — баланс, симулятор | 🟨 этап 3 |
+| Выгодно дропать длинные игры | почти линейные кубы, штраф по очкам | W1, RR2 (штраф дропа есть и в минус: `Runs/DropTests.Drop_takes_points_and_position_by_the_penalty_dice_and_creates_a_bad_event`, `Points_can_go_negative`); выгодно ли — симулятор: дроп длинных игр в среднем −1,7 очка (SM7, D-361) | ✅ |
 | Тех-реролл вместо дропа | окно, причина, админ делает дропом | RR5 (окно от ролла и из снапшота, причина, после окна — только админ с комментарием), RR6 (превращение в дроп со штрафом); e2e `03-tech-reroll` — I1 | 🟨 I1 |
 | Крутить колесо, обновляя страницу | результат решает сервер | G5: `Web.Tests/Api/SeasonApiTests.Reloading_the_page_after_a_roll_shows_the_same_offer`, `Player_chooses_one_of_several_rolled_games_and_the_choice_survives_a_reload`, `Same_command_id_twice_acts_once`; E2E двух вкладок — I1 | 🟨 I1 |
 | Копить лоты магазина | лоты живут N минут | — | ➖ этап 4 |

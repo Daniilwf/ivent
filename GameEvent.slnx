@@ -5,6 +5,7 @@
     <Project Path="src/GameEvent.Engine/GameEvent.Engine.csproj" />
     <Project Path="src/GameEvent.Infrastructure/GameEvent.Infrastructure.csproj" />
     <Project Path="src/GameEvent.Simulator/GameEvent.Simulator.csproj" />
+    <Project Path="src/GameEvent.Simulator.Tests/GameEvent.Simulator.Tests.csproj" />
     <Project Path="src/GameEvent.Tools.Import/GameEvent.Tools.Import.csproj" />
     <Project Path="src/GameEvent.Web.Tests/GameEvent.Web.Tests.csproj" />
     <Project Path="src/GameEvent.Web/GameEvent.Web.csproj" />
