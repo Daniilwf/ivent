@@ -18,5 +18,8 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
     css: false,
+    // A test's budget, not its expected time: a loaded machine (the .NET suite, Playwright and other worktrees at once)
+    // made userEvent-heavy tests cross the default 5 s at random; a real hang still fails, at 15 s
+    testTimeout: 15_000,
   },
 });
