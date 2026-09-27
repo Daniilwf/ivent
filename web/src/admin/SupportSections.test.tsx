@@ -108,12 +108,12 @@ describe('Bug reports in the admin pages', () => {
     render(<BugsSection />);
 
     expect(await screen.findByText(t.emptyTitle)).toBeInTheDocument();
-    await userEvent.click(screen.getByTestId('bugs-filter-all'));
+    await userEvent.click(screen.getByRole('radio', { name: ru.admin.bugs.filters.all }));
 
     await waitFor(() => {
       expect(server.sent('GET', '/bug-reports').at(-1)?.query.has('status')).toBe(false);
     });
-    expect(screen.getByTestId('bugs-filter-all')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('radio', { name: ru.admin.bugs.filters.all })).toBeChecked();
     expect(screen.getByTestId('bugs-export')).toHaveAttribute(
       'href',
       '/api/admin/bug-reports/export',

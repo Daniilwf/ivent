@@ -8,8 +8,9 @@ import { Cover } from '../board/GameCards';
 import { GameFacts } from '../pool/GameFacts';
 import { NotFound } from '../app/NotFound';
 import { ru } from '../i18n/ru';
+import { inlineLink } from '../ui/buttonStyles';
+import { Badge, Tag } from '../ui/Marks';
 import { AsyncState } from '../ui/AsyncState';
-import { textLink as linkText } from './linkStyle';
 import { cx } from '../ui/cx';
 import { Skeleton } from '../ui/Progress';
 import { EmptyState } from '../ui/States';
@@ -124,7 +125,7 @@ export function GameDetails({
                   <div className="flex flex-wrap items-baseline justify-between gap-x-3">
                     <Link
                       to={paths.profile(run.userId)}
-                      className={cx(linkText, 'font-bold wrap-anywhere')}
+                      className={cx(inlineLink, 'font-bold wrap-anywhere')}
                     >
                       {run.playerName}
                     </Link>
@@ -133,19 +134,20 @@ export function GameDetails({
                       {run.completedAt ? `, ${moscowDay(run.completedAt)}` : ''}
                     </span>
                   </div>
-                  <ul className="flex flex-wrap gap-1 text-sm">
-                    <li className="inline-flex items-center gap-1 rounded-full bg-muted px-2 font-medium">
-                      {statusIcons[run.status]}
-                      {ru.gamePage.status[run.status] ?? run.status}
+                  <ul className="flex flex-wrap items-center gap-1">
+                    <li>
+                      <Badge tone="muted" icon={statusIcons[run.status]}>
+                        {ru.gamePage.status[run.status] ?? run.status}
+                      </Badge>
                     </li>
                     {run.difficulty ? (
-                      <li className="rounded-full bg-muted px-2">
-                        {ru.difficulty[run.difficulty]}
+                      <li>
+                        <Tag>{ru.difficulty[run.difficulty]}</Tag>
                       </li>
                     ) : null}
                     {run.hours === null ? null : (
-                      <li className="rounded-full bg-muted px-2 tabular-nums">
-                        {ru.gamePage.played(run.hours)}
+                      <li>
+                        <Tag>{ru.gamePage.played(run.hours)}</Tag>
                       </li>
                     )}
                   </ul>

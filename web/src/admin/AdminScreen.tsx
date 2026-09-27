@@ -17,6 +17,7 @@ import { api, type Schemas } from '../api/client';
 import { Link } from '../app/Link';
 import { navigate, paths, usePageHeading } from '../app/router';
 import { ru } from '../i18n/ru';
+import { Badge } from '../ui/Marks';
 import { Button } from '../ui/Button';
 import { BottomSheet } from '../ui/Dialogs';
 import { EmptyState } from '../ui/States';
@@ -121,12 +122,9 @@ export function AdminScreen({
               {s.icon}
               <span className="mr-auto">{t.sections[s.id]}</span>
               {s.id === 'proofs' && waiting ? (
-                <span
-                  className="rounded-full bg-ink px-2 text-sm font-bold text-on-color tabular-nums"
-                  aria-label={t.waiting(waiting)}
-                >
+                <Badge tone="ink" label={t.waiting(waiting)}>
                   {waiting}
-                </span>
+                </Badge>
               ) : null}
             </Link>
           </li>
@@ -168,11 +166,7 @@ export function AdminScreen({
                 trigger={
                   <Button icon={<MenuIcon size={20} aria-hidden />} data-testid="admin-sections">
                     {t.sectionsButton}
-                    {waiting ? (
-                      <span className="rounded-full bg-ink px-2 text-sm text-on-color tabular-nums">
-                        {waiting}
-                      </span>
-                    ) : null}
+                    {waiting ? <Badge tone="ink">{waiting}</Badge> : null}
                   </Button>
                 }
               >

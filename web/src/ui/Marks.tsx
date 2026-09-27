@@ -36,6 +36,7 @@ export function Chip({
 
 const badgeTones = {
   gold: 'bg-gold text-ink',
+  ink: 'bg-ink text-on-color tabular-nums',
   me: 'bg-me text-on-color',
   muted: 'bg-muted text-ink',
   warning: 'bg-warning-soft text-ink',
@@ -50,16 +51,21 @@ export function Badge({
   tone = 'gold',
   icon,
   children,
+  label,
   'data-testid': testId,
 }: {
   tone?: keyof typeof badgeTones;
   icon?: ReactNode;
   children: ReactNode;
+  /** What a screen reader says instead of the visible text: «Оценка: 7 из 10» for «★ 7 из 10» */
+  label?: string;
   'data-testid'?: string;
 }) {
   return (
     <span
       data-testid={testId}
+      role={label ? 'img' : undefined}
+      aria-label={label}
       className={cx(
         'inline-flex shrink-0 items-center gap-1 rounded-full px-2 text-xs font-bold',
         badgeTones[tone],

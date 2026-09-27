@@ -1,16 +1,18 @@
 import { Star } from 'lucide-react';
 import { ru } from '../i18n/ru';
+import { Badge } from '../ui/Marks';
 
 /** A rating out of 10: a star and the number, said in words for screen readers */
 export function Rating({ value }: { value: number }) {
   return (
-    <span
-      className="inline-flex shrink-0 items-center gap-1 justify-self-start rounded-full bg-gold px-2 text-sm font-bold text-ink"
-      aria-label={ru.feed.ratingLabel(value)}
-      role="img"
-    >
-      <Star size={14} aria-hidden className="fill-ink" />
-      <span aria-hidden>{ru.feed.rating(value)}</span>
+    <span className="justify-self-start">
+      <Badge
+        tone="gold"
+        label={ru.feed.ratingLabel(value)}
+        icon={<Star size={14} aria-hidden className="fill-ink" />}
+      >
+        <span aria-hidden>{ru.feed.rating(value)}</span>
+      </Badge>
     </span>
   );
 }

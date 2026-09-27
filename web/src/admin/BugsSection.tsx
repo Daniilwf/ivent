@@ -3,10 +3,11 @@ import { useCallback, useState } from 'react';
 import { api, type Schemas } from '../api/client';
 import { moscowTime } from '../app/time';
 import { ru } from '../i18n/ru';
+import { ChoiceGroup } from '../ui/Field';
 import { Badge } from '../ui/Marks';
 import { Button } from '../ui/Button';
+import { buttonClass } from '../ui/buttonStyles';
 import { EmptyState, Notice } from '../ui/States';
-import { cx } from '../ui/cx';
 import { refusal } from './actions';
 import { newCommandId } from '../api/commands';
 import { AsyncState } from '../ui/AsyncState';
@@ -46,31 +47,21 @@ export function BugsSection() {
   return (
     <div className="grid gap-4" data-testid="admin-bugs">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div role="group" aria-label={t.filter} className="flex flex-wrap gap-2">
-          {filters.map((f) => (
-            <button
-              key={f}
-              type="button"
-              aria-pressed={filter === f}
-              data-testid={`bugs-filter-${f}`}
-              onClick={() => {
-                setFilter(f);
-                setMessage(null);
-              }}
-              className={cx(
-                'min-h-11 cursor-pointer rounded-full border-2 border-ink px-4 font-medium is-focus:focus-ring',
-                filter === f ? 'bg-ink text-on-color' : 'bg-card text-ink is-hover:bg-page',
-              )}
-            >
-              {t.filters[f]}
-            </button>
-          ))}
-        </div>
+        <ChoiceGroup<Filter>
+          label={t.filter}
+          options={filters.map((f) => ({ value: f, label: t.filters[f] }))}
+          value={filter}
+          data-testid="bugs-filter"
+          onChange={(f) => {
+            setFilter(f);
+            setMessage(null);
+          }}
+        />
         <a
           href={`/api/admin/bug-reports/export${filter === 'all' ? '' : `?status=${filter}`}`}
           download
           data-testid="bugs-export"
-          className="inline-flex min-h-11 items-center gap-2 rounded-full px-1 font-bold underline underline-offset-4 is-focus:focus-ring"
+          className={buttonClass('link')}
         >
           <Download size={18} aria-hidden />
           {t.export}

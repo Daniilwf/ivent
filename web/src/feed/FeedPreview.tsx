@@ -3,6 +3,7 @@ import { Link } from '../app/Link';
 import { paths } from '../app/router';
 import { useLoaded } from '../app/useLoaded';
 import { ru } from '../i18n/ru';
+import { buttonClass } from '../ui/buttonStyles';
 import { Button } from '../ui/Button';
 import { cx } from '../ui/cx';
 import { Notice } from '../ui/States';
@@ -60,10 +61,7 @@ export function FeedPreview({
       ) : (
         <FeedList days={days} level={3} />
       )}
-      <Link
-        to={paths.feed()}
-        className="inline-flex min-h-11 items-center justify-self-start rounded-sm px-1 font-bold underline underline-offset-4 is-hover:decoration-2"
-      >
+      <Link to={paths.feed()} className={buttonClass('link', 'justify-self-start')}>
         {ru.feed.all}
       </Link>
     </Panel>

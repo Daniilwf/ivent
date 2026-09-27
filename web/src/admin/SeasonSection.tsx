@@ -4,6 +4,7 @@ import { api, type Schemas } from '../api/client';
 import { moscowTime } from '../app/time';
 import { ru } from '../i18n/ru';
 import { Button } from '../ui/Button';
+import { buttonClass } from '../ui/buttonStyles';
 import { ConfirmDanger } from '../ui/Dialogs';
 import { Field } from '../ui/Field';
 import { Notice } from '../ui/States';
@@ -83,7 +84,7 @@ export function SeasonSection({
                       href={`/api/admin/seasons/${seasonId}/export`}
                       download
                       data-testid="season-export"
-                      className="inline-flex min-h-12 items-center gap-2 rounded-full border-2 border-ink bg-card px-5 font-bold is-hover:bg-page is-focus:focus-ring"
+                      className={buttonClass('quiet')}
                     >
                       <Download size={20} aria-hidden />
                       {t.export}

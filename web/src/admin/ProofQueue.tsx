@@ -5,6 +5,7 @@ import { moscowTime } from '../app/time';
 import { difficultyValues } from '../api/schema';
 import { ru } from '../i18n/ru';
 import { Button } from '../ui/Button';
+import { buttonClass } from '../ui/buttonStyles';
 import { ConfirmDanger } from '../ui/Dialogs';
 import { Select, TextArea } from '../ui/Field';
 import { Badge } from '../ui/Marks';
@@ -209,7 +210,10 @@ export function ProofCard({
                   href={link}
                   target="_blank"
                   rel="noreferrer noopener"
-                  className="inline-flex min-h-11 items-center gap-2 rounded-sm font-medium break-all underline underline-offset-4 is-focus:focus-ring"
+                  className={buttonClass(
+                    'link',
+                    'justify-start font-medium break-all whitespace-normal',
+                  )}
                 >
                   <ExternalLink size={16} aria-hidden className="shrink-0" />
                   {t.link(i + 1)}: {link}

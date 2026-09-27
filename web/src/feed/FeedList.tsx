@@ -16,7 +16,8 @@ import { Link } from '../app/Link';
 import { paths } from '../app/router';
 import { moscowClock, moscowTime } from '../app/time';
 import { ru } from '../i18n/ru';
-import { textLink as nameLink } from './linkStyle';
+import { inlineLink } from '../ui/buttonStyles';
+import { Badge, Tag } from '../ui/Marks';
 import { cx } from '../ui/cx';
 import { Skeleton } from '../ui/Progress';
 import { Sticker } from '../ui/Sticker';
@@ -42,7 +43,7 @@ function Ref({ part }: { part: FeedRef }) {
   if (part.kind === 'player') {
     const { player } = part;
     return player.hasProfile ? (
-      <Link to={paths.profile(player.userId)} className={cx(nameLink, 'font-bold')}>
+      <Link to={paths.profile(player.userId)} className={cx(inlineLink, 'font-bold')}>
         {player.name}
       </Link>
     ) : (
@@ -51,7 +52,7 @@ function Ref({ part }: { part: FeedRef }) {
   }
   const { game } = part;
   return game.hasPage ? (
-    <Link to={paths.game(game.id)} className={cx(nameLink, 'font-medium')}>
+    <Link to={paths.game(game.id)} className={cx(inlineLink, 'font-medium')}>
       {game.title}
     </Link>
   ) : (
@@ -110,17 +111,18 @@ export function FeedLine({ item, fresh = false }: { item: FeedItem; fresh?: bool
           </time>
         </div>
         {item.undone ? (
-          <p className="inline-flex items-center gap-1 justify-self-start rounded-full bg-danger-soft px-2 text-sm font-medium text-danger">
-            <Undo2 size={14} aria-hidden />
-            <span className="text-ink">{ru.feed.undone}</span>
-            <span className="sr-only">{ru.feed.undoneHint}</span>
+          <p className="justify-self-start">
+            <Badge tone="danger" icon={<Undo2 size={14} aria-hidden className="text-danger" />}>
+              {ru.feed.undone}
+              <span className="sr-only">{ru.feed.undoneHint}</span>
+            </Badge>
           </p>
         ) : null}
         {item.facts.length ? (
           <ul className="flex flex-wrap gap-1">
             {item.facts.map((fact, i) => (
-              <li key={i} className="rounded-full bg-muted px-2 text-sm">
-                {fact}
+              <li key={i}>
+                <Tag>{fact}</Tag>
               </li>
             ))}
           </ul>
