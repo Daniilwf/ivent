@@ -169,6 +169,30 @@ public class ZoneTests
     }
 
     [Fact]
+    public void Negative_zone_count_never_takes_the_dice_below_zero()
+    {
+        var zone = new ZoneDefinition
+        {
+            Id = "void",
+            Name = "Пустота",
+            DiceModifier = new DiceModifierSpec { Stage = DiceStage.Count, Value = ContentJson.Parse<ContentValue>("-5") },
+        };
+        var s = At(Season(zone), "h1");
+        s.NextRandom(0, 0).Roll("Вася").Start("Вася");
+
+        s.Complete("Вася");
+
+        ScenarioAssert.Accepted(s);
+        Assert.Empty(Run(s).Dice);
+        Assert.Equal(("h1", 0), (s.Player("Вася").CellId, s.Player("Вася").Points));
+
+        // More hours still leave no dice: the zone takes five
+        s.Act(new CorrectRunHours(Run(s).RunId, 9, "часы"));
+        ScenarioAssert.Accepted(s);
+        Assert.Empty(Run(s).Dice);
+    }
+
+    [Fact]
     public void Negative_zone_add_never_takes_the_total_below_zero()
     {
         var zone = new ZoneDefinition
@@ -317,5 +341,51 @@ public class ZoneTests
         s.Act(new AdjustPlayer(s.PlayerId("Вася"), "Вперёд", CellId: "y"));
         s.RollTitle("Вася", "Siren").Start("Вася").NextRandom(4, 4).Act(new DropRun(s.PlayerId("Вася")));
         Assert.Equal("c40", s.Player("Вася").CellId);
+    }
+
+    // ---- The editor's warning (SPEC «у зоны в пуле не меньше 15 подходящих игр, иначе предупреждение») ----
+
+    [Fact]
+    public void Zone_with_too_few_available_games_is_a_warning()
+    {
+        var s = Season().WithRuleset(r => r with { Map = r.Map with { MinZoneGames = 2 } });
+
+        Assert.Empty(ZoneWarnings.For(s.State.Map, s.State.Rules, s.State, s.Context().Pool));
+
+        // Петя plays Silent Hill: one Horror game is available
+        s.RollTitle("Петя", "Silent Hill");
+        Assert.Equal([new ZoneGamesWarning("horror-swamp", 1, 2)], ZoneWarnings.For(s.State.Map, s.State.Rules, s.State, s.Context().Pool));
+    }
+
+    [Fact]
+    public void No_warning_without_the_rule_or_a_zone_filter()
+    {
+        var s = Season();
+        Assert.Null(s.State.Rules.Map.MinZoneGames);
+        Assert.Empty(ZoneWarnings.For(s.State.Map, s.State.Rules, s.State, s.Context().Pool));
+
+        var unfiltered = ZoneMap(new ZoneDefinition { Id = "plain", Name = "Равнина", DropPenaltyMultiplier = 2 });
+        var rules = s.State.Rules with { Map = s.State.Rules.Map with { MinZoneGames = 100 } };
+        Assert.Empty(ZoneWarnings.For(unfiltered, rules, s.State, s.Context().Pool));
+    }
+
+    [Fact]
+    public void Content_map_example_plays_as_the_doc_says()
+    {
+        // start → f → (b1 bonus | c1 → c2 teleport, the swamp) → j checkpoint → finish
+        var map = ContentJson.Parse<MapGraph>(ContentExamplesTests.Example("map"));
+        var s = Scenario.New().WithMap(map).WithCategory("Any")
+            .WithGame("Silent Hill", 3, "Any", "Horror").WithGame("Tetris", 3, "Any", "Puzzle").WithGame("Portal", 3, "Any", "Puzzle")
+            .WithPlayers("Вася");
+
+        // Two steps: f, then the fork asks; the swamp branch c1 → c2 is a stop on the teleport to j
+        s.RollTitle("Вася", "Tetris").Start("Вася").NextRandom(3).Complete("Вася");
+        Assert.Equal(["b1", "c1"], s.Player("Вася").Choice!.Options.Select(o => o.Id));
+        s.ChooseBranch("Вася", "c1");
+        Assert.Equal("j", s.Player("Вася").CellId);
+
+        // From the checkpoint j a drop does not push back
+        s.RollTitle("Вася", "Portal").Start("Вася").NextRandom(4, 4).Act(new DropRun(s.PlayerId("Вася")));
+        Assert.Equal("j", s.Player("Вася").CellId);
     }
 }

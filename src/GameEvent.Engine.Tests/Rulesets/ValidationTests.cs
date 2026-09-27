@@ -274,4 +274,13 @@ public class ValidationTests
 
         Assert.True(errors.Count == 0, Show(errors));
     }
+
+    [Fact]
+    public void Negative_minimum_of_zone_games_is_an_error()
+    {
+        var errors = RulesetValidator.Validate(TestRuleset.Create() with { Map = TestRuleset.Create().Map with { MinZoneGames = -1 } });
+
+        Assert.Equal("map.minZoneGames", Assert.Single(errors).Path);
+        Assert.Empty(RulesetValidator.Validate(TestRuleset.Create() with { Map = TestRuleset.Create().Map with { MinZoneGames = 0 } }));
+    }
 }

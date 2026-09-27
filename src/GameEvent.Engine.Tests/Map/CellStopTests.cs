@@ -99,6 +99,21 @@ public class CellStopTests
     }
 
     [Fact]
+    public void Correction_moving_forward_onto_a_teleport_or_a_bonus_does_not_trigger()
+    {
+        // D-303: a correction adjusts history, it is not a move of the game
+        var map = MapBuilder.New().Path("start", "a", "t", "b", "p", "c", "d", "finish").Teleport("t", to: "d").Bonus("p", 5).Build();
+        var s = Pool(map);
+        Throw(s, "Silent Hill", 1);
+        s.NextRandom(1).Act(new CorrectRunHours(LastRun(s), 6, "часы"));
+        ScenarioAssert.Accepted(s);
+        Assert.Equal(("t", 2), (s.Player("Вася").CellId, s.Player("Вася").Points));
+
+        s.NextRandom(2).Act(new CorrectRunHours(LastRun(s), 9, "часы"));
+        Assert.Equal(("p", 4), (s.Player("Вася").CellId, s.Player("Вася").Points));
+    }
+
+    [Fact]
     public void Admin_transfer_onto_a_teleport_does_not_trigger()
     {
         var s = Pool(Shortcut());

@@ -146,6 +146,17 @@ public class GraphSeasonTests
     }
 
     [Fact]
+    public void Map_that_makes_a_finish_under_a_player_or_takes_one_from_a_finisher_is_refused()
+    {
+        // A token on a finish never moves: a player who has not finished would be stuck there (D-308)
+        var s = Scenario.New().WithMap(ForkMap()).WithPlayers("Вася");
+        s.Act(new AdjustPlayer(s.PlayerId("Вася"), "Перенос", CellId: "k"));
+        var finishOnK = MapBuilder.New().Path("start", "a", "f", "b1", "j", "k").Path("f", "c1", "j").Cell("k", CellType.Finish).Build();
+
+        ScenarioAssert.RejectsWithoutChanges(s, x => x.Act(new PublishMap(finishOnK, "Короче")), RejectionCodes.MapOccupiedCellRetyped);
+    }
+
+    [Fact]
     public void Map_is_published_in_a_draft_and_a_running_season_only()
     {
         var s = Scenario.New().WithMap(ForkMap()).AsDraft().WithPlayers("Вася");

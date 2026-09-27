@@ -41,13 +41,14 @@ public partial class ContentExamplesTests
     [Fact]
     public void The_doc_has_the_examples_the_stages_rely_on()
     {
-        // 10 items with their effects, 5 events, 3 achievements, a zone, the cells, a poll, a weekly challenge — and the
+        // 10 items with their effects, 5 events, 3 achievements, a zone, the cells, a map, a poll, a weekly challenge — and the
         // «Определение объекта» sample at the top
         var kinds = s_examples.Value.Select(Classify).ToList();
 
         Assert.Equal(1 + 10 + 3 + 5 + 3, kinds.Count(k => k == "object"));
         Assert.Equal(1, kinds.Count(k => k == "zone"));
         Assert.Equal(1, kinds.Count(k => k == "cells"));
+        Assert.Equal(1, kinds.Count(k => k == "map"));
         Assert.Equal(1, kinds.Count(k => k == "poll"));
         Assert.Equal(1, kinds.Count(k => k == "challenge"));
     }
@@ -257,10 +258,18 @@ public partial class ContentExamplesTests
             "object" => ContentValidator.Check(ContentJson.Parse<ObjectDefinition>(json)),
             "zone" => ContentValidator.Check(ContentJson.Parse<ZoneDefinition>(json)),
             "cells" => ContentValidator.Check([.. ContentJson.Parse<EquatableArray<CellDefinition>>(json)]),
+            "map" => MapChecked(json),
             "poll" => ContentValidator.Check(ContentJson.Parse<PollDefinition>(json)),
             "challenge" => ContentValidator.Check(ContentJson.Parse<WeeklyChallengeDefinition>(json)),
             var other => throw new InvalidOperationException($"Unknown example kind {other}: {Head(json)}"),
         };
+
+    // Stage 2 (D-300): the map example is checked like a published map in the graph mode
+    private static IReadOnlyList<ContentError> MapChecked(string json)
+    {
+        var rules = Support.TestRuleset.Create() with { Features = Support.TestRuleset.Create().Features with { MapMode = Engine.Rulesets.MapMode.Graph } };
+        return [.. Engine.Map.MapValidator.Validate(ContentJson.Parse<Engine.Map.MapGraph>(json), rules).Select(e => new ContentError(e.Subject, $"{e.Code}: {e.Message}"))];
+    }
 
     private static string Classify(string json)
     {
@@ -268,6 +277,7 @@ public partial class ContentExamplesTests
         return node switch
         {
             JsonArray => "cells",
+            JsonObject o when o.ContainsKey("edges") => "map",
             JsonObject o when o.ContainsKey("kind") => "object",
             JsonObject o when o.ContainsKey("rollFilter") => "zone",
             JsonObject o when o.ContainsKey("question") => "poll",

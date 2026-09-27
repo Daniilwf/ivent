@@ -3,6 +3,14 @@ using GameEvent.Engine.Rulesets;
 
 namespace GameEvent.Engine.Runs;
 
+/// <summary>What a completed run gives in points and steps (D-307), for the pages that show it.</summary>
+public static class RunTotal
+{
+    /// <summary>The dice, the challenge dice and the zone's addition of <paramref name="snapshot"/>, never below 0.</summary>
+    public static int Of(EquatableArray<Die> dice, EquatableArray<Die> challengeDice, RunSnapshot snapshot) =>
+        CompletionRoll.Total(dice, challengeDice, snapshot);
+}
+
 /// <summary>
 /// Dice for a completed run (D-13, D-14). Pipeline: count from hours (plus a zone's extra dice), sides from difficulty,
 /// roll, a zone's addition (D-307). Stage 4 adds reroll, multiply and min/max modifiers from items.
@@ -24,8 +32,8 @@ internal static class CompletionRoll
         return (int)Math.Clamp(rounded, rule.Min, rule.Max);
     }
 
-    /// <summary>The run's dice count: by the hours, plus the zone's extra dice after the limit (D-307).</summary>
-    public static int Count(decimal hours, RunSnapshot snapshot) => Count(hours, snapshot.DiceCount) + (snapshot.Zone?.ExtraDice ?? 0);
+    /// <summary>The run's dice count: by the hours, plus the zone's extra dice after the limit, never below 0 (D-307).</summary>
+    public static int Count(decimal hours, RunSnapshot snapshot) => Math.Max(0, Count(hours, snapshot.DiceCount) + (snapshot.Zone?.ExtraDice ?? 0));
 
     /// <summary>
     /// What a completed run gives in points and steps: its dice, its challenge dice and the zone's addition, never

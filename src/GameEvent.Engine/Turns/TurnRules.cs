@@ -14,7 +14,8 @@ namespace GameEvent.Engine.Turns;
 /// </summary>
 internal static class TurnRules
 {
-    // MakeChoice needs a pending choice rather than a phase; a choice exists only while Rolling.
+    // MakeChoice needs a pending choice rather than a phase: a game choice exists only while Rolling, a branch choice
+    // while Idle (its own rules, D-305).
     private static readonly Dictionary<Type, TurnPhase> s_phaseFor = new()
     {
         [typeof(RollGame)] = TurnPhase.Idle,

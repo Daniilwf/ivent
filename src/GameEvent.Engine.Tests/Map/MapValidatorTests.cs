@@ -74,6 +74,11 @@ public class MapValidatorTests
 
         var tooLong = MapBuilder.New().Path("start", new string('x', MapValidator.MaxIdLength + 1), "finish");
         Assert.Contains(Check(tooLong), e => e.Code == MapErrorCodes.CellIdInvalid);
+
+        // A branch choice sends the id back: Latin letters, digits, «-» and «_» like the API's option ids
+        Assert.Contains(Check(MapBuilder.New().Path("start", "болото", "finish")), e => e.Code == MapErrorCodes.CellIdInvalid && e.Subject == "болото");
+        Assert.Contains(Check(MapBuilder.New().Path("start", "c.1", "finish")), e => e.Code == MapErrorCodes.CellIdInvalid);
+        Assert.Empty(Check(MapBuilder.New().Path("start", "swamp-1_B", "finish")));
     }
 
     [Fact]

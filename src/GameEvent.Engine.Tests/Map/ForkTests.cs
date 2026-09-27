@@ -189,14 +189,35 @@ public class ForkTests
     }
 
     [Fact]
-    public void Branch_is_not_chosen_once_the_season_is_finished()
+    public void Season_does_not_finish_while_a_branch_waits()
     {
+        // D-305: the steps at the fork belong to a throw made before the deadline and may still reach the finish
         var s = Playing();
         s.NextRandom(2, 2, 2).Complete("Вася");
         s.Act(new ApproveProof(RunOf(s, "Вася"), Comment: "видел"));
-        s.MoveStatusTo(SeasonStatus.Finished);
+        s.MoveStatusTo(SeasonStatus.Closing);
 
-        ScenarioAssert.RejectsWithoutChanges(s, x => x.ChooseBranch("Вася", "c1"), RejectionCodes.SeasonNotActive);
+        ScenarioAssert.RejectsWithoutChanges(s, x => x.Act(new ChangeSeasonStatus(SeasonStatus.Finished)), RejectionCodes.BranchChoicePending);
+
+        // Chosen (or discarded by the admin), the season finishes; no branch is chosen after that
+        s.ChooseBranch("Вася", "c1");
+        s.MoveStatusTo(SeasonStatus.Finished);
+        ScenarioAssert.RejectsWithoutChanges(s, x => x.Act(new MakeChoice(x.PlayerId("Вася"), Guid.Empty, "b1")), RejectionCodes.SeasonNotActive);
+    }
+
+    [Fact]
+    public void Undo_that_would_bring_back_a_branch_the_map_no_longer_has_is_refused()
+    {
+        // The choice was made, then a map changed the fork's exits: the old choice must not come back
+        var s = Playing();
+        s.NextRandom(2, 2, 2).Complete("Вася");
+        s.ChooseBranch("Вася", "c1");
+        var chosen = s.LastCommandId;
+        var rerouted = MapBuilder.New().Path("start", "a", "f", "b1", "j", "k", "l", "m", "finish").Path("f", "c1", "j").Path("f", "d1", "j").Build();
+        s.Act(new PublishMap(rerouted, "Третья ветка"));
+        ScenarioAssert.Accepted(s);
+
+        ScenarioAssert.RejectsWithoutChanges(s, x => x.Act(new Engine.Undo.UndoCommand(chosen, "Назад")), RejectionCodes.UndoCellNotOnMap);
     }
 
     [Fact]

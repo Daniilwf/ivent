@@ -58,6 +58,16 @@ internal static class MapPublishing
             return Decision.Reject(RejectionCodes.MapOccupiedCellRemoved, $"Players stand on cells the new map removes: {string.Join(", ", stranded)}.");
         }
 
+        // A player who has not finished must not stand on a finish, a finisher must stay on one: a token on a finish never moves (D-308)
+        var misplaced = state.Players.Values
+            .Where(p => (command.Map.CellById(p.CellId).Type == CellType.Finish) != (p.Finish is not null))
+            .Select(p => p.CellId).Distinct().Order(StringComparer.Ordinal).ToList();
+        if (misplaced.Count > 0)
+        {
+            return Decision.Reject(
+                RejectionCodes.MapOccupiedCellRetyped, $"The new map makes a finish of a cell a player is still on, or the other way round: {string.Join(", ", misplaced)}.");
+        }
+
         // D-305: the remaining steps of a pending branch choice lead from a fork of the current map
         if (state.Players.Values.Any(p => p.Choice?.Kind == ChoiceKind.Branch))
         {

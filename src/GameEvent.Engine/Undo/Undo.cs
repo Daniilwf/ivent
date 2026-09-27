@@ -131,11 +131,15 @@ internal static class Undoing
         var compensation = Compensation(beforeTarget!, state, target, command.Comment);
 
         // D-308: a map published since may have removed the cells the undo would bring a player back to
-        if (compensation.Players.FirstOrDefault(p => !Map.MapPublishing.LiesOn(p.Path, state.Map) || !state.Map.HasCell(p.CellId)) is { } stranded)
+        if (compensation.Players.FirstOrDefault(p => !Map.MapPublishing.LiesOn(p.Path, state.Map) || !state.Map.HasCell(p.CellId)
+            || (p.Choice is { Kind: Turns.ChoiceKind.Branch } branch
+                && !branch.Options.Select(o => o.Id).SequenceEqual(state.Map.Exits(p.CellId).Select(e => e.To)))) is { } stranded)
         {
             return Decision.Reject(
-                RejectionCodes.UndoCellNotOnMap, $"The undo would bring player {stranded.PlayerId} back to cells the current map no longer has.");
+                RejectionCodes.UndoCellNotOnMap,
+                $"The undo would bring player {stranded.PlayerId} back to cells or branches the current map no longer has.");
         }
+
         if (compensation.Season is { } season && season.Deadline != state.Deadline && season.Deadline is { } deadline
             && deadline <= context.Clock.UtcNow)
         {

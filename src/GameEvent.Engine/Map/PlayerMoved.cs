@@ -23,7 +23,8 @@ public enum MoveReason
 /// A move that entered no cell (blocked at the finish or the start) writes no event, so <see cref="Path"/> is never
 /// empty. <see cref="RunId"/> links the move to a run when there is one. <see cref="Paused"/>: the player's own move
 /// reached a fork with steps left and waits for the branch (D-304): its last cell is passed, not stopped on; the rest
-/// of the steps follow in the move after the choice. Written only when set, so moves of stage 1 read and write as before.
+/// of the steps follow in the move after the choice, whose <see cref="Steps"/> are the steps left. A paused move keeps
+/// the whole throw in <see cref="Steps"/>, so its burned steps are not <c>Steps − Path.Count</c>. Written only when set, so moves of stage 1 read and write as before.
 /// </summary>
 [EventType("player-moved")]
 public sealed record PlayerMoved(

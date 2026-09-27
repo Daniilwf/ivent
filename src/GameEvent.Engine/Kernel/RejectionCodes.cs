@@ -73,6 +73,7 @@ public static class RejectionCodes
     public const string MapModeFixed = "ruleset.mapModeFixed";
     public const string MapOccupiedCellRemoved = "map.occupiedCellRemoved";
     public const string MapUnchanged = "map.unchanged";
+    public const string MapOccupiedCellRetyped = "map.occupiedCellRetyped";
     public const string BranchChoicePending = "map.branchChoicePending";
     public const string UndoCellNotOnMap = "undo.cellNotOnMap";
     public const string InvalidRating = "review.invalidRating";

@@ -36,7 +36,6 @@ public static class MapErrorCodes
     public const string ZoneDuplicate = "map.zoneDuplicate";
     public const string ZoneInvalid = "map.zoneInvalid";
     public const string ZoneUnsupported = "map.zoneUnsupported";
-    public const string OccupiedCellRemoved = "map.occupiedCellRemoved";
 }
 
 /// <summary>
@@ -71,9 +70,10 @@ public static class MapValidator
         var ids = new HashSet<string>(StringComparer.Ordinal);
         foreach (var cell in map.Cells)
         {
-            if (string.IsNullOrWhiteSpace(cell.Id) || cell.Id.Length > MaxIdLength || cell.Id.Trim() != cell.Id)
+            // The id is what a branch choice sends back: the same characters the API lets through
+            if (cell.Id.Length is 0 or > MaxIdLength || !cell.Id.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_'))
             {
-                Error(MapErrorCodes.CellIdInvalid, cell.Id, $"A cell id is 1–{MaxIdLength} characters without surrounding spaces.");
+                Error(MapErrorCodes.CellIdInvalid, cell.Id, $"A cell id is 1–{MaxIdLength} Latin letters, digits, «-» or «_».");
             }
 
             if (!ids.Add(cell.Id))

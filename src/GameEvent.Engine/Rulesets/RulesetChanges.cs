@@ -43,12 +43,6 @@ internal static class RulesetChanges
             return Decision.Reject(RejectionCodes.MapModeFixed, "A season on a graph map stays on it.");
         }
 
-        // D-302: the map's event and shop cells need their mechanics
-        if (Map.MapValidator.Validate(state.Map, command.Ruleset).FirstOrDefault(e => e.Code == Map.MapErrorCodes.FeatureDisabled) is { } off)
-        {
-            return Decision.Reject(RejectionCodes.RulesetInvalid, $"Cell {off.Subject} of the map needs its mechanic: {off.Message}");
-        }
-
         return command.Ruleset == state.Ruleset
             ? Decision.Reject(RejectionCodes.RulesetUnchanged, "The new ruleset equals the current one.")
             : Decision.Accept(new RulesetChanged(state.RulesetVersion + 1, command.Ruleset));

@@ -55,7 +55,8 @@ internal static class Choosing
             return Decision.Reject(RejectionCodes.NoPendingChoice, $"Choice {command.ChoiceId} is not pending.");
         }
 
-        if (choice.Options.All(o => o.Id != command.OptionId))
+        // The option must still be a branch of the map in force: an undo may bring back a choice made on an older map (D-308)
+        if (choice.Options.All(o => o.Id != command.OptionId) || state.Map.Exits(player.CellId).All(e => e.To != command.OptionId))
         {
             return Decision.Reject(RejectionCodes.UnknownChoiceOption, $"The option is not one of choice {command.ChoiceId}.");
         }

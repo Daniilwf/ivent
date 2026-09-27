@@ -127,6 +127,12 @@ internal static class SeasonSetup
             return Decision.Reject(RejectionCodes.SeasonProofsPending, "Every completed run must be approved or rejected first.");
         }
 
+        // D-305: the steps waiting at a fork belong to a throw made before the deadline and may still reach the finish
+        if (state.Players.Values.Any(p => p.Choice?.Kind == Turns.ChoiceKind.Branch))
+        {
+            return Decision.Reject(RejectionCodes.BranchChoicePending, "A player is choosing a branch: wait for the choice or discard it first.");
+        }
+
         return Decision.Accept(changed, new SeasonResultRecorded(Ranking.Leaderboard.Build(state)));
     }
 
