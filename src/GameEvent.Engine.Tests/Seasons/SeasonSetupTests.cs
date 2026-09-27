@@ -95,7 +95,6 @@ public class SeasonSetupTests
 
     public static TheoryData<string, Func<Ruleset, Ruleset>> UnsupportedRulesets() => new()
     {
-        { "graph map", r => r with { Features = r.Features with { MapMode = MapMode.Graph } } },
         { "two active runs", r => r with { Season = r.Season with { MaxActiveRunsPerPlayer = 2 } } },
     };
 

@@ -113,7 +113,7 @@ internal static class Drops
         var after = Rolling.Apply(Apply(state, rerolled), excluded);
 
         // SPEC: Playing --> Rolling. The new roll is a roll of its own, with its own free rerolls (D-07, D-94).
-        return Rolling.Draw(after, player.PlayerId, context, Rolling.Filters(after)) is { } roll
+        return Rolling.Draw(after, player.PlayerId, context, Rolling.Filters(after, player.PlayerId)) is { } roll
             ? Decision.Accept(rerolled, excluded, roll)
             : Decision.Accept(rerolled, excluded);
     }
@@ -191,7 +191,7 @@ internal static class Drops
         SeasonState state, SeasonPlayer player, EquatableArray<Die> dice, Guid runId, EngineContext context, bool exclude = true)
     {
         var rules = state.Rules.Drop;
-        var sum = dice.Sum(d => d.Value);
+        var sum = PenaltySum(dice, state.Runs[runId].Snapshot);
 
         // The frozen first loses nothing and is dealt no event; a finisher's position is fixed (D-09, D-99).
         if (Finishes.IsFrozen(player))
@@ -211,10 +211,16 @@ internal static class Drops
 
         if (rules.AffectsPosition && sum != 0 && player.Finish is null)
         {
-            var path = Movement.Backward(state.Map, player.Path, sum);
+            // A push back: not below a checkpoint (D-306); the cell it stops on triggers (D-303)
+            var path = Movement.Backward(state.Map, player.Path, sum, checkpoints: true);
             if (path.Count > 0)
             {
-                yield return new PlayerMoved(player.PlayerId, player.CellId, path[^1], -sum, [.. path], MoveReason.DropPenalty, runId);
+                var moved = new PlayerMoved(player.PlayerId, player.CellId, path[^1], -sum, [.. path], MoveReason.DropPenalty, runId);
+                yield return moved;
+                foreach (var e in CellStops.After(state, moved))
+                {
+                    yield return e;
+                }
             }
         }
 
@@ -227,6 +233,18 @@ internal static class Drops
         {
             yield return new ManualEffectCreated(context.Ids.NewId(), player.PlayerId, EventKind.Bad, ManualEffectSource.Drop, runId);
         }
+    }
+
+    /// <summary>
+    /// The penalty in points and steps: the dice sum times the multiplier of the zone the run was rolled in, rounded to
+    /// a whole number, halves away from zero (D-307).
+    /// </summary>
+    public static int PenaltySum(EquatableArray<Die> dice, RunSnapshot snapshot)
+    {
+        var sum = dice.Sum(d => d.Value);
+        return snapshot.Zone?.DropPenaltyMultiplier is { } multiplier
+            ? (int)Math.Round(sum * multiplier, MidpointRounding.AwayFromZero)
+            : sum;
     }
 
     private static SeasonState Finish(SeasonState state, Guid runId, Guid playerId, RunStatus status) =>

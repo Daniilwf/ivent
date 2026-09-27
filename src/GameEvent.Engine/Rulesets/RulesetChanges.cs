@@ -36,6 +36,13 @@ internal static class RulesetChanges
             return rejection;
         }
 
+        // D-301: the chain of a linear season is a valid graph, so it may switch to the graph mode; a graph never
+        // silently turns into a chain.
+        if (state.Rules.Features.MapMode == MapMode.Graph && command.Ruleset.Features.MapMode != MapMode.Graph)
+        {
+            return Decision.Reject(RejectionCodes.MapModeFixed, "A season on a graph map stays on it.");
+        }
+
         return command.Ruleset == state.Ruleset
             ? Decision.Reject(RejectionCodes.RulesetUnchanged, "The new ruleset equals the current one.")
             : Decision.Accept(new RulesetChanged(state.RulesetVersion + 1, command.Ruleset));

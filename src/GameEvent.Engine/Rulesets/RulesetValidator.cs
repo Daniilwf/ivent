@@ -98,6 +98,11 @@ public static class RulesetValidator
         }
 
         AtMost("map.linearLength", ruleset.Map.LinearLength, MaxMapLength);
+        if (ruleset.Map.MinZoneGames is < 0)
+        {
+            Error("map.minZoneGames", "must not be negative, or null for no warning");
+        }
+
         NotNegative("season.inactiveHintDays", ruleset.Season.InactiveHintDays);
 
         if (ruleset.Effects.MaxChainDepth < 1)
