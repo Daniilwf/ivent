@@ -839,10 +839,10 @@ export const ru = {
   // The strip on every page of a copy that is not the live site (H9, D-220)
   environment: {
     label: 'Какая это копия сайта',
-    development: 'Локальная копия для разработки — не настоящий сайт.',
-    test: 'Тестовое окружение — не настоящий сайт.',
-    staging: 'Тестовая копия — не настоящий сайт: ходы и пруфы отсюда не попадают в сезон.',
-    other: 'Это не боевой сайт: данные здесь не настоящие.',
+    development: 'Копия для разработки, не настоящий сайт',
+    test: 'Тестовое окружение, не настоящий сайт',
+    staging: 'Тестовая копия: ходы не идут в сезон',
+    other: 'Не боевой сайт: данные не настоящие',
   },
   maintenance: {
     banner: 'Идёт обслуживание: сайт на минуту только для чтения. Изменения сейчас не сохраняются.',
@@ -1713,13 +1713,22 @@ export const ru = {
       } as Readonly<Record<string, string>>,
       player: 'Игрок',
       load: 'Загрузить сценарий',
-      loaded: (steps: string) =>
-        `Сценарий загружен: ${steps}. Отменить можно откатом в разделе «Лог».`,
+      // What a loaded scenario did, in the game's words; the steps are in the season's log
+      done: {
+        'finish-soon': (player: string) => `${player} стоит на клетке перед финишем.`,
+        'deadline-in-hour': () => 'Дедлайн сезона — через час.',
+        'five-manual-effects': (player: string) =>
+          `${player}: пять хороших ивентов ждут розыгрыша.`,
+      } as Readonly<Record<string, (player: string) => string>>,
+      loaded: 'Сценарий загружен.',
+      undoHint: 'Отменить можно откатом в разделе «Лог».',
+      alreadyThere: 'Эта ситуация уже на месте: менять нечего.',
       noSeason: 'Сценарии работают на сезоне: создай его в разделе «Сезон».',
       noPlayers: 'В сезоне пока нет игроков: добавь их в разделе «Игроки».',
       clock: 'Время сайта',
       clockHint: 'Часы общие для всего сайта: дедлайны и таймеры сработают по новому времени.',
       realTime: 'Настоящее время',
+      nowLabel: 'Сейчас на сайте',
       shift: (text: string) => `Сдвиг от настоящего: ${text}`,
       days: (n: number) => `${n} дн`,
       hours: (n: number) => `${n} ч`,

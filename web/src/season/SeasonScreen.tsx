@@ -355,14 +355,17 @@ export function SeasonScreen({
               </p>
             ) : null}
             <div className="flex items-start gap-3">
-              <Cover
-                game={{
-                  title: me.lastCompleted.game.title,
-                  cover: me.lastCompleted.game.cover?.thumbnailUrl,
-                }}
-                width={40}
-                className="mt-1 ml-1"
-              />
+              {/* Beside a line of text only a real cover, as in the feed: a placeholder would be noise (D-222) */}
+              {me.lastCompleted.game.cover ? (
+                <Cover
+                  game={{
+                    title: me.lastCompleted.game.title,
+                    cover: me.lastCompleted.game.cover.thumbnailUrl,
+                  }}
+                  width={40}
+                  className="mt-1 ml-1"
+                />
+              ) : null}
               <p
                 id={lastDiceId}
                 data-testid="last-dice"

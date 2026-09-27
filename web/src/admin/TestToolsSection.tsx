@@ -1,6 +1,6 @@
 import { CalendarCog, Clock, Dices } from 'lucide-react';
-import { useCallback, useState, type SyntheticEvent } from 'react';
-import { api, type Schemas } from '../api/client';
+import { useCallback, useEffect, useState, type SyntheticEvent } from 'react';
+import { api, rejectionCode, type Schemas } from '../api/client';
 import { navigate, paths } from '../app/router';
 import { moscowInput, moscowTime } from '../app/time';
 import { answerOf, useLoaded } from '../app/useLoaded';
@@ -10,11 +10,11 @@ import { Button } from '../ui/Button';
 import { ChoiceGroup, Field, Select } from '../ui/Field';
 import { EmptyState, Notice } from '../ui/States';
 import { Panel } from '../ui/Surface';
-import { commandLabel, refusal } from './actions';
+import { refusal } from './actions';
 
 const t = ru.admin.test;
 
-type Message = { tone: 'success' | 'danger'; text: string };
+type Message = { tone: 'success' | 'info' | 'danger'; text: string };
 
 /** The scenario that does not need a player: the deadline is the season's */
 const seasonWide = 'deadline-in-hour';
@@ -103,7 +103,7 @@ function ScenarioForm({ seasonId, scenarios }: { seasonId: string; scenarios: st
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<Message | null>(null);
 
-  async function load(playerId: string | null) {
+  async function load(playerId: string | null, playerName: string | null) {
     setBusy(true);
     setMessage(null);
     try {
@@ -111,11 +111,15 @@ function ScenarioForm({ seasonId, scenarios }: { seasonId: string; scenarios: st
         params: { path: { seasonId, name: scenario } },
         body: playerId ? { playerId } : {},
       });
-      if (answer.data)
+      if (answer.data) {
+        const done = t.done[scenario];
         setMessage({
           tone: 'success',
-          text: t.loaded([...new Set(answer.data.commands.map(commandLabel))].join(', ')),
+          text: `${done ? done(playerName ?? '') : t.loaded} ${t.undoHint}`,
         });
+      } else if (rejectionCode(answer.error) === 'player.nothingToChange')
+        // Loaded before: the situation is in place, nothing went wrong
+        setMessage({ tone: 'info', text: t.alreadyThere });
       else setMessage({ tone: 'danger', text: refusal(answer) });
     } catch {
       setMessage({ tone: 'danger', text: ru.admin.failed });
@@ -136,7 +140,11 @@ function ScenarioForm({ seasonId, scenarios }: { seasonId: string; scenarios: st
             noValidate
             onSubmit={(e: SyntheticEvent) => {
               e.preventDefault();
-              if (!blocked) void load(needsPlayer ? (player?.id ?? null) : null);
+              if (!blocked)
+                void load(
+                  needsPlayer ? (player?.id ?? null) : null,
+                  needsPlayer ? (player?.name ?? null) : null,
+                );
             }}
           >
             <ChoiceGroup
@@ -197,6 +205,21 @@ function ScenarioForm({ seasonId, scenarios }: { seasonId: string; scenarios: st
   );
 }
 
+/** The site's time running on from the moment the server told it, a minute at a time («дальше часы идут сами») */
+function useSiteNow(told: string): Date {
+  const [ran, setRan] = useState({ told, ms: 0 });
+  useEffect(() => {
+    const from = Date.now();
+    const timer = globalThis.setInterval(() => {
+      setRan({ told, ms: Date.now() - from });
+    }, 30_000);
+    return () => {
+      globalThis.clearInterval(timer);
+    };
+  }, [told]);
+  return new Date(Date.parse(told) + (ran.told === told ? ran.ms : 0));
+}
+
 function ClockPanel({
   clock,
   onChanged,
@@ -209,6 +232,7 @@ function ClockPanel({
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<Message | null>(null);
   const shift = shiftText(clock.shiftMinutes);
+  const now = useSiteNow(clock.now);
 
   async function move(key: string, body: Schemas['TestClockRequest'], done: string) {
     setBusy(key);
@@ -232,7 +256,8 @@ function ClockPanel({
       <div className="grid gap-1">
         <p className="flex items-center gap-2 font-display text-lg font-heavy tabular-nums">
           <Clock size={20} aria-hidden />
-          <span data-testid="test-clock-now">{moscowTime(clock.now)}</span>
+          <span className="sr-only">{t.nowLabel}</span>
+          <span data-testid="test-clock-now">{moscowTime(now)}</span>
         </p>
         <p className="text-ink-soft" data-testid="test-clock-shift">
           {shift ? t.shift(shift) : t.realTime}
@@ -378,7 +403,6 @@ function RandomPanel({
             <Field
               label={t.seed}
               hint={t.seedHint}
-              inputMode="numeric"
               autoComplete="off"
               value={text}
               error={error}

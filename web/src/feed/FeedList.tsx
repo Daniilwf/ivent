@@ -132,7 +132,14 @@ export function FeedLine({ item, fresh = false }: { item: FeedItem; fresh?: bool
         {item.quote ? <Quote rating={item.quote.rating} text={item.quote.text} /> : null}
       </div>
       {/* The completed game's cover: a card on the table beside the line, the title is in the line itself */}
-      {item.cover ? <Cover game={item.cover} width={40} lazy className="mt-1 mr-1" /> : null}
+      {item.cover ? (
+        <Cover
+          game={item.cover}
+          width={40}
+          lazy
+          className={cx('mt-1 mr-1', item.undone && 'opacity-50 grayscale')}
+        />
+      ) : null}
     </li>
   );
 }

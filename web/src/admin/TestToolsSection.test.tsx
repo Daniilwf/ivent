@@ -99,7 +99,7 @@ describe('The test tools', () => {
     await userEvent.click(screen.getByTestId('scenario-load'));
 
     expect(
-      await screen.findByText(t.loaded(ru.admin.log.commands['AdjustPlayer'] ?? '')),
+      await screen.findByText(`${t.done['finish-soon']?.('Петя') ?? ''} ${t.undoHint}`),
     ).toBeInTheDocument();
     const sent = server.sent('POST', `/api/test/seasons/${seasonId}/scenarios/finish-soon`);
     expect(sent.map((c) => c.body)).toEqual([{ playerId: petya }]);
@@ -126,6 +126,22 @@ describe('The test tools', () => {
     await waitFor(() => {
       expect(server.sent('POST', '/scenarios/deadline-in-hour').map((c) => c.body)).toEqual([{}]);
     });
+  });
+
+  it('say calmly that a scenario loaded before is already in place', async () => {
+    site({
+      'POST /api/test/seasons/*/scenarios/*': answer(409, {
+        title: 'The test action was refused.',
+        status: 409,
+        code: 'player.nothingToChange',
+      }),
+    });
+    open();
+
+    await userEvent.click(await screen.findByTestId('scenario-load'));
+
+    expect(await screen.findByRole('status')).toHaveTextContent(t.alreadyThere);
+    expect(screen.queryByRole('alert')).toBeNull();
   });
 
   it('say in Russian why a scenario was refused', async () => {

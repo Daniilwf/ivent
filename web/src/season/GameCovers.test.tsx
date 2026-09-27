@@ -178,6 +178,28 @@ describe('Game covers on the season screen (D-222)', () => {
     expect(pictures(dice.parentElement as HTMLElement)).toEqual([cover(1).thumbnailUrl]);
   });
 
+  it('puts no placeholder beside the dice line of a game without a cover', async () => {
+    open(
+      season({
+        lastCompleted: {
+          id: 'b1000000-0000-0000-0000-000000000003',
+          game: { id: 'a3', title: 'Outlast', hours: 5, cover: null },
+          difficulty: 'normal',
+          dice: [{ sides: 4, value: 2 }],
+          challengeDice: [],
+          total: 2,
+          review: null,
+          proof: null,
+          status: 'completed',
+        },
+      }),
+    );
+
+    const row = (await screen.findByTestId('last-dice')).parentElement as HTMLElement;
+    expect(pictures(row)).toEqual([]);
+    expect(within(row).queryByRole('img', { name: ru.board.noCover })).toBeNull();
+  });
+
   it('shows the cover of the game the wheel lands on', async () => {
     // On a desktop the landed wheel stays on the map's stage with the result
     vi.stubGlobal('matchMedia', (query: string) => ({
