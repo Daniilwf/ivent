@@ -1,6 +1,7 @@
 import type { Schemas } from '../api/client';
 import { emptyRefs, feedDays, withRefs } from '../feed/feedModel';
 import { demoGames, demoPlayers } from './fixtures';
+import { demoGame } from '../pool/demoPool';
 
 // Demo data of the feed, the profile and the game page (H5) for the styleguide and the visual tests: the demo season's
 // made-up players with the longest nicknames and the pool's longest titles. Fixed dates: the screenshots do not age.
@@ -193,17 +194,15 @@ export const demoProfileEmpty: Schemas['ProfileView'] = {
 
 /** The pool's longest title, no cover, with its runs of every kind */
 export const demoGameCard: Schemas['PoolGameView'] = {
+  // The demo pool's game, as the feed names it (one demo game for the pool, the feed and the game page)
+  ...demoGame,
   id: game(0)?.id ?? '',
   title: game(0)?.title ?? '',
   tags: demoGames[0]?.tags ?? [],
   hours: 2,
   year: 2019,
-  steamAppId: null,
-  cover: null,
-  note: null,
   isCoop: true,
   author: null,
-  isDeleted: false,
   completionCondition: 'Любая концовка, достижения не нужны',
 };
 

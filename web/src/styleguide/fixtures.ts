@@ -63,7 +63,8 @@ export const demoGames: GameCard[] = [
   { title: 'Project Zomboid', tags: ['Horror', 'RPG', 'Online Co-Op'], hours: null },
 ];
 
-export const demoCategories = [
+/** The wheel's sectors in the moments' demo: category names, as the wheel shows them */
+export const demoWheelSectors = [
   'Action',
   'Horror',
   'Platformer',

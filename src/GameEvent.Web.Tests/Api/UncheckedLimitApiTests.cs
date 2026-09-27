@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using static GameEvent.Web.Tests.Api.ApiCalls;
 
 namespace GameEvent.Web.Tests.Api;
 
@@ -186,16 +187,4 @@ public sealed class UncheckedLimitApiTests : IAsyncLifetime
     private static async Task<JsonElement> MeAsync(HttpClient player) =>
         (await OkAsync(await player.GetAsync(Season, Ct))).GetProperty("me");
 
-    private static async Task PostOkAsync(HttpClient client, string url, object? body = null)
-    {
-        var response = await client.PostAsJsonAsync(url, body ?? new { commandId = Guid.NewGuid() }, Ct);
-        Assert.True(response.IsSuccessStatusCode, $"{url}: {await response.Content.ReadAsStringAsync(Ct)}");
-    }
-
-    private static async Task<JsonElement> OkAsync(HttpResponseMessage response)
-    {
-        var body = await response.Content.ReadAsStringAsync(Ct);
-        Assert.True(response.StatusCode == HttpStatusCode.OK, $"{response.StatusCode}: {body}");
-        return JsonDocument.Parse(body).RootElement.Clone();
-    }
 }
