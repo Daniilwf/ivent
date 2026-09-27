@@ -127,7 +127,15 @@ internal static class ScenarioCode
                 arguments.Add(skipped ? $"{parameter.Name}: {Value(argument, name)}" : Value(argument, name));
             }
 
-            return $"new {TypeName(type)}({string.Join(", ", arguments)})";
+            // Init-only properties beside the constructor (a map cell's parameters, D-300), when set
+            var extra = Properties(type)
+                .Where(p => !parameters.Any(x => string.Equals(x.Name, p.Name, StringComparison.OrdinalIgnoreCase)))
+                .Select(p => (p.Name, Value: p.GetValue(value)))
+                .Where(p => p.Value is not null && !(p.Value is IEnumerable items and not string && !items.Cast<object?>().Any()))
+                .Select(p => $"{p.Name} = {Value(p.Value, name)}")
+                .ToList();
+            var initializer = extra.Count == 0 ? "" : $" {{ {string.Join(", ", extra)} }}";
+            return $"new {TypeName(type)}({string.Join(", ", arguments)}){initializer}";
         }
 
         var members = Properties(type).Select(p => $"{p.Name} = {Value(p.GetValue(value), name)}");

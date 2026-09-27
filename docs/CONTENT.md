@@ -369,6 +369,42 @@
 ]
 ```
 
+Клетки — те же, что на карте сезона (этап 2, D-300…D-307): `type` — `start`, `empty`, `finish`, `fork`, `teleport` (`to`), `checkpoint`, `pointsBonus` (`amount`), `event` (`deck`), `shop` (`grants`); у любой клетки может быть `zone` и координаты редактора `x`, `y`. Как они работают:
+
+- **Остановка** — конец своего хода кубами и штрафного хода дропа (позже — толчков эффектов). Телепорт переносит на `to`, клетка назначения не срабатывает; бонус очков даёт `amount`. Переносы, правки часов и реджект клетки не запускают.
+- **Развилка** (`fork`) — у неё не меньше двух выходов и одна ветка по умолчанию. Свой ход останавливается на ней и ждёт выбора ветки, вынужденное движение идёт по ветке по умолчанию.
+- **Чекпоинт** — толчок назад на нём останавливается. Реджект и правки часов снимают клетки прохождения без учёта чекпоинта.
+- **Клетки `event` и `shop`** попадают на карту, только когда включены их механики (`features.events`, `features.shop`).
+- **Зона** задаёт фильтр ролла для игрока, стоящего в ней; зона фиксируется при ролле вместе с множителем штрафа дропа и модификатором кубов (на этапе 2 — `count` и `add` целым числом, остальной конвейер броска — с предметами). Колода и цены магазина зоны оживут со своими механиками.
+
+Карта целиком — клетки, стрелки и зоны. У стрелки `isDefaultForward` — ветка по умолчанию, `isPrimaryBackward` — основное входящее ребро (обязательно у клеток с несколькими входами):
+
+```json
+{
+  "cells": [
+    { "id": "start", "type": "start", "x": 40, "y": 300 },
+    { "id": "f", "type": "fork" },
+    { "id": "c1", "type": "empty", "zone": "horror-swamp" },
+    { "id": "c2", "type": "teleport", "to": "j", "zone": "horror-swamp" },
+    { "id": "b1", "type": "pointsBonus", "amount": 3 },
+    { "id": "j", "type": "checkpoint" },
+    { "id": "finish", "type": "finish" }
+  ],
+  "edges": [
+    { "from": "start", "to": "f", "isDefaultForward": true, "isPrimaryBackward": true },
+    { "from": "f", "to": "b1", "isDefaultForward": true, "isPrimaryBackward": true },
+    { "from": "f", "to": "c1", "isDefaultForward": false, "isPrimaryBackward": true },
+    { "from": "c1", "to": "c2", "isDefaultForward": true, "isPrimaryBackward": true },
+    { "from": "c2", "to": "j", "isDefaultForward": true, "isPrimaryBackward": false },
+    { "from": "b1", "to": "j", "isDefaultForward": true, "isPrimaryBackward": true },
+    { "from": "j", "to": "finish", "isDefaultForward": true, "isPrimaryBackward": true }
+  ],
+  "zones": [
+    { "id": "horror-swamp", "name": "Болото ужаса", "rollFilter": { "tags": ["Horror"] }, "dropPenaltyMultiplier": 1.5 }
+  ]
+}
+```
+
 ```json
 {
   "question": "Какой жанр подкинем лидеру?",

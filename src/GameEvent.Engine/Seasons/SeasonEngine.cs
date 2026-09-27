@@ -59,6 +59,7 @@ public static class SeasonEngine
             TechReroll c => Drops.Decide(state, c, context),
             ConvertTechRerollToDrop c => Drops.Decide(state, c, context),
             MakeChoice c => Choosing.Decide(state, c, context),
+            PublishMap c => MapPublishing.Decide(state, c),
             ResolveManualEffect c => ManualEffects.Decide(state, c),
             RecalculateFinishBonuses c => Finishing.Decide(state, c),
             Undo.UndoCommand c => Undo.Undoing.Decide(state, c, context),
@@ -70,12 +71,48 @@ public static class SeasonEngine
             return new CommandResult(decision, state);
         }
 
+        if (command is not MakeChoice && MovesAPlayerChoosingABranch(state, decision.Events) is { } choosing)
+        {
+            // D-305: the steps left at a fork lead from where the player stands; move them only after the choice
+            decision = Decision.Reject(
+                RejectionCodes.BranchChoicePending, $"Player {choosing} is choosing a branch: wait for the choice or discard it first.");
+            return new CommandResult(decision, state);
+        }
+
         // Effects react after the command's own events, within the chain limits (D-24, D-103).
         var after = decision.Events.Aggregate(state, Apply);
         var (reactions, final) = EffectChain.Run(after, decision.Events, context);
         return reactions.Count == 0
             ? new CommandResult(decision, after)
             : new CommandResult(Decision.Accept([.. decision.Events, .. reactions]), final);
+    }
+
+    // D-305: a player choosing a branch is not moved by other commands, and the run whose steps wait is not corrected or
+    // rejected — unless the same command discards the choice.
+    private static Guid? MovesAPlayerChoosingABranch(SeasonState state, IReadOnlyList<IGameEvent> events)
+    {
+        foreach (var player in state.Players.Values.Where(p => p.Choice?.Kind == ChoiceKind.Branch))
+        {
+            if (events.OfType<ChoiceDiscarded>().Any(d => d.PlayerId == player.PlayerId))
+            {
+                continue;
+            }
+
+            var run = player.Choice!.Move?.RunId;
+            if (events.Any(e => e switch
+            {
+                PlayerMoved moved => moved.PlayerId == player.PlayerId,
+                RunHoursCorrected corrected => corrected.RunId == run,
+                RunDifficultyChanged changed => changed.RunId == run,
+                ProofRejected rejected => rejected.RunId == run,
+                _ => false,
+            }))
+            {
+                return player.PlayerId;
+            }
+        }
+
+        return null;
     }
 
     public static SeasonState Apply(SeasonState state, IGameEvent gameEvent) =>
@@ -98,6 +135,7 @@ public static class SeasonEngine
             ManualEffectCreated e => ManualEffects.Apply(state, e),
             GameChoiceRolled e => Choosing.Apply(state, e),
             ChoiceMade e => Choosing.Apply(state, e),
+            BranchChoiceRequested e => Choosing.Apply(state, e),
             ChoiceDiscarded e => Choosing.Apply(state, e),
             RunStarted e => RunLifecycle.Apply(state, e),
             RunCompleted e => RunLifecycle.Apply(state, e),
@@ -119,6 +157,7 @@ public static class SeasonEngine
             TechRerollConvertedToDrop e => Drops.Apply(state, e),
             PointsChanged e => PointsLedger.Apply(state, e),
             PlayerMoved e => Movement.Apply(state, e),
+            MapPublished e => MapPublishing.Apply(state, e),
             EffectChainCut e => EffectChain.Apply(state, e),
             Undo.CommandUndone e => Undo.Undoing.Apply(state, e),
             _ => throw new ArgumentException($"Unknown event {gameEvent.GetType().Name}.", nameof(gameEvent)),

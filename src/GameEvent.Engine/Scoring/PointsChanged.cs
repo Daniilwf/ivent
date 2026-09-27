@@ -14,6 +14,9 @@ public enum PointsReason
     ProofRejected,
     FinishBonus,
     FinishBonusRevoked,
+
+    /// <summary>A stop on a points bonus cell (D-303).</summary>
+    CellBonus,
 }
 
 /// <summary>What changed a player's coins. Coins always equal the sum of deltas in non-undone events.</summary>

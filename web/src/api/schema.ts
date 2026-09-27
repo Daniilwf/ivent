@@ -5505,8 +5505,12 @@ export interface components {
             /** Format: int32 */
             games: number;
         };
-        /** @enum {unknown} */
-        CellType: "start" | "empty" | "finish";
+        /**
+         * @description What a cell does (SPEC «Карта»). The linear map of stage 1 uses CellType.Start, CellType.Empty and
+         *     CellType.Finish; the graph map adds the rest (D-302). New values are appended: the log stores them by name.
+         * @enum {unknown}
+         */
+        CellType: "start" | "empty" | "finish" | "fork" | "teleport" | "checkpoint" | "pointsBonus" | "event" | "shop";
         CellView: {
             id: string;
             type: components["schemas"]["CellType"];
@@ -5541,10 +5545,10 @@ export interface components {
             ruleset: components["schemas"]["Ruleset"];
         };
         /**
-         * @description What the player is choosing. Stage 1 has games only; branches, targets and outcomes come later (K-5).
+         * @description What the player is choosing (K-5): a game, a branch at a fork; targets and outcomes come later.
          * @enum {unknown}
          */
-        ChoiceKind: "game";
+        ChoiceKind: "game" | "branch";
         ChoiceOptionView: {
             id: string;
             game: null | components["schemas"]["OfferedGameView"];
@@ -6570,9 +6574,13 @@ export interface components {
             title: string;
             same: boolean;
         };
-        /** @description What every page asks the site: whether it only reads now (the maintenance banner). */
+        /**
+         * @description What every page asks the site: whether it only reads now (the maintenance banner) and which version it runs — a page
+         *     that saw another version before shows «Что нового» (J4, D-201).
+         */
         SiteStatusView: {
             maintenance: boolean;
+            version: string;
         };
         SocialRules: {
             reactions: components["schemas"]["EquatableArrayOfstring"];
@@ -6671,8 +6679,8 @@ type ReadonlyArray<T> = [
     unknown[]
 ] ? Readonly<Exclude<T, undefined>> : Readonly<Exclude<T, undefined>[]>;
 export const bugReportStatusValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["BugReportStatus"]> = ["new", "inWork", "closed"];
-export const cellTypeValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["CellType"]> = ["start", "empty", "finish"];
-export const choiceKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ChoiceKind"]> = ["game"];
+export const cellTypeValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["CellType"]> = ["start", "empty", "finish", "fork", "teleport", "checkpoint", "pointsBonus", "event", "shop"];
+export const choiceKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ChoiceKind"]> = ["game", "branch"];
 export const coopRoundUpForValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["CoopRoundUpFor"]> = ["roller"];
 export const difficultyValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["Difficulty"]> = ["easy", "normal", "hard", "extreme"];
 export const emptyPoolFallbackValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["EmptyPoolFallback"]> = ["dropZoneFilter"];

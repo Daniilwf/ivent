@@ -14,7 +14,8 @@ namespace GameEvent.Engine.Turns;
 /// </summary>
 internal static class TurnRules
 {
-    // MakeChoice needs a pending choice rather than a phase; a choice exists only while Rolling.
+    // MakeChoice needs a pending choice rather than a phase: a game choice exists only while Rolling, a branch choice
+    // while Idle (its own rules, D-305).
     private static readonly Dictionary<Type, TurnPhase> s_phaseFor = new()
     {
         [typeof(RollGame)] = TurnPhase.Idle,
@@ -55,7 +56,7 @@ internal static class TurnRules
         }
 
         // «Уже проходил» may name any option of a pending choice (D-92); a reroll gives up the whole choice (D-93).
-        if (player.Choice is not null && command is not (DeclareAlreadyPlayed or Reroll))
+        if (player.Choice is not null && !(player.Choice.Kind == ChoiceKind.Game && command is DeclareAlreadyPlayed or Reroll))
         {
             return Decision.Reject(RejectionCodes.ChoicePending, "The player must make the pending choice first.");
         }

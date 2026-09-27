@@ -118,7 +118,7 @@ internal static class Finishes
             return points;
         }
 
-        var newSum = run.Dice.Sum(d => d.Value) + run.ChallengeDice.Sum(d => d.Value);
+        var newSum = Runs.CompletionRoll.Total(run);
         return Math.Max(0, run.Moved - newSum);
     }
 

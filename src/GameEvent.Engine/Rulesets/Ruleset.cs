@@ -284,6 +284,12 @@ public sealed record RankingRules
 public sealed record MapRules
 {
     public required int LinearLength { get; init; }
+
+    /// How many available games of the pool a zone's roll filter should leave (SPEC «Редактор»: у зоны в пуле не меньше
+    /// 15 подходящих игр, иначе предупреждение; D-307). Only a warning for the editor. Null: no warning — so a season
+    /// logged before this rule reads without it; not written when null, so its ruleset logs exactly as before.
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? MinZoneGames { get; init; }
 }
 
 public sealed record RarityWeights

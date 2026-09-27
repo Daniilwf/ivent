@@ -25,7 +25,7 @@ public sealed record SetPlayerInactive(Guid PlayerId, bool IsInactive) : IComman
 
 /// <summary>
 /// The admin corrects a player (D-21): position, points, coins, other resources, and dropping an offered game or a
-/// pending choice of games (<see cref="DiscardOffer"/>, Rolling → Idle). Every change is a logged event with a reason; <see cref="Comment"/> explains it in the log.
+/// pending choice of games (<see cref="DiscardOffer"/>, Rolling → Idle) or a pending branch choice (its steps left burn, D-305). Every change is a logged event with a reason; <see cref="Comment"/> explains it in the log.
 /// A player playing a run is not reset here: that is a drop or tech reroll (C6).
 /// </summary>
 public sealed record AdjustPlayer(
@@ -204,7 +204,8 @@ internal static class PlayerAdministration
             changes.Add(new OfferDiscarded(player.PlayerId, offer.GameId));
         }
 
-        if (command.DiscardOffer && player is { Phase: TurnPhase.Rolling, Choice: { } choice })
+        // A branch choice is discarded too: its steps left burn, the points stay (D-305)
+        if (command.DiscardOffer && player.Choice is { } choice && (player.Phase == TurnPhase.Rolling || choice.Kind == ChoiceKind.Branch))
         {
             changes.Add(new ChoiceDiscarded(player.PlayerId, choice.ChoiceId));
         }
