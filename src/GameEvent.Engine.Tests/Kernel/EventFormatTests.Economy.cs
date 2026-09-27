@@ -73,6 +73,22 @@ public partial class EventFormatTests
         ("run-dice-modified", new RunDiceModified(s_run, s_player, RunDiceMods.None with { Added = 4, Sources = ["lucky-die"] }, [new Die(6, 4)]), """"{"runId":"00000000-0000-0000-0000-000000000001","playerId":"10000000-0000-0000-0000-000000000001","mods":{"added":4,"multiplier":1,"sources":["lucky-die"]},"rolled":[{"sides":6,"value":4}]}""""),
     ];
 
+    [Fact]
+    public void Manual_effect_created_v1_reads_as_it_was_and_v2_carries_the_text_of_an_object()
+    {
+        var v1 = new StoredEvent(
+            "manual-effect-created",
+            1,
+            """{"effectId":"00000000-0000-0000-0000-000000000001","playerId":"10000000-0000-0000-0000-000000000001","drawEvent":"bad","source":"drop","runId":null}""");
+        Assert.Equal(new Engine.Effects.ManualEffectCreated(s_run, s_player, Engine.Rulesets.EventKind.Bad, Engine.Effects.ManualEffectSource.Drop, null), EventCodec.Decode(v1));
+
+        var text = new Engine.Effects.ManualEffectCreated(s_run, s_player, null, Engine.Effects.ManualEffectSource.Item, null) { ObjectId = "gift-of-fate" };
+        Assert.Equal(
+            new StoredEvent("manual-effect-created", 2, """{"effectId":"00000000-0000-0000-0000-000000000001","playerId":"10000000-0000-0000-0000-000000000001","drawEvent":null,"source":"item","runId":null,"objectId":"gift-of-fate"}"""),
+            EventCodec.Encode(text));
+        Assert.Equal(text, EventCodec.Decode(EventCodec.Encode(text)));
+    }
+
     [Theory]
     [MemberData(nameof(EconomyVariants))]
     public void Economy_variant_is_stored_in_the_frozen_format(string type, IGameEvent sample, string json)

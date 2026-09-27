@@ -88,8 +88,8 @@ public sealed partial class DeadlineScheduler(
 
     /// <summary>
     /// The economy's timers (D-404): every season with a player whose earliest timer (shop lots, effects of hours, bets)
-    /// has come gets <see cref="Engine.Economy.FireTimers"/>; the command id comes from the season and that moment, so a
-    /// repeated tick is a duplicate and a refusal (nothing due by the engine's clock) writes nothing.
+    /// has come gets <see cref="Engine.Economy.FireTimers"/>; the command id comes from the season, that moment and the
+    /// season's last event, so a repeated tick is a duplicate and a refusal (nothing due by the engine's clock) writes nothing.
     /// </summary>
     private async Task FireTimersAsync(DateTimeOffset now, CancellationToken ct)
     {
@@ -108,7 +108,15 @@ public sealed partial class DeadlineScheduler(
 
         foreach (var (seasonId, moment) in due)
         {
-            var id = CommandIdFor("fire-timers", seasonId, moment);
+            // The season's last event joins the id: after an undo brings back what a pass fired, the next pass is a new
+            // command, not a duplicate of the undone one (D-404)
+            long last;
+            await using (var db = await dbFactory.CreateDbContextAsync(ct))
+            {
+                last = await db.Events.AsNoTracking().Where(e => e.SeasonId == seasonId).MaxAsync(e => (long?)e.Sequence, ct) ?? 0;
+            }
+
+            var id = CommandIdFor($"fire-timers:{last}", seasonId, moment);
             var outcome = await bus.SendAsync(new CommandEnvelope(id, seasonId, new Engine.Economy.FireTimers(), AuthorId: null), ct);
             if (!outcome.IsAccepted)
             {

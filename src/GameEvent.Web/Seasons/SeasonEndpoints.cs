@@ -182,7 +182,11 @@ public enum GameMarkKind
 public sealed record RerollPriceView(RerollPayment Payment, int Coins);
 
 /// <summary>A manual effect the player still has to play out (D-10, D-93); the player resolves it (D-102).</summary>
-public sealed record ManualEffectView(Guid Id, EventKind DrawEvent, ManualEffectSource Source);
+/// <remarks>
+/// <c>objectId</c> — the object whose text waits for resolution (D-410): the page shows its description, and
+/// <c>drawEvent</c> means nothing then.
+/// </remarks>
+public sealed record ManualEffectView(Guid Id, EventKind DrawEvent, ManualEffectSource Source, string? ObjectId = null);
 
 /// <summary>The pending choice, kept on the server: a reloaded page shows the same options (T2).</summary>
 public sealed record ChoiceView(Guid Id, ChoiceKind Kind, IReadOnlyList<ChoiceOptionView> Options);
@@ -545,7 +549,7 @@ public static class SeasonEndpoints
             var effects = await db.ManualEffects.AsNoTracking()
                 .Where(x => x.SeasonId == seasonId && x.PlayerId == mine.Id)
                 .OrderBy(x => x.Id)
-                .Select(x => new ManualEffectView(x.Id, x.DrawEvent, x.Source))
+                .Select(x => new ManualEffectView(x.Id, x.DrawEvent, x.Source, x.ObjectId))
                 .ToListAsync(ct);
             // D-134: the same count the engine checks (UncheckedRuns) — completed, the proof neither approved nor rejected;
             // the frozen first is never held

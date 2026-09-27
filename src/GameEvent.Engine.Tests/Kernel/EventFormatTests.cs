@@ -171,7 +171,7 @@ public partial class EventFormatTests
         {
             "manual-effect-created",
             new ManualEffectCreated(s_run, s_player, EventKind.Bad, ManualEffectSource.PaidReroll, null),
-            1,
+            2,
             """{"effectId":"00000000-0000-0000-0000-000000000001","playerId":"10000000-0000-0000-0000-000000000001","drawEvent":"bad","source":"paidReroll","runId":null}"""
         },
         {

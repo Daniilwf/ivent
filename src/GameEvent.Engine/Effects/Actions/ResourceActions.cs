@@ -24,7 +24,7 @@ internal sealed class ChangeResourceHandler : ActionHandler<ChangeResourceAction
                 break;
             case Coins:
                 var coins = run.State.Players[target].Coins;
-                if (!run.State.Rules.Economy.AllowNegativeCoins && coins + amount < 0)
+                if (!run.State.Rules.Economy.AllowNegativeCoins && amount < 0 && coins + amount < 0)
                 {
                     amount = -Math.Max(0, coins);
                 }

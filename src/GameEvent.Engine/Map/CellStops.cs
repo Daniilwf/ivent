@@ -19,7 +19,7 @@ internal static class CellStops
     /// grants its object on a stop and on a pass (SPEC «Магазин | при остановке и проходе», D-403); the other cells act on
     /// a stop only, so a paused move triggers only the shops it passed.
     /// </summary>
-    public static IEnumerable<IGameEvent> After(SeasonState state, PlayerMoved move, EngineContext? context = null)
+    public static IEnumerable<IGameEvent> After(SeasonState state, PlayerMoved move, EngineContext context)
     {
         ArgumentNullException.ThrowIfNull(state);
         ArgumentNullException.ThrowIfNull(move);
@@ -28,7 +28,7 @@ internal static class CellStops
             return [];
         }
 
-        var shops = context is null ? [] : ShopGrants(state, move, context);
+        var shops = ShopGrants(state, move, context);
         if (move.Paused)
         {
             return shops;
@@ -38,15 +38,19 @@ internal static class CellStops
         return [.. shops, .. Stop(state, move, cell)];
     }
 
-    private static List<IGameEvent> ShopGrants(SeasonState state, PlayerMoved move, EngineContext context)
+    /// <summary>
+    /// The coupons of the shop cells <paramref name="move"/> passed forward or stopped on (D-403): a pass back — a drop's
+    /// penalty, a push — gives nothing, so drops do not farm coupons.
+    /// </summary>
+    public static List<IGameEvent> ShopGrants(SeasonState state, PlayerMoved move, EngineContext context)
     {
-        if (!state.Rules.Features.Shop || Effects.Targets.IsFirst(state, move.PlayerId))
+        if (move.Steps == 0 || !Triggers(move.Reason) || !state.Rules.Features.Shop || Effects.Targets.IsFirst(state, move.PlayerId))
         {
             return [];
         }
 
         var events = new List<IGameEvent>();
-        foreach (var visit in Movement.Visits(move).Where(v => v.Kind is CellVisitKind.Pass or CellVisitKind.Stop))
+        foreach (var visit in Movement.Visits(move).Where(v => v.Kind == CellVisitKind.Stop || (v.Kind == CellVisitKind.Pass && move.Steps > 0)))
         {
             if (state.Map.CellById(visit.CellId) is { Type: CellType.Shop, Grants: { } grants } && state.Catalog.Live(grants) is { } definition)
             {

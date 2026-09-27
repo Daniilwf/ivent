@@ -94,7 +94,13 @@ internal static class Shop
             return Decision.Reject(RejectionCodes.InventoryFull, $"The inventory holds at most {state.Rules.Economy.InventoryLimit} items.");
         }
 
-        var item = Inventories.New(state, context, player.PlayerId, state.Catalog.Get(lot.ObjectId), null, fromPlayerId: null);
+        // Content published since the roll may have removed it (D-400): it is not sold any more
+        if (state.Catalog.Live(lot.ObjectId) is not { } definition)
+        {
+            return Decision.Reject(RejectionCodes.ObjectUnknown, $"«{lot.ObjectId}» is no longer in the season's content.");
+        }
+
+        var item = Inventories.New(state, context, player.PlayerId, definition, null, fromPlayerId: null);
         var bought = new LotBought(player.PlayerId, command.Lot, item, lot.Price);
         return Decision.Accept(lot.Price == 0 ? [bought] : [bought, new CoinsChanged(player.PlayerId, -lot.Price, CoinsReason.Purchase, RunId: null)]);
     }

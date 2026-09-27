@@ -61,9 +61,10 @@ public sealed record ManualEffectResolved(Guid EffectId, Guid PlayerId, Guid? Ru
 /// <summary>
 /// A manual effect waits for resolution: «draw a good/bad event» (<see cref="DrawEvent"/>), or the text of object
 /// <see cref="ObjectId"/> (D-410, then <see cref="DrawEvent"/> is null). <see cref="ObjectId"/> is written only when set, so
-/// the effects of stage 1 read and write as before.
+/// the effects of stage 1 write as before. v2 (D-410): <see cref="DrawEvent"/> may be null — a build before it cannot read
+/// such an effect, so the version tells it apart; v1 reads as it was.
 /// </summary>
-[EventType("manual-effect-created")]
+[EventType("manual-effect-created", 2)]
 public sealed record ManualEffectCreated(Guid EffectId, Guid PlayerId, EventKind? DrawEvent, ManualEffectSource Source, Guid? RunId) : IGameEvent
 {
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]

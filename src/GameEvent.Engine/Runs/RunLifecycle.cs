@@ -105,7 +105,7 @@ internal static class RunLifecycle
         };
         if (thrown.Mods is { } mods)
         {
-            events.Add(new RunDiceModified(run.RunId, player.PlayerId, mods, thrown.Rolled, SpentNext: Targets.IsFirst(state, player.PlayerId) ? 0 : pending));
+            events.Add(new RunDiceModified(run.RunId, player.PlayerId, mods, thrown.Rolled, SpentNext: pending));
         }
 
         // The frozen first plays in free mode: dice only (the freeze amendment, Q-3).
@@ -175,7 +175,8 @@ internal static class RunLifecycle
         if (moved is not null && !walk.Paused)
         {
             var finished = Finishes.AfterCompletionMove(state, player, run, moved, context.Clock.UtcNow).ToList();
-            events.AddRange(finished.Count > 0 ? finished : CellStops.After(state, moved, context));
+            // A move that reached the finish still passed its shops (D-403)
+            events.AddRange(finished.Count > 0 ? [.. CellStops.ShopGrants(state, moved, context), .. finished] : CellStops.After(state, moved, context));
         }
 
         if (walk.Paused)

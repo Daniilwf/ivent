@@ -26,6 +26,9 @@ public static class EventCodec
         [("game-rolled", 1)] = WheelOfOne,
         [("game-choice-rolled", 1)] = WheelOfOne,
 
+        // D-410: v2 lets «drawEvent» be null for the text of an object (with «objectId»); a v1 effect always drew an event
+        [("manual-effect-created", 1)] = data => data,
+
         // D-121: before bug report screenshots every stored file was an upload
         [("file-stored", 1)] = data =>
         {

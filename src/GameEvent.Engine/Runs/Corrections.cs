@@ -122,8 +122,11 @@ internal static class Corrections
 
         // Q-5: each die ⌈old × new sides / old sides⌉; no randomness.
         var newRule = CompletionRoll.DieFor(difficulty, run.Snapshot.DieByDifficulty);
+
+        // Dice whose sides an item set keep them (D-408): only the difficulty's event follows the change
+        var sides = run.Mods?.Sides ?? newRule.Sides;
         EquatableArray<DieChange> Recalculate(EquatableArray<Die> dice) =>
-            [.. dice.Select(d => new DieChange(d, new Die(newRule.Sides, (int)Math.Ceiling((decimal)d.Value * newRule.Sides / d.Sides))))];
+            [.. dice.Select(d => new DieChange(d, new Die(sides, (int)Math.Ceiling((decimal)d.Value * sides / d.Sides))))];
         var dice = Recalculate(run.Dice);
         var challenge = Recalculate(run.ChallengeDice);
         var changed = new RunDifficultyChanged(

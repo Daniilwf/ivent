@@ -59,6 +59,13 @@ internal static class DicePipeline
     public static void AfterThrow(EffectRun effect, Guid runId, DiceStage stage, ContentValue value)
     {
         var run = effect.State.Runs[runId];
+
+        // The throw's move waits at a fork: that step has begun, a change after the throw would move the token off it (D-416)
+        if (effect.State.Players[run.PlayerId].Choice?.Kind == Turns.ChoiceKind.Branch)
+        {
+            return;
+        }
+
         var sides = run.Mods?.Sides ?? (run.Dice.Count > 0 ? run.Dice[0].Sides : (int?)null) ?? CompletionRoll.DieFor(run.Difficulty!.Value, run.Snapshot.DieByDifficulty).Sides;
         var random = effect.Context.Random;
         var before = CompletionRoll.Total(run);

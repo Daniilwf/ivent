@@ -252,6 +252,13 @@ internal static class Undoing
                 keys.Add(FinishKey);
             }
 
+            // A bet reads the run and the player it is on: taking back that run's start or roll waits for the bet (D-414)
+            if (e is Economy.BetPlaced placed)
+            {
+                keys.Add($"run:{placed.Bet.RunId}");
+                keys.Add($"player:{placed.Bet.OnPlayerId}");
+            }
+
             foreach (var (kind, id) in GameIds.Of(e).Concat(GameIds.Own(e)))
             {
                 keys.Add($"{kind}:{id}");
