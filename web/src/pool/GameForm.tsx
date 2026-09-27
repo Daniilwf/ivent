@@ -1,5 +1,6 @@
 import { ImagePlus, X } from 'lucide-react';
 import { useEffect, useRef, useState, type SyntheticEvent } from 'react';
+import { newCommandId } from '../api/commands';
 import { api, rejectionCode, type Schemas } from '../api/client';
 import { UploadError, uploadFile } from '../api/files';
 import { Cover } from '../board/GameCards';
@@ -60,41 +61,50 @@ function check(
   return errors;
 }
 
+type CoverFile = { id: string; thumbnailUrl: string };
+
 /**
- * A player adds a game to the pool (SPEC «Пул игр», «Дубли»): the title, its categories, the hours if known, a note, a
- * cover of their own. While the title is typed the pool is asked for alike ones: the same title cannot be added, an alike
- * one needs «Всё равно добавить».
+ * The pool's game card as a form, one for everyone (D-202): a player or the admin adds a game (SPEC «Пул игр», «Дубли»),
+ * the admin changes one (`game`). The title, its categories, the hours if known, the year, a note, co-op, a cover. While
+ * the title is typed the pool is asked for alike ones: the same title cannot be saved, an alike one needs «Всё равно
+ * добавить». The same limits as the server's (PoolRules) for both.
  */
-export function AddGameForm({
+export function GameForm({
   categories,
-  onAdded,
+  game,
+  onSaved,
   onSignedOut,
 }: {
   categories: Schemas['CategoryView'][];
-  onAdded: (game: PoolGame) => void;
+  /** The game to change (the admin); none — a new game */
+  game?: PoolGame;
+  onSaved: (game: PoolGame) => void;
   onSignedOut: () => void;
 }) {
-  const [title, setTitle] = useState('');
-  const [tags, setTags] = useState<string[]>([]);
-  const [hours, setHours] = useState('');
-  const [year, setYear] = useState('');
-  const [note, setNote] = useState('');
-  const [coop, setCoop] = useState(false);
-  const [cover, setCover] = useState<Schemas['StoredFileView'] | null>(null);
+  const [title, setTitle] = useState(game?.title ?? '');
+  const [tags, setTags] = useState<string[]>(game?.tags ?? []);
+  const [hours, setHours] = useState(game?.hours == null ? '' : String(game.hours));
+  const [year, setYear] = useState(game?.year == null ? '' : String(game.year));
+  const [note, setNote] = useState(game?.note ?? '');
+  const [coop, setCoop] = useState(game?.isCoop ?? false);
+  const [cover, setCover] = useState<CoverFile | null>(game?.cover ?? null);
+  // The game's own categories stay choosable even when the wheel no longer has them
+  const choices = [
+    ...categories.map((c) => c.name),
+    ...(game?.tags ?? []).filter((tag) => !categories.some((c) => c.name === tag)),
+  ];
   const [uploading, setUploading] = useState(false);
   const [similar, setSimilar] = useState<{ title: string; games: Similar[] } | null>(null);
   const [errors, setErrors] = useState<Errors>({});
   const [failure, setFailure] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  // One command id per game: a retry of the same submit is the same command
-  const commandId = useRef(crypto.randomUUID());
   const fileInput = useRef<HTMLInputElement>(null);
 
   // The pool is asked about the title once the typing rests; an answer for an older title is dropped
   useEffect(() => {
     const asked = title.trim();
-    // An answer is kept with its title: an empty or changed title simply has none
-    if (!asked || asked.length > maxTitle) return;
+    // An answer is kept with its title: an empty or changed title simply has none; a game's own title is not asked
+    if (!asked || asked.length > maxTitle || asked === game?.title) return;
     let current = true;
     const timer = setTimeout(() => {
       void api
@@ -111,11 +121,16 @@ export function AddGameForm({
       current = false;
       clearTimeout(timer);
     };
-  }, [title]);
+  }, [title, game?.title]);
 
-  const known = similar?.title === title.trim() ? similar.games : [];
+  const own = title.trim() === game?.title;
+  const known =
+    !own && similar?.title === title.trim() ? similar.games.filter((g) => g.id !== game?.id) : [];
   const checking =
-    title.trim().length > 0 && title.trim().length <= maxTitle && similar?.title !== title.trim();
+    !own &&
+    title.trim().length > 0 &&
+    title.trim().length <= maxTitle &&
+    similar?.title !== title.trim();
   const same = known.find((g) => g.same);
   const alike = known.filter((g) => !g.same);
 
@@ -146,30 +161,37 @@ export function AddGameForm({
 
     setBusy(true);
     try {
-      const { data, error, response } = await api.POST('/api/pool', {
-        body: {
-          commandId: commandId.current,
-          title: title.trim(),
-          tags,
-          hours: parseNumber(hours),
-          year: parseNumber(year),
-          note: note.trim() || null,
-          isCoop: coop,
-          coverFileId: cover?.id ?? null,
-          // The alike titles were on the screen next to the button that said «Всё равно добавить»
-          force: alike.length > 0,
-        },
-      });
+      const card = {
+        commandId: newCommandId(),
+        title: title.trim(),
+        tags,
+        hours: parseNumber(hours),
+        year: parseNumber(year),
+        note: note.trim() || null,
+        isCoop: coop,
+        coverFileId: cover?.id ?? null,
+        // The alike titles were on the screen next to the button that said «Всё равно добавить»
+        force: alike.length > 0,
+      };
+      // A change replaces the card whole: what the form does not show is sent as it is
+      const { data, error, response } = game
+        ? await api.PUT('/api/admin/pool/{gameId}', {
+            params: { path: { gameId: game.id } },
+            body: {
+              ...card,
+              steamAppId: game.steamAppId,
+              completionCondition: game.completionCondition,
+            },
+          })
+        : await api.POST('/api/pool', { body: card });
       if (response.status === 401) {
         onSignedOut();
         return;
       }
       if (data) {
-        onAdded(data);
+        onSaved(data);
         return;
       }
-      // A refused command's id is spent: the next try is a new command
-      commandId.current = crypto.randomUUID();
       const code = rejectionCode(error);
       if (code === 'pool.duplicate') setErrors({ title: t.same(title.trim()) });
       else if (code === 'pool.similar') {
@@ -189,7 +211,13 @@ export function AddGameForm({
   }
 
   return (
-    <form className="grid gap-4" onSubmit={(e) => void submit(e)} noValidate data-testid="add-game">
+    <form
+      className="grid gap-4"
+      onSubmit={(e) => void submit(e)}
+      noValidate
+      data-testid={game ? 'game-form' : 'add-game'}
+      aria-label={game ? ru.admin.pool.editTitle(game.title) : undefined}
+    >
       <Field
         label={t.name}
         hint={t.nameHint}
@@ -228,19 +256,17 @@ export function AddGameForm({
       <fieldset className="grid gap-1" aria-describedby="add-game-tags-hint">
         <legend className="mb-1 text-sm font-bold">{t.categories}</legend>
         <span id="add-game-tags-hint" className="text-sm text-ink-soft">
-          {categories.length === 0 ? t.noCategories : t.categoriesHint}
+          {choices.length === 0 ? t.noCategories : t.categoriesHint}
         </span>
         <span className="grid grid-cols-2 gap-x-3">
-          {categories.map((category) => (
+          {choices.map((name) => (
             <Checkbox
-              key={category.name}
-              label={category.name}
-              checked={tags.includes(category.name)}
+              key={name}
+              label={name}
+              checked={tags.includes(name)}
               onChange={(e) => {
                 const on = e.target.checked;
-                setTags((list) =>
-                  on ? [...list, category.name] : list.filter((x) => x !== category.name),
-                );
+                setTags((list) => (on ? [...list, name] : list.filter((x) => x !== name)));
                 setErrors((x) => ({ ...x, tags: undefined }));
               }}
             />
@@ -348,8 +374,9 @@ export function AddGameForm({
         loading={busy}
         disabled={Boolean(same) || uploading}
         className="justify-self-stretch desk:justify-self-end"
+        data-testid={game ? 'game-save' : undefined}
       >
-        {alike.length > 0 && !same ? t.submitAnyway : t.submit}
+        {alike.length > 0 && !same ? t.submitAnyway : game ? ru.admin.save : t.submit}
       </Button>
     </form>
   );

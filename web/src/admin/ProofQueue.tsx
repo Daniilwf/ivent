@@ -9,7 +9,8 @@ import { ConfirmDanger } from '../ui/Dialogs';
 import { Select, TextArea } from '../ui/Field';
 import { Badge } from '../ui/Marks';
 import { EmptyState, Notice } from '../ui/States';
-import { commentProblem, newCommandId, refusal } from './actions';
+import { commentProblem, refusal } from './actions';
+import { newCommandId } from '../api/commands';
 import { Loading } from './common';
 import type { Loaded } from '../app/useLoaded';
 

@@ -11,8 +11,9 @@ import { Checkbox, ChoiceGroup, Field, Select } from '../ui/Field';
 import { Skeleton } from '../ui/Progress';
 import { EmptyState, ErrorState, Notice } from '../ui/States';
 import { useDesk } from '../ui/useDesk';
-import { AddGameForm } from './AddGameForm';
+import { GameForm } from './GameForm';
 import { PoolGameCard } from './PoolGameCard';
+import { usePaging } from './usePaging';
 import {
   activeFilters,
   lengthFilters,
@@ -40,9 +41,6 @@ async function fetchPool(): Promise<Answer<Pool>> {
   return { kind: 'ready', value: { games: games.data, categories: categories.data } };
 }
 
-/** Cards shown at first and added by «Показать ещё» */
-export const pageSize = 60;
-
 /** How long the page waits after a season update before it asks for the statuses again */
 export const statusDelayMs = 300;
 
@@ -66,7 +64,6 @@ export function PoolScreen({
   const [added, setAdded] = useState<string | null>(null);
   // Games added here show at once, before the pool's own update brings them
   const [addedGames, setAddedGames] = useState<PoolGame[]>([]);
-  const [showing, setShowing] = useState({ key: '', count: pageSize });
   const desk = useDesk();
   const heading = usePageHeading();
 
@@ -123,9 +120,8 @@ export function PoolScreen({
   );
   const filters = activeFilters(filter);
 
-  // Hundreds of cards at once slow a phone down: the list grows by a page, a new filter starts from the first page
-  const filterKey = JSON.stringify(filter);
-  const visible = showing.key === filterKey ? showing.count : pageSize;
+  // A new filter starts from the first page
+  const { page, more } = usePaging(shown, JSON.stringify(filter));
 
   function change(next: Partial<PoolFilter>) {
     setFilter((now) => ({ ...now, ...next }));
@@ -285,7 +281,7 @@ export function PoolScreen({
         ) : (
           <>
             <ul className="grid gap-3 desk:grid-cols-2" data-testid="pool-list">
-              {shown.slice(0, visible).map((game) => (
+              {page.map((game) => (
                 <PoolGameCard
                   key={game.id}
                   game={game}
@@ -295,26 +291,17 @@ export function PoolScreen({
                 />
               ))}
             </ul>
-            {shown.length > visible ? (
-              <Button
-                className="justify-self-center"
-                onClick={() => {
-                  setShowing({ key: filterKey, count: visible + pageSize });
-                }}
-              >
-                {t.more(Math.min(pageSize, shown.length - visible), shown.length - visible)}
-              </Button>
-            ) : null}
+            {more}
           </>
         )}
       </section>
 
       {canAdd && loaded.kind === 'ready' ? (
         <FormDialog open={adding} onOpenChange={setAdding} title={t.form.title} wide>
-          <AddGameForm
+          <GameForm
             categories={loaded.value.categories}
             onSignedOut={onSignedOut}
-            onAdded={(game) => {
+            onSaved={(game) => {
               setAdding(false);
               setAdded(game.title);
               setAddedGames((now) => [...now, game]);

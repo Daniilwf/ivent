@@ -2,7 +2,8 @@ import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ru } from '../i18n/ru';
 import { demoCategories, demoGame, demoPoolGames, demoStatuses } from './demoPool';
-import { pageSize, PoolScreen } from './PoolScreen';
+import { PoolScreen } from './PoolScreen';
+import { pageSize } from './usePaging';
 
 // H6: the pool page — covers, search and filters, the game's status in the season, adding a game with a warning
 // about alike titles (SPEC «Пул игр», «Статусы игры в сезоне», «Дубли»).

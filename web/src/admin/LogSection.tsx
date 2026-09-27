@@ -8,7 +8,8 @@ import { Button } from '../ui/Button';
 import { ConfirmDanger } from '../ui/Dialogs';
 import { TextArea } from '../ui/Field';
 import { EmptyState, Notice } from '../ui/States';
-import { commentProblem, newCommandId, refusal, related, commandLabel } from './actions';
+import { commentProblem, refusal, related, commandLabel } from './actions';
+import { newCommandId } from '../api/commands';
 import { Loading } from './common';
 import { answerOf, useLoaded } from '../app/useLoaded';
 

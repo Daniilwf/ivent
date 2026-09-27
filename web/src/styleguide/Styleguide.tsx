@@ -1,6 +1,6 @@
 import { CalendarClock, Inbox, Lock, Plus, Trophy } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
-import { AddGameForm } from '../pool/AddGameForm';
+import { GameForm } from '../pool/GameForm';
 import { demoCategories, demoPoolGames, demoStatuses } from '../pool/demoPool';
 import { PoolGameCard } from '../pool/PoolGameCard';
 import { onWheel, wheelOf } from '../pool/poolFilter';
@@ -137,7 +137,7 @@ function FormDemo() {
         {t.dialogs.form}
       </Button>
       <FormDialog open={open} onOpenChange={setOpen} title={ru.pool.form.title} wide>
-        <AddGameForm categories={demoCategories} onAdded={noop} onSignedOut={noop} />
+        <GameForm categories={demoCategories} onSaved={noop} onSignedOut={noop} />
       </FormDialog>
     </>
   );
@@ -559,7 +559,7 @@ export function Styleguide() {
             ))}
           </ul>
           <div className="rounded-lg bg-card p-4">
-            <AddGameForm categories={demoCategories} onAdded={noop} onSignedOut={noop} />
+            <GameForm categories={demoCategories} onSaved={noop} onSignedOut={noop} />
           </div>
         </div>
       </Section>

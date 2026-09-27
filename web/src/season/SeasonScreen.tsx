@@ -1,6 +1,7 @@
 import { CalendarClock, Flag, Trophy } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { api, rejectionCode, type Schemas } from '../api/client';
+import { newCommandId } from '../api/commands';
 import { usePageHeading } from '../app/router';
 import { useSeasonVersion } from '../app/useSeasonVersion';
 import { moscowTime } from '../app/time';
@@ -58,7 +59,7 @@ const lastDiceId = 'last-dice';
 
 /** Sends one game action; a new command id each time, so a retried request acts once (D-68). */
 function send(seasonId: string, command: Command) {
-  const commandId = crypto.randomUUID();
+  const commandId = newCommandId();
   const params = { path: { seasonId } };
   switch (command.kind) {
     case 'roll':

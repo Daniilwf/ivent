@@ -2,6 +2,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { Bug } from 'lucide-react';
 import { useRef, useState, type SyntheticEvent } from 'react';
 import { api, rejectionCode } from '../api/client';
+import { newCommandId } from '../api/commands';
 import { uploadFile } from '../api/files';
 import { ru } from '../i18n/ru';
 import { Button, IconButton } from '../ui/Button';
@@ -24,13 +25,11 @@ export function BugReportButton() {
   const [error, setError] = useState<string | null>(null);
   const [missingText, setMissingText] = useState(false);
   const [screenshot, setScreenshot] = useState<Blob | null>(null);
-  const commandId = useRef('');
   const button = useRef<HTMLButtonElement>(null);
 
   async function open() {
     setPhase('capturing');
     const picture = await captureScreenshot();
-    commandId.current = crypto.randomUUID();
     setScreenshot(picture);
     setText('');
     setAttach(picture !== null);
@@ -63,7 +62,7 @@ export function BugReportButton() {
 
       const { error: refused, response } = await api.POST('/api/bug-reports', {
         body: {
-          commandId: commandId.current,
+          commandId: newCommandId(),
           page: globalThis.location.pathname,
           text,
           context: bugContext(),

@@ -1,3 +1,4 @@
+import { newCommandId } from './commands';
 import { antiforgeryHeaders, noteResponse, rejectionCode, type Schemas } from './client';
 
 export type StoredFile = Schemas['StoredFileView'];
@@ -23,7 +24,7 @@ export async function uploadFile(
   path: '/api/files' | '/api/bug-reports/screenshot' = '/api/files',
 ): Promise<StoredFile> {
   const form = new FormData();
-  form.append('commandId', crypto.randomUUID());
+  form.append('commandId', newCommandId());
   form.append('file', file, name);
   const url = `${globalThis.location.origin}${path}`;
   const response = await globalThis.fetch(url, {

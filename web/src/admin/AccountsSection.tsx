@@ -8,7 +8,8 @@ import { ConfirmDanger } from '../ui/Dialogs';
 import { Field, Select } from '../ui/Field';
 import { EmptyState, Notice } from '../ui/States';
 import { Panel } from '../ui/Surface';
-import { newCommandId, refusal } from './actions';
+import { refusal } from './actions';
+import { newCommandId } from '../api/commands';
 import { Loading } from './common';
 import { answerOf, useLoaded } from '../app/useLoaded';
 

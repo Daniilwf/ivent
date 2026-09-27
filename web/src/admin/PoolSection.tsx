@@ -8,16 +8,17 @@ import { Checkbox, Field } from '../ui/Field';
 import { Badge, Tag } from '../ui/Marks';
 import { EmptyState, Notice } from '../ui/States';
 import { Panel } from '../ui/Surface';
-import { newCommandId, refusal } from './actions';
+import { refusal } from './actions';
+import { newCommandId } from '../api/commands';
 import { Loading } from './common';
+import { GameForm } from '../pool/GameForm';
+import { usePaging } from '../pool/usePaging';
 import { answerOf, useLoaded } from '../app/useLoaded';
 
 const t = ru.admin.pool;
 
 type Game = Schemas['PoolGameView'];
 type Message = { tone: 'success' | 'danger'; text: string } | null;
-
-const shownGames = 50;
 
 /** A category weight typed by the admin: a whole number 1–1000 */
 function parseWeight(text: string): number | null {
@@ -316,6 +317,9 @@ function Games({ onMessage }: { onMessage: (message: Message) => void }) {
   const [query, setQuery] = useState('');
   const [deleted, setDeleted] = useState(false);
   const search = useDeferredValue(query.trim());
+  const categories = useLoaded(
+    useCallback(async () => answerOf(await api.GET('/api/pool/categories')), []),
+  );
   const loaded = useLoaded(
     useCallback(
       async () =>
@@ -350,43 +354,79 @@ function Games({ onMessage }: { onMessage: (message: Message) => void }) {
         />
       </div>
       <Loading loaded={loaded} rows={3}>
-        {(games, reload) =>
-          games.length === 0 ? (
-            <EmptyState
-              icon={<Library size={28} aria-hidden />}
-              title={search === '' ? ru.pool.emptyTitle : ru.pool.nothingTitle}
-              text={search === '' ? t.gamesEmptyText : t.notFoundText}
-            />
-          ) : (
-            <ul className="grid gap-2">
-              {games.slice(0, shownGames).map((game) => (
-                <li key={game.id}>
-                  <GameRow
-                    game={game}
-                    onDone={(text) => {
-                      onMessage({ tone: 'success', text });
-                      reload();
-                    }}
-                    onFailed={(text) => {
-                      onMessage({ tone: 'danger', text });
-                    }}
-                  />
-                </li>
-              ))}
-            </ul>
-          )
-        }
+        {(games, reload) => (
+          <GameList
+            games={games}
+            searched={search !== ''}
+            listKey={`${search}|${String(deleted)}`}
+            categories={categories.kind === 'ready' ? categories.value : []}
+            onMessage={onMessage}
+            reload={reload}
+          />
+        )}
       </Loading>
     </Panel>
   );
 }
 
+/** The pool's games in the admin: a count, the list page by page like the pool page's, each with its actions */
+function GameList({
+  games,
+  searched,
+  listKey,
+  categories,
+  onMessage,
+  reload,
+}: {
+  games: Game[];
+  searched: boolean;
+  listKey: string;
+  categories: Schemas['CategoryView'][];
+  onMessage: (message: Message) => void;
+  reload: () => void;
+}) {
+  const { page, more } = usePaging(games, listKey);
+  return games.length === 0 ? (
+    <EmptyState
+      icon={<Library size={28} aria-hidden />}
+      title={searched ? ru.pool.nothingTitle : ru.pool.emptyTitle}
+      text={searched ? ru.pool.nothingText : t.gamesEmptyText}
+    />
+  ) : (
+    <div className="grid gap-3">
+      <p className="text-ink-soft tabular-nums" aria-live="polite" data-testid="games-count">
+        {searched ? ru.pool.searched(games.length) : ru.pool.found(games.length, games.length)}
+      </p>
+      <ul className="grid gap-2">
+        {page.map((game) => (
+          <li key={game.id}>
+            <GameRow
+              game={game}
+              categories={categories}
+              onDone={(text) => {
+                onMessage({ tone: 'success', text });
+                reload();
+              }}
+              onFailed={(text) => {
+                onMessage({ tone: 'danger', text });
+              }}
+            />
+          </li>
+        ))}
+      </ul>
+      {more}
+    </div>
+  );
+}
+
 function GameRow({
   game,
+  categories,
   onDone,
   onFailed,
 }: {
   game: Game;
+  categories: Schemas['CategoryView'][];
   onDone: (text: string) => void;
   onFailed: (text: string) => void;
 }) {
@@ -466,112 +506,17 @@ function GameRow({
       </div>
       {editing ? (
         <GameForm
+          categories={categories}
           game={game}
-          onDone={(text) => {
+          onSaved={(saved) => {
             setEditing(false);
-            onDone(text);
+            onDone(t.saved(saved.title));
+          }}
+          onSignedOut={() => {
+            onFailed(ru.admin.forbidden);
           }}
         />
       ) : null}
     </article>
-  );
-}
-
-function GameForm({ game, onDone }: { game: Game; onDone: (text: string) => void }) {
-  const [title, setTitle] = useState(game.title);
-  const [tags, setTags] = useState(game.tags.join(', '));
-  const [hours, setHours] = useState(game.hours === null ? '' : String(game.hours));
-  const [errors, setErrors] = useState<{
-    title?: string | undefined;
-    hours?: string | undefined;
-    form?: string | undefined;
-  }>({});
-  const [busy, setBusy] = useState(false);
-
-  async function submit(e: SyntheticEvent) {
-    e.preventDefault();
-    const typed = hours.trim().replace(',', '.');
-    const value = typed === '' ? null : Number(typed);
-    const found = {
-      title: title.trim() === '' ? ru.pool.form.nameRequired : undefined,
-      hours: value !== null && (!Number.isFinite(value) || value <= 0) ? t.hoursInvalid : undefined,
-    };
-    setErrors(found);
-    if (found.title || found.hours) return;
-    setBusy(true);
-    try {
-      // The card is replaced whole: what this form does not show is sent as it is
-      const answer = await api.PUT('/api/admin/pool/{gameId}', {
-        params: { path: { gameId: game.id } },
-        body: {
-          commandId: newCommandId(),
-          title: title.trim(),
-          tags: tags
-            .split(',')
-            .map((tag) => tag.trim())
-            .filter((tag) => tag !== ''),
-          hours: value,
-          year: game.year,
-          steamAppId: game.steamAppId,
-          coverFileId: game.cover?.id ?? null,
-          note: game.note,
-          isCoop: game.isCoop,
-          completionCondition: game.completionCondition,
-          force: false,
-        },
-      });
-      if (answer.data) onDone(t.saved(answer.data.title));
-      else setErrors({ form: refusal(answer) });
-    } catch {
-      setErrors({ form: ru.admin.failed });
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <form
-      className="grid gap-3 rounded-md border-2 border-muted bg-card p-3"
-      onSubmit={(e) => void submit(e)}
-      aria-label={t.editTitle(game.title)}
-      data-testid="game-form"
-      noValidate
-    >
-      <Field
-        label={ru.pool.form.name}
-        value={title}
-        error={errors.title}
-        data-testid="game-title"
-        onChange={(e) => {
-          setTitle(e.target.value);
-        }}
-      />
-      <Field
-        label={t.gameTags}
-        hint={t.gameTagsHint}
-        value={tags}
-        data-testid="game-tags"
-        onChange={(e) => {
-          setTags(e.target.value);
-        }}
-      />
-      <Field
-        label={t.gameHours}
-        hint={t.gameHoursHint}
-        inputMode="decimal"
-        value={hours}
-        error={errors.hours}
-        data-testid="game-hours"
-        onChange={(e) => {
-          setHours(e.target.value);
-        }}
-      />
-      {errors.form ? <Notice tone="danger">{errors.form}</Notice> : null}
-      <div>
-        <Button type="submit" loading={busy} data-testid="game-save">
-          {ru.admin.save}
-        </Button>
-      </div>
-    </form>
   );
 }

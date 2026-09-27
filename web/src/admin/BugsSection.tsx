@@ -7,7 +7,8 @@ import { Badge } from '../ui/Marks';
 import { Button } from '../ui/Button';
 import { EmptyState, Notice } from '../ui/States';
 import { cx } from '../ui/cx';
-import { newCommandId, refusal } from './actions';
+import { refusal } from './actions';
+import { newCommandId } from '../api/commands';
 import { Loading } from './common';
 import { answerOf, useLoaded } from '../app/useLoaded';
 

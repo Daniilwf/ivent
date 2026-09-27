@@ -151,19 +151,20 @@ describe('The pool section', () => {
   it('changes a game keeping what the form does not show', async () => {
     const server = open({ 'PUT /api/admin/pool/*': game({ title: 'Hollow Knight: Voidheart' }) });
 
+    // The pool page's form in its edit mode (D-202): the game's own tag stays choosable beside the wheel's categories
     await userEvent.click(await screen.findByTestId('game-edit'));
     const form = screen.getByTestId('game-form');
-    await userEvent.type(within(form).getByTestId('game-title'), ': Voidheart');
-    await userEvent.clear(within(form).getByTestId('game-tags'));
-    await userEvent.type(within(form).getByTestId('game-tags'), 'metroidvania, hard');
-    await userEvent.clear(within(form).getByTestId('game-hours'));
-    await userEvent.type(within(form).getByTestId('game-hours'), '30,5');
+    await userEvent.type(within(form).getByLabelText(ru.pool.form.name), ': Voidheart');
+    expect(within(form).getByRole('checkbox', { name: 'metroidvania' })).toBeChecked();
+    await userEvent.click(within(form).getByRole('checkbox', { name: 'roguelike' }));
+    await userEvent.clear(within(form).getByLabelText(ru.pool.form.hours));
+    await userEvent.type(within(form).getByLabelText(ru.pool.form.hours), '30,5');
     await userEvent.click(within(form).getByTestId('game-save'));
 
     await waitFor(() => {
       expect(server.sent('PUT', '/api/admin/pool/g1')[0]?.body).toMatchObject({
         title: 'Hollow Knight: Voidheart',
-        tags: ['metroidvania', 'hard'],
+        tags: ['metroidvania', 'roguelike'],
         hours: 30.5,
         year: 2017,
         steamAppId: '367520',
@@ -186,9 +187,33 @@ describe('The pool section', () => {
     await userEvent.click(await screen.findByTestId('game-edit'));
     await userEvent.click(screen.getByTestId('game-save'));
 
-    expect(
-      await screen.findByText(String(ru.admin.rejection['pool.duplicate'])),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(ru.pool.form.same('Hollow Knight'))).toBeInTheDocument();
+  });
+
+  it('checks a changed game as the pool page checks a new one', async () => {
+    const server = open({ 'PUT /api/admin/pool/*': game({}) });
+
+    await userEvent.click(await screen.findByTestId('game-edit'));
+    const form = screen.getByTestId('game-form');
+    await userEvent.clear(within(form).getByLabelText(ru.pool.form.hours));
+    await userEvent.type(within(form).getByLabelText(ru.pool.form.hours), '0,2');
+    await userEvent.click(within(form).getByTestId('game-save'));
+
+    expect(await within(form).findByText(ru.pool.form.hoursInvalid)).toBeInTheDocument();
+    expect(server.sent('PUT', '/api/admin/pool/g1')).toHaveLength(0);
+  });
+
+  it('counts the games and shows a big pool page by page, like the pool page', async () => {
+    const many = Array.from({ length: 70 }, (_, i) =>
+      game({ id: `g${String(i)}`, title: `Игра ${String(i).padStart(2, '0')}` }),
+    );
+    open({ 'GET /api/pool': many });
+
+    expect(await screen.findByTestId('games-count')).toHaveTextContent(ru.pool.found(70, 70));
+    expect(screen.getAllByTestId('game-edit')).toHaveLength(60);
+    await userEvent.click(screen.getByTestId('show-more'));
+    expect(screen.getAllByTestId('game-edit')).toHaveLength(70);
+    expect(screen.queryByTestId('show-more')).toBeNull();
   });
 
   it('deletes a game after a confirmation and restores a deleted one', async () => {

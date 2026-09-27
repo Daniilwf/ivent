@@ -143,23 +143,33 @@ describe('BugReportButton', () => {
     expect(sent).toHaveLength(0);
   });
 
-  it('says why a report was not taken and keeps the same command id for a retry', async () => {
-    let answer = json(503, { code: 'site.maintenance' });
-    const sent = serve(() => answer);
+  it('says why a report was not taken; a retry after a lost answer is the same command (D-68, D-202)', async () => {
+    let answer: () => Response = () => {
+      throw new TypeError('Failed to fetch');
+    };
+    const sent = serve(() => answer());
 
     const user = await describeBug('Во время обслуживания');
     await user.click(screen.getByTestId('bug-report-attach'));
     await user.click(screen.getByTestId('bug-report-send'));
+    expect(await screen.findByRole('alert')).toHaveTextContent(ru.bugReport.failed);
+
+    answer = () => json(503, { code: 'site.maintenance' });
+    await user.click(screen.getByTestId('bug-report-send'));
     expect(await screen.findByRole('alert')).toHaveTextContent(ru.rejection['site.maintenance']);
 
-    answer = json(429, {});
+    answer = () => json(429, {});
     await user.click(screen.getByTestId('bug-report-send'));
     expect(await screen.findByRole('alert')).toHaveTextContent(ru.bugReport.tooOften);
 
-    answer = json(200, { id: 'r1' });
+    answer = () => json(200, { id: 'r1' });
     await user.click(screen.getByTestId('bug-report-send'));
     await screen.findByText(ru.bugReport.sent);
     const ids = sent.map((s) => (s.body as { commandId: string }).commandId);
-    expect(new Set(ids).size).toBe(1);
+    // The lost first try and its retry are one command; an answered try ends it, the next is a new command
+    expect(ids).toHaveLength(4);
+    expect(ids[1]).toBe(ids[0]);
+    expect(ids[2]).not.toBe(ids[1]);
+    expect(ids[3]).not.toBe(ids[2]);
   });
 });
