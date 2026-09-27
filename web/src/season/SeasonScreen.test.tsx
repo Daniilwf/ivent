@@ -48,6 +48,7 @@ function season(overrides: Partial<Schemas['SeasonView']> = {}): Schemas['Season
       phase: 'idle',
       finishOrder: null,
       avatar: null,
+      token: 0,
     },
   ];
   return {
@@ -200,6 +201,7 @@ describe('SeasonScreen', () => {
           phase: 'idle',
           finishOrder: null,
           avatar: null,
+          token: 0,
         },
       ],
     });
@@ -225,6 +227,7 @@ describe('SeasonScreen', () => {
           phase: 'idle',
           finishOrder: null,
           avatar: null,
+          token: 0,
         },
       ],
     });
@@ -354,6 +357,7 @@ describe('SeasonScreen', () => {
           phase: 'playing',
           finishOrder: null,
           avatar: null,
+          token: 0,
         },
       ],
       me: {
@@ -665,6 +669,7 @@ describe('SeasonScreen', () => {
           phase: 'playing',
           finishOrder: null,
           avatar: null,
+          token: 0,
         },
       ],
       me: {
@@ -1048,6 +1053,7 @@ describe('SeasonScreen drop and tech reroll (RR2, RR4, RR5, D-94)', () => {
           phase: 'playing',
           finishOrder: null,
           avatar: null,
+          token: 0,
         },
       ],
       me: {
@@ -1506,6 +1512,7 @@ describe('SeasonScreen marks on offered games (G8, D-94 (6))', () => {
           phase: 'rolling',
           finishOrder: null,
           avatar: null,
+          token: 0,
         },
       ],
       me: {
@@ -1640,6 +1647,7 @@ describe('SeasonScreen completion reward (C7a, D-96)', () => {
           phase: 'idle',
           finishOrder: null,
           avatar: null,
+          token: 0,
         },
       ],
       me: {
@@ -1691,6 +1699,7 @@ describe('SeasonScreen completion reward (C7a, D-96)', () => {
           phase: 'playing',
           finishOrder: null,
           avatar: null,
+          token: 0,
         },
       ],
       me: {
@@ -2205,6 +2214,7 @@ describe('SeasonScreen completion moment (H4)', () => {
         phase: completed ? 'idle' : 'playing',
         finishOrder: extra.finish?.order ?? null,
         avatar: null,
+        token: 0,
       },
     ];
     const base = season({

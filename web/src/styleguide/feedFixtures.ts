@@ -21,6 +21,7 @@ const page: Pick<Schemas['FeedView'], 'players' | 'games' | 'runs'> = {
     name: p.name,
     avatar: p.avatar ? { id: `a${i}`, url: p.avatar, thumbnailUrl: p.avatar } : null,
     hasProfile: i !== 15,
+    token: i,
   })),
   games,
   runs: games.map((g, i) => ({ id: runOf(i), gameId: g.id })),

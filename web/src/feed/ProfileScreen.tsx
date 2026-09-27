@@ -95,7 +95,7 @@ export function ProfileDetails({
           player={{
             name: profile.name,
             // The colour of their token in their latest season, as on its map; none played yet — by the account
-            token: profile.seasons[0]?.token ?? userToken(profile.id),
+            token: userToken(profile.id, profile.seasons[0]?.token),
             // The profile shows the whole picture, a GIF moving (DESIGN.md «Производительность»)
             avatar: profile.avatar?.url,
           }}

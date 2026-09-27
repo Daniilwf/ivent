@@ -71,13 +71,13 @@ export function emptyRefs(): FeedRefs {
 export function withRefs(refs: FeedRefs, page: Pick<Page, 'players' | 'games' | 'runs'>): FeedRefs {
   const players = page.players.length
     ? new Map(
-        page.players.map((p, i) => [
+        page.players.map((p) => [
           p.id,
           {
             id: p.id,
             userId: p.userId,
             name: p.name,
-            token: i,
+            token: p.token,
             avatar: p.avatar?.thumbnailUrl,
             hasProfile: p.hasProfile,
           },

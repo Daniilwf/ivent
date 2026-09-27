@@ -164,6 +164,7 @@ export const demoWitnesses: Schemas['PlayerView'][] = demoPlayers.slice(1, 5).ma
   phase: 'idle',
   finishOrder: null,
   avatar: null,
+  token: p.token,
 }));
 /** A proof's screenshots: our own drawings stand for them */
 export const demoProofFiles: Schemas['FileLinkView'][] = avatars.map((url, i) => ({

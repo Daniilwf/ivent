@@ -3,6 +3,7 @@ using System.Security.Claims;
 using GameEvent.Infrastructure.Accounts;
 using GameEvent.Infrastructure.Database;
 using GameEvent.Web.Hosting;
+using GameEvent.Web.Seasons;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -13,7 +14,11 @@ namespace GameEvent.Web.Accounts;
 
 public sealed record LoginRequest([property: Required, MaxLength(64)] string Login, [property: Required, MaxLength(256)] string Password);
 
-public sealed record CurrentUser(Guid Id, string Login, string Name, Role Role, bool MustChangePassword, Files.FileLinkView? Avatar);
+/// <summary>
+/// The signed-in user. <c>token</c> — the colour of their token in the latest season they play (Seasons.PlayerTokens), as on
+/// their profile; none outside seasons (D-202).
+/// </summary>
+public sealed record CurrentUser(Guid Id, string Login, string Name, Role Role, bool MustChangePassword, Files.FileLinkView? Avatar, int? Token = null);
 
 public sealed record AntiforgeryToken(string Token, string HeaderName);
 
@@ -46,7 +51,7 @@ public static partial class AccountEndpoints
             ClaimsPrincipal principal, GameEventDbContext db, CancellationToken ct) =>
         {
             var user = await FindCurrentAsync(principal, db, ct);
-            return user is null ? TypedResults.Unauthorized() : TypedResults.Ok(ToCurrent(user));
+            return user is null ? TypedResults.Unauthorized() : TypedResults.Ok(await ToCurrentAsync(user, db, ct));
         }).RequireAuthorization();
     }
 
@@ -84,7 +89,7 @@ public static partial class AccountEndpoints
 
         throttle.Succeeded(normalized, address);
         await SignInAsync(http, user!);
-        return TypedResults.Ok(ToCurrent(user!));
+        return TypedResults.Ok(await ToCurrentAsync(user!, db, ct));
     }
 
     /// <summary>The session cookie for <paramref name="user"/> with its current security stamp (D-67).</summary>
@@ -123,6 +128,7 @@ public static partial class AccountEndpoints
             ? await db.Users.AsNoTracking().SingleOrDefaultAsync(u => u.Id == id && !u.IsDeleted, ct)
             : null;
 
-    private static CurrentUser ToCurrent(UserRecord user) =>
-        new(user.Id, user.Login, user.Name, user.Role, user.MustChangePassword, user.AvatarFileId is { } avatar ? Files.FileLinkView.Of(avatar) : null);
+    private static async Task<CurrentUser> ToCurrentAsync(UserRecord user, GameEventDbContext db, CancellationToken ct) =>
+        new(user.Id, user.Login, user.Name, user.Role, user.MustChangePassword, user.AvatarFileId is { } avatar ? Files.FileLinkView.Of(avatar) : null,
+            await db.LatestTokenAsync(user.Id, ct));
 }

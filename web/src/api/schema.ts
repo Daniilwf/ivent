@@ -5757,6 +5757,10 @@ export interface components {
             /** Format: uuid */
             id: string;
         };
+        /**
+         * @description The signed-in user. `token` — the colour of their token in the latest season they play (Seasons.PlayerTokens), as on
+         *     their profile; none outside seasons (D-202).
+         */
         CurrentUser: {
             /** Format: uuid */
             id: string;
@@ -5765,6 +5769,8 @@ export interface components {
             role: components["schemas"]["Role"];
             mustChangePassword: boolean;
             avatar: null | components["schemas"]["FileLinkView"];
+            /** Format: int32 */
+            token?: null | number;
         };
         DiceCountRule: {
             /** Format: double */
@@ -5953,8 +5959,7 @@ export interface components {
         };
         /**
          * @description A player of the season, for the feed's lines (H5, D-150): the name, the account for the profile link (`hasProfile` —
-         *     false once the account is deleted) and the avatar. The list is in the season screen's order, so a player's token colour
-         *     is their place in it.
+         *     false once the account is deleted), the avatar and `token` — the colour of their token in the season (PlayerTokens).
          */
         FeedPlayerView: {
             /** Format: uuid */
@@ -5964,6 +5969,8 @@ export interface components {
             name: string;
             avatar: null | components["schemas"]["FileLinkView"];
             hasProfile: boolean;
+            /** Format: int32 */
+            token: number;
         };
         /** @description A run an event of the page names, with its game: most events of a run carry only its id. */
         FeedRunView: {
@@ -6256,7 +6263,7 @@ export interface components {
         };
         /**
          * @description A player on the map and the leaderboard; `finishOrder` is their order among the finishers, null before the finish;
-         *     `avatar` — the account's picture (D-117), or none.
+         *     `avatar` — the account's picture (D-117), or none; `token` — the colour of their token (PlayerTokens, D-202).
          */
         PlayerView: {
             /** Format: uuid */
@@ -6269,6 +6276,8 @@ export interface components {
             /** Format: int32 */
             finishOrder: null | number;
             avatar: null | components["schemas"]["FileLinkView"];
+            /** Format: int32 */
+            token: number;
         };
         /** @description A player whose next roll would find no game: the empty-pool signal. */
         PlayerWithoutGamesView: {

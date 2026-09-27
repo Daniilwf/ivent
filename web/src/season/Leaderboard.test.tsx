@@ -41,6 +41,7 @@ function season(leaderboard: Row[]): Schemas['SeasonView'] {
         phase: 'idle',
         finishOrder: 1,
         avatar: null,
+        token: 0,
       },
       {
         id: petya,
@@ -50,6 +51,7 @@ function season(leaderboard: Row[]): Schemas['SeasonView'] {
         phase: 'idle',
         finishOrder: null,
         avatar: null,
+        token: 1,
       },
       {
         id: masha,
@@ -59,6 +61,7 @@ function season(leaderboard: Row[]): Schemas['SeasonView'] {
         phase: 'idle',
         finishOrder: null,
         avatar: null,
+        token: 2,
       },
     ],
     me: {

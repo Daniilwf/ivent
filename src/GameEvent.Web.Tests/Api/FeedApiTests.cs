@@ -162,6 +162,24 @@ public sealed class FeedApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task One_player_has_one_token_on_the_season_screen_the_feed_the_header_and_the_profile()
+    {
+        var vasya = await _site.SignedInAsync("vasya");
+        await PostOkAsync(vasya, Url("roll"));
+        var token = await SeasonTokenAsync(vasya, "vasya");
+
+        var feed = await OkAsync(await vasya.GetAsync($"/api/seasons/{SiteFactory.SeasonId}/feed", Ct));
+        var inFeed = feed.GetProperty("players").EnumerateArray().Single(p => p.GetProperty("name").GetString() == "vasya");
+        var me = await OkAsync(await vasya.GetAsync("/api/auth/me", Ct));
+        var spectator = await OkAsync(await (await _site.SignedInAsync("zritel")).GetAsync("/api/auth/me", Ct));
+
+        Assert.Equal(token, inFeed.GetProperty("token").GetInt32());
+        Assert.Equal(token, me.GetProperty("token").GetInt32());
+        // Outside seasons there is no token: the site colours the sticker by the account (userToken)
+        Assert.Equal(JsonValueKind.Null, spectator.GetProperty("token").ValueKind);
+    }
+
+    [Fact]
     public async Task A_spectator_has_a_profile_without_seasons_and_a_deleted_account_has_none()
     {
         var reader = await _site.SignedInAsync("vasya");
@@ -204,12 +222,16 @@ public sealed class FeedApiTests : IAsyncLifetime
 
     // ---- Helpers ----
 
-    /// <summary>The player's place in the season screen's list: the token colour every page gives them (D-150).</summary>
+    /// <summary>
+    /// The player's token on the season screen, where it is their place in the list (D-150): the colour every page gives
+    /// them (D-202).
+    /// </summary>
     private static async Task<int> SeasonTokenAsync(HttpClient client, string name)
     {
         var players = (await OkAsync(await client.GetAsync($"/api/seasons/{SiteFactory.SeasonId}", Ct))).GetProperty("players").EnumerateArray().ToList();
         var index = players.FindIndex(p => p.GetProperty("name").GetString() == name);
         Assert.True(index > 0, "the test needs a player who is not first in the list");
+        Assert.Equal(index, players[index].GetProperty("token").GetInt32());
         return index;
     }
 

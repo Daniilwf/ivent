@@ -22,13 +22,14 @@ const run1 = '55555555-5555-5555-5555-555555555555';
 
 const page = {
   players: [
-    { id: petya, userId: 'u-petya', name: 'Петя', avatar: null, hasProfile: true },
+    { id: petya, userId: 'u-petya', name: 'Петя', avatar: null, hasProfile: true, token: 0 },
     {
       id: vasya,
       userId: 'u-vasya',
       name: 'Вася',
       avatar: { id: 'f', url: '/a', thumbnailUrl: '/t' },
       hasProfile: true,
+      token: 1,
     },
   ],
   games: [

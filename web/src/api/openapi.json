@@ -6489,8 +6489,16 @@
                 "$ref": "#/components/schemas/FileLinkView"
               }
             ]
+          },
+          "token": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
           }
-        }
+        },
+        "description": "The signed-in user. `token` — the colour of their token in the latest season they play (Seasons.PlayerTokens), as on\ntheir profile; none outside seasons (D-202)."
       },
       "DiceCountRule": {
         "required": [
@@ -6983,7 +6991,8 @@
           "userId",
           "name",
           "avatar",
-          "hasProfile"
+          "hasProfile",
+          "token"
         ],
         "type": "object",
         "properties": {
@@ -7010,9 +7019,13 @@
           },
           "hasProfile": {
             "type": "boolean"
+          },
+          "token": {
+            "type": "integer",
+            "format": "int32"
           }
         },
-        "description": "A player of the season, for the feed's lines (H5, D-150): the name, the account for the profile link (`hasProfile` —\nfalse once the account is deleted) and the avatar. The list is in the season screen's order, so a player's token colour\nis their place in it."
+        "description": "A player of the season, for the feed's lines (H5, D-150): the name, the account for the profile link (`hasProfile` —\nfalse once the account is deleted), the avatar and `token` — the colour of their token in the season (PlayerTokens)."
       },
       "FeedRunView": {
         "required": [
@@ -7976,7 +7989,8 @@
           "points",
           "phase",
           "finishOrder",
-          "avatar"
+          "avatar",
+          "token"
         ],
         "type": "object",
         "properties": {
@@ -8013,9 +8027,13 @@
                 "$ref": "#/components/schemas/FileLinkView"
               }
             ]
+          },
+          "token": {
+            "type": "integer",
+            "format": "int32"
           }
         },
-        "description": "A player on the map and the leaderboard; `finishOrder` is their order among the finishers, null before the finish;\n`avatar` — the account's picture (D-117), or none."
+        "description": "A player on the map and the leaderboard; `finishOrder` is their order among the finishers, null before the finish;\n`avatar` — the account's picture (D-117), or none; `token` — the colour of their token (PlayerTokens, D-202)."
       },
       "PlayerWithoutGamesView": {
         "required": [

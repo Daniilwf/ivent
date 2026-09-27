@@ -41,6 +41,7 @@ function season(
         phase: 'idle',
         finishOrder: null,
         avatar: null,
+        token: 0,
       },
     ],
     leaderboard: [

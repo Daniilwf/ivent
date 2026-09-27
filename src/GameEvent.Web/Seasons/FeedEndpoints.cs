@@ -21,10 +21,9 @@ public sealed record FeedEntryView(
 
 /// <summary>
 /// A player of the season, for the feed's lines (H5, D-150): the name, the account for the profile link (<c>hasProfile</c> —
-/// false once the account is deleted) and the avatar. The list is in the season screen's order, so a player's token colour
-/// is their place in it.
+/// false once the account is deleted), the avatar and <c>token</c> — the colour of their token in the season (PlayerTokens).
 /// </summary>
-public sealed record FeedPlayerView(Guid Id, Guid UserId, string Name, FileLinkView? Avatar, bool HasProfile);
+public sealed record FeedPlayerView(Guid Id, Guid UserId, string Name, FileLinkView? Avatar, bool HasProfile, int Token);
 
 /// <summary>A game an event of the page names; <c>hasPage</c> — the viewer may open its page (a deleted game is the admin's).</summary>
 public sealed record FeedGameView(Guid Id, string Title, bool HasPage);
@@ -153,10 +152,10 @@ public static class FeedEndpoints
     private static async Task<(IReadOnlyList<FeedPlayerView> Players, IReadOnlyList<FeedGameView> Games, IReadOnlyList<FeedRunView> Runs)> ReferencesAsync(
         GameEventDbContext db, Guid seasonId, IReadOnlyList<FeedEntryView> entries, bool admin, CancellationToken ct)
     {
-        var seasonPlayers = await db.SeasonPlayers.AsNoTracking().Where(p => p.SeasonId == seasonId).OrderBy(p => p.Name).ToListAsync(ct);
+        var seasonPlayers = await db.SeasonPlayers.AsNoTracking().Where(p => p.SeasonId == seasonId).InTokenOrder().ToListAsync(ct);
         var userIds = seasonPlayers.Select(p => p.UserId).Distinct().ToList();
         var users = await db.Users.AsNoTracking().Where(u => userIds.Contains(u.Id)).ToDictionaryAsync(u => u.Id, ct);
-        IReadOnlyList<FeedPlayerView> players = [.. seasonPlayers.Select(p =>
+        IReadOnlyList<FeedPlayerView> players = [.. seasonPlayers.Select((p, token) =>
         {
             var user = users.GetValueOrDefault(p.UserId);
             return new FeedPlayerView(
@@ -164,7 +163,8 @@ public static class FeedEndpoints
                 p.UserId,
                 p.Name,
                 user?.AvatarFileId is { } file ? FileLinkView.Of(file) : null,
-                user is { IsDeleted: false });
+                user is { IsDeleted: false },
+                token);
         })];
 
         var runIds = new HashSet<Guid>();
@@ -181,20 +181,6 @@ public static class FeedEndpoints
             .Select(g => new FeedGameView(g.Id, g.Title, admin || !g.IsDeleted))
             .ToListAsync(ct);
         return (players, games, runs);
-    }
-
-    /// <summary>
-    /// Each player's place in their season's list of players by name — the order of the season screen, whose token colours
-    /// follow it (D-150).
-    /// </summary>
-    private static async Task<Dictionary<Guid, int>> TokensAsync(GameEventDbContext db, IReadOnlyCollection<Guid> seasonIds, CancellationToken ct)
-    {
-        var players = await db.SeasonPlayers.AsNoTracking()
-            .Where(p => seasonIds.Contains(p.SeasonId))
-            .OrderBy(p => p.Name)
-            .Select(p => new { p.Id, p.SeasonId })
-            .ToListAsync(ct);
-        return players.GroupBy(p => p.SeasonId).SelectMany(g => g.Select((p, i) => (p.Id, Token: i))).ToDictionary(x => x.Id, x => x.Token);
     }
 
     /// <summary>Every <c>runId</c>, <c>gameId</c> and <c>gameIds</c> in an event's data, at any depth (misses, offers).</summary>
@@ -255,7 +241,7 @@ public static class FeedEndpoints
         var playerIds = players.Select(p => p.Id).ToList();
         var seasonIds = players.Select(p => p.SeasonId).Distinct().ToList();
         var seasons = await db.Seasons.AsNoTracking().Where(s => seasonIds.Contains(s.Id)).ToDictionaryAsync(s => s.Id, ct);
-        var tokens = await TokensAsync(db, seasonIds, ct);
+        var tokens = await db.TokensAsync(seasonIds, ct);
         var places = await db.SeasonResults.AsNoTracking().Where(r => playerIds.Contains(r.PlayerId)).ToDictionaryAsync(r => r.PlayerId, r => r.Place, ct);
         var reviews = await db.Reviews.AsNoTracking().Where(r => playerIds.Contains(r.PlayerId)).ToListAsync(ct);
         var runs = await db.Runs.AsNoTracking().Where(r => playerIds.Contains(r.PlayerId)).ToListAsync(ct);
@@ -308,7 +294,7 @@ public static class FeedEndpoints
         var players = await db.SeasonPlayers.AsNoTracking().Where(p => playerIds.Contains(p.Id)).ToDictionaryAsync(p => p.Id, ct);
         var seasonIds = runs.Select(r => r.SeasonId).Distinct().ToList();
         var seasons = await db.Seasons.AsNoTracking().Where(s => seasonIds.Contains(s.Id)).ToDictionaryAsync(s => s.Id, s => s.Name, ct);
-        var tokens = await TokensAsync(db, seasonIds, ct);
+        var tokens = await db.TokensAsync(seasonIds, ct);
         var runIds = runs.Select(r => r.Id).ToList();
         var reviews = await db.Reviews.AsNoTracking().Where(r => runIds.Contains(r.RunId)).ToDictionaryAsync(r => r.RunId, ct);
         IReadOnlyList<GameRunView> views = [.. runs

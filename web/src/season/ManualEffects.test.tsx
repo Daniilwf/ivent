@@ -33,6 +33,7 @@ function season(status: Schemas['SeasonView']['status'] = 'active'): Schemas['Se
         phase: 'idle',
         finishOrder: null,
         avatar: null,
+        token: 0,
       },
     ],
     leaderboard: [

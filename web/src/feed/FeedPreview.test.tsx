@@ -38,7 +38,7 @@ function serve(answer: () => Response) {
 const page = (count: number) => ({
   entries: entries(count),
   nextBefore: null,
-  players: [{ id: vasya, userId: 'u', name: 'Вася', avatar: null, hasProfile: true }],
+  players: [{ id: vasya, userId: 'u', name: 'Вася', avatar: null, hasProfile: true, token: 0 }],
   games: [{ id: 'g', title: 'Celeste', hasPage: true }],
   runs: [],
 });

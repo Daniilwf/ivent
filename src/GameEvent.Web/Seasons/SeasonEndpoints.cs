@@ -105,9 +105,9 @@ public sealed record CellView(string Id, CellType Type);
 
 /// <summary>
 /// A player on the map and the leaderboard; <c>finishOrder</c> is their order among the finishers, null before the finish;
-/// <c>avatar</c> — the account's picture (D-117), or none.
+/// <c>avatar</c> — the account's picture (D-117), or none; <c>token</c> — the colour of their token (PlayerTokens, D-202).
 /// </summary>
-public sealed record PlayerView(Guid Id, string Name, string CellId, int Points, TurnPhase Phase, int? FinishOrder, Files.FileLinkView? Avatar);
+public sealed record PlayerView(Guid Id, string Name, string CellId, int Points, TurnPhase Phase, int? FinishOrder, Files.FileLinkView? Avatar, int Token);
 
 /// <summary>
 /// The signed-in player's own turn. While playing: <c>dropHintMinutes</c> is <c>roll.minPlayMinutesBeforeDrop</c> until
@@ -507,7 +507,7 @@ public static class SeasonEndpoints
         // The log position is read first: the data below is at least that fresh, so a client comparing it with
         // hub updates may refetch once too often but never misses one.
         var lastSequence = await db.Events.Where(e => e.SeasonId == seasonId).MaxAsync(e => e.Sequence, ct);
-        var players = await db.SeasonPlayers.AsNoTracking().Where(p => p.SeasonId == seasonId).OrderBy(p => p.Name).ToListAsync(ct);
+        var players = await db.SeasonPlayers.AsNoTracking().Where(p => p.SeasonId == seasonId).InTokenOrder().ToListAsync(ct);
         var seasonRecord = await db.Seasons.AsNoTracking().SingleAsync(s => s.Id == seasonId, ct);
         var rules = JsonSerializer.Deserialize<Ruleset>(seasonRecord.RulesetJson, EngineJson.Options)!;
         var completedRuns = await db.Runs.AsNoTracking()
@@ -650,8 +650,8 @@ public static class SeasonEndpoints
             seasonRecord.Status,
             seasonRecord.Deadline,
             [.. season.Map.Cells.Select(c => new CellView(c.Id, c.Type))],
-            [.. players.Select(p => new PlayerView(
-                p.Id, p.Name, p.CellId, p.Points, p.Phase, p.FinishOrder, avatars.TryGetValue(p.UserId, out var avatar) ? Files.FileLinkView.Of(avatar) : null))],
+            [.. players.Select((p, token) => new PlayerView(
+                p.Id, p.Name, p.CellId, p.Points, p.Phase, p.FinishOrder, avatars.TryGetValue(p.UserId, out var avatar) ? Files.FileLinkView.Of(avatar) : null, token))],
             [.. leaderboard.Select(r => new LeaderboardRowView(r.PlayerId, r.Place, r.Points, r.CellsToFinish, r.IsFirst, r.Provisional))],
             me,
             lastSequence,

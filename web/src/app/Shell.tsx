@@ -113,7 +113,7 @@ export function Shell({
                 <Sticker
                   player={{
                     name: user.name,
-                    token: userToken(user.id),
+                    token: userToken(user.id, user.token),
                     avatar: user.avatar?.thumbnailUrl,
                   }}
                   size={36}

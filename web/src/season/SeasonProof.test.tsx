@@ -57,6 +57,7 @@ function season(
         phase: 'idle',
         finishOrder: null,
         avatar: null,
+        token: 0,
       },
       {
         id: petya,
@@ -66,6 +67,7 @@ function season(
         phase: 'idle',
         finishOrder: null,
         avatar: null,
+        token: 1,
       },
       {
         id: masha,
@@ -75,6 +77,7 @@ function season(
         phase: 'idle',
         finishOrder: null,
         avatar: null,
+        token: 2,
       },
     ],
     // The server's leaderboard (D-100): Вася by points, Петя and Маша share place 2

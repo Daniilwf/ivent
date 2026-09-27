@@ -33,6 +33,7 @@ const refs = {
       name: 'Вася',
       avatar: null,
       hasProfile: true,
+      token: 0,
     },
   ],
   games: [{ id: hollow, title: 'Hollow Knight', hasPage: true }],
