@@ -1,26 +1,15 @@
-import {
-  CheckCheck,
-  Clock,
-  Gamepad2,
-  Play,
-  SearchX,
-  Trash2,
-  Users,
-  X,
-  RotateCcw,
-  Ban,
-} from 'lucide-react';
+import { CheckCheck, Gamepad2, Play, SearchX, X, RotateCcw, Ban } from 'lucide-react';
 import { useCallback, type ReactNode, type Ref } from 'react';
 import { api, type Schemas } from '../api/client';
 import { Link } from '../app/Link';
 import { navigate, paths, usePageHeading } from '../app/router';
 import { moscowDay } from '../app/time';
 import { Cover } from '../board/GameCards';
+import { GameFacts } from '../pool/GameFacts';
 import { ru } from '../i18n/ru';
 import { textLink as linkText } from './linkStyle';
 import { Button } from '../ui/Button';
 import { cx } from '../ui/cx';
-import { Chip, Tag } from '../ui/Marks';
 import { Skeleton } from '../ui/Progress';
 import { EmptyState, ErrorState } from '../ui/States';
 import { Sticker } from '../ui/Sticker';
@@ -120,25 +109,7 @@ export function GameDetails({
           >
             {game.title}
           </h1>
-          <div className="flex flex-wrap gap-2">
-            <Chip icon={<Clock size={16} aria-hidden />}>{ru.gamePage.hours(game.hours)}</Chip>
-            {game.year ? <Chip>{ru.gamePage.year(game.year)}</Chip> : null}
-            {game.isCoop ? (
-              <Chip icon={<Users size={16} aria-hidden />}>{ru.gamePage.coop}</Chip>
-            ) : null}
-            {game.isDeleted ? (
-              <Chip icon={<Trash2 size={16} aria-hidden />}>{ru.gamePage.deleted}</Chip>
-            ) : null}
-          </div>
-          {game.tags.length ? (
-            <ul className="flex flex-wrap gap-1" aria-label={ru.gamePage.tags}>
-              {game.tags.map((tag) => (
-                <li key={tag}>
-                  <Tag>{tag}</Tag>
-                </li>
-              ))}
-            </ul>
-          ) : null}
+          <GameFacts game={game} />
         </div>
       </header>
       {game.completionCondition ? (

@@ -92,7 +92,7 @@ describe('GameScreen', () => {
     expect(screen.getByTestId('game-loading')).toHaveAttribute('aria-busy', 'true');
     expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent('Hollow Knight');
     const header = screen.getByTestId('game');
-    expect(header).toHaveTextContent(ru.gamePage.hours(27));
+    expect(header).toHaveTextContent(ru.hours.estimate(27));
     expect(header).toHaveTextContent('2017 г.');
     expect(within(header).getByRole('list', { name: ru.gamePage.tags })).toHaveTextContent(
       'Метроидвании',

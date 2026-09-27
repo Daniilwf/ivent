@@ -489,6 +489,12 @@ export const ru = {
     meeples: 'ИВЕНТ',
   },
   // G3: the design system's components (src/ui, src/board)
+  // A game's length, one way everywhere (D-202): the estimate of HowLongToBeat, or hours played
+  hours: {
+    value: hoursText,
+    estimate: (n: number | null) =>
+      n === null ? 'Без оценки по HLTB' : `≈ ${hoursText(n)} по HLTB`,
+  },
   ui: {
     loading: 'Загружаем…',
     retry: 'Попробовать ещё раз',
@@ -519,8 +525,6 @@ export const ru = {
     sheetLeader: (leader: string) => `Лидирует ${leader}`,
     rule: 'Первый — кто первым дошёл до финиша, дальше по очкам',
     nowPlaying: 'Сейчас проходишь',
-    hours: (value: number | null) =>
-      value === null ? 'без оценки по HLTB' : `≈ ${value} ч по HLTB`,
     complete: 'Завершить прохождение',
     drop: 'Дропнуть',
     dropTitle: (title: string) => `Дропнуть «${title}»?`,
@@ -917,7 +921,6 @@ export const ru = {
       challenge: (values: number[]) => `За челлендж: ${values.join(' + ')}`,
       penalty: (values: number[]) =>
         `Штраф: ${values.join(' + ')} = ${values.reduce((a, b) => a + b, 0)}`,
-      hours: hoursText,
       category: (name: string) => `Категория: ${name}`,
       misses: (n: number) => `${n} ${plural(n, 'промах', 'промаха', 'промахов')} колеса`,
       reroll: {
@@ -968,7 +971,6 @@ export const ru = {
     runsTitle: (n: number) => (n === 0 ? 'Прохождения' : `Прохождения: ${n}`),
     tags: 'Категории',
     year: (n: number) => `${n} г.`,
-    hours: (n: number | null) => (n === null ? 'Нет оценки по HLTB' : `≈ ${hoursText(n)} по HLTB`),
     coop: 'Кооператив',
     deleted: 'Удалена из пула',
     condition: (text: string) => `Условие прохождения: ${text}`,
@@ -1018,9 +1020,6 @@ export const ru = {
     },
     freeOnly: 'Только свободные для меня',
     reset: 'Сбросить фильтры',
-    hours: (h: number) => `${h.toLocaleString('ru-RU')} ч`,
-    noHours: 'Часов нет',
-    coop: 'Кооп',
     author: (name: string) => `Добавил ${name}`,
     free: 'Свободна',
     offWheel: 'Не выпадет: ни одной её категории нет на колесе',
@@ -1341,8 +1340,7 @@ export const ru = {
       proofSent: 'Пруф прислан',
       completed: (time: string) => `Завершено ${time}`,
       claimed: (difficulty: string) => `Заявлено: ${difficulty}`,
-      hours: (hours: number | null) =>
-        hours === null ? 'часы не указаны' : `${hours.toLocaleString('ru-RU')} ч`,
+      noHours: 'часы не указаны',
       dice: (total: number) => `кубы +${total}`,
       witness: (name: string) => `Свидетель: ${name}`,
       note: (text: string) => `Заметка: ${text}`,
@@ -1513,9 +1511,6 @@ export const ru = {
       showDeleted: 'Показать удалённые',
       gamesEmptyText:
         'Загрузи таблицу командой npm run import:xlsx или добавь игры на странице пула.',
-      hours: (hours: number | null) =>
-        hours === null ? 'без часов' : `${hours.toLocaleString('ru-RU')} ч`,
-      deleted: 'Удалена',
       editTitle: (title: string) => `Изменить «${title}»`,
       saved: (title: string) => `Сохранено: ${title}`,
       delete: 'Удалить',

@@ -191,7 +191,7 @@ const headlines: [string, (d: Data, c: Context) => Headline][] = [
       line: L.completed(c.playerRef(d), c.gameRef(d)),
       facts: [
         ru.difficulty[(text(d, 'difficulty') ?? 'normal') as keyof typeof ru.difficulty],
-        F.hours(number(d, 'hours') ?? 0),
+        ru.hours.value(number(d, 'hours') ?? 0),
         ...(d['afterFinish'] === true ? [F.afterFinish] : []),
       ],
     }),

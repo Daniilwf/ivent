@@ -110,8 +110,8 @@ describe('the pool page', () => {
     expect(witcher).toHaveTextContent('51,5 ч');
     expect(witcher).toHaveTextContent('2015');
     expect(within(witcher).getByText('РПГ')).toBeInTheDocument();
-    expect(card('Tetris Effect')).toHaveTextContent(t.noHours);
-    expect(card('Portal 2')).toHaveTextContent(t.coop);
+    expect(card('Tetris Effect')).toHaveTextContent(ru.hours.estimate(null));
+    expect(card('Portal 2')).toHaveTextContent(ru.gamePage.coop);
   });
 
   it('shows the cover when the pool has one and the neutral stand-in when not', async () => {

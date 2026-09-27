@@ -285,9 +285,9 @@ describe('SeasonScreen', () => {
     // H3: the option card names the game and its hours the way the run card does
     const option = screen.getByTestId('option-a1');
     expect(option).toHaveTextContent('Silent Hill');
-    expect(option).toHaveTextContent(ru.board.hours(12));
+    expect(option).toHaveTextContent(ru.hours.estimate(12));
     // The card's name is its content: the action, the game and its hours
-    expect(option).toHaveAccessibleName(`${ru.turn.pick} Silent Hill. ${ru.board.hours(12)}`);
+    expect(option).toHaveAccessibleName(`${ru.turn.pick} Silent Hill. ${ru.hours.estimate(12)}`);
 
     await userEvent.click(screen.getByTestId('option-b2'));
 

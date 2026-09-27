@@ -191,7 +191,7 @@ export function ProofCard({
         <p className="text-sm text-ink-soft">
           {[
             claimed ? t.claimed(ru.difficulty[claimed]) : null,
-            t.hours(item.hours),
+            item.hours === null ? t.noHours : ru.hours.value(item.hours),
             t.dice(item.diceTotal),
           ]
             .filter((part) => part !== null)

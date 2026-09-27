@@ -1,10 +1,10 @@
 import { Gamepad2 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { ru } from '../i18n/ru';
+import { GameFacts } from '../pool/GameFacts';
 import { Button } from '../ui/Button';
 import { cx } from '../ui/cx';
 import { ConfirmDanger } from '../ui/Dialogs';
-import { Tag } from '../ui/Marks';
 import { RouteProgress } from '../ui/Progress';
 
 const t = ru.board;
@@ -91,12 +91,7 @@ export function RunCard({
         <Heading className="font-display text-lg font-heavy wrap-anywhere" title={game.title}>
           {game.title}
         </Heading>
-        <p className="text-sm text-ink-soft">{t.hours(game.hours)}</p>
-        <div className="flex flex-wrap gap-1">
-          {game.tags.map((tag) => (
-            <Tag key={tag}>{tag}</Tag>
-          ))}
-        </div>
+        <GameFacts game={game} />
       </div>
       <div className="col-span-2">
         {left === null ? (

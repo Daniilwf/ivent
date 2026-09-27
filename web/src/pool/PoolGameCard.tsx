@@ -1,9 +1,10 @@
-import { Ban, CircleCheck, Gamepad2, Sparkle, Users } from 'lucide-react';
+import { Ban, CircleCheck, Gamepad2, Sparkle } from 'lucide-react';
 import { moscowDay } from '../app/time';
 import { Cover } from '../board/GameCards';
 import { ru } from '../i18n/ru';
-import { Chip, Tag } from '../ui/Marks';
+import { Chip } from '../ui/Marks';
 import { GameMarks } from '../season/GameMarks';
+import { GameFacts } from './GameFacts';
 import type { PoolGame, SeasonGame } from './poolFilter';
 
 const t = ru.pool;
@@ -70,23 +71,7 @@ export function PoolGameCard({
       <Cover game={{ title: game.title, cover: game.cover?.thumbnailUrl }} width={64} lazy />
       <div className="grid min-w-0 content-start justify-items-start gap-2">
         <h2 className="font-display text-lg font-heavy text-balance wrap-anywhere">{game.title}</h2>
-        <p className="flex flex-wrap gap-x-3 gap-y-1 text-sm text-ink-soft tabular-nums">
-          <span>{game.hours === null ? t.noHours : t.hours(game.hours)}</span>
-          {game.year === null ? null : <span>{game.year}</span>}
-          {game.isCoop ? (
-            <span className="inline-flex items-center gap-1">
-              <Users size={14} aria-hidden />
-              {t.coop}
-            </span>
-          ) : null}
-        </p>
-        {game.tags.length > 0 ? (
-          <span className="flex flex-wrap gap-1">
-            {game.tags.map((tag) => (
-              <Tag key={tag}>{tag}</Tag>
-            ))}
-          </span>
-        ) : null}
+        <GameFacts game={game} />
         {inSeason ? <GameStatus status={status} inWheel={inWheel} /> : null}
       </div>
       {note || game.author ? (
