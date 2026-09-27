@@ -2,7 +2,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ru } from '../i18n/ru';
 import { AccountsSection } from './AccountsSection';
-import { adminUser, answer, fakeServer } from './fakeServer';
+import { adminUser, answer, fakeServer } from '../test/fakeServer';
 
 // H8: accounts (D8, D-106): create with a temporary password shown once, change the name and the role, reset the
 // password and delete after a confirmation, restore; the admin cannot delete themselves from here.

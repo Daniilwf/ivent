@@ -2,7 +2,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Schemas } from '../api/client';
 import { ru } from '../i18n/ru';
-import { fakeServer, seasonId } from './fakeServer';
+import { fakeServer, seasonId } from '../test/fakeServer';
 import { PlayersSection } from './PlayersSection';
 
 // H8: the season's players (SPEC «Игроки»): balances and turn, the inactivity hint (D-111), the flag with a

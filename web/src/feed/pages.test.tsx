@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { App } from '../App';
 import { navigate } from '../app/router';
 import { ru } from '../i18n/ru';
+import { fakeServer, json } from '../test/fakeServer';
 
 // H5: the feed, the profile and the game page as pages of the site — opened by address, from the header's sections and
 // from my menu (D-150).
@@ -22,30 +23,15 @@ const user = {
 const emptyFeed = { entries: [], nextBefore: null, players: [], games: [], runs: [] };
 const profile = { id: userId, name: 'Вася', avatar: null, seasons: [], reviews: [], completed: 0 };
 
-function respond(status: number, body?: unknown) {
-  return new Response(body === undefined ? null : JSON.stringify(body), {
-    status,
-    headers: { 'Content-Type': 'application/json' },
-  });
-}
-
 function serve(routes: Record<string, () => Response>) {
-  vi.stubGlobal(
-    'fetch',
-    vi.fn((request: Request) => {
-      const path = new URL(request.url).pathname;
-      if (path === '/api/auth/antiforgery')
-        return Promise.resolve(respond(200, { token: 't', headerName: 'X-CSRF-TOKEN' }));
-      return Promise.resolve(routes[path]?.() ?? respond(404));
-    }),
-  );
+  fakeServer(routes);
 }
 
 const site = {
-  '/api/auth/me': () => respond(200, user),
-  '/api/seasons/current': () => respond(200, { id: seasonId }),
-  [`/api/seasons/${seasonId}/feed`]: () => respond(200, emptyFeed),
-  [`/api/users/${userId}`]: () => respond(200, profile),
+  '/api/auth/me': () => json(200, user),
+  '/api/seasons/current': () => json(200, { id: seasonId }),
+  [`/api/seasons/${seasonId}/feed`]: () => json(200, emptyFeed),
+  [`/api/users/${userId}`]: () => json(200, profile),
 };
 
 describe('the pages of the site', () => {

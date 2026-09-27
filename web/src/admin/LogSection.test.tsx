@@ -2,7 +2,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Schemas } from '../api/client';
 import { ru } from '../i18n/ru';
-import { answer, fakeServer, seasonId } from './fakeServer';
+import { answer, fakeServer, seasonId } from '../test/fakeServer';
 import { LogSection } from './LogSection';
 
 // H8: the season log with undo (SPEC «Лог действий с откатом», D-104): newest first; undo of a whole command after a

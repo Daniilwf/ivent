@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import type { Schemas } from '../api/client';
 import { ru } from '../i18n/ru';
 import { FeedScreen } from './FeedScreen';
+import { fakeServer, json } from '../test/fakeServer';
 
 // H5: the season's feed page (SPEC «Лента», D-150) — lines by day, links to players and games, «Показать ещё»,
 // undone commands marked, every state, others' lines coming in without a reload.
@@ -52,26 +53,16 @@ function started(sequence: number, command: string, at: string, undone = false):
   };
 }
 
-function respond(status: number, body?: unknown) {
-  return new Response(body === undefined ? null : JSON.stringify(body), {
-    status,
-    headers: { 'Content-Type': 'application/json' },
-  });
-}
-
 /** The feed API: the newest page, or the page before a sequence */
 function serve(pages: (before: string | null) => Response | Promise<Response>) {
   const asked: (string | null)[] = [];
-  vi.stubGlobal(
-    'fetch',
-    vi.fn((request: Request) => {
-      const url = new URL(request.url);
-      if (url.pathname !== `/api/seasons/${seasonId}/feed`) return Promise.resolve(respond(404));
-      const before = url.searchParams.get('before');
+  fakeServer({
+    [`GET /api/seasons/${seasonId}/feed`]: ({ query }: { query: URLSearchParams }) => {
+      const before = query.get('before');
       asked.push(before);
-      return Promise.resolve(pages(before));
-    }),
-  );
+      return pages(before);
+    },
+  });
   return asked;
 }
 
@@ -91,7 +82,7 @@ describe('FeedScreen', () => {
   });
 
   it('shows a skeleton, then the lines under their days with links to the player and the game', async () => {
-    serve(() => respond(200, page([started(2, 'c2', new Date().toISOString())])));
+    serve(() => json(200, page([started(2, 'c2', new Date().toISOString())])));
 
     render(<FeedScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
 
@@ -113,7 +104,7 @@ describe('FeedScreen', () => {
   });
 
   it('opens the game page from a line without reloading', async () => {
-    serve(() => respond(200, page([started(2, 'c2', new Date().toISOString())])));
+    serve(() => json(200, page([started(2, 'c2', new Date().toISOString())])));
     render(<FeedScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
 
     await userEvent.click(await screen.findByRole('link', { name: 'Hollow Knight' }));
@@ -124,8 +115,8 @@ describe('FeedScreen', () => {
   it('loads older lines with «Показать ещё» and says where the season began', async () => {
     const asked = serve((before) =>
       before === null
-        ? respond(200, page([started(9, 'new', '2026-09-26T10:00:00Z')], 9))
-        : respond(200, page([started(3, 'old', '2026-09-20T10:00:00Z')])),
+        ? json(200, page([started(9, 'new', '2026-09-26T10:00:00Z')], 9))
+        : json(200, page([started(3, 'old', '2026-09-20T10:00:00Z')])),
     );
     render(<FeedScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
 
@@ -142,10 +133,10 @@ describe('FeedScreen', () => {
     let fail = true;
     serve((before) =>
       before === null
-        ? respond(200, page([started(9, 'new', '2026-09-26T10:00:00Z')], 9))
+        ? json(200, page([started(9, 'new', '2026-09-26T10:00:00Z')], 9))
         : fail
-          ? respond(500)
-          : respond(200, page([started(3, 'old', '2026-09-20T10:00:00Z')])),
+          ? json(500)
+          : json(200, page([started(3, 'old', '2026-09-20T10:00:00Z')])),
     );
     render(<FeedScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
 
@@ -160,7 +151,7 @@ describe('FeedScreen', () => {
   });
 
   it('marks an undone command in words, not only by crossing it out', async () => {
-    serve(() => respond(200, page([started(2, 'c2', new Date().toISOString(), true)])));
+    serve(() => json(200, page([started(2, 'c2', new Date().toISOString(), true)])));
     render(<FeedScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
 
     const line = await screen.findByTestId('feed-item-c2');
@@ -171,7 +162,7 @@ describe('FeedScreen', () => {
   });
 
   it('calls to the first roll when the feed is empty', async () => {
-    serve(() => respond(200, page([])));
+    serve(() => json(200, page([])));
     render(<FeedScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
 
     expect(await screen.findByRole('heading', { name: ru.feed.emptyTitle })).toBeInTheDocument();
@@ -181,9 +172,7 @@ describe('FeedScreen', () => {
 
   it('says what broke and loads again on retry', async () => {
     let fail = true;
-    serve(() =>
-      fail ? respond(500) : respond(200, page([started(2, 'c2', new Date().toISOString())])),
-    );
+    serve(() => (fail ? json(500) : json(200, page([started(2, 'c2', new Date().toISOString())]))));
     render(<FeedScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
 
     expect(await screen.findByRole('alert')).toHaveTextContent(ru.feed.errorTitle);
@@ -194,14 +183,14 @@ describe('FeedScreen', () => {
   });
 
   it('says there is no such season for an unknown one', async () => {
-    serve(() => respond(404));
+    serve(() => json(404));
     render(<FeedScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
 
     expect(await screen.findByRole('heading', { name: ru.feed.noSeasonTitle })).toBeInTheDocument();
   });
 
   it('hands a lost session to the sign-in', async () => {
-    serve(() => respond(401));
+    serve(() => json(401));
     const onSignedOut = vi.fn();
     render(<FeedScreen seasonId={seasonId} onSignedOut={onSignedOut} />);
 
@@ -212,7 +201,7 @@ describe('FeedScreen', () => {
 
   it('brings in others’ new lines on top without a reload and says how many came', async () => {
     let entries = [started(2, 'c2', new Date().toISOString())];
-    serve(() => respond(200, page(entries)));
+    serve(() => json(200, page(entries)));
     render(<FeedScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
     await screen.findByTestId('feed-item-c2');
 

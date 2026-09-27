@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import type { Schemas } from '../api/client';
 import { ru } from '../i18n/ru';
 import { FeedPreview } from './FeedPreview';
+import { json } from '../test/fakeServer';
 
 // H5: the latest of the feed beside the map on a desktop (DESIGN.md «Главная»): five lines, read again when the season
 // moves on, and the way to the whole feed.
@@ -20,13 +21,6 @@ function entries(count: number): Schemas['FeedEntryView'][] {
     author: null,
     undone: false,
   }));
-}
-
-function respond(status: number, body?: unknown) {
-  return new Response(body === undefined ? null : JSON.stringify(body), {
-    status,
-    headers: { 'Content-Type': 'application/json' },
-  });
 }
 
 function serve(answer: () => Response) {
@@ -49,7 +43,7 @@ describe('FeedPreview', () => {
   });
 
   it('shows the five newest lines and leads to the whole feed', async () => {
-    serve(() => respond(200, page(8)));
+    serve(() => json(200, page(8)));
 
     render(<FeedPreview seasonId={seasonId} version={1} />);
 
@@ -62,7 +56,7 @@ describe('FeedPreview', () => {
 
   it('reads the feed again when the season moves on', async () => {
     let count = 1;
-    const calls = serve(() => respond(200, page(count)));
+    const calls = serve(() => json(200, page(count)));
     const { rerender } = render(<FeedPreview seasonId={seasonId} version={1} />);
     await screen.findByTestId('feed-item-c0');
 
@@ -74,7 +68,7 @@ describe('FeedPreview', () => {
   });
 
   it('says the feed is empty', async () => {
-    serve(() => respond(200, page(0)));
+    serve(() => json(200, page(0)));
 
     render(<FeedPreview seasonId={seasonId} version={1} />);
 
@@ -83,7 +77,7 @@ describe('FeedPreview', () => {
 
   it('says it did not load and tries again', async () => {
     let fail = true;
-    serve(() => (fail ? respond(500) : respond(200, page(1))));
+    serve(() => (fail ? json(500) : json(200, page(1))));
     render(<FeedPreview seasonId={seasonId} version={1} />);
 
     expect(await screen.findByRole('alert')).toHaveTextContent(ru.feed.errorTitle);

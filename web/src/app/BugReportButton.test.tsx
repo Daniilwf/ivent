@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { ru } from '../i18n/ru';
 import { BugReportButton } from './BugReportButton';
 import { clearBugContext, recordAction } from './bugContext';
+import { json } from '../test/fakeServer';
 
 // A9, D-121: «Сообщить о баге» — a screenshot of the page, a description, and the context sent along by itself.
 
@@ -10,13 +11,6 @@ const toBlob = vi.fn<() => Promise<Blob | null>>();
 vi.mock('html-to-image', () => ({ toBlob: () => toBlob() }));
 
 type Sent = { url: string; method: string; body: unknown };
-
-function json(status: number, body: unknown) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'Content-Type': status >= 400 ? 'application/problem+json' : 'application/json' },
-  });
-}
 
 const stored = {
   id: '50000000-0000-0000-0000-000000000001',

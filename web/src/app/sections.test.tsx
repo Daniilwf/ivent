@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { App } from '../App';
 import { ru } from '../i18n/ru';
 import { demoRules } from '../rules/demoRules';
+import { fakeServer, json } from '../test/fakeServer';
 
 // H5–H7: the sections of the site — the season, the feed, the pool, the rules — each at its own address, from the
 // header (one router, D-202)
@@ -14,40 +15,22 @@ vi.mock('../api/realtime', () => ({
 
 const seasonId = '5ea50000-0000-0000-0000-000000000001';
 
-function respond(status: number, body: unknown) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'Content-Type': status >= 400 ? 'application/problem+json' : 'application/json' },
-  });
-}
-
 function serve(role: 'player' | 'spectator' = 'player', season: string | null = seasonId) {
-  const routes: Record<string, () => Response> = {
-    '/api/auth/antiforgery': () => respond(200, { token: 't', headerName: 'X-CSRF-TOKEN' }),
-    '/api/auth/me': () =>
-      respond(200, {
-        id: 'u1',
-        login: 'vasya',
-        name: 'Вася',
-        role,
-        mustChangePassword: false,
-        avatar: null,
-      }),
-    '/api/seasons/current': () =>
-      season ? respond(200, { id: season }) : new Response(null, { status: 404 }),
-    '/api/pool': () => respond(200, []),
-    '/api/pool/categories': () => respond(200, []),
-    [`/api/seasons/${seasonId}/games`]: () => respond(200, []),
-    [`/api/seasons/${seasonId}/rules`]: () => respond(200, demoRules),
-  };
-  vi.stubGlobal(
-    'fetch',
-    vi.fn((request: Request) =>
-      Promise.resolve(
-        routes[new URL(request.url).pathname]?.() ?? new Response(null, { status: 404 }),
-      ),
-    ),
-  );
+  fakeServer({
+    'GET /api/auth/me': {
+      id: 'u1',
+      login: 'vasya',
+      name: 'Вася',
+      role,
+      mustChangePassword: false,
+      avatar: null,
+    },
+    'GET /api/seasons/current': () => (season ? json(200, { id: season }) : json(404)),
+    'GET /api/pool': [],
+    'GET /api/pool/categories': [],
+    [`GET /api/seasons/${seasonId}/games`]: [],
+    [`GET /api/seasons/${seasonId}/rules`]: demoRules,
+  });
 }
 
 describe('the sections in the header', () => {

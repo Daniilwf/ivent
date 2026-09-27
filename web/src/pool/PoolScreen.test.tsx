@@ -4,6 +4,7 @@ import { ru } from '../i18n/ru';
 import { demoCategories, demoGame, demoPoolGames, demoStatuses } from './demoPool';
 import { PoolScreen } from './PoolScreen';
 import { pageSize } from './usePaging';
+import { json } from '../test/fakeServer';
 
 // H6: the pool page — covers, search and filters, the game's status in the season, adding a game with a warning
 // about alike titles (SPEC «Пул игр», «Статусы игры в сезоне», «Дубли»).
@@ -32,13 +33,6 @@ vi.mock('../api/realtime', () => ({
 
 const seasonId = '5ea50000-0000-0000-0000-000000000001';
 const t = ru.pool;
-
-function json(status: number, body: unknown) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'Content-Type': status >= 400 ? 'application/problem+json' : 'application/json' },
-  });
-}
 
 type Handler = (request: Request) => Response | Promise<Response>;
 

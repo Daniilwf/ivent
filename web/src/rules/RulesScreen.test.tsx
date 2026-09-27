@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { ru } from '../i18n/ru';
 import { demoRules } from './demoRules';
 import { RulesScreen } from './RulesScreen';
+import { json } from '../test/fakeServer';
 
 // H7: the rules page from the season's current ruleset and the history of its changes (SPEC «Правила на сайте»)
 
@@ -27,13 +28,6 @@ function seasonChange(...types: string[]) {
 const seasonId = '5ea50000-0000-0000-0000-000000000001';
 const rulesPath = `/api/seasons/${seasonId}/rules`;
 const t = ru.rules;
-
-function json(status: number, body: unknown) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'Content-Type': status >= 400 ? 'application/problem+json' : 'application/json' },
-  });
-}
 
 function serve(answer: () => Response) {
   const fetch = vi.fn((request: Request) =>

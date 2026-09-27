@@ -4,6 +4,7 @@ import type { Schemas } from '../api/client';
 import { moscowTime } from '../app/time';
 import { ru } from '../i18n/ru';
 import { SeasonScreen } from './SeasonScreen';
+import { json } from '../test/fakeServer';
 
 // The hub is replaced: tests trigger "another player acted" by calling the captured callback.
 let hubChange: (() => void) | null = null;
@@ -84,13 +85,6 @@ function season(overrides: Partial<Schemas['SeasonView']> = {}): Schemas['Season
     ...overrides,
     leaderboard: overrides.leaderboard ?? leaderboardOf(players),
   };
-}
-
-function json(status: number, body: unknown) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'Content-Type': status >= 400 ? 'application/problem+json' : 'application/json' },
-  });
 }
 
 type Handler = (request: Request) => Response | Promise<Response>;

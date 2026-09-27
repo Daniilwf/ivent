@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import type { Schemas } from '../api/client';
 import { ru } from '../i18n/ru';
 import { GameScreen } from './GameScreen';
+import { fakeServer, json } from '../test/fakeServer';
 
 // H5: a game's page (SPEC «Страница игры: все прохождения, дропы и отзывы», D-124) — the pool's card and every run of
 // the game in every season with its review; every state.
@@ -42,23 +43,11 @@ const run = (over: Partial<Schemas['GameRunView']>): Schemas['GameRunView'] => (
   ...over,
 });
 
-function respond(status: number, body?: unknown) {
-  return new Response(body === undefined ? null : JSON.stringify(body), {
-    status,
-    headers: { 'Content-Type': 'application/json' },
-  });
-}
-
 function serve(answers: { card: () => Response; runs: () => Response }) {
-  vi.stubGlobal(
-    'fetch',
-    vi.fn((request: Request) => {
-      const path = new URL(request.url).pathname;
-      if (path === `/api/pool/${gameId}`) return Promise.resolve(answers.card());
-      if (path === `/api/pool/${gameId}/runs`) return Promise.resolve(answers.runs());
-      return Promise.resolve(respond(404));
-    }),
-  );
+  fakeServer({
+    [`GET /api/pool/${gameId}`]: answers.card,
+    [`GET /api/pool/${gameId}/runs`]: answers.runs,
+  });
 }
 
 describe('GameScreen', () => {
@@ -69,9 +58,9 @@ describe('GameScreen', () => {
 
   it('shows the card and every run with its status, player link and review', async () => {
     serve({
-      card: () => respond(200, card),
+      card: () => json(200, card),
       runs: () =>
-        respond(200, [
+        json(200, [
           run({}),
           run({
             runId: 'r2',
@@ -120,7 +109,7 @@ describe('GameScreen', () => {
   });
 
   it('says nobody took the game yet', async () => {
-    serve({ card: () => respond(200, { ...card, isDeleted: true }), runs: () => respond(200, []) });
+    serve({ card: () => json(200, { ...card, isDeleted: true }), runs: () => json(200, []) });
 
     render(<GameScreen gameId={gameId} onSignedOut={vi.fn()} />);
 
@@ -131,7 +120,7 @@ describe('GameScreen', () => {
   });
 
   it('says an unknown or deleted game has no page', async () => {
-    serve({ card: () => respond(404), runs: () => respond(404) });
+    serve({ card: () => json(404), runs: () => json(404) });
 
     render(<GameScreen gameId={gameId} onSignedOut={vi.fn()} />);
 
@@ -142,7 +131,7 @@ describe('GameScreen', () => {
 
   it('says what broke and loads again on retry', async () => {
     let fail = true;
-    serve({ card: () => respond(200, card), runs: () => (fail ? respond(500) : respond(200, [])) });
+    serve({ card: () => json(200, card), runs: () => (fail ? json(500) : json(200, [])) });
     render(<GameScreen gameId={gameId} onSignedOut={vi.fn()} />);
 
     expect(await screen.findByRole('alert')).toHaveTextContent(ru.gamePage.errorTitle);
@@ -153,7 +142,7 @@ describe('GameScreen', () => {
   });
 
   it('hands a lost session to the sign-in', async () => {
-    serve({ card: () => respond(401), runs: () => respond(401) });
+    serve({ card: () => json(401), runs: () => json(401) });
     const onSignedOut = vi.fn();
     render(<GameScreen gameId={gameId} onSignedOut={onSignedOut} />);
 

@@ -2,7 +2,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Schemas } from '../api/client';
 import { ru } from '../i18n/ru';
-import { answer, fakeServer, seasonId } from './fakeServer';
+import { answer, fakeServer, seasonId } from '../test/fakeServer';
 import { PoolSection } from './PoolSection';
 
 // H8: the pool and the category wheel (SPEC «Контент: игры, теги и веса»; D-92, D-119): weights with the count of

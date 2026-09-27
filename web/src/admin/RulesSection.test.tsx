@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ru } from '../i18n/ru';
-import { answer, fakeServer, seasonId } from './fakeServer';
+import { answer, fakeServer, seasonId } from '../test/fakeServer';
 import { RulesSection } from './RulesSection';
 import { fieldName, valueText } from '../rules/rulesText';
 

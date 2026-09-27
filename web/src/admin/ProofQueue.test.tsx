@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import type { Schemas } from '../api/client';
 import { ru } from '../i18n/ru';
 import { AdminScreen } from './AdminScreen';
-import { adminUser, answer, fakeServer, seasonId } from './fakeServer';
+import { adminUser, answer, fakeServer, seasonId } from '../test/fakeServer';
 
 // H8: the proof queue (SPEC «Очередь пруфов», D-98, D-134): finishes on top as the server orders them, the players
 // whose roll the unchecked limit closed are marked; approve, approve without a screenshot (a comment then), a lower

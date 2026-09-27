@@ -1,7 +1,7 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ru } from '../i18n/ru';
-import { answer, fakeServer, seasonId } from './fakeServer';
+import { answer, fakeServer, seasonId } from '../test/fakeServer';
 import { SeasonSection } from './SeasonSection';
 
 // H8: the season (SE1, SE2, D-101, D-105): the next status after a confirmation with the consequences, the deadline in

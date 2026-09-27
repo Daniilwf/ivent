@@ -5,7 +5,7 @@ import { ru } from '../i18n/ru';
 import { BugsSection } from './BugsSection';
 import { EffectsSection } from './EffectsSection';
 import { ErrorsSection } from './ErrorsSection';
-import { answer, fakeServer, seasonId } from './fakeServer';
+import { answer, fakeServer, seasonId } from '../test/fakeServer';
 import { SiteSection } from './SiteSection';
 
 // H8: the smaller admin pages — manual effects (D-102), bug reports (E5), the error journal (D7) and maintenance mode

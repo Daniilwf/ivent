@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { refreshCsrf, type Schemas } from '../api/client';
 import { ru } from '../i18n/ru';
 import { ProofSection } from './ProofForm';
+import { json } from '../test/fakeServer';
 
 // D-116: screenshots in the proof — uploaded one by one to /api/files, shown as thumbnails, removable, sent as ids;
 // a screenshot alone is a proof; refusals of the upload are said in Russian.
@@ -17,13 +18,6 @@ const shot = (n: number) => ({
   thumbnailUrl: `/api/files/5000000${String(n)}/thumbnail`,
   duplicate: false,
 });
-
-function json(status: number, body: unknown) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'Content-Type': status >= 400 ? 'application/problem+json' : 'application/json' },
-  });
-}
 
 type Sent = { url: string; method: string | undefined; body: FormData };
 

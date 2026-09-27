@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { App } from '../App';
 import { ru } from '../i18n/ru';
 import { AdminScreen } from './AdminScreen';
-import { adminUser, fakeServer, seasonId } from './fakeServer';
+import { adminUser, fakeServer, seasonId } from '../test/fakeServer';
 
 // H8: the admin's pages as a whole: open for the admin only (from the menu or by the address), a list of sections
 // behind «Разделы» on a phone, the section in the address, the queue count, and no season yet.

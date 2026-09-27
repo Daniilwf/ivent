@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import type { Schemas } from '../api/client';
 import { ru } from '../i18n/ru';
 import { ProfileScreen } from './ProfileScreen';
+import { fakeServer, json } from '../test/fakeServer';
 
 // H5: a player's profile (SPEC «Профиль», «Отзыв … виден в ленте, профиле и на странице игры», D-124) — name,
 // avatar, completed games, seasons with points and place, reviews; every state.
@@ -50,22 +51,8 @@ const profile: Schemas['ProfileView'] = {
   ],
 };
 
-function respond(status: number, body?: unknown) {
-  return new Response(body === undefined ? null : JSON.stringify(body), {
-    status,
-    headers: { 'Content-Type': 'application/json' },
-  });
-}
-
 function serve(answer: () => Response) {
-  vi.stubGlobal(
-    'fetch',
-    vi.fn((request: Request) =>
-      Promise.resolve(
-        new URL(request.url).pathname === `/api/users/${userId}` ? answer() : respond(404),
-      ),
-    ),
-  );
+  fakeServer({ [`GET /api/users/${userId}`]: answer });
 }
 
 describe('ProfileScreen', () => {
@@ -75,7 +62,7 @@ describe('ProfileScreen', () => {
   });
 
   it('shows the name, the whole avatar, the completed games, the seasons and the reviews', async () => {
-    serve(() => respond(200, profile));
+    serve(() => json(200, profile));
 
     render(<ProfileScreen userId={userId} meId="someone-else" onSignedOut={vi.fn()} />);
 
@@ -115,7 +102,7 @@ describe('ProfileScreen', () => {
   });
 
   it('marks my own page and calls me to write the first review', async () => {
-    serve(() => respond(200, { ...profile, reviews: [], seasons: [], completed: 1 }));
+    serve(() => json(200, { ...profile, reviews: [], seasons: [], completed: 1 }));
 
     render(<ProfileScreen userId={userId} meId={userId} onSignedOut={vi.fn()} />);
 
@@ -126,7 +113,7 @@ describe('ProfileScreen', () => {
   });
 
   it('says a deleted or unknown player has no page and leads back to the season', async () => {
-    serve(() => respond(404));
+    serve(() => json(404));
     render(<ProfileScreen userId={userId} meId="me" onSignedOut={vi.fn()} />);
 
     expect(
@@ -138,7 +125,7 @@ describe('ProfileScreen', () => {
 
   it('says what broke and loads again on retry', async () => {
     let fail = true;
-    serve(() => (fail ? respond(500) : respond(200, profile)));
+    serve(() => (fail ? json(500) : json(200, profile)));
     render(<ProfileScreen userId={userId} meId="me" onSignedOut={vi.fn()} />);
 
     expect(await screen.findByRole('alert')).toHaveTextContent(ru.profile.errorTitle);
@@ -149,7 +136,7 @@ describe('ProfileScreen', () => {
   });
 
   it('hands a lost session to the sign-in', async () => {
-    serve(() => respond(401));
+    serve(() => json(401));
     const onSignedOut = vi.fn();
     render(<ProfileScreen userId={userId} meId="me" onSignedOut={onSignedOut} />);
 
