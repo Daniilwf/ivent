@@ -6,6 +6,7 @@ import {
   FlaskConical,
   History,
   Library,
+  Map as MapIcon,
   Menu as MenuIcon,
   ServerCrash,
   Sparkles,
@@ -32,6 +33,7 @@ import { BugsSection } from './BugsSection';
 import { EffectsSection } from './EffectsSection';
 import { ErrorsSection } from './ErrorsSection';
 import { LogSection } from './LogSection';
+import { MapSection } from './MapSection';
 import { PlayersSection } from './PlayersSection';
 import { PoolSection } from './PoolSection';
 import { ProofQueue } from './ProofQueue';
@@ -53,6 +55,7 @@ const sections: { id: AdminSectionId; icon: ReactNode; season: boolean }[] = [
   { id: 'log', icon: <History size={20} aria-hidden />, season: true },
   { id: 'effects', icon: <Sparkles size={20} aria-hidden />, season: true },
   { id: 'rules', icon: <FileJson size={20} aria-hidden />, season: true },
+  { id: 'map', icon: <MapIcon size={20} aria-hidden />, season: true },
   { id: 'season', icon: <CalendarCog size={20} aria-hidden />, season: false },
   { id: 'pool', icon: <Library size={20} aria-hidden />, season: false },
   { id: 'accounts', icon: <UserCog size={20} aria-hidden />, season: false },
@@ -241,6 +244,8 @@ export function AdminScreen({
         return <EffectsSection seasonId={id} version={version} />;
       case 'rules':
         return <RulesSection seasonId={id} version={version} />;
+      case 'map':
+        return <MapSection seasonId={id} version={version} />;
       case 'season':
         return (
           <SeasonSection
