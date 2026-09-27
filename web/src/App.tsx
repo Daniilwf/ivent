@@ -19,6 +19,10 @@ import { SeasonScreen } from './season/SeasonScreen';
 import { PoolScreen } from './pool/PoolScreen';
 import { RulesScreen } from './rules/RulesScreen';
 
+/** The admin's section of an address: none is the proof queue, an unknown one is «Такой страницы нет» */
+const knownAdminSection = (section: string | null) =>
+  section === null || Object.hasOwn(ru.admin.sections, section);
+
 type State =
   | { kind: 'loading' }
   | { kind: 'failed' }
@@ -180,7 +184,7 @@ export function App() {
               </Button>
             </ChangePasswordForm>
           </main>
-        ) : route.kind === 'admin' && admin ? (
+        ) : route.kind === 'admin' && admin && knownAdminSection(route.section) ? (
           <AdminScreen
             section={route.section}
             currentSeasonId={signedIn.seasonId}
@@ -195,7 +199,8 @@ export function App() {
           />
         ) : route.kind === 'game' ? (
           <GameScreen key={route.gameId} gameId={route.gameId} onSignedOut={signedOut} />
-        ) : route.kind === 'notFound' ? (
+        ) : route.kind === 'notFound' || (route.kind === 'admin' && admin) ? (
+          // An address the site does not have, the admin's unknown section included
           <main className="mx-auto grid max-w-110 px-4 py-10" data-testid="page-not-found">
             <NotFound
               icon={<SearchX size={28} aria-hidden />}

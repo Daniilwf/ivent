@@ -8,3 +8,6 @@ if (!('ResizeObserver' in globalThis)) {
     disconnect() {}
   };
 }
+
+// jsdom has no scrolling: a page opened by the router starts at the top, in tests nowhere
+window.scrollTo = () => undefined;

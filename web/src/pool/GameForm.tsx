@@ -1,5 +1,5 @@
 import { ImagePlus, X } from 'lucide-react';
-import { useEffect, useRef, useState, type SyntheticEvent } from 'react';
+import { useEffect, useId, useRef, useState, type SyntheticEvent } from 'react';
 import { newCommandId } from '../api/commands';
 import { api, rejectionCode, type Schemas } from '../api/client';
 import { UploadError, uploadFile } from '../api/files';
@@ -99,6 +99,9 @@ export function GameForm({
   const [failure, setFailure] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
+  // Two forms on one page (the styleguide) keep their hints apart
+  const tagsHint = useId();
+  const coverHint = useId();
 
   // The pool is asked about the title once the typing rests; an answer for an older title is dropped
   useEffect(() => {
@@ -253,9 +256,9 @@ export function GameForm({
         </div>
       ) : null}
 
-      <fieldset className="grid gap-1" aria-describedby="add-game-tags-hint">
+      <fieldset className="grid gap-1" aria-describedby={tagsHint}>
         <legend className="mb-1 text-sm font-bold">{t.categories}</legend>
-        <span id="add-game-tags-hint" className="text-sm text-ink-soft">
+        <span id={tagsHint} className="text-sm text-ink-soft">
           {choices.length === 0 ? t.noCategories : t.categoriesHint}
         </span>
         <span className="grid grid-cols-2 gap-x-3">
@@ -340,7 +343,7 @@ export function GameForm({
           <Button
             icon={<ImagePlus size={20} aria-hidden />}
             loading={uploading}
-            aria-describedby="add-game-cover-hint"
+            aria-describedby={coverHint}
             onClick={() => fileInput.current?.click()}
           >
             {cover ? t.coverReplace : t.coverPick}
@@ -357,7 +360,7 @@ export function GameForm({
             </Button>
           ) : null}
         </div>
-        <span id="add-game-cover-hint" className="text-sm text-ink-soft">
+        <span id={coverHint} className="text-sm text-ink-soft">
           {t.coverHint}
         </span>
         {errors.cover ? (

@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { ru } from '../i18n/ru';
 import { demoRules } from './demoRules';
 import { RulesScreen } from './RulesScreen';
-import { json } from '../test/fakeServer';
+import { fakeServer, json } from '../test/fakeServer';
 
 // H7: the rules page from the season's current ruleset and the history of its changes (SPEC «Правила на сайте»)
 
@@ -29,14 +29,8 @@ const seasonId = '5ea50000-0000-0000-0000-000000000001';
 const rulesPath = `/api/seasons/${seasonId}/rules`;
 const t = ru.rules;
 
-function serve(answer: () => Response) {
-  const fetch = vi.fn((request: Request) =>
-    Promise.resolve(
-      new URL(request.url).pathname === rulesPath ? answer() : new Response(null, { status: 404 }),
-    ),
-  );
-  vi.stubGlobal('fetch', fetch);
-  return fetch;
+function serve(answer: () => Response | Promise<Response>) {
+  return fakeServer({ [`GET ${rulesPath}`]: answer }).fetch;
 }
 
 function renderRules(id: string | null = seasonId) {
@@ -156,10 +150,7 @@ describe('the rules page', () => {
 
   it('shows the latest answer when an older one comes late', async () => {
     const answers: ((r: Response) => void)[] = [];
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(() => new Promise<Response>((resolve) => answers.push(resolve))),
-    );
+    serve(() => new Promise<Response>((resolve) => answers.push(resolve)));
     renderRules();
     await waitFor(() => {
       expect(answers).toHaveLength(1);

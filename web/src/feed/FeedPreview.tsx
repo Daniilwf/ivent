@@ -4,9 +4,8 @@ import { paths } from '../app/router';
 import { useLoaded } from '../app/useLoaded';
 import { ru } from '../i18n/ru';
 import { buttonClass } from '../ui/buttonStyles';
-import { Button } from '../ui/Button';
 import { cx } from '../ui/cx';
-import { Notice } from '../ui/States';
+import { AsyncState } from '../ui/AsyncState';
 import { Panel } from '../ui/Surface';
 import { FeedList, FeedSkeleton } from './FeedList';
 import { emptyRefs, feedDays, withRefs } from './feedModel';
@@ -49,18 +48,21 @@ export function FeedPreview({
 
   return (
     <Panel title={ru.feed.preview} className={cx(className)} data-testid="feed-preview">
-      {state.kind === 'loading' ? (
-        <FeedSkeleton rows={3} />
-      ) : state.kind !== 'ready' ? (
-        <div className="grid justify-items-start gap-2">
-          <Notice tone="danger">{ru.feed.errorTitle}</Notice>
-          <Button onClick={state.reload}>{ru.ui.retry}</Button>
-        </div>
-      ) : days.length === 0 ? (
-        <p className="text-ink-soft">{ru.feed.emptyTitle}</p>
-      ) : (
-        <FeedList days={days} level={3} />
-      )}
+      <AsyncState
+        loaded={state}
+        skeleton={<FeedSkeleton rows={3} />}
+        errorTitle={ru.feed.errorTitle}
+        // The season is gone (another season opened meanwhile): the preview says so quietly, the page reloads it
+        notFound={<p className="text-ink-soft">{ru.feed.noSeasonTitle}</p>}
+      >
+        {() =>
+          days.length === 0 ? (
+            <p className="text-ink-soft">{ru.feed.emptyTitle}</p>
+          ) : (
+            <FeedList days={days} level={3} />
+          )
+        }
+      </AsyncState>
       <Link to={paths.feed()} className={buttonClass('link', 'justify-self-start')}>
         {ru.feed.all}
       </Link>

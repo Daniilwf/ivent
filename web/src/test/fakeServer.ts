@@ -5,8 +5,10 @@
 
 export type Call = { method: string; path: string; query: URLSearchParams; body: unknown };
 type Answer = { status?: number; body?: unknown };
-// A body, or a function of the request that returns an Answer or a Response
-type Route = unknown;
+/** A route that looks at the request: a status and a body, or a Response as it is (a lost answer throws) */
+export type Handler = (call: Call) => Answer | Response | Promise<Answer | Response>;
+/** What a route answers: a handler, or the body of a 200 */
+type Route = Handler | object | string | number | boolean | null;
 
 /** A JSON answer of the backend: an error status is a problem, no body is an empty answer */
 export function json(status: number, body?: unknown): Response {
@@ -20,7 +22,6 @@ export function answer(status: number, body?: unknown): (call: Call) => Answer {
   return () => ({ status, body });
 }
 
-// A path is literal but for «*»: the other signs of a regular expression are escaped
 /** A request's body: JSON, the text itself when it is not JSON (a form), or none */
 function parseBody(text: string): unknown {
   if (text === '') return null;
@@ -31,6 +32,7 @@ function parseBody(text: string): unknown {
   }
 }
 
+// A path is literal but for «*»: the other signs of a regular expression are escaped
 const escape = (text: string) => text.replace(/[.+?^${}()|[\]\\]/g, '\\$&');
 
 export function fakeServer(routes: Record<string, Route>) {
@@ -58,9 +60,7 @@ export function fakeServer(routes: Record<string, Route>) {
     );
     if (!found) return json(404);
     if (typeof found.route === 'function') {
-      const result = await (found.route as (call: Call) => Answer | Response | Promise<Response>)(
-        call,
-      );
+      const result = await (found.route as Handler)(call);
       if (result instanceof Response) return result;
       return json(result.status ?? 200, result.body);
     }

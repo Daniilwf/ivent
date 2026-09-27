@@ -24,7 +24,7 @@ const filters: Filter[] = ['new', 'inWork', 'closed', 'all'];
 // The next step of a report: new → in work (docs/BUGS.md) → closed; a closed one can be opened again
 const moves: Record<Status, { to: Status; label: string }> = {
   new: { to: 'inWork', label: t.toWork },
-  inWork: { to: 'closed', label: t.close },
+  inWork: { to: 'closed', label: ru.ui.close },
   closed: { to: 'new', label: t.reopen },
 };
 

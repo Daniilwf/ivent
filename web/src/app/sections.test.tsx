@@ -34,10 +34,6 @@ function serve(role: 'player' | 'spectator' = 'player', season: string | null = 
 }
 
 describe('the sections in the header', () => {
-  beforeEach(() => {
-    vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined);
-  });
-
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.restoreAllMocks();

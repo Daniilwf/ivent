@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import type { Schemas } from '../api/client';
 import { ru } from '../i18n/ru';
 import { FeedPreview } from './FeedPreview';
-import { json } from '../test/fakeServer';
+import { fakeServer, json } from '../test/fakeServer';
 
 // H5: the latest of the feed beside the map on a desktop (DESIGN.md «Главная»): five lines, read again when the season
 // moves on, and the way to the whole feed.
@@ -24,9 +24,7 @@ function entries(count: number): Schemas['FeedEntryView'][] {
 }
 
 function serve(answer: () => Response) {
-  const calls = vi.fn(() => Promise.resolve(answer()));
-  vi.stubGlobal('fetch', calls);
-  return calls;
+  return fakeServer({ [`GET /api/seasons/${seasonId}/feed`]: answer }).fetch;
 }
 
 const page = (count: number) => ({

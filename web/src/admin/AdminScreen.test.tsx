@@ -169,15 +169,22 @@ describe('The admin pages', () => {
     expect(globalThis.location.pathname).toBe('/admin/season');
   });
 
-  it('open the section named in the address and the queue for an unknown one', () => {
+  it('open the section named in the address', () => {
     fakeServer({ 'GET /api/admin/seasons/*/proofs': [] });
     const { unmount } = render(
       <AdminScreen section="errors" currentSeasonId={seasonId} user={adminUser} />,
     );
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(t.sections.errors);
     unmount();
+  });
 
-    render(<AdminScreen section="nonsense" currentSeasonId={seasonId} user={adminUser} />);
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(t.sections.proofs);
+  it('say «no such page» at an address of a section they do not have', async () => {
+    globalThis.history.pushState(null, '', '/admin/nonsense');
+    const server = site(adminUser);
+    render(<App />);
+
+    expect(await screen.findByTestId('page-not-found')).toBeInTheDocument();
+    expect(screen.queryByTestId('admin')).toBeNull();
+    expect(server.calls.some((c) => c.path.startsWith('/api/admin'))).toBe(false);
   });
 });

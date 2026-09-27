@@ -79,8 +79,7 @@ export function navigate(to: string) {
   if (to === globalThis.location.pathname) return;
   globalThis.history.pushState(null, '', to);
   navigated = true;
-  // jsdom has no scrolling
-  if (!globalThis.navigator.userAgent.includes('jsdom')) globalThis.scrollTo(0, 0);
+  globalThis.scrollTo(0, 0);
   for (const listener of listeners) listener();
 }
 

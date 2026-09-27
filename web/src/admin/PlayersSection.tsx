@@ -19,7 +19,6 @@ const t = ru.admin.players;
 
 type Player = Schemas['AdminPlayerView'];
 type Cell = Schemas['SeasonView']['cells'][number];
-type Reason = TechRerollReason;
 
 /** The cells as the admin picks them: by their number along the chain, the start and the finish named */
 function cellOptions(cells: readonly Cell[]) {
@@ -378,7 +377,7 @@ function TechRerollForm({
   player: Player;
   onDone: (message: string) => void;
 }) {
-  const [reason, setReason] = useState<Reason | ''>('');
+  const [reason, setReason] = useState<TechRerollReason | ''>('');
   const [comment, setComment] = useState('');
   const [errors, setErrors] = useState<{
     reason?: string | undefined;
@@ -429,7 +428,7 @@ function TechRerollForm({
         error={errors.reason}
         data-testid="tech-reroll-reason"
         onChange={(e) => {
-          setReason(e.target.value as Reason | '');
+          setReason(e.target.value as TechRerollReason | '');
         }}
       >
         <option value="">{ru.turn.techRerollReasonPlaceholder}</option>

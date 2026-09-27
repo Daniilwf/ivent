@@ -8,8 +8,6 @@ import { ConfirmDanger, FormDialog } from '../ui/Dialogs';
 import { Select, TextArea } from '../ui/Field';
 import { Notice } from '../ui/States';
 
-type Reason = TechRerollReason;
-
 /**
  * Drop and tech reroll of the active run (D-94), quiet and apart from completing. A drop is confirmed in a window that
  * lists what it costs under the rules in force (`dropPenalty`); while the server says it is early, the window also
@@ -37,11 +35,11 @@ export function RunActions({
   techRerollOpen: boolean;
   pending: boolean;
   onDrop: () => void;
-  onTechReroll: (reason: Reason, comment: string | null) => void;
+  onTechReroll: (reason: TechRerollReason, comment: string | null) => void;
 }) {
   const [dropping, setDropping] = useState(false);
   const [rerolling, setRerolling] = useState(false);
-  const [reason, setReason] = useState<Reason | ''>('');
+  const [reason, setReason] = useState<TechRerollReason | ''>('');
   const [comment, setComment] = useState('');
   const [commentMissing, setCommentMissing] = useState(false);
   const [reasonMissing, setReasonMissing] = useState(false);
@@ -144,7 +142,7 @@ export function RunActions({
             required
             value={reason}
             onChange={(e) => {
-              setReason(e.target.value as Reason | '');
+              setReason(e.target.value as TechRerollReason | '');
               setReasonMissing(false);
               setCommentMissing(false);
             }}

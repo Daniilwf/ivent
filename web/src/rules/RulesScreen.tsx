@@ -10,6 +10,7 @@ import { ru } from '../i18n/ru';
 import { Chip } from '../ui/Marks';
 import { Skeleton } from '../ui/Progress';
 import { AsyncState } from '../ui/AsyncState';
+import { cx } from '../ui/cx';
 import { EmptyState } from '../ui/States';
 import { fieldName, rulesPage, valueText } from './rulesText';
 
@@ -84,33 +85,30 @@ export function RulesScreen({
     </header>
   );
 
-  if (loaded.kind !== 'ready')
-    return (
-      <main className={frame}>
-        {header}
-        <div className="grid max-w-200">
-          <AsyncState
-            loaded={loaded}
-            skeleton={
-              <div className="grid gap-4" aria-busy="true" data-testid="rules-loading">
-                <p className="sr-only">{ru.ui.loading}</p>
-                {[0, 1, 2].map((i) => (
-                  <Skeleton key={i} className="h-40 w-full rounded-lg" />
-                ))}
-              </div>
-            }
-            errorTitle={t.loadErrorTitle}
-          >
-            {() => null}
-          </AsyncState>
-        </div>
-      </main>
-    );
-
+  // The page's frame and heading stay; the rules come in place of the skeleton (two columns on a desktop)
   return (
-    <main className={`${frame} desk:grid-cols-[auto_minmax(0,1fr)] desk:items-start desk:gap-x-8`}>
+    <main
+      className={cx(
+        frame,
+        loaded.kind === 'ready' &&
+          'desk:grid-cols-[auto_minmax(0,1fr)] desk:items-start desk:gap-x-8',
+      )}
+    >
       {header}
-      <RulesContent rules={loaded.value} />
+      <AsyncState
+        loaded={loaded}
+        skeleton={
+          <div className="grid max-w-200 gap-4" aria-busy="true" data-testid="rules-loading">
+            <p className="sr-only">{ru.ui.loading}</p>
+            {[0, 1, 2].map((i) => (
+              <Skeleton key={i} className="h-40 w-full rounded-lg" />
+            ))}
+          </div>
+        }
+        errorTitle={t.loadErrorTitle}
+      >
+        {(rules) => <RulesContent rules={rules} />}
+      </AsyncState>
     </main>
   );
 }

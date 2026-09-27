@@ -377,16 +377,16 @@ export function Styleguide() {
         <div className="grid gap-4 desk:grid-cols-3">
           <EmptyState
             icon={<Inbox size={28} aria-hidden />}
-            title={t.feedback.emptyTitle}
-            text={t.feedback.emptyText}
-            action={<Button variant="main">{t.feedback.emptyAction}</Button>}
+            title={ru.pool.emptyTitle}
+            text={ru.pool.emptyText}
+            action={<Button variant="main">{ru.pool.add}</Button>}
           />
           <ErrorState
-            title={t.feedback.errorTitle}
-            text={t.feedback.errorText}
+            title={ru.feed.errorTitle}
+            text={ru.shell.loadErrorText}
             onRetry={() => undefined}
           />
-          <Panel title={t.feedback.loading} aria-busy="true">
+          <Panel title={t.states.loading} aria-busy="true">
             {[0, 1, 2, 3].map((i) => (
               <span key={i} className="flex items-center gap-3">
                 <Skeleton className="size-9 rounded-full" />
@@ -494,7 +494,7 @@ export function Styleguide() {
               onDrop={noop}
               onTechReroll={noop}
             />
-            <Notice tone="danger">{t.complete.message}</Notice>
+            <Notice tone="danger">{ru.shell.loadErrorText}</Notice>
           </div>
         </div>
       </Section>
@@ -627,7 +627,7 @@ export function Styleguide() {
               <p className="text-sm text-ink-soft">{ru.feed.start}</p>
             </div>
           </Panel>
-          <Panel title={t.feed.loading}>
+          <Panel title={t.states.loading}>
             <FeedSkeleton rows={4} />
           </Panel>
         </div>

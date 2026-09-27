@@ -56,7 +56,7 @@ const sections: { id: AdminSectionId; icon: ReactNode; season: boolean }[] = [
   { id: 'site', icon: <Wrench size={20} aria-hidden />, season: false },
 ];
 
-/** The section an address opens (the router's `admin` route): /admin is the proof queue, the admin's most frequent job */
+/** The section an address opens: /admin is the proof queue, the admin's most frequent job (App shows no page for an unknown one) */
 function adminSection(name: string | null): AdminSectionId {
   return sections.find((s) => s.id === name)?.id ?? 'proofs';
 }
