@@ -1,0 +1,23 @@
+{
+  "id": "shop-coupon",
+  "kind": "item",
+  "name": "Купон магазина",
+  "description": "Бесплатный ролл магазина: используй, когда будешь готов покупать.",
+  "rarity": "common",
+  "price": null,
+  "window": "anytime",
+  "hostile": false,
+  "stackable": true,
+  "effect": {
+    "target": {
+      "selector": "self"
+    },
+    "actions": [
+      {
+        "type": "changeResource",
+        "resource": "freeShopRolls",
+        "amount": 1
+      }
+    ]
+  }
+}

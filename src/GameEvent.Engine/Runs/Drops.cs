@@ -112,9 +112,11 @@ internal static class Drops
         var excluded = new GameExcluded(player.PlayerId, run.GameId, ExclusionReason.TechRerolled);
         var after = Rolling.Apply(Apply(state, rerolled), excluded);
 
-        // SPEC: Playing --> Rolling. The new roll is a roll of its own, with its own free rerolls (D-07, D-94).
-        return Rolling.Draw(after, player.PlayerId, context, Rolling.Filters(after, player.PlayerId)) is { } roll
-            ? Decision.Accept(rerolled, excluded, roll)
+        // SPEC: Playing --> Rolling. The new roll is a roll of its own, with its own free rerolls (D-07, D-94) and the
+        // special rolls and roll changes waiting for it (D-405).
+        var (prepared, ready) = RollPreparation.BeforeRoll(after, player.PlayerId, context);
+        return Rolling.Draw(ready, player.PlayerId, context, Rolling.Filters(ready, player.PlayerId)) is { } roll
+            ? Decision.Accept([rerolled, excluded, .. prepared, roll])
             : Decision.Accept(rerolled, excluded);
     }
 
@@ -217,7 +219,7 @@ internal static class Drops
             {
                 var moved = new PlayerMoved(player.PlayerId, player.CellId, path[^1], -sum, [.. path], MoveReason.DropPenalty, runId);
                 yield return moved;
-                foreach (var e in CellStops.After(state, moved))
+                foreach (var e in CellStops.After(state, moved, context))
                 {
                     yield return e;
                 }

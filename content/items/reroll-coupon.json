@@ -1,0 +1,23 @@
+{
+  "id": "reroll-coupon",
+  "kind": "item",
+  "name": "Купон реролла",
+  "description": "Даёт один бесплатный реролл игры.",
+  "rarity": "common",
+  "price": 12,
+  "window": "anytime",
+  "hostile": false,
+  "stackable": true,
+  "effect": {
+    "target": {
+      "selector": "self"
+    },
+    "actions": [
+      {
+        "type": "changeResource",
+        "resource": "freeRerolls",
+        "amount": 1
+      }
+    ]
+  }
+}

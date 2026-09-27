@@ -372,6 +372,9 @@ public partial class PlayerAdminInvariantTests
             "challenges" => features.Challenges,
             "effects" => features.Items || features.Events,
             "graphMap" => features.MapMode == MapMode.Graph,
+            "items" => features.Items,
+            "shop" => features.Shop,
+            "bets" => features.Bets,
             _ => throw new ArgumentOutOfRangeException(nameof(mechanic), mechanic, "Unknown mechanic."),
         };
 
@@ -384,6 +387,20 @@ public partial class PlayerAdminInvariantTests
             // The graph map of stage 2 (D-300…D-308): publications, forks, teleports and cell bonuses
             MapPublished or BranchChoiceRequested or PlayerMoved { Paused: true } or PlayerMoved { Reason: MoveReason.Teleport }
                 or PointsChanged { Reason: PointsReason.CellBonus } => "graphMap",
+
+            // The economy of stage 4 (D-400…): items and their effects, the shop, bets — each under its flag
+            Engine.Content.ContentPublished or Engine.Inventory.ObjectGiven or Engine.Inventory.ObjectRemoved or Engine.Inventory.ObjectTransferred
+                or Engine.Inventory.ObjectChanged or Engine.Inventory.ObjectLost or Engine.Inventory.ItemUsed or Engine.Inventory.EffectTriggered
+                or Engine.Inventory.EffectRolled or Engine.Inventory.HostileIntercepted or Engine.Inventory.HostileReceived or Engine.Inventory.WheelSpun
+                or Engine.Inventory.NextRollModified or Engine.Inventory.RollModifiersApplied or Engine.Inventory.NextDiceModified
+                or Engine.Inventory.InventoryAdjusted or RunDiceModified or RunDiceRerolled
+                or PointsChanged { Reason: PointsReason.Item or PointsReason.DiceModified } or CoinsChanged { Reason: CoinsReason.Item }
+                or ResourceChanged { Reason: ResourceReason.Item } or ManualEffectCreated { Source: ManualEffectSource.Item }
+                or PlayerMoved { Reason: MoveReason.Item or MoveReason.ItemTeleport or MoveReason.DiceModified } => "items",
+            Engine.Economy.ShopRolled or Engine.Economy.LotBought or Engine.Economy.ShopOfferExpired or Engine.Economy.ShopPriceRestarted
+                or CoinsChanged { Reason: CoinsReason.ShopRoll or CoinsReason.Purchase } or ResourceChanged { Reason: ResourceReason.ShopRoll } => "shop",
+            Engine.Economy.BetPlaced or Engine.Economy.BetSettled
+                or CoinsChanged { Reason: CoinsReason.BetStake or CoinsReason.BetPayout or CoinsReason.BetPayoutRevoked } => "bets",
 
             // The effect dispatcher reacts to content (items, events); stage 1 has no content effects in play (D-24, D-103)
             EffectChainCut => "effects",

@@ -295,6 +295,10 @@ namespace GameEvent.Infrastructure.Database.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("ObjectId")
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
                     b.Property<Guid>("PlayerId")
                         .HasColumnType("TEXT");
 
@@ -455,6 +459,9 @@ namespace GameEvent.Infrastructure.Database.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("DiceModsJson")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Difficulty")
                         .HasMaxLength(20)
                         .HasColumnType("TEXT");
@@ -526,6 +533,9 @@ namespace GameEvent.Infrastructure.Database.Migrations
                     b.Property<int>("Coins")
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("EconomyJson")
+                        .HasColumnType("TEXT");
+
                     b.Property<bool?>("FinishApprovalRequired")
                         .HasColumnType("INTEGER");
 
@@ -556,6 +566,9 @@ namespace GameEvent.Infrastructure.Database.Migrations
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("TEXT");
+
+                    b.Property<long?>("NextTimerAt")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("OfferJson")
                         .HasColumnType("TEXT");
@@ -589,6 +602,8 @@ namespace GameEvent.Infrastructure.Database.Migrations
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("NextTimerAt");
 
                     b.HasIndex("SeasonId", "Points");
 

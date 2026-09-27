@@ -79,8 +79,10 @@ internal static class Rolling
                 $"{waiting} runs wait for the admin's check; a new roll opens below {limit}.");
         }
 
-        return Draw(state, command.PlayerId, context, Filters(state, command.PlayerId)) is { } roll
-            ? Decision.Accept(roll)
+        // Special rolls and roll changes of items fire and are fixed for this roll (D-405).
+        var (prepared, after) = RollPreparation.BeforeRoll(state, command.PlayerId, context);
+        return Draw(after, command.PlayerId, context, Filters(after, command.PlayerId)) is { } roll
+            ? Decision.Accept([.. prepared, roll])
             : Decision.Reject(RejectionCodes.NoAvailableGames, "No category has an available game.");
     }
 
@@ -200,7 +202,8 @@ internal static class Rolling
         var misses = new List<RollMiss>();
         var offers = new List<RollOffer>();
         var now = context.Clock.UtcNow;
-        while (offers.Count < state.Rules.Roll.ChoiceCount && remaining.Count > 0)
+        var choiceCount = RollPreparation.ChoiceCount(state, playerId);
+        while (offers.Count < choiceCount && remaining.Count > 0)
         {
             var index = context.Random.NextInt(0, remaining.Count);
             var game = remaining[index];
@@ -253,15 +256,17 @@ internal static class Rolling
     }
 
     /// <summary>
-    /// The live filters of <paramref name="playerId"/>'s roll: the zone of the cell they stand on (D-307). The length limit
-    /// of the last days is not supported yet; effects come with items (stage 4).
+    /// The live filters of <paramref name="playerId"/>'s roll: the changes of items and special rolls fixed for it (D-405),
+    /// then the zone of the cell they stand on (D-307). The length limit of the last days is not supported yet.
     /// </summary>
     internal static IReadOnlyList<RollFilter> Filters(SeasonState state, Guid playerId)
     {
         ArgumentNullException.ThrowIfNull(state);
-        return state.Map.ZoneOf(state.Players[playerId].CellId) is { RollFilter: { } filter } zone
-            ? [new RollFilter(RollFilterPriority.Zone, $"zone:{zone.Id}", game => Matches(filter, game))]
+        var player = state.Players[playerId];
+        IEnumerable<RollFilter> zone = state.Map.ZoneOf(player.CellId) is { RollFilter: { } filter } z
+            ? [new RollFilter(RollFilterPriority.Zone, $"zone:{z.Id}", game => Matches(filter, game))]
             : [];
+        return [.. RollPreparation.Filters(player), .. zone];
     }
 
     /// <summary>

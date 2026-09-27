@@ -14,6 +14,15 @@ public enum MoveReason
 
     /// <summary>A stop on a teleport cell transferred the token (D-303).</summary>
     Teleport,
+
+    /// <summary>A push by an item or an effect (<c>move</c>): cells trigger on its stop and passes (D-409).</summary>
+    Item,
+
+    /// <summary>A transfer by an item or an effect (<c>teleport</c>): its destination does not trigger.</summary>
+    ItemTeleport,
+
+    /// <summary>Items or effects changed a run's throw after it was made (D-408), like a correction: no cell triggers.</summary>
+    DiceModified,
 }
 
 /// <summary>

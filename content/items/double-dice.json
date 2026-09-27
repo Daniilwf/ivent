@@ -1,0 +1,24 @@
+{
+  "id": "double-dice",
+  "kind": "item",
+  "name": "Двойной бросок",
+  "description": "Следующий бросок за прохождение удваивается.",
+  "rarity": "legendary",
+  "price": 50,
+  "window": "beforeDice",
+  "hostile": false,
+  "stackable": false,
+  "effect": {
+    "target": {
+      "selector": "self"
+    },
+    "actions": [
+      {
+        "type": "modifyDice",
+        "when": "next",
+        "stage": "multiply",
+        "value": 2
+      }
+    ]
+  }
+}

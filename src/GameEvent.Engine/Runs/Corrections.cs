@@ -74,7 +74,7 @@ internal static class Corrections
 
         // The count stage only (D-14): missing dice are rolled and appended, extra ones leave from the end.
         var count = CompletionRoll.Count(command.Hours, run.Snapshot);
-        var sides = CompletionRoll.DieFor(run.Difficulty!.Value, run.Snapshot.DieByDifficulty).Sides;
+        var sides = run.Mods?.Sides ?? CompletionRoll.DieFor(run.Difficulty!.Value, run.Snapshot.DieByDifficulty).Sides;
         var added = count > run.Dice.Count ? CompletionRoll.Roll(count - run.Dice.Count, sides, context.Random) : [];
         EquatableArray<Die> removed = [.. run.Dice.Skip(count)];
 
@@ -199,9 +199,10 @@ internal static class Corrections
             : null;
     }
 
-    // Points and position by the difference, from where the player stands now (D-97).
-    // state already holds the correction event, so the run carries its new dice.
-    private static IEnumerable<IGameEvent> Difference(SeasonState state, Guid runId, int delta)
+    // Points and position by the difference, from where the player stands now (D-97); also a change of the throw by an
+    // item after the fact (D-408). state already holds the correction event, so the run carries its new dice.
+    internal static IEnumerable<IGameEvent> Difference(
+        SeasonState state, Guid runId, int delta, PointsReason pointsReason = PointsReason.RunCorrection, MoveReason moveReason = MoveReason.RunCorrection)
     {
         if (delta == 0)
         {
@@ -215,18 +216,18 @@ internal static class Corrections
             yield break;
         }
 
-        yield return new PointsChanged(player.PlayerId, delta, PointsReason.RunCorrection, run.RunId);
+        yield return new PointsChanged(player.PlayerId, delta, pointsReason, run.RunId);
 
         // A finisher's position is fixed; a change of a run up to the finish goes through the surplus (Q-3).
         if (player.Finish is not null)
         {
             if (Finishes.CountsForFinish(player, run))
             {
-                var after = SeasonEngine.Apply(state, new PointsChanged(player.PlayerId, delta, PointsReason.RunCorrection, run.RunId));
+                var after = SeasonEngine.Apply(state, new PointsChanged(player.PlayerId, delta, pointsReason, run.RunId));
                 var events = delta > 0
                     ? [new FinishSurplusChanged(player.PlayerId, delta)]
                     : Finishes.AfterReduction(
-                        after, after.Players[player.PlayerId], run, Finishes.Reduction(player, run, -delta), MoveReason.RunCorrection);
+                        after, after.Players[player.PlayerId], run, Finishes.Reduction(player, run, -delta), moveReason);
                 foreach (var e in events)
                 {
                     yield return e;
@@ -249,7 +250,7 @@ internal static class Corrections
         }
         if (path.Count > 0)
         {
-            yield return new PlayerMoved(player.PlayerId, player.CellId, path[^1], steps, [.. path], MoveReason.RunCorrection, run.RunId);
+            yield return new PlayerMoved(player.PlayerId, player.CellId, path[^1], steps, [.. path], moveReason, run.RunId);
         }
     }
 

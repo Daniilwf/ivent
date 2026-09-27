@@ -1,0 +1,23 @@
+{
+  "id": "shove",
+  "kind": "item",
+  "name": "Толчок",
+  "description": "Столкни выбранного игрока на 2 клетки назад.",
+  "rarity": "common",
+  "price": 15,
+  "window": "anytime",
+  "hostile": true,
+  "stackable": false,
+  "effect": {
+    "target": {
+      "selector": "chosen",
+      "excludeSelf": true
+    },
+    "actions": [
+      {
+        "type": "move",
+        "steps": -2
+      }
+    ]
+  }
+}

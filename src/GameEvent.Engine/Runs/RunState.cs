@@ -87,4 +87,11 @@ public sealed record RunState(
     Proofs.ProofState? Proof = null,
     int Moved = 0,
     bool AfterFinish = false,
-    bool FreeMode = false);
+    bool FreeMode = false,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    RunDiceMods? Mods = null)
+{
+    /// <summary>What items and effects did to the throw (D-408); none for a run without them.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public RunDiceMods DiceMods => Mods ?? RunDiceMods.None;
+}

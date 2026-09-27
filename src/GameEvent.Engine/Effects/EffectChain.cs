@@ -42,11 +42,8 @@ internal static class EffectChain
     public static (IReadOnlyList<IGameEvent> Reactions, SeasonState State) Run(
         SeasonState state, IReadOnlyList<IGameEvent> commandEvents, EngineContext context)
     {
-        var handlers = context.Triggers ?? [];
-        if (handlers.Count == 0)
-        {
-            return ([], state);
-        }
+        // The effects of items and cells (D-412) react first, then any handlers of the context (tests, D-24).
+        IReadOnlyList<ITriggerHandler> handlers = [EffectTriggers.Instance, .. context.Triggers ?? []];
 
         var written = new List<IGameEvent>();
         var total = commandEvents.Count;

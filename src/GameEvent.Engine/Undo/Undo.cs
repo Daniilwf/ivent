@@ -85,9 +85,9 @@ internal static class Undoing
 
         var target = history[index];
         // D-308: a map is taken back by publishing the previous version again
-        if (target.Events.Any(e => e is SeasonCreated or CommandUndone or Map.MapPublished))
+        if (target.Events.Any(e => e is SeasonCreated or CommandUndone or Map.MapPublished or Content.ContentPublished))
         {
-            return Decision.Reject(RejectionCodes.UndoNotUndoable, "The season's creation, map publications and undos are not undone; do the action again instead.");
+            return Decision.Reject(RejectionCodes.UndoNotUndoable, "The season's creation, map and content publications and undos are not undone; do the action again instead.");
         }
 
         var undone = UndoneCommands(history);

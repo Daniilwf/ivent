@@ -65,7 +65,7 @@ public class LaterFinisherTests
         var (runId, _) = Complete(s, "Петя", [2, 2], Difficulty.Extreme);
 
         var created = Assert.Single(s.LastEvents<ManualEffectCreated>());
-        Assert.Equal((petya, EventKind.Good, ManualEffectSource.Difficulty, (Guid?)runId), (created.PlayerId, created.DrawEvent, created.Source, created.RunId));
+        Assert.Equal((petya, (EventKind?)EventKind.Good, ManualEffectSource.Difficulty, (Guid?)runId), (created.PlayerId, created.DrawEvent, created.Source, created.RunId));
     }
 
     [Fact]
@@ -95,7 +95,7 @@ public class LaterFinisherTests
         Assert.Empty(s.LastEvents<PlayerMoved>());
         Assert.Contains(new GameExcluded(petya, game, ExclusionReason.Dropped), s.Last.Events);
         var created = Assert.Single(s.LastEvents<ManualEffectCreated>());
-        Assert.Equal((petya, EventKind.Bad, ManualEffectSource.Drop), (created.PlayerId, created.DrawEvent, created.Source));
+        Assert.Equal((petya, (EventKind?)EventKind.Bad, ManualEffectSource.Drop), (created.PlayerId, created.DrawEvent, created.Source));
         Assert.Equal((14 - 5, LinearMap.FinishId), (s.Player("Петя").Points, s.Player("Петя").CellId));
         Assert.Equal(2, FinishOf(s, "Петя")!.Order);
     }

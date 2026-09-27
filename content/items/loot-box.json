@@ -1,0 +1,22 @@
+{
+  "id": "loot-box",
+  "kind": "item",
+  "name": "Лутбокс",
+  "description": "Открой — внутри случайный предмет.",
+  "rarity": "common",
+  "price": 20,
+  "window": "anytime",
+  "hostile": false,
+  "stackable": true,
+  "effect": {
+    "target": {
+      "selector": "self"
+    },
+    "actions": [
+      {
+        "type": "spinWheel",
+        "wheel": "lootbox"
+      }
+    ]
+  }
+}

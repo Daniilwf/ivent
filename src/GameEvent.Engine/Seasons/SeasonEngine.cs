@@ -1,4 +1,7 @@
+using GameEvent.Engine.Content;
+using GameEvent.Engine.Economy;
 using GameEvent.Engine.Effects;
+using GameEvent.Engine.Inventory;
 using GameEvent.Engine.Finish;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Map;
@@ -63,6 +66,13 @@ public static class SeasonEngine
             ResolveManualEffect c => ManualEffects.Decide(state, c),
             RecalculateFinishBonuses c => Finishing.Decide(state, c),
             Undo.UndoCommand c => Undo.Undoing.Decide(state, c, context),
+            PublishContent c => ContentPublishing.Decide(state, c),
+            UseItem c => ItemUse.Decide(state, c, context),
+            AdjustInventory c => ItemUse.Decide(state, c, context),
+            RollShop c => Shop.Decide(state, c, context),
+            BuyLot c => Shop.Decide(state, c, context),
+            PlaceBet c => Betting.Decide(state, c, context),
+            FireTimers => Timers.Decide(state, context),
             _ => throw new ArgumentException($"Unknown command {command.GetType().Name}.", nameof(command)),
         };
 
@@ -79,12 +89,16 @@ public static class SeasonEngine
             return new CommandResult(decision, state);
         }
 
-        // Effects react after the command's own events, within the chain limits (D-24, D-103).
+        // Bets, the shop price and the lifetimes of objects follow the command's events without limits (D-413); effects
+        // react after them, within the chain limits (D-24, D-103).
         var after = decision.Events.Aggregate(state, Apply);
-        var (reactions, final) = EffectChain.Run(after, decision.Events, context);
-        return reactions.Count == 0
+        var settlements = Settlements.After(after, decision.Events);
+        after = settlements.Aggregate(after, Apply);
+        IReadOnlyList<IGameEvent> own = [.. decision.Events, .. settlements];
+        var (reactions, final) = EffectChain.Run(after, own, context);
+        return reactions.Count == 0 && settlements.Count == 0
             ? new CommandResult(decision, after)
-            : new CommandResult(Decision.Accept([.. decision.Events, .. reactions]), final);
+            : new CommandResult(Decision.Accept([.. own, .. reactions]), final);
     }
 
     // D-305: a player choosing a branch is not moved by other commands, and the run whose steps wait is not corrected or
@@ -160,6 +174,26 @@ public static class SeasonEngine
             MapPublished e => MapPublishing.Apply(state, e),
             EffectChainCut e => EffectChain.Apply(state, e),
             Undo.CommandUndone e => Undo.Undoing.Apply(state, e),
+            ContentPublished e => ContentPublishing.Apply(state, e),
+            ObjectGiven e => Inventories.Apply(state, e),
+            ObjectRemoved e => Inventories.Apply(state, e),
+            ObjectTransferred e => Inventories.Apply(state, e),
+            ObjectChanged e => Inventories.Apply(state, e),
+            HostileReceived e => Inventories.Apply(state, e),
+            NextRollModified e => Inventories.Apply(state, e),
+            RollModifiersApplied e => Inventories.Apply(state, e),
+            NextDiceModified e => Inventories.Apply(state, e),
+            RunDiceModified e => DicePipeline.Apply(state, e),
+            RunDiceRerolled e => DicePipeline.Apply(state, e),
+            ShopRolled e => Shop.Apply(state, e),
+            LotBought e => Shop.Apply(state, e),
+            ShopOfferExpired e => Shop.Apply(state, e),
+            ShopPriceRestarted e => Shop.Apply(state, e),
+            BetPlaced e => Betting.Apply(state, e),
+            BetSettled e => Betting.Apply(state, e),
+
+            // Facts for the log and the feed that change nothing by themselves: their consequences are their own events.
+            ObjectLost or ItemUsed or EffectTriggered or EffectRolled or HostileIntercepted or WheelSpun or InventoryAdjusted => state,
             _ => throw new ArgumentException($"Unknown event {gameEvent.GetType().Name}.", nameof(gameEvent)),
         };
 

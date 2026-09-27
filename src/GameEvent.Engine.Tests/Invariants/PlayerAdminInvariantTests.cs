@@ -1228,7 +1228,7 @@ public partial class PlayerAdminInvariantTests
         Assert.Equal(
             s.EffectiveLog.OfType<ManualEffectCreated>()
                 .Where(e => !resolved.Contains(e.EffectId))
-                .Select(e => new PendingManualEffect(e.EffectId, e.PlayerId, e.DrawEvent, e.Source, e.RunId))
+                .Select(e => new PendingManualEffect(e.EffectId, e.PlayerId, e.DrawEvent, e.Source, e.RunId) { ObjectId = e.ObjectId })
                 .OrderBy(e => e.EffectId),
             s.State.ManualEffects.Values);
 

@@ -33,8 +33,9 @@ public sealed record DeadlineSchedulerSettings
 }
 
 /// <summary>
-/// Closes active seasons at their deadline (D-101). It only reads the projection and sends <see cref="ReachDeadline"/>
-/// through the common queue as the system (no author); the engine decides by its own clock. The command id comes from
+/// Closes active seasons at their deadline (D-101) and fires the economy's timers (D-404). It only reads the projection
+/// and sends <see cref="ReachDeadline"/> and <see cref="Engine.Economy.FireTimers"/> through the common queue as the
+/// system (no author); the engine decides by its own clock. The command id comes from
 /// the season and the deadline, so a repeated tick is a duplicate, and a moved deadline gets a new id.
 /// </summary>
 public sealed partial class DeadlineScheduler(
@@ -69,6 +70,8 @@ public sealed partial class DeadlineScheduler(
                 .Select(s => (s.Id, s.Deadline!.Value))];
         }
 
+        await FireTimersAsync(now, ct);
+
         foreach (var (seasonId, deadline) in due)
         {
             var outcome = await bus.SendAsync(new CommandEnvelope(CommandIdFor(seasonId, deadline), seasonId, new ReachDeadline(), AuthorId: null), ct);
@@ -79,6 +82,37 @@ public sealed partial class DeadlineScheduler(
             else if (!outcome.IsAccepted)
             {
                 LogRefused(logger, seasonId, outcome.Rejection?.Code);
+            }
+        }
+    }
+
+    /// <summary>
+    /// The economy's timers (D-404): every season with a player whose earliest timer (shop lots, effects of hours, bets)
+    /// has come gets <see cref="Engine.Economy.FireTimers"/>; the command id comes from the season and that moment, so a
+    /// repeated tick is a duplicate and a refusal (nothing due by the engine's clock) writes nothing.
+    /// </summary>
+    private async Task FireTimersAsync(DateTimeOffset now, CancellationToken ct)
+    {
+        List<(Guid SeasonId, DateTimeOffset Due)> due;
+        await using (var db = await dbFactory.CreateDbContextAsync(ct))
+        {
+            var running = db.Seasons.AsNoTracking().Where(s => s.Status == SeasonStatus.Active || s.Status == SeasonStatus.Closing).Select(s => s.Id);
+            due = [.. (await db.SeasonPlayers.AsNoTracking()
+                    .Where(p => p.NextTimerAt != null && running.Contains(p.SeasonId))
+                    .Select(p => new { p.SeasonId, p.NextTimerAt })
+                    .ToListAsync(ct))
+                .Where(p => p.NextTimerAt <= now)
+                .GroupBy(p => p.SeasonId)
+                .Select(g => (g.Key, g.Min(p => p.NextTimerAt!.Value)))];
+        }
+
+        foreach (var (seasonId, moment) in due)
+        {
+            var id = CommandIdFor("fire-timers", seasonId, moment);
+            var outcome = await bus.SendAsync(new CommandEnvelope(id, seasonId, new Engine.Economy.FireTimers(), AuthorId: null), ct);
+            if (!outcome.IsAccepted)
+            {
+                LogTimersRefused(logger, seasonId, outcome.Rejection?.Code);
             }
         }
     }
@@ -113,9 +147,11 @@ public sealed partial class DeadlineScheduler(
         }
     }
 
-    internal static Guid CommandIdFor(Guid seasonId, DateTimeOffset deadline)
+    internal static Guid CommandIdFor(Guid seasonId, DateTimeOffset deadline) => CommandIdFor("reach-deadline", seasonId, deadline);
+
+    private static Guid CommandIdFor(string kind, Guid seasonId, DateTimeOffset moment)
     {
-        var hash = SHA256.HashData(Encoding.UTF8.GetBytes($"reach-deadline:{seasonId:N}:{deadline.UtcTicks}"));
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes($"{kind}:{seasonId:N}:{moment.UtcTicks}"));
         return new Guid(hash.AsSpan(0, 16));
     }
 
@@ -124,6 +160,9 @@ public sealed partial class DeadlineScheduler(
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Season {SeasonId} was not closed at the deadline: {Code}")]
     private static partial void LogRefused(ILogger logger, Guid seasonId, string? code);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Timers of season {SeasonId} were not fired: {Code}")]
+    private static partial void LogTimersRefused(ILogger logger, Guid seasonId, string? code);
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Deadline scheduler pass failed")]
     private static partial void LogTickFailed(ILogger logger, Exception exception);

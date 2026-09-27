@@ -1,0 +1,22 @@
+{
+  "id": "pick-of-three",
+  "kind": "item",
+  "name": "Выбор из трёх",
+  "description": "Следующий ролл покажет три игры, выберешь одну.",
+  "rarity": "epic",
+  "price": 25,
+  "window": "beforeRoll",
+  "hostile": false,
+  "stackable": false,
+  "effect": {
+    "target": {
+      "selector": "self"
+    },
+    "actions": [
+      {
+        "type": "modifyNextRoll",
+        "choiceCount": 3
+      }
+    ]
+  }
+}

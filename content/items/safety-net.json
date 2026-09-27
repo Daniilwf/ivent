@@ -1,0 +1,24 @@
+{
+  "id": "safety-net",
+  "kind": "item",
+  "name": "Страховка",
+  "description": "Следующий бросок за прохождение даст не меньше 4.",
+  "rarity": "common",
+  "price": 12,
+  "window": "beforeDice",
+  "hostile": false,
+  "stackable": false,
+  "effect": {
+    "target": {
+      "selector": "self"
+    },
+    "actions": [
+      {
+        "type": "modifyDice",
+        "when": "next",
+        "stage": "min",
+        "value": 4
+      }
+    ]
+  }
+}

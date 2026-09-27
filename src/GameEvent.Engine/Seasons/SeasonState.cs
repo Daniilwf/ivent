@@ -26,8 +26,12 @@ public sealed record SeasonState(
     ImmutableSortedDictionary<Guid, PendingManualEffect> ManualEffects,
     int FinishesSoFar = 0,
     long PointsChanges = 0,
-    EquatableArray<Ranking.LeaderboardRow>? Result = null)
+    EquatableArray<Ranking.LeaderboardRow>? Result = null,
+    GameEvent.Engine.Content.ContentCatalog? Content = null)
 {
+    /// <summary>The season's content (D-400): empty until the admin publishes a pack.</summary>
+    public GameEvent.Engine.Content.ContentCatalog Catalog => Content ?? GameEvent.Engine.Content.ContentCatalog.Empty;
+
     public static SeasonState Empty { get; } =
         new(
             Guid.Empty,
@@ -60,7 +64,8 @@ public sealed record SeasonState(
         && ManualEffects.SequenceEqual(other.ManualEffects)
         && FinishesSoFar == other.FinishesSoFar
         && PointsChanges == other.PointsChanges
-        && Result == other.Result;
+        && Result == other.Result
+        && Catalog == other.Catalog;
 
     public override int GetHashCode() => HashCode.Combine(SeasonId, Players.Count, Runs.Count);
 }
@@ -107,4 +112,11 @@ public sealed record SeasonPlayer(
     int RerollsThisRoll,
     Finish.FinishState? Finish,
     Guid? ActiveRunId,
-    long PointsTick = 0);
+    long PointsTick = 0,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    Inventory.PlayerEconomy? Economy = null)
+{
+    /// <summary>The player's economy (D-401), empty when they have none.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public Inventory.PlayerEconomy Wallet => Economy ?? Inventory.PlayerEconomy.Empty;
+}

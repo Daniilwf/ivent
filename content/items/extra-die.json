@@ -1,0 +1,24 @@
+{
+  "id": "extra-die",
+  "kind": "item",
+  "name": "Лишний кубик",
+  "description": "В следующем броске за прохождение на один кубик больше.",
+  "rarity": "epic",
+  "price": 25,
+  "window": "beforeDice",
+  "hostile": false,
+  "stackable": false,
+  "effect": {
+    "target": {
+      "selector": "self"
+    },
+    "actions": [
+      {
+        "type": "modifyDice",
+        "when": "next",
+        "stage": "count",
+        "value": 1
+      }
+    ]
+  }
+}

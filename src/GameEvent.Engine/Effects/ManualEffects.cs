@@ -14,13 +14,27 @@ public enum ManualEffectSource
 
     /// <summary>The event a difficulty grants on completion (<c>dieByDifficulty.*.grantEvent</c>: «выше сложной» — good).</summary>
     Difficulty,
+
+    /// <summary>
+    /// An item or an effect (D-410): its text without automation (<c>manual: true</c>, <see cref="PendingManualEffect.ObjectId"/>),
+    /// or its <c>drawEvent</c> while <c>features.events</c> is off (D-10).
+    /// </summary>
+    Item,
 }
 
 /// <summary>
 /// A text effect waiting to be resolved by the player or the admin (GLOSSARY «Ручной эффект»). Stage 1 knows one kind:
 /// «Разыграй плохой/хороший ивент» (D-10, the <c>drawEvent</c> action with events off). Resolution comes with C11.
 /// </summary>
-public sealed record PendingManualEffect(Guid EffectId, Guid PlayerId, EventKind DrawEvent, ManualEffectSource Source, Guid? RunId);
+/// <remarks>
+/// <see cref="ObjectId"/> — the object whose text waits for resolution (D-410); then <see cref="DrawEvent"/> is null:
+/// the text is the object's description, not «draw an event».
+/// </remarks>
+public sealed record PendingManualEffect(Guid EffectId, Guid PlayerId, EventKind? DrawEvent, ManualEffectSource Source, Guid? RunId)
+{
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? ObjectId { get; init; }
+}
 
 /// <summary>How a manual effect was resolved (GLOSSARY «Ручной эффект»: применено / не применимо + комментарий).</summary>
 public enum ManualEffectOutcome
@@ -44,8 +58,17 @@ public sealed record ResolveManualEffect(Guid EffectId, ManualEffectOutcome Outc
 [EventType("manual-effect-resolved")]
 public sealed record ManualEffectResolved(Guid EffectId, Guid PlayerId, Guid? RunId, ManualEffectOutcome Outcome, string Comment) : IGameEvent;
 
+/// <summary>
+/// A manual effect waits for resolution: «draw a good/bad event» (<see cref="DrawEvent"/>), or the text of object
+/// <see cref="ObjectId"/> (D-410, then <see cref="DrawEvent"/> is null). <see cref="ObjectId"/> is written only when set, so
+/// the effects of stage 1 read and write as before.
+/// </summary>
 [EventType("manual-effect-created")]
-public sealed record ManualEffectCreated(Guid EffectId, Guid PlayerId, EventKind DrawEvent, ManualEffectSource Source, Guid? RunId) : IGameEvent;
+public sealed record ManualEffectCreated(Guid EffectId, Guid PlayerId, EventKind? DrawEvent, ManualEffectSource Source, Guid? RunId) : IGameEvent
+{
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? ObjectId { get; init; }
+}
 
 internal static class ManualEffects
 {
@@ -97,6 +120,7 @@ internal static class ManualEffects
     public static Seasons.SeasonState Apply(Seasons.SeasonState state, ManualEffectCreated e) =>
         state with
         {
-            ManualEffects = state.ManualEffects.Add(e.EffectId, new PendingManualEffect(e.EffectId, e.PlayerId, e.DrawEvent, e.Source, e.RunId)),
+            ManualEffects = state.ManualEffects.Add(
+                e.EffectId, new PendingManualEffect(e.EffectId, e.PlayerId, e.DrawEvent, e.Source, e.RunId) { ObjectId = e.ObjectId }),
         };
 }

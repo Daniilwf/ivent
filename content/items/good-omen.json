@@ -1,0 +1,22 @@
+{
+  "id": "good-omen",
+  "kind": "item",
+  "name": "Добрый знак",
+  "description": "Разыграй хороший ивент.",
+  "rarity": "common",
+  "price": 10,
+  "window": "anytime",
+  "hostile": false,
+  "stackable": true,
+  "effect": {
+    "target": {
+      "selector": "self"
+    },
+    "actions": [
+      {
+        "type": "drawEvent",
+        "deck": "good"
+      }
+    ]
+  }
+}

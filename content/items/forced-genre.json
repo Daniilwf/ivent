@@ -1,0 +1,23 @@
+{
+  "id": "forced-genre",
+  "kind": "specialRoll",
+  "name": "Навязанный жанр",
+  "description": "Следующая игра будет из выбранного жанра.",
+  "rarity": "common",
+  "price": null,
+  "hostile": true,
+  "effect": {
+    "trigger": "beforeRoll",
+    "duration": {
+      "uses": 1
+    },
+    "actions": [
+      {
+        "type": "modifyNextRoll",
+        "filter": {
+          "tags": ["$tag"]
+        }
+      }
+    ]
+  }
+}

@@ -20,7 +20,7 @@ namespace GameEvent.Engine.Tests.Kernel;
 /// The stored log format is frozen: renaming a property or an enum value must fail here, not silently
 /// change the log. A new format means a new version plus an upcaster, and a new golden sample.
 /// </summary>
-public class EventFormatTests
+public partial class EventFormatTests
 {
     private static readonly Guid s_player = SequentialIds.Make(0x10000000, 1);
     private static readonly Guid s_other = SequentialIds.Make(0x10000000, 2);
@@ -66,7 +66,9 @@ public class EventFormatTests
             [s_game],
             new Engine.Undo.SeasonFields(SeasonStatus.Active, s_at, "Тестовый сезон", null));
 
-    public static TheoryData<string, IGameEvent, int, string> Samples() => new()
+    public static TheoryData<string, IGameEvent, int, string> Samples() => WithEconomy(CoreSamples());
+
+    private static TheoryData<string, IGameEvent, int, string> CoreSamples() => new()
     {
         {
             "season-created",

@@ -381,7 +381,7 @@ public class DifficultyChangeTests
             new ManualEffectResolved(good, s.PlayerId("Вася"), runId, ManualEffectOutcome.NotApplicable, Comment),
             Assert.Single(s.LastEvents<ManualEffectResolved>()));
         var created = Assert.Single(s.LastEvents<ManualEffectCreated>());
-        Assert.Equal((EventKind.Bad, ManualEffectSource.Difficulty, (Guid?)runId), (created.DrawEvent, created.Source, created.RunId));
+        Assert.Equal(((EventKind?)EventKind.Bad, ManualEffectSource.Difficulty, (Guid?)runId), (created.DrawEvent, created.Source, created.RunId));
         Assert.Equal(created.EffectId, Assert.Single(s.State.ManualEffects.Keys));
     }
 

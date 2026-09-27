@@ -1,0 +1,24 @@
+{
+  "id": "reroll-dice",
+  "kind": "item",
+  "name": "Переброс",
+  "description": "Перебрось кубы за прохождение, результат нового броска окончательный.",
+  "rarity": "epic",
+  "price": 30,
+  "window": "afterDice",
+  "hostile": false,
+  "stackable": false,
+  "effect": {
+    "target": {
+      "selector": "self"
+    },
+    "actions": [
+      {
+        "type": "modifyDice",
+        "when": "current",
+        "stage": "reroll",
+        "value": 1
+      }
+    ]
+  }
+}

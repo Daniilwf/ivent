@@ -7,8 +7,8 @@ namespace GameEvent.Engine.Runs;
 public static class RunTotal
 {
     /// <summary>The dice, the challenge dice and the zone's addition of <paramref name="snapshot"/>, never below 0.</summary>
-    public static int Of(EquatableArray<Die> dice, EquatableArray<Die> challengeDice, RunSnapshot snapshot) =>
-        CompletionRoll.Total(dice, challengeDice, snapshot);
+    public static int Of(EquatableArray<Die> dice, EquatableArray<Die> challengeDice, RunSnapshot snapshot, RunDiceMods? mods = null) =>
+        CompletionRoll.Total(dice, challengeDice, snapshot, mods);
 }
 
 /// <summary>
@@ -39,10 +39,11 @@ internal static class CompletionRoll
     /// What a completed run gives in points and steps: its dice, its challenge dice and the zone's addition, never
     /// below 0 (D-307). Every correction and reject takes back by this total.
     /// </summary>
-    public static int Total(RunState run) => Total(run.Dice, run.ChallengeDice, run.Snapshot);
+    public static int Total(RunState run) => Total(run.Dice, run.ChallengeDice, run.Snapshot, run.Mods);
 
-    public static int Total(EquatableArray<Die> dice, EquatableArray<Die> challengeDice, RunSnapshot snapshot) =>
-        Math.Max(0, dice.Sum(d => d.Value) + challengeDice.Sum(d => d.Value) + (snapshot.Zone?.AddedToSum ?? 0));
+    /// <summary>The total through the pipeline (D-14, D-408); without mods — the dice and the zone's addition, never below 0.</summary>
+    public static int Total(EquatableArray<Die> dice, EquatableArray<Die> challengeDice, RunSnapshot snapshot, RunDiceMods? mods = null) =>
+        (mods ?? RunDiceMods.None).Total(dice.Sum(d => d.Value) + challengeDice.Sum(d => d.Value), snapshot.Zone?.AddedToSum ?? 0);
 
     public static DieRule DieFor(Difficulty difficulty, DieByDifficulty dice) =>
         difficulty switch

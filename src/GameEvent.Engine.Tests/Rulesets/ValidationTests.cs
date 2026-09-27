@@ -217,10 +217,9 @@ public class ValidationTests
     public static TheoryData<string, Func<Ruleset, Ruleset>, string> NotImplementedYet() => new()
     {
         { "two active runs", r => r with { Season = r.Season with { MaxActiveRunsPerPlayer = 2 } }, "season.maxActiveRunsPerPlayer" },
-        { "shop", Flags(f => f with { Shop = true }), "features.shop" },
-        { "items", Flags(f => f with { Items = true }), "features.items" },
+        // Items, the shop and bets are played since stage 4 (D-415); the shop sells items and needs them
+        { "shop without items", Flags(f => f with { Shop = true }), "features.shop" },
         { "events", Flags(f => f with { Events = true }), "features.events" },
-        { "bets", Flags(f => f with { Bets = true }), "features.bets" },
         { "polls", Flags(f => f with { Polls = true }), "features.polls" },
         { "achievements", Flags(f => f with { Achievements = true }), "features.achievements" },
         { "weekly challenge", Flags(f => f with { WeeklyChallenge = true }), "features.weeklyChallenge" },

@@ -78,13 +78,18 @@ internal static class RunLifecycle
         var now = context.Clock.UtcNow;
         var count = CompletionRoll.Count(hours.Value, run.Snapshot);
         var die = CompletionRoll.DieFor(command.Difficulty, run.Snapshot.DieByDifficulty);
-        var dice = CompletionRoll.Roll(count, die.Sides, context.Random);
-        var challengeDice = command.ChallengeDone
-            ? CompletionRoll.Roll(run.Snapshot.ChallengeExtraDice, die.Sides, context.Random)
-            : [];
-        var sum = CompletionRoll.Total(dice, challengeDice, run.Snapshot);
 
-        var events = new List<IGameEvent>
+        // Items and effects change the throw (D-408): what waits for it, then the beforeDice effects firing now.
+        var pending = player.Wallet.NextDice.Count;
+        var (fired, afterFiring, changes) = DicePipeline.BeforeDice(state, player.PlayerId, run.RunId, context);
+        state = afterFiring;
+        player = state.Players[player.PlayerId];
+        var thrown = DicePipeline.Throw(count, die, command.ChallengeDone ? run.Snapshot.ChallengeExtraDice : 0, changes, context.Random);
+        var dice = thrown.Dice;
+        var challengeDice = thrown.ChallengeDice;
+        var sum = CompletionRoll.Total(dice, challengeDice, run.Snapshot, thrown.Mods);
+
+        var events = new List<IGameEvent>(fired)
         {
             // Whether the run comes after the finish or in the first's free mode is stored, not recomputed on replay (D-99).
             new RunCompleted(
@@ -99,6 +104,10 @@ internal static class RunLifecycle
                 FreeMode: player.Finish is not null && FinishLine.First(state) == player.PlayerId),
             new CompletionRolled(run.RunId, player.PlayerId, dice, challengeDice),
         };
+        if (thrown.Mods is { } mods)
+        {
+            events.Add(new RunDiceModified(run.RunId, player.PlayerId, mods, thrown.Rolled, SpentNext: Targets.IsFirst(state, player.PlayerId) ? 0 : pending));
+        }
 
         // The frozen first plays in free mode: dice only (the freeze amendment, Q-3).
         if (Finishes.IsFrozen(player))
@@ -167,11 +176,17 @@ internal static class RunLifecycle
         if (moved is not null && !walk.Paused)
         {
             var finished = Finishes.AfterCompletionMove(state, player, run, moved, context.Clock.UtcNow).ToList();
-            events.AddRange(finished.Count > 0 ? finished : CellStops.After(state, moved));
+            events.AddRange(finished.Count > 0 ? finished : CellStops.After(state, moved, context));
         }
 
         if (walk.Paused)
         {
+            // The shop cells passed on the way to the fork grant their coupon (D-403)
+            if (moved is not null)
+            {
+                events.AddRange(CellStops.After(state, moved, context));
+            }
+
             var fork = moved?.To ?? player.CellId;
             events.Add(new BranchChoiceRequested(
                 player.PlayerId, context.Ids.NewId(), fork, [.. state.Map.Exits(fork).Select(e => e.To)], walk.Remaining,
@@ -241,7 +256,10 @@ internal static class RunLifecycle
         var run = new RunState(
             e.RunId, e.PlayerId, e.GameId, RunStatus.Playing, e.Snapshot, e.RolledAt, e.StartedAt, Difficulty: null, Hours: null, Dice: []);
         var player = state.Players[e.PlayerId] with { Phase = TurnPhase.Playing, Offer = null, RerollsThisRoll = 0, ActiveRunId = e.RunId };
-        return state with { Runs = state.Runs.Add(e.RunId, run), Players = state.Players.SetItem(e.PlayerId, player) };
+        state = state with { Runs = state.Runs.Add(e.RunId, run), Players = state.Players.SetItem(e.PlayerId, player) };
+
+        // The changes of the roll hold until the game starts (D-405).
+        return player.Wallet.CurrentRoll.Count > 0 ? Inventory.Inventories.Update(state, e.PlayerId, w => w with { CurrentRoll = [] }) : state;
     }
 
     public static SeasonState Apply(SeasonState state, RunCompleted e)

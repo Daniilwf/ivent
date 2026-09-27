@@ -1,0 +1,22 @@
+{
+  "id": "sneakers",
+  "kind": "item",
+  "name": "Кроссовки",
+  "description": "Иди вперёд на 1d4 клеток.",
+  "rarity": "common",
+  "price": 15,
+  "window": "anytime",
+  "hostile": false,
+  "stackable": true,
+  "effect": {
+    "target": {
+      "selector": "self"
+    },
+    "actions": [
+      {
+        "type": "move",
+        "steps": "1d4"
+      }
+    ]
+  }
+}

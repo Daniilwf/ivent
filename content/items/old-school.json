@@ -1,0 +1,24 @@
+{
+  "id": "old-school",
+  "kind": "item",
+  "name": "Олдскульный ролл",
+  "description": "Следующий ролл — только игры, вышедшие до 2005 года.",
+  "rarity": "common",
+  "price": 15,
+  "window": "beforeRoll",
+  "hostile": false,
+  "stackable": false,
+  "effect": {
+    "target": {
+      "selector": "self"
+    },
+    "actions": [
+      {
+        "type": "modifyNextRoll",
+        "filter": {
+          "releaseYearBefore": 2005
+        }
+      }
+    ]
+  }
+}

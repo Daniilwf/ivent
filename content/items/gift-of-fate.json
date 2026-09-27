@@ -1,0 +1,12 @@
+{
+  "id": "gift-of-fate",
+  "kind": "item",
+  "name": "Подарок судьбы",
+  "description": "Попроси админа выдать тебе любой обычный предмет.",
+  "rarity": "epic",
+  "price": null,
+  "window": "anytime",
+  "hostile": false,
+  "stackable": false,
+  "manual": true
+}

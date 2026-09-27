@@ -106,6 +106,7 @@ public sealed class GameEventDbContext(DbContextOptions<GameEventDbContext> opti
             e.HasOne<SeasonRecord>().WithMany().HasForeignKey(x => x.SeasonId);
             e.HasIndex(x => new { x.SeasonId, x.Points });
             e.HasIndex(x => new { x.SeasonId, x.UserId }).IsUnique();
+            e.HasIndex(x => x.NextTimerAt);
             e.Property(x => x.Phase).HasMaxLength(20);
         });
 
@@ -126,6 +127,7 @@ public sealed class GameEventDbContext(DbContextOptions<GameEventDbContext> opti
             e.HasIndex(x => new { x.SeasonId, x.PlayerId });
             e.Property(x => x.DrawEvent).HasMaxLength(20);
             e.Property(x => x.Source).HasMaxLength(30);
+            e.Property(x => x.ObjectId).HasMaxLength(50);
         });
 
         modelBuilder.Entity<SeasonResultRecord>(e =>

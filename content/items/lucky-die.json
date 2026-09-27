@@ -1,0 +1,24 @@
+{
+  "id": "lucky-die",
+  "kind": "item",
+  "name": "Счастливый кубик",
+  "description": "Добавь 1d6 к следующему броску за прохождение.",
+  "rarity": "common",
+  "price": 15,
+  "window": "beforeDice",
+  "hostile": false,
+  "stackable": false,
+  "effect": {
+    "target": {
+      "selector": "self"
+    },
+    "actions": [
+      {
+        "type": "modifyDice",
+        "when": "next",
+        "stage": "add",
+        "value": "1d6"
+      }
+    ]
+  }
+}

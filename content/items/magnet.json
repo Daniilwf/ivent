@@ -1,0 +1,27 @@
+{
+  "id": "magnet",
+  "kind": "item",
+  "name": "Магнит",
+  "description": "Забери у выбранного игрока случайный предмет.",
+  "rarity": "epic",
+  "price": 35,
+  "window": "anytime",
+  "hostile": true,
+  "stackable": false,
+  "effect": {
+    "target": {
+      "selector": "chosen",
+      "excludeSelf": true
+    },
+    "actions": [
+      {
+        "type": "takeObject",
+        "mode": "steal",
+        "filter": {
+          "kind": "item"
+        },
+        "pick": "random"
+      }
+    ]
+  }
+}
