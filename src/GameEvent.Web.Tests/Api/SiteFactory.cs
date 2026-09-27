@@ -184,6 +184,9 @@ internal sealed class SiteFactory : WebApplicationFactory<Program>
 
         builder.UseSetting("Files:Path", FilesPath);
 
+        // Several hosts over one database in one process (WithWebHostBuilder): no default site lock (D-214)
+        builder.UseSetting("Site:Lock", "false");
+
         // Tests never reach the outside: the pool's services are replaced by the tests that need them (D-118)
         builder.UseSetting("Metadata:SteamEnabled", "false");
         builder.UseSetting("Metadata:IgdbClientId", "");

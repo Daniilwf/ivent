@@ -51,7 +51,7 @@ public static class AppSetup
         var services = builder.Services;
 
         // First of the hosted services: the site's lock is held before the queue handles anything (D-127)
-        if (builder.Configuration["Site:LockFile"] is { Length: > 0 } && builder.Configuration["Site:OneOff"] != "true")
+        if (builder.Configuration["Site:OneOff"] != "true" && SitePaths.LockFile(builder.Configuration, builder.Environment.ContentRootPath) is not null)
         {
             services.AddHostedService<SiteLockService>();
         }
