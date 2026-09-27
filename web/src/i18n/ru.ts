@@ -1539,7 +1539,6 @@ export const ru = {
       restored: (title: string) => `Снова в пуле: ${title}`,
     },
     rules: {
-      version: (n: number) => `Версия ${n}`,
       editor: 'Конфиг правил (JSON)',
       editorHint: 'Меняй числа и флаги; поля проверяются по схеме',
       save: 'Сохранить правила',
@@ -1579,11 +1578,6 @@ export const ru = {
       recalcLead:
         'После правки таблицы бонусов финишировавшие остаются на своей. Пересчёт переводит их на текущую.',
       recalculated: 'Бонусы за финиш пересчитаны.',
-      history: 'История правок',
-      historyEntry: (version: number, time: string) => `Версия ${version}, ${time}`,
-      created: 'Правила при создании сезона',
-      change: (path: string, before: string | null, after: string | null) =>
-        `${path}: было ${before ?? 'нет'}, стало ${after ?? 'нет'}`,
     },
     season: {
       statuses: {

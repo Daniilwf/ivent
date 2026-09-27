@@ -1,10 +1,10 @@
 import { useCallback, useMemo, useState } from 'react';
 import { api, rejectionCode, type Schemas } from '../api/client';
-import { moscowTime } from '../app/time';
 import { ru } from '../i18n/ru';
 import { Button } from '../ui/Button';
 import { ConfirmDanger } from '../ui/Dialogs';
 import { TextArea } from '../ui/Field';
+import { RulesHistory } from '../rules/RulesScreen';
 import { Notice } from '../ui/States';
 import { Panel } from '../ui/Surface';
 import { newCommandId, refusal } from './actions';
@@ -161,7 +161,7 @@ function RulesEditor({
       ) : null}
       <Panel>
         <p className="font-bold" data-testid="rules-version">
-          {t.version(rules.version)}
+          {ru.rules.history.version(rules.version)}
         </p>
         {schemaFailed ? <Notice tone="info">{t.schemaFailed}</Notice> : null}
         <TextArea
@@ -229,7 +229,10 @@ function RulesEditor({
         </div>
       </Panel>
       <Recalculate seasonId={seasonId} highlighted={bonusesKept} />
-      <History rules={rules} />
+      {/* The history as the players read it: field names, «было/стало» in words, the author */}
+      <Panel title={ru.rules.sections.history}>
+        <RulesHistory history={rules.history} />
+      </Panel>
     </div>
   );
 }
@@ -285,30 +288,6 @@ function Recalculate({ seasonId, highlighted }: { seasonId: string; highlighted:
           onConfirm={() => void recalculate()}
         />
       </div>
-    </Panel>
-  );
-}
-
-function History({ rules }: { rules: Rules }) {
-  const versions = [...rules.history].sort((a, b) => b.version - a.version);
-  return (
-    <Panel title={t.history} data-testid="rules-history">
-      <ol className="grid gap-3">
-        {versions.map((v) => (
-          <li key={v.version} className="grid gap-1">
-            <p className="font-bold">{t.historyEntry(v.version, moscowTime(v.at))}</p>
-            {v.changes.length === 0 ? (
-              <p className="text-sm text-ink-soft">{t.created}</p>
-            ) : (
-              <ul className="grid gap-1 text-sm break-all">
-                {v.changes.map((c) => (
-                  <li key={c.path}>{t.change(c.path, c.before, c.after)}</li>
-                ))}
-              </ul>
-            )}
-          </li>
-        ))}
-      </ol>
     </Panel>
   );
 }

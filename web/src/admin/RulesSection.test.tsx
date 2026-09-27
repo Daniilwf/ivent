@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { ru } from '../i18n/ru';
 import { answer, fakeServer, seasonId } from './fakeServer';
 import { RulesSection } from './RulesSection';
+import { fieldName, valueText } from '../rules/rulesText';
 
 // H8: the rules as JSON (SPEC «Конфиг правил сезона»; C2, C3, D-113, D-181): checked by the schema while typing;
 // saved with the version it was edited from; the server's warnings shown after the save (finish.bonusesKept →
@@ -71,7 +72,7 @@ describe('The rules editor', () => {
 
     const editor = await screen.findByTestId('rules-editor');
     expect(JSON.parse((editor as HTMLTextAreaElement).value)).toEqual(ruleset);
-    expect(screen.getByTestId('rules-version')).toHaveTextContent(t.version(1));
+    expect(screen.getByTestId('rules-version')).toHaveTextContent(ru.rules.history.version(1));
     expect(screen.getByTestId('rules-save')).toBeDisabled();
   });
 
@@ -130,10 +131,14 @@ describe('The rules editor', () => {
     const outcome = await screen.findByTestId('rules-outcome');
     expect(outcome).toHaveTextContent(t.saved(2));
     expect(outcome).toHaveTextContent('Уже выданные бонусы за финиш не изменятся.');
-    expect(await screen.findByTestId('rules-version')).toHaveTextContent(t.version(2));
-    expect(screen.getByTestId('rules-history')).toHaveTextContent(
-      t.change('season.maxUncheckedRuns', '2', '3'),
+    expect(await screen.findByTestId('rules-version')).toHaveTextContent(
+      ru.rules.history.version(2),
     );
+    // The history reads as on the rules page: the field's name and «было/стало» in words
+    const history = screen.getByTestId('rules-history');
+    expect(history).toHaveTextContent(fieldName('season.maxUncheckedRuns'));
+    expect(history).toHaveTextContent(`${ru.rules.history.was}: ${valueText('2')}`);
+    expect(history).toHaveTextContent(`${ru.rules.history.now}: ${valueText('3')}`);
   });
 
   it('lists the server’s problems with their paths', async () => {
@@ -235,7 +240,7 @@ describe('The rules editor', () => {
     const entries = within(history)
       .getAllByRole('listitem')
       .filter((li) => li.parentElement?.tagName === 'OL');
-    expect(entries[0]).toHaveTextContent(t.version(2));
-    expect(entries[1]).toHaveTextContent(t.created);
+    expect(entries[0]).toHaveTextContent(ru.rules.history.version(2));
+    expect(entries[1]).toHaveTextContent(ru.rules.history.created);
   });
 });
