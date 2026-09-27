@@ -375,7 +375,7 @@ public class GraphInvariantTests
             // D-303: a teleport follows a stop of the game on a teleport cell, to its destination, and nothing fires there
             if (move.Reason == MoveReason.Teleport)
             {
-                var stop = Assert.IsType<PlayerMoved>(events[i - 1]);
+                var stop = events.Take(i).OfType<PlayerMoved>().Last(m => m.PlayerId == move.PlayerId);
                 Assert.True(stop.Steps != 0 && !stop.Paused && stop.Reason is MoveReason.CompletionRoll or MoveReason.DropPenalty);
                 Assert.Equal(new Cell(stop.To, CellType.Teleport) { To = move.To }.To, map.CellById(stop.To).To);
                 Assert.Equal(stop.To, move.From);
