@@ -32,19 +32,33 @@ public static class Operations
 
     /// <summary>
     /// The one-off commands run next to the site's data: they take the site's lock first when the site keeps one
-    /// (<c>Site:LockFile</c>), so they refuse while the site runs — and the site does not start while they do.
+    /// (<see cref="SitePaths.LockFile"/>), so they refuse while the site runs — and the site does not start while they do.
     /// </summary>
     public static SiteLock? LockForOneOff(IConfiguration configuration, string contentRoot)
     {
         ArgumentNullException.ThrowIfNull(configuration);
-        if (configuration["Site:LockFile"] is not { Length: > 0 } file)
+        if (SitePaths.LockFile(configuration, contentRoot) is not { } file)
         {
             return null;
         }
 
-        return SiteLock.TryAcquire(Path.Combine(contentRoot, file))
+        return SiteLock.TryAcquire(file)
             ?? throw new InvalidOperationException("The site is running: stop it first (docker compose stop site), the command has its own queue.");
     }
+
+    public const string Usage =
+        "Usage: [options] | migrate | create-admin <login> <name> | seed-dev | seed-demo | healthcheck | backup | backup-verify … | restore …";
+
+    private static readonly HashSet<string> s_commands =
+        ["migrate", "create-admin", "seed-dev", "seed-demo", "healthcheck", "backup", "backup-verify", "restore"];
+
+    /// <summary>
+    /// The first argument is a command the image knows, or no command at all (none, an option <c>--urls …</c> or a
+    /// <c>key=value</c> setting): the site. Anything else is refused, so a mistyped command — or one an older image does
+    /// not have yet — never starts a second site on the same data (D-214).
+    /// </summary>
+    public static bool IsKnownCommand(string? first) =>
+        first is null || s_commands.Contains(first) || first.StartsWith('-') || first.Contains('=', StringComparison.Ordinal);
 
     /// <summary>The container's health check: 0 when the site answers /health with 200, 1 otherwise.</summary>
     public static async Task<int> HealthCheckAsync(string url)

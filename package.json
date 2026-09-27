@@ -33,7 +33,7 @@
     "season:export": "dotnet run --project src/GameEvent.Tools.Import -- season-export",
     "season:import": "dotnet run --project src/GameEvent.Tools.Import -- season-import",
     "season:check": "dotnet run --project src/GameEvent.Tools.Import -- season-check",
-    "backup:verify": "node scripts/todo.mjs backup:verify J3",
+    "backup:verify": "dotnet run --project src/GameEvent.Tools.Import -- backup-verify",
     "deploy:staging": "node scripts/todo.mjs deploy:staging J2",
     "deploy:prod": "node scripts/todo.mjs deploy:prod J2"
   },

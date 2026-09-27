@@ -90,6 +90,36 @@ services:
       ASPNETCORE_ENVIRONMENT: Staging
       AllowedHosts: ${STAGING_DOMAIN:-staging.localhost};localhost
 
+  # One-off backup commands (J3, D-210, D-214): `backup`, `backup-verify`, `restore`. The only containers that mount the
+  # backups — the long-running site cannot touch an archive. Never started by `up` (profile tools); deploy/backup.sh runs
+  # them with `run --rm`. The data is mounted writable: SQLite's online backup opens the WAL database, a restore replaces it
+  backup:
+    <<: *site
+    image: ivent:${SITE_VERSION:-local}
+    profiles: [tools]
+    command: ['backup']
+    restart: 'no'
+    mem_limit: 512m
+    volumes: [site-data:/data, site-backups:/backups]
+    environment:
+      <<: *site-environment
+      AllowedHosts: ${SITE_DOMAIN:-localhost};localhost
+      Backup__Keep: ${BACKUP_KEEP:-14}
+
+  staging-backup:
+    <<: *site
+    image: ivent:${STAGING_VERSION:-local}
+    profiles: [tools]
+    command: ['backup']
+    restart: 'no'
+    mem_limit: 256m
+    volumes: [staging-data:/data, staging-backups:/backups]
+    environment:
+      <<: *site-environment
+      ASPNETCORE_ENVIRONMENT: Staging
+      AllowedHosts: ${STAGING_DOMAIN:-staging.localhost};localhost
+      Backup__Keep: ${BACKUP_KEEP:-14}
+
   caddy:
     image: caddy:2@sha256:0c994536bddb66445885237f1a5dcc1916bccea922661c76b4e9fc24061f9b52
     restart: unless-stopped
@@ -116,6 +146,8 @@ networks:
 
 volumes:
   site-data:
+  site-backups:
   staging-data:
+  staging-backups:
   caddy-data:
   caddy-config:

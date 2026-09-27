@@ -35,19 +35,25 @@ COPY --from=build /app ./
 COPY --from=web /src/web/dist ./frontend
 
 # Production unless the compose file says Staging: test endpoints and local cookies never switch on by accident (D-120)
-ENV ASPNETCORE_ENVIRONMENT=Production \
-    ASPNETCORE_URLS=http://+:8080 \
-    Frontend__DistPath=/app/frontend \
-    ConnectionStrings__Main="Data Source=/data/game-event.db" \
-    Files__Path=/data/files \
-    Logging__File__Path=/data/logs/game-event-.log \
-    DataProtection__KeysPath=/data/keys \
-    Site__LockFile=/data/site.lock
+ENV ASPNETCORE_ENVIRONMENT=Production
+ENV ASPNETCORE_URLS=http://+:8080
+ENV Frontend__DistPath=/app/frontend
+ENV ConnectionStrings__Main="Data Source=/data/game-event.db"
+ENV Files__Path=/data/files
+ENV Logging__File__Path=/data/logs/game-event-.log
+ENV DataProtection__KeysPath=/data/keys
+ENV Site__LockFile=/data/site.lock
+ENV Backup__Path=/backups
+
+# deploy/backup.sh runs only an image that knows the backup commands: an older one would start a second site (D-214)
+LABEL ivent.backup="1"
 
 # Everything the site keeps lives in /data: the database, its maintenance flag, uploaded files, logs and the keys that
-# sign sessions (a new container keeps everyone signed in)
-RUN mkdir -p /data && chown app:app /data
+# sign sessions (a new container keeps everyone signed in). Backups go to a volume of their own (J3, D-210): a restore
+# replaces /data, never the archives it restores from
+RUN mkdir -p /data /backups && chown app:app /data /backups
 USER app
+# /backups is not declared a volume: every one-off container (migrate) would get an anonymous one; compose mounts it
 VOLUME /data
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 CMD ["dotnet", "GameEvent.Web.dll", "healthcheck"]
