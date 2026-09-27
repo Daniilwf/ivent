@@ -20,13 +20,13 @@ export function seasonPicture(
   if (!season) return { board, players: [], rows: [], cellNumber };
 
   const rowOf = new Map(season.leaderboard.map((r) => [r.playerId, r]));
-  // A player's token colour follows their place in the season's list, which does not change as the game goes
-  const players: Player[] = season.players.map((p, i) => {
+  // A player's token colour comes from the server, the same in every view of the season (D-202)
+  const players: Player[] = season.players.map((p) => {
     const row = rowOf.get(p.id);
     return {
       id: p.id,
       name: p.name,
-      token: i,
+      token: p.token,
       avatar: p.avatar?.thumbnailUrl,
       // A cell the chain does not know (it should not happen) draws no token rather than a wrong one at the start
       cell: cellNumber.get(p.cellId) ?? 0,

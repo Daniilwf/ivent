@@ -2,20 +2,11 @@ import { useRef, useState, type SyntheticEvent } from 'react';
 import type { Schemas } from '../api/client';
 import { moscowTime } from '../app/time';
 import { ru } from '../i18n/ru';
+import { techRerollReasons, type TechRerollReason } from './techRerollReasons';
 import { Button } from '../ui/Button';
 import { ConfirmDanger, FormDialog } from '../ui/Dialogs';
 import { Select, TextArea } from '../ui/Field';
 import { Notice } from '../ui/States';
-
-type Reason = NonNullable<Schemas['TechRerollReason']>;
-
-const reasons: readonly Reason[] = [
-  'weakPc',
-  'paidUnavailable',
-  'doesNotLaunch',
-  'emulatorTooSlow',
-  'other',
-];
 
 /**
  * Drop and tech reroll of the active run (D-94), quiet and apart from completing. A drop is confirmed in a window that
@@ -44,11 +35,11 @@ export function RunActions({
   techRerollOpen: boolean;
   pending: boolean;
   onDrop: () => void;
-  onTechReroll: (reason: Reason, comment: string | null) => void;
+  onTechReroll: (reason: TechRerollReason, comment: string | null) => void;
 }) {
   const [dropping, setDropping] = useState(false);
   const [rerolling, setRerolling] = useState(false);
-  const [reason, setReason] = useState<Reason | ''>('');
+  const [reason, setReason] = useState<TechRerollReason | ''>('');
   const [comment, setComment] = useState('');
   const [commentMissing, setCommentMissing] = useState(false);
   const [reasonMissing, setReasonMissing] = useState(false);
@@ -112,19 +103,18 @@ export function RunActions({
           }
           title={ru.turn.dropTitle(game)}
           consequences={ru.turn.dropConsequences(dropPenalty, frozen)}
-          note={
-            dropHintMinutes !== null ? (
-              <div data-testid="drop-hint">
-                <Notice tone="warning">{ru.turn.dropHint(dropHintMinutes)}</Notice>
-              </div>
-            ) : null
-          }
           confirm={ru.turn.dropConfirmYes}
           onConfirm={() => {
             setDropping(false);
             onDrop();
           }}
-        />
+        >
+          {dropHintMinutes !== null ? (
+            <div data-testid="drop-hint">
+              <Notice tone="warning">{ru.turn.dropHint(dropHintMinutes)}</Notice>
+            </div>
+          ) : null}
+        </ConfirmDanger>
       </div>
       <FormDialog
         open={rerolling}
@@ -152,7 +142,7 @@ export function RunActions({
             required
             value={reason}
             onChange={(e) => {
-              setReason(e.target.value as Reason | '');
+              setReason(e.target.value as TechRerollReason | '');
               setReasonMissing(false);
               setCommentMissing(false);
             }}
@@ -160,7 +150,7 @@ export function RunActions({
             <option value="" disabled>
               {ru.turn.techRerollReasonPlaceholder}
             </option>
-            {reasons.map((r) => (
+            {techRerollReasons.map((r) => (
               <option key={r} value={r}>
                 {ru.turn.techRerollReasons[r]}
               </option>

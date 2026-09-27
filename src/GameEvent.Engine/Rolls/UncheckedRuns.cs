@@ -20,4 +20,11 @@ public static class UncheckedRuns
         state.Players.TryGetValue(playerId, out var player) && Finishes.IsFrozen(player)
             ? 0
             : state.Runs.Values.Count(run => run.PlayerId == playerId && Waits(run));
+
+    /// <summary>
+    /// Whether the player's next roll is closed by <c>season.maxUncheckedRuns</c>: the roll's refusal and the admin's
+    /// proof queue mark (D-180) ask the same question.
+    /// </summary>
+    public static bool ClosesRoll(SeasonState state, Guid playerId) =>
+        state.Rules.Season.MaxUncheckedRuns is { } limit && Count(state, playerId) >= limit;
 }

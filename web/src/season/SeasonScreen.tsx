@@ -1,7 +1,9 @@
 import { CalendarClock, Flag, Trophy } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { api, rejectionCode, type Schemas } from '../api/client';
-import { watchSeason } from '../api/realtime';
+import { newCommandId } from '../api/commands';
+import { usePageHeading } from '../app/router';
+import { useSeasonVersion } from '../app/useSeasonVersion';
 import { moscowTime } from '../app/time';
 import { ru } from '../i18n/ru';
 import { CompleteForm, type Completion } from './CompleteForm';
@@ -15,6 +17,7 @@ import { seasonPicture } from './seasonView';
 import { linearBoard } from '../board/linearBoard';
 import { RunCard } from '../board/GameCards';
 import { Leaderboard } from '../board/Leaderboard';
+import { FeedPreview } from '../feed/FeedPreview';
 import { MapView } from '../board/MapView';
 import type { MomentHandle } from '../board/moment';
 import { WheelMoment, type WheelRoll } from '../board/Wheel';
@@ -56,7 +59,7 @@ const lastDiceId = 'last-dice';
 
 /** Sends one game action; a new command id each time, so a retried request acts once (D-68). */
 function send(seasonId: string, command: Command) {
-  const commandId = crypto.randomUUID();
+  const commandId = newCommandId();
   const params = { path: { seasonId } };
   switch (command.kind) {
     case 'roll':
@@ -133,6 +136,8 @@ export function SeasonScreen({
 }) {
   const [season, setSeason] = useState<Season | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
+  // Back to the season from another page of the site: the reader starts at its name
+  const heading = usePageHeading(season !== null);
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   // Answers may arrive out of order: never replace newer data with an older view of the log.
@@ -204,20 +209,16 @@ export function SeasonScreen({
 
   // Load now, after every committed command of the season (another player's move included), after every
   // reconnection to the hub (names and avatars live outside the season log) and after a catch-up (D-122).
+  const version = useSeasonVersion(seasonId);
   useEffect(() => {
     let active = true;
-    const refresh = () => {
-      void fetchSeason(seasonId).then((loaded) => {
-        if (active) apply(loaded);
-      });
-    };
-    refresh();
-    const stop = watchSeason(seasonId, refresh);
+    void fetchSeason(seasonId).then((loaded) => {
+      if (active) apply(loaded);
+    });
     return () => {
       active = false;
-      stop();
     };
-  }, [seasonId, apply]);
+  }, [seasonId, apply, version]);
 
   async function act(command: Command) {
     setPending(true);
@@ -544,7 +545,13 @@ export function SeasonScreen({
   return (
     <main className="mx-auto grid max-w-300 grid-cols-1 gap-4 px-4 pt-4 pb-28 desk:grid-cols-[auto_minmax(0,1fr)] desk:items-start desk:gap-6 desk:px-8 desk:pb-8">
       <header className="grid gap-2 min-w-0 desk:col-start-1 desk:w-96">
-        <h1 className="font-display text-xl font-heavy text-balance">{season.name}</h1>
+        <h1
+          ref={heading}
+          tabIndex={-1}
+          className="font-display text-xl font-heavy text-balance outline-none"
+        >
+          {season.name}
+        </h1>
         <div className="flex flex-wrap gap-2">
           {season.deadline ? (
             <span data-testid="season-deadline">
@@ -746,6 +753,14 @@ export function SeasonScreen({
         <p className="text-sm text-ink-soft">{ru.board.rule}</p>
         <Leaderboard rows={shownRows} />
       </Panel>
+      {/* The latest of the feed beside the map on a desktop; a phone opens the feed from the header */}
+      {desk ? (
+        <FeedPreview
+          seasonId={seasonId}
+          version={season.lastSequence}
+          className="desk:col-start-1 desk:w-96"
+        />
+      ) : null}
 
       <div className="legacy-screens min-w-0 desk:col-start-1 desk:w-96">
         <AvatarSection
@@ -836,7 +851,7 @@ function SeasonSkeleton() {
       className="mx-auto grid max-w-300 gap-4 px-4 pt-4 desk:grid-cols-[auto_minmax(0,1fr)] desk:px-8"
       aria-busy="true"
     >
-      <p className="sr-only">{ru.app.loading}</p>
+      <p className="sr-only">{ru.ui.loading}</p>
       <div className="grid content-start gap-4 desk:w-96">
         <Skeleton className="h-8 w-2/3" />
         <Skeleton className="h-48 w-full rounded-lg" />

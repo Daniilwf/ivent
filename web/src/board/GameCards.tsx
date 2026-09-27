@@ -1,10 +1,10 @@
 import { Gamepad2 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { ru } from '../i18n/ru';
+import { GameFacts } from '../pool/GameFacts';
 import { Button } from '../ui/Button';
 import { cx } from '../ui/cx';
 import { ConfirmDanger } from '../ui/Dialogs';
-import { Tag } from '../ui/Marks';
 import { RouteProgress } from '../ui/Progress';
 
 const t = ru.board;
@@ -21,10 +21,13 @@ export type GameCard = {
 export function Cover({
   game,
   width = 88,
+  lazy = false,
   className,
 }: {
   game: Pick<GameCard, 'title' | 'cover'>;
   width?: number;
+  /** In a long list (the pool): the picture loads when it comes near the screen */
+  lazy?: boolean;
   className?: string;
 }) {
   const style = { width, height: width * 1.5 };
@@ -35,6 +38,7 @@ export function Cover({
       alt=""
       width={width}
       height={width * 1.5}
+      loading={lazy ? 'lazy' : undefined}
       className={cx(frame, 'object-cover')}
       style={style}
     />
@@ -87,12 +91,7 @@ export function RunCard({
         <Heading className="font-display text-lg font-heavy wrap-anywhere" title={game.title}>
           {game.title}
         </Heading>
-        <p className="text-sm text-ink-soft">{t.hours(game.hours)}</p>
-        <div className="flex flex-wrap gap-1">
-          {game.tags.map((tag) => (
-            <Tag key={tag}>{tag}</Tag>
-          ))}
-        </div>
+        <GameFacts game={game} />
       </div>
       <div className="col-span-2">
         {left === null ? (

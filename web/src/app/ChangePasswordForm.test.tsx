@@ -2,17 +2,11 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { App } from '../App';
 import { ru } from '../i18n/ru';
+import { json } from '../test/fakeServer';
 
 // After signing in with a temporary password nothing but its change opens (A1, D-106).
 
 vi.mock('../api/realtime', () => ({ watchSeason: () => () => undefined }));
-
-function respond(status: number, body: unknown) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'Content-Type': status >= 400 ? 'application/problem+json' : 'application/json' },
-  });
-}
 
 const temporaryUser = {
   id: 'u1',
@@ -31,9 +25,9 @@ function serve(answer: () => Response) {
     vi.fn(async (request: Request) => {
       const path = new URL(request.url).pathname;
       if (path === '/api/auth/antiforgery')
-        return respond(200, { token: 't', headerName: 'X-CSRF-TOKEN' });
+        return json(200, { token: 't', headerName: 'X-CSRF-TOKEN' });
       if (path === '/api/auth/me')
-        return respond(200, { ...temporaryUser, mustChangePassword: !changed });
+        return json(200, { ...temporaryUser, mustChangePassword: !changed });
       if (path === '/api/auth/password') {
         sent.push(await request.json());
         const response = answer();
@@ -60,7 +54,7 @@ describe('Password change', () => {
   });
 
   it('comes first after a temporary password, instead of the season', async () => {
-    serve(() => respond(200, {}));
+    serve(() => json(200, {}));
     render(<App />);
 
     expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent(ru.password.title);
@@ -68,9 +62,7 @@ describe('Password change', () => {
   });
 
   it('changes the password and lets the player in', async () => {
-    const sent = serve(() =>
-      respond(200, { duplicate: false, account: {}, temporaryPassword: null }),
-    );
+    const sent = serve(() => json(200, { duplicate: false, account: {}, temporaryPassword: null }));
     render(<App />);
 
     await fill('времянка-1', 'свой-пароль-1');
@@ -83,7 +75,7 @@ describe('Password change', () => {
   });
 
   it('refuses a short password before asking the server', async () => {
-    const sent = serve(() => respond(200, {}));
+    const sent = serve(() => json(200, {}));
     render(<App />);
 
     await fill('времянка-1', 'short');
@@ -93,7 +85,7 @@ describe('Password change', () => {
   });
 
   it('refuses two different new passwords', async () => {
-    const sent = serve(() => respond(200, {}));
+    const sent = serve(() => json(200, {}));
     render(<App />);
 
     await fill('времянка-1', 'свой-пароль-1', 'свой-пароль-2');
@@ -104,7 +96,7 @@ describe('Password change', () => {
 
   it('says in Russian when the temporary password is wrong', async () => {
     serve(() =>
-      respond(409, { title: 'rejected', status: 409, code: 'account.currentPasswordWrong' }),
+      json(409, { title: 'rejected', status: 409, code: 'account.currentPasswordWrong' }),
     );
     render(<App />);
 

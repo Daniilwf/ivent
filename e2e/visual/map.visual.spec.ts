@@ -136,6 +136,12 @@ for (const section of [
   'offer',
   'complete',
   'proof',
+  'feed',
+  'profile',
+  'game',
+  'pool',
+  'rules',
+  'admin',
   'whats-new',
 ]) {
   test(`the styleguide section «${section}» looks as approved`, async ({ page }) => {
@@ -143,3 +149,12 @@ for (const section of [
     await expect(page.locator(`#${section}`)).toHaveScreenshot(`${section}.png`);
   });
 }
+
+test('the styleguide has no horizontal scroll: every section fits the screen', async ({ page }) => {
+  await openStyleguide(page, 'whats-new');
+  const widths = await page.evaluate(() => ({
+    page: document.documentElement.scrollWidth,
+    screen: document.documentElement.clientWidth,
+  }));
+  expect(widths.page).toBeLessThanOrEqual(widths.screen);
+});

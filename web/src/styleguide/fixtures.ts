@@ -63,7 +63,8 @@ export const demoGames: GameCard[] = [
   { title: 'Project Zomboid', tags: ['Horror', 'RPG', 'Online Co-Op'], hours: null },
 ];
 
-export const demoCategories = [
+/** The wheel's sectors in the moments' demo: category names, as the wheel shows them */
+export const demoWheelSectors = [
   'Action',
   'Horror',
   'Platformer',
@@ -164,6 +165,7 @@ export const demoWitnesses: Schemas['PlayerView'][] = demoPlayers.slice(1, 5).ma
   phase: 'idle',
   finishOrder: null,
   avatar: null,
+  token: p.token,
 }));
 /** A proof's screenshots: our own drawings stand for them */
 export const demoProofFiles: Schemas['FileLinkView'][] = avatars.map((url, i) => ({

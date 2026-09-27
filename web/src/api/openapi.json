@@ -1339,6 +1339,45 @@
         }
       }
     },
+    "/api/admin/rules/schema": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/schema+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JsonObject"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/admin/seasons/{seasonId}/pool-stats": {
       "get": {
         "tags": [
@@ -1832,6 +1871,62 @@
           },
           "429": {
             "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/seasons/{seasonId}/games": {
+      "get": {
+        "tags": [
+          "Pool"
+        ],
+        "parameters": [
+          {
+            "name": "seasonId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SeasonGameView"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -4397,7 +4492,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/GameView"
+                    "$ref": "#/components/schemas/PoolGameView"
                   }
                 }
               }
@@ -4435,7 +4530,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GameView"
+                  "$ref": "#/components/schemas/PoolGameView"
                 }
               }
             }
@@ -4551,7 +4646,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GameView"
+                  "$ref": "#/components/schemas/PoolGameView"
                 }
               }
             }
@@ -4594,7 +4689,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GameView"
+                  "$ref": "#/components/schemas/PoolGameView"
                 }
               }
             }
@@ -4657,7 +4752,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GameView"
+                  "$ref": "#/components/schemas/PoolGameView"
                 }
               }
             }
@@ -4720,7 +4815,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GameView"
+                  "$ref": "#/components/schemas/PoolGameView"
                 }
               }
             }
@@ -6151,7 +6246,7 @@
             "format": "uuid"
           },
           "game": {
-            "$ref": "#/components/schemas/GameView"
+            "$ref": "#/components/schemas/RunGameView"
           },
           "difficulty": {
             "$ref": "#/components/schemas/Difficulty"
@@ -6402,8 +6497,16 @@
                 "$ref": "#/components/schemas/FileLinkView"
               }
             ]
+          },
+          "token": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
           }
-        }
+        },
+        "description": "The signed-in user. `token` — the colour of their token in the latest season they play (Seasons.PlayerTokens), as on\ntheir profile; none outside seasons (D-202)."
       },
       "DiceCountRule": {
         "required": [
@@ -6759,6 +6862,14 @@
           "bad"
         ]
       },
+      "ExclusionReason": {
+        "enum": [
+          "alreadyPlayed",
+          "dropped",
+          "techRerolled",
+          null
+        ]
+      },
       "Features": {
         "required": [
           "mapMode",
@@ -6861,10 +6972,94 @@
         },
         "description": "One event of the season's feed (GLOSSARY «Лента», D-124): its place in the log, the command it came from, when, the\nevent type and its data as the current format reads it (older versions upcast), who sent the command (none for the\nscheduler) and whether the admin undid it. The screen turns a type and its data into a line of text."
       },
+      "FeedGameView": {
+        "required": [
+          "id",
+          "title",
+          "hasPage"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "hasPage": {
+            "type": "boolean"
+          }
+        },
+        "description": "A game an event of the page names; `hasPage` — the viewer may open its page (a deleted game is the admin's)."
+      },
+      "FeedPlayerView": {
+        "required": [
+          "id",
+          "userId",
+          "name",
+          "avatar",
+          "hasProfile",
+          "token"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "avatar": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/FileLinkView"
+              }
+            ]
+          },
+          "hasProfile": {
+            "type": "boolean"
+          },
+          "token": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "A player of the season, for the feed's lines (H5, D-150): the name, the account for the profile link (`hasProfile` —\nfalse once the account is deleted), the avatar and `token` — the colour of their token in the season (PlayerTokens)."
+      },
+      "FeedRunView": {
+        "required": [
+          "id",
+          "gameId"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "gameId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "description": "A run an event of the page names, with its game: most events of a run carry only its id."
+      },
       "FeedView": {
         "required": [
           "entries",
-          "nextBefore"
+          "nextBefore",
+          "players",
+          "games",
+          "runs"
         ],
         "type": "object",
         "properties": {
@@ -6880,9 +7075,27 @@
               "integer"
             ],
             "format": "int64"
+          },
+          "players": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FeedPlayerView"
+            }
+          },
+          "games": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FeedGameView"
+            }
+          },
+          "runs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FeedRunView"
+            }
           }
         },
-        "description": "A page of the feed, newest first; `nextBefore` — the sequence to ask before for the next page, none at the start of the log."
+        "description": "A page of the feed, newest first; `nextBefore` — the sequence to ask before for the next page, none at the start of\nthe log. `players` — every player of the season; `games` and `runs` — those the page's events name (D-150)."
       },
       "FileFromUrlRequest": {
         "required": [
@@ -7150,7 +7363,8 @@
           "hours",
           "completedAt",
           "rating",
-          "reviewText"
+          "reviewText",
+          "token"
         ],
         "type": "object",
         "properties": {
@@ -7215,33 +7429,13 @@
               "null",
               "string"
             ]
+          },
+          "token": {
+            "type": "integer",
+            "format": "int32"
           }
         },
-        "description": "A run of a game in any season, with its review if there is one (the game page, D-124)."
-      },
-      "GameView": {
-        "required": [
-          "id",
-          "title",
-          "hours"
-        ],
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "title": {
-            "type": "string"
-          },
-          "hours": {
-            "type": [
-              "null",
-              "number"
-            ],
-            "format": "double"
-          }
-        }
+        "description": "A run of a game in any season, with its review if there is one (the game page, D-124). `token` — the player's place\nin that season's list of players, their token colour there (D-150)."
       },
       "HostileCap": {
         "required": [
@@ -7398,6 +7592,9 @@
         }
       },
       "JsonElement": { },
+      "JsonObject": {
+        "type": "object"
+      },
       "LastDaysLengthFilter": {
         "required": [
           "enabled",
@@ -7552,6 +7749,13 @@
         "properties": {
           "linearLength": {
             "type": "integer",
+            "format": "int32"
+          },
+          "minZoneGames": {
+            "type": [
+              "null",
+              "integer"
+            ],
             "format": "int32"
           }
         }
@@ -7800,7 +8004,8 @@
           "points",
           "phase",
           "finishOrder",
-          "avatar"
+          "avatar",
+          "token"
         ],
         "type": "object",
         "properties": {
@@ -7837,9 +8042,13 @@
                 "$ref": "#/components/schemas/FileLinkView"
               }
             ]
+          },
+          "token": {
+            "type": "integer",
+            "format": "int32"
           }
         },
-        "description": "A player on the map and the leaderboard; `finishOrder` is their order among the finishers, null before the finish;\n`avatar` — the account's picture (D-117), or none."
+        "description": "A player on the map and the leaderboard; `finishOrder` is their order among the finishers, null before the finish;\n`avatar` — the account's picture (D-117), or none; `token` — the colour of their token (PlayerTokens, D-202)."
       },
       "PlayerWithoutGamesView": {
         "required": [
@@ -7869,6 +8078,93 @@
             "format": "uuid"
           }
         }
+      },
+      "PoolGameView": {
+        "required": [
+          "id",
+          "title",
+          "tags",
+          "hours",
+          "year",
+          "steamAppId",
+          "cover",
+          "note",
+          "isCoop",
+          "author",
+          "isDeleted",
+          "completionCondition"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "hours": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "year": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "steamAppId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "cover": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/FileLinkView"
+              }
+            ]
+          },
+          "note": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "isCoop": {
+            "type": "boolean"
+          },
+          "author": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "isDeleted": {
+            "type": "boolean"
+          },
+          "completionCondition": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "A game of the pool as everyone sees it (D-119); `author` — the name of the account that added it, or the author as\nthe imported table names them (D-125); none for the seed."
       },
       "PoolStatsView": {
         "required": [
@@ -8011,7 +8307,8 @@
           "status",
           "playerId",
           "points",
-          "place"
+          "place",
+          "token"
         ],
         "type": "object",
         "properties": {
@@ -8039,9 +8336,13 @@
               "integer"
             ],
             "format": "int32"
+          },
+          "token": {
+            "type": "integer",
+            "format": "int32"
           }
         },
-        "description": "A season a user took part in, with their points and, once the season finished, their place."
+        "description": "A season a user took part in, with their points and, once the season finished, their place. `token` — their place in\nthe season's list of players (by name), which the screens colour their token by (D-150)."
       },
       "ProfileView": {
         "required": [
@@ -8106,7 +8407,8 @@
           "hours",
           "diceTotal",
           "decidesFinish",
-          "files"
+          "files",
+          "rollClosed"
         ],
         "type": "object",
         "properties": {
@@ -8191,9 +8493,12 @@
             "items": {
               "$ref": "#/components/schemas/FileLinkView"
             }
+          },
+          "rollClosed": {
+            "type": "boolean"
           }
         },
-        "description": "A run to check, in queue order (D-98, Q-3): the runs that decide a finish on top (`decidesFinish`), then by\ncompletion time; with the claimed difficulty, the counted hours and the dice total, what an approval at a lower\ndifficulty or a reject changes. `reachedFinish`: this run's latest move stands on the finish."
+        "description": "A run to check, in queue order (D-98, Q-3): the runs that decide a finish on top (`decidesFinish`), then by\ncompletion time; with the claimed difficulty, the counted hours and the dice total, what an approval at a lower\ndifficulty or a reject changes. `reachedFinish`: this run's latest move stands on the finish.\n`rollClosed`: the player's next roll is closed by the limit of unchecked runs (D-134) until the admin checks one."
       },
       "ProofRequest": {
         "required": [
@@ -8867,9 +9172,15 @@
             "items": {
               "$ref": "#/components/schemas/RulesetChange"
             }
+          },
+          "authorName": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         },
-        "description": "One version of the rules: when, by whom (null for the season's creation by the system), and what changed."
+        "description": "One version of the rules: when, by whom (null for the season's creation by the system), and what changed.\n`authorName` — the author's name for the rules page (H7, D-170); null with no author."
       },
       "RulesView": {
         "required": [
@@ -8891,9 +9202,41 @@
             "items": {
               "$ref": "#/components/schemas/RulesVersionView"
             }
+          },
+          "deadline": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
           }
         },
-        "description": "The rules in force and their history: who changed what and when (C3). Numbers on the rules page are real."
+        "description": "The rules in force and their history: who changed what and when (C3). Numbers on the rules page are real.\n`deadline` — the season's deadline, set apart from the rules by the admin (H7, D-170); null while not set."
+      },
+      "RunGameView": {
+        "required": [
+          "id",
+          "title",
+          "hours"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "hours": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          }
+        },
+        "description": "The game of a run: its title and hours. Named apart from the pool's PoolGameView: the OpenAPI document\nkeys schemas by type name, so two records called GameView became one schema and the pool lost its fields (D-161)."
       },
       "RunStatus": {
         "enum": [
@@ -8917,7 +9260,7 @@
             "format": "uuid"
           },
           "game": {
-            "$ref": "#/components/schemas/GameView"
+            "$ref": "#/components/schemas/RunGameView"
           },
           "startedAt": {
             "type": "string",
@@ -8958,6 +9301,63 @@
           }
         },
         "description": "The admin sets or removes (null) the deadline; only in draft or active (D-101)."
+      },
+      "SeasonGameView": {
+        "required": [
+          "gameId",
+          "taken",
+          "takenBy",
+          "completedAt",
+          "marks",
+          "excludedForMe"
+        ],
+        "type": "object",
+        "properties": {
+          "gameId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "taken": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/RollMissReason"
+              }
+            ]
+          },
+          "takenBy": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "completedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "marks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GameMarkView"
+            }
+          },
+          "excludedForMe": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ExclusionReason"
+              }
+            ]
+          }
+        },
+        "description": "A game's status in the season as the pool page shows it (SPEC «Статусы игры в сезоне», H6, D-160): `taken` —\ncompleted in the season or being played (an offer and a pending option count), with the player and, for a completed\ngame, when; `marks` — other players who dropped or tech-rerolled it (the game is free again);\n`excludedForMe` — why it never comes to the viewer again. Only games with something to show are listed."
       },
       "SeasonJoin": {
         "required": [

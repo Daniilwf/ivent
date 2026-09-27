@@ -1,5 +1,6 @@
 import { useEffect, useState, type ChangeEvent, type SyntheticEvent } from 'react';
 import { api, rejectionCode, type Schemas } from '../api/client';
+import { newCommandId } from '../api/commands';
 import { uploadFile, UploadError } from '../api/files';
 import { ru } from '../i18n/ru';
 import { FilePicker } from '../ui/Field';
@@ -36,7 +37,7 @@ export function AvatarSection({ onChanged }: { onChanged: () => void }) {
 
   async function use(fileId: string | null) {
     const { error: refused } = await api.PUT('/api/auth/me/avatar', {
-      body: { commandId: crypto.randomUUID(), fileId },
+      body: { commandId: newCommandId(), fileId },
     });
     if (refused) {
       const code = rejectionCode(refused);
@@ -87,7 +88,7 @@ export function AvatarSection({ onChanged }: { onChanged: () => void }) {
         error: refused,
         response,
       } = await api.POST('/api/files/from-url', {
-        body: { commandId: crypto.randomUUID(), url },
+        body: { commandId: newCommandId(), url },
       });
       if (!data) {
         // The hourly limit of downloads answers without a code (D-117)
