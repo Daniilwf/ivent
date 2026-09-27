@@ -72,12 +72,12 @@ public static class MarkdownReport
 
         Line(md, "## Профили игроков");
         Line(md);
-        Table(md, ["Профиль", "Ботов", "Очки (ср.)", "Очки 10–50–90%", "Место (ср.)", "Побед", "Топ-3", "Финиш", "Первый", "Пройдено", "Дропов", "Рероллов (беспл. / платн.)", "Часов игры", "Своб. часов", "Ждал проверки, ч", "Очки/ч"],
+        Table(md, ["Профиль", "Ботов", "Очки (ср.)", "Очки 10–50–90%", "Место (ср.)", "Побед", "Топ-3", "Финиш", "Первый", "Пройдено", "Дропов", "Рероллов (беспл. / платн.)", "Часов игры", "Своб. часов", "Ждал проверки, ч", "Не допройдено к дедлайну, ч", "Очки/ч"],
             report.Profiles.Select(p => new[]
             {
                 p.Profile, p.BotsPerSeason.ToString(s_ru), N(p.MeanPoints), $"{N(p.Points.P10)}–{N(p.Points.P50)}–{N(p.Points.P90)}",
                 N(p.MeanPlace), P(p.WinShare), P(p.Top3Share), P(p.FinishShare), P(p.FirstShare), N(p.MeanCompleted), N(p.MeanDrops),
-                $"{N(p.MeanFreeRerolls)} / {N(p.MeanPaidRerolls)}", N(p.MeanPlayHours), N(p.MeanFreeHours), N(p.MeanBlockedHours), N(p.PointsPerPlayHour, 2),
+                $"{N(p.MeanFreeRerolls)} / {N(p.MeanPaidRerolls)}", N(p.MeanPlayHours), N(p.MeanFreeHours), N(p.MeanBlockedHours), N(p.MeanUnfinishedHours), N(p.PointsPerPlayHour, 2),
             }));
 
         var g = report.Gap;

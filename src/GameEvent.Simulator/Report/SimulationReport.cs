@@ -92,6 +92,7 @@ public sealed record ProfileRow(
     double MeanPlayHours,
     double MeanFreeHours,
     double MeanBlockedHours,
+    double MeanUnfinishedHours,
     double PointsPerPlayHour);
 
 /// <summary>The profile with the most free time against the one with the least.</summary>

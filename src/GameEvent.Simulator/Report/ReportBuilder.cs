@@ -158,6 +158,9 @@ public static class ReportBuilder
         {
             var of = bots.Where(b => b.Profile == profile).ToList();
             var scored = runsBySeason.Where(x => Scored(x.Run) && profileOf[(x.Season, x.Run.Bot)] == profile).Select(x => x.Run).ToList();
+            var unfinished = runsBySeason
+                .Where(x => x.Run.End == RunEnd.Unfinished && profileOf[(x.Season, x.Run.Bot)] == profile)
+                .Sum(x => x.Run.PlayHours);
             var won = seasons.Sum(s => s.Bots.Where(b => b.Profile == profile).Sum(b => wins.GetValueOrDefault((s.Index, b.Index))));
             return new ProfileRow(
                 profile,
@@ -178,6 +181,7 @@ public static class ReportBuilder
                 Mean(of.Select(b => b.PlayHours)),
                 Mean(of.Select(b => b.FreeHours)),
                 Mean(of.Select(b => b.BlockedHours)),
+                Ratio(unfinished, of.Count),
                 Ratio(scored.Sum(r => r.Points), scored.Sum(r => r.PlayHours)));
         })];
     }

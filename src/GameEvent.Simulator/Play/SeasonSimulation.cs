@@ -345,7 +345,7 @@ public sealed class SeasonSimulation
             return Execute(new DeclareAlreadyPlayed(bot.PlayerId, gameId), bot).IsAccepted;
         }
 
-        if (!bot.RerollRefused && WantsReroll(player, (double)(hours ?? 0)))
+        if (!bot.RerollRefused && WantsReroll(bot, player, (double)(hours ?? 0)))
         {
             if (Execute(new Reroll(bot.PlayerId), bot).IsAccepted)
             {
@@ -358,7 +358,7 @@ public sealed class SeasonSimulation
         return Execute(start, bot).IsAccepted;
     }
 
-    private bool WantsReroll(SeasonPlayer player, double hours)
+    private bool WantsReroll(Bot bot, SeasonPlayer player, double hours)
     {
         var behaviour = _inputs.Settings.Behaviour;
         if (player.RerollsThisRoll >= behaviour.MaxRerollsPerRoll)
@@ -370,11 +370,14 @@ public sealed class SeasonSimulation
         return payment switch
         {
             RerollPayment.FreeThisRoll or RerollPayment.FreeRerollResource or RerollPayment.FreeMode =>
-                behaviour.RerollAboveHours is { } free && hours > free,
+                (behaviour.RerollAboveHours is { } free && hours > free) || (behaviour.DeadlineAware && hours > HoursLeft(bot)),
             RerollPayment.Coins => behaviour.PaidRerollAboveHours is { } paid && hours > paid && player.Coins >= price,
             _ => false,
         };
     }
+
+    // The free time the bot still has before the deadline: this session's rest and the sessions to come
+    private static double HoursLeft(Bot bot) => bot.Budget + bot.Sessions.Skip(bot.Session + 1).Sum(s => s.Hours);
 
     private RunPlan NewPlan(Bot bot, SeasonPlayer player)
     {

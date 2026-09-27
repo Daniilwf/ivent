@@ -187,6 +187,12 @@ public sealed record BotBehaviour
     /// <summary>A free reroll is used when the offered game is longer than this; null — never.</summary>
     public double? RerollAboveHours { get; init; } = 15;
 
+    /// <summary>
+    /// A free reroll is also used when the offered game is longer than the bot's free time left before the deadline: what
+    /// the length limit of the last days (<c>roll.lastDaysLengthFilter</c>, not in the engine yet) would do (D-357).
+    /// </summary>
+    public bool DeadlineAware { get; init; }
+
     /// <summary>A paid reroll (coins) is used when the offered game is longer than this; null — never.</summary>
     public double? PaidRerollAboveHours { get; init; }
 
