@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ru } from '../i18n/ru';
 import { BugReportButton } from './BugReportButton';
-import { clearBugContext, recordAction } from './bugContext';
+import { clearBugContext, recordAction, startBugContext } from './bugContext';
 import { json } from '../test/fakeServer';
 
 // A9, D-121: «Сообщить о баге» — a screenshot of the page, a description, and the context sent along by itself.
@@ -137,33 +137,68 @@ describe('BugReportButton', () => {
     expect(sent).toHaveLength(0);
   });
 
-  it('says why a report was not taken; a retry after a lost answer is the same command (D-68, D-202)', async () => {
-    let answer: () => Response = () => {
-      throw new TypeError('Failed to fetch');
-    };
-    const sent = serve(() => answer());
+  it('sends one report with one screenshot however often it is retried in a dialog (D-68)', async () => {
+    // As in the app: every click is recorded, «Отправить» included
+    const stop = startBugContext();
+    try {
+      recordAction('кнопка «Завершить прохождение»');
+      let answer: () => Response = () => {
+        throw new TypeError('Failed to fetch');
+      };
+      const sent = serve(() => answer());
 
-    const user = await describeBug('Во время обслуживания');
-    await user.click(screen.getByTestId('bug-report-attach'));
-    await user.click(screen.getByTestId('bug-report-send'));
-    expect(await screen.findByRole('alert')).toHaveTextContent(ru.bugReport.failed);
+      const user = await describeBug('Во время обслуживания');
+      await user.click(screen.getByTestId('bug-report-send'));
+      expect(await screen.findByRole('alert')).toHaveTextContent(ru.bugReport.failed);
 
-    answer = () => json(503, { code: 'site.maintenance' });
-    await user.click(screen.getByTestId('bug-report-send'));
-    expect(await screen.findByRole('alert')).toHaveTextContent(ru.rejection['site.maintenance']);
+      answer = () => json(503, { code: 'site.maintenance' });
+      await user.click(screen.getByTestId('bug-report-send'));
+      expect(await screen.findByRole('alert')).toHaveTextContent(ru.rejection['site.maintenance']);
 
-    answer = () => json(429, {});
-    await user.click(screen.getByTestId('bug-report-send'));
-    expect(await screen.findByRole('alert')).toHaveTextContent(ru.bugReport.tooOften);
+      answer = () => json(429, {});
+      await user.click(screen.getByTestId('bug-report-send'));
+      expect(await screen.findByRole('alert')).toHaveTextContent(ru.bugReport.tooOften);
 
-    answer = () => json(200, { id: 'r1' });
+      answer = () => json(200, { id: 'r1' });
+      await user.click(screen.getByTestId('bug-report-send'));
+      await screen.findByText(ru.bugReport.sent);
+
+      type Report = {
+        commandId: string;
+        screenshotFileId: string | null;
+        context: { actions: { text: string }[] };
+      };
+      const reports = sent
+        .filter((s) => s.url.endsWith('/api/bug-reports'))
+        .map((s) => s.body as Report);
+      expect(sent.filter((s) => s.url.endsWith('/api/bug-reports/screenshot'))).toHaveLength(1);
+      expect(reports).toHaveLength(4);
+      expect(new Set(reports.map((r) => r.commandId)).size).toBe(1);
+      expect(new Set(reports.map((r) => r.screenshotFileId))).toEqual(new Set([stored.id]));
+      expect(new Set(reports.map((r) => JSON.stringify(r.context))).size).toBe(1);
+      expect(reports[0]?.context.actions.map((x) => x.text)).toContain(
+        'кнопка «Завершить прохождение»',
+      );
+    } finally {
+      stop();
+    }
+  });
+
+  it('makes a new report of a new dialog', async () => {
+    const sent = serve(() => json(200, { id: 'r1' }));
+    const user = await describeBug('Первый');
     await user.click(screen.getByTestId('bug-report-send'));
     await screen.findByText(ru.bugReport.sent);
-    const ids = sent.map((s) => (s.body as { commandId: string }).commandId);
-    // The lost first try and its retry are one command; an answered try ends it, the next is a new command
-    expect(ids).toHaveLength(4);
-    expect(ids[1]).toBe(ids[0]);
-    expect(ids[2]).not.toBe(ids[1]);
-    expect(ids[3]).not.toBe(ids[2]);
+    await user.click(screen.getByRole('button', { name: ru.bugReport.done }));
+    await user.click(screen.getByTestId('bug-report'));
+    await user.type(await screen.findByTestId('bug-report-text'), 'Второй');
+    await user.click(screen.getByTestId('bug-report-send'));
+    await screen.findByText(ru.bugReport.sent);
+
+    const ids = sent
+      .filter((s) => s.url.endsWith('/api/bug-reports'))
+      .map((s) => (s.body as { commandId: string }).commandId);
+    expect(ids).toHaveLength(2);
+    expect(ids[1]).not.toBe(ids[0]);
   });
 });
