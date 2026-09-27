@@ -14,7 +14,6 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { api, type Schemas } from '../api/client';
-import { watchSeason } from '../api/realtime';
 import { Link } from '../app/Link';
 import { navigate, paths, usePageHeading } from '../app/router';
 import { ru } from '../i18n/ru';
@@ -36,6 +35,7 @@ import { SeasonSection } from './SeasonSection';
 import { SiteSection } from './SiteSection';
 import { SectionHead } from './common';
 import { answerOf, useLoaded } from '../app/useLoaded';
+import { useSeasonVersion } from '../app/useSeasonVersion';
 
 const t = ru.admin;
 
@@ -67,37 +67,6 @@ const href = (id: AdminSectionId) => paths.admin(id === 'proofs' ? undefined : i
 // this often
 const refreshEveryMs = 10_000;
 
-/** The season's updates, thinned out: a number that grows at most once per refreshEveryMs */
-function useSeasonVersion(seasonId: string | null) {
-  const [version, setVersion] = useState(0);
-  const waiting = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const last = useRef(0);
-  useEffect(() => {
-    if (!seasonId) return;
-    let first = true;
-    const stop = watchSeason(seasonId, () => {
-      // The first answer is the join itself: the data was just loaded
-      if (first) {
-        first = false;
-        return;
-      }
-      if (waiting.current) return;
-      const wait = Math.max(0, last.current + refreshEveryMs - Date.now());
-      waiting.current = setTimeout(() => {
-        waiting.current = null;
-        last.current = Date.now();
-        setVersion((v) => v + 1);
-      }, wait);
-    });
-    return () => {
-      stop();
-      if (waiting.current) clearTimeout(waiting.current);
-      waiting.current = null;
-    };
-  }, [seasonId]);
-  return version;
-}
-
 /** The admin's pages: a list of sections (a side column on a desktop, a sheet on a phone) and the open section */
 export function AdminScreen({
   path,
@@ -111,7 +80,7 @@ export function AdminScreen({
   const section = adminSection(path);
   const desk = useDesk();
   const [seasonId, setSeasonId] = useState(currentSeasonId);
-  const version = useSeasonVersion(seasonId);
+  const version = useSeasonVersion(seasonId, { throttleMs: refreshEveryMs });
   const [sheet, setSheet] = useState(false);
   // A section picked in the sheet takes the focus to its heading, not back to the «Разделы» button
   const picked = useRef(false);

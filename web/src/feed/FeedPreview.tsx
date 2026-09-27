@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
-import type { Schemas } from '../api/client';
+import { useCallback, useMemo } from 'react';
 import { Link } from '../app/Link';
 import { paths } from '../app/router';
+import { useLoaded } from '../app/useLoaded';
 import { ru } from '../i18n/ru';
 import { Button } from '../ui/Button';
 import { cx } from '../ui/cx';
@@ -13,9 +13,6 @@ import { fetchFeedPage } from './feedApi';
 
 /** How many lines the season screen shows */
 const PREVIEW_LINES = 5;
-
-type State =
-  { kind: 'loading' } | { kind: 'failed' } | { kind: 'ready'; page: Schemas['FeedView'] };
 
 /**
  * The latest lines of the feed beside the map on a desktop (DESIGN.md «Главная»). `version` — the season's last log
@@ -30,25 +27,15 @@ export function FeedPreview({
   version: number;
   className?: string;
 }) {
-  const [state, setState] = useState<State>({ kind: 'loading' });
-  const [attempt, setAttempt] = useState(0);
-
-  useEffect(() => {
-    let active = true;
-    void fetchFeedPage(seasonId, null, 30).then((result) => {
-      if (!active) return;
-      if (result.kind === 'page') setState({ kind: 'ready', page: result.page });
-      // A failed refresh keeps the lines shown
-      else setState((shown) => (shown.kind === 'ready' ? shown : { kind: 'failed' }));
-    });
-    return () => {
-      active = false;
-    };
-  }, [seasonId, version, attempt]);
+  // A failed refresh keeps the lines shown
+  const state = useLoaded(
+    useCallback(() => fetchFeedPage(seasonId, null, 30), [seasonId]),
+    { version },
+  );
 
   const days = useMemo(() => {
     if (state.kind !== 'ready') return [];
-    const all = feedDays(state.page.entries, withRefs(emptyRefs(), state.page));
+    const all = feedDays(state.value.entries, withRefs(emptyRefs(), state.value));
     // The newest lines only, their days kept
     let left = PREVIEW_LINES;
     return all.flatMap((day) => {
@@ -63,17 +50,10 @@ export function FeedPreview({
     <Panel title={ru.feed.preview} className={cx(className)} data-testid="feed-preview">
       {state.kind === 'loading' ? (
         <FeedSkeleton rows={3} />
-      ) : state.kind === 'failed' ? (
+      ) : state.kind !== 'ready' ? (
         <div className="grid justify-items-start gap-2">
           <Notice tone="danger">{ru.feed.errorTitle}</Notice>
-          <Button
-            onClick={() => {
-              setState({ kind: 'loading' });
-              setAttempt((n) => n + 1);
-            }}
-          >
-            {ru.ui.retry}
-          </Button>
+          <Button onClick={state.reload}>{ru.ui.retry}</Button>
         </div>
       ) : days.length === 0 ? (
         <p className="text-ink-soft">{ru.feed.emptyTitle}</p>

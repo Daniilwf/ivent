@@ -8,8 +8,12 @@ import { SeasonScreen } from './SeasonScreen';
 // The hub is replaced: tests trigger "another player acted" by calling the captured callback.
 let hubChange: (() => void) | null = null;
 vi.mock('../api/realtime', () => ({
-  watchSeason: (_seasonId: string, onChange: () => void) => {
-    hubChange = onChange;
+  watchSeason: (_seasonId: string, onChange: (updates: unknown[]) => void) => {
+    hubChange = () => {
+      onChange([]);
+    };
+    // The hub's first answer is the join: the page has just loaded and skips it (D-202)
+    onChange([]);
     return () => {
       hubChange = null;
     };

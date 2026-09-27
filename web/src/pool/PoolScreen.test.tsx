@@ -9,15 +9,20 @@ import { pageSize, PoolScreen } from './PoolScreen';
 
 let poolChange: (() => void) | null = null;
 let seasonChange: (() => void) | null = null;
+// The hubs' first answer is the join: the page has just loaded and skips it (D-202)
 vi.mock('../api/realtime', () => ({
   watchPool: (onChange: () => void) => {
     poolChange = onChange;
+    onChange();
     return () => {
       poolChange = null;
     };
   },
-  watchSeason: (_seasonId: string, onChange: () => void) => {
-    seasonChange = onChange;
+  watchSeason: (_seasonId: string, onChange: (updates: unknown[]) => void) => {
+    seasonChange = () => {
+      onChange([{ seasonId, fromSequence: 1, toSequence: 1, types: ['game-rolled'] }]);
+    };
+    onChange([]);
     return () => {
       seasonChange = null;
     };

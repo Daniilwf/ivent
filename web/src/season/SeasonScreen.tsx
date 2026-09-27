@@ -1,8 +1,8 @@
 import { CalendarClock, Flag, Trophy } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { api, rejectionCode, type Schemas } from '../api/client';
-import { watchSeason } from '../api/realtime';
 import { usePageHeading } from '../app/router';
+import { useSeasonVersion } from '../app/useSeasonVersion';
 import { moscowTime } from '../app/time';
 import { ru } from '../i18n/ru';
 import { CompleteForm, type Completion } from './CompleteForm';
@@ -208,20 +208,16 @@ export function SeasonScreen({
 
   // Load now, after every committed command of the season (another player's move included), after every
   // reconnection to the hub (names and avatars live outside the season log) and after a catch-up (D-122).
+  const version = useSeasonVersion(seasonId);
   useEffect(() => {
     let active = true;
-    const refresh = () => {
-      void fetchSeason(seasonId).then((loaded) => {
-        if (active) apply(loaded);
-      });
-    };
-    refresh();
-    const stop = watchSeason(seasonId, refresh);
+    void fetchSeason(seasonId).then((loaded) => {
+      if (active) apply(loaded);
+    });
     return () => {
       active = false;
-      stop();
     };
-  }, [seasonId, apply]);
+  }, [seasonId, apply, version]);
 
   async function act(command: Command) {
     setPending(true);

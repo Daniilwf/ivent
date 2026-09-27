@@ -1,10 +1,11 @@
 import { BookOpen, CalendarClock } from 'lucide-react';
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, type ReactNode } from 'react';
 import { api, type Schemas } from '../api/client';
-import { watchSeason } from '../api/realtime';
+import type { SeasonUpdate } from '../api/realtime';
 import { usePageHeading } from '../app/router';
 import { moscowTime } from '../app/time';
 import { answerOf, useLoaded, type Answer } from '../app/useLoaded';
+import { useSeasonVersion } from '../app/useSeasonVersion';
 import { ru } from '../i18n/ru';
 import { Chip } from '../ui/Marks';
 import { Skeleton } from '../ui/Progress';
@@ -12,6 +13,12 @@ import { EmptyState, ErrorState } from '../ui/States';
 import { fieldName, rulesPage, valueText } from './rulesText';
 
 const t = ru.rules;
+
+/** What the rules page shows can change: the rules, the deadline, or an undo of either */
+const changesRules = (update: SeasonUpdate) =>
+  update.types.some((type) =>
+    ['ruleset-changed', 'season-deadline-set', 'command-undone'].includes(type),
+  );
 
 type SectionId = keyof typeof t.sections;
 const order: SectionId[] = ['win', 'roll', 'reward', 'drop', 'finish', 'deadline', 'history'];
@@ -28,15 +35,9 @@ export function RulesScreen({
   onSignedOut: () => void;
 }) {
   const heading = usePageHeading();
-  // Load now and again after every command of the season: a change of the rules is one of them. A failed refresh
+  // Load now and again when the rules or the deadline change (or are undone), not on every roll. A failed refresh
   // keeps the rules on the screen; only the first load turns into the error
-  const [version, setVersion] = useState(0);
-  useEffect(() => {
-    if (!seasonId) return;
-    return watchSeason(seasonId, () => {
-      setVersion((v) => v + 1);
-    });
-  }, [seasonId]);
+  const version = useSeasonVersion(seasonId, { relevant: changesRules });
   const loaded = useLoaded(
     useCallback(
       async (): Promise<Answer<Schemas['RulesView']>> =>

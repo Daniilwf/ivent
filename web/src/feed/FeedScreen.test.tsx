@@ -9,8 +9,12 @@ import { FeedScreen } from './FeedScreen';
 
 const live = vi.hoisted(() => ({ changes: [] as (() => void)[] }));
 vi.mock('../api/realtime', () => ({
-  watchSeason: (_seasonId: string, onChange: () => void) => {
-    live.changes.push(onChange);
+  watchSeason: (_seasonId: string, onChange: (updates: unknown[]) => void) => {
+    live.changes.push(() => {
+      onChange([]);
+    });
+    // The hub's first answer is the join: the page has just loaded and skips it (D-202)
+    onChange([]);
     return () => undefined;
   },
 }));

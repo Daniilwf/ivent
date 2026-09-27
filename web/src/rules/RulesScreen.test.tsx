@@ -6,15 +6,23 @@ import { RulesScreen } from './RulesScreen';
 
 // H7: the rules page from the season's current ruleset and the history of its changes (SPEC «Правила на сайте»)
 
-let seasonChange: (() => void) | null = null;
+type Update = { seasonId: string; fromSequence: number; toSequence: number; types: string[] };
+let notify: ((updates: Update[]) => void) | null = null;
 vi.mock('../api/realtime', () => ({
-  watchSeason: (_seasonId: string, onChange: () => void) => {
-    seasonChange = onChange;
+  watchSeason: (_seasonId: string, onChange: (updates: Update[]) => void) => {
+    notify = onChange;
+    // The hub's first answer is the join
+    onChange([]);
     return () => {
-      seasonChange = null;
+      notify = null;
     };
   },
 }));
+
+/** A command of the season with these events came in */
+function seasonChange(...types: string[]) {
+  notify?.([{ seasonId, fromSequence: 1, toSequence: 1, types }]);
+}
 
 const seasonId = '5ea50000-0000-0000-0000-000000000001';
 const rulesPath = `/api/seasons/${seasonId}/rules`;
@@ -96,7 +104,7 @@ describe('the rules page', () => {
 
     rules = { ...demoRules, deadline: null };
     act(() => {
-      seasonChange?.();
+      seasonChange('ruleset-changed');
     });
     await waitFor(() => {
       expect(screen.getByTestId('rules-deadline')).toHaveTextContent(t.deadline.none);
@@ -163,7 +171,7 @@ describe('the rules page', () => {
       expect(answers).toHaveLength(1);
     });
     act(() => {
-      seasonChange?.();
+      seasonChange('ruleset-changed');
     });
     await waitFor(() => {
       expect(answers).toHaveLength(2);
@@ -204,11 +212,31 @@ describe('the rules page', () => {
       },
     };
     act(() => {
-      seasonChange?.();
+      seasonChange('ruleset-changed');
     });
 
     expect(await screen.findByText(t.version(4))).toBeInTheDocument();
     expect(section(t.sections.drop)).toHaveTextContent('Штраф: −3d6 очков и клеток.');
+  });
+
+  it('reads the rules again only when they, the deadline or an undo change them', async () => {
+    const fetched = serve(() => json(200, demoRules));
+    renderRules();
+    await screen.findByText(t.version(3));
+    const before = fetched.mock.calls.length;
+
+    act(() => {
+      seasonChange('game-rolled', 'player-moved');
+    });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(fetched.mock.calls.length).toBe(before);
+
+    act(() => {
+      seasonChange('season-deadline-set');
+    });
+    await waitFor(() => {
+      expect(fetched.mock.calls.length).toBe(before + 1);
+    });
   });
 
   it('shows the error with a retry', async () => {

@@ -1,8 +1,9 @@
 import { Library, Plus, SearchX, SlidersHorizontal } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { api, type Schemas } from '../api/client';
-import { watchPool, watchSeason } from '../api/realtime';
 import { usePageHeading } from '../app/router';
+import { answerOf, useLoaded, type Answer } from '../app/useLoaded';
+import { usePoolVersion, useSeasonVersion } from '../app/useSeasonVersion';
 import { ru } from '../i18n/ru';
 import { Button } from '../ui/Button';
 import { FormDialog } from '../ui/Dialogs';
@@ -27,32 +28,16 @@ import {
 
 const t = ru.pool;
 
-type PoolResult = { games: PoolGame[]; categories: Schemas['CategoryView'][] } | 'signedOut' | null;
+type Pool = { games: PoolGame[]; categories: Schemas['CategoryView'][] };
 
-async function fetchPool(): Promise<PoolResult> {
-  try {
-    const [games, categories] = await Promise.all([
-      api.GET('/api/pool'),
-      api.GET('/api/pool/categories'),
-    ]);
-    if (games.response.status === 401 || categories.response.status === 401) return 'signedOut';
-    return games.data && categories.data
-      ? { games: games.data, categories: categories.data }
-      : null;
-  } catch {
-    return null;
-  }
-}
-
-async function fetchStatuses(seasonId: string): Promise<SeasonGame[] | null> {
-  try {
-    const { data } = await api.GET('/api/seasons/{seasonId}/games', {
-      params: { path: { seasonId } },
-    });
-    return data ?? null;
-  } catch {
-    return null;
-  }
+async function fetchPool(): Promise<Answer<Pool>> {
+  const [games, categories] = await Promise.all([
+    api.GET('/api/pool'),
+    api.GET('/api/pool/categories'),
+  ]);
+  if (!games.data) return answerOf(games);
+  if (!categories.data) return answerOf(categories);
+  return { kind: 'ready', value: { games: games.data, categories: categories.data } };
 }
 
 /** Cards shown at first and added by «Показать ещё» */
@@ -60,11 +45,6 @@ export const pageSize = 60;
 
 /** How long the page waits after a season update before it asks for the statuses again */
 export const statusDelayMs = 300;
-
-type Loaded =
-  | { kind: 'loading' }
-  | { kind: 'failed' }
-  | { kind: 'ready'; games: PoolGame[]; categories: Schemas['CategoryView'][] };
 
 /**
  * The pool of games (H6; SPEC «Пул игр», «Статусы игры в сезоне»): every game with its cover, hours, tags and its status
@@ -80,86 +60,53 @@ export function PoolScreen({
   canAdd: boolean;
   onSignedOut: () => void;
 }) {
-  const [loaded, setLoaded] = useState<Loaded>({ kind: 'loading' });
-  const [statuses, setStatuses] = useState<Map<string, SeasonGame> | null>(null);
-  const [statusFailed, setStatusFailed] = useState(false);
   const [filter, setFilter] = useState<PoolFilter>(noFilter);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [adding, setAdding] = useState(false);
   const [added, setAdded] = useState<string | null>(null);
-  const [retrying, setRetrying] = useState(false);
+  // Games added here show at once, before the pool's own update brings them
+  const [addedGames, setAddedGames] = useState<PoolGame[]>([]);
   const [showing, setShowing] = useState({ key: '', count: pageSize });
   const desk = useDesk();
   const heading = usePageHeading();
-  // Only the latest answer is shown: an older one that comes late must not undo a newer one
-  const poolAsked = useRef(0);
-  const statusAsked = useRef(0);
 
-  const applyPool = useCallback(
-    (result: PoolResult) => {
-      if (result === 'signedOut') onSignedOut();
-      else if (result) setLoaded({ kind: 'ready', ...result });
-      // A failed refresh keeps what the page shows; only the first load turns into the error
-      else setLoaded((now) => (now.kind === 'ready' ? now : { kind: 'failed' }));
+  // The pool follows its own hub; the statuses follow the season, one read after a burst of commands (D-160)
+  const loaded = useLoaded(
+    useCallback(() => fetchPool(), []),
+    {
+      onSignedOut,
+      version: usePoolVersion(),
     },
-    [onSignedOut],
   );
+  const statusVersion = useSeasonVersion(seasonId, { debounceMs: statusDelayMs });
+  const statusLoad = useLoaded(
+    useCallback(async (): Promise<Answer<SeasonGame[]>> => {
+      if (!seasonId) return { kind: 'ready', value: [] };
+      return answerOf(
+        await api.GET('/api/seasons/{seasonId}/games', { params: { path: { seasonId } } }),
+      );
+    }, [seasonId]),
+    { version: statusVersion },
+  );
+  const statuses = useMemo(
+    () =>
+      statusLoad.kind === 'ready' ? new Map(statusLoad.value.map((s) => [s.gameId, s])) : null,
+    [statusLoad],
+  );
+  const statusFailed = statusLoad.kind === 'failed' || statusLoad.kind === 'notFound';
 
-  const applyStatuses = useCallback((result: SeasonGame[] | null) => {
-    if (result) setStatuses(new Map(result.map((s) => [s.gameId, s])));
-    setStatusFailed(!result);
-  }, []);
-
-  const loadPool = useCallback(() => {
-    const asked = ++poolAsked.current;
-    return fetchPool().then((result) => {
-      if (asked === poolAsked.current) applyPool(result);
-    });
-  }, [applyPool]);
-  const loadStatuses = useCallback(() => {
-    if (!seasonId) return Promise.resolve();
-    const asked = ++statusAsked.current;
-    return fetchStatuses(seasonId).then((result) => {
-      if (asked === statusAsked.current) applyStatuses(result);
-    });
-  }, [seasonId, applyStatuses]);
-
-  // Load now, after every change of the pool and after every command of the season (someone rolled, dropped…)
-  useEffect(() => {
-    let active = true;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const refreshPool = () => {
-      const asked = ++poolAsked.current;
-      void fetchPool().then((result) => {
-        if (active && asked === poolAsked.current) applyPool(result);
-      });
-    };
-    const refreshStatuses = () => {
-      if (!seasonId) return;
-      const asked = ++statusAsked.current;
-      void fetchStatuses(seasonId).then((result) => {
-        if (active && asked === statusAsked.current) applyStatuses(result);
-      });
-    };
-    // Commands of the season come in bursts (a roll, its misses, a move): one read after the burst (D-160)
-    const statusesSoon = () => {
-      clearTimeout(timer);
-      timer = setTimeout(refreshStatuses, statusDelayMs);
-    };
-    refreshPool();
-    refreshStatuses();
-    const stopPool = watchPool(refreshPool);
-    const stopSeason = seasonId ? watchSeason(seasonId, statusesSoon) : () => undefined;
-    return () => {
-      active = false;
-      clearTimeout(timer);
-      stopPool();
-      stopSeason();
-    };
-  }, [seasonId, applyPool, applyStatuses]);
-
-  const games = useMemo(() => (loaded.kind === 'ready' ? loaded.games : []), [loaded]);
-  const wheel = useMemo(() => wheelOf(loaded.kind === 'ready' ? loaded.categories : []), [loaded]);
+  const games = useMemo(() => {
+    if (loaded.kind !== 'ready') return [];
+    const known = new Set(loaded.value.games.map((g) => g.id));
+    const extra = addedGames.filter((g) => !known.has(g.id));
+    return extra.length === 0
+      ? loaded.value.games
+      : [...loaded.value.games, ...extra].sort((a, b) => a.title.localeCompare(b.title));
+  }, [loaded, addedGames]);
+  const wheel = useMemo(
+    () => wheelOf(loaded.kind === 'ready' ? loaded.value.categories : []),
+    [loaded],
+  );
   // «Only free» waits for the statuses: without them it would pass every game
   const known = statuses !== null;
   const shown = useMemo(
@@ -260,7 +207,7 @@ export function PoolScreen({
             }}
           >
             <option value="">{t.anyCategory}</option>
-            {(loaded.kind === 'ready' ? loaded.categories : []).map((c) => (
+            {(loaded.kind === 'ready' ? loaded.value.categories : []).map((c) => (
               <option key={c.name} value={c.name}>
                 {t.categoryOption(c.name, c.games)}
               </option>
@@ -302,18 +249,14 @@ export function PoolScreen({
         {statusFailed ? <Notice tone="warning">{t.statusError}</Notice> : null}
         {loaded.kind === 'loading' ? (
           <PoolSkeleton />
-        ) : loaded.kind === 'failed' ? (
+        ) : loaded.kind !== 'ready' ? (
           <ErrorState
             level={2}
             title={t.loadErrorTitle}
             text={ru.shell.loadErrorText}
             onRetry={() => {
-              if (retrying) return;
-              setRetrying(true);
-              setLoaded({ kind: 'loading' });
-              void Promise.all([loadPool(), loadStatuses()]).finally(() => {
-                setRetrying(false);
-              });
+              loaded.reload();
+              statusLoad.reload();
             }}
           />
         ) : games.length === 0 ? (
@@ -369,19 +312,12 @@ export function PoolScreen({
       {canAdd && loaded.kind === 'ready' ? (
         <FormDialog open={adding} onOpenChange={setAdding} title={t.form.title} wide>
           <AddGameForm
-            categories={loaded.categories}
+            categories={loaded.value.categories}
             onSignedOut={onSignedOut}
             onAdded={(game) => {
               setAdding(false);
               setAdded(game.title);
-              setLoaded((now) =>
-                now.kind === 'ready' && !now.games.some((g) => g.id === game.id)
-                  ? {
-                      ...now,
-                      games: [...now.games, game].sort((a, b) => a.title.localeCompare(b.title)),
-                    }
-                  : now,
-              );
+              setAddedGames((now) => [...now, game]);
             }}
           />
         </FormDialog>

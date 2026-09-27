@@ -1,8 +1,8 @@
 import { MessagesSquare, SearchX } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Schemas } from '../api/client';
-import { watchSeason } from '../api/realtime';
 import { navigate, paths, usePageHeading } from '../app/router';
+import { useSeasonVersion } from '../app/useSeasonVersion';
 import { ru } from '../i18n/ru';
 import { Button } from '../ui/Button';
 import { EmptyState, ErrorState, Notice } from '../ui/States';
@@ -44,12 +44,12 @@ export function FeedScreen({
       return;
     }
     const before = current.current;
-    if (result.kind !== 'page') {
+    if (result.kind !== 'ready') {
       // A failed refresh keeps what is shown; only the first load shows the error
       if (before.kind !== 'ready') show({ kind: result.kind });
       return;
     }
-    const { page } = result;
+    const page = result.value;
     if (before.kind !== 'ready') {
       show({
         kind: 'ready',
@@ -78,11 +78,11 @@ export function FeedScreen({
     }
   }, [seasonId, onSignedOut, show]);
 
+  // Others' actions come in without a reload (DESIGN.md «Обновления в реальном времени»)
+  const version = useSeasonVersion(seasonId);
   useEffect(() => {
     void load();
-    // Others' actions come in without a reload (DESIGN.md «Обновления в реальном времени»)
-    return watchSeason(seasonId, () => void load());
-  }, [seasonId, load, show]);
+  }, [load, version]);
 
   async function loadMore() {
     const shown = current.current;
@@ -93,7 +93,7 @@ export function FeedScreen({
       onSignedOut();
       return;
     }
-    if (result.kind !== 'page') {
+    if (result.kind !== 'ready') {
       setMore('failed');
       return;
     }
@@ -101,9 +101,9 @@ export function FeedScreen({
     if (latest.kind === 'ready') {
       show({
         ...latest,
-        entries: mergeEntries(latest.entries, result.page.entries),
-        refs: withRefs(latest.refs, result.page),
-        nextBefore: result.page.nextBefore,
+        entries: mergeEntries(latest.entries, result.value.entries),
+        refs: withRefs(latest.refs, result.value),
+        nextBefore: result.value.nextBefore,
       });
     }
     setMore('idle');
