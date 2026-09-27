@@ -18,7 +18,7 @@ public enum RunEnd
 
 /// <summary>
 /// One run: the game's hours (from the snapshot), the hours the bot played it, how it ended, the points its completion
-/// gave and the drop penalty it took, the zone it was rolled in, and whether it was played in the first's free mode
+/// gave (less what a reject took back) and the drop penalty it took, the zone it was rolled in, and whether it was played in the first's free mode
 /// (no points).
 /// </summary>
 public sealed record RunOutcome(int Bot, double Hours, double PlayHours, RunEnd End, int Points, int Penalty, string? Zone, bool FreeMode);
@@ -30,7 +30,9 @@ public sealed record BranchOutcome(int Bot, string Fork, string Option);
 /// A bot at the end of the season: its profile and policies, its place and points in the result, its finish
 /// (<see cref="FinishedDay"/> — days from the start when the finish that stood was reached), what it did, and
 /// <see cref="BlockedHours"/> — free time lost waiting for the admin's check (<c>season.maxUncheckedRuns</c>).
-/// <see cref="Rejected"/> — its commands the engine refused.
+/// <see cref="Rejected"/> — its commands the engine refused. Points are the engine's; they add up from the runs' points
+/// (a reject's take-back included), the drop penalties, <see cref="CellBonus"/>, <see cref="FinishBonus"/> and
+/// <see cref="OtherPoints"/> (any other change, such as an admin's).
 /// </summary>
 public sealed record BotOutcome(
     int Index,
@@ -54,6 +56,7 @@ public sealed record BotOutcome(
     int Rejected,
     int CellBonus,
     int FinishBonus,
+    int OtherPoints,
     int Teleports);
 
 /// <summary>

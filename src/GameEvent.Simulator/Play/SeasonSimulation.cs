@@ -25,7 +25,6 @@ public sealed class SeasonSimulation
     public const int MaxActionsPerWake = 40;
 
     private const double Epsilon = 1e-9;
-    private const double MaxSessionHours = 14;
     private const string ProofLink = "https://example.com/proof";
 
     private static readonly Guid s_seasonId = SimIds.Make(0x5ea50000, 1);
@@ -186,7 +185,7 @@ public sealed class SeasonSimulation
             }
 
             var weekend = date.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday;
-            var hours = Math.Min(MaxSessionHours, profile.HoursPerDay * noise * (weekend ? profile.WeekendFactor : 1));
+            var hours = Math.Min(profile.MaxSessionHours, profile.HoursPerDay * noise * (weekend ? profile.WeekendFactor : 1));
             if (hours < 0.05)
             {
                 continue;
@@ -216,10 +215,12 @@ public sealed class SeasonSimulation
             return;
         }
 
+        // A session that starts late (the previous one ran over) still ends at the deadline at the latest
         var session = bot.Sessions[bot.Session];
-        bot.Budget = session.Hours;
-        bot.FreeHours += session.Hours;
-        Enqueue(session.Start > _clock.UtcNow ? session.Start : _clock.UtcNow, WakeKind.Bot, bot.Index, bot.Session);
+        var start = session.Start > _clock.UtcNow ? session.Start : _clock.UtcNow;
+        bot.Budget = Math.Max(0, Math.Min(session.Hours, (_deadline - start).TotalHours));
+        bot.FreeHours += bot.Budget;
+        Enqueue(start, WakeKind.Bot, bot.Index, bot.Session);
     }
 
     private void BotWake(Bot bot, int session)
@@ -231,6 +232,14 @@ public sealed class SeasonSimulation
 
         for (var actions = 0; actions < MaxActionsPerWake; actions++)
         {
+            // A branch choice takes no time and is allowed after the deadline too (D-305): the steps belong to a throw before it
+            var player = _state.Players[bot.PlayerId];
+            if (player.Choice is { Kind: ChoiceKind.Branch } branch)
+            {
+                ChooseBranch(bot, player, branch);
+                continue;
+            }
+
             var now = _clock.UtcNow;
             if (now >= _deadline)
             {
@@ -243,13 +252,6 @@ public sealed class SeasonSimulation
             {
                 NextSession(bot);
                 return;
-            }
-
-            var player = _state.Players[bot.PlayerId];
-            if (player.Choice is { Kind: ChoiceKind.Branch } branch)
-            {
-                ChooseBranch(bot, player, branch);
-                continue;
             }
 
             switch (player.Phase)
@@ -387,9 +389,9 @@ public sealed class SeasonSimulation
         var need = Math.Max(0.1, _bots.LogNormal(hours, behaviour.PlayTimeNoise));
         var minPlay = _state.Rules.Roll.MinPlayMinutesBeforeDrop / 60.0;
         var plan = new RunPlan(run.RunId, need);
-        if (_bots.Chance(behaviour.TechRerollChance))
+        if (run.Snapshot.TechRerollWindowHours > 0 && _bots.Chance(behaviour.TechRerollChance))
         {
-            plan.Act(PlanAction.TechReroll, Math.Min(0.5, need));
+            plan.Act(PlanAction.TechReroll, Math.Min(behaviour.TechRerollAfterHours, need));
         }
         else if (bot.Dropper && hours > behaviour.DropAboveHours && minPlay < need)
         {
@@ -397,7 +399,8 @@ public sealed class SeasonSimulation
         }
         else if (_bots.Chance(behaviour.RandomDropChance))
         {
-            plan.Act(PlanAction.Drop, Math.Max(minPlay, need * (0.2 + (0.6 * _bots.NextDouble()))));
+            var share = behaviour.RandomDropFrom + ((behaviour.RandomDropTo - behaviour.RandomDropFrom) * _bots.NextDouble());
+            plan.Act(PlanAction.Drop, Math.Max(minPlay, need * share));
         }
 
         if (plan.ActAt > need)
@@ -594,11 +597,17 @@ public sealed class SeasonSimulation
             case PointsChanged { Reason: PointsReason.DropPenalty, RunId: { } run } points:
                 _runs[run].Penalty -= points.Delta;
                 break;
+            case PointsChanged { Reason: PointsReason.ProofRejected, RunId: { } run } points:
+                _runs[run].Points += points.Delta;
+                break;
             case PointsChanged { Reason: PointsReason.CellBonus } points:
                 _byPlayer[points.PlayerId].CellBonus += points.Delta;
                 break;
             case PointsChanged { Reason: PointsReason.FinishBonus or PointsReason.FinishBonusRevoked } points:
                 _byPlayer[points.PlayerId].FinishBonus += points.Delta;
+                break;
+            case PointsChanged points:
+                _byPlayer[points.PlayerId].OtherPoints += points.Delta;
                 break;
             case PlayerMoved { Reason: MoveReason.Teleport } moved:
                 _byPlayer[moved.PlayerId].Teleports++;
@@ -674,6 +683,7 @@ public sealed class SeasonSimulation
                 b.Rejected,
                 b.CellBonus,
                 b.FinishBonus,
+                b.OtherPoints,
                 b.Teleports);
         }).ToList();
 
@@ -800,6 +810,8 @@ public sealed class SeasonSimulation
         public int CellBonus { get; set; }
 
         public int FinishBonus { get; set; }
+
+        public int OtherPoints { get; set; }
 
         public int Teleports { get; set; }
 

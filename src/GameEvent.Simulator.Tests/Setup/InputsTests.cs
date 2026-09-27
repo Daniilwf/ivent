@@ -53,13 +53,18 @@ public class InputsTests
     public void Inputs_that_cannot_be_played_name_every_problem()
     {
         var rules = RulesetJson.Default() with { Features = RulesetJson.Default().Features with { MapMode = MapMode.Graph } };
-        var settings = new SimulationSettings { Players = [new("nobody", 2)], Behaviour = new BotBehaviour { TechRerollChance = 2 } };
+        var settings = new SimulationSettings
+        {
+            Players = [new("nobody", 2)],
+            Behaviour = new BotBehaviour { TechRerollChance = 2, Difficulty = new Dictionary<string, double> { ["medium"] = 1 } },
+        };
 
         var error = Assert.Throws<InvalidDataException>(() => SimulatorFixtures.Inputs(rules, settings: settings));
 
         Assert.Contains("--map", error.Message, StringComparison.Ordinal);
         Assert.Contains("players.nobody", error.Message, StringComparison.Ordinal);
         Assert.Contains("behaviour.techRerollChance", error.Message, StringComparison.Ordinal);
+        Assert.Contains("behaviour.difficulty", error.Message, StringComparison.Ordinal);
     }
 
     [Fact]

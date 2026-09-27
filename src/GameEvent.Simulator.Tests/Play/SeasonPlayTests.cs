@@ -67,24 +67,48 @@ public class SeasonPlayTests
     [Fact]
     public void Every_branch_policy_is_played_by_every_profile_over_the_runs()
     {
-        var seasons = SimulationRunner.Play(SimulatorFixtures.Inputs(map: SimulatorFixtures.Map("content/map.example.json")), 3, 3, 1);
+        // One bot per profile: only the rotation with the run gives each of them every policy in three runs
+        var settings = new SimulationSettings { Players = [new("active", 1), new("average", 1), new("busy", 1)] };
+        var inputs = SimulatorFixtures.Inputs(map: SimulatorFixtures.Map("content/map.example.json"), settings: settings);
 
-        var pairs = seasons.SelectMany(s => s.Bots).Select(b => (b.Profile, b.BranchPolicy)).Distinct().Count();
-        Assert.Equal(3 * 3, pairs);
+        var seasons = SimulationRunner.Play(inputs, 3, 3, 1);
+
+        foreach (var profile in new[] { "active", "average", "busy" })
+        {
+            Assert.Equal(
+                [BranchPolicy.Shortest, BranchPolicy.Default, BranchPolicy.Random],
+                seasons.SelectMany(s => s.Bots).Where(b => b.Profile == profile).Select(b => b.BranchPolicy).Order());
+        }
     }
 
-    // Points are the engine's; the sum of what the simulator saw per run and per bot must give the same
-    private static void AssertConsistent(SeasonOutcome season)
+    [Fact]
+    public void Rejected_proofs_take_back_their_points_and_the_books_still_balance()
     {
-        Assert.Equal(new SimulationSettings().Players.Sum(p => p.Count), season.Bots.Count);
+        var settings = new SimulationSettings { Admin = new AdminBehaviour { RejectChance = 0.3 } };
+        var inputs = SimulatorFixtures.Inputs(map: SimulatorFixtures.Map("content/map.demo.json"), settings: settings);
+
+        var seasons = SimulationRunner.Play(inputs, 4, 21, 17);
+
+        Assert.All(seasons, s => AssertConsistent(s, settings));
+        var rejected = seasons.SelectMany(s => s.Runs).Where(r => r.End == RunEnd.Rejected).ToList();
+        Assert.NotEmpty(rejected);
+        Assert.All(rejected, r => Assert.Equal(0, r.Points));
+    }
+
+    private static void AssertConsistent(SeasonOutcome season) => AssertConsistent(season, new SimulationSettings());
+
+    // Points are the engine's; the sum of what the simulator saw per run and per bot must give the same
+    private static void AssertConsistent(SeasonOutcome season, SimulationSettings settings)
+    {
+        Assert.Equal(settings.Players.Sum(p => p.Count), season.Bots.Count);
         Assert.Equal(0, season.GuardTrips);
         Assert.Equal(1, season.Bots.Min(b => b.Place));
         Assert.True(season.Bots.Count(b => b.IsFirst) <= 1);
         foreach (var bot in season.Bots)
         {
             var runs = season.Runs.Where(r => r.Bot == bot.Index).ToList();
-            var fromRuns = runs.Where(r => r.End != RunEnd.Rejected).Sum(r => r.Points) - runs.Sum(r => r.Penalty);
-            Assert.Equal(bot.Points, fromRuns + bot.CellBonus + bot.FinishBonus);
+            var fromRuns = runs.Sum(r => r.Points) - runs.Sum(r => r.Penalty);
+            Assert.Equal(bot.Points, fromRuns + bot.CellBonus + bot.FinishBonus + bot.OtherPoints);
             Assert.Equal(bot.Completed, runs.Count(r => r.End == RunEnd.Completed));
             Assert.Equal(bot.Drops, runs.Count(r => r.End == RunEnd.Dropped));
             Assert.Equal(bot.FinishOrder is not null, bot.FinishedDay is not null);

@@ -14,7 +14,7 @@ public sealed record SimulationReport(
     DropReport Drops,
     FinishReport Finish,
     IReadOnlyList<ProfileRow> Profiles,
-    GapReport Gap,
+    GapReport? Gap,
     CountsReport Counts,
     BranchReport? Branches,
     IReadOnlyList<ZoneRow> Zones,
@@ -28,7 +28,9 @@ public sealed record ReportMeta(
 
 /// <summary>
 /// Runs by the game's hours: started, completed, dropped per season; points per hour of play and per hour of the game's
-/// length over completed runs (the first's free mode left out).
+/// length over completed runs (the first's free mode left out); <see cref="PointsPerAllPlayHours"/> — the points of the
+/// completions less the drop penalties, over every hour played on the bucket's games, dropped, tech-rerolled and
+/// unfinished at the deadline included.
 /// </summary>
 public sealed record LengthBucketRow(
     string Label,
@@ -40,6 +42,7 @@ public sealed record LengthBucketRow(
     double DropShare,
     double PointsPerPlayHour,
     double PointsPerGameHour,
+    double PointsPerAllPlayHours,
     double MeanPointsPerCompletion,
     double MeanPlayHoursPerCompletion);
 
@@ -73,6 +76,10 @@ public sealed record FinishReport(
 
 public sealed record Percentiles(double P10, double P25, double P50, double P75, double P90, double Mean);
 
+/// <summary>
+/// A profile's bots, per bot: <see cref="WinShare"/> — place 1 (a tie shares it), <see cref="PointsPerPlayHour"/> — over
+/// its completed runs, <see cref="SeasonPointsPerPlayHour"/> — the season's points over every hour played.
+/// </summary>
 public sealed record ProfileRow(
     string Profile,
     int BotsPerSeason,
@@ -93,7 +100,8 @@ public sealed record ProfileRow(
     double MeanFreeHours,
     double MeanBlockedHours,
     double MeanUnfinishedHours,
-    double PointsPerPlayHour);
+    double PointsPerPlayHour,
+    double SeasonPointsPerPlayHour);
 
 /// <summary>The profile with the most free time against the one with the least.</summary>
 public sealed record GapReport(

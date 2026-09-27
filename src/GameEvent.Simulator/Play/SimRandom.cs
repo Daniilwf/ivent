@@ -4,7 +4,8 @@ namespace GameEvent.Simulator.Play;
 
 /// <summary>
 /// A seeded SplitMix64 generator: the engine's dice and the bots' choices. Its own algorithm, not <see cref="Random"/>,
-/// so a seed gives the same season on every .NET version and machine (D-351).
+/// so a seed gives the same season on every .NET version; the log-normal draws use <see cref="Math"/> functions, so
+/// another processor architecture or OS may differ in the last bits (D-351).
 /// </summary>
 public sealed class SimRandom(ulong seed) : IRandomSource
 {

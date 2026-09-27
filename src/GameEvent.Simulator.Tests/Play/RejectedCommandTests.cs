@@ -49,9 +49,28 @@ public class RejectedCommandTests
     }
 
     [Fact]
-    public void Bots_start_the_game_when_a_paid_reroll_is_refused()
+    public void Bots_start_the_game_when_the_engine_refuses_a_reroll()
     {
-        // Every bot wants a paid reroll of every game but has no coins for it: the engine refuses, the bot plays on
+        // Every bot wants to reroll every game, but the pool has a single game: the engine refuses, the bot plays it
+        var pool = new PoolFile([new PoolFileCategory("Puzzle", 1)], [new PoolFileGame("Portal", ["Puzzle"], 3)]);
+        var settings = new SimulationSettings
+        {
+            Players = [new("active", 1)],
+            Behaviour = new BotBehaviour { RerollAboveHours = 0, AlreadyPlayedChance = 0, TechRerollChance = 0, RandomDropChance = 0 },
+        };
+        var inputs = SimulatorFixtures.Inputs(pool: pool, settings: settings);
+
+        var seasons = SimulationRunner.Play(inputs, 3, Days, 13);
+
+        AssertNoLoops(seasons, settings);
+        Assert.All(seasons, s => Assert.True(s.Rejections.GetValueOrDefault(RejectionCodes.NoAvailableGames) > 0));
+        Assert.All(seasons.SelectMany(s => s.Bots), b => Assert.Equal((1, 0, 0), (b.Completed, b.FreeRerolls, b.PaidRerolls)));
+    }
+
+    [Fact]
+    public void Bots_never_pay_for_a_reroll_they_cannot_afford()
+    {
+        // Every bot would pay for a reroll of every game; it checks its coins first, so the engine never refuses for coins
         var rules = RulesetJson.Default();
         rules = rules with { Roll = rules.Roll with { FreeRerollsPerRoll = 0 } };
         var settings = new SimulationSettings { Behaviour = new BotBehaviour { PaidRerollAboveHours = 0, RerollAboveHours = null } };
@@ -60,6 +79,7 @@ public class RejectedCommandTests
         var seasons = SimulationRunner.Play(inputs, 3, Days, 13);
 
         AssertNoLoops(seasons, settings);
+        Assert.All(seasons, s => Assert.False(s.Rejections.ContainsKey(RejectionCodes.NotEnoughCoins)));
         Assert.All(seasons, s => Assert.True(s.Bots.Sum(b => b.Completed) > 0));
     }
 

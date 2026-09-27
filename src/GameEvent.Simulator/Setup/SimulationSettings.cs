@@ -81,6 +81,11 @@ public sealed record SimulationSettings
                 problems.Add($"profiles.{name}: hoursPerDay 0…16, dayNoise 0…3, weekendFactor 0…4");
             }
 
+            if (profile.MaxSessionHours is <= 0 or > 24)
+            {
+                problems.Add($"profiles.{name}.maxSessionHours: above 0, at most 24");
+            }
+
             if (profile.SessionStartHour is < 0 or > 23)
             {
                 problems.Add($"profiles.{name}.sessionStartHour: 0…23");
@@ -101,9 +106,16 @@ public sealed record SimulationSettings
             problems.Add("behaviour.playTimeNoise: 0…3");
         }
 
-        if (b.Difficulty.Values.Any(w => w < 0) || b.Difficulty.Values.Sum() <= 0)
+        string[] difficulties = ["easy", "normal", "hard", "extreme"];
+        if (b.Difficulty.Keys.Any(k => !difficulties.Contains(k, StringComparer.Ordinal))
+            || b.Difficulty.Values.Any(w => w < 0) || b.Difficulty.Values.Sum() <= 0)
         {
-            problems.Add("behaviour.difficulty: non-negative weights, at least one positive");
+            problems.Add("behaviour.difficulty: weights of easy, normal, hard, extreme — not negative, at least one positive");
+        }
+
+        if (b.RandomDropFrom < 0 || b.RandomDropTo > 1 || b.RandomDropFrom > b.RandomDropTo || b.TechRerollAfterHours < 0)
+        {
+            problems.Add("behaviour: 0 ≤ randomDropFrom ≤ randomDropTo ≤ 1, techRerollAfterHours not negative");
         }
 
         if (b.BranchPolicies.Count == 0)
@@ -157,6 +169,9 @@ public sealed record BotProfile
     public double WeekendFactor { get; init; } = 1.5;
 
     public int SessionStartHour { get; init; } = 19;
+
+    /// <summary>A day's session is never longer than this.</summary>
+    public double MaxSessionHours { get; init; } = 14;
 }
 
 /// <summary>How the bot picks a branch at a fork.</summary>
@@ -181,8 +196,10 @@ public sealed record BotBehaviour
     /// <summary>A rolled game is one the bot played before the event: «Уже проходил».</summary>
     public double AlreadyPlayedChance { get; init; } = 0.03;
 
-    /// <summary>A started game does not run: the bot tech-rerolls it after half an hour.</summary>
+    /// <summary>A started game does not run: the bot tech-rerolls it after <see cref="TechRerollAfterHours"/> of play.</summary>
     public double TechRerollChance { get; init; } = 0.02;
+
+    public double TechRerollAfterHours { get; init; } = 0.5;
 
     /// <summary>A free reroll is used when the offered game is longer than this; null — never.</summary>
     public double? RerollAboveHours { get; init; } = 15;
@@ -207,6 +224,11 @@ public sealed record BotBehaviour
 
     /// <summary>Any bot gives up a game midway (at 20–80% of it): the game turned out not to be for them.</summary>
     public double RandomDropChance { get; init; } = 0.03;
+
+    /// <summary>Where in the game a random drop comes: a share of its play time, evenly between these two.</summary>
+    public double RandomDropFrom { get; init; } = 0.2;
+
+    public double RandomDropTo { get; init; } = 0.8;
 
     /// <summary>Weights of the difficulty the bot plays on.</summary>
     public IReadOnlyDictionary<string, double> Difficulty { get; init; } = new Dictionary<string, double>

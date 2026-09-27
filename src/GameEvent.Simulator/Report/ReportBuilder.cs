@@ -73,6 +73,7 @@ public static class ReportBuilder
             var scored = inBucket.Where(Scored).ToList();
             var dropped = inBucket.Count(r => r.End == RunEnd.Dropped);
             var points = scored.Sum(r => r.Points);
+            var played = inBucket.Where(r => !r.FreeMode).ToList();
             return new LengthBucketRow(
                 b.Label,
                 b.From,
@@ -83,6 +84,7 @@ public static class ReportBuilder
                 Ratio(dropped, inBucket.Count),
                 Ratio(points, scored.Sum(r => r.PlayHours)),
                 Ratio(points, scored.Sum(r => r.Hours)),
+                Ratio(points - played.Sum(r => r.Penalty), played.Sum(r => r.PlayHours)),
                 Ratio(points, scored.Count),
                 Ratio(scored.Sum(r => r.PlayHours), scored.Count));
         })];
@@ -168,7 +170,7 @@ public static class ReportBuilder
                 Mean(of.Select(b => (double)b.Points)),
                 Percentile(of.Select(b => (double)b.Points)) ?? new Percentiles(0, 0, 0, 0, 0, 0),
                 Mean(of.Select(b => (double)b.Place)),
-                Ratio(won, seasons.Count),
+                Ratio(won, of.Count),
                 Ratio(of.Count(b => b.Place <= 3), of.Count),
                 Ratio(of.Count(b => b.IsFirst), of.Count),
                 Ratio(of.Count(b => b.FinishOrder is not null), of.Count),
@@ -182,13 +184,19 @@ public static class ReportBuilder
                 Mean(of.Select(b => b.FreeHours)),
                 Mean(of.Select(b => b.BlockedHours)),
                 Ratio(unfinished, of.Count),
-                Ratio(scored.Sum(r => r.Points), scored.Sum(r => r.PlayHours)));
+                Ratio(scored.Sum(r => r.Points), scored.Sum(r => r.PlayHours)),
+                Ratio(of.Sum(b => (double)b.Points), of.Sum(b => b.PlayHours)));
         })];
     }
 
-    private static GapReport Gap(SimulationSettings settings, IReadOnlyList<SeasonOutcome> seasons)
+    private static GapReport? Gap(SimulationSettings settings, IReadOnlyList<SeasonOutcome> seasons)
     {
         var used = ProfileNames(settings).ToList();
+        if (used.Count < 2)
+        {
+            return null;
+        }
+
         var active = used.OrderByDescending(p => settings.Profiles[p].HoursPerDay).ThenBy(p => p, StringComparer.Ordinal).First();
         var busy = used.OrderBy(p => settings.Profiles[p].HoursPerDay).ThenBy(p => p, StringComparer.Ordinal).First();
         var a = seasons.SelectMany(s => s.Bots).Where(b => b.Profile == active).ToList();

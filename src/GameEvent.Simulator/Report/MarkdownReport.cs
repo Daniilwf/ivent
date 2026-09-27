@@ -29,13 +29,13 @@ public static class MarkdownReport
 
         Line(md, "## Очки в час по длине игры");
         Line(md);
-        Line(md, "Только засчитанные прохождения (без свободного режима первого). «Очки/ч игры» — на час реальной игры бота, «очки/ч HLTB» — на час длины игры из пула.");
+        Line(md, "«Очки/ч игры» и «очки/ч HLTB» — по засчитанным прохождениям (без свободного режима первого): на час реальной игры бота и на час длины игры из пула. «Очки/ч всех часов» — очки прохождений минус штрафы дропа на все часы, сыгранные в играх этой длины, включая дропнутые, тех-рероллы и недопройденные к дедлайну.");
         Line(md);
-        Table(md, ["Длина", "Начато за сезон", "Пройдено", "Дропнуто", "Доля дропов", "Очки/ч игры", "Очки/ч HLTB", "Очков за прохождение", "Часов на прохождение"],
+        Table(md, ["Длина", "Начато за сезон", "Пройдено", "Дропнуто", "Доля дропов", "Очки/ч игры", "Очки/ч HLTB", "Очки/ч всех часов", "Очков за прохождение", "Часов на прохождение"],
             report.LengthBuckets.Select(b => new[]
             {
                 b.Label, N(b.StartedPerSeason), N(b.CompletedPerSeason), N(b.DroppedPerSeason), P(b.DropShare),
-                N(b.PointsPerPlayHour, 2), N(b.PointsPerGameHour, 2), N(b.MeanPointsPerCompletion), N(b.MeanPlayHoursPerCompletion),
+                N(b.PointsPerPlayHour, 2), N(b.PointsPerGameHour, 2), N(b.PointsPerAllPlayHours, 2), N(b.MeanPointsPerCompletion), N(b.MeanPlayHoursPerCompletion),
             }));
 
         Line(md, "## Выгода дропа");
@@ -72,20 +72,22 @@ public static class MarkdownReport
 
         Line(md, "## Профили игроков");
         Line(md);
-        Table(md, ["Профиль", "Ботов", "Очки (ср.)", "Очки 10–50–90%", "Место (ср.)", "Побед", "Топ-3", "Финиш", "Первый", "Пройдено", "Дропов", "Рероллов (беспл. / платн.)", "Часов игры", "Своб. часов", "Ждал проверки, ч", "Не допройдено к дедлайну, ч", "Очки/ч"],
+        Table(md, ["Профиль", "Ботов", "Очки (ср.)", "Очки 10–50–90%", "Место (ср.)", "Место 1", "Топ-3", "Финиш", "Первый", "Пройдено", "Дропов", "Рероллов (беспл. / платн.)", "Часов игры", "Своб. часов", "Ждал проверки, ч", "Не допройдено к дедлайну, ч", "Очки/ч прохождений", "Очки сезона/ч игры"],
             report.Profiles.Select(p => new[]
             {
                 p.Profile, p.BotsPerSeason.ToString(s_ru), N(p.MeanPoints), $"{N(p.Points.P10)}–{N(p.Points.P50)}–{N(p.Points.P90)}",
                 N(p.MeanPlace), P(p.WinShare), P(p.Top3Share), P(p.FinishShare), P(p.FirstShare), N(p.MeanCompleted), N(p.MeanDrops),
-                $"{N(p.MeanFreeRerolls)} / {N(p.MeanPaidRerolls)}", N(p.MeanPlayHours), N(p.MeanFreeHours), N(p.MeanBlockedHours), N(p.MeanUnfinishedHours), N(p.PointsPerPlayHour, 2),
+                $"{N(p.MeanFreeRerolls)} / {N(p.MeanPaidRerolls)}", N(p.MeanPlayHours), N(p.MeanFreeHours), N(p.MeanBlockedHours), N(p.MeanUnfinishedHours), N(p.PointsPerPlayHour, 2), N(p.SeasonPointsPerPlayHour, 2),
             }));
 
-        var g = report.Gap;
-        Line(md, "## Разрыв активных и занятых");
-        Line(md);
-        Line(md, $"- `{g.Active}`: {N(g.ActiveMeanPoints)} очков, место {N(g.ActiveMeanPlace)}; `{g.Busy}`: {N(g.BusyMeanPoints)} очков, место {N(g.BusyMeanPlace)}.");
-        Line(md, $"- Очки активного больше в {N(g.PointsRatio, 2)} раза. Лучший занятый выше худшего активного в {P(g.BusyBeatsActiveShare)} сезонов.");
-        Line(md);
+        if (report.Gap is { } g)
+        {
+            Line(md, "## Разрыв активных и занятых");
+            Line(md);
+            Line(md, $"- `{g.Active}`: {N(g.ActiveMeanPoints)} очков, место {N(g.ActiveMeanPlace)}; `{g.Busy}`: {N(g.BusyMeanPoints)} очков, место {N(g.BusyMeanPlace)}.");
+            Line(md, $"- Очки активного больше в {N(g.PointsRatio, 2)} раза. Лучший занятый выше худшего активного в {P(g.BusyBeatsActiveShare)} сезонов.");
+            Line(md);
+        }
 
         var c = report.Counts;
         Line(md, "## Действия за сезон (среднее)");
