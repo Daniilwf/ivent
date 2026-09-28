@@ -303,6 +303,11 @@ export function SeasonScreen({
     () => (walking ? seasonPicture(walking.before, chain) : null),
     [walking, chain],
   );
+  // Worked out once per move: a new path in the middle of the walk would start the token over
+  const walkingPath = useMemo(
+    () => (walking ? legsPath(walking.legs, chain.cellNumber) : null),
+    [walking, chain],
+  );
   // A branch choice that comes while the page is open takes the focus, as a rolled game does
   const branchId = season?.me?.choice?.kind === 'branch' ? season.me.choice.id : null;
   const branchSeen = useRef<string | null | undefined>(undefined);
@@ -380,7 +385,7 @@ export function SeasonScreen({
   const mine = players.find((p) => p.me);
   // While the dice roll, the map and the leaderboard still show the season before the completion
   // …and while my token walks the chosen branch, the map shows me at the fork
-  const walked = !throwing && walking && mine ? legsPath(walking.legs, cellNumber) : null;
+  const walked = !throwing && mine ? walkingPath : null;
   // A walk the page cannot draw (a cell it does not know) is not played
   const moving = walked ? walking : null;
   const shownPlayers =
@@ -595,7 +600,12 @@ export function SeasonScreen({
         }}
         free={throwFree}
         walked={
-          thrown.legs ? (legsPath(thrown.legs, cellNumber) ?? { path: null, jumps: [] }) : undefined
+          thrown.legs
+            ? (legsPath(thrown.legs, cellNumber) ?? { path: null, jumps: [] })
+            : // On the graph without the server's legs the numbers say nothing about the way: one jump
+              graphMode
+              ? { path: throwFrom === mine.cell ? null : [throwFrom, mine.cell], jumps: [] }
+              : undefined
         }
         board={board}
         players={held?.players ?? players}

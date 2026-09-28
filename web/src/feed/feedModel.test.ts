@@ -373,6 +373,79 @@ describe('feed lines', () => {
   });
 });
 
+describe('feed lines of the graph map (D-319)', () => {
+  it('says a branch was chosen, with the teleport the move ended on', () => {
+    const item = one([
+      entry('m1', 'player-moved', {
+        playerId: vasya,
+        from: 't',
+        to: 'a2',
+        steps: 0,
+        path: ['a2'],
+        reason: 'teleport',
+        runId: null,
+      }),
+      entry('m1', 'player-moved', {
+        playerId: vasya,
+        from: 'f',
+        to: 't',
+        steps: 2,
+        path: ['b1', 't'],
+        reason: 'completionRoll',
+        runId: run1,
+      }),
+      entry('m1', 'choice-made', { playerId: vasya, choiceId: 'c', optionId: 'b1' }),
+    ]);
+    expect(text(item)).toBe(ru.feed.lines.choseBranch<string>('Вася').join(''));
+    expect(item?.facts).toContain(ru.feed.facts.teleport);
+    expect(item?.facts).toContain(ru.feed.facts.cells(2));
+  });
+
+  it('keeps «выбирает игру» for a choice of games', () => {
+    const item = one([
+      entry('g1', 'choice-made', { playerId: vasya, choiceId: 'c', optionId: 'x' }),
+    ]);
+    expect(text(item)).toBe(ru.feed.lines.chose<string>('Вася').join(''));
+  });
+
+  it("says the map was published, with the admin's comment", () => {
+    const item = one([entry('p1', 'map-published', { map: {}, comment: 'Добавили болото' })]);
+    expect(text(item)).toBe(ru.feed.lines.mapPublished<string>().join(''));
+    expect(item?.quote?.text).toBe('Добавили болото');
+  });
+
+  it('says a completion stopped at a fork to wait for the branch', () => {
+    const item = one([
+      entry('w1', 'branch-choice-requested', {
+        playerId: vasya,
+        choiceId: 'c',
+        cellId: 'f',
+        options: ['a1', 'b1'],
+        steps: 2,
+        reason: 'completionRoll',
+        runId: run1,
+      }),
+      entry('w1', 'player-moved', {
+        playerId: vasya,
+        from: 'start',
+        to: 'f',
+        steps: 3,
+        path: ['f'],
+        reason: 'completionRoll',
+        runId: run1,
+        paused: true,
+      }),
+      entry('w1', 'run-completed', {
+        runId: run1,
+        playerId: vasya,
+        difficulty: 'normal',
+        hours: 5,
+      }),
+    ]);
+    expect(item?.facts).toContain(ru.feed.facts.branchWaiting);
+  });
+});
+
 describe('feed pages', () => {
   it('gives each player the token of their place in the season’s list, as on the map', () => {
     expect([...refs.players.values()].map((p) => [p.name, p.token, p.avatar])).toEqual([

@@ -1,3 +1,4 @@
+import { onDesktop } from '../test/desk';
 import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Schemas } from '../api/client';
@@ -2121,12 +2122,7 @@ describe('SeasonScreen wheel (H3, D-136)', () => {
   });
 
   it('plays on the stage of the map on a desktop and keeps the result there until closed', async () => {
-    vi.stubGlobal('matchMedia', (query: string) => ({
-      matches: query.includes('min-width'),
-      media: query,
-      addEventListener: () => undefined,
-      removeEventListener: () => undefined,
-    }));
+    onDesktop();
     let current = season();
     serve(async (r) => {
       if (isSeasonGet(r)) return json(200, current);
@@ -2421,12 +2417,7 @@ describe('SeasonScreen completion moment (H4)', () => {
   });
 
   it('plays on the stage of the map on a desktop, not in the turn card', async () => {
-    vi.stubGlobal('matchMedia', (query: string) => ({
-      matches: query.includes('min-width'),
-      media: query,
-      addEventListener: () => undefined,
-      removeEventListener: () => undefined,
-    }));
+    onDesktop();
     serveCompletion();
     render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
     await complete();

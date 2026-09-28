@@ -1,3 +1,4 @@
+import { onDesktop } from '../test/desk';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Schemas } from '../api/client';
@@ -133,15 +134,6 @@ const common = {
   'GET /api/seasons/*/feed': { entries: [], nextBefore: null, players: [], games: [], runs: [] },
 };
 
-function desktop() {
-  vi.stubGlobal('matchMedia', (query: string) => ({
-    matches: query.includes('min-width'),
-    media: query,
-    addEventListener: () => undefined,
-    removeEventListener: () => undefined,
-  }));
-}
-
 afterEach(() => {
   vi.unstubAllGlobals();
 });
@@ -251,7 +243,7 @@ describe('the season screen on the graph map', () => {
   });
 
   it('asks for the branch on the map on a desktop and points there from the turn card', async () => {
-    desktop();
+    onDesktop();
     fakeServer({ ...common, 'GET /api/seasons/*': season('f', { choice: branchChoice }) });
     render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
 

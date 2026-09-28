@@ -1,3 +1,4 @@
+import { onDesktop } from '../test/desk';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Schemas } from '../api/client';
@@ -6,10 +7,14 @@ import { fakeServer, seasonId, type Call } from '../test/fakeServer';
 import {
   addCell,
   addEdge,
+  draftOf,
+  loadDraft,
   normalized,
   removeCell,
   removeEdge,
   sameMap,
+  saveDraft,
+  setCell,
   setCellType,
   setDefaultBranch,
   type Draft,
@@ -40,15 +45,6 @@ const view = (overrides: Partial<Schemas['AdminMapView']> = {}): Schemas['AdminM
 });
 
 const ok = { canPublish: true, problems: [], warnings: [] };
-
-function desktop() {
-  vi.stubGlobal('matchMedia', (query: string) => ({
-    matches: query.includes('min-width'),
-    media: query,
-    addEventListener: () => undefined,
-    removeEventListener: () => undefined,
-  }));
-}
 
 beforeEach(() => {
   localStorage.clear();
@@ -112,9 +108,41 @@ describe('the map draft', () => {
   });
 });
 
+describe('the kept draft', () => {
+  it("equals the server's map whatever order the edits added the fields in", () => {
+    const { id, draft: added } = addCell(draftOf(published), { x: 420, y: 0 });
+    const edited = setCell(setCellType(added, id, 'teleport'), id, { zone: 'swamp', to: 'c1' });
+    // The server lists every field of a cell in its own order, the empty ones as null
+    const fromServer: Draft = {
+      ...edited,
+      cells: edited.cells.map((c) => ({
+        id: c.id,
+        type: c.type,
+        zone: c.zone ?? null,
+        to: c.to ?? null,
+        amount: null,
+        deck: null,
+        grants: null,
+        x: c.x ?? null,
+        y: c.y ?? null,
+      })),
+    };
+    expect(sameMap(edited, fromServer)).toBe(true);
+  });
+
+  it('is dropped when the map was published again since it was made', () => {
+    const base = draftOf(published);
+    saveDraft(seasonId, { base, draft: addCell(base, { x: 0, y: 0 }).draft });
+    const republished = addEdge(addCell(base, { x: 9, y: 9 }).draft, 'c1', 'c2');
+
+    expect(loadDraft(seasonId, republished)).toEqual({ draft: null, stale: true });
+    expect(loadDraft(seasonId, base)).toEqual({ draft: null, stale: false });
+  });
+});
+
 describe('the map editor', () => {
   it('checks the draft as it changes and shows every problem in words, the occupied cell included', async () => {
-    desktop();
+    onDesktop();
     const checks: Call[] = [];
     fakeServer({
       'GET /api/admin/seasons/*/map': view(),
@@ -159,7 +187,7 @@ describe('the map editor', () => {
   });
 
   it('builds a fork with the keyboard panel and publishes it after the confirmation', async () => {
-    desktop();
+    onDesktop();
     const server = fakeServer({
       'GET /api/admin/seasons/*/map': view(),
       'POST /api/admin/seasons/*/map/check': (call) => ({
@@ -204,7 +232,7 @@ describe('the map editor', () => {
   });
 
   it('says why the engine refused a publication', async () => {
-    desktop();
+    onDesktop();
     fakeServer({
       'GET /api/admin/seasons/*/map': view(),
       'POST /api/admin/seasons/*/map/check': ok,
@@ -230,7 +258,7 @@ describe('the map editor', () => {
   });
 
   it('keeps the draft in this browser and brings back the published map', async () => {
-    desktop();
+    onDesktop();
     fakeServer({
       'GET /api/admin/seasons/*/map': view(),
       'POST /api/admin/seasons/*/map/check': ok,
@@ -246,7 +274,7 @@ describe('the map editor', () => {
   });
 
   it('warns about a zone with few games without blocking the publication', async () => {
-    desktop();
+    onDesktop();
     fakeServer({
       'GET /api/admin/seasons/*/map': view({
         map: { ...published, zones: [{ id: 'swamp', name: 'Болото ужаса' }] },
@@ -263,8 +291,22 @@ describe('the map editor', () => {
     expect(screen.getByTestId('map-publish-button')).toBeEnabled();
   });
 
+  it('says when the kept draft was dropped because the map was published since', async () => {
+    onDesktop();
+    const older = { cells: [{ id: 'start', type: 'start' as const }], edges: [], zones: [] };
+    saveDraft(seasonId, { base: older, draft: older });
+    fakeServer({
+      'GET /api/admin/seasons/*/map': view(),
+      'POST /api/admin/seasons/*/map/check': ok,
+    });
+    render(<MapSection seasonId={seasonId} version={0} />);
+
+    expect(await screen.findByText(t.draftStale)).toBeInTheDocument();
+    expect(screen.queryByTestId('map-changed')).not.toBeInTheDocument();
+  });
+
   it('says a linear season needs the graph mode first', async () => {
-    desktop();
+    onDesktop();
     fakeServer({
       'GET /api/admin/seasons/*/map': view({ mode: 'linear' }),
       'POST /api/admin/seasons/*/map/check': { ...ok, canPublish: false },

@@ -22,6 +22,7 @@ import {
   addZone,
   draftOf,
   loadDraft,
+  placed,
   moveCell,
   normalized,
   consequenceCodes,
@@ -100,18 +101,24 @@ function MapEditor({
 }) {
   const desk = useDesk();
   const published = useMemo(() => draftOf(view.map), [view.map]);
-  const [draft, setDraftState] = useState<Draft>(() => loadDraft(seasonId) ?? published);
+  // A map without places (a chain from before the graph) gets the places the players' board gives it, once
+  const start = useMemo(() => {
+    const { board, cellNumber } = graphBoard(published);
+    return placed(published, (id) => board.cells.find((c) => c.id === cellNumber.get(id)));
+  }, [published]);
+  const [kept] = useState(() => loadDraft(seasonId, published));
+  const [draft, setDraftState] = useState<Draft>(() => kept.draft ?? start);
   const [selected, setSelected] = useState<string | null>(null);
   // The answer of the check, for the draft (and attempt) it was asked for; another draft is «checking» until its own
   const [answered, setAnswered] = useState<{ key: string; check: Check } | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [outcome, setOutcome] = useState<{ tone: 'success' | 'danger'; text: string } | null>(null);
-  const changed = !sameMap(draft, published);
+  const changed = !sameMap(draft, start);
 
   const setDraft = (next: Draft) => {
     setDraftState(next);
     setOutcome(null);
-    saveDraft(seasonId, sameMap(next, published) ? null : next);
+    saveDraft(seasonId, sameMap(next, start) ? null : { base: published, draft: next });
   };
 
   // The draft is checked by the server as it changes: every problem at once, the players' cells included
@@ -162,6 +169,7 @@ function MapEditor({
   const notices = (
     <>
       {view.mode === 'linear' ? <Notice tone="info">{t.linear}</Notice> : null}
+      {kept.stale ? <Notice tone="warning">{t.draftStale}</Notice> : null}
       {view.status !== 'draft' && view.status !== 'active' ? (
         <Notice tone="warning">{t.closed}</Notice>
       ) : null}
@@ -213,7 +221,7 @@ function MapEditor({
                   icon={<Undo2 size={20} aria-hidden />}
                   data-testid="map-reset"
                   onClick={() => {
-                    setDraft(published);
+                    setDraft(start);
                     setSelected(null);
                   }}
                 >

@@ -158,21 +158,38 @@ export function removeZone(draft: Draft, id: string): Draft {
  * nothing changed (the check says «nothing to publish» then)
  */
 export function normalized(draft: Draft): Draft {
-  const clean = <T extends object>(o: T): T =>
+  // Keys in one fixed order, whatever order the edits added them in: the server's map and a draft of the same map
+  // serialize alike (sameMap compares the text)
+  const clean = <T extends object>(o: T, order: readonly (keyof T)[]): T =>
     Object.fromEntries(
-      Object.entries(o).filter(([, v]) => v !== null && v !== undefined && v !== ''),
+      order
+        .map((key) => [key, o[key]] as const)
+        .filter(([, v]) => v !== null && v !== undefined && v !== ''),
     ) as T;
+  const cellKeys = ['id', 'type', 'zone', 'to', 'amount', 'deck', 'grants', 'x', 'y'] as const;
+  const edgeKeys = ['from', 'to', 'isDefaultForward', 'isPrimaryBackward'] as const;
+  const zoneKeys = [
+    'id',
+    'name',
+    'rollFilter',
+    'diceModifier',
+    'dropPenaltyMultiplier',
+    'deck',
+    'shopPriceMultiplier',
+  ] as const;
+  const filterKeys = ['tags', 'minHours', 'maxHours', 'releaseYearBefore'] as const;
   return {
-    cells: draft.cells.map(clean),
-    edges: draft.edges.map((e) => ({ ...e })),
+    cells: draft.cells.map((c) => clean(c, cellKeys)),
+    edges: draft.edges.map((e) => clean(e, edgeKeys)),
     zones: draft.zones.map((z) => {
-      const zone = clean(z);
+      const zone = clean(z, zoneKeys);
       if (zone.rollFilter) {
-        const filter = clean(zone.rollFilter);
+        const filter = clean(zone.rollFilter, filterKeys);
         if (filter.tags?.length === 0) delete filter.tags;
         if (Object.keys(filter).length === 0) delete zone.rollFilter;
         else zone.rollFilter = filter;
       }
+      if (zone.diceModifier) zone.diceModifier = clean(zone.diceModifier, ['stage', 'value']);
       return zone;
     }),
   };
@@ -185,26 +202,59 @@ export function sameMap(a: Draft, b: Draft): boolean {
 /** Where the draft is kept between visits: this browser only, per season (a convenience, not a store) */
 const storageKey = (seasonId: string) => `map-draft:${seasonId}`;
 
-export function loadDraft(seasonId: string): Draft | null {
+const isDraft = (value: unknown): value is Draft =>
+  typeof value === 'object' &&
+  value !== null &&
+  Array.isArray((value as Draft).cells) &&
+  Array.isArray((value as Draft).edges) &&
+  Array.isArray((value as Draft).zones);
+
+/**
+ * The kept draft, if it was made from the map published now. A draft of an older map (someone published since, from
+ * another browser) is not opened over the new one: publishing it would undo their changes silently (D-314).
+ */
+export function loadDraft(
+  seasonId: string,
+  published: Draft,
+): { draft: Draft | null; stale: boolean } {
   try {
     const raw = localStorage.getItem(storageKey(seasonId));
-    if (!raw) return null;
-    const value = JSON.parse(raw) as Partial<Draft>;
-    return Array.isArray(value.cells) && Array.isArray(value.edges) && Array.isArray(value.zones)
-      ? (value as Draft)
-      : null;
+    if (!raw) return { draft: null, stale: false };
+    const value = JSON.parse(raw) as { base?: unknown; draft?: unknown };
+    if (!isDraft(value.base) || !isDraft(value.draft)) return { draft: null, stale: false };
+    if (!sameMap(value.base, published)) {
+      localStorage.removeItem(storageKey(seasonId));
+      return { draft: null, stale: true };
+    }
+    return { draft: value.draft, stale: false };
   } catch {
-    return null;
+    return { draft: null, stale: false };
   }
 }
 
-export function saveDraft(seasonId: string, draft: Draft | null) {
+/** Keeps the draft with the published map it was made from; none forgets it */
+export function saveDraft(seasonId: string, draft: { base: Draft; draft: Draft } | null) {
   try {
     if (draft) localStorage.setItem(storageKey(seasonId), JSON.stringify(draft));
     else localStorage.removeItem(storageKey(seasonId));
   } catch {
     // A private window or blocked storage: the draft lives while the page is open
   }
+}
+
+/** A map from the server as the editor opens it: every cell with a place (a map without them is laid out once) */
+export function placed(
+  draft: Draft,
+  place: (id: string) => { x: number; y: number } | undefined,
+): Draft {
+  if (draft.cells.every((c) => c.x != null && c.y != null)) return draft;
+  return {
+    ...draft,
+    cells: draft.cells.map((c) => {
+      const at = place(c.id);
+      return at ? { ...c, x: Math.round(at.x), y: Math.round(at.y) } : c;
+    }),
+  };
 }
 
 /**

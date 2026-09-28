@@ -149,7 +149,9 @@ export function MapCanvas({
   const [nodes, setNodes] = useState(fromDraft);
   const key = JSON.stringify(fromDraft);
   const [shown, setShown] = useState(key);
-  if (shown !== key) {
+  // A node being dragged keeps its place until it is dropped: a check's answer must not pull it back mid-drag
+  const [dragging, setDragging] = useState(false);
+  if (shown !== key && !dragging) {
     setShown(key);
     setNodes(fromDraft);
   }
@@ -221,7 +223,14 @@ export function MapCanvas({
         onPaneClick={() => {
           onSelect(null);
         }}
+        // One cell moves at a time: the draft takes the place of the node that was dropped
+        multiSelectionKeyCode={null}
+        selectionKeyCode={null}
+        onNodeDragStart={() => {
+          setDragging(true);
+        }}
         onNodeDragStop={(_, node) => {
+          setDragging(false);
           onMove(node.id, node.position);
         }}
         onNodesChange={(changes) => {
