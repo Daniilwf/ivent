@@ -1,18 +1,21 @@
 import {
   applyNodeChanges,
   Background,
-  Controls,
   Handle,
+  Panel as FlowPanel,
   Position,
   ReactFlow,
   type Edge as FlowEdge,
   type Node as FlowNode,
   type NodeProps,
+  useReactFlow,
 } from '@xyflow/react';
 import '@xyflow/react/dist/base.css';
-import { Flag, GitFork, Orbit, Play, Trophy } from 'lucide-react';
+import { Flag, GitFork, Maximize, Minus, Orbit, Play, Plus, Trophy, Users } from 'lucide-react';
 import { memo, useMemo, useState } from 'react';
+import { graphBoard } from '../board/graphBoard';
 import { ru } from '../i18n/ru';
+import { IconButton } from '../ui/Button';
 import { cx } from '../ui/cx';
 import type { Draft } from './mapDraft';
 
@@ -20,6 +23,8 @@ const t = ru.admin.map;
 
 type CellData = {
   label: string;
+  /** The cell's number as the players see it on their map */
+  number: number;
   type: string;
   amount: number | null;
   zone: string | null;
@@ -52,17 +57,22 @@ const CellBox = memo(function CellBox({ data, selected }: NodeProps<CellNode>) {
         position={Position.Left}
         className="size-3! border-2! border-ink! bg-card!"
       />
-      <span className="flex items-center gap-1 font-display font-heavy">
+      {/* The number the players see first, then what the cell does; the id only small, for the panel's list */}
+      <span className="flex items-center gap-2 font-display text-base font-heavy">
+        <span className="grid size-8 shrink-0 place-items-center rounded-full border-2 border-ink">
+          {data.number}
+        </span>
         {icons[data.type] ?? null}
-        {data.label}
-      </span>
-      <span className="text-xs text-ink-soft">
         {t.types[data.type] ?? data.type}
         {data.type === 'pointsBonus' && data.amount ? ` ${ru.board.bonus(data.amount)}` : ''}
       </span>
-      {data.zone ? <span className="text-xs font-bold">{data.zone}</span> : null}
+      <span className="text-sm text-ink-soft">{data.label}</span>
+      {data.zone ? <span className="text-sm font-bold">{data.zone}</span> : null}
       {data.players > 0 ? (
-        <span className="text-xs font-bold text-me">{ru.board.more(data.players)}</span>
+        <span className="flex items-center gap-1 text-sm font-bold text-me">
+          <Users size={14} aria-hidden />
+          {t.cell.onCell(data.players)}
+        </span>
       ) : null}
       <Handle
         type="source"
@@ -74,6 +84,24 @@ const CellBox = memo(function CellBox({ data, selected }: NodeProps<CellNode>) {
 });
 
 const nodeTypes = { cell: CellBox };
+
+/** The zoom buttons of the player's map, on the canvas */
+function CanvasTools() {
+  const flow = useReactFlow();
+  return (
+    <FlowPanel position="bottom-right" className="flex gap-2">
+      <IconButton label={ru.board.zoomIn} onClick={() => void flow.zoomIn()}>
+        <Plus size={20} />
+      </IconButton>
+      <IconButton label={ru.board.zoomOut} onClick={() => void flow.zoomOut()}>
+        <Minus size={20} />
+      </IconButton>
+      <IconButton label={t.fit} onClick={() => void flow.fitView({ padding: 0.08 })}>
+        <Maximize size={20} />
+      </IconButton>
+    </FlowPanel>
+  );
+}
 
 /**
  * The map on a React Flow canvas (SPEC «Трудности реализации»): cells to drag, arrows drawn from a cell's right edge
@@ -100,6 +128,7 @@ export function MapCanvas({
   onConnect: (from: string, to: string) => void;
 }) {
   const zoneName = useMemo(() => new Map(draft.zones.map((z) => [z.id, z.name])), [draft.zones]);
+  const { cellNumber } = useMemo(() => graphBoard(draft), [draft]);
   const fromDraft: CellNode[] = draft.cells.map((c, i) => ({
     id: c.id,
     type: 'cell',
@@ -108,6 +137,7 @@ export function MapCanvas({
     ariaLabel: t.cell.title(c.id),
     data: {
       label: c.id,
+      number: cellNumber.get(c.id) ?? 0,
       type: c.type,
       amount: c.amount ?? null,
       zone: c.zone ? (zoneName.get(c.zone) ?? c.zone) : null,
@@ -148,7 +178,6 @@ export function MapCanvas({
         style: {
           stroke: 'var(--color-ink)',
           strokeWidth: e.isDefaultForward ? 3 : 2,
-          strokeDasharray: e.isDefaultForward ? undefined : '6 4',
         },
       };
     }),
@@ -161,8 +190,9 @@ export function MapCanvas({
               target: c.to,
               selectable: false,
               focusable: false,
-              markerEnd: { type: 'arrowclosed' as const, color: 'var(--color-me)' },
-              style: { stroke: 'var(--color-me)', strokeWidth: 2, strokeDasharray: '2 6' },
+              markerEnd: { type: 'arrowclosed' as const, color: 'var(--color-ink)' },
+              // As on the player's map: a dashed jump
+              style: { stroke: 'var(--color-ink)', strokeWidth: 3, strokeDasharray: '10 8' },
             },
           ]
         : [],
@@ -181,7 +211,9 @@ export function MapCanvas({
         edges={edges}
         nodeTypes={nodeTypes}
         fitView
-        minZoom={0.2}
+        // Text on the canvas never shrinks below the small text size of the site
+        fitViewOptions={{ padding: 0.08, minZoom: 0.75, maxZoom: 1.2 }}
+        minZoom={0.5}
         deleteKeyCode={null}
         onNodeClick={(_, node) => {
           onSelect(node.id);
@@ -202,7 +234,7 @@ export function MapCanvas({
         }}
       >
         <Background />
-        <Controls showInteractive={false} />
+        <CanvasTools />
       </ReactFlow>
     </div>
   );

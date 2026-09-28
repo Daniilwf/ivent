@@ -313,7 +313,12 @@ export function SeasonScreen({
       ? chain.cellNumber.get(season.players.find((p) => p.id === season.me?.playerId)?.cellId ?? '')
       : undefined;
   useEffect(() => {
-    if (!desk || forkCell === undefined) return;
+    // The choice made, the camera goes back to the map's own view, around my new cell
+    if (forkCell === undefined) {
+      camera.current?.reset();
+      return;
+    }
+    if (!desk) return;
     const fork = cellById(chain.board, forkCell);
     requestAnimationFrame(() => {
       camera.current?.centerOn({ x: fork.x, y: fork.y + 140 }, 900);

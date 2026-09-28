@@ -207,6 +207,15 @@ export function saveDraft(seasonId: string, draft: Draft | null) {
   }
 }
 
+/**
+ * Problems that follow from others: a cell cut off from the start or from the finish is the consequence of a missing
+ * or wrong arrow elsewhere. The editor names the causes one by one and these in one line each (D-320).
+ */
+export const consequenceCodes: ReadonlySet<string> = new Set([
+  'map.unreachable',
+  'map.finishUnreachable',
+]);
+
 /** The cell a problem is about (its subject), or null for the map, an arrow or a zone */
 export function problemCell(draft: Draft, subject: string): string | null {
   return draft.cells.some((c) => c.id === subject) ? subject : null;

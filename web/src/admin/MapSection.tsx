@@ -24,6 +24,7 @@ import {
   loadDraft,
   moveCell,
   normalized,
+  consequenceCodes,
   problemCell,
   removeCell,
   removeEdge,
@@ -141,8 +142,10 @@ function MapEditor({
     };
   }, [body, seasonId, checkKey, view]);
 
+  // Only the causes are outlined red on the canvas: a cut-off cell is not where the fix is
   const problemCells = new Set(
     (check.kind === 'done' ? check.result.problems : [])
+      .filter((p) => !consequenceCodes.has(p.code))
       .map((p) => problemCell(draft, p.subject))
       .filter((c): c is string => c !== null),
   );
@@ -259,6 +262,7 @@ function MapEditor({
       <CheckPanel
         check={check}
         draft={draft}
+        same={!changed}
         onRetry={() => {
           setAttempt((n) => n + 1);
         }}
@@ -268,6 +272,21 @@ function MapEditor({
         seasonId={seasonId}
         draft={draft}
         canPublish={check.kind === 'done' && check.result.canPublish}
+        reason={
+          check.kind === 'checking'
+            ? t.check.checking
+            : check.kind === 'failed'
+              ? t.check.failed
+              : check.result.problems.length > 0
+                ? t.publish.fixFirst
+                : view.mode === 'linear'
+                  ? t.publish.linearFirst
+                  : view.status !== 'draft' && view.status !== 'active'
+                    ? t.closed
+                    : check.result.canPublish
+                      ? null
+                      : t.publish.nothingNew
+        }
         outcome={outcome}
         onOutcome={setOutcome}
         onPublished={() => {
@@ -657,12 +676,17 @@ export function CheckPanel({
   draft,
   onRetry,
   onSelect,
+  same = false,
 }: {
   check: Check;
   draft: Draft;
   onRetry: () => void;
   onSelect: (cell: string) => void;
+  /** The draft is the published map */
+  same?: boolean;
 }) {
+  const causes =
+    check.kind === 'done' ? check.result.problems.filter((p) => !consequenceCodes.has(p.code)) : [];
   const zoneName = (id: string) => draft.zones.find((z) => z.id === id)?.name ?? id;
   return (
     <Panel title={t.check.title} data-testid="map-check" aria-live="polite">
@@ -677,15 +701,13 @@ export function CheckPanel({
         <>
           {check.result.problems.length === 0 ? (
             <Notice tone={check.result.canPublish ? 'success' : 'info'}>
-              {check.result.canPublish ? t.check.ok : t.check.unchanged}
+              {check.result.canPublish ? t.check.ok : same ? t.check.unchanged : t.check.noProblems}
             </Notice>
           ) : (
             <div className="grid gap-2" data-testid="map-problems">
-              <p className="font-bold text-danger">
-                {t.check.problems(check.result.problems.length)}
-              </p>
+              <p className="font-bold text-danger">{t.check.problems(causes.length)}</p>
               <ul className="grid list-disc gap-1 pl-5">
-                {check.result.problems.map((p) => {
+                {causes.map((p) => {
                   const cell = problemCell(draft, p.subject);
                   return (
                     <li key={`${p.code}-${p.subject}`}>
@@ -706,6 +728,16 @@ export function CheckPanel({
                   );
                 })}
               </ul>
+              {[...consequenceCodes].map((code) => {
+                const cells = check.result.problems
+                  .filter((p) => p.code === code)
+                  .map((p) => p.subject);
+                return cells.length === 0 ? null : (
+                  <p key={code} className="text-sm text-ink-soft" data-testid={`map-cut-${code}`}>
+                    {t.check.consequence(code, cells)}
+                  </p>
+                );
+              })}
             </div>
           )}
           {check.result.warnings.map((w) => (
@@ -723,6 +755,7 @@ function PublishPanel({
   seasonId,
   draft,
   canPublish,
+  reason,
   outcome,
   onOutcome,
   onPublished,
@@ -730,6 +763,8 @@ function PublishPanel({
   seasonId: string;
   draft: Draft;
   canPublish: boolean;
+  /** Why the button is disabled, said under it */
+  reason: string | null;
   outcome: { tone: 'success' | 'danger'; text: string } | null;
   onOutcome: (outcome: { tone: 'success' | 'danger'; text: string } | null) => void;
   onPublished: () => void;
@@ -798,6 +833,11 @@ function PublishPanel({
           onConfirm={() => void publish()}
         />
       </div>
+      {canPublish || !reason ? null : (
+        <p className="text-sm text-ink-soft" data-testid="map-publish-reason">
+          {reason}
+        </p>
+      )}
     </Panel>
   );
 }

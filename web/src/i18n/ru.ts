@@ -916,7 +916,7 @@ export const ru = {
     },
     zones: {
       title: 'Зоны',
-      lead: 'Правила зоны берутся в момент ролла: где стоишь, когда крутишь колесо, те и действуют до конца прохождения.',
+      lead: 'Правила зоны берутся в момент ролла и действуют до конца прохождения.',
       here: 'Ты здесь',
       plain: 'Обычные правила',
       filter: (parts: string) => `Ролл: ${parts}`,
@@ -941,7 +941,6 @@ export const ru = {
       lead: (steps: number) =>
         `Осталось ${steps} ${plural(steps, 'шаг', 'шага', 'шагов')}: фишка пойдёт по ветке, которую ты выберешь.`,
       onMap: 'Ты на развилке: выбери ветку на карте',
-      option: (n: number) => `Ветка ${n}`,
       firstCell: (cell: number) => `Первая клетка — ${cell}`,
       endCell: (cell: number) => `Встанешь на клетку ${cell}`,
       endTeleport: (cell: number, to: number) =>
@@ -1393,6 +1392,7 @@ export const ru = {
       reset: 'Вернуть опубликованную',
       addCell: 'Добавить клетку',
       cellsList: 'Клетка',
+      fit: 'Показать всю карту',
       noSelection: 'Выбери клетку на холсте или в списке.',
       cell: {
         title: (id: string) => `Клетка «${id}»`,
@@ -1403,6 +1403,7 @@ export const ru = {
         amount: 'Очки за остановку',
         amountHint: 'Целое число, не ноль: минус отнимает очки',
         players: (names: string) => `Здесь стоят: ${names}`,
+        onCell: (n: number) => `${n} ${plural(n, 'игрок', 'игрока', 'игроков')}`,
         remove: 'Удалить клетку',
         exits: 'Выходы',
         entries: 'Входы',
@@ -1456,6 +1457,12 @@ export const ru = {
         title: 'Проверка',
         checking: 'Проверяю…',
         ok: 'Ошибок нет: карту можно публиковать.',
+        noProblems: 'Ошибок нет.',
+        consequence: (code: string, cells: string[]) =>
+          (code === 'map.unreachable'
+            ? `Из-за этого со старта не дойти до ${cells.length} ${plural(cells.length, 'клетки', 'клеток', 'клеток')}`
+            : `Из-за этого до финиша не дойти с ${cells.length} ${plural(cells.length, 'клетки', 'клеток', 'клеток')}`) +
+          `: ${cells.slice(0, 8).join(', ')}${cells.length > 8 ? '…' : ''}.`,
         failed: 'Проверка не удалась. Правки не потеряны, попробуй ещё раз.',
         retry: 'Проверить ещё раз',
         problems: (n: number) => `${n} ${plural(n, 'ошибка', 'ошибки', 'ошибок')}`,
@@ -1516,6 +1523,9 @@ export const ru = {
         ],
         confirm: 'Опубликовать',
         done: 'Карта опубликована.',
+        fixFirst: 'Сначала исправь ошибки проверки.',
+        nothingNew: 'Правок нет: сначала измени карту.',
+        linearFirst: 'Сначала включи карту-граф в правилах сезона.',
       },
     },
     // Refusals only the admin meets; the rest are in ru.rejection

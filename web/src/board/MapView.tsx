@@ -496,11 +496,16 @@ function usePanZoom(board: Board, focus: Point | null, anchor: Point | null) {
     setView({ w, cx: p.x, cy: p.y });
   };
 
+  // Back to the first view: the whole world, or around me — after a moment moved the camera
+  const reset = () => {
+    setView(null);
+  };
+
   const viewBox = `${view.cx - view.w / 2} ${view.cy - (view.w * ratio) / 2} ${view.w} ${view.w * ratio}`;
-  return { viewBox, svg, handlers, zoomAt, centerOn };
+  return { viewBox, svg, handlers, zoomAt, centerOn, reset };
 }
 
-export type MapApi = { centerOn: (p: Point, w?: number) => void };
+export type MapApi = { centerOn: (p: Point, w?: number) => void; reset: () => void };
 
 export type MapViewProps = {
   board: Board;
@@ -533,12 +538,12 @@ export function MapView({
 }: MapViewProps) {
   const start = focus ? cellById(board, focus) : null;
   const meAt = players.find((p) => p.me);
-  const { viewBox, svg, handlers, zoomAt, centerOn } = usePanZoom(
+  const { viewBox, svg, handlers, zoomAt, centerOn, reset } = usePanZoom(
     board,
     start,
     meAt ? cellById(board, meAt.cell) : null,
   );
-  useImperativeHandle(ref, () => ({ centerOn }));
+  useImperativeHandle(ref, () => ({ centerOn, reset }));
   const props = useMemo(() => scenery(board), [board]);
   const signs = useMemo(() => signSpots(board), [board]);
   const me = players.find((p) => p.me);

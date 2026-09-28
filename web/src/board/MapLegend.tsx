@@ -66,6 +66,12 @@ export function MapLegend({
 
   return (
     <div className={cx('grid gap-4', className)} data-testid="map-legend">
+      {symbols.length > 0 ? (
+        // The symbols stay in sight: a newcomer meets a dashed arrow or a flag on the map before any question
+        <Panel title={t.legend.title} data-testid="map-symbols">
+          <ul className="grid gap-3">{symbols}</ul>
+        </Panel>
+      ) : null}
       {zones.length > 0 ? (
         <Panel title={t.zones.title}>
           <p className="text-sm text-ink-soft">{t.zones.lead}</p>
@@ -101,14 +107,6 @@ export function MapLegend({
             ))}
           </ul>
         </Panel>
-      ) : null}
-      {symbols.length > 0 ? (
-        <details className="rounded-lg bg-card p-4" data-testid="map-symbols">
-          <summary className="min-h-11 cursor-pointer content-center rounded-md font-display font-heavy is-focus:focus-ring">
-            {t.legend.title}
-          </summary>
-          <ul className="mt-3 grid gap-3">{symbols}</ul>
-        </details>
       ) : null}
     </div>
   );

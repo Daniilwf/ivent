@@ -49,7 +49,13 @@ export function BranchChoice({
             <button
               type="button"
               data-testid={`branch-${option.id}`}
-              aria-label={[t.go(i + 1), t.firstCell(option.cell), option.zone, option.end]
+              aria-label={[
+                t.go(i + 1),
+                option.end,
+                option.zone,
+                ...option.rules,
+                t.firstCell(option.cell),
+              ]
                 .filter(Boolean)
                 .join('. ')}
               disabled={pending}
@@ -64,13 +70,19 @@ export function BranchChoice({
               >
                 {i + 1}
               </span>
+              {/* Where the steps take me comes first: that is what the choice decides; then the zone and its rules */}
               <span className="grid gap-1">
-                <span className="flex flex-wrap items-center gap-2">
-                  <strong className="font-display">{t.option(i + 1)}</strong>
-                  {option.zone ? <Tag>{option.zone}</Tag> : null}
-                </span>
-                <span className="text-sm text-ink-soft">{t.firstCell(option.cell)}</span>
-                <span className="text-sm">{option.end}</span>
+                <strong className="font-display">{option.end}</strong>
+                {option.zone ? (
+                  <span className="flex flex-wrap items-center gap-2">
+                    <Tag>{option.zone}</Tag>
+                  </span>
+                ) : null}
+                {option.rules.map((rule) => (
+                  <span key={rule} className="text-sm text-ink-soft">
+                    {rule}
+                  </span>
+                ))}
               </span>
             </button>
           </li>

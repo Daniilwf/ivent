@@ -311,6 +311,8 @@ export type BranchOption = {
   end: string;
   /** The zone of the first cell, if any */
   zone: string | null;
+  /** The zone's rules in words: the zone decides the next roll (D-307) */
+  rules: string[];
 };
 
 /** The options of a branch choice as the page shows them: numbered as on the map, with where each leads */
@@ -322,16 +324,20 @@ export function branchOptions(
   const steps = choice.steps ?? 1;
   const t = ru.map.branch;
   const number = (id: string) => cellNumber.get(id) ?? 0;
-  const zoneName = (id: string) => {
+  const zoneOf = (id: string) => {
     const zone = map.cells.find((c) => c.id === id)?.zone;
-    return map.zones.find((z) => z.id === zone)?.name ?? null;
+    return map.zones.find((z) => z.id === zone) ?? null;
   };
   return choice.options.map((o) => {
     const end = branchEnd(map, o.id, steps);
     return {
       id: o.id,
       cell: number(o.id),
-      zone: zoneName(o.id),
+      zone: zoneOf(o.id)?.name ?? null,
+      rules: (() => {
+        const zone = zoneOf(o.id);
+        return zone ? zoneRules(zone) : [];
+      })(),
       end:
         end.kind === 'finish'
           ? t.endFinish
