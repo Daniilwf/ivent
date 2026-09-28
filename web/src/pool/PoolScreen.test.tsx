@@ -542,6 +542,75 @@ describe('adding a game', () => {
     expect(seen.some((r) => r.key === 'POST /api/pool')).toBe(false);
   });
 
+  it('tells a game the admin took out of the pool with its reason and does not add it (D-208)', async () => {
+    const { seen, dialog } = await openForm({
+      'GET /api/pool/similar': () =>
+        json(200, [
+          {
+            id: 'g5',
+            title: 'Outlast',
+            same: true,
+            isDeleted: true,
+            deletionReason: 'Слишком страшная',
+          },
+        ]),
+    });
+
+    await userEvent.type(within(dialog).getByLabelText(t.form.name), 'outlast');
+
+    expect(
+      await within(dialog).findByText('Эта игра убрана из пула: Слишком страшная'),
+    ).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: t.form.submit })).toBeDisabled();
+    expect(seen.some((r) => r.key === 'POST /api/pool')).toBe(false);
+  });
+
+  it('a game in the pool wins over one taken out under the same title', async () => {
+    const { dialog } = await openForm({
+      'GET /api/pool/similar': () =>
+        json(200, [
+          { id: 'g1', title: 'Alan Wake', same: true, isDeleted: false, deletionReason: null },
+          { id: 'g6', title: 'Alan Wake', same: true, isDeleted: true, deletionReason: 'Дубль' },
+        ]),
+    });
+
+    await userEvent.type(within(dialog).getByLabelText(t.form.name), 'Alan Wake');
+
+    expect(await within(dialog).findByText(t.form.same('Alan Wake'))).toBeInTheDocument();
+    expect(within(dialog).queryByText(t.form.removed('Дубль'))).toBeNull();
+  });
+
+  it('an alike game taken out of the pool is listed with its reason', async () => {
+    const { dialog } = await openForm({
+      'GET /api/pool/similar': () =>
+        json(200, [
+          { id: 'g9', title: 'Dice Fold', same: false, isDeleted: true, deletionReason: 'Не игра' },
+        ]),
+    });
+
+    await userEvent.type(within(dialog).getByLabelText(t.form.name), 'Dice & Fold');
+
+    const warning = await within(dialog).findByTestId('similar-games');
+    expect(warning).toHaveTextContent('Dice Fold');
+    expect(warning).toHaveTextContent(t.form.removed('Не игра'));
+  });
+
+  it('shows the server refusal of a game taken out meanwhile with its reason', async () => {
+    let known: unknown[] = [];
+    const { dialog } = await openForm({
+      'GET /api/pool/similar': () => json(200, known),
+      'POST /api/pool': () => json(409, { code: 'pool.removed' }),
+    });
+
+    await userEvent.type(within(dialog).getByLabelText(t.form.name), 'Outlast');
+    await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Хоррор' }));
+    known = [{ id: 'g5', title: 'Outlast', same: true, isDeleted: true, deletionReason: null }];
+    await userEvent.click(within(dialog).getByRole('button', { name: t.form.submit }));
+
+    expect(await within(dialog).findAllByText(t.form.removed(null))).not.toHaveLength(0);
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+
   it('shows the server refusal of a duplicate under the title', async () => {
     const { dialog } = await openForm({
       'GET /api/pool/similar': similarNone,

@@ -5107,7 +5107,7 @@ export interface paths {
             };
             requestBody: {
                 content: {
-                    "application/json": components["schemas"]["PoolActionRequest"];
+                    "application/json": components["schemas"]["DeleteGameRequest"];
                 };
             };
             responses: {
@@ -6318,6 +6318,12 @@ export interface components {
             /** Format: int32 */
             token?: null | number;
         };
+        /** @description The admin takes a game out of the pool: `reason` is required (1–500 characters, D-208). */
+        DeleteGameRequest: {
+            /** Format: uuid */
+            commandId: string;
+            reason: null | string;
+        };
         DiceCountRule: {
             /** Format: double */
             hoursPerDie: number;
@@ -6929,7 +6935,8 @@ export interface components {
         };
         /**
          * @description A game of the pool as everyone sees it (D-119); `author` — the name of the account that added it, or the author as
-         *     the imported table names them (D-125); none for the seed.
+         *     the imported table names them (D-125); none for the seed. `deletionReason` — why the admin took it out of the pool
+         *     (D-208); none while it is in the pool and for games deleted before a reason was required.
          */
         PoolGameView: {
             /** Format: uuid */
@@ -6947,6 +6954,7 @@ export interface components {
             author: null | string;
             isDeleted: boolean;
             completionCondition: null | string;
+            deletionReason: null | string;
         };
         /** @description Pool health of a season for the admin (G10, G11, D-92). */
         PoolStatsView: {
@@ -7445,12 +7453,17 @@ export interface components {
             rerollCostStep: number;
             resetOn: components["schemas"]["EquatableArrayOfShopPriceReset"];
         };
-        /** @description A game in the pool whose title is the same or alike (SPEC «Дубли»). */
+        /**
+         * @description A game whose title is the same or alike (SPEC «Дубли»). `isDeleted` — the admin took it out of the pool: the same
+         *     title cannot be added again, and `deletionReason` says why (D-208).
+         */
         SimilarGameView: {
             /** Format: uuid */
             id: string;
             title: string;
             same: boolean;
+            isDeleted: boolean;
+            deletionReason: null | string;
         };
         /**
          * @description Which copy of the site this is (H9, D-220): every page shows a strip on anything but the live site, so nobody takes the

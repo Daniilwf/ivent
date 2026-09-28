@@ -210,13 +210,98 @@ public sealed class PoolApiTests : IAsyncLifetime
         var changed = await OkAsync(await admin.PutAsJsonAsync($"/api/admin/pool/{id}", new { commandId = Guid.NewGuid(), title = "Dead Space", tags = new[] { "Horror", "Sci-fi" }, hours = 11.5 }, Ct));
         Assert.Equal(["Horror", "Sci-fi"], changed.GetProperty("tags").EnumerateArray().Select(t => t.GetString()));
 
-        await OkAsync(await admin.PostAsJsonAsync($"/api/admin/pool/{id}/delete", new { commandId = Guid.NewGuid() }, Ct));
+        await OkAsync(await admin.PostAsJsonAsync($"/api/admin/pool/{id}/delete", new { commandId = Guid.NewGuid(), reason = "Дубль" }, Ct));
         Assert.DoesNotContain("Dead Space", Titles(await JsonAsync(vasya, "/api/pool")));
         Assert.DoesNotContain("Dead Space", Titles(await JsonAsync(vasya, "/api/pool?deleted=true")));
         Assert.Contains("Dead Space", Titles(await JsonAsync(admin, "/api/pool?deleted=true")));
 
         await OkAsync(await admin.PostAsJsonAsync($"/api/admin/pool/{id}/restore", new { commandId = Guid.NewGuid() }, Ct));
         Assert.Contains("Dead Space", Titles(await JsonAsync(vasya, "/api/pool")));
+    }
+
+    [Fact]
+    public async Task A_deletion_keeps_its_reason_for_the_admin_and_a_restore_clears_it()
+    {
+        var admin = await _site.SignedInAsync("admin");
+        var vasya = await _site.SignedInAsync("vasya");
+        var id = (await AddAsync(vasya, "Dead Space", ["Horror"])).GetProperty("id").GetGuid();
+
+        var deleted = await OkAsync(await admin.PostAsJsonAsync($"/api/admin/pool/{id}/delete", new { commandId = Guid.NewGuid(), reason = "  Дубль Dead Space Remake  " }, Ct));
+
+        Assert.Equal("Дубль Dead Space Remake", deleted.GetProperty("deletionReason").GetString());
+        var listed = (await JsonAsync(admin, "/api/pool?deleted=true")).EnumerateArray().Single(g => g.GetProperty("id").GetGuid() == id);
+        Assert.Equal("Дубль Dead Space Remake", listed.GetProperty("deletionReason").GetString());
+        var restored = await OkAsync(await admin.PostAsJsonAsync($"/api/admin/pool/{id}/restore", new { commandId = Guid.NewGuid() }, Ct));
+        Assert.Equal(JsonValueKind.Null, restored.GetProperty("deletionReason").ValueKind);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("long")]
+    public async Task A_deletion_without_a_reason_is_invalid(string? reason)
+    {
+        var admin = await _site.SignedInAsync("admin");
+        var id = (await JsonAsync(admin, "/api/pool")).EnumerateArray().First().GetProperty("id").GetGuid();
+        var text = reason == "long" ? new string('r', GameEvent.Infrastructure.Pool.PoolRules.MaxDeletionReasonLength + 1) : reason;
+
+        var response = await admin.PostAsJsonAsync($"/api/admin/pool/{id}/delete", new { commandId = Guid.NewGuid(), reason = text }, Ct);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains("\"reason\"", await response.Content.ReadAsStringAsync(Ct), StringComparison.Ordinal);
+        Assert.Equal(3, (await JsonAsync(admin, "/api/pool")).GetArrayLength());
+    }
+
+    [Fact]
+    public async Task A_reason_at_its_limit_is_taken()
+    {
+        var admin = await _site.SignedInAsync("admin");
+        var id = (await JsonAsync(admin, "/api/pool")).EnumerateArray().First().GetProperty("id").GetGuid();
+        var reason = new string('r', GameEvent.Infrastructure.Pool.PoolRules.MaxDeletionReasonLength);
+
+        var deleted = await OkAsync(await admin.PostAsJsonAsync($"/api/admin/pool/{id}/delete", new { commandId = Guid.NewGuid(), reason }, Ct));
+
+        Assert.Equal(reason, deleted.GetProperty("deletionReason").GetString());
+    }
+
+    [Theory]
+    [InlineData("vasya")]
+    [InlineData("admin")]
+    public async Task Re_adding_a_deleted_game_shows_the_removal_reason(string login)
+    {
+        // D-208 (RGG 15): a game the admin took out of the pool is not added again, by anyone; the form says why
+        var admin = await _site.SignedInAsync("admin");
+        var client = await _site.SignedInAsync(login);
+        var id = (await JsonAsync(admin, "/api/pool")).EnumerateArray().Single(g => g.GetProperty("title").GetString() == "Outlast").GetProperty("id").GetGuid();
+        await OkAsync(await admin.PostAsJsonAsync($"/api/admin/pool/{id}/delete", new { commandId = Guid.NewGuid(), reason = "Слишком страшная" }, Ct));
+
+        var similar = (await JsonAsync(client, "/api/pool/similar?title=outlast")).EnumerateArray().Single();
+        var again = await client.PostAsJsonAsync("/api/pool", new { commandId = Guid.NewGuid(), title = " OUTLAST ", tags = new[] { "Horror" }, force = true }, Ct);
+
+        Assert.Equal((id, true, true, "Слишком страшная"), (similar.GetProperty("id").GetGuid(), similar.GetProperty("same").GetBoolean(), similar.GetProperty("isDeleted").GetBoolean(), similar.GetProperty("deletionReason").GetString()));
+        await RefusedAsync(again, HttpStatusCode.Conflict, "pool.removed");
+        Assert.DoesNotContain("Outlast", Titles(await JsonAsync(admin, "/api/pool")));
+
+        // The admin's restore still brings it back
+        await OkAsync(await admin.PostAsJsonAsync($"/api/admin/pool/{id}/restore", new { commandId = Guid.NewGuid() }, Ct));
+        Assert.Contains("Outlast", Titles(await JsonAsync(client, "/api/pool")));
+    }
+
+    [Fact]
+    public async Task A_title_alike_a_deleted_game_is_told_and_needs_the_confirmation()
+    {
+        var admin = await _site.SignedInAsync("admin");
+        var vasya = await _site.SignedInAsync("vasya");
+        var id = (await AddAsync(vasya, "Dice Fold", ["Horror"])).GetProperty("id").GetGuid();
+        await OkAsync(await admin.PostAsJsonAsync($"/api/admin/pool/{id}/delete", new { commandId = Guid.NewGuid(), reason = "Не игра" }, Ct));
+
+        var similar = (await JsonAsync(vasya, "/api/pool/similar?title=Dice%20%26%20Fold")).EnumerateArray().Single();
+        var unconfirmed = await vasya.PostAsJsonAsync("/api/pool", new { commandId = Guid.NewGuid(), title = "Dice & Fold", tags = new[] { "Horror" } }, Ct);
+
+        Assert.Equal((false, true, "Не игра"), (similar.GetProperty("same").GetBoolean(), similar.GetProperty("isDeleted").GetBoolean(), similar.GetProperty("deletionReason").GetString()));
+        await RefusedAsync(unconfirmed, HttpStatusCode.Conflict, "pool.similar");
+        await AddAsync(vasya, "Dice & Fold", ["Horror"]);
     }
 
     [Fact]
@@ -244,7 +329,7 @@ public sealed class PoolApiTests : IAsyncLifetime
         var id = (await JsonAsync(admin, "/api/pool")).EnumerateArray().First().GetProperty("id").GetGuid();
 
         Assert.Equal(HttpStatusCode.Forbidden, (await client.PutAsJsonAsync($"/api/admin/pool/{id}", new { commandId = Guid.NewGuid(), title = "X", tags = new[] { "Horror" } }, Ct)).StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync($"/api/admin/pool/{id}/delete", new { commandId = Guid.NewGuid() }, Ct)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync($"/api/admin/pool/{id}/delete", new { commandId = Guid.NewGuid(), reason = "Дубль" }, Ct)).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await client.PutAsJsonAsync("/api/admin/pool/categories/Horror", new { commandId = Guid.NewGuid(), weight = 5 }, Ct)).StatusCode);
     }
 
@@ -254,7 +339,7 @@ public sealed class PoolApiTests : IAsyncLifetime
         var admin = await _site.SignedInAsync("admin");
         var vasya = await _site.SignedInAsync("vasya");
         var id = (await AddAsync(vasya, "Dead Space", ["Horror"])).GetProperty("id").GetGuid();
-        await OkAsync(await admin.PostAsJsonAsync($"/api/admin/pool/{id}/delete", new { commandId = Guid.NewGuid() }, Ct));
+        await OkAsync(await admin.PostAsJsonAsync($"/api/admin/pool/{id}/delete", new { commandId = Guid.NewGuid(), reason = "Дубль" }, Ct));
 
         Assert.Equal(HttpStatusCode.NotFound, (await vasya.GetAsync($"/api/pool/{id}", Ct)).StatusCode);
         Assert.True((await OkAsync(await admin.GetAsync($"/api/pool/{id}", Ct))).GetProperty("isDeleted").GetBoolean());
@@ -292,7 +377,7 @@ public sealed class PoolApiTests : IAsyncLifetime
     {
         var admin = await _site.SignedInAsync("admin");
 
-        Assert.Equal(HttpStatusCode.NotFound, (await admin.PostAsJsonAsync($"/api/admin/pool/{Guid.NewGuid()}/delete", new { commandId = Guid.NewGuid() }, Ct)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await admin.PostAsJsonAsync($"/api/admin/pool/{Guid.NewGuid()}/delete", new { commandId = Guid.NewGuid(), reason = "Дубль" }, Ct)).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await admin.PutAsJsonAsync($"/api/admin/pool/{Guid.NewGuid()}", new { commandId = Guid.NewGuid(), title = "X", tags = new[] { "Horror" } }, Ct)).StatusCode);
     }
 

@@ -25,6 +25,10 @@ export const similarDelayMs = 400;
 
 type Similar = Schemas['SimilarGameView'];
 
+/** Why a title cannot be saved: it is in the pool, or the admin took it out of the pool and said why (D-208) */
+const sameText = (game: Similar) =>
+  game.isDeleted ? t.removed(game.deletionReason ?? null) : t.same(game.title);
+
 type Errors = Partial<
   Record<'title' | 'tags' | 'hours' | 'year' | 'note' | 'cover', string | undefined>
 >;
@@ -66,8 +70,9 @@ type CoverFile = { id: string; thumbnailUrl: string };
 /**
  * The pool's game card as a form, one for everyone (D-202): a player or the admin adds a game (SPEC «Пул игр», «Дубли»),
  * the admin changes one (`game`). The title, its categories, the hours if known, the year, a note, co-op, a cover. While
- * the title is typed the pool is asked for alike ones: the same title cannot be saved, an alike one needs «Всё равно
- * добавить». The same limits as the server's (PoolRules) for both.
+ * the title is typed the pool is asked for alike ones: the same title cannot be saved, nor a game the admin took out of
+ * the pool (its reason is told, D-208); an alike one needs «Всё равно добавить». The same limits as the server's
+ * (PoolRules) for both.
  */
 export function GameForm({
   categories,
@@ -134,7 +139,8 @@ export function GameForm({
     title.trim().length > 0 &&
     title.trim().length <= maxTitle &&
     similar?.title !== title.trim();
-  const same = known.find((g) => g.same);
+  // A game in the pool before one taken out of it: both may carry the title
+  const same = known.find((g) => g.same && !g.isDeleted) ?? known.find((g) => g.same);
   const alike = known.filter((g) => !g.same);
 
   async function pickCover(file: File) {
@@ -157,7 +163,7 @@ export function GameForm({
   async function submit(event: SyntheticEvent) {
     event.preventDefault();
     const found = check(title, tags, parseNumber(hours), parseNumber(year), note);
-    if (same) found.title = t.same(same.title);
+    if (same) found.title = sameText(same);
     setErrors(found);
     setFailure(null);
     if (Object.keys(found).length > 0) return;
@@ -197,13 +203,17 @@ export function GameForm({
       }
       const code = rejectionCode(error);
       if (code === 'pool.duplicate') setErrors({ title: t.same(title.trim()) });
-      else if (code === 'pool.similar') {
-        // Someone added an alike title meanwhile: show it, the next press confirms
+      else if (code === 'pool.similar' || code === 'pool.removed') {
+        // Someone added an alike title or the admin took the game out meanwhile: show it; an alike one, the next press
+        // confirms
         const { data: fresh } = await api.GET('/api/pool/similar', {
           params: { query: { title: title.trim() } },
         });
         if (fresh) setSimilar({ title: title.trim(), games: fresh });
-        setFailure(ru.rejection[code]);
+        const removed = fresh?.find((g) => g.same && g.isDeleted);
+        if (code === 'pool.removed')
+          setErrors({ title: t.removed(removed?.deletionReason ?? null) });
+        else setFailure(ru.rejection[code]);
       } else if (response.status === 429) setFailure(t.tooOften);
       else setFailure((code && ru.rejection[code]) ?? t.failed);
     } catch {
@@ -237,7 +247,7 @@ export function GameForm({
         {checking ? t.checking : null}
       </p>
       {same ? (
-        <Notice tone="danger">{t.same(same.title)}</Notice>
+        <Notice tone="danger">{sameText(same)}</Notice>
       ) : alike.length > 0 ? (
         <div className="grid gap-2" data-testid="similar-games">
           <Notice tone="warning">
@@ -250,6 +260,11 @@ export function GameForm({
             {alike.map((game) => (
               <li key={game.id} className="wrap-anywhere">
                 {game.title}
+                {game.isDeleted ? (
+                  <span className="block text-sm text-ink-soft">
+                    {t.removed(game.deletionReason ?? null)}
+                  </span>
+                ) : null}
               </li>
             ))}
           </ul>

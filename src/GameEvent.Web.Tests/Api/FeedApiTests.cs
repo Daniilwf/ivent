@@ -102,7 +102,7 @@ public sealed class FeedApiTests : IAsyncLifetime
         var vasya = await _site.SignedInAsync("vasya");
         var (_, gameId) = await CompletedWithReviewAsync(vasya, 4, null);
         var admin = await _site.SignedInAsync("admin");
-        await PostOkAsync(admin, $"/api/admin/pool/{gameId}/delete", new { commandId = Guid.NewGuid() });
+        await PostOkAsync(admin, $"/api/admin/pool/{gameId}/delete", new { commandId = Guid.NewGuid(), reason = "Дубль" });
         await PostOkAsync(admin, $"/api/admin/accounts/{_site.Users["vasya"]}/delete", new { commandId = Guid.NewGuid() });
 
         var feed = await OkAsync(await (await _site.SignedInAsync("petya")).GetAsync(Feed, Ct));
@@ -214,7 +214,7 @@ public sealed class FeedApiTests : IAsyncLifetime
         var vasya = await _site.SignedInAsync("vasya");
         var (_, gameId) = await CompletedWithReviewAsync(vasya, 5, null);
         var admin = await _site.SignedInAsync("admin");
-        await PostOkAsync(admin, $"/api/admin/pool/{gameId}/delete", new { commandId = Guid.NewGuid() });
+        await PostOkAsync(admin, $"/api/admin/pool/{gameId}/delete", new { commandId = Guid.NewGuid(), reason = "Дубль" });
 
         Assert.Equal(HttpStatusCode.NotFound, (await vasya.GetAsync($"/api/pool/{gameId}/runs", Ct)).StatusCode);
         Assert.Single((await OkAsync(await admin.GetAsync($"/api/pool/{gameId}/runs", Ct))).EnumerateArray());

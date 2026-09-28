@@ -32,9 +32,12 @@ public sealed record GameAdded(Guid GameId, GameCard Card, Guid? AuthorId, strin
 [EventType("game-changed")]
 public sealed record GameChanged(Guid GameId, GameCard Card) : IGameEvent;
 
-/// <summary>The admin removed a game from the pool (soft): no roll gets it; runs that had it keep it (SPEC «Удаление мягкое»).</summary>
-[EventType("game-deleted")]
-public sealed record GameDeleted(Guid GameId) : IGameEvent;
+/// <summary>
+/// The admin removed a game from the pool (soft): no roll gets it; runs that had it keep it (SPEC «Удаление мягкое»).
+/// <see cref="Reason"/> — why, as the admin wrote it (D-208); none in v1, written before a reason was required.
+/// </summary>
+[EventType("game-deleted", version: 2)]
+public sealed record GameDeleted(Guid GameId, string? Reason) : IGameEvent;
 
 [EventType("game-restored")]
 public sealed record GameRestored(Guid GameId) : IGameEvent;

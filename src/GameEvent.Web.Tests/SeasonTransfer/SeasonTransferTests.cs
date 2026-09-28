@@ -420,6 +420,24 @@ public sealed class SeasonTransferTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_deleted_games_reason_travels_with_the_pool()
+    {
+        await PlayAsync();
+        var added = await _site.Services.GetRequiredService<CommandBus>().SendAsync(
+            new CommandEnvelope(Guid.NewGuid(), Guid.Empty, new Infrastructure.Pool.AddGame(new Engine.Pool.GameCard("Dead Space", ["Horror"], null, null, null, null, null, IsCoop: false), null, Force: true), null),
+            Ct);
+        var gameId = Assert.IsType<Engine.Pool.GameAdded>(Assert.Single(added.Events).Event).GameId;
+        Assert.True((await _site.Services.GetRequiredService<CommandBus>().SendAsync(new CommandEnvelope(Guid.NewGuid(), Guid.Empty, new Infrastructure.Pool.DeleteGame(gameId, "Дубль"), null), Ct)).IsAccepted);
+        var archive = await ExportAsync();
+
+        await using var other = OpenOther();
+        await Infrastructure.Seasons.SeasonTransfer.ImportAsync(other, archive, _site.Clock.UtcNow, new ImportOptions(WithPool: true), Ct);
+
+        var game = await other.Games.SingleAsync(g => g.Id == gameId, Ct);
+        Assert.Equal((true, "Дубль"), (game.IsDeleted, game.DeletionReason));
+    }
+
+    [Fact]
     public async Task The_live_pool_changes_only_when_asked()
     {
         await PlayAsync();

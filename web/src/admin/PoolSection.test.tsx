@@ -2,7 +2,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Schemas } from '../api/client';
 import { ru } from '../i18n/ru';
-import { answer, fakeServer, seasonId } from '../test/fakeServer';
+import { answer, fakeServer, json, seasonId } from '../test/fakeServer';
 import { PoolSection } from './PoolSection';
 
 // H8: the pool and the category wheel (SPEC «Контент: игры, теги и веса»; D-92, D-119): weights with the count of
@@ -36,6 +36,7 @@ function game(overrides: Partial<Schemas['PoolGameView']>): Schemas['PoolGameVie
     author: null,
     isDeleted: false,
     completionCondition: 'Титры',
+    deletionReason: null,
     ...overrides,
   };
 }
@@ -224,17 +225,60 @@ describe('The pool section', () => {
     });
 
     await userEvent.click(within(await screen.findByTestId('game-g1')).getByTestId('game-delete'));
-    await userEvent.click(
-      within(await screen.findByRole('alertdialog')).getByRole('button', { name: t.deleteConfirm }),
-    );
+    const dialog = await screen.findByRole('alertdialog');
+    await userEvent.type(within(dialog).getByLabelText(t.deleteReason), '  Дубль Hollow Knight ');
+    await userEvent.click(within(dialog).getByRole('button', { name: t.deleteConfirm }));
     await waitFor(() => {
       expect(server.sent('POST', '/pool/g1/delete')).toHaveLength(1);
+    });
+    expect(server.sent('POST', '/pool/g1/delete')[0]?.body).toMatchObject({
+      reason: 'Дубль Hollow Knight',
     });
 
     await userEvent.click(within(screen.getByTestId('game-g2')).getByTestId('game-restore'));
     await waitFor(() => {
       expect(server.sent('POST', '/pool/g2/restore')).toHaveLength(1);
     });
+  });
+
+  it('does not delete a game without a reason (D-208)', async () => {
+    const server = open();
+
+    await userEvent.click(within(await screen.findByTestId('game-g1')).getByTestId('game-delete'));
+    const dialog = await screen.findByRole('alertdialog');
+    await userEvent.type(within(dialog).getByLabelText(t.deleteReason), '   ');
+    await userEvent.click(within(dialog).getByRole('button', { name: t.deleteConfirm }));
+
+    expect(within(dialog).getByText(t.deleteReasonRequired)).toBeInTheDocument();
+    expect(within(dialog).getByLabelText(t.deleteReason)).toHaveAccessibleDescription(
+      expect.stringContaining(t.deleteReasonRequired) as string,
+    );
+    expect(server.sent('POST', '/pool/g1/delete')).toHaveLength(0);
+  });
+
+  it('keeps a refused deletion in its window', async () => {
+    open({ 'POST /api/admin/pool/*/delete': () => json(409, { code: 'pool.deleted' }) });
+
+    await userEvent.click(within(await screen.findByTestId('game-g1')).getByTestId('game-delete'));
+    const dialog = await screen.findByRole('alertdialog');
+    await userEvent.type(within(dialog).getByLabelText(t.deleteReason), 'Дубль');
+    await userEvent.click(within(dialog).getByRole('button', { name: t.deleteConfirm }));
+
+    expect(
+      await within(dialog).findByText(ru.admin.rejection['pool.deleted'] ?? ''),
+    ).toBeInTheDocument();
+  });
+
+  it('shows why a deleted game was taken out of the pool', async () => {
+    open({
+      'GET /api/pool': [
+        game({ id: 'g2', title: 'Celeste', isDeleted: true, deletionReason: 'Дубль Celeste' }),
+      ],
+    });
+
+    expect(await screen.findByTestId('game-deletion-reason')).toHaveTextContent(
+      t.deletionReason('Дубль Celeste'),
+    );
   });
 
   it('invites to load the pool when it is empty', async () => {
