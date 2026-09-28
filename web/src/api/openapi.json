@@ -5980,9 +5980,13 @@
           },
           "inactiveHint": {
             "type": "boolean"
+          },
+          "choosingBranch": {
+            "type": "boolean",
+            "default": false
           }
         },
-        "description": "A player as the admin sees them (SE5, D-123): the balance and the place in the turn, the inactivity flag, when they\nlast acted themselves and the hint — no action of their own for the rules' `inactiveHintDays` while not marked\ninactive. `playing` — a run is going on: a long game is a reason to be quiet, not a sign of leaving."
+        "description": "A player as the admin sees them (SE5, D-123): the balance and the place in the turn, the inactivity flag, when they\nlast acted themselves and the hint — no action of their own for the rules' `inactiveHintDays` while not marked\ninactive. `playing` — a run is going on: a long game is a reason to be quiet, not a sign of leaving.\n`choosingBranch` — the player's throw waits at a fork (D-305): the admin may discard the choice, the steps left burn."
       },
       "AlreadyPlayedRequest": {
         "required": [

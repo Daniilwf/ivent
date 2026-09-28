@@ -5899,6 +5899,7 @@ export interface components {
          * @description A player as the admin sees them (SE5, D-123): the balance and the place in the turn, the inactivity flag, when they
          *     last acted themselves and the hint — no action of their own for the rules' `inactiveHintDays` while not marked
          *     inactive. `playing` — a run is going on: a long game is a reason to be quiet, not a sign of leaving.
+         *     `choosingBranch` — the player's throw waits at a fork (D-305): the admin may discard the choice, the steps left burn.
          */
         AdminPlayerView: {
             /** Format: uuid */
@@ -5920,6 +5921,8 @@ export interface components {
             /** Format: date-time */
             lastActionAt: null | string;
             inactiveHint: boolean;
+            /** @default false */
+            choosingBranch: boolean;
         };
         /** @description «Уже проходил» on the offered game or an option of the pending choice (D-92). */
         AlreadyPlayedRequest: {

@@ -74,7 +74,10 @@ public static class AdminMapEndpoints
             .RequireRateLimiting(AppSetup.AdminReadRateLimit)
             .ProducesProblem(StatusCodes.Status429TooManyRequests);
 
+        // Each check folds the season log: the editor checks as the admin edits, so a limit of its own, per admin
         map.MapPost("/check", CheckAsync)
+            .RequireRateLimiting(AppSetup.MapCheckRateLimit)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests)
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status404NotFound);
 
@@ -88,14 +91,13 @@ public static class AdminMapEndpoints
     private static async Task<Results<Ok<AdminMapView>, NotFound>> GetAsync(Guid seasonId, GameEventDbContext db, CancellationToken ct)
     {
         var season = await db.Seasons.AsNoTracking().SingleOrDefaultAsync(s => s.Id == seasonId, ct);
-        var created = await CreatedAsync(db, seasonId, ct);
-        if (season is null || created is null)
+        var current = await SeasonMaps.CurrentAsync(db, seasonId, ct);
+        if (season is null || current is null)
         {
             return TypedResults.NotFound();
         }
 
         var rules = JsonSerializer.Deserialize<Ruleset>(season.RulesetJson, EngineJson.Options)!;
-        var current = await SeasonMaps.CurrentAsync(db, seasonId, created.Map, ct);
         var players = await db.SeasonPlayers.AsNoTracking()
             .Where(p => p.SeasonId == seasonId)
             .OrderBy(p => p.Name)
@@ -157,12 +159,6 @@ public static class AdminMapEndpoints
 
     private static ValidationProblem MapMissing() =>
         TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["map"] = ["A map with cells and edges is required."] });
-
-    private static async Task<SeasonCreated?> CreatedAsync(GameEventDbContext db, Guid seasonId, CancellationToken ct)
-    {
-        var row = await db.Events.AsNoTracking().SingleOrDefaultAsync(e => e.SeasonId == seasonId && e.Sequence == 1, ct);
-        return row is null ? null : EventCodec.Decode(new StoredEvent(row.Type, row.Version, row.Data)) as SeasonCreated;
-    }
 
     private static async Task<Results<Ok<CommandResponse>, ProblemHttpResult, ValidationProblem, NotFound, ForbidHttpResult>> PublishAsync(
         Guid seasonId, Guid commandId, ICommand command, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, CancellationToken ct) =>

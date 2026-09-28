@@ -309,9 +309,9 @@ export type BranchOption = {
   cell: number;
   /** Where the steps left would take the token, in words */
   end: string;
-  /** The zone of the first cell, if any */
+  /** The zone of the cell where the token will stand (past a teleport, its destination): it decides the next roll */
   zone: string | null;
-  /** The zone's rules in words: the zone decides the next roll (D-307) */
+  /** That zone's rules in words (D-307) */
   rules: string[];
 };
 
@@ -330,14 +330,12 @@ export function branchOptions(
   };
   return choice.options.map((o) => {
     const end = branchEnd(map, o.id, steps);
+    const zone = zoneOf(end.kind === 'teleport' ? end.to : end.cell);
     return {
       id: o.id,
       cell: number(o.id),
-      zone: zoneOf(o.id)?.name ?? null,
-      rules: (() => {
-        const zone = zoneOf(o.id);
-        return zone ? zoneRules(zone) : [];
-      })(),
+      zone: zone?.name ?? null,
+      rules: zone ? zoneRules(zone) : [],
       end:
         end.kind === 'finish'
           ? t.endFinish

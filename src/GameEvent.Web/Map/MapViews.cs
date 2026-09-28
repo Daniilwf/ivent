@@ -71,16 +71,26 @@ public static class SeasonMaps
     /// <summary>How many recent moves of the season are read to find my latest one.</summary>
     private const int RecentMoves = 64;
 
-    /// <summary>The latest published map (D-300: publication is never undone), or the one the season was created with.</summary>
-    public static async Task<MapGraph> CurrentAsync(GameEventDbContext db, Guid seasonId, MapGraph created, CancellationToken ct)
+    /// <summary>
+    /// The map in force: the latest published one (D-300: publication is never undone), or the one the season was
+    /// created with; null when there is no such season. Found by the events' types and positions, never by their data.
+    /// </summary>
+    public static async Task<MapGraph?> CurrentAsync(GameEventDbContext db, Guid seasonId, CancellationToken ct)
     {
+        ArgumentNullException.ThrowIfNull(db);
         var row = await db.Events.AsNoTracking()
-            .Where(e => e.SeasonId == seasonId && e.Type == s_published)
-            .OrderByDescending(e => e.Sequence)
-            .FirstOrDefaultAsync(ct);
-        return row is not null && EventCodec.Decode(new StoredEvent(row.Type, row.Version, row.Data)) is MapPublished published
-            ? published.Map
-            : created;
+                .Where(e => e.SeasonId == seasonId && e.Type == s_published)
+                .OrderByDescending(e => e.Sequence)
+                .FirstOrDefaultAsync(ct)
+            ?? await db.Events.AsNoTracking().SingleOrDefaultAsync(e => e.SeasonId == seasonId && e.Sequence == 1, ct);
+        return row is null
+            ? null
+            : EventCodec.Decode(new StoredEvent(row.Type, row.Version, row.Data)) switch
+            {
+                MapPublished published => published.Map,
+                Engine.Seasons.SeasonCreated created => created.Map,
+                _ => null,
+            };
     }
 
     /// <summary>

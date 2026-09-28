@@ -144,6 +144,42 @@ public sealed class MapApiTests : IAsyncLifetime
         Assert.Equal(JsonValueKind.Null, (await MeAsync(petya)).GetProperty("lastMove").ValueKind);
     }
 
+    [Fact]
+    public async Task An_undone_move_is_not_my_last_move()
+    {
+        var admin = await _site.SignedInAsync("admin");
+        var vasya = await _site.SignedInAsync("vasya");
+        await SwitchToGraphAsync(admin);
+        await PublishAsync(admin, ForkMap());
+        await CompleteOneAsync(vasya);
+        var before = await MeAsync(vasya);
+        var choose = Guid.NewGuid();
+        await ApiCalls.PostOkAsync(vasya, $"{Season}/choose", new { commandId = choose, choiceId = before.GetProperty("choice").GetProperty("id").GetGuid(), optionId = "b1" });
+
+        await ApiCalls.PostOkAsync(admin, $"/api/admin/seasons/{SiteFactory.SeasonId}/undo", new { commandId = Guid.NewGuid(), targetCommandId = choose, comment = "Не та ветка" });
+
+        // The move of the completion is the latest again, and the choice waits once more
+        var me = await MeAsync(vasya);
+        Assert.Equal(before.GetProperty("lastMove").GetProperty("sequence").GetInt64(), me.GetProperty("lastMove").GetProperty("sequence").GetInt64());
+        Assert.Equal("branch", me.GetProperty("choice").GetProperty("kind").GetString());
+    }
+
+    [Fact]
+    public async Task The_players_section_says_who_is_choosing_a_branch()
+    {
+        var admin = await _site.SignedInAsync("admin");
+        var vasya = await _site.SignedInAsync("vasya");
+        await SwitchToGraphAsync(admin);
+        await PublishAsync(admin, ForkMap());
+        await CompleteOneAsync(vasya);
+
+        var players = await ApiCalls.OkAsync(await admin.GetAsync($"/api/admin/seasons/{SiteFactory.SeasonId}/players", Ct));
+
+        Assert.Equal(
+            [("petya", false), ("vasya", true)],
+            players.EnumerateArray().Select(p => (p.GetProperty("name").GetString(), p.GetProperty("choosingBranch").GetBoolean())));
+    }
+
     // ---- The editor: read ----
 
     [Fact]
@@ -354,6 +390,22 @@ public sealed class MapApiTests : IAsyncLifetime
         var check = await ApiCalls.OkAsync(await admin.PostAsJsonAsync($"{Admin}/check", map, Ct));
 
         Assert.True(check.GetProperty("canPublish").GetBoolean(), check.ToString());
+    }
+
+    [Fact]
+    public async Task A_map_past_the_limit_is_413_and_other_admin_bodies_keep_the_small_limit()
+    {
+        var admin = await _site.SignedInAsync("admin");
+        await SwitchToGraphAsync(admin);
+        var huge = new string('x', (int)Map.AdminMapEndpoints.MaxMapRequestBytes);
+        var small = new string('x', (int)Hosting.WebSecurity.ApiBodyLimitBytes + 1);
+
+        Assert.Equal(
+            HttpStatusCode.RequestEntityTooLarge,
+            (await admin.PostAsync($"{Admin}/check", new StringContent($"{{\"cells\":[],\"edges\":[],\"pad\":\"{huge}\"}}", System.Text.Encoding.UTF8, "application/json"), Ct)).StatusCode);
+        Assert.Equal(
+            HttpStatusCode.RequestEntityTooLarge,
+            (await admin.PostAsJsonAsync($"/api/admin/seasons/{SiteFactory.SeasonId}/undo", new { commandId = Guid.NewGuid(), targetCommandId = Guid.NewGuid(), comment = small }, Ct)).StatusCode);
     }
 
     // ---- The editor: publish ----

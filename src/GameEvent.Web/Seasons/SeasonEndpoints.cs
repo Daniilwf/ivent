@@ -506,10 +506,7 @@ public static class SeasonEndpoints
     private static async Task<Results<Ok<SeasonView>, NotFound>> GetSeasonAsync(
         Guid seasonId, ClaimsPrincipal user, GameEventDbContext db, IClock clock, CancellationToken ct)
     {
-        var created = await db.Events.AsNoTracking()
-            .Where(e => e.SeasonId == seasonId && e.Sequence == 1)
-            .SingleOrDefaultAsync(ct);
-        if (created is null || EventCodec.Decode(new StoredEvent(created.Type, created.Version, created.Data)) is not SeasonCreated season)
+        if (await SeasonMaps.CurrentAsync(db, seasonId, ct) is not { } map)
         {
             return TypedResults.NotFound();
         }
@@ -520,7 +517,6 @@ public static class SeasonEndpoints
         var players = await db.SeasonPlayers.AsNoTracking().Where(p => p.SeasonId == seasonId).InTokenOrder().ToListAsync(ct);
         var seasonRecord = await db.Seasons.AsNoTracking().SingleAsync(s => s.Id == seasonId, ct);
         var rules = JsonSerializer.Deserialize<Ruleset>(seasonRecord.RulesetJson, EngineJson.Options)!;
-        var map = await SeasonMaps.CurrentAsync(db, seasonId, season.Map, ct);
         var completedRuns = await db.Runs.AsNoTracking()
             .Where(r => r.SeasonId == seasonId && r.Status == RunStatus.Completed)
             .GroupBy(r => r.PlayerId)

@@ -56,6 +56,7 @@ public sealed record InactivityRequest(Guid CommandId, bool IsInactive);
 /// A player as the admin sees them (SE5, D-123): the balance and the place in the turn, the inactivity flag, when they
 /// last acted themselves and the hint — no action of their own for the rules' <c>inactiveHintDays</c> while not marked
 /// inactive. <c>playing</c> — a run is going on: a long game is a reason to be quiet, not a sign of leaving.
+/// <c>choosingBranch</c> — the player's throw waits at a fork (D-305): the admin may discard the choice, the steps left burn.
 /// </summary>
 public sealed record AdminPlayerView(
     Guid Id,
@@ -69,7 +70,8 @@ public sealed record AdminPlayerView(
     bool Playing,
     bool IsInactive,
     DateTimeOffset? LastActionAt,
-    bool InactiveHint);
+    bool InactiveHint,
+    bool ChoosingBranch = false);
 
 /// <summary>
 /// Seasons and their players for the admin (SPEC «Админка», E2, D-123): create a season, add and correct players, the
@@ -230,7 +232,9 @@ public static class AdminPlayerEndpoints
                     p.Phase == TurnPhase.Playing,
                     p.IsInactive,
                     last,
-                    season.Status == SeasonStatus.Active && !p.IsInactive && !p.Frozen && now - quietSince >= TimeSpan.FromDays(hintDays));
+                    season.Status == SeasonStatus.Active && !p.IsInactive && !p.Frozen && now - quietSince >= TimeSpan.FromDays(hintDays),
+                    p.ChoiceJson is { } choice
+                        && JsonSerializer.Deserialize<Engine.Turns.PendingChoice>(choice, EngineJson.Options)?.Kind == Engine.Turns.ChoiceKind.Branch);
             })];
         return TypedResults.Ok(views);
     }

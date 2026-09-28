@@ -88,19 +88,10 @@ internal static class MapPublishing
         }
 
         // SPEC «Проверки»: клетки, где стоят игроки, не удалены; D-305, D-308
-        var conflicts = MapPublicationChecks.For(state, command.Map);
-        foreach (var code in new[] { RejectionCodes.MapOccupiedCellRemoved, RejectionCodes.MapOccupiedCellRetyped, RejectionCodes.BranchChoicePending })
+        // The first kind of conflict found refuses: its code, the cells it is about
+        if (MapPublicationChecks.For(state, command.Map).GroupBy(c => c.Code).FirstOrDefault() is { } conflict)
         {
-            var cells = conflicts.Where(c => c.Code == code).Select(c => c.Subject).ToList();
-            if (cells.Count > 0)
-            {
-                return Decision.Reject(code, code switch
-                {
-                    RejectionCodes.MapOccupiedCellRemoved => $"Players stand on cells the new map removes: {string.Join(", ", cells)}.",
-                    RejectionCodes.MapOccupiedCellRetyped => $"The new map makes a finish of a cell a player is still on, or the other way round: {string.Join(", ", cells)}.",
-                    _ => "A player is choosing a branch: wait for the choice or discard it first.",
-                });
-            }
+            return Decision.Reject(conflict.Key, string.Join(" ", conflict.Select(c => c.Message)));
         }
 
         return command.Map == state.Map

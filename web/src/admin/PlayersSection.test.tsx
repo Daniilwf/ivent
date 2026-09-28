@@ -24,6 +24,7 @@ function player(overrides: Partial<Schemas['AdminPlayerView']>): Schemas['AdminP
     isInactive: false,
     lastActionAt: '2026-09-20T09:00:00+00:00',
     inactiveHint: false,
+    choosingBranch: false,
     ...overrides,
   };
 }
@@ -171,6 +172,22 @@ describe('The players', () => {
     expect(screen.queryByTestId('adjust-discard')).toBeNull();
     await userEvent.click(within(screen.getByTestId('player-p2')).getByTestId('adjust-open'));
     expect(screen.getByTestId('adjust-discard')).toBeInTheDocument();
+  });
+
+  it('offers to discard a branch choice at a fork, saying the steps left burn (D-305)', async () => {
+    const server = open([player({ choosingBranch: true, cellId: 'c2' })], {
+      'POST /api/admin/seasons/*/players/*/adjust': ok,
+    });
+
+    await userEvent.click(await screen.findByTestId('adjust-open'));
+    const form = screen.getByTestId('adjust-form');
+    await userEvent.click(within(form).getByRole('checkbox', { name: t.discardBranch }));
+    await userEvent.type(within(form).getByTestId('adjust-comment'), 'Завис на развилке');
+    await userEvent.click(within(form).getByTestId('adjust-submit'));
+
+    expect(server.sent('POST', '/adjust')[0]?.body).toEqual(
+      expect.objectContaining({ discardOffer: true }),
+    );
   });
 
   it('shows the engine’s refusal of a correction in the form', async () => {

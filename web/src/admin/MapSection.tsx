@@ -271,6 +271,7 @@ function MapEditor({
         check={check}
         draft={draft}
         same={!changed}
+        choosing={view.players.filter((p) => p.choosingBranch).map((p) => p.name)}
         onRetry={() => {
           setAttempt((n) => n + 1);
         }}
@@ -685,7 +686,10 @@ export function CheckPanel({
   onRetry,
   onSelect,
   same = false,
+  choosing = [],
 }: {
+  /** Who is choosing a branch now: the problem «someone is choosing» names them */
+  choosing?: string[];
   check: Check;
   draft: Draft;
   onRetry: () => void;
@@ -729,6 +733,8 @@ export function CheckPanel({
                         >
                           {problemText(p)}
                         </button>
+                      ) : p.code === 'map.branchChoicePending' && choosing.length > 0 ? (
+                        `${problemText(p)} ${t.check.choosing(choosing.join(', '))}`
                       ) : (
                         problemText(p)
                       )}

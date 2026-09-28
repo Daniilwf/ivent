@@ -213,6 +213,9 @@ describe('the season screen on the graph map', () => {
     expect(within(branch).getByTestId('branch-b1')).toHaveTextContent(
       ru.map.branch.endTeleport(6, 5),
     );
+    // The teleport lands in the swamp: that zone decides the next roll, not the branch's first cell
+    expect(within(branch).getByTestId('branch-b1')).toHaveTextContent('Болото ужаса');
+    expect(within(branch).getByTestId('branch-b1')).toHaveTextContent(ru.map.zones.diceAdd(1));
     // No roll while the throw waits for its branch
     expect(screen.queryByTestId('roll')).not.toBeInTheDocument();
     // The map rings the options, numbered as the buttons
@@ -223,6 +226,21 @@ describe('the season screen on the graph map', () => {
     expect(server.sent('POST', '/choose').map((c) => c.body)).toEqual([
       expect.objectContaining({ choiceId, optionId: 'b1' }),
     ]);
+  });
+
+  it('asks for the branch after the deadline too: the throw was made before it (D-305)', async () => {
+    fakeServer({
+      ...common,
+      'GET /api/seasons/*': {
+        ...season('f', { choice: branchChoice }),
+        status: 'closing',
+        deadline: '2026-01-01T00:00:00Z',
+      },
+    });
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    expect(await screen.findByTestId('branch')).toBeInTheDocument();
+    expect(screen.queryByTestId('roll')).not.toBeInTheDocument();
   });
 
   it('picks a branch with the keyboard', async () => {
