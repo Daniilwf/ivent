@@ -1,17 +1,17 @@
 import { expect, test } from '@playwright/test';
+import { seedAdmin } from '../support/api.ts';
+import { signInHere } from '../support/world.ts';
 
 // H8: the admin's pages end to end on the development seed — the admin opens them from the menu, the proof queue
 // comes first, the sections switch (a side column on a desktop, a sheet on a phone) and the address follows; a player
 // at the same address sees the game. Read-only: the other tests play on the same seed.
-const password = 'dev-password';
+const password = seedAdmin.password;
 
 test('the admin opens the admin pages from the menu and walks the sections', async ({
   page,
 }, testInfo) => {
   await page.goto('/');
-  await page.getByTestId('login-name').fill('admin');
-  await page.getByTestId('login-password').fill(password);
-  await page.getByTestId('login-submit').click();
+  await signInHere(page, { login: 'admin', password });
 
   await page.getByTestId('user-menu').click();
   await page.getByTestId('to-admin').click();
@@ -33,9 +33,7 @@ test('the admin opens the admin pages from the menu and walks the sections', asy
 
 test('a player at the admin address sees the game', async ({ page }) => {
   await page.goto('/');
-  await page.getByTestId('login-name').fill('dasha');
-  await page.getByTestId('login-password').fill(password);
-  await page.getByTestId('login-submit').click();
+  await signInHere(page, { login: 'dasha', password });
   await expect(page.getByTestId('turn')).toBeVisible();
 
   await page.goto('/admin/players');
