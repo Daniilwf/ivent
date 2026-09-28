@@ -6,6 +6,7 @@ import {
   FlaskConical,
   History,
   Library,
+  Map as MapIcon,
   Menu as MenuIcon,
   ServerCrash,
   Sparkles,
@@ -13,7 +14,7 @@ import {
   Users,
   Wrench,
 } from 'lucide-react';
-import { useCallback, useRef, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useCallback, useRef, useState, type ReactNode } from 'react';
 import { api, type Schemas } from '../api/client';
 import { Link } from '../app/Link';
 import { NotFoundPage } from '../app/NotFound';
@@ -43,6 +44,9 @@ import { SectionHead } from './common';
 import { answerOf, useLoaded } from '../app/useLoaded';
 import { useSeasonVersion } from '../app/useSeasonVersion';
 
+// The map editor (@xyflow/react) loads apart from the site: the players never download it
+const MapSection = lazy(async () => ({ default: (await import('./MapSection')).MapSection }));
+
 const t = ru.admin;
 
 export type AdminSectionId = keyof typeof t.sections;
@@ -53,6 +57,7 @@ const sections: { id: AdminSectionId; icon: ReactNode; season: boolean }[] = [
   { id: 'log', icon: <History size={20} aria-hidden />, season: true },
   { id: 'effects', icon: <Sparkles size={20} aria-hidden />, season: true },
   { id: 'rules', icon: <FileJson size={20} aria-hidden />, season: true },
+  { id: 'map', icon: <MapIcon size={20} aria-hidden />, season: true },
   { id: 'season', icon: <CalendarCog size={20} aria-hidden />, season: false },
   { id: 'pool', icon: <Library size={20} aria-hidden />, season: false },
   { id: 'accounts', icon: <UserCog size={20} aria-hidden />, season: false },
@@ -241,6 +246,12 @@ export function AdminScreen({
         return <EffectsSection seasonId={id} version={version} />;
       case 'rules':
         return <RulesSection seasonId={id} version={version} />;
+      case 'map':
+        return (
+          <Suspense fallback={<p>{ru.ui.loading}</p>}>
+            <MapSection seasonId={id} version={version} />
+          </Suspense>
+        );
       case 'season':
         return (
           <SeasonSection

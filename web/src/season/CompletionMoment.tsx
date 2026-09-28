@@ -28,8 +28,12 @@ export function CompletionMoment({
   to,
   fill = false,
   free = false,
+  walked,
   onDone,
 }: {
+  /** The cells the token passed, as the server walked them (the graph map, D-304): its old cell first, the flights
+   *  (teleports) by the index they land on; without it the token walks the chain from `from` to `to` */
+  walked?: { path: number[] | null; jumps: number[] } | undefined;
   /** The frozen first plays in free mode: the dice give no points */
   free?: boolean;
   dice: DiceRoll;
@@ -46,7 +50,8 @@ export function CompletionMoment({
   const reduce = useReducedMotion() ?? false;
   // Frozen at the start: new objects from a refresh must not restart the dice or the move
   const [roll] = useState(dice);
-  const [path] = useState(() => movePath(board, from, to));
+  const [path] = useState(() => (walked ? walked.path : movePath(board, from, to)));
+  const [jumps] = useState(() => walked?.jumps ?? []);
   const [token] = useState(() => ({ ...mover, cell: from }));
   const [step, setStep] = useState<'dice' | 'move'>('dice');
   const moment = useRef<MomentHandle>(null);
@@ -104,6 +109,7 @@ export function CompletionMoment({
           players={players}
           mover={token}
           path={path}
+          jumps={jumps}
           budget={walkBudget}
           className={cx('w-full', fill ? 'h-full' : 'h-90 rounded-lg border-3 border-ink')}
           onPhase={(phase) => {

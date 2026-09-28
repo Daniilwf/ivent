@@ -10,6 +10,7 @@ using GameEvent.Infrastructure.Seasons;
 using GameEvent.Web.Accounts;
 using GameEvent.Web.BugReports;
 using GameEvent.Web.Files;
+using GameEvent.Web.Map;
 using GameEvent.Web.Observability;
 using GameEvent.Web.Pool;
 using GameEvent.Web.Proofs;
@@ -44,6 +45,11 @@ public static class AppSetup
     public const string SeasonReadRateLimit = "season-read";
 
     public const int SeasonReadsPerMinute = 60;
+
+    /// <summary>The map editor's checks (D-315): one after each edit settles, so more than the admin's other reads.</summary>
+    public const string MapCheckRateLimit = "map-check";
+
+    public const int MapChecksPerMinute = 120;
 
     public static void AddGameEvent(this WebApplicationBuilder builder)
     {
@@ -152,6 +158,9 @@ public static class AppSetup
             o.AddPolicy(AdminReadRateLimit, ctx => RateLimitPartition.GetFixedWindowLimiter(
                 ctx.User.UserId()?.ToString() ?? WebSecurity.ClientKey(ctx.Connection.RemoteIpAddress),
                 _ => new FixedWindowRateLimiterOptions { PermitLimit = AdminReadsPerMinute, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+            o.AddPolicy(MapCheckRateLimit, ctx => RateLimitPartition.GetFixedWindowLimiter(
+                ctx.User.UserId()?.ToString() ?? WebSecurity.ClientKey(ctx.Connection.RemoteIpAddress),
+                _ => new FixedWindowRateLimiterOptions { PermitLimit = MapChecksPerMinute, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
             o.AddPolicy(SeasonReadRateLimit, ctx => RateLimitPartition.GetFixedWindowLimiter(
                 ctx.User.UserId()?.ToString() ?? WebSecurity.ClientKey(ctx.Connection.RemoteIpAddress),
                 _ => new FixedWindowRateLimiterOptions { PermitLimit = SeasonReadsPerMinute, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
@@ -210,6 +219,7 @@ public static class AppSetup
         api.MapAdminRuns();
         api.MapAdminProofs();
         api.MapAdminSeasons();
+        api.MapAdminMap();
         api.MapSeasonsAndPlayers();
         api.MapFeed();
         api.MapAdminAccounts();

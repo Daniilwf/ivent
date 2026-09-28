@@ -1,3 +1,4 @@
+import { onDesktop } from '../test/desk';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Schemas } from '../api/client';
@@ -76,6 +77,9 @@ function season(turn: Partial<Schemas['MyTurnView']>): Schemas['SeasonView'] {
       ...turn,
     },
     lastSequence: 3,
+    edges: [],
+    zones: [],
+    mapMode: 'linear',
     name: 'Тестовый сезон',
   };
 }
@@ -202,12 +206,7 @@ describe('Game covers on the season screen (D-222)', () => {
 
   it('shows the cover of the game the wheel lands on', async () => {
     // On a desktop the landed wheel stays on the map's stage with the result
-    vi.stubGlobal('matchMedia', (query: string) => ({
-      matches: query.includes('min-width'),
-      media: query,
-      addEventListener: () => undefined,
-      removeEventListener: () => undefined,
-    }));
+    onDesktop();
     let current = season({});
     fakeServer({
       [`GET /api/seasons/${seasonId}`]: () => ({ body: current }),

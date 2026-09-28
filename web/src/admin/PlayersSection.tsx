@@ -336,9 +336,9 @@ function AdjustForm({
           }}
         />
       </div>
-      {player.phase === 'rolling' ? (
+      {player.phase === 'rolling' || player.choosingBranch ? (
         <Checkbox
-          label={t.discardOffer}
+          label={player.choosingBranch ? t.discardBranch : t.discardOffer}
           checked={discard}
           data-testid="adjust-discard"
           onChange={(e) => {

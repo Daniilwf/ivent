@@ -16,9 +16,14 @@ import { RunActions } from './RunActions';
 import { seasonPicture } from './seasonView';
 import { linearBoard } from '../board/linearBoard';
 import { Cover, RunCard } from '../board/GameCards';
+import { branchOptions, graphBoard, legsPath } from '../board/graphBoard';
+import { MapLegend } from '../board/MapLegend';
+import { cellById, cellsToFinish } from '../board/geometry';
+import { TokenMove } from '../board/TokenMove';
+import { BranchChoice, branchTitle } from './BranchChoice';
 import { Leaderboard } from '../board/Leaderboard';
 import { FeedPreview } from '../feed/FeedPreview';
-import { MapView } from '../board/MapView';
+import { MapView, type MapApi } from '../board/MapView';
 import type { MomentHandle } from '../board/moment';
 import { WheelMoment, type WheelRoll } from '../board/Wheel';
 import { Button } from '../ui/Button';
@@ -51,8 +56,12 @@ type Command =
   | { kind: 'alreadyPlayed'; gameId: string }
   | { kind: 'resolveEffect'; effectId: string; outcome: EffectOutcome; comment: string | null };
 type Loaded = { kind: 'season'; season: Season } | { kind: 'signedOut' } | { kind: 'failed' };
-/** A completion that came while the page is open: its run and the cell my token left */
-type Thrown = { run: string; from: string; before: Season };
+/** The legs of one move of my token, as the server walked them (the graph map) */
+type Legs = Schemas['MoveLegView'][];
+/** A completion that came while the page is open: its run, the cell my token left and, on the graph, its legs */
+type Thrown = { run: string; from: string; before: Season; legs: Legs | null };
+/** My token's move after a branch choice, while the page is open (the graph map, D-304) */
+type Walking = { sequence: number; legs: Legs; before: Season };
 
 /** The last completed run's dice line takes the focus when its moment ends */
 const lastDiceId = 'last-dice';
@@ -152,9 +161,18 @@ export function SeasonScreen({
   // The last completed run and my cell of the last view shown; undefined until the first load. A new completed run
   // brings its dice and my token's move (H4); the one the page opened with is shown at once.
   const seen = useRef<
-    { run: string | null; cell: string | null; points: number; shown: Set<string> } | undefined
+    | {
+        run: string | null;
+        cell: string | null;
+        points: number;
+        shown: Set<string>;
+        move: number | null;
+      }
+    | undefined
   >(undefined);
   const [thrown, setThrown] = useState<Thrown | null>(null);
+  const [walking, setWalking] = useState<Walking | null>(null);
+  const walk = useRef<MomentHandle>(null);
   // The season as the page showed it last: while the dice roll, the map and the leaderboard keep it (the moment owns
   // its result, H4 design review)
   const shownSeason = useRef<Season | null>(null);
@@ -181,25 +199,45 @@ export function SeasonScreen({
         const before = seen.current;
         const shown = before?.shown ?? new Set<string>();
         const at = (id: string | null) => view.cells.findIndex((c) => c.id === id);
+        const graph = view.mapMode === 'graph';
+        // My latest move, when it is new to this page (the graph map gives it with its legs)
+        const move = view.me?.lastMove ?? null;
+        const newMove =
+          graph && before && move && move.sequence > (before.move ?? 0) ? move.legs : null;
         // Only a completion new to this page plays: not the one it opened with, not an older run an admin's rollback
-        // brings back (the token goes back and the points drop), not a run already shown
-        if (
+        // brings back (the token goes back and the points drop), not a run already shown. On the graph a snake may take
+        // the token back: its cell's order says nothing
+        const completed =
           before?.cell &&
           last &&
           last.id !== before.run &&
           !shown.has(last.id) &&
           last.status !== 'rejected' &&
-          at(cell) >= at(before.cell) &&
-          points >= before.points
-        )
+          (graph || at(cell) >= at(before.cell)) &&
+          points >= before.points;
+        if (completed)
           setThrown(
-            shownSeason.current
-              ? { run: last.id, from: before.cell, before: shownSeason.current }
+            shownSeason.current && before.cell
+              ? {
+                  run: last.id,
+                  from: before.cell,
+                  before: shownSeason.current,
+                  legs: newMove,
+                }
               : null,
           );
         else if (last?.id !== before?.run || last?.status === 'rejected') setThrown(null);
+        // The rest of a move after the branch choice: the token walks the chosen branch
+        if (
+          !completed &&
+          newMove &&
+          move &&
+          newMove[0]?.reason === 'completionRoll' &&
+          shownSeason.current
+        )
+          setWalking({ sequence: move.sequence, legs: newMove, before: shownSeason.current });
         if (last) shown.add(last.id);
-        seen.current = { run: last?.id ?? null, cell, points, shown };
+        seen.current = { run: last?.id ?? null, cell, points, shown, move: move?.sequence ?? null };
         shownSeason.current = view;
         setLoadFailed(false);
       }
@@ -243,14 +281,61 @@ export function SeasonScreen({
 
   // Turns end at the deadline even before the scheduler closes the season (D-101): no action the server would refuse.
   const pastDeadline = useIsPast(season?.deadline ?? null);
-  const cellsKey = season?.cells.map((c) => `${c.id}:${c.type}`).join('|') ?? '';
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- the key stands for the cells
-  const chain = useMemo(() => linearBoard(season?.cells ?? []), [cellsKey]);
+  const graphMode = season?.mapMode === 'graph';
+  // The map is drawn again only when it changes (a publication), not on every refresh of the season
+  const mapKey = season
+    ? JSON.stringify([season.mapMode, season.cells, graphMode ? season.edges : [], season.zones])
+    : '';
+  const chain = useMemo(
+    () =>
+      season && graphMode
+        ? graphBoard({ cells: season.cells, edges: season.edges, zones: season.zones })
+        : linearBoard(season?.cells ?? []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the key stands for the map
+    [mapKey],
+  );
   const view = useMemo(() => seasonPicture(season, chain), [season, chain]);
   const held = useMemo(
     () => (thrown ? seasonPicture(thrown.before, chain) : null),
     [thrown, chain],
   );
+  const walkingHeld = useMemo(
+    () => (walking ? seasonPicture(walking.before, chain) : null),
+    [walking, chain],
+  );
+  // Worked out once per move: a new path in the middle of the walk would start the token over
+  const walkingPath = useMemo(
+    () => (walking ? legsPath(walking.legs, chain.cellNumber) : null),
+    [walking, chain],
+  );
+  // A branch choice that comes while the page is open takes the focus, as a rolled game does
+  const branchId = season?.me?.choice?.kind === 'branch' ? season.me.choice.id : null;
+  const branchSeen = useRef<string | null | undefined>(undefined);
+  // On a desktop the choice stands at the bottom of the map: the camera shows the fork and its branches above it
+  const camera = useRef<MapApi>(null);
+  const forkCell =
+    branchId && season
+      ? chain.cellNumber.get(season.players.find((p) => p.id === season.me?.playerId)?.cellId ?? '')
+      : undefined;
+  useEffect(() => {
+    // The choice made, the camera goes back to the map's own view, around my new cell
+    if (forkCell === undefined) {
+      camera.current?.reset();
+      return;
+    }
+    if (!desk) return;
+    const fork = cellById(chain.board, forkCell);
+    requestAnimationFrame(() => {
+      camera.current?.centerOn({ x: fork.x, y: fork.y + 140 }, 900);
+    });
+  }, [desk, forkCell, chain, branchId]);
+  useEffect(() => {
+    if (branchSeen.current !== undefined && branchId && branchId !== branchSeen.current)
+      requestAnimationFrame(() => {
+        document.getElementById(branchTitle)?.focus();
+      });
+    if (season) branchSeen.current = branchId;
+  }, [branchId, season]);
   const [retrying, setRetrying] = useState(false);
 
   if (loadFailed && !season)
@@ -279,7 +364,10 @@ export function SeasonScreen({
     (me?.phase === 'rolling' && !me.offer && !me.choice) ||
     (me?.phase === 'playing' && !me.activeRun);
   const turnsOpen = season.status === 'active' && !pastDeadline;
-  const choice = turnsOpen && me?.phase === 'rolling' ? me.choice : null;
+  const choice =
+    turnsOpen && me?.phase === 'rolling' && me.choice?.kind === 'game' ? me.choice : null;
+  // A branch choice is part of a throw made before the deadline: it is answered after it too (D-305)
+  const branch = me?.choice?.kind === 'branch' ? me.choice : null;
   const offer = turnsOpen && me?.phase === 'rolling' ? me.offer : null;
   // A roll that came while the page is open spins its wheel first; the server chose everything, the page only shows it
   const fresh =
@@ -296,12 +384,19 @@ export function SeasonScreen({
       : null;
   const mine = players.find((p) => p.me);
   // While the dice roll, the map and the leaderboard still show the season before the completion
-  const shownPlayers = throwing && held ? held.players : players;
+  // …and while my token walks the chosen branch, the map shows me at the fork
+  const walked = !throwing && mine ? walkingPath : null;
+  // A walk the page cannot draw (a cell it does not know) is not played
+  const moving = walked ? walking : null;
+  const shownPlayers =
+    throwing && held ? held.players : moving && walkingHeld ? walkingHeld.players : players;
   const shownRows = throwing && held ? held.rows : rows;
   const shownMine = shownPlayers.find((p) => p.me);
   const myRow = shownRows.find((r) => r.player.me);
   const leader = shownRows[0];
-  const routeLength = Math.max(board.cells.length - 1, 1);
+  const routeLength = graphMode
+    ? Math.max(cellsToFinish(board, 1), 1)
+    : Math.max(board.cells.length - 1, 1);
   const closing = season.status === 'closing' || (season.status === 'active' && pastDeadline);
   const finished = season.status === 'finished' || season.status === 'archived';
 
@@ -504,6 +599,14 @@ export function SeasonScreen({
           sides: [...throwing.dice, ...throwing.challengeDice].map((d) => d.sides),
         }}
         free={throwFree}
+        walked={
+          thrown.legs
+            ? (legsPath(thrown.legs, cellNumber) ?? { path: null, jumps: [] })
+            : // On the graph without the server's legs the numbers say nothing about the way: one jump
+              graphMode
+              ? { path: throwFrom === mine.cell ? null : [throwFrom, mine.cell], jumps: [] }
+              : undefined
+        }
         board={board}
         players={held?.players ?? players}
         mover={mine}
@@ -553,7 +656,49 @@ export function SeasonScreen({
         }}
       />
     ) : null;
-  const onMap = desk ? (stage ?? diceStage) : null;
+  // The walk of the chosen branch: on a desktop over the map, on a phone in the turn card
+  const walkStage =
+    moving && mine && walked ? (
+      <div
+        data-testid="walk"
+        className={cx('grid w-full justify-items-center', desk ? 'relative h-full' : 'gap-3')}
+      >
+        <TokenMove
+          key={moving.sequence}
+          ref={walk}
+          board={board}
+          players={walkingHeld?.players ?? players}
+          mover={{ ...mine, cell: walked.path[0] ?? mine.cell }}
+          path={walked.path}
+          jumps={walked.jumps}
+          className={cx('w-full', desk ? 'h-full' : 'h-90 rounded-lg border-3 border-ink')}
+          onPhase={(phase) => {
+            if (phase !== 'done') return;
+            setWalking(null);
+            setAnnounced(ru.map.branch.announce(mine.cell));
+          }}
+        />
+        <Button
+          className={desk ? 'absolute bottom-4 left-1/2 z-10 -translate-x-1/2' : undefined}
+          onClick={() => walk.current?.skip()}
+        >
+          {ru.moments.skip}
+        </Button>
+      </div>
+    ) : null;
+  const options =
+    branch && !throwing && !moving && graphMode ? branchOptions(branch, season, cellNumber) : null;
+  const branchCard =
+    branch && options ? (
+      <BranchChoice
+        wide={desk}
+        steps={branch.steps ?? 1}
+        options={options}
+        pending={pending}
+        onChoose={(optionId) => void act({ kind: 'choose', choiceId: branch.id, optionId })}
+      />
+    ) : null;
+  const onMap = desk ? (stage ?? diceStage ?? walkStage) : null;
 
   return (
     <main className="mx-auto grid max-w-300 grid-cols-1 gap-4 px-4 pt-4 pb-28 desk:grid-cols-[auto_minmax(0,1fr)] desk:items-start desk:gap-6 desk:px-8 desk:pb-8">
@@ -621,7 +766,17 @@ export function SeasonScreen({
             <Skeleton className="h-12 w-full" />
           </div>
         )}
-        {me?.phase === 'idle' && turnsOpen && !throwing && (
+        {!desk && walkStage ? <div ref={showStage}>{walkStage}</div> : null}
+        {branchCard ? (
+          desk ? (
+            <p data-testid="branch-hint" className="font-bold">
+              {ru.map.branch.onMap}
+            </p>
+          ) : (
+            <div ref={showStage}>{branchCard}</div>
+          )
+        ) : null}
+        {me?.phase === 'idle' && turnsOpen && !throwing && !branch && !moving && (
           // D-134: at the limit of runs waiting for the admin's check the roll is closed, and the page says why
           <div className="grid gap-2">
             {uncheckedBlocked ? (
@@ -723,12 +878,19 @@ export function SeasonScreen({
         </h2>
         <div className="relative">
           <MapView
+            ref={camera}
             board={board}
             players={shownPlayers}
             focus={shownMine && shownMine.cell > 0 ? shownMine.cell : undefined}
             tools="auto"
+            options={options?.map((o) => o.cell)}
             className="h-105 rounded-lg border-3 border-ink desk:h-190"
           />
+          {desk && branchCard && !onMap ? (
+            <div className="absolute inset-x-3 bottom-3 z-10 rounded-lg border-3 border-ink bg-card p-4 shadow-lift">
+              {branchCard}
+            </div>
+          ) : null}
           {onMap ? (
             <div
               className={cx(
@@ -742,7 +904,12 @@ export function SeasonScreen({
         </div>
         {/* The map in words: every cell and who stands there (also what the tests and screen readers read) */}
         <ol data-testid="cells" className="sr-only">
-          {season.cells.map((cell, i) => {
+          {(graphMode
+            ? [...season.cells].sort(
+                (a, b) => (cellNumber.get(a.id) ?? 0) - (cellNumber.get(b.id) ?? 0),
+              )
+            : season.cells
+          ).map((cell, i) => {
             const here = season.players.filter((p) => p.cellId === cell.id);
             return (
               <li key={cell.id} data-testid={`cell-${cell.id}`}>
@@ -750,7 +917,9 @@ export function SeasonScreen({
                   ? ru.map.start
                   : cell.type === 'finish'
                     ? ru.map.finish
-                    : ru.map.cellNumber(i + 1)}
+                    : graphMode
+                      ? cellWords(cell, season, cellNumber)
+                      : ru.map.cellNumber(i + 1)}
                 {here.map((p) => (
                   <span key={p.id} data-testid={`token-${p.id}`}>
                     {' '}
@@ -763,6 +932,18 @@ export function SeasonScreen({
         </ol>
       </section>
 
+      {graphMode ? (
+        <MapLegend
+          zones={season.zones}
+          kinds={new Set(season.cells.map((c) => c.type))}
+          myZone={
+            season.cells.find(
+              (c) => c.id === season.players.find((p) => p.id === me?.playerId)?.cellId,
+            )?.zone
+          }
+          className="min-w-0 desk:col-start-1 desk:w-96"
+        />
+      ) : null}
       <Panel title={ru.leaderboard.title} className="hidden desk:col-start-1 desk:grid desk:w-96">
         <p className="text-sm text-ink-soft">{ru.board.rule}</p>
         <Leaderboard rows={shownRows} />
@@ -822,6 +1003,25 @@ export function SeasonScreen({
       </div>
     </main>
   );
+}
+
+/** A cell of the graph in words: its number, what it does, its zone */
+function cellWords(
+  cell: Schemas['CellView'],
+  season: Season,
+  cellNumber: Map<string, number>,
+): string {
+  const kind = ru.map.cellKinds[cell.type] ?? '';
+  const zone = season.zones.find((z) => z.id === cell.zone)?.name;
+  return [
+    ru.map.cellNumber(cellNumber.get(cell.id) ?? 0),
+    kind,
+    cell.type === 'teleport' && cell.to ? ru.map.teleportTo(cellNumber.get(cell.to) ?? 0) : '',
+    cell.type === 'pointsBonus' && cell.amount ? ru.map.bonusAmount(cell.amount) : '',
+    zone ? ru.map.inZone(zone) : '',
+  ]
+    .filter(Boolean)
+    .join(', ');
 }
 
 /** A phone scrolls the wheel into view when it starts: the roll button may have been low on the screen */

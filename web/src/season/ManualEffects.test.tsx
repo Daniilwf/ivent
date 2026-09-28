@@ -58,6 +58,9 @@ function season(status: Schemas['SeasonView']['status'] = 'active'): Schemas['Se
       finish: null,
     },
     lastSequence: 3,
+    edges: [],
+    zones: [],
+    mapMode: 'linear',
     name: 'Тестовый сезон',
   };
 }

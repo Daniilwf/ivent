@@ -39,6 +39,7 @@ import {
   demoWitnesses,
 } from './fixtures';
 import { DiceDemo, FinishDemo, MapDemo, MoveDemo, WheelDemo } from './MomentDemos';
+import { EditorDemo, GraphMapDemo } from './GraphDemos';
 import { FeedList, FeedSkeleton } from '../feed/FeedList';
 import { GameDetails } from '../feed/GameScreen';
 import { ProfileDetails } from '../feed/ProfileScreen';
@@ -599,6 +600,14 @@ export function Styleguide() {
 
       <Section id="map" title={t.map.title} lead={t.map.lead}>
         <MapDemo />
+      </Section>
+
+      <Section id="graph" title={t.graph.title} lead={t.graph.lead}>
+        <GraphMapDemo />
+      </Section>
+
+      <Section id="editor" title={t.editor.title} lead={t.editor.lead}>
+        <EditorDemo />
       </Section>
 
       <Section id="wheel" title={t.wheel.title} lead={t.wheel.lead}>

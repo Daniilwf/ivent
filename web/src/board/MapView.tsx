@@ -1,4 +1,4 @@
-import { Flag, LocateFixed, Minus, Plus, Sparkles } from 'lucide-react';
+import { Flag, LocateFixed, Minus, Orbit, Plus, ShoppingBag, Sparkles } from 'lucide-react';
 import {
   useEffect,
   useEffectEvent,
@@ -17,6 +17,7 @@ import { ru } from '../i18n/ru';
 import { IconButton } from '../ui/Button';
 import { cx } from '../ui/cx';
 import { blobPath, cellById, polylinePath, zoneAt } from './geometry';
+import { zoneFill } from './graphBoard';
 import type { Board, BoardZone, Player, Point, ZoneTheme } from './types';
 
 const t = ru.board;
@@ -133,15 +134,6 @@ function Castle({ at }: { at: Point }) {
   );
 }
 
-const zoneFill: Record<ZoneTheme, string> = {
-  meadow: 'var(--color-zone-meadow)',
-  forest: 'var(--color-zone-forest)',
-  mountains: 'var(--color-zone-mountains)',
-  swamp: 'var(--color-zone-swamp)',
-  city: 'var(--color-zone-city)',
-  castle: 'var(--color-zone-castle)',
-};
-
 // ---- Stickers on the map ----
 export function MapSticker({
   player,
@@ -242,6 +234,64 @@ function MoreChip({ at, count }: { at: Point; count: number }) {
   );
 }
 
+// ---- Teleports: a dashed arc from the teleport to where it leads, an arrowhead at the end ----
+function TeleportArc({ from, to }: { from: Point; to: Point }) {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const length = Math.hypot(dx, dy) || 1;
+  // The arc bends to one side by a quarter of its length, so it never runs along the road it jumps over
+  const control = {
+    x: (from.x + to.x) / 2 - (dy / length) * length * 0.25,
+    y: (from.y + to.y) / 2 + (dx / length) * length * 0.25,
+  };
+  // It starts and ends at the cells' rims, not their centres
+  const rim = (p: Point, towards: Point, r: number) => {
+    const d = Math.hypot(towards.x - p.x, towards.y - p.y) || 1;
+    return { x: p.x + ((towards.x - p.x) / d) * r, y: p.y + ((towards.y - p.y) / d) * r };
+  };
+  const a = rim(from, control, 22);
+  const b = rim(to, control, 26);
+  const tx = b.x - control.x;
+  const ty = b.y - control.y;
+  const t = Math.hypot(tx, ty) || 1;
+  const ux = tx / t;
+  const uy = ty / t;
+  const head = `M${b.x} ${b.y} L${b.x - ux * 14 - uy * 8} ${b.y - uy * 14 + ux * 8} L${b.x - ux * 14 + uy * 8} ${b.y - uy * 14 - ux * 8} Z`;
+  return (
+    <g data-teleport="" pointerEvents="none">
+      <path
+        d={`M${a.x} ${a.y} Q${control.x} ${control.y} ${b.x} ${b.y}`}
+        fill="none"
+        stroke={ink}
+        strokeWidth={4}
+        strokeDasharray="10 8"
+        strokeLinecap="round"
+      />
+      <path d={head} fill={ink} />
+    </g>
+  );
+}
+
+/** The branches of a fork to choose from: a ring round each option's first cell and its number, as on the buttons */
+function OptionMark({ at, number }: { at: Point; number: number }) {
+  return (
+    <g data-option={number} pointerEvents="none">
+      <circle cx={at.x} cy={at.y} r={27} fill="none" stroke="var(--color-me)" strokeWidth={5} />
+      <g transform={`translate(${at.x + 24} ${at.y + 24})`}>
+        <circle r={15} fill="var(--color-me)" stroke={ink} strokeWidth={2.5} />
+        <text
+          className="pointer-events-none font-display text-sm font-heavy"
+          textAnchor="middle"
+          dominantBaseline="central"
+          fill="var(--color-on-color)"
+        >
+          {number}
+        </text>
+      </g>
+    </g>
+  );
+}
+
 // ---- Zone signs: where they cover no cell and stay inside their zone ----
 const signWidth = (text: string) => text.length * 16 * 0.72 + 28;
 
@@ -300,7 +350,8 @@ function usePanZoom(board: Board, focus: Point | null, anchor: Point | null) {
   }, []);
 
   const ratio = box.height / box.width;
-  const portrait = ratio > board.height / board.width;
+  // Only a phone's frame crops the board around me; a desktop's always shows the whole board
+  const portrait = ratio > board.height / board.width && box.width < 600;
   // A wide frame shows the whole board; a tall one (a phone) fills its height and centres on me
   const fitWidth = portrait
     ? (board.height / ratio) * 1.04
@@ -446,11 +497,16 @@ function usePanZoom(board: Board, focus: Point | null, anchor: Point | null) {
     setView({ w, cx: p.x, cy: p.y });
   };
 
+  // Back to the first view: the whole world, or around me — after a moment moved the camera
+  const reset = () => {
+    setView(null);
+  };
+
   const viewBox = `${view.cx - view.w / 2} ${view.cy - (view.w * ratio) / 2} ${view.w} ${view.w * ratio}`;
-  return { viewBox, svg, handlers, zoomAt, centerOn };
+  return { viewBox, svg, handlers, zoomAt, centerOn, reset };
 }
 
-export type MapApi = { centerOn: (p: Point, w?: number) => void };
+export type MapApi = { centerOn: (p: Point, w?: number) => void; reset: () => void };
 
 export type MapViewProps = {
   board: Board;
@@ -465,6 +521,8 @@ export type MapViewProps = {
   children?: ReactNode;
   /** The camera, for a moment that follows a token */
   ref?: Ref<MapApi> | undefined;
+  /** A branch choice: the first cells of the branches, numbered as the buttons that pick them */
+  options?: number[] | undefined;
 };
 
 /** The season's map: a board of zones with the route, the cells and the players' stickers; pan, zoom, keyboard */
@@ -477,15 +535,16 @@ export function MapView({
   tools = 'bottom',
   children,
   ref,
+  options = [],
 }: MapViewProps) {
   const start = focus ? cellById(board, focus) : null;
   const meAt = players.find((p) => p.me);
-  const { viewBox, svg, handlers, zoomAt, centerOn } = usePanZoom(
+  const { viewBox, svg, handlers, zoomAt, centerOn, reset } = usePanZoom(
     board,
     start,
     meAt ? cellById(board, meAt.cell) : null,
   );
-  useImperativeHandle(ref, () => ({ centerOn }));
+  useImperativeHandle(ref, () => ({ centerOn, reset }));
   const props = useMemo(() => scenery(board), [board]);
   const signs = useMemo(() => signSpots(board), [board]);
   const me = players.find((p) => p.me);
@@ -589,12 +648,18 @@ export function MapView({
           />
         ))}
 
+        {board.cells.flatMap((c) =>
+          c.kind === 'teleport' && c.to !== undefined
+            ? [<TeleportArc key={`teleport-${c.id}`} from={c} to={cellById(board, c.to)} />]
+            : [],
+        )}
+
         {board.cells.map((c) => {
           const big = c.kind === 'start' || c.kind === 'finish';
           const mine = myCell === c.id;
           const fill = mine
             ? 'var(--color-me)'
-            : c.kind === 'event'
+            : c.kind === 'event' || c.kind === 'bonus'
               ? 'var(--color-gold)'
               : c.kind === 'checkpoint'
                 ? 'var(--color-zone-meadow)'
@@ -650,6 +715,37 @@ export function MapView({
                   strokeWidth={2.5}
                   aria-hidden
                 />
+              ) : c.kind === 'teleport' ? (
+                <Orbit
+                  x={c.x - 10}
+                  y={c.y - 10}
+                  width={20}
+                  height={20}
+                  color={mine ? 'var(--color-on-color)' : ink}
+                  strokeWidth={2.5}
+                  aria-hidden
+                />
+              ) : c.kind === 'shop' ? (
+                <ShoppingBag
+                  x={c.x - 10}
+                  y={c.y - 10}
+                  width={20}
+                  height={20}
+                  color={mine ? 'var(--color-on-color)' : ink}
+                  strokeWidth={2.5}
+                  aria-hidden
+                />
+              ) : c.kind === 'bonus' ? (
+                <text
+                  x={c.x}
+                  y={c.y}
+                  className="pointer-events-none font-display text-sm font-heavy"
+                  textAnchor="middle"
+                  dominantBaseline="central"
+                  fill={mine ? 'var(--color-on-color)' : ink}
+                >
+                  {t.bonus(c.amount ?? 0)}
+                </text>
               ) : c.kind === 'checkpoint' ? (
                 <Flag
                   x={c.x - 10}
@@ -675,6 +771,10 @@ export function MapView({
             </g>
           );
         })}
+
+        {options.map((cell, i) => (
+          <OptionMark key={`option-${cell}`} at={cellById(board, cell)} number={i + 1} />
+        ))}
 
         {board.cells.flatMap((c) => {
           const here = onCell(c.id);

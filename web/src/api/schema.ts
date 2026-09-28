@@ -3395,6 +3395,213 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/seasons/{seasonId}/map": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminMapView"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Too Many Requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/seasons/{seasonId}/map/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["MapGraphView"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MapCheckView"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Too Many Requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/seasons/{seasonId}/map/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["PublishMapRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CommandResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/seasons": {
         parameters: {
             query?: never;
@@ -5688,9 +5895,20 @@ export interface components {
             runId: null | string;
         };
         /**
+         * @description The season's map in the editor (2.11): the map in force, the players on it, the mode (the editor publishes only in
+         *     `graph`, D-301) and the status (only a draft or a running season takes a new map).
+         */
+        AdminMapView: {
+            mode: components["schemas"]["MapMode"];
+            status: components["schemas"]["SeasonStatus"];
+            map: components["schemas"]["MapGraphView"];
+            players: components["schemas"]["MapPlayerView"][];
+        };
+        /**
          * @description A player as the admin sees them (SE5, D-123): the balance and the place in the turn, the inactivity flag, when they
          *     last acted themselves and the hint — no action of their own for the rules' `inactiveHintDays` while not marked
          *     inactive. `playing` — a run is going on: a long game is a reason to be quiet, not a sign of leaving.
+         *     `choosingBranch` — the player's throw waits at a fork (D-305): the admin may discard the choice, the steps left burn.
          */
         AdminPlayerView: {
             /** Format: uuid */
@@ -5712,6 +5930,8 @@ export interface components {
             /** Format: date-time */
             lastActionAt: null | string;
             inactiveHint: boolean;
+            /** @default false */
+            choosingBranch: boolean;
         };
         /** @description «Уже проходил» on the offered game or an option of the pending choice (D-92). */
         AlreadyPlayedRequest: {
@@ -5841,9 +6061,24 @@ export interface components {
          * @enum {unknown}
          */
         CellType: "start" | "empty" | "finish" | "fork" | "teleport" | "checkpoint" | "pointsBonus" | "event" | "shop";
+        /**
+         * @description A cell of the season's map (D-300, D-302): its type and the parameters of that type (`to` of a teleport,
+         *     `amount` of a points bonus, `deck` of an event, `grants` of a shop), its zone and where the editor
+         *     placed it (`x`, `y`; none on a linear map). The same shape goes back to the editor's check and publication.
+         */
         CellView: {
             id: string;
             type: components["schemas"]["CellType"];
+            zone?: null | string;
+            to?: null | string;
+            /** Format: int32 */
+            amount?: null | number;
+            deck?: null | string;
+            grants?: null | string;
+            /** Format: double */
+            x?: null | number;
+            /** Format: double */
+            y?: null | number;
         };
         ChallengeBonus: {
             /** Format: int32 */
@@ -5883,12 +6118,17 @@ export interface components {
             id: string;
             game: null | components["schemas"]["OfferedGameView"];
         };
-        /** @description The pending choice, kept on the server: a reloaded page shows the same options (T2). */
+        /**
+         * @description The pending choice, kept on the server: a reloaded page shows the same options (T2). A branch choice (D-304): each
+         *     option's id is the cell the branch leads to, `steps` — the steps of the throw still to walk from the fork.
+         */
         ChoiceView: {
             /** Format: uuid */
             id: string;
             kind: components["schemas"]["ChoiceKind"];
             options: components["schemas"]["ChoiceOptionView"][];
+            /** Format: int32 */
+            steps?: null | number;
         };
         /** @description An answer to the pending choice: its id and the picked option's id. */
         ChooseRequest: {
@@ -6000,6 +6240,11 @@ export interface components {
             /** Format: int32 */
             max: number;
         };
+        /**
+         * @description A stage of the dice pipeline (D-14).
+         * @enum {unknown}
+         */
+        DiceStage: "count" | "sides" | "add" | "multiply" | "reroll" | "min" | "max";
         DieByDifficulty: {
             easy: components["schemas"]["DieRule"];
             normal: components["schemas"]["DieRule"];
@@ -6060,6 +6305,16 @@ export interface components {
             inventoryLimit: number;
             rarityWeights: components["schemas"]["RarityWeights"];
             shop: components["schemas"]["ShopRules"];
+        };
+        /**
+         * @description An arrow of the map: `isDefaultForward` — the default branch (every exit of a plain cell, one exit of a fork);
+         *     `isPrimaryBackward` — the main incoming edge a move back takes into a cell with several entries.
+         */
+        EdgeView: {
+            from: string;
+            to: string;
+            isDefaultForward: boolean;
+            isPrimaryBackward: boolean;
         };
         EffectRules: {
             /** Format: int32 */
@@ -6421,13 +6676,73 @@ export interface components {
             drawEvent: components["schemas"]["EventKind"];
             source: components["schemas"]["ManualEffectSource"];
         };
+        /**
+         * @description The check of a map before publication (SPEC «Редактор»): every problem at once — the map's own (MapValidator) and
+         *     the ones of the season now (occupied cells, pending branch choices) — and the zone warnings. `canPublish` — no
+         *     problems and the season takes a map now.
+         */
+        MapCheckView: {
+            canPublish: boolean;
+            problems: components["schemas"]["MapProblemView"][];
+            warnings: components["schemas"]["ZoneGamesWarningView"][];
+        };
+        /** @description A whole map: what the editor loads, checks and publishes. */
+        MapGraphView: {
+            cells: null | components["schemas"]["CellView"][];
+            edges: null | components["schemas"]["EdgeView"][];
+            zones: null | components["schemas"]["ZoneView"][];
+        };
         /** @enum {unknown} */
         MapMode: "linear" | "graph";
+        /**
+         * @description A player on the map as the editor needs them: the cell they stand on (it cannot be removed, D-308), whether they
+         *     have finished (their cell stays a finish) and whether they are choosing a branch (publication waits, D-305).
+         */
+        MapPlayerView: {
+            /** Format: uuid */
+            playerId: string;
+            name: string;
+            cellId: string;
+            finished: boolean;
+            choosingBranch: boolean;
+        };
+        /**
+         * @description A problem of a map: the engine's stable code (`map.…`; the editor's dictionary words it), what it is about — a
+         *     cell id, an arrow `from→to`, a zone id or `map` — and the engine's English message for the log.
+         */
+        MapProblemView: {
+            code: string;
+            subject: string;
+            message: string;
+        };
         MapRules: {
             /** Format: int32 */
             linearLength: number;
             /** Format: int32 */
             minZoneGames?: null | number;
+        };
+        /**
+         * @description One leg of my latest move: the cells entered from `from` in order. `reason` `teleport` is a transfer,
+         *     not a walk (D-303); a leg that stopped at a fork with steps left is followed by a branch choice (D-304).
+         */
+        MoveLegView: {
+            from: string;
+            path: string[];
+            reason: components["schemas"]["MoveReason"];
+        };
+        /**
+         * @description What moved the token. Rejecting a run takes back the cells of moves linked to it.
+         * @enum {unknown}
+         */
+        MoveReason: "completionRoll" | "startingCell" | "adminAdjustment" | "dropPenalty" | "runCorrection" | "proofRejected" | "teleport";
+        /**
+         * @description My latest move, from the log: the legs of the one command that moved my token last, so the page walks the token
+         *     along the real branch and teleport. `sequence` tells one move from the next.
+         */
+        MoveView: {
+            /** Format: int64 */
+            sequence: number;
+            legs: components["schemas"]["MoveLegView"][];
         };
         /** @description The player's own finish (D-99): order among the finishers and whether the first place is final and frozen. */
         MyFinishView: {
@@ -6466,6 +6781,7 @@ export interface components {
             /** Format: date-time */
             techRerollUntil?: null | string;
             difficultyDice?: null | components["schemas"]["DifficultyDieView"][];
+            lastMove?: null | components["schemas"]["MoveView"];
         };
         NominationRules: {
             auto: components["schemas"]["EquatableArrayOfAutoNomination"];
@@ -6662,6 +6978,13 @@ export interface components {
             note: null | string;
             comment: null | string;
             files: components["schemas"]["FileLinkView"][];
+        };
+        /** @description Publish a new version of the map (D-300, D-308); `comment` goes to the public log, at most 500 characters. */
+        PublishMapRequest: {
+            /** Format: uuid */
+            commandId: string;
+            map: null | components["schemas"]["MapGraphView"];
+            comment?: null | string;
         };
         RankingRules: {
             tiebreakers: components["schemas"]["EquatableArrayOfTiebreaker"];
@@ -6989,7 +7312,9 @@ export interface components {
         };
         /**
          * @description The season screen's data. `status` and `deadline` (UTC; the screen shows it in Moscow time) follow the
-         *     lifecycle (D-101); after the finish `leaderboard` is the recorded result.
+         *     lifecycle (D-101); after the finish `leaderboard` is the recorded result. The map is the one in force (the
+         *     latest published, D-300): `cells`, `edges` and `zones`; `mapMode` says whether the season plays
+         *     on the linear chain of stage 1 or on the graph (D-301).
          */
         SeasonView: {
             /** Format: uuid */
@@ -7004,6 +7329,9 @@ export interface components {
             /** Format: int64 */
             lastSequence: number;
             name: string;
+            edges: components["schemas"]["EdgeView"][];
+            zones: components["schemas"]["ZoneView"][];
+            mapMode: components["schemas"]["MapMode"];
         };
         ShopRules: {
             /** Format: int32 */
@@ -7172,6 +7500,45 @@ export interface components {
             sectors: string[];
             misses: components["schemas"]["RollMissView"][];
         };
+        /** @description A zone's change of the completion dice (D-307): `count` — more dice (less when negative), `add` — to the sum. */
+        ZoneDiceView: {
+            stage: components["schemas"]["DiceStage"];
+            /** Format: int32 */
+            value: number;
+        };
+        /** @description A zone's roll filter (CONTENT.md «Зона»): any of the tags, hours between, released before the year. */
+        ZoneFilterView: {
+            tags?: null | string[];
+            /** Format: double */
+            minHours?: null | number;
+            /** Format: double */
+            maxHours?: null | number;
+            /** Format: int32 */
+            releaseYearBefore?: null | number;
+        };
+        /** @description A zone whose roll filter leaves fewer available games than the rules want (D-307); it never blocks publication. */
+        ZoneGamesWarningView: {
+            zoneId: string;
+            /** Format: int32 */
+            available: number;
+            /** Format: int32 */
+            wanted: number;
+        };
+        /**
+         * @description A zone of the map and its rules (CONTENT.md «Зона», D-307): the roll filter while a player stands in it, the dice
+         *     change and the drop penalty multiplier fixed at the roll; the deck and the shop prices wait for their mechanics.
+         */
+        ZoneView: {
+            id: string;
+            name: string;
+            rollFilter?: null | components["schemas"]["ZoneFilterView"];
+            diceModifier?: null | components["schemas"]["ZoneDiceView"];
+            /** Format: double */
+            dropPenaltyMultiplier?: null | number;
+            deck?: null | string;
+            /** Format: double */
+            shopPriceMultiplier?: null | number;
+        };
     };
     responses: never;
     parameters: never;
@@ -7192,6 +7559,7 @@ export const bugReportStatusValues: ReadonlyArray<FlattenedDeepRequired<componen
 export const cellTypeValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["CellType"]> = ["start", "empty", "finish", "fork", "teleport", "checkpoint", "pointsBonus", "event", "shop"];
 export const choiceKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ChoiceKind"]> = ["game", "branch"];
 export const coopRoundUpForValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["CoopRoundUpFor"]> = ["roller"];
+export const diceStageValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["DiceStage"]> = ["count", "sides", "add", "multiply", "reroll", "min", "max"];
 export const difficultyValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["Difficulty"]> = ["easy", "normal", "hard", "extreme"];
 export const emptyPoolFallbackValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["EmptyPoolFallback"]> = ["dropZoneFilter"];
 export const eventKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["EventKind"]> = ["good", "bad"];
@@ -7199,6 +7567,7 @@ export const gameMarkKindValues: ReadonlyArray<FlattenedDeepRequired<components>
 export const mandatoryEventValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["MandatoryEvent"]> = ["bad", "none"];
 export const manualEffectSourceValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ManualEffectSource"]> = ["paidReroll", "drop", "difficulty"];
 export const mapModeValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["MapMode"]> = ["linear", "graph"];
+export const moveReasonValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["MoveReason"]> = ["completionRoll", "startingCell", "adminAdjustment", "dropPenalty", "runCorrection", "proofRejected", "teleport"];
 export const proofStatusValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ProofStatus"]> = ["pending", "approved", "rejected"];
 export const rerollCostKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["RerollCostKind"]> = ["coins", "badEvent"];
 export const rerollPaymentValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["RerollPayment"]> = ["freeThisRoll", "freeRerollResource", "coins", "badEvent", "freeMode"];

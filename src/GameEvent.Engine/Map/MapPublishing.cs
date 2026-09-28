@@ -16,6 +16,42 @@ public sealed record PublishMap(MapGraph Map, string Comment) : ICommand;
 [EventType("map-published")]
 public sealed record MapPublished(MapGraph Map, string Comment) : IGameEvent;
 
+/// <summary>
+/// What stands in the way of publishing a valid map now, apart from the map itself (SPEC «Проверки», D-305, D-308): the
+/// cells where players stand and are removed or change between a finish and not, and pending branch choices. The
+/// editor shows them before the admin publishes; <see cref="PublishMap"/> refuses on the first kind found. Codes are
+/// those of the rejection; the subject is the cell, or <c>map</c> for a pending branch choice.
+/// </summary>
+public static class MapPublicationChecks
+{
+    public static IReadOnlyList<MapError> For(SeasonState state, MapGraph map)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        ArgumentNullException.ThrowIfNull(map);
+        var errors = new List<MapError>();
+        foreach (var cell in state.Players.Values.Where(p => !map.HasCell(p.CellId)).Select(p => p.CellId).Distinct().Order(StringComparer.Ordinal))
+        {
+            errors.Add(new MapError(RejectionCodes.MapOccupiedCellRemoved, cell, $"Players stand on cell '{cell}' the new map removes."));
+        }
+
+        // A player who has not finished must not stand on a finish, a finisher must stay on one: a token on a finish never moves (D-308)
+        foreach (var cell in state.Players.Values
+            .Where(p => map.HasCell(p.CellId) && (map.CellById(p.CellId).Type == CellType.Finish) != (p.Finish is not null))
+            .Select(p => p.CellId).Distinct().Order(StringComparer.Ordinal))
+        {
+            errors.Add(new MapError(RejectionCodes.MapOccupiedCellRetyped, cell, $"The new map makes a finish of cell '{cell}' a player is still on, or the other way round."));
+        }
+
+        // D-305: the remaining steps of a pending branch choice lead from a fork of the current map
+        if (state.Players.Values.Any(p => p.Choice?.Kind == ChoiceKind.Branch))
+        {
+            errors.Add(new MapError(RejectionCodes.BranchChoicePending, "map", "A player is choosing a branch: wait for the choice or discard it first."));
+        }
+
+        return errors;
+    }
+}
+
 internal static class MapPublishing
 {
     public static Decision Decide(SeasonState state, PublishMap command)
@@ -51,27 +87,11 @@ internal static class MapPublishing
             return invalid;
         }
 
-        // SPEC «Проверки»: клетки, где стоят игроки, не удалены
-        var stranded = state.Players.Values.Where(p => !command.Map.HasCell(p.CellId)).Select(p => p.CellId).Distinct().Order(StringComparer.Ordinal).ToList();
-        if (stranded.Count > 0)
+        // SPEC «Проверки»: клетки, где стоят игроки, не удалены; D-305, D-308
+        // The first kind of conflict found refuses: its code, the cells it is about
+        if (MapPublicationChecks.For(state, command.Map).GroupBy(c => c.Code).FirstOrDefault() is { } conflict)
         {
-            return Decision.Reject(RejectionCodes.MapOccupiedCellRemoved, $"Players stand on cells the new map removes: {string.Join(", ", stranded)}.");
-        }
-
-        // A player who has not finished must not stand on a finish, a finisher must stay on one: a token on a finish never moves (D-308)
-        var misplaced = state.Players.Values
-            .Where(p => (command.Map.CellById(p.CellId).Type == CellType.Finish) != (p.Finish is not null))
-            .Select(p => p.CellId).Distinct().Order(StringComparer.Ordinal).ToList();
-        if (misplaced.Count > 0)
-        {
-            return Decision.Reject(
-                RejectionCodes.MapOccupiedCellRetyped, $"The new map makes a finish of a cell a player is still on, or the other way round: {string.Join(", ", misplaced)}.");
-        }
-
-        // D-305: the remaining steps of a pending branch choice lead from a fork of the current map
-        if (state.Players.Values.Any(p => p.Choice?.Kind == ChoiceKind.Branch))
-        {
-            return Decision.Reject(RejectionCodes.BranchChoicePending, "A player is choosing a branch: wait for the choice or discard it first.");
+            return Decision.Reject(conflict.Key, string.Join(" ", conflict.Select(c => c.Message)));
         }
 
         return command.Map == state.Map

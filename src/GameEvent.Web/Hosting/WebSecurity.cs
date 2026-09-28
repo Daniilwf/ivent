@@ -134,10 +134,12 @@ public static class WebSecurity
         ArgumentNullException.ThrowIfNull(app);
         app.Use(async (context, next) =>
         {
-            // An upload carries a picture (D-108); every other API body is small JSON
+            // An upload carries a picture (D-108), the map editor a whole map; every other API body is small JSON
             var bodyLimit = Files.FileEndpoints.IsUpload(context.Request)
                 ? context.RequestServices.GetRequiredService<Infrastructure.Files.FileLimits>().MaxUploadBytes + Files.FileEndpoints.FormOverheadBytes
-                : ApiBodyLimitBytes;
+                : Map.AdminMapEndpoints.IsMapBody(context.Request)
+                    ? Map.AdminMapEndpoints.MaxMapRequestBytes
+                    : ApiBodyLimitBytes;
             if (context.Request.Path.StartsWithSegments("/api")
                 && context.Features.Get<IHttpMaxRequestBodySizeFeature>() is { IsReadOnly: false } limit)
             {

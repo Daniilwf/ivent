@@ -1,0 +1,93 @@
+import { GitFork } from 'lucide-react';
+import type { BranchOption } from '../board/graphBoard';
+import { ru } from '../i18n/ru';
+import { cx } from '../ui/cx';
+import { Tag } from '../ui/Marks';
+
+const t = ru.map.branch;
+
+/** The branch choice's heading takes the focus when it appears, as a rolled game's does */
+export const branchTitle = 'branch-title';
+
+/**
+ * The branch choice at a fork (D-304): the steps left and one big button per branch, numbered as the rings on the
+ * map. On a desktop it stands on the map's stage, on a phone in the turn card; every option is a button, so the
+ * keyboard picks one as the pointer does.
+ */
+export function BranchChoice({
+  steps,
+  options,
+  pending,
+  onChoose,
+  className,
+  wide = false,
+}: {
+  /** On the map's stage: the options side by side, so the map above stays in sight */
+  wide?: boolean;
+  steps: number;
+  options: BranchOption[];
+  pending: boolean;
+  onChoose: (optionId: string) => void;
+  className?: string;
+}) {
+  return (
+    <fieldset
+      data-testid="branch"
+      aria-busy={pending || undefined}
+      className={cx('grid min-w-0 gap-3', className)}
+    >
+      <legend className="mb-1 font-display text-lg font-heavy">
+        <span id={branchTitle} tabIndex={-1} className="flex items-center gap-2 focus:outline-none">
+          <GitFork size={22} aria-hidden />
+          {t.title}
+        </span>
+      </legend>
+      <p className="text-ink-soft">{t.lead(steps)}</p>
+      <ul className={cx('grid gap-3', wide && 'grid-cols-2')}>
+        {options.map((option, i) => (
+          <li key={option.id}>
+            <button
+              type="button"
+              data-testid={`branch-${option.id}`}
+              aria-label={[
+                t.go(i + 1),
+                option.end,
+                option.zone,
+                ...option.rules,
+                t.firstCell(option.cell),
+              ]
+                .filter(Boolean)
+                .join('. ')}
+              disabled={pending}
+              onClick={() => {
+                onChoose(option.id);
+              }}
+              className="grid w-full cursor-pointer grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 rounded-md border-2 border-ink bg-card p-3 text-left transition duration-(--duration-fast) ease-out is-hover:bg-page is-focus:focus-ring disabled:cursor-default disabled:opacity-50"
+            >
+              <span
+                aria-hidden
+                className="grid size-10 place-items-center rounded-full border-2 border-ink bg-me font-display text-lg font-heavy text-on-color"
+              >
+                {i + 1}
+              </span>
+              {/* Where the steps take me comes first: that is what the choice decides; then the zone and its rules */}
+              <span className="grid gap-1">
+                <strong className="font-display">{option.end}</strong>
+                {option.zone ? (
+                  <span className="flex flex-wrap items-center gap-2">
+                    <Tag>{option.zone}</Tag>
+                  </span>
+                ) : null}
+                {option.rules.map((rule) => (
+                  <span key={rule} className="text-sm text-ink-soft">
+                    {rule}
+                  </span>
+                ))}
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </fieldset>
+  );
+}

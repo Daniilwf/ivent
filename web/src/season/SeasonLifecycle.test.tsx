@@ -65,6 +65,9 @@ function season(
       finish: null,
     },
     lastSequence: 3,
+    edges: [],
+    zones: [],
+    mapMode: 'linear',
     name: 'Тестовый сезон',
   };
 }
