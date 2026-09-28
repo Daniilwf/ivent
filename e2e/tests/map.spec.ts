@@ -1,44 +1,26 @@
-import { expect, request, test, type APIRequestContext } from '@playwright/test';
+import { expect, test } from '@playwright/test';
+import type { Schemas } from '../support/api.ts';
+import {
+  cellOf,
+  completeHere,
+  confirmButton,
+  openAdmin,
+  rollAndStartHere,
+  setUpSeason,
+  signIn,
+} from '../support/world.ts';
 
-// 2.10: a completion walks the token to a fork, the player picks the branch that is not the default one, and the
-// token goes on along it. The test plays in a season of its own on the graph map, with a player of its own, so the
-// other tests of the shared development seed never see it (a graph season never goes back to linear, D-301).
-const password = 'dev-password';
+// Stage 2 (2.10, 2.11, D-318): in a season of its own on the graph map, a completion walks the token to a fork, the
+// player picks the branch that is not the default one with the keyboard and the token goes on along it; on a desktop
+// the admin then changes the map in the editor and publishes it, and the player sees the change.
 
-type Api = { context: APIRequestContext; csrf: string };
-
-async function csrfOf(context: APIRequestContext): Promise<string> {
-  const token = (await (await context.get('/api/auth/antiforgery')).json()) as { token: string };
-  return token.token;
-}
-
-async function signIn(baseURL: string, login: string, secret: string): Promise<Api> {
-  const context = await request.newContext({ baseURL, ignoreHTTPSErrors: true });
-  // Every POST carries the antiforgery token, the sign-in too; a signed-in user gets a new one
-  const signedIn = await context.post('/api/auth/login', {
-    data: { login, password: secret },
-    headers: { 'X-CSRF-TOKEN': await csrfOf(context) },
-  });
-  expect(signedIn.ok(), await signedIn.text()).toBe(true);
-  return { context, csrf: await csrfOf(context) };
-}
-
-async function send(api: Api, method: 'post' | 'put', url: string, data: object) {
-  const response = await api.context[method](url, {
-    data: { commandId: crypto.randomUUID(), ...data },
-    headers: { 'X-CSRF-TOKEN': api.csrf },
-  });
-  expect(response.ok(), `${url}: ${await response.text()}`).toBe(true);
-  return (await response.json()) as Record<string, unknown>;
-}
-
-/** start → fork, then two branches of twelve cells (a… the default, b…) that meet before the finish */
-function forkMap() {
-  const cells: object[] = [
+/** start → fork, then two branches of twelve cells (a… the default, b…) that meet at the finish */
+function forkMap(): Schemas['MapGraphView'] {
+  const cells: Schemas['CellView'][] = [
     { id: 'start', type: 'start', x: 0, y: 200 },
     { id: 'fork', type: 'fork', x: 120, y: 200 },
   ];
-  const edges: object[] = [
+  const edges: Schemas['EdgeView'][] = [
     { from: 'start', to: 'fork', isDefaultForward: true, isPrimaryBackward: true },
   ];
   for (const [branch, y] of [
@@ -69,76 +51,46 @@ function forkMap() {
 }
 
 test('a completion stops at the fork, the player picks a branch and the token walks it', async ({
-  page,
-  baseURL,
+  browser,
 }, testInfo) => {
-  const site = baseURL ?? 'http://localhost:5080';
-  const admin = await signIn(site, 'admin', password);
+  const world = await setUpSeason({ players: ['Картограф'], start: false });
+  const [player] = world.players;
+  if (!player) throw new Error('No player');
+  const admin = world.adminApi;
 
-  // A player of its own: created by the admin, the temporary password changed once
-  const login = `map${testInfo.project.name.slice(0, 5)}${String(Date.now() % 1_000_000)}`;
-  const created = await send(admin, 'post', '/api/admin/accounts', {
-    login,
-    name: 'Картограф',
-    role: 'player',
-  });
-  const account = created['account'] as { id: string };
-  const temporary = created['temporaryPassword'] as string;
-  const player = await signIn(site, login, temporary);
-  await send(player, 'post', '/api/auth/password', {
-    currentPassword: temporary,
-    newPassword: password,
-  });
-
-  // A season of its own on the graph map: three dice a completion, so a throw always passes the fork
-  const seasonId = crypto.randomUUID();
-  await send(admin, 'post', '/api/admin/seasons', { seasonId, name: 'Развилка E2E' });
-  const rules = (await (await admin.context.get(`/api/seasons/${seasonId}/rules`)).json()) as {
-    version: number;
-    ruleset: {
-      features: { mapMode: string };
-      reward: { diceCount: { min: number; max: number } };
-    };
+  // The graph map, three dice a completion: a throw from the start always passes the fork
+  const rules = await admin.get<Schemas['RulesView']>(`/api/seasons/${world.seasonId}/rules`);
+  const ruleset = {
+    ...rules.ruleset,
+    features: { ...rules.ruleset.features, mapMode: 'graph' as const },
+    reward: {
+      ...rules.ruleset.reward,
+      diceCount: { ...rules.ruleset.reward.diceCount, min: 3, max: 3 },
+    },
   };
-  rules.ruleset.features.mapMode = 'graph';
-  rules.ruleset.reward.diceCount.min = 3;
-  rules.ruleset.reward.diceCount.max = 3;
-  await send(admin, 'put', `/api/admin/seasons/${seasonId}/rules`, {
+  await admin.put(`/api/admin/seasons/${world.seasonId}/rules`, {
     expectedVersion: rules.version,
-    ruleset: rules.ruleset,
+    ruleset,
   });
-  await send(admin, 'post', `/api/admin/seasons/${seasonId}/map/publish`, {
+  await admin.post(`/api/admin/seasons/${world.seasonId}/map/publish`, {
     map: forkMap(),
     comment: 'Карта с развилкой',
   });
-  await send(admin, 'post', `/api/admin/seasons/${seasonId}/players`, { userId: account.id });
-  await send(admin, 'post', `/api/admin/seasons/${seasonId}/status`, { to: 'active' });
+  await admin.post(`/api/admin/seasons/${world.seasonId}/status`, { to: 'active' });
 
-  // The player plays one game in the browser
-  await page.goto('/');
-  await page.getByTestId('login-name').fill(login);
-  await page.getByTestId('login-password').fill(password);
-  await page.getByTestId('login-submit').click();
-  await expect(page.getByRole('heading', { level: 1, name: 'Развилка E2E' })).toBeVisible();
-  await page.getByTestId('roll').click();
-  await expect(page.getByTestId('offer')).toBeVisible();
-  await page.getByTestId('start').click();
-  await expect(page.getByTestId('active-run')).toBeVisible();
-  const hours = page.getByTestId('complete-hours');
-  if (await hours.isVisible()) {
-    await hours.fill('5');
-    await page.getByTestId('complete-hours-source').fill('HowLongToBeat');
-  }
-  await page.getByTestId('complete-difficulty').getByText('Нормальная', { exact: true }).click();
-  await page.getByTestId('complete-submit').click();
+  // The player's only season opens by itself
+  const page = await signIn(browser, player);
+  await expect(page.getByRole('heading', { level: 1, name: world.seasonName })).toBeVisible();
+  await rollAndStartHere(page);
+  await completeHere(page);
 
   // The token stands on the fork and the page asks for the branch: in the turn card on a phone, on the map on a desktop
   const branch = page.getByTestId('branch');
   await expect(branch).toBeVisible();
-  if (testInfo.project.name === 'phone')
+  if (testInfo.project.name.startsWith('phone'))
     await expect(page.getByTestId('turn').getByTestId('branch')).toBeVisible();
   else await expect(page.getByTestId('branch-hint')).toBeVisible();
-  await expect(page.getByTestId('cell-fork').getByText('Картограф')).toHaveCount(1);
+  expect(await cellOf(page, player.name)).toBe('cell-fork');
   await expect(page.getByTestId('roll')).toHaveCount(0);
 
   // The branch that is not the default one, picked with the keyboard
@@ -147,39 +99,22 @@ test('a completion stops at the fork, the player picks a branch and the token wa
 
   await expect(branch).toHaveCount(0);
   await expect(page.getByTestId('roll')).toBeVisible();
-  const cell = await page
-    .getByTestId('cells')
-    .locator('[data-testid^="token-"]', { hasText: 'Картограф' })
-    .locator('xpath=ancestor::li[1]')
-    .getAttribute('data-testid');
-  expect(cell).toMatch(/^cell-b\d+$/);
+  expect(await cellOf(page, player.name)).toMatch(/^cell-b\d+$/);
 
-  // 2.11 on a desktop: the admin changes the map in the editor and publishes it; the player sees it after a reload
-  if (testInfo.project.name === 'desktop') {
-    const context = await page.context().browser()?.newContext();
-    if (!context) throw new Error('No browser');
-    const editor = await context.newPage();
-    await editor.goto('/');
-    await editor.getByTestId('login-name').fill('admin');
-    await editor.getByTestId('login-password').fill(password);
-    await editor.getByTestId('login-submit').click();
-    await editor.goto('/admin/season');
-    await editor.getByTestId(`season-open-${seasonId}`).click();
-    await editor.getByTestId('admin-nav-map').click();
+  // 2.11 on a desktop: the admin makes a5 a checkpoint in the editor and publishes it; the player sees it
+  if (testInfo.project.name.startsWith('desktop')) {
+    const editor = await signIn(browser, world.admin);
+    await openAdmin(editor, world, 'map');
     await expect(editor.getByTestId('map-editor')).toBeVisible();
     await editor.getByTestId('map-cell-pick').selectOption('a5');
     await editor.getByTestId('map-cell-type').selectOption('checkpoint');
     await expect(editor.getByText('Ошибок нет: карту можно публиковать.')).toBeVisible();
     await editor.getByTestId('map-publish-comment').fill('Чекпоинт на верхней ветке');
     await editor.getByTestId('map-publish-button').click();
-    await editor.getByTestId('map-publish-confirm-yes').click();
+    await confirmButton(editor, 'Опубликовать').click();
     await expect(editor.getByText('Карта опубликована.')).toBeVisible();
-    await context.close();
 
     await page.reload();
     await expect(page.getByTestId('cell-a5')).toContainText('чекпоинт');
   }
-
-  await admin.context.dispose();
-  await player.context.dispose();
 });
