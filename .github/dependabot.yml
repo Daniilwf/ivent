@@ -28,6 +28,10 @@ updates:
     cooldown:
       default-days: 7
     open-pull-requests-limit: 3
+    # Node's types follow the Node line the project runs (D-204): their majors move with a new LTS, by hand
+    ignore:
+      - dependency-name: '@types/node'
+        update-types: ['version-update:semver-major']
 
   # The base images of deploy/ are pinned by digest: monthly fresh ones bring the security patches
   - package-ecosystem: docker
