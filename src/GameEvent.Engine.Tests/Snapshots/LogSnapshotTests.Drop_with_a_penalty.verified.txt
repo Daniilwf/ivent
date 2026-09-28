@@ -23,4 +23,4 @@ run-dropped v1 {"runId":"00000000-0000-0000-0000-000000000002","playerId":"10000
 points-changed v1 {"playerId":"10000000-0000-0000-0000-000000000001","delta":-5,"reason":"dropPenalty","runId":"00000000-0000-0000-0000-000000000002"}
 player-moved v1 {"playerId":"10000000-0000-0000-0000-000000000001","from":"c8","to":"c3","steps":-5,"path":["c7","c6","c5","c4","c3"],"reason":"dropPenalty","runId":"00000000-0000-0000-0000-000000000002"}
 game-excluded v1 {"playerId":"10000000-0000-0000-0000-000000000001","gameId":"20000000-0000-0000-0000-000000000004","reason":"dropped"}
-manual-effect-created v1 {"effectId":"00000000-0000-0000-0000-000000000003","playerId":"10000000-0000-0000-0000-000000000001","drawEvent":"bad","source":"drop","runId":"00000000-0000-0000-0000-000000000002"}
+manual-effect-created v2 {"effectId":"00000000-0000-0000-0000-000000000003","playerId":"10000000-0000-0000-0000-000000000001","drawEvent":"bad","source":"drop","runId":"00000000-0000-0000-0000-000000000002"}

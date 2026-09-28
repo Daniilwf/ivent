@@ -1,0 +1,34 @@
+{
+  "id": "point-thief",
+  "kind": "item",
+  "name": "Карманник",
+  "description": "Укради у игрока с большим числом очков 1d4 очков.",
+  "rarity": "legendary",
+  "price": 60,
+  "window": "anytime",
+  "hostile": true,
+  "stackable": false,
+  "effect": {
+    "target": {
+      "selector": "chosen",
+      "among": "higherPoints"
+    },
+    "actions": [
+      {
+        "type": "roll",
+        "dice": "1d4"
+      },
+      {
+        "type": "changeResource",
+        "resource": "points",
+        "amount": "-$roll"
+      },
+      {
+        "type": "changeResource",
+        "resource": "points",
+        "amount": "$roll",
+        "target": "self"
+      }
+    ]
+  }
+}

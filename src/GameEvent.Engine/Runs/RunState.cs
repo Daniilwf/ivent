@@ -105,4 +105,11 @@ public sealed record RunState(
     [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     int Gain = 0,
     [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    int CellPoints = 0);
+    int CellPoints = 0,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    RunDiceMods? Mods = null)
+{
+    /// <summary>What items and effects did to the throw (D-408); none for a run without them.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public RunDiceMods DiceMods => Mods ?? RunDiceMods.None;
+}

@@ -44,6 +44,7 @@ const effectSources = {
   paidReroll: '(за реролл)',
   drop: '(за дроп)',
   difficulty: '(за сложность)',
+  item: '(от предмета)',
 } as const;
 
 type DropPenalty = {
