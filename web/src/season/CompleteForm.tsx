@@ -103,7 +103,7 @@ export function CompleteForm({
       aria-labelledby="complete-title"
       className="grid min-w-0 gap-4"
     >
-      <div className="flex flex-wrap items-center justify-between gap-x-4">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
         <h3 id="complete-title" className="font-display font-heavy">
           {ru.turn.completeTitle}
         </h3>

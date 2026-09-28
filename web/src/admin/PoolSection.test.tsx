@@ -254,6 +254,10 @@ describe('The pool section', () => {
       expect.stringContaining(t.deleteReasonRequired) as string,
     );
     expect(server.sent('POST', '/pool/g1/delete')).toHaveLength(0);
+    // The field takes the focus, and typing a reason takes the error away
+    expect(within(dialog).getByLabelText(t.deleteReason)).toHaveFocus();
+    await userEvent.type(within(dialog).getByLabelText(t.deleteReason), 'Дубль');
+    expect(within(dialog).queryByText(t.deleteReasonRequired)).toBeNull();
   });
 
   it('keeps a refused deletion in its window', async () => {

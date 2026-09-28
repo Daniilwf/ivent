@@ -259,7 +259,9 @@ export function CompletionCriteria() {
         ))}
       </ol>
       <p>
-        <strong>{c.doubtTitle}</strong> {c.doubtText}
+        {/* The text starts with a no-break space and its dash: the dash stays by the title */}
+        <strong>{c.doubtTitle}</strong>
+        {c.doubtText}
       </p>
       <p>
         <strong>{c.proofTitle}</strong> {c.proofText}

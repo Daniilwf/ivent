@@ -247,12 +247,23 @@ export function GameForm({
         {checking ? t.checking : null}
       </p>
       {same ? (
-        <Notice tone="danger">{sameText(same)}</Notice>
+        <Notice tone="danger">
+          {same.isDeleted ? (
+            <span className="grid gap-1">
+              <span>{sameText(same)}</span>
+              <span className="font-regular">{t.removedHint}</span>
+            </span>
+          ) : (
+            sameText(same)
+          )}
+        </Notice>
       ) : alike.length > 0 ? (
         <div className="grid gap-2" data-testid="similar-games">
           <Notice tone="warning">
             <span className="grid gap-1">
-              <strong>{t.similarTitle}</strong>
+              <strong>
+                {alike.every((g) => g.isDeleted) ? t.similarRemovedTitle : t.similarTitle}
+              </strong>
               <span>{t.similarText}</span>
             </span>
           </Notice>

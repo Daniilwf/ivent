@@ -561,6 +561,7 @@ describe('adding a game', () => {
     expect(
       await within(dialog).findByText('Эта игра убрана из пула: Слишком страшная'),
     ).toBeInTheDocument();
+    expect(within(dialog).getByText(t.form.removedHint)).toBeInTheDocument();
     expect(within(dialog).getByRole('button', { name: t.form.submit })).toBeDisabled();
     expect(seen.some((r) => r.key === 'POST /api/pool')).toBe(false);
   });
@@ -591,6 +592,8 @@ describe('adding a game', () => {
     await userEvent.type(within(dialog).getByLabelText(t.form.name), 'Dice & Fold');
 
     const warning = await within(dialog).findByTestId('similar-games');
+    expect(warning).toHaveTextContent(t.form.similarRemovedTitle);
+    expect(warning).not.toHaveTextContent(t.form.similarTitle);
     expect(warning).toHaveTextContent('Dice Fold');
     expect(warning).toHaveTextContent(t.form.removed('Не игра'));
   });

@@ -203,7 +203,7 @@ export function ProofCard({
       </header>
 
       <section className="grid gap-2" aria-label={ru.proof.title}>
-        <div className="flex flex-wrap items-center justify-between gap-x-4">
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
           <p className="font-medium">{sent ? t.proofSent : t.noProof}</p>
           <CompletionRulesLink />
         </div>

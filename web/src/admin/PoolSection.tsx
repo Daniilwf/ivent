@@ -1,5 +1,5 @@
 import { Dices, Library, Plus } from 'lucide-react';
-import { useCallback, useDeferredValue, useState, type SyntheticEvent } from 'react';
+import { useCallback, useDeferredValue, useRef, useState, type SyntheticEvent } from 'react';
 import { api, type Schemas } from '../api/client';
 import { ru } from '../i18n/ru';
 import { Button } from '../ui/Button';
@@ -440,13 +440,17 @@ function GameRow({
   const [reason, setReason] = useState('');
   const [reasonError, setReasonError] = useState<string>();
   const [deleteRefusal, setDeleteRefusal] = useState<string>();
+  const reasonField = useRef<HTMLTextAreaElement>(null);
 
   async function remove() {
     const text = reason.trim();
     // The field holds at most maxReason characters: only an empty reason is left to tell
     const problem = text === '' ? t.deleteReasonRequired : undefined;
     setReasonError(problem);
-    if (problem) return;
+    if (problem) {
+      reasonField.current?.focus();
+      return;
+    }
     setBusy(true);
     setDeleteRefusal(undefined);
     try {
@@ -491,7 +495,7 @@ function GameRow({
       </div>
       <GameFacts game={game} />
       {game.isDeleted && game.deletionReason ? (
-        <p className="text-ink-soft" data-testid="game-deletion-reason">
+        <p className="max-w-prose text-ink-soft" data-testid="game-deletion-reason">
           {t.deletionReason(game.deletionReason)}
         </p>
       ) : null}
@@ -534,6 +538,8 @@ function GameRow({
               onConfirm={() => void remove()}
             >
               <TextArea
+                ref={reasonField}
+                required
                 label={t.deleteReason}
                 hint={t.deleteReasonHint}
                 rows={2}
@@ -543,6 +549,7 @@ function GameRow({
                 data-testid="game-delete-reason"
                 onChange={(e) => {
                   setReason(e.target.value);
+                  setReasonError(undefined);
                 }}
               />
               {deleteRefusal ? <Notice tone="danger">{deleteRefusal}</Notice> : null}
