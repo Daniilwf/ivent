@@ -944,6 +944,9 @@ export const ru = {
       onMap: 'Ты на развилке: выбери ветку на карте',
       firstCell: (cell: number) => `Первая клетка — ${cell}`,
       endCell: (cell: number) => `Встанешь на клетку ${cell}`,
+      endBonus: (amount: number, cell: number) =>
+        `Встанешь на бонус ${signed(amount)} (клетка ${cell})`,
+      endCheckpoint: (cell: number) => `Встанешь на чекпоинт (клетка ${cell})`,
       endTeleport: (cell: number, to: number) =>
         `Встанешь на телепорт ${cell} и перенесёшься на клетку ${to}`,
       endFork: (cell: number) => `Дойдёшь до развилки ${cell}: там снова выбор`,

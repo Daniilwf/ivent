@@ -350,7 +350,8 @@ function usePanZoom(board: Board, focus: Point | null, anchor: Point | null) {
   }, []);
 
   const ratio = box.height / box.width;
-  const portrait = ratio > board.height / board.width;
+  // Only a phone's frame crops the board around me; a desktop's always shows the whole board
+  const portrait = ratio > board.height / board.width && box.width < 600;
   // A wide frame shows the whole board; a tall one (a phone) fills its height and centres on me
   const fitWidth = portrait
     ? (board.height / ratio) * 1.04

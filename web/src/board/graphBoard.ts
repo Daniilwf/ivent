@@ -328,6 +328,15 @@ export function branchOptions(
     const zone = map.cells.find((c) => c.id === id)?.zone;
     return map.zones.find((z) => z.id === zone) ?? null;
   };
+  // A cell the way the map draws it: a bonus shows its amount, a checkpoint its flag, others their number
+  const endOn = (id: string) => {
+    const cell = map.cells.find((c) => c.id === id);
+    return cell?.type === 'pointsBonus' && cell.amount
+      ? t.endBonus(cell.amount, number(id))
+      : cell?.type === 'checkpoint'
+        ? t.endCheckpoint(number(id))
+        : t.endCell(number(id));
+  };
   return choice.options.map((o) => {
     const end = branchEnd(map, o.id, steps);
     const zone = zoneOf(end.kind === 'teleport' ? end.to : end.cell);
@@ -343,7 +352,7 @@ export function branchOptions(
             ? t.endFork(number(end.cell))
             : end.kind === 'teleport'
               ? t.endTeleport(number(end.cell), number(end.to))
-              : t.endCell(number(end.cell)),
+              : endOn(end.cell),
     };
   });
 }

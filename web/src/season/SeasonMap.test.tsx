@@ -2,7 +2,7 @@ import { onDesktop } from '../test/desk';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Schemas } from '../api/client';
-import { graphBoard, legsPath } from '../board/graphBoard';
+import { branchOptions, graphBoard, legsPath } from '../board/graphBoard';
 import { ru } from '../i18n/ru';
 import { fakeServer, seasonId } from '../test/fakeServer';
 import { SeasonScreen } from './SeasonScreen';
@@ -149,6 +149,15 @@ describe('the graph board', () => {
     expect(teleport?.to).toBe(cellNumber.get('a2'));
     expect(board.zones.map((z) => z.name)).toEqual(['Болото ужаса']);
     expect(board.edges).toHaveLength(8);
+  });
+
+  it('names the end of a branch as the map draws it: a bonus by its amount', () => {
+    const { cellNumber } = graphBoard(map);
+    const options = branchOptions({ ...branchChoice, steps: 1 }, map, cellNumber);
+    expect(options.map((o) => o.end)).toEqual([
+      ru.map.branch.endCell(3),
+      ru.map.branch.endBonus(3, 4),
+    ]);
   });
 
   it('lays out a map without places in columns from the start', () => {

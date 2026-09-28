@@ -34,21 +34,34 @@ type CellData = {
 type CellNode = FlowNode<CellData, 'cell'>;
 
 const icons: Record<string, React.ReactNode> = {
-  start: <Play size={14} aria-hidden />,
-  finish: <Trophy size={14} aria-hidden />,
-  fork: <GitFork size={14} aria-hidden />,
-  teleport: <Orbit size={14} aria-hidden />,
-  checkpoint: <Flag size={14} aria-hidden />,
+  start: <Play size={20} aria-hidden />,
+  finish: <Trophy size={20} aria-hidden />,
+  fork: <GitFork size={20} aria-hidden />,
+  teleport: <Orbit size={20} aria-hidden />,
+  checkpoint: <Flag size={20} aria-hidden />,
 };
 
 /** A cell on the canvas: its id, its type and what stands there; red when the check found a problem with it */
 const CellBox = memo(function CellBox({ data, selected }: NodeProps<CellNode>) {
+  // A compact card: the number the players see, what the cell does, a bonus's amount, who stands there; the id, the
+  // type's name and the zone are in the card's title and in the panel when the cell is picked (D-320)
+  const title = [
+    data.label,
+    t.types[data.type] ?? data.type,
+    data.zone,
+    data.players > 0 ? t.cell.onCell(data.players) : null,
+  ]
+    .filter(Boolean)
+    .join(', ');
   return (
     <div
       data-testid={`canvas-cell-${data.label}`}
+      title={title}
+      aria-label={title}
       className={cx(
-        'grid min-w-24 gap-1 rounded-md border-3 bg-card px-3 py-2 text-sm text-ink',
+        'flex items-center gap-1 rounded-full border-3 bg-card py-1 pr-3 pl-1 font-display text-xl font-heavy text-ink',
         data.problem ? 'border-danger' : 'border-ink',
+        data.zone && 'bg-page',
         selected && 'outline-3 outline-offset-2 outline-me',
       )}
     >
@@ -57,21 +70,15 @@ const CellBox = memo(function CellBox({ data, selected }: NodeProps<CellNode>) {
         position={Position.Left}
         className="size-3! border-2! border-ink! bg-card!"
       />
-      {/* The number the players see first, then what the cell does; the id only small, for the panel's list */}
-      <span className="flex items-center gap-2 font-display text-base font-heavy">
-        <span className="grid size-8 shrink-0 place-items-center rounded-full border-2 border-ink">
-          {data.number}
-        </span>
-        {icons[data.type] ?? null}
-        {t.types[data.type] ?? data.type}
-        {data.type === 'pointsBonus' && data.amount ? ` ${ru.board.bonus(data.amount)}` : ''}
+      <span className="grid size-10 shrink-0 place-items-center rounded-full border-2 border-ink">
+        {data.number}
       </span>
-      <span className="text-sm text-ink-soft">{data.label}</span>
-      {data.zone ? <span className="text-sm font-bold">{data.zone}</span> : null}
+      {icons[data.type] ?? null}
+      {data.type === 'pointsBonus' && data.amount ? ru.board.bonus(data.amount) : null}
       {data.players > 0 ? (
-        <span className="flex items-center gap-1 text-sm font-bold text-me">
-          <Users size={14} aria-hidden />
-          {t.cell.onCell(data.players)}
+        <span className="flex items-center gap-1 text-base text-me">
+          <Users size={16} aria-hidden />
+          {data.players}
         </span>
       ) : null}
       <Handle
@@ -84,6 +91,12 @@ const CellBox = memo(function CellBox({ data, selected }: NodeProps<CellNode>) {
 });
 
 const nodeTypes = { cell: CellBox };
+
+/**
+ * The canvas spreads the map's places: a node card is wider than a cell on the players' map, so at the map's own
+ * places the cards would overlap. The draft keeps the map's places; a drop divides back.
+ */
+const spread = 1.4;
 
 /** The zoom buttons of the player's map, on the canvas */
 function CanvasTools() {
@@ -132,7 +145,7 @@ export function MapCanvas({
   const fromDraft: CellNode[] = draft.cells.map((c, i) => ({
     id: c.id,
     type: 'cell',
-    position: { x: c.x ?? i * 140, y: c.y ?? 0 },
+    position: { x: (c.x ?? i * 140) * spread, y: (c.y ?? 0) * spread },
     selected: c.id === selected,
     ariaLabel: t.cell.title(c.id),
     data: {
@@ -214,7 +227,7 @@ export function MapCanvas({
         nodeTypes={nodeTypes}
         fitView
         // Text on the canvas never shrinks below the small text size of the site
-        fitViewOptions={{ padding: 0.08, minZoom: 0.75, maxZoom: 1.2 }}
+        fitViewOptions={{ padding: 0.15, minZoom: 0.5, maxZoom: 1.2 }}
         minZoom={0.5}
         deleteKeyCode={null}
         onNodeClick={(_, node) => {
@@ -231,7 +244,7 @@ export function MapCanvas({
         }}
         onNodeDragStop={(_, node) => {
           setDragging(false);
-          onMove(node.id, node.position);
+          onMove(node.id, { x: node.position.x / spread, y: node.position.y / spread });
         }}
         onNodesChange={(changes) => {
           setNodes((current) => applyNodeChanges(changes, current));
