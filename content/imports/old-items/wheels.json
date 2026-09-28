@@ -1,0 +1,1243 @@
+[
+  {
+    "id": "lootbox-sedobnyy",
+    "name": "Лутбокс: Съедобное",
+    "kind": "lootbox",
+    "entries": [
+      {
+        "type": "object",
+        "ref": "apelsin",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "banan",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "baunti",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "brokkoli",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "vishenka",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "keksik",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "kefir",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "klubnichka",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "konfetka",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "kryzhovnik",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "kubik-sahara",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "malinka",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "mificheskoe-varene",
+        "weight": 5
+      },
+      {
+        "type": "object",
+        "ref": "morskaya-kapusta",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "muhomor",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "picca",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "redkoe-svetloe-pivo",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "redkoe-temnoe-pivo",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "rybiy-zhir",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "svetloe-pivo",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "sladkiy-rulet",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "smorodinka",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "sosiska",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "syurstreming",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "temnoe-pivo",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "tomat",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "tortik",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "uluchshennoe-svetloe-pivo",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "uluchshennoe-temnoe-pivo",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "chernichka",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "shashlyk",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "shokoladka",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "epicheskoe-svetloe-pivo",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "epicheskoe-temnoe-pivo",
+        "weight": 25
+      }
+    ]
+  },
+  {
+    "id": "lootbox-oruzhiya",
+    "name": "Лутбокс: Оружие",
+    "kind": "lootbox",
+    "entries": [
+      {
+        "type": "object",
+        "ref": "granata",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "dinamit",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "kope",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "legendarnyy-tomagavk-kovra",
+        "weight": 5
+      },
+      {
+        "type": "object",
+        "ref": "pistolet",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "plazmagan",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "redkaya-granata",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "redkiy-dinamit",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "redkiy-pistolet",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "redkoe-kope",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "rogatka",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "uluchshennaya-granata",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "uluchshennoe-kope",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "uluchshennyy-dinamit",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "uluchshennyy-pistolet",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "epicheskaya-granata",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "epicheskiy-dinamit",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "epicheskiy-pistolet",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "epicheskoe-kope",
+        "weight": 25
+      }
+    ]
+  },
+  {
+    "id": "lootbox-krysy",
+    "name": "Лутбокс: Крысы",
+    "kind": "lootbox",
+    "entries": [
+      {
+        "type": "object",
+        "ref": "dobraya-krysa",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "krysa",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "krysa-shredingera",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "krysa-zhulik",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "krysa-kyukyushka",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "krysenshteks",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "podarochnaya-krysa",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "proklyataya-krysa",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "uluchshennaya-krysa",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "effektnaya-krysa",
+        "weight": 70
+      }
+    ]
+  },
+  {
+    "id": "lootbox-kuby",
+    "name": "Лутбокс: Кубики",
+    "kind": "lootbox",
+    "entries": [
+      {
+        "type": "object",
+        "ref": "d8-kubik",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "gandonopitek",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "ezdovoy-drakon",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "klubnichka",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "krysenshteks",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "kubik-vtorogo-shansa",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "kubik-romana",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "lyagushoid",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "mificheskie-sapogi-skorohody",
+        "weight": 5
+      },
+      {
+        "type": "object",
+        "ref": "proklyatye-sapogi-skorohody",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "pyatyy-kubik",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "redkie-sapogi-skorohody",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "roza",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "sapogi-skorohody",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "svinopitek",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "sredniy-kubik",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "schastlivyy-kubik",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "tort",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "uluchshennye-sapogi-skorohody",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "chernichka",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "chiterskiy-kubik",
+        "weight": 5
+      },
+      {
+        "type": "object",
+        "ref": "shlyapa-igrovogo-ebuna",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "epicheskie-sapogi-skorohody",
+        "weight": 25
+      }
+    ]
+  },
+  {
+    "id": "lootbox-epiki",
+    "name": "Лутбокс: Эпические",
+    "kind": "lootbox",
+    "entries": [
+      {
+        "type": "object",
+        "ref": "brokkoli",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "gandonopitek",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "dobraya-krysa",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "ezdovoy-drakon",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "kefir",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "muhomor",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "mshistyy-sharf",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "picca",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "podarochnaya-krysa",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "pyatyy-kubik",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "redkaya-granata",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "redkie-sapogi-skorohody",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "redkiy-gremlin",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "redkiy-dinamit",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "redkiy-pistolet",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "redkoe-kope",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "redkoe-svetloe-pivo",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "redkoe-temnoe-pivo",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "reroll",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "svinopitek",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "sladkiy-rulet",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "sredniy-kubik",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "schastlivyy-kubik",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "uluchshennye-sapogi-skorohody",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "epicheskaya-granata",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "epicheskaya-svinya",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "epicheskie-sapogi-skorohody",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "epicheskiy-gremlin",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "epicheskiy-dinamit",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "epicheskiy-pistolet",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "epicheskoe-kope",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "epicheskoe-svetloe-pivo",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "epicheskoe-temnoe-pivo",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "babl",
+        "weight": 25
+      }
+    ]
+  },
+  {
+    "id": "lootbox-legi",
+    "name": "Лутбокс: Легендарные",
+    "kind": "lootbox",
+    "entries": [
+      {
+        "type": "object",
+        "ref": "ebanuto-zhivuchaya-svinya",
+        "weight": 5
+      },
+      {
+        "type": "object",
+        "ref": "legendarnyy-tomagavk-kovra",
+        "weight": 5
+      },
+      {
+        "type": "object",
+        "ref": "mificheskie-sapogi-skorohody",
+        "weight": 5
+      },
+      {
+        "type": "object",
+        "ref": "mificheskoe-varene",
+        "weight": 5
+      },
+      {
+        "type": "object",
+        "ref": "proklyataya-svinya",
+        "weight": 5
+      },
+      {
+        "type": "object",
+        "ref": "chiterskiy-kubik",
+        "weight": 5
+      }
+    ]
+  },
+  {
+    "id": "lootbox-mifiki",
+    "name": "Лутбокс: Мифические (в пакете = легендарные)",
+    "kind": "lootbox",
+    "entries": [
+      {
+        "type": "object",
+        "ref": "ebanuto-zhivuchaya-svinya",
+        "weight": 5
+      },
+      {
+        "type": "object",
+        "ref": "legendarnyy-tomagavk-kovra",
+        "weight": 5
+      },
+      {
+        "type": "object",
+        "ref": "mificheskie-sapogi-skorohody",
+        "weight": 5
+      },
+      {
+        "type": "object",
+        "ref": "mificheskoe-varene",
+        "weight": 5
+      },
+      {
+        "type": "object",
+        "ref": "proklyataya-svinya",
+        "weight": 5
+      },
+      {
+        "type": "object",
+        "ref": "chiterskiy-kubik",
+        "weight": 5
+      }
+    ]
+  },
+  {
+    "id": "lootbox-common",
+    "name": "Лутбокс: Обычный",
+    "kind": "lootbox",
+    "entries": [
+      {
+        "type": "object",
+        "ref": "d8-kubik",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "apelsin",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "banan",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "baunti",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "brokkoli",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "vishenka",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "gandonopitek",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "granata",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "gremlin",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "gremlin-santa",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "dvoynoy-gremlin",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "dvoynoy-ptichkers",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "dinamit",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "dobraya-krysa",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "ebanuto-zhivuchaya-svinya",
+        "weight": 5
+      },
+      {
+        "type": "object",
+        "ref": "ezdovoy-drakon",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "zabludivshiysya-ptichkers",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "zele-vremeni",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "zele-lozy",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "zele-takticheskogo-otstupleniya",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "keksik",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "kefir",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "klavisha-r",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "klubnichka",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "konfetka",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "kope",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "kryzhovnik",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "krysa",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "krysa-shredingera",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "krysa-zhulik",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "krysa-kyukyushka",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "krysenshteks",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "kubik-vtorogo-shansa",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "kubik-romana",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "kubik-sahara",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "legendarnyy-tomagavk-kovra",
+        "weight": 5
+      },
+      {
+        "type": "object",
+        "ref": "lyagushoid",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "malinka",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "mificheskie-sapogi-skorohody",
+        "weight": 5
+      },
+      {
+        "type": "object",
+        "ref": "mificheskoe-varene",
+        "weight": 5
+      },
+      {
+        "type": "object",
+        "ref": "morskaya-kapusta",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "muhomor",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "mshistyy-sharf",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "ognennyy-ptichkers",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "pistolet",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "picca",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "plazmagan",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "podarochnaya-krysa",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "proklyataya-krysa",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "proklyataya-svinya",
+        "weight": 5
+      },
+      {
+        "type": "object",
+        "ref": "proklyatye-sapogi-skorohody",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "ptichkers",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "pyatyy-kubik",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "redkaya-granata",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "redkie-sapogi-skorohody",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "redkiy-gremlin",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "redkiy-dinamit",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "redkiy-pistolet",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "redkoe-kope",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "redkoe-svetloe-pivo",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "redkoe-temnoe-pivo",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "reroll",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "rogatka",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "roza",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "rybiy-zhir",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "sapogi-skorohody",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "svetloe-pivo",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "svinopitek",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "svinya",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "sladkiy-rulet",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "smorodinka",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "sosiska",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "sredniy-kubik",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "schastlivyy-kubik",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "sytyy-gremlin",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "syurstreming",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "temnoe-pivo",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "tomat",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "tort",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "tortik",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "uluchshennaya-granata",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "uluchshennaya-krysa",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "uluchshennoe-kope",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "uluchshennoe-svetloe-pivo",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "uluchshennoe-temnoe-pivo",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "uluchshennye-sapogi-skorohody",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "uluchshennyy-dinamit",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "uluchshennyy-pistolet",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "chernichka",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "chiterskiy-kubik",
+        "weight": 5
+      },
+      {
+        "type": "object",
+        "ref": "shashlyk",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "shlyapa-igrovogo-ebuna",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "shokoladka",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "epicheskaya-granata",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "epicheskaya-svinya",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "epicheskie-sapogi-skorohody",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "epicheskiy-gremlin",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "epicheskiy-dinamit",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "epicheskiy-pistolet",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "epicheskoe-kope",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "epicheskoe-svetloe-pivo",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "epicheskoe-temnoe-pivo",
+        "weight": 25
+      },
+      {
+        "type": "object",
+        "ref": "effektnaya-krysa",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "effektnyy-gremlin",
+        "weight": 70
+      },
+      {
+        "type": "object",
+        "ref": "babl",
+        "weight": 25
+      }
+    ]
+  }
+]

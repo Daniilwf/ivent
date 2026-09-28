@@ -1,7 +1,9 @@
 import { useEffect, useState, type ChangeEvent, type SyntheticEvent } from 'react';
 import { api, rejectionCode, type Schemas } from '../api/client';
+import { newCommandId } from '../api/commands';
 import { uploadFile, UploadError } from '../api/files';
 import { ru } from '../i18n/ru';
+import { FilePicker } from '../ui/Field';
 
 const pictureTypes = 'image/png,image/jpeg,image/webp,image/gif';
 
@@ -35,7 +37,7 @@ export function AvatarSection({ onChanged }: { onChanged: () => void }) {
 
   async function use(fileId: string | null) {
     const { error: refused } = await api.PUT('/api/auth/me/avatar', {
-      body: { commandId: crypto.randomUUID(), fileId },
+      body: { commandId: newCommandId(), fileId },
     });
     if (refused) {
       const code = rejectionCode(refused);
@@ -86,7 +88,7 @@ export function AvatarSection({ onChanged }: { onChanged: () => void }) {
         error: refused,
         response,
       } = await api.POST('/api/files/from-url', {
-        body: { commandId: crypto.randomUUID(), url },
+        body: { commandId: newCommandId(), url },
       });
       if (!data) {
         // The hourly limit of downloads answers without a code (D-117)
@@ -118,16 +120,14 @@ export function AvatarSection({ onChanged }: { onChanged: () => void }) {
       ) : (
         <p>{ru.avatar.none}</p>
       )}
-      <label>
-        {ru.avatar.file}
-        <input
-          data-testid="avatar-file"
-          type="file"
-          accept={pictureTypes}
-          disabled={busy}
-          onChange={pick}
-        />
-      </label>
+      {/* A Russian button over the browser's own field (H4, the H2 design review) */}
+      <FilePicker
+        data-testid="avatar-file"
+        label={ru.avatar.file}
+        accept={pictureTypes}
+        busy={busy}
+        onChange={pick}
+      />
       <form onSubmit={byLink} noValidate>
         <label>
           {ru.avatar.link}

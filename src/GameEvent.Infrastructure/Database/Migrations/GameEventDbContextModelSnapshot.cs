@@ -161,6 +161,8 @@ namespace GameEvent.Infrastructure.Database.Migrations
 
                     b.HasIndex("CommandId");
 
+                    b.HasIndex("SeasonId", "OccurredAt");
+
                     b.HasIndex("SeasonId", "Sequence")
                         .IsUnique();
 

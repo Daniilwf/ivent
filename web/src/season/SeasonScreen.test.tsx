@@ -1,14 +1,20 @@
 import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Schemas } from '../api/client';
+import { moscowTime } from '../app/time';
 import { ru } from '../i18n/ru';
 import { SeasonScreen } from './SeasonScreen';
+import { json } from '../test/fakeServer';
 
 // The hub is replaced: tests trigger "another player acted" by calling the captured callback.
 let hubChange: (() => void) | null = null;
 vi.mock('../api/realtime', () => ({
-  watchSeason: (_seasonId: string, onChange: () => void) => {
-    hubChange = onChange;
+  watchSeason: (_seasonId: string, onChange: (updates: unknown[]) => void) => {
+    hubChange = () => {
+      onChange([]);
+    };
+    // The hub's first answer is the join: the page has just loaded and skips it (D-202)
+    onChange([]);
     return () => {
       hubChange = null;
     };
@@ -43,6 +49,7 @@ function season(overrides: Partial<Schemas['SeasonView']> = {}): Schemas['Season
       phase: 'idle',
       finishOrder: null,
       avatar: null,
+      token: 0,
     },
   ];
   return {
@@ -69,6 +76,8 @@ function season(overrides: Partial<Schemas['SeasonView']> = {}): Schemas['Season
       dropPenalty: null,
       techRerollOpen: false,
       challengesEnabled: false,
+      roll: null,
+      unchecked: null,
       finish: null,
     },
     lastSequence: 3,
@@ -76,13 +85,6 @@ function season(overrides: Partial<Schemas['SeasonView']> = {}): Schemas['Season
     ...overrides,
     leaderboard: overrides.leaderboard ?? leaderboardOf(players),
   };
-}
-
-function json(status: number, body: unknown) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'Content-Type': status >= 400 ? 'application/problem+json' : 'application/json' },
-  });
 }
 
 type Handler = (request: Request) => Response | Promise<Response>;
@@ -98,9 +100,19 @@ const account = {
   avatar: null,
 };
 
+// The feed beside the map on a desktop (H5) reads its own page; the cases here are about the season, so it is empty
+const isFeedGet = (r: Request) => r.method === 'GET' && new URL(r.url).pathname.endsWith('/feed');
+const emptyFeed = { entries: [], nextBefore: null, players: [], games: [], runs: [] };
+
 function serve(handler: Handler) {
   const fetch = vi.fn((request: Request) =>
-    Promise.resolve(isAccountGet(request) ? json(200, account) : handler(request)),
+    Promise.resolve(
+      isAccountGet(request)
+        ? json(200, account)
+        : isFeedGet(request)
+          ? json(200, emptyFeed)
+          : handler(request),
+    ),
   );
   vi.stubGlobal('fetch', fetch);
   return fetch;
@@ -183,6 +195,7 @@ describe('SeasonScreen', () => {
           phase: 'idle',
           finishOrder: null,
           avatar: null,
+          token: 0,
         },
       ],
     });
@@ -208,6 +221,7 @@ describe('SeasonScreen', () => {
           phase: 'idle',
           finishOrder: null,
           avatar: null,
+          token: 0,
         },
       ],
     });
@@ -251,6 +265,8 @@ describe('SeasonScreen', () => {
               dropPenalty: null,
               techRerollOpen: false,
               challengesEnabled: false,
+              roll: null,
+              unchecked: null,
               finish: null,
             },
           }),
@@ -263,7 +279,12 @@ describe('SeasonScreen', () => {
 
     expect(await screen.findByTestId('choice')).toHaveTextContent(ru.turn.choose);
     expect(screen.queryByTestId('start')).not.toBeInTheDocument();
-    expect(screen.getByTestId('option-a1')).toHaveTextContent(ru.turn.option('Silent Hill', 12));
+    // H3: the option card names the game and its hours the way the run card does
+    const option = screen.getByTestId('option-a1');
+    expect(option).toHaveTextContent('Silent Hill');
+    expect(option).toHaveTextContent(ru.hours.estimate(12));
+    // The card's name is its content: the action, the game and its hours
+    expect(option).toHaveAccessibleName(`${ru.turn.pick} Silent Hill. ${ru.hours.estimate(12)}`);
 
     await userEvent.click(screen.getByTestId('option-b2'));
 
@@ -313,6 +334,8 @@ describe('SeasonScreen', () => {
         dropPenalty: null,
         techRerollOpen: false,
         challengesEnabled: false,
+        roll: null,
+        unchecked: null,
         finish: null,
       },
     });
@@ -328,6 +351,7 @@ describe('SeasonScreen', () => {
           phase: 'playing',
           finishOrder: null,
           avatar: null,
+          token: 0,
         },
       ],
       me: {
@@ -347,6 +371,8 @@ describe('SeasonScreen', () => {
         dropPenalty: null,
         techRerollOpen: false,
         challengesEnabled: false,
+        roll: null,
+        unchecked: null,
         finish: null,
       },
     });
@@ -403,6 +429,8 @@ describe('SeasonScreen', () => {
               dropPenalty: null,
               techRerollOpen: false,
               challengesEnabled: false,
+              roll: null,
+              unchecked: null,
               finish: null,
             },
           }),
@@ -466,6 +494,8 @@ describe('SeasonScreen', () => {
               dropPenalty: null,
               techRerollOpen: false,
               challengesEnabled: false,
+              roll: null,
+              unchecked: null,
               finish: null,
             },
           }),
@@ -516,6 +546,8 @@ describe('SeasonScreen', () => {
               dropPenalty: null,
               techRerollOpen: false,
               challengesEnabled: false,
+              roll: null,
+              unchecked: null,
               finish: null,
             },
           }),
@@ -587,6 +619,8 @@ describe('SeasonScreen', () => {
               dropPenalty: null,
               techRerollOpen: false,
               challengesEnabled: false,
+              roll: null,
+              unchecked: null,
               finish: null,
             },
           }),
@@ -629,6 +663,7 @@ describe('SeasonScreen', () => {
           phase: 'playing',
           finishOrder: null,
           avatar: null,
+          token: 0,
         },
       ],
       me: {
@@ -648,6 +683,8 @@ describe('SeasonScreen', () => {
         dropPenalty: null,
         techRerollOpen: false,
         challengesEnabled: false,
+        roll: null,
+        unchecked: null,
         finish: null,
       },
     });
@@ -683,6 +720,8 @@ describe('SeasonScreen', () => {
                 dropPenalty: null,
                 techRerollOpen: false,
                 challengesEnabled: false,
+                roll: null,
+                unchecked: null,
                 finish: null,
               },
             }),
@@ -713,6 +752,19 @@ describe('SeasonScreen', () => {
     expect(screen.queryByTestId('roll')).not.toBeInTheDocument();
   });
 
+  it.each<[string, Partial<Schemas['SeasonView']>, string]>([
+    ['a spectator', { me: null }, ru.turn.spectatorTitle],
+    ['a finished season', { status: 'finished' }, ru.turn.finishedTitle],
+    ['a closing season', { status: 'closing' }, ru.turn.closingTitle],
+    ['an open turn', {}, ru.turn.title],
+  ])('names the turn card by the state: %s (H2)', async (_, overrides, title) => {
+    serve(() => json(200, season(overrides)));
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    const turn = await screen.findByTestId('turn');
+    expect(within(turn).getByRole('heading', { level: 2 })).toHaveTextContent(title);
+  });
+
   it('returns to sign-in when the session is gone', async () => {
     serve(() => json(401, {}));
     const onSignedOut = vi.fn();
@@ -730,7 +782,7 @@ describe('SeasonScreen', () => {
     );
     render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(ru.app.loadError);
+    expect(await screen.findByRole('alert')).toHaveTextContent(ru.shell.loadErrorTitle);
   });
 });
 
@@ -761,6 +813,8 @@ describe('SeasonScreen reroll price and manual effects (D-93)', () => {
         dropPenalty: null,
         techRerollOpen: false,
         challengesEnabled: false,
+        roll: null,
+        unchecked: null,
         finish: null,
       },
     });
@@ -854,6 +908,32 @@ describe('SeasonScreen reroll price and manual effects (D-93)', () => {
     expect(commands).toHaveLength(0);
   });
 
+  it('moves the focus into the reroll confirmation and back to the reroll on cancel (H3)', async () => {
+    serveRolling(rolling({ payment: 'coins', coins: 5 }));
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    await userEvent.click(await screen.findByTestId('reroll'));
+    await vi.waitFor(() => {
+      expect(screen.getByText(ru.turn.rerollConfirm('coins', 5))).toHaveFocus();
+    });
+    await userEvent.click(screen.getByTestId('reroll-confirm-no'));
+
+    await vi.waitFor(() => {
+      expect(screen.getByTestId('reroll')).toHaveFocus();
+    });
+
+    // Escape cancels it too
+    await userEvent.click(screen.getByTestId('reroll'));
+    await vi.waitFor(() => {
+      expect(screen.getByText(ru.turn.rerollConfirm('coins', 5))).toHaveFocus();
+    });
+    await userEvent.keyboard('{Escape}');
+    expect(screen.queryByTestId('reroll-confirm')).not.toBeInTheDocument();
+    await vi.waitFor(() => {
+      expect(screen.getByTestId('reroll')).toHaveFocus();
+    });
+  });
+
   it('lists pending manual effects of the player', async () => {
     const effects: Schemas['ManualEffectView'][] = [
       { id: 'e1000000-0000-0000-0000-000000000001', drawEvent: 'bad', source: 'paidReroll' },
@@ -869,6 +949,43 @@ describe('SeasonScreen reroll price and manual effects (D-93)', () => {
         ru.effects.drawEvent('bad', 'paidReroll'),
       );
     }
+  });
+
+  it('puts pending effects in the turn card above the roll button, with their count (H2)', async () => {
+    const effects: Schemas['ManualEffectView'][] = [
+      { id: 'e1000000-0000-0000-0000-000000000001', drawEvent: 'bad', source: 'drop' },
+    ];
+    const idle = season();
+    if (!idle.me) throw new Error('the fixture has a player');
+    serve((r) =>
+      isSeasonGet(r)
+        ? json(200, { ...idle, me: { ...idle.me, manualEffects: effects } })
+        : json(404, {}),
+    );
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    const turn = await screen.findByTestId('turn');
+    const todo = within(turn).getByTestId('after');
+    expect(within(todo).getByRole('heading', { name: ru.turn.todo(1) })).toBeInTheDocument();
+    expect(within(todo).getByTestId('manual-effects')).toBeInTheDocument();
+    // Before a new roll, the to-do comes first
+    const roll = within(turn).getByTestId('roll');
+    expect(todo.compareDocumentPosition(roll) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('puts the rolled game above the pending effects while the roll waits for an answer (H3, D-137)', async () => {
+    const effects: Schemas['ManualEffectView'][] = [
+      { id: 'e1000000-0000-0000-0000-000000000001', drawEvent: 'bad', source: 'paidReroll' },
+    ];
+    serveRolling(rolling({ payment: 'badEvent', coins: 0 }, effects));
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    const turn = await screen.findByTestId('turn');
+    const todo = within(turn).getByTestId('after');
+    expect(within(todo).getByRole('heading', { name: ru.turn.todo(1) })).toBeInTheDocument();
+    // The answer to the roll is the one main action: it stands first, the tails of the last run below it
+    const reroll = within(turn).getByTestId('reroll');
+    expect(todo.compareDocumentPosition(reroll) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
   });
 
   it('shows no manual effects section when there are none', async () => {
@@ -930,6 +1047,7 @@ describe('SeasonScreen drop and tech reroll (RR2, RR4, RR5, D-94)', () => {
           phase: 'playing',
           finishOrder: null,
           avatar: null,
+          token: 0,
         },
       ],
       me: {
@@ -949,6 +1067,8 @@ describe('SeasonScreen drop and tech reroll (RR2, RR4, RR5, D-94)', () => {
         dropPenalty: turn.dropPenalty === undefined ? defaultPenalty : turn.dropPenalty,
         techRerollOpen: turn.techRerollOpen ?? true,
         challengesEnabled: false,
+        roll: null,
+        unchecked: null,
         finish: null,
       },
     });
@@ -1005,6 +1125,8 @@ describe('SeasonScreen drop and tech reroll (RR2, RR4, RR5, D-94)', () => {
           dropPenalty: null,
           techRerollOpen: false,
           challengesEnabled: false,
+          roll: null,
+          unchecked: null,
           finish: null,
         },
       }),
@@ -1022,8 +1144,16 @@ describe('SeasonScreen drop and tech reroll (RR2, RR4, RR5, D-94)', () => {
 
     await userEvent.click(await screen.findByTestId('drop'));
 
-    const text = ru.turn.dropConfirm(defaultPenalty);
-    expect(await screen.findByTestId('drop-confirm')).toHaveTextContent(text);
+    // H4: a window names the game and lists every consequence, one per line
+    const dialog = await screen.findByTestId('drop-confirm');
+    expect(dialog).toHaveTextContent(ru.turn.dropTitle('Silent Hill'));
+    const consequences = ru.turn.dropConsequences(defaultPenalty);
+    expect(
+      within(dialog)
+        .getAllByRole('listitem')
+        .map((li) => li.textContent),
+    ).toEqual(consequences);
+    const text = consequences.join(' ');
     expect(text).toMatch(/штраф/i);
     expect(text).toContain('2d4');
     expect(text).toMatch(/очки/);
@@ -1060,18 +1190,18 @@ describe('SeasonScreen drop and tech reroll (RR2, RR4, RR5, D-94)', () => {
       '1d6 on points only, no bad event',
       { count: 1, sides: 6, affectsPoints: true, affectsPosition: false, badEvent: false },
       [/1d6/, /очки/],
-      [/клетки/, /плох\S* ивент/i, /штрафа кубами нет/],
+      [/клетки/, /плох\S* ивент/i, /штрафа кубами нет/i],
     ],
     [
       'no dice penalty but a bad event',
       { count: 2, sides: 4, affectsPoints: false, affectsPosition: false, badEvent: true },
-      [/штрафа кубами нет/, /плох\S* ивент/i],
+      [/штрафа кубами нет/i, /плох\S* ивент/i],
       [/2d4/],
     ],
     [
       'nothing at all',
       { count: 2, sides: 4, affectsPoints: false, affectsPosition: false, badEvent: false },
-      [/штрафа кубами нет/],
+      [/штрафа кубами нет/i],
       [/2d4/, /плох\S* ивент/i],
     ],
   ])('names the penalty the server gives: %s', async (_case, penalty, present, absent) => {
@@ -1080,9 +1210,15 @@ describe('SeasonScreen drop and tech reroll (RR2, RR4, RR5, D-94)', () => {
 
     await userEvent.click(await screen.findByTestId('drop'));
 
-    const text = ru.turn.dropConfirm(penalty);
-    expect(text).not.toBe(ru.turn.dropConfirm(defaultPenalty));
-    expect(await screen.findByTestId('drop-confirm')).toHaveTextContent(text);
+    const consequences = ru.turn.dropConsequences(penalty);
+    expect(consequences).not.toEqual(ru.turn.dropConsequences(defaultPenalty));
+    const dialog = await screen.findByTestId('drop-confirm');
+    expect(
+      within(dialog)
+        .getAllByRole('listitem')
+        .map((li) => li.textContent),
+    ).toEqual(consequences);
+    const text = consequences.join(' ');
     for (const pattern of present) expect(text).toMatch(pattern);
     for (const pattern of absent) expect(text).not.toMatch(pattern);
   });
@@ -1093,8 +1229,18 @@ describe('SeasonScreen drop and tech reroll (RR2, RR4, RR5, D-94)', () => {
 
     await userEvent.click(await screen.findByTestId('drop'));
 
-    expect(ru.turn.dropConfirm(null)).toBe('Дропнуть игру?');
-    expect(await screen.findByTestId('drop-confirm')).toHaveTextContent(ru.turn.dropConfirm(null));
+    // No penalty to name: only what a drop always does
+    expect(ru.turn.dropConsequences(null)).toEqual([
+      'Игра больше не выпадет тебе в этом сезоне, дальше — новый ролл',
+    ]);
+    const dialog = await screen.findByTestId('drop-confirm');
+    expect(dialog).toHaveTextContent(ru.turn.dropTitle('Silent Hill'));
+    expect(
+      within(dialog)
+        .getAllByRole('listitem')
+        .map((li) => li.textContent),
+    ).toEqual(ru.turn.dropConsequences(null));
+    expect(dialog).not.toHaveTextContent(/штраф|кубы/i);
   });
 
   it('hints before an hour of play but still lets the player drop (RR4)', async () => {
@@ -1123,6 +1269,38 @@ describe('SeasonScreen drop and tech reroll (RR2, RR4, RR5, D-94)', () => {
 
     expect(await screen.findByTestId('drop-confirm')).toBeInTheDocument();
     expect(screen.queryByTestId('drop-hint')).not.toBeInTheDocument();
+  });
+
+  it('says plainly that the frozen first drops without a penalty', async () => {
+    const view = playing({ dropPenalty: null });
+    if (!view.me) throw new Error('the fixture has a player');
+    servePlaying({ ...view, me: { ...view.me, finish: { order: 1, frozen: true } } });
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    await userEvent.click(await screen.findByTestId('drop'));
+
+    const dialog = await screen.findByTestId('drop-confirm');
+    const consequences = ru.turn.dropConsequences(null, true);
+    expect(consequences[0]).toBe('Штрафа нет: ты уже финишировал первым');
+    expect(
+      within(dialog)
+        .getAllByRole('listitem')
+        .map((li) => li.textContent),
+    ).toEqual(consequences);
+  });
+
+  it('says in the tech reroll window when it closes', async () => {
+    const view = playing();
+    if (!view.me) throw new Error('the fixture has a player');
+    const until = '2026-09-26T10:00:00Z';
+    servePlaying({ ...view, me: { ...view.me, techRerollUntil: until } });
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    await userEvent.click(await screen.findByTestId('tech-reroll'));
+
+    expect(await screen.findByTestId('tech-reroll-until')).toHaveTextContent(
+      ru.turn.techRerollUntil(moscowTime(until)),
+    );
   });
 
   it('replaces the tech reroll with a note once the window is closed, keeping the drop', async () => {
@@ -1170,6 +1348,49 @@ describe('SeasonScreen drop and tech reroll (RR2, RR4, RR5, D-94)', () => {
       commandId: expect.any(String) as unknown,
       reason: 'paidUnavailable',
     });
+  });
+
+  it('opens the tech reroll in a window that says what it does before anything is sent (H4)', async () => {
+    const commands = servePlaying(playing());
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    await userEvent.click(await screen.findByTestId('tech-reroll'));
+
+    const dialog = await screen.findByRole('dialog', {
+      name: ru.turn.techRerollTitle('Silent Hill'),
+    });
+    expect(
+      within(dialog)
+        .getAllByRole('listitem')
+        .map((li) => li.textContent),
+    ).toEqual(ru.turn.techRerollConsequences);
+    // Nothing is sent without a reason: the select says so and takes the focus
+    await userEvent.click(within(dialog).getByTestId('tech-reroll-submit'));
+    const reason = within(dialog).getByTestId('tech-reroll-reason');
+    expect(reason).toHaveAttribute('aria-invalid', 'true');
+    expect(reason).toHaveAccessibleDescription(ru.turn.techRerollReasonRequired);
+    expect(reason).toHaveFocus();
+    expect(commands).toHaveLength(0);
+
+    // Closing the window gives the focus back to «Тех-реролл»
+    await userEvent.click(within(dialog).getByTestId('tech-reroll-cancel'));
+    await vi.waitFor(() => {
+      expect(screen.getByTestId('tech-reroll')).toHaveFocus();
+    });
+  });
+
+  it('keeps the drop apart from completing: a quiet red link, not a main button (H4)', async () => {
+    servePlaying(playing());
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    expect(await screen.findByTestId('drop')).toHaveAttribute('data-variant', 'dangerLink');
+    expect(screen.getByTestId('complete-submit')).toHaveAttribute('data-variant', 'main');
+    // One main action on the screen
+    expect(
+      within(screen.getByTestId('turn'))
+        .getAllByRole('button')
+        .filter((b) => b.getAttribute('data-variant') === 'main'),
+    ).toHaveLength(1);
   });
 
   it('requires a comment for the reason «other» before sending', async () => {
@@ -1250,6 +1471,8 @@ describe('SeasonScreen drop and tech reroll (RR2, RR4, RR5, D-94)', () => {
           dropPenalty: null,
           techRerollOpen: false,
           challengesEnabled: false,
+          roll: null,
+          unchecked: null,
           finish: null,
         },
       }),
@@ -1283,6 +1506,7 @@ describe('SeasonScreen marks on offered games (G8, D-94 (6))', () => {
           phase: 'rolling',
           finishOrder: null,
           avatar: null,
+          token: 0,
         },
       ],
       me: {
@@ -1298,6 +1522,8 @@ describe('SeasonScreen marks on offered games (G8, D-94 (6))', () => {
         dropPenalty: null,
         techRerollOpen: false,
         challengesEnabled: false,
+        roll: null,
+        unchecked: null,
         finish: null,
         ...turn,
       },
@@ -1388,6 +1614,10 @@ describe('SeasonScreen marks on offered games (G8, D-94 (6))', () => {
       within(screen.getByTestId('option-b2')).queryByTestId('game-marks'),
     ).not.toBeInTheDocument();
     expect(screen.getAllByTestId('game-marks')).toHaveLength(1);
+    // A screen reader hears the mark in the card's name too (H3 review)
+    expect(marked).toHaveAccessibleName(
+      expect.stringContaining(ru.turn.gameMark('Петя', 'techRerolled')) as string,
+    );
   });
 });
 
@@ -1411,6 +1641,7 @@ describe('SeasonScreen completion reward (C7a, D-96)', () => {
           phase: 'idle',
           finishOrder: null,
           avatar: null,
+          token: 0,
         },
       ],
       me: {
@@ -1426,6 +1657,8 @@ describe('SeasonScreen completion reward (C7a, D-96)', () => {
         dropPenalty: null,
         techRerollOpen: false,
         challengesEnabled: false,
+        roll: null,
+        unchecked: null,
         finish: null,
       },
     });
@@ -1460,6 +1693,7 @@ describe('SeasonScreen completion reward (C7a, D-96)', () => {
           phase: 'playing',
           finishOrder: null,
           avatar: null,
+          token: 0,
         },
       ],
       me: {
@@ -1479,6 +1713,8 @@ describe('SeasonScreen completion reward (C7a, D-96)', () => {
         dropPenalty: null,
         techRerollOpen: true,
         challengesEnabled,
+        roll: null,
+        unchecked: null,
         finish: null,
       },
     });
@@ -1707,5 +1943,654 @@ describe('SeasonScreen completion reward (C7a, D-96)', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       ru.rejection['run.hoursSourceRequired'],
     );
+  });
+});
+
+describe('SeasonScreen: runs waiting for the admin (D-134)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const waiting = (count: number, limit: number) => {
+    const base = season();
+    return season({ me: base.me && { ...base.me, unchecked: { count, limit } } });
+  };
+
+  it('closes the roll at the limit and says why, offering to send the proofs meanwhile', async () => {
+    const fetch = serve((r) => (isSeasonGet(r) ? json(200, waiting(2, 2)) : json(200, {})));
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    const roll = await screen.findByTestId('roll');
+    expect(roll).toBeDisabled();
+    expect(screen.getByText(ru.turn.uncheckedBlocked(2, 2))).toBeInTheDocument();
+    await userEvent.click(roll);
+    expect(fetch.mock.calls.some(([r]) => r.method === 'POST')).toBe(false);
+  });
+
+  it('keeps the roll open below the limit with a quiet count', async () => {
+    serve((r) => (isSeasonGet(r) ? json(200, waiting(1, 2)) : json(200, {})));
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    expect(await screen.findByTestId('roll')).toBeEnabled();
+    expect(screen.getByTestId('unchecked')).toHaveTextContent(ru.turn.uncheckedWaiting(1, 2));
+    expect(screen.queryByText(ru.turn.uncheckedBlocked(1, 2))).toBeNull();
+  });
+
+  it('says nothing when the season has no limit or nothing waits', async () => {
+    serve((r) => (isSeasonGet(r) ? json(200, waiting(0, 2)) : json(200, {})));
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    expect(await screen.findByTestId('roll')).toBeEnabled();
+    expect(screen.queryByTestId('unchecked')).toBeNull();
+  });
+
+  it('shows the refusal in Russian if the server refuses the roll anyway', async () => {
+    serve((r) =>
+      isSeasonGet(r)
+        ? json(200, waiting(1, 2))
+        : json(409, {
+            title: 'rejected',
+            status: 409,
+            detail: null,
+            code: 'roll.tooManyUnchecked',
+          }),
+    );
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    await userEvent.click(await screen.findByTestId('roll'));
+    expect(await screen.findByText(ru.rejection['roll.tooManyUnchecked'])).toBeInTheDocument();
+  });
+});
+
+describe('SeasonScreen wheel (H3, D-136)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const offered = {
+    id: 'a1000000-0000-0000-0000-000000000001',
+    title: 'Silent Hill',
+    hours: 12,
+    marks: [],
+  };
+  const roll: Schemas['WheelRollView'] = {
+    sequence: 7,
+    category: 'Horror',
+    sectors: ['Action', 'Horror', 'RPG'],
+    misses: [
+      { game: 'Outlast', reason: 'completedInSeason', player: 'Петя', at: '2026-10-12T09:00:00Z' },
+      { game: 'Alan Wake', reason: 'beingPlayed', player: 'Маша', at: null },
+    ],
+  };
+  const rolled = (sequence = 7): Schemas['SeasonView'] => {
+    const base = season({ lastSequence: sequence });
+    if (!base.me) throw new Error('the fixture has a player');
+    return {
+      ...base,
+      me: {
+        ...base.me,
+        phase: 'rolling',
+        offer: offered,
+        nextReroll: { payment: 'freeThisRoll', coins: 0 },
+        roll: { ...roll, sequence },
+      },
+    };
+  };
+
+  it('shows a roll the page opened with at once, its misses in words', async () => {
+    serve((r) => (isSeasonGet(r) ? json(200, rolled()) : json(404, {})));
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    const offer = await screen.findByTestId('offer');
+    expect(screen.queryByTestId('wheel')).not.toBeInTheDocument();
+    expect(offer).toHaveTextContent('Silent Hill');
+    expect(offer).toHaveTextContent('Horror');
+    // Told as done, with the day of the completion (SPEC «Уже прошёл Вася, 12.10»)
+    const misses = within(offer).getByTestId('roll-misses');
+    expect(misses).toHaveTextContent(ru.moments.wheel.missed(2));
+    expect(misses).toHaveTextContent(ru.moments.wheel.missedCompleted('Outlast', 'Петя', '12.10'));
+    expect(misses).toHaveTextContent(ru.moments.wheel.missedPlaying('Alan Wake', 'Маша'));
+  });
+
+  it('spins the wheel for a new roll, then offers the game; the moment can be skipped', async () => {
+    let current = season();
+    serve(async (r) => {
+      if (isSeasonGet(r)) return json(200, current);
+      await r.text();
+      current = rolled();
+      return json(200, { duplicate: false, events: [] });
+    });
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    await userEvent.click(await screen.findByTestId('roll'));
+
+    const wheel = await screen.findByTestId('wheel');
+    expect(screen.queryByTestId('start')).not.toBeInTheDocument();
+    await userEvent.click(within(wheel).getByRole('button', { name: ru.moments.skip }));
+    expect(await screen.findByTestId('start')).toBeInTheDocument();
+    expect(screen.queryByTestId('wheel')).not.toBeInTheDocument();
+    // The result is said in a live region that outlives the wheel, and the focus goes to the rolled game
+    expect(screen.getByTestId('roll-announce')).toHaveTextContent(
+      ru.moments.wheel.announce('Horror', ru.moments.wheel.result('Silent Hill')),
+    );
+    await vi.waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Silent Hill' })).toHaveFocus();
+    });
+  });
+
+  it('spins for the new roll «Уже проходил» brings, on the wheel the server sent', async () => {
+    let current = rolled(7);
+    serve(async (r) => {
+      if (isSeasonGet(r)) return json(200, current);
+      await r.text();
+      current = rolled(8);
+      return json(200, { duplicate: false, events: [] });
+    });
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    await userEvent.click(await screen.findByTestId('already-played'));
+
+    const wheel = await screen.findByTestId('wheel');
+    for (const sector of roll.sectors) {
+      expect(within(wheel).getByText(sector)).toBeInTheDocument();
+    }
+  });
+
+  it('does not spin again for an older roll the admin brought back by undoing a reroll', async () => {
+    let current = rolled(9);
+    serve((r) => (isSeasonGet(r) ? json(200, current) : json(404, {})));
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+    await screen.findByTestId('offer');
+
+    const older = rolled(7);
+    if (!older.me) throw new Error('the fixture has a player');
+    current = {
+      ...older,
+      lastSequence: 12,
+      me: { ...older.me, offer: { ...offered, title: 'Outlast' } },
+    };
+    act(() => {
+      hubChange?.();
+    });
+    expect(await screen.findByText('Outlast', { selector: 'h3' })).toBeInTheDocument();
+
+    expect(screen.queryByTestId('wheel')).not.toBeInTheDocument();
+  });
+
+  it('plays on the stage of the map on a desktop and keeps the result there until closed', async () => {
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: query.includes('min-width'),
+      media: query,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+    }));
+    let current = season();
+    serve(async (r) => {
+      if (isSeasonGet(r)) return json(200, current);
+      await r.text();
+      current = rolled();
+      return json(200, { duplicate: false, events: [] });
+    });
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    await userEvent.click(await screen.findByTestId('roll'));
+
+    const wheel = await screen.findByTestId('wheel');
+    expect(within(screen.getByTestId('turn')).queryByTestId('wheel')).not.toBeInTheDocument();
+    await userEvent.click(within(wheel).getByRole('button', { name: ru.moments.skip }));
+    // The answer is in the turn card at once; the landed wheel stays on the stage
+    expect(await screen.findByTestId('start')).toBeInTheDocument();
+    const landed = screen.getByTestId('wheel');
+    await userEvent.click(within(landed).getByRole('button', { name: ru.moments.wheel.toMap }));
+    expect(screen.queryByTestId('wheel')).not.toBeInTheDocument();
+    // The button went with the stage: the focus is on the rolled game
+    await vi.waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Silent Hill' })).toHaveFocus();
+    });
+  });
+
+  it('spins again for a reroll', async () => {
+    let current = rolled(7);
+    serve(async (r) => {
+      if (isSeasonGet(r)) return json(200, current);
+      await r.text();
+      current = rolled(9);
+      return json(200, { duplicate: false, events: [] });
+    });
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    await userEvent.click(await screen.findByTestId('reroll'));
+
+    expect(await screen.findByTestId('wheel')).toBeInTheDocument();
+  });
+});
+
+describe('SeasonScreen completion moment (H4)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const runId = 'b1000000-0000-0000-0000-000000000020';
+  const done: Schemas['CompletedRunView'] = {
+    id: runId,
+    game: { id: 'a1000000-0000-0000-0000-000000000001', title: 'Silent Hill', hours: 6 },
+    difficulty: 'normal',
+    dice: [{ sides: 4, value: 1 }],
+    challengeDice: [{ sides: 4, value: 2 }],
+    total: 3,
+    review: null,
+    proof: null,
+    status: 'completed',
+  };
+  const announce = ru.moments.dice.announce(
+    'Silent Hill',
+    ru.moments.dice.result([1], [2], 3),
+    ru.moments.dice.at(2, false),
+  );
+
+  /** Вася plays Silent Hill at the start, or has completed it (standing on c1) */
+  function view(
+    completed: Schemas['CompletedRunView'] | null,
+    sequence = 5,
+    cellId = completed ? 'c1' : 'start',
+    extra: {
+      finish?: Schemas['MyFinishView'];
+      points?: number;
+      provisional?: boolean;
+    } = {},
+  ): Schemas['SeasonView'] {
+    const players: Schemas['PlayerView'][] = [
+      {
+        id: me,
+        name: 'Вася',
+        cellId,
+        points: extra.points ?? completed?.total ?? 0,
+        phase: completed ? 'idle' : 'playing',
+        finishOrder: extra.finish?.order ?? null,
+        avatar: null,
+        token: 0,
+      },
+    ];
+    const base = season({
+      lastSequence: sequence,
+      players,
+      leaderboard: leaderboardOf(players).map((row) => ({
+        ...row,
+        isFirst: extra.finish?.order === 1,
+        provisional: extra.provisional ?? false,
+      })),
+    });
+    if (!base.me) throw new Error('the fixture has a player');
+    return {
+      ...base,
+      me: {
+        ...base.me,
+        finish: extra.finish ?? null,
+        phase: completed ? 'idle' : 'playing',
+        activeRun: completed
+          ? null
+          : {
+              id: runId,
+              game: { id: 'a1000000-0000-0000-0000-000000000001', title: 'Silent Hill', hours: 6 },
+              startedAt: '2026-09-24T10:00:00Z',
+            },
+        lastCompleted: completed,
+        dropPenalty: completed
+          ? null
+          : { count: 2, sides: 4, affectsPoints: true, affectsPosition: true, badEvent: true },
+      },
+    };
+  }
+
+  /** The page opens with the run in play; completing it brings the dice */
+  function serveCompletion(
+    after: Schemas['SeasonView'] = view(done, 6),
+    opened: Schemas['SeasonView'] = view(null),
+  ) {
+    let current = opened;
+    serve(async (r) => {
+      if (isSeasonGet(r)) return json(200, current);
+      await r.text();
+      current = after;
+      return json(200, { duplicate: false, events: [] });
+    });
+    return {
+      set: (next: Schemas['SeasonView']) => {
+        current = next;
+      },
+    };
+  }
+
+  async function complete() {
+    await userEvent.click(await screen.findByTestId('complete-submit'));
+  }
+
+  it('shows the last completion the page opened with at once, without the dice', async () => {
+    serve((r) => (isSeasonGet(r) ? json(200, view(done)) : json(404, {})));
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    expect(await screen.findByTestId('last-dice')).toHaveTextContent(
+      ru.turn.lastDice('Silent Hill', [1, 2], 3),
+    );
+    expect(screen.getByTestId('roll')).toBeInTheDocument();
+    expect(screen.queryByTestId('dice')).not.toBeInTheDocument();
+  });
+
+  it('throws the dice in the turn card for a completion made while the page is open; the rest waits', async () => {
+    serveCompletion();
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    await complete();
+
+    const dice = await screen.findByTestId('dice');
+    expect(within(screen.getByTestId('turn')).getByTestId('dice')).toBe(dice);
+    // Every die of the run is on the table, the challenge die among them
+    expect(dice.querySelectorAll('[data-die]')).toHaveLength(2);
+    expect(within(dice).getByText(ru.moments.dice.challengeDie)).toBeInTheDocument();
+    // The result is not told before the dice land, and the next roll waits
+    expect(screen.queryByTestId('last-dice')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('roll')).not.toBeInTheDocument();
+    expect(screen.getByTestId('roll-announce')).toBeEmptyDOMElement();
+  });
+
+  it('shows the result at once on «Показать результат»: said in words, the focus on the dice line', async () => {
+    serveCompletion();
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+    await complete();
+
+    const dice = await screen.findByTestId('dice');
+    await userEvent.click(within(dice).getByRole('button', { name: ru.moments.skip }));
+
+    expect(screen.queryByTestId('dice')).not.toBeInTheDocument();
+    expect(screen.getByTestId('roll-announce')).toHaveTextContent(announce);
+    expect(screen.getByTestId('roll')).toBeInTheDocument();
+    await vi.waitFor(() => {
+      expect(screen.getByTestId('last-dice')).toHaveFocus();
+    });
+    expect(screen.getByTestId('last-dice')).toHaveTextContent(
+      ru.turn.lastDice('Silent Hill', [1, 2], 3),
+    );
+  });
+
+  it('keeps the map and the leaderboard as they were until the moment ends, then shows the result big', async () => {
+    serveCompletion();
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+    await complete();
+    const dice = await screen.findByTestId('dice');
+
+    // The moment owns its result: the points and the place do not change under it
+    expect(screen.getAllByTestId(`leader-${me}`)[0]).toHaveTextContent(
+      ru.leaderboard.row(1, 'Вася', 0, 2),
+    );
+    expect(screen.queryByTestId('throw-result')).not.toBeInTheDocument();
+
+    await userEvent.click(within(dice).getByRole('button', { name: ru.moments.skip }));
+
+    expect(screen.getAllByTestId(`leader-${me}`)[0]).toHaveTextContent(
+      ru.leaderboard.row(1, 'Вася', 3, 1),
+    );
+    expect(screen.getByTestId('throw-result')).toHaveTextContent(
+      ru.moments.dice.after(3, ru.moments.dice.at(2, false)),
+    );
+  });
+
+  it('puts the game in play first and the tails of the last run under it, named by that game', async () => {
+    const playing = view(null, 5);
+    if (!playing.me) throw new Error('the fixture has a player');
+    const previous = {
+      ...done,
+      id: 'b1000000-0000-0000-0000-000000000018',
+      game: { ...done.game, title: 'Outlast' },
+    };
+    serve((r) =>
+      isSeasonGet(r)
+        ? json(200, {
+            ...playing,
+            me: { ...playing.me, lastCompleted: previous },
+          })
+        : json(404, {}),
+    );
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    const run = await screen.findByTestId('active-run');
+    const after = screen.getByTestId('after');
+    expect(run.compareDocumentPosition(after) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(
+      screen.getByTestId('complete-submit').compareDocumentPosition(after) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(within(after).getByRole('heading', { level: 3 })).toHaveTextContent(
+      ru.turn.afterGame('Outlast'),
+    );
+  });
+
+  it('does not restart the dice when the season refreshes in the middle, nor throw them again after', async () => {
+    const server = serveCompletion();
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+    await complete();
+    const dice = await screen.findByTestId('dice');
+    const firstDie = dice.querySelector('[data-die]');
+
+    // Another player acts: the same completion comes again in a newer view
+    server.set(view(done, 9));
+    act(() => {
+      hubChange?.();
+    });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+    expect(screen.getByTestId('dice')).toBe(dice);
+    expect(dice.querySelector('[data-die]')).toBe(firstDie);
+
+    await userEvent.click(within(dice).getByRole('button', { name: ru.moments.skip }));
+    server.set(view(done, 11));
+    act(() => {
+      hubChange?.();
+    });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+    expect(screen.queryByTestId('dice')).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ['the admin rejects it', { status: 'rejected' as const }],
+    [
+      'the admin adds a die after a change of hours',
+      { dice: [...done.dice, { sides: 4, value: 4 }], total: 7 },
+    ],
+  ])('does not throw the dice again for the same run when %s', async (_case, change) => {
+    let current = view(done);
+    serve((r) => (isSeasonGet(r) ? json(200, current) : json(404, {})));
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+    await screen.findByTestId('last-dice');
+
+    current = view({ ...done, ...change }, 12);
+    act(() => {
+      hubChange?.();
+    });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+
+    expect(screen.queryByTestId('dice')).not.toBeInTheDocument();
+    expect(screen.getByTestId('last-dice')).toBeInTheDocument();
+  });
+
+  it('plays on the stage of the map on a desktop, not in the turn card', async () => {
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: query.includes('min-width'),
+      media: query,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+    }));
+    serveCompletion();
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+    await complete();
+
+    const dice = await screen.findByTestId('dice');
+    expect(within(screen.getByTestId('turn')).queryByTestId('dice')).not.toBeInTheDocument();
+    // The turn card says where to look meanwhile
+    expect(screen.getByTestId('throwing')).toHaveTextContent(ru.turn.throwing('Silent Hill'));
+    await userEvent.click(within(dice).getByRole('button', { name: ru.moments.skip }));
+    expect(screen.queryByTestId('dice')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('throwing')).not.toBeInTheDocument();
+    expect(screen.getByTestId('roll-announce')).toHaveTextContent(announce);
+  });
+
+  it('ends by itself: the dice land, the token walks, the result is said', async () => {
+    serveCompletion();
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+    await complete();
+    await screen.findByTestId('dice');
+    // The player moves on meanwhile: the end does not take the focus away from them
+    const sheet = screen.getByRole('button', { name: new RegExp(ru.leaderboard.title) });
+    sheet.focus();
+
+    // Within the moments' budget: the dice, the rest on the total and the walk
+    await vi.waitFor(
+      () => {
+        expect(screen.getByTestId('roll-announce')).toHaveTextContent(announce);
+      },
+      { timeout: 6000 },
+    );
+    expect(screen.queryByTestId('dice')).not.toBeInTheDocument();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(sheet).toHaveFocus();
+  });
+
+  it('does not throw the dice of an older run an admin rollback brings back', async () => {
+    const older: Schemas['CompletedRunView'] = {
+      ...done,
+      id: 'b1000000-0000-0000-0000-000000000019',
+      game: { id: 'a1000000-0000-0000-0000-000000000002', title: 'Outlast', hours: 4 },
+      dice: [{ sides: 4, value: 1 }],
+      challengeDice: [],
+      total: 1,
+    };
+    let current = view(done);
+    serve((r) => (isSeasonGet(r) ? json(200, current) : json(404, {})));
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+    await screen.findByTestId('last-dice');
+
+    // The rollback of Silent Hill: the token goes back to the start, the points drop to Outlast's
+    current = view(older, 14, 'start');
+    const players = current.players.map((p) => ({ ...p, points: 1 }));
+    current = { ...current, players, leaderboard: leaderboardOf(players) };
+    act(() => {
+      hubChange?.();
+    });
+
+    expect(await screen.findByText(ru.turn.lastDice('Outlast', [1], 1, [4]))).toBeInTheDocument();
+    expect(screen.queryByTestId('dice')).not.toBeInTheDocument();
+  });
+
+  it('gives a later finisher points only: the token stands and the words say so', async () => {
+    // Вася finished second earlier: his position is fixed, his points still grow
+    const second = { order: 2, frozen: false };
+    serveCompletion(
+      view(done, 6, 'finish', { finish: second }),
+      view(null, 5, 'finish', { finish: second }),
+    );
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+    await complete();
+
+    const dice = await screen.findByTestId('dice');
+    await userEvent.click(within(dice).getByRole('button', { name: ru.moments.skip }));
+
+    const said = screen.getByTestId('roll-announce');
+    expect(said).toHaveTextContent(ru.moments.dice.resultStay([1], [2], 3));
+    expect(said).not.toHaveTextContent(/клеток вперёд/);
+    expect(screen.getByTestId('throw-result')).toHaveTextContent(ru.moments.dice.afterStay(3));
+  });
+
+  it('gives the frozen first no points: free mode, not «+N»', async () => {
+    // The engine rolls the dice of the frozen first but gives no points (Q-3); the view's total is the dice sum
+    const frozen = { order: 1, frozen: true };
+    serveCompletion(
+      view(done, 6, 'finish', { finish: frozen, points: 40 }),
+      view(null, 5, 'finish', { finish: frozen, points: 40 }),
+    );
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+    await complete();
+
+    const dice = await screen.findByTestId('dice');
+    // No «+3» on the table
+    expect(within(dice).queryByText('+3')).not.toBeInTheDocument();
+    await userEvent.click(within(dice).getByRole('button', { name: ru.moments.skip }));
+
+    const said = screen.getByTestId('roll-announce');
+    expect(said).toHaveTextContent(ru.moments.dice.resultFree([1], [2]));
+    expect(said).not.toHaveTextContent(/\+3|очков и/);
+    expect(screen.getByTestId('throw-result')).toHaveTextContent(ru.moments.dice.afterFree);
+    expect(screen.getByTestId('throw-result')).not.toHaveTextContent('+3');
+  });
+
+  // Reduced motion: CompletionMoment.test.tsx (motion reads the preference once per module)
+
+  it('says a first finish reached by the dice is provisional until the proofs are approved', async () => {
+    serveCompletion(
+      view(done, 6, 'finish', { finish: { order: 1, frozen: false }, provisional: true }),
+    );
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+    await complete();
+
+    const dice = await screen.findByTestId('dice');
+    await userEvent.click(within(dice).getByRole('button', { name: ru.moments.skip }));
+
+    expect(ru.moments.dice.atFirst(true)).toContain(ru.moments.finish.provisional);
+    expect(screen.getByTestId('roll-announce')).toHaveTextContent(ru.moments.dice.atFirst(true));
+    expect(screen.getByTestId('throw-result')).toHaveTextContent(ru.moments.dice.atFirst(true));
+  });
+
+  it('says a later finish reached by the dice with its order', async () => {
+    serveCompletion(view(done, 6, 'finish', { finish: { order: 3, frozen: false } }));
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+    await complete();
+
+    const dice = await screen.findByTestId('dice');
+    await userEvent.click(within(dice).getByRole('button', { name: ru.moments.skip }));
+
+    expect(screen.getByTestId('roll-announce')).toHaveTextContent(ru.moments.dice.atLater(3));
+    expect(screen.getByTestId('roll-announce')).not.toHaveTextContent(/первый/);
+  });
+
+  it('draws each die with its own sides and names them in the last dice line', async () => {
+    serveCompletion();
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+    await complete();
+
+    const dice = await screen.findByTestId('dice');
+    // The run's dice are d4: numbers, not the pips of a d6, and each says so
+    expect(within(dice).getAllByText(ru.moments.dice.sides(4), { exact: false })).toHaveLength(2);
+    await userEvent.click(within(dice).getByRole('button', { name: ru.moments.skip }));
+    expect(screen.getByTestId('last-dice')).toHaveTextContent(
+      ru.turn.lastDice('Silent Hill', [1, 2], 3, [4]),
+    );
+  });
+
+  it("asks for the estimate when the run was rolled without hours (the view gives the roll's hours)", async () => {
+    const playing = view(null);
+    const turn = playing.me;
+    const run = turn?.activeRun;
+    if (!turn || !run) throw new Error('the fixture plays');
+    serve((r) =>
+      isSeasonGet(r)
+        ? json(200, {
+            ...playing,
+            me: {
+              ...turn,
+              activeRun: {
+                ...run,
+                game: { ...run.game, hours: null },
+              },
+            },
+          })
+        : json(404, {}),
+    );
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    expect(await screen.findByTestId('complete-hours')).toBeInTheDocument();
+    expect(screen.getByTestId('complete-hours-source')).toBeInTheDocument();
   });
 });

@@ -80,6 +80,8 @@ public sealed class GameEventDbContext(DbContextOptions<GameEventDbContext> opti
             e.ToTable("GameEvent");
             e.HasIndex(x => new { x.SeasonId, x.Sequence }).IsUnique();
             e.HasIndex(x => x.CommandId);
+            // The season view finds the roll behind an offer by its time (D-136): a range from the roll on, not the whole log
+            e.HasIndex(x => new { x.SeasonId, x.OccurredAt });
             e.Property(x => x.Type).HasMaxLength(100);
             e.Property(x => x.CommandType).HasMaxLength(100);
         });

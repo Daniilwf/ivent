@@ -1365,6 +1365,59 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/rules/schema": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/schema+json": components["schemas"]["JsonObject"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/seasons/{seasonId}/pool-stats": {
         parameters: {
             query?: never;
@@ -1918,6 +1971,68 @@ export interface paths {
                 };
             };
         };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/seasons/{seasonId}/games": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SeasonGameView"][];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Too Many Requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -4417,7 +4532,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["GameView"][];
+                        "application/json": components["schemas"]["PoolGameView"][];
                     };
                 };
             };
@@ -4442,7 +4557,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["GameView"];
+                        "application/json": components["schemas"]["PoolGameView"];
                     };
                 };
                 /** @description Bad Request */
@@ -4592,7 +4707,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["GameView"];
+                        "application/json": components["schemas"]["PoolGameView"];
                     };
                 };
                 /** @description Not Found */
@@ -4641,7 +4756,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["GameView"];
+                        "application/json": components["schemas"]["PoolGameView"];
                     };
                 };
                 /** @description Bad Request */
@@ -4708,7 +4823,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["GameView"];
+                        "application/json": components["schemas"]["PoolGameView"];
                     };
                 };
                 /** @description Bad Request */
@@ -4774,7 +4889,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["GameView"];
+                        "application/json": components["schemas"]["PoolGameView"];
                     };
                 };
                 /** @description Bad Request */
@@ -5505,8 +5620,12 @@ export interface components {
             /** Format: int32 */
             games: number;
         };
-        /** @enum {unknown} */
-        CellType: "start" | "empty" | "finish";
+        /**
+         * @description What a cell does (SPEC «Карта»). The linear map of stage 1 uses CellType.Start, CellType.Empty and
+         *     CellType.Finish; the graph map adds the rest (D-302). New values are appended: the log stores them by name.
+         * @enum {unknown}
+         */
+        CellType: "start" | "empty" | "finish" | "fork" | "teleport" | "checkpoint" | "pointsBonus" | "event" | "shop";
         CellView: {
             id: string;
             type: components["schemas"]["CellType"];
@@ -5541,10 +5660,10 @@ export interface components {
             ruleset: components["schemas"]["Ruleset"];
         };
         /**
-         * @description What the player is choosing. Stage 1 has games only; branches, targets and outcomes come later (K-5).
+         * @description What the player is choosing (K-5): a game, a branch at a fork; targets and outcomes come later.
          * @enum {unknown}
          */
-        ChoiceKind: "game";
+        ChoiceKind: "game" | "branch";
         ChoiceOptionView: {
             id: string;
             game: null | components["schemas"]["OfferedGameView"];
@@ -5581,7 +5700,7 @@ export interface components {
         CompletedRunView: {
             /** Format: uuid */
             id: string;
-            game: components["schemas"]["GameView"];
+            game: components["schemas"]["RunGameView"];
             difficulty: components["schemas"]["Difficulty"];
             dice: components["schemas"]["DieView"][];
             challengeDice: components["schemas"]["DieView"][];
@@ -5642,6 +5761,10 @@ export interface components {
             /** Format: uuid */
             id: string;
         };
+        /**
+         * @description The signed-in user. `token` — the colour of their token in the latest season they play (Seasons.PlayerTokens), as on
+         *     their profile; none outside seasons (D-202).
+         */
         CurrentUser: {
             /** Format: uuid */
             id: string;
@@ -5650,6 +5773,8 @@ export interface components {
             role: components["schemas"]["Role"];
             mustChangePassword: boolean;
             avatar: null | components["schemas"]["FileLinkView"];
+            /** Format: int32 */
+            token?: null | number;
         };
         DiceCountRule: {
             /** Format: double */
@@ -5685,6 +5810,13 @@ export interface components {
             commandId: string;
             difficulty: null | components["schemas"]["Difficulty"];
             comment: null | string;
+        };
+        /** @description The die a difficulty gives on completion, and the event it grants (`good`, `bad`) or none. */
+        DifficultyDieView: {
+            difficulty: components["schemas"]["Difficulty"];
+            /** Format: int32 */
+            sides: number;
+            grantEvent: null | components["schemas"]["EventKind"];
         };
         /** @description The drop penalty: `count` dice of `sides`, what they take, and whether a bad event follows. */
         DropPenaltyView: {
@@ -5783,6 +5915,8 @@ export interface components {
         };
         /** @enum {unknown} */
         EventKind: "good" | "bad";
+        /** @enum {unknown} */
+        ExclusionReason: "alreadyPlayed" | "dropped" | "techRerolled" | null;
         /** @description Feature flags: a disabled mechanic is invisible in the interface and refused by the engine. */
         Features: {
             mapMode: components["schemas"]["MapMode"];
@@ -5820,11 +5954,46 @@ export interface components {
             author: null | string;
             undone: boolean;
         };
-        /** @description A page of the feed, newest first; `nextBefore` — the sequence to ask before for the next page, none at the start of the log. */
+        /** @description A game an event of the page names; `hasPage` — the viewer may open its page (a deleted game is the admin's). */
+        FeedGameView: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            hasPage: boolean;
+        };
+        /**
+         * @description A player of the season, for the feed's lines (H5, D-150): the name, the account for the profile link (`hasProfile` —
+         *     false once the account is deleted), the avatar and `token` — the colour of their token in the season (PlayerTokens).
+         */
+        FeedPlayerView: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            userId: string;
+            name: string;
+            avatar: null | components["schemas"]["FileLinkView"];
+            hasProfile: boolean;
+            /** Format: int32 */
+            token: number;
+        };
+        /** @description A run an event of the page names, with its game: most events of a run carry only its id. */
+        FeedRunView: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            gameId: string;
+        };
+        /**
+         * @description A page of the feed, newest first; `nextBefore` — the sequence to ask before for the next page, none at the start of
+         *     the log. `players` — every player of the season; `games` and `runs` — those the page's events name (D-150).
+         */
         FeedView: {
             entries: components["schemas"]["FeedEntryView"][];
             /** Format: int64 */
             nextBefore: null | number;
+            players: components["schemas"]["FeedPlayerView"][];
+            games: components["schemas"]["FeedGameView"][];
+            runs: components["schemas"]["FeedRunView"][];
         };
         /** @description A picture by link (D-117): https from Tenor, Giphy or Klipy; the server downloads it and stores it as an upload. */
         FileFromUrlRequest: {
@@ -5906,7 +6075,10 @@ export interface components {
             force: boolean;
             completionCondition?: null | string;
         };
-        /** @description A run of a game in any season, with its review if there is one (the game page, D-124). */
+        /**
+         * @description A run of a game in any season, with its review if there is one (the game page, D-124). `token` — the player's place
+         *     in that season's list of players, their token colour there (D-150).
+         */
         GameRunView: {
             /** Format: uuid */
             runId: string;
@@ -5927,13 +6099,8 @@ export interface components {
             /** Format: int32 */
             rating: null | number;
             reviewText: null | string;
-        };
-        GameView: {
-            /** Format: uuid */
-            id: string;
-            title: string;
-            /** Format: double */
-            hours: null | number;
+            /** Format: int32 */
+            token: number;
         };
         HostileCap: {
             enabled: boolean;
@@ -5986,6 +6153,7 @@ export interface components {
             inviteTtlHours: number;
         };
         JsonElement: unknown;
+        JsonObject: Record<string, never>;
         LastDaysLengthFilter: {
             enabled: boolean;
             steps: components["schemas"]["EquatableArrayOfLengthFilterStep"];
@@ -6039,6 +6207,8 @@ export interface components {
         MapRules: {
             /** Format: int32 */
             linearLength: number;
+            /** Format: int32 */
+            minZoneGames?: null | number;
         };
         /** @description The player's own finish (D-99): order among the finishers and whether the first place is final and frozen. */
         MyFinishView: {
@@ -6050,7 +6220,11 @@ export interface components {
          * @description The signed-in player's own turn. While playing: `dropHintMinutes` is `roll.minPlayMinutesBeforeDrop` until
          *     that much has been played by the server clock (only a hint: D-09), then null; `dropPenalty` is what a drop costs
          *     under the rules in force; `techRerollOpen` says whether the player may still tech-reroll themselves (D-94);
-         *     `challengesEnabled` says whether a challenge may be claimed on completion (`features.challenges`, D-96).
+         *     `challengesEnabled` says whether a challenge may be claimed on completion (`features.challenges`, D-96);
+         *     `techRerollUntil` is when the player's own tech reroll window closes (the roll time plus the run's snapshot of
+         *     `roll.techRerollWindowHours`), null while not playing. The active run's game carries the hours of the roll's
+         *     snapshot, the ones the completion counts (D-44): the pool may have got hours since (D-138). `difficultyDice` —
+         *     while playing, the die each difficulty gives under the run's snapshot and the event it grants, if any.
          */
         MyTurnView: {
             /** Format: uuid */
@@ -6068,6 +6242,11 @@ export interface components {
             techRerollOpen: boolean;
             challengesEnabled: boolean;
             finish: null | components["schemas"]["MyFinishView"];
+            unchecked: null | components["schemas"]["UncheckedRunsView"];
+            roll: null | components["schemas"]["WheelRollView"];
+            /** Format: date-time */
+            techRerollUntil?: null | string;
+            difficultyDice?: null | components["schemas"]["DifficultyDieView"][];
         };
         NominationRules: {
             auto: components["schemas"]["EquatableArrayOfAutoNomination"];
@@ -6090,7 +6269,7 @@ export interface components {
         };
         /**
          * @description A player on the map and the leaderboard; `finishOrder` is their order among the finishers, null before the finish;
-         *     `avatar` — the account's picture (D-117), or none.
+         *     `avatar` — the account's picture (D-117), or none; `token` — the colour of their token (PlayerTokens, D-202).
          */
         PlayerView: {
             /** Format: uuid */
@@ -6103,6 +6282,8 @@ export interface components {
             /** Format: int32 */
             finishOrder: null | number;
             avatar: null | components["schemas"]["FileLinkView"];
+            /** Format: int32 */
+            token: number;
         };
         /** @description A player whose next roll would find no game: the empty-pool signal. */
         PlayerWithoutGamesView: {
@@ -6113,6 +6294,27 @@ export interface components {
         PoolActionRequest: {
             /** Format: uuid */
             commandId: string;
+        };
+        /**
+         * @description A game of the pool as everyone sees it (D-119); `author` — the name of the account that added it, or the author as
+         *     the imported table names them (D-125); none for the seed.
+         */
+        PoolGameView: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            tags: string[];
+            /** Format: double */
+            hours: null | number;
+            /** Format: int32 */
+            year: null | number;
+            steamAppId: null | string;
+            cover: null | components["schemas"]["FileLinkView"];
+            note: null | string;
+            isCoop: boolean;
+            author: null | string;
+            isDeleted: boolean;
+            completionCondition: null | string;
         };
         /** @description Pool health of a season for the admin (G10, G11, D-92). */
         PoolStatsView: {
@@ -6151,7 +6353,10 @@ export interface components {
             /** Format: date-time */
             completedAt: null | string;
         };
-        /** @description A season a user took part in, with their points and, once the season finished, their place. */
+        /**
+         * @description A season a user took part in, with their points and, once the season finished, their place. `token` — their place in
+         *     the season's list of players (by name), which the screens colour their token by (D-150).
+         */
         ProfileSeasonView: {
             /** Format: uuid */
             seasonId: string;
@@ -6163,6 +6368,8 @@ export interface components {
             points: number;
             /** Format: int32 */
             place: null | number;
+            /** Format: int32 */
+            token: number;
         };
         /**
          * @description A user's profile (D-124): the name, the avatar, the seasons they played and their reviews. `completed` — games
@@ -6182,6 +6389,7 @@ export interface components {
          * @description A run to check, in queue order (D-98, Q-3): the runs that decide a finish on top (`decidesFinish`), then by
          *     completion time; with the claimed difficulty, the counted hours and the dice total, what an approval at a lower
          *     difficulty or a reject changes. `reachedFinish`: this run's latest move stands on the finish.
+         *     `rollClosed`: the player's next roll is closed by the limit of unchecked runs (D-134) until the admin checks one.
          */
         ProofQueueItemView: {
             /** Format: uuid */
@@ -6204,6 +6412,7 @@ export interface components {
             diceTotal: number;
             decidesFinish: boolean;
             files: components["schemas"]["FileLinkView"][];
+            rollClosed: boolean;
         };
         /**
          * @description The proof of the player's own completed run: links (http/https), screenshots the player uploaded (`files` — ids
@@ -6327,6 +6536,22 @@ export interface components {
          * @enum {unknown}
          */
         Role: "player" | "admin" | "spectator";
+        /**
+         * @description Why the wheel landed on a game the player cannot take.
+         * @enum {unknown}
+         */
+        RollMissReason: "completedInSeason" | "beingPlayed";
+        /**
+         * @description A game the wheel landed on and passed: «Уже прошёл Вася, 12.10» (`at` — when that run was completed, SPEC
+         *     «Статусы игры в сезоне»), «Сейчас играет Петя» (no date).
+         */
+        RollMissView: {
+            game: string;
+            reason: components["schemas"]["RollMissReason"];
+            player: string;
+            /** Format: date-time */
+            at: null | string;
+        };
         /** @description A game action. `commandId` is generated by the client once per action: a repeat acts once. */
         RollRequest: {
             /** Format: uuid */
@@ -6401,7 +6626,10 @@ export interface components {
             status: number;
             errors: components["schemas"]["RulesetError"][];
         };
-        /** @description One version of the rules: when, by whom (null for the season's creation by the system), and what changed. */
+        /**
+         * @description One version of the rules: when, by whom (null for the season's creation by the system), and what changed.
+         *     `authorName` — the author's name for the rules page (H7, D-170); null with no author.
+         */
         RulesVersionView: {
             /** Format: int32 */
             version: number;
@@ -6410,20 +6638,37 @@ export interface components {
             /** Format: uuid */
             authorId: null | string;
             changes: components["schemas"]["RulesetChange"][];
+            authorName?: null | string;
         };
-        /** @description The rules in force and their history: who changed what and when (C3). Numbers on the rules page are real. */
+        /**
+         * @description The rules in force and their history: who changed what and when (C3). Numbers on the rules page are real.
+         *     `deadline` — the season's deadline, set apart from the rules by the admin (H7, D-170); null while not set.
+         */
         RulesView: {
             /** Format: int32 */
             version: number;
             ruleset: components["schemas"]["Ruleset"];
             history: components["schemas"]["RulesVersionView"][];
+            /** Format: date-time */
+            deadline?: null | string;
+        };
+        /**
+         * @description The game of a run: its title and hours. Named apart from the pool's PoolGameView: the OpenAPI document
+         *     keys schemas by type name, so two records called GameView became one schema and the pool lost its fields (D-161).
+         */
+        RunGameView: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            /** Format: double */
+            hours: null | number;
         };
         /** @enum {unknown} */
         RunStatus: "playing" | "completed" | "dropped" | "techRerolled" | "rejected";
         RunView: {
             /** Format: uuid */
             id: string;
-            game: components["schemas"]["GameView"];
+            game: components["schemas"]["RunGameView"];
             /** Format: date-time */
             startedAt: string;
         };
@@ -6438,6 +6683,22 @@ export interface components {
             commandId: string;
             /** Format: date-time */
             deadline: null | string;
+        };
+        /**
+         * @description A game's status in the season as the pool page shows it (SPEC «Статусы игры в сезоне», H6, D-160): `taken` —
+         *     completed in the season or being played (an offer and a pending option count), with the player and, for a completed
+         *     game, when; `marks` — other players who dropped or tech-rerolled it (the game is free again);
+         *     `excludedForMe` — why it never comes to the viewer again. Only games with something to show are listed.
+         */
+        SeasonGameView: {
+            /** Format: uuid */
+            gameId: string;
+            taken: null | components["schemas"]["RollMissReason"];
+            takenBy: null | string;
+            /** Format: date-time */
+            completedAt: null | string;
+            marks: components["schemas"]["GameMarkView"][];
+            excludedForMe: null | components["schemas"]["ExclusionReason"];
         };
         /**
          * @description The answer to joining a season (E3, D-122): the last sequence of its log now, and what was committed after the
@@ -6475,6 +6736,8 @@ export interface components {
             maxActiveRunsPerPlayer: number;
             /** Format: int32 */
             inactiveHintDays: number;
+            /** Format: int32 */
+            maxUncheckedRuns?: null | number;
         };
         /**
          * @description Season lifecycle (GLOSSARY «Статус сезона»): draft → active → closing → finished → archived.
@@ -6536,9 +6799,13 @@ export interface components {
             title: string;
             same: boolean;
         };
-        /** @description What every page asks the site: whether it only reads now (the maintenance banner). */
+        /**
+         * @description What every page asks the site: whether it only reads now (the maintenance banner) and which version it runs — a page
+         *     that saw another version before shows «Что нового» (J4, D-201).
+         */
         SiteStatusView: {
             maintenance: boolean;
+            version: string;
         };
         SocialRules: {
             reactions: components["schemas"]["EquatableArrayOfstring"];
@@ -6584,6 +6851,16 @@ export interface components {
          * @enum {unknown}
          */
         TurnPhase: "idle" | "rolling" | "playing";
+        /**
+         * @description My runs waiting for the admin's check and the rules' limit (D-134): at the limit a new roll is refused, so the page
+         *     says so before the button is pressed. Null when the season has no limit.
+         */
+        UncheckedRunsView: {
+            /** Format: int32 */
+            count: number;
+            /** Format: int32 */
+            limit: number;
+        };
         /** @description Undo a whole earlier command (D-104); `comment` is required, at most 500 characters. */
         UndoRequest: {
             /** Format: uuid */
@@ -6597,6 +6874,18 @@ export interface components {
         WeeklyChallengeRules: {
             /** Format: int32 */
             defaultRewardCoins: number;
+        };
+        /**
+         * @description The wheel of the roll that offered what I see now (D-136), from the log: the categories that were on it, the one it
+         *     picked and the games it missed on the way, with who holds each. `sequence` tells one roll from the next, so the
+         *     page spins only for a new one. Null when nothing is offered or the offer did not come from my own roll.
+         */
+        WheelRollView: {
+            /** Format: int64 */
+            sequence: number;
+            category: string;
+            sectors: string[];
+            misses: components["schemas"]["RollMissView"][];
         };
     };
     responses: never;
@@ -6615,8 +6904,8 @@ type ReadonlyArray<T> = [
     unknown[]
 ] ? Readonly<Exclude<T, undefined>> : Readonly<Exclude<T, undefined>[]>;
 export const bugReportStatusValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["BugReportStatus"]> = ["new", "inWork", "closed"];
-export const cellTypeValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["CellType"]> = ["start", "empty", "finish"];
-export const choiceKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ChoiceKind"]> = ["game"];
+export const cellTypeValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["CellType"]> = ["start", "empty", "finish", "fork", "teleport", "checkpoint", "pointsBonus", "event", "shop"];
+export const choiceKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ChoiceKind"]> = ["game", "branch"];
 export const coopRoundUpForValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["CoopRoundUpFor"]> = ["roller"];
 export const difficultyValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["Difficulty"]> = ["easy", "normal", "hard", "extreme"];
 export const emptyPoolFallbackValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["EmptyPoolFallback"]> = ["dropZoneFilter"];
@@ -6629,6 +6918,7 @@ export const proofStatusValues: ReadonlyArray<FlattenedDeepRequired<components>[
 export const rerollCostKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["RerollCostKind"]> = ["coins", "badEvent"];
 export const rerollPaymentValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["RerollPayment"]> = ["freeThisRoll", "freeRerollResource", "coins", "badEvent", "freeMode"];
 export const roleValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["Role"]> = ["player", "admin", "spectator"];
+export const rollMissReasonValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["RollMissReason"]> = ["completedInSeason", "beingPlayed"];
 export const roundingValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["Rounding"]> = ["nearest", "floor", "ceil"];
 export const runStatusValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["RunStatus"]> = ["playing", "completed", "dropped", "techRerolled", "rejected"];
 export const seasonStatusValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["SeasonStatus"]> = ["draft", "active", "closing", "finished", "archived"];

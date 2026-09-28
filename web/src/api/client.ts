@@ -1,5 +1,6 @@
 import createClient, { type Middleware } from 'openapi-fetch';
 import { recordRequest } from '../app/bugContext';
+import { actOnce } from './commands';
 import type { components, paths } from './schema';
 
 export type Schemas = components['schemas'];
@@ -49,7 +50,7 @@ export const api = createClient<paths>({
   // Looked up per call, so tests can stub the global fetch.
   fetch: (request) => globalThis.fetch(request),
 });
-api.use(antiforgery, observed);
+api.use(antiforgery, observed, actOnce);
 
 /** Engine rejection code from a 409 answer, or null. */
 export function rejectionCode(error: unknown): string | null {

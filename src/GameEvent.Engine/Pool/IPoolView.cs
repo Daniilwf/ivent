@@ -13,8 +13,11 @@ public interface IPoolView
     IReadOnlyList<Category> Categories { get; }
 }
 
-/// <summary>A game in the pool. <see cref="Hours"/> is null when neither HowLongToBeat nor the admin set it.</summary>
-public sealed record Game(Guid Id, string Title, EquatableArray<string> Tags, decimal? Hours, bool IsDeleted = false);
+/// <summary>
+/// A game in the pool. <see cref="Hours"/> is null when neither HowLongToBeat nor the admin set it;
+/// <see cref="ReleaseYear"/> when it is not known (a zone's year filter then does not pass it, D-307).
+/// </summary>
+public sealed record Game(Guid Id, string Title, EquatableArray<string> Tags, decimal? Hours, bool IsDeleted = false, int? ReleaseYear = null);
 
 /// <summary>A category on the category wheel: a tag with a weight.</summary>
 public sealed record Category(string Name, int Weight);

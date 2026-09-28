@@ -83,7 +83,7 @@ public static class ProofReviewOrder
 
         // A finisher's runs up to the finish decide the first place (Q-3): they go on top, with the run that reached it.
         return [.. state.Runs.Values
-            .Where(r => r.Status == RunStatus.Completed && r.Proof?.Status is null or ProofStatus.Pending)
+            .Where(Rolls.UncheckedRuns.Waits)
             .OrderByDescending(r => DecidesFinish(state, r))
             .ThenBy(r => r.CompletedAt)
             .ThenBy(r => r.RunId)
@@ -244,7 +244,7 @@ internal static class ProofReview
             return Decision.Accept(events);
         }
 
-        var points = run.Dice.Sum(d => d.Value) + run.ChallengeDice.Sum(d => d.Value);
+        var points = CompletionRoll.Total(run);
         if (points != 0)
         {
             events.Add(new PointsChanged(run.PlayerId, -points, PointsReason.ProofRejected, run.RunId));

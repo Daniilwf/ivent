@@ -26,6 +26,19 @@ public static class PoolStats
     }
 
     /// <summary>
+    /// The games <paramref name="viewerPlayerId"/> cannot roll now for a season reason, ordered by game id (H6: the pool
+    /// page shows «Уже прошёл Вася» and «Сейчас играет Вася» by the same predicate the wheel uses). An offered game and
+    /// every option of a pending choice count as being played; a free-mode run of the first completes the game for him
+    /// alone (D-16), so another viewer (or <see cref="Guid.Empty"/>, a spectator) sees it free. Deleted games and personal
+    /// exclusions are not the season's status and are not listed.
+    /// </summary>
+    public static IReadOnlyList<RollMiss> Taken(SeasonState state, Guid viewerPlayerId)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        return [.. SeasonGameStatus.For(state, viewerPlayerId).Taken.OrderBy(m => m.GameId)];
+    }
+
+    /// <summary>
     /// Idle, active players of a running season whose roll would find no game now (their exclusions and the filters
     /// included), ordered by name: the signal for the admin (D-92). A player playing or holding an offer has a game.
     /// </summary>
@@ -39,9 +52,8 @@ public static class PoolStats
             return [];
         }
 
-        var filters = Rolling.Filters(state);
         return [.. state.Players.Values
-            .Where(p => p is { Phase: TurnPhase.Idle, IsInactive: false } && !Rolling.CanRoll(state, p.PlayerId, pool, filters))
+            .Where(p => p is { Phase: TurnPhase.Idle, IsInactive: false } && !Rolling.CanRoll(state, p.PlayerId, pool, Rolling.Filters(state, p.PlayerId)))
             .OrderBy(p => p.Name, StringComparer.Ordinal)
             .Select(p => p.PlayerId)];
     }

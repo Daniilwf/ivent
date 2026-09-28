@@ -2,6 +2,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { Bug } from 'lucide-react';
 import { useRef, useState, type SyntheticEvent } from 'react';
 import { api, rejectionCode } from '../api/client';
+import { newCommandId } from '../api/commands';
 import { uploadFile } from '../api/files';
 import { ru } from '../i18n/ru';
 import { Button, IconButton } from '../ui/Button';
@@ -14,8 +15,9 @@ type Phase = 'closed' | 'capturing' | 'open' | 'sending' | 'sent';
 
 /**
  * The «Сообщить о баге» button (SPEC, A9, D-121): a screenshot of the page is taken first, then the user describes what
- * happened; the page, the last actions and the browser's errors go along by themselves. A retry of the same report keeps
- * its command id, so it is stored once.
+ * happened; the page, the last actions and the browser's errors go along by themselves. The report of one dialog is one
+ * command (D-68): its id, the context and the uploaded screenshot are fixed at the first try, so a retry after an error
+ * (a lost answer, maintenance, too often) sends the same report and stores it once, with one screenshot.
  */
 export function BugReportButton() {
   const [phase, setPhase] = useState<Phase>('closed');
@@ -24,14 +26,19 @@ export function BugReportButton() {
   const [error, setError] = useState<string | null>(null);
   const [missingText, setMissingText] = useState(false);
   const [screenshot, setScreenshot] = useState<Blob | null>(null);
-  const commandId = useRef('');
   const button = useRef<HTMLButtonElement>(null);
+  // The report as first sent in this dialog: a retry repeats it rather than making another
+  const sentOnce = useRef<{
+    commandId: string;
+    context: ReturnType<typeof bugContext>;
+    screenshotFileId: string | null;
+  } | null>(null);
 
   async function open() {
     setPhase('capturing');
     const picture = await captureScreenshot();
-    commandId.current = crypto.randomUUID();
     setScreenshot(picture);
+    sentOnce.current = null;
     setText('');
     setAttach(picture !== null);
     setError(null);
@@ -49,24 +56,30 @@ export function BugReportButton() {
     setPhase('sending');
     setError(null);
     try {
-      let screenshotFileId: string | null = null;
-      if (attach && screenshot) {
-        // A report matters more than its picture: a refused screenshot leaves the report without one
-        screenshotFileId = await uploadFile(
-          screenshot,
-          'screenshot.png',
-          '/api/bug-reports/screenshot',
-        )
-          .then((file) => file.id)
-          .catch(() => null);
+      if (!sentOnce.current) {
+        // The context as it was when «Отправить» was first pressed: later clicks in the dialog are not the bug
+        const context = bugContext();
+        let screenshotFileId: string | null = null;
+        if (attach && screenshot) {
+          // A report matters more than its picture: a refused screenshot leaves the report without one
+          screenshotFileId = await uploadFile(
+            screenshot,
+            'screenshot.png',
+            '/api/bug-reports/screenshot',
+          )
+            .then((file) => file.id)
+            .catch(() => null);
+        }
+        sentOnce.current = { commandId: newCommandId(), context, screenshotFileId };
       }
+      const { commandId, context, screenshotFileId } = sentOnce.current;
 
       const { error: refused, response } = await api.POST('/api/bug-reports', {
         body: {
-          commandId: commandId.current,
+          commandId,
           page: globalThis.location.pathname,
           text,
-          context: bugContext(),
+          context,
           screenshotFileId,
         },
       });

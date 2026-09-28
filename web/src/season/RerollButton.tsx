@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { RefreshCw } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import type { Schemas } from '../api/client';
 import { ru } from '../i18n/ru';
+import { Button } from '../ui/Button';
 
 type Price = Schemas['RerollPriceView'];
 
@@ -19,36 +21,71 @@ export function RerollButton({
   onReroll: () => void;
 }) {
   const [confirming, setConfirming] = useState(false);
+  // The confirmation replaces the button: the focus goes into it and comes back when it is cancelled
+  const question = useRef<HTMLParagraphElement>(null);
+  const button = useRef<HTMLButtonElement>(null);
+  const back = useRef(false);
+  useEffect(() => {
+    if (confirming) {
+      // jsdom has no scrolling
+      if (typeof question.current?.scrollIntoView === 'function') {
+        question.current.scrollIntoView({ block: 'nearest' });
+      }
+      question.current?.focus();
+    } else if (back.current) {
+      back.current = false;
+      button.current?.focus();
+    }
+  }, [confirming]);
 
   if (confirming && price) {
     return (
-      <div role="group" data-testid="reroll-confirm">
-        <p>{ru.turn.rerollConfirm(price.payment, price.coins)}</p>
-        <button
-          data-testid="reroll-confirm-yes"
-          disabled={pending}
-          onClick={() => {
-            setConfirming(false);
-            onReroll();
-          }}
-        >
-          {ru.turn.rerollConfirmYes}
-        </button>
-        <button
-          data-testid="reroll-confirm-no"
-          onClick={() => {
-            setConfirming(false);
-          }}
-        >
-          {ru.turn.rerollConfirmNo}
-        </button>
+      <div
+        role="group"
+        aria-label={ru.turn.reroll}
+        data-testid="reroll-confirm"
+        className="grid w-full scroll-mb-28 gap-3 rounded-md bg-muted p-3"
+        onKeyDown={(e) => {
+          if (e.key !== 'Escape') return;
+          back.current = true;
+          setConfirming(false);
+        }}
+      >
+        <p ref={question} tabIndex={-1} className="focus:outline-none">
+          {ru.turn.rerollConfirm(price.payment, price.coins)}
+        </p>
+        <div className="flex flex-wrap gap-3">
+          {/* Not the screen's main blue: «Начать» stays the one main action */}
+          <Button
+            data-testid="reroll-confirm-yes"
+            disabled={pending}
+            onClick={() => {
+              setConfirming(false);
+              onReroll();
+            }}
+          >
+            {ru.turn.rerollConfirmYes}
+          </Button>
+          <Button
+            variant="link"
+            data-testid="reroll-confirm-no"
+            onClick={() => {
+              back.current = true;
+              setConfirming(false);
+            }}
+          >
+            {ru.turn.rerollConfirmNo}
+          </Button>
+        </div>
       </div>
     );
   }
 
   return (
-    <button
+    <Button
+      ref={button}
       data-testid="reroll"
+      icon={<RefreshCw size={18} aria-hidden />}
       disabled={pending}
       onClick={() => {
         if (isPaid(price)) setConfirming(true);
@@ -56,6 +93,6 @@ export function RerollButton({
       }}
     >
       {price ? ru.turn.rerollFor(price.payment, price.coins) : ru.turn.reroll}
-    </button>
+    </Button>
   );
 }

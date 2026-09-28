@@ -25,3 +25,45 @@ export function moscowTime(utc: string | Date, now: Date = new Date()): string {
   const date = (year.format(at) === year.format(now) ? day : dayWithYear).format(at);
   return ru.time.moscow(date, clock.format(at));
 }
+
+const dayMonth = new Intl.DateTimeFormat('ru-RU', {
+  timeZone: zone,
+  day: '2-digit',
+  month: '2-digit',
+});
+
+/** A UTC instant as the Moscow day in short: «12.10» (SPEC «Уже прошёл Вася, 12.10») */
+export function moscowDay(utc: string | Date): string {
+  return dayMonth.format(typeof utc === 'string' ? new Date(utc) : utc);
+}
+
+const dayKey = new Intl.DateTimeFormat('en-CA', {
+  timeZone: zone,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
+/** The Moscow calendar day of a UTC instant as «2026-09-26»: the feed groups its lines by it */
+export function moscowDayKey(utc: string | Date): string {
+  return dayKey.format(typeof utc === 'string' ? new Date(utc) : utc);
+}
+
+/** A day's heading: «Сегодня», «Вчера» or «25 сентября» (with the year when it is not now's) */
+export function moscowDayLabel(utc: string | Date, now: Date = new Date()): string {
+  const at = typeof utc === 'string' ? new Date(utc) : utc;
+  const key = moscowDayKey(at);
+  if (key === moscowDayKey(now)) return ru.feed.today;
+  if (key === moscowDayKey(new Date(now.getTime() - 86_400_000))) return ru.feed.yesterday;
+  return (year.format(at) === year.format(now) ? day : dayWithYear).format(at);
+}
+
+/** The Moscow clock of a UTC instant: «14:05» */
+export function moscowClock(utc: string | Date): string {
+  return clock.format(typeof utc === 'string' ? new Date(utc) : utc);
+}
+
+/** A time typed in a «datetime-local» field is Moscow time (the site's clock, SH4) */
+export function moscowInput(value: string): string {
+  return `${value}:00+03:00`;
+}

@@ -105,15 +105,19 @@ public sealed record CellView(string Id, CellType Type);
 
 /// <summary>
 /// A player on the map and the leaderboard; <c>finishOrder</c> is their order among the finishers, null before the finish;
-/// <c>avatar</c> — the account's picture (D-117), or none.
+/// <c>avatar</c> — the account's picture (D-117), or none; <c>token</c> — the colour of their token (PlayerTokens, D-202).
 /// </summary>
-public sealed record PlayerView(Guid Id, string Name, string CellId, int Points, TurnPhase Phase, int? FinishOrder, Files.FileLinkView? Avatar);
+public sealed record PlayerView(Guid Id, string Name, string CellId, int Points, TurnPhase Phase, int? FinishOrder, Files.FileLinkView? Avatar, int Token);
 
 /// <summary>
 /// The signed-in player's own turn. While playing: <c>dropHintMinutes</c> is <c>roll.minPlayMinutesBeforeDrop</c> until
 /// that much has been played by the server clock (only a hint: D-09), then null; <c>dropPenalty</c> is what a drop costs
 /// under the rules in force; <c>techRerollOpen</c> says whether the player may still tech-reroll themselves (D-94);
-/// <c>challengesEnabled</c> says whether a challenge may be claimed on completion (<c>features.challenges</c>, D-96).
+/// <c>challengesEnabled</c> says whether a challenge may be claimed on completion (<c>features.challenges</c>, D-96);
+/// <c>techRerollUntil</c> is when the player's own tech reroll window closes (the roll time plus the run's snapshot of
+/// <c>roll.techRerollWindowHours</c>), null while not playing. The active run's game carries the hours of the roll's
+/// snapshot, the ones the completion counts (D-44): the pool may have got hours since (D-138). <c>difficultyDice</c> —
+/// while playing, the die each difficulty gives under the run's snapshot and the event it grants, if any.
 /// </summary>
 public sealed record MyTurnView(
     Guid PlayerId,
@@ -128,7 +132,33 @@ public sealed record MyTurnView(
     DropPenaltyView? DropPenalty,
     bool TechRerollOpen,
     bool ChallengesEnabled,
-    MyFinishView? Finish);
+    MyFinishView? Finish,
+    UncheckedRunsView? Unchecked,
+    WheelRollView? Roll,
+    DateTimeOffset? TechRerollUntil = null,
+    IReadOnlyList<DifficultyDieView>? DifficultyDice = null);
+
+/// <summary>The die a difficulty gives on completion, and the event it grants (<c>good</c>, <c>bad</c>) or none.</summary>
+public sealed record DifficultyDieView(Difficulty Difficulty, int Sides, EventKind? GrantEvent);
+
+/// <summary>
+/// The wheel of the roll that offered what I see now (D-136), from the log: the categories that were on it, the one it
+/// picked and the games it missed on the way, with who holds each. <c>sequence</c> tells one roll from the next, so the
+/// page spins only for a new one. Null when nothing is offered or the offer did not come from my own roll.
+/// </summary>
+public sealed record WheelRollView(long Sequence, string Category, IReadOnlyList<string> Sectors, IReadOnlyList<RollMissView> Misses);
+
+/// <summary>
+/// A game the wheel landed on and passed: «Уже прошёл Вася, 12.10» (<c>at</c> — when that run was completed, SPEC
+/// «Статусы игры в сезоне»), «Сейчас играет Петя» (no date).
+/// </summary>
+public sealed record RollMissView(string Game, RollMissReason Reason, string Player, DateTimeOffset? At);
+
+/// <summary>
+/// My runs waiting for the admin's check and the rules' limit (D-134): at the limit a new roll is refused, so the page
+/// says so before the button is pressed. Null when the season has no limit.
+/// </summary>
+public sealed record UncheckedRunsView(int Count, int Limit);
 
 /// <summary>The player's own finish (D-99): order among the finishers and whether the first place is final and frozen.</summary>
 public sealed record MyFinishView(int Order, bool Frozen);
@@ -165,7 +195,7 @@ public sealed record ChoiceOptionView(string Id, OfferedGameView? Game);
 /// </summary>
 public sealed record CompletedRunView(
     Guid Id,
-    GameView Game,
+    RunGameView Game,
     Difficulty Difficulty,
     IReadOnlyList<DieView> Dice,
     IReadOnlyList<DieView> ChallengeDice,
@@ -184,9 +214,13 @@ public sealed record DieView(int Sides, int Value);
 /// <summary>The season the signed-in user sees by default (D-18).</summary>
 public sealed record CurrentSeasonView(Guid Id);
 
-public sealed record GameView(Guid Id, string Title, decimal? Hours);
+/// <summary>
+/// The game of a run: its title and hours. Named apart from the pool's <see cref="Pool.PoolGameView"/>: the OpenAPI document
+/// keys schemas by type name, so two records called GameView became one schema and the pool lost its fields (D-161).
+/// </summary>
+public sealed record RunGameView(Guid Id, string Title, decimal? Hours);
 
-public sealed record RunView(Guid Id, GameView Game, DateTimeOffset StartedAt);
+public sealed record RunView(Guid Id, RunGameView Game, DateTimeOffset StartedAt);
 
 public static class SeasonEndpoints
 {
@@ -473,7 +507,7 @@ public static class SeasonEndpoints
         // The log position is read first: the data below is at least that fresh, so a client comparing it with
         // hub updates may refetch once too often but never misses one.
         var lastSequence = await db.Events.Where(e => e.SeasonId == seasonId).MaxAsync(e => e.Sequence, ct);
-        var players = await db.SeasonPlayers.AsNoTracking().Where(p => p.SeasonId == seasonId).OrderBy(p => p.Name).ToListAsync(ct);
+        var players = await db.SeasonPlayers.AsNoTracking().Where(p => p.SeasonId == seasonId).InTokenOrder().ToListAsync(ct);
         var seasonRecord = await db.Seasons.AsNoTracking().SingleAsync(s => s.Id == seasonId, ct);
         var rules = JsonSerializer.Deserialize<Ruleset>(seasonRecord.RulesetJson, EngineJson.Options)!;
         var completedRuns = await db.Runs.AsNoTracking()
@@ -517,6 +551,26 @@ public static class SeasonEndpoints
                 .OrderBy(x => x.Id)
                 .Select(x => new ManualEffectView(x.Id, x.DrawEvent, x.Source))
                 .ToListAsync(ct);
+            // D-134: the same count the engine checks (UncheckedRuns) — completed, the proof neither approved nor rejected;
+            // the frozen first is never held
+            UncheckedRunsView? waitingCheck = null;
+            if (rules.Season.MaxUncheckedRuns is { } limit)
+            {
+                var waiting = mine.Frozen
+                    ? 0
+                    : await db.Runs.AsNoTracking()
+                        .Where(r => r.PlayerId == mine.Id && r.Status == RunStatus.Completed
+                            && !db.Proofs.Any(x => x.RunId == r.Id
+                                && (x.Status == Engine.Proofs.ProofStatus.Approved || x.Status == Engine.Proofs.ProofStatus.Rejected)))
+                        .CountAsync(ct);
+                waitingCheck = new UncheckedRunsView(waiting, limit);
+            }
+
+            // Only while turns are open: after the deadline the page offers nothing to spin for (D-101)
+            var turnsOpen = seasonRecord.Status == SeasonStatus.Active && (seasonRecord.Deadline is not { } end || clock.UtcNow < end);
+            var roll = turnsOpen && (offer is not null || choice is not null)
+                ? await RollOf(db, seasonId, mine.Id, offer, choice, players, ct)
+                : null;
             var price = mine.Frozen ? (Payment: RerollPayment.FreeMode, Coins: 0) : RerollPrice.Next(mine.RerollsThisRoll, coupons, rules.Roll);
             var now = clock.UtcNow;
 
@@ -547,7 +601,15 @@ public static class SeasonEndpoints
                     choice.Kind,
                     [.. choice.Options.Select(o => new ChoiceOptionView(o.Id, o.Game is null ? null : Offered(o.Game)))]),
                 mine.Phase == TurnPhase.Rolling ? new RerollPriceView(price.Payment, price.Coins) : null,
-                run is null ? null : new RunView(run.Id, Game(run, games[run.GameId]), run.StartedAt),
+                run is null
+                    ? null
+                    : new RunView(
+                        run.Id,
+                        // Playing: the hours of the roll's snapshot, as the completion counts them (D-44, D-138)
+                        snapshot is null
+                            ? Game(run, games[run.GameId])
+                            : new RunGameView(run.GameId, games[run.GameId].Title, snapshot.Hours is > 0 ? snapshot.Hours : null),
+                        run.StartedAt),
                 last is null ? null : Completed(last, games[last.GameId], lastReview, lastProof),
                 effects,
                 playing && played < TimeSpan.FromMinutes(rules.Roll.MinPlayMinutesBeforeDrop) ? rules.Roll.MinPlayMinutesBeforeDrop : null,
@@ -562,7 +624,19 @@ public static class SeasonEndpoints
                     : null,
                 playing && now - run!.RolledAt <= TimeSpan.FromHours(snapshot!.TechRerollWindowHours),
                 rules.Features.Challenges,
-                mine.FinishOrder is { } order ? new MyFinishView(order, mine.Frozen) : null);
+                mine.FinishOrder is { } order ? new MyFinishView(order, mine.Frozen) : null,
+                waitingCheck,
+                roll,
+                playing ? run!.RolledAt + TimeSpan.FromHours(snapshot!.TechRerollWindowHours) : null,
+                snapshot is null
+                    ? null
+                    :
+                    [
+                        new DifficultyDieView(Difficulty.Easy, snapshot.DieByDifficulty.Easy.Sides, snapshot.DieByDifficulty.Easy.GrantEvent),
+                        new DifficultyDieView(Difficulty.Normal, snapshot.DieByDifficulty.Normal.Sides, snapshot.DieByDifficulty.Normal.GrantEvent),
+                        new DifficultyDieView(Difficulty.Hard, snapshot.DieByDifficulty.Hard.Sides, snapshot.DieByDifficulty.Hard.GrantEvent),
+                        new DifficultyDieView(Difficulty.Extreme, snapshot.DieByDifficulty.Extreme.Sides, snapshot.DieByDifficulty.Extreme.GrantEvent),
+                    ]);
         }
 
         // Avatars live on the accounts, across seasons (SPEC «Сезоны»)
@@ -576,16 +650,91 @@ public static class SeasonEndpoints
             seasonRecord.Status,
             seasonRecord.Deadline,
             [.. season.Map.Cells.Select(c => new CellView(c.Id, c.Type))],
-            [.. players.Select(p => new PlayerView(
-                p.Id, p.Name, p.CellId, p.Points, p.Phase, p.FinishOrder, avatars.TryGetValue(p.UserId, out var avatar) ? Files.FileLinkView.Of(avatar) : null))],
+            [.. players.Select((p, token) => new PlayerView(
+                p.Id, p.Name, p.CellId, p.Points, p.Phase, p.FinishOrder, avatars.TryGetValue(p.UserId, out var avatar) ? Files.FileLinkView.Of(avatar) : null, token))],
             [.. leaderboard.Select(r => new LeaderboardRowView(r.PlayerId, r.Place, r.Points, r.CellsToFinish, r.IsFirst, r.Provisional))],
             me,
             lastSequence,
             seasonRecord.Name));
     }
 
+    private static readonly string[] s_rollTypes =
+        [EventCatalog.Describe(typeof(GameRolled)).Name, EventCatalog.Describe(typeof(GameChoiceRolled)).Name];
+
+    /// <summary>
+    /// The roll behind my current offer or choice (D-136), whoever sent the command (me, the admin's tech reroll, later
+    /// an effect): the first roll event in force from the offer's roll time on that is mine and made what is offered now.
+    /// Found by the type and the time (an index), never by the JSON data (invariant 9). The roll event is written after
+    /// the offer takes its time, so it is never earlier; an undone reroll brings the earlier offer back, and with it
+    /// its own roll.
+    /// </summary>
+    private static async Task<WheelRollView?> RollOf(
+        GameEventDbContext db,
+        Guid seasonId,
+        Guid playerId,
+        RollOffer? offer,
+        PendingChoice? choice,
+        IReadOnlyList<Infrastructure.Seasons.SeasonPlayerRecord> players,
+        CancellationToken ct)
+    {
+        var rolledAt = offer?.RolledAt ?? choice?.Options.Select(o => o.Game?.RolledAt).OfType<DateTimeOffset>().FirstOrDefault();
+        if (rolledAt is not { } from)
+        {
+            return null;
+        }
+
+        // Other players' rolls after mine come too, oldest first: mine is among the first of them
+        var rows = await db.Events.AsNoTracking()
+            .Where(e => e.SeasonId == seasonId && e.OccurredAt >= from && e.UndoneByEventId == null && s_rollTypes.Contains(e.Type))
+            .OrderBy(e => e.Sequence)
+            .Take(MaxRollsAfterMine)
+            .ToListAsync(ct);
+        foreach (var row in rows)
+        {
+            var (category, misses, sectors) = EventCodec.Decode(new StoredEvent(row.Type, row.Version, row.Data)) switch
+            {
+                GameRolled g when g.PlayerId == playerId && g.GameId == offer?.GameId && g.RolledAt == offer.RolledAt
+                    => (g.Category, g.Misses, g.Sectors),
+                GameChoiceRolled c when c.PlayerId == playerId && c.ChoiceId == choice?.ChoiceId => (c.Category, c.Misses, c.Sectors),
+                _ => default,
+            };
+            if (category is null)
+            {
+                continue;
+            }
+
+            var missed = misses.Select(m => m.GameId).ToList();
+            var titles = await db.Games.AsNoTracking().Where(g => missed.Contains(g.Id)).ToDictionaryAsync(g => g.Id, g => g.Title, ct);
+            // «Уже прошёл Вася, 12.10»: the day the run that took the game was completed
+            var completed = (await db.Runs.AsNoTracking()
+                    .Where(r => r.SeasonId == seasonId && missed.Contains(r.GameId) && r.Status == RunStatus.Completed)
+                    .Select(r => new { r.GameId, r.CompletedAt })
+                    .ToListAsync(ct))
+                .GroupBy(r => r.GameId)
+                .ToDictionary(g => g.Key, g => g.Max(r => r.CompletedAt));
+            var names = players.ToDictionary(p => p.Id, p => p.Name);
+            // Games and players are never deleted for real (invariant 11); a miss that names neither is left out, not shown blank
+            return new WheelRollView(
+                row.Sequence,
+                category,
+                [.. sectors],
+                [.. misses
+                    .Where(m => titles.ContainsKey(m.GameId) && names.ContainsKey(m.ByPlayerId))
+                    .Select(m => new RollMissView(
+                        titles[m.GameId],
+                        m.Reason,
+                        names[m.ByPlayerId],
+                        m.Reason == RollMissReason.CompletedInSeason ? completed.GetValueOrDefault(m.GameId) : null))]);
+        }
+
+        return null;
+    }
+
+    /// <summary>How many roll events after the offer's time are read: mine comes first unless others rolled in the same tick.</summary>
+    private const int MaxRollsAfterMine = 32;
+
     /// <summary>A run's game: the run's own hours when known, otherwise the pool's.</summary>
-    private static GameView Game(Infrastructure.Seasons.RunRecord run, Infrastructure.Pool.GameRecord game) =>
+    private static RunGameView Game(Infrastructure.Seasons.RunRecord run, Infrastructure.Pool.GameRecord game) =>
         new(run.GameId, game.Title, run.Hours ?? game.Hours);
 
     private static CompletedRunView Completed(
@@ -602,7 +751,7 @@ public static class SeasonEndpoints
             run.Difficulty ?? throw new InvalidOperationException($"Completed run {run.Id} has no difficulty."),
             [.. dice.Select(d => new DieView(d.Sides, d.Value))],
             [.. challenge.Select(d => new DieView(d.Sides, d.Value))],
-            dice.Sum(d => d.Value) + challenge.Sum(d => d.Value),
+            RunTotal.Of(dice, challenge, JsonSerializer.Deserialize<RunSnapshot>(run.SnapshotJson, EngineJson.Options)!),
             review is null ? null : new ReviewView(review.Rating, review.Text),
             proof is null
                 ? null

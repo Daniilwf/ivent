@@ -87,12 +87,22 @@ public static class RulesetValidator
             Error("season.maxActiveRunsPerPlayer", "must be at least 1");
         }
 
+        if (ruleset.Season.MaxUncheckedRuns is < 1)
+        {
+            Error("season.maxUncheckedRuns", "must be at least 1, or null for no limit");
+        }
+
         if (ruleset.Map.LinearLength < 1)
         {
             Error("map.linearLength", "must be at least 1");
         }
 
         AtMost("map.linearLength", ruleset.Map.LinearLength, MaxMapLength);
+        if (ruleset.Map.MinZoneGames is < 0)
+        {
+            Error("map.minZoneGames", "must not be negative, or null for no warning");
+        }
+
         NotNegative("season.inactiveHintDays", ruleset.Season.InactiveHintDays);
 
         if (ruleset.Effects.MaxChainDepth < 1)

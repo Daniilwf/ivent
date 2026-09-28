@@ -18,7 +18,8 @@
   "season": {
     "timezone": "Europe/Moscow",
     "maxActiveRunsPerPlayer": 1,
-    "inactiveHintDays": 3
+    "inactiveHintDays": 3,
+    "maxUncheckedRuns": 2
   },
   "roll": {
     "choiceCount": 1,
@@ -63,7 +64,8 @@
     "tiebreakers": ["completedRuns", "earliestFinalScore"]
   },
   "map": {
-    "linearLength": 60
+    "linearLength": 60,
+    "minZoneGames": 15
   },
   "economy": {
     "allowNegativeCoins": true,

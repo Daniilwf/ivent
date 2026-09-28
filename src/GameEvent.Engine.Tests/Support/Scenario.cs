@@ -1,4 +1,5 @@
 using GameEvent.Engine.Kernel;
+using GameEvent.Engine.Map;
 using GameEvent.Engine.Players;
 using GameEvent.Engine.Pool;
 using GameEvent.Engine.Ranking;
@@ -6,6 +7,7 @@ using GameEvent.Engine.Rolls;
 using GameEvent.Engine.Rulesets;
 using GameEvent.Engine.Runs;
 using GameEvent.Engine.Seasons;
+using GameEvent.Engine.Turns;
 using GameEvent.Engine.Undo;
 
 namespace GameEvent.Engine.Tests.Support;
@@ -97,6 +99,31 @@ public sealed class Scenario
         using var _ = Recording(() => $"s.WithMapLength({length});");
         return WithRuleset(r => r with { Map = r.Map with { LinearLength = length } });
     }
+
+    /// <summary>
+    /// A graph map (D-300): before the season exists, it is created in the graph mode with this map; after, the admin
+    /// publishes it (<see cref="PublishMap"/>, which must be accepted).
+    /// </summary>
+    public Scenario WithMap(MapGraph map)
+    {
+        ArgumentNullException.ThrowIfNull(map);
+        using var _ = Recording(() => $"s.WithMap({ScenarioCode.Value(map, CodeName)});");
+        if (!State.IsCreated)
+        {
+            _initialRuleset = _initialRuleset with { Features = _initialRuleset.Features with { MapMode = MapMode.Graph } };
+            _initialMap = map;
+            return this;
+        }
+
+        Setup(new PublishMap(map, "Новая карта"));
+        return this;
+    }
+
+    private MapGraph? _initialMap;
+
+    /// <summary>The player picks the branch into <paramref name="cellId"/> at the fork they wait at.</summary>
+    public Scenario ChooseBranch(string player, string cellId) =>
+        Play(new MakeChoice(PlayerId(player), Player(player).Choice?.ChoiceId ?? Guid.Empty, cellId));
 
     public Scenario WithCategory(string name, int weight = 1)
     {
@@ -201,6 +228,25 @@ public sealed class Scenario
     public Scenario Roll(string player) => Play(new RollGame(PlayerId(player)));
 
     public Scenario Start(string player) => Play(new StartRun(PlayerId(player)));
+
+    /// <summary>
+    /// Rolls <paramref name="title"/> for the player: the scripted wheel lands on the first category (a pool of one
+    /// category of weight 1) and the draw on the game, counted among the games the player sees (not deleted, not
+    /// excluded for them) in pool order.
+    /// </summary>
+    public Scenario RollTitle(string player, string title)
+    {
+        var excluded = State.IsCreated && State.Players.TryGetValue(PlayerId(player), out var p)
+            ? p.Exclusions.Select(x => x.GameId).ToHashSet()
+            : [];
+        var index = _games.Where(g => !g.IsDeleted && !excluded.Contains(g.Id)).OrderBy(g => g.Id).ToList().FindIndex(g => g.Title == title);
+        if (index < 0)
+        {
+            throw new KeyNotFoundException($"No game '{title}' the player sees in the pool.");
+        }
+
+        return NextRandom(0, index).Roll(player);
+    }
 
     public Scenario Complete(
         string player,
@@ -456,7 +502,7 @@ public sealed class Scenario
     {
         if (!State.IsCreated)
         {
-            Setup(new CreateSeason(SequentialIds.Make(SeasonIdPrefix, 1), "Тестовый сезон", _initialRuleset));
+            Setup(new CreateSeason(SequentialIds.Make(SeasonIdPrefix, 1), "Тестовый сезон", _initialRuleset, Map: _initialMap));
 
             // Scenarios play: the season starts right away unless a test drives the lifecycle itself.
             if (_startSeason)

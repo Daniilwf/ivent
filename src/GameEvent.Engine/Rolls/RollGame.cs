@@ -31,27 +31,34 @@ public sealed record RollMiss(Guid GameId, RollMissReason Reason, Guid ByPlayerI
 /// <summary>The rolled game waiting for the player to start it, with rules fixed at roll time.</summary>
 public sealed record RollOffer(Guid GameId, RunSnapshot Snapshot, DateTimeOffset RolledAt);
 
-[EventType("game-rolled")]
+/// <summary>
+/// A plain roll. <c>Sectors</c> — the categories that were on the wheel, in its order (ordinal by name): the page draws
+/// the wheel from the log, not from today's pool (D-136). v1 had no wheel; it reads as the picked category alone.
+/// </summary>
+[EventType("game-rolled", 2)]
 public sealed record GameRolled(
     Guid PlayerId,
     string Category,
     EquatableArray<RollMiss> Misses,
     Guid GameId,
     RunSnapshot Snapshot,
-    DateTimeOffset RolledAt) : IGameEvent;
+    DateTimeOffset RolledAt,
+    EquatableArray<string> Sectors) : IGameEvent;
 
 /// <summary>
 /// The wheel with <c>roll.choiceCount</c> &gt; 1 (D-06): up to that many available games of one category, drawn without
 /// replacement, reserved until the player picks one with <see cref="Turns.MakeChoice"/>. When the category has only
 /// one available game the roll is a plain <see cref="GameRolled"/>.
 /// </summary>
-[EventType("game-choice-rolled")]
+/// <remarks><c>Sectors</c> as in <see cref="GameRolled"/> (D-136, v2).</remarks>
+[EventType("game-choice-rolled", 2)]
 public sealed record GameChoiceRolled(
     Guid PlayerId,
     string Category,
     EquatableArray<RollMiss> Misses,
     Guid ChoiceId,
-    EquatableArray<RollOffer> Offers) : IGameEvent;
+    EquatableArray<RollOffer> Offers,
+    EquatableArray<string> Sectors) : IGameEvent;
 
 internal static class Rolling
 {
@@ -62,7 +69,16 @@ internal static class Rolling
             return rejection;
         }
 
-        return Draw(state, command.PlayerId, context, Filters(state)) is { } roll
+        // D-134: a new roll waits while too many of the player's runs wait for the admin's check. Only the next roll:
+        // a turn already started goes on, and proofs can be sent meanwhile.
+        if (UncheckedRuns.ClosesRoll(state, command.PlayerId))
+        {
+            return Decision.Reject(
+                RejectionCodes.TooManyUncheckedRuns,
+                $"{UncheckedRuns.Count(state, command.PlayerId)} runs wait for the admin's check; a new roll opens below {state.Rules.Season.MaxUncheckedRuns}.");
+        }
+
+        return Draw(state, command.PlayerId, context, Filters(state, command.PlayerId)) is { } roll
             ? Decision.Accept(roll)
             : Decision.Reject(RejectionCodes.NoAvailableGames, "No category has an available game.");
     }
@@ -83,7 +99,7 @@ internal static class Rolling
         // The exclusion drops the offer or the choice; the free roll then spins over what is left (D-07, D-92).
         var excluded = new GameExcluded(player.PlayerId, command.GameId, ExclusionReason.AlreadyPlayed);
         var after = Apply(state, excluded);
-        return Draw(after, player.PlayerId, context, Filters(after)) is { } roll
+        return Draw(after, player.PlayerId, context, Filters(after, player.PlayerId)) is { } roll
             ? Decision.Accept(excluded, roll)
             : Decision.Accept(excluded);
     }
@@ -104,7 +120,7 @@ internal static class Rolling
             : player.Choice!.Options.Select(o => o.Game?.GameId).OfType<Guid>().ToHashSet();
         var rerolled = new GameRerolled(player.PlayerId, [.. givenUp.Order()], payment);
         var after = Apply(state, rerolled);
-        if (Draw(after, player.PlayerId, context, Filters(after), givenUp) is not { } roll)
+        if (Draw(after, player.PlayerId, context, Filters(after, player.PlayerId), givenUp) is not { } roll)
         {
             return Decision.Reject(RejectionCodes.NoAvailableGames, "No game is left besides the ones given up.");
         }
@@ -175,6 +191,7 @@ internal static class Rolling
         }
 
         var category = SpinWheel(wheel, context.Random);
+        EquatableArray<string> sectors = [.. wheel.Select(c => c.Name)];
 
         // Draw games of the category without replacement until choiceCount are available or the category runs out;
         // misses are logged (D-46). The wheel and the draw share one predicate, so at least one game is found.
@@ -201,15 +218,16 @@ internal static class Rolling
                 state.Rules.Reward.DieByDifficulty,
                 state.Rules.Roll.TechRerollWindowHours,
                 state.Rules.Reward.ChallengeBonus.ExtraDice,
-                state.Rules.Reward.Coins);
+                state.Rules.Reward.Coins,
+                ZoneAtRoll(state, playerId));
             offers.Add(new RollOffer(game.Id, snapshot, now));
         }
 
         return offers.Count switch
         {
             0 => throw new InvalidOperationException($"Category '{category.Name}' was on the wheel without an available game."),
-            1 => new GameRolled(playerId, category.Name, [.. misses], offers[0].GameId, offers[0].Snapshot, now),
-            _ => new GameChoiceRolled(playerId, category.Name, [.. misses], context.Ids.NewId(), [.. offers]),
+            1 => new GameRolled(playerId, category.Name, [.. misses], offers[0].GameId, offers[0].Snapshot, now, sectors),
+            _ => new GameChoiceRolled(playerId, category.Name, [.. misses], context.Ids.NewId(), [.. offers], sectors),
         };
     }
 
@@ -233,12 +251,33 @@ internal static class Rolling
         return (status, candidates, categories);
     }
 
-    // Stage 1 has no live filters: the length limit of the last days is not supported yet, zones come in stage 2 (D-92).
-    internal static IReadOnlyList<RollFilter> Filters(SeasonState state)
+    /// <summary>
+    /// The live filters of <paramref name="playerId"/>'s roll: the zone of the cell they stand on (D-307). The length limit
+    /// of the last days is not supported yet; effects come with items (stage 4).
+    /// </summary>
+    internal static IReadOnlyList<RollFilter> Filters(SeasonState state, Guid playerId)
     {
         ArgumentNullException.ThrowIfNull(state);
-        return [];
+        return state.Map.ZoneOf(state.Players[playerId].CellId) is { RollFilter: { } filter } zone
+            ? [new RollFilter(RollFilterPriority.Zone, $"zone:{zone.Id}", game => Matches(filter, game))]
+            : [];
     }
+
+    /// <summary>
+    /// A content game filter as a predicate (D-307): any of the tags (ignoring case), the hours and the release year within
+    /// the bounds — a game without hours or a year does not pass a bound on them.
+    /// </summary>
+    internal static bool Matches(Content.GameFilterSpec filter, Game game) =>
+        (filter.Tags is not { } tags || tags.Any(t => game.Tags.Contains(t, StringComparer.OrdinalIgnoreCase)))
+        && (filter.MinHours is not { } min || game.Hours >= min)
+        && (filter.MaxHours is not { } max || game.Hours <= max)
+        && (filter.ReleaseYearBefore is not { } before || game.ReleaseYear < before);
+
+    /// <summary>The zone the player stands in, as the run fixes it at the roll (D-307); null outside any zone.</summary>
+    private static RunZone? ZoneAtRoll(SeasonState state, Guid playerId) =>
+        state.Map.ZoneOf(state.Players[playerId].CellId) is { } zone
+            ? new RunZone(zone.Id, zone.DiceModifier, zone.DropPenaltyMultiplier)
+            : null;
 
     /// <summary>Whether <paramref name="game"/> is on <paramref name="category"/>'s slice of the wheel (tags ignore case).</summary>
     internal static bool InCategory(Game game, Category category) =>

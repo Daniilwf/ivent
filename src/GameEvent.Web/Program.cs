@@ -1,15 +1,33 @@
 using GameEvent.Infrastructure.Site;
+using GameEvent.Web.Backups;
 using GameEvent.Web.Hosting;
 
 // Commands: (none) — run the site; `migrate` — apply migrations and exit (a separate deployment step, D-27);
 // `seed-dev` — fill a local database for development and exit; `seed-demo` — the demo season (16 players, bots, F2);
 // `create-admin <login> <name>` — the first admin of a new site, with a temporary password (J1, D-127);
-// `healthcheck` — ask the running site's /health and exit 0 when it is healthy (the container's health check).
+// `healthcheck` — ask the running site's /health and exit 0 when it is healthy (the container's health check);
+// `backup`, `backup-verify`, `restore` — the site's backups (J3, D-210…D-214, usage in BackupCommands).
+// Anything else first that is not an option (`--urls …`, `key=value`) is refused: an unknown command must never start a
+// second site on the same data (D-214).
 var command = args.FirstOrDefault();
+
+if (!Operations.IsKnownCommand(command))
+{
+    await Console.Error.WriteLineAsync($"Unknown command «{command}». {Operations.Usage}");
+    return 2;
+}
 
 if (command == "healthcheck")
 {
     return await Operations.HealthCheckAsync(Environment.GetEnvironmentVariable("HEALTHCHECK_URL") ?? "http://localhost:8080/health");
+}
+
+if (command is "backup" or "backup-verify" or "restore")
+{
+    // The site's configuration without the site: no queue, no lock of its own, no port. Arguments are paths, not settings
+    var settingsHost = WebApplication.CreateBuilder(new WebApplicationOptions { Args = [] });
+    var settings = BackupSettings.From(settingsHost.Configuration, settingsHost.Environment.ContentRootPath, settingsHost.Environment.EnvironmentName);
+    return await BackupCommands.RunAsync(command, [.. args.Skip(1)], settings, DateTimeOffset.UtcNow, Console.Out, Console.OpenStandardInput());
 }
 
 var builder = WebApplication.CreateBuilder(args);

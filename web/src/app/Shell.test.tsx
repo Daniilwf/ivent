@@ -3,17 +3,11 @@ import userEvent from '@testing-library/user-event';
 import { App } from '../App';
 import { registerConnection } from '../api/connection';
 import { ru } from '../i18n/ru';
+import { json } from '../test/fakeServer';
 
 // H1: the shell of a signed-in page — the connection mark, my menu, a password change of my own.
 
 vi.mock('../api/realtime', () => ({ watchSeason: () => () => undefined }));
-
-function respond(status: number, body: unknown) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'Content-Type': status >= 400 ? 'application/problem+json' : 'application/json' },
-  });
-}
 
 const user = {
   id: 'u1',
@@ -41,7 +35,7 @@ function serve(routes: Record<string, (request: Request) => Response>) {
             : null,
       });
       if (path === '/api/auth/antiforgery')
-        return respond(200, { token: 't', headerName: 'X-CSRF-TOKEN' });
+        return json(200, { token: 't', headerName: 'X-CSRF-TOKEN' });
       return routes[path]?.(request) ?? new Response(null, { status: 404 });
     }),
   );
@@ -54,7 +48,7 @@ describe('the shell', () => {
   });
 
   it('shows «no connection» while a live subscription is offline, and hides it when it is back', async () => {
-    serve({ '/api/auth/me': () => respond(200, user) });
+    serve({ '/api/auth/me': () => json(200, user) });
     render(<App />);
     await screen.findByTestId('no-season');
     expect(screen.queryByText(ru.ui.connectionLost)).toBeNull();
@@ -75,7 +69,7 @@ describe('the shell', () => {
   it('changes my own password from the menu and keeps me in the game', async () => {
     const renamed = { ...user, name: 'Вася' };
     const seen = serve({
-      '/api/auth/me': () => respond(200, renamed),
+      '/api/auth/me': () => json(200, renamed),
       '/api/auth/password': () => new Response(null, { status: 204 }),
     });
     const person = userEvent.setup();
@@ -102,7 +96,7 @@ describe('the shell', () => {
   });
 
   it('goes back to the game from my password form without changing anything', async () => {
-    const seen = serve({ '/api/auth/me': () => respond(200, user) });
+    const seen = serve({ '/api/auth/me': () => json(200, user) });
     const person = userEvent.setup();
     render(<App />);
     await screen.findByTestId('no-season');
@@ -116,12 +110,16 @@ describe('the shell', () => {
   });
 
   it('says a too short new password at its field', async () => {
-    serve({ '/api/auth/me': () => respond(200, user) });
+    serve({ '/api/auth/me': () => json(200, user) });
     const person = userEvent.setup();
     render(<App />);
     await screen.findByTestId('no-season');
     await person.click(screen.getByTestId('user-menu'));
     await person.click(await screen.findByTestId('change-password'));
+    // The form takes the focus on the next frame; typing starts after it, as a person's would
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { level: 1, name: ru.password.title })).toHaveFocus();
+    });
 
     await person.type(screen.getByTestId('password-current'), 'old-password');
     await person.type(screen.getByTestId('password-new'), 'short');

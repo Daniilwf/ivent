@@ -41,6 +41,7 @@ function season(
         phase: 'idle',
         finishOrder: null,
         avatar: null,
+        token: 0,
       },
     ],
     leaderboard: [
@@ -59,6 +60,8 @@ function season(
       dropPenalty: null,
       techRerollOpen: false,
       challengesEnabled: false,
+      roll: null,
+      unchecked: null,
       finish: null,
     },
     lastSequence: 3,

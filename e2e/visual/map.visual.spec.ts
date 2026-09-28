@@ -127,9 +127,34 @@ test('the map looks as approved', async ({ page }) => {
   await expect(map).toHaveScreenshot('map.png');
 });
 
-for (const section of ['buttons', 'fields', 'states', 'progress', 'run']) {
+for (const section of [
+  'buttons',
+  'fields',
+  'states',
+  'progress',
+  'run',
+  'offer',
+  'complete',
+  'proof',
+  'feed',
+  'profile',
+  'game',
+  'pool',
+  'rules',
+  'admin',
+  'whats-new',
+]) {
   test(`the styleguide section «${section}» looks as approved`, async ({ page }) => {
     await openStyleguide(page, section);
     await expect(page.locator(`#${section}`)).toHaveScreenshot(`${section}.png`);
   });
 }
+
+test('the styleguide has no horizontal scroll: every section fits the screen', async ({ page }) => {
+  await openStyleguide(page, 'whats-new');
+  const widths = await page.evaluate(() => ({
+    page: document.documentElement.scrollWidth,
+    screen: document.documentElement.clientWidth,
+  }));
+  expect(widths.page).toBeLessThanOrEqual(widths.screen);
+});

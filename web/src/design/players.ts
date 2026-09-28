@@ -44,3 +44,18 @@ export function playerToken(index: number) {
     contrast(color, white) >= contrast(color, ink) ? 'var(--color-on-color)' : 'var(--color-ink)';
   return { fill: `var(--color-token-${n + 1})`, ink: onColor, hex: color };
 }
+
+/** A stable token colour for a user outside a season: by their id */
+function hashToken(id: string) {
+  let hash = 0;
+  for (const ch of id) hash = (hash * 31 + ch.charCodeAt(0)) | 0;
+  return Math.abs(hash) % tokenColors.length;
+}
+
+/**
+ * A user's sticker colour outside a season's map, one rule for the header and the profile (D-202): their token in the
+ * latest season they play (the server's `token`), otherwise a stable colour by their id
+ */
+export function userToken(id: string, seasonToken?: number | null) {
+  return seasonToken ?? hashToken(id);
+}

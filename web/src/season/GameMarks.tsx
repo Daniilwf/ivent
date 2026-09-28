@@ -5,9 +5,10 @@ import { ru } from '../i18n/ru';
 export function GameMarks({ marks }: { marks: Schemas['GameMarkView'][] }) {
   if (marks.length === 0) return null;
   return (
-    <span data-testid="game-marks">
+    // Spans, not a list: the marks also sit inside a choice card, which is a button
+    <span data-testid="game-marks" className="grid gap-1 text-sm text-ink-soft">
       {marks.map((mark, i) => (
-        <small key={i}> {ru.turn.gameMark(mark.playerName, mark.kind)}</small>
+        <span key={i}>{ru.turn.gameMark(mark.playerName, mark.kind)}</span>
       ))}
     </span>
   );

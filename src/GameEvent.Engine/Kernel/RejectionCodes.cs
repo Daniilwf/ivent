@@ -48,6 +48,7 @@ public static class RejectionCodes
     public const string NoAvailableGames = "roll.noAvailableGames";
     public const string GameNotOffered = "roll.gameNotOffered";
     public const string NotEnoughCoins = "roll.notEnoughCoins";
+    public const string TooManyUncheckedRuns = "roll.tooManyUnchecked";
     public const string HoursRequired = "run.hoursRequired";
     public const string InvalidHours = "run.invalidHours";
     public const string TechRerollWindowClosed = "run.techRerollWindowClosed";
@@ -66,6 +67,15 @@ public static class RejectionCodes
     public const string ProofInvalidFile = "proof.invalidFile";
     public const string ProofWitnessInvalid = "proof.witnessInvalid";
     public const string ProofDifficultyAboveClaimed = "proof.difficultyAboveClaimed";
+    public const string MapInvalid = "map.invalid";
+    public const string MapRequired = "map.required";
+    public const string MapNotInLinearMode = "map.notInLinearMode";
+    public const string MapModeFixed = "ruleset.mapModeFixed";
+    public const string MapOccupiedCellRemoved = "map.occupiedCellRemoved";
+    public const string MapUnchanged = "map.unchanged";
+    public const string MapOccupiedCellRetyped = "map.occupiedCellRetyped";
+    public const string BranchChoicePending = "map.branchChoicePending";
+    public const string UndoCellNotOnMap = "undo.cellNotOnMap";
     public const string InvalidRating = "review.invalidRating";
     public const string ReviewTooLong = "review.tooLong";
 }

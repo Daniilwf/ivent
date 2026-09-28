@@ -8,11 +8,12 @@ const t = ru.moments.wheel;
 
 export type WheelGame = { title: string; cover?: string | undefined };
 
-/** The server's answer, whole: the misses on the way (games someone already completed) and the pick */
+/** The server's answer, whole: the misses on the way (games someone completed or plays now) and the pick */
 export type WheelRoll = {
   id: number;
-  misses: { sector: number; game: WheelGame; by: string }[];
-  pick: { sector: number; game: WheelGame };
+  misses: { sector: number; game: WheelGame; by: string; playing?: boolean | undefined }[];
+  /** The game, or none when the roll offers a choice of `choices` games of the category */
+  pick: { sector: number; game: WheelGame | null; choices?: number | undefined };
 };
 
 const sectorFills = [
@@ -33,7 +34,13 @@ export function WheelMoment({
   roll,
   onPhase,
   ref,
+  announce = true,
+  fill = false,
 }: {
+  /** The wheel fills its frame (the map's stage on a desktop); the miss and the result lie over the table */
+  fill?: boolean;
+  /** False when the page has its own live region for the result (it outlives the wheel) */
+  announce?: boolean;
   sectors: string[];
   roll: WheelRoll | null;
   onPhase?: ((phase: MomentPhase) => void) | undefined;
@@ -77,6 +84,9 @@ export function WheelMoment({
   };
   useImperativeHandle(ref, () => ({ skip: finish }));
 
+  // One roll per mount (the parent keys the wheel by it): a page refresh hands in an equal roll as a new object,
+  // which must not restart the spin
+  const rollId = roll?.id;
   useEffect(() => {
     if (!roll) return;
     if (reduce) {
@@ -121,25 +131,40 @@ export function WheelMoment({
     };
     // The rotation and the turns are fixed for one roll: the component is keyed by it
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roll, reduce]);
+  }, [rollId, reduce]);
 
   const playing = stage === 'spinning' || stage === 'miss';
   const miss = roll?.misses[missShown];
   const size = 300;
   const r = size / 2;
-  const missLine = (m: WheelRoll['misses'][number]) =>
-    `${t.missNote(m.game.title)} ${t.miss(m.by)}`;
+  const missSays = (m: WheelRoll['misses'][number]) =>
+    m.playing ? t.missPlaying(m.by) : t.miss(m.by);
+  // Once the wheel stands, the misses are told as done, the way the turn card tells them
+  const missedLine = (m: WheelRoll['misses'][number]) =>
+    m.playing ? t.missedPlaying(m.game.title, m.by) : t.missedCompleted(m.game.title, m.by, null);
+  const over = fill ? 'absolute inset-x-4 bottom-4 grid justify-items-center' : undefined;
+  const picked = (pick: WheelRoll['pick']) =>
+    pick.game ? t.result(pick.game.title) : t.choice(pick.choices ?? 0);
 
   return (
     <div className="grid w-full justify-items-center gap-3">
       <Table
-        className="grid w-full max-w-190 cursor-default place-items-center gap-4 p-4 desk:grid-cols-2"
+        className={
+          fill
+            ? 'relative grid h-full w-full cursor-default place-items-center p-4'
+            : 'grid w-full max-w-190 cursor-default place-items-center gap-4 p-4 desk:grid-cols-2'
+        }
         onClick={() => {
           if (playing) finish();
         }}
       >
-        <div className="w-75 max-w-full">
-          <svg viewBox={`-10 -22 ${size + 20} ${size + 32}`} width="100%" aria-hidden>
+        <div className={fill ? 'aspect-square h-full max-h-full max-w-full' : 'w-75 max-w-full'}>
+          <svg
+            viewBox={`-10 -22 ${size + 20} ${size + 32}`}
+            width="100%"
+            height={fill ? '100%' : undefined}
+            aria-hidden
+          >
             <motion.g style={{ rotate: rotation, originX: `${r}px`, originY: `${r}px` }}>
               {sectors.map((name, i) => {
                 const a0 = ((i * sector - 90) * Math.PI) / 180;
@@ -193,6 +218,7 @@ export function WheelMoment({
         </div>
         {stage === 'miss' && miss ? (
           <motion.div
+            className={over}
             initial={{ scale: 0.6, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ duration: 0.18 }}
@@ -208,18 +234,19 @@ export function WheelMoment({
                 />
               ) : null}
               <span className="line-clamp-2 text-sm text-ink-soft">{miss.game.title}</span>
-              <strong>{t.miss(miss.by)}</strong>
+              <strong>{missSays(miss)}</strong>
             </MomentCard>
           </motion.div>
         ) : null}
         {stage === 'done' && roll ? (
           <motion.div
+            className={over}
             initial={reduce ? false : { rotateY: 90, opacity: 0 }}
             animate={{ rotateY: 0, opacity: 1 }}
             transition={{ duration: 0.25 }}
           >
             <MomentCard className="w-full max-w-105">
-              {roll.pick.game.cover ? (
+              {roll.pick.game?.cover ? (
                 <img
                   src={roll.pick.game.cover}
                   alt=""
@@ -229,26 +256,24 @@ export function WheelMoment({
                 />
               ) : null}
               <strong className="font-display text-xl font-heavy text-balance">
-                {roll.pick.game.title}
+                {roll.pick.game ? roll.pick.game.title : picked(roll.pick)}
               </strong>
               <span className="text-sm text-ink-soft">
                 {t.category(sectors[roll.pick.sector] ?? '')}
               </span>
-              {roll.misses.map((m) => (
-                <span key={m.game.title} className="line-clamp-2 text-xs text-ink-soft">
-                  {missLine(m)}
-                </span>
-              ))}
+              {roll.misses.length > 0 ? (
+                <span className="text-xs text-ink-soft">{t.missed(roll.misses.length)}</span>
+              ) : null}
             </MomentCard>
           </motion.div>
         ) : null}
       </Table>
       {/* The card shows the result; the words are for screen readers */}
-      <p className="sr-only" aria-live="polite">
-        {stage === 'done' && roll
+      <p className="sr-only" aria-live={announce ? 'polite' : 'off'}>
+        {announce && stage === 'done' && roll
           ? [
-              ...roll.misses.map((miss) => `${missLine(miss)}.`),
-              `${t.category(sectors[roll.pick.sector] ?? '')}. ${t.result(roll.pick.game.title)}`,
+              ...roll.misses.map((miss) => `${missedLine(miss)}.`),
+              `${t.category(sectors[roll.pick.sector] ?? '')}. ${picked(roll.pick)}`,
             ].join(' ')
           : ''}
       </p>

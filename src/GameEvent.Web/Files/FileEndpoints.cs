@@ -65,7 +65,7 @@ public static class FileEndpoints
         ArgumentNullException.ThrowIfNull(builder);
         var limits = builder.Configuration.GetSection("Files").Get<FileLimits>() ?? new FileLimits();
         var root = Path.GetFullPath(Path.Combine(
-            builder.Environment.ContentRootPath, builder.Configuration["Files:Path"] ?? Path.Combine("var", "files")));
+            builder.Environment.ContentRootPath, builder.Configuration["Files:Path"] ?? Hosting.SitePaths.DefaultFiles));
         builder.Services.AddSingleton(limits);
         builder.Services.AddSingleton(new FileStorage(root));
         builder.Services.AddSingleton(DownloadSettingsFrom(builder.Configuration));

@@ -37,13 +37,21 @@ public static class AppSetup
 
     public const int AdminReadsPerMinute = 30;
 
+    /// <summary>
+    /// Player reads that fold the whole season log (the pool's statuses, D-160): per user, enough for a page that
+    /// follows every command of the season, not for a loop.
+    /// </summary>
+    public const string SeasonReadRateLimit = "season-read";
+
+    public const int SeasonReadsPerMinute = 60;
+
     public static void AddGameEvent(this WebApplicationBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
         var services = builder.Services;
 
         // First of the hosted services: the site's lock is held before the queue handles anything (D-127)
-        if (builder.Configuration["Site:LockFile"] is { Length: > 0 } && builder.Configuration["Site:OneOff"] != "true")
+        if (builder.Configuration["Site:OneOff"] != "true" && SitePaths.LockFile(builder.Configuration, builder.Environment.ContentRootPath) is not null)
         {
             services.AddHostedService<SiteLockService>();
         }
@@ -144,6 +152,9 @@ public static class AppSetup
             o.AddPolicy(AdminReadRateLimit, ctx => RateLimitPartition.GetFixedWindowLimiter(
                 ctx.User.UserId()?.ToString() ?? WebSecurity.ClientKey(ctx.Connection.RemoteIpAddress),
                 _ => new FixedWindowRateLimiterOptions { PermitLimit = AdminReadsPerMinute, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+            o.AddPolicy(SeasonReadRateLimit, ctx => RateLimitPartition.GetFixedWindowLimiter(
+                ctx.User.UserId()?.ToString() ?? WebSecurity.ClientKey(ctx.Connection.RemoteIpAddress),
+                _ => new FixedWindowRateLimiterOptions { PermitLimit = SeasonReadsPerMinute, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
         });
 
         services.Configure<ForwardedHeadersOptions>(o => WebSecurity.ConfigureForwardedHeaders(o, builder.Configuration));
@@ -206,6 +217,7 @@ public static class AppSetup
         api.MapAvatars();
         api.MapGameLookup();
         api.MapPool();
+        api.MapSeasonPool();
         api.MapMaintenance();
         api.MapBugReports();
 

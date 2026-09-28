@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import type { Schemas } from '../api/client';
 import { ru } from '../i18n/ru';
 import { SeasonScreen } from './SeasonScreen';
+import { json } from '../test/fakeServer';
 
 // C8, D-98: the proof of the last completed run is sent from the season screen (`me.lastCompleted.proof`,
 // `ru.proof`), with links, a note and a witness chosen from the other players of the season (D-98 (5)).
@@ -57,6 +58,7 @@ function season(
         phase: 'idle',
         finishOrder: null,
         avatar: null,
+        token: 0,
       },
       {
         id: petya,
@@ -66,6 +68,7 @@ function season(
         phase: 'idle',
         finishOrder: null,
         avatar: null,
+        token: 1,
       },
       {
         id: masha,
@@ -75,6 +78,7 @@ function season(
         phase: 'idle',
         finishOrder: null,
         avatar: null,
+        token: 2,
       },
     ],
     // The server's leaderboard (D-100): Вася by points, Петя and Маша share place 2
@@ -110,18 +114,13 @@ function season(
       dropPenalty: null,
       techRerollOpen: false,
       challengesEnabled: false,
+      roll: null,
+      unchecked: null,
       finish: null,
     },
     lastSequence: 3,
     name: 'Тестовый сезон',
   };
-}
-
-function json(status: number, body: unknown) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'Content-Type': status >= 400 ? 'application/problem+json' : 'application/json' },
-  });
 }
 
 type Handler = (request: Request) => Response | Promise<Response>;
@@ -151,6 +150,10 @@ describe('Proof of the last completed run', () => {
     expect(within(form).getByTestId('proof-note')).toBeInTheDocument();
     expect(within(form).getByTestId('proof-submit')).toHaveTextContent(proofRu().submit);
     expect(screen.queryByTestId('proof-status')).not.toBeInTheDocument();
+    // H3: the form folds into one line that says the proof is not sent yet
+    const folded = screen.getByTestId('proof-details');
+    expect(folded).not.toHaveAttribute('open');
+    expect(within(folded).getByText(ru.turn.proofToSend)).toBeInTheDocument();
   });
 
   it('sends the links and the note of the proof, then shows it is waiting for the admin', async () => {

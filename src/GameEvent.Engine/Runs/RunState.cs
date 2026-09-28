@@ -38,7 +38,25 @@ public sealed record RunSnapshot(
     DieByDifficulty DieByDifficulty,
     int TechRerollWindowHours,
     int ChallengeExtraDice = 0,
-    CoinReward? Coins = null);
+    CoinReward? Coins = null,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    RunZone? Zone = null);
+
+/// <summary>
+/// The zone the player stood in at the roll, with the rules of it the run plays by (SPEC «Зона фиксируется в момент
+/// ролла», D-307): the dice modifier and the drop penalty multiplier. Null — the roll was outside any zone; then the
+/// snapshot is written as before zones existed.
+/// </summary>
+public sealed record RunZone(string Id, Content.DiceModifierSpec? DiceModifier = null, decimal? DropPenaltyMultiplier = null)
+{
+    /// <summary>Dice of the run's die added after the count's limit (<c>count</c>).</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public int ExtraDice => DiceModifier is { Stage: Content.DiceStage.Count, Value: { Kind: Content.ContentValueKind.Number } value } ? value.Number : 0;
+
+    /// <summary>Points and steps added to the dice sum (<c>add</c>).</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public int AddedToSum => DiceModifier is { Stage: Content.DiceStage.Add, Value: { Kind: Content.ContentValueKind.Number } value } ? value.Number : 0;
+}
 
 /// <summary>A review of a completed run (SPEC «Отзыв»): a rating 1–10 and an optional text.</summary>
 public sealed record RunReview(int Rating, string? Text);

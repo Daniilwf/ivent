@@ -130,17 +130,17 @@ public class EventFormatTests
         },
         {
             "game-rolled",
-            new GameRolled(s_player, "Horror", [new RollMiss(s_game, RollMissReason.CompletedInSeason, s_other)], s_game, Snapshot(), s_at),
-            1,
+            new GameRolled(s_player, "Horror", [new RollMiss(s_game, RollMissReason.CompletedInSeason, s_other)], s_game, Snapshot(), s_at, ["Horror", "RPG"]),
+            2,
             """{"playerId":"10000000-0000-0000-0000-000000000001","category":"Horror","misses":[{"gameId":"20000000-0000-0000-0000-000000000001","reason":"completedInSeason","byPlayerId":"10000000-0000-0000-0000-000000000002"}],"gameId":"20000000-0000-0000-0000-000000000001","snapshot":"""
-            + SnapshotJson + ""","rolledAt":"2026-10-01T12:30:00+00:00"}"""
+            + SnapshotJson + ""","rolledAt":"2026-10-01T12:30:00+00:00","sectors":["Horror","RPG"]}"""
         },
         {
             "game-choice-rolled",
-            new GameChoiceRolled(s_player, "Horror", [], s_run, [new RollOffer(s_game, Snapshot(), s_at)]),
-            1,
+            new GameChoiceRolled(s_player, "Horror", [], s_run, [new RollOffer(s_game, Snapshot(), s_at)], ["Horror"]),
+            2,
             """{"playerId":"10000000-0000-0000-0000-000000000001","category":"Horror","misses":[],"choiceId":"00000000-0000-0000-0000-000000000001","offers":[{"gameId":"20000000-0000-0000-0000-000000000001","snapshot":"""
-            + SnapshotJson + ""","rolledAt":"2026-10-01T12:30:00+00:00"}]}"""
+            + SnapshotJson + ""","rolledAt":"2026-10-01T12:30:00+00:00"}],"sectors":["Horror"]}"""
         },
         {
             "choice-made",
@@ -426,7 +426,49 @@ public class EventFormatTests
             1,
             """{"playerId":"10000000-0000-0000-0000-000000000001","from":"start","to":"c2","steps":2,"path":["c1","c2"],"reason":"completionRoll","runId":"00000000-0000-0000-0000-000000000001"}"""
         },
+        {
+            "branch-choice-requested",
+            new BranchChoiceRequested(s_player, s_other, "f", ["b1", "c1"], 4, MoveReason.CompletionRoll, s_run),
+            1,
+            """{"playerId":"10000000-0000-0000-0000-000000000001","choiceId":"10000000-0000-0000-0000-000000000002","cellId":"f","options":["b1","c1"],"steps":4,"reason":"completionRoll","runId":"00000000-0000-0000-0000-000000000001"}"""
+        },
+        {
+            "map-published",
+            new MapPublished(GraphMap(), "Новая карта"),
+            1,
+            """{"map":""" + GraphMapJson + ""","comment":"Новая карта"}"""
+        },
     };
+
+    /// <summary>A graph map with every cell parameter and a zone (D-300).</summary>
+    private static MapGraph GraphMap() =>
+        new(
+            [
+                new Cell("start", CellType.Start) { X = 10, Y = 20.5m },
+                new Cell("f", CellType.Fork) { Zone = "swamp" },
+                new Cell("t", CellType.Teleport) { To = "p" },
+                new Cell("p", CellType.PointsBonus) { Amount = 3 },
+                new Cell("k", CellType.Checkpoint),
+                new Cell("e", CellType.Event) { Deck = "zone" },
+                new Cell("s", CellType.Shop) { Grants = "shop-coupon" },
+                new Cell("finish", CellType.Finish),
+            ],
+            [new Edge("start", "f", true, true), new Edge("f", "t", true, true), new Edge("f", "p", false, true)])
+        {
+            Zones =
+            [
+                new Engine.Content.ZoneDefinition
+                {
+                    Id = "swamp",
+                    Name = "Болото",
+                    RollFilter = new Engine.Content.GameFilterSpec { Tags = ["Horror"] },
+                    DropPenaltyMultiplier = 1.5m,
+                },
+            ],
+        };
+
+    private const string GraphMapJson =
+        """{"cells":[{"id":"start","type":"start","x":10,"y":20.5},{"id":"f","type":"fork","zone":"swamp"},{"id":"t","type":"teleport","to":"p"},{"id":"p","type":"pointsBonus","amount":3},{"id":"k","type":"checkpoint"},{"id":"e","type":"event","deck":"zone"},{"id":"s","type":"shop","grants":"shop-coupon"},{"id":"finish","type":"finish"}],"edges":[{"from":"start","to":"f","isDefaultForward":true,"isPrimaryBackward":true},{"from":"f","to":"t","isDefaultForward":true,"isPrimaryBackward":true},{"from":"f","to":"p","isDefaultForward":false,"isPrimaryBackward":true}],"zones":[{"id":"swamp","name":"Болото","rollFilter":{"tags":["Horror"],"maxHours":null,"minHours":null,"releaseYearBefore":null},"diceModifier":null,"dropPenaltyMultiplier":1.5,"deck":null,"shopPriceMultiplier":null}]}""";
 
     /// <summary>Enum values that are not in <see cref="Samples"/> (one sample per type) are frozen here.</summary>
     public static TheoryData<string, IGameEvent, string> ValueSamples() => new()
@@ -440,6 +482,17 @@ public class EventFormatTests
         { "coins-changed", new CoinsChanged(s_player, 7, CoinsReason.StartingBalance, null), """{"playerId":"10000000-0000-0000-0000-000000000001","delta":7,"reason":"startingBalance","runId":null}""" },
         { "player-moved", new PlayerMoved(s_player, "start", "c5", 0, ["c5"], MoveReason.StartingCell, null), """{"playerId":"10000000-0000-0000-0000-000000000001","from":"start","to":"c5","steps":0,"path":["c5"],"reason":"startingCell","runId":null}""" },
         { "player-moved", new PlayerMoved(s_player, "c5", "c2", 0, ["c2"], MoveReason.AdminAdjustment, null), """{"playerId":"10000000-0000-0000-0000-000000000001","from":"c5","to":"c2","steps":0,"path":["c2"],"reason":"adminAdjustment","runId":null}""" },
+
+        // Stage 2 (D-300, D-303, D-304): new values and optional fields, written only when set
+        { "player-moved", new PlayerMoved(s_player, "t", "p", 0, ["p"], MoveReason.Teleport, null), """{"playerId":"10000000-0000-0000-0000-000000000001","from":"t","to":"p","steps":0,"path":["p"],"reason":"teleport","runId":null}""" },
+        { "player-moved", new PlayerMoved(s_player, "start", "f", 6, ["f"], MoveReason.CompletionRoll, null, Paused: true), "\"path\":[\"f\"],\"reason\":\"completionRoll\",\"runId\":null,\"paused\":true}" },
+        { "points-changed", new PointsChanged(s_player, 3, PointsReason.CellBonus, null), """{"playerId":"10000000-0000-0000-0000-000000000001","delta":3,"reason":"cellBonus","runId":null}""" },
+        { "season-created", new SeasonCreated(s_season, "Тестовый сезон", TestRuleset.Create(), GraphMap(), null), "\"map\":" + GraphMapJson },
+        {
+            "game-rolled",
+            new GameRolled(s_player, "Horror", [], s_game, Snapshot() with { Zone = new RunZone("swamp", null, 1.5m) }, s_at, ["Horror"]),
+            "\"coins\":{\"perHour\":1,\"min\":3},\"zone\":{\"id\":\"swamp\",\"diceModifier\":null,\"dropPenaltyMultiplier\":1.5}}"
+        },
     };
 
     [Theory]
@@ -548,6 +601,30 @@ public class EventFormatTests
             """{"runId":"00000000-0000-0000-0000-000000000001","playerId":"10000000-0000-0000-0000-000000000001","links":["https://imgur.com/a/credits"],"note":"Титры","witnessId":"10000000-0000-0000-0000-000000000002","submittedAt":"2026-10-01T12:30:00+00:00"}""");
 
         Assert.Equal(new ProofSubmitted(s_run, s_player, ["https://imgur.com/a/credits"], "Титры", s_other, s_at, []), EventCodec.Decode(v1));
+    }
+
+    [Fact]
+    public void Game_rolled_v1_reads_with_the_picked_category_as_its_wheel()
+    {
+        // The frozen v1 of game-rolled (before D-136): the log did not keep the wheel, only the category it picked
+        var v1 = new StoredEvent(
+            "game-rolled",
+            1,
+            """{"playerId":"10000000-0000-0000-0000-000000000001","category":"Horror","misses":[],"gameId":"20000000-0000-0000-0000-000000000001","snapshot":"""
+            + SnapshotJson + ""","rolledAt":"2026-10-01T12:30:00+00:00"}""");
+
+        Assert.Equal(new GameRolled(s_player, "Horror", [], s_game, Snapshot(), s_at, ["Horror"]), EventCodec.Decode(v1));
+    }
+
+    [Fact]
+    public void Game_choice_rolled_v1_reads_with_the_picked_category_as_its_wheel()
+    {
+        var v1 = new StoredEvent(
+            "game-choice-rolled",
+            1,
+            """{"playerId":"10000000-0000-0000-0000-000000000001","category":"Horror","misses":[],"choiceId":"00000000-0000-0000-0000-000000000001","offers":[]}""");
+
+        Assert.Equal(new GameChoiceRolled(s_player, "Horror", [], s_run, [], ["Horror"]), EventCodec.Decode(v1));
     }
 
     [Fact]

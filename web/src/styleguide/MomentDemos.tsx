@@ -12,7 +12,7 @@ import { Button } from '../ui/Button';
 import { Chip } from '../ui/Marks';
 import { MomentCard } from '../ui/Surface';
 import { Sticker } from '../ui/Sticker';
-import { demoCategories, demoGames, demoLeader, demoMe, demoPlayers } from './fixtures';
+import { demoWheelSectors, demoGames, demoLeader, demoMe, demoPlayers } from './fixtures';
 
 const t = ru.styleguide;
 const m = ru.moments;
@@ -49,8 +49,8 @@ export function WheelDemo() {
   const [phase, setPhase] = useState<MomentPhase>('idle');
   const moment = useRef<MomentHandle>(null);
   const spin = () => {
-    const pick = Math.floor(Math.random() * demoCategories.length);
-    const miss = (pick + 3 + Math.floor(Math.random() * 4)) % demoCategories.length;
+    const pick = Math.floor(Math.random() * demoWheelSectors.length);
+    const miss = (pick + 3 + Math.floor(Math.random() * 4)) % demoWheelSectors.length;
     setRoll({
       id: (roll?.id ?? 0) + 1,
       misses: [
@@ -69,7 +69,7 @@ export function WheelDemo() {
       <WheelMoment
         key={roll?.id ?? 0}
         ref={moment}
-        sectors={demoCategories}
+        sectors={demoWheelSectors}
         roll={roll}
         onPhase={setPhase}
       />
@@ -110,7 +110,7 @@ export function DiceDemo() {
     setRoll({
       id: (roll?.id ?? 0) + 1,
       values: [0, 0, 0, 0].map(() => 1 + Math.floor(Math.random() * 6)),
-      challenge: true,
+      challenge: 1,
     });
     setPhase('playing');
   };

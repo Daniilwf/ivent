@@ -9,6 +9,11 @@ internal static class Choosing
 {
     public static Decision Decide(SeasonState state, MakeChoice command, EngineContext context)
     {
+        if (state.IsCreated && state.Players.TryGetValue(command.PlayerId, out var chooser) && chooser.Choice is { Kind: ChoiceKind.Branch } branch)
+        {
+            return DecideBranch(state, chooser, branch, command, context);
+        }
+
         if (TurnRules.Check(state, command.PlayerId, command, context.Clock.UtcNow) is { } rejection)
         {
             return rejection;
@@ -33,6 +38,49 @@ internal static class Choosing
             new RunStarted(context.Ids.NewId(), command.PlayerId, game.GameId, game.Snapshot, game.RolledAt, context.Clock.UtcNow));
     }
 
+    /// <summary>
+    /// The branch at a fork (D-304): the paused move goes on into the picked cell, and may reach the finish, stop on a
+    /// cell or pause at the next fork. Allowed after the deadline and while closing: the steps belong to a throw made
+    /// before it (D-305).
+    /// </summary>
+    private static Decision DecideBranch(SeasonState state, SeasonPlayer player, PendingChoice choice, MakeChoice command, EngineContext context)
+    {
+        if (state.Status is not (SeasonStatus.Active or SeasonStatus.Closing))
+        {
+            return Decision.Reject(RejectionCodes.SeasonNotActive, $"The season is {state.Status}.");
+        }
+
+        if (choice.ChoiceId != command.ChoiceId)
+        {
+            return Decision.Reject(RejectionCodes.NoPendingChoice, $"Choice {command.ChoiceId} is not pending.");
+        }
+
+        // The option must still be a branch of the map in force: an undo may bring back a choice made on an older map (D-308)
+        if (choice.Options.All(o => o.Id != command.OptionId) || state.Map.Exits(player.CellId).All(e => e.To != command.OptionId))
+        {
+            return Decision.Reject(RejectionCodes.UnknownChoiceOption, $"The option is not one of choice {command.ChoiceId}.");
+        }
+
+        var move = choice.Move ?? throw new InvalidOperationException($"Branch choice {choice.ChoiceId} has no paused move.");
+        var run = state.Runs[move.RunId ?? throw new InvalidOperationException($"Branch choice {choice.ChoiceId} has no run.")];
+        var made = new ChoiceMade(player.PlayerId, choice.ChoiceId, command.OptionId);
+        var after = Apply(state, made);
+        var walk = Map.Movement.WalkOwn(state.Map, player.CellId, move.Steps, command.OptionId);
+        var moved = new Map.PlayerMoved(
+            player.PlayerId, player.CellId, walk.Path[^1], move.Steps, [.. walk.Path], move.Reason, move.RunId, walk.Paused);
+        after = SeasonEngine.Apply(after, moved);
+        return Decision.Accept([made, moved, .. RunLifecycle.AfterOwnMove(after, after.Players[player.PlayerId], run, moved, walk, context)]);
+    }
+
+    public static SeasonState Apply(SeasonState state, Map.BranchChoiceRequested e)
+    {
+        var choice = new PendingChoice(e.ChoiceId, ChoiceKind.Branch, [.. e.Options.Select(cell => new ChoiceOption(cell, Game: null))])
+        {
+            Move = new PendingMove(e.Steps, e.Reason, e.RunId),
+        };
+        return Update(state, e.PlayerId, p => p with { Choice = choice });
+    }
+
     public static SeasonState Apply(SeasonState state, GameChoiceRolled e)
     {
         var choice = new PendingChoice(
@@ -47,6 +95,7 @@ internal static class Choosing
             return p.Choice.Kind switch
             {
                 ChoiceKind.Game => p with { Offer = option.Game, Choice = null },
+                ChoiceKind.Branch => p with { Choice = null },
                 _ => throw new InvalidOperationException($"Unknown choice kind {p.Choice.Kind}."),
             };
         });

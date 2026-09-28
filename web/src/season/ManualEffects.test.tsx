@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import type { Schemas } from '../api/client';
 import { ru } from '../i18n/ru';
 import { SeasonScreen } from './SeasonScreen';
+import { json } from '../test/fakeServer';
 
 // Resolving manual effects on the season screen (C11a, E1, D-102): «Применено» sends at once, with the comment if one is
 // typed; «Не применимо» needs a comment first; the engine's refusal is shown in Russian.
@@ -33,6 +34,7 @@ function season(status: Schemas['SeasonView']['status'] = 'active'): Schemas['Se
         phase: 'idle',
         finishOrder: null,
         avatar: null,
+        token: 0,
       },
     ],
     leaderboard: [
@@ -51,18 +53,13 @@ function season(status: Schemas['SeasonView']['status'] = 'active'): Schemas['Se
       dropPenalty: null,
       techRerollOpen: false,
       challengesEnabled: false,
+      roll: null,
+      unchecked: null,
       finish: null,
     },
     lastSequence: 3,
     name: 'Тестовый сезон',
   };
-}
-
-function json(status: number, body: unknown) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'Content-Type': status >= 400 ? 'application/problem+json' : 'application/json' },
-  });
 }
 
 const resolveUrl = `/api/seasons/${seasonId}/effects/${effectId}/resolve`;
