@@ -119,7 +119,8 @@ test('full cycle: the admin sets up a season, a player completes a game, others 
   await goToAdminSection(admin, 'proofs');
   const card = admin.getByTestId('proof-queue').getByRole('article').first();
   await expect(card).toContainText('Вася', adminRefresh);
-  await expect(card).toContainText('https://example.com/credits.png');
+  // The queue refreshes at most every 10 s (the admin's throttle): the proof may come one refresh after the run
+  await expect(card).toContainText('https://example.com/credits.png', adminRefresh);
   await card.getByTestId('approve').click();
   await expect(admin.getByTestId('proof-queue')).toContainText('Одобрено');
 
