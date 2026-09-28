@@ -161,10 +161,10 @@ public sealed class DemoPoolTests
     {
         var table = new ImportedTable(
             [
-                new ImportedGame(2, "Hades", ["Roguelike"], "Яковка", "Челлендж от Винила: без смертей"),
-                new ImportedGame(3, "Celeste", ["Platformer"], " Винил ", null),
-                new ImportedGame(4, " hades ", ["Roguelike"], "Дензел", "Повтор"),
-                new ImportedGame(5, "Portal", ["Puzzle"], "яковка", "Для Дензела"),
+                new ImportedGame(2, "Hades", ["Roguelike"], "Совушка", "Челлендж от Кротика: без смертей"),
+                new ImportedGame(3, "Celeste", ["Platformer"], " Кротик ", null),
+                new ImportedGame(4, " hades ", ["Roguelike"], "Барсук", "Повтор"),
+                new ImportedGame(5, "Portal", ["Puzzle"], "совушка", "Для Барсука"),
                 new ImportedGame(6, "Limbo", ["Puzzle"], "   ", null),
             ],
             [new ImportedCategory(2, "Puzzle", 3), new ImportedCategory(3, "Roguelike", 2), new ImportedCategory(4, "puzzle", 9)],
@@ -178,7 +178,7 @@ public sealed class DemoPoolTests
         Assert.All(demo.Games, g => Assert.Null(g.Note));
         Assert.Equal(2, demo.NotesDropped);
         Assert.Equal([("Puzzle", 3), ("Roguelike", 2)], demo.Categories.Select(c => (c.Name, c.Weight)));
-        foreach (var nickname in new[] { "Яковка", "Винил", "Дензел", "Челлендж", "note", "notesDropped" })
+        foreach (var nickname in new[] { "Совушка", "Кротик", "Барсук", "Челлендж", "note", "notesDropped" })
         {
             Assert.DoesNotContain(nickname, json, StringComparison.OrdinalIgnoreCase);
         }
