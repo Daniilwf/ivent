@@ -14,7 +14,7 @@ import {
   Users,
   Wrench,
 } from 'lucide-react';
-import { useCallback, useRef, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useCallback, useRef, useState, type ReactNode } from 'react';
 import { api, type Schemas } from '../api/client';
 import { Link } from '../app/Link';
 import { NotFoundPage } from '../app/NotFound';
@@ -33,7 +33,6 @@ import { BugsSection } from './BugsSection';
 import { EffectsSection } from './EffectsSection';
 import { ErrorsSection } from './ErrorsSection';
 import { LogSection } from './LogSection';
-import { MapSection } from './MapSection';
 import { PlayersSection } from './PlayersSection';
 import { PoolSection } from './PoolSection';
 import { ProofQueue } from './ProofQueue';
@@ -44,6 +43,9 @@ import { TestToolsSection } from './TestToolsSection';
 import { SectionHead } from './common';
 import { answerOf, useLoaded } from '../app/useLoaded';
 import { useSeasonVersion } from '../app/useSeasonVersion';
+
+// The map editor (@xyflow/react) loads apart from the site: the players never download it
+const MapSection = lazy(async () => ({ default: (await import('./MapSection')).MapSection }));
 
 const t = ru.admin;
 
@@ -245,7 +247,11 @@ export function AdminScreen({
       case 'rules':
         return <RulesSection seasonId={id} version={version} />;
       case 'map':
-        return <MapSection seasonId={id} version={version} />;
+        return (
+          <Suspense fallback={<p>{ru.ui.loading}</p>}>
+            <MapSection seasonId={id} version={version} />
+          </Suspense>
+        );
       case 'season':
         return (
           <SeasonSection
