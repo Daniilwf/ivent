@@ -10,9 +10,10 @@ import {
   testPassword,
   uniqueTag,
   adminRefresh,
+  baseURL,
+  confirmButton,
 } from '../support/world.ts';
 import { Api, seedAdmin } from '../support/api.ts';
-import { baseURL } from '../support/world.ts';
 
 // TESTING.md scenario 1 «Полный цикл»: the admin creates a season and three players in the admin pages → the players
 // sign in with the temporary password → a roll → a run with a proof → dice → the token moves → another player sees it
@@ -66,7 +67,7 @@ test('full cycle: the admin sets up a season, a player completes a game, others 
 
   await goToAdminSection(admin, 'season');
   await admin.getByTestId('season-next').click();
-  await admin.getByRole('alertdialog').getByRole('button', { name: 'Начать сезон' }).click();
+  await confirmButton(admin, 'Начать сезон').click();
   await expect(admin.getByTestId('season-status')).toContainText('Идёт');
 
   // The players come in with the temporary password and set their own

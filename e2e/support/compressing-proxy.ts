@@ -22,6 +22,7 @@ export async function compressingProxy(
         headers: { ...incoming.headers, host: upstream.host, 'accept-encoding': 'identity' },
       },
       (answer) => {
+        answer.on('error', () => outgoing.destroy());
         const headers: IncomingHttpHeaders = { ...answer.headers };
         const type = headers['content-type'] ?? '';
         const gzip =
@@ -41,7 +42,10 @@ export async function compressingProxy(
         answer.pipe(createGzip({ flush: constants.Z_SYNC_FLUSH })).pipe(outgoing);
       },
     );
+    // A connection reset on either side (the page closed mid-answer) ends the other quietly
     forward.on('error', () => outgoing.destroy());
+    incoming.on('error', () => forward.destroy());
+    outgoing.on('error', () => forward.destroy());
     incoming.pipe(forward);
   });
   server.on('upgrade', (incoming, socket, head) => {

@@ -8,7 +8,8 @@ import { baseURL } from './world.ts';
 // whose steps must stay inside a window of time, holds this lock for that part: the workers of one run (and of the phone
 // and desktop projects) take turns there, the rest of the suite goes on in parallel.
 
-const staleAfterMs = 3 * 60_000;
+// No longer than a test may take (the config's timeout): a lock older than that was left by a killed worker
+const staleAfterMs = 90_000;
 
 function lockDir() {
   const address = new URL(baseURL());

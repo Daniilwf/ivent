@@ -3,6 +3,7 @@ import {
   adminRefresh,
   apiOf,
   cellOf,
+  commandsOf,
   complete,
   confirmButton,
   leaderRow,
@@ -20,9 +21,7 @@ import type { Schemas } from '../support/api.ts';
 // the season is back where it was before it.
 
 async function commandOf(world: World, type: string): Promise<Schemas['AdminCommandView']> {
-  const commands = await world.adminApi.get<Schemas['AdminCommandView'][]>(
-    `/api/admin/seasons/${world.seasonId}/commands?limit=50`,
-  );
+  const commands = await commandsOf(world);
   const found = commands.find((c) => c.commandType === type && !c.undone);
   if (!found) throw new Error(`No ${type} in the log.`);
   return found;
@@ -31,9 +30,11 @@ async function commandOf(world: World, type: string): Promise<Schemas['AdminComm
 test('undo: a command with later ones is refused with them listed, the latest is undone whole', async ({
   browser,
 }) => {
-  const world = await setUpSeason({ players: ['Вася'] });
-  const [vasya] = world.players;
-  if (!vasya) throw new Error('No player.');
+  const world = await setUpSeason({ players: ['Вася', 'Петя'] });
+  const [vasya, petya] = world.players;
+  if (!vasya || !petya) throw new Error('No players.');
+  const vasyaIn = (view: { players: { id: string; cellId: string; points: number }[] }) =>
+    view.players.find((p) => p.id === vasya.playerId);
 
   // Setup: Vasya rolled, started and completed a game
   const player = await apiOf(vasya);
@@ -41,7 +42,7 @@ test('undo: a command with later ones is refused with them listed, the latest is
   const before = await seasonOf(player, world.seasonId);
   await complete(player, world.seasonId);
   const done = await seasonOf(player, world.seasonId);
-  expect(done.players[0]?.points).toBeGreaterThan(0);
+  expect(vasyaIn(done)?.points).toBeGreaterThan(0);
 
   const page = await signIn(browser, vasya);
   await expect(page.getByTestId('last-dice')).toBeVisible();
@@ -71,9 +72,16 @@ test('undo: a command with later ones is refused with them listed, the latest is
   await expect(page.getByTestId('active-run')).toBeVisible();
   await expect(page.getByTestId('active-run')).toContainText(game);
   await expect(leaderRow(page, vasya.playerId)).toContainText('Вася: 0 очк.');
-  await expect.poll(() => cellOf(page, 'Вася')).toBe(`cell-${before.players[0]?.cellId ?? ''}`);
+  await expect.poll(() => cellOf(page, 'Вася')).toBe(`cell-${vasyaIn(before)?.cellId ?? ''}`);
   const after = await seasonOf(player, world.seasonId);
   expect(after.players).toEqual(before.players);
   expect(after.leaderboard).toEqual(before.leaderboard);
   expect(after.me?.phase).toBe('playing');
+
+  // The log is open to every player (L1): Petya's feed has the admin's undo, and the completion is marked undone
+  const petyaPage = await signIn(browser, petya);
+  await petyaPage.getByTestId('nav-feed').first().click();
+  const feed = petyaPage.getByTestId('feed');
+  await expect(feed).toContainText('Админ откатывает действие');
+  await expect(feed.locator('[data-undone]').filter({ hasText: game })).toContainText('Отменено');
 });

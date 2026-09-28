@@ -24,6 +24,10 @@ export type World = {
 /** The admin's pages follow the season at most every 10 s (AdminScreen's refreshEveryMs): what they wait for live */
 export const adminRefresh = { timeout: 15_000 };
 
+/** A player's page follows the season at once by the hub; a change made by the site's scheduler (the deadline) comes
+ *  with its next tick */
+export const live = { timeout: 15_000 };
+
 /** The password every test account gets after its temporary one */
 export const testPassword = 'e2e-password-1';
 
@@ -45,8 +49,12 @@ let root: Promise<Api> | null = null;
 /** The development seed's admin, one session per worker */
 function rootAdmin(): Promise<Api> {
   const session = root ?? Api.signIn(baseURL(), seedAdmin.login, seedAdmin.password);
-  root = session;
-  return session;
+  // A failed sign-in is not kept: the next test of the worker tries again
+  root = session.catch((error: unknown) => {
+    root = null;
+    throw error;
+  });
+  return root;
 }
 
 /** An account made by an admin; its temporary password is changed at once, as its owner would on the first visit */
@@ -236,8 +244,22 @@ export async function rollAndStartHere(page: Page): Promise<string> {
   return title.trim();
 }
 
+/** The season's log as the admin's log page lists it, newest first */
+export function commandsOf(world: World): Promise<Schemas['AdminCommandView'][]> {
+  return world.adminApi.get<Schemas['AdminCommandView'][]>(
+    `/api/admin/seasons/${world.seasonId}/commands?limit=50`,
+  );
+}
+
 /** Completes the active run with the completion form (with an estimate when the game has no hours) */
 export async function completeHere(page: Page, difficulty = 'Нормальная') {
+  await fillCompletionHere(page, difficulty);
+  await page.getByTestId('complete-submit').click();
+  await expect(page.getByTestId('last-dice')).toBeVisible();
+}
+
+/** Fills the completion form without sending it */
+export async function fillCompletionHere(page: Page, difficulty = 'Нормальная') {
   // A game without pool hours needs an estimate with its source (D-96)
   const hours = page.getByTestId('complete-hours');
   if (await hours.isVisible()) {
@@ -249,8 +271,6 @@ export async function completeHere(page: Page, difficulty = 'Нормальна�
   await expect(
     page.getByTestId('complete-difficulty').getByRole('radio', { name: difficulty }),
   ).toBeChecked();
-  await page.getByTestId('complete-submit').click();
-  await expect(page.getByTestId('last-dice')).toBeVisible();
 }
 
 /** The confirm button of the open danger dialog (ConfirmDanger without a test id of its own) */

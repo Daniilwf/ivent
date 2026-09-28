@@ -22,7 +22,14 @@ test('speed: the demo season’s main page shows its content within 2.5 s on a m
   browser,
 }, testInfo) => {
   // The player the global setup added to the demo season, signed in through the API
-  const player = await Api.signIn(baseURL(), speedPlayer.login, testPassword);
+  const player = await Api.signIn(baseURL(), speedPlayer.login, testPassword).catch(
+    (error: unknown) => {
+      throw new Error(
+        `No demo player ${speedPlayer.login}: the global setup adds it on the E2E site (E2E_LOCAL_SITE=1 for a site given in E2E_BASE_URL, D-231).`,
+        { cause: error },
+      );
+    },
+  );
   const context = await browser.newContext();
   await context.addCookies(await player.cookies());
   await player.dispose();

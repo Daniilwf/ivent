@@ -5,7 +5,8 @@ import { createAccountAt } from './world.ts';
 // Before any scenario moves the site's clock: a player of the demo season for scenario 13 (tests/late/s13-speed). The
 // demo players also play the development season, which is newer and would open instead; a player added to the demo
 // season alone opens it. Players join only a running season, and the clock moves past the demo deadline as the
-// scenarios run, so the player joins here, first. Only on the E2E site (not on an address given to the smoke tests).
+// scenarios run, so the player joins here, first. Only on the E2E site: an address given in E2E_BASE_URL (the smoke
+// tests) is left alone unless E2E_LOCAL_SITE=1 says it is an E2E site started by hand (scripts/e2e-server.mjs, D-231).
 
 /** DemoSeed.SeasonId */
 export const demoSeasonId = 'de300000-0000-0000-0000-000000000001';

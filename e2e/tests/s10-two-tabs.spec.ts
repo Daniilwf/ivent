@@ -1,25 +1,20 @@
-import { expect, test, type Page } from '@playwright/test';
-import type { Schemas } from '../support/api.ts';
-import { apiOf, seasonOf, setUpSeason, signIn, type World } from '../support/world.ts';
+import { expect, test } from '@playwright/test';
+import {
+  apiOf,
+  commandsOf,
+  fillCompletionHere,
+  seasonOf,
+  setUpSeason,
+  signIn,
+  type World,
+} from '../support/world.ts';
 
 // TESTING.md scenario 10 «Две вкладки одного игрока и параллельные клики»: the same player in two tabs clicks the same
 // step in both at once (and twice in one): the command queue takes one (SPEC «Два действия одновременно»), the other is
 // refused or repeats nothing; both tabs end on the same state, and the log holds each step once.
 
 async function accepted(world: World, type: string): Promise<number> {
-  const commands = await world.adminApi.get<Schemas['AdminCommandView'][]>(
-    `/api/admin/seasons/${world.seasonId}/commands?limit=50`,
-  );
-  return commands.filter((c) => c.commandType === type && !c.undone).length;
-}
-
-async function fillCompletion(page: Page) {
-  const hours = page.getByTestId('complete-hours');
-  if (await hours.isVisible()) {
-    await hours.fill('5');
-    await page.getByTestId('complete-hours-source').fill('HowLongToBeat');
-  }
-  await page.getByTestId('complete-difficulty').getByText('Сложная', { exact: true }).click();
+  return (await commandsOf(world)).filter((c) => c.commandType === type && !c.undone).length;
 }
 
 test('two tabs: the same step clicked in both at once happens once, and both tabs agree', async ({
@@ -47,7 +42,7 @@ test('two tabs: the same step clicked in both at once happens once, and both tab
   expect(await accepted(world, 'StartRun')).toBe(1);
 
   // The completion, sent from both at once
-  for (const tab of tabs) await fillCompletion(tab);
+  for (const tab of tabs) await fillCompletionHere(tab, 'Сложная');
   await Promise.all(tabs.map((tab) => tab.getByTestId('complete-submit').click()));
   for (const tab of tabs) await expect(tab.getByTestId('roll')).toBeVisible();
   expect(await accepted(world, 'CompleteRun')).toBe(1);
@@ -55,6 +50,7 @@ test('two tabs: the same step clicked in both at once happens once, and both tab
   // One run's dice counted once, and both tabs show the same
   const view = await seasonOf(await apiOf(vasya), world.seasonId);
   const run = view.me?.lastCompleted;
+  expect(run?.dice.length).toBeGreaterThan(0);
   expect(run?.dice.every((d) => d.sides === 6)).toBe(true);
   expect(view.players[0]?.points).toBe(run?.total);
   const dice = await first.getByTestId('last-dice').textContent();

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { adminRefresh, openAdmin, setUpSeason, signIn } from '../support/world.ts';
+import { live, openAdmin, setUpSeason, signIn } from '../support/world.ts';
 
 // TESTING.md scenario 12 «Страница правил»: the rules page is built from the season's current config (SPEC «Правила на
 // сайте»): the numbers of docs/ruleset.default.json first; the admin changes two of them in the admin's rules editor —
@@ -44,7 +44,7 @@ test('rules: the page shows the config, then the admin’s new numbers and the c
   await expect(admin.getByTestId('rules-version')).toContainText('2');
 
   // The player's page follows without a reload
-  await expect(dieOf(page, 'Сложная')).toContainText('d8', adminRefresh);
+  await expect(dieOf(page, 'Сложная')).toContainText('d8', live);
   await expect(dieOf(page, 'Нормальная')).toContainText('d4');
   await expect(second).toHaveText('2-е место+12 очк.');
   const history = page.getByTestId('rules-history');

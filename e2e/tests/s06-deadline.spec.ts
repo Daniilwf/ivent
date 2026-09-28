@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { holdingTheClock } from '../support/clock.ts';
 import {
-  adminRefresh,
+  live,
   advanceClock,
   apiOf,
   commandId,
@@ -46,11 +46,11 @@ test('deadline: rolls closed, proofs accepted, results only after every proof is
 
   // The scheduler closes the season; the pages follow without a reload
   const closing = 'Дедлайн прошёл: броски закрыты, пруфы принимаются.';
-  await expect(vasyaPage.getByTestId('season-status')).toContainText(closing, adminRefresh);
+  await expect(vasyaPage.getByTestId('season-status')).toContainText(closing, live);
   await expect(vasyaPage.getByTestId('turn')).toContainText('Ждём проверку пруфов');
   await expect(vasyaPage.getByTestId('roll')).toHaveCount(0);
   // Petya's game was not completed in time: nothing to complete it with any more
-  await expect(petyaPage.getByTestId('season-status')).toContainText(closing, adminRefresh);
+  await expect(petyaPage.getByTestId('season-status')).toContainText(closing, live);
   await expect(petyaPage.getByTestId('complete-form')).toHaveCount(0);
   await expect(petyaPage.getByTestId('roll')).toHaveCount(0);
 

@@ -5,17 +5,15 @@ import { rollAndStartHere, setUpSeason, signIn } from '../support/world.ts';
 // 390×844 with touch — the map zooms with two fingers; the desktop project checks the same screens at 1440×900 with a
 // mouse wheel. Both: no sideways scroll, the one main action in view, the map zooms with its buttons and pans by drag.
 
-/** The map's visible width in map units: smaller is closer */
-async function mapWidth(page: Page): Promise<number> {
-  const box = await page.locator('svg[role="application"]').first().getAttribute('viewBox');
-  return Number(box?.split(' ')[2]);
-}
-
-async function mapCentre(page: Page): Promise<number> {
+/** The map's visible box in map units (its viewBox): a smaller width is closer */
+async function mapView(page: Page) {
   const box = (await page.locator('svg[role="application"]').first().getAttribute('viewBox')) ?? '';
   const [x = 0, , w = 0] = box.split(' ').map(Number);
-  return x + w / 2;
+  return { width: w, centre: x + w / 2 };
 }
+
+const mapWidth = async (page: Page) => (await mapView(page)).width;
+const mapCentre = async (page: Page) => (await mapView(page)).centre;
 
 async function noSidewaysScroll(page: Page) {
   const overflow = await page.evaluate(

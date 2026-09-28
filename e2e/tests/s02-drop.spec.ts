@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { holdingTheClock } from '../support/clock.ts';
 import {
   adminRefresh,
   apiOf,
@@ -30,15 +31,19 @@ test('drop: the penalty takes points and cells, and a manual bad event joins the
   );
 
   const page = await signIn(browser, vasya);
-  const game = await rollAndStartHere(page);
+  // The hour of play before the hint goes is counted by the site's clock: held, so no other test moves it meanwhile
+  await holdingTheClock(async () => {
+    const game = await rollAndStartHere(page);
 
-  // The drop is confirmed in a window that says what it costs
-  await page.getByTestId('drop').click();
-  const confirm = page.getByTestId('drop-confirm');
-  await expect(confirm).toContainText(`Дропнуть «${game}»?`);
-  // A drop right after the start: the hint to wait an hour, only a hint (RR4)
-  await expect(confirm.getByTestId('drop-hint')).toBeVisible();
-  await page.getByTestId('drop-confirm-yes').click();
+    // The drop is confirmed in a window that says what it costs
+    await page.getByTestId('drop').click();
+    const confirm = page.getByTestId('drop-confirm');
+    await expect(confirm).toContainText(`Дропнуть «${game}»?`);
+    // A drop right after the start: the hint to wait an hour, only a hint (RR4)
+    await expect(confirm.getByTestId('drop-hint')).toBeVisible();
+    await page.getByTestId('drop-confirm-yes').click();
+    await expect(page.getByTestId('roll')).toBeVisible();
+  });
 
   // Back to the roll, with the bad event to play by hand
   await expect(page.getByTestId('roll')).toBeVisible();
