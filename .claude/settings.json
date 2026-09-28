@@ -43,7 +43,9 @@
       "Bash(gh workflow run*)",
       "Bash(gh pr create*)",
       "Bash(gh pr merge*)",
-      "Bash(gh release*)"
+      "Bash(gh release*)",
+      "Edit(docs/SPEC.md)",
+      "Write(docs/SPEC.md)"
     ],
     "deny": [
       "Bash(git push --force*)",
@@ -56,9 +58,7 @@
       "Bash(dotnet ef database drop*)",
       "Read(./.env)",
       "Read(./.env.production)",
-      "Read(./deploy/secrets/**)",
-      "Edit(docs/SPEC.md)",
-      "Write(docs/SPEC.md)"
+      "Read(./deploy/secrets/**)"
     ]
   },
   "hooks": {
