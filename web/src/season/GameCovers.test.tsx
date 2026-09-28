@@ -76,6 +76,9 @@ function season(turn: Partial<Schemas['MyTurnView']>): Schemas['SeasonView'] {
       ...turn,
     },
     lastSequence: 3,
+    edges: [],
+    zones: [],
+    mapMode: 'linear',
     name: 'Тестовый сезон',
   };
 }
