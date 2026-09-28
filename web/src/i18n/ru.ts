@@ -1695,7 +1695,7 @@ export const ru = {
       trace: 'Стек вызовов',
       traceId: (id: string) => `Трасса: ${id}`,
     },
-    // The test tools (H9, D-221): only in Development and Test
+    // The test tools (H9, D-221): in Development, Test and on the test copy (Staging), never on the live site (D-220)
     test: {
       scenarios: 'Сценарии',
       scenario: 'Сценарий',

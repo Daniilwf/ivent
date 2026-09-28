@@ -47,7 +47,7 @@ public sealed record TestScenarioView(string Scenario, IReadOnlyList<string> Com
 
 /// <summary>
 /// Test endpoints (SPEC «Тестовые эндпоинты», E4, A7, D-120): rewind the time, seed the randomness, load a scenario —
-/// «финиш на носу», «дедлайн через час», «на игроке пять ручных эффектов». Mapped only in Development and Test, admin
+/// «финиш на носу», «дедлайн через час», «на игроке пять ручных эффектов». Mapped in Development, Test and on the test copy (Staging, D-220), admin
 /// only; in Production the routes do not exist. Scenarios go through the queue like any admin action.
 /// </summary>
 public static class TestEndpoints
@@ -67,7 +67,9 @@ public static class TestEndpoints
     public static bool Available(IWebHostEnvironment environment)
     {
         ArgumentNullException.ThrowIfNull(environment);
-        return environment.IsDevelopment() || environment.IsEnvironment("Test");
+        // The test copy on the server (Staging) has them too: loading scenarios there is what it is for (D-220, the
+        // owner's decision); the live site (Production) never does
+        return environment.IsDevelopment() || environment.IsEnvironment("Test") || environment.IsStaging();
     }
 
     /// <summary>A movable clock and a seedable randomness for the test endpoints; production keeps the real ones.</summary>

@@ -246,7 +246,7 @@ public sealed class TestEndpointsTests : IAsyncLifetime
 
     [Theory]
     [InlineData("Production", "production", false)]
-    [InlineData("Staging", "staging", false)]
+    [InlineData("Staging", "staging", true)]
     [InlineData("Development", "development", true)]
     [InlineData("Test", "test", true)]
     public async Task The_status_names_the_copy_of_the_site_and_whether_the_test_tools_are_there(string environment, string named, bool tools)
@@ -262,9 +262,10 @@ public sealed class TestEndpointsTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task On_the_test_copy_the_admin_has_no_test_tools_either()
+    public async Task On_the_test_copy_the_admin_has_the_test_tools_and_a_player_does_not()
     {
-        // Staging is the test copy on the server (D-120): the tools stay off there until decided otherwise (D-220)
+        // Staging is the test copy on the server (D-120): loading scenarios there is what it is for (D-220, the owner's
+        // decision) — for the admin only, as everywhere
         await using var staging = new SiteFactory(loginAttemptsPerMinute: 1000, environment: "Staging");
         await staging.SeedAsync();
         // Secure cookies off Development and Test: the client signs in over https
@@ -274,8 +275,15 @@ public sealed class TestEndpointsTests : IAsyncLifetime
         await SiteFactory.RefreshCsrfAsync(admin);
         Assert.Equal(HttpStatusCode.OK, (await admin.GetAsync("/api/auth/me", Ct)).StatusCode);
 
-        Assert.Equal(HttpStatusCode.NotFound, (await admin.GetAsync("/api/test", Ct)).StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, (await admin.PostAsJsonAsync("/api/test/clock", new { advanceMinutes = 60 }, Ct)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await admin.GetAsync("/api/test", Ct)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await admin.PostAsJsonAsync("/api/test/clock", new { advanceMinutes = 60 }, Ct)).StatusCode);
+
+        var player = staging.CreateClient(new WebApplicationFactoryClientOptions { BaseAddress = new Uri("https://localhost"), HandleCookies = true });
+        await SiteFactory.RefreshCsrfAsync(player);
+        (await player.PostAsJsonAsync("/api/auth/login", new { login = "vasya", password = SiteFactory.Password }, Ct)).EnsureSuccessStatusCode();
+        await SiteFactory.RefreshCsrfAsync(player);
+        Assert.Equal(HttpStatusCode.Forbidden, (await player.GetAsync("/api/test", Ct)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await player.PostAsJsonAsync("/api/test/clock", new { advanceMinutes = 60 }, Ct)).StatusCode);
     }
 
     [Fact]
@@ -292,10 +300,10 @@ public sealed class TestEndpointsTests : IAsyncLifetime
 
     [Theory]
     [InlineData("Production", false)]
-    [InlineData("Staging", false)]
+    [InlineData("Staging", true)]
     [InlineData("Development", true)]
     [InlineData("Test", true)]
-    public void Only_development_and_test_get_the_movable_clock_and_the_seedable_randomness(string environment, bool registered)
+    public void Only_the_live_site_keeps_the_real_clock_and_randomness(string environment, bool registered)
     {
         // The site as it is built, without the tests' own clock: production keeps the real time and the real randomness
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = environment });
