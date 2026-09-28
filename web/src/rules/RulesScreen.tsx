@@ -1,5 +1,5 @@
 import { BookOpen, CalendarClock } from 'lucide-react';
-import { useCallback, type ReactNode } from 'react';
+import { useCallback, useEffect, type ReactNode } from 'react';
 import { api, type Schemas } from '../api/client';
 import type { SeasonUpdate } from '../api/realtime';
 import { usePageHeading } from '../app/router';
@@ -23,7 +23,16 @@ const changesRules = (update: SeasonUpdate) =>
   );
 
 type SectionId = keyof typeof t.sections;
-const order: SectionId[] = ['win', 'roll', 'reward', 'drop', 'finish', 'deadline', 'history'];
+const order: SectionId[] = [
+  'win',
+  'roll',
+  'completion',
+  'reward',
+  'drop',
+  'finish',
+  'deadline',
+  'history',
+];
 
 /**
  * The season's rules (H7; SPEC «Правила на сайте»): every number from the ruleset in force, in words, and the history of
@@ -117,6 +126,15 @@ export function RulesScreen({
 export function RulesContent({ rules }: { rules: Schemas['RulesView'] }) {
   const page = rulesPage(rules.ruleset);
   const deadline = rules.deadline ?? null;
+  // A link to a section (D-207: «Что считается прохождением» from a run or the proof queue) came before the rules did:
+  // the browser found nothing to scroll to, so the section is shown once it is here
+  useEffect(() => {
+    const target = decodeURIComponent(globalThis.location.hash.slice(1));
+    if (!target.startsWith('rules-')) return;
+    const section = document.getElementById(target);
+    if (section && typeof section.scrollIntoView === 'function')
+      section.scrollIntoView({ block: 'start' });
+  }, []);
   return (
     <>
       <nav
@@ -144,6 +162,9 @@ export function RulesContent({ rules }: { rules: Schemas['RulesView'] }) {
         </RulesSection>
         <RulesSection id="roll">
           <Lines lines={page.roll} />
+        </RulesSection>
+        <RulesSection id="completion">
+          <CompletionCriteria />
         </RulesSection>
         <RulesSection id="reward">
           <Lines lines={page.reward} />
@@ -221,6 +242,29 @@ function RulesSection({ id, children }: { id: SectionId; children: ReactNode }) 
       </h2>
       {children}
     </section>
+  );
+}
+
+/** «Что считается прохождением» (D-207, RGG 14): the first condition that fits, top to bottom; the same for every season */
+export function CompletionCriteria() {
+  const c = t.completion;
+  return (
+    <div className="grid max-w-prose gap-3" data-testid="rules-completion">
+      <p>{c.lead}</p>
+      <ol className="grid list-decimal gap-2 pl-5">
+        {c.steps.map((step) => (
+          <li key={step.title}>
+            <strong>{step.title}</strong> {step.text}
+          </li>
+        ))}
+      </ol>
+      <p>
+        <strong>{c.doubtTitle}</strong> {c.doubtText}
+      </p>
+      <p>
+        <strong>{c.proofTitle}</strong> {c.proofText}
+      </p>
+    </div>
   );
 }
 

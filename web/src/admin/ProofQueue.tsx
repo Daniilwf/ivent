@@ -14,6 +14,7 @@ import { EmptyState, Notice } from '../ui/States';
 import { commentProblem, refusal } from './actions';
 import { newCommandId } from '../api/commands';
 import { AsyncState } from '../ui/AsyncState';
+import { CompletionRulesLink } from '../rules/CompletionRulesLink';
 import type { Loaded } from '../app/useLoaded';
 
 const t = ru.admin.proofs;
@@ -202,7 +203,10 @@ export function ProofCard({
       </header>
 
       <section className="grid gap-2" aria-label={ru.proof.title}>
-        <p className="font-medium">{sent ? t.proofSent : t.noProof}</p>
+        <div className="flex flex-wrap items-center justify-between gap-x-4">
+          <p className="font-medium">{sent ? t.proofSent : t.noProof}</p>
+          <CompletionRulesLink />
+        </div>
         {item.links.length > 0 ? (
           <ul className="grid gap-1">
             {item.links.map((link, i) => (

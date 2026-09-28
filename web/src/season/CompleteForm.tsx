@@ -2,6 +2,7 @@ import { useRef, useState, type SyntheticEvent } from 'react';
 import type { Schemas } from '../api/client';
 import { difficultyValues } from '../api/schema';
 import { ru } from '../i18n/ru';
+import { CompletionRulesLink } from '../rules/CompletionRulesLink';
 import { Button } from '../ui/Button';
 import { Checkbox, ChoiceGroup, Field, Select, TextArea } from '../ui/Field';
 
@@ -102,9 +103,12 @@ export function CompleteForm({
       aria-labelledby="complete-title"
       className="grid min-w-0 gap-4"
     >
-      <h3 id="complete-title" className="font-display font-heavy">
-        {ru.turn.completeTitle}
-      </h3>
+      <div className="flex flex-wrap items-center justify-between gap-x-4">
+        <h3 id="complete-title" className="font-display font-heavy">
+          {ru.turn.completeTitle}
+        </h3>
+        <CompletionRulesLink />
+      </div>
       <ChoiceGroup
         data-testid="complete-difficulty"
         label={ru.turn.difficulty}

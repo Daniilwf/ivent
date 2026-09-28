@@ -3,6 +3,7 @@ import { useRef, useState, type ChangeEvent, type ReactNode, type SyntheticEvent
 import type { Schemas } from '../api/client';
 import { uploadFile, UploadError } from '../api/files';
 import { ru } from '../i18n/ru';
+import { CompletionRulesLink } from '../rules/CompletionRulesLink';
 import { Button, IconButton } from '../ui/Button';
 import { cx } from '../ui/cx';
 import { Field, FilePicker, Select, TextArea } from '../ui/Field';
@@ -165,6 +166,7 @@ export function ProofSection({
       {open && (
         <form onSubmit={submit} noValidate data-testid="proof-form" className="grid min-w-0 gap-4">
           <p className="text-sm text-ink-soft">{ru.proof.lead}</p>
+          <CompletionRulesLink className="justify-self-start" />
           {links.map((value, i) => (
             <Field
               key={i}

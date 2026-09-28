@@ -4,6 +4,16 @@ import { ru } from '../i18n/ru';
 import { CompleteForm } from './CompleteForm';
 
 describe('CompleteForm', () => {
+  it('links to what counts as a completion (D-207)', () => {
+    render(<CompleteForm needsHours={false} pending={false} onComplete={vi.fn()} />);
+
+    const form = screen.getByTestId('complete-form');
+    expect(within(form).getByRole('link', { name: ru.rules.sections.completion })).toHaveAttribute(
+      'href',
+      '/rules#rules-completion',
+    );
+  });
+
   it('sends the chosen difficulty without hours when the game has them', async () => {
     const onComplete = vi.fn();
     render(<CompleteForm needsHours={false} pending={false} onComplete={onComplete} />);

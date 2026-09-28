@@ -45,6 +45,16 @@ describe('Screenshots in the proof', () => {
     vi.unstubAllGlobals();
   });
 
+  it('links the proof to what counts as a completion (D-207)', () => {
+    renderForm();
+
+    expect(
+      within(screen.getByTestId('proof-form')).getByRole('link', {
+        name: ru.rules.sections.completion,
+      }),
+    ).toHaveAttribute('href', '/rules#rules-completion');
+  });
+
   it('uploads a screenshot, shows its thumbnail and sends it alone as the proof', async () => {
     const requests = serveUploads([json(200, shot(1))]);
     const onSubmit = renderForm();
