@@ -154,6 +154,32 @@ test('a completion stops at the fork, the player picks a branch and the token wa
     .getAttribute('data-testid');
   expect(cell).toMatch(/^cell-b\d+$/);
 
+  // 2.11 on a desktop: the admin changes the map in the editor and publishes it; the player sees it after a reload
+  if (testInfo.project.name === 'desktop') {
+    const context = await page.context().browser()?.newContext();
+    if (!context) throw new Error('No browser');
+    const editor = await context.newPage();
+    await editor.goto('/');
+    await editor.getByTestId('login-name').fill('admin');
+    await editor.getByTestId('login-password').fill(password);
+    await editor.getByTestId('login-submit').click();
+    await editor.goto('/admin/season');
+    await editor.getByTestId(`season-open-${seasonId}`).click();
+    await editor.getByTestId('admin-nav-map').click();
+    await expect(editor.getByTestId('map-editor')).toBeVisible();
+    await editor.getByTestId('map-cell-pick').selectOption('a5');
+    await editor.getByTestId('map-cell-type').selectOption('checkpoint');
+    await expect(editor.getByText('Ошибок нет: карту можно публиковать.')).toBeVisible();
+    await editor.getByTestId('map-publish-comment').fill('Чекпоинт на верхней ветке');
+    await editor.getByTestId('map-publish-button').click();
+    await editor.getByTestId('map-publish-confirm-yes').click();
+    await expect(editor.getByText('Карта опубликована.')).toBeVisible();
+    await context.close();
+
+    await page.reload();
+    await expect(page.getByTestId('cell-a5')).toContainText('чекпоинт');
+  }
+
   await admin.context.dispose();
   await player.context.dispose();
 });
