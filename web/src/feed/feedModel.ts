@@ -210,6 +210,16 @@ const headlines: [string, (d: Data, c: Context) => Headline][] = [
       ],
     }),
   ],
+  // D-327: a reject with the drop penalty leads its command
+  [
+    'proof-reject-penalized',
+    (d, c) => ({
+      icon: 'drop',
+      actor: c.player(d),
+      line: L.proofRejectPenalized(c.playerRef(d), c.gameRef(d)),
+      facts: [F.penalty(dieValues(d, 'penaltyDice'))],
+    }),
+  ],
   [
     'proof-rejected',
     (d, c) => ({

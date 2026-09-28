@@ -81,6 +81,7 @@ public class SeasonSetupTests
         { "proof", new Engine.Proofs.SubmitProof(SequentialIds.Make(0x10000000, 1), SequentialIds.Make(0x60000000, 1), ["https://imgur.com/a/1"]) },
         { "approve", new Engine.Proofs.ApproveProof(SequentialIds.Make(0x60000000, 1), null, "Видел") },
         { "reject", new Engine.Proofs.RejectProof(SequentialIds.Make(0x60000000, 1), "Другая игра") },
+        { "reject with the drop penalty", new Engine.Proofs.RejectProofWithDropPenalty(SequentialIds.Make(0x60000000, 1), "Обман") },
     };
 
     [Theory]

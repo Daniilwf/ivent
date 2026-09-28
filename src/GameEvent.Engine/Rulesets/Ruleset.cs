@@ -147,6 +147,12 @@ public sealed record RollRules
     public required EmptyPoolFallback EmptyPoolFallback { get; init; }
 
     public required LastDaysLengthFilter LastDaysLengthFilter { get; init; }
+
+    /// Tags whose games may be given up for free by wish within the tech reroll window (D-206, D-325): a tech reroll with
+    /// the reason «wish», refused when the roll's own filters imposed a genre; fixed in the run's snapshot at the roll.
+    /// Empty — no wish rerolls. Not written while empty: a ruleset without it logs exactly as before the field existed.
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public EquatableArray<string> WishRerollTags { get; init; }
 }
 
 public enum Rounding
@@ -259,6 +265,12 @@ public sealed record DropRules
     public required bool AffectsPosition { get; init; }
 
     public required MandatoryEvent MandatoryEvent { get; init; }
+
+    /// Penalty dice (of <see cref="PenaltyDice"/>'s kind) every further drop in a row adds (D-205, D-324): the n-th drop
+    /// since the player's last counted completion throws <c>count + (n − 1) × consecutiveExtraDice</c>. Null — never more
+    /// (a season logged before the field reads without it and keeps its old behaviour); not written when null.
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? ConsecutiveExtraDice { get; init; }
 }
 
 public sealed record FinishRules

@@ -26,6 +26,12 @@ public enum TechRerollReason
     DoesNotLaunch,
     EmulatorTooSlow,
     Other,
+
+    /// <summary>
+    /// «Реролл по желанию» (D-206, D-325): the game has a tag of <c>roll.wishRerollTags</c> that the roll did not impose;
+    /// only within the window.
+    /// </summary>
+    Wish,
 }
 
 /// <summary>
@@ -66,7 +72,7 @@ internal static class Drops
 
         var player = state.Players[command.PlayerId];
         var run = ActiveRun(state, player);
-        var dice = PenaltyRoll(state, context);
+        var dice = PenaltyRoll(state, run, context);
         return Decision.Accept(
         [
             new RunDropped(run.RunId, player.PlayerId, dice, context.Clock.UtcNow),
@@ -101,11 +107,16 @@ internal static class Drops
         var run = ActiveRun(state, player);
         var now = context.Clock.UtcNow;
         var window = TimeSpan.FromHours(run.Snapshot.TechRerollWindowHours);
-        if (!command.ByAdmin && now - run.RolledAt > window)
+        if ((!command.ByAdmin || command.Reason == TechRerollReason.Wish) && now - run.RolledAt > window)
         {
-            // D-11: after the window only the admin, on the player's behalf.
+            // D-11: after the window only the admin, on the player's behalf; a wish reroll not at all (D-325).
             return Decision.Reject(
                 RejectionCodes.TechRerollWindowClosed, $"The tech reroll window of {window.TotalHours} h after the roll has passed.");
+        }
+
+        if (command.Reason == TechRerollReason.Wish && WishRerolls.Refusal(run, context.Pool) is { } refusal)
+        {
+            return refusal;
         }
 
         var rerolled = new RunTechRerolled(run.RunId, player.PlayerId, command.Reason, command.Comment, command.ByAdmin, now);
@@ -152,7 +163,7 @@ internal static class Drops
 
         // The penalty hits the player's current points and position; their turn is left alone (D-11).
         var player = state.Players[run.PlayerId];
-        var dice = PenaltyRoll(state, context);
+        var dice = PenaltyRoll(state, run, context);
         return Decision.Accept(
         [
             new TechRerollConvertedToDrop(run.RunId, player.PlayerId, command.Comment, dice, context.Clock.UtcNow),
@@ -180,14 +191,15 @@ internal static class Drops
     private static RunState ActiveRun(SeasonState state, SeasonPlayer player) =>
         state.Runs[player.ActiveRunId ?? throw new InvalidOperationException($"Player {player.PlayerId} is Playing without a run.")];
 
-    private static EquatableArray<Die> PenaltyRoll(SeasonState state, EngineContext context) =>
-        CompletionRoll.Roll(state.Rules.Drop.PenaltyDice.Count, state.Rules.Drop.PenaltyDice.Sides, context.Random);
+    // D-205: every drop in a row before this one adds its extra dice
+    private static EquatableArray<Die> PenaltyRoll(SeasonState state, RunState run, EngineContext context) =>
+        CompletionRoll.Roll(DropStreak.PenaltyDiceCount(state.Rules.Drop, DropStreak.Before(state, run)), state.Rules.Drop.PenaltyDice.Sides, context.Random);
 
     /// <summary>
     /// The drop penalty (D-09, D-94): points and position by the dice sum, never past the start; the game excluded
     /// for a drop (a conversion changes the existing exclusion instead); the mandatory bad event.
     /// </summary>
-    private static IEnumerable<IGameEvent> Penalty(
+    internal static IEnumerable<IGameEvent> Penalty(
         SeasonState state, SeasonPlayer player, EquatableArray<Die> dice, Guid runId, EngineContext context, bool exclude = true)
     {
         var rules = state.Rules.Drop;

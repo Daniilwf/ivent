@@ -51,6 +51,7 @@ public static class FeedVisibility
         ["run-dropped"] = Access.Public,
         ["run-tech-rerolled"] = Access.Public,
         ["tech-reroll-converted-to-drop"] = Access.Public,
+        ["proof-reject-penalized"] = Access.Public,
         ["run-hours-corrected"] = Access.Public,
         ["run-difficulty-changed"] = Access.Public,
         ["proof-submitted"] = Access.OwnerFields,

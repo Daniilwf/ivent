@@ -525,6 +525,42 @@ public class CommandQueueTests
     }
 
     [Fact]
+    public async Task Projection_of_a_move_onto_a_bonus_cell_and_its_reject_equals_the_fold_of_the_log()
+    {
+        // D-321, D-327: the run keeps the bonus of the cell its move stopped on (every cell but the ends is a bonus
+        // here); the fold-only fields must not make the integrity check see a difference
+        await using var h = await QueueHarness.StartAsync();
+        var ct = TestContext.Current.CancellationToken;
+        var rules = RulesetJson.Default();
+        var ids = Enumerable.Range(1, 40).Select(i => $"b{i}").ToList();
+        var map = new Engine.Map.MapGraph(
+            [
+                new Engine.Map.Cell("start", Engine.Map.CellType.Start),
+                .. ids.Select(id => new Engine.Map.Cell(id, Engine.Map.CellType.PointsBonus) { Amount = 2 }),
+                new Engine.Map.Cell("finish", Engine.Map.CellType.Finish),
+            ],
+            [.. new[] { "start" }.Concat(ids).Zip(ids.Append("finish")).Select(p => new Engine.Map.Edge(p.First, p.Second, true, true))]);
+        await AcceptedAsync(h, new CreateSeason(s_season, "Осень", rules with { Features = rules.Features with { MapMode = MapMode.Graph } }, Map: map));
+        await AcceptedAsync(h, new ChangeSeasonStatus(SeasonStatus.Active));
+        await AcceptedAsync(h, new AddSeasonPlayer(s_vasya, s_vasya, "Вася"));
+        await AcceptedAsync(h, new RollGame(s_vasya));
+        await AcceptedAsync(h, new StartRun(s_vasya));
+        await AcceptedAsync(h, new CompleteRun(s_vasya, Difficulty.Normal));
+
+        var completed = await AssertProjectionEqualsReplayAsync(h, ct);
+        var run = completed.Runs.Values.Single();
+        Assert.Equal(2, run.CellPoints);
+        await using (var db = h.NewDb())
+        {
+            Assert.True((await SeasonIntegrity.CheckAsync(db, s_season, ct))!.IsIntact);
+        }
+
+        await AcceptedAsync(h, new RejectProof(run.RunId, "Фейк"));
+        var rejected = await AssertProjectionEqualsReplayAsync(h, ct);
+        Assert.Equal(0, rejected.Players[s_vasya].Points);
+    }
+
+    [Fact]
     public async Task Projection_of_proofs_approvals_and_a_reject_equals_the_fold_of_the_log()
     {
         await using var h = await QueueHarness.StartAsync();

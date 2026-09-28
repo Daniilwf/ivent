@@ -235,6 +235,12 @@ public class EventFormatTests
             """{"runId":"00000000-0000-0000-0000-000000000001","playerId":"10000000-0000-0000-0000-000000000001","comment":"На скрине другая игра","rejectedAt":"2026-10-01T12:30:00+00:00"}"""
         },
         {
+            "proof-reject-penalized",
+            new ProofRejectPenalized(s_run, s_player, [new Die(4, 1), new Die(4, 3)], s_at),
+            1,
+            """{"runId":"00000000-0000-0000-0000-000000000001","playerId":"10000000-0000-0000-0000-000000000001","penaltyDice":[{"sides":4,"value":1},{"sides":4,"value":3}],"penalizedAt":"2026-10-01T12:30:00+00:00"}"""
+        },
+        {
             "player-finished",
             new PlayerFinished(s_player, s_run, 2, s_at, 3),
             1,

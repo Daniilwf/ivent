@@ -164,6 +164,12 @@
             "steps"
           ],
           "additionalProperties": false
+        },
+        "wishRerollTags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       },
       "required": [
@@ -389,6 +395,12 @@
           "enum": [
             "bad",
             "none"
+          ]
+        },
+        "consecutiveExtraDice": {
+          "type": [
+            "integer",
+            "null"
           ]
         }
       },

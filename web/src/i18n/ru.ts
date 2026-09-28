@@ -82,6 +82,8 @@ const rejection = {
   'proof.difficultyAboveClaimed': 'По пруфу нельзя поднять заявленную сложность.',
   'run.techRerollWindowClosed': 'Окно тех-реролла после ролла закрылось. Обратись к админу.',
   'run.reasonCommentRequired': 'Для причины «Другое» нужен комментарий.',
+  'run.wishRerollNotListed': 'Реролл по желанию — только для игр с жанром из списка в правилах.',
+  'run.wishRerollImposed': 'Жанр задал сам ролл (зона): реролл по желанию тут не действует.',
   'run.hoursRequired': 'У игры нет данных о длине: укажи оценку часов.',
   'run.invalidHours': 'Часы должны быть больше нуля.',
   'run.hoursSourceTooLong': 'Источник оценки не длиннее 300 символов.',
@@ -236,6 +238,13 @@ const feedLines = {
     withoutProof ? ' принято без скрина' : ' принят',
   ],
   proofRejected: <T>(p: T, g: T): Line<T> => [p, ': прохождение ', g, ' отклонено'],
+  // D-327: «Отклонить со штрафом дропа»
+  proofRejectPenalized: <T>(p: T, g: T): Line<T> => [
+    p,
+    ': прохождение ',
+    g,
+    ' отклонено со штрафом дропа',
+  ],
   finished: <T>(p: T, order: number): Line<T> => [p, ` финиширует ${order}-м!`],
   finishRevoked: <T>(p: T): Line<T> => [p, ': финиш отменён'],
   effectDrawn: <T>(p: T, kind: 'good' | 'bad'): Line<T> => [
@@ -365,6 +374,8 @@ export const ru = {
       doesNotLaunch: 'Не запускается',
       emulatorTooSlow: 'Эмулятор не тянет',
       other: 'Другое',
+      // D-206: a reroll by wish of a listed genre; the log shows it, the forms do not offer it yet
+      wish: 'По желанию: жанр из списка',
     },
     techRerollComment: 'Комментарий',
     techRerollCommentHint: 'Для причины «Другое» — обязательно',
@@ -1255,6 +1266,12 @@ export const ru = {
                 : '— ничего не отнимает'
         }.`,
       badEvent: 'И обязательный плохой ивент.',
+      // D-205: drops in a row
+      consecutive: (extra: number, sides: number) =>
+        `Каждый следующий дроп подряд — ещё +${extra}d${sides} к штрафу. Серию обнуляет засчитанное прохождение, тех-реролл её не меняет.`,
+      // D-206: the wish reroll's genres
+      wish: (tags: string, hours: number) =>
+        `Реролл по желанию — бесплатно, для игр с жанрами: ${tags}. Доступен ${hoursText(hours)} после ролла, если жанр не задан зоной.`,
       floor: 'Назад дальше старта не откатывает. Монеток за дроп нет.',
       tech: (hours: number) =>
         `Тех-реролл — бесплатно, с причиной: слабый ПК, игра платная, не запускается, эмулятор не тянет или другое. Доступен ${hoursText(hours)} после ролла, позже — через админа.`,
@@ -1596,8 +1613,12 @@ export const ru = {
       reject: 'Отклонить',
       rejectTitle: (game: string, player: string) => `Отклонить «${game}» (${player})?`,
       // D-98, D-99: what the run really gave is taken back (the frozen first loses nothing); a finish may go
-      rejectConsequences: (total: number, decidesFinish: boolean) => [
+      rejectConsequences: (total: number, decidesFinish: boolean, cellBonus = 0) => [
         `Снимутся очки, клетки и монетки, которые дало это прохождение (кубы: +${total})`,
+        // D-327: the bonus of the cell the move stopped on goes too
+        ...(cellBonus !== 0
+          ? [`И бонус клетки, куда пришёл этот ход: ${cellBonus > 0 ? '+' : ''}${cellBonus}`]
+          : []),
         ...(decidesFinish
           ? [
               'Если без него игрок не дотягивает до финиша, финиш и место снимутся, места пересчитаются',
@@ -1707,6 +1728,7 @@ export const ru = {
         SubmitProof: 'Пруф',
         ApproveProof: 'Одобрение',
         RejectProof: 'Реджект',
+        RejectProofWithDropPenalty: 'Реджект со штрафом дропа',
         DropRun: 'Дроп',
         TechReroll: techReroll,
         ConvertTechRerollToDrop: 'Тех-реролл в дроп',

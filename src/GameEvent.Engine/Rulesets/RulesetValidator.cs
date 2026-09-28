@@ -60,6 +60,17 @@ public static class RulesetValidator
         Sides("drop.penaltyDice.sides", ruleset.Drop.PenaltyDice.Sides);
         NotNegative("drop.penaltyDice.count", ruleset.Drop.PenaltyDice.Count);
         AtMost("drop.penaltyDice.count", ruleset.Drop.PenaltyDice.Count, MaxDice);
+        if (ruleset.Drop.ConsecutiveExtraDice is { } extra)
+        {
+            NotNegative("drop.consecutiveExtraDice", extra);
+            AtMost("drop.consecutiveExtraDice", extra, MaxDice);
+        }
+
+        if (ruleset.Roll.WishRerollTags.Any(string.IsNullOrWhiteSpace))
+        {
+            Error("roll.wishRerollTags", "a tag must not be blank");
+        }
+
         NotNegative("reward.challengeBonus.extraDice", ruleset.Reward.ChallengeBonus.ExtraDice);
         AtMost("reward.challengeBonus.extraDice", ruleset.Reward.ChallengeBonus.ExtraDice, MaxDice);
 

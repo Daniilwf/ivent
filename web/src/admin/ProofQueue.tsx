@@ -308,7 +308,11 @@ export function ProofCard({
             </Button>
           }
           title={t.rejectTitle(item.gameTitle, item.playerName)}
-          consequences={t.rejectConsequences(item.diceTotal, item.decidesFinish)}
+          consequences={t.rejectConsequences(
+            item.diceTotal,
+            item.decidesFinish,
+            item.cellBonus ?? 0,
+          )}
           confirm={t.rejectConfirm}
           busy={busy === 'reject'}
           onConfirm={() => void reject()}

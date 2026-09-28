@@ -52,6 +52,12 @@ internal static class PointsLedger
     // Every non-zero change is numbered in the season; the player keeps the number of his last one (D-100).
     public static SeasonState Apply(SeasonState state, PointsChanged e)
     {
+        // D-327: the bonus of the cell a run's own move stopped on belongs to that run — a reject takes it back
+        if (e.Reason == PointsReason.CellBonus && state.Players[e.PlayerId].LastMoveRunId is { } mover && state.Runs.TryGetValue(mover, out var run))
+        {
+            state = state with { Runs = state.Runs.SetItem(mover, run with { CellPoints = run.CellPoints + e.Delta }) };
+        }
+
         var tick = e.Delta == 0 ? state.PointsChanges : state.PointsChanges + 1;
         return Update(state with { PointsChanges = tick }, e.PlayerId, p => p with
         {

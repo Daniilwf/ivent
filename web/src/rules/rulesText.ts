@@ -108,12 +108,17 @@ export function rulesPage(rules: Ruleset): RulesPage {
   ];
 
   const penalty = drop.penaltyDice;
+  const wishTags = list(roll.wishRerollTags, isString);
   const dropLines = [
     t.drop.after(roll.minPlayMinutesBeforeDrop),
     t.drop.penalty(penalty.count, penalty.sides, drop.affectsPoints, drop.affectsPosition),
+    ...(drop.consecutiveExtraDice
+      ? [t.drop.consecutive(drop.consecutiveExtraDice, penalty.sides)]
+      : []),
     ...(drop.mandatoryEvent === 'bad' ? [t.drop.badEvent] : []),
     t.drop.floor,
     t.drop.tech(roll.techRerollWindowHours),
+    ...(wishTags.length > 0 ? [t.drop.wish(wishTags.join(', '), roll.techRerollWindowHours)] : []),
   ];
 
   // The first finisher holds no bonus: the list starts at the second place (the engine's Finishing)

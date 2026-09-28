@@ -281,7 +281,8 @@ internal static class SeasonProjection
     /// <summary>
     /// Rebuilds the state a projection describes, for the integrity check: it must equal the fold of the log.
     /// The map, the count of finishes so far and the count of points changes are not projected; they are taken from
-    /// <paramref name="replayed"/>.
+    /// <paramref name="replayed"/>. So is the engine's bookkeeping of a reject (D-321): the run whose move last placed a
+    /// player, the cell a run's move began on, what it gained and the bonus of the cell it stopped on (D-321, D-327) — the pages never read them.
     /// </summary>
     public static async Task<SeasonState> ReadAsync(GameEventDbContext db, SeasonState replayed, CancellationToken ct)
     {
@@ -320,7 +321,8 @@ internal static class SeasonProjection
                             p.FinishApprovalRequired)
                         : null,
                     p.ActiveRunId,
-                    p.PointsTick)),
+                    p.PointsTick,
+                    replayed.Players.TryGetValue(p.Id, out var folded) ? folded.LastMoveRunId : null)),
             Runs = runs.ToImmutableSortedDictionary(
                 r => r.Id,
                 r => new RunState(
@@ -345,7 +347,10 @@ internal static class SeasonProjection
                         : null,
                     r.Moved,
                     r.AfterFinish,
-                    r.FreeMode)),
+                    r.FreeMode,
+                    replayed.Runs.GetValueOrDefault(r.Id)?.MoveFrom,
+                    replayed.Runs.GetValueOrDefault(r.Id)?.Gain ?? 0,
+                    replayed.Runs.GetValueOrDefault(r.Id)?.CellPoints ?? 0)),
             ManualEffects = effects.ToImmutableSortedDictionary(
                 x => x.Id,
                 x => new PendingManualEffect(x.Id, x.PlayerId, x.DrawEvent, x.Source, x.RunId)),

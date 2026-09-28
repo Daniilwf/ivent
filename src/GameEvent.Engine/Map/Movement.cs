@@ -81,6 +81,18 @@ public static class Movement
     }
 
     /// <summary>
+    /// Cells entered, in order, on a forced move of <paramref name="steps"/> forward from <paramref name="from"/> that is not
+    /// a run's own move — a correction now, pushes of effects and items later. Only a run's own move reaches the finish
+    /// (SPEC «Движение», D-322): a push that would enter it stops on the cell it passed just before, the previous cell of
+    /// its own path; from the cell before the finish it enters nothing. Forks are passed by their default branch.
+    /// </summary>
+    public static IReadOnlyList<string> Push(MapGraph map, string from, int steps)
+    {
+        var path = Forward(map, from, steps);
+        return path.Count > 0 && map.CellById(path[^1]).Type == CellType.Finish ? [.. path.Take(path.Count - 1)] : path;
+    }
+
+    /// <summary>
     /// Cells entered, in order, on <paramref name="steps"/> steps back from where <paramref name="path"/> stands:
     /// first back along the walked edges of the last segment, then along primary backward edges (the edge a cell
     /// is entered by when history runs out). Never past the start: missing steps are lost (M2, RR3). A push
@@ -154,7 +166,37 @@ public static class Movement
     internal static SeasonState Apply(SeasonState state, PlayerMoved e)
     {
         var player = state.Players[e.PlayerId];
-        state = state with { Players = state.Players.SetItem(e.PlayerId, player with { CellId = e.To, Path = player.Path.After(e) }) };
+
+        // D-321: the run whose own move last placed the player — kept by the teleport that move stopped on and by the
+        // run's own corrections right after it, lost on any other move
+        var lastMoveRunId = e.Reason switch
+        {
+            MoveReason.CompletionRoll => e.RunId,
+            MoveReason.Teleport => player.LastMoveRunId,
+            MoveReason.RunCorrection when e.RunId == player.LastMoveRunId => e.RunId,
+            _ => null,
+        };
+        state = state with
+        {
+            Players = state.Players.SetItem(e.PlayerId, player with { CellId = e.To, Path = player.Path.After(e), LastMoveRunId = lastMoveRunId }),
+        };
+
+        // What the run's moves brought the player closer to the finish, its teleport included (D-321)
+        var gainRunId = e.Reason switch
+        {
+            MoveReason.CompletionRoll or MoveReason.RunCorrection => e.RunId,
+            MoveReason.Teleport => player.LastMoveRunId,
+            _ => null,
+        };
+        if (gainRunId is { } gaining && state.Runs.TryGetValue(gaining, out var gainer))
+        {
+            gainer = gainer with
+            {
+                Gain = gainer.Gain + MapDistances.Closer(state.Map, e),
+                MoveFrom = gainer.MoveFrom ?? (e.Reason == MoveReason.CompletionRoll ? e.From : null),
+            };
+            state = state with { Runs = state.Runs.SetItem(gaining, gainer) };
+        }
 
         if (e.RunId is not { } runId)
         {

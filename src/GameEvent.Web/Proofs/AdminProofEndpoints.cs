@@ -23,6 +23,8 @@ namespace GameEvent.Web.Proofs;
 /// completion time; with the claimed difficulty, the counted hours and the dice total, what an approval at a lower
 /// difficulty or a reject changes. <c>reachedFinish</c>: this run's latest move stands on the finish.
 /// <c>rollClosed</c>: the player's next roll is closed by the limit of unchecked runs (D-134) until the admin checks one.
+/// <c>cellBonus</c>: the points bonus of the cell the run's move stopped on, which a reject takes back too (D-327; always
+/// set, optional for older clients).
 /// </summary>
 public sealed record ProofQueueItemView(
     Guid RunId,
@@ -40,12 +42,16 @@ public sealed record ProofQueueItemView(
     int DiceTotal,
     bool DecidesFinish,
     IReadOnlyList<Files.FileLinkView> Files,
-    bool RollClosed);
+    bool RollClosed,
+    int? CellBonus = null);
 
 /// <summary>Approve a run: with its proof, or without one («без скрина», a comment then); a lower proven difficulty.</summary>
 public sealed record ApproveProofRequest(Guid CommandId, Difficulty? Difficulty = null, string? Comment = null);
 
-/// <summary>Reject a run: its points, cells and coins are taken back (D-15, D-98).</summary>
+/// <summary>
+/// Reject a run: all its move gave is taken back — points with the bonus of its cell, cells, coins (D-15, D-98, D-327); the
+/// same body rejects with the drop penalty at <c>reject-with-penalty</c>.
+/// </summary>
 public sealed record RejectProofRequest(Guid CommandId, string? Comment);
 
 /// <summary>The admin's proof queue and checks (SPEC «Админка»: очередь пруфов).</summary>
@@ -73,6 +79,13 @@ public static class AdminProofEndpoints
             request.Comment is null || request.Comment.Length > SeasonEndpoints.MaxCommentLength
                 ? Invalid("comment", $"A comment of at most {SeasonEndpoints.MaxCommentLength} characters is required.")
                 : SendAsync(seasonId, request.CommandId, new RejectProof(runId, request.Comment), user, db, bus, ct))
+            .WithActionErrors();
+
+        // «Отклонить со штрафом дропа» (D-327): the reject, then the season's drop penalty — for obvious cheating
+        season.MapPost("/runs/{runId:guid}/reject-with-penalty", (Guid seasonId, Guid runId, RejectProofRequest request, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, CancellationToken ct) =>
+            request.Comment is null || request.Comment.Length > SeasonEndpoints.MaxCommentLength
+                ? Invalid("comment", $"A comment of at most {SeasonEndpoints.MaxCommentLength} characters is required.")
+                : SendAsync(seasonId, request.CommandId, new RejectProofWithDropPenalty(runId, request.Comment), user, db, bus, ct))
             .WithActionErrors();
     }
 
@@ -111,7 +124,8 @@ public static class AdminProofEndpoints
                     RunTotal.Of(run.Dice, run.ChallengeDice, run.Snapshot),
                     ProofReviewOrder.DecidesFinish(state, run),
                     proof is null ? [] : [.. proof.Files.Select(Files.FileLinkView.Of)],
-                    Engine.Rolls.UncheckedRuns.ClosesRoll(state, run.PlayerId));
+                    Engine.Rolls.UncheckedRuns.ClosesRoll(state, run.PlayerId),
+                    run.CellPoints);
             }),
         ];
         return TypedResults.Ok(items);
