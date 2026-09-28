@@ -64,6 +64,8 @@ public partial class PlayerAdminInvariantTests
         var finishListChangedWithFinishers = 0;
         var recalculated = 0;
         var nothingToRecalculate = 0;
+        var grownPenalty = false;
+        var penalizedReject = false;
         for (var seed = 0; seed < 200; seed++)
         {
             var x = (uint)seed + 13;
@@ -90,6 +92,10 @@ public partial class PlayerAdminInvariantTests
                 finishListChangedWithFinishers += command is ChangeRuleset && s.Last.IsAccepted && before.FinishesSoFar > 0
                     && FinishBonusRules.Of(before.Rules.Finish) != FinishBonusRules.Of(s.State.Rules.Finish) ? 1 : 0;
                 recalculated += command is RecalculateFinishBonuses && s.Last.IsAccepted ? 1 : 0;
+
+                // D-205: a drop in a row throws more than the base penalty (wish rerolls are met in GraphInvariantTests)
+                penalizedReject |= command is RejectProofWithDropPenalty && s.Last.Events.Any(e => e is ProofRejectPenalized);
+                grownPenalty |= s.Last.IsAccepted && s.Last.Events.OfType<RunDropped>().Any(d => d.PenaltyDice.Count > before.Rules.Drop.PenaltyDice.Count);
                 nothingToRecalculate += command is RecalculateFinishBonuses && s.Last.Rejection?.Code == RejectionCodes.FinishNothingToRecalculate ? 1 : 0;
                 claimRefused |= command is CompleteRun { ChallengeDone: true } && !before.Rules.Features.Challenges
                     && before.Players.TryGetValue(((CompleteRun)command).PlayerId, out var p) && p.Phase == TurnPhase.Playing
@@ -110,6 +116,8 @@ public partial class PlayerAdminInvariantTests
         // FinishBonusRecalculationTests; here the recalculation is reached both ways
         Assert.True(recalculated > 0, "No recalculation was accepted.");
         Assert.True(nothingToRecalculate > 0, "No recalculation was refused as having nothing to do.");
+        Assert.True(grownPenalty, "No drop in a row threw extra penalty dice.");
+        Assert.True(penalizedReject, "No reject with the drop penalty threw its dice (D-327).");
     }
 
     private static readonly (string Name, Func<Ruleset, Ruleset> Change)[] s_ruleChanges =
@@ -126,6 +134,10 @@ public partial class PlayerAdminInvariantTests
         ("drop penalty", r => r with { Drop = r.Drop with { PenaltyDice = r.Drop.PenaltyDice with { Count = r.Drop.PenaltyDice.Count == 2 ? 1 : 2 }, AffectsPosition = !r.Drop.AffectsPosition } }),
         ("drop event", r => r with { Drop = r.Drop with { MandatoryEvent = r.Drop.MandatoryEvent == MandatoryEvent.Bad ? MandatoryEvent.None : MandatoryEvent.Bad } }),
         ("tiebreakers", r => r with { Ranking = new RankingRules { Tiebreakers = [.. r.Ranking.Tiebreakers.Reverse()] } }),
+
+        // D-205, D-206: drops in a row and the wish reroll's tags, on and off
+        ("drops in a row", r => r with { Drop = r.Drop with { ConsecutiveExtraDice = r.Drop.ConsecutiveExtraDice is null ? 1 : null } }),
+        ("wish reroll tags", r => r with { Roll = r.Roll with { WishRerollTags = r.Roll.WishRerollTags.Count == 0 ? ["horror", "Puzzle"] : [] } }),
 
         // D-113: finish bonuses change mid-season; the finishers keep theirs until the admin recalculates
         ("finish bonuses up", r => r with { Finish = r.Finish with { BonusByOrder = [.. r.Finish.BonusByOrder.Select(b => b + 5)], BonusAfterList = r.Finish.BonusAfterList + 1 } }),
@@ -392,7 +404,7 @@ public partial class PlayerAdminInvariantTests
                 or GameRolled or GameChoiceRolled or GameRerolled or GameExcluded or ChoiceMade
                 or RunStarted or RunCompleted or CompletionRolled or RunReviewed or RunDropped or RunTechRerolled
                 or TechRerollConvertedToDrop or RunHoursCorrected or RunDifficultyChanged
-                or ProofSubmitted or ProofApproved or ProofRejected
+                or ProofSubmitted or ProofApproved or ProofRejected or ProofRejectPenalized
                 or PointsChanged or CoinsChanged or ResourceChanged or PlayerMoved
                 or PlayerFinished or PlayerFrozen or PlayerFinishRevoked or FinishSurplusChanged or FinishBonusRulesRefreshed
                 or ManualEffectCreated or ManualEffectResolved or CommandUndone

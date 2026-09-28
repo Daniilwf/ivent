@@ -47,8 +47,17 @@ public sealed record SubmitProof(
 /// </summary>
 public sealed record ApproveProof(Guid RunId, Difficulty? Difficulty = null, string? Comment = null) : ICommand;
 
-/// <summary>The admin rejects a run (D-15): its points, cells and completion coins are taken back.</summary>
+/// <summary>
+/// The admin rejects a run (D-15, D-327): all its move gave is taken back — its points and the bonus of the cell it stopped
+/// on, its cells (never improving the position, D-321), its completion coins.
+/// </summary>
 public sealed record RejectProof(Guid RunId, string Comment) : ICommand;
+
+/// <summary>
+/// «Отклонить со штрафом дропа» (D-327), for obvious cheating: a <see cref="RejectProof"/>, then the season's drop penalty,
+/// as a drop.
+/// </summary>
+public sealed record RejectProofWithDropPenalty(Guid RunId, string Comment) : ICommand;
 
 /// <summary>The player's proof, as checked. v2 (D-116) adds <see cref="Files"/>; a v1 record reads with none.</summary>
 [EventType("proof-submitted", version: 2)]
@@ -61,6 +70,13 @@ public sealed record ProofApproved(Guid RunId, Guid PlayerId, bool WithoutProof,
 /// <summary>The run is rejected; the events taking back its points, cells and coins follow in the same command.</summary>
 [EventType("proof-rejected")]
 public sealed record ProofRejected(Guid RunId, Guid PlayerId, string Comment, DateTimeOffset RejectedAt) : IGameEvent;
+
+/// <summary>
+/// The reject came with the drop penalty (D-327): <see cref="PenaltyDice"/> are its roll, each die separately; the penalty's
+/// points, push back and bad event follow, as a drop's.
+/// </summary>
+[EventType("proof-reject-penalized")]
+public sealed record ProofRejectPenalized(Guid RunId, Guid PlayerId, EquatableArray<Die> PenaltyDice, DateTimeOffset PenalizedAt) : IGameEvent;
 
 /// <summary>The admin's queue of runs to check (SPEC «Уточнения», Q-3: the runs that decide a finish go on top).</summary>
 public static class ProofReviewOrder
@@ -214,54 +230,58 @@ internal static class ProofReview
     public static Decision Decide(SeasonState state, RejectProof command, EngineContext context)
     {
         ArgumentNullException.ThrowIfNull(command);
+        return Reject(state, command.RunId, command.Comment, withDropPenalty: false, context);
+    }
 
-        if (AdminGuard(state, command.RunId) is { } rejection)
+    public static Decision Decide(SeasonState state, RejectProofWithDropPenalty command, EngineContext context)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        return Reject(state, command.RunId, command.Comment, withDropPenalty: true, context);
+    }
+
+    private static Decision Reject(SeasonState state, Guid runId, string comment, bool withDropPenalty, EngineContext context)
+    {
+        if (AdminGuard(state, runId) is { } rejection)
         {
             return rejection;
         }
 
-        if (string.IsNullOrWhiteSpace(command.Comment))
+        if (string.IsNullOrWhiteSpace(comment))
         {
             return Decision.Reject(RejectionCodes.CommentRequired, "A reject explains itself in the public log.");
         }
 
-        if (command.Comment.Length > Limits.MaxCommentLength)
+        if (comment.Length > Limits.MaxCommentLength)
         {
             return Decision.Reject(RejectionCodes.CommentTooLong, $"The comment is limited to {Limits.MaxCommentLength} characters.");
         }
 
         // D-15, D-98: what this run gave is taken back — its dice (after every correction), the cells it moved the
         // token, its completion coins; its pending difficulty event is not applicable.
-        var run = state.Runs[command.RunId];
+        var run = state.Runs[runId];
         var player = state.Players[run.PlayerId];
-        var events = new List<IGameEvent> { new ProofRejected(run.RunId, run.PlayerId, command.Comment, context.Clock.UtcNow) };
+        var events = new List<IGameEvent> { new ProofRejected(run.RunId, run.PlayerId, comment, context.Clock.UtcNow) };
 
         // The frozen first loses nothing (Q-3); his runs up to the finish are approved, so only later ones get here.
         // The rejected run's pending difficulty event still does not apply (D-98, D-99).
         if (Finishes.IsFrozen(player))
         {
-            events.AddRange(PendingDifficultyEvents(state, run, command.Comment));
+            events.AddRange(PendingDifficultyEvents(state, run, comment));
             return Decision.Accept(events);
         }
 
+        // D-327: the dice and the points bonus of the cell the move stopped on, in one change
         var points = CompletionRoll.Total(run);
-        if (points != 0)
+        if (points + run.CellPoints != 0)
         {
-            events.Add(new PointsChanged(run.PlayerId, -points, PointsReason.ProofRejected, run.RunId));
+            events.Add(new PointsChanged(run.PlayerId, -(points + run.CellPoints), PointsReason.ProofRejected, run.RunId));
         }
 
-        // The cells this run really moved the token (steps that burned at the finish gave none); a finisher's position
-        // changes only through a run up to the finish, and then by the surplus rule (Q-3).
-        if (player.Finish is null && run.Moved != 0)
+        // A reject never improves the position (D-321); a finisher's position changes only through a run up to the
+        // finish, and then by the surplus rule (Q-3).
+        if (player.Finish is null && BackToWhere(state, player, run) is { } back)
         {
-            var path = run.Moved > 0
-                ? Movement.Backward(state.Map, player.Path, run.Moved)
-                : Movement.Forward(state.Map, player.CellId, -run.Moved);
-            if (path.Count > 0)
-            {
-                events.Add(new PlayerMoved(
-                    run.PlayerId, player.CellId, path[^1], -run.Moved, [.. path], MoveReason.ProofRejected, run.RunId));
-            }
+            events.Add(back);
         }
 
         var coins = run.Snapshot.Coins is { } reward && run.Hours is { } hours
@@ -272,17 +292,78 @@ internal static class ProofReview
             events.Add(new CoinsChanged(run.PlayerId, -coins, CoinsReason.ProofRejected, run.RunId));
         }
 
-        events.AddRange(PendingDifficultyEvents(state, run, command.Comment));
+        events.AddRange(PendingDifficultyEvents(state, run, comment));
 
         if (Finishes.CountsForFinish(player, run))
         {
             var after = events.Aggregate(state, SeasonEngine.Apply);
-            var taken = player.Finish!.RunId == run.RunId ? points : run.Moved;
+            // The finishing run takes back its dice (the surplus holds the steps it burned); an earlier one what it
+            // brought the player closer to the finish, its teleport included (D-321)
+            var taken = player.Finish!.RunId == run.RunId ? points : Math.Max(0, Gain(run));
             events.AddRange(Finishes.AfterReduction(after, after.Players[player.PlayerId], after.Runs[run.RunId], taken, MoveReason.ProofRejected));
+        }
+
+        // «Отклонить со штрафом дропа» (D-327): the season's drop penalty on what is left, as a drop — its dice counting the
+        // drops in a row before the run (D-324)
+        if (withDropPenalty)
+        {
+            var rejected = events.Aggregate(state, SeasonEngine.Apply);
+            var dice = CompletionRoll.Roll(
+                DropStreak.PenaltyDiceCount(rejected.Rules.Drop, DropStreak.Before(rejected, rejected.Runs[run.RunId])),
+                rejected.Rules.Drop.PenaltyDice.Sides,
+                context.Random);
+            events.Add(new ProofRejectPenalized(run.RunId, run.PlayerId, dice, context.Clock.UtcNow));
+            events.AddRange(Drops.Penalty(rejected, rejected.Players[run.PlayerId], dice, run.RunId, context, exclude: false));
         }
 
         return Decision.Accept(events);
     }
+
+    /// <summary>
+    /// Where a reject puts a player who has not finished (the owner's decision on D-303, D-321): nowhere when the run's
+    /// moves brought them no closer to the finish (a snake); back to the cell before the run's move when they have not
+    /// moved since — walking the cells back when the path still holds them, else a transfer (a teleport came between);
+    /// otherwise back along their own path by what the run gained. A walk that would still end closer to the finish
+    /// than where they stand (a shorter branch behind) moves nothing: the reject never improves the position.
+    /// </summary>
+    private static PlayerMoved? BackToWhere(SeasonState state, SeasonPlayer player, RunState run)
+    {
+        var gain = Gain(run);
+        if (gain <= 0)
+        {
+            return null;
+        }
+
+        PlayerMoved? back;
+
+        // The cell before the move may be gone with a map published since (D-308): then back by the gain, as after a move
+        if (player.LastMoveRunId == run.RunId && run.MoveFrom is { } from && state.Map.HasCell(from))
+        {
+            var walk = run.Moved > 0 ? Movement.Backward(state.Map, player.Path, run.Moved) : [];
+            back = walk.Count > 0 && walk[^1] == from
+                ? new PlayerMoved(run.PlayerId, player.CellId, from, -walk.Count, [.. walk], MoveReason.ProofRejected, run.RunId)
+                : from != player.CellId
+                    ? new PlayerMoved(run.PlayerId, player.CellId, from, 0, [from], MoveReason.ProofRejected, run.RunId)
+                    : null;
+        }
+        else
+        {
+            // Steps are the ones asked for, as in every move; the path may stop short at the start (PlayerMoved)
+            var path = Movement.Backward(state.Map, player.Path, gain);
+            back = path.Count > 0
+                ? new PlayerMoved(run.PlayerId, player.CellId, path[^1], -gain, [.. path], MoveReason.ProofRejected, run.RunId)
+                : null;
+        }
+
+        var distances = MapDistances.ToFinish(state.Map);
+        return back is not null
+            && distances.TryGetValue(back.To, out var after) && distances.TryGetValue(player.CellId, out var now) && after < now
+                ? null
+                : back;
+    }
+
+    // Runs folded before the gain was kept (an undo snapshot of an older log) take back the cells they walked
+    private static int Gain(RunState run) => run.MoveFrom is null && run.Gain == 0 ? run.Moved : run.Gain;
 
     private static IEnumerable<IGameEvent> PendingDifficultyEvents(SeasonState state, RunState run, string comment) =>
         state.ManualEffects.Values

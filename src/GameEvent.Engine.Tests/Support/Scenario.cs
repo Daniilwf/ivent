@@ -394,6 +394,9 @@ public sealed class Scenario
 
     public SeasonPlayer Player(string name) => State.Players[PlayerId(name)];
 
+    /// <summary>The pool's game with the given id, as the engine sees it now.</summary>
+    public Game PoolGame(Guid id) => _games.Single(g => g.Id == id);
+
     /// <summary>Name of the player with the given id (the id itself for a player the builder did not add).</summary>
     public string PlayerName(Guid id) => _players.FirstOrDefault(p => p.Value == id).Key ?? id.ToString();
 

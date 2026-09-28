@@ -60,6 +60,9 @@ describe('the rules page from the ruleset', () => {
     expect(drop).toContain('Штраф: −2d4 очков и клеток.');
     expect(drop).toContain(t.drop.badEvent);
     expect(drop.some((line) => line.includes('Доступен 48 ч после ролла'))).toBe(true);
+    // D-205: the default adds a die per drop in a row; D-206: no wish reroll while the list is empty
+    expect(drop).toContain(t.drop.consecutive(1, 4));
+    expect(drop.join(' ')).not.toContain('Реролл по желанию');
 
     const soft = rulesPage({
       ...demoRuleset,
@@ -69,6 +72,17 @@ describe('the rules page from the ruleset', () => {
     expect(soft).toContain('Дропнуть можно не раньше чем через 90 мин игры — на совести.');
     expect(soft).toContain('Штраф: −2d4 очков.');
     expect(soft).not.toContain(t.drop.badEvent);
+
+    const flat = rulesPage({
+      ...demoRuleset,
+      drop: { ...demoRuleset.drop, consecutiveExtraDice: null },
+    }).drop;
+    expect(flat.join(' ')).not.toContain('подряд');
+    const wish = rulesPage({
+      ...demoRuleset,
+      roll: { ...demoRuleset.roll, wishRerollTags: ['RPG', 'VN'] },
+    }).drop;
+    expect(wish).toContain(t.drop.wish('RPG, VN', 48));
   });
 
   it('lists the finish bonuses from the second place, then the rest', () => {
@@ -90,7 +104,7 @@ describe('the rules page from the ruleset', () => {
   it('mentions the approval of the first place and the tiebreakers in their order', () => {
     const win = rulesPage(demoRuleset).win;
     expect(win).toContain(t.win.firstApproval);
-    expect(win).toContain('От старта до финиша — 60 клеток.');
+    expect(win).toContain('От старта до финиша — 70 клеток.');
     expect(win).toContain(
       'При равных очках выше тот, у кого больше пройденных игр, затем — раньше набраны итоговые очки.',
     );

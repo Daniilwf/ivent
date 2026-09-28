@@ -10,6 +10,7 @@ using GameEvent.Engine.Runs;
 using GameEvent.Engine.Seasons;
 using GameEvent.Engine.Turns;
 using GameEvent.Infrastructure.Database;
+using GameEvent.Infrastructure.Pool;
 using GameEvent.Infrastructure.Queue;
 using GameEvent.Web.Accounts;
 using GameEvent.Web.Hosting;
@@ -121,6 +122,9 @@ public sealed record PlayerView(Guid Id, string Name, string CellId, int Points,
 /// <c>roll.techRerollWindowHours</c>), null while not playing. The active run's game carries the hours of the roll's
 /// snapshot, the ones the completion counts (D-44): the pool may have got hours since (D-138). <c>difficultyDice</c> —
 /// while playing, the die each difficulty gives under the run's snapshot and the event it grants, if any.
+/// <c>dropPenalty.count</c> counts the extra dice of the drops in a row before this run (D-205, D-324).
+/// <c>wishRerollOpen</c> — whether the player may give the game up by wish now (D-206, D-325; always set, optional for older clients): a tech reroll with the
+/// reason <c>wish</c>, within the window, for a game with a listed tag the roll did not impose.
 /// </summary>
 public sealed record MyTurnView(
     Guid PlayerId,
@@ -140,7 +144,8 @@ public sealed record MyTurnView(
     WheelRollView? Roll,
     DateTimeOffset? TechRerollUntil = null,
     IReadOnlyList<DifficultyDieView>? DifficultyDice = null,
-    MoveView? LastMove = null);
+    MoveView? LastMove = null,
+    bool? WishRerollOpen = null);
 
 /// <summary>The die a difficulty gives on completion, and the event it grants (<c>good</c>, <c>bad</c>) or none.</summary>
 public sealed record DifficultyDieView(Difficulty Difficulty, int Sides, EventKind? GrantEvent);
@@ -598,6 +603,18 @@ public static class SeasonEndpoints
             var played = playing ? now - run!.StartedAt : TimeSpan.Zero;
             var snapshot = playing ? JsonSerializer.Deserialize<RunSnapshot>(run!.SnapshotJson, EngineJson.Options)! : null;
             var drop = rules.Drop;
+            var techRerollOpen = playing && now - run!.RolledAt <= TimeSpan.FromHours(snapshot!.TechRerollWindowHours);
+
+            // D-205: the drops in a row before this run add their dice; D-206: a wish reroll of a listed genre
+            var streak = playing
+                ? DropStreak.Count(
+                    (await db.Runs.AsNoTracking().Where(r => r.PlayerId == mine.Id).Select(r => new { r.Id, r.RolledAt, r.Status }).ToListAsync(ct))
+                        .Select(r => (r.Id, r.RolledAt, r.Status)),
+                    run!.Id,
+                    run.RolledAt)
+                : 0;
+            var wishRerollOpen = techRerollOpen
+                && WishRerolls.Allowed(snapshot!, new Engine.Pool.Game(run!.GameId, games[run.GameId].Title, PoolReader.Tags(games[run.GameId].TagsJson), null));
 
             me = new MyTurnView(
                 mine.Id,
@@ -624,13 +641,13 @@ public static class SeasonEndpoints
                 // The frozen first drops with no penalty; a finisher's position is fixed (D-99).
                 playing && !mine.Frozen
                     ? new DropPenaltyView(
-                        drop.PenaltyDice.Count,
+                        DropStreak.PenaltyDiceCount(drop, streak),
                         drop.PenaltyDice.Sides,
                         drop.AffectsPoints,
                         drop.AffectsPosition && mine.FinishOrder is null,
                         drop.MandatoryEvent == MandatoryEvent.Bad)
                     : null,
-                playing && now - run!.RolledAt <= TimeSpan.FromHours(snapshot!.TechRerollWindowHours),
+                techRerollOpen,
                 rules.Features.Challenges,
                 mine.FinishOrder is { } order ? new MyFinishView(order, mine.Frozen) : null,
                 waitingCheck,
@@ -646,7 +663,8 @@ public static class SeasonEndpoints
                         new DifficultyDieView(Difficulty.Extreme, snapshot.DieByDifficulty.Extreme.Sides, snapshot.DieByDifficulty.Extreme.GrantEvent),
                     ],
                 // The token walks the real branch and teleport on the graph map; the chain of stage 1 needs no path
-                rules.Features.MapMode == MapMode.Graph ? await SeasonMaps.LastMoveAsync(db, seasonId, mine.Id, ct) : null);
+                rules.Features.MapMode == MapMode.Graph ? await SeasonMaps.LastMoveAsync(db, seasonId, mine.Id, ct) : null,
+                wishRerollOpen);
         }
 
         // Avatars live on the accounts, across seasons (SPEC «Сезоны»)

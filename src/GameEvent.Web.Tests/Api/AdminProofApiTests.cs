@@ -301,6 +301,26 @@ public sealed class AdminProofApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Admin_rejects_a_run_with_the_drop_penalty()
+    {
+        // D-327: the reject's own events, then the penalty dice, points and the bad event of the season's drop rules
+        var runId = await CompletedAsync("vasya");
+        var admin = await _site.SignedInAsync("admin");
+
+        var response = await PostOkAsync(admin, Url("reject-with-penalty", runId), new { commandId = Guid.NewGuid(), comment = "Очевидный обман" });
+
+        var types = await TypesAsync(response);
+        Assert.Equal(["proof-rejected", "points-changed", "player-moved", "coins-changed", "proof-reject-penalized"], types.Take(5));
+        Assert.Contains("manual-effect-created", types.Skip(5));
+        var vasya = await _site.SignedInAsync("vasya");
+        Assert.True(await PointsOfAsync(vasya, "vasya") < 0);
+        await using var db = _site.NewDb();
+        Assert.Equal(RunStatus.Rejected, (await db.Runs.SingleAsync(r => r.Id == runId, Ct)).Status);
+        var logged = await db.Events.SingleAsync(e => e.Type == "proof-reject-penalized", Ct);
+        Assert.Equal(_site.Users["admin"], logged.AuthorId);
+    }
+
+    [Fact]
     public async Task Game_of_a_rejected_run_can_be_rolled_again()
     {
         // D-15: the game returns to the pool for everyone; with the other games deleted Петя can still roll
@@ -321,14 +341,16 @@ public sealed class AdminProofApiTests : IAsyncLifetime
     }
 
     [Theory]
-    [InlineData("")]
-    [InlineData("   ")]
-    public async Task Blank_reject_comment_is_a_conflict(string comment)
+    [InlineData("", "reject")]
+    [InlineData("   ", "reject")]
+    [InlineData("", "reject-with-penalty")]
+    [InlineData("   ", "reject-with-penalty")]
+    public async Task Blank_reject_comment_is_a_conflict(string comment, string action)
     {
         var runId = await CompletedAsync("vasya");
         var admin = await _site.SignedInAsync("admin");
 
-        var response = await admin.PostAsJsonAsync(Url("reject", runId), new { commandId = Guid.NewGuid(), comment }, Ct);
+        var response = await admin.PostAsJsonAsync(Url(action, runId), new { commandId = Guid.NewGuid(), comment }, Ct);
 
         await AssertConflictAsync(response, "player.commentRequired");
         Assert.Equal(0, await EventCountAsync("proof-rejected"));
@@ -339,6 +361,7 @@ public sealed class AdminProofApiTests : IAsyncLifetime
     [Theory]
     [InlineData("approve")]
     [InlineData("reject")]
+    [InlineData("reject-with-penalty")]
     public async Task Checked_run_is_a_conflict_with_already_reviewed(string action)
     {
         var runId = await CompletedAsync("vasya");
@@ -353,6 +376,7 @@ public sealed class AdminProofApiTests : IAsyncLifetime
     [Theory]
     [InlineData("approve")]
     [InlineData("reject")]
+    [InlineData("reject-with-penalty")]
     public async Task Run_being_played_is_a_conflict(string action)
     {
         var vasya = await _site.SignedInAsync("vasya");
@@ -369,6 +393,7 @@ public sealed class AdminProofApiTests : IAsyncLifetime
     [Theory]
     [InlineData("approve")]
     [InlineData("reject")]
+    [InlineData("reject-with-penalty")]
     public async Task Unknown_run_is_a_conflict(string action)
     {
         var admin = await _site.SignedInAsync("admin");
@@ -381,6 +406,7 @@ public sealed class AdminProofApiTests : IAsyncLifetime
     [Theory]
     [InlineData("approve")]
     [InlineData("reject")]
+    [InlineData("reject-with-penalty")]
     public async Task Review_is_allowed_while_the_season_is_closing(string action)
     {
         var runId = await CompletedAsync("vasya");
@@ -395,6 +421,7 @@ public sealed class AdminProofApiTests : IAsyncLifetime
     [Theory]
     [InlineData("approve")]
     [InlineData("reject")]
+    [InlineData("reject-with-penalty")]
     public async Task Review_after_the_season_is_finished_is_a_conflict(string action)
     {
         // The season finishes only with every run checked (D-101): the run is approved first, so after the finish the
@@ -413,6 +440,7 @@ public sealed class AdminProofApiTests : IAsyncLifetime
     [Theory]
     [InlineData("approve")]
     [InlineData("reject")]
+    [InlineData("reject-with-penalty")]
     public async Task Run_of_another_season_is_a_conflict_and_leaves_that_season_alone(string action)
     {
         var seasonB = await _site.CreateSeasonAsync();
@@ -438,6 +466,7 @@ public sealed class AdminProofApiTests : IAsyncLifetime
     [Theory]
     [InlineData("approve", "proof-approved")]
     [InlineData("reject", "proof-rejected")]
+    [InlineData("reject-with-penalty", "proof-reject-penalized")]
     public async Task Repeating_with_the_same_command_id_acts_once(string action, string type)
     {
         var runId = await CompletedAsync("vasya");
@@ -455,6 +484,7 @@ public sealed class AdminProofApiTests : IAsyncLifetime
     [Theory]
     [InlineData("approve")]
     [InlineData("reject")]
+    [InlineData("reject-with-penalty")]
     public async Task Same_command_id_with_another_body_is_a_conflict(string action)
     {
         var runId = await CompletedAsync("vasya");
@@ -480,6 +510,10 @@ public sealed class AdminProofApiTests : IAsyncLifetime
     [InlineData("petya", "reject")]
     [InlineData("masha", "reject")]
     [InlineData("zritel", "reject")]
+    [InlineData("vasya", "reject-with-penalty")]
+    [InlineData("petya", "reject-with-penalty")]
+    [InlineData("masha", "reject-with-penalty")]
+    [InlineData("zritel", "reject-with-penalty")]
     public async Task Players_and_spectators_are_forbidden(string login, string action)
     {
         // Вася's run is completed, so only the role can stop the request — even his own run
@@ -496,6 +530,7 @@ public sealed class AdminProofApiTests : IAsyncLifetime
     [Theory]
     [InlineData("approve")]
     [InlineData("reject")]
+    [InlineData("reject-with-penalty")]
     public async Task Anonymous_is_unauthorized(string action)
     {
         var client = await _site.AnonymousAsync();
@@ -508,6 +543,7 @@ public sealed class AdminProofApiTests : IAsyncLifetime
     [Theory]
     [InlineData("approve")]
     [InlineData("reject")]
+    [InlineData("reject-with-penalty")]
     public async Task Post_without_the_antiforgery_token_is_refused(string action)
     {
         var runId = await CompletedAsync("vasya");
@@ -524,6 +560,7 @@ public sealed class AdminProofApiTests : IAsyncLifetime
     [Theory]
     [InlineData("approve")]
     [InlineData("reject")]
+    [InlineData("reject-with-penalty")]
     public async Task Unknown_season_is_not_found(string action)
     {
         var admin = await _site.SignedInAsync("admin");
@@ -536,6 +573,7 @@ public sealed class AdminProofApiTests : IAsyncLifetime
     [Theory]
     [InlineData("approve")]
     [InlineData("reject")]
+    [InlineData("reject-with-penalty")]
     public async Task Run_id_that_is_not_a_guid_is_not_found(string action)
     {
         var admin = await _site.SignedInAsync("admin");
@@ -561,6 +599,9 @@ public sealed class AdminProofApiTests : IAsyncLifetime
     [InlineData("reject", """{"commandId":"5b1e2f0a-0000-0000-0000-000000000412","comment":null}""")]
     [InlineData("reject", """{"commandId":"5b1e2f0a-0000-0000-0000-000000000413","comment":42}""")]
     [InlineData("reject", "not json")]
+    [InlineData("reject-with-penalty", """{"commandId":"5b1e2f0a-0000-0000-0000-000000000421"}""")]
+    [InlineData("reject-with-penalty", """{"commandId":"5b1e2f0a-0000-0000-0000-000000000422","comment":42}""")]
+    [InlineData("reject-with-penalty", "not json")]
     public async Task Invalid_input_is_a_bad_request(string action, string body)
     {
         var runId = await CompletedAsync("vasya");
@@ -576,6 +617,7 @@ public sealed class AdminProofApiTests : IAsyncLifetime
     [Theory]
     [InlineData("approve")]
     [InlineData("reject")]
+    [InlineData("reject-with-penalty")]
     public async Task Comment_over_500_characters_is_a_bad_request(string action)
     {
         var runId = await CompletedAsync("vasya");

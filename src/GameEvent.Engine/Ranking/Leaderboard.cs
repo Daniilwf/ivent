@@ -116,32 +116,6 @@ public static class Leaderboard
             p.PointsTick));
     }
 
-    /// <summary>The fewest forward steps (along edges) from each cell to a finish cell; cells that cannot reach one are absent.</summary>
-    public static IReadOnlyDictionary<string, int> CellsToFinish(MapGraph map)
-    {
-        ArgumentNullException.ThrowIfNull(map);
-
-        // Breadth-first from the finish cells against the arrows.
-        var incoming = map.Edges.ToLookup(e => e.To, e => e.From);
-        var distances = new Dictionary<string, int>();
-        var queue = new Queue<string>();
-        foreach (var finish in map.Cells.Where(c => c.Type == CellType.Finish))
-        {
-            distances[finish.Id] = 0;
-            queue.Enqueue(finish.Id);
-        }
-
-        while (queue.TryDequeue(out var cell))
-        {
-            foreach (var from in incoming[cell])
-            {
-                if (distances.TryAdd(from, distances[cell] + 1))
-                {
-                    queue.Enqueue(from);
-                }
-            }
-        }
-
-        return distances;
-    }
+    /// <inheritdoc cref="MapDistances.ToFinish"/>
+    public static IReadOnlyDictionary<string, int> CellsToFinish(MapGraph map) => MapDistances.ToFinish(map);
 }

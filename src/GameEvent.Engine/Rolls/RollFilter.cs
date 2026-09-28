@@ -15,8 +15,11 @@ public enum RollFilterPriority
     Effect = 3,
 }
 
-/// <summary>A predicate over pool games (SPEC «Уточнения»: filters are a predicate). Built by the engine, never stored.</summary>
-public sealed record RollFilter(RollFilterPriority Priority, string Name, Func<Game, bool> Matches);
+/// <summary>
+/// A predicate over pool games (SPEC «Уточнения»: filters are a predicate). Built by the engine, never stored.
+/// <see cref="Tags"/> — the genres it imposes, if it filters by tags: a kept filter fixes them in the run's snapshot (D-325).
+/// </summary>
+public sealed record RollFilter(RollFilterPriority Priority, string Name, Func<Game, bool> Matches, Kernel.EquatableArray<string> Tags = default);
 
 /// <summary>
 /// Combines roll filters (G12, D-92): from the highest priority down, each filter narrows the games left. A lower filter

@@ -1433,26 +1433,28 @@ describe('SeasonScreen drop and tech reroll (RR2, RR4, RR5, D-94)', () => {
     expect(commands).toHaveLength(0);
   });
 
-  it.each(['run.techRerollWindowClosed', 'run.reasonCommentRequired'])(
-    'explains the rejection %s in Russian',
-    async (code) => {
-      serve((r) =>
-        isSeasonGet(r)
-          ? json(200, playing())
-          : json(409, { title: 'rejected', status: 409, detail: null, code }),
-      );
-      render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+  it.each([
+    'run.techRerollWindowClosed',
+    'run.reasonCommentRequired',
+    'run.wishRerollNotListed',
+    'run.wishRerollImposed',
+  ])('explains the rejection %s in Russian', async (code) => {
+    serve((r) =>
+      isSeasonGet(r)
+        ? json(200, playing())
+        : json(409, { title: 'rejected', status: 409, detail: null, code }),
+    );
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
 
-      await userEvent.click(await screen.findByTestId('tech-reroll'));
-      await userEvent.selectOptions(await screen.findByTestId('tech-reroll-reason'), 'weakPc');
-      await userEvent.click(screen.getByTestId('tech-reroll-submit'));
+    await userEvent.click(await screen.findByTestId('tech-reroll'));
+    await userEvent.selectOptions(await screen.findByTestId('tech-reroll-reason'), 'weakPc');
+    await userEvent.click(screen.getByTestId('tech-reroll-submit'));
 
-      const text = ru.rejection[code];
-      expect(text).toEqual(expect.any(String));
-      expect(text).not.toBe(ru.rejection.unknown);
-      expect(await screen.findByRole('alert')).toHaveTextContent(text ?? '');
-    },
-  );
+    const text = ru.rejection[code];
+    expect(text).toEqual(expect.any(String));
+    expect(text).not.toBe(ru.rejection.unknown);
+    expect(await screen.findByRole('alert')).toHaveTextContent(text ?? '');
+  });
 
   it('lists the bad event of a drop among manual effects', async () => {
     const effect: Schemas['ManualEffectView'] = {

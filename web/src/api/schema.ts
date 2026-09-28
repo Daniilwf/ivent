@@ -2750,6 +2750,93 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/seasons/{seasonId}/runs/{runId}/reject-with-penalty": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                    runId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["RejectProofRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CommandResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/seasons/{seasonId}/status": {
         parameters: {
             query?: never;
@@ -6298,6 +6385,8 @@ export interface components {
             affectsPoints: boolean;
             affectsPosition: boolean;
             mandatoryEvent: components["schemas"]["MandatoryEvent"];
+            /** Format: int32 */
+            consecutiveExtraDice?: null | number;
         };
         EconomyRules: {
             allowNegativeCoins: boolean;
@@ -6759,6 +6848,9 @@ export interface components {
          *     `roll.techRerollWindowHours`), null while not playing. The active run's game carries the hours of the roll's
          *     snapshot, the ones the completion counts (D-44): the pool may have got hours since (D-138). `difficultyDice` —
          *     while playing, the die each difficulty gives under the run's snapshot and the event it grants, if any.
+         *     `dropPenalty.count` counts the extra dice of the drops in a row before this run (D-205, D-324).
+         *     `wishRerollOpen` — whether the player may give the game up by wish now (D-206, D-325; always set, optional for older clients): a tech reroll with the
+         *     reason `wish`, within the window, for a game with a listed tag the roll did not impose.
          */
         MyTurnView: {
             /** Format: uuid */
@@ -6782,6 +6874,7 @@ export interface components {
             techRerollUntil?: null | string;
             difficultyDice?: null | components["schemas"]["DifficultyDieView"][];
             lastMove?: null | components["schemas"]["MoveView"];
+            wishRerollOpen?: null | boolean;
         };
         NominationRules: {
             auto: components["schemas"]["EquatableArrayOfAutoNomination"];
@@ -6929,6 +7022,8 @@ export interface components {
          *     completion time; with the claimed difficulty, the counted hours and the dice total, what an approval at a lower
          *     difficulty or a reject changes. `reachedFinish`: this run's latest move stands on the finish.
          *     `rollClosed`: the player's next roll is closed by the limit of unchecked runs (D-134) until the admin checks one.
+         *     `cellBonus`: the points bonus of the cell the run's move stopped on, which a reject takes back too (D-327; always
+         *     set, optional for older clients).
          */
         ProofQueueItemView: {
             /** Format: uuid */
@@ -6952,6 +7047,8 @@ export interface components {
             decidesFinish: boolean;
             files: components["schemas"]["FileLinkView"][];
             rollClosed: boolean;
+            /** Format: int32 */
+            cellBonus?: null | number;
         };
         /**
          * @description The proof of the player's own completed run: links (http/https), screenshots the player uploaded (`files` — ids
@@ -7005,7 +7102,10 @@ export interface components {
             detail: null | string;
             code: string;
         };
-        /** @description Reject a run: its points, cells and coins are taken back (D-15, D-98). */
+        /**
+         * @description Reject a run: all its move gave is taken back — points with the bonus of its cell, cells, coins (D-15, D-98, D-327); the
+         *     same body rejects with the drop penalty at `reject-with-penalty`.
+         */
         RejectProofRequest: {
             /** Format: uuid */
             commandId: string;
@@ -7115,6 +7215,7 @@ export interface components {
             minPlayMinutesBeforeDrop: number;
             emptyPoolFallback: components["schemas"]["EmptyPoolFallback"];
             lastDaysLengthFilter: components["schemas"]["LastDaysLengthFilter"];
+            wishRerollTags?: components["schemas"]["EquatableArrayOfstring"];
         };
         /** @enum {unknown} */
         Rounding: "nearest" | "floor" | "ceil";
@@ -7400,7 +7501,7 @@ export interface components {
             duplicate: boolean;
         };
         /** @enum {unknown} */
-        TechRerollReason: "weakPc" | "paidUnavailable" | "doesNotLaunch" | "emulatorTooSlow" | "other" | null;
+        TechRerollReason: "weakPc" | "paidUnavailable" | "doesNotLaunch" | "emulatorTooSlow" | "other" | "wish" | null;
         /** @description A tech reroll of the active run; `comment` is required for the reason «other» (D-11). */
         TechRerollRequest: {
             /** Format: uuid */

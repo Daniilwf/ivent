@@ -197,7 +197,13 @@ public static class DemoSeed
                         break;
                     }
 
-                    await TryAsync(new StartRun(player.Id), userId);
+                    // Now and then the game does not launch at all: a tech reroll right after the start, well within its
+                    // window (a later turn comes a day or two after the roll, when the window may be over)
+                    if (await TryAsync(new StartRun(player.Id), userId) && _random.NextDouble() < 0.05)
+                    {
+                        await TryAsync(new TechReroll(player.Id, TechRerollReason.DoesNotLaunch, "Вылетает при запуске"), userId);
+                    }
+
                     break;
 
                 case TurnPhase.Playing:

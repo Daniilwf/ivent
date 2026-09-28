@@ -52,6 +52,21 @@ public class GraphInvariantTests
             var script = Enumerable.Range(0, 300).Select(_ => (byte)((x = (x * 1103515245) + 12345) >> 16)).ToArray();
             Play(seed, script, (s, command, before, _) =>
             {
+                // D-325: wish rerolls accepted, refused for an unlisted genre and for one the zone imposed
+                if (command is TechReroll { Reason: TechRerollReason.Wish })
+                {
+                    var outcome = s.Last.IsAccepted ? "wish" : s.Last.Rejection!.Code switch
+                    {
+                        RejectionCodes.WishRerollNotListed => "wish-unlisted",
+                        RejectionCodes.WishRerollImposed => "wish-imposed",
+                        _ => null,
+                    };
+                    if (outcome is not null)
+                    {
+                        seen.Add(outcome);
+                    }
+                }
+
                 if (!s.Last.IsAccepted)
                 {
                     return;
@@ -76,6 +91,12 @@ public class GraphInvariantTests
                     }
                 }
 
+                // D-321: rejects of runs whose gain is not their walked cells (a teleport, a branch), both ways
+                if (command is RejectProof reject && before.Runs[reject.RunId] is { } rejected && rejected.Gain != rejected.Moved)
+                {
+                    seen.Add(rejected.Gain > rejected.Moved ? "reject-shortcut" : "reject-snake");
+                }
+
                 if (command is MakeChoice && before.Players[((MakeChoice)command).PlayerId].Choice?.Kind == ChoiceKind.Branch)
                 {
                     seen.Add("chosen");
@@ -83,7 +104,7 @@ public class GraphInvariantTests
             });
         }
 
-        Assert.Superset(new HashSet<string> { "branch", "chosen", "teleport", "bonus", "publish", "undo", "checkpoint" }, seen);
+        Assert.Empty(new[] { "branch", "chosen", "teleport", "bonus", "publish", "undo", "checkpoint", "reject-shortcut", "reject-snake", "wish", "wish-unlisted", "wish-imposed" }.Except(seen));
     }
 
     // ---- The random map ----
@@ -189,7 +210,10 @@ public class GraphInvariantTests
 
     private static Scenario Play(int seed, byte[] script, Action<Scenario, ICommand, SeasonState, int> afterEach)
     {
-        var s = Scenario.New(seed: seed).WithMap(RandomMap(seed))
+        // D-205, D-206: drops in a row add a die; Horror games may be given up by wish unless the swamp imposed Horror
+        var s = Scenario.New(seed: seed)
+            .WithRuleset(r => r with { Drop = r.Drop with { ConsecutiveExtraDice = 1 }, Roll = r.Roll with { WishRerollTags = ["horror"] } })
+            .WithMap(RandomMap(seed))
             .WithCategory("Horror", weight: 2).WithCategory("Puzzle")
             .WithGame("Silent Hill", 12, "Horror").WithGame("Alan Wake", 6, "Horror").WithGame("Dead Space", 3, "Horror")
             .WithGame("Tetris", 3, "Puzzle").WithGame("Portal", 6, "Puzzle").WithGame("Limbo", null, "Puzzle")
@@ -228,7 +252,7 @@ public class GraphInvariantTests
             5 when p.Choice is { } choice => new MakeChoice(player, choice.ChoiceId, arg < choice.Options.Count * 2 ? choice.Options[arg % choice.Options.Count].Id : "nowhere"),
             5 => new MakeChoice(player, SequentialIds.Make(0x50000000, arg), "nowhere"),
             6 => new DropRun(player),
-            _ => new TechReroll(player, TechRerollReason.WeakPc, null),
+            _ => new TechReroll(player, arg % 2 == 0 ? TechRerollReason.WeakPc : TechRerollReason.Wish, null),
         };
     }
 
@@ -331,6 +355,129 @@ public class GraphInvariantTests
         {
             CheckMoves(before, s.Last.Events);
         }
+
+        // D-321: a reject never improves the position — the player of the rejected run ends no closer to the finish
+        if (s.Last.IsAccepted && command is RejectProof reject)
+        {
+            var owner = before.Runs[reject.RunId].PlayerId;
+            var distances = Engine.Ranking.Leaderboard.CellsToFinish(before.Map);
+            Assert.True(
+                distances[s.State.Players[owner].CellId] >= distances[before.Players[owner].CellId],
+                $"A reject brought {before.Players[owner].Name} from {before.Players[owner].CellId} closer to the finish, to {s.State.Players[owner].CellId}.");
+            CheckRejectPosition(s, reject, before);
+        }
+
+        // D-325: a wish reroll goes through only for a listed genre the roll did not impose, within the window
+        if (command is TechReroll { Reason: TechRerollReason.Wish } wish && before.Players[wish.PlayerId].ActiveRunId is { } active)
+        {
+            var run = before.Runs[active];
+            var listed = s.PoolGame(run.GameId).Tags.Contains("Horror", StringComparer.OrdinalIgnoreCase);
+            var imposed = run.Snapshot.ImposedTags.Count > 0;
+            var open = s.Clock.UtcNow - run.RolledAt <= TimeSpan.FromHours(run.Snapshot.TechRerollWindowHours);
+            if (s.Last.IsAccepted)
+            {
+                Assert.True(listed && !imposed && open, $"A wish reroll of {s.GameTitle(run.GameId)} went through.");
+            }
+            else if (s.Last.Rejection!.Code is RejectionCodes.WishRerollNotListed)
+            {
+                Assert.False(listed);
+            }
+            else if (s.Last.Rejection.Code is RejectionCodes.WishRerollImposed)
+            {
+                Assert.True(listed && imposed);
+            }
+        }
+
+        // D-325: a genre is imposed only by a kept zone filter — the swamp's Horror, with the roll inside the swamp
+        foreach (var rolled in s.Last.IsAccepted ? s.Last.Events.OfType<GameRolled>() : [])
+        {
+            Assert.True(
+                rolled.Snapshot.ImposedTags.Count == 0 || (rolled.Snapshot.Zone is not null && rolled.Snapshot.ImposedTags.SequenceEqual(["Horror"])),
+                $"Imposed {rolled.Snapshot.ImposedTags} outside the swamp.");
+        }
+    }
+
+    /// <summary>
+    /// D-321 by the log: what the rejected run's moves brought its player closer to the finish (its own moves, the teleport
+    /// its move stopped on, its corrections; by the map of the moment) and whether the player moved since. A gain of 0 or
+    /// less leaves the position; a player who has not moved since goes back to the cell the run's move began on — unless
+    /// that cell is closer to the finish on today's map, then he stays.
+    /// </summary>
+    private static void CheckRejectPosition(Scenario s, RejectProof reject, SeasonState before)
+    {
+        var run = before.Runs[reject.RunId];
+        var was = before.Players[run.PlayerId];
+        if (was.Finish is not null)
+        {
+            return;
+        }
+
+        MapGraph? map = null;
+        var gain = 0;
+        string? from = null;
+        Guid? lastRun = null;
+        var points = 0;
+        foreach (var e in s.EffectiveLog.Take(s.EffectiveLog.Count - s.Last.Events.Count))
+        {
+            switch (e)
+            {
+                case SeasonCreated created:
+                    map = created.Map;
+                    break;
+                case MapPublished published:
+                    map = published.Map;
+                    break;
+                // D-327: the run's points — its dice and corrections, and the bonus of a cell its own move stopped on
+                case PointsChanged p when p.PlayerId == was.PlayerId
+                    && (p.RunId == run.RunId || (p.Reason == PointsReason.CellBonus && lastRun == run.RunId)):
+                    points += p.Delta;
+                    break;
+                case PlayerMoved m when m.PlayerId == was.PlayerId:
+                    var ofRun = (m.Reason is MoveReason.CompletionRoll or MoveReason.RunCorrection && m.RunId == run.RunId)
+                        || (m.Reason == MoveReason.Teleport && lastRun == run.RunId);
+                    if (ofRun)
+                    {
+                        var d = Engine.Ranking.Leaderboard.CellsToFinish(map!);
+                        gain += d[m.From] - d[m.To];
+                    }
+
+                    from ??= m.Reason == MoveReason.CompletionRoll && m.RunId == run.RunId ? m.From : null;
+                    lastRun = m.Reason switch
+                    {
+                        MoveReason.CompletionRoll => m.RunId,
+                        MoveReason.Teleport => lastRun,
+                        MoveReason.RunCorrection when m.RunId == lastRun => lastRun,
+                        _ => null,
+                    };
+                    break;
+            }
+        }
+
+        Assert.Equal(gain, run.Gain);
+        Assert.Equal(
+            -points,
+            s.Last.Events.OfType<PointsChanged>().Where(p => p.PlayerId == was.PlayerId && p.Reason == PointsReason.ProofRejected).Sum(p => p.Delta));
+        var now = s.State.Players[was.PlayerId].CellId;
+        var distances = Engine.Ranking.Leaderboard.CellsToFinish(before.Map);
+        if (gain <= 0)
+        {
+            Assert.True(was.CellId == now, $"A reject of a run {gain} closer moved {was.Name} from {was.CellId} to {now}.");
+        }
+        else if (lastRun == run.RunId && from is not null && before.Map.HasCell(from))
+        {
+            Assert.True(
+                now == from || (now == was.CellId && distances[from] < distances[was.CellId]),
+                $"{was.Name} had not moved since the rejected run's move from {from}, but the reject left him on {now}.");
+        }
+        else
+        {
+            // Moved since (or the cell before the move is gone): back along his own path by the gain, unless that is closer
+            var back = Movement.Backward(before.Map, was.Path, gain);
+            var target = back.Count == 0 ? was.CellId : back[^1];
+            Assert.True(
+                now == target || (now == was.CellId && distances[target] < distances[was.CellId]),
+                $"{was.Name} moved since the rejected run's move: back {gain} leads to {target}, the reject left him on {now}.");
+        }
     }
 
     /// <summary>The moves of one accepted command against the map it was decided on.</summary>
@@ -342,6 +489,12 @@ public class GraphInvariantTests
             if (events[i] is not PlayerMoved move)
             {
                 continue;
+            }
+
+            // D-322: only a run's own move reaches the finish (the steps after a branch choice are part of it)
+            if (map.CellById(move.To).Type == CellType.Finish)
+            {
+                Assert.True(move.Reason == MoveReason.CompletionRoll && move.Steps > 0, $"A {move.Reason} move reached the finish.");
             }
 
             if (move.Steps != 0)

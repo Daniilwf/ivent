@@ -221,6 +221,23 @@ describe('feed lines', () => {
     expect(rejected?.facts).toEqual(['−7 очков']);
   });
 
+  it('says a reject with the drop penalty with its dice (D-327)', () => {
+    const item = one([
+      entry('c7', 'proof-rejected', { runId: run1, playerId: vasya, comment: 'Очевидный обман' }),
+      entry('c7', 'proof-reject-penalized', {
+        runId: run1,
+        playerId: vasya,
+        penaltyDice: [
+          { sides: 4, value: 1 },
+          { sides: 4, value: 3 },
+        ],
+      }),
+    ]);
+
+    expect(text(item)).toBe('Вася: прохождение Hollow Knight отклонено со штрафом дропа');
+    expect(item?.facts).toContain('Штраф: 1 + 3 = 4');
+  });
+
   it('keeps an undone command, marked, and says the undo with its reason', () => {
     const days = feedDays(
       [

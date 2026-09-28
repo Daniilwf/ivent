@@ -191,6 +191,17 @@ describe('The proof queue', () => {
     expect(await screen.findByText(t.rejected('Hollow Knight'))).toBeInTheDocument();
   });
 
+  it('says a reject also takes the bonus of the cell the move stopped on (D-327)', async () => {
+    open([item({ cellBonus: 3 })]);
+
+    await userEvent.click(await screen.findByTestId('reject'));
+    const dialog = await screen.findByRole('alertdialog');
+
+    for (const line of t.rejectConsequences(11, false, 3))
+      expect(within(dialog).getByText(line)).toBeInTheDocument();
+    expect(within(dialog).getByText(/бонус клетки/)).toBeInTheDocument();
+  });
+
   it('warns that rejecting a run that decides a finish may take the finish away', async () => {
     open([finishing]);
 

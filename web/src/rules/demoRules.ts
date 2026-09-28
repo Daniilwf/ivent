@@ -39,6 +39,7 @@ export const demoRuleset: Schemas['Ruleset'] = {
         { daysBeforeDeadline: 2, maxHours: 4 },
       ],
     },
+    wishRerollTags: [],
   },
   reward: {
     diceCount: { hoursPerDie: 3, rounding: 'nearest', min: 1, max: 10 },
@@ -58,10 +59,11 @@ export const demoRuleset: Schemas['Ruleset'] = {
     affectsPoints: true,
     affectsPosition: true,
     mandatoryEvent: 'bad',
+    consecutiveExtraDice: 1,
   },
   finish: { requireApprovalForFirst: true, bonusByOrder: [10, 8, 6, 4], bonusAfterList: 2 },
   ranking: { tiebreakers: ['completedRuns', 'earliestFinalScore'] },
-  map: { linearLength: 60 },
+  map: { linearLength: 70 },
   economy: {
     allowNegativeCoins: true,
     inventoryLimit: 5,

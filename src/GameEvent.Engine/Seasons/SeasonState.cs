@@ -88,7 +88,9 @@ public enum TurnPhase
 /// fields (the leaderboard sorts by them); any other resource lives in <see cref="Resources"/> (invariant 9).
 /// <see cref="RerollsThisRoll"/> counts rerolls since the last roll from Idle: 0 whenever the player is not Rolling.
 /// <see cref="PointsTick"/> is when the points last changed, as the number of the season's points change (1, 2, 3…;
-/// 0 — never): the «earliest final score» tiebreaker (D-100).
+/// 0 — never): the «earliest final score» tiebreaker (D-100). <see cref="LastMoveRunId"/> — the run whose own move (with
+/// the teleport it stopped on and its own corrections right after) last changed the position; null after any other move
+/// (D-321: a reject returns a player who has not moved since to the cell before that move).
 /// </summary>
 public sealed record SeasonPlayer(
     Guid PlayerId,
@@ -107,4 +109,8 @@ public sealed record SeasonPlayer(
     int RerollsThisRoll,
     Finish.FinishState? Finish,
     Guid? ActiveRunId,
-    long PointsTick = 0);
+    long PointsTick = 0,
+
+    // Written only when set: undo snapshots of players made before it keep their format (D-321)
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    Guid? LastMoveRunId = null);

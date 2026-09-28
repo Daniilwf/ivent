@@ -73,7 +73,9 @@
 | Сброс выпавшей игры | админ снимает предложенную игру без реролла: игрок снова ждёт ролла, игра свободна | `OfferDiscarded` |
 | Реролл | повторный ролл до начала игры | команда `Reroll`, событие `GameRerolled` |
 | Оплата реролла | бесплатный за ролл, купон реролла (ресурс `freeRerolls`), монетки или плохой ивент; цену следующего считает `RerollPrice.Next` | `RerollPayment` (`FreeThisRoll`, `FreeRerollResource`, `Coins`, `BadEvent`), `SeasonPlayer.RerollsThisRoll` |
-| Тех-реролл | бесплатный реролл по технической причине в окне после ролла | команда `TechReroll`, событие `RunTechRerolled`, исключение `ExclusionReason.TechRerolled`, окно `RunSnapshot.TechRerollWindowHours`, причина `TechRerollReason` (`WeakPc`, `PaidUnavailable`, `DoesNotLaunch`, `EmulatorTooSlow`, `Other`) |
+| Тех-реролл | бесплатный реролл по технической причине в окне после ролла | команда `TechReroll`, событие `RunTechRerolled`, исключение `ExclusionReason.TechRerolled`, окно `RunSnapshot.TechRerollWindowHours`, причина `TechRerollReason` (`WeakPc`, `PaidUnavailable`, `DoesNotLaunch`, `EmulatorTooSlow`, `Other`, `Wish`) |
+| Реролл по желанию | бесплатный отказ от игры с тегом из списка конфига, в окне тех-реролла; не действует, если жанр навязан роллом (зоной, позже спецроллом или ивентом) (D-206, D-325) | тех-реролл с причиной `TechRerollReason.Wish`, список `RollRules.WishRerollTags` (`roll.wishRerollTags`, в снапшоте — `RunSnapshot.WishRerollTags`), `WishRerolls`, отказы `run.wishRerollNotListed`, `run.wishRerollImposed`, `MyTurnView.WishRerollOpen` |
+| Навязанный жанр | теги, которыми фильтры ролла (сейчас — зона) ограничили выбор; фиксируются в снапшоте | `RunSnapshot.ImposedTags`, `RollFilter.Tags` |
 | Тех-реролл → дроп | админ превращает тех-реролл в дроп со штрафом | команда `ConvertTechRerollToDrop`, событие `TechRerollConvertedToDrop` |
 | Исключение | игра, которая больше не выпадает конкретному игроку | `PlayerGameExclusion` |
 | Фильтр ролла | предикат по играм от спецролла, зоны или конфига | `RollFilter` |
@@ -88,7 +90,8 @@
 | Сложность | лёгкая, нормальная, сложная, выше сложной | `Difficulty` (`Easy`, `Normal`, `Hard`, `Extreme`) |
 | Пруф | доказательство прохождения: ссылки, заметка или свидетель | `ProofState` (`ProofStatus`: `Pending`, `Approved`, `Rejected`), команда `SubmitProof`, событие `ProofSubmitted`, таблица `Proof` |
 | Одобрение | подтверждение пруфа админом, в том числе «без скрина» | команда `ApproveProof`, событие `ProofApproved` |
-| Реджект | отклонение пруфа админом: снимаются очки, клетки и монетки прохождения | команда `RejectProof`, событие `ProofRejected`, `RunStatus.Rejected` |
+| Реджект | отклонение пруфа админом: снимается всё, что дал ход прохождения, — очки с бонусом клетки хода, клетки (позиция не улучшается), монетки (D-321, D-327) | команда `RejectProof`, событие `ProofRejected`, `RunStatus.Rejected`, `RunState.CellPoints` |
+| Отклонить со штрафом дропа | реджект при очевидном обмане: всё, что даёт реджект, плюс штраф дропа по правилам сезона (D-327) | команда `RejectProofWithDropPenalty`, событие `ProofRejectPenalized` (`proof-reject-penalized`), API `reject-with-penalty` |
 | Очередь пруфов | непроверенные прохождения, финиши сверху | `ProofReviewOrder.Order` |
 | Ждёт проверки | прохождение завершено, пруф не одобрен и не отклонён (прислан или нет) | `UncheckedRuns.Waits` |
 | Ролл закрыт лимитом | у игрока ждут проверки не меньше `season.maxUncheckedRuns` прохождений: новый ролл откроется после проверки; пометка в очереди пруфов (D-134, D-180) | `ProofQueueItemView.RollClosed`, отказ `roll.tooManyUnchecked` |
@@ -98,6 +101,7 @@
 | Правило кубика | грани кубика по сложности и ивент в придачу | `DieRule` |
 | Округление | как число кубов получается из часов: до ближайшего, вниз, вверх | `Rounding` (`Nearest`, `Floor`, `Ceil`) |
 | Кубы за дроп | штрафной бросок при дропе, каждый кубик отдельно | `RunDropped.PenaltyDice`, причины `PointsReason.DropPenalty`, `MoveReason.DropPenalty` |
+| Дропы подряд | дропы игрока после его последнего засчитанного прохождения; каждый следующий добавляет к штрафу `drop.consecutiveExtraDice` кубиков; тех-реролл и отклонённое прохождение серию не меняют (D-205, D-324) | `DropStreak`, `DropRules.ConsecutiveExtraDice` |
 | Дроп | отказ от прохождения со штрафом | команда `DropRun`, событие `RunDropped`, исключение `ExclusionReason.Dropped`, плохой ивент `ManualEffectSource.Drop` |
 | Пометка игры | у предложенной игры: кто из других дропнул или тех-рерольнул её и почему | `GameMarkView` (`marks`) |
 | Кооп | общее прохождение двух игроков | `Run.PartnerId` |
@@ -159,6 +163,9 @@
 | Выбор ветки | ожидание выбора на развилке с оставшимися шагами хода | `ChoiceKind.Branch`, `PendingMove`, событие `BranchChoiceRequested` (`branch-choice-requested`) |
 | Ход на паузе | ход, остановившийся на развилке до выбора ветки: развилка — проход, а не остановка | `PlayerMoved.Paused`, `Walk` |
 | Свой ход и вынужденное движение | свой ход кубами спрашивает ветку на развилке, вынужденное (правка, толчок) идёт по ветке по умолчанию | `Movement.WalkOwn`, `Movement.Forward` |
+| Толчок | вынужденное движение вперёд не ходом за прохождение (правка, позже эффекты и предметы); на финиш не заводит — останавливается на клетке перед ним (D-322) | `Movement.Push` |
+| Клетки до финиша | наименьшее число шагов по стрелкам до финиша; мера лидерборда и реджекта | `MapDistances.ToFinish`, `Leaderboard.CellsToFinish` |
+| Выигрыш хода | на сколько клеток до финиша ходы прохождения приблизили игрока, с телепортом, на котором остановился его ход; отрицательный — змея; столько снимает реджект (D-321) | `RunState.Gain`, `RunState.MoveFrom`, `SeasonPlayer.LastMoveRunId` |
 | Предупреждение о зоне | в зоне меньше `map.minZoneGames` доступных игр | `ZoneWarnings`, `ZoneGamesWarning` |
 | Проверка публикации | что мешает опубликовать правильную карту сейчас: клетки под игроками, выбор ветки | `MapPublicationChecks`, `MapCheckView`, `POST /api/admin/seasons/{id}/map/check` |
 | Редактор карты | раздел «Карта» админки: холст, панели клетки и зон, проверка, публикация | `MapSection`, `MapCanvas` (React Flow) |

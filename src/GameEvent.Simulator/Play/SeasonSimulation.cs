@@ -598,7 +598,12 @@ public sealed class SeasonSimulation
                 _runs[run].Penalty -= points.Delta;
                 break;
             case PointsChanged { Reason: PointsReason.ProofRejected, RunId: { } run } points:
-                _runs[run].Points += points.Delta;
+                // D-327: the reject takes the run's points and the bonus of the cell its move stopped on, in one change.
+                // The run's points here are its completion dice: the simulator's admin never corrects hours or difficulty,
+                // so the rest of the change is the cell bonus (revisit if corrections come into the simulation)
+                var ofRun = -_runs[run].Points;
+                _runs[run].Points += ofRun;
+                _byPlayer[points.PlayerId].CellBonus += points.Delta - ofRun;
                 break;
             case PointsChanged { Reason: PointsReason.CellBonus } points:
                 _byPlayer[points.PlayerId].CellBonus += points.Delta;

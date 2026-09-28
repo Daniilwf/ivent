@@ -191,6 +191,13 @@ internal static class Rolling
         }
 
         var category = SpinWheel(wheel, context.Random);
+
+        // The genres the kept filters imposed (a lifted filter left games outside it among the candidates): no wish
+        // reroll for them (D-325)
+        EquatableArray<string> imposed = [.. filters
+            .Where(f => f.Tags.Count > 0 && candidates.All(f.Matches))
+            .SelectMany(f => f.Tags)
+            .Distinct(StringComparer.OrdinalIgnoreCase)];
         EquatableArray<string> sectors = [.. wheel.Select(c => c.Name)];
 
         // Draw games of the category without replacement until choiceCount are available or the category runs out;
@@ -219,7 +226,9 @@ internal static class Rolling
                 state.Rules.Roll.TechRerollWindowHours,
                 state.Rules.Reward.ChallengeBonus.ExtraDice,
                 state.Rules.Reward.Coins,
-                ZoneAtRoll(state, playerId));
+                ZoneAtRoll(state, playerId),
+                imposed,
+                state.Rules.Roll.WishRerollTags);
             offers.Add(new RollOffer(game.Id, snapshot, now));
         }
 
@@ -259,7 +268,7 @@ internal static class Rolling
     {
         ArgumentNullException.ThrowIfNull(state);
         return state.Map.ZoneOf(state.Players[playerId].CellId) is { RollFilter: { } filter } zone
-            ? [new RollFilter(RollFilterPriority.Zone, $"zone:{zone.Id}", game => Matches(filter, game))]
+            ? [new RollFilter(RollFilterPriority.Zone, $"zone:{zone.Id}", game => Matches(filter, game), filter.Tags ?? default)]
             : [];
     }
 

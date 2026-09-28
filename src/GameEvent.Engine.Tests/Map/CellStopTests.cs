@@ -154,16 +154,17 @@ public class CellStopTests
     }
 
     [Fact]
-    public void Bonus_stays_when_the_run_is_rejected()
+    public void Bonus_of_the_move_goes_with_the_rejected_run()
     {
-        // SPEC «Реджект»: остальные последствия (ивенты клеток) остаются
+        // The owner's decision 2026-09-28 (D-327): a reject cancels all the move gave, the bonus of its stop too; it
+        // replaced «бонус остаётся» of D-303, which read SPEC «Реджект: ивенты клеток остаются» for the bonus as well
         var s = Pool(BonusMap());
         Throw(s, "Silent Hill", 2);
 
         s.Act(new RejectProof(LastRun(s), "нет пруфа"));
 
         ScenarioAssert.Accepted(s);
-        Assert.Equal(("start", 3), (s.Player("Вася").CellId, s.Player("Вася").Points));
+        Assert.Equal(("start", 0), (s.Player("Вася").CellId, s.Player("Вася").Points));
     }
 
     [Fact]

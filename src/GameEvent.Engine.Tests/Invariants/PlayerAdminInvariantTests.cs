@@ -110,6 +110,14 @@ public partial class PlayerAdminInvariantTests
             .WithGame("Doom", 4, "Action");
         // Invariant 10: the tiebreakers vary by the seed — default, swapped, one of each alone, none
         s.WithRuleset(r => r with { Ranking = new RankingRules { Tiebreakers = TiebreakersFor(seed) } });
+
+        // D-205, D-206: drops in a row (none, one or two extra dice) and wish rerolls of Horror games vary by the seed
+        var extra = ((seed % 3) + 3) % 3;
+        s.WithRuleset(r => r with
+        {
+            Drop = r.Drop with { ConsecutiveExtraDice = extra == 0 ? null : extra },
+            Roll = r.Roll with { WishRerollTags = seed % 2 != 0 ? ["horror"] : [] },
+        });
         if (finishes)
         {
             s.WithRuleset(r => r with { Finish = r.Finish with { RequireApprovalForFirst = ((seed % 3) + 3) % 3 != 1 } })
@@ -256,10 +264,10 @@ public partial class PlayerAdminInvariantTests
         return arg switch
         {
             0 => new DropRun(player),
-            1 => new TechReroll(player, (TechRerollReason)(b % 5), "попросил в чате", ByAdmin: true),
+            1 => new TechReroll(player, (TechRerollReason)(b % 6), "попросил в чате", ByAdmin: true),
             2 => new TechReroll(player, TechRerollReason.Other, "  "),
             3 => new TechReroll(player, TechRerollReason.Other, "не тянет шейдеры"),
-            4 => new TechReroll(player, (TechRerollReason)(b % 4), null),
+            4 => new TechReroll(player, s.Log.Count % 3 == 0 ? TechRerollReason.Wish : (TechRerollReason)(b % 4), null),
             5 => new TechReroll(player, TechRerollReason.DoesNotLaunch, null, ByAdmin: true),
             _ => new ConvertTechRerollToDrop(RunToConvert(s, player, b), "это был дроп"),
         };
@@ -363,6 +371,7 @@ public partial class PlayerAdminInvariantTests
                 runId,
                 (variant % 5) switch { 0 => null, var d => (Difficulty)(d - 1) },
                 variant % 2 == 0 ? "без скрина" : null),
+            _ when variant % 7 == 3 => new RejectProofWithDropPenalty(runId, "очевидный обман"),
             _ => new RejectProof(runId, variant % 5 == 0 ? " " : "на скрине другая игра"),
         };
     }
@@ -902,7 +911,7 @@ public partial class PlayerAdminInvariantTests
         foreach (var revoked in events.OfType<PlayerFinishRevoked>())
         {
             Assert.True(
-                command is RejectProof or CorrectRunHours or ChangeRunDifficulty or ApproveProof { Difficulty: not null },
+                command is RejectProof or RejectProofWithDropPenalty or CorrectRunHours or ChangeRunDifficulty or ApproveProof { Difficulty: not null },
                 $"{command} revoked a finish.");
             Assert.NotNull(before.Players[revoked.PlayerId].Finish);
             Assert.Null(s.State.Players[revoked.PlayerId].Finish);
@@ -911,7 +920,7 @@ public partial class PlayerAdminInvariantTests
         // Q-3: the surplus changes only by a correction or a reject, never with a revoke of the same player
         foreach (var changed in events.OfType<FinishSurplusChanged>())
         {
-            Assert.True(command is RejectProof or CorrectRunHours or ChangeRunDifficulty or ApproveProof, $"{command} changed a surplus.");
+            Assert.True(command is RejectProof or RejectProofWithDropPenalty or CorrectRunHours or ChangeRunDifficulty or ApproveProof, $"{command} changed a surplus.");
             Assert.NotEqual(0, changed.Delta);
         }
 
@@ -929,7 +938,7 @@ public partial class PlayerAdminInvariantTests
                 case ApproveProof approve when !movedFirst:
                     Assert.Contains(approve.RunId, UpToFinishRuns(s.State, s.State.Players[frozen.PlayerId]).Select(r => r.RunId));
                     break;
-                case ApproveProof or RejectProof or CorrectRunHours or ChangeRunDifficulty:
+                case ApproveProof or RejectProof or RejectProofWithDropPenalty or CorrectRunHours or ChangeRunDifficulty:
                     Assert.True(movedFirst, $"{command} froze a player without moving the first place.");
                     break;
                 default:
@@ -1476,6 +1485,24 @@ public partial class PlayerAdminInvariantTests
                 break;
             case RejectProof reject:
                 CheckAcceptedReject(s, reject, before);
+                break;
+            case RejectProofWithDropPenalty penalized:
+                // D-327: a reject, then the drop penalty on what the reject left
+                var cut = events.ToList().FindIndex(e => e is ProofRejectPenalized);
+                var rejectPart = cut < 0 ? events : [.. events.Take(cut)];
+                CheckAcceptedReject(s, new RejectProof(penalized.RunId, penalized.Comment), before, rejectPart);
+                if (cut >= 0)
+                {
+                    var marked = (ProofRejectPenalized)events[cut];
+                    Assert.Equal(before.Runs[penalized.RunId].PlayerId, marked.PlayerId);
+                    CheckPenalty(s, [.. events.Skip(cut + 1)], marked.PlayerId, penalized.RunId, marked.PenaltyDice, rejectPart.Aggregate(before, SeasonEngine.Apply));
+                }
+                else
+                {
+                    // Only the frozen first gets no penalty at all (he loses nothing, D-99)
+                    Assert.True(before.Players[before.Runs[penalized.RunId].PlayerId].Finish?.Frozen == true, "A reject with the penalty threw no dice.");
+                }
+
                 break;
             case MakeChoice choose:
                 // Choosing --> Playing (D-91): the chosen option starts at once with its roll-time snapshot
@@ -2035,9 +2062,12 @@ public partial class PlayerAdminInvariantTests
     /// moved, a finisher by the Q-3 surplus rule for a run up to the finish and not at all for a later one; its pending
     /// difficulty event «не применимо»; the run is rejected; the owner's turn untouched, the others only recalculated.
     /// </summary>
-    private static void CheckAcceptedReject(Scenario s, RejectProof reject, SeasonState before)
+    private static void CheckAcceptedReject(Scenario s, RejectProof reject, SeasonState before, IReadOnlyList<IGameEvent>? rejectEvents = null)
     {
-        var all = s.Last.Events;
+        var all = rejectEvents ?? s.Last.Events;
+
+        // With the drop penalty (D-327) the reject's own part is checked against the state it left
+        var state = rejectEvents is null ? s.State : rejectEvents.Aggregate(before, SeasonEngine.Apply);
         var events = all.Where(e => !IsFinishEvent(e)).ToList();
         Assert.True(before.Status is SeasonStatus.Active or SeasonStatus.Closing, $"Rejected while {before.Status}.");
         Assert.False(string.IsNullOrWhiteSpace(reject.Comment), "A reject without a comment.");
@@ -2062,7 +2092,7 @@ public partial class PlayerAdminInvariantTests
         Assert.DoesNotContain(-1, positions);
         Assert.Equal(positions.Order(), positions);
 
-        var earlier = s.EffectiveLog.Take(s.EffectiveLog.Count - all.Count).ToList();
+        var earlier = s.EffectiveLog.Take(s.EffectiveLog.Count - s.Last.Events.Count).ToList();
         var points = keepsAll || (open && !events.OfType<PointsChanged>().Any())
             ? 0
             : earlier.OfType<PointsChanged>().Where(e => e.RunId == run.RunId && e.Reason is not (PointsReason.FinishBonus or PointsReason.FinishBonusRevoked)).Sum(e => e.Delta);
@@ -2113,7 +2143,7 @@ public partial class PlayerAdminInvariantTests
             pending.Select(e => (e.EffectId, player, (Guid?)run.RunId, ManualEffectOutcome.NotApplicable)),
             events.OfType<ManualEffectResolved>().Select(e => (e.EffectId, e.PlayerId, e.RunId, e.Outcome)));
 
-        var after = s.State.Runs[run.RunId];
+        var after = state.Runs[run.RunId];
         Assert.Equal(RunStatus.Rejected, after.Status);
         Assert.Equal(
             run.Proof is { } sent
@@ -2122,7 +2152,7 @@ public partial class PlayerAdminInvariantTests
             after.Proof);
         Assert.Equal((run.Dice, run.ChallengeDice, run.Hours, run.Difficulty), (after.Dice, after.ChallengeDice, after.Hours, after.Difficulty));
 
-        var now = s.State.Players[player];
+        var now = state.Players[player];
         var ownBonus = all.OfType<PointsChanged>()
             .Where(e => e.PlayerId == player && e.Reason is PointsReason.FinishBonus or PointsReason.FinishBonusRevoked)
             .Sum(e => e.Delta);
@@ -2133,7 +2163,7 @@ public partial class PlayerAdminInvariantTests
         // Nothing else changes in the other runs — but a revoke turns the owner's runs completed after the finish into
         // ordinary ones (D-99: they did not move the token; C13 long run, D-111)
         var revoked = all.OfType<PlayerFinishRevoked>().Any();
-        Assert.All(s.State.Runs.Values.Where(r => r.RunId != run.RunId), r =>
+        Assert.All(state.Runs.Values.Where(r => r.RunId != run.RunId), r =>
         {
             var was = before.Runs[r.RunId];
             Assert.Equal(revoked && r.PlayerId == player ? was with { AfterFinish = false } : was, r);
@@ -2167,7 +2197,25 @@ public partial class PlayerAdminInvariantTests
 
         // RR7 / D-09 / D-99: a frozen first pays nothing (the dice may be left unrolled); a finisher pays in points only
         var frozen = was.Finish?.Frozen == true;
-        Assert.True(dice.Count == rules.PenaltyDice.Count || (frozen && dice.Count == 0), $"{dice.Count} penalty dice.");
+
+        // D-324: every drop in a row before this run — since the player's last counted completion, by roll time — adds
+        // its extra dice; tech rerolls and rejected runs neither add nor end the streak
+        var dropped = before.Runs[runId];
+        var streak = 0;
+        foreach (var earlier in before.Runs.Values
+            .Where(r => r.PlayerId == playerId && (r.RolledAt, r.RunId).CompareTo((dropped.RolledAt, dropped.RunId)) < 0)
+            .OrderByDescending(r => (r.RolledAt, r.RunId)))
+        {
+            if (earlier.Status == RunStatus.Completed)
+            {
+                break;
+            }
+
+            streak += earlier.Status == RunStatus.Dropped ? 1 : 0;
+        }
+
+        var expected = rules.PenaltyDice.Count + (streak * (rules.ConsecutiveExtraDice ?? 0));
+        Assert.True(dice.Count == expected || (frozen && dice.Count == 0), $"{dice.Count} penalty dice, {expected} expected.");
         Assert.All(dice, d =>
         {
             Assert.Equal(rules.PenaltyDice.Sides, d.Sides);
@@ -2244,8 +2292,17 @@ public partial class PlayerAdminInvariantTests
         Assert.Equal(TurnPhase.Playing, was.Phase);
         var run = before.Runs[was.ActiveRunId!.Value];
         Assert.True(
-            techReroll.ByAdmin || s.Clock.UtcNow - run.RolledAt <= TimeSpan.FromHours(run.Snapshot.TechRerollWindowHours),
-            "A player tech-rerolled after the window fixed at the roll.");
+            (techReroll.ByAdmin && techReroll.Reason != TechRerollReason.Wish)
+                || s.Clock.UtcNow - run.RolledAt <= TimeSpan.FromHours(run.Snapshot.TechRerollWindowHours),
+            "A player tech-rerolled (or anyone rerolled by wish) after the window fixed at the roll.");
+
+        // D-325: a wish reroll only of a game with a listed tag, when the roll imposed no genre
+        if (techReroll.Reason == TechRerollReason.Wish)
+        {
+            var tags = s.PoolGame(run.GameId).Tags;
+            Assert.Contains(run.Snapshot.WishRerollTags, t => tags.Contains(t, StringComparer.OrdinalIgnoreCase));
+            Assert.Empty(run.Snapshot.ImposedTags);
+        }
         Assert.True(
             !techReroll.ByAdmin || !string.IsNullOrWhiteSpace(techReroll.Comment), "An admin tech reroll without a comment (D-94 (2)).");
         Assert.True(
@@ -2301,12 +2358,25 @@ public partial class PlayerAdminInvariantTests
     /// <summary>RR5: «window closed» only for the player and only after the window.</summary>
     private static void CheckRejectedTechReroll(Scenario s, ICommand command, SeasonState before)
     {
+        if (command is TechReroll { Reason: TechRerollReason.Wish } wish
+            && s.Last.Rejection!.Code is RejectionCodes.WishRerollNotListed or RejectionCodes.WishRerollImposed)
+        {
+            // D-325: refused only when no listed tag is on the game, or the roll imposed a genre
+            var played = before.Runs[before.Players[wish.PlayerId].ActiveRunId!.Value];
+            var tags = s.PoolGame(played.GameId).Tags;
+            var listed = played.Snapshot.WishRerollTags.Any(t => tags.Contains(t, StringComparer.OrdinalIgnoreCase));
+            Assert.True(
+                s.Last.Rejection.Code == RejectionCodes.WishRerollNotListed ? !listed : listed && played.Snapshot.ImposedTags.Count > 0,
+                $"A wish reroll refused with {s.Last.Rejection.Code}.");
+            return;
+        }
+
         if (command is not TechReroll techReroll || s.Last.Rejection!.Code != RejectionCodes.TechRerollWindowClosed)
         {
             return;
         }
 
-        Assert.False(techReroll.ByAdmin, "The admin is not bound by the tech reroll window.");
+        Assert.False(techReroll.ByAdmin && techReroll.Reason != TechRerollReason.Wish, "The admin is not bound by the tech reroll window.");
         var was = before.Players[techReroll.PlayerId];
         Assert.Equal(TurnPhase.Playing, was.Phase);
         var run = before.Runs[was.ActiveRunId!.Value];

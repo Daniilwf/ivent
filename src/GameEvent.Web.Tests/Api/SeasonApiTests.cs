@@ -676,6 +676,88 @@ public sealed class SeasonApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Drop_penalty_counts_the_drops_in_a_row_before_this_run()
+    {
+        // D-205: the default ruleset adds one die per drop in a row; the screen shows what the drop will throw
+        Assert.Equal(1, RulesetJson.Default().Drop.ConsecutiveExtraDice);
+        var vasya = await _site.SignedInAsync("vasya");
+        await PostAsync(vasya, "roll", new { commandId = Guid.NewGuid() });
+        await PostAsync(vasya, "start", new { commandId = Guid.NewGuid() });
+        await PostAsync(vasya, "drop", new { commandId = Guid.NewGuid() });
+        await PostAsync(vasya, "roll", new { commandId = Guid.NewGuid() });
+        await PostAsync(vasya, "start", new { commandId = Guid.NewGuid() });
+
+        AssertDropPenalty(await MeJsonAsync(vasya), 3, 4, points: true, position: true, badEvent: true);
+    }
+
+    [Fact]
+    public async Task Wish_reroll_is_open_for_a_listed_genre_within_the_window_and_goes_through_the_tech_reroll()
+    {
+        // D-206: the default list is empty — closed; with every tag of the pool listed before the roll — open (the run
+        // fixes the list at the roll); after the window — closed, and the engine refuses by the window
+        Assert.Empty(RulesetJson.Default().Roll.WishRerollTags);
+        var vasya = await _site.SignedInAsync("vasya");
+        await PostAsync(vasya, "roll", new { commandId = Guid.NewGuid() });
+        await PostAsync(vasya, "start", new { commandId = Guid.NewGuid() });
+        Assert.False((await MeJsonAsync(vasya)).GetProperty("wishRerollOpen").GetBoolean());
+        await PostAsync(vasya, "drop", new { commandId = Guid.NewGuid() });
+
+        await using (var db = _site.NewDb())
+        {
+            var tags = db.Games.Select(g => g.TagsJson).ToList().SelectMany(json => Infrastructure.Pool.PoolReader.Tags(json)).Distinct().ToList();
+            var rules = RulesetJson.Default();
+            await _site.SendAsync(new ChangeRuleset(rules with { Roll = rules.Roll with { WishRerollTags = [.. tags] } }, ExpectedVersion: null));
+        }
+
+        await PostAsync(vasya, "roll", new { commandId = Guid.NewGuid() });
+        await PostAsync(vasya, "start", new { commandId = Guid.NewGuid() });
+        Assert.True((await MeJsonAsync(vasya)).GetProperty("wishRerollOpen").GetBoolean());
+        var response = await PostAsync(vasya, "tech-reroll", new { commandId = Guid.NewGuid(), reason = "wish" });
+        Assert.Equal(["run-tech-rerolled", "game-excluded", "game-rolled"], await TypesAsync(response));
+
+        // The next game, played past its window: closed, and the engine refuses by the window
+        await PostAsync(vasya, "start", new { commandId = Guid.NewGuid() });
+        _site.Clock.UtcNow = _site.Clock.UtcNow.AddHours(RulesetJson.Default().Roll.TechRerollWindowHours + 1);
+        Assert.False((await MeJsonAsync(vasya)).GetProperty("wishRerollOpen").GetBoolean());
+        var late = await vasya.PostAsJsonAsync(Url("tech-reroll"), new { commandId = Guid.NewGuid(), reason = "wish" }, Ct);
+        Assert.Equal(HttpStatusCode.Conflict, late.StatusCode);
+        using var problem = JsonDocument.Parse(await late.Content.ReadAsStringAsync(Ct));
+        Assert.Equal("run.techRerollWindowClosed", problem.RootElement.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task Drop_penalty_is_back_to_the_base_after_a_counted_completion()
+    {
+        // D-205: a drop, then a completed run: the streak is over
+        var vasya = await _site.SignedInAsync("vasya");
+        await PostAsync(vasya, "roll", new { commandId = Guid.NewGuid() });
+        await PostAsync(vasya, "start", new { commandId = Guid.NewGuid() });
+        await PostAsync(vasya, "drop", new { commandId = Guid.NewGuid() });
+        await PostAsync(vasya, "roll", new { commandId = Guid.NewGuid() });
+        await PostAsync(vasya, "start", new { commandId = Guid.NewGuid() });
+        await PostAsync(vasya, "complete", new { commandId = Guid.NewGuid(), difficulty = "hard" });
+        await PostAsync(vasya, "roll", new { commandId = Guid.NewGuid() });
+        await PostAsync(vasya, "start", new { commandId = Guid.NewGuid() });
+
+        AssertDropPenalty(await MeJsonAsync(vasya), 2, 4, points: true, position: true, badEvent: true);
+    }
+
+    [Fact]
+    public async Task Wish_reroll_of_an_unlisted_genre_is_a_conflict()
+    {
+        var vasya = await _site.SignedInAsync("vasya");
+        await PostAsync(vasya, "roll", new { commandId = Guid.NewGuid() });
+        await PostAsync(vasya, "start", new { commandId = Guid.NewGuid() });
+
+        var response = await vasya.PostAsJsonAsync(Url("tech-reroll"), new { commandId = Guid.NewGuid(), reason = "wish" }, Ct);
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        using var problem = JsonDocument.Parse(await response.Content.ReadAsStringAsync(Ct));
+        Assert.Equal("run.wishRerollNotListed", problem.RootElement.GetProperty("code").GetString());
+        Assert.Equal("playing", (await MeJsonAsync(vasya)).GetProperty("phase").GetString());
+    }
+
+    [Fact]
     public async Task Drop_before_playing_is_a_conflict()
     {
         var vasya = await _site.SignedInAsync("vasya");

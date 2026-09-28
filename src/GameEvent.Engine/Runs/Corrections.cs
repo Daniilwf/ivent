@@ -240,13 +240,8 @@ internal static class Corrections
         // beyond its new dice sum — steps that burned at the finish gave no cells to take back (D-47, D-97).
         var newSum = CompletionRoll.Total(run);
         var steps = delta > 0 ? delta : -Math.Max(0, run.Moved - newSum);
-        var path = steps > 0 ? Movement.Forward(state.Map, player.CellId, steps) : Movement.Backward(state.Map, player.Path, -steps);
-
-        // Only a run's own move reaches the finish; a correction stops a cell before it (RR8).
-        if (steps > 0 && path.Count > 0 && state.Map.CellById(path[^1]).Type == CellType.Finish)
-        {
-            path = [.. path.Take(path.Count - 1)];
-        }
+        // Only a run's own move reaches the finish: a correction is a push and stops a cell before it (RR8, D-322).
+        var path = steps > 0 ? Movement.Push(state.Map, player.CellId, steps) : Movement.Backward(state.Map, player.Path, -steps);
         if (path.Count > 0)
         {
             yield return new PlayerMoved(player.PlayerId, player.CellId, path[^1], steps, [.. path], MoveReason.RunCorrection, run.RunId);

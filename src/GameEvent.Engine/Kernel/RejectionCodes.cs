@@ -52,6 +52,8 @@ public static class RejectionCodes
     public const string HoursRequired = "run.hoursRequired";
     public const string InvalidHours = "run.invalidHours";
     public const string TechRerollWindowClosed = "run.techRerollWindowClosed";
+    public const string WishRerollNotListed = "run.wishRerollNotListed";
+    public const string WishRerollImposed = "run.wishRerollImposed";
     public const string ReasonCommentRequired = "run.reasonCommentRequired";
     public const string RunUnknown = "run.unknown";
     public const string NotTechRerolled = "run.notTechRerolled";
