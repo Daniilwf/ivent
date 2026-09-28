@@ -10575,7 +10575,7 @@
             ]
           }
         },
-        "description": "A game whose title is the same or alike (SPEC «Дубли»). `isDeleted` — the admin took it out of the pool: the same\ntitle cannot be added again, and `deletionReason` says why (D-208)."
+        "description": "A game whose title is the same or alike (SPEC «Дубли»). `isDeleted` — the admin took it out of the pool: the same\ntitle cannot be added again, and `deletionReason` says why (D-208, D-241)."
       },
       "SiteEnvironment": {
         "enum": [

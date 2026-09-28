@@ -111,6 +111,36 @@ public sealed class PoolQueueTests
         Assert.Equal(PoolRules.Duplicate, (await SendAsync(h, new RestoreGame(gameId))).Rejection!.Code);
     }
 
+    [Fact]
+    public async Task A_game_in_the_pool_is_told_before_one_taken_out_under_the_same_title()
+    {
+        // D-241: a pool from before D-208 may hold the title twice; the game in the pool is what the author is told about
+        await using var h = await QueueHarness.StartAsync();
+        var gameId = await AddAsync(h, "Dead Space");
+        Assert.True((await SendAsync(h, new DeleteGame(gameId, "Дубль"))).IsAccepted);
+        await using (var db = h.NewDb())
+        {
+            db.Games.Add(new GameRecord { Id = Guid.NewGuid(), Title = "Dead Space", TagsJson = "[]" });
+            await db.SaveChangesAsync(Ct);
+        }
+
+        Assert.Equal(PoolRules.Duplicate, (await SendAsync(h, new AddGame(Card("Dead Space", "Horror"), null, Force: true))).Rejection!.Code);
+    }
+
+    [Fact]
+    public async Task A_deletion_without_a_reason_holds_no_title()
+    {
+        // D-241: a game deleted before D-208 or a season import's placeholder was not taken out by the admin with a reason
+        await using var h = await QueueHarness.StartAsync();
+        await using (var db = h.NewDb())
+        {
+            db.Games.Add(new GameRecord { Id = Guid.NewGuid(), Title = "Dead Space", TagsJson = "[]", IsDeleted = true });
+            await db.SaveChangesAsync(Ct);
+        }
+
+        Assert.True((await SendAsync(h, new AddGame(Card("Dead Space", "Horror"), null, Force: false))).IsAccepted);
+    }
+
     [Theory]
     [InlineData("")]
     [InlineData("   ")]

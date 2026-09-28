@@ -165,11 +165,12 @@ public sealed partial class CommandProcessor
         }
     }
 
-    // The same title never twice among the games in the pool, nor a title the admin took out of it (D-208: only his restore
-    // brings it back); an alike one — in the pool or out of it — only when the author confirmed it (SPEC «Дубли»)
+    // The same title never twice among the games in the pool, nor a title the admin took out of it with a reason (D-208,
+    // D-241: only his restore brings it back); an alike one — in the pool or taken out — only when the author confirmed it
+    // (SPEC «Дубли»). A deletion without a reason (before D-208, a season import's placeholder) holds no title
     private static async Task<Rejection?> TitleProblemAsync(GameEventDbContext db, string title, Guid? self, bool force, CancellationToken ct)
     {
-        var games = await db.Games.AsNoTracking().Where(g => g.Id != self).Select(g => new { g.Title, g.IsDeleted, g.DeletionReason }).ToListAsync(ct);
+        var games = await db.Games.AsNoTracking().Where(g => g.Id != self && (!g.IsDeleted || g.DeletionReason != null)).Select(g => new { g.Title, g.IsDeleted, g.DeletionReason }).ToListAsync(ct);
         if (games.FirstOrDefault(g => !g.IsDeleted && PoolRules.IsSame(g.Title, title)) is { } same)
         {
             return new Rejection(PoolRules.Duplicate, $"The pool already has «{same.Title}».");
@@ -177,7 +178,7 @@ public sealed partial class CommandProcessor
 
         if (games.FirstOrDefault(g => g.IsDeleted && PoolRules.IsSame(g.Title, title)) is { } removed)
         {
-            return new Rejection(PoolRules.Removed, $"«{removed.Title}» was taken out of the pool: {removed.DeletionReason ?? "no reason recorded"}.");
+            return new Rejection(PoolRules.Removed, $"«{removed.Title}» was taken out of the pool: {removed.DeletionReason}.");
         }
 
         return !force && games.Where(g => PoolRules.IsAlike(g.Title, title)).ToList() is { Count: > 0 } alike

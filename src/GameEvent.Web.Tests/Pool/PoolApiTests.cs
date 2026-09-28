@@ -254,6 +254,31 @@ public sealed class PoolApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_deletion_without_the_reason_field_is_invalid()
+    {
+        var admin = await _site.SignedInAsync("admin");
+        var id = (await JsonAsync(admin, "/api/pool")).EnumerateArray().First().GetProperty("id").GetGuid();
+
+        var response = await admin.PostAsJsonAsync($"/api/admin/pool/{id}/delete", new { commandId = Guid.NewGuid() }, Ct);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(3, (await JsonAsync(admin, "/api/pool")).GetArrayLength());
+    }
+
+    [Fact]
+    public async Task A_spectator_is_not_told_the_games_taken_out_of_the_pool()
+    {
+        // D-241: a spectator adds no games — the removed titles and the admin's reasons are for players and the admin
+        var admin = await _site.SignedInAsync("admin");
+        var zritel = await _site.SignedInAsync("zritel");
+        var id = (await JsonAsync(admin, "/api/pool")).EnumerateArray().Single(g => g.GetProperty("title").GetString() == "Outlast").GetProperty("id").GetGuid();
+        await OkAsync(await admin.PostAsJsonAsync($"/api/admin/pool/{id}/delete", new { commandId = Guid.NewGuid(), reason = "Слишком страшная" }, Ct));
+
+        Assert.Empty((await JsonAsync(zritel, "/api/pool/similar?title=Outlast")).EnumerateArray());
+        Assert.Single((await JsonAsync(admin, "/api/pool/similar?title=Outlast")).EnumerateArray());
+    }
+
+    [Fact]
     public async Task A_reason_at_its_limit_is_taken()
     {
         var admin = await _site.SignedInAsync("admin");

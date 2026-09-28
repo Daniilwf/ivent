@@ -604,10 +604,10 @@ describe('adding a game', () => {
 
     await userEvent.type(within(dialog).getByLabelText(t.form.name), 'Outlast');
     await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Хоррор' }));
-    known = [{ id: 'g5', title: 'Outlast', same: true, isDeleted: true, deletionReason: null }];
+    known = [{ id: 'g5', title: 'Outlast', same: true, isDeleted: true, deletionReason: 'Дубль' }];
     await userEvent.click(within(dialog).getByRole('button', { name: t.form.submit }));
 
-    expect(await within(dialog).findAllByText(t.form.removed(null))).not.toHaveLength(0);
+    expect(await within(dialog).findAllByText(t.form.removed('Дубль'))).not.toHaveLength(0);
     expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 

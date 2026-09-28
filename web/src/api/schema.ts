@@ -7455,7 +7455,7 @@ export interface components {
         };
         /**
          * @description A game whose title is the same or alike (SPEC «Дубли»). `isDeleted` — the admin took it out of the pool: the same
-         *     title cannot be added again, and `deletionReason` says why (D-208).
+         *     title cannot be added again, and `deletionReason` says why (D-208, D-241).
          */
         SimilarGameView: {
             /** Format: uuid */

@@ -37,7 +37,7 @@ public sealed record CategoryView(string Name, int Weight, int Games);
 
 /// <summary>
 /// A game whose title is the same or alike (SPEC «Дубли»). <c>isDeleted</c> — the admin took it out of the pool: the same
-/// title cannot be added again, and <c>deletionReason</c> says why (D-208).
+/// title cannot be added again, and <c>deletionReason</c> says why (D-208, D-241).
 /// </summary>
 public sealed record SimilarGameView(Guid Id, string Title, bool Same, bool IsDeleted, string? DeletionReason);
 
@@ -164,16 +164,20 @@ public static class PoolEndpoints
 
     /// <summary>
     /// What the pool has under this title or an alike one, to warn before adding (SPEC «Дубли»); games the admin took out of
-    /// the pool too, with the reason (D-208).
+    /// the pool with a reason too, for whoever may add a game (D-208, D-241): a spectator adds none.
     /// </summary>
-    private static async Task<Results<Ok<IReadOnlyList<SimilarGameView>>, ValidationProblem>> SimilarAsync(string? title, GameEventDbContext db, CancellationToken ct)
+    private static async Task<Results<Ok<IReadOnlyList<SimilarGameView>>, ValidationProblem>> SimilarAsync(string? title, ClaimsPrincipal user, GameEventDbContext db, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(title) || title.Length > PoolRules.MaxTitleLength)
         {
             return TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["title"] = [$"A title is 1–{PoolRules.MaxTitleLength} characters."] });
         }
 
-        var games = await db.Games.AsNoTracking().Select(g => new { g.Id, g.Title, g.IsDeleted, g.DeletionReason }).ToListAsync(ct);
+        var removedToo = user.IsInRole(nameof(Role.Player)) || user.IsInRole(nameof(Role.Admin));
+        var games = await db.Games.AsNoTracking()
+            .Where(g => !g.IsDeleted || (removedToo && g.DeletionReason != null))
+            .Select(g => new { g.Id, g.Title, g.IsDeleted, g.DeletionReason })
+            .ToListAsync(ct);
         IReadOnlyList<SimilarGameView> similar =
         [
             .. games.Where(g => PoolRules.IsSame(g.Title, title) || PoolRules.IsAlike(g.Title, title))

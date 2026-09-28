@@ -517,6 +517,7 @@ function GameRow({
               onOpenChange={(open) => {
                 setConfirming(open);
                 if (!open) {
+                  setReason('');
                   setReasonError(undefined);
                   setDeleteRefusal(undefined);
                 }
