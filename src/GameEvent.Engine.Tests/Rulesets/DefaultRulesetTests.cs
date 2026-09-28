@@ -17,6 +17,13 @@ public class DefaultRulesetTests
     }
 
     [Fact]
+    public void Default_ruleset_limits_unchecked_runs_to_two()
+    {
+        // D-134: the customer's «вариант 2, N = 2»
+        Assert.Equal(2, RulesetJson.Default().Season.MaxUncheckedRuns);
+    }
+
+    [Fact]
     public void Embedded_default_is_the_docs_file()
     {
         var docs = File.ReadAllText(Path.Combine(RepositoryRoot(), "docs", "ruleset.default.json"));
@@ -27,7 +34,7 @@ public class DefaultRulesetTests
     [Fact]
     public void Default_ruleset_is_supported_by_this_build()
     {
-        Assert.Null(RulesetSupport.Unsupported(RulesetJson.Default()));
+        Assert.Empty(RulesetSupport.Unsupported(RulesetJson.Default()));
     }
 
     private static string Normalize(string text) => text.Replace("\r\n", "\n", StringComparison.Ordinal).Trim();

@@ -1,0 +1,724 @@
+{
+  "type": "object",
+  "properties": {
+    "version": {
+      "type": "integer"
+    },
+    "features": {
+      "type": "object",
+      "properties": {
+        "mapMode": {
+          "enum": [
+            "linear",
+            "graph"
+          ]
+        },
+        "shop": {
+          "type": "boolean"
+        },
+        "items": {
+          "type": "boolean"
+        },
+        "events": {
+          "type": "boolean"
+        },
+        "bets": {
+          "type": "boolean"
+        },
+        "polls": {
+          "type": "boolean"
+        },
+        "achievements": {
+          "type": "boolean"
+        },
+        "weeklyChallenge": {
+          "type": "boolean"
+        },
+        "partnerBoard": {
+          "type": "boolean"
+        },
+        "reactions": {
+          "type": "boolean"
+        },
+        "comments": {
+          "type": "boolean"
+        },
+        "gallery": {
+          "type": "boolean"
+        },
+        "challenges": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "mapMode",
+        "shop",
+        "items",
+        "events",
+        "bets",
+        "polls",
+        "achievements",
+        "weeklyChallenge",
+        "partnerBoard",
+        "reactions",
+        "comments",
+        "gallery"
+      ],
+      "additionalProperties": false
+    },
+    "season": {
+      "type": "object",
+      "properties": {
+        "timezone": {
+          "type": "string"
+        },
+        "maxActiveRunsPerPlayer": {
+          "type": "integer"
+        },
+        "inactiveHintDays": {
+          "type": "integer"
+        },
+        "maxUncheckedRuns": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "timezone",
+        "maxActiveRunsPerPlayer",
+        "inactiveHintDays"
+      ],
+      "additionalProperties": false
+    },
+    "roll": {
+      "type": "object",
+      "properties": {
+        "choiceCount": {
+          "type": "integer"
+        },
+        "freeRerollsPerRoll": {
+          "type": "integer"
+        },
+        "rerollCost": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "enum": [
+                "coins",
+                "badEvent"
+              ]
+            },
+            "amount": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "additionalProperties": false
+        },
+        "techRerollWindowHours": {
+          "type": "integer"
+        },
+        "minPlayMinutesBeforeDrop": {
+          "type": "integer"
+        },
+        "emptyPoolFallback": {
+          "enum": [
+            "dropZoneFilter"
+          ]
+        },
+        "lastDaysLengthFilter": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "steps": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "daysBeforeDeadline": {
+                    "type": "integer"
+                  },
+                  "maxHours": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "daysBeforeDeadline",
+                  "maxHours"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "enabled",
+            "steps"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "choiceCount",
+        "freeRerollsPerRoll",
+        "rerollCost",
+        "techRerollWindowHours",
+        "minPlayMinutesBeforeDrop",
+        "emptyPoolFallback",
+        "lastDaysLengthFilter"
+      ],
+      "additionalProperties": false
+    },
+    "reward": {
+      "type": "object",
+      "properties": {
+        "diceCount": {
+          "type": "object",
+          "properties": {
+            "hoursPerDie": {
+              "type": "number"
+            },
+            "rounding": {
+              "enum": [
+                "nearest",
+                "floor",
+                "ceil"
+              ]
+            },
+            "min": {
+              "type": "integer"
+            },
+            "max": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "hoursPerDie",
+            "rounding",
+            "min",
+            "max"
+          ],
+          "additionalProperties": false
+        },
+        "dieByDifficulty": {
+          "type": "object",
+          "properties": {
+            "easy": {
+              "type": "object",
+              "properties": {
+                "sides": {
+                  "type": "integer"
+                },
+                "grantEvent": {
+                  "enum": [
+                    "good",
+                    "bad",
+                    null
+                  ]
+                }
+              },
+              "required": [
+                "sides"
+              ],
+              "additionalProperties": false
+            },
+            "normal": {
+              "type": "object",
+              "properties": {
+                "sides": {
+                  "type": "integer"
+                },
+                "grantEvent": {
+                  "enum": [
+                    "good",
+                    "bad",
+                    null
+                  ]
+                }
+              },
+              "required": [
+                "sides"
+              ],
+              "additionalProperties": false
+            },
+            "hard": {
+              "type": "object",
+              "properties": {
+                "sides": {
+                  "type": "integer"
+                },
+                "grantEvent": {
+                  "enum": [
+                    "good",
+                    "bad",
+                    null
+                  ]
+                }
+              },
+              "required": [
+                "sides"
+              ],
+              "additionalProperties": false
+            },
+            "extreme": {
+              "type": "object",
+              "properties": {
+                "sides": {
+                  "type": "integer"
+                },
+                "grantEvent": {
+                  "enum": [
+                    "good",
+                    "bad",
+                    null
+                  ]
+                }
+              },
+              "required": [
+                "sides"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "easy",
+            "normal",
+            "hard",
+            "extreme"
+          ],
+          "additionalProperties": false
+        },
+        "challengeBonus": {
+          "type": "object",
+          "properties": {
+            "extraDice": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "extraDice"
+          ],
+          "additionalProperties": false
+        },
+        "unmetConditionPolicy": {
+          "enum": [
+            "noDiceKeepCoins",
+            "countAsDrop",
+            "ignore"
+          ]
+        },
+        "coins": {
+          "type": "object",
+          "properties": {
+            "perHour": {
+              "type": "number"
+            },
+            "min": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "perHour",
+            "min"
+          ],
+          "additionalProperties": false
+        },
+        "coop": {
+          "type": "object",
+          "properties": {
+            "pointsShare": {
+              "type": "number"
+            },
+            "roundUpFor": {
+              "enum": [
+                "roller"
+              ]
+            }
+          },
+          "required": [
+            "pointsShare",
+            "roundUpFor"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "diceCount",
+        "dieByDifficulty",
+        "challengeBonus",
+        "unmetConditionPolicy",
+        "coins",
+        "coop"
+      ],
+      "additionalProperties": false
+    },
+    "drop": {
+      "type": "object",
+      "properties": {
+        "penaltyDice": {
+          "type": "object",
+          "properties": {
+            "count": {
+              "type": "integer"
+            },
+            "sides": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "count",
+            "sides"
+          ],
+          "additionalProperties": false
+        },
+        "affectsPoints": {
+          "type": "boolean"
+        },
+        "affectsPosition": {
+          "type": "boolean"
+        },
+        "mandatoryEvent": {
+          "enum": [
+            "bad",
+            "none"
+          ]
+        }
+      },
+      "required": [
+        "penaltyDice",
+        "affectsPoints",
+        "affectsPosition",
+        "mandatoryEvent"
+      ],
+      "additionalProperties": false
+    },
+    "finish": {
+      "type": "object",
+      "properties": {
+        "requireApprovalForFirst": {
+          "type": "boolean"
+        },
+        "bonusByOrder": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        },
+        "bonusAfterList": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "requireApprovalForFirst",
+        "bonusByOrder",
+        "bonusAfterList"
+      ],
+      "additionalProperties": false
+    },
+    "ranking": {
+      "type": "object",
+      "properties": {
+        "tiebreakers": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "completedRuns",
+              "earliestFinalScore"
+            ]
+          }
+        }
+      },
+      "required": [
+        "tiebreakers"
+      ],
+      "additionalProperties": false
+    },
+    "map": {
+      "type": "object",
+      "properties": {
+        "linearLength": {
+          "type": "integer"
+        },
+        "minZoneGames": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "linearLength"
+      ],
+      "additionalProperties": false
+    },
+    "economy": {
+      "type": "object",
+      "properties": {
+        "allowNegativeCoins": {
+          "type": "boolean"
+        },
+        "inventoryLimit": {
+          "type": "integer"
+        },
+        "rarityWeights": {
+          "type": "object",
+          "properties": {
+            "common": {
+              "type": "integer"
+            },
+            "epic": {
+              "type": "integer"
+            },
+            "legendary": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "common",
+            "epic",
+            "legendary"
+          ],
+          "additionalProperties": false
+        },
+        "shop": {
+          "type": "object",
+          "properties": {
+            "lotsPerRoll": {
+              "type": "integer"
+            },
+            "lotLifetimeMinutes": {
+              "type": "integer"
+            },
+            "rollCost": {
+              "type": "integer"
+            },
+            "rerollCostStep": {
+              "type": "integer"
+            },
+            "resetOn": {
+              "type": "array",
+              "items": {
+                "enum": [
+                  "runCompleted",
+                  "runDropped"
+                ]
+              }
+            }
+          },
+          "required": [
+            "lotsPerRoll",
+            "lotLifetimeMinutes",
+            "rollCost",
+            "rerollCostStep",
+            "resetOn"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "allowNegativeCoins",
+        "inventoryLimit",
+        "rarityWeights",
+        "shop"
+      ],
+      "additionalProperties": false
+    },
+    "effects": {
+      "type": "object",
+      "properties": {
+        "maxChainDepth": {
+          "type": "integer"
+        },
+        "maxEventsPerCommand": {
+          "type": "integer"
+        },
+        "hostileCap": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "maxActive": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "enabled",
+            "maxActive"
+          ],
+          "additionalProperties": false
+        },
+        "attacksOnlyOnHigherPoints": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "maxChainDepth",
+        "maxEventsPerCommand",
+        "hostileCap",
+        "attacksOnlyOnHigherPoints"
+      ],
+      "additionalProperties": false
+    },
+    "interactions": {
+      "type": "object",
+      "properties": {
+        "inviteTtlHours": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "inviteTtlHours"
+      ],
+      "additionalProperties": false
+    },
+    "bets": {
+      "type": "object",
+      "properties": {
+        "maxStake": {
+          "type": "integer"
+        },
+        "maxOpenBetsPerPlayer": {
+          "type": "integer"
+        },
+        "windowHoursAfterRoll": {
+          "type": "integer"
+        },
+        "deadlineOptionsDays": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        },
+        "payoutByHoursPerDay": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "upTo": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "multiplier": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "upTo",
+              "multiplier"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "maxStake",
+        "maxOpenBetsPerPlayer",
+        "windowHoursAfterRoll",
+        "deadlineOptionsDays",
+        "payoutByHoursPerDay"
+      ],
+      "additionalProperties": false
+    },
+    "social": {
+      "type": "object",
+      "properties": {
+        "reactions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "galleryUploadsPerDay": {
+          "type": "integer"
+        },
+        "commentsPerDay": {
+          "type": "integer"
+        },
+        "spectatorsCanVote": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "reactions",
+        "galleryUploadsPerDay",
+        "commentsPerDay",
+        "spectatorsCanVote"
+      ],
+      "additionalProperties": false
+    },
+    "nominations": {
+      "type": "object",
+      "properties": {
+        "auto": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "mostHours",
+              "mostRuns",
+              "unluckiestDice",
+              "mostDrops",
+              "mostAttacks"
+            ]
+          }
+        },
+        "voted": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "bestReview",
+              "gameOfSeason",
+              "funniestMoment"
+            ]
+          }
+        }
+      },
+      "required": [
+        "auto",
+        "voted"
+      ],
+      "additionalProperties": false
+    },
+    "weeklyChallenge": {
+      "type": "object",
+      "properties": {
+        "defaultRewardCoins": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "defaultRewardCoins"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "version",
+    "features",
+    "season",
+    "roll",
+    "reward",
+    "drop",
+    "finish",
+    "ranking",
+    "map",
+    "economy",
+    "effects",
+    "interactions",
+    "bets",
+    "social",
+    "nominations",
+    "weeklyChallenge"
+  ],
+  "additionalProperties": false
+}

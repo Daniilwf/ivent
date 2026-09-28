@@ -2,7 +2,7 @@
 // Quick check before the agent ends a turn: build, linters, architecture tests and fast tests
 // of the parts touched by uncommitted changes. With a clean tree it checks everything.
 // Budget: 3 minutes.
-import { quote, root, run } from './lib.mjs';
+import { quote, root, run, runAsync } from './lib.mjs';
 
 const BUDGET_SECONDS = 180;
 const started = Date.now();
@@ -44,15 +44,12 @@ if (areas.dotnet) {
     'dotnet',
     ['build', 'GameEvent.slnx', '-nologo', '-clp:ErrorsOnly', '-v', 'q'],
   ]);
-  const cs = changed.filter((p) => p.endsWith('.cs'));
-  const include = all ? [] : cs.length ? ['--include', ...cs.map(quote)] : null;
-  if (include) {
-    steps.push([
-      '.NET formatting',
-      'dotnet',
-      ['format', 'whitespace', '--folder', '--verify-no-changes', ...include],
-    ]);
-  }
+  // Full format check (style and import order too), as in CI: ~10 s for the whole solution.
+  steps.push([
+    '.NET formatting and code style',
+    'dotnet',
+    ['format', 'GameEvent.slnx', '--verify-no-changes', '--no-restore'],
+  ]);
   steps.push([
     '.NET architecture and fast tests',
     'dotnet',
@@ -91,10 +88,10 @@ if (areas.web || areas.e2e || areas.scripts) {
   ]);
 }
 
+// The build comes first (the tests run on its output); every other step reads only sources or built
+// binaries, so they run side by side (C13: the fast set went from ~175 s in a row to well under the budget).
 let failed = 0;
-for (const [title, command, args] of steps) {
-  const t = Date.now();
-  const result = run(command, args, { capture: true });
+const report = (title, t, result) => {
   const seconds = ((Date.now() - t) / 1000).toFixed(1);
   if (result.ok) {
     process.stdout.write(`ok   ${title} (${seconds}s)\n`);
@@ -104,7 +101,25 @@ for (const [title, command, args] of steps) {
       `FAIL ${title} (${seconds}s)\n${result.output.trim().split('\n').slice(-60).join('\n')}\n`,
     );
   }
+};
+
+const [first, ...rest] = steps;
+const buildFirst = first !== undefined && first[1] === 'dotnet' && first[2][0] === 'build';
+let parallel = steps;
+if (buildFirst) {
+  const t = Date.now();
+  const built = run(first[1], first[2], { capture: true });
+  report(first[0], t, built);
+  // Without a build the .NET tests and the format check would only repeat its errors
+  parallel = built.ok ? rest : rest.filter(([, command]) => command !== 'dotnet');
 }
+
+await Promise.all(
+  parallel.map(async ([title, command, args]) => {
+    const t = Date.now();
+    report(title, t, await runAsync(command, args));
+  }),
+);
 
 const total = (Date.now() - started) / 1000;
 process.stdout.write(

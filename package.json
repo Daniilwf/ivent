@@ -16,19 +16,26 @@
     "test:fast": "npm run -s test:dotnet:fast && npm --prefix web run -s test",
     "test": "npm run -s test:dotnet && npm --prefix web run -s test",
     "test:e2e": "node scripts/e2e.mjs e2e",
+    "test:visual": "node scripts/visual.mjs",
     "test:smoke": "node scripts/e2e.mjs smoke",
+    "test:migrations": "node scripts/migration-check.mjs",
+    "test:memory": "node scripts/memory-check.mjs",
     "test:invariants:long": "node scripts/invariants-long.mjs",
-    "test:mutation": "dotnet tool run dotnet-stryker --config-file stryker-config.json",
+    "test:mutation": "dotnet tool run dotnet-stryker --config-file stryker-config.json --output test-artifacts/stryker",
     "coverage": "node scripts/coverage.mjs",
     "gitleaks": "node scripts/gitleaks.mjs",
-    "dev": "node scripts/todo.mjs dev B4",
-    "dev:demo": "node scripts/todo.mjs dev:demo F2",
-    "seed:demo": "node scripts/todo.mjs seed:demo F2",
-    "gen:api": "node scripts/todo.mjs gen:api B3",
-    "import:xlsx": "node scripts/todo.mjs import:xlsx F1",
-    "season:export": "node scripts/todo.mjs season:export C12",
-    "season:import": "node scripts/todo.mjs season:import C12",
-    "backup:verify": "node scripts/todo.mjs backup:verify J3",
+    "dev": "node scripts/dev.mjs",
+    "dev:demo": "node scripts/dev.mjs --demo",
+    "seed:demo": "node scripts/dev.mjs --demo --seed-only",
+    "gen:api": "node scripts/gen-api.mjs",
+    "clean": "node scripts/clean.mjs",
+    "release:notes": "node scripts/release-notes.mjs",
+    "import:xlsx": "dotnet run --project src/GameEvent.Tools.Import -- pool-import",
+    "season:export": "dotnet run --project src/GameEvent.Tools.Import -- season-export",
+    "season:import": "dotnet run --project src/GameEvent.Tools.Import -- season-import",
+    "season:check": "dotnet run --project src/GameEvent.Tools.Import -- season-check",
+    "backup:verify": "dotnet run --project src/GameEvent.Tools.Import -- backup-verify",
+    "simulate": "dotnet run --project src/GameEvent.Simulator -c Release --",
     "deploy:staging": "node scripts/todo.mjs deploy:staging J2",
     "deploy:prod": "node scripts/todo.mjs deploy:prod J2"
   },
@@ -37,9 +44,10 @@
     "@commitlint/config-conventional": "^21.2.3",
     "husky": "^9.1.7",
     "lint-staged": "^17.5.1",
+    "openapi-typescript": "^7.13.0",
     "prettier": "^3.9.9"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=24"
   }
 }

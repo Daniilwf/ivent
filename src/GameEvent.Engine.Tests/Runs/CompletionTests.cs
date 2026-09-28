@@ -342,6 +342,21 @@ public class CompletionTests
         Assert.Equal(2, DiceOf(s).Dice.Count);
     }
 
+    // ---- Undefined difficulty (D-97) ----
+
+    [Theory]
+    [InlineData(99)]
+    [InlineData(-1)]
+    public void Completion_with_an_undefined_difficulty_is_rejected_as_an_invalid_command(int difficulty)
+    {
+        var s = Playing(6);
+        s.NextRandom(1, 1);
+
+        ScenarioAssert.RejectsWithoutChanges(s, x => x.Complete("Вася", (Difficulty)difficulty), RejectionCodes.CommandInvalid);
+        Assert.Equal(TurnPhase.Playing, s.Player("Вася").Phase);
+        Assert.Equal(2, s.Random.ScriptedLeft);
+    }
+
     // ---- Hours required (W6) ----
 
     [Fact]
@@ -358,7 +373,7 @@ public class CompletionTests
     {
         var s = Playing(null);
 
-        s.Complete("Вася", Difficulty.Normal, estimatedHours: 6);
+        s.Complete("Вася", Difficulty.Normal, estimatedHours: 6, hoursSource: "https://howlongtobeat.com/game/1");
 
         ScenarioAssert.Accepted(s);
         Assert.Equal(6m, Assert.Single(s.LastEvents<RunCompleted>()).Hours);
@@ -374,7 +389,7 @@ public class CompletionTests
         var s = Playing(null);
 
         ScenarioAssert.RejectsWithoutChanges(
-            s, x => x.Complete("Вася", Difficulty.Normal, estimatedHours: (decimal)estimate), RejectionCodes.InvalidHours);
+            s, x => x.Complete("Вася", Difficulty.Normal, estimatedHours: (decimal)estimate, hoursSource: "HLTB"), RejectionCodes.InvalidHours);
     }
 
     [Fact]
@@ -384,7 +399,7 @@ public class CompletionTests
         s.ExpectRejection().Complete("Вася");
         Assert.False(s.Last.IsAccepted);
 
-        s.Complete("Вася", Difficulty.Hard, estimatedHours: 3);
+        s.Complete("Вася", Difficulty.Hard, estimatedHours: 3, hoursSource: "HLTB");
 
         ScenarioAssert.Accepted(s);
         Assert.Equal(new[] { 6 }, DiceOf(s).Dice.Select(d => d.Sides));

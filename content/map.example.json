@@ -1,0 +1,92 @@
+{
+  "cells": [
+    {
+      "id": "start",
+      "type": "start",
+      "x": 40,
+      "y": 300
+    },
+    {
+      "id": "f",
+      "type": "fork"
+    },
+    {
+      "id": "c1",
+      "type": "empty",
+      "zone": "horror-swamp"
+    },
+    {
+      "id": "c2",
+      "type": "teleport",
+      "to": "j",
+      "zone": "horror-swamp"
+    },
+    {
+      "id": "b1",
+      "type": "pointsBonus",
+      "amount": 3
+    },
+    {
+      "id": "j",
+      "type": "checkpoint"
+    },
+    {
+      "id": "finish",
+      "type": "finish"
+    }
+  ],
+  "edges": [
+    {
+      "from": "start",
+      "to": "f",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "f",
+      "to": "b1",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "f",
+      "to": "c1",
+      "isDefaultForward": false,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "c1",
+      "to": "c2",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "c2",
+      "to": "j",
+      "isDefaultForward": true,
+      "isPrimaryBackward": false
+    },
+    {
+      "from": "b1",
+      "to": "j",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "j",
+      "to": "finish",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    }
+  ],
+  "zones": [
+    {
+      "id": "horror-swamp",
+      "name": "Болото ужаса",
+      "rollFilter": {
+        "tags": ["Horror"]
+      },
+      "dropPenaltyMultiplier": 1.5
+    }
+  ]
+}

@@ -32,10 +32,12 @@ public class RollTests
 
         // Then one GameRolled with the game, its category, no misses and the roll-time snapshot
         ScenarioAssert.Accepted(s);
-        var expectedSnapshot = new RunSnapshot(s.Ruleset.Version, 12m, s.Ruleset.Reward.DiceCount, s.Ruleset.Reward.DieByDifficulty);
+        var expectedSnapshot = new RunSnapshot(
+            s.Ruleset.Version, 12m, s.Ruleset.Reward.DiceCount, s.Ruleset.Reward.DieByDifficulty, s.Ruleset.Roll.TechRerollWindowHours,
+            s.Ruleset.Reward.ChallengeBonus.ExtraDice, s.Ruleset.Reward.Coins);
         var rolled = Assert.IsType<GameRolled>(Assert.Single(s.Last.Events));
         Assert.Equal(
-            new GameRolled(s.PlayerId("Вася"), "Horror", [], s.GameId("Silent Hill"), expectedSnapshot, rolledAt),
+            new GameRolled(s.PlayerId("Вася"), "Horror", [], s.GameId("Silent Hill"), expectedSnapshot, rolledAt, ["Horror"]),
             rolled);
 
         // And the player is Rolling with the game offered (reserved), nothing else changed
@@ -83,6 +85,53 @@ public class RollTests
             Assert.Equal("Horror", rolled.Category);
             Assert.Equal(s.GameId("Silent Hill"), rolled.GameId);
             Assert.Empty(rolled.Misses);
+            // D-136: the logged wheel is the one that spun — the empty categories were not on it
+            Assert.Equal(["Horror"], rolled.Sectors);
+        }
+    }
+
+    [Fact]
+    public void Logged_wheel_lists_the_categories_with_available_games_in_ordinal_order()
+    {
+        // D-136: the page draws the wheel from the log. A category whose only game someone plays, one with no weight and
+        // an empty one stay off it; the rest go in the order the engine spins them (ordinal by name).
+        var s = Scenario.New()
+            .WithCategory("Busy").WithGame("Held", 3, "Busy")
+            .WithPlayers("Вася", "Петя")
+            .Roll("Петя");
+        ScenarioAssert.Accepted(s);
+        s.WithCategory("Puzzle").WithGame("Tetris", 2, "Puzzle")
+            .WithCategory("Horror").WithGame("Silent Hill", 12, "Horror")
+            .WithCategory("Off", weight: 0).WithGame("Muted", 3, "Off")
+            .WithCategory("Empty");
+
+        s.Roll("Вася");
+
+        ScenarioAssert.Accepted(s);
+        var rolled = Assert.Single(s.LastEvents<GameRolled>());
+        Assert.Equal(["Horror", "Puzzle"], rolled.Sectors);
+        Assert.Contains(rolled.Category, rolled.Sectors);
+    }
+
+    [Fact]
+    public void A_choice_roll_logs_every_category_on_the_wheel_not_just_its_pick()
+    {
+        foreach (var seed in s_seeds)
+        {
+            // D-136: a choice roll keeps the whole wheel too; a category without an available game stays off it
+            var s = Scenario.New(seed: seed)
+                .WithRuleset(r => r with { Roll = r.Roll with { ChoiceCount = 2 } })
+                .WithCategory("Horror").WithGame("Silent Hill", 12, "Horror").WithGame("Outlast", 5, "Horror")
+                .WithCategory("Puzzle").WithGame("Tetris", 2, "Puzzle").WithGame("Portal", 3, "Puzzle")
+                .WithCategory("OnlyDeleted").WithDeletedGame("Gone", 5, "OnlyDeleted")
+                .WithPlayers("Вася");
+
+            s.Roll("Вася");
+
+            ScenarioAssert.Accepted(s);
+            var rolled = Assert.Single(s.LastEvents<GameChoiceRolled>());
+            Assert.Equal(["Horror", "Puzzle"], rolled.Sectors);
+            Assert.Contains(rolled.Category, rolled.Sectors);
         }
     }
 

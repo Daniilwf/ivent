@@ -8,7 +8,7 @@ const rel = (files) =>
     .map((f) => `"${relative(process.cwd(), f).split(sep).join('/')}"`)
     .join(' ');
 const eslint = (pkg) => (files) =>
-  `node ${pkg}/node_modules/eslint/bin/eslint.js --max-warnings 0 ${rel(files)}`;
+  `node ${pkg}/node_modules/eslint/bin/eslint.js --max-warnings 0 --no-warn-ignored ${rel(files)}`;
 
 export default {
   '*.cs': (files) =>

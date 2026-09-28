@@ -1,7 +1,20 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" />
+    <PackageReference Include="NetVips" />
+    <PackageReference Include="NetVips.Native.win-x64" />
+    <PackageReference Include="NetVips.Native.linux-x64" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\GameEvent.Engine\GameEvent.Engine.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="GameEvent.Web.Tests" />
   </ItemGroup>
 
 </Project>

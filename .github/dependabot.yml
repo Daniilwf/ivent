@@ -13,6 +13,10 @@ updates:
     cooldown:
       default-days: 7
     open-pull-requests-limit: 3
+    # The customer keeps Verify on 32 (D-114): 33+ needs a sponsorship/licence declaration. Patches and minors of 32 still come.
+    ignore:
+      - dependency-name: 'Verify*'
+        update-types: ['version-update:semver-major']
 
   - package-ecosystem: npm
     directories: [/, /web, /e2e]
@@ -24,6 +28,35 @@ updates:
     cooldown:
       default-days: 7
     open-pull-requests-limit: 3
+    # Node's types follow the Node line the project runs (D-204): their majors move with a new LTS, by hand
+    ignore:
+      - dependency-name: '@types/node'
+        update-types: ['version-update:semver-major']
+
+  # The base images of deploy/ are pinned by digest: monthly fresh ones bring the security patches
+  - package-ecosystem: docker
+    directories: [/deploy]
+    schedule:
+      interval: monthly
+    groups:
+      docker:
+        patterns: ['*']
+    cooldown:
+      default-days: 7
+    # Node moves to the next LTS by hand (the owner's rule, 2026-09-28): a Dependabot major is often a non-LTS line
+    ignore:
+      - dependency-name: 'node'
+        update-types: ['version-update:semver-major']
+
+  - package-ecosystem: docker-compose
+    directory: /deploy
+    schedule:
+      interval: monthly
+    groups:
+      compose:
+        patterns: ['*']
+    cooldown:
+      default-days: 7
 
   - package-ecosystem: github-actions
     directory: /
@@ -32,6 +65,10 @@ updates:
     groups:
       actions:
         patterns: ['*']
+    # The same rule for the action that installs Node: its majors follow Node's
+    ignore:
+      - dependency-name: 'actions/setup-node'
+        update-types: ['version-update:semver-major']
 
   - package-ecosystem: dotnet-sdk
     directory: /

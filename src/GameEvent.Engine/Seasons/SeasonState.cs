@@ -1,7 +1,11 @@
 using System.Collections.Immutable;
+using GameEvent.Engine.Effects;
+using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Map;
 using GameEvent.Engine.Rolls;
+using GameEvent.Engine.Rulesets;
 using GameEvent.Engine.Runs;
+using GameEvent.Engine.Turns;
 
 namespace GameEvent.Engine.Seasons;
 
@@ -11,23 +15,64 @@ namespace GameEvent.Engine.Seasons;
 /// </summary>
 public sealed record SeasonState(
     Guid SeasonId,
+    string Name,
+    SeasonStatus Status,
+    DateTimeOffset? Deadline,
+    Ruleset? Ruleset,
+    int RulesetVersion,
     MapGraph Map,
     ImmutableSortedDictionary<Guid, SeasonPlayer> Players,
-    ImmutableSortedDictionary<Guid, RunState> Runs)
+    ImmutableSortedDictionary<Guid, RunState> Runs,
+    ImmutableSortedDictionary<Guid, PendingManualEffect> ManualEffects,
+    int FinishesSoFar = 0,
+    long PointsChanges = 0,
+    EquatableArray<Ranking.LeaderboardRow>? Result = null)
 {
     public static SeasonState Empty { get; } =
-        new(Guid.Empty, new MapGraph([], []), ImmutableSortedDictionary<Guid, SeasonPlayer>.Empty, ImmutableSortedDictionary<Guid, RunState>.Empty);
+        new(
+            Guid.Empty,
+            Name: "",
+            SeasonStatus.Draft,
+            Deadline: null,
+            Ruleset: null,
+            RulesetVersion: 0,
+            new MapGraph([], []),
+            ImmutableSortedDictionary<Guid, SeasonPlayer>.Empty,
+            ImmutableSortedDictionary<Guid, RunState>.Empty,
+            ImmutableSortedDictionary<Guid, PendingManualEffect>.Empty);
 
     public bool IsCreated => SeasonId != Guid.Empty;
+
+    /// <summary>The rules in force; only valid on a created season.</summary>
+    public Ruleset Rules => Ruleset ?? throw new InvalidOperationException("The season is not created yet.");
 
     public bool Equals(SeasonState? other) =>
         other is not null
         && SeasonId == other.SeasonId
+        && Name == other.Name
+        && Status == other.Status
+        && Deadline == other.Deadline
+        && Ruleset == other.Ruleset
+        && RulesetVersion == other.RulesetVersion
         && Map == other.Map
         && Players.SequenceEqual(other.Players)
-        && Runs.SequenceEqual(other.Runs);
+        && Runs.SequenceEqual(other.Runs)
+        && ManualEffects.SequenceEqual(other.ManualEffects)
+        && FinishesSoFar == other.FinishesSoFar
+        && PointsChanges == other.PointsChanges
+        && Result == other.Result;
 
     public override int GetHashCode() => HashCode.Combine(SeasonId, Players.Count, Runs.Count);
+}
+
+/// <summary>Season lifecycle (GLOSSARY «Статус сезона»): draft → active → closing → finished → archived.</summary>
+public enum SeasonStatus
+{
+    Draft,
+    Active,
+    Closing,
+    Finished,
+    Archived,
 }
 
 /// <summary>Where the player is in the turn cycle. Moving and resolving happen inside one command.</summary>
@@ -38,12 +83,28 @@ public enum TurnPhase
     Playing,
 }
 
-/// <summary>A player's standing in the season. Points and position are independent measures.</summary>
+/// <summary>
+/// A player's standing in the season. Points and position are independent measures. Points and coins are
+/// fields (the leaderboard sorts by them); any other resource lives in <see cref="Resources"/> (invariant 9).
+/// <see cref="RerollsThisRoll"/> counts rerolls since the last roll from Idle: 0 whenever the player is not Rolling.
+/// <see cref="PointsTick"/> is when the points last changed, as the number of the season's points change (1, 2, 3…;
+/// 0 — never): the «earliest final score» tiebreaker (D-100).
+/// </summary>
 public sealed record SeasonPlayer(
     Guid PlayerId,
+    Guid UserId,
     string Name,
     string CellId,
     int Points,
+    int Coins,
+    ResourceBag Resources,
+    bool IsInactive,
+    PlayerPath Path,
     TurnPhase Phase,
     RollOffer? Offer,
-    Guid? ActiveRunId);
+    PendingChoice? Choice,
+    EquatableArray<GameExclusion> Exclusions,
+    int RerollsThisRoll,
+    Finish.FinishState? Finish,
+    Guid? ActiveRunId,
+    long PointsTick = 0);

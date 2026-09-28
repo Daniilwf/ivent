@@ -1,0 +1,155 @@
+# The live site and the test copy on one server behind Caddy (J1, D-127). Locally the same file brings the site up on
+# https://localhost (Caddy's own certificate):
+#   docker compose -f deploy/docker-compose.yml --env-file .env up -d --build
+# The test copy starts only with its profile and its own version: --profile staging, STAGING_VERSION. A deploy names
+# the services it brings up, so a new test copy never touches the live site (and its migrations never run on its data).
+# Migrations are their own step before the site starts (D-27): the one-off `migrate` service runs them and exits.
+
+name: ivent
+
+x-logging:
+  &logging # Rotated: the logs hold sign-in journals with addresses, kept 30 days by the site itself (D-107)
+  driver: local
+  options: { max-size: 10m, max-file: '3' }
+
+x-site: &site
+  restart: unless-stopped
+  networks: [web]
+  logging: *logging
+  # Hardened: no Linux capabilities, no privilege gain, a read-only root; writes go to /data and a small /tmp
+  cap_drop: [ALL]
+  security_opt: ['no-new-privileges:true']
+  read_only: true
+  tmpfs: ['/tmp:size=256m']
+  pids_limit: 256
+  environment: &site-environment
+    # «localhost» among the allowed hosts is the container's own health check (port 8080 is not published)
+    # Only Caddy's network may say who the client is (the login limit counts real addresses, D-107)
+    Proxy__KnownNetworks__0: 172.28.0.0/16
+    Metadata__IgdbClientId: ${IGDB_CLIENT_ID:-}
+    Metadata__IgdbClientSecret: ${IGDB_CLIENT_SECRET:-}
+    Metadata__HltbSearchUrl: ${HLTB_SEARCH_URL:-}
+
+x-build: &build
+  context: ..
+  dockerfile: deploy/Dockerfile
+
+services:
+  migrate:
+    <<: *site
+    image: ivent:${SITE_VERSION:-local}
+    build: *build
+    command: ['migrate']
+    restart: 'no'
+    mem_limit: 384m
+    volumes: [site-data:/data]
+    environment:
+      <<: *site-environment
+      AllowedHosts: ${SITE_DOMAIN:-localhost};localhost
+
+  site:
+    <<: *site
+    image: ivent:${SITE_VERSION:-local}
+    build: *build
+    # A 1-core, 1 GB server (D-209): the process keeps within 400 MB (npm run test:memory); 512 MB of RAM for the
+    # container and up to 256 MB of the host's swap file for a spike, one core
+    mem_limit: 512m
+    memswap_limit: 768m
+    cpus: 1
+    volumes: [site-data:/data]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    environment:
+      <<: *site-environment
+      AllowedHosts: ${SITE_DOMAIN:-localhost};localhost
+
+  staging-migrate:
+    <<: *site
+    image: ivent:${STAGING_VERSION:-local}
+    profiles: [staging]
+    command: ['migrate']
+    restart: 'no'
+    mem_limit: 384m
+    volumes: [staging-data:/data]
+    environment:
+      <<: *site-environment
+      ASPNETCORE_ENVIRONMENT: Staging
+      AllowedHosts: ${STAGING_DOMAIN:-staging.localhost};localhost
+
+  staging:
+    <<: *site
+    image: ivent:${STAGING_VERSION:-local}
+    profiles: [staging]
+    # The test copy runs only while a check is on and is stopped after it (CLAUDE.md «Эксплуатация», D-209)
+    mem_limit: 384m
+    memswap_limit: 512m
+    cpus: 0.5
+    volumes: [staging-data:/data]
+    depends_on:
+      staging-migrate: { condition: service_completed_successfully }
+    environment:
+      <<: *site-environment
+      ASPNETCORE_ENVIRONMENT: Staging
+      AllowedHosts: ${STAGING_DOMAIN:-staging.localhost};localhost
+
+  # One-off backup commands (J3, D-210, D-214): `backup`, `backup-verify`, `restore`. The only containers that mount the
+  # backups — the long-running site cannot touch an archive. Never started by `up` (profile tools); deploy/backup.sh runs
+  # them with `run --rm`. The data is mounted writable: SQLite's online backup opens the WAL database, a restore replaces it
+  backup:
+    <<: *site
+    image: ivent:${SITE_VERSION:-local}
+    profiles: [tools]
+    command: ['backup']
+    restart: 'no'
+    mem_limit: 384m
+    volumes: [site-data:/data, site-backups:/backups]
+    environment:
+      <<: *site-environment
+      AllowedHosts: ${SITE_DOMAIN:-localhost};localhost
+      Backup__Keep: ${BACKUP_KEEP:-14}
+
+  staging-backup:
+    <<: *site
+    image: ivent:${STAGING_VERSION:-local}
+    profiles: [tools]
+    command: ['backup']
+    restart: 'no'
+    mem_limit: 256m
+    volumes: [staging-data:/data, staging-backups:/backups]
+    environment:
+      <<: *site-environment
+      ASPNETCORE_ENVIRONMENT: Staging
+      AllowedHosts: ${STAGING_DOMAIN:-staging.localhost};localhost
+      Backup__Keep: ${BACKUP_KEEP:-14}
+
+  caddy:
+    image: caddy:2@sha256:0c994536bddb66445885237f1a5dcc1916bccea922661c76b4e9fc24061f9b52
+    restart: unless-stopped
+    networks: [web]
+    logging: *logging
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
+    security_opt: ['no-new-privileges:true']
+    mem_limit: 128m
+    ports: ['80:80', '443:443', '443:443/udp']
+    environment:
+      SITE_DOMAIN: ${SITE_DOMAIN:-localhost}
+      STAGING_DOMAIN: ${STAGING_DOMAIN:-staging.localhost}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on: [site]
+
+networks:
+  web:
+    ipam:
+      config: [{ subnet: 172.28.0.0/16 }]
+
+volumes:
+  site-data:
+  site-backups:
+  staging-data:
+  staging-backups:
+  caddy-data:
+  caddy-config:

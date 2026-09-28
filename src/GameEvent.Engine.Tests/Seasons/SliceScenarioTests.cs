@@ -1,5 +1,6 @@
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Map;
+using GameEvent.Engine.Players;
 using GameEvent.Engine.Rolls;
 using GameEvent.Engine.Runs;
 using GameEvent.Engine.Scoring;
@@ -66,8 +67,8 @@ public class SliceScenarioTests
         ScenarioAssert.Accepted(s);
         var sum = faces.Sum();
         Assert.Equal(
-            [typeof(SeasonCreated), typeof(SeasonPlayerAdded), typeof(SeasonPlayerAdded), typeof(GameRolled), typeof(RunStarted)],
-            s.Log.Take(5).Select(e => e.GetType()));
+            [typeof(SeasonCreated), typeof(SeasonStatusChanged), typeof(SeasonPlayerAdded), typeof(SeasonPlayerAdded), typeof(GameRolled), typeof(RunStarted)],
+            s.Log.Take(6).Select(e => e.GetType()));
         Assert.Equal(sum, s.Player("Вася").Points);
         Assert.Equal($"c{sum}", s.Player("Вася").CellId);
         Assert.Equal(RunStatus.Completed, s.State.Runs[runId].Status);
@@ -183,8 +184,9 @@ public class SliceScenarioTests
             [new RollMiss(SequentialIds.Make(2, 1), RollMissReason.BeingPlayed, SequentialIds.Make(1, 2)),
              new RollMiss(SequentialIds.Make(2, 2), RollMissReason.CompletedInSeason, SequentialIds.Make(1, 3))],
             SequentialIds.Make(2, 3),
-            new RunSnapshot(ruleset.Version, 7.5m, ruleset.Reward.DiceCount, ruleset.Reward.DieByDifficulty),
-            FixedClock.SeasonStart);
+            new RunSnapshot(ruleset.Version, 7.5m, ruleset.Reward.DiceCount, ruleset.Reward.DieByDifficulty, ruleset.Roll.TechRerollWindowHours),
+            FixedClock.SeasonStart,
+            ["Horror", "RPG"]);
 
         Assert.Equal(rolled, EventCodec.Decode(EventCodec.Encode(rolled)));
     }

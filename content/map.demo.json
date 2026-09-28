@@ -1,0 +1,952 @@
+{
+  "cells": [
+    {
+      "id": "start",
+      "type": "start"
+    },
+    {
+      "id": "a1",
+      "type": "empty"
+    },
+    {
+      "id": "a2",
+      "type": "empty"
+    },
+    {
+      "id": "a3",
+      "type": "empty"
+    },
+    {
+      "id": "a4",
+      "type": "empty"
+    },
+    {
+      "id": "a5",
+      "type": "empty"
+    },
+    {
+      "id": "a6",
+      "type": "empty"
+    },
+    {
+      "id": "a7",
+      "type": "empty"
+    },
+    {
+      "id": "a8",
+      "type": "empty"
+    },
+    {
+      "id": "a9",
+      "type": "empty"
+    },
+    {
+      "id": "f1",
+      "type": "fork"
+    },
+    {
+      "id": "p1",
+      "type": "empty"
+    },
+    {
+      "id": "p2",
+      "type": "empty"
+    },
+    {
+      "id": "p3",
+      "type": "empty"
+    },
+    {
+      "id": "p4",
+      "type": "empty"
+    },
+    {
+      "id": "p5",
+      "type": "empty"
+    },
+    {
+      "id": "p6",
+      "type": "empty"
+    },
+    {
+      "id": "p7",
+      "type": "empty"
+    },
+    {
+      "id": "p8",
+      "type": "pointsBonus",
+      "amount": 3
+    },
+    {
+      "id": "p9",
+      "type": "empty"
+    },
+    {
+      "id": "p10",
+      "type": "empty"
+    },
+    {
+      "id": "p11",
+      "type": "empty"
+    },
+    {
+      "id": "p12",
+      "type": "empty"
+    },
+    {
+      "id": "p13",
+      "type": "empty"
+    },
+    {
+      "id": "p14",
+      "type": "empty"
+    },
+    {
+      "id": "p15",
+      "type": "empty"
+    },
+    {
+      "id": "p16",
+      "type": "empty"
+    },
+    {
+      "id": "s1",
+      "type": "empty",
+      "zone": "horror-swamp"
+    },
+    {
+      "id": "s2",
+      "type": "empty",
+      "zone": "horror-swamp"
+    },
+    {
+      "id": "s3",
+      "type": "empty",
+      "zone": "horror-swamp"
+    },
+    {
+      "id": "s4",
+      "type": "empty",
+      "zone": "horror-swamp"
+    },
+    {
+      "id": "s5",
+      "type": "empty",
+      "zone": "horror-swamp"
+    },
+    {
+      "id": "s6",
+      "type": "empty",
+      "zone": "horror-swamp"
+    },
+    {
+      "id": "s7",
+      "type": "empty",
+      "zone": "horror-swamp"
+    },
+    {
+      "id": "s8",
+      "type": "empty",
+      "zone": "horror-swamp"
+    },
+    {
+      "id": "s9",
+      "type": "teleport",
+      "to": "s2",
+      "zone": "horror-swamp"
+    },
+    {
+      "id": "s10",
+      "type": "empty",
+      "zone": "horror-swamp"
+    },
+    {
+      "id": "s11",
+      "type": "empty",
+      "zone": "horror-swamp"
+    },
+    {
+      "id": "j1",
+      "type": "checkpoint"
+    },
+    {
+      "id": "b1",
+      "type": "empty"
+    },
+    {
+      "id": "b2",
+      "type": "empty"
+    },
+    {
+      "id": "b3",
+      "type": "empty"
+    },
+    {
+      "id": "b4",
+      "type": "empty"
+    },
+    {
+      "id": "b5",
+      "type": "empty"
+    },
+    {
+      "id": "b6",
+      "type": "empty"
+    },
+    {
+      "id": "b7",
+      "type": "empty"
+    },
+    {
+      "id": "b8",
+      "type": "empty"
+    },
+    {
+      "id": "b9",
+      "type": "empty"
+    },
+    {
+      "id": "f2",
+      "type": "fork"
+    },
+    {
+      "id": "l1",
+      "type": "empty"
+    },
+    {
+      "id": "l2",
+      "type": "empty"
+    },
+    {
+      "id": "l3",
+      "type": "empty"
+    },
+    {
+      "id": "l4",
+      "type": "empty"
+    },
+    {
+      "id": "l5",
+      "type": "empty"
+    },
+    {
+      "id": "l6",
+      "type": "empty"
+    },
+    {
+      "id": "l7",
+      "type": "empty"
+    },
+    {
+      "id": "l8",
+      "type": "empty"
+    },
+    {
+      "id": "l9",
+      "type": "pointsBonus",
+      "amount": 3
+    },
+    {
+      "id": "l10",
+      "type": "empty"
+    },
+    {
+      "id": "l11",
+      "type": "empty"
+    },
+    {
+      "id": "l12",
+      "type": "empty"
+    },
+    {
+      "id": "l13",
+      "type": "empty"
+    },
+    {
+      "id": "l14",
+      "type": "empty"
+    },
+    {
+      "id": "l15",
+      "type": "empty"
+    },
+    {
+      "id": "l16",
+      "type": "empty"
+    },
+    {
+      "id": "l17",
+      "type": "empty"
+    },
+    {
+      "id": "q1",
+      "type": "empty",
+      "zone": "quick"
+    },
+    {
+      "id": "q2",
+      "type": "empty",
+      "zone": "quick"
+    },
+    {
+      "id": "q3",
+      "type": "empty",
+      "zone": "quick"
+    },
+    {
+      "id": "q4",
+      "type": "teleport",
+      "to": "j2",
+      "zone": "quick"
+    },
+    {
+      "id": "q5",
+      "type": "empty",
+      "zone": "quick"
+    },
+    {
+      "id": "q6",
+      "type": "empty",
+      "zone": "quick"
+    },
+    {
+      "id": "q7",
+      "type": "empty",
+      "zone": "quick"
+    },
+    {
+      "id": "q8",
+      "type": "empty",
+      "zone": "quick"
+    },
+    {
+      "id": "q9",
+      "type": "empty",
+      "zone": "quick"
+    },
+    {
+      "id": "q10",
+      "type": "empty",
+      "zone": "quick"
+    },
+    {
+      "id": "j2",
+      "type": "checkpoint"
+    },
+    {
+      "id": "e1",
+      "type": "empty"
+    },
+    {
+      "id": "e2",
+      "type": "empty"
+    },
+    {
+      "id": "e3",
+      "type": "empty"
+    },
+    {
+      "id": "e4",
+      "type": "empty"
+    },
+    {
+      "id": "e5",
+      "type": "empty"
+    },
+    {
+      "id": "e6",
+      "type": "empty"
+    },
+    {
+      "id": "e7",
+      "type": "empty"
+    },
+    {
+      "id": "e8",
+      "type": "empty"
+    },
+    {
+      "id": "e9",
+      "type": "empty"
+    },
+    {
+      "id": "e10",
+      "type": "empty"
+    },
+    {
+      "id": "e11",
+      "type": "empty"
+    },
+    {
+      "id": "finish",
+      "type": "finish"
+    }
+  ],
+  "edges": [
+    {
+      "from": "a1",
+      "to": "a2",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "a2",
+      "to": "a3",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "a3",
+      "to": "a4",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "a4",
+      "to": "a5",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "a5",
+      "to": "a6",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "a6",
+      "to": "a7",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "a7",
+      "to": "a8",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "a8",
+      "to": "a9",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "start",
+      "to": "a1",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "a9",
+      "to": "f1",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "p1",
+      "to": "p2",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "p2",
+      "to": "p3",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "p3",
+      "to": "p4",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "p4",
+      "to": "p5",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "p5",
+      "to": "p6",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "p6",
+      "to": "p7",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "p7",
+      "to": "p8",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "p8",
+      "to": "p9",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "p9",
+      "to": "p10",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "p10",
+      "to": "p11",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "p11",
+      "to": "p12",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "p12",
+      "to": "p13",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "p13",
+      "to": "p14",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "p14",
+      "to": "p15",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "p15",
+      "to": "p16",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "f1",
+      "to": "p1",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "s1",
+      "to": "s2",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "s2",
+      "to": "s3",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "s3",
+      "to": "s4",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "s4",
+      "to": "s5",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "s5",
+      "to": "s6",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "s6",
+      "to": "s7",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "s7",
+      "to": "s8",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "s8",
+      "to": "s9",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "s9",
+      "to": "s10",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "s10",
+      "to": "s11",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "f1",
+      "to": "s1",
+      "isDefaultForward": false,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "p16",
+      "to": "j1",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "s11",
+      "to": "j1",
+      "isDefaultForward": true,
+      "isPrimaryBackward": false
+    },
+    {
+      "from": "b1",
+      "to": "b2",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "b2",
+      "to": "b3",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "b3",
+      "to": "b4",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "b4",
+      "to": "b5",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "b5",
+      "to": "b6",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "b6",
+      "to": "b7",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "b7",
+      "to": "b8",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "b8",
+      "to": "b9",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "j1",
+      "to": "b1",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "b9",
+      "to": "f2",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "l1",
+      "to": "l2",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "l2",
+      "to": "l3",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "l3",
+      "to": "l4",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "l4",
+      "to": "l5",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "l5",
+      "to": "l6",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "l6",
+      "to": "l7",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "l7",
+      "to": "l8",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "l8",
+      "to": "l9",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "l9",
+      "to": "l10",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "l10",
+      "to": "l11",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "l11",
+      "to": "l12",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "l12",
+      "to": "l13",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "l13",
+      "to": "l14",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "l14",
+      "to": "l15",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "l15",
+      "to": "l16",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "l16",
+      "to": "l17",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "f2",
+      "to": "l1",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "q1",
+      "to": "q2",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "q2",
+      "to": "q3",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "q3",
+      "to": "q4",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "q4",
+      "to": "q5",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "q5",
+      "to": "q6",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "q6",
+      "to": "q7",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "q7",
+      "to": "q8",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "q8",
+      "to": "q9",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "q9",
+      "to": "q10",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "f2",
+      "to": "q1",
+      "isDefaultForward": false,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "l17",
+      "to": "j2",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "q10",
+      "to": "j2",
+      "isDefaultForward": true,
+      "isPrimaryBackward": false
+    },
+    {
+      "from": "e1",
+      "to": "e2",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "e2",
+      "to": "e3",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "e3",
+      "to": "e4",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "e4",
+      "to": "e5",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "e5",
+      "to": "e6",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "e6",
+      "to": "e7",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "e7",
+      "to": "e8",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "e8",
+      "to": "e9",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "e9",
+      "to": "e10",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "e10",
+      "to": "e11",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "j2",
+      "to": "e1",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "e11",
+      "to": "finish",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    }
+  ],
+  "zones": [
+    {
+      "id": "horror-swamp",
+      "name": "Болото ужаса",
+      "rollFilter": {
+        "tags": ["Horror"]
+      },
+      "diceModifier": {
+        "stage": "add",
+        "value": 1
+      },
+      "dropPenaltyMultiplier": 1.5
+    },
+    {
+      "id": "quick",
+      "name": "Тропа коротких игр",
+      "rollFilter": {
+        "maxHours": 8
+      },
+      "diceModifier": {
+        "stage": "count",
+        "value": -1
+      }
+    }
+  ]
+}

@@ -13,7 +13,32 @@ public sealed record StoredEvent(string Type, int Version, string Data);
 public static class EventCodec
 {
     /// <summary>Upcasters by (type name, version they read); each returns data of the next version.</summary>
-    private static readonly Dictionary<(string Type, int FromVersion), Func<JsonObject, JsonObject>> s_upcasters = [];
+    private static readonly Dictionary<(string Type, int FromVersion), Func<JsonObject, JsonObject>> s_upcasters = new()
+    {
+        // D-116: a proof of v1 had no uploaded screenshots
+        [("proof-submitted", 1)] = data =>
+        {
+            data["files"] = new JsonArray();
+            return data;
+        },
+
+        // D-136: before the wheel was logged a roll knew only the category it picked
+        [("game-rolled", 1)] = WheelOfOne,
+        [("game-choice-rolled", 1)] = WheelOfOne,
+
+        // D-121: before bug report screenshots every stored file was an upload
+        [("file-stored", 1)] = data =>
+        {
+            data["kind"] = "upload";
+            return data;
+        },
+    };
+
+    private static JsonObject WheelOfOne(JsonObject data)
+    {
+        data["sectors"] = new JsonArray(data["category"]?.DeepClone());
+        return data;
+    }
 
     public static StoredEvent Encode(IGameEvent gameEvent)
     {

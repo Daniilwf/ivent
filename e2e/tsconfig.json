@@ -11,7 +11,8 @@
     "noUnusedParameters": true,
     "verbatimModuleSyntax": true,
     "skipLibCheck": true,
-    "noEmit": true
+    "noEmit": true,
+    "allowImportingTsExtensions": true
   },
-  "include": ["playwright.config.ts", "tests", "support"]
+  "include": ["playwright.config.ts", "playwright.visual.config.ts", "tests", "visual", "support"]
 }

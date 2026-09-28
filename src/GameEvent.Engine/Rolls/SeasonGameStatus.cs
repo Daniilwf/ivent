@@ -24,13 +24,23 @@ internal enum GameAvailability
 internal sealed class SeasonGameStatus
 {
     private readonly Dictionary<Guid, RollMiss> _misses = [];
+    private readonly HashSet<Guid> _excluded = [];
 
-    private SeasonGameStatus(SeasonState state)
+    private SeasonGameStatus(SeasonState state, Guid playerId)
     {
+        // The player's own exclusions are hidden from them, never shown as a miss (D-05).
+        if (state.Players.TryGetValue(playerId, out var me))
+        {
+            _excluded.UnionWith(me.Exclusions.Select(x => x.GameId));
+        }
+
         foreach (var run in state.Runs.Values)
         {
             switch (run.Status)
             {
+                case RunStatus.Completed when run.FreeMode && run.PlayerId != playerId:
+                    // The first's games in free mode do not complete the game for the others (D-16); for him they do.
+                    break;
                 case RunStatus.Completed:
                     // «Уже прошёл» wins over «Сейчас играет».
                     _misses[run.GameId] = new RollMiss(run.GameId, RollMissReason.CompletedInSeason, run.PlayerId);
@@ -51,20 +61,31 @@ internal sealed class SeasonGameStatus
             {
                 _misses.TryAdd(offer.GameId, new RollMiss(offer.GameId, RollMissReason.BeingPlayed, player.PlayerId));
             }
+
+            // Every option of a pending choice is reserved until the pick (D-06).
+            foreach (var option in player.Choice?.Options ?? [])
+            {
+                if (option.Game is { } game)
+                {
+                    _misses.TryAdd(game.GameId, new RollMiss(game.GameId, RollMissReason.BeingPlayed, player.PlayerId));
+                }
+            }
         }
     }
 
-    /// <summary>Game statuses as seen by <paramref name="playerId"/>. Personal exclusions arrive in tasks C5–C6.</summary>
-    public static SeasonGameStatus For(SeasonState state, Guid playerId)
-    {
-        _ = playerId;
-        return new SeasonGameStatus(state);
-    }
+    /// <summary>Game statuses as seen by <paramref name="playerId"/>; an unknown id sees no personal exclusions.</summary>
+    public static SeasonGameStatus For(SeasonState state, Guid playerId) => new(state, playerId);
+
+    /// <summary>Game statuses without anyone's personal exclusions (category counts for the admin).</summary>
+    public static SeasonGameStatus ForNobody(SeasonState state) => new(state, Guid.Empty);
+
+    /// <summary>Every game taken in the season: completed (winning over played) or played, offered or among pending options.</summary>
+    public IEnumerable<RollMiss> Taken => _misses.Values;
 
     public GameAvailability Of(Game game, out RollMiss? miss)
     {
         miss = null;
-        if (game.IsDeleted)
+        if (game.IsDeleted || _excluded.Contains(game.Id))
         {
             return GameAvailability.Hidden;
         }

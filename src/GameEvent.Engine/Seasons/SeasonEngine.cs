@@ -1,9 +1,14 @@
+using GameEvent.Engine.Effects;
+using GameEvent.Engine.Finish;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Map;
+using GameEvent.Engine.Players;
+using GameEvent.Engine.Proofs;
 using GameEvent.Engine.Rolls;
 using GameEvent.Engine.Rulesets;
 using GameEvent.Engine.Runs;
 using GameEvent.Engine.Scoring;
+using GameEvent.Engine.Turns;
 
 namespace GameEvent.Engine.Seasons;
 
@@ -29,36 +34,132 @@ public static class SeasonEngine
         ArgumentNullException.ThrowIfNull(command);
         ArgumentNullException.ThrowIfNull(context);
 
-        // A ruleset changed mid-season to a mechanic this build lacks is refused on every command (D-53).
-        if (RulesetSupport.Unsupported(context.Ruleset) is { } unsupported)
-        {
-            return new CommandResult(Decision.Reject(RejectionCodes.RulesetUnsupported, unsupported), state);
-        }
-
         var decision = command switch
         {
-            CreateSeason c => SeasonSetup.Decide(state, c, context),
-            AddSeasonPlayer c => SeasonSetup.Decide(state, c),
+            CreateSeason c => SeasonSetup.Decide(state, c),
+            ChangeRuleset c => RulesetChanges.Decide(state, c),
+            ChangeSeasonStatus c => SeasonSetup.Decide(state, c, context),
+            SetSeasonDeadline c => SeasonSetup.Decide(state, c, context),
+            ReachDeadline c => SeasonSetup.Decide(state, c, context),
+            AddSeasonPlayer c => PlayerAdministration.Decide(state, c),
+            SetPlayerInactive c => PlayerAdministration.Decide(state, c),
+            AdjustPlayer c => PlayerAdministration.Decide(state, c),
             RollGame c => Rolling.Decide(state, c, context),
+            DeclareAlreadyPlayed c => Rolling.Decide(state, c, context),
+            Reroll c => Rolling.Decide(state, c, context),
             StartRun c => RunLifecycle.Decide(state, c, context),
             CompleteRun c => RunLifecycle.Decide(state, c, context),
+            ReviewRun c => RunLifecycle.Decide(state, c, context),
+            CorrectRunHours c => Corrections.Decide(state, c, context),
+            SubmitProof c => ProofReview.Decide(state, c, context),
+            ApproveProof c => ProofReview.Decide(state, c, context),
+            RejectProof c => ProofReview.Decide(state, c, context),
+            ChangeRunDifficulty c => Corrections.Decide(state, c, context),
+            DropRun c => Drops.Decide(state, c, context),
+            TechReroll c => Drops.Decide(state, c, context),
+            ConvertTechRerollToDrop c => Drops.Decide(state, c, context),
+            MakeChoice c => Choosing.Decide(state, c, context),
+            PublishMap c => MapPublishing.Decide(state, c),
+            ResolveManualEffect c => ManualEffects.Decide(state, c),
+            RecalculateFinishBonuses c => Finishing.Decide(state, c),
+            Undo.UndoCommand c => Undo.Undoing.Decide(state, c, context),
             _ => throw new ArgumentException($"Unknown command {command.GetType().Name}.", nameof(command)),
         };
 
-        return new CommandResult(decision, decision.Events.Aggregate(state, Apply));
+        if (!decision.IsAccepted)
+        {
+            return new CommandResult(decision, state);
+        }
+
+        if (command is not MakeChoice && MovesAPlayerChoosingABranch(state, decision.Events) is { } choosing)
+        {
+            // D-305: the steps left at a fork lead from where the player stands; move them only after the choice
+            decision = Decision.Reject(
+                RejectionCodes.BranchChoicePending, $"Player {choosing} is choosing a branch: wait for the choice or discard it first.");
+            return new CommandResult(decision, state);
+        }
+
+        // Effects react after the command's own events, within the chain limits (D-24, D-103).
+        var after = decision.Events.Aggregate(state, Apply);
+        var (reactions, final) = EffectChain.Run(after, decision.Events, context);
+        return reactions.Count == 0
+            ? new CommandResult(decision, after)
+            : new CommandResult(Decision.Accept([.. decision.Events, .. reactions]), final);
+    }
+
+    // D-305: a player choosing a branch is not moved by other commands, and the run whose steps wait is not corrected or
+    // rejected — unless the same command discards the choice.
+    private static Guid? MovesAPlayerChoosingABranch(SeasonState state, IReadOnlyList<IGameEvent> events)
+    {
+        foreach (var player in state.Players.Values.Where(p => p.Choice?.Kind == ChoiceKind.Branch))
+        {
+            if (events.OfType<ChoiceDiscarded>().Any(d => d.PlayerId == player.PlayerId))
+            {
+                continue;
+            }
+
+            var run = player.Choice!.Move?.RunId;
+            if (events.Any(e => e switch
+            {
+                PlayerMoved moved => moved.PlayerId == player.PlayerId,
+                RunHoursCorrected corrected => corrected.RunId == run,
+                RunDifficultyChanged changed => changed.RunId == run,
+                ProofRejected rejected => rejected.RunId == run,
+                _ => false,
+            }))
+            {
+                return player.PlayerId;
+            }
+        }
+
+        return null;
     }
 
     public static SeasonState Apply(SeasonState state, IGameEvent gameEvent) =>
         gameEvent switch
         {
             SeasonCreated e => SeasonSetup.Apply(state, e),
-            SeasonPlayerAdded e => SeasonSetup.Apply(state, e),
+            SeasonStatusChanged e => SeasonSetup.Apply(state, e),
+            SeasonDeadlineSet e => SeasonSetup.Apply(state, e),
+            SeasonResultRecorded e => SeasonSetup.Apply(state, e),
+            SeasonPlayerAdded e => PlayerAdministration.Apply(state, e),
+            PlayerInactivitySet e => PlayerAdministration.Apply(state, e),
+            PlayerAdjusted e => PlayerAdministration.Apply(state, e),
+            OfferDiscarded e => PlayerAdministration.Apply(state, e),
+            CoinsChanged e => PointsLedger.Apply(state, e),
+            ResourceChanged e => PointsLedger.Apply(state, e),
+            RulesetChanged e => RulesetChanges.Apply(state, e),
             GameRolled e => Rolling.Apply(state, e),
+            GameExcluded e => Rolling.Apply(state, e),
+            GameRerolled e => Rolling.Apply(state, e),
+            ManualEffectCreated e => ManualEffects.Apply(state, e),
+            GameChoiceRolled e => Choosing.Apply(state, e),
+            ChoiceMade e => Choosing.Apply(state, e),
+            BranchChoiceRequested e => Choosing.Apply(state, e),
+            ChoiceDiscarded e => Choosing.Apply(state, e),
             RunStarted e => RunLifecycle.Apply(state, e),
             RunCompleted e => RunLifecycle.Apply(state, e),
             CompletionRolled e => RunLifecycle.Apply(state, e),
+            RunReviewed e => RunLifecycle.Apply(state, e),
+            RunHoursCorrected e => Corrections.Apply(state, e),
+            ProofSubmitted e => ProofReview.Apply(state, e),
+            PlayerFinished e => Finishing.Apply(state, e),
+            PlayerFrozen e => Finishing.Apply(state, e),
+            PlayerFinishRevoked e => Finishing.Apply(state, e),
+            FinishSurplusChanged e => Finishing.Apply(state, e),
+            FinishBonusRulesRefreshed e => Finishing.Apply(state, e),
+            ProofApproved e => ProofReview.Apply(state, e),
+            ProofRejected e => ProofReview.Apply(state, e),
+            RunDifficultyChanged e => Corrections.Apply(state, e),
+            ManualEffectResolved e => ManualEffects.Apply(state, e),
+            RunDropped e => Drops.Apply(state, e),
+            RunTechRerolled e => Drops.Apply(state, e),
+            TechRerollConvertedToDrop e => Drops.Apply(state, e),
             PointsChanged e => PointsLedger.Apply(state, e),
             PlayerMoved e => Movement.Apply(state, e),
+            MapPublished e => MapPublishing.Apply(state, e),
+            EffectChainCut e => EffectChain.Apply(state, e),
+            Undo.CommandUndone e => Undo.Undoing.Apply(state, e),
             _ => throw new ArgumentException($"Unknown event {gameEvent.GetType().Name}.", nameof(gameEvent)),
         };
 
