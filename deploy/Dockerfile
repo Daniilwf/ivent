@@ -44,6 +44,10 @@ ENV Logging__File__Path=/data/logs/game-event-.log
 ENV DataProtection__KeysPath=/data/keys
 ENV Site__LockFile=/data/site.lock
 ENV Backup__Path=/backups
+# A 1-core, 1 GB server (CLAUDE.md «Эксплуатация», D-209): the workstation GC (one heap, no GC thread per core) and
+# the GC's conserve-memory mode keep the live process within its 400 MB budget; `npm run test:memory` measures it
+ENV DOTNET_gcServer=0
+ENV DOTNET_GCConserveMemory=7
 
 # deploy/backup.sh runs only an image that knows the backup commands: an older one would start a second site (D-214)
 LABEL ivent.backup="1"
