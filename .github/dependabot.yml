@@ -39,6 +39,10 @@ updates:
         patterns: ['*']
     cooldown:
       default-days: 7
+    # Node moves to the next LTS by hand (the owner's rule, 2026-09-28): a Dependabot major is often a non-LTS line
+    ignore:
+      - dependency-name: 'node'
+        update-types: ['version-update:semver-major']
 
   - package-ecosystem: docker-compose
     directory: /deploy
@@ -57,6 +61,10 @@ updates:
     groups:
       actions:
         patterns: ['*']
+    # The same rule for the action that installs Node: its majors follow Node's
+    ignore:
+      - dependency-name: 'actions/setup-node'
+        update-types: ['version-update:semver-major']
 
   - package-ecosystem: dotnet-sdk
     directory: /
