@@ -23,7 +23,7 @@ public static class XlsxPoolReader
         var workbook = document.WorkbookPart ?? throw new InvalidDataException("The file has no workbook.");
 
         // Only the text runs of a shared string: phonetic hints (rPh) are not part of what the cell shows
-        var strings = workbook.SharedStringTablePart?.SharedStringTable.Elements<SharedStringItem>().Select(Text).ToList() ?? [];
+        var strings = workbook.SharedStringTablePart?.SharedStringTable?.Elements<SharedStringItem>().Select(Text).ToList() ?? [];
         var problems = new List<string>();
 
         var games = new List<ImportedGame>();
@@ -69,7 +69,7 @@ public static class XlsxPoolReader
     /// <summary>A sheet's rows by number, each as its cells by column letter, with the values the cells show.</summary>
     private static IEnumerable<(int Row, Dictionary<string, string> Cells)> Rows(WorkbookPart workbook, string name, List<string> strings, List<string> problems)
     {
-        var sheet = workbook.Workbook.Sheets?.Elements<Sheet>().FirstOrDefault(s => string.Equals(s.Name?.Value?.Trim(), name, StringComparison.OrdinalIgnoreCase));
+        var sheet = workbook.Workbook?.Sheets?.Elements<Sheet>().FirstOrDefault(s => string.Equals(s.Name?.Value?.Trim(), name, StringComparison.OrdinalIgnoreCase));
         if (sheet?.Id?.Value is not { } id || workbook.GetPartById(id) is not WorksheetPart part)
         {
             problems.Add($"The sheet «{name}» is not in the file.");
@@ -77,7 +77,7 @@ public static class XlsxPoolReader
         }
 
         var number = 0;
-        foreach (var row in part.Worksheet.Descendants<Row>())
+        foreach (var row in part.Worksheet?.Descendants<Row>() ?? [])
         {
             // A row or a cell without its reference (some writers skip it) takes its place in order
             number = (int?)row.RowIndex?.Value ?? number + 1;
