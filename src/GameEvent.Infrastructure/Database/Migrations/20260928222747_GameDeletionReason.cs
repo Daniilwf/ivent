@@ -21,9 +21,9 @@ namespace GameEvent.Infrastructure.Database.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropColumn(
-                name: "DeletionReason",
-                table: "Game");
+            // SQLite drops the column in place: EF's DropColumn rebuilds the table with its columns reordered, and the
+            // rollback must give the previous release's schema back exactly (npm run test:migrations)
+            migrationBuilder.Sql("ALTER TABLE \"Game\" DROP COLUMN \"DeletionReason\";");
         }
     }
 }
