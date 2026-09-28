@@ -143,6 +143,8 @@ internal sealed class TestClock : GameEvent.Infrastructure.Kernel.IAdjustableClo
         }
     }
 
+    public TimeSpan Offset => UtcNow - _start;
+
     public void Advance(TimeSpan by) => UtcNow += by;
 
     public void MoveTo(DateTimeOffset at) => UtcNow = at;
@@ -155,10 +157,16 @@ internal sealed class SeededRandom(int seed) : GameEvent.Infrastructure.Kernel.I
 #pragma warning disable CA5394 // deterministic randomness is the point in tests
     private Random _random = new(seed);
 
+    public int? CurrentSeed { get; private set; }
+
     public int NextInt(int minInclusive, int maxExclusive) => _random.Next(minInclusive, maxExclusive);
 
     // Unlike the site's, no seed is the tests' own seed again: the tests stay repeatable
-    public void Seed(int? value) => _random = new Random(value ?? seed);
+    public void Seed(int? value)
+    {
+        _random = new Random(value ?? seed);
+        CurrentSeed = value;
+    }
 #pragma warning restore CA5394
 }
 

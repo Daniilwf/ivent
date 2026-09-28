@@ -19,7 +19,8 @@ export type FeedPlayer = {
   hasProfile: boolean;
 };
 
-export type FeedGame = { id: string; title: string; hasPage: boolean };
+/** A game a line names; `cover` — the pool's cover (the thumbnail), when it has one */
+export type FeedGame = { id: string; title: string; hasPage: boolean; cover?: string | undefined };
 
 /** A name in a line: the screen makes it a link to the profile or the game page */
 export type FeedRef = { kind: 'player'; player: FeedPlayer } | { kind: 'game'; game: FeedGame };
@@ -49,6 +50,8 @@ export type FeedItem = {
   line: readonly (string | FeedRef)[];
   facts: string[];
   quote: { rating: number | null; text: string | null } | null;
+  /** A completion's game, shown with its cover beside the line (D-222); none when the game has no cover */
+  cover: FeedGame | null;
   /** The admin undid the command: the line stays, crossed out */
   undone: boolean;
 };
@@ -85,7 +88,13 @@ export function withRefs(refs: FeedRefs, page: Pick<Page, 'players' | 'games' | 
       )
     : refs.players;
   const games = new Map(refs.games);
-  for (const g of page.games) games.set(g.id, { id: g.id, title: g.title, hasPage: g.hasPage });
+  for (const g of page.games)
+    games.set(g.id, {
+      id: g.id,
+      title: g.title,
+      hasPage: g.hasPage,
+      cover: g.cover?.thumbnailUrl,
+    });
   const runs = new Map(refs.runs);
   for (const r of page.runs) runs.set(r.id, r.gameId);
   return { players, games, runs };
@@ -124,6 +133,8 @@ type Headline = {
   line: readonly (string | FeedRef)[];
   facts?: string[];
   quote?: FeedItem['quote'];
+  /** The game whose cover stands beside the line */
+  showcase?: FeedRef;
 };
 
 type Context = {
@@ -189,6 +200,7 @@ const headlines: [string, (d: Data, c: Context) => Headline][] = [
       icon: 'complete',
       actor: c.player(d),
       line: L.completed(c.playerRef(d), c.gameRef(d)),
+      showcase: c.gameRef(d),
       facts: [
         ru.difficulty[(text(d, 'difficulty') ?? 'normal') as keyof typeof ru.difficulty],
         ru.hours.value(number(d, 'hours') ?? 0),
@@ -541,6 +553,10 @@ function itemOf(entries: Entry[], refs: FeedRefs): FeedItem | null {
     line: headline.line,
     facts: [...(headline.facts ?? []), ...factsOf(events, lead)],
     quote: headline.quote ?? null,
+    cover:
+      headline.showcase?.kind === 'game' && headline.showcase.game.cover
+        ? headline.showcase.game
+        : null,
     undone: entries.every((e) => e.undone),
   };
 }

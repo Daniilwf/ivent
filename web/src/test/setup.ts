@@ -11,3 +11,9 @@ if (!('ResizeObserver' in globalThis)) {
 
 // jsdom has no scrolling: a page opened by the router starts at the top, in tests nowhere
 window.scrollTo = () => undefined;
+
+// The site's status is asked once per page (siteStatus.ts): every test is a new page
+import { forgetSiteEnvironment } from '../app/siteStatus';
+beforeEach(() => {
+  forgetSiteEnvironment();
+});

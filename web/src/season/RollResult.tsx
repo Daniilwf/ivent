@@ -69,7 +69,7 @@ export function OfferCard({
 }) {
   return (
     <div data-testid="offer" className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-3">
-      <Cover game={offer} />
+      <Cover game={{ title: offer.title, cover: offer.cover?.thumbnailUrl }} />
       <div className="grid content-start gap-1">
         <h3
           id={rollResultTitle}
@@ -161,7 +161,10 @@ export function ChoiceCard({
                 dense ? 'p-2' : 'p-3',
               )}
             >
-              <Cover game={game} width={dense ? 40 : 64} />
+              <Cover
+                game={{ title: game.title, cover: game.cover?.thumbnailUrl }}
+                width={dense ? 40 : 64}
+              />
               <span className="grid content-start gap-1">
                 <strong className="font-display wrap-anywhere">{game.title}</strong>
                 <span className="text-sm text-ink-soft">

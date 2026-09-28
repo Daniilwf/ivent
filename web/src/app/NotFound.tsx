@@ -1,3 +1,4 @@
+import { SearchX } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { ru } from '../i18n/ru';
 import { Button } from '../ui/Button';
@@ -23,5 +24,18 @@ export function NotFound({ icon, title, text }: { icon: ReactNode; title: string
         </Button>
       }
     />
+  );
+}
+
+/** An address the site does not have (D-202, H9): the whole page says so */
+export function NotFoundPage() {
+  return (
+    <main className="mx-auto grid max-w-110 px-4 py-10" data-testid="page-not-found">
+      <NotFound
+        icon={<SearchX size={28} aria-hidden />}
+        title={ru.feed.pageNotFoundTitle}
+        text={ru.feed.pageNotFoundText}
+      />
+    </main>
   );
 }

@@ -18,8 +18,17 @@ using Microsoft.EntityFrameworkCore;
 
 namespace GameEvent.Web.Testing;
 
-/// <summary>The site's clock as the test endpoints see it: now, and whether it can be moved.</summary>
-public sealed record TestClockView(DateTimeOffset Now, bool Adjustable);
+/// <summary>
+/// The site's clock as the test endpoints see it: now, whether it can be moved and how far it is from the real time
+/// (<c>shiftMinutes</c>, negative — in the past; H9, D-221).
+/// </summary>
+public sealed record TestClockView(DateTimeOffset Now, bool Adjustable, double ShiftMinutes);
+
+/// <summary>The site's randomness: the seed in force, or null while it is unpredictable; whether it can be seeded.</summary>
+public sealed record TestRandomView(int? Seed, bool Seedable);
+
+/// <summary>Everything the page of the test tools shows (H9, D-221): the clock, the randomness and the scenarios by name.</summary>
+public sealed record TestToolsView(TestClockView Clock, TestRandomView Random, IReadOnlyList<string> Scenarios);
 
 /// <summary>Move the clock: forward by minutes, to a moment, or back to the real time.</summary>
 public sealed record TestClockRequest(double? AdvanceMinutes = null, DateTimeOffset? MoveTo = null, bool Reset = false);
@@ -27,15 +36,18 @@ public sealed record TestClockRequest(double? AdvanceMinutes = null, DateTimeOff
 /// <summary>Seed the randomness (the same rolls and dice every time), or null for unpredictable randomness again.</summary>
 public sealed record TestRandomRequest(int? Seed);
 
-/// <summary>A scenario for a player of the season, by login (the first player when none).</summary>
-public sealed record TestScenarioRequest(string? Player = null);
+/// <summary>
+/// A scenario for a player of the season: by the player's id in the season (<c>playerId</c>, the page picks from the
+/// season's players) or by login (<c>player</c>); the first player by name when neither.
+/// </summary>
+public sealed record TestScenarioRequest(string? Player = null, Guid? PlayerId = null);
 
 /// <summary>What a scenario did: the commands it sent, in order.</summary>
 public sealed record TestScenarioView(string Scenario, IReadOnlyList<string> Commands);
 
 /// <summary>
 /// Test endpoints (SPEC «Тестовые эндпоинты», E4, A7, D-120): rewind the time, seed the randomness, load a scenario —
-/// «финиш на носу», «дедлайн через час», «на игроке пять ручных эффектов». Mapped only in Development and Test, admin
+/// «финиш на носу», «дедлайн через час», «на игроке пять ручных эффектов». Mapped in Development, Test and on the test copy (Staging, D-220), admin
 /// only; in Production the routes do not exist. Scenarios go through the queue like any admin action.
 /// </summary>
 public static class TestEndpoints
@@ -55,7 +67,9 @@ public static class TestEndpoints
     public static bool Available(IWebHostEnvironment environment)
     {
         ArgumentNullException.ThrowIfNull(environment);
-        return environment.IsDevelopment() || environment.IsEnvironment("Test");
+        // The test copy on the server (Staging) has them too: loading scenarios there is what it is for (D-220, the
+        // owner's decision); the live site (Production) never does
+        return environment.IsDevelopment() || environment.IsEnvironment("Test") || environment.IsStaging();
     }
 
     /// <summary>A movable clock and a seedable randomness for the test endpoints; production keeps the real ones.</summary>
@@ -78,11 +92,15 @@ public static class TestEndpoints
             return;
         }
 
-        var test = api.MapGroup("/test").WithTags("Test").RequireAuthorization(Policies.Admin).ExcludeFromDescription();
-        test.MapGet("/clock", (IClock clock) => TypedResults.Ok(new TestClockView(clock.UtcNow, clock is IAdjustableClock)));
-        test.MapPost("/clock", MoveClock);
-        test.MapPost("/random", SeedRandom);
-        test.MapPost("/seasons/{seasonId:guid}/scenarios/{name}", RunScenarioAsync);
+        // In the API description where they exist (the client of the test tools' page is generated from it, D-221); the
+        // live site has neither the routes nor the description
+        var test = api.MapGroup("/test").WithTags("Test").RequireAuthorization(Policies.Admin);
+        test.MapGet("", (IClock clock, IRandomSource random) =>
+            TypedResults.Ok(new TestToolsView(ClockOf(clock), RandomOf(random), s_scenarios)));
+        test.MapGet("/clock", (IClock clock) => TypedResults.Ok(ClockOf(clock)));
+        test.MapPost("/clock", MoveClock).ProducesProblem(StatusCodes.Status409Conflict);
+        test.MapPost("/random", SeedRandom).ProducesProblem(StatusCodes.Status409Conflict);
+        test.MapPost("/seasons/{seasonId:guid}/scenarios/{name}", RunScenarioAsync).ProducesProblem(StatusCodes.Status409Conflict);
     }
 
     private static Results<Ok<TestClockView>, ProblemHttpResult, ValidationProblem> MoveClock(TestClockRequest? request, IClock clock)
@@ -130,8 +148,14 @@ public static class TestEndpoints
             return Invalid("moveTo", "The clock goes at most 100 years from the real time.");
         }
 
-        return TypedResults.Ok(new TestClockView(clock.UtcNow, true));
+        return TypedResults.Ok(ClockOf(clock));
     }
+
+    private static TestClockView ClockOf(IClock clock) =>
+        new(clock.UtcNow, clock is IAdjustableClock, clock is IAdjustableClock adjustable ? adjustable.Offset.TotalMinutes : 0);
+
+    private static TestRandomView RandomOf(IRandomSource random) =>
+        new(random is IReseedableRandom reseedable ? reseedable.CurrentSeed : null, random is IReseedableRandom);
 
     private static Results<NoContent, ProblemHttpResult> SeedRandom(TestRandomRequest request, IRandomSource random)
     {
@@ -161,9 +185,11 @@ public static class TestEndpoints
 
         var players = await db.SeasonPlayers.AsNoTracking().Where(p => p.SeasonId == seasonId).ToListAsync(ct);
         var logins = await db.Users.AsNoTracking().ToDictionaryAsync(u => u.Id, u => u.Login, ct);
-        var player = request.Player is { Length: > 0 } login
-            ? players.FirstOrDefault(p => string.Equals(logins.GetValueOrDefault(p.UserId), login, StringComparison.OrdinalIgnoreCase))
-            : players.OrderBy(p => p.Name).FirstOrDefault();
+        var player = request.PlayerId is { } playerId
+            ? players.FirstOrDefault(p => p.Id == playerId)
+            : request.Player is { Length: > 0 } login
+                ? players.FirstOrDefault(p => string.Equals(logins.GetValueOrDefault(p.UserId), login, StringComparison.OrdinalIgnoreCase))
+                : players.OrderBy(p => p.Name).FirstOrDefault();
         if (player is null && name != DeadlineInHour)
         {
             return Problem("test.playerUnknown", "No such player in the season.");

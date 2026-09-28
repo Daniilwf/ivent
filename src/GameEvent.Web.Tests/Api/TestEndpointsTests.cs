@@ -84,6 +84,76 @@ public sealed class TestEndpointsTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task The_tools_page_reads_the_clocks_shift_the_seed_and_the_scenarios()
+    {
+        var admin = await _site.SignedInAsync("admin");
+
+        var fresh = await OkAsync(await admin.GetAsync("/api/test", Ct));
+        Assert.Equal(0, fresh.GetProperty("clock").GetProperty("shiftMinutes").GetDouble());
+        Assert.True(fresh.GetProperty("clock").GetProperty("adjustable").GetBoolean());
+        Assert.Equal(JsonValueKind.Null, fresh.GetProperty("random").GetProperty("seed").ValueKind);
+        Assert.True(fresh.GetProperty("random").GetProperty("seedable").GetBoolean());
+        Assert.Equal(
+            ["finish-soon", "deadline-in-hour", "five-manual-effects"],
+            fresh.GetProperty("scenarios").EnumerateArray().Select(s => s.GetString()));
+
+        await OkAsync(await admin.PostAsJsonAsync("/api/test/clock", new { advanceMinutes = -30 }, Ct));
+        Assert.Equal(HttpStatusCode.NoContent, (await admin.PostAsJsonAsync("/api/test/random", new { seed = 42 }, Ct)).StatusCode);
+
+        var moved = await OkAsync(await admin.GetAsync("/api/test", Ct));
+        Assert.Equal(-30, moved.GetProperty("clock").GetProperty("shiftMinutes").GetDouble());
+        Assert.Equal(_site.Clock.UtcNow, moved.GetProperty("clock").GetProperty("now").GetDateTimeOffset());
+        Assert.Equal(42, moved.GetProperty("random").GetProperty("seed").GetInt32());
+
+        Assert.Equal(HttpStatusCode.NoContent, (await admin.PostAsJsonAsync("/api/test/random", new { seed = (int?)null }, Ct)).StatusCode);
+        Assert.Equal(JsonValueKind.Null, (await OkAsync(await admin.GetAsync("/api/test", Ct))).GetProperty("random").GetProperty("seed").ValueKind);
+    }
+
+    [Fact]
+    public async Task A_scenario_takes_the_player_by_their_id_in_the_season()
+    {
+        var admin = await _site.SignedInAsync("admin");
+
+        await OkAsync(await admin.PostAsJsonAsync(Scenario("finish-soon"), new { playerId = _site.Players["petya"] }, Ct));
+
+        var season = await SeasonAsync(admin);
+        var cells = season.GetProperty("cells").EnumerateArray().Select(c => c.GetProperty("id").GetString()).ToList();
+        var players = season.GetProperty("players").EnumerateArray().ToDictionary(p => p.GetProperty("id").GetGuid(), p => p.GetProperty("cellId").GetString());
+        Assert.Equal(cells[^2], players[_site.Players["petya"]]);
+        Assert.Equal(cells[0], players[_site.Players["vasya"]]);
+
+        // Someone who does not play the season is refused, and nothing moves
+        var stranger = await admin.PostAsJsonAsync(Scenario("finish-soon"), new { playerId = Guid.NewGuid() }, Ct);
+        Assert.Equal(HttpStatusCode.Conflict, stranger.StatusCode);
+        Assert.Contains("test.playerUnknown", await stranger.Content.ReadAsStringAsync(Ct), StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("/api/test/random", """{"seed":"abc"}""")]
+    [InlineData("/api/test/random", """{"seed":1.5}""")]
+    [InlineData("/api/test/random", """{"seed":99999999999}""")]
+    [InlineData("/api/test/clock", """{"advanceMinutes":"soon"}""")]
+    public async Task A_malformed_test_request_is_invalid(string url, string body)
+    {
+        var admin = await _site.SignedInAsync("admin");
+
+        var response = await admin.PostAsync(url, new StringContent(body, System.Text.Encoding.UTF8, "application/json"), Ct);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task A_scenario_for_a_malformed_player_id_is_invalid()
+    {
+        var admin = await _site.SignedInAsync("admin");
+
+        var response = await admin.PostAsync(
+            Scenario("finish-soon"), new StringContent("""{"playerId":"vasya"}""", System.Text.Encoding.UTF8, "application/json"), Ct);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
     public async Task Finish_soon_puts_the_player_one_cell_before_the_finish()
     {
         var admin = await _site.SignedInAsync("admin");
@@ -143,7 +213,9 @@ public sealed class TestEndpointsTests : IAsyncLifetime
     {
         var client = await _site.SignedInAsync(login);
 
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/test", Ct)).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync("/api/test/clock", new { advanceMinutes = 60 }, Ct)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync("/api/test/random", new { seed = 1 }, Ct)).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync(Scenario("finish-soon"), new { }, Ct)).StatusCode);
     }
 
@@ -153,6 +225,7 @@ public sealed class TestEndpointsTests : IAsyncLifetime
         var anonymous = await _site.AnonymousAsync();
 
         Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync("/api/test/clock", Ct)).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync("/api/test", Ct)).StatusCode);
     }
 
     [Fact]
@@ -163,6 +236,8 @@ public sealed class TestEndpointsTests : IAsyncLifetime
         var client = production.CreateClient(new WebApplicationFactoryClientOptions { BaseAddress = new Uri("https://localhost"), HandleCookies = true });
 
         Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/api/test/clock", Ct)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/api/test", Ct)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/openapi/v1.json", Ct)).StatusCode);
         foreach (var url in new[] { "/api/test/clock", "/api/test/random", Scenario("finish-soon") })
         {
             Assert.Equal(HttpStatusCode.NotFound, (await client.PostAsJsonAsync(url, new { }, Ct)).StatusCode);
@@ -170,11 +245,65 @@ public sealed class TestEndpointsTests : IAsyncLifetime
     }
 
     [Theory]
+    [InlineData("Production", "production", false)]
+    [InlineData("Staging", "staging", true)]
+    [InlineData("Development", "development", true)]
+    [InlineData("Test", "test", true)]
+    public async Task The_status_names_the_copy_of_the_site_and_whether_the_test_tools_are_there(string environment, string named, bool tools)
+    {
+        await using var site = new SiteFactory(loginAttemptsPerMinute: 1000, environment: environment);
+        await site.SeedAsync();
+        var client = site.CreateClient(new WebApplicationFactoryClientOptions { BaseAddress = new Uri("https://localhost"), HandleCookies = true });
+
+        var status = await OkAsync(await client.GetAsync("/api/status", Ct));
+
+        Assert.Equal(named, status.GetProperty("environment").GetString());
+        Assert.Equal(tools, status.GetProperty("testTools").GetBoolean());
+    }
+
+    [Fact]
+    public async Task On_the_test_copy_the_admin_has_the_test_tools_and_a_player_does_not()
+    {
+        // Staging is the test copy on the server (D-120): loading scenarios there is what it is for (D-220, the owner's
+        // decision) — for the admin only, as everywhere
+        await using var staging = new SiteFactory(loginAttemptsPerMinute: 1000, environment: "Staging");
+        await staging.SeedAsync();
+        // Secure cookies off Development and Test: the client signs in over https
+        var admin = staging.CreateClient(new WebApplicationFactoryClientOptions { BaseAddress = new Uri("https://localhost"), HandleCookies = true });
+        await SiteFactory.RefreshCsrfAsync(admin);
+        (await admin.PostAsJsonAsync("/api/auth/login", new { login = "admin", password = SiteFactory.Password }, Ct)).EnsureSuccessStatusCode();
+        await SiteFactory.RefreshCsrfAsync(admin);
+        Assert.Equal(HttpStatusCode.OK, (await admin.GetAsync("/api/auth/me", Ct)).StatusCode);
+
+        Assert.Equal(HttpStatusCode.OK, (await admin.GetAsync("/api/test", Ct)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await admin.PostAsJsonAsync("/api/test/clock", new { advanceMinutes = 60 }, Ct)).StatusCode);
+
+        var player = staging.CreateClient(new WebApplicationFactoryClientOptions { BaseAddress = new Uri("https://localhost"), HandleCookies = true });
+        await SiteFactory.RefreshCsrfAsync(player);
+        (await player.PostAsJsonAsync("/api/auth/login", new { login = "vasya", password = SiteFactory.Password }, Ct)).EnsureSuccessStatusCode();
+        await SiteFactory.RefreshCsrfAsync(player);
+        Assert.Equal(HttpStatusCode.Forbidden, (await player.GetAsync("/api/test", Ct)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await player.PostAsJsonAsync("/api/test/clock", new { advanceMinutes = 60 }, Ct)).StatusCode);
+    }
+
+    [Fact]
+    public async Task The_api_description_of_the_test_copy_names_the_test_endpoints()
+    {
+        using var document = JsonDocument.Parse(await (await _site.AnonymousAsync()).GetStringAsync("/openapi/v1.json", Ct));
+
+        var paths = document.RootElement.GetProperty("paths");
+        foreach (var path in new[] { "/api/test", "/api/test/clock", "/api/test/random", "/api/test/seasons/{seasonId}/scenarios/{name}" })
+        {
+            Assert.True(paths.TryGetProperty(path, out _), path);
+        }
+    }
+
+    [Theory]
     [InlineData("Production", false)]
-    [InlineData("Staging", false)]
+    [InlineData("Staging", true)]
     [InlineData("Development", true)]
     [InlineData("Test", true)]
-    public void Only_development_and_test_get_the_movable_clock_and_the_seedable_randomness(string environment, bool registered)
+    public void Only_the_live_site_keeps_the_real_clock_and_randomness(string environment, bool registered)
     {
         // The site as it is built, without the tests' own clock: production keeps the real time and the real randomness
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = environment });

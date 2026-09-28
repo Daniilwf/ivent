@@ -5375,6 +5375,221 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["TestToolsView"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/test/clock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["TestClockView"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": null | components["schemas"]["TestClockRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["TestClockView"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/test/random": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["TestRandomRequest"];
+                };
+            };
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/test/seasons/{seasonId}/scenarios/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                    name: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["TestScenarioRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["TestScenarioView"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -5954,12 +6169,16 @@ export interface components {
             author: null | string;
             undone: boolean;
         };
-        /** @description A game an event of the page names; `hasPage` — the viewer may open its page (a deleted game is the admin's). */
+        /**
+         * @description A game an event of the page names; `hasPage` — the viewer may open its page (a deleted game is the admin's);
+         *     `cover` — the pool's cover, as the season screen shows it (D-222).
+         */
         FeedGameView: {
             /** Format: uuid */
             id: string;
             title: string;
             hasPage: boolean;
+            cover?: null | components["schemas"]["FileLinkView"];
         };
         /**
          * @description A player of the season, for the feed's lines (H5, D-150): the name, the account for the profile link (`hasProfile` —
@@ -6252,7 +6471,10 @@ export interface components {
             auto: components["schemas"]["EquatableArrayOfAutoNomination"];
             voted: components["schemas"]["EquatableArrayOfVotedNomination"];
         };
-        /** @description A game offered to the player, with the hours fixed at roll time and marks from other players (SPEC «Статусы игры»). */
+        /**
+         * @description A game offered to the player, with the hours fixed at roll time, marks from other players (SPEC «Статусы игры») and
+         *     the pool's cover, if it has one (D-222).
+         */
         OfferedGameView: {
             /** Format: uuid */
             id: string;
@@ -6260,6 +6482,7 @@ export interface components {
             /** Format: double */
             hours: null | number;
             marks: components["schemas"]["GameMarkView"][];
+            cover?: null | components["schemas"]["FileLinkView"];
         };
         PenaltyDice: {
             /** Format: int32 */
@@ -6653,7 +6876,7 @@ export interface components {
             deadline?: null | string;
         };
         /**
-         * @description The game of a run: its title and hours. Named apart from the pool's PoolGameView: the OpenAPI document
+         * @description The game of a run: its title, hours and the pool's cover (none when the game has none, D-222). Named apart from the pool's PoolGameView: the OpenAPI document
          *     keys schemas by type name, so two records called GameView became one schema and the pool lost its fields (D-161).
          */
         RunGameView: {
@@ -6662,6 +6885,7 @@ export interface components {
             title: string;
             /** Format: double */
             hours: null | number;
+            cover?: null | components["schemas"]["FileLinkView"];
         };
         /** @enum {unknown} */
         RunStatus: "playing" | "completed" | "dropped" | "techRerolled" | "rejected";
@@ -6800,12 +7024,22 @@ export interface components {
             same: boolean;
         };
         /**
+         * @description Which copy of the site this is (H9, D-220): every page shows a strip on anything but the live site, so nobody takes the
+         *     test copy for the real one. `Other` — an environment name the site does not know.
+         * @enum {unknown}
+         */
+        SiteEnvironment: "production" | "staging" | "development" | "test" | "other";
+        /**
          * @description What every page asks the site: whether it only reads now (the maintenance banner) and which version it runs — a page
-         *     that saw another version before shows «Что нового» (J4, D-201).
+         *     that saw another version before shows «Что нового» (J4, D-201). `environment` — which copy of the site this is
+         *     (anything but `production` shows a strip on every page); `testTools` — the test endpoints are there (only
+         *     Development and Test), so the admin gets the page of the test tools (H9, D-220).
          */
         SiteStatusView: {
             maintenance: boolean;
             version: string;
+            environment: components["schemas"]["SiteEnvironment"];
+            testTools: boolean;
         };
         SocialRules: {
             reactions: components["schemas"]["EquatableArrayOfstring"];
@@ -6845,6 +7079,57 @@ export interface components {
             commandId: string;
             reason: null | components["schemas"]["TechRerollReason"];
             comment?: null | string;
+        };
+        /** @description Move the clock: forward by minutes, to a moment, or back to the real time. */
+        TestClockRequest: {
+            /** Format: double */
+            advanceMinutes?: null | number;
+            /** Format: date-time */
+            moveTo?: null | string;
+            /** @default false */
+            reset: boolean;
+        };
+        /**
+         * @description The site's clock as the test endpoints see it: now, whether it can be moved and how far it is from the real time
+         *     (`shiftMinutes`, negative — in the past; H9, D-221).
+         */
+        TestClockView: {
+            /** Format: date-time */
+            now: string;
+            adjustable: boolean;
+            /** Format: double */
+            shiftMinutes: number;
+        };
+        /** @description Seed the randomness (the same rolls and dice every time), or null for unpredictable randomness again. */
+        TestRandomRequest: {
+            /** Format: int32 */
+            seed: null | number;
+        };
+        /** @description The site's randomness: the seed in force, or null while it is unpredictable; whether it can be seeded. */
+        TestRandomView: {
+            /** Format: int32 */
+            seed: null | number;
+            seedable: boolean;
+        };
+        /**
+         * @description A scenario for a player of the season: by the player's id in the season (`playerId`, the page picks from the
+         *     season's players) or by login (`player`); the first player by name when neither.
+         */
+        TestScenarioRequest: {
+            player?: null | string;
+            /** Format: uuid */
+            playerId?: null | string;
+        };
+        /** @description What a scenario did: the commands it sent, in order. */
+        TestScenarioView: {
+            scenario: string;
+            commands: string[];
+        };
+        /** @description Everything the page of the test tools shows (H9, D-221): the clock, the randomness and the scenarios by name. */
+        TestToolsView: {
+            clock: components["schemas"]["TestClockView"];
+            random: components["schemas"]["TestRandomView"];
+            scenarios: string[];
         };
         /**
          * @description Where the player is in the turn cycle. Moving and resolving happen inside one command.
@@ -6922,6 +7207,7 @@ export const rollMissReasonValues: ReadonlyArray<FlattenedDeepRequired<component
 export const roundingValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["Rounding"]> = ["nearest", "floor", "ceil"];
 export const runStatusValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["RunStatus"]> = ["playing", "completed", "dropped", "techRerolled", "rejected"];
 export const seasonStatusValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["SeasonStatus"]> = ["draft", "active", "closing", "finished", "archived"];
+export const siteEnvironmentValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["SiteEnvironment"]> = ["production", "staging", "development", "test", "other"];
 export const turnPhaseValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["TurnPhase"]> = ["idle", "rolling", "playing"];
 export const unmetConditionPolicyValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["UnmetConditionPolicy"]> = ["noDiceKeepCoins", "countAsDrop", "ignore"];
 export type operations = Record<string, never>;

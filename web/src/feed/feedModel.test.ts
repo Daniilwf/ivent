@@ -406,4 +406,47 @@ describe('feed pages', () => {
       [1, false],
     ]);
   });
+
+  it('puts the cover of a completed game beside its line, and none without a cover or on other lines (D-222)', () => {
+    const covered = withRefs(refs, {
+      players: [],
+      games: [
+        {
+          id: hollow,
+          title: 'Hollow Knight',
+          hasPage: true,
+          cover: { id: 'f1', url: '/api/files/f1', thumbnailUrl: '/api/files/f1/thumbnail' },
+        },
+      ],
+      runs: [],
+    });
+    const completed = (game: string) =>
+      feedDays(
+        [
+          entry('c9', 'run-completed', {
+            runId: run1,
+            gameId: game,
+            playerId: vasya,
+            difficulty: 'hard',
+            hours: 3,
+          }),
+        ],
+        covered,
+        now,
+      )[0]?.items[0];
+
+    expect(completed(hollow)?.cover).toEqual({
+      id: hollow,
+      title: 'Hollow Knight',
+      hasPage: true,
+      cover: '/api/files/f1/thumbnail',
+    });
+    expect(completed(celeste)?.cover).toBeNull();
+    const started = feedDays(
+      [entry('c10', 'run-started', { runId: run1, gameId: hollow, playerId: vasya })],
+      covered,
+      now,
+    )[0]?.items[0];
+    expect(started?.cover).toBeNull();
+  });
 });

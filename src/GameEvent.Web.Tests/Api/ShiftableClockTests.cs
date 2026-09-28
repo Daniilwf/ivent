@@ -46,4 +46,36 @@ public sealed class ShiftableClockTests
         Assert.Throws<ArgumentOutOfRangeException>(() => clock.MoveTo(DateTimeOffset.MaxValue));
         Assert.InRange(clock.UtcNow - DateTimeOffset.UtcNow, TimeSpan.FromDays(90 * 365) - TimeSpan.FromSeconds(5), TimeSpan.FromDays(90 * 365) + TimeSpan.FromSeconds(5));
     }
+
+    [Fact]
+    public void The_offset_follows_every_move_and_a_reset()
+    {
+        var clock = new ShiftableClock();
+        Assert.Equal(TimeSpan.Zero, clock.Offset);
+
+        clock.Advance(TimeSpan.FromMinutes(-30));
+        Assert.Equal(TimeSpan.FromMinutes(-30), clock.Offset);
+
+        clock.MoveTo(DateTimeOffset.UtcNow.AddDays(2));
+        Assert.InRange(clock.Offset, TimeSpan.FromDays(2) - TimeSpan.FromSeconds(5), TimeSpan.FromDays(2));
+
+        clock.Reset();
+        Assert.Equal(TimeSpan.Zero, clock.Offset);
+    }
+
+    [Fact]
+    public void The_randomness_tells_its_seed_and_repeats_with_it()
+    {
+        var random = new ReseedableRandom();
+        Assert.Null(random.CurrentSeed);
+
+        random.Seed(42);
+        var first = Enumerable.Range(0, 8).Select(_ => random.NextInt(0, 1000)).ToList();
+        random.Seed(42);
+        Assert.Equal(42, random.CurrentSeed);
+        Assert.Equal(first, Enumerable.Range(0, 8).Select(_ => random.NextInt(0, 1000)).ToList());
+
+        random.Seed(null);
+        Assert.Null(random.CurrentSeed);
+    }
 }

@@ -8,9 +8,11 @@ namespace GameEvent.Web.Site;
 
 /// <summary>
 /// What every page asks the site: whether it only reads now (the maintenance banner) and which version it runs — a page
-/// that saw another version before shows «Что нового» (J4, D-201).
+/// that saw another version before shows «Что нового» (J4, D-201). <c>environment</c> — which copy of the site this is
+/// (anything but <c>production</c> shows a strip on every page); <c>testTools</c> — the test endpoints are there (only
+/// Development and Test), so the admin gets the page of the test tools (H9, D-220).
 /// </summary>
-public sealed record SiteStatusView(bool Maintenance, string Version);
+public sealed record SiteStatusView(bool Maintenance, string Version, SiteEnvironment Environment, bool TestTools);
 
 public sealed record MaintenanceRequest(bool On);
 
@@ -66,8 +68,8 @@ public static partial class MaintenanceEndpoints
     public static void MapMaintenance(this RouteGroupBuilder api)
     {
         ArgumentNullException.ThrowIfNull(api);
-        api.MapGet("/status", (MaintenanceMode maintenance, IConfiguration configuration) =>
-                TypedResults.Ok(new SiteStatusView(maintenance.IsOn, SiteVersion.Of(configuration))))
+        api.MapGet("/status", (MaintenanceMode maintenance, IConfiguration configuration, IWebHostEnvironment environment) =>
+                TypedResults.Ok(StatusOf(maintenance, configuration, environment)))
             .WithTags("Site")
             .AllowAnonymous();
 
@@ -77,7 +79,12 @@ public static partial class MaintenanceEndpoints
     }
 
     private static Results<Ok<SiteStatusView>, ProblemHttpResult> Set(
-        MaintenanceRequest request, MaintenanceMode maintenance, ClaimsPrincipal user, ILoggerFactory loggers, IConfiguration configuration)
+        MaintenanceRequest request,
+        MaintenanceMode maintenance,
+        ClaimsPrincipal user,
+        ILoggerFactory loggers,
+        IConfiguration configuration,
+        IWebHostEnvironment environment)
     {
         try
         {
@@ -101,8 +108,11 @@ public static partial class MaintenanceEndpoints
 
         // Not a command (the queue is closed while it is on): the site's log keeps who turned it on and off
         LogChanged(loggers.CreateLogger(typeof(MaintenanceEndpoints)), request.On, user.UserId());
-        return TypedResults.Ok(new SiteStatusView(maintenance.IsOn, SiteVersion.Of(configuration)));
+        return TypedResults.Ok(StatusOf(maintenance, configuration, environment));
     }
+
+    private static SiteStatusView StatusOf(MaintenanceMode maintenance, IConfiguration configuration, IWebHostEnvironment environment) =>
+        new(maintenance.IsOn, SiteVersion.Of(configuration), SiteEnvironments.Of(environment), Testing.TestEndpoints.Available(environment));
 
     private static bool IsWrite(HttpRequest request) =>
         !(HttpMethods.IsGet(request.Method) || HttpMethods.IsHead(request.Method) || HttpMethods.IsOptions(request.Method))

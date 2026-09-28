@@ -103,6 +103,39 @@ describe('FeedScreen', () => {
     expect(screen.queryByTestId('feed-more')).toBeNull();
   });
 
+  it('shows the cover of a completed game beside its line (D-222)', async () => {
+    const completed: Entry = {
+      sequence: 3,
+      commandId: 'c3',
+      occurredAt: new Date().toISOString(),
+      type: 'run-completed',
+      data: { runId: 'r', playerId: vasya, gameId: hollow, difficulty: 'hard', hours: 5 },
+      author: 'vasya',
+      undone: false,
+    };
+    const thumbnail = '/api/files/f1/thumbnail';
+    serve(() =>
+      json(200, {
+        ...page([completed, started(2, 'c2', new Date().toISOString())]),
+        games: [
+          {
+            id: hollow,
+            title: 'Hollow Knight',
+            hasPage: true,
+            cover: { id: 'f1', url: '/api/files/f1', thumbnailUrl: thumbnail },
+          },
+        ],
+      }),
+    );
+
+    render(<FeedScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    const line = await screen.findByTestId('feed-item-c3');
+    expect(line.querySelector('img')).toHaveAttribute('src', thumbnail);
+    // The start of the same game is a plain line
+    expect(screen.getByTestId('feed-item-c2').querySelector('img')).toBeNull();
+  });
+
   it('opens the game page from a line without reloading', async () => {
     serve(() => json(200, page([started(2, 'c2', new Date().toISOString())])));
     render(<FeedScreen seasonId={seasonId} onSignedOut={vi.fn()} />);

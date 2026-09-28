@@ -15,7 +15,7 @@ import { ManualEffectItem, type EffectOutcome } from './ManualEffectItem';
 import { RunActions } from './RunActions';
 import { seasonPicture } from './seasonView';
 import { linearBoard } from '../board/linearBoard';
-import { RunCard } from '../board/GameCards';
+import { Cover, RunCard } from '../board/GameCards';
 import { Leaderboard } from '../board/Leaderboard';
 import { FeedPreview } from '../feed/FeedPreview';
 import { MapView } from '../board/MapView';
@@ -354,29 +354,42 @@ export function SeasonScreen({
                 {thrownResult.text}
               </p>
             ) : null}
-            <p
-              id={lastDiceId}
-              data-testid="last-dice"
-              tabIndex={-1}
-              className="font-medium focus:outline-none"
-            >
-              {me.lastCompleted.status === 'rejected'
-                ? ru.turn.lastRejected(me.lastCompleted.game.title)
-                : ru.turn.lastDice(
-                    me.lastCompleted.game.title,
-                    [...me.lastCompleted.dice, ...me.lastCompleted.challengeDice].map(
-                      (d) => d.value,
-                    ),
-                    me.lastCompleted.total,
-                    [
-                      ...new Set(
-                        [...me.lastCompleted.dice, ...me.lastCompleted.challengeDice].map(
-                          (d) => d.sides,
-                        ),
+            <div className="flex items-start gap-3">
+              {/* Beside a line of text only a real cover, as in the feed: a placeholder would be noise (D-222) */}
+              {me.lastCompleted.game.cover ? (
+                <Cover
+                  game={{
+                    title: me.lastCompleted.game.title,
+                    cover: me.lastCompleted.game.cover.thumbnailUrl,
+                  }}
+                  width={40}
+                  className="mt-1 ml-1"
+                />
+              ) : null}
+              <p
+                id={lastDiceId}
+                data-testid="last-dice"
+                tabIndex={-1}
+                className="min-w-0 font-medium focus:outline-none"
+              >
+                {me.lastCompleted.status === 'rejected'
+                  ? ru.turn.lastRejected(me.lastCompleted.game.title)
+                  : ru.turn.lastDice(
+                      me.lastCompleted.game.title,
+                      [...me.lastCompleted.dice, ...me.lastCompleted.challengeDice].map(
+                        (d) => d.value,
                       ),
-                    ],
-                  )}
-            </p>
+                      me.lastCompleted.total,
+                      [
+                        ...new Set(
+                          [...me.lastCompleted.dice, ...me.lastCompleted.challengeDice].map(
+                            (d) => d.sides,
+                          ),
+                        ),
+                      ],
+                    )}
+              </p>
+            </div>
             {me.lastCompleted.challengeDice.length > 0 && (
               <p data-testid="last-challenge-dice" className="text-sm text-ink-soft">
                 {ru.turn.lastChallengeDice(me.lastCompleted.challengeDice.map((d) => d.value))}
@@ -667,6 +680,7 @@ export function SeasonScreen({
                 title: me.activeRun.game.title,
                 hours: me.activeRun.game.hours ?? null,
                 tags: [],
+                cover: me.activeRun.game.cover?.thumbnailUrl,
               }}
               left={myRow ? myRow.cellsToFinish : routeLength}
               level={3}
@@ -832,7 +846,7 @@ function wheelRoll(
       playing: miss.reason === 'beingPlayed',
     })),
     pick: offer
-      ? { sector, game: { title: offer.title } }
+      ? { sector, game: { title: offer.title, cover: offer.cover?.thumbnailUrl } }
       : { sector, game: null, choices: choice?.options.filter((o) => o.game).length ?? 0 },
   };
 }

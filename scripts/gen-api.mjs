@@ -22,7 +22,11 @@ const steps = [
 ];
 
 const [build, generate] = steps;
-if (!run(...build)) process.exit(1);
+// The document is written in the Test environment: the test endpoints are mapped only there and in Development, and the
+// page of the test tools gets its client from the same document (H9, D-221). The live site has neither the routes nor
+// the document.
+if (!run(...build, { env: { ASPNETCORE_ENVIRONMENT: 'Test', DOTNET_ENVIRONMENT: 'Test' } }))
+  process.exit(1);
 
 // XML doc comments carry the OS line ending (an escaped CR LF on Windows): normalize so any OS writes
 // the same bytes.

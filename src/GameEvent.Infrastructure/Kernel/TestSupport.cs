@@ -8,6 +8,9 @@ namespace GameEvent.Infrastructure.Kernel;
 /// </summary>
 public interface IAdjustableClock : IClock
 {
+    /// <summary>How far the clock is from the real time: zero when it was never moved or was reset.</summary>
+    TimeSpan Offset { get; }
+
     void Advance(TimeSpan by);
 
     void MoveTo(DateTimeOffset at);
@@ -19,6 +22,9 @@ public interface IAdjustableClock : IClock
 /// <summary>A random source the test endpoints may seed (E4, D-120): the same seed, the same rolls and dice.</summary>
 public interface IReseedableRandom : IRandomSource
 {
+    /// <summary>The seed in force, or null while the randomness is unpredictable.</summary>
+    int? CurrentSeed { get; }
+
     /// <summary>A fixed seed, or null for unpredictable randomness again.</summary>
     void Seed(int? seed);
 }
@@ -34,6 +40,17 @@ public sealed class ShiftableClock : IAdjustableClock
 
     private readonly Lock _lock = new();
     private TimeSpan _offset;
+
+    public TimeSpan Offset
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return _offset;
+            }
+        }
+    }
 
     public DateTimeOffset UtcNow
     {
@@ -80,6 +97,18 @@ public sealed class ReseedableRandom : IReseedableRandom
     private readonly Lock _lock = new();
     private readonly CryptoRandomSource _crypto = new();
     private Random? _seeded;
+    private int? _seed;
+
+    public int? CurrentSeed
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return _seed;
+            }
+        }
+    }
 
     public int NextInt(int minInclusive, int maxExclusive)
     {
@@ -96,6 +125,7 @@ public sealed class ReseedableRandom : IReseedableRandom
         lock (_lock)
         {
             _seeded = seed is { } value ? new Random(value) : null;
+            _seed = seed;
         }
     }
 }
