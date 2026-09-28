@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import {
   apiOf,
   commandsOf,
@@ -15,6 +15,22 @@ import {
 
 async function accepted(world: World, type: string): Promise<number> {
   return (await commandsOf(world)).filter((c) => c.commandType === type && !c.undone).length;
+}
+
+/**
+ * Clicks the same button in every tab at once: the buttons are taken first and clicked together, without Playwright's
+ * retries. The first click's live update may take the button away in the other tab; its click then does nothing,
+ * which is the point: the step still happens once.
+ */
+async function clickTogether(tabs: Page[], testId: string) {
+  const buttons = await Promise.all(tabs.map((tab) => tab.getByTestId(testId).elementHandle()));
+  await Promise.all(
+    buttons.map((button) =>
+      button.evaluate((b) => {
+        if (b instanceof HTMLElement) b.click();
+      }),
+    ),
+  );
 }
 
 test('two tabs: the same step clicked in both at once happens once, and both tabs agree', async ({
@@ -37,13 +53,13 @@ test('two tabs: the same step clicked in both at once happens once, and both tab
   expect(await accepted(world, 'RollGame')).toBe(1);
 
   // The start, in both at once
-  await Promise.all(tabs.map((tab) => tab.getByTestId('start').click()));
+  await clickTogether(tabs, 'start');
   for (const tab of tabs) await expect(tab.getByTestId('active-run')).toContainText(title ?? '');
   expect(await accepted(world, 'StartRun')).toBe(1);
 
   // The completion, sent from both at once
   for (const tab of tabs) await fillCompletionHere(tab, 'Сложная');
-  await Promise.all(tabs.map((tab) => tab.getByTestId('complete-submit').click()));
+  await clickTogether(tabs, 'complete-submit');
   for (const tab of tabs) await expect(tab.getByTestId('roll')).toBeVisible();
   expect(await accepted(world, 'CompleteRun')).toBe(1);
 
