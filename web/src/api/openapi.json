@@ -5042,7 +5042,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/PoolActionRequest"
+                "$ref": "#/components/schemas/DeleteGameRequest"
               }
             }
           },
@@ -7078,6 +7078,26 @@
         },
         "description": "The signed-in user. `token` — the colour of their token in the latest season they play (Seasons.PlayerTokens), as on\ntheir profile; none outside seasons (D-202)."
       },
+      "DeleteGameRequest": {
+        "required": [
+          "commandId",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "commandId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "The admin takes a game out of the pool: `reason` is required (1–500 characters, D-208)."
+      },
       "DiceCountRule": {
         "required": [
           "hoursPerDie",
@@ -8909,7 +8929,8 @@
           "isCoop",
           "author",
           "isDeleted",
-          "completionCondition"
+          "completionCondition",
+          "deletionReason"
         ],
         "type": "object",
         "properties": {
@@ -8979,9 +9000,15 @@
               "null",
               "string"
             ]
+          },
+          "deletionReason": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         },
-        "description": "A game of the pool as everyone sees it (D-119); `author` — the name of the account that added it, or the author as\nthe imported table names them (D-125); none for the seed."
+        "description": "A game of the pool as everyone sees it (D-119); `author` — the name of the account that added it, or the author as\nthe imported table names them (D-125); none for the seed. `deletionReason` — why the admin took it out of the pool\n(D-208); none while it is in the pool and for games deleted before a reason was required."
       },
       "PoolStatsView": {
         "required": [
@@ -10522,7 +10549,9 @@
         "required": [
           "id",
           "title",
-          "same"
+          "same",
+          "isDeleted",
+          "deletionReason"
         ],
         "type": "object",
         "properties": {
@@ -10535,9 +10564,18 @@
           },
           "same": {
             "type": "boolean"
+          },
+          "isDeleted": {
+            "type": "boolean"
+          },
+          "deletionReason": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         },
-        "description": "A game in the pool whose title is the same or alike (SPEC «Дубли»)."
+        "description": "A game whose title is the same or alike (SPEC «Дубли»). `isDeleted` — the admin took it out of the pool: the same\ntitle cannot be added again, and `deletionReason` says why (D-208, D-241)."
       },
       "SiteEnvironment": {
         "enum": [

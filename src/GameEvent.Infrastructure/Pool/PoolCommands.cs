@@ -14,7 +14,8 @@ public sealed record AddGame(GameCard Card, Guid? AuthorId, bool Force, string? 
 /// <summary>The admin changes a game's card.</summary>
 public sealed record ChangeGame(Guid GameId, GameCard Card, bool Force) : Queue.IGlobalCommand;
 
-public sealed record DeleteGame(Guid GameId) : Queue.IGlobalCommand;
+/// <summary>The admin takes a game out of the pool (soft), saying why (D-208): the reason is shown to whoever adds it again.</summary>
+public sealed record DeleteGame(Guid GameId, string Reason) : Queue.IGlobalCommand;
 
 public sealed record RestoreGame(Guid GameId) : Queue.IGlobalCommand;
 
@@ -31,6 +32,7 @@ public static class PoolRules
     public const int MaxTagLength = 50;
     public const int MaxNoteLength = 1000;
     public const int MaxAuthorNameLength = 64;
+    public const int MaxDeletionReasonLength = 500;
     public const decimal MinHours = 0.5m;
     public const decimal MaxHours = 1000m;
     public const int MinYear = 1950;
@@ -42,6 +44,10 @@ public static class PoolRules
     public const string Similar = "pool.similar";
     public const string Unknown = "pool.unknown";
     public const string Deleted = "pool.deleted";
+
+    /// <summary>The title is a game the admin took out of the pool (D-208): only the admin's restore brings it back.</summary>
+    public const string Removed = "pool.removed";
+    public const string ReasonInvalid = "pool.reasonInvalid";
     public const string NotDeleted = "pool.notDeleted";
     public const string CoverUnknown = "pool.coverUnknown";
     public const string NothingToChange = "pool.nothingToChange";
@@ -129,6 +135,10 @@ public static class PoolRules
     /// <summary>Letters and digits of a title, lower case: the key two titles are compared by.</summary>
     public static string Key(string title) =>
         new([.. Tidy(title).ToLower(CultureInfo.InvariantCulture).Where(char.IsLetterOrDigit)]);
+
+    /// <summary>A deletion's reason as stored (trimmed), or none when it is empty or too long (D-208).</summary>
+    public static string? DeletionReason(string? reason) =>
+        reason?.Trim() is { Length: > 0 and <= MaxDeletionReasonLength } trimmed ? trimmed : null;
 
     public static Rejection? CheckCategory(string name, int weight) =>
         string.IsNullOrWhiteSpace(name) || name.Trim().Length > MaxTagLength

@@ -46,7 +46,8 @@ public sealed record ExportedGame(
     bool IsCoop = false,
     Guid? AuthorId = null,
     DateTimeOffset? CreatedAt = null,
-    string? AuthorName = null);
+    string? AuthorName = null,
+    string? DeletionReason = null);
 
 public sealed record ExportedCategory(string Name, int Weight);
 
@@ -113,7 +114,7 @@ public static class SeasonTransfer
         var users = await db.Users.AsNoTracking().Where(u => userIds.Contains(u.Id)).OrderBy(u => u.Login)
             .Select(u => new ExportedUser(u.Id, u.Login, u.Name, u.Role)).ToListAsync(ct);
         var games = await db.Games.AsNoTracking().OrderBy(g => g.Id)
-            .Select(g => new ExportedGame(g.Id, g.Title, g.TagsJson, g.Hours, g.IsDeleted, g.Year, g.SteamAppId, g.Note, g.CompletionCondition, g.IsCoop, g.AuthorId, g.CreatedAt, g.AuthorName))
+            .Select(g => new ExportedGame(g.Id, g.Title, g.TagsJson, g.Hours, g.IsDeleted, g.Year, g.SteamAppId, g.Note, g.CompletionCondition, g.IsCoop, g.AuthorId, g.CreatedAt, g.AuthorName, g.DeletionReason))
             .ToListAsync(ct);
         var categories = await db.Categories.AsNoTracking().OrderBy(c => c.Name).Select(c => new ExportedCategory(c.Name, c.Weight)).ToListAsync(ct);
 
@@ -254,6 +255,7 @@ public static class SeasonTransfer
                     TagsJson = game.TagsJson,
                     Hours = game.Hours,
                     IsDeleted = game.IsDeleted || !options.WithPool,
+                    DeletionReason = game.IsDeleted ? game.DeletionReason : null,
                     Year = game.Year,
                     SteamAppId = game.SteamAppId,
                     Note = game.Note,

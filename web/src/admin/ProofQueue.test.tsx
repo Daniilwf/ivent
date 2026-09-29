@@ -111,6 +111,18 @@ describe('The proof queue', () => {
     expect(card).toHaveTextContent(t.dice(11));
   });
 
+  it('links every proof to what counts as a completion (D-207)', async () => {
+    open([finishing, item({})]);
+
+    for (const runId of ['r0', 'r1']) {
+      const link = within(await screen.findByTestId(`proof-${runId}`)).getByRole('link', {
+        name: ru.rules.sections.completion,
+      });
+      expect(link).toHaveAttribute('href', '/rules#rules-completion');
+      expect(link).toHaveAttribute('target', '_blank');
+    }
+  });
+
   it('approves a sent proof and refreshes the queue', async () => {
     let queue = [item({})];
     const server = open([], {

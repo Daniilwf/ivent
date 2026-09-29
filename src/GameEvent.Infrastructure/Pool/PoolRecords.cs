@@ -45,6 +45,9 @@ public sealed class GameRecord
     public DateTimeOffset? CreatedAt { get; set; }
 
     public bool IsDeleted { get; set; }
+
+    /// <summary>Why the admin took the game out of the pool (D-208); none while it is in the pool and for older deletions.</summary>
+    public string? DeletionReason { get; set; }
 }
 
 /// <summary>A category on the category wheel: a tag with a weight.</summary>

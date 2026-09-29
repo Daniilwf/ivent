@@ -114,7 +114,7 @@ public sealed class GameCoverApiTests : IAsyncLifetime
         // A deleted game has no page for a player, but its cover stays, as on the season screen: covers are not secret
         // (any signed-in user reads a file by its id, D-222)
         var gameId = (await MeAsync(vasya)).GetProperty("lastCompleted").GetProperty("game").GetProperty("id").GetGuid();
-        await PostOkAsync(admin, $"/api/admin/pool/{gameId}/delete");
+        await PostOkAsync(admin, $"/api/admin/pool/{gameId}/delete", new { commandId = Guid.NewGuid(), reason = "Дубль" });
 
         var forPlayer = (await FeedGamesAsync(vasya)).Single(g => g.GetProperty("id").GetGuid() == gameId);
         Assert.False(forPlayer.GetProperty("hasPage").GetBoolean());

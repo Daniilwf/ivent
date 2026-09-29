@@ -77,16 +77,95 @@ public sealed class PoolQueueTests
     }
 
     [Fact]
-    public async Task A_deleted_game_does_not_hold_its_title()
+    public async Task A_deleted_game_holds_its_title_with_its_reason()
+    {
+        // D-208 (RGG 15) replaced D-119's «a deleted game does not hold its title»: the admin's reason is told instead
+        await using var h = await QueueHarness.StartAsync();
+        var gameId = await AddAsync(h, "Dead Space");
+        Assert.True((await SendAsync(h, new DeleteGame(gameId, "  Дубль Dead Space Remake "))).IsAccepted);
+
+        var added = await SendAsync(h, new AddGame(Card("dead  space", "Horror"), null, Force: true));
+        var renamed = await SendAsync(h, new ChangeGame(await AddAsync(h, "Outlast"), Card("Dead Space", "Horror"), Force: true));
+
+        Assert.Equal(PoolRules.Removed, added.Rejection!.Code);
+        Assert.Contains("Дубль Dead Space Remake", added.Rejection.Detail, StringComparison.Ordinal);
+        Assert.Equal(PoolRules.Removed, renamed.Rejection!.Code);
+        await using var db = h.NewDb();
+        Assert.Equal("Дубль Dead Space Remake", (await db.Games.SingleAsync(g => g.Id == gameId, Ct)).DeletionReason);
+    }
+
+    [Fact]
+    public async Task A_deleted_game_comes_back_only_while_no_game_holds_its_title()
     {
         await using var h = await QueueHarness.StartAsync();
         var gameId = await AddAsync(h, "Dead Space");
-        Assert.True((await SendAsync(h, new DeleteGame(gameId))).IsAccepted);
+        Assert.True((await SendAsync(h, new DeleteGame(gameId, "Дубль"))).IsAccepted);
 
-        Assert.True((await SendAsync(h, new AddGame(Card("Dead Space", "Horror"), null, false))).IsAccepted);
+        // A pool from before D-208 may hold the title again: the old one cannot come back beside it
+        await using (var db = h.NewDb())
+        {
+            db.Games.Add(new GameRecord { Id = Guid.NewGuid(), Title = "Dead Space", TagsJson = "[]" });
+            await db.SaveChangesAsync(Ct);
+        }
 
-        // The old one cannot come back while the new one holds the title
         Assert.Equal(PoolRules.Duplicate, (await SendAsync(h, new RestoreGame(gameId))).Rejection!.Code);
+    }
+
+    [Fact]
+    public async Task A_game_in_the_pool_is_told_before_one_taken_out_under_the_same_title()
+    {
+        // D-241: a pool from before D-208 may hold the title twice; the game in the pool is what the author is told about
+        await using var h = await QueueHarness.StartAsync();
+        var gameId = await AddAsync(h, "Dead Space");
+        Assert.True((await SendAsync(h, new DeleteGame(gameId, "Дубль"))).IsAccepted);
+        await using (var db = h.NewDb())
+        {
+            db.Games.Add(new GameRecord { Id = Guid.NewGuid(), Title = "Dead Space", TagsJson = "[]" });
+            await db.SaveChangesAsync(Ct);
+        }
+
+        Assert.Equal(PoolRules.Duplicate, (await SendAsync(h, new AddGame(Card("Dead Space", "Horror"), null, Force: true))).Rejection!.Code);
+    }
+
+    [Fact]
+    public async Task A_deletion_without_a_reason_holds_no_title()
+    {
+        // D-241: a game deleted before D-208 or a season import's placeholder was not taken out by the admin with a reason
+        await using var h = await QueueHarness.StartAsync();
+        await using (var db = h.NewDb())
+        {
+            db.Games.Add(new GameRecord { Id = Guid.NewGuid(), Title = "Dead Space", TagsJson = "[]", IsDeleted = true });
+            await db.SaveChangesAsync(Ct);
+        }
+
+        Assert.True((await SendAsync(h, new AddGame(Card("Dead Space", "Horror"), null, Force: false))).IsAccepted);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task A_deletion_needs_a_reason(string reason)
+    {
+        await using var h = await QueueHarness.StartAsync();
+        var gameId = await AddAsync(h, "Dead Space");
+
+        Assert.Equal(PoolRules.ReasonInvalid, (await SendAsync(h, new DeleteGame(gameId, reason))).Rejection!.Code);
+        Assert.Equal(PoolRules.ReasonInvalid, (await SendAsync(h, new DeleteGame(gameId, new string('r', PoolRules.MaxDeletionReasonLength + 1)))).Rejection!.Code);
+        await using var db = h.NewDb();
+        Assert.False((await db.Games.SingleAsync(g => g.Id == gameId, Ct)).IsDeleted);
+    }
+
+    [Fact]
+    public async Task A_restore_clears_the_reason()
+    {
+        await using var h = await QueueHarness.StartAsync();
+        var gameId = await AddAsync(h, "Dead Space");
+        Assert.True((await SendAsync(h, new DeleteGame(gameId, "Дубль"))).IsAccepted);
+
+        Assert.True((await SendAsync(h, new RestoreGame(gameId))).IsAccepted);
+
+        await using var db = h.NewDb();
+        Assert.Null((await db.Games.SingleAsync(g => g.Id == gameId, Ct)).DeletionReason);
     }
 
     [Theory]
@@ -171,15 +250,15 @@ public sealed class PoolQueueTests
         var gameId = await AddAsync(h, "Dead Space");
 
         Assert.Equal(PoolRules.NotDeleted, (await SendAsync(h, new RestoreGame(gameId))).Rejection!.Code);
-        Assert.True((await SendAsync(h, new DeleteGame(gameId))).IsAccepted);
-        Assert.Equal(PoolRules.Deleted, (await SendAsync(h, new DeleteGame(gameId))).Rejection!.Code);
+        Assert.True((await SendAsync(h, new DeleteGame(gameId, "Дубль"))).IsAccepted);
+        Assert.Equal(PoolRules.Deleted, (await SendAsync(h, new DeleteGame(gameId, "Дубль"))).Rejection!.Code);
         await using (var db = h.NewDb())
         {
             Assert.True((await db.Games.SingleAsync(g => g.Id == gameId, Ct)).IsDeleted);
         }
 
         Assert.True((await SendAsync(h, new RestoreGame(gameId))).IsAccepted);
-        Assert.Equal(PoolRules.Unknown, (await SendAsync(h, new DeleteGame(Guid.NewGuid()))).Rejection!.Code);
+        Assert.Equal(PoolRules.Unknown, (await SendAsync(h, new DeleteGame(Guid.NewGuid(), "Дубль"))).Rejection!.Code);
     }
 
     [Fact]
@@ -245,7 +324,7 @@ public sealed class PoolQueueTests
     {
         await using var h = await QueueHarness.StartAsync();
         var gameId = await AddAsync(h, "Dead Space");
-        Assert.True((await SendAsync(h, new DeleteGame(gameId))).IsAccepted);
+        Assert.True((await SendAsync(h, new DeleteGame(gameId, "Дубль"))).IsAccepted);
         Assert.True((await SendAsync(h, new AddGame(Card("Dead Space 2", "Horror"), null, Force: true))).IsAccepted);
 
         Assert.True((await SendAsync(h, new RestoreGame(gameId))).IsAccepted);
