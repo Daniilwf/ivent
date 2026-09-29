@@ -89,13 +89,13 @@ public class BetTests
     {
         var s = Season();
         s.Bet("Вася", "Петя", days: 1, stake: 5);
-        Assert.Equal(s.Clock.UtcNow.AddDays(1), Timers.Next(s.Player("Вася")));
+        Assert.Equal(s.Clock.UtcNow.AddDays(1), Timers.Next(s.Player("Вася"), s.State.Rules.Features));
 
         s.Advance(TimeSpan.FromDays(1));
         s.FireTimers();
 
         Assert.Equal(BetStatus.Lost, Assert.Single(s.LastEvents<BetSettled>()).Status);
-        Assert.Null(Timers.Next(s.Player("Вася")));
+        Assert.Null(Timers.Next(s.Player("Вася"), s.State.Rules.Features));
     }
 
     [Fact]

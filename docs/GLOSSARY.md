@@ -93,7 +93,7 @@
 | Сложность | лёгкая, нормальная, сложная, выше сложной | `Difficulty` (`Easy`, `Normal`, `Hard`, `Extreme`) |
 | Пруф | доказательство прохождения: ссылки, заметка или свидетель | `ProofState` (`ProofStatus`: `Pending`, `Approved`, `Rejected`), команда `SubmitProof`, событие `ProofSubmitted`, таблица `Proof` |
 | Одобрение | подтверждение пруфа админом, в том числе «без скрина» | команда `ApproveProof`, событие `ProofApproved` |
-| Реджект | отклонение пруфа админом: снимается всё, что дал ход прохождения, — очки с бонусом клетки хода, клетки (позиция не улучшается), монетки (D-321, D-327) | команда `RejectProof`, событие `ProofRejected`, `RunStatus.Rejected`, `RunState.CellPoints` |
+| Реджект | отклонение пруфа админом: снимается всё, что дал ход прохождения, — очки с бонусом клетки хода, клетки (позиция не улучшается), монетки (в минус), предметы клеток хода, которые игрок ещё держит (D-321, D-327, D-421) | команда `RejectProof`, событие `ProofRejected`, `RunStatus.Rejected`, `RunState.CellPoints`, `RunState.CellObjects`, `ObjectRemoval.ProofRejected` |
 | Отклонить со штрафом дропа | реджект при очевидном обмане: всё, что даёт реджект, плюс штраф дропа по правилам сезона (D-327) | команда `RejectProofWithDropPenalty`, событие `ProofRejectPenalized` (`proof-reject-penalized`), API `reject-with-penalty` |
 | Очередь пруфов | непроверенные прохождения, финиши сверху | `ProofReviewOrder.Order` |
 | Ждёт проверки | прохождение завершено, пруф не одобрен и не отклонён (прислан или нет) | `UncheckedRuns.Waits` |

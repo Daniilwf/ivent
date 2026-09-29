@@ -32,6 +32,40 @@ public partial class PlayerAdminInvariantTests
     public void Invariants_hold_with_items_the_shop_and_bets(int seed, byte[] script) =>
         PlayEconomy(seed, script, CheckEconomyInvariants);
 
+    /// <summary>
+    /// The same games on a graph with shop cells, a points bonus and a teleport: the moves get coupons on cells, and a
+    /// reject takes back those its move got (MP22, D-327 (2), D-421).
+    /// </summary>
+    [Property(MaxTest = 100)]
+    public void Invariants_hold_with_items_on_a_map_with_shops(int seed, byte[] script) =>
+        PlayEconomy(seed, script, CheckEconomyInvariants, ShopMap());
+
+    [Fact]
+    public void Shop_map_games_reach_coupons_taken_back_by_a_reject()
+    {
+        var taken = 0;
+        for (var seed = 0; seed < 100 && taken == 0; seed++)
+        {
+            var x = (uint)seed + 11;
+            var script = Enumerable.Range(0, 300).Select(_ => (byte)((x = (x * 1103515245) + 12345) >> 16)).ToArray();
+            PlayEconomy(seed, script, (s, _, _, _) => taken += s.Last.IsAccepted
+                ? s.Last.Events.OfType<ObjectRemoved>().Count(r => r.Reason == ObjectRemoval.ProofRejected)
+                : 0, ShopMap());
+        }
+
+        Assert.True(taken > 0, "The shop map games never took a coupon back by a reject.");
+    }
+
+    // start → c1 … c19 → finish: shops on c2, c5, c9 and c14 (the coupon), 3 points on c7, a shortcut c11 → c15
+    private static Engine.Map.MapGraph ShopMap()
+    {
+        var map = MapBuilder.New().Path(["start", .. Enumerable.Range(1, 19).Select(i => $"c{i}"), "finish"]).Bonus("c7", 3).Teleport("c11", "c15").Build();
+        return map with
+        {
+            Cells = [.. map.Cells.Select(c => c.Id is "c2" or "c5" or "c9" or "c14" ? c with { Type = Engine.Map.CellType.Shop, Grants = "shop-coupon" } : c)],
+        };
+    }
+
     [Property(MaxTest = 50)]
     public void Same_seed_and_commands_give_the_same_log_with_items_the_shop_and_bets(int seed, byte[] script)
     {
@@ -91,9 +125,15 @@ public partial class PlayerAdminInvariantTests
         }
     }
 
-    private static Scenario PlayEconomy(int seed, byte[] script, Action<Scenario, ICommand, SeasonState, int>? afterEach = null)
+    private static Scenario PlayEconomy(int seed, byte[] script, Action<Scenario, ICommand, SeasonState, int>? afterEach = null, Engine.Map.MapGraph? map = null)
     {
-        var s = EconomyScenario.New(seed)
+        var s = EconomyScenario.New(seed);
+        if (map is not null)
+        {
+            s.WithMap(map);
+        }
+
+        s
             .WithCategory("Horror").WithCategory("RPG")
             .WithGame("Silent Hill", 6, "Horror").WithGame("Dead Space", 9, "Horror").WithGame("Amnesia", 3, "Horror")
             .WithGame("Gothic", 30, "RPG").WithGame("Risen", 12, "RPG").WithGame("Tetris", null, "RPG");
@@ -167,7 +207,12 @@ public partial class PlayerAdminInvariantTests
                 }
 
                 var run = completed[variant % completed.Count];
-                return variant % 3 == 0 ? new RejectProof(run.RunId, "нет титров") : new ApproveProof(run.RunId, null);
+                return (variant % 6) switch
+                {
+                    0 => new RejectProof(run.RunId, "нет титров"),
+                    3 => new RejectProofWithDropPenalty(run.RunId, "нет титров"),
+                    _ => new ApproveProof(run.RunId, null),
+                };
             case 14:
                 return variant % 4 == 0
                     ? new ChangeRuleset(s.Ruleset with { Features = s.Ruleset.Features with { Bets = !s.Ruleset.Features.Bets, Shop = !s.Ruleset.Features.Shop } })
@@ -236,6 +281,29 @@ public partial class PlayerAdminInvariantTests
                     Assert.Equal(before.Runs[active], s.State.Runs[active]);
                 }
             }
+        }
+
+        // 22 (MP22, D-327 (2), D-421): a reject takes back only objects its move got on cells, and every one of them the
+        // player still holds — unless he is the frozen first, or items are off
+        var rejectedRun = command switch
+        {
+            RejectProof c => c.RunId,
+            RejectProofWithDropPenalty c => c.RunId,
+            _ => (Guid?)null,
+        };
+        var takenBack = events.OfType<ObjectRemoved>().Where(r => r.Reason == ObjectRemoval.ProofRejected).ToList();
+        if (rejectedRun is { } rejected)
+        {
+            var run = before.Runs[rejected];
+            Assert.All(takenBack, r => Assert.Contains(r.InstanceId, run.CellObjects));
+            if (before.Rules.Features.Items && !Engine.Finish.Finishes.IsFrozen(before.Players[run.PlayerId]))
+            {
+                Assert.DoesNotContain(s.State.Players[run.PlayerId].Wallet.Inventory, o => run.CellObjects.Contains(o.InstanceId));
+            }
+        }
+        else
+        {
+            Assert.Empty(takenBack);
         }
 
         // 17: no bet on oneself; a revoked bet was won on a run rejected since; a run rejected leaves no bet won on it

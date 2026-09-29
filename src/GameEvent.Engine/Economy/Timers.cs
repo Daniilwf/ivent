@@ -12,16 +12,20 @@ namespace GameEvent.Engine.Economy;
 /// </summary>
 public static class Timers
 {
-    /// <summary>The earliest moment something of <paramref name="player"/> is due; null when nothing waits.</summary>
-    public static DateTimeOffset? Next(SeasonPlayer player)
+    /// <summary>
+    /// The earliest moment something of <paramref name="player"/> is due; null when nothing waits. What a mechanic switched
+    /// off left waiting is not due until it is back (D-420).
+    /// </summary>
+    public static DateTimeOffset? Next(SeasonPlayer player, Rulesets.Features features)
     {
         ArgumentNullException.ThrowIfNull(player);
+        ArgumentNullException.ThrowIfNull(features);
         var wallet = player.Wallet;
         IEnumerable<DateTimeOffset?> moments =
         [
-            wallet.Shop?.ExpiresAt,
-            .. wallet.Inventory.Select(o => o.ExpiresAt),
-            .. wallet.Bets.Where(b => b.Status == BetStatus.Open).Select(b => (DateTimeOffset?)b.Deadline),
+            features.Shop ? wallet.Shop?.ExpiresAt : null,
+            .. features.Items ? wallet.Inventory.Select(o => o.ExpiresAt) : [],
+            .. features.Bets ? wallet.Bets.Where(b => b.Status == BetStatus.Open).Select(b => (DateTimeOffset?)b.Deadline) : [],
         ];
         return moments.Where(m => m is not null).Min();
     }
@@ -38,21 +42,23 @@ public static class Timers
             return Decision.Reject(RejectionCodes.SeasonClosed, $"The season is {state.Status}: no timers run.");
         }
 
+        // A mechanic switched off leaves no event: what it left waiting stays until it is back (D-420)
         var now = context.Clock.UtcNow;
+        var features = state.Rules.Features;
         var events = new List<IGameEvent>();
         foreach (var player in state.Players.Values)
         {
             var wallet = player.Wallet;
-            if (wallet.Shop is { } offer && offer.ExpiresAt <= now)
+            if (features.Shop && wallet.Shop is { } offer && offer.ExpiresAt <= now)
             {
                 events.Add(new ShopOfferExpired(player.PlayerId));
             }
 
             events.AddRange(wallet.Inventory
-                .Where(o => o.ExpiresAt <= now)
+                .Where(o => features.Items && o.ExpiresAt <= now)
                 .Select(o => new ObjectRemoved(player.PlayerId, o.InstanceId, o.ObjectId, ObjectRemoval.Expired)));
             events.AddRange(wallet.Bets
-                .Where(b => b.Status == BetStatus.Open && b.Deadline <= now)
+                .Where(b => features.Bets && b.Status == BetStatus.Open && b.Deadline <= now)
                 .Select(b => new BetSettled(player.PlayerId, b.BetId, BetStatus.Lost, 0)));
         }
 
@@ -65,19 +71,19 @@ public static class Timers
 /// <summary>
 /// What follows a command's own events without being an effect (D-413): bets are decided, the shop price starts over,
 /// objects living for some runs count one down. Not limited by the effect chain: a settlement must never be cut.
-/// Writes nothing while the season has none of it (a mechanic off writes no events).
+/// Writes nothing while the season has none of it, nor for a mechanic switched off (D-420).
 /// </summary>
 internal static class Settlements
 {
     public static IReadOnlyList<IGameEvent> After(SeasonState state, IReadOnlyList<IGameEvent> events) =>
-        Each(state, events, (s, e) => Betting.Settle(s, e).Concat(ShopReset(s, e)));
+        Each(state, events, (s, e) => (s.Rules.Features.Bets ? Betting.Settle(s, e) : []).Concat(s.Rules.Features.Shop ? ShopReset(s, e) : []));
 
     /// <summary>
     /// After the effects fired: an object living for some runs counts one down when a run of its owner ends, so it still
     /// fires on its last run (SPEC «на N игр»).
     /// </summary>
     public static IReadOnlyList<IGameEvent> Lifetimes(SeasonState state, IReadOnlyList<IGameEvent> events) =>
-        Each(state, events, RunsLived);
+        state.Rules.Features.Items ? Each(state, events, RunsLived) : [];
 
     private static List<IGameEvent> Each(SeasonState state, IReadOnlyList<IGameEvent> events, Func<SeasonState, IGameEvent, IEnumerable<IGameEvent>> follow)
     {

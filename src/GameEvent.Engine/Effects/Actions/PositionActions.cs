@@ -17,7 +17,7 @@ internal static class Positions
 /// <summary>
 /// <c>move</c>: a push of <c>steps</c> cells, forward along the default branches or back along the walked path, never past
 /// a checkpoint or the start (D-306). A push does not reach the finish — the finish is the player's own move with a
-/// proof behind it — it stops a cell before (D-409). The cell where it stops and the shop cells it passes trigger (D-303).
+/// proof behind it — it stops a cell before (D-409, D-322: <see cref="Movement.Push"/>). The cell where it stops and the shop cells it passes trigger (D-303).
 /// </summary>
 internal sealed class MoveHandler : ActionHandler<MoveAction>
 {
@@ -31,14 +31,10 @@ internal sealed class MoveHandler : ActionHandler<MoveAction>
         }
 
         var map = run.State.Map;
-        IReadOnlyList<string> path = steps > 0
-            ? Movement.Forward(map, player.CellId, steps)
+        // Only a run's own move reaches the finish: a push stops on the cell before it (D-322)
+        var path = steps > 0
+            ? Movement.Push(map, player.CellId, steps)
             : Movement.Backward(map, player.Path, -steps, checkpoints: true);
-        if (steps > 0 && path.Count > 0 && map.CellById(path[^1]).Type == CellType.Finish)
-        {
-            path = [.. path.Take(path.Count - 1)];
-        }
-
         if (path.Count == 0)
         {
             return;

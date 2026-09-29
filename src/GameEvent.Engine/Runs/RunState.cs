@@ -75,8 +75,9 @@ public sealed record RunReview(int Rating, string? Text);
 /// so it does not make the game completed in the season (D-16). <see cref="MoveFrom"/> — the cell the run's own move
 /// began on; <see cref="Gain"/> — how many cells closer to the finish its moves brought the player, the teleport its own
 /// move stopped on included (negative — further, a snake): what a reject takes back (D-321). <see cref="CellPoints"/> — the
-/// points bonus of the cell the run's own move stopped on, which a reject takes back with the dice (D-327); coins and items
-/// of the move's cells will be kept the same way when cells give them (stage 4).
+/// points bonus of the cell the run's own move stopped on, which a reject takes back with the dice (D-327);
+/// <see cref="CellObjects"/> — the objects the cells of that move granted (a shop's coupon), which a reject takes back
+/// when the player still holds them (D-327 (2), D-421).
 /// </summary>
 public sealed record RunState(
     Guid RunId,
@@ -107,7 +108,9 @@ public sealed record RunState(
     [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     int CellPoints = 0,
     [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
-    RunDiceMods? Mods = null)
+    RunDiceMods? Mods = null,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    EquatableArray<Guid> CellObjects = default)
 {
     /// <summary>What items and effects did to the throw (D-408); none for a run without them.</summary>
     [System.Text.Json.Serialization.JsonIgnore]

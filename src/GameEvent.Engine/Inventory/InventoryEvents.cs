@@ -50,6 +50,9 @@ public enum ObjectRemoval
 
     /// <summary>The admin's correction.</summary>
     Admin,
+
+    /// <summary>Got on a cell by the move of a run, taken back by the reject of that run (D-327, D-421).</summary>
+    ProofRejected,
 }
 
 /// <summary>The player got <see cref="Item"/>; <see cref="FromPlayerId"/> — the other player behind it, if any.</summary>

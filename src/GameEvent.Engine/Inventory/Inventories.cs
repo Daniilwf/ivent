@@ -70,8 +70,17 @@ internal static class Inventories
         return item.UsesLeft is { } uses ? new ObjectChanged(playerId, item with { UsesLeft = uses - 1 }) : null;
     }
 
-    public static SeasonState Apply(SeasonState state, ObjectGiven e) =>
-        Update(state, e.PlayerId, w => w with { Inventory = [.. w.Inventory, e.Item], Acquisitions = Math.Max(w.Acquisitions, e.Item.Acquired) });
+    public static SeasonState Apply(SeasonState state, ObjectGiven e)
+    {
+        // D-421: what a cell grants while the player's last move is a run's own move belongs to that run — a reject takes
+        // it back (the same sign as the points bonus of the cell, D-327)
+        if (e.Source == ObjectSource.Cell && state.Players[e.PlayerId].LastMoveRunId is { } mover && state.Runs.TryGetValue(mover, out var run))
+        {
+            state = state with { Runs = state.Runs.SetItem(mover, run with { CellObjects = [.. run.CellObjects, e.Item.InstanceId] }) };
+        }
+
+        return Update(state, e.PlayerId, w => w with { Inventory = [.. w.Inventory, e.Item], Acquisitions = Math.Max(w.Acquisitions, e.Item.Acquired) });
+    }
 
     public static SeasonState Apply(SeasonState state, ObjectRemoved e) =>
         Update(state, e.PlayerId, w => w with { Inventory = Without(w, e.InstanceId) });

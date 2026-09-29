@@ -173,7 +173,7 @@ public class ShopTests
         s.FireTimers();
         Assert.Single(s.LastEvents<ShopOfferExpired>());
         Assert.Null(s.Player("Вася").Wallet.Shop);
-        Assert.Null(Timers.Next(s.Player("Вася")));
+        Assert.Null(Timers.Next(s.Player("Вася"), s.State.Rules.Features));
     }
 
     [Fact]
@@ -197,7 +197,7 @@ public class ShopTests
         s.FireTimers();
 
         Assert.Equal(RejectionCodes.TimersNothingDue, s.Last.Rejection!.Code);
-        Assert.Equal(s.Clock.UtcNow.AddMinutes(15), Timers.Next(s.Player("Вася")));
+        Assert.Equal(s.Clock.UtcNow.AddMinutes(15), Timers.Next(s.Player("Вася"), s.State.Rules.Features));
     }
 
     [Fact]
