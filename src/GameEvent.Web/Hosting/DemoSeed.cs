@@ -329,7 +329,7 @@ public static class DemoSeed
             // Mid-season the admin publishes the whole map — the shortcut zone — while players stand on it (D-270)
             if (day == MapPublishedOn)
             {
-                await SendAsync(new PublishMap(_map.Published, "Открыта «Зона быстрых игр» с коротким путём"), _admin);
+                await SendAsync(new PublishMap(_map.Published, "Открыта «Тропа коротких игр» с коротким путём"), _admin);
             }
 
             await using var db = await factory.CreateDbContextAsync(ct);
