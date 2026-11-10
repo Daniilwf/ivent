@@ -112,9 +112,6 @@ public static class AdminProofEndpoints
             {
                 var run = state.Runs[id];
                 var proof = run.Proof;
-                var player = state.Players[run.PlayerId];
-                var decidesFinish = ProofReviewOrder.DecidesFinish(state, run);
-                var drop = state.Rules.Drop;
                 return new ProofQueueItemView(
                     run.RunId,
                     run.PlayerId,
@@ -129,18 +126,13 @@ public static class AdminProofEndpoints
                     run.Difficulty,
                     run.Hours,
                     RunTotal.Of(run.Dice, run.ChallengeDice, run.Snapshot),
-                    decidesFinish,
+                    ProofReviewOrder.DecidesFinish(state, run),
                     proof is null ? [] : [.. proof.Files.Select(Files.FileLinkView.Of)],
                     Engine.Rolls.UncheckedRuns.ClosesRoll(state, run.PlayerId),
                     run.CellPoints,
-                    player.Finish?.Frozen == true
-                        ? null
-                        : new DropPenaltyView(
-                            DropStreak.PenaltyDiceCount(drop, DropStreak.Before(state, run)),
-                            drop.PenaltyDice.Sides,
-                            drop.AffectsPoints,
-                            drop.AffectsPosition && (player.Finish is null || decidesFinish),
-                            drop.MandatoryEvent == Engine.Rulesets.MandatoryEvent.Bad));
+                    RejectPenaltyPreview.Of(state, run) is { } penalty
+                        ? new DropPenaltyView(penalty.Count, penalty.Sides, penalty.AffectsPoints, penalty.AffectsPosition, penalty.BadEvent)
+                        : null);
             }),
         ];
         return TypedResults.Ok(items);
