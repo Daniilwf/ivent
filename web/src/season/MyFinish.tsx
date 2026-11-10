@@ -13,12 +13,15 @@ export function MyFinish({
   finish,
   first: leads,
   place,
+  rollsOpen,
 }: {
   finish: Schemas['MyFinishView'];
   /** The leaderboard says I hold the first place */
   first: boolean;
   /** My place in the leaderboard, if it lists me */
   place: number | null;
+  /** Rolls are still open: past the deadline the card does not invite to play on */
+  rollsOpen: boolean;
 }) {
   const t = ru.turn.myFinish;
   const first = leads || finish.frozen;
@@ -46,7 +49,7 @@ export function MyFinish({
         {t.title}
       </h3>
       <p>{main}</p>
-      <p className="text-sm text-ink-soft">{next}</p>
+      <p className="text-sm text-ink-soft">{rollsOpen ? next : t.closedNext}</p>
     </section>
   );
 }

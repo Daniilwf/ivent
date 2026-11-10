@@ -5,8 +5,28 @@ import { ru } from '../i18n/ru';
 import { Button } from './Button';
 import { ConfirmDanger } from './Dialogs';
 import { ChoiceGroup, Field, FilePicker, Select } from './Field';
+import { CountBadge } from './Marks';
 import { RouteProgress, Skeleton } from './Progress';
 import { ErrorState, Notice } from './States';
+
+describe('the count badge (D-263)', () => {
+  it('shows nothing for zero, the number up to 99, then 99+; hidden from screen readers', () => {
+    const { rerender } = render(<CountBadge count={0} data-testid="count" />);
+    expect(screen.queryByTestId('count')).toBeNull();
+    rerender(<CountBadge count={7} data-testid="count" />);
+    expect(screen.getByTestId('count')).toHaveTextContent('7');
+    expect(screen.getByTestId('count')).toHaveAttribute('aria-hidden', 'true');
+    rerender(<CountBadge count={99} data-testid="count" />);
+    expect(screen.getByTestId('count')).toHaveTextContent('99');
+    rerender(<CountBadge count={100} data-testid="count" />);
+    expect(screen.getByTestId('count')).toHaveTextContent('99+');
+  });
+
+  it('is a to-do, not an alarm: it is never painted with the danger colour', () => {
+    render(<CountBadge count={3} data-testid="count" />);
+    expect(screen.getByTestId('count').className).not.toMatch(/danger/);
+  });
+});
 
 describe('the design system components', () => {
   it('a loading button keeps its label, says it is busy and takes no clicks', async () => {

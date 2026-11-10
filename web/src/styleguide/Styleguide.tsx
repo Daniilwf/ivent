@@ -21,7 +21,7 @@ import { ru } from '../i18n/ru';
 import { Button, IconButton, type ButtonVariant } from '../ui/Button';
 import { BottomSheet, ConfirmDanger, FormDialog } from '../ui/Dialogs';
 import { ChoiceGroup, Field, FilePicker, Select } from '../ui/Field';
-import { Badge, Chip, Tag } from '../ui/Marks';
+import { Badge, Chip, CountBadge, Tag } from '../ui/Marks';
 import { RouteProgress, Skeleton } from '../ui/Progress';
 import { ConnectionLost, EmptyState, ErrorState, Notice } from '../ui/States';
 import { Sticker } from '../ui/Sticker';
@@ -320,6 +320,11 @@ export function Styleguide() {
             {ru.admin.proofs.rollClosed}
           </Badge>
           <Badge tone="danger">{ru.admin.accounts.deleted}</Badge>
+          {/* D-263: a count of what waits — nothing for 0, the number, 99+ */}
+          <CountBadge count={0} />
+          <CountBadge count={4} />
+          <CountBadge count={99} />
+          <CountBadge count={120} />
           <Tag>Platformer</Tag>
           <Tag>Online Co-Op</Tag>
           <ConnectionLost />
@@ -645,11 +650,17 @@ export function Styleguide() {
 
       <Section id="finish" title={t.finish.title} lead={t.finish.lead}>
         <FinishDemo />
-        {/* D-260: the finisher's own turn card — provisional first, frozen first, a later finisher */}
-        <div className="grid items-start gap-4 desk:grid-cols-3">
-          <MyFinish finish={{ order: 1, frozen: false }} first place={1} />
-          <MyFinish finish={{ order: 2, frozen: true }} first place={1} />
-          <MyFinish finish={{ order: 3, frozen: false }} first={false} place={4} />
+        {/* D-260: the finisher's own turn card — provisional first, frozen first, a later finisher, and past the deadline */}
+        <div className="grid items-start gap-4 desk:grid-cols-2">
+          <MyFinish finish={{ order: 1, frozen: false }} first place={1} rollsOpen />
+          <MyFinish finish={{ order: 2, frozen: true }} first place={1} rollsOpen />
+          <MyFinish finish={{ order: 3, frozen: false }} first={false} place={4} rollsOpen />
+          <MyFinish
+            finish={{ order: 3, frozen: false }}
+            first={false}
+            place={4}
+            rollsOpen={false}
+          />
         </div>
       </Section>
 

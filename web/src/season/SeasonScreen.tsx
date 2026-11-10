@@ -757,6 +757,7 @@ export function SeasonScreen({
             finish={me.finish}
             first={rows.find((r) => r.player.me)?.isFirst === true}
             place={rows.find((r) => r.player.me)?.place ?? null}
+            rollsOpen={turnsOpen}
           />
         ) : null}
         {/* A refusal is said at the top of the card, where the eye is after the action */}

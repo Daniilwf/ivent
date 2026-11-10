@@ -196,6 +196,42 @@ describe('the finished player’s turn card (D-260)', () => {
     expect(screen.queryByTestId('my-finish')).not.toBeInTheDocument();
   });
 
+  // Past the deadline the rolls are closed (SPEC «После дедлайна»): the card keeps the place and says it waits for the proofs
+  it.each([
+    [
+      'the provisional first',
+      { order: 1, frozen: false },
+      {},
+      ru.turn.myFinish.firstProvisional,
+      ru.turn.myFinish.firstProvisionalNext,
+    ],
+    [
+      'the frozen first',
+      { order: 1, frozen: true },
+      {},
+      ru.turn.myFinish.firstFrozen,
+      ru.turn.myFinish.firstFrozenNext,
+    ],
+    [
+      'a later finisher',
+      { order: 3, frozen: false },
+      { place: 2 },
+      ru.turn.myFinish.later(2),
+      ru.turn.myFinish.laterNext,
+    ],
+  ] as const)(
+    'tells %s past the deadline that the rolls are closed, not to play on',
+    async (_who, finish, row, place, playOn) => {
+      serve(() => ({ ...season({ finish }, 'finish', row), deadline: '2020-01-01T00:00:00Z' }));
+      render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+      const card = await screen.findByTestId('my-finish');
+      expect(card).toHaveTextContent(place);
+      expect(card).toHaveTextContent(ru.turn.myFinish.closedNext);
+      expect(card).not.toHaveTextContent(playOn);
+    },
+  );
+
   it('turns from provisional to frozen when the hub says the proofs were approved', async () => {
     let frozen = false;
     serve(() => ({

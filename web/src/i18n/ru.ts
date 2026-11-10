@@ -329,6 +329,8 @@ export const ru = {
           ? 'Бонус за финиш получен, фишка остаётся здесь.'
           : `Сейчас ${String(place)}-е место: бонус за финиш получен, фишка остаётся здесь.`,
       laterNext: 'Играй дальше: кубы за прохождения ещё дают очки, место — по очкам.',
+      // Past the deadline no one rolls (SPEC «После дедлайна»): the place waits for the proofs
+      closedNext: 'Броски закрыты — место станет окончательным после проверки пруфов.',
     },
     roll: 'Крутить колесо',
     start: 'Начать',
@@ -528,7 +530,6 @@ export const ru = {
     // D-359, D-263: the admin's count of runs waiting for a proof check
     menuWaiting: (name: string, waiting: number) =>
       `Меню: ${name}. Ждут проверки пруфов: ${waiting}`,
-    waitingShort: (waiting: number) => (waiting > 99 ? '99+' : String(waiting)),
     changePassword: 'Сменить пароль',
     noSeasonTitle: 'Сезон ещё не начался',
     noSeasonText: 'Когда админ заведёт сезон, здесь появятся карта, лидерборд и твой ход.',

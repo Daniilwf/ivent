@@ -15,6 +15,7 @@ import type { Schemas } from '../api/client';
 import { userToken } from '../design/players';
 import { ru } from '../i18n/ru';
 import { cx } from '../ui/cx';
+import { CountBadge } from '../ui/Marks';
 import { Menu } from '../ui/Menu';
 import { ConnectionLost } from '../ui/States';
 import { Sticker } from '../ui/Sticker';
@@ -66,22 +67,6 @@ function SiteNav({ admin }: { admin: boolean }) {
         })}
       </ul>
     </nav>
-  );
-}
-
-/** The admin's count of proofs to check: 99+ at most on the screen, the words around it say the number (D-263) */
-function WaitingCount({ count, className }: { count: number; className?: string }) {
-  return (
-    <span
-      data-testid="admin-waiting"
-      aria-hidden
-      className={cx(
-        'inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-danger px-1 text-xs font-bold text-on-color tabular-nums',
-        className,
-      )}
-    >
-      {ru.shell.waitingShort(count)}
-    </span>
   );
 }
 
@@ -154,8 +139,9 @@ export function Shell({
                   />
                   {/* D-263: the admin's runs waiting for a proof check, on the way to «Админка» */}
                   {shownWaiting > 0 ? (
-                    <WaitingCount
+                    <CountBadge
                       count={shownWaiting}
+                      data-testid="admin-waiting"
                       className="absolute -top-1 -right-2 border-2 border-page"
                     />
                   ) : null}
@@ -185,7 +171,7 @@ export function Shell({
                       icon: <ShieldCheck size={18} aria-hidden />,
                       ...(shownWaiting > 0
                         ? {
-                            badge: <WaitingCount count={shownWaiting} />,
+                            badge: <CountBadge count={shownWaiting} data-testid="admin-waiting" />,
                             ariaLabel: ru.nav.adminWaiting(shownWaiting),
                           }
                         : {}),
