@@ -338,6 +338,7 @@ describe('the season screen on the graph map', () => {
     const other = '10000000-0000-0000-0000-000000000002';
     const [player] = view.players;
     const [row] = view.leaderboard;
+    if (!player || !row) throw new Error('No player in the season');
     const both = {
       ...view,
       players: [...view.players, { ...player, id: other, name: 'Петя', token: 1 }],
