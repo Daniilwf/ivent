@@ -267,9 +267,9 @@ public class CellStopTests
         var vasya = s.PlayerId("Вася");
         PlayerMoved Move(int steps, MoveReason reason, bool paused = false) => new(vasya, "a", "p", steps, ["p"], reason, null, paused);
 
-        Assert.Empty(CellStops.After(s.State, Move(1, MoveReason.CompletionRoll, paused: true)));
-        Assert.Empty(CellStops.After(s.State, Move(0, MoveReason.CompletionRoll)));
-        Assert.Empty(CellStops.After(s.State, Move(1, MoveReason.RunCorrection)));
-        Assert.NotEmpty(CellStops.After(s.State, Move(1, MoveReason.CompletionRoll)));
+        Assert.Empty(CellStops.After(s.State, Move(1, MoveReason.CompletionRoll, paused: true), s.Context()));
+        Assert.Empty(CellStops.After(s.State, Move(0, MoveReason.CompletionRoll), s.Context()));
+        Assert.Empty(CellStops.After(s.State, Move(1, MoveReason.RunCorrection), s.Context()));
+        Assert.NotEmpty(CellStops.After(s.State, Move(1, MoveReason.CompletionRoll), s.Context()));
     }
 }
