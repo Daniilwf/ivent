@@ -436,7 +436,7 @@
 | RG8 | Окно удаления в админке: причина обязательна, без неё запрос не уходит, отказ остаётся в окне; у удалённой игры — «Причина удаления: …» | `web/src/admin/PoolSection.test.tsx` («deletes a game after a confirmation…», «does not delete a game without a reason», «keeps a refused deletion in its window», «shows why a deleted game was taken out…») | ✅ |
 | RG9 | Формат события: `game-deleted` v2 с причиной, v1 читается без причины; архив сезона переносит причину; миграция `GameDeletionReason` расширяющая, с откатом | `src/GameEvent.Engine.Tests/Kernel/EventFormatTests.cs` («Game_deleted_v1_reads_with_no_reason», золотой образец), `src/GameEvent.Web.Tests/SeasonTransfer/SeasonTransferTests.cs` («A_deleted_games_reason_travels_with_the_pool»), `npm run test:migrations` | ✅ |
 
-## Пакет зависимостей 2026-11 (D-250…D-252)
+## Пакет зависимостей 2026-11 (D-250…D-253)
 
 | ID | Правило | Тесты | Статус |
 | --- | --- | --- | --- |
