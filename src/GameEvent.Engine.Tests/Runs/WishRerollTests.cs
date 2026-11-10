@@ -207,4 +207,34 @@ public class WishRerollTests
 
         ScenarioAssert.RejectsWithoutChanges(s, x => Wish(x), RejectionCodes.WrongPhase);
     }
+
+    // ---- What the season screen asks (WishRerolls.Allowed, D-325); found by mutation testing (D-282) ----
+
+    [Fact]
+    public void The_screen_offers_a_wish_reroll_only_for_a_listed_genre_the_roll_did_not_impose()
+    {
+        var s = Playing(Season(Listed("RPG")), "Persona");
+        var snapshot = s.State.Runs[s.Player("Вася").ActiveRunId!.Value].Snapshot;
+        var persona = new Engine.Pool.Game(s.GameId("Persona"), "Persona", ["Any", "RPG"], 3);
+        var dragonQuest = persona with { Tags = ["Any", "rpg"] };
+        var silentHill = persona with { Tags = ["Any", "Horror"] };
+
+        Assert.True(WishRerolls.Allowed(snapshot, persona));
+        Assert.True(WishRerolls.Allowed(snapshot, dragonQuest));
+        Assert.False(WishRerolls.Allowed(snapshot, silentHill));
+        Assert.False(WishRerolls.Allowed(snapshot, null));
+        Assert.False(WishRerolls.Allowed(snapshot with { ImposedTags = ["RPG"] }, persona));
+        Assert.Throws<ArgumentNullException>(() => WishRerolls.Allowed(null!, persona));
+    }
+
+    [Fact]
+    public void A_game_gone_from_the_pool_is_not_listed()
+    {
+        var s = Playing(Season(Listed("RPG")), "Persona");
+        var run = s.State.Runs[s.Player("Вася").ActiveRunId!.Value];
+
+        var refusal = WishRerolls.Refusal(run with { GameId = Guid.Parse("0c000000-0000-0000-0000-000000000001") }, s.Context().Pool);
+
+        Assert.Equal(RejectionCodes.WishRerollNotListed, refusal!.Rejection!.Code);
+    }
 }
