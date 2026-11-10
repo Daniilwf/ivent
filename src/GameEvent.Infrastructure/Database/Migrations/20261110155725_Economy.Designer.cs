@@ -11,14 +11,14 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace GameEvent.Infrastructure.Database.Migrations
 {
     [DbContext(typeof(GameEventDbContext))]
-    [Migration("20260927064044_Economy")]
+    [Migration("20261110155725_Economy")]
     partial class Economy
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder.HasAnnotation("ProductVersion", "10.0.12");
+            modelBuilder.HasAnnotation("ProductVersion", "10.0.13");
 
             modelBuilder.Entity("GameEvent.Infrastructure.Accounts.UserRecord", b =>
                 {
@@ -252,6 +252,10 @@ namespace GameEvent.Infrastructure.Database.Migrations
 
                     b.Property<long?>("CreatedAt")
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("DeletionReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
 
                     b.Property<decimal?>("Hours")
                         .HasColumnType("TEXT");
