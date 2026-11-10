@@ -128,7 +128,7 @@ function picture({ width, height, cells, edges, zones, seed }) {
     const y1 = Math.max(...inside.map((c) => c.y)) + reach;
     insideRegion.push({ x0, x1, y0, y1, region });
     parts.push(
-      `<rect x="${x0}" y="${y0}" width="${x1 - x0}" height="${y1 - y0}" rx="${reach}" fill="${region.fill}" stroke="${ink}" stroke-width="5" stroke-dasharray="2 14" stroke-linecap="round"/>`,
+      `<rect x="${x0}" y="${y0}" width="${x1 - x0}" height="${y1 - y0}" rx="${reach}" fill="${region.fill}"/>`,
     );
   });
   const regionAt = (p) =>
@@ -181,8 +181,9 @@ function picture({ width, height, cells, edges, zones, seed }) {
 
   const start = cells.find((c) => c.type === 'start');
   const finish = cells.find((c) => c.type === 'finish');
-  if (start) parts.push(camp(Math.max(40, start.x - 6), Math.max(60, start.y - 74)));
-  if (finish) parts.push(castle(Math.min(width - 70, finish.x + 6), Math.max(110, finish.y - 96)));
+  if (start) parts.push(camp(Math.max(40, start.x - 90), Math.max(60, start.y - 20)));
+  if (finish)
+    parts.push(castle(Math.min(width - 70, finish.x + 130), Math.min(height - 50, finish.y - 10)));
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">\n${parts.join('\n')}\n</svg>\n`;
 }
 

@@ -122,7 +122,20 @@ function PropShape({ prop }: { prop: Prop }) {
  * fades in once the browser has it, so a slow phone network never waits for it.
  */
 function BackgroundPicture({ picture }: { picture: BoardBackground }) {
-  const [ready, setReady] = useState(false);
+  // Loaded aside, so a picture already in the cache still says it is there (an SVG image's own load event may come
+  // before the page listens to it)
+  const [ready, setReady] = useState<string | null>(null);
+  useEffect(() => {
+    let active = true;
+    const probe = new Image();
+    probe.onload = () => {
+      if (active) setReady(picture.url);
+    };
+    probe.src = picture.url;
+    return () => {
+      active = false;
+    };
+  }, [picture.url]);
   return (
     <image
       href={picture.url}
@@ -134,14 +147,8 @@ function BackgroundPicture({ picture }: { picture: BoardBackground }) {
       data-map-background=""
       className={cx(
         'transition-opacity duration-(--duration-slow) motion-reduce:transition-none',
-        ready ? 'opacity-100' : 'opacity-0',
+        ready === picture.url ? 'opacity-100' : 'opacity-0',
       )}
-      onLoad={() => {
-        setReady(true);
-      }}
-      onError={() => {
-        setReady(false);
-      }}
     />
   );
 }

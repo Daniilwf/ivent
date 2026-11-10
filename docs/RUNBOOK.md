@@ -119,6 +119,18 @@
 
 Через API (без экрана): `GET /api/admin/seasons/{id}/map` — карта и кто где стоит; `POST …/map/check` с `{map}` — все проблемы и `canPublish`; `POST …/map/publish` с `{commandId, map, comment}`.
 
+## Как загрузить или заменить фон карты
+
+Проверено 2026-11-11: E2E `map-background.spec.ts` (админ загружает картинку в редакторе и публикует, у игрока с открытой страницей фон появляется без перезагрузки), просмотр демо-сезона на локальной копии (`seed-demo`, фон из `content/map.demo.background.png`) на 390 и 1440 px. Фон — часть карты (D-277): меняется только публикацией, как клетки.
+
+1. **Картинка.** Неподвижная JPEG, PNG или WebP (анимация не принимается), до `Files:MapBackgroundMaxBytes` (10 МБ). Сайт перекодирует её в WebP не длиннее `Files:MapBackgroundMaxLongSide` (3200 px по длинной стороне) и отдаёт эту версию с долгим кэшем (D-278). Места клеток — в пикселях **сохранённой** картинки: если исходник больше 3200 px, расставляй клетки по уменьшенной (её размер панель пишет под превью).
+2. **Загрузка.** «Админка» → «Карта» (на компьютере) → панель «Фон карты» → «Загрузить картинку». Под превью — размер; на холсте картинка ляжет под клетки. Ошибка («Файл слишком большой», «Нужна неподвижная картинка…») — словами в панели; прежний фон черновика остаётся.
+3. **Клетки.** Перетащи клетки на нужные места картинки (или поправь `x`, `y` в черновике). Игроки увидят фон только после публикации; до неё панель пишет «Фон попадёт к игрокам вместе с картой…».
+4. **Публикация** — как в разделе выше (бэкап, комментарий, подтверждение). Проверка карты отказывает «Фона нет на сайте или его размер не совпадает», если картинка не загружена через эту панель (например, черновик из другой копии сайта).
+5. **Заменить** — «Заменить картинку» в той же панели и публикация; **убрать** — «Убрать фон» и публикация: игроки снова видят доску из зон. Прежние картинки остаются файлами (в старых версиях карты в логе), место на диске — сотни килобайт.
+
+Через API: `POST /api/admin/seasons/{id}/map/background` (multipart: `commandId`, `file`; только админ) → `{id, width, height, url}`; затем в карте `{"background": {"fileId": id, "width": width, "height": height}}` для `…/map/check` и `…/map/publish`. Выгрузка сезона (`season:export`) файлов не несёт: в копии сезона карта без картинки рисуется доской из зон, пока фон не загрузят заново.
+
 ## Закрыть сезон
 
 Не проверено руками (появится в админке, H8; пока — через API, как «Начать сезон»).
@@ -207,7 +219,7 @@
 
 Не проверено руками (проверки — `FileUploadTests`, `SafeDownloaderTests`, `AvatarApiTests`).
 
-- Файлы — `var/files` (`Files:Path`), лимиты — раздел `Files` (`MaxUploadBytes`, `MaxGifBytes`, `MaxPixels`, `MaxInterlacedPixels`, `MaxFrames`, `UploadsPerDay`, `UploadsPerMinute`, `DownloadsPerHour`), D-108, D-117.
+- Файлы — `var/files` (`Files:Path`), лимиты — раздел `Files` (`MaxUploadBytes`, `MaxGifBytes`, `MaxPixels`, `MaxInterlacedPixels`, `MaxFrames`, `UploadsPerDay`, `UploadsPerMinute`, `DownloadsPerHour`, фон карты — `MapBackgroundMaxBytes`, `MapBackgroundMaxLongSide`), D-108, D-117, D-278.
 - Скачивание аватарок по ссылке — раздел `Files:Download`: `AllowedHosts` (список заменяет стандартный: `media.tenor.com`, `i.giphy.com`, `*.klipy.com`…), `TimeoutSeconds`, `MaxRedirects`, `MaxConcurrent`. Через переменные окружения: `Files__Download__AllowedHosts__0=media.tenor.com`, `Files__Download__AllowedHosts__1=…`.
 - Хост из списка перестал отдавать картинки или взломан — убрать его из `AllowedHosts` и перезапустить сайт.
 
@@ -239,7 +251,7 @@
 ## Демо-сезон и локальные сиды
 
 - `npm run dev` — маленький сид в `var/dev.db` (admin, vasya, petya, masha, kolya, dasha, zritel; пароль — `DevSeed:Password` в `appsettings.Development.json`).
-- `npm run seed:demo` — демо-сезон заново в `var/demo.db` (admin, zritel, player01…player16), `npm run dev:demo` — сайт на нём. Сезон играется на карте-графе `content/map.demo.json` (D-270): развилки в две зоны, шорткат и змея, чекпоинты, бонусы; на 13-й день админ публикует полную карту (зона «Тропа коротких игр»), в конце сезона трое ждут выбора ветки на развилке, в очереди есть пруфы. Проверка: `npm run season:check -- de300000-0000-0000-0000-000000000001 --db var/demo.db`.
+- `npm run seed:demo` — демо-сезон заново в `var/demo.db` (admin, zritel, player01…player16), `npm run dev:demo` — сайт на нём. Сезон играется на карте-графе `content/map.demo.json` (D-270): развилки в две зоны, шорткат и змея, чекпоинты, бонусы; карта лежит на нашей картинке `content/map.demo.background.png` (D-279, перерисовать — `node scripts/map-background.mjs`); на 13-й день админ публикует полную карту (зона «Тропа коротких игр»), в конце сезона трое ждут выбора ветки на развилке, в очереди есть пруфы. Проверка: `npm run season:check -- de300000-0000-0000-0000-000000000001 --db var/demo.db`.
 - Демо-пул из таблицы (после её обновления): `dotnet run --project src/GameEvent.Tools.Import -- pool-demo data/import/games.xlsx content/pool.demo.json`; затем `npm run format:file -- content/pool.demo.json` (Prettier); перед коммитом убедиться, что в файле нет ников.
 
 ## Импорт пула из таблицы

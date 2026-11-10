@@ -99,6 +99,9 @@ const nodeTypes = { cell: CellBox };
  */
 const spread = 1.4;
 
+/** About half of a cell's card on the canvas: from its corner (its place) to its number's centre */
+const cardHalf = { x: 26, y: 26 };
+
 /** The zoom buttons of the player's map, on the canvas */
 function CanvasTools() {
   const flow = useReactFlow();
@@ -269,6 +272,9 @@ export function MapCanvas({
               style={{
                 width: draft.background.width * spread,
                 height: draft.background.height * spread,
+                // A card stands with its corner on the place; the picture moves by about half a card so the place it
+                // marks falls under the card's number, as on the players' map
+                transform: `translate(${String(-cardHalf.x)}px, ${String(-cardHalf.y)}px)`,
               }}
             />
           </ViewportPortal>
