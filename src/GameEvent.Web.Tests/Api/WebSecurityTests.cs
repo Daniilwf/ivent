@@ -65,6 +65,54 @@ public sealed class WebSecurityTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_guess_spread_over_many_addresses_does_not_lock_out_a_browser_that_signed_in_before()
+    {
+        // SEC-2: the per-login ceiling is reached from elsewhere (the pair limit is out of the way here, so every attempt
+        // counts towards the ceiling only); the owner's browser that signed in before still gets in
+        using var site = _site.WithWebHostBuilder(b =>
+        {
+            b.UseSetting("Security:LoginFailuresPerLogin", "3");
+            b.UseSetting("Security:LoginFailuresPerAddress", "100");
+        });
+        var owner = site.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions { HandleCookies = true });
+        await SiteFactory.RefreshCsrfAsync(owner);
+        Assert.Equal(HttpStatusCode.OK, (await owner.PostAsJsonAsync("/api/auth/login", new { login = "petya", password = SiteFactory.Password }, Ct)).StatusCode);
+        await SiteFactory.RefreshCsrfAsync(owner);
+        Assert.Equal(HttpStatusCode.NoContent, (await owner.PostAsync("/api/auth/logout", null, Ct)).StatusCode);
+        await SiteFactory.RefreshCsrfAsync(owner);
+
+        var guesser = site.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions { HandleCookies = true });
+        await SiteFactory.RefreshCsrfAsync(guesser);
+        for (var i = 0; i < 3; i++)
+        {
+            await guesser.PostAsJsonAsync("/api/auth/login", new { login = "petya", password = "guess-" + i }, Ct);
+        }
+
+        Assert.Equal(HttpStatusCode.TooManyRequests, (await guesser.PostAsJsonAsync("/api/auth/login", new { login = "petya", password = SiteFactory.Password }, Ct)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await owner.PostAsJsonAsync("/api/auth/login", new { login = "petya", password = SiteFactory.Password }, Ct)).StatusCode);
+    }
+
+    [Fact]
+    public async Task A_browser_known_for_one_login_is_a_stranger_to_another()
+    {
+        using var site = _site.WithWebHostBuilder(b =>
+        {
+            b.UseSetting("Security:LoginFailuresPerLogin", "3");
+            b.UseSetting("Security:LoginFailuresPerAddress", "100");
+        });
+        var vasya = site.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions { HandleCookies = true });
+        await SiteFactory.RefreshCsrfAsync(vasya);
+        Assert.Equal(HttpStatusCode.OK, (await vasya.PostAsJsonAsync("/api/auth/login", new { login = "vasya", password = SiteFactory.Password }, Ct)).StatusCode);
+        await SiteFactory.RefreshCsrfAsync(vasya);
+        for (var i = 0; i < 3; i++)
+        {
+            await vasya.PostAsJsonAsync("/api/auth/login", new { login = "petya", password = "guess-" + i }, Ct);
+        }
+
+        Assert.Equal(HttpStatusCode.TooManyRequests, (await vasya.PostAsJsonAsync("/api/auth/login", new { login = "petya", password = SiteFactory.Password }, Ct)).StatusCode);
+    }
+
+    [Fact]
     public async Task Responses_carry_security_headers()
     {
         var client = await _site.AnonymousAsync();

@@ -59,7 +59,7 @@ public static partial class AccountEndpoints
         Guid.TryParse(principal.FindFirstValue(ClaimTypes.NameIdentifier), out var id) ? id : null;
 
     private static async Task<Results<Ok<CurrentUser>, UnauthorizedHttpResult, ValidationProblem, StatusCodeHttpResult>> LoginAsync(
-        LoginRequest request, HttpContext http, GameEventDbContext db, Passwords passwords, LoginThrottle throttle, ILoggerFactory loggers, CancellationToken ct)
+        LoginRequest request, HttpContext http, GameEventDbContext db, Passwords passwords, LoginThrottle throttle, LoginDevices devices, ILoggerFactory loggers, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(request.Login) || string.IsNullOrEmpty(request.Password)
             || request.Login.Length > 64 || request.Password.Length > 256)
@@ -74,7 +74,7 @@ public static partial class AccountEndpoints
         var normalized = UserRecord.Normalize(request.Login);
         var logger = loggers.CreateLogger(typeof(AccountEndpoints));
         var address = WebSecurity.ClientKey(http.Connection.RemoteIpAddress);
-        if (!throttle.TryBegin(normalized, address))
+        if (!throttle.TryBegin(normalized, address, devices.IsKnown(http, normalized)))
         {
             LogLoginThrottled(logger, TypedLogin(null, normalized), address);
             return TypedResults.StatusCode(StatusCodes.Status429TooManyRequests);
@@ -88,6 +88,7 @@ public static partial class AccountEndpoints
         }
 
         throttle.Succeeded(normalized, address);
+        devices.Remember(http, normalized);
         await SignInAsync(http, user!);
         return TypedResults.Ok(await ToCurrentAsync(user!, db, ct));
     }

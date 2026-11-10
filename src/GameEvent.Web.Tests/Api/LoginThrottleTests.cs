@@ -66,4 +66,46 @@ public class LoginThrottleTests
 
         Assert.True(throttle.TryBegin("petya", "203.0.113.1"));
     }
+
+    [Fact]
+    public void A_browser_that_signed_in_to_the_login_before_is_not_stopped_by_the_per_login_ceiling()
+    {
+        // SEC-2: a guess spread over a few addresses must not lock the owner out of their own account
+        var throttle = Throttle(perLogin: 10);
+        for (var i = 0; i < 10; i++)
+        {
+            Assert.True(throttle.TryBegin("petya", $"203.0.113.{i}"));
+        }
+
+        Assert.False(throttle.TryBegin("petya", "198.51.100.7"));
+        Assert.True(throttle.TryBegin("petya", "198.51.100.7", knownDevice: true));
+    }
+
+    [Fact]
+    public void A_known_browser_is_still_stopped_by_the_limit_of_its_own_address()
+    {
+        var throttle = Throttle();
+        for (var i = 0; i < 5; i++)
+        {
+            Assert.True(throttle.TryBegin("petya", "203.0.113.1", knownDevice: true));
+        }
+
+        Assert.False(throttle.TryBegin("petya", "203.0.113.1", knownDevice: true));
+    }
+
+    [Fact]
+    public void Attempts_of_logins_never_tried_again_are_forgotten_after_their_windows()
+    {
+        // SEC-3: every typed login used to stay in memory for good, so a stream of made-up logins grew the site's memory
+        var throttle = Throttle();
+        for (var i = 0; i < 1000; i++)
+        {
+            throttle.TryBegin($"guess-{i}", $"203.0.113.{i % 200}");
+        }
+
+        _clock.UtcNow = _clock.UtcNow.AddMinutes(61);
+        throttle.TryBegin("petya", "198.51.100.7");
+
+        Assert.True(throttle.TrackedKeys <= 2, $"{throttle.TrackedKeys} keys are still tracked.");
+    }
 }

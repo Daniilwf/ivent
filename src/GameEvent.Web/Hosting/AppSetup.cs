@@ -120,6 +120,7 @@ public static class AppSetup
         services.AddSingleton<Passwords>();
         services.AddSingleton<IPasswords>(sp => sp.GetRequiredService<Passwords>());
         services.AddSingleton<LoginThrottle>();
+        services.AddSingleton(sp => new LoginDevices(sp.GetRequiredService<IDataProtectionProvider>(), cookiePrefix + "ge.device", securePolicy));
         services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
             .AddCookie(o =>
             {
