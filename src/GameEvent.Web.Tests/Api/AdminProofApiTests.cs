@@ -153,6 +153,52 @@ public sealed class AdminProofApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Queue_item_carries_the_drop_penalty_a_reject_with_penalty_would_throw()
+    {
+        // D-327, D-262: the confirmation of «Отклонить со штрафом дропа» names the penalty; after a drop in a row it has the
+        // extra die (D-324): the default 2d4 plus drop.consecutiveExtraDice = 1
+        var vasya = await _site.SignedInAsync("vasya");
+        await PostOkAsync(vasya, PlayerUrl("roll"), new { commandId = Guid.NewGuid() });
+        await PostOkAsync(vasya, PlayerUrl("start"), new { commandId = Guid.NewGuid() });
+        await PostOkAsync(vasya, PlayerUrl("drop"), new { commandId = Guid.NewGuid() });
+        _site.Clock.UtcNow = _site.Clock.UtcNow.AddHours(1);
+        await CompletedAsync("vasya");
+        await CompletedAsync("petya");
+        var admin = await _site.SignedInAsync("admin");
+
+        using var queue = JsonDocument.Parse(await admin.GetStringAsync(QueueUrl(), Ct));
+
+        var items = queue.RootElement.EnumerateArray().ToDictionary(i => i.GetProperty("playerName").GetString()!);
+        var drop = RulesetJson.Default().Drop;
+        var afterDrop = items["vasya"].GetProperty("dropPenalty");
+        Assert.Equal(drop.PenaltyDice.Count + 1, afterDrop.GetProperty("count").GetInt32());
+        Assert.Equal(drop.PenaltyDice.Sides, afterDrop.GetProperty("sides").GetInt32());
+        Assert.Equal(drop.AffectsPoints, afterDrop.GetProperty("affectsPoints").GetBoolean());
+        Assert.Equal(drop.AffectsPosition, afterDrop.GetProperty("affectsPosition").GetBoolean());
+        Assert.True(afterDrop.GetProperty("badEvent").GetBoolean());
+        Assert.Equal(drop.PenaltyDice.Count, items["petya"].GetProperty("dropPenalty").GetProperty("count").GetInt32());
+    }
+
+    [Fact]
+    public async Task Queue_item_of_the_frozen_first_has_no_drop_penalty()
+    {
+        // D-99: the frozen first loses nothing, a reject with the drop penalty included
+        var beforeFinish = $"c{RulesetJson.Default().Map.LinearLength - 1}";
+        await _site.SendAsync(new AdjustPlayer(_site.Players["vasya"], "Перенос для теста", CellId: beforeFinish));
+        var finishRun = await CompletedAsync("vasya");
+        var admin = await _site.SignedInAsync("admin");
+        await PostOkAsync(admin, Url("approve", finishRun), new { commandId = Guid.NewGuid(), comment = "Видел на стриме" });
+        _site.Clock.UtcNow = _site.Clock.UtcNow.AddHours(1);
+        var later = await CompletedAsync("vasya");
+
+        using var queue = JsonDocument.Parse(await admin.GetStringAsync(QueueUrl(), Ct));
+
+        var item = Assert.Single(queue.RootElement.EnumerateArray().ToList());
+        Assert.Equal(later, item.GetProperty("runId").GetGuid());
+        Assert.Equal(JsonValueKind.Null, item.GetProperty("dropPenalty").ValueKind);
+    }
+
+    [Fact]
     public async Task Approved_and_rejected_runs_leave_the_queue()
     {
         var vasyaRun = await CompletedAsync("vasya");

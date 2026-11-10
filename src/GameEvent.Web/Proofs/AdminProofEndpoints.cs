@@ -24,7 +24,10 @@ namespace GameEvent.Web.Proofs;
 /// difficulty or a reject changes. <c>reachedFinish</c>: this run's latest move stands on the finish.
 /// <c>rollClosed</c>: the player's next roll is closed by the limit of unchecked runs (D-134) until the admin checks one.
 /// <c>cellBonus</c>: the points bonus of the cell the run's move stopped on, which a reject takes back too (D-327; always
-/// set, optional for older clients).
+/// set, optional for older clients). <c>dropPenalty</c>: the drop penalty «Отклонить со штрафом дропа» would throw on top of
+/// the reject (D-327, D-262) under the season's rules, with the drops in a row before the run (D-324); null for the frozen
+/// first, who loses nothing (D-99); <c>affectsPosition</c> is false for a finisher whose finish this run does not decide
+/// (his position is fixed); always set, optional for older clients.
 /// </summary>
 public sealed record ProofQueueItemView(
     Guid RunId,
@@ -43,7 +46,8 @@ public sealed record ProofQueueItemView(
     bool DecidesFinish,
     IReadOnlyList<Files.FileLinkView> Files,
     bool RollClosed,
-    int? CellBonus = null);
+    int? CellBonus = null,
+    DropPenaltyView? DropPenalty = null);
 
 /// <summary>Approve a run: with its proof, or without one («без скрина», a comment then); a lower proven difficulty.</summary>
 public sealed record ApproveProofRequest(Guid CommandId, Difficulty? Difficulty = null, string? Comment = null);
@@ -108,6 +112,9 @@ public static class AdminProofEndpoints
             {
                 var run = state.Runs[id];
                 var proof = run.Proof;
+                var player = state.Players[run.PlayerId];
+                var decidesFinish = ProofReviewOrder.DecidesFinish(state, run);
+                var drop = state.Rules.Drop;
                 return new ProofQueueItemView(
                     run.RunId,
                     run.PlayerId,
@@ -122,10 +129,18 @@ public static class AdminProofEndpoints
                     run.Difficulty,
                     run.Hours,
                     RunTotal.Of(run.Dice, run.ChallengeDice, run.Snapshot),
-                    ProofReviewOrder.DecidesFinish(state, run),
+                    decidesFinish,
                     proof is null ? [] : [.. proof.Files.Select(Files.FileLinkView.Of)],
                     Engine.Rolls.UncheckedRuns.ClosesRoll(state, run.PlayerId),
-                    run.CellPoints);
+                    run.CellPoints,
+                    player.Finish?.Frozen == true
+                        ? null
+                        : new DropPenaltyView(
+                            DropStreak.PenaltyDiceCount(drop, DropStreak.Before(state, run)),
+                            drop.PenaltyDice.Sides,
+                            drop.AffectsPoints,
+                            drop.AffectsPosition && (player.Finish is null || decidesFinish),
+                            drop.MandatoryEvent == Engine.Rulesets.MandatoryEvent.Bad));
             }),
         ];
         return TypedResults.Ok(items);
