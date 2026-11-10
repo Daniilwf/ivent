@@ -57,10 +57,13 @@
 | Пул | общий список игр для ролла | `Game` (коллекция), в движке — `IPoolView` |
 | Игра | запись в пуле с тегами, часами, обложкой и заметкой | `Game`, `GameRecord`, карточка — `GameCard`, в API — `PoolGameView` (D-182); события `GameAdded`, `GameChanged`, `GameDeleted`, `GameRestored` |
 | Похожее название | название, совпадающее по буквам и цифрам или отличающееся на 1–2 символа: добавление — после подтверждения | `PoolRules.IsAlike`, код `pool.similar`; то же название — `pool.duplicate` |
+| Причина удаления игры | почему админ убрал игру из пула; обязательна, её видит тот, кто добавляет игру снова (D-208) | `DeleteGame.Reason`, `GameDeleted.Reason`, `GameRecord.DeletionReason`, `PoolGameView.DeletionReason`, `SimilarGameView.DeletionReason` |
+| Убрана из пула | та же игра удалена админом: добавить заново нельзя, только вернуть в пул (D-208, D-241) | отказ `pool.removed`, `SimilarGameView.IsDeleted` |
 | Тег | метка жанра или свойства игры | `Tag` |
 | Категория | тег с весом на колесе категорий | `Category`, `SetCategory`, `RemoveCategory`, события `CategorySet`, `CategoryRemoved` |
 | Часы | длина игры по HowLongToBeat, основной сюжет | `Game.Hours`, `RunSnapshot.Hours` |
 | Условие прохождения | что считается прохождением для бесконечной или мультиплеерной игры | `GameRecord.CompletionCondition`, `GameCard.CompletionCondition` |
+| Что считается прохождением | раздел страницы правил: общий порядок условий (концовка → круг уровней → весь контент → победа над компьютером → рекорд очков); условие в заметке к игре важнее (D-207) | `ru.rules.completion`, раздел `rules-completion`, `CompletionCriteria`, ссылка `CompletionRulesLink` |
 | Заметка к игре | челлендж или пометка в карточке игры | `GameRecord.Note`, `GameCard.Note` |
 | Кооп-игра | игра, которую проходят вместе (признак карточки, не само совместное прохождение) | `GameRecord.IsCoop`, `GameCard.IsCoop` |
 | Колесо | взвешенный список записей | `Wheel`, `WheelEntry` |

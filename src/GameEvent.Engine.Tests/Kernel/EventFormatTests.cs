@@ -343,9 +343,9 @@ public class EventFormatTests
         },
         {
             "game-deleted",
-            new GameDeleted(Guid.Parse("20000000-0000-0000-0000-000000000001")),
-            1,
-            """{"gameId":"20000000-0000-0000-0000-000000000001"}"""
+            new GameDeleted(Guid.Parse("20000000-0000-0000-0000-000000000001"), "Дубль «Dice Fold»"),
+            2,
+            """{"gameId":"20000000-0000-0000-0000-000000000001","reason":"Дубль «Dice Fold»"}"""
         },
         {
             "game-restored",
@@ -645,6 +645,15 @@ public class EventFormatTests
         Assert.Equal(
             new Engine.Files.FileStored(Guid.Parse("50000000-0000-0000-0000-000000000001"), s_user, "image/gif", 900, 20, 20, 3, Engine.Files.FileKind.Upload),
             EventCodec.Decode(v1));
+    }
+
+    [Fact]
+    public void Game_deleted_v1_reads_with_no_reason()
+    {
+        // The frozen v1 of game-deleted (before D-208): a deletion needed no reason
+        var v1 = new StoredEvent("game-deleted", 1, """{"gameId":"20000000-0000-0000-0000-000000000001"}""");
+
+        Assert.Equal(new GameDeleted(Guid.Parse("20000000-0000-0000-0000-000000000001"), null), EventCodec.Decode(v1));
     }
 
     [Fact]

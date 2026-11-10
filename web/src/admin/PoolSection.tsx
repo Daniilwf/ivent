@@ -1,10 +1,10 @@
 import { Dices, Library, Plus } from 'lucide-react';
-import { useCallback, useDeferredValue, useState, type SyntheticEvent } from 'react';
+import { useCallback, useDeferredValue, useRef, useState, type SyntheticEvent } from 'react';
 import { api, type Schemas } from '../api/client';
 import { ru } from '../i18n/ru';
 import { Button } from '../ui/Button';
 import { ConfirmDanger } from '../ui/Dialogs';
-import { Checkbox, Field } from '../ui/Field';
+import { Checkbox, Field, TextArea } from '../ui/Field';
 import { EmptyState, Notice } from '../ui/States';
 import { Panel } from '../ui/Surface';
 import { refusal } from './actions';
@@ -19,6 +19,9 @@ const t = ru.admin.pool;
 
 type Game = Schemas['PoolGameView'];
 type Message = { tone: 'success' | 'danger'; text: string } | null;
+
+/** A deletion's reason: PoolRules.MaxDeletionReasonLength on the server (D-208) */
+const maxReason = 500;
 
 /** A category weight typed by the admin: a whole number 1–1000 */
 function parseWeight(text: string): number | null {
@@ -433,22 +436,49 @@ function GameRow({
   const [editing, setEditing] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
+  // D-208: a deletion says why; a refusal stays in the window, like the undo's
+  const [reason, setReason] = useState('');
+  const [reasonError, setReasonError] = useState<string>();
+  const [deleteRefusal, setDeleteRefusal] = useState<string>();
+  const reasonField = useRef<HTMLTextAreaElement>(null);
 
-  async function act(action: 'delete' | 'restore') {
+  async function remove() {
+    const text = reason.trim();
+    // The field holds at most maxReason characters: only an empty reason is left to tell
+    const problem = text === '' ? t.deleteReasonRequired : undefined;
+    setReasonError(problem);
+    if (problem) {
+      reasonField.current?.focus();
+      return;
+    }
+    setBusy(true);
+    setDeleteRefusal(undefined);
+    try {
+      const answer = await api.POST('/api/admin/pool/{gameId}/delete', {
+        params: { path: { gameId: game.id } },
+        body: { commandId: newCommandId(), reason: text },
+      });
+      if (answer.data) {
+        setConfirming(false);
+        onDone(t.deletedOk(game.title));
+      } else setDeleteRefusal(refusal(answer));
+    } catch {
+      setDeleteRefusal(ru.admin.failed);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function restore() {
     setBusy(true);
     try {
-      const params = { path: { gameId: game.id } };
-      const body = { commandId: newCommandId() };
-      const answer =
-        action === 'delete'
-          ? await api.POST('/api/admin/pool/{gameId}/delete', { params, body })
-          : await api.POST('/api/admin/pool/{gameId}/restore', { params, body });
-      setConfirming(false);
-      if (answer.data)
-        onDone(action === 'delete' ? t.deletedOk(game.title) : t.restored(game.title));
+      const answer = await api.POST('/api/admin/pool/{gameId}/restore', {
+        params: { path: { gameId: game.id } },
+        body: { commandId: newCommandId() },
+      });
+      if (answer.data) onDone(t.restored(game.title));
       else onFailed(refusal(answer));
     } catch {
-      setConfirming(false);
       onFailed(ru.admin.failed);
     } finally {
       setBusy(false);
@@ -464,9 +494,14 @@ function GameRow({
         <p className="mr-auto font-bold">{game.title}</p>
       </div>
       <GameFacts game={game} />
+      {game.isDeleted && game.deletionReason ? (
+        <p className="max-w-prose text-ink-soft" data-testid="game-deletion-reason">
+          {t.deletionReason(game.deletionReason)}
+        </p>
+      ) : null}
       <div className="flex flex-wrap items-center gap-3">
         {game.isDeleted ? (
-          <Button loading={busy} data-testid="game-restore" onClick={() => void act('restore')}>
+          <Button loading={busy} data-testid="game-restore" onClick={() => void restore()}>
             {t.restore}
           </Button>
         ) : (
@@ -483,7 +518,14 @@ function GameRow({
             </Button>
             <ConfirmDanger
               open={confirming}
-              onOpenChange={setConfirming}
+              onOpenChange={(open) => {
+                setConfirming(open);
+                if (!open) {
+                  setReason('');
+                  setReasonError(undefined);
+                  setDeleteRefusal(undefined);
+                }
+              }}
               trigger={
                 <Button variant="dangerLink" data-testid="game-delete">
                   {t.delete}
@@ -493,8 +535,25 @@ function GameRow({
               consequences={t.deleteConsequences}
               confirm={t.deleteConfirm}
               busy={busy}
-              onConfirm={() => void act('delete')}
-            />
+              onConfirm={() => void remove()}
+            >
+              <TextArea
+                ref={reasonField}
+                required
+                label={t.deleteReason}
+                hint={t.deleteReasonHint}
+                rows={2}
+                maxLength={maxReason}
+                value={reason}
+                error={reasonError}
+                data-testid="game-delete-reason"
+                onChange={(e) => {
+                  setReason(e.target.value);
+                  setReasonError(undefined);
+                }}
+              />
+              {deleteRefusal ? <Notice tone="danger">{deleteRefusal}</Notice> : null}
+            </ConfirmDanger>
           </>
         )}
       </div>

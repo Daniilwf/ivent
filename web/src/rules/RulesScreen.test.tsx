@@ -65,6 +65,57 @@ describe('the rules page', () => {
     );
   });
 
+  it('says what counts as a completion in its own section with its anchor (D-207)', async () => {
+    serve(() => json(200, demoRules));
+    renderRules();
+
+    await screen.findByText(t.version(3));
+    const completion = section(t.sections.completion);
+    expect(completion).toHaveAttribute('id', 'rules-completion');
+    expect(completion).toHaveTextContent(t.completion.lead);
+    const steps = within(completion).getAllByRole('listitem');
+    expect(steps.map((li) => li.querySelector('strong')?.textContent)).toEqual([
+      'Концовка.',
+      'Зацикленные уровни.',
+      'Весь контент.',
+      'Победа над компьютером.',
+      'Рекорд очков.',
+    ]);
+    expect(steps[0]).toHaveTextContent(
+      'Истинная, секретная или «хорошая» концовка не нужна, если её не требует челлендж.',
+    );
+    expect(completion).toHaveTextContent('Если сомневаешься — спроси админа до того, как начнёшь.');
+    expect(completion).toHaveTextContent('Что показать в пруфе: кадр того, чем закончилось');
+    const contents = screen.getByRole('navigation', { name: t.contents });
+    expect(within(contents).getByRole('link', { name: t.sections.completion })).toHaveAttribute(
+      'href',
+      '#rules-completion',
+    );
+  });
+
+  it('shows the section a link led to once the rules are here', async () => {
+    // jsdom has no scrolling: the page's call is caught here
+    const scroll = vi.fn();
+    Object.defineProperty(Element.prototype, 'scrollIntoView', {
+      value: scroll,
+      configurable: true,
+    });
+    globalThis.history.replaceState(null, '', '/rules#rules-completion');
+    try {
+      serve(() => json(200, demoRules));
+      renderRules();
+
+      await screen.findByText(t.version(3));
+      await waitFor(() => {
+        expect(scroll).toHaveBeenCalledTimes(1);
+      });
+      expect(scroll.mock.contexts[0]).toBe(section(t.sections.completion));
+    } finally {
+      Reflect.deleteProperty(Element.prototype, 'scrollIntoView');
+      globalThis.history.replaceState(null, '', '/');
+    }
+  });
+
   it('gives the real numbers: dice by difficulty, drop penalty, bonuses, the unchecked limit', async () => {
     serve(() => json(200, demoRules));
     renderRules();

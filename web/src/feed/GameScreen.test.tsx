@@ -24,6 +24,7 @@ const card: Schemas['PoolGameView'] = {
   author: null,
   isDeleted: false,
   completionCondition: 'Любая концовка',
+  deletionReason: null,
 };
 
 const run = (over: Partial<Schemas['GameRunView']>): Schemas['GameRunView'] => ({

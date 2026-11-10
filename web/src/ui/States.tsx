@@ -32,8 +32,8 @@ export function Notice({ tone, children }: { tone: Tone; children: ReactNode }) 
         tones[tone].box,
       )}
     >
-      {tones[tone].icon}
-      <span className="text-ink">{children}</span>
+      <span className="shrink-0">{tones[tone].icon}</span>
+      <span className="min-w-0 text-ink wrap-anywhere">{children}</span>
     </p>
   );
 }

@@ -23,6 +23,7 @@ function game(
     author: null,
     isDeleted: false,
     completionCondition: null,
+    deletionReason: null,
     ...more,
   };
 }

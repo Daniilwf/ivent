@@ -98,7 +98,7 @@ public sealed class FeedVisibilityTests : IAsyncLifetime
         await PostOkAsync(vasya, Url($"runs/{run}/review"), new { commandId = Guid.NewGuid(), rating = 7 });
         var gameId = (await JsonAsync(await vasya.GetAsync($"/api/seasons/{SiteFactory.SeasonId}", Ct))).GetProperty("me").GetProperty("lastCompleted").GetProperty("game").GetProperty("id").GetGuid();
         var admin = await _site.SignedInAsync("admin");
-        await PostOkAsync(admin, $"/api/admin/pool/{gameId}/delete", new { commandId = Guid.NewGuid() });
+        await PostOkAsync(admin, $"/api/admin/pool/{gameId}/delete", new { commandId = Guid.NewGuid(), reason = "Дубль" });
 
         var seen = await JsonAsync(await (await _site.SignedInAsync("petya")).GetAsync($"/api/users/{_site.Users["vasya"]}", Ct));
         var adminSees = await JsonAsync(await admin.GetAsync($"/api/users/{_site.Users["vasya"]}", Ct));

@@ -139,7 +139,7 @@ public sealed class PoolImportTests
             hades = (await db.Games.SingleAsync(g => g.Title == "Hades", Ct)).Id;
         }
 
-        await h.SendAsync(new DeleteGame(hades), Guid.Empty);
+        await h.SendAsync(new DeleteGame(hades, "Дубль"), Guid.Empty);
         PoolImportPlan plan;
         await using (var db = h.NewDb())
         {

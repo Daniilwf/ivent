@@ -87,9 +87,18 @@ public sealed partial class CommandProcessor
                         return Reject(PoolRules.Unknown, $"Game {delete.GameId} is not in the pool.");
                     }
 
-                    return record.IsDeleted
-                        ? Reject(PoolRules.Deleted, "The game is already deleted.")
-                        : ([new GameDeleted(record.Id)], () => record.IsDeleted = true, null, null);
+                    if (record.IsDeleted)
+                    {
+                        return Reject(PoolRules.Deleted, "The game is already deleted.");
+                    }
+
+                    return PoolRules.DeletionReason(delete.Reason) is not { } reason
+                        ? Reject(PoolRules.ReasonInvalid, $"A reason is 1–{PoolRules.MaxDeletionReasonLength} characters.")
+                        : ([new GameDeleted(record.Id, reason)], () =>
+                        {
+                            record.IsDeleted = true;
+                            record.DeletionReason = reason;
+                        }, null, null);
                 }
 
             case RestoreGame restore:
@@ -108,7 +117,11 @@ public sealed partial class CommandProcessor
                     var titles = await db.Games.AsNoTracking().Where(g => g.Id != record.Id && !g.IsDeleted).Select(g => g.Title).ToListAsync(ct);
                     return titles.Any(t => PoolRules.IsSame(t, record.Title))
                         ? Reject(PoolRules.Duplicate, $"The pool already has «{record.Title}».")
-                        : ([new GameRestored(record.Id)], () => record.IsDeleted = false, null, null);
+                        : ([new GameRestored(record.Id)], () =>
+                        {
+                            record.IsDeleted = false;
+                            record.DeletionReason = null;
+                        }, null, null);
                 }
 
             case SetCategory set:
@@ -152,17 +165,24 @@ public sealed partial class CommandProcessor
         }
     }
 
-    // The same title never twice among the games in the pool; an alike one only when the author confirmed it (SPEC «Дубли»)
+    // The same title never twice among the games in the pool, nor a title the admin took out of it with a reason (D-208,
+    // D-241: only his restore brings it back); an alike one — in the pool or taken out — only when the author confirmed it
+    // (SPEC «Дубли»). A deletion without a reason (before D-208, a season import's placeholder) holds no title
     private static async Task<Rejection?> TitleProblemAsync(GameEventDbContext db, string title, Guid? self, bool force, CancellationToken ct)
     {
-        var titles = await db.Games.AsNoTracking().Where(g => !g.IsDeleted && g.Id != self).Select(g => g.Title).ToListAsync(ct);
-        if (titles.FirstOrDefault(t => PoolRules.IsSame(t, title)) is { } same)
+        var games = await db.Games.AsNoTracking().Where(g => g.Id != self && (!g.IsDeleted || g.DeletionReason != null)).Select(g => new { g.Title, g.IsDeleted, g.DeletionReason }).ToListAsync(ct);
+        if (games.FirstOrDefault(g => !g.IsDeleted && PoolRules.IsSame(g.Title, title)) is { } same)
         {
-            return new Rejection(PoolRules.Duplicate, $"The pool already has «{same}».");
+            return new Rejection(PoolRules.Duplicate, $"The pool already has «{same.Title}».");
         }
 
-        return !force && titles.Where(t => PoolRules.IsAlike(t, title)).ToList() is { Count: > 0 } alike
-            ? new Rejection(PoolRules.Similar, $"The pool has similar titles: {string.Join(", ", alike.Select(t => $"«{t}»"))}.")
+        if (games.FirstOrDefault(g => g.IsDeleted && PoolRules.IsSame(g.Title, title)) is { } removed)
+        {
+            return new Rejection(PoolRules.Removed, $"«{removed.Title}» was taken out of the pool: {removed.DeletionReason}.");
+        }
+
+        return !force && games.Where(g => PoolRules.IsAlike(g.Title, title)).ToList() is { Count: > 0 } alike
+            ? new Rejection(PoolRules.Similar, $"The pool has similar titles: {string.Join(", ", alike.Select(g => $"«{g.Title}»"))}.")
             : null;
     }
 

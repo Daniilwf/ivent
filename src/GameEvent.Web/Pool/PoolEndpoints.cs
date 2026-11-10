@@ -14,7 +14,8 @@ namespace GameEvent.Web.Pool;
 
 /// <summary>
 /// A game of the pool as everyone sees it (D-119); <c>author</c> — the name of the account that added it, or the author as
-/// the imported table names them (D-125); none for the seed.
+/// the imported table names them (D-125); none for the seed. <c>deletionReason</c> — why the admin took it out of the pool
+/// (D-208); none while it is in the pool and for games deleted before a reason was required.
 /// </summary>
 public sealed record PoolGameView(
     Guid Id,
@@ -28,13 +29,17 @@ public sealed record PoolGameView(
     bool IsCoop,
     string? Author,
     bool IsDeleted,
-    string? CompletionCondition);
+    string? CompletionCondition,
+    string? DeletionReason);
 
 /// <summary>A category of the wheel with its weight and how many games in the pool carry its tag.</summary>
 public sealed record CategoryView(string Name, int Weight, int Games);
 
-/// <summary>A game in the pool whose title is the same or alike (SPEC «Дубли»).</summary>
-public sealed record SimilarGameView(Guid Id, string Title, bool Same);
+/// <summary>
+/// A game whose title is the same or alike (SPEC «Дубли»). <c>isDeleted</c> — the admin took it out of the pool: the same
+/// title cannot be added again, and <c>deletionReason</c> says why (D-208, D-241).
+/// </summary>
+public sealed record SimilarGameView(Guid Id, string Title, bool Same, bool IsDeleted, string? DeletionReason);
 
 /// <summary>
 /// A game card from a player or the admin (D-119). <c>force</c> — add although the pool has an alike title (the site showed
@@ -54,6 +59,9 @@ public sealed record GameRequest(
     string? CompletionCondition = null);
 
 public sealed record PoolActionRequest(Guid CommandId);
+
+/// <summary>The admin takes a game out of the pool: <c>reason</c> is required (1–500 characters, D-208).</summary>
+public sealed record DeleteGameRequest(Guid CommandId, string? Reason);
 
 public sealed record CategoryRequest(Guid CommandId, int Weight);
 
@@ -101,8 +109,10 @@ public static class PoolEndpoints
         admin.MapPut("/{gameId:guid}", (Guid gameId, GameRequest request, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, CancellationToken ct) =>
                 SendCardAsync(request, user, db, bus, card => new ChangeGame(gameId, card, request.Force), gameId, ct))
             .WithPoolErrors();
-        admin.MapPost("/{gameId:guid}/delete", (Guid gameId, PoolActionRequest request, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, CancellationToken ct) =>
-                SendAsync(request.CommandId, new DeleteGame(gameId), gameId, user, db, bus, ct))
+        admin.MapPost("/{gameId:guid}/delete", (Guid gameId, DeleteGameRequest request, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, CancellationToken ct) =>
+                PoolRules.DeletionReason(request.Reason) is { } reason
+                    ? SendAsync(request.CommandId, new DeleteGame(gameId, reason), gameId, user, db, bus, ct)
+                    : Task.FromResult<IResult>(Invalid("reason", $"A reason is 1–{PoolRules.MaxDeletionReasonLength} characters.")))
             .WithPoolErrors();
         admin.MapPost("/{gameId:guid}/restore", (Guid gameId, PoolActionRequest request, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, CancellationToken ct) =>
                 SendAsync(request.CommandId, new RestoreGame(gameId), gameId, user, db, bus, ct))
@@ -152,20 +162,28 @@ public static class PoolEndpoints
         return TypedResults.Ok(views);
     }
 
-    /// <summary>What the pool already has under this title or an alike one, to warn before adding (SPEC «Дубли»).</summary>
-    private static async Task<Results<Ok<IReadOnlyList<SimilarGameView>>, ValidationProblem>> SimilarAsync(string? title, GameEventDbContext db, CancellationToken ct)
+    /// <summary>
+    /// What the pool has under this title or an alike one, to warn before adding (SPEC «Дубли»); games the admin took out of
+    /// the pool with a reason too, for whoever may add a game (D-208, D-241): a spectator adds none.
+    /// </summary>
+    private static async Task<Results<Ok<IReadOnlyList<SimilarGameView>>, ValidationProblem>> SimilarAsync(string? title, ClaimsPrincipal user, GameEventDbContext db, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(title) || title.Length > PoolRules.MaxTitleLength)
         {
             return TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["title"] = [$"A title is 1–{PoolRules.MaxTitleLength} characters."] });
         }
 
-        var games = await db.Games.AsNoTracking().Where(g => !g.IsDeleted).Select(g => new { g.Id, g.Title }).ToListAsync(ct);
+        var removedToo = user.IsInRole(nameof(Role.Player)) || user.IsInRole(nameof(Role.Admin));
+        var games = await db.Games.AsNoTracking()
+            .Where(g => !g.IsDeleted || (removedToo && g.DeletionReason != null))
+            .Select(g => new { g.Id, g.Title, g.IsDeleted, g.DeletionReason })
+            .ToListAsync(ct);
         IReadOnlyList<SimilarGameView> similar =
         [
             .. games.Where(g => PoolRules.IsSame(g.Title, title) || PoolRules.IsAlike(g.Title, title))
-                .OrderBy(g => g.Title)
-                .Select(g => new SimilarGameView(g.Id, g.Title, PoolRules.IsSame(g.Title, title))),
+                .OrderBy(g => g.IsDeleted)
+                .ThenBy(g => g.Title)
+                .Select(g => new SimilarGameView(g.Id, g.Title, PoolRules.IsSame(g.Title, title), g.IsDeleted, g.DeletionReason)),
         ];
         return TypedResults.Ok(similar);
     }
@@ -240,7 +258,8 @@ public static class PoolEndpoints
             game.IsCoop,
             (game.AuthorId is { } author ? authors.GetValueOrDefault(author) : null) ?? game.AuthorName,
             game.IsDeleted,
-            game.CompletionCondition);
+            game.CompletionCondition,
+            game.DeletionReason);
 
     private static ProblemHttpResult Rejected(string code, string detail) =>
         TypedResults.Problem(statusCode: StatusCodes.Status409Conflict, title: "The command was rejected.", detail: detail, extensions: new Dictionary<string, object?> { ["code"] = code });

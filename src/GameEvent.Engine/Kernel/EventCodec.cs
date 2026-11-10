@@ -32,6 +32,13 @@ public static class EventCodec
             data["kind"] = "upload";
             return data;
         },
+
+        // D-208: a game deleted before a reason was required has none
+        [("game-deleted", 1)] = data =>
+        {
+            data["reason"] = null;
+            return data;
+        },
     };
 
     private static JsonObject WheelOfOne(JsonObject data)

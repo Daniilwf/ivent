@@ -250,6 +250,10 @@ namespace GameEvent.Infrastructure.Database.Migrations
                     b.Property<long?>("CreatedAt")
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("DeletionReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
                     b.Property<decimal?>("Hours")
                         .HasColumnType("TEXT");
 
