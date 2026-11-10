@@ -17,6 +17,13 @@ updates:
     ignore:
       - dependency-name: 'Verify*'
         update-types: ['version-update:semver-major']
+      # The .NET packages follow the runtime's LTS line (10), not the next major (D-254)
+      - dependency-name: 'Microsoft.AspNetCore.*'
+        update-types: ['version-update:semver-major']
+      - dependency-name: 'Microsoft.EntityFrameworkCore*'
+        update-types: ['version-update:semver-major']
+      - dependency-name: 'Microsoft.Extensions.*'
+        update-types: ['version-update:semver-major']
 
   - package-ecosystem: npm
     directories: [/, /web, /e2e]
@@ -50,6 +57,11 @@ updates:
     # Node moves to the next LTS by hand (the owner's rule, 2026-09-28): a Dependabot major is often a non-LTS line
     ignore:
       - dependency-name: 'node'
+        update-types: ['version-update:semver-major']
+      # .NET stays on the LTS line of CLAUDE.md (10); 11 is not LTS, so its images never come by Dependabot (D-254)
+      - dependency-name: 'dotnet/sdk'
+        update-types: ['version-update:semver-major']
+      - dependency-name: 'dotnet/aspnet'
         update-types: ['version-update:semver-major']
 
   - package-ecosystem: docker-compose
