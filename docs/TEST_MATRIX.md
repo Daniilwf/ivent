@@ -207,7 +207,11 @@
 | SM5 | Агрегаты отчёта на двух маленьких сезонах, посчитанных руками: очки в час по длинам, дроп, финиш, профили, разрыв, зоны, развилки, счётчики (D-356) | `Report/ReportBuilderTests.*` | ✅ |
 | SM6 | Входы: часы пула свои или сгенерированные одинаково, карта включает режим графа, ошибки входов все сразу, строгие настройки, карта-пример совпадает с CONTENT.md, командная строка (D-353, D-354) | `Setup/InputsTests.*` | ✅ |
 | SM7 | SPEC «Симулятор»: очки в час по длинам игр, выгода дропа, частота финиша, разрыв активных и занятых, тысячи прогонов | прогоны `npm run simulate` в `docs/SIMULATION.md` | ✅ |
-| SM8 | SPEC «Длина карты подбирается так, чтобы до финиша доходил только самый активный и ближе к концу. Проверяется симуляцией» | `docs/SIMULATION.md` «Финиш», предложение D-358 | 🟨 ждёт решения заказчика |
+| SM8 | SPEC «Длина карты подбирается так, чтобы до финиша доходил только самый активный и ближе к концу. Проверяется симуляцией» | `docs/SIMULATION.md` «Финиш», D-358 (принято: 70), D-366 (запас на медленную проверку и реджекты) | 🟨 ждёт решения заказчика (D-366) |
+| SM9 | Дропы подряд (D-324): дропающий бот не дропает длинную игру вторым дропом подряд, даже если реджект сделал серию между планом и дропом; лимит 2 — серия до 1; без лимита — серии 2+ и штраф в пределах кубиков движка `count + серия × consecutiveExtraDice`; серия без кубиков не держит дроп (D-362) | `Play/NewRulesBehaviourTests.A_dropper_keeps_the_game_once_it_has_dropped_in_a_row`, `A_higher_limit_lets_the_streak_grow_to_it_and_no_further`, `A_bot_that_ignores_the_streak_pays_more_dice_for_each_drop_in_a_row`, `A_streak_that_adds_no_dice_does_not_hold_a_drop_back` | ✅ |
+| SM10 | Реролл по желанию (D-325): без жанров в конфиге попыток нет; с жанрами каждая подходящая игра отдаётся сразу после старта, бесплатно, без отказов движка (D-363) | `Play/NewRulesBehaviourTests.Without_wish_tags_in_the_ruleset_no_bot_tries_a_wish_reroll`, `Bots_give_up_games_of_the_wish_tags_for_free_and_only_those` | ✅ |
+| SM11 | Реджект админ-бота (D-321, D-327): снимает очки и ровно клетки хода у игрока без финиша, никогда не двигает вперёд; «Отклонить со штрафом дропа» добавляет штраф (кроме замороженного первого), очки бота сходятся; новые настройки проверяются (D-364) | `Play/NewRulesBehaviourTests.A_reject_takes_back_the_cells_its_move_gave_and_never_moves_the_token_forward`, `A_penalized_reject_adds_the_drop_penalty_and_the_books_still_balance`, `The_new_settings_are_checked` | ✅ |
+| SM12 | Отчёт: дропы по серии, оставленные из-за серии игры, реролл по желанию, реджекты (сколько, со штрафом, очки и клетки), посчитано руками (D-364) | `Report/ReportBuilderTests.Drop_streaks_wish_rerolls_and_rejects` | ✅ |
 
 ## Проверка на дыры
 
@@ -443,3 +447,10 @@
 | RG7 | Форма игры пишет «Эта игра убрана из пула: причина» и не отправляет; игра в пуле важнее удалённой; отказ сервера `pool.removed` показывает причину у названия | `PoolScreen.test.tsx` («tells a game the admin took out…», «a game in the pool wins over…», «shows the server refusal of a game taken out meanwhile…») | ✅ |
 | RG8 | Окно удаления в админке: причина обязательна, без неё запрос не уходит, отказ остаётся в окне; у удалённой игры — «Причина удаления: …» | `web/src/admin/PoolSection.test.tsx` («deletes a game after a confirmation…», «does not delete a game without a reason», «keeps a refused deletion in its window», «shows why a deleted game was taken out…») | ✅ |
 | RG9 | Формат события: `game-deleted` v2 с причиной, v1 читается без причины; архив сезона переносит причину; миграция `GameDeletionReason` расширяющая, с откатом | `src/GameEvent.Engine.Tests/Kernel/EventFormatTests.cs` («Game_deleted_v1_reads_with_no_reason», золотой образец), `src/GameEvent.Web.Tests/SeasonTransfer/SeasonTransferTests.cs` («A_deleted_games_reason_travels_with_the_pool»), `npm run test:migrations` | ✅ |
+
+## Пакет зависимостей 2026-11 (D-250…D-253)
+
+| ID | Правило | Тесты | Статус |
+| --- | --- | --- | --- |
+| DP1 | Обрезанный GIF отклоняется `file.broken` и не сохраняется, в том числе обрезанный сразу после байта 0x3B внутри данных; GIF с байтами после завершающего тоже отклоняется (DP-1, D-252) | `src/GameEvent.Web.Tests/Files/FileUploadTests.cs` («A_cut_off_gif_is_refused_and_nothing_is_kept», «A_gif_cut_off_right_after_a_byte_that_looks_like_the_trailer_is_refused», «A_gif_with_bytes_after_its_trailer_is_refused») | ✅ |
+| DP2 | Наклейка игрока в истории игры и в профиле окрашена токеном фишки сезона (D-251) | `web/src/feed/GameScreen.test.tsx`, `web/src/feed/ProfileScreen.test.tsx` | ✅ |

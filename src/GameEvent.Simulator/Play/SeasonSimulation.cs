@@ -2,6 +2,7 @@ using GameEvent.Engine.Finish;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Map;
 using GameEvent.Engine.Players;
+using GameEvent.Engine.Pool;
 using GameEvent.Engine.Proofs;
 using GameEvent.Engine.Ranking;
 using GameEvent.Engine.Rolls;
@@ -50,6 +51,7 @@ public sealed class SeasonSimulation
     private readonly List<BranchOutcome> _branches = [];
     private readonly SortedDictionary<string, int> _rejections = new(StringComparer.Ordinal);
     private readonly double[] _difficultyWeights;
+    private readonly Dictionary<Guid, Game> _games;
     private IReadOnlyDictionary<string, int>? _cellsToFinish;
     private SeasonState _state = SeasonState.Empty;
     private long _seq;
@@ -73,6 +75,7 @@ public sealed class SeasonSimulation
         _context = new EngineContext(_clock, new SimRandom(SimRandom.Mix(seed, 1)), new SimIds(0x51300000), inputs.Pool);
         var weights = inputs.Settings.Behaviour.Difficulty;
         _difficultyWeights = [.. s_difficulties.Select(d => weights.TryGetValue(d.ToString().ToLowerInvariant(), out var w) ? w : 0)];
+        _games = inputs.Pool.Games.ToDictionary(g => g.Id);
     }
 
     private enum WakeKind
@@ -389,13 +392,25 @@ public sealed class SeasonSimulation
         var need = Math.Max(0.1, _bots.LogNormal(hours, behaviour.PlayTimeNoise));
         var minPlay = _state.Rules.Roll.MinPlayMinutesBeforeDrop / 60.0;
         var plan = new RunPlan(run.RunId, need);
-        if (run.Snapshot.TechRerollWindowHours > 0 && _bots.Chance(behaviour.TechRerollChance))
+        var longGame = bot.Dropper && hours > behaviour.DropAboveHours && minPlay < need;
+        if (_runs[run.RunId].WishListed && run.Snapshot.TechRerollWindowHours > 0 && _bots.Chance(behaviour.WishRerollChance))
+        {
+            // Right after the start: no wish reroll before it (D-325), and the window counts from the roll
+            plan.Act(PlanAction.WishReroll, 0);
+        }
+        else if (run.Snapshot.TechRerollWindowHours > 0 && _bots.Chance(behaviour.TechRerollChance))
         {
             plan.Act(PlanAction.TechReroll, Math.Min(behaviour.TechRerollAfterHours, need));
         }
-        else if (bot.Dropper && hours > behaviour.DropAboveHours && minPlay < need)
+        else if (longGame && !StreakAllowsDrop(run))
+        {
+            // Another drop in a row costs more dice (D-324): the bot keeps the game (D-362)
+            bot.KeptForStreak++;
+        }
+        else if (longGame)
         {
             plan.Act(PlanAction.Drop, minPlay);
+            plan.ForLength = true;
         }
         else if (_bots.Chance(behaviour.RandomDropChance))
         {
@@ -410,6 +425,12 @@ public sealed class SeasonSimulation
 
         return plan;
     }
+
+    // The bot's limit of drops in a row (D-362); null — it ignores the streak, and a streak that adds no dice costs nothing
+    private bool StreakAllowsDrop(RunState run) =>
+        _inputs.Settings.Behaviour.DropStreakLimit is not { } limit
+        || _state.Rules.Drop.ConsecutiveExtraDice is null or 0
+        || DropStreak.Before(_state, run) < limit;
 
     // The planned end of the run. False — the engine refused it; the bot tries again next session.
     private bool Act(Bot bot, RunPlan plan)
@@ -428,6 +449,16 @@ public sealed class SeasonSimulation
                 return true;
 
             case PlanAction.Drop:
+                var run = _state.Runs[plan.RunId];
+                if (plan.ForLength && !StreakAllowsDrop(run))
+                {
+                    // A reject since the plan made the drops around it a streak: the bot keeps the game after all
+                    bot.KeptForStreak++;
+                    plan.Act(PlanAction.Complete, plan.Need);
+                    return true;
+                }
+
+                _runs[plan.RunId].DropStreak = DropStreak.Before(_state, run);
                 if (!Execute(new DropRun(bot.PlayerId), bot).IsAccepted)
                 {
                     return false;
@@ -446,6 +477,17 @@ public sealed class SeasonSimulation
                 }
 
                 // Past the window only the admin could: the bot plays on to the end
+                plan.Act(PlanAction.Complete, plan.Need);
+                return true;
+
+            case PlanAction.WishReroll:
+                if (Execute(new TechReroll(bot.PlayerId, TechRerollReason.Wish, Comment: null), bot).IsAccepted)
+                {
+                    bot.Plan = null;
+                    bot.RerollRefused = false;
+                    return true;
+                }
+
                 plan.Act(PlanAction.Complete, plan.Need);
                 return true;
 
@@ -529,7 +571,13 @@ public sealed class SeasonSimulation
 
             if (_bots.Chance(admin.RejectChance))
             {
-                Execute(new RejectProof(runId, "Пруф не подтверждает прохождение"), bot: null);
+                // The engine takes back all the move gave (D-321, D-327); the simulator only notes what it saw
+                const string Comment = "Пруф не подтверждает прохождение";
+                _runs[runId].RejectedAfterFinish = _state.Players[run.PlayerId].Finish is not null;
+                _runs[runId].RejectedWhileFrozen = _state.Players[run.PlayerId].Finish?.Frozen == true;
+                Execute(
+                    _bots.Chance(admin.PenalizedRejectShare) ? new RejectProofWithDropPenalty(runId, Comment) : new RejectProof(runId, Comment),
+                    bot: null);
             }
             else
             {
@@ -570,7 +618,10 @@ public sealed class SeasonSimulation
         switch (e)
         {
             case RunStarted started:
-                var record = new RunRecord(_byPlayer[started.PlayerId].Index, (double)(started.Snapshot.Hours ?? 0), started.Snapshot.Zone?.Id);
+                var record = new RunRecord(_byPlayer[started.PlayerId].Index, (double)(started.Snapshot.Hours ?? 0), started.Snapshot.Zone?.Id)
+                {
+                    WishListed = WishRerolls.Allowed(started.Snapshot, _games.GetValueOrDefault(started.GameId)),
+                };
                 _runs[started.RunId] = record;
                 _runOrder.Add(record);
                 break;
@@ -583,9 +634,17 @@ public sealed class SeasonSimulation
                 _runs[dropped.RunId].End = RunEnd.Dropped;
                 _byPlayer[dropped.PlayerId].Drops++;
                 break;
+            case RunTechRerolled { Reason: TechRerollReason.Wish } wish:
+                _runs[wish.RunId].End = RunEnd.WishRerolled;
+                _byPlayer[wish.PlayerId].WishRerolls++;
+                break;
             case RunTechRerolled tech:
                 _runs[tech.RunId].End = RunEnd.TechRerolled;
                 _byPlayer[tech.PlayerId].TechRerolls++;
+                break;
+            case ProofRejectPenalized penalized:
+                _runs[penalized.RunId].PenalizedReject = true;
+                _byPlayer[penalized.PlayerId].PenalizedRejects++;
                 break;
             case ProofRejected rejected:
                 _runs[rejected.RunId].End = RunEnd.Rejected;
@@ -603,6 +662,7 @@ public sealed class SeasonSimulation
                 // so the rest of the change is the cell bonus (revisit if corrections come into the simulation)
                 var ofRun = -_runs[run].Points;
                 _runs[run].Points += ofRun;
+                _runs[run].RejectTaken -= points.Delta;
                 _byPlayer[points.PlayerId].CellBonus += points.Delta - ofRun;
                 break;
             case PointsChanged { Reason: PointsReason.CellBonus } points:
@@ -613,6 +673,12 @@ public sealed class SeasonSimulation
                 break;
             case PointsChanged points:
                 _byPlayer[points.PlayerId].OtherPoints += points.Delta;
+                break;
+            case PlayerMoved { Reason: MoveReason.CompletionRoll, RunId: { } run } moved:
+                _runs[run].MoveCells += moved.Steps;
+                break;
+            case PlayerMoved { Reason: MoveReason.ProofRejected, RunId: { } run } moved:
+                _runs[run].RejectCells -= moved.Steps;
                 break;
             case PlayerMoved { Reason: MoveReason.Teleport } moved:
                 _byPlayer[moved.PlayerId].Teleports++;
@@ -689,7 +755,10 @@ public sealed class SeasonSimulation
                 b.CellBonus,
                 b.FinishBonus,
                 b.OtherPoints,
-                b.Teleports);
+                b.Teleports,
+                b.WishRerolls,
+                b.KeptForStreak,
+                b.PenalizedRejects);
         }).ToList();
 
         var first = _players.FirstOrDefault(b => byPlayer[b.PlayerId].IsFirst);
@@ -697,7 +766,9 @@ public sealed class SeasonSimulation
             _index,
             _seed,
             bots,
-            [.. _runOrder.Select(r => new RunOutcome(r.Bot, r.Hours, r.PlayHours, r.End, r.Points, r.Penalty, r.Zone, r.FreeMode))],
+            [.. _runOrder.Select(r => new RunOutcome(
+                r.Bot, r.Hours, r.PlayHours, r.End, r.Points, r.Penalty, r.Zone, r.FreeMode, r.DropStreak, r.WishListed, r.MoveCells,
+                r.RejectCells, r.RejectedAfterFinish, r.PenalizedReject, r.RejectTaken, r.RejectedWhileFrozen))],
             [.. _branches],
             first?.FinishedDay,
             first?.FrozenDay,
@@ -728,6 +799,7 @@ public sealed class SeasonSimulation
         Complete,
         Drop,
         TechReroll,
+        WishReroll,
     }
 
     private sealed class RunPlan(Guid runId, double need)
@@ -741,6 +813,9 @@ public sealed class SeasonSimulation
         public double ActAt { get; private set; } = need;
 
         public double Played { get; set; }
+
+        /// <summary>A dropper's drop of a long game (not a random one): it looks at the streak (D-362).</summary>
+        public bool ForLength { get; set; }
 
         public void Act(PlanAction action, double at)
         {
@@ -766,6 +841,22 @@ public sealed class SeasonSimulation
         public int Penalty { get; set; }
 
         public bool FreeMode { get; set; }
+
+        public int? DropStreak { get; set; }
+
+        public bool WishListed { get; init; }
+
+        public int MoveCells { get; set; }
+
+        public int RejectCells { get; set; }
+
+        public bool RejectedAfterFinish { get; set; }
+
+        public bool RejectedWhileFrozen { get; set; }
+
+        public bool PenalizedReject { get; set; }
+
+        public int RejectTaken { get; set; }
     }
 
     private sealed class Bot(int index, Guid playerId, string profile, bool dropper, BranchPolicy branchPolicy, List<Session> sessions)
@@ -819,6 +910,12 @@ public sealed class SeasonSimulation
         public int OtherPoints { get; set; }
 
         public int Teleports { get; set; }
+
+        public int WishRerolls { get; set; }
+
+        public int KeptForStreak { get; set; }
+
+        public int PenalizedRejects { get; set; }
 
         public double? FinishedDay { get; set; }
 

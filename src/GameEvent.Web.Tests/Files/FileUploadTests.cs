@@ -180,6 +180,34 @@ public sealed class FileUploadTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_gif_cut_off_right_after_a_byte_that_looks_like_the_trailer_is_refused()
+    {
+        // libvips reads the frames a cut-off GIF still has without a word (DP-1): the last byte alone proves nothing,
+        // a cut inside the picture data can end on 0x3B as well
+        var vasya = await _site.SignedInAsync("vasya");
+        var gif = AnimatedGif(64, 64, frames: 6, noise: true);
+        var cut = Enumerable.Range(gif.Length / 3, gif.Length / 2).First(i => gif[i] == 0x3B) + 1;
+
+        var response = await UploadAsync(vasya, gif[..cut], "cut.gif");
+
+        await AssertRefusedAsync(response, HttpStatusCode.UnprocessableEntity, "file.broken");
+        Assert.Empty(StoredFiles());
+    }
+
+    [Fact]
+    public async Task A_gif_with_bytes_after_its_trailer_is_refused()
+    {
+        // A whole GIF ends where its trailer is: anything glued on after it is not a picture
+        var vasya = await _site.SignedInAsync("vasya");
+        var gif = AnimatedGif(40, 30, frames: 3);
+
+        var response = await UploadAsync(vasya, [.. gif, .. "<script>alert(1)</script>;"u8], "tail.gif");
+
+        await AssertRefusedAsync(response, HttpStatusCode.UnprocessableEntity, "file.broken");
+        Assert.Empty(StoredFiles());
+    }
+
+    [Fact]
     public async Task An_interlaced_png_or_a_progressive_jpeg_has_a_lower_pixel_limit()
     {
         using var strict = _site.WithWebHostBuilder(b => b.UseSetting("Files:MaxInterlacedPixels", "10000"));

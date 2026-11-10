@@ -9,7 +9,8 @@ namespace GameEvent.Simulator.Tests.Report;
 /// <summary>
 /// SM5: the report's aggregates on two tiny seasons, every number checked by hand. Season 0: the active dropper finishes
 /// first; season 1: the busy keeper wins on points, the active one has a run unfinished at the deadline and a tech
-/// reroll, the busy one a run in the first's free mode (no points: left out of the points per hour).
+/// reroll, the busy one a run in the first's free mode (no points: left out of the points per hour). SM12: drop streaks,
+/// wish rerolls and rejects on two more seasons.
 /// </summary>
 public class ReportBuilderTests
 {
@@ -131,6 +132,42 @@ public class ReportBuilderTests
         var counts = s_report.Counts;
         Assert.Equal((3, 2.5, 0.5), (counts.CompletedPerSeason, counts.CommandsPerSeason, counts.RejectionsPerSeason["roll.tooManyUnchecked"]));
         Assert.Equal((0.5, 1, 0.5), (counts.UnfinishedAtDeadlinePerSeason, counts.UnfinishedHoursPerSeason, counts.BlockedHoursPerSeason));
+    }
+
+    [Fact]
+    public void Drop_streaks_wish_rerolls_and_rejects()
+    {
+        // Two seasons: drops after 0, 1 and 3 drops in a row (penalties 4, 7, 12), a kept long game, two wish rerolls,
+        // three rejects — one with the drop penalty 6 — taking 5, 9 and 4 points and 3, 0 and 6 cells
+        var inputs = SimulationInputs.Create(RulesetJson.Default(), null, Pool(), s_settings, "ruleset", null, "pool");
+        SeasonOutcome Season(int index, BotOutcome bot, RunOutcome[] runs) =>
+            new(index, 1, [bot, Bot(1, "busy", false, 0, 2, false, null, 0, 0, 1)], runs, [], null, null, new Dictionary<string, int>(), 0, 0, 0, 0);
+        var seasons = new[]
+        {
+            Season(0, Bot(0, "active", true, 0, 1, false, null, 0, 2, 10) with { KeptForStreak = 1, WishRerolls = 2 }, [
+                new RunOutcome(0, 20, 1, RunEnd.Dropped, 0, 4, null, false, DropStreak: 0),
+                new RunOutcome(0, 20, 1, RunEnd.Dropped, 0, 7, null, false, DropStreak: 1),
+                new RunOutcome(0, 3, 0, RunEnd.WishRerolled, 0, 0, null, false, WishListed: true),
+                new RunOutcome(0, 3, 0, RunEnd.WishRerolled, 0, 0, null, false, WishListed: true),
+                new RunOutcome(0, 3, 3, RunEnd.Rejected, 0, 0, null, false, MoveCells: 3, RejectCells: 3, RejectTaken: 5),
+            ]),
+            Season(1, Bot(0, "active", true, 0, 1, false, null, 0, 1, 10) with { PenalizedRejects = 1 }, [
+                new RunOutcome(0, 20, 1, RunEnd.Dropped, 0, 12, null, false, DropStreak: 3),
+                new RunOutcome(0, 3, 3, RunEnd.Rejected, 0, 0, null, false, RejectedAfterFinish: true, RejectTaken: 9),
+                new RunOutcome(0, 9, 9, RunEnd.Rejected, 0, 6, null, false, MoveCells: 6, RejectCells: 6, PenalizedReject: true, RejectTaken: 4),
+            ]),
+        };
+
+        var report = ReportBuilder.Build(inputs, 21, 1, seasons);
+
+        Assert.Equal(
+            [("0", 0.5, 4.0), ("1", 0.5, 7.0), ("2+", 0.5, 12.0)],
+            report.Drops.ByStreak.Select(s => (s.Streak, s.DropsPerSeason, s.MeanPenalty)));
+        Assert.Equal(0.5, report.Drops.KeptForStreakPerSeason);
+        var c = report.Counts;
+        Assert.Equal((1, 1.5, 0.5), (c.WishRerollsPerSeason, c.RejectsPerSeason, c.PenalizedRejectsPerSeason));
+        Assert.Equal((6, 3, 6), (c.MeanPointsPerReject, c.MeanCellsPerReject, c.MeanPenaltyPerPenalizedReject));
+        Assert.Contains("Рероллов по желанию 1,0. Реджектов 1,5, из них со штрафом дропа 0,5", MarkdownReport.Render(report), StringComparison.Ordinal);
     }
 
     private static PoolFile Pool() =>

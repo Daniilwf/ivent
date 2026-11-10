@@ -139,8 +139,8 @@ public static class ImageProcessor
 
     private static (ProcessedFile?, Rejection?) Gif(byte[] input, FileLimits limits)
     {
-        // libvips reads the frames a cut-off GIF still has without a word; a whole GIF ends with its trailer byte
-        if (input[^1] != 0x3B)
+        // libvips reads the frames a cut-off GIF still has without a word (DP-1): the blocks are walked to the trailer first
+        if (!IsWholeGif(input))
         {
             return (null, new Rejection(Broken, "The picture cannot be read."));
         }
@@ -174,6 +174,68 @@ public static class ImageProcessor
         using var thumbnail = Image.ThumbnailBuffer(
             input, limits.ThumbnailSize, optionString: "[n=-1]", height: limits.ThumbnailSize, size: Enums.Size.Down, failOn: Enums.FailOn.Error);
         return (new ProcessedFile(FileNames.Gif, input, thumbnail.GifsaveBuffer(keep: Enums.ForeignKeep.None), width, height, frames), null);
+    }
+
+    /// <summary>
+    /// Walks the blocks of a GIF (the GIF89a layout): the screen descriptor with its colour table, then extensions and frames,
+    /// each a chain of sub-blocks closed by an empty one. The file is whole only when the walk reaches the trailer and the
+    /// trailer is its last byte: a cut anywhere, even on a byte that looks like the trailer, or anything glued on after it fails.
+    /// </summary>
+    private static bool IsWholeGif(ReadOnlySpan<byte> gif)
+    {
+        const int Header = 6;
+        const int ScreenDescriptor = 7;
+        const int ImageDescriptor = 9;
+        var at = Header + ScreenDescriptor;
+        if (gif.Length < at)
+        {
+            return false;
+        }
+
+        at += ColourTableLength(gif[Header + 4]);
+        while (at < gif.Length)
+        {
+            switch (gif[at])
+            {
+                case 0x3B:
+                    return at == gif.Length - 1;
+                case 0x21:
+                    // The introducer and the label, then the sub-blocks
+                    at = SkipSubBlocks(gif, at + 2);
+                    break;
+                case 0x2C:
+                    if (at + 1 + ImageDescriptor > gif.Length)
+                    {
+                        return false;
+                    }
+
+                    // The descriptor, the local colour table, the LZW code size, then the sub-blocks of the picture
+                    at = SkipSubBlocks(gif, at + 1 + ImageDescriptor + ColourTableLength(gif[at + ImageDescriptor]) + 1);
+                    break;
+                default:
+                    return false;
+            }
+        }
+
+        return false;
+
+        static int ColourTableLength(byte packed) => (packed & 0x80) == 0 ? 0 : 3 << ((packed & 0x07) + 1);
+
+        // The position after the empty sub-block, or past the end when the chain is cut off
+        static int SkipSubBlocks(ReadOnlySpan<byte> gif, int at)
+        {
+            while (at < gif.Length)
+            {
+                var size = gif[at];
+                at += 1 + size;
+                if (size == 0)
+                {
+                    return at;
+                }
+            }
+
+            return int.MaxValue;
+        }
     }
 
     /// <summary>The decoder libvips picked must be the one the first bytes promised: no polyglot file slips through.</summary>
