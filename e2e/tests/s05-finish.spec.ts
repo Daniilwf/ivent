@@ -6,6 +6,7 @@ import {
   completeHere,
   confirmButton,
   leaderRow,
+  live,
   openAdmin,
   rollAndStart,
   rollAndStartHere,
@@ -50,6 +51,10 @@ test('finish: provisional first, a second with the bonus, the first rejected, th
   const vasyaRun = view.me?.lastCompleted;
   if (!vasyaRun) throw new Error('No finishing run.');
   expect(view.me?.finish).toEqual({ order: 1, frozen: false });
+  // D-260: his turn card says where he stands — the first, provisionally — and the season goes on for him
+  const vasyaFinish = vasyaPage.getByTestId('my-finish');
+  await expect(vasyaFinish).toContainText('Первое место — твоё, пока предварительно');
+  await expect(vasyaPage.getByTestId('roll')).toBeEnabled();
 
   // Petya finishes second: the bonus of the second place on top of his dice
   await finishSoon(world, petya.login);
@@ -61,6 +66,10 @@ test('finish: provisional first, a second with the bonus, the first rejected, th
   const petyaRun = view.me?.lastCompleted;
   if (!petyaRun) throw new Error('No finishing run.');
   expect(view.me?.finish?.order).toBe(2);
+  // A later finisher's card: the bonus taken, the token stays, the points still grow
+  const petyaFinish = petyaPage.getByTestId('my-finish');
+  await expect(petyaFinish).toContainText('бонус за финиш получен');
+  await expect(petyaFinish).toContainText('кубы за прохождения ещё дают очки');
   const petyaPoints = petyaRun.total + secondBonus;
   await expect(leaderRow(petyaPage, petya.playerId)).toContainText(
     `Петя: ${String(petyaPoints)} очк., на финише`,
@@ -85,6 +94,9 @@ test('finish: provisional first, a second with the bonus, the first rejected, th
   await expect(leaderRow(vasyaPage, vasya.playerId)).toContainText('2. Вася: 0 очк., до финиша');
   view = await seasonOf(vasyaApi, world.seasonId);
   expect(view.me?.finish).toBeNull();
+  await expect(vasyaFinish).toHaveCount(0);
+  // The second to finish holds the first place now, provisionally: his card says so (the order of finishing stays 2)
+  await expect(petyaFinish).toContainText('Первое место — твоё, пока предварительно', live);
 
   // The admin approves Petya's run: the first place is final, Petya is frozen
   const petyaCard = admin.getByTestId(`proof-${petyaRun.id}`);
@@ -98,6 +110,8 @@ test('finish: provisional first, a second with the bonus, the first rejected, th
   view = await seasonOf(petyaApi, world.seasonId);
   // The order of finishing is never reused (D-99): he finished second, he holds the first place now
   expect(view.me?.finish).toEqual({ order: 2, frozen: true });
+  // His card follows the approval: the first place is his, the points frozen, he plays on without counting
+  await expect(petyaFinish).toContainText('Первое место — твоё. Очки заморожены', live);
 
   // Frozen: another game completed in free mode gives no points and does not move the token
   await rollAndStart(petyaApi, world.seasonId);

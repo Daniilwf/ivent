@@ -12,7 +12,9 @@ import { Notice } from '../ui/States';
  * Drop and tech reroll of the active run (D-94), quiet and apart from completing. A drop is confirmed in a window that
  * lists what it costs under the rules in force (`dropPenalty`); while the server says it is early, the window also
  * hints to wait (RR4: only a hint). A tech reroll opens a window with what it does, one of the reasons and a comment
- * («other» needs one); once the window of time has closed the player is sent to the admin.
+ * («other» needs one); once the window of time has closed the player is sent to the admin. While the server says a wish
+ * reroll is open (D-325, D-261: a game of a genre the season lists, within the tech reroll window), «Реролл по желанию»
+ * stands next to it: a window says what it does, a yes sends the tech reroll with the reason «wish».
  */
 export function RunActions({
   game,
@@ -20,6 +22,8 @@ export function RunActions({
   dropPenalty,
   techRerollOpen,
   techRerollUntil = null,
+  wishRerollOpen = false,
+  onWishReroll,
   frozen = false,
   pending,
   onDrop,
@@ -27,6 +31,9 @@ export function RunActions({
 }: {
   /** When the player's own tech reroll window closes (UTC), if the server says */
   techRerollUntil?: string | null;
+  /** Whether a wish reroll is open now (the server says; an older server does not) */
+  wishRerollOpen?: boolean;
+  onWishReroll?: () => void;
   /** The frozen first: a drop costs nothing (D-99) */
   frozen?: boolean;
   game: string;
@@ -39,6 +46,8 @@ export function RunActions({
 }) {
   const [dropping, setDropping] = useState(false);
   const [rerolling, setRerolling] = useState(false);
+  const [wishing, setWishing] = useState(false);
+  const wishOpener = useRef<HTMLButtonElement>(null);
   const [reason, setReason] = useState<TechRerollReason | ''>('');
   const [comment, setComment] = useState('');
   const [commentMissing, setCommentMissing] = useState(false);
@@ -90,6 +99,19 @@ export function RunActions({
             }}
           >
             {ru.turn.techReroll}
+          </Button>
+        ) : null}
+        {wishRerollOpen && onWishReroll ? (
+          <Button
+            ref={wishOpener}
+            variant="link"
+            data-testid="wish-reroll"
+            disabled={pending}
+            onClick={() => {
+              setWishing(true);
+            }}
+          >
+            {ru.turn.wishReroll}
           </Button>
         ) : null}
         <ConfirmDanger
@@ -185,6 +207,43 @@ export function RunActions({
           </div>
         </form>
       </FormDialog>
+      {onWishReroll ? (
+        <FormDialog
+          open={wishing}
+          onOpenChange={setWishing}
+          title={ru.turn.wishRerollTitle(game)}
+          description={ru.turn.wishRerollConsequences}
+          returnFocus={wishOpener}
+          testId="wish-reroll-dialog"
+        >
+          {techRerollUntil ? (
+            <p data-testid="wish-reroll-until" className="text-sm text-ink-soft">
+              {ru.turn.wishRerollUntil(moscowTime(techRerollUntil))}
+            </p>
+          ) : null}
+          <div className="grid gap-3 desk:flex desk:flex-row-reverse desk:justify-start">
+            <Button
+              variant="main"
+              data-testid="wish-reroll-confirm"
+              loading={pending}
+              onClick={() => {
+                setWishing(false);
+                onWishReroll();
+              }}
+            >
+              {ru.turn.wishRerollConfirm}
+            </Button>
+            <Button
+              data-testid="wish-reroll-cancel"
+              onClick={() => {
+                setWishing(false);
+              }}
+            >
+              {ru.turn.wishRerollCancel}
+            </Button>
+          </div>
+        </FormDialog>
+      ) : null}
     </div>
   );
 }
