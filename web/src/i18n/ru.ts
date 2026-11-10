@@ -313,6 +313,20 @@ export const ru = {
     closingTitle: 'Ждём проверку пруфов',
     closingText: 'Броски закрыты. Пруфы ещё можно дослать — итоги после проверки всех.',
     todo: (count: number) => `Сначала дела: ${count}`,
+    // The player's own finish on the turn card (D-99, D-260): the place, provisional until the proofs are checked, frozen
+    // for the first; the season goes on for them (SPEC: the first plays on without counting, the later finishers score)
+    myFinish: {
+      title: 'Ты на финише',
+      firstProvisional:
+        'Ты пришёл первым! Место предварительное: станет окончательным, когда админ проверит пруфы.',
+      firstProvisionalNext: 'Пока идёт проверка, очки за прохождения считаются как обычно.',
+      firstFrozen: 'Первое место — твоё. Очки заморожены, на других ты больше не влияешь.',
+      firstFrozenNext:
+        'Можно играть дальше без зачёта: рероллы бесплатны, твои игры не закрываются для остальных.',
+      later: (order: number) =>
+        `Ты финишировал ${order}-м: бонус за финиш получен, фишка остаётся на финише.`,
+      laterNext: 'Играй дальше: кубы за прохождения ещё дают очки, место — по очкам.',
+    },
     roll: 'Крутить колесо',
     start: 'Начать',
     alreadyPlayed: 'Уже проходил',
@@ -386,6 +400,18 @@ export const ru = {
     techRerollClosed:
       'Окно тех-реролла закрылось. Если с игрой техническая проблема, напиши админу.',
     techRerollUntil: (time: string) => `Тех-реролл сам можно сделать до ${time}.`,
+    // D-206, D-325, D-261: a free give-up of a game of a listed genre, a tech reroll with the reason «wish»
+    wishReroll: 'Реролл по желанию',
+    wishRerollTitle: (title: string) => `Реролл по желанию: «${title}»`,
+    wishRerollConsequences: [
+      'Бесплатно: очки и клетки не меняются, штрафа нет',
+      'Игра вернётся в пул — тебе она больше не выпадет в этом сезоне',
+      'Сразу новый ролл',
+      'Можно только в окне тех-реролла и только для жанров из правил сезона',
+    ],
+    wishRerollUntil: (time: string) => `Окно закроется в ${time}.`,
+    wishRerollConfirm: 'Да, реролл по желанию',
+    wishRerollCancel: 'Отмена',
     gameMark: (player: string, kind: 'dropped' | 'techRerolled') =>
       kind === 'dropped' ? `Дропнул ${player}` : `Тех-реролл у ${player}`,
     alreadyPlayedGame: (title: string) => `Уже проходил: ${title}`,
@@ -496,6 +522,10 @@ export const ru = {
   },
   shell: {
     menu: (name: string) => `Меню: ${name}`,
+    // D-359, D-263: the admin's count of runs waiting for a proof check
+    menuWaiting: (name: string, waiting: number) =>
+      `Меню: ${name}. Ждут проверки пруфов: ${waiting}`,
+    waitingShort: (waiting: number) => (waiting > 99 ? '99+' : String(waiting)),
     changePassword: 'Сменить пароль',
     noSeasonTitle: 'Сезон ещё не начался',
     noSeasonText: 'Когда админ заведёт сезон, здесь появятся карта, лидерборд и твой ход.',
@@ -1092,6 +1122,7 @@ export const ru = {
     rules: 'Правила',
     profile: 'Мой профиль',
     admin: 'Админка',
+    adminWaiting: (waiting: number) => `Админка, ждут проверки пруфов: ${waiting}`,
   },
   // H6: the pool of games (SPEC «Пул игр», «Статусы игры в сезоне», «Дубли»)
   pool: {
@@ -1667,6 +1698,29 @@ export const ru = {
         'Игра снова станет доступна для ролла',
       ],
       rejectConfirm: 'Отклонить прохождение',
+      // D-327, D-262: for obvious cheating — the reject, then the season's drop penalty on what is left
+      rejectPenalty: 'Отклонить со штрафом дропа',
+      rejectPenaltyTitle: (game: string, player: string) =>
+        `Отклонить «${game}» (${player}) со штрафом дропа?`,
+      rejectPenaltyConsequences: (penalty: DropPenalty | null): string[] => {
+        // The frozen first loses nothing (D-99)
+        if (!penalty) return ['Штрафа не будет: игрок уже первый, его очки заморожены'];
+        const takes = [
+          penalty.affectsPoints ? 'очки' : null,
+          penalty.affectsPosition ? 'клетки (не дальше чекпоинта и старта)' : null,
+        ]
+          .filter((part) => part !== null)
+          .join(' и ');
+        return [
+          takes === ''
+            ? 'Затем штраф дропа без кубов'
+            : `Затем штраф дропа: кубы ${String(penalty.count)}d${String(penalty.sides)} отнимут ${takes}`,
+          ...(penalty.badEvent ? ['И плохой ивент, как за дроп'] : []),
+          'Прохождение останется отклонённым, а не дропнутым',
+        ];
+      },
+      rejectPenaltyConfirm: 'Отклонить со штрафом',
+      rejectedPenalty: (game: string) => `Отклонено со штрафом дропа: ${game}`,
       rejectCommentHint: 'Что не так с пруфом: игрок увидит этот комментарий',
       approved: (game: string) => `Одобрено: ${game}`,
       rejected: (game: string) => `Отклонено: ${game}`,

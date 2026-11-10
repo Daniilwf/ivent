@@ -750,6 +750,8 @@ export function SeasonScreen({
         {!me && <p className="text-ink-soft">{ru.turn.spectator}</p>}
         {me && finished && <p className="text-ink-soft">{ru.turn.finishedText}</p>}
         {me && closing && <p className="text-ink-soft">{ru.turn.closingText}</p>}
+        {/* D-260: a finisher's season goes on; the card says where he stands and what his next runs give */}
+        {me?.finish && !finished ? <MyFinish finish={me.finish} /> : null}
         {/* A refusal is said at the top of the card, where the eye is after the action */}
         {message && <Notice tone="danger">{message}</Notice>}
         {/* A phone scrolls the dice into view: the completion button was low on the screen */}
@@ -859,6 +861,8 @@ export function SeasonScreen({
               dropPenalty={me.dropPenalty}
               techRerollOpen={me.techRerollOpen}
               techRerollUntil={me.techRerollUntil ?? null}
+              wishRerollOpen={me.wishRerollOpen === true}
+              onWishReroll={() => void act({ kind: 'techReroll', reason: 'wish', comment: null })}
               frozen={me.finish?.frozen === true}
               pending={pending}
               onDrop={() => void act({ kind: 'drop' })}
@@ -1059,6 +1063,42 @@ function showMe(node: HTMLDivElement | null) {
 }
 
 /** The season's first load: the same frame, grey, so nothing jumps when it comes */
+/**
+ * The player's own finish (D-99, D-260): the first is provisional until the admin approves the proofs, then frozen and
+ * playing on without counting; a later finisher's token stays on the finish while his points still grow
+ */
+function MyFinish({ finish }: { finish: Schemas['MyFinishView'] }) {
+  const t = ru.turn.myFinish;
+  const first = finish.order === 1;
+  const [main, next] = first
+    ? finish.frozen
+      ? [t.firstFrozen, t.firstFrozenNext]
+      : [t.firstProvisional, t.firstProvisionalNext]
+    : [t.later(finish.order), t.laterNext];
+  return (
+    <section
+      data-testid="my-finish"
+      aria-labelledby="my-finish-title"
+      className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-3 gap-y-1 rounded-md bg-muted p-3"
+    >
+      <span
+        aria-hidden
+        className={cx(
+          'row-span-3 grid size-10 place-items-center rounded-full border-2 border-ink',
+          first ? 'bg-gold' : 'bg-card',
+        )}
+      >
+        {first ? <Trophy size={20} /> : <Flag size={20} />}
+      </span>
+      <h3 id="my-finish-title" className="font-display font-heavy">
+        {t.title}
+      </h3>
+      <p>{main}</p>
+      <p className="text-sm text-ink-soft">{next}</p>
+    </section>
+  );
+}
+
 function SeasonSkeleton() {
   return (
     <main
