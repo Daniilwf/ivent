@@ -1,12 +1,15 @@
 using System.Text.Json;
+using GameEvent.Engine.Content;
 using GameEvent.Engine.Effects;
 using GameEvent.Engine.Kernel;
+using GameEvent.Engine.Map;
 using GameEvent.Engine.Players;
 using GameEvent.Engine.Proofs;
 using GameEvent.Engine.Rolls;
 using GameEvent.Engine.Rulesets;
 using GameEvent.Engine.Runs;
 using GameEvent.Engine.Seasons;
+using GameEvent.Engine.Turns;
 using GameEvent.Engine.Undo;
 using GameEvent.Infrastructure.Accounts;
 using GameEvent.Infrastructure.Database;
@@ -22,6 +25,10 @@ namespace GameEvent.Web.Hosting;
 /// rerolls, proofs sent, approved and rejected, reviews, manual effects resolved and waiting, an inactive player, finishes,
 /// an undo. The bots only send commands, so the log is what the engine made of them: valid by construction. The same seed
 /// gives the same season; the site's clock is moved back four weeks for the play and set right after.
+/// Stage 2 (D-270): the season plays on the graph map of content/map.demo.json — forks, a teleport forward and a snake,
+/// checkpoints, points bonuses, zones. It starts without the shortcut zone «quick»; the admin publishes the whole map in
+/// the middle of the season, while players stand on it. In the last days the players leave their branch choices
+/// waiting, so the season ends with players standing at a fork.
 /// </summary>
 public static class DemoSeed
 {
@@ -29,6 +36,14 @@ public static class DemoSeed
 
     public const int Seed = 20260926;
     public const int Days = 28;
+
+    /// <summary>The day the admin publishes the whole map (D-270); the bots' branch choices are left waiting from <see cref="BranchesWaitFrom"/>.</summary>
+    public const int MapPublishedOn = 13;
+
+    public const int BranchesWaitFrom = Days - 2;
+
+    /// <summary>The zone of the shortcut that the mid-season publication adds.</summary>
+    public const string AddedZone = "quick";
 
     private static readonly string[] s_names =
     [
@@ -87,7 +102,7 @@ public static class DemoSeed
         random?.Seed(Seed);
         try
         {
-            await new Bots(factory, bus, clock, ct).PlayAsync();
+            await new Bots(factory, bus, clock, ct).PlayAsync(DemoMap(contentRoot));
         }
         finally
         {
@@ -97,6 +112,21 @@ public static class DemoSeed
 
         await new Bots(factory, bus, clock, ct).FinishAsync(realNow.AddDays(5));
         return true;
+    }
+
+    /// <summary>
+    /// The demo map (content/map.demo.json) as the admin publishes it mid-season, and the first version the season starts
+    /// with: the same cells and arrows without the zone <see cref="AddedZone"/> and its teleport (an empty cell there).
+    /// </summary>
+    public static (MapGraph First, MapGraph Published) DemoMap(string contentRoot)
+    {
+        var published = ContentJson.Parse<MapGraph>(File.ReadAllText(Path.Combine(contentRoot, "content", "map.demo.json")));
+        var first = published with
+        {
+            Cells = [.. published.Cells.Select(c => c.Zone != AddedZone ? c : c with { Zone = null, Type = c.Type == CellType.Teleport ? CellType.Empty : c.Type, To = null })],
+            Zones = [.. published.Zones.Where(z => z.Id != AddedZone)],
+        };
+        return (first, published);
     }
 
     private sealed class Bots(IDbContextFactory<GameEventDbContext> factory, CommandBus bus, IAdjustableClock clock, CancellationToken ct)
@@ -119,8 +149,12 @@ public static class DemoSeed
             await SendAsync(new SetSeasonDeadline(deadline), _admin);
         }
 
-        public async Task PlayAsync()
+        private (MapGraph First, MapGraph Published) _map;
+        private int _day;
+
+        public async Task PlayAsync((MapGraph First, MapGraph Published) map)
         {
+            _map = map;
             List<Guid> players;
             await using (var db = await factory.CreateDbContextAsync(ct))
             {
@@ -131,7 +165,9 @@ public static class DemoSeed
                     .ToListAsync(ct);
             }
 
-            await SendAsync(new CreateSeason(SeasonId, "Демо-сезон", RulesetJson.Default()), _admin);
+            var rules = RulesetJson.Default();
+            rules = rules with { Features = rules.Features with { MapMode = MapMode.Graph } };
+            await SendAsync(new CreateSeason(SeasonId, "Демо-сезон", rules, Map: _map.First), _admin);
             for (var i = 0; i < players.Count; i++)
             {
                 await SendAsync(new AddSeasonPlayer(Guid.CreateVersion7(), players[i], s_names[i]), _admin);
@@ -142,6 +178,7 @@ public static class DemoSeed
 
             for (var day = 0; day < Days; day++)
             {
+                _day = day;
                 foreach (var userId in players.OrderBy(_ => _random.Next()))
                 {
                     // One player goes quiet in the second week: the admin marks him inactive a few days later
@@ -183,6 +220,12 @@ public static class DemoSeed
                 {
                     await TryAsync(new SubmitProof(player.Id, runId, [$"https://imgur.com/a/demo{_random.Next(100000, 999999)}"], "Титры"), userId);
                 }
+            }
+
+            // A branch left waiting (an undone choice) is chosen first; in the last days it stays for the screens to show
+            if (await ChooseBranchesAsync(player.Id, userId, _day))
+            {
+                return;
             }
 
             switch (player.Phase)
@@ -242,20 +285,60 @@ public static class DemoSeed
                     ? new CompleteRun(playerId, difficulty, Review: review)
                     : new CompleteRun(playerId, difficulty, _random.Next(2, 26), "Оценка игрока", Review: review),
                 userId);
+            if (completed)
+            {
+                await ChooseBranchesAsync(playerId, userId, _day);
+            }
+
             if (completed && _random.NextDouble() < 0.8)
             {
                 await TryAsync(new SubmitProof(playerId, run.Id, [$"https://imgur.com/a/demo{_random.Next(100000, 999999)}"], "Титры и последний босс"), userId);
             }
         }
 
+        /// <summary>
+        /// The player's own move stopped at a fork: they pick a branch — the default one more often — and the move goes on;
+        /// a second fork in the same throw asks again. From <see cref="BranchesWaitFrom"/> the choice is left waiting.
+        /// True when a choice is waiting after it.
+        /// </summary>
+        private async Task<bool> ChooseBranchesAsync(Guid playerId, Guid userId, int day)
+        {
+            for (var asked = 0; asked < 4; asked++)
+            {
+                await using var db = await factory.CreateDbContextAsync(ct);
+                var json = await db.SeasonPlayers.AsNoTracking().Where(p => p.Id == playerId).Select(p => p.ChoiceJson).SingleAsync(ct);
+                if (json is null || JsonSerializer.Deserialize<PendingChoice>(json, EngineJson.Options) is not { Kind: ChoiceKind.Branch } choice)
+                {
+                    return false;
+                }
+
+                if (day >= BranchesWaitFrom)
+                {
+                    return true;
+                }
+
+                var pick = _random.NextDouble() < 0.6 ? choice.Options[0] : choice.Options[^1];
+                await SendAsync(new MakeChoice(playerId, choice.ChoiceId, pick.Id), userId);
+            }
+
+            throw new InvalidOperationException("The demo season asked for a branch more times than the map has forks.");
+        }
+
         private async Task AdminTurnAsync(int day, Guid quiet)
         {
+            // Mid-season the admin publishes the whole map — the shortcut zone — while players stand on it (D-270)
+            if (day == MapPublishedOn)
+            {
+                await SendAsync(new PublishMap(_map.Published, "Открыта «Зона быстрых игр» с коротким путём"), _admin);
+            }
+
             await using var db = await factory.CreateDbContextAsync(ct);
             var day1 = clock.UtcNow.AddDays(-1);
             var proofs = await db.Proofs.AsNoTracking().Where(p => p.SeasonId == SeasonId && p.Status == ProofStatus.Pending && p.SubmittedAt != null).ToListAsync(ct);
             var finishers = await db.SeasonPlayers.AsNoTracking().Where(p => p.SeasonId == SeasonId && p.FinishOrder != null).Select(p => p.Id).ToListAsync(ct);
-            // The finishers' proofs are checked the same day: the first place freezes before the season ends
-            foreach (var proof in proofs.Where(p => p.SubmittedAt <= day1 || finishers.Contains(p.PlayerId)))
+            // The finishers' proofs are checked the same day: the first place freezes before the season ends. On the last
+            // evening the admin checks none: the queue has proofs waiting for the screens to show
+            foreach (var proof in proofs.Where(p => day < Days - 1 && (p.SubmittedAt <= day1 || finishers.Contains(p.PlayerId))))
             {
                 var roll = _random.NextDouble();
                 if (roll < 0.82 || finishers.Contains(proof.PlayerId))
