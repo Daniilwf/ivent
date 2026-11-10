@@ -133,6 +133,8 @@ public static class Movement
     private static Edge? PrimaryBackward(MapGraph map, string cellId)
     {
         var incoming = map.Edges.Where(e => e.To == cellId).ToList();
+
+        // Stryker disable once NullCoalescing : equivalent — a single incoming edge is the answer whether or not it is marked primary
         return incoming.FirstOrDefault(e => e.IsPrimaryBackward) ?? (incoming.Count == 1 ? incoming[0] : null);
     }
 

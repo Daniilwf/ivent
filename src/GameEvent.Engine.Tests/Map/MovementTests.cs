@@ -259,4 +259,45 @@ public class MovementTests
 
         Assert.Equal(["c2"], Movement.Backward(map, path, 1));
     }
+
+    // ---- Forward moves on maps the validator would refuse (found by mutation testing, D-282) ----
+
+    // start → a, and no arrow leads out of a
+    private static MapGraph DeadEndMap() => new(
+        [new Cell("start", CellType.Start), new Cell("a", CellType.Empty), new Cell("finish", CellType.Finish)],
+        [new Edge("start", "a", IsDefaultForward: true, IsPrimaryBackward: true)]);
+
+    [Fact]
+    public void Own_walk_and_forced_moves_stop_where_no_arrow_leads_on()
+    {
+        Assert.Equal(["a"], Movement.WalkOwn(DeadEndMap(), "start", 3).Path);
+        Assert.Equal(0, Movement.WalkOwn(DeadEndMap(), "start", 3).Remaining);
+        Assert.Equal(["a"], Movement.Forward(DeadEndMap(), "start", 3));
+        Assert.Empty(Movement.Forward(DeadEndMap(), "a", 2));
+    }
+
+    [Fact]
+    public void A_branch_that_is_not_an_exit_is_an_argument_error()
+    {
+        var error = Assert.Throws<ArgumentException>(() => Movement.WalkOwn(MergeMap(), "start", 2, branch: "x"));
+
+        Assert.Equal("branch", error.ParamName);
+        Assert.StartsWith("'x' is not a branch out of 'start'.", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_push_from_the_finish_enters_nothing()
+    {
+        Assert.Empty(Movement.Push(LinearMap.Generate(3), "finish", 2));
+    }
+
+    [Fact]
+    public void Moves_refuse_a_missing_map_path_or_move()
+    {
+        Assert.Throws<ArgumentNullException>(() => Movement.WalkOwn(null!, "start", 1));
+        Assert.Throws<ArgumentNullException>(() => Movement.Forward(null!, "start", 1));
+        Assert.Throws<ArgumentNullException>(() => Movement.Backward(null!, Path(["start"]), 1));
+        Assert.Throws<ArgumentNullException>(() => Movement.Backward(MergeMap(), null!, 1));
+        Assert.Throws<ArgumentNullException>(() => Movement.Visits(null!));
+    }
 }
