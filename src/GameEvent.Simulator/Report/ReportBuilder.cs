@@ -115,11 +115,19 @@ public static class ReportBuilder
         var rows = new List<DropRow> { Row("все", bots) };
         rows.AddRange(ProfileNames(settings).Select(p => Row(p, [.. bots.Where(b => b.Profile == p)])));
         var drops = runs.Where(r => r.End == RunEnd.Dropped).ToList();
+        StreakRow Streak(string label, Func<int, bool> of)
+        {
+            var these = drops.Where(r => of(r.DropStreak ?? 0)).ToList();
+            return new StreakRow(label, Round((double)these.Count / n), Mean(these.Select(r => (double)r.Penalty)));
+        }
+
         return new DropReport(
             rows,
             Mean(drops.Select(r => (double)r.Penalty)),
             Mean(drops.Select(r => r.PlayHours)),
-            Round((double)drops.Count / n));
+            Round((double)drops.Count / n),
+            [Streak("0", s => s == 0), Streak("1", s => s == 1), Streak("2+", s => s >= 2)],
+            Round((double)bots.Sum(b => b.KeptForStreak) / n));
     }
 
     private static FinishReport Finish(IReadOnlyList<SeasonOutcome> seasons, List<BotOutcome> bots)
@@ -228,6 +236,8 @@ public static class ReportBuilder
             .OrderBy(g => g.Key, StringComparer.Ordinal)
             .ToDictionary(g => g.Key, g => Round((double)g.Sum(x => x.Value) / n), StringComparer.Ordinal);
         var unfinished = runs.Where(r => r.End == RunEnd.Unfinished).ToList();
+        var rejected = runs.Where(r => r.End == RunEnd.Rejected).ToList();
+        var penalized = rejected.Where(r => r.PenalizedReject).ToList();
         return new CountsReport(
             Round(seasons.Average(s => s.Commands)),
             Round(seasons.Average(s => s.Events)),
@@ -242,7 +252,13 @@ public static class ReportBuilder
             Round(unfinished.Sum(r => r.PlayHours) / n),
             PerSeason(b => b.BlockedHours),
             codes,
-            seasons.Sum(s => s.GuardTrips));
+            seasons.Sum(s => s.GuardTrips),
+            PerSeason(b => b.WishRerolls),
+            Round((double)rejected.Count / n),
+            Round((double)penalized.Count / n),
+            Mean(rejected.Select(r => (double)r.RejectTaken)),
+            Mean(rejected.Select(r => (double)r.RejectCells)),
+            Mean(penalized.Select(r => (double)r.Penalty)));
     }
 
     private static BranchReport Branches(SimulationSettings settings, IReadOnlyList<SeasonOutcome> seasons)

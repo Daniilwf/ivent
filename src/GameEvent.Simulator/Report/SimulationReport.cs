@@ -46,8 +46,21 @@ public sealed record LengthBucketRow(
     double MeanPointsPerCompletion,
     double MeanPlayHoursPerCompletion);
 
-/// <summary>Bots that drop long games against bots that keep them, overall and per profile, with the cost of one drop.</summary>
-public sealed record DropReport(IReadOnlyList<DropRow> Rows, double MeanPenaltyPerDrop, double MeanHoursPerDrop, double DropsPerSeason);
+/// <summary>
+/// Bots that drop long games against bots that keep them, overall and per profile, with the cost of one drop;
+/// <see cref="ByStreak"/> — drops by the drops in a row before them (D-324); <see cref="KeptForStreakPerSeason"/> — long
+/// games droppers kept because of the streak (D-362).
+/// </summary>
+public sealed record DropReport(
+    IReadOnlyList<DropRow> Rows,
+    double MeanPenaltyPerDrop,
+    double MeanHoursPerDrop,
+    double DropsPerSeason,
+    IReadOnlyList<StreakRow> ByStreak,
+    double KeptForStreakPerSeason);
+
+/// <summary>Drops after <see cref="Streak"/> drops in a row («2+» — two or more): how many per season and their mean penalty.</summary>
+public sealed record StreakRow(string Streak, double DropsPerSeason, double MeanPenalty);
 
 public sealed record DropRow(
     string Group,
@@ -114,7 +127,11 @@ public sealed record GapReport(
     double BusyMeanPlace,
     double BusyBeatsActiveShare);
 
-/// <summary>Per-season means of what happened, and the engine's refusals by code.</summary>
+/// <summary>
+/// Per-season means of what happened, and the engine's refusals by code. Rejects (D-321, D-327): how many, how many with
+/// the drop penalty, the points a reject took back (dice and the cell bonus of the move, the penalty aside), the cells it
+/// moved the token back and the penalty of a penalized one.
+/// </summary>
 public sealed record CountsReport(
     double CommandsPerSeason,
     double EventsPerSeason,
@@ -129,7 +146,13 @@ public sealed record CountsReport(
     double UnfinishedHoursPerSeason,
     double BlockedHoursPerSeason,
     IReadOnlyDictionary<string, double> RejectionsPerSeason,
-    int GuardTrips);
+    int GuardTrips,
+    double WishRerollsPerSeason,
+    double RejectsPerSeason,
+    double PenalizedRejectsPerSeason,
+    double MeanPointsPerReject,
+    double MeanCellsPerReject,
+    double MeanPenaltyPerPenalizedReject);
 
 /// <summary>Graph maps: each branch of each fork, and each branch policy.</summary>
 public sealed record BranchReport(IReadOnlyList<BranchRow> Options, IReadOnlyList<PolicyRow> Policies);
