@@ -1,0 +1,33 @@
+{
+  "id": "dirty-trick",
+  "kind": "item",
+  "name": "Подлянка",
+  "description": "Выбери игрока с большим числом очков и жанр его следующей игры.",
+  "rarity": "epic",
+  "price": 30,
+  "window": "anytime",
+  "hostile": true,
+  "stackable": false,
+  "effect": {
+    "target": {
+      "selector": "chosen",
+      "among": "higherPoints"
+    },
+    "actions": [
+      {
+        "type": "requestChoice",
+        "prompt": "Какой жанр подкинуть?",
+        "options": {
+          "from": "categories"
+        }
+      },
+      {
+        "type": "giveObject",
+        "objectId": "forced-genre",
+        "params": {
+          "tag": "$choice"
+        }
+      }
+    ]
+  }
+}

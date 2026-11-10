@@ -168,12 +168,13 @@ public static class Movement
         var player = state.Players[e.PlayerId];
 
         // D-321: the run whose own move last placed the player — kept by the teleport that move stopped on and by the
-        // run's own corrections right after it, lost on any other move
+        // run's own corrections right after it (items changing its throw after it was made among them, D-421), lost on
+        // any other move
         var lastMoveRunId = e.Reason switch
         {
             MoveReason.CompletionRoll => e.RunId,
             MoveReason.Teleport => player.LastMoveRunId,
-            MoveReason.RunCorrection when e.RunId == player.LastMoveRunId => e.RunId,
+            MoveReason.RunCorrection or MoveReason.DiceModified when e.RunId == player.LastMoveRunId => e.RunId,
             _ => null,
         };
         state = state with
@@ -184,7 +185,7 @@ public static class Movement
         // What the run's moves brought the player closer to the finish, its teleport included (D-321)
         var gainRunId = e.Reason switch
         {
-            MoveReason.CompletionRoll or MoveReason.RunCorrection => e.RunId,
+            MoveReason.CompletionRoll or MoveReason.RunCorrection or MoveReason.DiceModified => e.RunId,
             MoveReason.Teleport => player.LastMoveRunId,
             _ => null,
         };

@@ -1,0 +1,30 @@
+{
+  "id": "lootbox",
+  "name": "Лутбокс",
+  "entries": [
+    {
+      "objectId": "orange",
+      "weight": 30
+    },
+    {
+      "objectId": "banana",
+      "weight": 20
+    },
+    {
+      "objectId": "piggy-bank",
+      "weight": 20
+    },
+    {
+      "objectId": "reroll-coupon",
+      "weight": 15
+    },
+    {
+      "objectId": "shop-coupon",
+      "weight": 10
+    },
+    {
+      "objectId": "shield",
+      "weight": 5
+    }
+  ]
+}

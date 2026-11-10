@@ -1,0 +1,22 @@
+{
+  "id": "talisman",
+  "kind": "item",
+  "name": "Талисман",
+  "description": "Три следующих прохождения приносят по 2 монетки сверху.",
+  "rarity": "epic",
+  "price": 20,
+  "window": "anytime",
+  "hostile": false,
+  "stackable": false,
+  "effect": {
+    "target": {
+      "selector": "self"
+    },
+    "actions": [
+      {
+        "type": "giveObject",
+        "objectId": "talisman-effect"
+      }
+    ]
+  }
+}

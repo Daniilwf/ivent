@@ -1,0 +1,17 @@
+{
+  "id": "shield-effect",
+  "kind": "effect",
+  "name": "Под щитом",
+  "description": "Гасит следующий враждебный эффект.",
+  "rarity": "epic",
+  "price": null,
+  "hostile": false,
+  "effect": {
+    "trigger": "hostileIncoming",
+    "intercept": "hostile",
+    "duration": {
+      "uses": 1
+    },
+    "actions": []
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "id": "curse",
+  "kind": "item",
+  "name": "Проклятие",
+  "description": "У выбранного игрока следующий бросок за прохождение уменьшится на 1d6, но не ниже 1.",
+  "rarity": "legendary",
+  "price": 45,
+  "window": "anytime",
+  "hostile": true,
+  "stackable": false,
+  "effect": {
+    "target": {
+      "selector": "chosen",
+      "excludeSelf": true
+    },
+    "actions": [
+      {
+        "type": "giveObject",
+        "objectId": "curse-effect"
+      }
+    ]
+  }
+}

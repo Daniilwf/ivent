@@ -1,0 +1,27 @@
+{
+  "id": "bomb",
+  "kind": "item",
+  "name": "Бомба",
+  "description": "Уничтожь случайный предмет выбранного игрока.",
+  "rarity": "epic",
+  "price": 30,
+  "window": "anytime",
+  "hostile": true,
+  "stackable": false,
+  "effect": {
+    "target": {
+      "selector": "chosen",
+      "excludeSelf": true
+    },
+    "actions": [
+      {
+        "type": "takeObject",
+        "mode": "destroy",
+        "filter": {
+          "kind": "item"
+        },
+        "pick": "random"
+      }
+    ]
+  }
+}

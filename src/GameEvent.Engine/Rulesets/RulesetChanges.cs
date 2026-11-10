@@ -43,10 +43,23 @@ internal static class RulesetChanges
             return Decision.Reject(RejectionCodes.MapModeFixed, "A season on a graph map stays on it.");
         }
 
+        // D-420: a switched-off mechanic writes nothing, so bets in play would never be settled or taken back by a reject
+        if (state.Rules.Features.Bets && !command.Ruleset.Features.Bets && BetsInPlay(state))
+        {
+            return Decision.Reject(
+                RejectionCodes.BetsInPlay, "A bet is open or won on a run whose proof is not approved yet: switch bets off after they are settled.");
+        }
+
         return command.Ruleset == state.Ruleset
             ? Decision.Reject(RejectionCodes.RulesetUnchanged, "The new ruleset equals the current one.")
             : Decision.Accept(new RulesetChanged(state.RulesetVersion + 1, command.Ruleset));
     }
+
+    private static bool BetsInPlay(SeasonState state) =>
+        state.Players.Values.SelectMany(p => p.Wallet.Bets).Any(b =>
+            b.Status == Inventory.BetStatus.Open
+            || (b.Status == Inventory.BetStatus.Won && state.Runs.TryGetValue(b.RunId, out var run)
+                && run.Status == Runs.RunStatus.Completed && run.Proof?.Status is not Proofs.ProofStatus.Approved));
 
     public static SeasonState Apply(SeasonState state, RulesetChanged e) =>
         state with { Ruleset = e.Ruleset, RulesetVersion = e.Version };

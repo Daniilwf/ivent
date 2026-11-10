@@ -292,6 +292,15 @@ internal static class ProofReview
             events.Add(new CoinsChanged(run.PlayerId, -coins, CoinsReason.ProofRejected, run.RunId));
         }
 
+        // D-327 (2), D-421: the objects the move's cells granted, those the player still holds; none while items are off
+        if (state.Rules.Features.Items)
+        {
+            events.AddRange(run.CellObjects
+                .Select(player.Wallet.Find)
+                .OfType<Inventory.InventoryObject>()
+                .Select(o => new Inventory.ObjectRemoved(run.PlayerId, o.InstanceId, o.ObjectId, Inventory.ObjectRemoval.ProofRejected)));
+        }
+
         events.AddRange(PendingDifficultyEvents(state, run, comment));
 
         if (Finishes.CountsForFinish(player, run))

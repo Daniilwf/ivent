@@ -1,0 +1,1381 @@
+{
+  "type": "object",
+  "properties": {
+    "objects": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "item",
+              "effect",
+              "specialRoll",
+              "event",
+              "achievement"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "rarity": {
+            "enum": [
+              "common",
+              "epic",
+              "legendary",
+              null
+            ]
+          },
+          "price": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "window": {
+            "enum": [
+              "beforeRoll",
+              "afterRoll",
+              "beforeDice",
+              "afterDice",
+              "anytime",
+              null
+            ]
+          },
+          "hostile": {
+            "type": "boolean"
+          },
+          "stackable": {
+            "type": "boolean"
+          },
+          "manual": {
+            "type": "boolean"
+          },
+          "proof": {
+            "enum": [
+              "media",
+              null
+            ]
+          },
+          "scope": {
+            "enum": [
+              "season",
+              "allTime",
+              null
+            ]
+          },
+          "effect": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "target": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "properties": {
+                  "selector": {
+                    "enum": [
+                      "self",
+                      "chosen",
+                      "randomActive",
+                      "all",
+                      "leader",
+                      "higherPoints",
+                      "lowerPoints"
+                    ]
+                  },
+                  "among": {
+                    "enum": [
+                      "higherPoints",
+                      "lowerPoints",
+                      null
+                    ]
+                  },
+                  "excludeSelf": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "selector"
+                ],
+                "additionalProperties": false
+              },
+              "trigger": {
+                "enum": [
+                  "beforeRoll",
+                  "afterRoll",
+                  "runCompleted",
+                  "beforeDice",
+                  "afterDice",
+                  "moveStep",
+                  "stop",
+                  "pass",
+                  "drop",
+                  "techReroll",
+                  "time",
+                  "hostileIncoming",
+                  null
+                ]
+              },
+              "duration": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "properties": {
+                  "uses": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "hours": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "runs": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "untilTriggered": {
+                    "type": [
+                      "boolean",
+                      "null"
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              },
+              "condition": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "properties": {
+                  "difficultyAtLeast": {
+                    "enum": [
+                      "easy",
+                      "normal",
+                      "hard",
+                      "extreme",
+                      null
+                    ]
+                  },
+                  "game": {
+                    "type": [
+                      "object",
+                      "null"
+                    ],
+                    "properties": {
+                      "tags": true,
+                      "maxHours": {
+                        "type": [
+                          "number",
+                          "null"
+                        ]
+                      },
+                      "minHours": {
+                        "type": [
+                          "number",
+                          "null"
+                        ]
+                      },
+                      "releaseYearBefore": {
+                        "type": [
+                          "integer",
+                          "null"
+                        ]
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "stat": {
+                    "enum": [
+                      "hostileReceived",
+                      "completedStreakWithTag",
+                      "allDiceMax",
+                      "runHours",
+                      null
+                    ]
+                  },
+                  "tag": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "gte": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "minDice": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              },
+              "intercept": {
+                "enum": [
+                  "hostile",
+                  null
+                ]
+              },
+              "actions": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "type"
+                  ],
+                  "anyOf": [
+                    {
+                      "properties": {
+                        "type": {
+                          "const": "move"
+                        },
+                        "steps": {
+                          "description": "A whole number, dice («1d6», «-1d6») or a reference («$roll», «-$roll», «$choice», «$name»).",
+                          "type": [
+                            "integer",
+                            "string"
+                          ],
+                          "pattern": "^(-?([1-9][0-9]?)?d[1-9][0-9]{0,2}|-?\\$[a-zA-Z][a-zA-Z0-9]{0,39})$"
+                        },
+                        "target": {
+                          "enum": [
+                            "self",
+                            null
+                          ]
+                        }
+                      },
+                      "required": [
+                        "steps"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "properties": {
+                        "type": {
+                          "const": "changeResource"
+                        },
+                        "resource": {
+                          "type": "string"
+                        },
+                        "amount": {
+                          "description": "A whole number, dice («1d6», «-1d6») or a reference («$roll», «-$roll», «$choice», «$name»).",
+                          "type": [
+                            "integer",
+                            "string"
+                          ],
+                          "pattern": "^(-?([1-9][0-9]?)?d[1-9][0-9]{0,2}|-?\\$[a-zA-Z][a-zA-Z0-9]{0,39})$"
+                        },
+                        "target": {
+                          "enum": [
+                            "self",
+                            null
+                          ]
+                        }
+                      },
+                      "required": [
+                        "resource",
+                        "amount"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "properties": {
+                        "type": {
+                          "const": "roll"
+                        },
+                        "dice": {
+                          "description": "A whole number, dice («1d6», «-1d6») or a reference («$roll», «-$roll», «$choice», «$name»).",
+                          "type": [
+                            "integer",
+                            "string"
+                          ],
+                          "pattern": "^(-?([1-9][0-9]?)?d[1-9][0-9]{0,2}|-?\\$[a-zA-Z][a-zA-Z0-9]{0,39})$"
+                        },
+                        "target": {
+                          "enum": [
+                            "self",
+                            null
+                          ]
+                        }
+                      },
+                      "required": [
+                        "dice"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "properties": {
+                        "type": {
+                          "const": "giveObject"
+                        },
+                        "objectId": {
+                          "type": "string"
+                        },
+                        "params": {
+                          "type": [
+                            "object",
+                            "null"
+                          ],
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
+                        "target": {
+                          "enum": [
+                            "self",
+                            null
+                          ]
+                        }
+                      },
+                      "required": [
+                        "objectId"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "properties": {
+                        "type": {
+                          "const": "takeObject"
+                        },
+                        "mode": {
+                          "enum": [
+                            "take",
+                            "steal",
+                            "destroy"
+                          ]
+                        },
+                        "filter": {
+                          "type": [
+                            "object",
+                            "null"
+                          ],
+                          "properties": {
+                            "kind": {
+                              "enum": [
+                                "item",
+                                "effect",
+                                "specialRoll",
+                                "event",
+                                "achievement",
+                                null
+                              ]
+                            },
+                            "rarity": {
+                              "enum": [
+                                "common",
+                                "epic",
+                                "legendary",
+                                null
+                              ]
+                            },
+                            "objectId": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "hostile": {
+                              "type": [
+                                "boolean",
+                                "null"
+                              ]
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "pick": {
+                          "enum": [
+                            "random",
+                            "chosen"
+                          ]
+                        },
+                        "target": {
+                          "enum": [
+                            "self",
+                            null
+                          ]
+                        }
+                      },
+                      "required": [
+                        "mode"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "properties": {
+                        "type": {
+                          "const": "transformObject"
+                        },
+                        "mode": {
+                          "enum": [
+                            "transform",
+                            "annotate"
+                          ]
+                        },
+                        "filter": {
+                          "type": [
+                            "object",
+                            "null"
+                          ],
+                          "properties": {
+                            "kind": {
+                              "enum": [
+                                "item",
+                                "effect",
+                                "specialRoll",
+                                "event",
+                                "achievement",
+                                null
+                              ]
+                            },
+                            "rarity": {
+                              "enum": [
+                                "common",
+                                "epic",
+                                "legendary",
+                                null
+                              ]
+                            },
+                            "objectId": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "hostile": {
+                              "type": [
+                                "boolean",
+                                "null"
+                              ]
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "into": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "note": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "target": {
+                          "enum": [
+                            "self",
+                            null
+                          ]
+                        }
+                      },
+                      "required": [
+                        "mode"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "properties": {
+                        "type": {
+                          "const": "drawEvent"
+                        },
+                        "deck": {
+                          "type": "string"
+                        },
+                        "target": {
+                          "enum": [
+                            "self",
+                            null
+                          ]
+                        }
+                      },
+                      "required": [
+                        "deck"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "properties": {
+                        "type": {
+                          "const": "spinWheel"
+                        },
+                        "wheel": {
+                          "type": "string"
+                        },
+                        "target": {
+                          "enum": [
+                            "self",
+                            null
+                          ]
+                        }
+                      },
+                      "required": [
+                        "wheel"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "properties": {
+                        "type": {
+                          "const": "modifyNextRoll"
+                        },
+                        "filter": {
+                          "type": [
+                            "object",
+                            "null"
+                          ],
+                          "properties": {
+                            "tags": true,
+                            "maxHours": {
+                              "type": [
+                                "number",
+                                "null"
+                              ]
+                            },
+                            "minHours": {
+                              "type": [
+                                "number",
+                                "null"
+                              ]
+                            },
+                            "releaseYearBefore": {
+                              "type": [
+                                "integer",
+                                "null"
+                              ]
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "choiceCount": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        },
+                        "runCondition": {
+                          "type": [
+                            "object",
+                            "null"
+                          ],
+                          "properties": {
+                            "difficultyAtLeast": {
+                              "enum": [
+                                "easy",
+                                "normal",
+                                "hard",
+                                "extreme",
+                                null
+                              ]
+                            },
+                            "game": {
+                              "type": [
+                                "object",
+                                "null"
+                              ],
+                              "properties": {
+                                "tags": true,
+                                "maxHours": {
+                                  "type": [
+                                    "number",
+                                    "null"
+                                  ]
+                                },
+                                "minHours": {
+                                  "type": [
+                                    "number",
+                                    "null"
+                                  ]
+                                },
+                                "releaseYearBefore": {
+                                  "type": [
+                                    "integer",
+                                    "null"
+                                  ]
+                                }
+                              },
+                              "additionalProperties": false
+                            },
+                            "stat": {
+                              "enum": [
+                                "hostileReceived",
+                                "completedStreakWithTag",
+                                "allDiceMax",
+                                "runHours",
+                                null
+                              ]
+                            },
+                            "tag": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "gte": {
+                              "type": [
+                                "integer",
+                                "null"
+                              ]
+                            },
+                            "minDice": {
+                              "type": [
+                                "integer",
+                                "null"
+                              ]
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "target": {
+                          "enum": [
+                            "self",
+                            null
+                          ]
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    {
+                      "properties": {
+                        "type": {
+                          "const": "modifyDice"
+                        },
+                        "when": {
+                          "enum": [
+                            "current",
+                            "next"
+                          ]
+                        },
+                        "stage": {
+                          "enum": [
+                            "count",
+                            "sides",
+                            "add",
+                            "multiply",
+                            "reroll",
+                            "min",
+                            "max"
+                          ]
+                        },
+                        "value": {
+                          "description": "A whole number, dice («1d6», «-1d6») or a reference («$roll», «-$roll», «$choice», «$name»).",
+                          "type": [
+                            "integer",
+                            "string"
+                          ],
+                          "pattern": "^(-?([1-9][0-9]?)?d[1-9][0-9]{0,2}|-?\\$[a-zA-Z][a-zA-Z0-9]{0,39})$"
+                        },
+                        "target": {
+                          "enum": [
+                            "self",
+                            null
+                          ]
+                        }
+                      },
+                      "required": [
+                        "when",
+                        "stage",
+                        "value"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "properties": {
+                        "type": {
+                          "const": "teleport"
+                        },
+                        "cell": {
+                          "type": "string"
+                        },
+                        "target": {
+                          "enum": [
+                            "self",
+                            null
+                          ]
+                        }
+                      },
+                      "required": [
+                        "cell"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "properties": {
+                        "type": {
+                          "const": "requestChoice"
+                        },
+                        "prompt": {
+                          "type": "string"
+                        },
+                        "options": {
+                          "type": "object",
+                          "properties": {
+                            "from": {
+                              "enum": [
+                                "categories",
+                                "players",
+                                "games",
+                                null
+                              ]
+                            },
+                            "list": true
+                          },
+                          "additionalProperties": false
+                        },
+                        "target": {
+                          "enum": [
+                            "self",
+                            null
+                          ]
+                        }
+                      },
+                      "required": [
+                        "prompt",
+                        "options"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              },
+              "outcomes": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "properties": {
+                  "roll": {
+                    "description": "A whole number, dice («1d6», «-1d6») or a reference («$roll», «-$roll», «$choice», «$name»).",
+                    "type": [
+                      "integer",
+                      "string"
+                    ],
+                    "pattern": "^(-?([1-9][0-9]?)?d[1-9][0-9]{0,2}|-?\\$[a-zA-Z][a-zA-Z0-9]{0,39})$"
+                  },
+                  "cases": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "from": {
+                          "type": "integer"
+                        },
+                        "to": {
+                          "type": "integer"
+                        },
+                        "actions": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "type"
+                            ],
+                            "anyOf": [
+                              {
+                                "properties": {
+                                  "type": {
+                                    "const": "move"
+                                  },
+                                  "steps": {
+                                    "description": "A whole number, dice («1d6», «-1d6») or a reference («$roll», «-$roll», «$choice», «$name»).",
+                                    "type": [
+                                      "integer",
+                                      "string"
+                                    ],
+                                    "pattern": "^(-?([1-9][0-9]?)?d[1-9][0-9]{0,2}|-?\\$[a-zA-Z][a-zA-Z0-9]{0,39})$"
+                                  },
+                                  "target": {
+                                    "enum": [
+                                      "self",
+                                      null
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "steps"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "properties": {
+                                  "type": {
+                                    "const": "changeResource"
+                                  },
+                                  "resource": {
+                                    "type": "string"
+                                  },
+                                  "amount": {
+                                    "description": "A whole number, dice («1d6», «-1d6») or a reference («$roll», «-$roll», «$choice», «$name»).",
+                                    "type": [
+                                      "integer",
+                                      "string"
+                                    ],
+                                    "pattern": "^(-?([1-9][0-9]?)?d[1-9][0-9]{0,2}|-?\\$[a-zA-Z][a-zA-Z0-9]{0,39})$"
+                                  },
+                                  "target": {
+                                    "enum": [
+                                      "self",
+                                      null
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "resource",
+                                  "amount"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "properties": {
+                                  "type": {
+                                    "const": "roll"
+                                  },
+                                  "dice": {
+                                    "description": "A whole number, dice («1d6», «-1d6») or a reference («$roll», «-$roll», «$choice», «$name»).",
+                                    "type": [
+                                      "integer",
+                                      "string"
+                                    ],
+                                    "pattern": "^(-?([1-9][0-9]?)?d[1-9][0-9]{0,2}|-?\\$[a-zA-Z][a-zA-Z0-9]{0,39})$"
+                                  },
+                                  "target": {
+                                    "enum": [
+                                      "self",
+                                      null
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "dice"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "properties": {
+                                  "type": {
+                                    "const": "giveObject"
+                                  },
+                                  "objectId": {
+                                    "type": "string"
+                                  },
+                                  "params": {
+                                    "type": [
+                                      "object",
+                                      "null"
+                                    ],
+                                    "additionalProperties": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "target": {
+                                    "enum": [
+                                      "self",
+                                      null
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "objectId"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "properties": {
+                                  "type": {
+                                    "const": "takeObject"
+                                  },
+                                  "mode": {
+                                    "enum": [
+                                      "take",
+                                      "steal",
+                                      "destroy"
+                                    ]
+                                  },
+                                  "filter": {
+                                    "type": [
+                                      "object",
+                                      "null"
+                                    ],
+                                    "properties": {
+                                      "kind": {
+                                        "enum": [
+                                          "item",
+                                          "effect",
+                                          "specialRoll",
+                                          "event",
+                                          "achievement",
+                                          null
+                                        ]
+                                      },
+                                      "rarity": {
+                                        "enum": [
+                                          "common",
+                                          "epic",
+                                          "legendary",
+                                          null
+                                        ]
+                                      },
+                                      "objectId": {
+                                        "type": [
+                                          "string",
+                                          "null"
+                                        ]
+                                      },
+                                      "hostile": {
+                                        "type": [
+                                          "boolean",
+                                          "null"
+                                        ]
+                                      }
+                                    },
+                                    "additionalProperties": false
+                                  },
+                                  "pick": {
+                                    "enum": [
+                                      "random",
+                                      "chosen"
+                                    ]
+                                  },
+                                  "target": {
+                                    "enum": [
+                                      "self",
+                                      null
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "mode"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "properties": {
+                                  "type": {
+                                    "const": "transformObject"
+                                  },
+                                  "mode": {
+                                    "enum": [
+                                      "transform",
+                                      "annotate"
+                                    ]
+                                  },
+                                  "filter": {
+                                    "type": [
+                                      "object",
+                                      "null"
+                                    ],
+                                    "properties": {
+                                      "kind": {
+                                        "enum": [
+                                          "item",
+                                          "effect",
+                                          "specialRoll",
+                                          "event",
+                                          "achievement",
+                                          null
+                                        ]
+                                      },
+                                      "rarity": {
+                                        "enum": [
+                                          "common",
+                                          "epic",
+                                          "legendary",
+                                          null
+                                        ]
+                                      },
+                                      "objectId": {
+                                        "type": [
+                                          "string",
+                                          "null"
+                                        ]
+                                      },
+                                      "hostile": {
+                                        "type": [
+                                          "boolean",
+                                          "null"
+                                        ]
+                                      }
+                                    },
+                                    "additionalProperties": false
+                                  },
+                                  "into": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  },
+                                  "note": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  },
+                                  "target": {
+                                    "enum": [
+                                      "self",
+                                      null
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "mode"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "properties": {
+                                  "type": {
+                                    "const": "drawEvent"
+                                  },
+                                  "deck": {
+                                    "type": "string"
+                                  },
+                                  "target": {
+                                    "enum": [
+                                      "self",
+                                      null
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "deck"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "properties": {
+                                  "type": {
+                                    "const": "spinWheel"
+                                  },
+                                  "wheel": {
+                                    "type": "string"
+                                  },
+                                  "target": {
+                                    "enum": [
+                                      "self",
+                                      null
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "wheel"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "properties": {
+                                  "type": {
+                                    "const": "modifyNextRoll"
+                                  },
+                                  "filter": {
+                                    "type": [
+                                      "object",
+                                      "null"
+                                    ],
+                                    "properties": {
+                                      "tags": true,
+                                      "maxHours": {
+                                        "type": [
+                                          "number",
+                                          "null"
+                                        ]
+                                      },
+                                      "minHours": {
+                                        "type": [
+                                          "number",
+                                          "null"
+                                        ]
+                                      },
+                                      "releaseYearBefore": {
+                                        "type": [
+                                          "integer",
+                                          "null"
+                                        ]
+                                      }
+                                    },
+                                    "additionalProperties": false
+                                  },
+                                  "choiceCount": {
+                                    "type": [
+                                      "integer",
+                                      "null"
+                                    ]
+                                  },
+                                  "runCondition": {
+                                    "type": [
+                                      "object",
+                                      "null"
+                                    ],
+                                    "properties": {
+                                      "difficultyAtLeast": {
+                                        "enum": [
+                                          "easy",
+                                          "normal",
+                                          "hard",
+                                          "extreme",
+                                          null
+                                        ]
+                                      },
+                                      "game": {
+                                        "type": [
+                                          "object",
+                                          "null"
+                                        ],
+                                        "properties": {
+                                          "tags": true,
+                                          "maxHours": {
+                                            "type": [
+                                              "number",
+                                              "null"
+                                            ]
+                                          },
+                                          "minHours": {
+                                            "type": [
+                                              "number",
+                                              "null"
+                                            ]
+                                          },
+                                          "releaseYearBefore": {
+                                            "type": [
+                                              "integer",
+                                              "null"
+                                            ]
+                                          }
+                                        },
+                                        "additionalProperties": false
+                                      },
+                                      "stat": {
+                                        "enum": [
+                                          "hostileReceived",
+                                          "completedStreakWithTag",
+                                          "allDiceMax",
+                                          "runHours",
+                                          null
+                                        ]
+                                      },
+                                      "tag": {
+                                        "type": [
+                                          "string",
+                                          "null"
+                                        ]
+                                      },
+                                      "gte": {
+                                        "type": [
+                                          "integer",
+                                          "null"
+                                        ]
+                                      },
+                                      "minDice": {
+                                        "type": [
+                                          "integer",
+                                          "null"
+                                        ]
+                                      }
+                                    },
+                                    "additionalProperties": false
+                                  },
+                                  "target": {
+                                    "enum": [
+                                      "self",
+                                      null
+                                    ]
+                                  }
+                                },
+                                "additionalProperties": false
+                              },
+                              {
+                                "properties": {
+                                  "type": {
+                                    "const": "modifyDice"
+                                  },
+                                  "when": {
+                                    "enum": [
+                                      "current",
+                                      "next"
+                                    ]
+                                  },
+                                  "stage": {
+                                    "enum": [
+                                      "count",
+                                      "sides",
+                                      "add",
+                                      "multiply",
+                                      "reroll",
+                                      "min",
+                                      "max"
+                                    ]
+                                  },
+                                  "value": {
+                                    "description": "A whole number, dice («1d6», «-1d6») or a reference («$roll», «-$roll», «$choice», «$name»).",
+                                    "type": [
+                                      "integer",
+                                      "string"
+                                    ],
+                                    "pattern": "^(-?([1-9][0-9]?)?d[1-9][0-9]{0,2}|-?\\$[a-zA-Z][a-zA-Z0-9]{0,39})$"
+                                  },
+                                  "target": {
+                                    "enum": [
+                                      "self",
+                                      null
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "when",
+                                  "stage",
+                                  "value"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "properties": {
+                                  "type": {
+                                    "const": "teleport"
+                                  },
+                                  "cell": {
+                                    "type": "string"
+                                  },
+                                  "target": {
+                                    "enum": [
+                                      "self",
+                                      null
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "cell"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "properties": {
+                                  "type": {
+                                    "const": "requestChoice"
+                                  },
+                                  "prompt": {
+                                    "type": "string"
+                                  },
+                                  "options": {
+                                    "type": "object",
+                                    "properties": {
+                                      "from": {
+                                        "enum": [
+                                          "categories",
+                                          "players",
+                                          "games",
+                                          null
+                                        ]
+                                      },
+                                      "list": true
+                                    },
+                                    "additionalProperties": false
+                                  },
+                                  "target": {
+                                    "enum": [
+                                      "self",
+                                      null
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "prompt",
+                                  "options"
+                                ],
+                                "additionalProperties": false
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "from",
+                        "to"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": [
+                  "roll",
+                  "cases"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "name",
+          "description"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "wheels": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "objectId": {
+                  "type": "string"
+                },
+                "weight": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "objectId",
+                "weight"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "entries"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

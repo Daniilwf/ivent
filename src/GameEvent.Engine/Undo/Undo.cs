@@ -85,9 +85,9 @@ internal static class Undoing
 
         var target = history[index];
         // D-308: a map is taken back by publishing the previous version again
-        if (target.Events.Any(e => e is SeasonCreated or CommandUndone or Map.MapPublished))
+        if (target.Events.Any(e => e is SeasonCreated or CommandUndone or Map.MapPublished or Content.ContentPublished))
         {
-            return Decision.Reject(RejectionCodes.UndoNotUndoable, "The season's creation, map publications and undos are not undone; do the action again instead.");
+            return Decision.Reject(RejectionCodes.UndoNotUndoable, "The season's creation, map and content publications and undos are not undone; do the action again instead.");
         }
 
         var undone = UndoneCommands(history);
@@ -251,6 +251,13 @@ internal static class Undoing
                 or Scoring.PointsChanged { Reason: Scoring.PointsReason.FinishBonus or Scoring.PointsReason.FinishBonusRevoked })
             {
                 keys.Add(FinishKey);
+            }
+
+            // A bet reads the run and the player it is on: taking back that run's start or roll waits for the bet (D-414)
+            if (e is Economy.BetPlaced placed)
+            {
+                keys.Add($"run:{placed.Bet.RunId}");
+                keys.Add($"player:{placed.Bet.OnPlayerId}");
             }
 
             foreach (var (kind, id) in GameIds.Of(e).Concat(GameIds.Own(e)))

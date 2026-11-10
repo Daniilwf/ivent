@@ -16,11 +16,18 @@ public sealed class PendingManualEffectRecord
 
     public Guid PlayerId { get; set; }
 
+    /// <summary>
+    /// «Draw a good/bad event». For the text of an object (<see cref="ObjectId"/> set, D-410) the engine has none; the column
+    /// keeps its former NOT NULL and holds <c>good</c> then, read back as none.
+    /// </summary>
     public Engine.Rulesets.EventKind DrawEvent { get; set; }
 
     public Engine.Effects.ManualEffectSource Source { get; set; }
 
     public Guid? RunId { get; set; }
+
+    /// <summary>The object whose text waits for resolution (D-410); null for «draw an event».</summary>
+    public string? ObjectId { get; set; }
 }
 
 /// <summary>A game excluded for one player of the season (SPEC «Модель данных»: PlayerGameExclusion).</summary>
@@ -150,6 +157,15 @@ public sealed class SeasonPlayerRecord
     public long PointsTick { get; set; }
 
     public Guid? ActiveRunId { get; set; }
+
+    /// <summary>
+    /// The player's economy (D-401: inventory, roll and throw changes, shop offer, bets) as JSON; null when they have none.
+    /// Never filtered or sorted in SQL (invariant 9): what the scheduler needs is <see cref="NextTimerAt"/>.
+    /// </summary>
+    public string? EconomyJson { get; set; }
+
+    /// <summary>The earliest timer of the player's economy (D-404): the scheduler sends the timers command when it has come.</summary>
+    public DateTimeOffset? NextTimerAt { get; set; }
 }
 
 public sealed class RunRecord
@@ -178,6 +194,9 @@ public sealed class RunRecord
 
     /// <summary>The challenge bonus dice, apart from the dice by hours (D-14, D-96).</summary>
     public required string ChallengeDiceJson { get; set; }
+
+    /// <summary>What items and effects did to the throw (D-408), JSON; null for a run without them.</summary>
+    public string? DiceModsJson { get; set; }
 
     /// <summary>Where the player's hours estimate comes from, when the pool had no hours.</summary>
     public string? HoursSource { get; set; }

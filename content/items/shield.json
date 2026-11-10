@@ -1,0 +1,22 @@
+{
+  "id": "shield",
+  "kind": "item",
+  "name": "Щит",
+  "description": "Следующий враждебный эффект против тебя не сработает.",
+  "rarity": "epic",
+  "price": 25,
+  "window": "anytime",
+  "hostile": false,
+  "stackable": false,
+  "effect": {
+    "target": {
+      "selector": "self"
+    },
+    "actions": [
+      {
+        "type": "giveObject",
+        "objectId": "shield-effect"
+      }
+    ]
+  }
+}
