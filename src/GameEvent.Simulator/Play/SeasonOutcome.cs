@@ -14,14 +14,36 @@ public enum RunEnd
 
     /// <summary>Completed, then rejected by the admin bot.</summary>
     Rejected,
+
+    /// <summary>Given up by wish: a tech reroll with the reason «wish» (D-325).</summary>
+    WishRerolled,
 }
 
 /// <summary>
 /// One run: the game's hours (from the snapshot), the hours the bot played it, how it ended, the points its completion
 /// gave (less what a reject took back) and the drop penalty it took, the zone it was rolled in, and whether it was played in the first's free mode
-/// (no points).
+/// (no points). <see cref="DropStreak"/> — for a drop, the drops in a row before it (D-324); <see cref="WishListed"/> — the
+/// game could be given up by wish (D-325); <see cref="MoveCells"/> — the cells its completion moved the token forward;
+/// for a reject, <see cref="RejectCells"/> — the cells it moved the token back, <see cref="RejectedAfterFinish"/> — the
+/// player had a finish then, <see cref="PenalizedReject"/> — it came with the drop penalty (D-327), <see cref="RejectTaken"/> — the points it took
+/// back (the dice and the bonus of the cell the move stopped on).
 /// </summary>
-public sealed record RunOutcome(int Bot, double Hours, double PlayHours, RunEnd End, int Points, int Penalty, string? Zone, bool FreeMode);
+public sealed record RunOutcome(
+    int Bot,
+    double Hours,
+    double PlayHours,
+    RunEnd End,
+    int Points,
+    int Penalty,
+    string? Zone,
+    bool FreeMode,
+    int? DropStreak = null,
+    bool WishListed = false,
+    int MoveCells = 0,
+    int RejectCells = 0,
+    bool RejectedAfterFinish = false,
+    bool PenalizedReject = false,
+    int RejectTaken = 0);
 
 /// <summary>A bot's branch at a fork (<see cref="Fork"/> — the fork cell, <see cref="Option"/> — the cell of the branch).</summary>
 public sealed record BranchOutcome(int Bot, string Fork, string Option);
@@ -32,7 +54,9 @@ public sealed record BranchOutcome(int Bot, string Fork, string Option);
 /// <see cref="BlockedHours"/> — free time lost waiting for the admin's check (<c>season.maxUncheckedRuns</c>).
 /// <see cref="Rejected"/> — its commands the engine refused. Points are the engine's; they add up from the runs' points
 /// (a reject's take-back included), the drop penalties, <see cref="CellBonus"/>, <see cref="FinishBonus"/> and
-/// <see cref="OtherPoints"/> (any other change, such as an admin's).
+/// <see cref="OtherPoints"/> (any other change, such as an admin's). <see cref="WishRerolls"/> — games given up by wish (not in
+/// <see cref="TechRerolls"/>), <see cref="KeptForStreak"/> — long games a dropper kept because of its drops in a row (D-362),
+/// <see cref="PenalizedRejects"/> — its runs rejected with the drop penalty.
 /// </summary>
 public sealed record BotOutcome(
     int Index,
@@ -57,7 +81,10 @@ public sealed record BotOutcome(
     int CellBonus,
     int FinishBonus,
     int OtherPoints,
-    int Teleports);
+    int Teleports,
+    int WishRerolls = 0,
+    int KeptForStreak = 0,
+    int PenalizedRejects = 0);
 
 /// <summary>
 /// One simulated season. <see cref="FirstFinishDay"/> — when the player who ended up first reached the finish;
