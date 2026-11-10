@@ -32,6 +32,10 @@ updates:
     ignore:
       - dependency-name: '@types/node'
         update-types: ['version-update:semver-major']
+      # TypeScript majors move by hand (D-250): typescript-eslint has to support the new line first
+      # (8.72 still declares typescript <6.1, so TypeScript 7 broke lint and the build in PR #80)
+      - dependency-name: 'typescript'
+        update-types: ['version-update:semver-major']
 
   # The base images of deploy/ are pinned by digest: monthly fresh ones bring the security patches
   - package-ecosystem: docker

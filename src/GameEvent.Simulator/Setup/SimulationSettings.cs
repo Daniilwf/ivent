@@ -101,6 +101,13 @@ public sealed record SimulationSettings
         CheckChance(problems, "behaviour.randomDropChance", b.RandomDropChance);
         CheckChance(problems, "admin.skipCheckChance", Admin.SkipCheckChance);
         CheckChance(problems, "admin.rejectChance", Admin.RejectChance);
+        CheckChance(problems, "admin.penalizedRejectShare", Admin.PenalizedRejectShare);
+        CheckChance(problems, "behaviour.wishRerollChance", b.WishRerollChance);
+        if (b.DropStreakLimit is < 0)
+        {
+            problems.Add("behaviour.dropStreakLimit: not negative, or null — the streak is ignored");
+        }
+
         if (b.PlayTimeNoise is < 0 or > 3)
         {
             problems.Add("behaviour.playTimeNoise: 0…3");
@@ -222,6 +229,21 @@ public sealed record BotBehaviour
     /// <summary>A dropper drops a started game longer than this after <c>roll.minPlayMinutesBeforeDrop</c>.</summary>
     public double DropAboveHours { get; init; } = 15;
 
+    /// <summary>
+    /// Drops in a row add penalty dice (<c>drop.consecutiveExtraDice</c>, D-324): a dropper drops a long game only while its
+    /// drops in a row before the run are fewer than this, else it keeps the game (D-362). It looks at the streak when it
+    /// plans the run and again at the drop (a reject in between makes the drops around it a streak). null — the streak is
+    /// ignored, as before the rule. Random drops (<see cref="RandomDropChance"/>) do not look at it.
+    /// </summary>
+    public int? DropStreakLimit { get; init; } = 1;
+
+    /// <summary>
+    /// A started game the ruleset lets the player give up by wish (<c>roll.wishRerollTags</c>, D-325) is given up right
+    /// after the start with this chance (D-363): a genre the player does not want. Nothing happens while the tag list is
+    /// empty — the default ruleset's.
+    /// </summary>
+    public double WishRerollChance { get; init; } = 0.5;
+
     /// <summary>Any bot gives up a game midway (at 20–80% of it): the game turned out not to be for them.</summary>
     public double RandomDropChance { get; init; } = 0.03;
 
@@ -246,7 +268,7 @@ public sealed record BotBehaviour
 /// <summary>
 /// The admin bot: checks proofs at <see cref="CheckHours"/> (UTC) every day, approving those sent at least
 /// <see cref="MinDelayHours"/> earlier; skips a check with <see cref="SkipCheckChance"/>; rejects with
-/// <see cref="RejectChance"/>. After the deadline it approves everything left within <see cref="FinalReviewHours"/> and
+/// <see cref="RejectChance"/>, a share <see cref="PenalizedRejectShare"/> of them with the drop penalty. After the deadline it approves everything left within <see cref="FinalReviewHours"/> and
 /// finishes the season.
 /// </summary>
 public sealed record AdminBehaviour
@@ -258,6 +280,9 @@ public sealed record AdminBehaviour
     public double SkipCheckChance { get; init; } = 0.1;
 
     public double RejectChance { get; init; }
+
+    /// <summary>The share of the rejects done as «Отклонить со штрафом дропа» (<c>RejectProofWithDropPenalty</c>, D-327, D-364).</summary>
+    public double PenalizedRejectShare { get; init; }
 
     public double FinalReviewHours { get; init; } = 24;
 }

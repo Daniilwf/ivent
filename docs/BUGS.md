@@ -18,6 +18,16 @@
 - **Тест:** `web/src/season/TurnTails.test.tsx` («the finished player’s turn card (D-260)»), E2E `e2e/tests/s05-finish.spec.ts`.
 - **Исправление:** блок «Ты на финише» (`MyFinish`) над кнопкой ролла, кто первый — по лидерборду. **Исправлено.**
 
+### DP-1. С NetVips 8.18.7 обрезанный GIF принимался
+
+- **Найдено:** PR Dependabot #81 (2026-11-10), падал `FileUploadTests.A_cut_off_gif_is_refused_and_nothing_is_kept`.
+- **Шаги:** загрузить GIF, обрезанный посреди данных кадра так, что последний оставшийся байт равен 0x3B.
+- **Ожидалось:** отказ `file.broken`, ничего не сохранено.
+- **Получилось:** libvips 8.18.7 читает уцелевшие кадры без ошибки, проверка последнего байта пропускала файл.
+- **Важность:** средняя — битая картинка в пруфе или аватарке.
+- **Тест:** `src/GameEvent.Web.Tests/Files/FileUploadTests.cs` («A_cut_off_gif_is_refused_and_nothing_is_kept», «A_gif_cut_off_right_after_a_byte_that_looks_like_the_trailer_is_refused», «A_gif_with_bytes_after_its_trailer_is_refused»).
+- **Исправление:** обход блоков GIF до завершающего байта (D-252).
+
 ### RG-1. E2E-сценарий 1 ждал ссылку пруфа в очереди 5 с, а очередь админки обновляется по хабу до 10 с
 
 - **Найдено:** `npm run test:e2e` на ветке `feat/rgg-rules-pool` (2026-09-29), под нагрузкой машины; второй прогон зелёный.
