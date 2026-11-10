@@ -425,6 +425,17 @@ describe('feed lines of the graph map (D-319)', () => {
     expect(text(item)).toBe(ru.feed.lines.chose<string>('Вася').join(''));
   });
 
+  it('tells a discarded branch choice from a discarded choice of games (MP-1)', () => {
+    const branch = one([
+      entry('d1', 'choice-discarded', { playerId: vasya, choiceId: 'c', kind: 'branch' }),
+    ]);
+    expect(text(branch)).toBe(ru.feed.lines.branchDiscarded<string>('Вася').join(''));
+    const game = one([
+      entry('d2', 'choice-discarded', { playerId: vasya, choiceId: 'c', kind: 'game' }),
+    ]);
+    expect(text(game)).toBe(ru.feed.lines.choiceDiscarded<string>('Вася').join(''));
+  });
+
   it("says the map was published, with the admin's comment", () => {
     const item = one([entry('p1', 'map-published', { map: {}, comment: 'Добавили болото' })]);
     expect(text(item)).toBe(ru.feed.lines.mapPublished<string>().join(''));
