@@ -170,6 +170,27 @@ describe('the graph board', () => {
     expect(x(2)).toBeLessThan(x(3));
   });
 
+  it('lays the cells over a background picture at its own pixels (D-277)', () => {
+    const background = { fileId: 'f1', width: 1200, height: 800, url: '/api/files/f1' };
+    const { board } = graphBoard({ ...map, background });
+    expect(board.background).toEqual({ url: '/api/files/f1', width: 1200, height: 800 });
+    expect([board.width, board.height]).toEqual([1200, 800]);
+    // No margin and no shift: a cell stands where the editor put it on the picture
+    const start = board.cells.find((c) => c.kind === 'start');
+    expect([start?.x, start?.y]).toEqual([20, 40]);
+    // Without a picture the board frames the cells with its margin, as before
+    const plain = graphBoard(map).board;
+    expect(plain.background).toBeUndefined();
+    expect(plain.cells.find((c) => c.kind === 'start')?.x).toBe(90);
+  });
+
+  it('grows the board past a picture smaller than the cells', () => {
+    const { board } = graphBoard({ ...map, background: { fileId: 'f1', width: 300, height: 60 } });
+    expect(board.width).toBeGreaterThanOrEqual(520 + 90);
+    expect(board.height).toBeGreaterThanOrEqual(80 + 90);
+    expect(board.background?.url).toBe('/api/files/f1');
+  });
+
   it('walks the legs of a move with a teleport as a flight', () => {
     const { cellNumber } = graphBoard(map);
     const walked = legsPath(
@@ -357,6 +378,38 @@ describe('the season screen on the graph map', () => {
     expect(token(me)).toBeTruthy();
     expect(token(other)).toBeTruthy();
     expect(token(me)).not.toBe(token(other));
+  });
+
+  it('draws the background picture under the cells, and the zones only as outlines over it', async () => {
+    fakeServer({
+      ...common,
+      'GET /api/seasons/*': {
+        ...season('a1'),
+        background: { fileId: 'f1', width: 1200, height: 800, url: '/api/files/f1' },
+      },
+    });
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    await screen.findByTestId('cells');
+    const picture = document.querySelector('image[data-map-background]');
+    expect(picture?.getAttribute('href')).toBe('/api/files/f1');
+    expect([picture?.getAttribute('width'), picture?.getAttribute('height')]).toEqual([
+      '1200',
+      '800',
+    ]);
+    // Under everything: the first thing the map draws
+    expect(picture?.parentElement?.firstElementChild).toBe(picture);
+    // The picture is the world: the zones are outlines, not painted blobs
+    expect(document.querySelector('[data-zone="swamp"]')?.getAttribute('fill')).toBe('none');
+  });
+
+  it('draws the zones board when the map has no background', async () => {
+    fakeServer({ ...common, 'GET /api/seasons/*': season('a1') });
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    await screen.findByTestId('cells');
+    expect(document.querySelector('image[data-map-background]')).toBeNull();
+    expect(document.querySelector('[data-zone="swamp"]')?.getAttribute('fill')).not.toBe('none');
   });
 
   it('draws the linear season as before: no legend, no branch', async () => {

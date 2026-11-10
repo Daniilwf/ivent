@@ -9,6 +9,7 @@ import {
   type Node as FlowNode,
   type NodeProps,
   useReactFlow,
+  ViewportPortal,
 } from '@xyflow/react';
 import '@xyflow/react/dist/base.css';
 import { Flag, GitFork, Maximize, Minus, Orbit, Play, Plus, Trophy, Users } from 'lucide-react';
@@ -256,6 +257,22 @@ export function MapCanvas({
         }}
       >
         <Background />
+        {draft.background ? (
+          // The picture under the cells (D-277), at the canvas's spread of the places; under the arrows and cards
+          <ViewportPortal>
+            <img
+              src={draft.background.url ?? `/api/files/${draft.background.fileId}`}
+              alt=""
+              draggable={false}
+              data-testid="canvas-background"
+              className="pointer-events-none absolute top-0 left-0 -z-1 max-w-none select-none"
+              style={{
+                width: draft.background.width * spread,
+                height: draft.background.height * spread,
+              }}
+            />
+          </ViewportPortal>
+        ) : null}
         <CanvasTools />
       </ReactFlow>
     </div>

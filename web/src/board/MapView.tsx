@@ -18,7 +18,7 @@ import { IconButton } from '../ui/Button';
 import { cx } from '../ui/cx';
 import { blobPath, cellById, polylinePath, zoneAt } from './geometry';
 import { zoneFill } from './graphBoard';
-import type { Board, BoardZone, Player, Point, ZoneTheme } from './types';
+import type { Board, BoardBackground, BoardZone, Player, Point, ZoneTheme } from './types';
 
 const t = ru.board;
 
@@ -37,6 +37,8 @@ function seeded(seed: number) {
 type Prop = Point & { theme: ZoneTheme; size: number; flip: boolean };
 
 function scenery(board: Board): Prop[] {
+  // A picture under the map is its scenery (D-277)
+  if (board.background) return [];
   const random = seeded(7);
   const props: Prop[] = [];
   const nearRoute = (p: Point) => board.cells.some((c) => Math.hypot(c.x - p.x, c.y - p.y) < 42);
@@ -113,6 +115,35 @@ function PropShape({ prop }: { prop: Prop }) {
     default:
       return null;
   }
+}
+
+/**
+ * The admin's picture under the map (D-277). It comes after the season itself — the map is drawn first, the picture
+ * fades in once the browser has it, so a slow phone network never waits for it.
+ */
+function BackgroundPicture({ picture }: { picture: BoardBackground }) {
+  const [ready, setReady] = useState(false);
+  return (
+    <image
+      href={picture.url}
+      x={0}
+      y={0}
+      width={picture.width}
+      height={picture.height}
+      preserveAspectRatio="none"
+      data-map-background=""
+      className={cx(
+        'transition-opacity duration-(--duration-slow) motion-reduce:transition-none',
+        ready ? 'opacity-100' : 'opacity-0',
+      )}
+      onLoad={() => {
+        setReady(true);
+      }}
+      onError={() => {
+        setReady(false);
+      }}
+    />
+  );
 }
 
 function Castle({ at }: { at: Point }) {
@@ -576,18 +607,35 @@ export function MapView({
         onKeyDown={handlers.onKeyDown}
       >
         {/* No layer under the map: the table is the frame's own background (a huge SVG layer can exceed a phone
-            GPU's texture limit and render in part). Zones carry their own outline: no black underlay either. */}
-        {board.zones.map((z: BoardZone) => (
-          <path
-            key={z.id}
-            d={blobPath(z.outline)}
-            fill={zoneFill[z.theme]}
-            stroke={ink}
-            strokeWidth={6}
-            strokeLinejoin="round"
-            data-zone={z.id}
-          />
-        ))}
+            GPU's texture limit and render in part). Zones carry their own outline: no black underlay either. The
+            admin's picture (D-277) is the one exception: one image, at most a few thousand pixels a side. */}
+        {board.background ? <BackgroundPicture picture={board.background} /> : null}
+        {board.zones.map((z: BoardZone) =>
+          board.background ? (
+            // Over a picture a zone is its dashed outline: the picture is the world
+            <path
+              key={z.id}
+              d={blobPath(z.outline)}
+              fill="none"
+              stroke={ink}
+              strokeWidth={4}
+              strokeDasharray="14 10"
+              strokeLinejoin="round"
+              opacity={0.7}
+              data-zone={z.id}
+            />
+          ) : (
+            <path
+              key={z.id}
+              d={blobPath(z.outline)}
+              fill={zoneFill[z.theme]}
+              stroke={ink}
+              strokeWidth={6}
+              strokeLinejoin="round"
+              data-zone={z.id}
+            />
+          ),
+        )}
         {props.map((p, i) => (
           <PropShape key={i} prop={p} />
         ))}
@@ -621,7 +669,7 @@ export function MapView({
           );
         })}
 
-        {finish ? <Castle at={finish} /> : null}
+        {finish && !board.background ? <Castle at={finish} /> : null}
 
         {/* The route: a road with an outline, the cells over it */}
         {board.roads.map((road, i) => (

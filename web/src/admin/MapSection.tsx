@@ -15,6 +15,7 @@ import { Notice } from '../ui/States';
 import { Panel } from '../ui/Surface';
 import { useDesk } from '../ui/useDesk';
 import { commentProblem, refusal } from './actions';
+import { MapBackgroundPanel } from './MapBackgroundPanel';
 import { MapCanvas } from './MapCanvas';
 import {
   addCell,
@@ -35,6 +36,7 @@ import {
   setCell,
   setCellType,
   setDefaultBranch,
+  setBackground,
   setPrimaryEntry,
   setZone,
   type CellType,
@@ -265,6 +267,14 @@ function MapEditor({
             )}
           </Panel>
           <ZonesPanel draft={draft} onChange={setDraft} />
+          <MapBackgroundPanel
+            seasonId={seasonId}
+            background={draft.background ?? null}
+            pending={draft.background?.fileId !== start.background?.fileId}
+            onChange={(next) => {
+              setDraft(setBackground(draft, next));
+            }}
+          />
         </div>
       </div>
       <CheckPanel
