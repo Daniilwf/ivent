@@ -326,8 +326,8 @@ export const ru = {
       // A later finisher's place goes by points (D-100): the leaderboard's, not the order of finishing
       later: (place: number | null) =>
         place === null
-          ? 'Ты на финише: бонус за финиш получен, фишка остаётся здесь.'
-          : `Ты на финише, сейчас ${String(place)}-е место: бонус за финиш получен, фишка остаётся здесь.`,
+          ? 'Бонус за финиш получен, фишка остаётся здесь.'
+          : `Сейчас ${String(place)}-е место: бонус за финиш получен, фишка остаётся здесь.`,
       laterNext: 'Играй дальше: кубы за прохождения ещё дают очки, место — по очкам.',
     },
     roll: 'Крутить колесо',
@@ -412,7 +412,7 @@ export const ru = {
       'Сразу новый ролл',
       'Можно только в окне тех-реролла и только для жанров из правил сезона',
     ],
-    wishRerollUntil: (time: string) => `Окно закроется в ${time}.`,
+    wishRerollUntil: (time: string) => `Окно закроется ${time}.`,
     wishRerollConfirm: 'Да, реролл по желанию',
     wishRerollCancel: 'Отмена',
     gameMark: (player: string, kind: 'dropped' | 'techRerolled') =>
