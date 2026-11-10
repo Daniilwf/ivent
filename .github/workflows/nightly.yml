@@ -82,7 +82,8 @@ jobs:
     needs: plan
     if: needs.plan.outputs.mutation == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    # D-280: every mutant runs the engine tests that cover it (about an hour on 4 cores locally)
+    timeout-minutes: 240
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -101,7 +102,7 @@ jobs:
           restore-keys: nuget-${{ runner.os }}-
       - run: dotnet tool restore
       - name: Stryker (engine, break below 80%)
-        run: npm run -s test:mutation
+        run: npm run -s test:mutation -- --concurrency 4
       - name: Mutation report
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
