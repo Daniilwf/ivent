@@ -24,7 +24,10 @@ type Difficulty = NonNullable<Schemas['Difficulty']>;
 
 const ladder = difficultyValues;
 
-/** The runs to check, finishes on top (D-98): approve, approve without a screenshot, or reject */
+/**
+ * The runs to check, finishes on top (D-98): approve, approve without a screenshot, reject, or reject with the drop
+ * penalty for obvious cheating (D-327, D-262)
+ */
 export function ProofQueue({
   seasonId,
   loaded,
@@ -79,7 +82,7 @@ export function ProofQueue({
   );
 }
 
-/** One run to check: what was claimed, the proof, and the three decisions */
+/** One run to check: what was claimed, the proof, and the decisions */
 export function ProofCard({
   seasonId,
   item,
@@ -96,11 +99,15 @@ export function ProofCard({
   const [comment, setComment] = useState('');
   const [commentError, setCommentError] = useState<string>();
   const [error, setError] = useState<string>();
-  const [busy, setBusy] = useState<'approve' | 'reject' | null>(null);
+  const [busy, setBusy] = useState<'approve' | 'reject' | 'rejectPenalty' | null>(null);
   const [rejecting, setRejecting] = useState(false);
   const [rejectComment, setRejectComment] = useState('');
   const [rejectError, setRejectError] = useState<string>();
   const [rejectRefusal, setRejectRefusal] = useState<string>();
+  const [penalizing, setPenalizing] = useState(false);
+  const [penaltyComment, setPenaltyComment] = useState('');
+  const [penaltyError, setPenaltyError] = useState<string>();
+  const [penaltyRefusal, setPenaltyRefusal] = useState<string>();
 
   const claimed = item.difficulty ?? null;
   const lower = claimed ? ladder.slice(0, ladder.indexOf(claimed)) : [];
@@ -159,6 +166,31 @@ export function ProofCard({
       setBusy(null);
     }
   }
+
+  // «Отклонить со штрафом дропа» (D-327): the same body at its own address; a refusal stays in its dialog too
+  async function rejectWithPenalty() {
+    const problem = commentProblem(penaltyComment);
+    setPenaltyError(problem);
+    if (problem) return;
+    setBusy('rejectPenalty');
+    setPenaltyRefusal(undefined);
+    try {
+      const answer = await api.POST(
+        '/api/admin/seasons/{seasonId}/runs/{runId}/reject-with-penalty',
+        { params: { path }, body: { commandId: newCommandId(), comment: penaltyComment.trim() } },
+      );
+      if (answer.data) {
+        setPenalizing(false);
+        onDone(t.rejectedPenalty(item.gameTitle));
+      } else setPenaltyRefusal(refusal(answer));
+    } catch {
+      setPenaltyRefusal(ru.admin.failed);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const rejectLines = t.rejectConsequences(item.diceTotal, item.decidesFinish, item.cellBonus ?? 0);
 
   return (
     <article
@@ -291,7 +323,7 @@ export function ProofCard({
         <Button
           variant={first ? 'main' : 'quiet'}
           loading={busy === 'approve'}
-          disabled={busy === 'reject'}
+          disabled={busy !== null && busy !== 'approve'}
           data-testid="approve"
           onClick={() => void approve()}
         >
@@ -307,16 +339,16 @@ export function ProofCard({
             }
           }}
           trigger={
-            <Button variant="danger" data-testid="reject" disabled={busy === 'approve'}>
+            <Button
+              variant="danger"
+              data-testid="reject"
+              disabled={busy !== null && busy !== 'reject'}
+            >
               {t.reject}
             </Button>
           }
           title={t.rejectTitle(item.gameTitle, item.playerName)}
-          consequences={t.rejectConsequences(
-            item.diceTotal,
-            item.decidesFinish,
-            item.cellBonus ?? 0,
-          )}
+          consequences={rejectLines}
           confirm={t.rejectConfirm}
           busy={busy === 'reject'}
           onConfirm={() => void reject()}
@@ -334,6 +366,44 @@ export function ProofCard({
             }}
           />
           {rejectRefusal ? <Notice tone="danger">{rejectRefusal}</Notice> : null}
+        </ConfirmDanger>
+        <ConfirmDanger
+          open={penalizing}
+          onOpenChange={(open) => {
+            setPenalizing(open);
+            if (!open) {
+              setPenaltyError(undefined);
+              setPenaltyRefusal(undefined);
+            }
+          }}
+          trigger={
+            <Button
+              variant="dangerLink"
+              data-testid="reject-penalty"
+              disabled={busy !== null && busy !== 'rejectPenalty'}
+            >
+              {t.rejectPenalty}
+            </Button>
+          }
+          title={t.rejectPenaltyTitle(item.gameTitle, item.playerName)}
+          consequences={[...rejectLines, ...t.rejectPenaltyConsequences(item.dropPenalty ?? null)]}
+          confirm={t.rejectPenaltyConfirm}
+          busy={busy === 'rejectPenalty'}
+          onConfirm={() => void rejectWithPenalty()}
+        >
+          <TextArea
+            label={ru.admin.comment}
+            hint={t.rejectCommentHint}
+            value={penaltyComment}
+            rows={2}
+            maxLength={500}
+            error={penaltyError}
+            data-testid="reject-penalty-comment"
+            onChange={(e) => {
+              setPenaltyComment(e.target.value);
+            }}
+          />
+          {penaltyRefusal ? <Notice tone="danger">{penaltyRefusal}</Notice> : null}
         </ConfirmDanger>
       </div>
     </article>
