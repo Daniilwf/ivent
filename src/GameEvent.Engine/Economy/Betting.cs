@@ -138,7 +138,9 @@ internal static class Betting
                     foreach (var bet in bettor.Wallet.Bets.Where(b => b.RunId == rejected.RunId && b.Status == BetStatus.Won))
                     {
                         yield return new BetSettled(bettor.PlayerId, bet.BetId, BetStatus.Revoked, bet.Payout);
-                        if (bet.Payout != 0)
+
+                        // The frozen first's coins do not change (Q-3, D-422): the bet is revoked, the coins stay
+                        if (bet.Payout != 0 && !Finishes.IsFrozen(bettor))
                         {
                             yield return new CoinsChanged(bettor.PlayerId, -bet.Payout, CoinsReason.BetPayoutRevoked, RunId: null);
                         }

@@ -65,11 +65,14 @@ internal static class RollPreparation
         return (events, state);
     }
 
-    /// <summary>The filters of the roll in progress, in their order (priority «effect», D-92).</summary>
+    /// <summary>
+    /// The filters of the roll in progress, in their order (priority «effect», D-92); their tags are an imposed genre,
+    /// which refuses the wish reroll (D-325, D-422).
+    /// </summary>
     public static IEnumerable<RollFilter> Filters(SeasonPlayer player) =>
         player.Wallet.CurrentRoll
             .Where(m => m.Filter is not null)
-            .Select(m => new RollFilter(RollFilterPriority.Effect, $"effect:{m.ObjectId}", game => Rolling.Matches(m.Filter!, game)));
+            .Select(m => new RollFilter(RollFilterPriority.Effect, $"effect:{m.ObjectId}", game => Rolling.Matches(m.Filter!, game), m.Filter!.Tags ?? default));
 
     /// <summary>How many games the roll shows: the rules' count, or more when an item asks for a choice (CONTENT.md «Выбор из трёх»).</summary>
     public static int ChoiceCount(SeasonState state, Guid playerId) =>

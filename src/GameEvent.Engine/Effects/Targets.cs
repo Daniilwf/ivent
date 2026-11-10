@@ -52,7 +52,8 @@ internal static class Targets
         switch (spec?.Selector ?? TargetSelector.Self)
         {
             case TargetSelector.Self:
-                return [userId];
+                // A finisher's position is fixed: an effect that only moves him has nobody to act on (D-422)
+                return candidates.Any(p => p.PlayerId == userId) || !PositionOnly(definition.Effect) ? [userId] : [];
             case TargetSelector.RandomActive:
                 var active = candidates.Where(p => !p.IsInactive).ToList();
                 return active.Count == 0 ? [] : [active[context.Random.NextInt(0, active.Count)].PlayerId];

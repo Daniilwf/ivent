@@ -1,4 +1,5 @@
 using GameEvent.Engine.Content;
+using GameEvent.Engine.Finish;
 using GameEvent.Engine.Inventory;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Seasons;
@@ -24,7 +25,7 @@ public static class Timers
         IEnumerable<DateTimeOffset?> moments =
         [
             features.Shop ? wallet.Shop?.ExpiresAt : null,
-            .. features.Items ? wallet.Inventory.Select(o => o.ExpiresAt) : [],
+            .. features.Items && !Finishes.IsFrozen(player) ? wallet.Inventory.Select(o => o.ExpiresAt) : [],
             .. features.Bets ? wallet.Bets.Where(b => b.Status == BetStatus.Open).Select(b => (DateTimeOffset?)b.Deadline) : [],
         ];
         return moments.Where(m => m is not null).Min();
@@ -54,8 +55,9 @@ public static class Timers
                 events.Add(new ShopOfferExpired(player.PlayerId));
             }
 
+            // The frozen first's inventory is frozen too (D-407, D-422)
             events.AddRange(wallet.Inventory
-                .Where(o => features.Items && o.ExpiresAt <= now)
+                .Where(o => features.Items && o.ExpiresAt <= now && !Finishes.IsFrozen(player))
                 .Select(o => new ObjectRemoved(player.PlayerId, o.InstanceId, o.ObjectId, ObjectRemoval.Expired)));
             events.AddRange(wallet.Bets
                 .Where(b => features.Bets && b.Status == BetStatus.Open && b.Deadline <= now)
@@ -119,7 +121,7 @@ internal static class Settlements
 
     private static IEnumerable<IGameEvent> RunsLived(SeasonState state, IGameEvent e)
     {
-        if (Ended(e) is not { } ended)
+        if (Ended(e) is not { } ended || Finishes.IsFrozen(state.Players[ended.PlayerId]))
         {
             yield break;
         }
