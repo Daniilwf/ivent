@@ -1,0 +1,22 @@
+{
+  "id": "talisman-effect",
+  "kind": "effect",
+  "name": "Талисман",
+  "description": "+2 монетки за каждое из трёх следующих прохождений.",
+  "rarity": "epic",
+  "price": null,
+  "hostile": false,
+  "effect": {
+    "trigger": "runCompleted",
+    "duration": {
+      "runs": 3
+    },
+    "actions": [
+      {
+        "type": "changeResource",
+        "resource": "coins",
+        "amount": 2
+      }
+    ]
+  }
+}

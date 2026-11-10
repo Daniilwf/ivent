@@ -1,0 +1,29 @@
+{
+  "id": "curse-effect",
+  "kind": "effect",
+  "name": "Проклят",
+  "description": "Следующий бросок за прохождение −1d6, минимум 1.",
+  "rarity": "legendary",
+  "price": null,
+  "hostile": true,
+  "effect": {
+    "trigger": "beforeDice",
+    "duration": {
+      "uses": 1
+    },
+    "actions": [
+      {
+        "type": "modifyDice",
+        "when": "current",
+        "stage": "add",
+        "value": "-1d6"
+      },
+      {
+        "type": "modifyDice",
+        "when": "current",
+        "stage": "min",
+        "value": 1
+      }
+    ]
+  }
+}

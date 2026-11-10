@@ -1,0 +1,22 @@
+{
+  "id": "orange",
+  "kind": "item",
+  "name": "Апельсин",
+  "description": "Иди на 1 клетку вперёд.",
+  "rarity": "common",
+  "price": 10,
+  "window": "anytime",
+  "hostile": false,
+  "stackable": true,
+  "effect": {
+    "target": {
+      "selector": "self"
+    },
+    "actions": [
+      {
+        "type": "move",
+        "steps": 1
+      }
+    ]
+  }
+}

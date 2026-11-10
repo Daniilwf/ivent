@@ -1,0 +1,22 @@
+{
+  "id": "shortcut-ticket",
+  "kind": "item",
+  "name": "Билет на шорткат",
+  "description": "Перенесись туда, куда ведёт ближайший шорткат впереди.",
+  "rarity": "epic",
+  "price": 25,
+  "window": "anytime",
+  "hostile": false,
+  "stackable": false,
+  "effect": {
+    "target": {
+      "selector": "self"
+    },
+    "actions": [
+      {
+        "type": "teleport",
+        "cell": "nearestShortcut"
+      }
+    ]
+  }
+}

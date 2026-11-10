@@ -5980,6 +5980,7 @@ export interface components {
             source: components["schemas"]["ManualEffectSource"];
             /** Format: uuid */
             runId: null | string;
+            objectId?: null | string;
         };
         /**
          * @description The season's map in the editor (2.11): the map in force, the players on it, the mode (the editor publishes only in
@@ -6763,13 +6764,14 @@ export interface components {
          * @description What created a manual effect; C11 adds item, cell and event sources.
          * @enum {unknown}
          */
-        ManualEffectSource: "paidReroll" | "drop" | "difficulty";
+        ManualEffectSource: "paidReroll" | "drop" | "difficulty" | "item";
         /** @description A manual effect the player still has to play out (D-10, D-93); the player resolves it (D-102). */
         ManualEffectView: {
             /** Format: uuid */
             id: string;
             drawEvent: components["schemas"]["EventKind"];
             source: components["schemas"]["ManualEffectSource"];
+            objectId?: null | string;
         };
         /**
          * @description The check of a map before publication (SPEC «Редактор»): every problem at once — the map's own (MapValidator) and
@@ -6829,7 +6831,7 @@ export interface components {
          * @description What moved the token. Rejecting a run takes back the cells of moves linked to it.
          * @enum {unknown}
          */
-        MoveReason: "completionRoll" | "startingCell" | "adminAdjustment" | "dropPenalty" | "runCorrection" | "proofRejected" | "teleport";
+        MoveReason: "completionRoll" | "startingCell" | "adminAdjustment" | "dropPenalty" | "runCorrection" | "proofRejected" | "teleport" | "item" | "itemTeleport" | "diceModified";
         /**
          * @description My latest move, from the log: the legs of the one command that moved my token last, so the page walks the token
          *     along the real branch and teleport. `sequence` tells one move from the next.
@@ -7683,9 +7685,9 @@ export const emptyPoolFallbackValues: ReadonlyArray<FlattenedDeepRequired<compon
 export const eventKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["EventKind"]> = ["good", "bad"];
 export const gameMarkKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["GameMarkKind"]> = ["dropped", "techRerolled"];
 export const mandatoryEventValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["MandatoryEvent"]> = ["bad", "none"];
-export const manualEffectSourceValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ManualEffectSource"]> = ["paidReroll", "drop", "difficulty"];
+export const manualEffectSourceValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ManualEffectSource"]> = ["paidReroll", "drop", "difficulty", "item"];
 export const mapModeValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["MapMode"]> = ["linear", "graph"];
-export const moveReasonValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["MoveReason"]> = ["completionRoll", "startingCell", "adminAdjustment", "dropPenalty", "runCorrection", "proofRejected", "teleport"];
+export const moveReasonValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["MoveReason"]> = ["completionRoll", "startingCell", "adminAdjustment", "dropPenalty", "runCorrection", "proofRejected", "teleport", "item", "itemTeleport", "diceModified"];
 export const proofStatusValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ProofStatus"]> = ["pending", "approved", "rejected"];
 export const rerollCostKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["RerollCostKind"]> = ["coins", "badEvent"];
 export const rerollPaymentValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["RerollPayment"]> = ["freeThisRoll", "freeRerollResource", "coins", "badEvent", "freeMode"];
