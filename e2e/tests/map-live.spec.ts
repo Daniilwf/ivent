@@ -10,13 +10,14 @@ import {
   setUpSeason,
   signIn,
 } from '../support/world.ts';
+import { fingerDrag, mapMiddle, mapView, pinchOut } from '../support/touch.ts';
 
 // Stage 2 closing (2.12, D-272): two browsers on the graph map. Player A reaches a fork and picks the branch that is not
 // the default; player B, on the season's screen all along, sees A's token stop at the fork, then stand on the far end
 // of the chosen branch — where only its teleport leads — and the feed tells the branch and the flight, all without a
 // reload. On a desktop the admin then publishes the map mid-season while the players stand on it: refused while A
 // chooses the branch and when the draft removes the cell A stands on, accepted for a valid change, which both players
-// see live.
+// see live. On a phone B's graph map zooms with two fingers and pans with one (MP29, D-275).
 
 /**
  * start → fork, the default branch a1…a6 and the branch b1…b10, both to the finish. b1, b2 and b3 are teleports to b9:
@@ -147,6 +148,21 @@ test('a fork and a teleport seen live from another browser; the map published mi
   expect(await wasNotReloaded(b)).toBe(true);
   await b.goBack();
   await expect(b.getByRole('heading', { level: 1, name: world.seasonName })).toBeVisible();
+
+  if (!desktop) {
+    // The graph on a phone, cropped around B's token (D-320 (9)): two fingers bring it closer, one finger drags it
+    await expect(b.getByTestId('cell-b9')).toBeAttached();
+    const middle = await mapMiddle(b);
+    const start = await mapView(b);
+    await pinchOut(b, middle);
+    await expect.poll(async () => (await mapView(b)).width).toBeLessThan(start.width * 0.9);
+    const zoomed = await mapView(b);
+    await fingerDrag(b, middle, { x: -80, y: 0 });
+    await expect.poll(async () => (await mapView(b)).centre).toBeGreaterThan(zoomed.centre);
+    await fingerDrag(b, middle, { x: 0, y: -80 });
+    await expect.poll(async () => (await mapView(b)).middle).toBeGreaterThan(zoomed.middle);
+    expect(await wasNotReloaded(b)).toBe(true);
+  }
 
   if (!editor) return;
 
