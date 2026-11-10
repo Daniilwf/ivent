@@ -107,6 +107,45 @@ public static class ProofReviewOrder
     }
 }
 
+/// <summary>
+/// What «Отклонить со штрафом дропа» would take (D-327), for the admin's confirm: the dice of the penalty, and whether they
+/// take points and cells and deal a bad event.
+/// </summary>
+public sealed record RejectPenalty(int Count, int Sides, bool AffectsPoints, bool AffectsPosition, bool BadEvent);
+
+/// <summary>
+/// The preview of a reject with the drop penalty: it folds the same reject events the command does and reads the penalty
+/// off the state they leave — a finish the surplus keeps still fixes the position (Q-3, D-99).
+/// </summary>
+public static class RejectPenaltyPreview
+{
+    /// <summary>Null when the penalty takes nothing: the frozen first (Q-3).</summary>
+    public static RejectPenalty? Of(SeasonState state, RunState run)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        ArgumentNullException.ThrowIfNull(run);
+        if (Finishes.IsFrozen(state.Players[run.PlayerId]))
+        {
+            return null;
+        }
+
+        var rejected = ProofReview.RejectEvents(state, run, comment: string.Empty, now: default).Aggregate(state, SeasonEngine.Apply);
+        var player = rejected.Players[run.PlayerId];
+        if (Finishes.IsFrozen(player))
+        {
+            return null;
+        }
+
+        var drop = rejected.Rules.Drop;
+        return new RejectPenalty(
+            DropStreak.PenaltyDiceCount(drop, DropStreak.Before(rejected, rejected.Runs[run.RunId])),
+            drop.PenaltyDice.Sides,
+            drop.AffectsPoints,
+            drop.AffectsPosition && player.Finish is null,
+            drop.MandatoryEvent == Rulesets.MandatoryEvent.Bad);
+    }
+}
+
 internal static class ProofReview
 {
     public static Decision Decide(SeasonState state, SubmitProof command, EngineContext context)
@@ -256,18 +295,46 @@ internal static class ProofReview
             return Decision.Reject(RejectionCodes.CommentTooLong, $"The comment is limited to {Limits.MaxCommentLength} characters.");
         }
 
+        var run = state.Runs[runId];
+        var events = RejectEvents(state, run, comment, context.Clock.UtcNow);
+        if (Finishes.IsFrozen(state.Players[run.PlayerId]))
+        {
+            return Decision.Accept(events);
+        }
+
+        // «Отклонить со штрафом дропа» (D-327): the season's drop penalty on what is left, as a drop — its dice counting the
+        // drops in a row before the run (D-324)
+        if (withDropPenalty)
+        {
+            var rejected = events.Aggregate(state, SeasonEngine.Apply);
+            var dice = CompletionRoll.Roll(
+                DropStreak.PenaltyDiceCount(rejected.Rules.Drop, DropStreak.Before(rejected, rejected.Runs[run.RunId])),
+                rejected.Rules.Drop.PenaltyDice.Sides,
+                context.Random);
+            events.Add(new ProofRejectPenalized(run.RunId, run.PlayerId, dice, context.Clock.UtcNow));
+            events.AddRange(Drops.Penalty(rejected, rejected.Players[run.PlayerId], dice, run.RunId, context, exclude: false));
+        }
+
+        return Decision.Accept(events);
+    }
+
+    /// <summary>
+    /// The events of a reject without the drop penalty (D-15, D-98, Q-3); the frozen first gets only the reject and the
+    /// end of the run's pending difficulty event. Pure of the context, so the queue's preview folds the same events.
+    /// </summary>
+    internal static List<IGameEvent> RejectEvents(SeasonState state, RunState run, string comment, DateTimeOffset now)
+    {
         // D-15, D-98: what this run gave is taken back — its dice (after every correction), the cells it moved the
         // token, its completion coins; its pending difficulty event is not applicable.
-        var run = state.Runs[runId];
         var player = state.Players[run.PlayerId];
-        var events = new List<IGameEvent> { new ProofRejected(run.RunId, run.PlayerId, comment, context.Clock.UtcNow) };
+        var events = new List<IGameEvent> { new ProofRejected(run.RunId, run.PlayerId, comment, now) };
 
         // The frozen first loses nothing (Q-3); his runs up to the finish are approved, so only later ones get here.
         // The rejected run's pending difficulty event still does not apply (D-98, D-99).
         if (Finishes.IsFrozen(player))
         {
             events.AddRange(PendingDifficultyEvents(state, run, comment));
-            return Decision.Accept(events);
+            return events;
         }
 
         // D-327: the dice and the points bonus of the cell the move stopped on, in one change
@@ -312,20 +379,7 @@ internal static class ProofReview
             events.AddRange(Finishes.AfterReduction(after, after.Players[player.PlayerId], after.Runs[run.RunId], taken, MoveReason.ProofRejected));
         }
 
-        // «Отклонить со штрафом дропа» (D-327): the season's drop penalty on what is left, as a drop — its dice counting the
-        // drops in a row before the run (D-324)
-        if (withDropPenalty)
-        {
-            var rejected = events.Aggregate(state, SeasonEngine.Apply);
-            var dice = CompletionRoll.Roll(
-                DropStreak.PenaltyDiceCount(rejected.Rules.Drop, DropStreak.Before(rejected, rejected.Runs[run.RunId])),
-                rejected.Rules.Drop.PenaltyDice.Sides,
-                context.Random);
-            events.Add(new ProofRejectPenalized(run.RunId, run.PlayerId, dice, context.Clock.UtcNow));
-            events.AddRange(Drops.Penalty(rejected, rejected.Players[run.PlayerId], dice, run.RunId, context, exclude: false));
-        }
-
-        return Decision.Accept(events);
+        return events;
     }
 
     /// <summary>
