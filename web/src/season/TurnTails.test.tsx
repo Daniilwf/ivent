@@ -26,7 +26,11 @@ const runId = 'e0000000-0000-0000-0000-000000000001';
 
 type Me = Schemas['MyTurnView'];
 
-function season(turn: Partial<Me> = {}, cellId = 'start'): Schemas['SeasonView'] {
+function season(
+  turn: Partial<Me> = {},
+  cellId = 'start',
+  row: { place?: number; isFirst?: boolean } = {},
+): Schemas['SeasonView'] {
   const players: Schemas['PlayerView'][] = [
     {
       id: me,
@@ -75,11 +79,11 @@ function season(turn: Partial<Me> = {}, cellId = 'start'): Schemas['SeasonView']
     leaderboard: [
       {
         playerId: me,
-        place: 1,
+        place: row.place ?? 1,
         points: 12,
         cellsToFinish: cellId === 'finish' ? 0 : 2,
-        isFirst: turn.finish?.order === 1,
-        provisional: turn.finish?.order === 1 && !turn.finish.frozen,
+        isFirst: row.isFirst ?? turn.finish?.order === 1,
+        provisional: (row.isFirst ?? turn.finish?.order === 1) && turn.finish?.frozen !== true,
       },
     ],
   };
@@ -146,13 +150,31 @@ describe('the finished player’s turn card (D-260)', () => {
     expect(screen.getByTestId('roll')).toBeEnabled();
   });
 
-  it('says a later finisher’s order and that the points still grow', async () => {
-    serve(() => season({ finish: { order: 3, frozen: false } }, 'finish'));
+  it('says a later finisher’s place by points and that the points still grow', async () => {
+    serve(() => season({ finish: { order: 3, frozen: false } }, 'finish', { place: 2 }));
     render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
 
     const finish = await screen.findByTestId('my-finish');
-    expect(finish).toHaveTextContent(ru.turn.myFinish.later(3));
+    expect(finish).toHaveTextContent(ru.turn.myFinish.later(2));
     expect(finish).toHaveTextContent(ru.turn.myFinish.laterNext);
+    expect(finish).not.toHaveTextContent(ru.turn.myFinish.firstProvisional);
+  });
+
+  it('takes the first place from the leaderboard: the second to finish leads once the first’s finish is revoked', async () => {
+    // D-99: the order of finishing is never reused — Петя of scenario 5 finished second and holds the first place
+    serve(() => season({ finish: { order: 2, frozen: false } }, 'finish', { isFirst: true }));
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    expect(await screen.findByTestId('my-finish')).toHaveTextContent(
+      ru.turn.myFinish.firstProvisional,
+    );
+  });
+
+  it('says the frozen one is the first whatever his order of finishing', async () => {
+    serve(() => season({ finish: { order: 2, frozen: true } }, 'finish', { isFirst: true }));
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    expect(await screen.findByTestId('my-finish')).toHaveTextContent(ru.turn.myFinish.firstFrozen);
   });
 
   it('shows no finish state to a player who has not finished', async () => {

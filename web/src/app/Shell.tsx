@@ -95,6 +95,7 @@ export function Shell({
   onChangePassword,
   onLogout,
   offline,
+  waiting: shownInStyleguide,
   children,
 }: {
   user: Schemas['CurrentUser'];
@@ -104,13 +105,16 @@ export function Shell({
   onLogout: () => void;
   /** The styleguide shows the lost connection without losing it */
   offline?: boolean;
+  /** The styleguide shows the admin's count of proofs to check without a season */
+  waiting?: number;
   children: ReactNode;
 }) {
   // The admin's menu also opens the admin's pages (H8)
   const admin = user.role === 'admin';
   // On the admin page the page's own queue reads give the count; elsewhere the header reads it
   const onAdminPage = routeOf(usePath()).kind === 'admin';
-  const waiting = useWaitingProofs(admin ? seasonId : null, admin && !onAdminPage) ?? 0;
+  const read = useWaitingProofs(admin ? seasonId : null, admin && !onAdminPage) ?? 0;
+  const waiting = shownInStyleguide ?? read;
   const shownWaiting = admin && waiting > 0 ? waiting : 0;
   const live = useSyncExternalStore(connectionStatus.subscribe, connectionStatus.get) === 'online';
   const online = offline === undefined ? live : !offline;

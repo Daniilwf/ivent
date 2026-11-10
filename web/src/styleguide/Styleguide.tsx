@@ -13,6 +13,7 @@ import { CompleteForm } from '../season/CompleteForm';
 import { ProofSection } from '../season/ProofForm';
 import { ChoiceCard, OfferCard } from '../season/RollResult';
 import { RunActions } from '../season/RunActions';
+import { MyFinish } from '../season/MyFinish';
 import { Leaderboard } from '../board/Leaderboard';
 import { cellsToFinish } from '../board/geometry';
 import { demoBoard } from '../board/demoBoard';
@@ -193,6 +194,23 @@ export function Styleguide() {
               {null}
             </Shell>
           </div>
+          {/* D-263: the admin's count of proofs to check on the menu button; 99+ at most */}
+          {[4, 120].map((waiting) => (
+            <div
+              key={waiting}
+              className="h-30 w-full max-w-98 overflow-hidden rounded-lg border-2 border-muted desk:h-16"
+            >
+              <Shell
+                user={{ ...demoUser, role: 'admin' }}
+                offline={false}
+                waiting={waiting}
+                onChangePassword={() => undefined}
+                onLogout={() => undefined}
+              >
+                {null}
+              </Shell>
+            </div>
+          ))}
         </div>
       </Section>
 
@@ -479,6 +497,9 @@ export function Styleguide() {
               dropHintMinutes={null}
               dropPenalty={demoPenalty}
               techRerollOpen
+              techRerollUntil="2026-09-25T18:00:00Z"
+              wishRerollOpen
+              onWishReroll={noop}
               pending={false}
               onDrop={noop}
               onTechReroll={noop}
@@ -624,6 +645,12 @@ export function Styleguide() {
 
       <Section id="finish" title={t.finish.title} lead={t.finish.lead}>
         <FinishDemo />
+        {/* D-260: the finisher's own turn card — provisional first, frozen first, a later finisher */}
+        <div className="grid items-start gap-4 desk:grid-cols-3">
+          <MyFinish finish={{ order: 1, frozen: false }} first place={1} />
+          <MyFinish finish={{ order: 2, frozen: true }} first place={1} />
+          <MyFinish finish={{ order: 3, frozen: false }} first={false} place={4} />
+        </div>
       </Section>
 
       <Section id="feed" title={t.feed.title} lead={t.feed.lead}>
