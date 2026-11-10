@@ -7,7 +7,8 @@ namespace GameEvent.Engine.Effects;
 
 /// <summary>
 /// Whom an effect reaches (SPEC «Цели», «Взаимодействие игроков»): everyone but the first finisher; random targets only
-/// among the active; effects only on the position skip the finishers, whose position is fixed; <c>among</c> and
+/// among the active; a player who finished not first is reached only by effects on points and coins, and his own effects that only move him
+/// have nobody to act on (his position is fixed); <c>among</c> and
 /// <c>excludeSelf</c> narrow; <c>effects.attacksOnlyOnHigherPoints</c> keeps hostile effects on those with more points.
 /// </summary>
 internal static class Targets
@@ -70,6 +71,7 @@ internal static class Targets
         var user = state.Players[userId];
         var selector = spec?.Selector ?? TargetSelector.Self;
         var positionOnly = PositionOnly(definition.Effect);
+        var pointsAndCoinsOnly = PointsAndCoinsOnly(definition.Effect);
         var among = selector switch
         {
             TargetSelector.HigherPoints => Among.HigherPoints,
@@ -79,11 +81,29 @@ internal static class Targets
         var onlyHigher = definition.Hostile && state.Rules.Effects.AttacksOnlyOnHigherPoints;
         return [.. state.Players.Values.Where(p =>
             !IsFirst(state, p.PlayerId)
-            && !(positionOnly && p.Finish is not null)
+            && !(p.Finish is not null && (p.PlayerId == userId ? positionOnly : !pointsAndCoinsOnly))
             && !(spec?.ExcludeSelf == true && p.PlayerId == userId)
             && !(among == Among.HigherPoints && p.Points <= user.Points)
             && !(among == Among.LowerPoints && p.Points >= user.Points)
             && !(onlyHigher && p.PlayerId != userId && p.Points <= user.Points))];
+    }
+
+    /// <summary>
+    /// An effect that acts on its target only through points and coins (dice for the amount aside; actions aimed at the
+    /// user himself do not count): the only kind that reaches a player who finished not first (SPEC «Цели», D-424).
+    /// </summary>
+    public static bool PointsAndCoinsOnly(EffectSpec? effect)
+    {
+        if (effect is null)
+        {
+            return false;
+        }
+
+        var onTarget = effect.Actions.Concat(effect.Outcomes?.Cases.SelectMany(c => c.Actions) ?? [])
+            .Where(a => a.Target != ActionTarget.Self)
+            .ToList();
+        return onTarget.Any(a => a is ChangeResourceAction)
+            && onTarget.All(a => a is RollAction || (a is ChangeResourceAction c && c.Resource is Actions.ChangeResourceHandler.Points or Actions.ChangeResourceHandler.Coins));
     }
 
     /// <summary>An effect that only moves the token: finishers are out of its reach (SPEC «Исключения по умолчанию»).</summary>

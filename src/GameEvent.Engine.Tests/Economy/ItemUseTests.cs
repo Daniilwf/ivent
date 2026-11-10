@@ -249,6 +249,41 @@ public class ItemUseTests
         Assert.Contains(s.LastEvents<CoinsChanged>(), c => c.PlayerId == s.PlayerId("Коля") && c.Delta == -2);
     }
 
+    [Theory]
+    [InlineData("magnet")]
+    [InlineData("bomb")]
+    [InlineData("curse")]
+    [InlineData("dirty-trick")]
+    public void Only_points_and_coins_reach_a_later_finisher(string item)
+    {
+        // SPEC «Цели»: «По финишировавшим не первыми работают только эффекты на очки и монетки»
+        var s = Season(mapLength: 2);
+        s.RollTitle("Петя", "Silent Hill").Start("Петя").NextRandom(1, 1).Complete("Петя");
+        s.RollTitle("Коля", "Dead Space").Start("Коля").NextRandom(1, 1, 1).Complete("Коля");
+        Assert.Equal(2, s.Player("Коля").Finish!.Order);
+        s.Give("Коля", "shield");
+
+        s.Give("Вася", item);
+        s.Use("Вася", s.Held("Вася", item).InstanceId, target: "Коля");
+
+        Assert.Equal(RejectionCodes.ItemInvalidTarget, s.Last.Rejection!.Code);
+        Assert.Contains("shield", s.Inventory("Коля"));
+        Assert.Contains(item, s.Inventory("Вася"));
+    }
+
+    [Fact]
+    public void Points_of_a_later_finisher_can_still_be_stolen()
+    {
+        var s = Season(mapLength: 2);
+        s.RollTitle("Петя", "Silent Hill").Start("Петя").NextRandom(1, 1).Complete("Петя");
+        s.RollTitle("Коля", "Dead Space").Start("Коля").NextRandom(1, 1, 1).Complete("Коля");
+
+        s.Give("Вася", "point-thief");
+        s.NextRandom(2).Used("Вася", "point-thief", target: "Коля");
+
+        Assert.Contains(s.LastEvents<PointsChanged>(), c => c.PlayerId == s.PlayerId("Коля") && c.Delta == -2);
+    }
+
     [Fact]
     public void Stealing_coins_takes_the_rolled_amount_from_the_target_and_gives_it_to_the_user()
     {
