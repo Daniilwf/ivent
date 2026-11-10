@@ -196,6 +196,27 @@ public class ContentPackTests
     }
 
     [Fact]
+    public void A_pack_made_from_an_older_version_is_refused_and_one_from_the_version_in_force_is_published()
+    {
+        // D-491: the editor sends the version it was opened on, so two admins never overwrite each other silently
+        var s = Season().WithContent(EconomyScenario.ExamplePack("orange"));
+        var bigger = EconomyScenario.ExamplePack("orange", "shield", "shield-effect");
+
+        s.Act(new PublishContent(bigger, "Старый редактор", ExpectedVersion: 0));
+        Assert.Equal(RejectionCodes.ContentVersionChanged, s.Last.Rejection!.Code);
+        Assert.Equal(1, s.State.Catalog.Version);
+
+        s.Act(new PublishContent(bigger, "Свежий редактор", ExpectedVersion: 1));
+        Assert.True(s.Last.IsAccepted);
+        Assert.Equal(2, s.State.Catalog.Version);
+
+        // Without a version (a pack loaded by a script or a seed) it is taken as before
+        s.Act(new PublishContent(EconomyScenario.ExamplePack("orange"), "Без версии"));
+        Assert.True(s.Last.IsAccepted);
+        Assert.Equal(3, s.State.Catalog.Version);
+    }
+
+    [Fact]
     public void A_definition_left_out_is_soft_deleted_and_the_objects_held_keep_working()
     {
         var s = Season().WithContent(EconomyScenario.ExamplePack("orange", "reroll-coupon"));

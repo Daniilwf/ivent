@@ -188,6 +188,13 @@ public static class ContentPublishing
             return Decision.Reject(RejectionCodes.CommentTooLong, $"The comment is limited to {Limits.MaxCommentLength} characters.");
         }
 
+        if (command.ExpectedVersion is { } expected && expected != state.Catalog.Version)
+        {
+            return Decision.Reject(
+                RejectionCodes.ContentVersionChanged,
+                $"The content changed while it was edited: version {state.Catalog.Version} is in force, the pack was made from {expected}.");
+        }
+
         var errors = Check(command.Pack);
         if (errors.Count > 0)
         {
