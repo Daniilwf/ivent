@@ -91,8 +91,9 @@ describe('GameScreen', () => {
     expect(screen.getByRole('heading', { name: ru.gamePage.runsTitle(2) })).toBeInTheDocument();
 
     const [done, dropped] = [...screen.getByTestId('game-runs').children] as HTMLElement[];
-    // The player's sticker has their token colour in that season
-    expect(done?.querySelector('span')).toHaveStyle({ background: 'var(--color-token-5)' });
+    // The player's sticker has their token colour in that season. The inline declaration is read:
+    // jsdom 30.1.3 substitutes var() in computed styles, and the test page defines no tokens (D-251)
+    expect(done?.querySelector('span')?.style.background).toBe('var(--color-token-5)');
     expect(within(done as HTMLElement).getByRole('link', { name: 'Вася' })).toHaveAttribute(
       'href',
       `/users/${vasya}`,
