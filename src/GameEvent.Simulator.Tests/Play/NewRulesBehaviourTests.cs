@@ -151,7 +151,9 @@ public class NewRulesBehaviourTests
 
         // The frozen first loses nothing and takes no penalty (D-99); every other reject is penalized
         Assert.All(rejected.Where(r => r.PenalizedReject), r => Assert.True(r.Penalty > 0));
-        Assert.True(rejected.Count(r => r.PenalizedReject) > rejected.Count / 2);
+        Assert.All(rejected.Where(r => !r.RejectedWhileFrozen), r => Assert.True(r.PenalizedReject));
+        Assert.All(rejected.Where(r => r.RejectedWhileFrozen), r => Assert.False(r.PenalizedReject));
+        Assert.Contains(rejected, r => !r.RejectedWhileFrozen);
         Assert.All(seasons.SelectMany(s => s.Bots), b => Assert.True(b.PenalizedRejects <= seasons.SelectMany(s => s.Runs).Count(r => r.Bot == b.Index && r.End == RunEnd.Rejected)));
         foreach (var season in seasons)
         {

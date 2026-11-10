@@ -25,7 +25,8 @@ public enum RunEnd
 /// (no points). <see cref="DropStreak"/> — for a drop, the drops in a row before it (D-324); <see cref="WishListed"/> — the
 /// game could be given up by wish (D-325); <see cref="MoveCells"/> — the cells its completion moved the token forward;
 /// for a reject, <see cref="RejectCells"/> — the cells it moved the token back, <see cref="RejectedAfterFinish"/> — the
-/// player had a finish then, <see cref="PenalizedReject"/> — it came with the drop penalty (D-327), <see cref="RejectTaken"/> — the points it took
+/// player had a finish then, <see cref="RejectedWhileFrozen"/> — he was the frozen first then (D-99),
+/// <see cref="PenalizedReject"/> — it came with the drop penalty (D-327), <see cref="RejectTaken"/> — the points it took
 /// back (the dice and the bonus of the cell the move stopped on).
 /// </summary>
 public sealed record RunOutcome(
@@ -43,7 +44,8 @@ public sealed record RunOutcome(
     int RejectCells = 0,
     bool RejectedAfterFinish = false,
     bool PenalizedReject = false,
-    int RejectTaken = 0);
+    int RejectTaken = 0,
+    bool RejectedWhileFrozen = false);
 
 /// <summary>A bot's branch at a fork (<see cref="Fork"/> — the fork cell, <see cref="Option"/> — the cell of the branch).</summary>
 public sealed record BranchOutcome(int Bot, string Fork, string Option);

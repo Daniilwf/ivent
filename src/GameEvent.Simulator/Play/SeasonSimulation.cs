@@ -574,6 +574,7 @@ public sealed class SeasonSimulation
                 // The engine takes back all the move gave (D-321, D-327); the simulator only notes what it saw
                 const string Comment = "Пруф не подтверждает прохождение";
                 _runs[runId].RejectedAfterFinish = _state.Players[run.PlayerId].Finish is not null;
+                _runs[runId].RejectedWhileFrozen = _state.Players[run.PlayerId].Finish?.Frozen == true;
                 Execute(
                     _bots.Chance(admin.PenalizedRejectShare) ? new RejectProofWithDropPenalty(runId, Comment) : new RejectProof(runId, Comment),
                     bot: null);
@@ -767,7 +768,7 @@ public sealed class SeasonSimulation
             bots,
             [.. _runOrder.Select(r => new RunOutcome(
                 r.Bot, r.Hours, r.PlayHours, r.End, r.Points, r.Penalty, r.Zone, r.FreeMode, r.DropStreak, r.WishListed, r.MoveCells,
-                r.RejectCells, r.RejectedAfterFinish, r.PenalizedReject, r.RejectTaken))],
+                r.RejectCells, r.RejectedAfterFinish, r.PenalizedReject, r.RejectTaken, r.RejectedWhileFrozen))],
             [.. _branches],
             first?.FinishedDay,
             first?.FrozenDay,
@@ -850,6 +851,8 @@ public sealed class SeasonSimulation
         public int RejectCells { get; set; }
 
         public bool RejectedAfterFinish { get; set; }
+
+        public bool RejectedWhileFrozen { get; set; }
 
         public bool PenalizedReject { get; set; }
 
