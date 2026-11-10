@@ -17,6 +17,12 @@ public enum PointsReason
 
     /// <summary>A stop on a points bonus cell (D-303).</summary>
     CellBonus,
+
+    /// <summary>An item or an effect (<c>changeResource</c> on <c>points</c>).</summary>
+    Item,
+
+    /// <summary>Items or effects changed a run's throw after it was made (D-408).</summary>
+    DiceModified,
 }
 
 /// <summary>What changed a player's coins. Coins always equal the sum of deltas in non-undone events.</summary>
@@ -28,6 +34,24 @@ public enum CoinsReason
     CompletionReward,
     RunCorrection,
     ProofRejected,
+
+    /// <summary>An item or an effect (<c>changeResource</c> on <c>coins</c>).</summary>
+    Item,
+
+    /// <summary>A shop roll paid in coins.</summary>
+    ShopRoll,
+
+    /// <summary>A lot bought in the shop.</summary>
+    Purchase,
+
+    /// <summary>A bet's stake went into the pledge.</summary>
+    BetStake,
+
+    /// <summary>A won bet paid out.</summary>
+    BetPayout,
+
+    /// <summary>A won bet's payout was taken back after the run's proof was rejected.</summary>
+    BetPayoutRevoked,
 }
 
 /// <summary>What changed another resource of a player.</summary>
@@ -35,6 +59,12 @@ public enum ResourceReason
 {
     AdminAdjustment,
     Reroll,
+
+    /// <summary>An item or an effect (<c>changeResource</c> on another resource).</summary>
+    Item,
+
+    /// <summary>A free shop roll spent (<c>freeShopRolls</c>).</summary>
+    ShopRoll,
 }
 
 /// <summary>Points changed by <see cref="Delta"/>; <see cref="RunId"/> links the change to a run when there is one.</summary>

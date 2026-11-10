@@ -23,7 +23,7 @@ public sealed record SeasonDeadlineRequest(Guid CommandId, DateTimeOffset? Deadl
 
 /// <summary>A pending manual effect of any player, oldest first, for the admin to resolve (D-102).</summary>
 public sealed record AdminManualEffectView(
-    Guid Id, Guid PlayerId, string PlayerName, Engine.Rulesets.EventKind DrawEvent, Engine.Effects.ManualEffectSource Source, Guid? RunId);
+    Guid Id, Guid PlayerId, string PlayerName, Engine.Rulesets.EventKind DrawEvent, Engine.Effects.ManualEffectSource Source, Guid? RunId, string? ObjectId = null);
 
 /// <summary>An admin action on the season with nothing else to say (D-113: recalculate the finish bonuses).</summary>
 public sealed record SeasonActionRequest(Guid CommandId);
@@ -135,7 +135,7 @@ public static class AdminSeasonEndpoints
             .Where(x => x.SeasonId == seasonId)
             .Join(db.SeasonPlayers, x => x.PlayerId, p => p.Id, (x, p) => new { x, p.Name })
             .OrderBy(r => r.x.Id)
-            .Select(r => new AdminManualEffectView(r.x.Id, r.x.PlayerId, r.Name, r.x.DrawEvent, r.x.Source, r.x.RunId))
+            .Select(r => new AdminManualEffectView(r.x.Id, r.x.PlayerId, r.Name, r.x.DrawEvent, r.x.Source, r.x.RunId, r.x.ObjectId))
             .ToListAsync(ct);
         return TypedResults.Ok(effects);
     }

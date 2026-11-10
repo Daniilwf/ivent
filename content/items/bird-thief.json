@@ -1,0 +1,34 @@
+{
+  "id": "bird-thief",
+  "kind": "item",
+  "name": "Птичкерс",
+  "description": "Укради у выбранного игрока 1d4 монеток.",
+  "rarity": "common",
+  "price": 15,
+  "window": "anytime",
+  "hostile": true,
+  "stackable": false,
+  "effect": {
+    "target": {
+      "selector": "chosen",
+      "excludeSelf": true
+    },
+    "actions": [
+      {
+        "type": "roll",
+        "dice": "1d4"
+      },
+      {
+        "type": "changeResource",
+        "resource": "coins",
+        "amount": "-$roll"
+      },
+      {
+        "type": "changeResource",
+        "resource": "coins",
+        "amount": "$roll",
+        "target": "self"
+      }
+    ]
+  }
+}

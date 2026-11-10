@@ -1,0 +1,23 @@
+{
+  "id": "piggy-bank",
+  "kind": "item",
+  "name": "Копилка",
+  "description": "Получи 1d6 монеток.",
+  "rarity": "common",
+  "price": null,
+  "window": "anytime",
+  "hostile": false,
+  "stackable": true,
+  "effect": {
+    "target": {
+      "selector": "self"
+    },
+    "actions": [
+      {
+        "type": "changeResource",
+        "resource": "coins",
+        "amount": "1d6"
+      }
+    ]
+  }
+}

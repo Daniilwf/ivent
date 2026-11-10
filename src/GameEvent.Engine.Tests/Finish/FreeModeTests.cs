@@ -357,7 +357,7 @@ public class FreeModeTests
         Assert.Equal([new PointsChanged(vasya, -5, PointsReason.DropPenalty, runId)], s.LastEvents<PointsChanged>());
         Assert.Empty(s.LastEvents<PlayerMoved>());
         var created = Assert.Single(s.LastEvents<ManualEffectCreated>());
-        Assert.Equal((vasya, EventKind.Bad, ManualEffectSource.Drop, (Guid?)runId), (created.PlayerId, created.DrawEvent, created.Source, created.RunId));
+        Assert.Equal((vasya, (EventKind?)EventKind.Bad, ManualEffectSource.Drop, (Guid?)runId), (created.PlayerId, created.DrawEvent, created.Source, created.RunId));
         Assert.Equal((4 - 5, LinearMap.FinishId), (s.Player("Вася").Points, s.Player("Вася").CellId));
     }
 

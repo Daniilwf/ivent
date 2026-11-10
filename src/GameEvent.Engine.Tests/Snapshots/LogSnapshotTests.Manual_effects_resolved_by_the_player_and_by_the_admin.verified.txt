@@ -14,7 +14,7 @@ completion-rolled v1 {"runId":"00000000-0000-0000-0000-000000000001","playerId":
 points-changed v1 {"playerId":"10000000-0000-0000-0000-000000000001","delta":9,"reason":"completionRoll","runId":"00000000-0000-0000-0000-000000000001"}
 player-moved v1 {"playerId":"10000000-0000-0000-0000-000000000001","from":"start","to":"c9","steps":9,"path":["c1","c2","c3","c4","c5","c6","c7","c8","c9"],"reason":"completionRoll","runId":"00000000-0000-0000-0000-000000000001"}
 coins-changed v1 {"playerId":"10000000-0000-0000-0000-000000000001","delta":6,"reason":"completionReward","runId":"00000000-0000-0000-0000-000000000001"}
-manual-effect-created v1 {"effectId":"00000000-0000-0000-0000-000000000002","playerId":"10000000-0000-0000-0000-000000000001","drawEvent":"good","source":"difficulty","runId":"00000000-0000-0000-0000-000000000001"}
+manual-effect-created v2 {"effectId":"00000000-0000-0000-0000-000000000002","playerId":"10000000-0000-0000-0000-000000000001","drawEvent":"good","source":"difficulty","runId":"00000000-0000-0000-0000-000000000001"}
 # RollGame { PlayerId = 10000000-0000-0000-0000-000000000001 }
 game-rolled v2 {"playerId":"10000000-0000-0000-0000-000000000001","category":"Horror","misses":[],"gameId":"20000000-0000-0000-0000-000000000004","snapshot":{"rulesetVersion":1,"hours":6,"diceCount":{"hoursPerDie":3,"rounding":"nearest","min":1,"max":10},"dieByDifficulty":{"easy":{"sides":2,"grantEvent":null},"normal":{"sides":4,"grantEvent":null},"hard":{"sides":6,"grantEvent":null},"extreme":{"sides":6,"grantEvent":"good"}},"techRerollWindowHours":48,"challengeExtraDice":1,"coins":{"perHour":1,"min":3}},"rolledAt":"2026-10-01T19:00:00+00:00","sectors":["Horror"]}
 # StartRun { PlayerId = 10000000-0000-0000-0000-000000000001 }
@@ -24,7 +24,7 @@ run-dropped v1 {"runId":"00000000-0000-0000-0000-000000000003","playerId":"10000
 points-changed v1 {"playerId":"10000000-0000-0000-0000-000000000001","delta":-2,"reason":"dropPenalty","runId":"00000000-0000-0000-0000-000000000003"}
 player-moved v1 {"playerId":"10000000-0000-0000-0000-000000000001","from":"c9","to":"c7","steps":-2,"path":["c8","c7"],"reason":"dropPenalty","runId":"00000000-0000-0000-0000-000000000003"}
 game-excluded v1 {"playerId":"10000000-0000-0000-0000-000000000001","gameId":"20000000-0000-0000-0000-000000000004","reason":"dropped"}
-manual-effect-created v1 {"effectId":"00000000-0000-0000-0000-000000000004","playerId":"10000000-0000-0000-0000-000000000001","drawEvent":"bad","source":"drop","runId":"00000000-0000-0000-0000-000000000003"}
+manual-effect-created v2 {"effectId":"00000000-0000-0000-0000-000000000004","playerId":"10000000-0000-0000-0000-000000000001","drawEvent":"bad","source":"drop","runId":"00000000-0000-0000-0000-000000000003"}
 # ResolveManualEffect { EffectId = 00000000-0000-0000-0000-000000000002, Outcome = Applied, Comment = , PlayerId = 10000000-0000-0000-0000-000000000001 }
 manual-effect-resolved v1 {"effectId":"00000000-0000-0000-0000-000000000002","playerId":"10000000-0000-0000-0000-000000000001","runId":"00000000-0000-0000-0000-000000000001","outcome":"applied","comment":""}
 # ResolveManualEffect { EffectId = 00000000-0000-0000-0000-000000000004, Outcome = NotApplicable, Comment = Ивент уже разыгран в чате, PlayerId =  }
