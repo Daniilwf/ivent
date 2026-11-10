@@ -211,4 +211,47 @@ public class RejectCellGainsTests
         Assert.Equal(before.Players[s.PlayerId("Вася")].Wallet, s.Player("Вася").Wallet);
         Assert.Equal(before.Runs[run], s.State.Runs[run]);
     }
+
+    // start → s1 (shop) → a → finish: a throw of 3 passes the shop and finishes
+    private static MapGraph ShortShopMap()
+    {
+        var map = MapBuilder.New().Path("start", "s1", "a", "finish").Build();
+        return map with { Cells = [.. map.Cells.Select(c => c.Id == "s1" ? c with { Type = CellType.Shop, Grants = "shop-coupon" } : c)] };
+    }
+
+    [Fact]
+    public void Reject_of_a_later_finishers_finishing_run_takes_its_coupon_and_the_finish()
+    {
+        // Given Петя finished first and was approved (frozen); Вася passed the shop on his finishing move
+        var s = Season(ShortShopMap());
+        s.RollTitle("Петя", "Fatal Frame").Start("Петя").NextRandom(3).Complete("Петя");
+        var first = s.State.Runs.Values.Single(r => r.PlayerId == s.PlayerId("Петя")).RunId;
+        s.Act(new ApproveProof(first, null, "Видел стрим"));
+        ScenarioAssert.Accepted(s);
+        var run = Throw(s, "Silent Hill", 3);
+        Assert.Equal(2, s.Player("Вася").Finish!.Order);
+        Assert.Equal(["shop-coupon"], s.Inventory("Вася"));
+
+        s.Act(new RejectProof(run, Comment));
+
+        ScenarioAssert.Accepted(s);
+        Assert.Single(TakenBack(s));
+        Assert.Empty(s.Inventory("Вася"));
+        Assert.Null(s.Player("Вася").Finish);
+    }
+
+    [Fact]
+    public void Reject_of_the_provisional_firsts_finishing_run_takes_its_coupon()
+    {
+        var s = Season(ShortShopMap());
+        var run = Throw(s, "Silent Hill", 3);
+        Assert.Equal(1, s.Player("Вася").Finish!.Order);
+        Assert.Equal(["shop-coupon"], s.Inventory("Вася"));
+
+        s.Act(new RejectProof(run, Comment));
+
+        ScenarioAssert.Accepted(s);
+        Assert.Single(TakenBack(s));
+        Assert.Null(s.Player("Вася").Finish);
+    }
 }

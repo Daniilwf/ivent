@@ -71,6 +71,10 @@ public partial class EventFormatTests
     [
         ("object-given", new ObjectGiven(s_player, Forced(), ObjectSource.Admin), """"{"playerId":"10000000-0000-0000-0000-000000000001","item":{"instanceId":"60000000-0000-0000-0000-000000000001","objectId":"forced-genre","kind":"specialRoll","acquired":2,"hostile":false,"fromPlayerId":null,"params":{"tag":"Horror"},"usesLeft":null,"runsLeft":null,"expiresAt":"2026-10-01T12:30:00+00:00","notes":["Помечен"]},"source":"admin","fromPlayerId":null}""""),
         ("run-dice-modified", new RunDiceModified(s_run, s_player, RunDiceMods.None with { Added = 4, Sources = ["lucky-die"] }, [new Die(6, 4)]), """"{"runId":"00000000-0000-0000-0000-000000000001","playerId":"10000000-0000-0000-0000-000000000001","mods":{"added":4,"multiplier":1,"sources":["lucky-die"]},"rolled":[{"sides":6,"value":4}]}""""),
+        ("object-removed", new ObjectRemoved(s_player, s_object, "shop-coupon", ObjectRemoval.ProofRejected), """"{"playerId":"10000000-0000-0000-0000-000000000001","instanceId":"60000000-0000-0000-0000-000000000001","objectId":"shop-coupon","reason":"proofRejected"}""""),
+        ("player-moved", new Engine.Map.PlayerMoved(s_player, "c1", "c3", 2, ["c2", "c3"], Engine.Map.MoveReason.Item, null), """"{"playerId":"10000000-0000-0000-0000-000000000001","from":"c1","to":"c3","steps":2,"path":["c2","c3"],"reason":"item","runId":null}""""),
+        ("player-moved", new Engine.Map.PlayerMoved(s_player, "c1", "c5", 0, ["c5"], Engine.Map.MoveReason.ItemTeleport, null), """"{"playerId":"10000000-0000-0000-0000-000000000001","from":"c1","to":"c5","steps":0,"path":["c5"],"reason":"itemTeleport","runId":null}""""),
+        ("player-moved", new Engine.Map.PlayerMoved(s_player, "c2", "c4", 2, ["c3", "c4"], Engine.Map.MoveReason.DiceModified, s_run), """"{"playerId":"10000000-0000-0000-0000-000000000001","from":"c2","to":"c4","steps":2,"path":["c3","c4"],"reason":"diceModified","runId":"00000000-0000-0000-0000-000000000001"}""""),
     ];
 
     [Fact]
