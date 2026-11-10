@@ -77,6 +77,15 @@ public sealed class DemoSeedTests : IAsyncLifetime
         var season = await db.Seasons.SingleAsync(s => s.Id == DemoSeed.SeasonId, Ct);
         Assert.Contains("\"graph\"", season.RulesetJson, StringComparison.Ordinal);
 
+        // The map is drawn over our own picture (D-279): an uploaded map background, every cell on it, and the screen has it
+        var inForce = await Web.Map.SeasonMaps.CurrentAsync(db, DemoSeed.SeasonId, Ct);
+        var background = inForce!.Background;
+        Assert.NotNull(background);
+        var picture = await db.Files.SingleAsync(f => f.Id == background.FileId, Ct);
+        Assert.Equal((Engine.Files.FileKind.MapBackground, background.Width, background.Height), (picture.Kind, picture.Width, picture.Height));
+        Assert.All(inForce.Cells, c => Assert.True(c.X > 0 && c.X < background.Width && c.Y > 0 && c.Y < background.Height, $"cell {c.Id} is off the picture"));
+        Assert.NotNull(await Web.Map.SeasonMaps.BackgroundAsync(db, inForce, Ct));
+
         var integrity = await SeasonIntegrity.CheckAsync(db, DemoSeed.SeasonId, Ct);
         Assert.True(integrity!.IsIntact, string.Join("; ", integrity.Differences));
 

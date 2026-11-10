@@ -13,6 +13,7 @@ using GameEvent.Engine.Turns;
 using GameEvent.Engine.Undo;
 using GameEvent.Infrastructure.Accounts;
 using GameEvent.Infrastructure.Database;
+using GameEvent.Infrastructure.Files;
 using GameEvent.Infrastructure.Kernel;
 using GameEvent.Infrastructure.Queue;
 using Microsoft.EntityFrameworkCore;
@@ -28,7 +29,8 @@ namespace GameEvent.Web.Hosting;
 /// Stage 2 (D-270): the season plays on the graph map of content/map.demo.json — forks, a teleport forward and a snake,
 /// checkpoints, points bonuses, zones. It starts without the shortcut zone «quick»; the admin publishes the whole map in
 /// the middle of the season, while players stand on it. In the last days the players leave their branch choices
-/// waiting, so the season ends with players standing at a fork.
+/// waiting, so the season ends with players standing at a fork. The map is drawn over our own picture (D-279,
+/// content/map.demo.background.png from scripts/map-background.mjs), uploaded as the admin uploads a map background.
 /// </summary>
 public static class DemoSeed
 {
@@ -100,9 +102,11 @@ public static class DemoSeed
         var realNow = clock.UtcNow;
         clock.MoveTo(new DateTimeOffset(realNow.UtcDateTime.Date, TimeSpan.Zero).AddDays(-Days).AddHours(9));
         random?.Seed(Seed);
+        var background = await StoreBackgroundAsync(services, contentRoot, ct);
+        var (first, published) = DemoMap(contentRoot);
         try
         {
-            await new Bots(factory, bus, clock, ct).PlayAsync(DemoMap(contentRoot));
+            await new Bots(factory, bus, clock, ct).PlayAsync((first with { Background = background }, published with { Background = background }));
         }
         finally
         {
@@ -112,6 +116,30 @@ public static class DemoSeed
 
         await new Bots(factory, bus, clock, ct).FinishAsync(realNow.AddDays(5));
         return true;
+    }
+
+    /// <summary>
+    /// The demo map's picture (D-279), stored exactly as the admin's upload of a map background: re-encoded, of its kind,
+    /// recorded through the queue; outside the admin's daily limit.
+    /// </summary>
+    private static async Task<MapBackground> StoreBackgroundAsync(IServiceProvider services, string contentRoot, CancellationToken ct)
+    {
+        var factory = services.GetRequiredService<IDbContextFactory<GameEventDbContext>>();
+        await using var db = await factory.CreateDbContextAsync(ct);
+        var admin = await db.Users.Where(u => u.Login == "admin").Select(u => u.Id).SingleAsync(ct);
+        var files = new Files.FileServices(
+            db,
+            services.GetRequiredService<FileStorage>(),
+            services.GetRequiredService<FileLimits>(),
+            services.GetRequiredService<IIdGenerator>(),
+            services.GetRequiredService<IClock>(),
+            services.GetRequiredService<CommandBus>());
+        var content = await File.ReadAllBytesAsync(Path.Combine(contentRoot, "content", "map.demo.background.png"), ct);
+        var (_, fileId) = await Files.FileEndpoints.StoreFileAsync(
+            content, Guid.CreateVersion7(), admin, files, ct, countTowardsLimit: false, kind: Engine.Files.FileKind.MapBackground);
+        var record = await db.Files.AsNoTracking().SingleOrDefaultAsync(f => f.Id == fileId, ct)
+            ?? throw new InvalidOperationException("The demo map's background was not stored.");
+        return new MapBackground(record.Id, record.Width, record.Height);
     }
 
     /// <summary>
