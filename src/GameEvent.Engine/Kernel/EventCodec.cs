@@ -62,16 +62,7 @@ public static class EventCodec
     {
         ArgumentNullException.ThrowIfNull(stored);
         ArgumentNullException.ThrowIfNull(upcasters);
-        Type type;
-        try
-        {
-            type = EventCatalog.TypeOf(stored.Type);
-        }
-        catch (KeyNotFoundException e)
-        {
-            throw new JsonException($"Unknown event type '{stored.Type}'.", e);
-        }
-
+        var type = TypeOf(stored.Type);
         var current = EventCatalog.Describe(type).Version;
         if (stored.Version > current)
         {
@@ -91,5 +82,18 @@ public static class EventCodec
 
         return (IGameEvent)(data.Deserialize(type, EngineJson.Options)
             ?? throw new JsonException($"Event '{stored.Type}' data is null."));
+    }
+
+    // A method of its own, no local assigned inside try: mutation testing can mutate Decode (D-281)
+    private static Type TypeOf(string name)
+    {
+        try
+        {
+            return EventCatalog.TypeOf(name);
+        }
+        catch (KeyNotFoundException e)
+        {
+            throw new JsonException($"Unknown event type '{name}'.", e);
+        }
     }
 }

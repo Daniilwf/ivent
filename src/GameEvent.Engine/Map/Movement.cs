@@ -28,24 +28,22 @@ public static class Movement
         for (var i = 0; i < steps && current.Type != CellType.Finish; i++)
         {
             var exits = map.Exits(current.Id);
-            string next;
-            if (i == 0 && branch is not null)
-            {
-                next = exits.FirstOrDefault(e => e.To == branch)?.To
-                    ?? throw new ArgumentException($"'{branch}' is not a branch out of '{current.Id}'.", nameof(branch));
-            }
-            else if (exits.Count > 1)
+            var chosen = i == 0 && branch is not null;
+            if (!chosen && exits.Count > 1)
             {
                 return new Walk(path, steps - i);
             }
-            else if (exits.Count == 1)
-            {
-                next = exits[0].To;
-            }
-            else
+
+            if (!chosen && exits.Count == 0)
             {
                 break;
             }
+
+            // One expression, no local assigned in branches: mutation testing can mutate this method (D-281)
+            var next = chosen
+                ? exits.FirstOrDefault(e => e.To == branch)?.To
+                    ?? throw new ArgumentException($"'{branch}' is not a branch out of '{current.Id}'.", nameof(branch))
+                : exits[0].To;
 
             current = map.CellById(next);
             path.Add(current.Id);
