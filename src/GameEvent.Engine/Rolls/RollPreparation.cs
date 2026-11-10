@@ -10,7 +10,8 @@ namespace GameEvent.Engine.Rolls;
 /// Special rolls and roll changes (SPEC «Спецролл», D-405). A roll from Idle fires the player's first special roll (in the
 /// order they came) and every <c>beforeRoll</c> effect, then fixes all waiting changes for this roll and its rerolls:
 /// the special roll's first, then the others in the order they came. Changes that arrive later wait for the next roll —
-/// effects of others never touch a roll already made.
+/// effects of others never touch a roll already made. A player who finished not first rolls without the changes others
+/// put on his game before the finish (D-425).
 /// </summary>
 internal static class RollPreparation
 {
@@ -38,8 +39,12 @@ internal static class RollPreparation
         state = after;
 
         var wallet = state.Players[playerId].Wallet;
-        EquatableArray<RollModifier> modifiers = [.. wallet.NextRoll.Skip(waiting.Count), .. waiting];
-        if (modifiers.Count > 0 || wallet.CurrentRoll.Count > 0)
+        EquatableArray<RollModifier> pending = [.. wallet.NextRoll.Skip(waiting.Count), .. waiting];
+
+        // Others' changes of the game put on him before he finished not first are taken off the roll and recorded by
+        // what the roll applies (D-425); dice changes wait for his throw as before.
+        EquatableArray<RollModifier> modifiers = Targets.IsLaterFinisher(state, playerId) ? [.. pending.Where(m => !m.Hostile)] : pending;
+        if (pending.Count > 0 || wallet.CurrentRoll.Count > 0)
         {
             var applied = new RollModifiersApplied(playerId, modifiers);
             events.Add(applied);

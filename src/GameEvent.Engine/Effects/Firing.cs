@@ -8,7 +8,8 @@ namespace GameEvent.Engine.Effects;
 /// <summary>
 /// Effects and special rolls that act on their own (SPEC «Эффект … действует сам»): the owner's objects subscribed to a
 /// trigger fire in the order they came, when their condition holds; a use is spent each time (D-412). The first finisher's
-/// effects are frozen (SPEC «эффекты обнуляются»): they do not fire.
+/// effects are frozen (SPEC «эффекты обнуляются»): they do not fire. A later finisher's hostile objects from others that
+/// change the choice of the game (a forced genre) do not fire either and stay where they are (D-425).
 /// </summary>
 internal static class Firing
 {
@@ -18,7 +19,8 @@ internal static class Firing
             ? []
             : [.. state.Players[ownerId].Wallet.Inventory
                 .Where(o => o.Kind != ObjectKind.Item && (kind is null || o.Kind == kind))
-                .Where(o => state.Catalog.Find(o.ObjectId)?.Effect is { Intercept: null } effect && effect.Trigger == trigger)
+                .Where(o => state.Catalog.Find(o.ObjectId)?.Effect is { Intercept: null } effect && effect.Trigger == trigger
+                    && !(o.Hostile && Targets.ChangesTheGame(effect) && Targets.IsLaterFinisher(state, ownerId)))
                 .OrderBy(o => o.Acquired)];
 
     /// <summary>Fires <paramref name="item"/> of <paramref name="ownerId"/>; null when its condition does not hold.</summary>

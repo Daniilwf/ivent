@@ -707,6 +707,222 @@ public class ItemUseTests
         Assert.Equal([s.PlayerId("Петя")], Assert.Single(s.LastEvents<ItemUsed>()).Targets);
     }
 
+    // ---- Whom an effect reaches once Коля finished second (SPEC «Цели», D-424): only effects on points and coins ----
+
+    private static readonly TargetSpec s_others = new() { Selector = TargetSelector.All, ExcludeSelf = true };
+
+    private static ChangeResourceAction Change(string resource, int amount, ActionTarget? target = null) =>
+        new() { Resource = resource, Amount = ContentValue.Of(amount), Target = target };
+
+    private static ObjectDefinition Fixture(string id, EffectSpec effect, bool hostile = true) =>
+        new()
+        {
+            Id = id,
+            Kind = ObjectKind.Item,
+            Name = "Проверка",
+            Description = "Предмет для проверки целей.",
+            Rarity = Rarity.Common,
+            Window = UseWindow.Anytime,
+            Hostile = hostile,
+            Stackable = true,
+            Effect = effect,
+        };
+
+    private static ObjectDefinition[] Reach() =>
+    [
+        CoinTax("tax-all", TargetSelector.All),
+        CoinTax("tax-leader", TargetSelector.Leader, excludeSelf: false),
+        Fixture("levy-and-gift-to-self", new EffectSpec
+        {
+            Target = s_others,
+            Actions = [Change("coins", -1), new GiveObjectAction { ObjectId = "orange", Target = ActionTarget.Self }],
+        }),
+        Fixture("levy-and-gift", new EffectSpec { Target = s_others, Actions = [Change("coins", -1), new GiveObjectAction { ObjectId = "orange" }] }),
+        Fixture("levy-leader-and-gift", new EffectSpec
+        {
+            Target = new TargetSpec { Selector = TargetSelector.Leader, ExcludeSelf = false },
+            Actions = [Change("coins", -1), new GiveObjectAction { ObjectId = "orange" }],
+        }),
+        Fixture("gamble-points-or-steal", new EffectSpec
+        {
+            Target = s_others,
+            Outcomes = new OutcomesSpec
+            {
+                Roll = ContentValue.TryParse("1d2")!,
+                Cases =
+                [
+                    new OutcomeCase { From = 1, To = 1, Actions = [Change("points", -2)] },
+                    new OutcomeCase { From = 2, To = 2, Actions = [new TakeObjectAction { Mode = TakeMode.Steal }] },
+                ],
+            },
+        }),
+        Fixture("gamble-points-or-coins", new EffectSpec
+        {
+            Target = s_others,
+            Outcomes = new OutcomesSpec
+            {
+                Roll = ContentValue.TryParse("1d2")!,
+                Cases =
+                [
+                    new OutcomeCase { From = 1, To = 1, Actions = [Change("points", -2)] },
+                    new OutcomeCase { From = 2, To = 2, Actions = [Change("coins", -2)] },
+                ],
+            },
+        }),
+        Fixture("gift-to-all", new EffectSpec
+        {
+            Target = new TargetSpec { Selector = TargetSelector.All, ExcludeSelf = false },
+            Actions = [new GiveObjectAction { ObjectId = "orange" }],
+        }, hostile: false),
+        Fixture("wish-for", new EffectSpec
+        {
+            Target = new TargetSpec { Selector = TargetSelector.Chosen },
+            Actions = [new ModifyNextRollAction { Filter = new GameFilterSpec { Tags = ["RPG"] } }],
+        }, hostile: false),
+        Fixture("roll-only", new EffectSpec { Target = s_others, Actions = [new RollAction { Dice = ContentValue.TryParse("1d6")! }] }),
+        Fixture("bonus-to-self-only", new EffectSpec { Target = s_others, Actions = [Change("coins", 1, ActionTarget.Self)] }),
+        Fixture("take-chosen-points", new EffectSpec
+        {
+            Target = s_others,
+            Actions =
+            [
+                new RequestChoiceAction { Prompt = "Сколько очков забрать?", Options = new ChoiceOptionsSpec { List = ["1", "2"] } },
+                new ChangeResourceAction { Resource = "points", Amount = ContentValue.TryParse("-$choice")! },
+            ],
+        }),
+    ];
+
+    // Петя finishes first, Коля second; Вася plays on.
+    private static Scenario KolyaFinishedSecond()
+    {
+        var s = Season(mapLength: 2);
+        var pack = EconomyScenario.RepositoryPack();
+        s.WithContent(pack with { Objects = [.. pack.Objects, .. Reach()] });
+        s.RollTitle("Петя", "Silent Hill").Start("Петя").NextRandom(1, 1).Complete("Петя");
+        s.RollTitle("Коля", "Dead Space").Start("Коля").NextRandom(1, 1, 1).Complete("Коля");
+        Assert.Equal(2, s.Player("Коля").Finish!.Order);
+        return s;
+    }
+
+    private static List<Guid> TargetsOf(Scenario s) => [.. Assert.Single(s.LastEvents<ItemUsed>()).Targets.Order()];
+
+    [Fact]
+    public void Everyone_and_the_leader_reach_a_later_finisher_with_coins()
+    {
+        var s = KolyaFinishedSecond();
+        s.WithPoints("Коля", 50).WithPoints("Вася", 1);
+
+        s.Give("Вася", "tax-all");
+        s.Used("Вася", "tax-all");
+        Assert.Equal([s.PlayerId("Коля")], TargetsOf(s));
+
+        s.Give("Вася", "tax-leader");
+        s.Used("Вася", "tax-leader");
+        Assert.Equal([s.PlayerId("Коля")], TargetsOf(s));
+    }
+
+    [Fact]
+    public void What_the_user_gives_himself_does_not_keep_a_later_finisher_out()
+    {
+        var s = KolyaFinishedSecond();
+        s.Give("Вася", "levy-and-gift-to-self");
+
+        s.Used("Вася", "levy-and-gift-to-self");
+
+        Assert.Equal([s.PlayerId("Коля")], TargetsOf(s));
+        Assert.Contains("orange", s.Inventory("Вася"));
+        Assert.DoesNotContain("orange", s.Inventory("Коля"));
+    }
+
+    [Fact]
+    public void An_object_given_to_the_target_keeps_a_later_finisher_out_of_everyone()
+    {
+        var s = KolyaFinishedSecond();
+        var item = s.Give("Вася", "levy-and-gift");
+
+        s.Use("Вася", item);
+
+        Assert.Equal(RejectionCodes.ItemNoTarget, s.Last.Rejection!.Code);
+    }
+
+    [Fact]
+    public void A_leader_who_finished_later_is_skipped_by_more_than_coins_and_the_next_by_points_is_hit()
+    {
+        var s = KolyaFinishedSecond();
+        s.WithPoints("Коля", 50).WithPoints("Вася", 1);
+        s.Give("Вася", "levy-leader-and-gift");
+
+        s.Used("Вася", "levy-leader-and-gift");
+
+        Assert.Equal([s.PlayerId("Вася")], TargetsOf(s));
+        Assert.DoesNotContain("orange", s.Inventory("Коля"));
+    }
+
+    [Fact]
+    public void An_outcome_beyond_points_and_coins_keeps_a_later_finisher_out()
+    {
+        var s = KolyaFinishedSecond();
+        var item = s.Give("Вася", "gamble-points-or-steal");
+
+        s.Use("Вася", item);
+
+        Assert.Equal(RejectionCodes.ItemNoTarget, s.Last.Rejection!.Code);
+    }
+
+    [Fact]
+    public void Outcomes_only_on_points_and_coins_reach_a_later_finisher()
+    {
+        var s = KolyaFinishedSecond();
+        var points = s.Player("Коля").Points;
+        s.Give("Вася", "gamble-points-or-coins");
+
+        s.NextRandom(1).Used("Вася", "gamble-points-or-coins");
+
+        Assert.Equal([s.PlayerId("Коля")], TargetsOf(s));
+        Assert.Equal(points - 2, s.Player("Коля").Points);
+    }
+
+    [Fact]
+    public void A_later_finisher_still_gives_himself_objects_and_changes_his_own_roll()
+    {
+        var s = KolyaFinishedSecond();
+        s.Give("Коля", "gift-to-all");
+        s.Used("Коля", "gift-to-all");
+        Assert.Equal([.. new[] { s.PlayerId("Вася"), s.PlayerId("Коля") }.Order()], TargetsOf(s));
+        Assert.Contains("orange", s.Inventory("Коля"));
+
+        s.Give("Коля", "wish-for");
+        s.Used("Коля", "wish-for", target: "Коля");
+        Assert.Equal([s.PlayerId("Коля")], TargetsOf(s));
+        Assert.Single(s.Player("Коля").Wallet.NextRoll);
+    }
+
+    [Theory]
+    [InlineData("roll-only")]
+    [InlineData("bonus-to-self-only")]
+    public void An_effect_that_changes_no_points_or_coins_of_the_target_keeps_a_later_finisher_out(string id)
+    {
+        var s = KolyaFinishedSecond();
+        var item = s.Give("Вася", id);
+
+        s.Use("Вася", item);
+
+        Assert.Equal(RejectionCodes.ItemNoTarget, s.Last.Rejection!.Code);
+    }
+
+    [Fact]
+    public void A_choice_of_how_many_points_to_take_reaches_a_later_finisher()
+    {
+        var s = KolyaFinishedSecond();
+        var points = s.Player("Коля").Points;
+        s.Give("Вася", "take-chosen-points");
+
+        s.Used("Вася", "take-chosen-points", null, "2");
+
+        Assert.Equal([s.PlayerId("Коля")], TargetsOf(s));
+        Assert.Equal(points - 2, s.Player("Коля").Points);
+    }
+
     [Fact]
     public void The_admin_gives_and_removes_objects_with_a_comment()
     {

@@ -8,13 +8,18 @@ namespace GameEvent.Engine.Effects;
 /// <summary>
 /// Whom an effect reaches (SPEC «Цели», «Взаимодействие игроков»): everyone but the first finisher; random targets only
 /// among the active; a player who finished not first is reached only by effects on points and coins, and his own effects that only move him
-/// have nobody to act on (his position is fixed); <c>among</c> and
+/// have nobody to act on (his position is fixed), and the changes of the game others put on him before are ignored
+/// (D-425); <c>among</c> and
 /// <c>excludeSelf</c> narrow; <c>effects.attacksOnlyOnHigherPoints</c> keeps hostile effects on those with more points.
 /// </summary>
 internal static class Targets
 {
     /// <summary>The first finisher is out of the game for others: not a target, and does not act on others (SPEC).</summary>
     public static bool IsFirst(SeasonState state, Guid playerId) => FinishLine.First(state) == playerId;
+
+    /// <summary>A player who finished, but not first: his position is fixed, only points and coins reach him (SPEC «Цели»).</summary>
+    public static bool IsLaterFinisher(SeasonState state, Guid playerId) =>
+        state.Players[playerId].Finish is not null && !IsFirst(state, playerId);
 
     /// <summary>
     /// The targets of an item used by <paramref name="userId"/> (a <c>chosen</c> one is <paramref name="chosen"/>), or a
@@ -103,8 +108,15 @@ internal static class Targets
             .Where(a => a.Target != ActionTarget.Self)
             .ToList();
         return onTarget.Any(a => a is ChangeResourceAction)
-            && onTarget.All(a => a is RollAction || (a is ChangeResourceAction c && c.Resource is Actions.ChangeResourceHandler.Points or Actions.ChangeResourceHandler.Coins));
+            && onTarget.All(a => a is RollAction or RequestChoiceAction || (a is ChangeResourceAction c && c.Resource is Actions.ChangeResourceHandler.Points or Actions.ChangeResourceHandler.Coins));
     }
+
+    /// <summary>
+    /// An effect that changes the choice of the game (<c>modifyNextRoll</c>): put by another player before the finish, it
+    /// is ignored at the rolls of one who finished not first (D-425).
+    /// </summary>
+    public static bool ChangesTheGame(EffectSpec? effect) =>
+        effect is not null && effect.Actions.Concat(effect.Outcomes?.Cases.SelectMany(c => c.Actions) ?? []).Any(a => a is ModifyNextRollAction);
 
     /// <summary>An effect that only moves the token: finishers are out of its reach (SPEC «Исключения по умолчанию»).</summary>
     public static bool PositionOnly(EffectSpec? effect)
