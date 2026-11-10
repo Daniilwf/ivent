@@ -109,6 +109,7 @@ internal static class Undoing
                 beforeTarget = before;
                 targetKeys = Keys(before, after, history[i].Events);
             }
+            // Stryker disable once Linq : equivalent — an undo's entry is its single CommandUndone, so Any and All agree
             else if (i > index && !undone.Contains(history[i].CommandId) && !history[i].Events.Any(e => e is CommandUndone)
                 && (targetKeys!.Contains(SeasonKey) || Keys(before, after, history[i].Events).Overlaps(targetKeys)))
             {
