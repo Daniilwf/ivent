@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { useSyncExternalStore, type ReactNode } from 'react';
 import { connectionStatus } from '../api/connection';
+import { useWaitingProofs } from '../admin/waitingProofs';
 import type { Schemas } from '../api/client';
 import { userToken } from '../design/players';
 import { ru } from '../i18n/ru';
@@ -68,18 +69,37 @@ function SiteNav({ admin }: { admin: boolean }) {
   );
 }
 
+/** The admin's count of proofs to check: 99+ at most on the screen, the words around it say the number (D-263) */
+function WaitingCount({ count, className }: { count: number; className?: string }) {
+  return (
+    <span
+      data-testid="admin-waiting"
+      aria-hidden
+      className={cx(
+        'inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-danger px-1 text-xs font-bold text-on-color tabular-nums',
+        className,
+      )}
+    >
+      {ru.shell.waitingShort(count)}
+    </span>
+  );
+}
+
 /**
  * The frame of every signed-in page: the name of the game, the sections, the connection mark, the bug report and my
  * menu (my profile, the admin's pages for the admin, my password, sign out)
  */
 export function Shell({
   user,
+  seasonId = null,
   onChangePassword,
   onLogout,
   offline,
   children,
 }: {
   user: Schemas['CurrentUser'];
+  /** The current season: the admin's count of proofs to check is its (D-263) */
+  seasonId?: string | null;
   onChangePassword: () => void;
   onLogout: () => void;
   /** The styleguide shows the lost connection without losing it */
@@ -88,6 +108,10 @@ export function Shell({
 }) {
   // The admin's menu also opens the admin's pages (H8)
   const admin = user.role === 'admin';
+  // On the admin page the page's own queue reads give the count; elsewhere the header reads it
+  const onAdminPage = routeOf(usePath()).kind === 'admin';
+  const waiting = useWaitingProofs(admin ? seasonId : null, admin && !onAdminPage) ?? 0;
+  const shownWaiting = admin && waiting > 0 ? waiting : 0;
   const live = useSyncExternalStore(connectionStatus.subscribe, connectionStatus.get) === 'online';
   const online = offline === undefined ? live : !offline;
   return (
@@ -108,17 +132,30 @@ export function Shell({
               <button
                 type="button"
                 data-testid="user-menu"
-                aria-label={ru.shell.menu(user.name)}
+                aria-label={
+                  shownWaiting > 0
+                    ? ru.shell.menuWaiting(user.name, shownWaiting)
+                    : ru.shell.menu(user.name)
+                }
                 className="inline-flex min-h-11 shrink-0 cursor-pointer items-center gap-2 rounded-full p-1 is-hover:bg-muted is-focus:focus-ring data-[state=open]:bg-muted desk:pr-3"
               >
-                <Sticker
-                  player={{
-                    name: user.name,
-                    token: userToken(user.id, user.token),
-                    avatar: user.avatar?.thumbnailUrl,
-                  }}
-                  size={36}
-                />
+                <span className="relative">
+                  <Sticker
+                    player={{
+                      name: user.name,
+                      token: userToken(user.id, user.token),
+                      avatar: user.avatar?.thumbnailUrl,
+                    }}
+                    size={36}
+                  />
+                  {/* D-263: the admin's runs waiting for a proof check, on the way to «Админка» */}
+                  {shownWaiting > 0 ? (
+                    <WaitingCount
+                      count={shownWaiting}
+                      className="absolute -top-1 -right-2 border-2 border-page"
+                    />
+                  ) : null}
+                </span>
                 {/* A phone's header keeps the sticker only; the name is still there for screen readers */}
                 <span
                   data-testid="current-user"
@@ -142,6 +179,12 @@ export function Shell({
                     {
                       label: ru.nav.admin,
                       icon: <ShieldCheck size={18} aria-hidden />,
+                      ...(shownWaiting > 0
+                        ? {
+                            badge: <WaitingCount count={shownWaiting} />,
+                            ariaLabel: ru.nav.adminWaiting(shownWaiting),
+                          }
+                        : {}),
                       onSelect: () => {
                         navigate(paths.admin());
                       },

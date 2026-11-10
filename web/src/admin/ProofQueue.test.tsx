@@ -275,6 +275,86 @@ describe('The proof queue', () => {
     expect(id(server.sent('POST', '/r2/approve')[0])).not.toBe(id(first));
   });
 
+  // D-327, D-262: «Отклонить со штрафом дропа» — the reject's consequences, then the drop penalty the server names
+  const penalty = {
+    count: 3,
+    sides: 4,
+    affectsPoints: true,
+    affectsPosition: true,
+    badEvent: true,
+  };
+
+  it('rejects with the drop penalty only after a confirmation that names the penalty and a comment', async () => {
+    const server = open([item({ dropPenalty: penalty, cellBonus: 2 })], {
+      'POST /api/admin/seasons/*/runs/*/reject-with-penalty': ok,
+    });
+
+    await userEvent.click(await screen.findByTestId('reject-penalty'));
+    const dialog = await screen.findByRole('alertdialog');
+    expect(dialog).toHaveTextContent(t.rejectPenaltyTitle('Hollow Knight', 'Вася'));
+    for (const line of [
+      ...t.rejectConsequences(11, false, 2),
+      ...t.rejectPenaltyConsequences(penalty),
+    ])
+      expect(within(dialog).getByText(line)).toBeInTheDocument();
+    expect(within(dialog).getByText(/3d4/)).toBeInTheDocument();
+
+    await userEvent.click(within(dialog).getByRole('button', { name: t.rejectPenaltyConfirm }));
+    expect(await within(dialog).findByText(ru.admin.commentRequired)).toBeInTheDocument();
+    expect(server.sent('POST', '/reject-with-penalty')).toHaveLength(0);
+
+    await userEvent.type(within(dialog).getByTestId('reject-penalty-comment'), 'Чужое видео');
+    await userEvent.click(within(dialog).getByRole('button', { name: t.rejectPenaltyConfirm }));
+
+    await waitFor(() => {
+      expect(server.sent('POST', '/r1/reject-with-penalty')[0]?.body).toMatchObject({
+        comment: 'Чужое видео',
+      });
+    });
+    expect(server.sent('POST', '/r1/reject')).toHaveLength(0);
+    expect(await screen.findByText(t.rejectedPenalty('Hollow Knight'))).toBeInTheDocument();
+  });
+
+  it('says the frozen first gets no drop penalty', async () => {
+    open([item({ dropPenalty: null })]);
+
+    await userEvent.click(await screen.findByTestId('reject-penalty'));
+    const dialog = await screen.findByRole('alertdialog');
+
+    expect(
+      within(dialog).getByText(t.rejectPenaltyConsequences(null)[0] ?? ''),
+    ).toBeInTheDocument();
+  });
+
+  it('keeps a refused reject with the penalty in its dialog', async () => {
+    open([item({ dropPenalty: penalty })], {
+      'POST /api/admin/seasons/*/runs/*/reject-with-penalty': answer(409, {
+        title: 'Rejected',
+        status: 409,
+        code: 'proof.alreadyReviewed',
+      }),
+    });
+
+    await userEvent.click(await screen.findByTestId('reject-penalty'));
+    const dialog = await screen.findByRole('alertdialog');
+    await userEvent.type(within(dialog).getByTestId('reject-penalty-comment'), 'Обман');
+    await userEvent.click(within(dialog).getByRole('button', { name: t.rejectPenaltyConfirm }));
+
+    expect(
+      await within(dialog).findByText(ru.rejection['proof.alreadyReviewed']),
+    ).toBeInTheDocument();
+  });
+
+  it('cancelling the reject with the penalty sends nothing', async () => {
+    const server = open([item({ dropPenalty: penalty })]);
+
+    await userEvent.click(await screen.findByTestId('reject-penalty'));
+    await userEvent.click(await screen.findByRole('button', { name: ru.ui.cancel }));
+
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    expect(server.sent('POST', '/reject-with-penalty')).toHaveLength(0);
+  });
+
   it('cancelling the reject sends nothing', async () => {
     const server = open([item({})]);
 

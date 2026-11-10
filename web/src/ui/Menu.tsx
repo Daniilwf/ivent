@@ -8,6 +8,9 @@ export type MenuItem = {
   onSelect: () => void;
   danger?: boolean;
   testId?: string;
+  /** A count after the label (the admin's proofs to check); `ariaLabel` then says it in words */
+  badge?: ReactNode;
+  ariaLabel?: string;
 };
 
 /** A short list of actions behind a button: the user's menu in the header */
@@ -31,6 +34,7 @@ export function Menu({ trigger, items }: { trigger: ReactNode; items: MenuItem[]
             <DropdownMenu.Item
               key={item.label}
               data-testid={item.testId}
+              aria-label={item.ariaLabel}
               onSelect={() => {
                 chosen.current = true;
                 item.onSelect();
@@ -41,7 +45,8 @@ export function Menu({ trigger, items }: { trigger: ReactNode; items: MenuItem[]
               )}
             >
               {item.icon}
-              {item.label}
+              {item.badge ? <span className="mr-auto">{item.label}</span> : item.label}
+              {item.badge}
             </DropdownMenu.Item>
           ))}
         </DropdownMenu.Content>
