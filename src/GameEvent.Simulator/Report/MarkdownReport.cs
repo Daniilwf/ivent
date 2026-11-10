@@ -49,6 +49,11 @@ public static class MarkdownReport
                 $"{N(r.DropperMeanDrops)} / {N(r.KeeperMeanDrops)}", $"{N(r.DropperMeanCompleted)} / {N(r.KeeperMeanCompleted)}",
             }));
 
+        Line(md, $"Дропы по числу дропов подряд перед ними (каждый следующий подряд — больше кубиков штрафа). Длинных игр, оставленных дропающими из-за серии: {N(report.Drops.KeptForStreakPerSeason)} за сезон.");
+        Line(md);
+        Table(md, ["Дропов подряд до этого", "Дропов за сезон", "Штраф (ср.)"],
+            report.Drops.ByStreak.Select(s => new[] { s.Streak, N(s.DropsPerSeason), N(s.MeanPenalty) }));
+
         var f = report.Finish;
         Line(md, "## Финиш");
         Line(md);
@@ -94,6 +99,7 @@ public static class MarkdownReport
         Line(md);
         Line(md, $"- Команд {N(c.CommandsPerSeason)}, событий {N(c.EventsPerSeason)}, промахов колеса {N(c.MissesPerSeason)}.");
         Line(md, $"- Пройдено {N(c.CompletedPerSeason)}, дропов {N(c.DropsPerSeason)}, тех-рероллов {N(c.TechRerollsPerSeason)}, «Уже проходил» {N(c.AlreadyPlayedPerSeason)}, рероллов бесплатных {N(c.FreeRerollsPerSeason)}, платных {N(c.PaidRerollsPerSeason)}.");
+        Line(md, $"- Рероллов по желанию {N(c.WishRerollsPerSeason)}. Реджектов {N(c.RejectsPerSeason)}, из них со штрафом дропа {N(c.PenalizedRejectsPerSeason)}; реджект снимает в среднем {N(c.MeanPointsPerReject)} очка и {N(c.MeanCellsPerReject)} клетки, штраф к нему — {N(c.MeanPenaltyPerPenalizedReject)} очка.");
         Line(md, $"- Не допройдено к дедлайну: {N(c.UnfinishedAtDeadlinePerSeason)} игр, {N(c.UnfinishedHoursPerSeason)} ч игры впустую. Ожидание проверки пруфов (лимит непроверенных): {N(c.BlockedHoursPerSeason)} ч на сезон.");
         Line(md, $"- Отказы движка: {(c.RejectionsPerSeason.Count == 0 ? "нет" : string.Join(", ", c.RejectionsPerSeason.Select(x => $"`{x.Key}` {N(x.Value)}")))}. Срабатываний защиты от зацикливания: {c.GuardTrips}.");
         Line(md);
