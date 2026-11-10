@@ -9,6 +9,7 @@ using GameEvent.Infrastructure.Queue;
 using GameEvent.Infrastructure.Seasons;
 using GameEvent.Web.Accounts;
 using GameEvent.Web.BugReports;
+using GameEvent.Web.Economy;
 using GameEvent.Web.Files;
 using GameEvent.Web.Map;
 using GameEvent.Web.Observability;
@@ -222,6 +223,8 @@ public static class AppSetup
         api.MapAdminMap();
         api.MapSeasonsAndPlayers();
         api.MapFeed();
+        api.MapEconomy();
+        api.MapAdminEconomy();
         api.MapAdminAccounts();
         api.MapFiles();
         api.MapAvatars();

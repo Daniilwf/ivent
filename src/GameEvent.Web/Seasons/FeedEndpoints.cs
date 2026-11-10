@@ -43,7 +43,11 @@ public sealed record FeedView(
     long? NextBefore,
     IReadOnlyList<FeedPlayerView> Players,
     IReadOnlyList<FeedGameView> Games,
-    IReadOnlyList<FeedRunView> Runs);
+    IReadOnlyList<FeedRunView> Runs,
+    IReadOnlyList<FeedObjectView>? Objects = null);
+
+/// <summary>An object of the season's content the page's events name (<c>objectId</c>): its name as last published (D-444).</summary>
+public sealed record FeedObjectView(string Id, string Name);
 
 /// <summary>
 /// A season a user took part in, with their points and, once the season finished, their place. <c>token</c> — their place in
@@ -145,7 +149,7 @@ public static class FeedEndpoints
         }).OfType<FeedEntryView>()];
         var nextBefore = rows.Count == limit && rows[^1].Sequence > 1 ? rows[^1].Sequence : (long?)null;
         var (players, games, runs) = await ReferencesAsync(db, seasonId, entries, admin, ct);
-        return TypedResults.Ok(new FeedView(entries, nextBefore, players, games, runs));
+        return TypedResults.Ok(new FeedView(entries, nextBefore, players, games, runs, await ObjectsAsync(db, seasonId, entries, ct)));
     }
 
     /// <summary>
@@ -186,6 +190,69 @@ public static class FeedEndpoints
             .Select(g => new FeedGameView(g.Id, g.Title, g.HasPage, g.CoverFileId is { } cover ? FileLinkView.Of(cover) : null))
             .ToList();
         return (players, games, runs);
+    }
+
+    /// <summary>
+    /// The names of the objects the page's events name (D-444): from the season's content packs, the latest name of each
+    /// (a deleted definition keeps the name it last had). Read only when the page names an object.
+    /// </summary>
+    private static async Task<IReadOnlyList<FeedObjectView>> ObjectsAsync(GameEventDbContext db, Guid seasonId, IReadOnlyList<FeedEntryView> entries, CancellationToken ct)
+    {
+        var ids = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var entry in entries)
+        {
+            CollectObjects(entry.Data, ids);
+        }
+
+        if (ids.Count == 0)
+        {
+            return [];
+        }
+
+        var published = EventCatalog.Describe(typeof(Engine.Content.ContentPublished)).Name;
+        var packs = await db.Events.AsNoTracking()
+            .Where(e => e.SeasonId == seasonId && e.Type == published && e.UndoneByEventId == null)
+            .OrderBy(e => e.Sequence)
+            .ToListAsync(ct);
+        var names = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var row in packs)
+        {
+            if (EventCodec.Decode(new StoredEvent(row.Type, row.Version, row.Data)) is Engine.Content.ContentPublished { Pack: var pack })
+            {
+                foreach (var definition in pack.Objects)
+                {
+                    names[definition.Id] = definition.Name;
+                }
+            }
+        }
+
+        return [.. ids.Order(StringComparer.Ordinal).Where(names.ContainsKey).Select(id => new FeedObjectView(id, names[id]))];
+    }
+
+    // Every «objectId» at any depth (an object given carries it inside «item»)
+    private static void CollectObjects(JsonElement data, HashSet<string> ids)
+    {
+        if (data.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in data.EnumerateArray())
+            {
+                CollectObjects(item, ids);
+            }
+        }
+        else if (data.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var property in data.EnumerateObject())
+            {
+                if (property.Name == "objectId" && property.Value.ValueKind == JsonValueKind.String)
+                {
+                    ids.Add(property.Value.GetString()!);
+                }
+                else
+                {
+                    CollectObjects(property.Value, ids);
+                }
+            }
+        }
     }
 
     /// <summary>Every <c>runId</c>, <c>gameId</c> and <c>gameIds</c> in an event's data, at any depth (misses, offers).</summary>

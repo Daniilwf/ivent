@@ -99,7 +99,14 @@ public sealed record SeasonView(
     string Name,
     IReadOnlyList<EdgeView> Edges,
     IReadOnlyList<ZoneView> Zones,
-    MapMode MapMode);
+    MapMode MapMode,
+    EconomyFeaturesView? Economy = null);
+
+/// <summary>
+/// Which economy mechanics the season plays (D-441): a mechanic off is not shown at all; always set, optional for older
+/// clients. The inventory, the shop and the bets come from <c>GET /api/seasons/{id}/economy</c>.
+/// </summary>
+public sealed record EconomyFeaturesView(bool Items, bool Shop, bool Bets);
 
 /// <summary>
 /// A leaderboard row in place order (D-100): tied players share <c>place</c>; <c>isFirst</c> — the first finisher, on top
@@ -690,7 +697,8 @@ public static class SeasonEndpoints
             seasonRecord.Name,
             [.. map.Edges.Select(SeasonMaps.ToView)],
             [.. map.Zones.Select(SeasonMaps.ToView)],
-            rules.Features.MapMode));
+            rules.Features.MapMode,
+            new EconomyFeaturesView(rules.Features.Items, rules.Features.Shop, rules.Features.Bets)));
     }
 
     private static readonly string[] s_rollTypes =
