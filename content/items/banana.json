@@ -1,0 +1,22 @@
+{
+  "id": "banana",
+  "kind": "item",
+  "name": "Банан",
+  "description": "Иди на 2 клетки вперёд.",
+  "rarity": "common",
+  "price": 18,
+  "window": "anytime",
+  "hostile": false,
+  "stackable": true,
+  "effect": {
+    "target": {
+      "selector": "self"
+    },
+    "actions": [
+      {
+        "type": "move",
+        "steps": 2
+      }
+    ]
+  }
+}

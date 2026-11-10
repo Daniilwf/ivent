@@ -26,7 +26,7 @@ public static class RulesetSupport
         var f = ruleset.Features;
         foreach (var (name, on) in new[]
         {
-            ("shop", f.Shop), ("items", f.Items), ("events", f.Events), ("bets", f.Bets), ("polls", f.Polls),
+            ("events", f.Events), ("polls", f.Polls),
             ("achievements", f.Achievements), ("weeklyChallenge", f.WeeklyChallenge), ("partnerBoard", f.PartnerBoard),
             ("reactions", f.Reactions), ("comments", f.Comments), ("gallery", f.Gallery),
         })
@@ -35,6 +35,12 @@ public static class RulesetSupport
             {
                 errors.Add(new($"features.{name}", NotYet));
             }
+        }
+
+        // The shop sells items: it plays only with them (D-403).
+        if (f.Shop && !f.Items)
+        {
+            errors.Add(new("features.shop", "needs features.items: the shop sells items"));
         }
 
         return errors;

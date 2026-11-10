@@ -124,6 +124,8 @@ internal static class SeasonProjection
             record.FinishBonusRulesJson = player.Finish?.BonusRules is { } bonusRules ? JsonSerializer.Serialize(bonusRules, EngineJson.Options) : null;
             record.FinishApprovalRequired = player.Finish?.ApprovalRequired;
             record.PointsTick = player.PointsTick;
+            record.EconomyJson = player.Economy is null ? null : JsonSerializer.Serialize(player.Economy, EngineJson.Options);
+            record.NextTimerAt = Engine.Economy.Timers.Next(player, after.Rules.Features);
 
             // Exclusions grow within a season (D-08), a tech reroll turned into a drop changes its reason (D-11), an undo
             // takes back those its command added (D-104).
@@ -146,6 +148,17 @@ internal static class SeasonProjection
                         ?? throw new InvalidOperationException($"Exclusion of game {exclusion.GameId} for player {id} has no projection row.");
                     row.Reason = exclusion.Reason;
                 }
+            }
+        }
+
+        // D-420: what a switched-off mechanic left waiting is not due, so the timer column follows the flags too
+        if (before.Ruleset is not null && before.Rules.Features != after.Rules.Features)
+        {
+            foreach (var (id, player) in after.Players)
+            {
+                var record = await db.SeasonPlayers.FindAsync([id], ct)
+                    ?? throw new InvalidOperationException($"Player {id} has no projection row.");
+                record.NextTimerAt = Engine.Economy.Timers.Next(player, after.Rules.Features);
             }
         }
 
@@ -175,6 +188,7 @@ internal static class SeasonProjection
             record.Hours = run.Hours;
             record.DiceJson = JsonSerializer.Serialize(run.Dice, EngineJson.Options);
             record.ChallengeDiceJson = JsonSerializer.Serialize(run.ChallengeDice, EngineJson.Options);
+            record.DiceModsJson = run.Mods is null ? null : JsonSerializer.Serialize(run.Mods, EngineJson.Options);
             record.HoursSource = run.HoursSource;
             record.CompletedAt = run.CompletedAt;
             record.ReachedFinish = run.ReachedFinish;
@@ -256,9 +270,10 @@ internal static class SeasonProjection
                 Id = id,
                 SeasonId = after.SeasonId,
                 PlayerId = effect.PlayerId,
-                DrawEvent = effect.DrawEvent,
+                DrawEvent = effect.DrawEvent ?? Engine.Rulesets.EventKind.Good,
                 Source = effect.Source,
                 RunId = effect.RunId,
+                ObjectId = effect.ObjectId,
             });
         }
 
@@ -280,9 +295,10 @@ internal static class SeasonProjection
 
     /// <summary>
     /// Rebuilds the state a projection describes, for the integrity check: it must equal the fold of the log.
-    /// The map, the count of finishes so far and the count of points changes are not projected; they are taken from
-    /// <paramref name="replayed"/>. So is the engine's bookkeeping of a reject (D-321): the run whose move last placed a
-    /// player, the cell a run's move began on, what it gained and the bonus of the cell it stopped on (D-321, D-327) — the pages never read them.
+    /// The map, the content (D-400), the count of finishes so far and the count of points changes are not projected; they
+    /// are taken from <paramref name="replayed"/>. So is the engine's bookkeeping of a reject (D-321): the run whose move
+    /// last placed a player, the cell a run's move began on, what it gained, the bonus of the cell it stopped on and the
+    /// objects its cells granted (D-321, D-327, D-421) — the pages never read them.
     /// </summary>
     public static async Task<SeasonState> ReadAsync(GameEventDbContext db, SeasonState replayed, CancellationToken ct)
     {
@@ -322,7 +338,8 @@ internal static class SeasonProjection
                         : null,
                     p.ActiveRunId,
                     p.PointsTick,
-                    replayed.Players.TryGetValue(p.Id, out var folded) ? folded.LastMoveRunId : null)),
+                    replayed.Players.TryGetValue(p.Id, out var folded) ? folded.LastMoveRunId : null,
+                    p.EconomyJson is null ? null : JsonSerializer.Deserialize<Engine.Inventory.PlayerEconomy>(p.EconomyJson, EngineJson.Options))),
             Runs = runs.ToImmutableSortedDictionary(
                 r => r.Id,
                 r => new RunState(
@@ -350,10 +367,12 @@ internal static class SeasonProjection
                     r.FreeMode,
                     replayed.Runs.GetValueOrDefault(r.Id)?.MoveFrom,
                     replayed.Runs.GetValueOrDefault(r.Id)?.Gain ?? 0,
-                    replayed.Runs.GetValueOrDefault(r.Id)?.CellPoints ?? 0)),
+                    replayed.Runs.GetValueOrDefault(r.Id)?.CellPoints ?? 0,
+                    r.DiceModsJson is null ? null : JsonSerializer.Deserialize<RunDiceMods>(r.DiceModsJson, EngineJson.Options),
+                    replayed.Runs.GetValueOrDefault(r.Id)?.CellObjects ?? default)),
             ManualEffects = effects.ToImmutableSortedDictionary(
                 x => x.Id,
-                x => new PendingManualEffect(x.Id, x.PlayerId, x.DrawEvent, x.Source, x.RunId)),
+                x => new PendingManualEffect(x.Id, x.PlayerId, x.ObjectId is null ? x.DrawEvent : null, x.Source, x.RunId) { ObjectId = x.ObjectId }),
             Result = result.Count == 0
                 ? null
                 : [.. result.Select(x => new Engine.Ranking.LeaderboardRow(x.PlayerId, x.Place, x.Points, x.CellsToFinish, x.IsFirst, x.Provisional))],
