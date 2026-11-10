@@ -55,12 +55,15 @@ internal sealed class RequestChoiceHandler : ActionHandler<RequestChoiceAction>
 {
     protected override void Execute(RequestChoiceAction action, EffectRun run) => run.NextChoice(Options(action.Options, run));
 
-    public static IReadOnlyCollection<string> Options(ChoiceOptionsSpec options, EffectRun run) =>
+    public static IReadOnlyCollection<string> Options(ChoiceOptionsSpec options, EffectRun run) => Options(options, run.State, run.Context.Pool);
+
+    /// <summary>The answers the engine accepts, in order: the screen offers the same (D-440).</summary>
+    public static IReadOnlyList<string> Options(ChoiceOptionsSpec options, Seasons.SeasonState state, Pool.IPoolView pool) =>
         options.From switch
         {
-            ChoiceSource.Categories => [.. run.Context.Pool.Categories.Where(c => c.Weight > 0).Select(c => c.Name)],
-            ChoiceSource.Players => [.. run.State.Players.Keys.Select(id => id.ToString("N"))],
-            ChoiceSource.Games => [.. run.Context.Pool.Games.Where(g => !g.IsDeleted).Select(g => g.Id.ToString("N"))],
+            ChoiceSource.Categories => [.. pool.Categories.Where(c => c.Weight > 0).Select(c => c.Name)],
+            ChoiceSource.Players => [.. state.Players.Keys.Select(id => id.ToString("N"))],
+            ChoiceSource.Games => [.. pool.Games.Where(g => !g.IsDeleted).Select(g => g.Id.ToString("N"))],
             _ => [.. options.List ?? []],
         };
 }

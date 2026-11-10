@@ -8,8 +8,11 @@ namespace GameEvent.Engine.Effects.Actions;
 internal static class ObjectFilters
 {
     public static IReadOnlyList<InventoryObject> Matching(EffectRun run, Guid playerId, ObjectFilterSpec? filter) =>
-        [.. run.State.Players[playerId].Wallet.Inventory
-            .Where(o => filter is null || Matches(run.State.Catalog.Get(o.ObjectId), o, filter))
+        Matching(run.State, playerId, filter);
+
+    public static IReadOnlyList<InventoryObject> Matching(Seasons.SeasonState state, Guid playerId, ObjectFilterSpec? filter) =>
+        [.. state.Players[playerId].Wallet.Inventory
+            .Where(o => filter is null || Matches(state.Catalog.Get(o.ObjectId), o, filter))
             .OrderBy(o => o.Acquired)];
 
     private static bool Matches(ObjectDefinition definition, InventoryObject item, ObjectFilterSpec filter) =>

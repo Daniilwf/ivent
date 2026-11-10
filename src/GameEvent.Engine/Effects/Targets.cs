@@ -48,6 +48,13 @@ internal static class Targets
             : (targets, null);
     }
 
+    /// <summary>
+    /// The players <paramref name="userId"/> may pick as the target of <paramref name="definition"/>'s <c>chosen</c>
+    /// selector, in id order: exactly the ones <see cref="ForUse"/> accepts (the screen offers no other, D-440).
+    /// </summary>
+    public static IReadOnlyList<Guid> Choosable(SeasonState state, ObjectDefinition definition, Guid userId) =>
+        [.. Candidates(state, definition, definition.Effect?.Target, userId).Select(p => p.PlayerId)];
+
     /// <summary>The targets of an effect that fired for its owner (no one chooses: <c>chosen</c> reaches nobody).</summary>
     public static IReadOnlyList<Guid> ForTriggered(SeasonState state, EngineContext context, ObjectDefinition definition, Guid ownerId) =>
         definition.Effect?.Target?.Selector == TargetSelector.Chosen ? [] : Resolve(state, context, definition, definition.Effect?.Target, ownerId);
