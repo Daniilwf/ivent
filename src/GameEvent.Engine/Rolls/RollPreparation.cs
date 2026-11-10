@@ -73,5 +73,7 @@ internal static class RollPreparation
 
     /// <summary>How many games the roll shows: the rules' count, or more when an item asks for a choice (CONTENT.md «Выбор из трёх»).</summary>
     public static int ChoiceCount(SeasonState state, Guid playerId) =>
-        Math.Max(state.Rules.Roll.ChoiceCount, state.Players[playerId].Wallet.CurrentRoll.Max(m => m.ChoiceCount) ?? 0);
+        state.Rules.Features.Items
+            ? Math.Max(state.Rules.Roll.ChoiceCount, state.Players[playerId].Wallet.CurrentRoll.Max(m => m.ChoiceCount) ?? 0)
+            : state.Rules.Roll.ChoiceCount;
 }

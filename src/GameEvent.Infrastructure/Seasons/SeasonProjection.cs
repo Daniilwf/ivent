@@ -151,6 +151,17 @@ internal static class SeasonProjection
             }
         }
 
+        // D-420: what a switched-off mechanic left waiting is not due, so the timer column follows the flags too
+        if (before.Ruleset is not null && before.Rules.Features != after.Rules.Features)
+        {
+            foreach (var (id, player) in after.Players)
+            {
+                var record = await db.SeasonPlayers.FindAsync([id], ct)
+                    ?? throw new InvalidOperationException($"Player {id} has no projection row.");
+                record.NextTimerAt = Engine.Economy.Timers.Next(player, after.Rules.Features);
+            }
+        }
+
         foreach (var (id, run) in after.Runs)
         {
             if (before.Runs.TryGetValue(id, out var old) && old == run)

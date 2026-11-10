@@ -73,6 +73,9 @@ public static class RejectionCodes
     public const string MapRequired = "map.required";
     public const string MapNotInLinearMode = "map.notInLinearMode";
     public const string MapModeFixed = "ruleset.mapModeFixed";
+
+    /// <summary>Bets are switched off only when none is open and no win waits for its run's proof (D-420).</summary>
+    public const string BetsInPlay = "ruleset.betsInPlay";
     public const string MapOccupiedCellRemoved = "map.occupiedCellRemoved";
     public const string MapUnchanged = "map.unchanged";
     public const string MapOccupiedCellRetyped = "map.occupiedCellRetyped";

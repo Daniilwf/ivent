@@ -214,9 +214,14 @@ public partial class PlayerAdminInvariantTests
                     _ => new ApproveProof(run.RunId, null),
                 };
             case 14:
-                return variant % 4 == 0
-                    ? new ChangeRuleset(s.Ruleset with { Features = s.Ruleset.Features with { Bets = !s.Ruleset.Features.Bets, Shop = !s.Ruleset.Features.Shop } })
-                    : new Reroll(player);
+                // Items off take the shop with them (the shop sells items); bets in play refuse the switch (D-420)
+                var features = s.Ruleset.Features;
+                return (variant % 8) switch
+                {
+                    0 => new ChangeRuleset(s.Ruleset with { Features = features with { Items = !features.Items, Shop = !features.Items && features.Shop } }),
+                    4 => new ChangeRuleset(s.Ruleset with { Features = features with { Bets = !features.Bets, Shop = !features.Shop } }),
+                    _ => new Reroll(player),
+                };
             default:
                 return new AdjustPlayer(player, "монетки", CoinsDelta: (variant % 21) - 8);
         }
@@ -296,6 +301,15 @@ public partial class PlayerAdminInvariantTests
         {
             var run = before.Runs[rejected];
             Assert.All(takenBack, r => Assert.Contains(r.InstanceId, run.CellObjects));
+
+            // By the log, not by the engine's own bookkeeping: each was granted by a cell in a command of the run's own move
+            // (its throw, the continuation after a fork, a change of its throw), after that move
+            var byOwnMove = s.History.SelectMany(c => c.Events
+                .SkipWhile(e => e is not Engine.Map.PlayerMoved { Reason: Engine.Map.MoveReason.CompletionRoll or Engine.Map.MoveReason.DiceModified or Engine.Map.MoveReason.RunCorrection } m || m.RunId != rejected)
+                .OfType<ObjectGiven>()
+                .Where(g => g.Source == ObjectSource.Cell && g.PlayerId == run.PlayerId)
+                .Select(g => g.Item.InstanceId)).ToHashSet();
+            Assert.All(run.CellObjects, o => Assert.Contains(o, byOwnMove));
             if (before.Rules.Features.Items && !Engine.Finish.Finishes.IsFrozen(before.Players[run.PlayerId]))
             {
                 Assert.DoesNotContain(s.State.Players[run.PlayerId].Wallet.Inventory, o => run.CellObjects.Contains(o.InstanceId));

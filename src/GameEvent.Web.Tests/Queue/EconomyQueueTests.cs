@@ -89,6 +89,36 @@ public sealed class EconomyQueueTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Switching_the_shop_off_and_on_moves_the_timer_column_with_it()
+    {
+        // D-420: a mechanic switched off is not due; the column follows the flags, not only changes of the player
+        await EconomyOnAsync();
+        var vasya = _site.Players["vasya"];
+        await _site.SendAsync(new Engine.Players.AdjustPlayer(vasya, "Монетки", CoinsDelta: 10));
+        await _site.SendAsync(new RollShop(vasya));
+        var due = _site.Clock.UtcNow.AddMinutes(15);
+
+        await SetShopAsync(on: false);
+        Assert.Null(await NextTimerAsync(vasya));
+
+        await SetShopAsync(on: true);
+        Assert.Equal(due, await NextTimerAsync(vasya));
+    }
+
+    private async Task SetShopAsync(bool on)
+    {
+        await using var db = _site.NewDb();
+        var (state, _) = await EventLogReader.ReplaySeasonAsync(db, SiteFactory.SeasonId, Ct);
+        await _site.SendAsync(new ChangeRuleset(state.Rules with { Features = state.Rules.Features with { Shop = on } }));
+    }
+
+    private async Task<DateTimeOffset?> NextTimerAsync(Guid player)
+    {
+        await using var db = _site.NewDb();
+        return (await db.SeasonPlayers.AsNoTracking().SingleAsync(p => p.Id == player, Ct)).NextTimerAt;
+    }
+
+    [Fact]
     public async Task The_scheduler_fires_the_shops_timer_through_the_queue_once_it_has_come()
     {
         await EconomyOnAsync();

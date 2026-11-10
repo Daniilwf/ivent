@@ -274,7 +274,8 @@ internal static class Rolling
         IEnumerable<RollFilter> zone = state.Map.ZoneOf(player.CellId) is { RollFilter: { } filter } z
             ? [new RollFilter(RollFilterPriority.Zone, $"zone:{z.Id}", game => Matches(filter, game), filter.Tags ?? default)]
             : [];
-        return [.. RollPreparation.Filters(player), .. zone];
+        // D-420: the changes of items stop with items switched off
+        return [.. state.Rules.Features.Items ? RollPreparation.Filters(player) : [], .. zone];
     }
 
     /// <summary>
