@@ -114,6 +114,14 @@ public sealed record ObjectDefinition
 
     public ContentProof? Proof { get; init; }
 
+    /// <summary>
+    /// Labels of the object itself (<c>edible</c>, <c>rat</c>, <c>gremlin</c>…), for filters such as «не крадёт крысиные»
+    /// (<see cref="ObjectFilterSpec.ExcludeTags"/>) and for loot boxes (D-470). Not the tags of games. Written only when
+    /// set, like every field the import added, so the logs of packs without it stay as they were.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public EquatableArray<string>? Tags { get; init; }
+
     /// <summary>Achievements only: counted per season or over all seasons.</summary>
     public AchievementScope? Scope { get; init; }
 
@@ -305,6 +313,10 @@ public sealed record ObjectFilterSpec
     public string? ObjectId { get; init; }
 
     public bool? Hostile { get; init; }
+
+    /// <summary>Objects with any of these <see cref="ObjectDefinition.Tags"/> are left alone (D-470).</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public EquatableArray<string>? ExcludeTags { get; init; }
 }
 
 public sealed record TakeObjectAction : ActionSpec

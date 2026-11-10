@@ -15,6 +15,9 @@ public partial class ContentExamplesTests
 {
     private static readonly Lazy<IReadOnlyList<string>> s_examples = new(ReadExamples);
 
+    /// <summary>The examples of «Примеры расширений формата»: one per extension of the import queue.</summary>
+    private const int ExtensionExamples = 1;
+
     /// <summary>The one example of CONTENT.md of <paramref name="kind"/> (<c>zone</c>, <c>cells</c>, …), for acceptance tests of other stages.</summary>
     internal static string Example(string kind) => s_examples.Value.Single(j => Classify(j) == kind);
 
@@ -41,11 +44,11 @@ public partial class ContentExamplesTests
     [Fact]
     public void The_doc_has_the_examples_the_stages_rely_on()
     {
-        // 10 items with their effects, 5 events, 3 achievements, a zone, the cells, a map, a poll, a weekly challenge — and the
-        // «Определение объекта» sample at the top
+        // 10 items with their effects, the examples of the format's extensions (the import of the old pack, D-470), 5 events,
+        // 3 achievements, a zone, the cells, a map, a poll, a weekly challenge — and the «Определение объекта» sample at the top
         var kinds = s_examples.Value.Select(Classify).ToList();
 
-        Assert.Equal(1 + 10 + 3 + 5 + 3, kinds.Count(k => k == "object"));
+        Assert.Equal(1 + 10 + 3 + ExtensionExamples + 5 + 3, kinds.Count(k => k == "object"));
         Assert.Equal(1, kinds.Count(k => k == "zone"));
         Assert.Equal(1, kinds.Count(k => k == "cells"));
         Assert.Equal(1, kinds.Count(k => k == "map"));

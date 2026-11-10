@@ -1,0 +1,25 @@
+{
+  "id": "better-dark-beer",
+  "kind": "item",
+  "name": "Улучшенное Темное Пиво",
+  "description": "Иди на 2 клетки назад.",
+  "rarity": "common",
+  "price": 20,
+  "window": "anytime",
+  "hostile": false,
+  "stackable": true,
+  "tags": [
+    "edible"
+  ],
+  "effect": {
+    "target": {
+      "selector": "self"
+    },
+    "actions": [
+      {
+        "type": "move",
+        "steps": -2
+      }
+    ]
+  }
+}

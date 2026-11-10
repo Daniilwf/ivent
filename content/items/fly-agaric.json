@@ -1,0 +1,26 @@
+{
+  "id": "fly-agaric",
+  "kind": "item",
+  "name": "Мухомор",
+  "description": "Теряешь 6 монеток.",
+  "rarity": "epic",
+  "price": 35,
+  "window": "anytime",
+  "hostile": false,
+  "stackable": true,
+  "tags": [
+    "edible"
+  ],
+  "effect": {
+    "target": {
+      "selector": "self"
+    },
+    "actions": [
+      {
+        "type": "changeResource",
+        "resource": "coins",
+        "amount": -6
+      }
+    ]
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "id": "gremlin",
+  "kind": "item",
+  "name": "Гремлин",
+  "description": "Уничтожь предмет на выбор у любого игрока, хоть у себя. Плата — 1 монетка. Гремлинские предметы гремлину не по зубам.",
+  "rarity": "common",
+  "price": null,
+  "window": "anytime",
+  "hostile": true,
+  "stackable": false,
+  "tags": [
+    "gremlin"
+  ],
+  "effect": {
+    "target": {
+      "selector": "chosen"
+    },
+    "actions": [
+      {
+        "type": "takeObject",
+        "mode": "destroy",
+        "pick": "chosen",
+        "filter": {
+          "kind": "item",
+          "excludeTags": [
+            "gremlin"
+          ]
+        }
+      },
+      {
+        "type": "changeResource",
+        "resource": "coins",
+        "amount": -1,
+        "target": "self"
+      }
+    ]
+  }
+}

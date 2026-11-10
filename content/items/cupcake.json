@@ -1,0 +1,26 @@
+{
+  "id": "cupcake",
+  "kind": "item",
+  "name": "Тортик",
+  "description": "Получаешь 3 монетки.",
+  "rarity": "common",
+  "price": 20,
+  "window": "anytime",
+  "hostile": false,
+  "stackable": true,
+  "tags": [
+    "edible"
+  ],
+  "effect": {
+    "target": {
+      "selector": "self"
+    },
+    "actions": [
+      {
+        "type": "changeResource",
+        "resource": "coins",
+        "amount": 3
+      }
+    ]
+  }
+}

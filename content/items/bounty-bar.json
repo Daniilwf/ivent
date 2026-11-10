@@ -1,0 +1,31 @@
+{
+  "id": "bounty-bar",
+  "kind": "item",
+  "name": "Баунти",
+  "description": "Ты и выбранный другой игрок идёте на 1 клетку вперёд.",
+  "rarity": "common",
+  "price": 12,
+  "window": "anytime",
+  "hostile": false,
+  "stackable": true,
+  "tags": [
+    "edible"
+  ],
+  "effect": {
+    "target": {
+      "selector": "chosen",
+      "excludeSelf": true
+    },
+    "actions": [
+      {
+        "type": "move",
+        "steps": 1
+      },
+      {
+        "type": "move",
+        "steps": 1,
+        "target": "self"
+      }
+    ]
+  }
+}

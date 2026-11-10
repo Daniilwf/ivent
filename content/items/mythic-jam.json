@@ -1,0 +1,26 @@
+{
+  "id": "mythic-jam",
+  "kind": "item",
+  "name": "Мифическое Варенье",
+  "description": "Получаешь 30 монеток.",
+  "rarity": "legendary",
+  "price": null,
+  "window": "anytime",
+  "hostile": false,
+  "stackable": true,
+  "tags": [
+    "edible"
+  ],
+  "effect": {
+    "target": {
+      "selector": "self"
+    },
+    "actions": [
+      {
+        "type": "changeResource",
+        "resource": "coins",
+        "amount": 30
+      }
+    ]
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "id": "raspberry",
+  "kind": "item",
+  "name": "Малинка",
+  "description": "Подбрось монетку: 1 или 2 монетки.",
+  "rarity": "common",
+  "price": null,
+  "window": "anytime",
+  "hostile": false,
+  "stackable": true,
+  "tags": [
+    "edible"
+  ],
+  "effect": {
+    "target": {
+      "selector": "self"
+    },
+    "outcomes": {
+      "roll": "1d2",
+      "cases": [
+        {
+          "from": 1,
+          "to": 1,
+          "actions": [
+            {
+              "type": "changeResource",
+              "resource": "coins",
+              "amount": 1
+            }
+          ]
+        },
+        {
+          "from": 2,
+          "to": 2,
+          "actions": [
+            {
+              "type": "changeResource",
+              "resource": "coins",
+              "amount": 2
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -63,6 +63,7 @@
               null
             ]
           },
+          "tags": true,
           "scope": {
             "enum": [
               "season",
@@ -401,7 +402,8 @@
                                 "boolean",
                                 "null"
                               ]
-                            }
+                            },
+                            "excludeTags": true
                           },
                           "additionalProperties": false
                         },
@@ -469,7 +471,8 @@
                                 "boolean",
                                 "null"
                               ]
-                            }
+                            },
+                            "excludeTags": true
                           },
                           "additionalProperties": false
                         },
@@ -949,7 +952,8 @@
                                           "boolean",
                                           "null"
                                         ]
-                                      }
+                                      },
+                                      "excludeTags": true
                                     },
                                     "additionalProperties": false
                                   },
@@ -1017,7 +1021,8 @@
                                           "boolean",
                                           "null"
                                         ]
-                                      }
+                                      },
+                                      "excludeTags": true
                                     },
                                     "additionalProperties": false
                                   },

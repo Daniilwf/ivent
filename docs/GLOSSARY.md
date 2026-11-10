@@ -61,6 +61,7 @@
 | Причина удаления игры | почему админ убрал игру из пула; обязательна, её видит тот, кто добавляет игру снова (D-208) | `DeleteGame.Reason`, `GameDeleted.Reason`, `GameRecord.DeletionReason`, `PoolGameView.DeletionReason`, `SimilarGameView.DeletionReason` |
 | Убрана из пула | та же игра удалена админом: добавить заново нельзя, только вернуть в пул (D-208, D-241) | отказ `pool.removed`, `SimilarGameView.IsDeleted` |
 | Тег | метка жанра или свойства игры | `Tag` |
+| Тег объекта | метка самого предмета или эффекта: съедобный, крысиный, гремлинский, свиной, оружие, зелье; по ней фильтр действия пропускает объекты (D-470) | `ObjectDefinition.Tags`, `ObjectFilterSpec.ExcludeTags` |
 | Категория | тег с весом на колесе категорий | `Category`, `SetCategory`, `RemoveCategory`, события `CategorySet`, `CategoryRemoved` |
 | Часы | длина игры по HowLongToBeat, основной сюжет | `Game.Hours`, `RunSnapshot.Hours` |
 | Условие прохождения | что считается прохождением для бесконечной или мультиплеерной игры | `GameRecord.CompletionCondition`, `GameCard.CompletionCondition` |

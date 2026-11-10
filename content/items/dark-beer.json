@@ -1,0 +1,25 @@
+{
+  "id": "dark-beer",
+  "kind": "item",
+  "name": "Темное Пиво",
+  "description": "Иди на 1 клетку назад.",
+  "rarity": "common",
+  "price": 15,
+  "window": "anytime",
+  "hostile": false,
+  "stackable": true,
+  "tags": [
+    "edible"
+  ],
+  "effect": {
+    "target": {
+      "selector": "self"
+    },
+    "actions": [
+      {
+        "type": "move",
+        "steps": -1
+      }
+    ]
+  }
+}

@@ -193,6 +193,9 @@ internal sealed class EffectRun
                 if (Interception.Find(State, target) is { } shield)
                 {
                     Emit(Interception.Stop(State, target, shield, ObjectId, UserId));
+
+                    // The answers were given for this target: the shield takes them with the effect (IT-1)
+                    _choiceIndex = _choices.Count;
                     continue;
                 }
 

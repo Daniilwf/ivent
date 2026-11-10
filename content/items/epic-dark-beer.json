@@ -1,0 +1,36 @@
+{
+  "id": "epic-dark-beer",
+  "kind": "item",
+  "name": "Эпическое Темное Пиво",
+  "description": "Иди на 1, 2 или 3 клетки назад на выбор.",
+  "rarity": "epic",
+  "price": null,
+  "window": "anytime",
+  "hostile": false,
+  "stackable": true,
+  "tags": [
+    "edible"
+  ],
+  "effect": {
+    "target": {
+      "selector": "self"
+    },
+    "actions": [
+      {
+        "type": "requestChoice",
+        "prompt": "На сколько клеток назад?",
+        "options": {
+          "list": [
+            "1",
+            "2",
+            "3"
+          ]
+        }
+      },
+      {
+        "type": "move",
+        "steps": "-$choice"
+      }
+    ]
+  }
+}

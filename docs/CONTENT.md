@@ -32,6 +32,7 @@
 | `stackable` | можно ли применить несколько одинаковых за раз |
 | `manual` | `true` — автоматики нет, эффект уходит в ручное разрешение |
 | `proof` | `media` — для IRL-ивентов нужен фото- или видеопруф |
+| `tags` | теги самого объекта: `edible`, `rat`, `gremlin`, `pig`, `weapon`, `potion`…; строчные слова через дефис, каждое один раз. Нужны фильтрам вроде «не крадёт крысиные» (`excludeTags`) и лутбоксам; это не теги игр (D-470) |
 | `effect` | что происходит; у объектов с `manual: true` может отсутствовать |
 
 ## Пакет контента и файлы
@@ -64,7 +65,7 @@
 | `changeResource` | `resource`: `points`, `coins` или свой ключ; `amount` |
 | `roll` | `dice`: результат доступен как `$roll` |
 | `giveObject` | `objectId`, `params` для параметризованных объектов |
-| `takeObject` | `mode`: `take`, `steal`, `destroy`; `filter`; `pick`: `random` или `chosen` |
+| `takeObject` | `mode`: `take`, `steal`, `destroy`; `filter`; `pick`: `random` или `chosen` (ответ — id экземпляра) |
 | `transformObject` | `mode`: `transform` (`into`) или `annotate` (`note`) |
 | `drawEvent` | `deck`: `good`, `bad`, `special`, `risky`, `zone` или id колоды |
 | `spinWheel` | `wheel`: id колеса |
@@ -78,6 +79,7 @@
 | Условие | Пример |
 | --- | --- |
 | Фильтр игры | `{ "tags": ["Horror"], "maxHours": 10, "minHours": 2, "releaseYearBefore": 2005 }` |
+| Фильтр объектов (`takeObject`, `transformObject`) | `{ "kind": "item", "rarity": "epic", "objectId": "orange", "hostile": true, "excludeTags": ["rat"] }`; `excludeTags` пропускает объекты с любым из этих тегов (D-470) |
 | Условие на прохождение | `{ "difficultyAtLeast": "hard" }` |
 | Статистика игрока | `{ "stat": "hostileReceived", "gte": 5 }`, `{ "stat": "completedStreakWithTag", "tag": "Horror", "gte": 3 }`, `{ "stat": "allDiceMax", "minDice": 3 }`, `{ "stat": "runHours", "gte": 30 }` |
 
@@ -256,6 +258,27 @@
       { "type": "roll", "dice": "1d4" },
       { "type": "changeResource", "resource": "coins", "amount": "-$roll" },
       { "type": "changeResource", "resource": "coins", "amount": "$roll", "target": "self" }
+    ]
+  }
+}
+```
+
+## Примеры расширений формата
+
+Расширения, добавленные при импорте пакета предметов старой таблицы (`content/imports/old-items`, очередь в `docs/PROGRESS.md`). Каждый пример — файл `content/items` как есть.
+
+### 11. Гремлин — уничтожить предмет на выбор, кроме гремлинских
+
+```json
+{
+  "id": "gremlin", "kind": "item", "name": "Гремлин",
+  "description": "Уничтожь предмет на выбор у любого игрока, хоть у себя. Плата — 1 монетка. Гремлинские предметы гремлину не по зубам.",
+  "rarity": "common", "price": null, "window": "anytime", "hostile": true, "stackable": false, "tags": ["gremlin"],
+  "effect": {
+    "target": { "selector": "chosen" },
+    "actions": [
+      { "type": "takeObject", "mode": "destroy", "pick": "chosen", "filter": { "kind": "item", "excludeTags": ["gremlin"] } },
+      { "type": "changeResource", "resource": "coins", "amount": -1, "target": "self" }
     ]
   }
 }

@@ -46,6 +46,8 @@ public static partial class ContentValidator
             Error("$.window", "Only items have a window of use.");
         }
 
+        CheckTags(definition.Tags, "$.tags", Error);
+
         if (kind == ObjectKind.Achievement && definition.Scope is null)
         {
             Error("$.scope", "An achievement is counted per season or over all seasons.");
@@ -271,6 +273,14 @@ public static partial class ContentValidator
             {
                 CheckReference(value, $"{at}.{field}", scope with { Rolled = rolled, Chose = chose }, error);
             }
+
+            var objectFilter = actions[i] switch
+            {
+                TakeObjectAction a => a.Filter,
+                TransformObjectAction a => a.Filter,
+                _ => null,
+            };
+            CheckTags(objectFilter?.ExcludeTags, $"{at}.filter.excludeTags", error, empty: false);
 
             switch (actions[i])
             {
@@ -506,6 +516,33 @@ public static partial class ContentValidator
         else if (options.List is { } list && (list.Count < 2 || list.Any(string.IsNullOrWhiteSpace)))
         {
             error($"{path}.list", "A list offers at least 2 non-empty options.");
+        }
+    }
+
+    // Object tags are lowercase words like ids («rat», «gremlin»), each once; a filter names at least one.
+    private static void CheckTags(Kernel.EquatableArray<string>? tags, string path, Action<string, string> error, bool empty = true)
+    {
+        if (tags is not { } list)
+        {
+            return;
+        }
+
+        if (!empty && list.Count == 0)
+        {
+            error(path, "List at least one tag.");
+        }
+
+        for (var i = 0; i < list.Count; i++)
+        {
+            if (list[i] is null || list[i].Length > MaxIdLength || !IdPattern().IsMatch(list[i]))
+            {
+                error($"{path}[{i}]", "A tag is lowercase words with hyphens, like an id («rat»).");
+            }
+        }
+
+        if (list.Where(t => t is not null).GroupBy(t => t, StringComparer.Ordinal).FirstOrDefault(g => g.Count() > 1) is { } twice)
+        {
+            error(path, $"«{twice.Key}» is listed twice.");
         }
     }
 

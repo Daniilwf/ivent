@@ -1,0 +1,49 @@
+{
+  "id": "sausage",
+  "kind": "item",
+  "name": "Сосиска",
+  "description": "Подбрось монетку: 1 монетка и шаг вперёд или шаг назад.",
+  "rarity": "common",
+  "price": 22,
+  "window": "anytime",
+  "hostile": false,
+  "stackable": true,
+  "tags": [
+    "edible"
+  ],
+  "effect": {
+    "target": {
+      "selector": "self"
+    },
+    "outcomes": {
+      "roll": "1d2",
+      "cases": [
+        {
+          "from": 1,
+          "to": 1,
+          "actions": [
+            {
+              "type": "changeResource",
+              "resource": "coins",
+              "amount": 1
+            },
+            {
+              "type": "move",
+              "steps": 1
+            }
+          ]
+        },
+        {
+          "from": 2,
+          "to": 2,
+          "actions": [
+            {
+              "type": "move",
+              "steps": -1
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "id": "fed-gremlin",
+  "kind": "item",
+  "name": "Сытый Гремлин",
+  "description": "Уничтожь предмет на выбор у любого игрока, хоть у себя. Гремлинские предметы гремлину не по зубам.",
+  "rarity": "common",
+  "price": 15,
+  "window": "anytime",
+  "hostile": true,
+  "stackable": false,
+  "tags": [
+    "gremlin"
+  ],
+  "effect": {
+    "target": {
+      "selector": "chosen"
+    },
+    "actions": [
+      {
+        "type": "takeObject",
+        "mode": "destroy",
+        "pick": "chosen",
+        "filter": {
+          "kind": "item",
+          "excludeTags": [
+            "gremlin"
+          ]
+        }
+      }
+    ]
+  }
+}

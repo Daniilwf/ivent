@@ -16,7 +16,8 @@ internal static class ObjectFilters
         (filter.Kind is not { } kind || item.Kind == kind)
         && (filter.Rarity is not { } rarity || definition.Rarity == rarity)
         && (filter.ObjectId is not { } id || item.ObjectId == id)
-        && (filter.Hostile is not { } hostile || definition.Hostile == hostile);
+        && (filter.Hostile is not { } hostile || definition.Hostile == hostile)
+        && (filter.ExcludeTags is not { } excluded || !(definition.Tags ?? []).Any(t => excluded.Contains(t, StringComparer.Ordinal)));
 
     /// <summary>One of <paramref name="candidates"/>: at random, or the one the player named (its instance id).</summary>
     public static InventoryObject? Pick(EffectRun run, IReadOnlyList<InventoryObject> candidates, Pick pick)

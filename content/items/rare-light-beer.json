@@ -1,0 +1,25 @@
+{
+  "id": "rare-light-beer",
+  "kind": "item",
+  "name": "Редкое Светлое Пиво",
+  "description": "Бахни пивка для рывка: иди на 3 клетки вперёд.",
+  "rarity": "epic",
+  "price": 25,
+  "window": "anytime",
+  "hostile": false,
+  "stackable": true,
+  "tags": [
+    "edible"
+  ],
+  "effect": {
+    "target": {
+      "selector": "self"
+    },
+    "actions": [
+      {
+        "type": "move",
+        "steps": 3
+      }
+    ]
+  }
+}

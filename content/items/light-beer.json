@@ -1,0 +1,25 @@
+{
+  "id": "light-beer",
+  "kind": "item",
+  "name": "Светлое Пиво",
+  "description": "Бахни пивка для рывка: иди на 1 клетку вперёд.",
+  "rarity": "common",
+  "price": 15,
+  "window": "anytime",
+  "hostile": false,
+  "stackable": true,
+  "tags": [
+    "edible"
+  ],
+  "effect": {
+    "target": {
+      "selector": "self"
+    },
+    "actions": [
+      {
+        "type": "move",
+        "steps": 1
+      }
+    ]
+  }
+}

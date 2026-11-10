@@ -1,0 +1,30 @@
+{
+  "id": "effect-rat",
+  "kind": "item",
+  "name": "Эффектная Крыса",
+  "description": "Укради эффект на выбор у другого игрока.",
+  "rarity": "common",
+  "price": null,
+  "window": "anytime",
+  "hostile": true,
+  "stackable": false,
+  "tags": [
+    "rat"
+  ],
+  "effect": {
+    "target": {
+      "selector": "chosen",
+      "excludeSelf": true
+    },
+    "actions": [
+      {
+        "type": "takeObject",
+        "mode": "steal",
+        "pick": "chosen",
+        "filter": {
+          "kind": "effect"
+        }
+      }
+    ]
+  }
+}

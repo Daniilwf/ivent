@@ -1,0 +1,25 @@
+{
+  "id": "better-light-beer",
+  "kind": "item",
+  "name": "Улучшенное Светлое Пиво",
+  "description": "Бахни пивка для рывка: иди на 2 клетки вперёд.",
+  "rarity": "common",
+  "price": 20,
+  "window": "anytime",
+  "hostile": false,
+  "stackable": true,
+  "tags": [
+    "edible"
+  ],
+  "effect": {
+    "target": {
+      "selector": "self"
+    },
+    "actions": [
+      {
+        "type": "move",
+        "steps": 2
+      }
+    ]
+  }
+}

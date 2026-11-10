@@ -1,0 +1,25 @@
+{
+  "id": "rare-dark-beer",
+  "kind": "item",
+  "name": "Редкое Темное Пиво",
+  "description": "Иди на 3 клетки назад.",
+  "rarity": "epic",
+  "price": 25,
+  "window": "anytime",
+  "hostile": false,
+  "stackable": true,
+  "tags": [
+    "edible"
+  ],
+  "effect": {
+    "target": {
+      "selector": "self"
+    },
+    "actions": [
+      {
+        "type": "move",
+        "steps": -3
+      }
+    ]
+  }
+}

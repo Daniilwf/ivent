@@ -1,0 +1,33 @@
+{
+  "id": "rat",
+  "kind": "item",
+  "name": "Крыса",
+  "description": "Укради предмет на выбор у другого игрока. Крысиные предметы не крадёт.",
+  "rarity": "common",
+  "price": null,
+  "window": "anytime",
+  "hostile": true,
+  "stackable": false,
+  "tags": [
+    "rat"
+  ],
+  "effect": {
+    "target": {
+      "selector": "chosen",
+      "excludeSelf": true
+    },
+    "actions": [
+      {
+        "type": "takeObject",
+        "mode": "steal",
+        "pick": "chosen",
+        "filter": {
+          "kind": "item",
+          "excludeTags": [
+            "rat"
+          ]
+        }
+      }
+    ]
+  }
+}
