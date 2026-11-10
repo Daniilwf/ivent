@@ -73,13 +73,23 @@ public sealed record Cell(string Id, CellType Type)
 public sealed record Edge(string From, string To, bool IsDefaultForward, bool IsPrimaryBackward);
 
 /// <summary>
+/// The picture the map is drawn over (SPEC «Карта», «Редактор»; D-277): a stored file and its natural size in pixels.
+/// The cells' places are in the picture's space. The rules never read it.
+/// </summary>
+public sealed record MapBackground(Guid FileId, int Width, int Height);
+
+/// <summary>
 /// The map is a graph from day one; the stage 1 linear map is a generated chain. <see cref="Zones"/> are the rules of
-/// the cells' zones (CONTENT.md «Зона»); written only when there are any (D-300).
+/// the cells' zones (CONTENT.md «Зона»); written only when there are any (D-300). <see cref="Background"/> — the picture
+/// under the cells, written only when there is one (D-277): a map of the log without it reads as before.
 /// </summary>
 public sealed record MapGraph(EquatableArray<Cell> Cells, EquatableArray<Edge> Edges)
 {
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public EquatableArray<ZoneDefinition> Zones { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public MapBackground? Background { get; init; }
 
     [JsonIgnore]
     public Cell Start => Cells.Single(c => c.Type == CellType.Start);

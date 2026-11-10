@@ -3689,6 +3689,115 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/seasons/{seasonId}/map/background": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "multipart/form-data": components["schemas"]["FileUploadForm"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StoredFileView"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+                /** @description Payload Too Large */
+                413: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+                /** @description Unsupported Media Type */
+                415: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Unprocessable Entity */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+                /** @description Too Many Requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+                /** @description Service Unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/seasons": {
         parameters: {
             query?: never;
@@ -6774,6 +6883,20 @@ export interface components {
             objectId?: null | string;
         };
         /**
+         * @description The picture under the map (D-277): an uploaded map background (`POST …/map/background`) and its natural size in
+         *     pixels — the cells' `x`, `y` are in this picture's space. `url` serves it (the server fills it in; a
+         *     request may leave it out).
+         */
+        MapBackgroundView: {
+            /** Format: uuid */
+            fileId: string;
+            /** Format: int32 */
+            width: number;
+            /** Format: int32 */
+            height: number;
+            url?: null | string;
+        };
+        /**
          * @description The check of a map before publication (SPEC «Редактор»): every problem at once — the map's own (MapValidator) and
          *     the ones of the season now (occupied cells, pending branch choices) — and the zone warnings. `canPublish` — no
          *     problems and the season takes a map now.
@@ -6783,11 +6906,15 @@ export interface components {
             problems: components["schemas"]["MapProblemView"][];
             warnings: components["schemas"]["ZoneGamesWarningView"][];
         };
-        /** @description A whole map: what the editor loads, checks and publishes. */
+        /**
+         * @description A whole map: what the editor loads, checks and publishes. `background` — the picture under the cells, or null:
+         *     the screens then draw the zones' board (D-277).
+         */
         MapGraphView: {
             cells: null | components["schemas"]["CellView"][];
             edges: null | components["schemas"]["EdgeView"][];
             zones: null | components["schemas"]["ZoneView"][];
+            background?: null | components["schemas"]["MapBackgroundView"];
         };
         /** @enum {unknown} */
         MapMode: "linear" | "graph";
@@ -7425,7 +7552,8 @@ export interface components {
          * @description The season screen's data. `status` and `deadline` (UTC; the screen shows it in Moscow time) follow the
          *     lifecycle (D-101); after the finish `leaderboard` is the recorded result. The map is the one in force (the
          *     latest published, D-300): `cells`, `edges` and `zones`; `mapMode` says whether the season plays
-         *     on the linear chain of stage 1 or on the graph (D-301).
+         *     on the linear chain of stage 1 or on the graph (D-301); `background` — the picture under the cells, null when
+         *     the map has none or its file is not on this site (D-277).
          */
         SeasonView: {
             /** Format: uuid */
@@ -7443,6 +7571,7 @@ export interface components {
             edges: components["schemas"]["EdgeView"][];
             zones: components["schemas"]["ZoneView"][];
             mapMode: components["schemas"]["MapMode"];
+            background?: null | components["schemas"]["MapBackgroundView"];
         };
         ShopRules: {
             /** Format: int32 */
