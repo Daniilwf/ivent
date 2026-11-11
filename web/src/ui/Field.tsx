@@ -14,6 +14,7 @@ export function Field({
   label,
   hint,
   error,
+  announce = true,
   force,
   className,
   ...input
@@ -21,6 +22,9 @@ export function Field({
   label: string;
   hint?: string;
   error?: string | undefined;
+  /** false: the error follows the typing (a live check) — it is linked to the field, not announced by itself;
+   * the form says the count of errors politely (DESIGN.md, «Формы») */
+  announce?: boolean;
   /** Styleguide only: shows the focus without the keyboard */
   force?: string;
 }) {
@@ -50,7 +54,11 @@ export function Field({
         {...input}
       />
       {error ? (
-        <span id={errorId} role="alert" className="text-sm font-medium text-danger">
+        <span
+          id={errorId}
+          role={announce ? 'alert' : undefined}
+          className="text-sm font-medium text-danger"
+        >
           {error}
         </span>
       ) : null}
@@ -63,12 +71,16 @@ export function TextArea({
   label,
   hint,
   error,
+  announce = true,
   className,
   ...input
 }: TextareaHTMLAttributes<HTMLTextAreaElement> & {
   label: string;
   hint?: string;
   error?: string | undefined;
+  /** false: the error follows the typing (a live check) — it is linked to the field, not announced by itself;
+   * the form says the count of errors politely (DESIGN.md, «Формы») */
+  announce?: boolean;
   ref?: Ref<HTMLTextAreaElement> | undefined;
 }) {
   const id = useId();
@@ -96,7 +108,11 @@ export function TextArea({
         {...input}
       />
       {error ? (
-        <span id={errorId} role="alert" className="text-sm font-medium text-danger">
+        <span
+          id={errorId}
+          role={announce ? 'alert' : undefined}
+          className="text-sm font-medium text-danger"
+        >
           {error}
         </span>
       ) : null}
@@ -128,6 +144,7 @@ export function Select({
   label,
   hint,
   error,
+  announce = true,
   force,
   className,
   children,
@@ -136,6 +153,9 @@ export function Select({
   label: string;
   hint?: string;
   error?: string | undefined;
+  /** false: the error follows the typing (a live check) — it is linked to the field, not announced by itself;
+   * the form says the count of errors politely (DESIGN.md, «Формы») */
+  announce?: boolean;
   force?: string;
   children: ReactNode;
   ref?: Ref<HTMLSelectElement> | undefined;
@@ -168,7 +188,11 @@ export function Select({
         {children}
       </select>
       {error ? (
-        <span id={errorId} role="alert" className="text-sm font-medium text-danger">
+        <span
+          id={errorId}
+          role={announce ? 'alert' : undefined}
+          className="text-sm font-medium text-danger"
+        >
           {error}
         </span>
       ) : null}

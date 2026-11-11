@@ -29,6 +29,8 @@ function describe(problem: SchemaProblem): string {
       return t.wrongType(problem.path, problem.expected.map((x) => t.types[x] ?? x).join(t.or));
     case 'enum':
       return t.notInList(problem.path, problem.values.map((v) => JSON.stringify(v)).join(', '));
+    case 'pattern':
+      return t.badFormat(problem.path);
   }
 }
 

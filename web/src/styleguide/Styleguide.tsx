@@ -52,6 +52,7 @@ import {
   demoProfileEmpty,
 } from './feedFixtures';
 import { AdminDemos } from './AdminDemos';
+import { ContentDemos } from './ContentDemos';
 
 // The styleguide's cards act on nothing
 const noop = () => undefined;
@@ -634,6 +635,10 @@ export function Styleguide() {
 
       <Section id="editor" title={t.editor.title} lead={t.editor.lead}>
         <EditorDemo />
+      </Section>
+
+      <Section id="content" title={t.content.title} lead={t.content.lead}>
+        <ContentDemos />
       </Section>
 
       <Section id="map-background" title={t.mapBackground.title} lead={t.mapBackground.lead}>
