@@ -1,16 +1,10 @@
 import { expect, test, type Page } from '@playwright/test';
+import { fingerDrag, mapView, pinchOut } from '../support/touch.ts';
 import { rollAndStartHere, setUpSeason, signIn } from '../support/world.ts';
 
 // TESTING.md scenario 9 «Экран телефона 390×844: главная, прохождение, карта с зумом». The phone project plays it at
 // 390×844 with touch — the map zooms with two fingers; the desktop project checks the same screens at 1440×900 with a
 // mouse wheel. Both: no sideways scroll, the one main action in view, the map zooms with its buttons and pans by drag.
-
-/** The map's visible box in map units (its viewBox): a smaller width is closer */
-async function mapView(page: Page) {
-  const box = (await page.locator('svg[role="application"]').first().getAttribute('viewBox')) ?? '';
-  const [x = 0, , w = 0] = box.split(' ').map(Number);
-  return { width: w, centre: x + w / 2 };
-}
 
 const mapWidth = async (page: Page) => (await mapView(page)).width;
 const mapCentre = async (page: Page) => (await mapView(page)).centre;
@@ -76,15 +70,7 @@ test('screen: the main page, the run and the map zoom on this device', async ({
   const cy = frame.y + frame.height / 2;
   if (phone) {
     // Two fingers apart: closer
-    const cdp = await page.context().newCDPSession(page);
-    const touch = (spread: number) => [
-      { x: cx - spread, y: cy, id: 1 },
-      { x: cx + spread, y: cy, id: 2 },
-    ];
-    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: touch(20) });
-    for (const spread of [40, 60, 80])
-      await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: touch(spread) });
-    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await pinchOut(page, { x: cx, y: cy });
   } else {
     // The mouse wheel: closer
     await page.mouse.move(cx, cy);
@@ -95,16 +81,7 @@ test('screen: the main page, the run and the map zoom on this device', async ({
   // A drag moves the map
   const centre = await mapCentre(page);
   if (phone) {
-    const cdp = await page.context().newCDPSession(page);
-    await cdp.send('Input.dispatchTouchEvent', {
-      type: 'touchStart',
-      touchPoints: [{ x: cx, y: cy, id: 3 }],
-    });
-    await cdp.send('Input.dispatchTouchEvent', {
-      type: 'touchMove',
-      touchPoints: [{ x: cx - 80, y: cy, id: 3 }],
-    });
-    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await fingerDrag(page, { x: cx, y: cy }, { x: -80, y: 0 });
   } else {
     await page.mouse.move(cx, cy);
     await page.mouse.down();
