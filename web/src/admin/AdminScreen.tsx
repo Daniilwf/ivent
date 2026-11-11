@@ -100,8 +100,12 @@ export function AdminScreen({
   const [kept, setKept] = useState(keptSeason);
   const seasons = useLoaded(useCallback(async () => answerOf(await api.GET('/api/seasons')), []));
   const listed = seasons.kind === 'ready' ? seasons.value : null;
+  // A season picked on this page wins as it is: one just created is not yet in the list read before it
+  const [pickedHere, setPickedHere] = useState(false);
   const seasonId =
-    kept && (listed === null || listed.some((s) => s.id === kept)) ? kept : currentSeasonId;
+    kept && (pickedHere || listed === null || listed.some((s) => s.id === kept))
+      ? kept
+      : currentSeasonId;
   const season = listed?.find((s) => s.id === seasonId) ?? null;
   const version = useSeasonVersion(seasonId, { throttleMs: refreshEveryMs });
   const [sheet, setSheet] = useState(false);
@@ -288,6 +292,7 @@ export function AdminScreen({
             version={version}
             onPick={(id) => {
               setKept(id);
+              setPickedHere(true);
               keepSeason(id);
             }}
           />

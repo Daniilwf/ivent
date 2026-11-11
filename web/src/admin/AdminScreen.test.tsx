@@ -244,6 +244,48 @@ describe('The admin pages', () => {
     ).toBe(false);
   });
 
+  it('open a season just created, though the list read before did not have it', async () => {
+    // K1A: the kept choice must not fall back to the current season because the list was read before the new one
+    const created: { id: string; name: string }[] = [];
+    fakeServer({
+      'GET /api/seasons': () => ({
+        body: [
+          ...created.map((s) => ({
+            ...s,
+            status: 'preparing',
+            deadline: null,
+            createdAt: '2026-10-03T00:00:00Z',
+          })),
+          ...seasons,
+        ],
+      }),
+      'POST /api/admin/seasons': (call) => {
+        const body = call.body as { seasonId: string; name: string };
+        created.push({ id: body.seasonId, name: body.name });
+        return { body: { events: [] } };
+      },
+      'GET /api/seasons/*': (call) => {
+        const id = call.path.split('/').at(-1) ?? '';
+        const found = created.find((s) => s.id === id);
+        return {
+          body: found
+            ? { ...seasonView(id, found.name), status: 'preparing' }
+            : seasonView(id, id === other ? 'Демо-сезон' : 'Сезон разработки'),
+        };
+      },
+      'GET /api/admin/seasons/*/proofs': [],
+    });
+    render(<AdminScreen section="season" currentSeasonId={seasonId} user={adminUser} />);
+
+    await userEvent.type(await screen.findByTestId('season-name'), 'Зима');
+    await userEvent.click(screen.getByTestId('season-create'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('season-status')).toHaveTextContent('Зима');
+    });
+    expect(globalThis.localStorage.getItem('ge.admin.season')).toBe(created[0]?.id);
+  });
+
   it('fall back to the current season when the one kept is gone', async () => {
     fakeServer({
       'GET /api/seasons': seasons.slice(0, 1),

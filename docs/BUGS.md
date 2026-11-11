@@ -132,8 +132,8 @@
 - **Ожидалось:** админ продолжает с выбранным сезоном или видит, чей это раздел.
 - **Получилось:** после F5 — самый новый сезон и «Проверять нечего», имени сезона нет.
 - **Важность:** средняя.
-- **Тест:** Vitest `AdminScreen.test.tsx` «keep the season the admin opened after a reload and name it…», «fall back to the current season when the one kept is gone».
-- **Исправление:** D-619 (1).
+- **Тест:** Vitest `AdminScreen.test.tsx` «keep the season the admin opened after a reload and name it…», «fall back to the current season when the one kept is gone», «open a season just created, though the list read before did not have it» (первая версия исправления открывала после «Создать» прежний сезон: новый ещё не был в списке; поймал Playwright `s01-full-cycle`).
+- **Исправление:** D-619 (1); сезон, выбранный на этой странице, берётся как есть, проверку по списку проходит только сохранённый в браузере.
 
 ### K1A-13. Строки лога и окно отката не говорили, кого касалось действие
 
