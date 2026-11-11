@@ -312,6 +312,11 @@ export const ru = {
     retrying: 'Пробуем ещё раз…',
     title: 'Твой ход',
     spectatorTitle: 'Ты зритель',
+    // K2-1: a player or an admin who is not in the season has no token in it, but is not a spectator either
+    outsiderTitle: 'Тебя нет в этом сезоне',
+    outsider: 'Сезон идёт без тебя. Попроси админа добавить тебя — и крути колесо.',
+    adminOutsideTitle: 'Ты ведёшь сезон',
+    adminOutside: 'В этом сезоне ты не играешь: пруфы и правки — в админке.',
     finishedTitle: 'Сезон завершён',
     finishedText: 'Ходы закончились, итоги — в лидерборде.',
     closingTitle: 'Ждём проверку пруфов',
@@ -790,6 +795,8 @@ export const ru = {
       info: 'Сова выкрутила Hollow Knight',
       warning: 'До дедлайна 2 часа: успей закончить ход',
       danger: 'Игра дропнута: −4 очка и клетки',
+      folded:
+        'Свёрнутая часть открывается своей строкой: шеврон поворачивается, когда она открыта.',
     },
     progress: {
       title: 'Прогресс и лидерборд',

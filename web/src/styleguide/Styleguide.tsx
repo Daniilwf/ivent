@@ -18,6 +18,7 @@ import { Leaderboard } from '../board/Leaderboard';
 import { cellsToFinish } from '../board/geometry';
 import { demoBoard } from '../board/demoBoard';
 import { ru } from '../i18n/ru';
+import { Summary } from '../ui/Disclosure';
 import { Button, IconButton, type ButtonVariant } from '../ui/Button';
 import { BottomSheet, ConfirmDanger, FormDialog } from '../ui/Dialogs';
 import { ChoiceGroup, Field, FilePicker, Select } from '../ui/Field';
@@ -397,6 +398,17 @@ export function Styleguide() {
           <Notice tone="info">{t.feedback.info}</Notice>
           <Notice tone="warning">{t.feedback.warning}</Notice>
           <Notice tone="danger">{t.feedback.danger}</Notice>
+        </div>
+        {/* A folded part, closed and open (K2-5) */}
+        <div className="grid gap-3 desk:grid-cols-2">
+          <details data-testid="sg-fold-closed">
+            <Summary className="font-bold">{ru.turn.proofToSend}</Summary>
+            <p className="pt-1 text-sm text-ink-soft">{t.feedback.folded}</p>
+          </details>
+          <details open data-testid="sg-fold-open">
+            <Summary className="font-bold">{ru.turn.proofSummary}</Summary>
+            <p className="pt-1 text-sm text-ink-soft">{t.feedback.folded}</p>
+          </details>
         </div>
         <div className="grid gap-4 desk:grid-cols-3">
           <EmptyState

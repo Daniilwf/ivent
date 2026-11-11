@@ -36,6 +36,7 @@ import { Sticker } from '../ui/Sticker';
 import { useDesk } from '../ui/useDesk';
 import { cx } from '../ui/cx';
 import { Panel } from '../ui/Surface';
+import { Summary } from '../ui/Disclosure';
 
 type Season = Schemas['SeasonView'];
 type Command =
@@ -139,9 +140,12 @@ async function fetchSeason(seasonId: string): Promise<Loaded> {
  *  and in a sheet at the bottom of a phone. */
 export function SeasonScreen({
   seasonId,
+  role = 'spectator',
   onSignedOut,
 }: {
   seasonId: string;
+  /** Who looks at the season: without a token of my own the turn card says why (K2-1) */
+  role?: 'player' | 'admin' | 'spectator';
   onSignedOut: () => void;
 }) {
   const [season, setSeason] = useState<Season | null>(null);
@@ -512,9 +516,9 @@ export function SeasonScreen({
             )}
             {/* The proof form folds into one line: it is not a to-do that holds the roll (H3 design review) */}
             <details data-testid="proof-details" className="grid gap-2">
-              <summary className="min-h-11 cursor-pointer content-center rounded-md font-bold is-focus:focus-ring">
+              <Summary className="font-bold">
                 {me.lastCompleted.proof ? ru.turn.proofSummary : ru.turn.proofToSend}
-              </summary>
+              </Summary>
               <ProofSection
                 proof={me.lastCompleted.proof ?? null}
                 pending={pending}
@@ -752,14 +756,26 @@ export function SeasonScreen({
       >
         <h2 id="turn-title" className="font-display text-lg font-heavy">
           {!me
-            ? ru.turn.spectatorTitle
+            ? role === 'player'
+              ? ru.turn.outsiderTitle
+              : role === 'admin'
+                ? ru.turn.adminOutsideTitle
+                : ru.turn.spectatorTitle
             : finished
               ? ru.turn.finishedTitle
               : closing
                 ? ru.turn.closingTitle
                 : ru.turn.title}
         </h2>
-        {!me && <p className="text-ink-soft">{ru.turn.spectator}</p>}
+        {!me && (
+          <p className="text-ink-soft">
+            {role === 'player'
+              ? ru.turn.outsider
+              : role === 'admin'
+                ? ru.turn.adminOutside
+                : ru.turn.spectator}
+          </p>
+        )}
         {me && finished && <p className="text-ink-soft">{ru.turn.finishedText}</p>}
         {me && closing && <p className="text-ink-soft">{ru.turn.closingText}</p>}
         {/* D-260: a finisher's season goes on; the card says where he stands and what his next runs give */}
@@ -955,18 +971,6 @@ export function SeasonScreen({
         </ol>
       </section>
 
-      {graphMode ? (
-        <MapLegend
-          zones={season.zones}
-          kinds={new Set(season.cells.map((c) => c.type))}
-          myZone={
-            season.cells.find(
-              (c) => c.id === season.players.find((p) => p.id === me?.playerId)?.cellId,
-            )?.zone
-          }
-          className="min-w-0 desk:col-start-1 desk:w-96"
-        />
-      ) : null}
       <Panel title={ru.leaderboard.title} className="hidden desk:col-start-1 desk:grid desk:w-96">
         <p className="text-sm text-ink-soft">{ru.board.rule}</p>
         <Leaderboard rows={shownRows} />
@@ -980,6 +984,19 @@ export function SeasonScreen({
         />
       ) : null}
 
+      {/* The map's legend after the leaderboard and the feed (K2-7): on a desktop it pushed «who leads» below the fold */}
+      {graphMode ? (
+        <MapLegend
+          zones={season.zones}
+          kinds={new Set(season.cells.map((c) => c.type))}
+          myZone={
+            season.cells.find(
+              (c) => c.id === season.players.find((p) => p.id === me?.playerId)?.cellId,
+            )?.zone
+          }
+          className="min-w-0 desk:col-start-1 desk:w-96"
+        />
+      ) : null}
       <div className="legacy-screens min-w-0 desk:col-start-1 desk:w-96">
         <AvatarSection
           onChanged={() => {

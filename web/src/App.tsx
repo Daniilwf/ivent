@@ -232,7 +232,11 @@ export function App() {
         ) : route.kind === 'rules' ? (
           <RulesScreen seasonId={signedIn.seasonId} onSignedOut={signedOut} />
         ) : signedIn.seasonId ? (
-          <SeasonScreen seasonId={signedIn.seasonId} onSignedOut={signedOut} />
+          <SeasonScreen
+            seasonId={signedIn.seasonId}
+            role={signedIn.user.role}
+            onSignedOut={signedOut}
+          />
         ) : (
           <main className="mx-auto grid max-w-110 px-4 py-10" data-testid="no-season">
             <EmptyState

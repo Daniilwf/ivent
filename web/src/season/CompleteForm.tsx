@@ -5,6 +5,7 @@ import { ru } from '../i18n/ru';
 import { CompletionRulesLink } from '../rules/CompletionRulesLink';
 import { Button } from '../ui/Button';
 import { Checkbox, ChoiceGroup, Field, Select, TextArea } from '../ui/Field';
+import { Summary } from '../ui/Disclosure';
 
 export type Completion = {
   difficulty: Schemas['Difficulty'];
@@ -169,9 +170,7 @@ export function CompleteForm({
         }}
         className="grid gap-3"
       >
-        <summary className="min-h-11 cursor-pointer content-center rounded-md font-bold is-focus:focus-ring">
-          {ru.turn.review}
-        </summary>
+        <Summary className="font-bold">{ru.turn.review}</Summary>
         <div className="grid gap-4 pt-2">
           <Select
             data-testid="complete-review-rating"
