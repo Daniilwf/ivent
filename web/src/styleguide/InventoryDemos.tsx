@@ -50,29 +50,32 @@ export function InventoryDemos() {
       </div>
       <div className="grid gap-2">
         <h3 className="font-display font-heavy">{t.buttons}</h3>
-        <ul className="grid gap-3 desk:grid-cols-2">
+        <div className="grid gap-4 desk:grid-cols-2">
           {['hover', 'focus', 'active'].map((force) => (
-            <ItemRow
-              key={force}
-              item={itemFixture({ instanceId: `force-${force}`, objectId: `force-${force}` })}
-              onUse={noop}
-              force={force}
-            />
+            <ul key={force}>
+              <ItemRow
+                item={itemFixture({ instanceId: `force-${force}`, objectId: `force-${force}` })}
+                onUse={noop}
+                force={force}
+              />
+            </ul>
           ))}
-          <ItemRow
-            item={itemFixture({
-              objectId: 'lucky-die',
-              name: 'Счастливый кубик',
-              description: 'Следующий бросок за прохождение получает +1 кубик.',
-              hostile: false,
-              rarity: 'legendary',
-              usable: false,
-              refusal: 'item.wrongWindow',
-              window: 'beforeDice',
-            })}
-            onUse={noop}
-          />
-        </ul>
+          <ul>
+            <ItemRow
+              item={itemFixture({
+                objectId: 'lucky-die',
+                name: 'Счастливый кубик',
+                description: 'Следующий бросок за прохождение получает +1 кубик.',
+                hostile: false,
+                rarity: 'legendary',
+                usable: false,
+                refusal: 'item.wrongWindow',
+                window: 'beforeDice',
+              })}
+              onUse={noop}
+            />
+          </ul>
+        </div>
       </div>
       <div className="flex flex-wrap gap-3">
         <Button
