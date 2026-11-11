@@ -8,9 +8,7 @@
   "window": "anytime",
   "hostile": true,
   "stackable": false,
-  "tags": [
-    "gremlin"
-  ],
+  "tags": ["gremlin"],
   "effect": {
     "target": {
       "selector": "chosen"
@@ -22,9 +20,7 @@
         "pick": "chosen",
         "filter": {
           "kind": "item",
-          "excludeTags": [
-            "gremlin"
-          ]
+          "excludeTags": ["gremlin"]
         }
       },
       {

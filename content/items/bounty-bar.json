@@ -8,9 +8,7 @@
   "window": "anytime",
   "hostile": false,
   "stackable": true,
-  "tags": [
-    "edible"
-  ],
+  "tags": ["edible"],
   "effect": {
     "target": {
       "selector": "chosen",

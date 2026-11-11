@@ -8,9 +8,7 @@
   "window": "beforeDice",
   "hostile": false,
   "stackable": true,
-  "tags": [
-    "rat"
-  ],
+  "tags": ["rat"],
   "effect": {
     "target": {
       "selector": "self"

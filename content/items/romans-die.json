@@ -17,10 +17,7 @@
         "type": "requestChoice",
         "prompt": "1 или 3?",
         "options": {
-          "list": [
-            "1",
-            "3"
-          ]
+          "list": ["1", "3"]
         }
       },
       {

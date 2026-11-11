@@ -8,9 +8,7 @@
   "window": "anytime",
   "hostile": true,
   "stackable": false,
-  "tags": [
-    "rat"
-  ],
+  "tags": ["rat"],
   "effect": {
     "target": {
       "selector": "chosen",

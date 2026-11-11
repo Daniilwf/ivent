@@ -8,9 +8,7 @@
   "window": "anytime",
   "hostile": true,
   "stackable": false,
-  "tags": [
-    "rat"
-  ],
+  "tags": ["rat"],
   "undestroyable": true,
   "effect": {
     "target": {
@@ -24,9 +22,7 @@
         "pick": "chosen",
         "filter": {
           "kind": "item",
-          "excludeTags": [
-            "rat"
-          ]
+          "excludeTags": ["rat"]
         }
       }
     ]

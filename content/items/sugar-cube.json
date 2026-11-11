@@ -8,9 +8,7 @@
   "window": "beforeDice",
   "hostile": false,
   "stackable": false,
-  "tags": [
-    "edible"
-  ],
+  "tags": ["edible"],
   "effect": {
     "target": {
       "selector": "self"
@@ -19,10 +17,7 @@
       "choice": {
         "prompt": "Что берёшь?",
         "options": {
-          "list": [
-            "+1d6 к броску",
-            "+3 монетки"
-          ]
+          "list": ["+1d6 к броску", "+3 монетки"]
         }
       },
       "cases": [

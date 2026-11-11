@@ -8,9 +8,7 @@
   "window": "anytime",
   "hostile": true,
   "stackable": false,
-  "tags": [
-    "pig"
-  ],
+  "tags": ["pig"],
   "effect": {
     "target": {
       "selector": "chosen",

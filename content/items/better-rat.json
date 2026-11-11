@@ -8,9 +8,7 @@
   "window": "anytime",
   "hostile": true,
   "stackable": false,
-  "tags": [
-    "rat"
-  ],
+  "tags": ["rat"],
   "effect": {
     "target": {
       "selector": "chosen",
@@ -24,9 +22,7 @@
         "count": 2,
         "filter": {
           "kind": "item",
-          "excludeTags": [
-            "rat"
-          ]
+          "excludeTags": ["rat"]
         }
       }
     ]

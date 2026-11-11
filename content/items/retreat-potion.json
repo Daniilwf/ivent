@@ -8,9 +8,7 @@
   "window": "anytime",
   "hostile": false,
   "stackable": true,
-  "tags": [
-    "potion"
-  ],
+  "tags": ["potion"],
   "effect": {
     "target": {
       "selector": "self"

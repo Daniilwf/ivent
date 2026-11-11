@@ -8,9 +8,7 @@
   "window": "beforeDice",
   "hostile": false,
   "stackable": true,
-  "tags": [
-    "pig"
-  ],
+  "tags": ["pig"],
   "effect": {
     "target": {
       "selector": "self"

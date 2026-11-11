@@ -8,9 +8,7 @@
   "window": "anytime",
   "hostile": false,
   "stackable": true,
-  "tags": [
-    "edible"
-  ],
+  "tags": ["edible"],
   "effect": {
     "target": {
       "selector": "self"
@@ -20,11 +18,7 @@
         "type": "requestChoice",
         "prompt": "На сколько клеток назад?",
         "options": {
-          "list": [
-            "1",
-            "2",
-            "3"
-          ]
+          "list": ["1", "2", "3"]
         }
       },
       {

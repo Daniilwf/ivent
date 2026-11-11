@@ -8,9 +8,7 @@
   "window": "anytime",
   "hostile": true,
   "stackable": false,
-  "tags": [
-    "weapon"
-  ],
+  "tags": ["weapon"],
   "effect": {
     "target": {
       "selector": "withinCells",
