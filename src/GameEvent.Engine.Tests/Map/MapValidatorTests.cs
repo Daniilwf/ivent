@@ -210,6 +210,22 @@ public class MapValidatorTests
         AssertOnly(Check(MapBuilder.New().Path("start", "t", "finish").Teleport("t", to: "finish")), MapErrorCodes.TeleportTarget, "t");
     }
 
+    [Theory]
+    [InlineData(null)]
+    [InlineData("t")]
+    public void A_teleport_without_another_target_is_one_error_not_a_cycle(string? to)
+    {
+        // K1A: no target (or itself) is «the teleport needs a target», not also «teleports go round»
+        var map = to is null
+            ? MapBuilder.New().Path("start", "t", "finish").Retyped("t", CellType.Teleport)
+            : MapBuilder.New().Path("start", "t", "finish").Teleport("t", to: to);
+
+        var errors = Check(map);
+
+        Assert.Equal([MapErrorCodes.TeleportTarget], errors.Where(e => e.Subject == "t").Select(e => e.Code));
+        Assert.DoesNotContain(errors, e => e.Code == MapErrorCodes.TeleportCycle);
+    }
+
     [Fact]
     public void Teleport_cycles_are_refused()
     {

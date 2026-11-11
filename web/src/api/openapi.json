@@ -6133,9 +6133,22 @@
             "items": {
               "$ref": "#/components/schemas/MapPlayerView"
             }
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32",
+            "default": 0
+          },
+          "events": {
+            "type": "boolean",
+            "default": false
+          },
+          "shop": {
+            "type": "boolean",
+            "default": false
           }
         },
-        "description": "The season's map in the editor (2.11): the map in force, the players on it, the mode (the editor publishes only in\n`graph`, D-301) and the status (only a draft or a running season takes a new map)."
+        "description": "The season's map in the editor (2.11): the map in force, the players on it, the mode (the editor publishes only in\n`graph`, D-301) and the status (only a draft or a running season takes a new map). `version`: how many times\nthe map was published (0 — the map of the season's creation); the publication names it back (D-616; always set).\n`events`, `shop`: whether the season's mechanics behind the event and shop cells are on — a switched-off\nmechanic is not offered in the editor (D-302, K1A; always set)."
       },
       "AdminPlayerView": {
         "required": [
@@ -9648,9 +9661,16 @@
               "null",
               "string"
             ]
+          },
+          "expectedVersion": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
           }
         },
-        "description": "Publish a new version of the map (D-300, D-308); `comment` goes to the public log, at most 500 characters."
+        "description": "Publish a new version of the map (D-300, D-308); `comment` goes to the public log, at most 500 characters.\n`expectedVersion`: the map version the draft was made from (`version` of the map read); a newer one\npublished since refuses with `map.versionConflict` (D-616). Without it nothing is checked (scripts)."
       },
       "RankingRules": {
         "required": [

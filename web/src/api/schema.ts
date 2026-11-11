@@ -6093,13 +6093,25 @@ export interface components {
         };
         /**
          * @description The season's map in the editor (2.11): the map in force, the players on it, the mode (the editor publishes only in
-         *     `graph`, D-301) and the status (only a draft or a running season takes a new map).
+         *     `graph`, D-301) and the status (only a draft or a running season takes a new map). `version`: how many times
+         *     the map was published (0 — the map of the season's creation); the publication names it back (D-616; always set).
+         *     `events`, `shop`: whether the season's mechanics behind the event and shop cells are on — a switched-off
+         *     mechanic is not offered in the editor (D-302, K1A; always set).
          */
         AdminMapView: {
             mode: components["schemas"]["MapMode"];
             status: components["schemas"]["SeasonStatus"];
             map: components["schemas"]["MapGraphView"];
             players: components["schemas"]["MapPlayerView"][];
+            /**
+             * Format: int32
+             * @default 0
+             */
+            version: number;
+            /** @default false */
+            events: boolean;
+            /** @default false */
+            shop: boolean;
         };
         /**
          * @description A player as the admin sees them (SE5, D-123): the balance and the place in the turn, the inactivity flag, when they
@@ -7219,12 +7231,18 @@ export interface components {
             comment: null | string;
             files: components["schemas"]["FileLinkView"][];
         };
-        /** @description Publish a new version of the map (D-300, D-308); `comment` goes to the public log, at most 500 characters. */
+        /**
+         * @description Publish a new version of the map (D-300, D-308); `comment` goes to the public log, at most 500 characters.
+         *     `expectedVersion`: the map version the draft was made from (`version` of the map read); a newer one
+         *     published since refuses with `map.versionConflict` (D-616). Without it nothing is checked (scripts).
+         */
         PublishMapRequest: {
             /** Format: uuid */
             commandId: string;
             map: null | components["schemas"]["MapGraphView"];
             comment?: null | string;
+            /** Format: int32 */
+            expectedVersion?: null | number;
         };
         RankingRules: {
             tiebreakers: components["schemas"]["EquatableArrayOfTiebreaker"];

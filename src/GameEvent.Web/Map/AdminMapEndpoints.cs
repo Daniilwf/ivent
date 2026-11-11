@@ -24,9 +24,13 @@ public sealed record MapPlayerView(Guid PlayerId, string Name, string CellId, bo
 
 /// <summary>
 /// The season's map in the editor (2.11): the map in force, the players on it, the mode (the editor publishes only in
-/// <c>graph</c>, D-301) and the status (only a draft or a running season takes a new map).
+/// <c>graph</c>, D-301) and the status (only a draft or a running season takes a new map). <c>version</c>: how many times
+/// the map was published (0 — the map of the season's creation); the publication names it back (D-616; always set).
+/// <c>events</c>, <c>shop</c>: whether the season's mechanics behind the event and shop cells are on — a switched-off
+/// mechanic is not offered in the editor (D-302, K1A; always set).
 /// </summary>
-public sealed record AdminMapView(MapMode Mode, SeasonStatus Status, MapGraphView Map, IReadOnlyList<MapPlayerView> Players);
+public sealed record AdminMapView(
+    MapMode Mode, SeasonStatus Status, MapGraphView Map, IReadOnlyList<MapPlayerView> Players, int Version = 0, bool Events = false, bool Shop = false);
 
 /// <summary>
 /// A problem of a map: the engine's stable code (<c>map.…</c>; the editor's dictionary words it), what it is about — a
@@ -44,8 +48,12 @@ public sealed record ZoneGamesWarningView(string ZoneId, int Available, int Want
 /// </summary>
 public sealed record MapCheckView(bool CanPublish, IReadOnlyList<MapProblemView> Problems, IReadOnlyList<ZoneGamesWarningView> Warnings);
 
-/// <summary>Publish a new version of the map (D-300, D-308); <c>comment</c> goes to the public log, at most 500 characters.</summary>
-public sealed record PublishMapRequest(Guid CommandId, MapGraphView? Map, string? Comment = null);
+/// <summary>
+/// Publish a new version of the map (D-300, D-308); <c>comment</c> goes to the public log, at most 500 characters.
+/// <c>expectedVersion</c>: the map version the draft was made from (<c>version</c> of the map read); a newer one
+/// published since refuses with <c>map.versionConflict</c> (D-616). Without it nothing is checked (scripts).
+/// </summary>
+public sealed record PublishMapRequest(Guid CommandId, MapGraphView? Map, string? Comment = null, int? ExpectedVersion = null);
 
 /// <summary>The map editor's API (2.11): read the map in force, check a draft, publish it through the queue.</summary>
 public static class AdminMapEndpoints
@@ -92,7 +100,7 @@ public static class AdminMapEndpoints
         map.MapPost("/publish", (Guid seasonId, PublishMapRequest request, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, CancellationToken ct) =>
                 PublishInvalid(request, out var graph) is { } invalid
                     ? Task.FromResult<Results<Ok<CommandResponse>, ProblemHttpResult, ValidationProblem, NotFound, ForbidHttpResult>>(invalid)
-                    : PublishAsync(seasonId, request.CommandId, new PublishMap(graph!, request.Comment!), user, db, bus, ct))
+                    : PublishAsync(seasonId, request.CommandId, new PublishMap(graph!, request.Comment!, request.ExpectedVersion), user, db, bus, ct))
             .WithActionErrors();
 
         // The picture under the map (D-278): stored like every upload, of its own kind; the draft names it, the publication carries it
@@ -145,7 +153,11 @@ public static class AdminMapEndpoints
                 p.Name,
                 p.CellId,
                 p.FinishOrder is not null,
-                p.ChoiceJson is { } json && JsonSerializer.Deserialize<Engine.Turns.PendingChoice>(json, EngineJson.Options)?.Kind == Engine.Turns.ChoiceKind.Branch))]));
+                p.ChoiceJson is { } json && JsonSerializer.Deserialize<Engine.Turns.PendingChoice>(json, EngineJson.Options)?.Kind == Engine.Turns.ChoiceKind.Branch))],
+            // The engine's MapVersion: map publications are never undone (Undo), so their count is it
+            await db.Events.AsNoTracking().CountAsync(e => e.SeasonId == seasonId && e.Type == "map-published", ct),
+            rules.Features.Events,
+            rules.Features.Shop));
     }
 
     private static async Task<Results<Ok<MapCheckView>, ValidationProblem, NotFound>> CheckAsync(

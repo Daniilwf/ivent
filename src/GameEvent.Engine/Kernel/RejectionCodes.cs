@@ -79,6 +79,7 @@ public static class RejectionCodes
     public const string BetsInPlay = "ruleset.betsInPlay";
     public const string MapOccupiedCellRemoved = "map.occupiedCellRemoved";
     public const string MapUnchanged = "map.unchanged";
+    public const string MapVersionConflict = "map.versionConflict";
     public const string MapOccupiedCellRetyped = "map.occupiedCellRetyped";
     public const string BranchChoicePending = "map.branchChoicePending";
     public const string UndoCellNotOnMap = "undo.cellNotOnMap";

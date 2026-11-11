@@ -240,7 +240,8 @@ public static class MapValidator
                 current = cells.GetValueOrDefault(to);
             }
 
-            if (current is not null && current.Id == cell.Id && reported.Add(cell.Id))
+            // A teleport with no other target is a target error alone, not a circle of one (K1A)
+            if (seen.Count > 1 && current is not null && current.Id == cell.Id && reported.Add(cell.Id))
             {
                 foreach (var id in seen)
                 {
