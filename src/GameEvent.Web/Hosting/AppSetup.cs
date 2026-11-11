@@ -18,6 +18,7 @@ using GameEvent.Web.Realtime;
 using GameEvent.Web.Rolls;
 using GameEvent.Web.Rulesets;
 using GameEvent.Web.Runs;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using GameEvent.Web.Seasons;
 using GameEvent.Web.Site;
 using GameEvent.Web.Testing;
@@ -120,7 +121,8 @@ public static class AppSetup
         services.AddSingleton<Passwords>();
         services.AddSingleton<IPasswords>(sp => sp.GetRequiredService<Passwords>());
         services.AddSingleton<LoginThrottle>();
-        services.AddSingleton(sp => new LoginDevices(sp.GetRequiredService<IDataProtectionProvider>(), sp.GetRequiredService<IClock>(), cookiePrefix + "ge.device", securePolicy));
+        services.TryAddSingleton(TimeProvider.System);
+        services.AddSingleton(sp => new LoginDevices(sp.GetRequiredService<IDataProtectionProvider>(), sp.GetRequiredService<TimeProvider>(), cookiePrefix + "ge.device", securePolicy));
         services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
             .AddCookie(o =>
             {

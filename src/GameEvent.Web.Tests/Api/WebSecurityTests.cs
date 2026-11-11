@@ -120,11 +120,73 @@ public sealed class WebSecurityTests : IAsyncLifetime
             b.UseSetting("Security:LoginFailuresPerAddress", "100");
         });
         var owner = await KnownBrowserAsync(site, "petya");
-        _site.Clock.UtcNow = _site.Clock.UtcNow.Add(LoginDevices.Lifetime).AddDays(1);
+        _site.Time.Advance = LoginDevices.Lifetime.Add(TimeSpan.FromDays(1)); // wall time, like sessions (D-650)
 
         await ReachCeilingAsync(site, "petya");
 
         Assert.Equal(HttpStatusCode.TooManyRequests, (await owner.PostAsJsonAsync("/api/auth/login", new { login = "petya", password = SiteFactory.Password }, Ct)).StatusCode);
+    }
+
+    [Fact]
+    public async Task Moving_the_game_clock_does_not_end_a_device_cookie()
+    {
+        // SEC-7: the device cookie runs by wall time like the session it came with; the game clock is the season's and
+        // the test endpoints move it on the test copy
+        using var site = CeilingOfThree();
+        var owner = await KnownBrowserAsync(site, "petya");
+        _site.Clock.UtcNow = _site.Clock.UtcNow.Add(LoginDevices.Lifetime).AddDays(1);
+
+        await ReachCeilingAsync(site, "petya");
+
+        Assert.Equal(HttpStatusCode.OK, (await owner.PostAsJsonAsync("/api/auth/login", new { login = "petya", password = SiteFactory.Password }, Ct)).StatusCode);
+    }
+
+    [Fact]
+    public async Task The_signed_in_owner_changes_the_password_while_a_spread_guess_fills_the_ceiling()
+    {
+        // SEC-5: a live session is a stronger proof than the device cookie, so the per-login ceiling does not hold the
+        // password change; the pair limit still does
+        using var site = CeilingOfThree();
+        var owner = await SignedInBrowserAsync(site, "petya");
+
+        await ReachCeilingAsync(site, "petya");
+
+        var changed = await owner.PostAsJsonAsync("/api/auth/password", new { commandId = Guid.NewGuid(), currentPassword = SiteFactory.Password, newPassword = NewPassword }, Ct);
+        Assert.Equal(HttpStatusCode.OK, changed.StatusCode);
+    }
+
+    [Fact]
+    public async Task The_password_change_keeps_the_browser_known()
+    {
+        // SEC-6: the change rotates the security stamp; the browser that made it is remembered with the new one
+        using var site = CeilingOfThree();
+        var owner = await SignedInBrowserAsync(site, "petya");
+        var changed = await owner.PostAsJsonAsync("/api/auth/password", new { commandId = Guid.NewGuid(), currentPassword = SiteFactory.Password, newPassword = NewPassword }, Ct);
+        Assert.Equal(HttpStatusCode.OK, changed.StatusCode);
+        await SiteFactory.RefreshCsrfAsync(owner);
+        Assert.Equal(HttpStatusCode.NoContent, (await owner.PostAsync("/api/auth/logout", null, Ct)).StatusCode);
+        await SiteFactory.RefreshCsrfAsync(owner);
+
+        await ReachCeilingAsync(site, "petya");
+
+        Assert.Equal(HttpStatusCode.OK, (await owner.PostAsJsonAsync("/api/auth/login", new { login = "petya", password = NewPassword }, Ct)).StatusCode);
+    }
+
+    private const string NewPassword = "новый-пароль-1";
+
+    private Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactory<Program> CeilingOfThree() => _site.WithWebHostBuilder(b =>
+    {
+        b.UseSetting("Security:LoginFailuresPerLogin", "3");
+        b.UseSetting("Security:LoginFailuresPerAddress", "100");
+    });
+
+    private static async Task<HttpClient> SignedInBrowserAsync(Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactory<Program> site, string login)
+    {
+        var browser = site.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions { HandleCookies = true });
+        await SiteFactory.RefreshCsrfAsync(browser);
+        Assert.Equal(HttpStatusCode.OK, (await browser.PostAsJsonAsync("/api/auth/login", new { login, password = SiteFactory.Password }, Ct)).StatusCode);
+        await SiteFactory.RefreshCsrfAsync(browser);
+        return browser;
     }
 
     private static async Task<HttpClient> KnownBrowserAsync(Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactory<Program> site, string login)
