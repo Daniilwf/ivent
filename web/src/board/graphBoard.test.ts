@@ -90,7 +90,7 @@ describe('the numbers of the cells', () => {
   });
 
   it('number a chain from 0 at the start, as the admin counts it', () => {
-    const chain = Array.from({ length: 6 }, (_, i) => ({
+    const chain: MapCell[] = Array.from({ length: 6 }, (_, i) => ({
       id: `c${i}`,
       type: i === 0 ? 'start' : i === 5 ? 'finish' : 'empty',
     }));

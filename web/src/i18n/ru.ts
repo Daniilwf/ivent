@@ -577,6 +577,7 @@ export const ru = {
     zoomIn: 'Приблизить',
     zoomOut: 'Отдалить',
     toMe: 'К моей фишке',
+    pickedClose: 'Скрыть, кто на клетке',
     leaderboard: 'Лидерборд',
     first: 'Первый',
     firstProvisional: 'Первый, пока предварительно',
