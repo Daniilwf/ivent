@@ -178,6 +178,9 @@
 | Предупреждение о зоне | в зоне меньше `map.minZoneGames` доступных игр | `ZoneWarnings`, `ZoneGamesWarning` |
 | Проверка публикации | что мешает опубликовать правильную карту сейчас: клетки под игроками, выбор ветки | `MapPublicationChecks`, `MapCheckView`, `POST /api/admin/seasons/{id}/map/check` |
 | Редактор карты | раздел «Карта» админки: холст, панели клетки и зон, проверка, публикация | `MapSection`, `MapCanvas` (React Flow) |
+| Редактор контента | раздел «Контент» админки: объекты и колёса сезона, форма и JSON по схеме, ошибки у полей, шаблоны действий, загрузка и выгрузка пакета, версии | `ContentSection`, `ObjectEditor`, `ObjectForm`; API — `AdminContentEndpoints` |
+| Версия контента | номер публикации пакета контента в сезоне; новая версия собирается из той, что в силе | `ContentCatalog.Version`, `PublishContent.ExpectedVersion`, отказ `content.versionChanged` |
+| Шаблон действия | базовое действие с примером параметров, которое редактор вставляет в эффект | `actionTemplate` (`web/src/admin/content/templates.ts`) |
 | Черновик карты | неопубликованные правки карты в браузере админа | `Draft`, `mapDraft.ts` (`loadDraft`, `saveDraft`) |
 | Последний ход | отрезки последнего перемещения моей фишки для анимации | `MoveView`, `MoveLegView`, `MyTurnView.LastMove` |
 | Ветка (в выборе) | выход развилки, пронумерованный на карте и в кнопках | `BranchOption`, `BranchChoice`, `ChoiceView.Steps` |

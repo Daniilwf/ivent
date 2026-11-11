@@ -178,7 +178,7 @@ function Workspace({
                   className="flex flex-wrap items-center gap-x-3 gap-y-1 wrap-anywhere"
                 >
                   <span className="font-bold">{d.name}</span>
-                  <code className="font-mono text-sm text-ink-soft">{d.id}</code>
+                  <code className="font-code text-sm text-ink-soft">{d.id}</code>
                   <Badge tone="muted">{t.kindOne[d.kind] ?? d.kind}</Badge>
                   <span className="text-sm text-ink-soft">{t.deletedIn(d.deletedIn)}</span>
                 </li>
@@ -196,27 +196,31 @@ function Workspace({
               return (
                 <li
                   key={`${collection}-${id}-${index}`}
-                  className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md px-2 py-1 wrap-anywhere is-hover:bg-page"
+                  className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 rounded-md px-2 py-1 wrap-anywhere is-hover:bg-page"
                   data-testid={`content-row-${id}`}
                 >
-                  <span className="font-bold">{name === '' ? t.previewEmpty : name}</span>
-                  <code className="mr-auto font-mono text-sm text-ink-soft">{id}</code>
-                  {collection === 'wheels' ? (
-                    <span className="text-sm text-ink-soft">
-                      {t.entries(Array.isArray(item.entries) ? item.entries.length : 0)}
-                    </span>
-                  ) : (
-                    <>
-                      {typeof item.rarity === 'string' ? (
-                        <Badge tone="muted">{t.values.rarity?.[item.rarity] ?? item.rarity}</Badge>
-                      ) : null}
-                      {item.kind === 'item' ? (
-                        <span className="text-sm text-ink-soft">
-                          {typeof item.price === 'number' ? t.price(item.price) : t.notForSale}
-                        </span>
-                      ) : null}
-                    </>
-                  )}
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <span className="font-bold">{name === '' ? t.previewEmpty : name}</span>
+                    <code className="font-code text-sm text-ink-soft">{id}</code>
+                    {collection === 'wheels' ? (
+                      <span className="text-sm text-ink-soft">
+                        {t.entries(Array.isArray(item.entries) ? item.entries.length : 0)}
+                      </span>
+                    ) : (
+                      <>
+                        {typeof item.rarity === 'string' ? (
+                          <Badge tone="muted">
+                            {t.values.rarity?.[item.rarity] ?? item.rarity}
+                          </Badge>
+                        ) : null}
+                        {item.kind === 'item' ? (
+                          <span className="text-sm text-ink-soft">
+                            {typeof item.price === 'number' ? t.price(item.price) : t.notForSale}
+                          </span>
+                        ) : null}
+                      </>
+                    )}
+                  </div>
                   {current ? (
                     <Badge tone="ink">{t.opened}</Badge>
                   ) : (
@@ -453,7 +457,7 @@ function Import({
                 <ul className="grid list-disc gap-1 pl-5">
                   {imported.check.result.problems.map((p) => (
                     <li key={`${p.path}-${p.message}`} className="wrap-anywhere">
-                      <code className="font-mono text-sm">{p.path}</code> {serverText(p.message)}
+                      <code className="font-code text-sm">{p.path}</code> {serverText(p.message)}
                     </li>
                   ))}
                 </ul>

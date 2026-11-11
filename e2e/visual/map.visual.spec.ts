@@ -144,6 +144,7 @@ for (const section of [
   'admin',
   'graph',
   'editor',
+  'content',
   'whats-new',
 ]) {
   test(`the styleguide section «${section}» looks as approved`, async ({ page }) => {

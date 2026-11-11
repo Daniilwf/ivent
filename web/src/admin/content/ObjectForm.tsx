@@ -419,7 +419,7 @@ function ActionField({
     return (
       <Field
         label={name}
-        {...(schema.pattern !== undefined ? { hint: t.problem.pattern } : {})}
+        {...(schema.pattern !== undefined ? { hint: t.valueHint } : {})}
         value={shown(value)}
         error={error}
         disabled={disabled}
@@ -493,7 +493,7 @@ function InJson({
   return (
     <div className="grid gap-1">
       <p className="text-sm font-bold">{label}</p>
-      <code className="block rounded-md bg-muted px-3 py-2 font-mono text-sm break-all whitespace-pre-wrap">
+      <code className="block rounded-md bg-muted px-3 py-2 font-code text-sm break-all whitespace-pre-wrap">
         {JSON.stringify(value)}
       </code>
       <p className="text-sm text-ink-soft">{t.inJson}</p>

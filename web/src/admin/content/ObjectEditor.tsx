@@ -106,7 +106,8 @@ export function ObjectEditor({
   const problems: Problem[] = [
     ...checked.problems,
     ...(taken && id ? [{ path: 'id', text: t.idTaken(id), source: 'schema' as const }] : []),
-    ...(fresh?.own ?? []),
+    // The server says the same of a field the schema already flagged, in other words: the schema's word is enough
+    ...(fresh?.own ?? []).filter((p) => !checked.problems.some((s) => s.path === p.path)),
   ];
   // The same content in another order (a field taken out and put back) is not a change: there is nothing to save
   const changed =
@@ -282,7 +283,7 @@ export function ObjectEditor({
                     key={`${p.source}-${p.path}-${p.text}`}
                     className="flex flex-wrap items-center gap-x-2"
                   >
-                    <code className="font-mono text-sm break-all">
+                    <code className="font-code text-sm break-all">
                       {p.path === '' ? t.root : p.path}
                     </code>
                     <span className="mr-auto">{p.text}</span>
@@ -312,7 +313,7 @@ export function ObjectEditor({
           <ul className="grid list-disc gap-1 pl-5">
             {fresh.other.map((p) => (
               <li key={`${p.path}-${p.text}`}>
-                <code className="font-mono text-sm break-all">{p.path}</code> {p.text}
+                <code className="font-code text-sm break-all">{p.path}</code> {p.text}
               </li>
             ))}
           </ul>
@@ -357,7 +358,7 @@ export function ObjectEditor({
           spellCheck={false}
           autoCapitalize="off"
           autoCorrect="off"
-          className="font-mono"
+          className="[&_textarea]:font-code"
           data-testid="content-json"
           aria-invalid={blocked || undefined}
           onChange={(e) => {
