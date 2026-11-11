@@ -1,0 +1,26 @@
+{
+  "id": "ratzenstecks",
+  "kind": "item",
+  "name": "Крысенштекс",
+  "description": "В следующем броске за прохождение есть дополнительный d4.",
+  "rarity": "common",
+  "price": null,
+  "window": "beforeDice",
+  "hostile": false,
+  "stackable": true,
+  "tags": ["rat"],
+  "effect": {
+    "target": {
+      "selector": "self"
+    },
+    "actions": [
+      {
+        "type": "modifyDice",
+        "when": "next",
+        "stage": "count",
+        "value": 1,
+        "sides": 4
+      }
+    ]
+  }
+}

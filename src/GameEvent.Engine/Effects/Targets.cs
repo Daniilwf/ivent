@@ -1,6 +1,7 @@
 using GameEvent.Engine.Content;
 using GameEvent.Engine.Finish;
 using GameEvent.Engine.Kernel;
+using GameEvent.Engine.Map;
 using GameEvent.Engine.Seasons;
 
 namespace GameEvent.Engine.Effects;
@@ -90,6 +91,18 @@ internal static class Targets
                 return active.Count == 0 ? [] : [active[context.Random.NextInt(0, active.Count)].PlayerId];
             case TargetSelector.Leader:
                 return candidates.OrderByDescending(p => p.Points).ThenBy(p => p.PointsTick).ThenBy(p => p.PlayerId).Take(1).Select(p => p.PlayerId).ToList();
+            case TargetSelector.WithinCells:
+                var around = MapDistances.Around(state.Map, state.Players[userId].CellId);
+                return [.. candidates
+                    .Where(p => p.PlayerId != userId && around.TryGetValue(p.CellId, out var away)
+                        && away <= (spec!.Cells ?? 0) && (away > 0 || spec.IncludeSameCell))
+                    .Select(p => p.PlayerId)];
+            case TargetSelector.NearestBehind:
+                var toFinish = MapDistances.ToFinish(state.Map);
+                var mine = toFinish.GetValueOrDefault(state.Players[userId].CellId);
+                var behind = candidates.Where(p => p.PlayerId != userId && toFinish.TryGetValue(p.CellId, out var d) && d > mine).ToList();
+                var nearest = behind.Count == 0 ? 0 : behind.Min(p => toFinish[p.CellId]);
+                return [.. behind.Where(p => toFinish[p.CellId] == nearest).Select(p => p.PlayerId)];
             default:
                 return [.. candidates.Select(p => p.PlayerId)];
         }

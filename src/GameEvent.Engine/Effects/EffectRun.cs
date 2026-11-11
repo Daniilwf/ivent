@@ -21,7 +21,7 @@ public enum DiceScope
 }
 
 /// <summary>A change of the throw being made, collected while <c>beforeDice</c> effects fire (D-408).</summary>
-internal sealed record ThrowChange(string ObjectId, DiceStage Stage, ContentValue Value);
+internal sealed record ThrowChange(string ObjectId, DiceStage Stage, ContentValue Value, int? Sides = null, int? From = null, DieFilter? Filter = null);
 
 /// <summary>
 /// One run of an effect (SPEC «Архитектура движка правил»: trigger, condition, targets, actions): the actions of an
@@ -33,6 +33,9 @@ internal sealed class EffectRun
 {
     private readonly IReadOnlyList<string> _choices;
     private int _choiceIndex;
+
+    // The actions aimed at the user ran: with several targets they run once per use (D-480)
+    private bool _selfDone;
 
     public EffectRun(
         SeasonState state,
@@ -134,6 +137,30 @@ internal sealed class EffectRun
         return answer;
     }
 
+    /// <summary>
+    /// Every answer not used yet, now used: a list of preference for a count known only at the use (D-476). Each must be one
+    /// of <paramref name="options"/> and given once; otherwise null and a refusal.
+    /// </summary>
+    public IReadOnlyList<string>? RemainingChoices(IReadOnlyCollection<string> options)
+    {
+        var answers = _choices.Skip(_choiceIndex).ToList();
+        _choiceIndex = _choices.Count;
+        if (answers.FirstOrDefault(a => !options.Contains(a, StringComparer.Ordinal)) is { } wrong)
+        {
+            Refuse(RejectionCodes.ItemInvalidChoice, $"«{wrong}» is not one of the options of «{ObjectId}».");
+            return null;
+        }
+
+        if (answers.Distinct(StringComparer.Ordinal).Count() != answers.Count)
+        {
+            Refuse(RejectionCodes.ItemInvalidChoice, $"An answer to «{ObjectId}» is given twice.");
+            return null;
+        }
+
+        LastChoice = answers.LastOrDefault() ?? LastChoice;
+        return answers;
+    }
+
     /// <summary>A value as a number (CONTENT.md «Значения»): dice are rolled now and logged, references resolved.</summary>
     public int Number(ContentValue value)
     {
@@ -193,15 +220,26 @@ internal sealed class EffectRun
                 if (Interception.Find(State, target) is { } shield)
                 {
                     Emit(Interception.Stop(State, target, shield, ObjectId, UserId));
+
+                    // The answers were given for this target: the shield takes them with the effect (IT-1)
+                    _choiceIndex = _choices.Count;
                     continue;
                 }
 
                 Emit(new HostileReceived(target, UserId, ObjectId));
             }
 
-            if (effect.Outcomes is { } outcomes)
+            if (effect.Outcomes is { Choice: { } choice } byChoice)
             {
-                LastRoll = Number(outcomes.Roll);
+                // The player's answer picks the case (D-482)
+                if (NextChoice(Actions.RequestChoiceHandler.Options(choice.Options, this)) is { } option)
+                {
+                    RunActions(byChoice.Cases.FirstOrDefault(c => c.Option == option)?.Actions ?? []);
+                }
+            }
+            else if (effect.Outcomes is { Roll: { } dice } outcomes)
+            {
+                LastRoll = Number(dice);
                 var roll = LastRoll.Value;
                 RunActions(outcomes.Cases.FirstOrDefault(c => c.From <= roll && roll <= c.To)?.Actions ?? []);
             }
@@ -219,9 +257,16 @@ internal sealed class EffectRun
 
     private void RunActions(EquatableArray<ActionSpec> actions)
     {
+        var selfDone = _selfDone;
         foreach (var action in actions)
         {
+            if (selfDone && action.Target == Content.ActionTarget.Self && TargetId != UserId)
+            {
+                continue;
+            }
+
             Actions.BaseActionRegistry.ByType[action.GetType()].Execute(action, this);
+            _selfDone |= action.Target == Content.ActionTarget.Self;
             if (Refusal is not null)
             {
                 return;

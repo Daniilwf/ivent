@@ -1,0 +1,28 @@
+{
+  "id": "time-bomb",
+  "kind": "effect",
+  "name": "Часовая бомба",
+  "description": "Счётчик 3: каждое твоё прохождение или дроп уменьшает его на 1. На нуле — назад на d6.",
+  "rarity": "common",
+  "price": null,
+  "hostile": true,
+  "effect": {
+    "trigger": "runEnded",
+    "duration": {
+      "untilTriggered": true
+    },
+    "counter": {
+      "start": 3
+    },
+    "actions": [
+      {
+        "type": "roll",
+        "dice": "1d6"
+      },
+      {
+        "type": "move",
+        "steps": "-$roll"
+      }
+    ]
+  }
+}

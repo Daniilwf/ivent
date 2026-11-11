@@ -85,7 +85,8 @@
     "maxChainDepth": 3,
     "maxEventsPerCommand": 50,
     "hostileCap": { "enabled": false, "maxActive": 1 },
-    "attacksOnlyOnHigherPoints": false
+    "attacksOnlyOnHigherPoints": false,
+    "reflect": { "coinsAtMost": -30, "multiplier": 2 }
   },
   "interactions": {
     "inviteTtlHours": 24

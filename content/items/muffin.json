@@ -1,0 +1,29 @@
+{
+  "id": "muffin",
+  "kind": "item",
+  "name": "Кексик",
+  "description": "Можно использовать, только если у тебя ноль монеток. Получаешь 5 монеток.",
+  "rarity": "common",
+  "price": 10,
+  "window": "anytime",
+  "hostile": false,
+  "stackable": true,
+  "tags": ["edible"],
+  "useCondition": {
+    "stat": "coins",
+    "gte": 0,
+    "lte": 0
+  },
+  "effect": {
+    "target": {
+      "selector": "self"
+    },
+    "actions": [
+      {
+        "type": "changeResource",
+        "resource": "coins",
+        "amount": 5
+      }
+    ]
+  }
+}

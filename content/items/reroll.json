@@ -1,0 +1,23 @@
+{
+  "id": "reroll",
+  "kind": "item",
+  "name": "Реролл",
+  "description": "Даёт один бесплатный реролл игры.",
+  "rarity": "epic",
+  "price": 50,
+  "window": "anytime",
+  "hostile": false,
+  "stackable": true,
+  "effect": {
+    "target": {
+      "selector": "self"
+    },
+    "actions": [
+      {
+        "type": "changeResource",
+        "resource": "freeRerolls",
+        "amount": 1
+      }
+    ]
+  }
+}

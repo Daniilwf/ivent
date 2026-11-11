@@ -121,6 +121,11 @@ public static class RulesetValidator
             Error("effects.maxChainDepth", "must be at least 1");
         }
 
+        if (ruleset.Effects.Reflect is { Multiplier: < 1 })
+        {
+            Error("effects.reflect.multiplier", "must be at least 1");
+        }
+
         if (ruleset.Effects.MaxEventsPerCommand < 1)
         {
             Error("effects.maxEventsPerCommand", "must be at least 1");

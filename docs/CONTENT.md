@@ -32,6 +32,9 @@
 | `stackable` | можно ли применить несколько одинаковых за раз |
 | `manual` | `true` — автоматики нет, эффект уходит в ручное разрешение |
 | `proof` | `media` — для IRL-ивентов нужен фото- или видеопруф |
+| `useCondition` | только у предметов: условие, при котором предмет можно использовать (см. «Условия»), иначе отказ `item.conditionNotMet` (D-483) |
+| `unstealable`, `undestroyable` | эффекты не забирают, не крадут и не передают объект / не уничтожают и не превращают его; правка админа действует (D-478) |
+| `tags` | теги самого объекта: `edible`, `rat`, `gremlin`, `pig`, `weapon`, `potion`…; строчные слова через дефис, каждое один раз. Нужны фильтрам вроде «не крадёт крысиные» (`excludeTags`) и лутбоксам; это не теги игр (D-470) |
 | `effect` | что происходит; у объектов с `manual: true` может отсутствовать |
 
 ## Пакет контента и файлы
@@ -44,32 +47,33 @@
 
 | Поле | Значения |
 | --- | --- |
-| `target` | `selector`: `self`, `chosen`, `randomActive`, `all`, `leader`, `higherPoints`, `lowerPoints`; `among` — ограничить выбор для `chosen` и `randomActive`: `higherPoints`, `lowerPoints`; `excludeSelf` — исключить себя |
-| `trigger` | для эффектов: `beforeRoll`, `afterRoll`, `runCompleted`, `beforeDice`, `afterDice`, `moveStep`, `stop`, `pass`, `drop`, `techReroll`, `time`, `hostileIncoming` |
+| `target` | `selector`: `self`, `chosen`, `randomActive`, `all`, `leader`, `higherPoints`, `lowerPoints`, `withinCells`, `nearestBehind`; `among` — ограничить выбор для `chosen` и `randomActive`: `higherPoints`, `lowerPoints`; `excludeSelf` — исключить себя; у `withinCells` — `cells`: все в пределах стольких клеток по рёбрам карты в обе стороны, стоящие на клетке использующего — при `includeSameCell`; `nearestBehind` — ближайший позади по расстоянию до финиша, при равенстве — все (D-480) |
+| `trigger` | для эффектов: `beforeRoll`, `afterRoll`, `runCompleted`, `beforeDice`, `afterDice`, `moveStep`, `stop`, `pass`, `drop`, `techReroll`, `time`, `hostileIncoming`, `runEnded` (прохождение или дроп, D-479) |
 | `duration` | `{ "uses": N }`, `{ "hours": N }`, `{ "runs": N }` или `{ "untilTriggered": true }` |
 | `condition` | условие срабатывания, см. «Условия» |
 | `intercept` | `hostile` — эффект гасит входящий враждебный эффект (пассивная защита) |
 | `actions` | список базовых действий, выполняются по порядку |
-| `outcomes` | случайное ветвление: `{ "roll": "1d6", "cases": [{ "from": 1, "to": 3, "actions": [...] }] }` |
+| `counter` | `{ "start": 3 }` — обратный отсчёт эффекта или спецролла: каждое срабатывание триггера уменьшает счётчик экземпляра на 1 вместо действий, на нуле действия выполняются (D-479) |
+| `outcomes` | случайное ветвление: `{ "roll": "1d6", "cases": [{ "from": 1, "to": 3, "actions": [...] }] }`; или по выбору игрока (D-482): `{ "choice": { "prompt": "…", "options": { "list": ["а", "б"] } }, "cases": [{ "option": "а", "actions": [...] }] }` — по случаю на каждый вариант, ответ даётся с использованием |
 
 **Значения** в действиях: целое число, строка с кубиками (`"1d6"`, `"2d4"`, `"-1d6"`) или ссылка: `"$roll"` — результат последнего броска в этом эффекте, `"$choice"` — последний выбор игрока, `"$result"` — итог голосования, `"$имя"` — параметр, переданный через `params` в `giveObject`, `"-$roll"` — со знаком минус.
 
-**Цель действия**: по умолчанию цель эффекта; поле `"target": "self"` у действия переопределяет её.
+**Цель действия**: по умолчанию цель эффекта; поле `"target": "self"` у действия переопределяет её. При нескольких целях действие на себя выполняется один раз за использование (D-480).
 
 ## Базовые действия
 
 | `type` | Параметры |
 | --- | --- |
-| `move` | `steps`: число, кубики или ссылка; минус — назад |
-| `changeResource` | `resource`: `points`, `coins` или свой ключ; `amount` |
+| `move` | `steps`: число, кубики или ссылка; минус — назад; `direction` (D-477): `chosen` — игрок отвечает `forward` или `back` (интерфейс называет их своими словами), `away` — от использующего: вперёд, если цель ближе к финишу, назад, если дальше, на равном расстоянии — на месте |
+| `changeResource` | `resource`: `points`, `coins` или свой ключ; `amount`; `reflect: true` — монетки, снятые с цели, у которой их не больше `effects.reflect.coinsAtMost`, снимаются с использующего, умноженные на `effects.reflect.multiplier` (D-474) |
 | `roll` | `dice`: результат доступен как `$roll` |
 | `giveObject` | `objectId`, `params` для параметризованных объектов |
-| `takeObject` | `mode`: `take`, `steal`, `destroy`; `filter`; `pick`: `random` или `chosen` |
-| `transformObject` | `mode`: `transform` (`into`) или `annotate` (`note`) |
+| `takeObject` | `mode`: `take`, `steal`, `destroy`, `give` (отдать свой объект цели; нечего отдать — отказ `item.nothingToGive`, D-478); `filter`; `pick`: `random` или `chosen` (ответ — id экземпляра); `count`: сколько объектов — число от 1 или ссылка (`$roll`), `all: true` — все подходящие (D-476). При `chosen` число просит ответ на каждый объект, а ссылка забирает все оставшиеся ответы как список по порядку, недостающие берутся случайно |
+| `transformObject` | `mode`: `transform` (`into`), `annotate` (`note`), `addCounter` (`value`: на сколько меняются счётчики всех подходящих; дошедший до нуля срабатывает сразу) или `resetCounters` (счётчики всех подходящих — к началу), D-479 |
 | `drawEvent` | `deck`: `good`, `bad`, `special`, `risky`, `zone` или id колоды |
 | `spinWheel` | `wheel`: id колеса |
 | `modifyNextRoll` | `filter`, `choiceCount`, `runCondition` |
-| `modifyDice` | `when`: `current` или `next`; `stage`: `count`, `sides`, `add`, `multiply`, `reroll`, `min`, `max`; `value` |
+| `modifyDice` | `when`: `current` или `next`; `stage`: `count`, `sides`, `add`, `multiply`, `reroll`, `min`, `max`, `singleDie`, `setOne`, `replaceValue`, `fixAverage`, `bonusPerEven`, `percent`; `value`; у `count` — `sides`: дополнительные кубики своего вида (d6 рядом с d4 прохождения, D-475). Редкие этапы (D-481): `singleDie` — вместо кубиков по часам один кубик на `value` граней; `setOne` — первый кубик показывает `value` (число или `$choice`), не больше своих граней; `replaceValue` — каждый кубик с `from` считается за `value`; `fixAverage` — каждый кубик показывает половину граней; `bonusPerEven` — `value` за каждый чётный кубик; `percent` — сумма с модификаторами × `value`/100 с округлением к нулю; у `reroll` — `filter: belowAverage`: перебросить только кубики ниже половины граней |
 | `teleport` | `cell`: id клетки или `nearestShortcut` |
 | `requestChoice` | `prompt`, `options`: `{ "from": "categories" }`, `players`, `games` или `{ "list": [...] }`; результат — `$choice` |
 
@@ -78,8 +82,9 @@
 | Условие | Пример |
 | --- | --- |
 | Фильтр игры | `{ "tags": ["Horror"], "maxHours": 10, "minHours": 2, "releaseYearBefore": 2005 }` |
+| Фильтр объектов (`takeObject`, `transformObject`) | `{ "kind": "item", "rarity": "epic", "objectId": "orange", "hostile": true, "hasCounter": true, "excludeTags": ["rat"] }`; `excludeTags` пропускает объекты с любым из этих тегов (D-470), `hasCounter` — только объекты со счётчиком или без (D-479) |
 | Условие на прохождение | `{ "difficultyAtLeast": "hard" }` |
-| Статистика игрока | `{ "stat": "hostileReceived", "gte": 5 }`, `{ "stat": "completedStreakWithTag", "tag": "Horror", "gte": 3 }`, `{ "stat": "allDiceMax", "minDice": 3 }`, `{ "stat": "runHours", "gte": 30 }` |
+| Статистика игрока | `{ "stat": "hostileReceived", "gte": 5 }`, `{ "stat": "completedStreakWithTag", "tag": "Horror", "gte": 3 }`, `{ "stat": "allDiceMax", "minDice": 3 }`, `{ "stat": "runHours", "gte": 30 }`, `{ "stat": "coins", "gte": 0, "lte": 0 }` (монетки владельца: `gte` и/или `lte`, D-483) |
 
 Набор статистик расширяется по мере надобности; каждая новая статистика — отдельная задача с тестом.
 
@@ -258,6 +263,177 @@
       { "type": "changeResource", "resource": "coins", "amount": "$roll", "target": "self" }
     ]
   }
+}
+```
+
+## Примеры расширений формата
+
+Расширения, добавленные при импорте пакета предметов старой таблицы (`content/imports/old-items`, очередь в `docs/PROGRESS.md`). Каждый пример — файл `content/items` как есть.
+
+### 11. Гремлин — уничтожить предмет на выбор, кроме гремлинских
+
+```json
+{
+  "id": "gremlin", "kind": "item", "name": "Гремлин",
+  "description": "Уничтожь предмет на выбор у любого игрока, хоть у себя. Плата — 1 монетка. Гремлинские предметы гремлину не по зубам.",
+  "rarity": "common", "price": null, "window": "anytime", "hostile": true, "stackable": false, "tags": ["gremlin"],
+  "effect": {
+    "target": { "selector": "chosen" },
+    "actions": [
+      { "type": "takeObject", "mode": "destroy", "pick": "chosen", "filter": { "kind": "item", "excludeTags": ["gremlin"] } },
+      { "type": "changeResource", "resource": "coins", "amount": -1, "target": "self" }
+    ]
+  }
+}
+```
+
+### 12. Граната — урон монетками отражается от бедной цели
+
+```json
+{
+  "id": "grenade", "kind": "item", "name": "Граната",
+  "description": "Оружие. Выбранный другой игрок идёт на 1 клетку назад и теряет 2 монетки. Если у жертвы монеток не больше порога из правил сезона, урон монетками достаётся тебе, умноженный по тем же правилам.",
+  "rarity": "common", "price": null, "window": "anytime", "hostile": true, "stackable": false, "tags": ["weapon"],
+  "effect": {
+    "target": { "selector": "chosen", "excludeSelf": true },
+    "actions": [
+      { "type": "move", "steps": -1 },
+      { "type": "changeResource", "resource": "coins", "amount": -2, "reflect": true }
+    ]
+  }
+}
+```
+
+### 13. Ездовой дракон — дополнительный d6 к следующему броску
+
+```json
+{
+  "id": "riding-dragon", "kind": "item", "name": "Ездовой дракон",
+  "description": "В следующем броске за прохождение есть дополнительный d6.",
+  "rarity": "epic", "price": 45, "window": "beforeDice", "hostile": false, "stackable": true,
+  "effect": { "target": { "selector": "self" }, "actions": [{ "type": "modifyDice", "when": "next", "stage": "count", "value": 1, "sides": 6 }] }
+}
+```
+
+### 14. Плазмаган — уничтожить столько предметов, сколько выпало
+
+```json
+{
+  "id": "plasma-gun", "kind": "item", "name": "Плазмаган",
+  "description": "Оружие. Брось d4: у выбранного другого игрока уничтожается столько предметов. Назови их заранее по порядку; если назвал меньше — остальные случайные, если выпало больше, чем у него есть, — уничтожаются все.",
+  "rarity": "common", "price": 20, "window": "anytime", "hostile": true, "stackable": false, "tags": ["weapon"],
+  "effect": {
+    "target": { "selector": "chosen", "excludeSelf": true },
+    "actions": [
+      { "type": "roll", "dice": "1d4" },
+      { "type": "takeObject", "mode": "destroy", "pick": "chosen", "count": "$roll", "filter": { "kind": "item" } }
+    ]
+  }
+}
+```
+
+### 15. Пистолет — толчок вперёд или назад на выбор
+
+```json
+{
+  "id": "pistol", "kind": "item", "name": "Пистолет",
+  "description": "Оружие. Выбранный другой игрок идёт на 1 клетку вперёд или назад — на твой выбор — и теряет 2 монетки. Если у жертвы монеток не больше порога из правил сезона, урон монетками достаётся тебе, умноженный по тем же правилам.",
+  "rarity": "common", "price": null, "window": "anytime", "hostile": true, "stackable": false, "tags": ["weapon"],
+  "effect": {
+    "target": { "selector": "chosen", "excludeSelf": true },
+    "actions": [
+      { "type": "move", "steps": 1, "direction": "chosen" },
+      { "type": "changeResource", "resource": "coins", "amount": -2, "reflect": true }
+    ]
+  }
+}
+```
+
+### 16. Свинья — отдать свой эффект другому
+
+```json
+{
+  "id": "pig", "kind": "item", "name": "Свинья",
+  "description": "Отдай выбранному другому игроку один свой эффект на выбор.",
+  "rarity": "common", "price": null, "window": "anytime", "hostile": true, "stackable": false, "tags": ["pig"],
+  "effect": {
+    "target": { "selector": "chosen", "excludeSelf": true },
+    "actions": [{ "type": "takeObject", "mode": "give", "pick": "chosen", "filter": { "kind": "effect" } }]
+  }
+}
+```
+
+### 17. Часовая бомба — эффект со счётчиком
+
+```json
+{
+  "id": "time-bomb", "kind": "effect", "name": "Часовая бомба",
+  "description": "Счётчик 3: каждое твоё прохождение или дроп уменьшает его на 1. На нуле — назад на d6.",
+  "rarity": "common", "price": null, "hostile": true,
+  "effect": {
+    "trigger": "runEnded", "duration": { "untilTriggered": true }, "counter": { "start": 3 },
+    "actions": [{ "type": "roll", "dice": "1d6" }, { "type": "move", "steps": "-$roll" }]
+  }
+}
+```
+
+### 18. Копьё — все в пределах пяти клеток
+
+```json
+{
+  "id": "spear", "kind": "item", "name": "Копье",
+  "description": "Оружие. Все игроки в пределах пяти клеток от тебя по карте, включая стоящих с тобой на одной клетке, идут на 1 клетку назад и теряют 1 монетку. Если у жертвы монеток не больше порога из правил сезона, урон монетками достаётся тебе, умноженный по тем же правилам.",
+  "rarity": "common", "price": null, "window": "anytime", "hostile": true, "stackable": false, "tags": ["weapon"],
+  "effect": {
+    "target": { "selector": "withinCells", "cells": 5, "includeSameCell": true, "excludeSelf": true },
+    "actions": [
+      { "type": "move", "steps": -1 },
+      { "type": "changeResource", "resource": "coins", "amount": -1, "reflect": true }
+    ]
+  }
+}
+```
+
+### 19. Средний кубик — каждый кубик показывает среднее
+
+```json
+{
+  "id": "middle-die", "kind": "item", "name": "Средний кубик",
+  "description": "В следующем броске за прохождение каждый кубик показывает своё среднее: d4 — 2, d6 — 3, d8 — 4, d10 — 5, d12 — 6, d20 — 10.",
+  "rarity": "epic", "price": 50, "window": "beforeDice", "hostile": false, "stackable": false,
+  "effect": { "target": { "selector": "self" }, "actions": [{ "type": "modifyDice", "when": "next", "stage": "fixAverage", "value": 1 }] }
+}
+```
+
+### 20. Кубик сахара — ветвление по выбору игрока
+
+```json
+{
+  "id": "sugar-cube", "kind": "item", "name": "Кубик сахара",
+  "description": "На выбор: дополнительный d6 к следующему броску за прохождение или 3 монетки.",
+  "rarity": "common", "price": null, "window": "beforeDice", "hostile": false, "stackable": false, "tags": ["edible"],
+  "effect": {
+    "target": { "selector": "self" },
+    "outcomes": {
+      "choice": { "prompt": "Что берёшь?", "options": { "list": ["+1d6 к броску", "+3 монетки"] } },
+      "cases": [
+        { "option": "+1d6 к броску", "actions": [{ "type": "modifyDice", "when": "next", "stage": "count", "value": 1, "sides": 6 }] },
+        { "option": "+3 монетки", "actions": [{ "type": "changeResource", "resource": "coins", "amount": 3 }] }
+      ]
+    }
+  }
+}
+```
+
+### 21. Кексик — только при нуле монеток
+
+```json
+{
+  "id": "muffin", "kind": "item", "name": "Кексик",
+  "description": "Можно использовать, только если у тебя ноль монеток. Получаешь 5 монеток.",
+  "rarity": "common", "price": 10, "window": "anytime", "hostile": false, "stackable": true, "tags": ["edible"],
+  "useCondition": { "stat": "coins", "gte": 0, "lte": 0 },
+  "effect": { "target": { "selector": "self" }, "actions": [{ "type": "changeResource", "resource": "coins", "amount": 5 }] }
 }
 ```
 
