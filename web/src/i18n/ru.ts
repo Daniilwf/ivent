@@ -724,6 +724,8 @@ export const ru = {
       ['complete', 'Завершение'],
       ['proof', 'Пруф'],
       ['inventory', 'Инвентарь'],
+      ['shop', 'Магазин'],
+      ['bets', 'Ставки'],
       ['pool', 'Игры пула'],
       ['rules', 'Правила сезона'],
       ['dialogs', 'Окна'],
@@ -873,6 +875,16 @@ export const ru = {
       buttons:
         'Кнопка «Использовать»: наведение, фокус, нажатие; вне окна — подсказка вместо кнопки',
       openSheet: 'Открыть лист «Использовать»',
+    },
+    shop: {
+      title: 'Магазин',
+      lead: 'Личные лоты с таймером: ролл за монетки или по купону, «Купить» у каждого лота, куплено — плашка, нельзя — причина словами. Таймер в табличных цифрах; лоты исчезают по времени сервера.',
+      buttons: 'Кнопка «Купить»: наведение, фокус, нажатие',
+    },
+    bets: {
+      title: 'Ставки',
+      lead: 'Чужие игры, на которые можно поставить сейчас, и мои ставки со статусом словом и значком. Лист ставки: срок с коэффициентом, сумма, выигрыш до нажатия.',
+      openSheet: 'Открыть лист ставки',
     },
     dialogs: {
       title: 'Окна',
@@ -1035,6 +1047,78 @@ export const ru = {
       anytime: 'Используется в любой момент',
     },
   },
+  // 4.11c (D-446): my shop on the season screen — the roll, the lots with their timer, the purchase
+  shop: {
+    title: 'Магазин',
+    lead: 'Ролл даёт личные лоты на несколько минут. Не купил — лоты исчезнут.',
+    coupons: (n: number) => `${plural(n, 'Купон', 'Купона', 'Купонов')}: ${n}`,
+    roll: (price: number) => `Ролл магазина за ${coins(price)}`,
+    rollAgain: (price: number) => `Новый ролл за ${coins(price)}`,
+    rollFree: 'Ролл по купону',
+    rollAnnounce: 'Новые лоты в магазине.',
+    left: (time: string) => `Лоты исчезнут через ${time}`,
+    gone: 'Время лотов вышло',
+    price: (n: number) => coins(n),
+    buy: 'Купить',
+    buyNamed: (name: string, price: number) => `Купить «${name}» за ${coins(price)}`,
+    sold: 'Куплено',
+    bought: (name: string) => `«${name}» куплен и лежит в инвентаре.`,
+    emptyTitle: 'Лотов пока нет',
+    emptyText: 'Сделай ролл магазина — появятся личные лоты.',
+    goneTitle: 'Лоты исчезли',
+    goneText: 'Время вышло. Новый ролл даст новые лоты.',
+    loadErrorTitle: 'Магазин не загрузился',
+    // The engine's codes said in the shop's own words where the common ones speak of something else
+    refusals: {
+      'roll.notEnoughCoins': 'Не хватает монеток.',
+      'content.unknownObject': 'Этого предмета больше нет в сезоне.',
+    } as Record<string, string>,
+  },
+  // 4.11c (D-446): bets on the runs of others and my bets
+  bets: {
+    title: 'Ставки',
+    lead: 'Ставка — на то, что игрок пройдёт свою игру к сроку. Успел — выигрыш по коэффициенту, нет — монетки сгорают.',
+    open: (n: number, limit: number) => `Открыто ${n} из ${limit}`,
+    runsTitle: 'На кого поставить',
+    until: (time: string) => `Ставки до ${time}`,
+    hours: (h: number) => `${h.toLocaleString('ru-RU')} ч`,
+    noHours: 'Часы не указаны',
+    place: 'Поставить',
+    placeOn: (name: string) => `Поставить на игрока ${name}`,
+    dialogTitle: (name: string) => `Ставка на игрока ${name}`,
+    dialogGame: (game: string) => `Пройдёт «${game}» к сроку?`,
+    deadline: 'Срок',
+    deadlineHint: 'Чем короче срок, тем выше коэффициент',
+    option: (days: number, multiplier: number) =>
+      `${days} ${plural(days, 'день', 'дня', 'дней')}, ×${multiplier.toLocaleString('ru-RU')}`,
+    stake: 'Ставка в монетках',
+    stakeHint: (max: number) => `От 1 до ${coins(max)}`,
+    stakeInvalid: (max: number) => `Ставка — целое число от 1 до ${max}.`,
+    payout: (n: number) => `Выигрыш, если успеет: ${coins(n)}`,
+    confirm: (stake: number) => `Поставить ${coins(stake)}`,
+    placed: (name: string) => `Ставка на игрока ${name} принята.`,
+    emptyTitle: 'Сейчас ставить не на кого',
+    emptyText:
+      'Ставить можно на чужую игру вскоре после её ролла. Загляни, когда кто-нибудь роллит.',
+    mineTitle: 'Мои ставки',
+    mineEmpty: 'Ты ещё не ставил.',
+    on: (name: string, game: string) => `${name}: «${game}»`,
+    deadlineAt: (time: string) => `Срок до ${time}`,
+    stakeOf: (stake: number, multiplier: number) =>
+      `${coins(stake)}, ×${multiplier.toLocaleString('ru-RU')}`,
+    status: {
+      open: 'Ждёт',
+      won: 'Выиграна',
+      lost: 'Проиграна',
+      revoked: 'Отменена',
+    },
+    wonPayout: (n: number) => `+${coins(n)}`,
+    loadErrorTitle: 'Ставки не загрузились',
+    refusals: {
+      'roll.notEnoughCoins': 'Нет монеток на ставку.',
+      'coins.inDebt': 'Ты в минусе по монеткам: ставить нельзя.',
+    } as Record<string, string>,
+  },
   effects: {
     title: 'Нужно разыграть',
     drawEvent: (kind: 'good' | 'bad', source: keyof typeof effectSources) =>
@@ -1188,6 +1272,9 @@ export const ru = {
       gotObject: (item: string) => `Получено: «${item}»`,
       lostObject: (item: string) => `Не влезло в инвентарь: «${item}»`,
       stake: (n: number) => `Ставка: ${coins(n)}`,
+      // EA-1: coins moved between players by one command, each with its name
+      coinsOf: (name: string, n: number) =>
+        `${name}: ${signed(n)} ${plural(n, 'монетка', 'монетки', 'монеток')}`,
     },
     rating: (n: number) => `${n} из 10`,
     ratingLabel: (n: number) => `Оценка: ${n} из 10`,

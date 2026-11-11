@@ -546,14 +546,23 @@ const effectSource = (value: string | null) =>
     ? value
     : 'drop';
 
-/** The facts the rest of a command's events add to its line: dice, points and cells, coins, the finish, events drawn */
-function factsOf(events: Event[], lead: Event, object: (id: string | null) => string): string[] {
+/**
+ * The facts the rest of a command's events add to its line: dice, points and cells, coins, the finish, events drawn.
+ * Coins of one player are one fact; coins moved between players (an item that steals, a bet paid out on another's
+ * completion) are a fact per player with the name, so −3 and +3 do not add up to nothing (EA-1).
+ */
+function factsOf(
+  events: Event[],
+  lead: Event,
+  object: (id: string | null) => string,
+  nameOf: (playerId: string) => string,
+): string[] {
   const facts: string[] = [];
   let points = 0;
   let cells = 0;
   let moved = false;
   let transferred = false;
-  let coins = 0;
+  const coins = new Map<string, number>();
   for (const event of events) {
     if (event === lead) continue;
     const d = event.data;
@@ -568,9 +577,11 @@ function factsOf(events: Event[], lead: Event, object: (id: string | null) => st
       case 'points-changed':
         points += number(d, 'delta') ?? 0;
         break;
-      case 'coins-changed':
-        coins += number(d, 'delta') ?? 0;
+      case 'coins-changed': {
+        const who = text(d, 'playerId') ?? '';
+        coins.set(who, (coins.get(who) ?? 0) + (number(d, 'delta') ?? 0));
         break;
+      }
       case 'player-moved': {
         const steps = number(d, 'steps') ?? 0;
         const path = list(d, 'path').length;
@@ -623,7 +634,15 @@ function factsOf(events: Event[], lead: Event, object: (id: string | null) => st
     if (cells !== 0) facts.push(F.cells(cells));
   }
   if (moved && transferred && cells === 0) facts.push(F.moved);
-  if (coins !== 0) facts.push(F.coins(coins));
+  if (coins.size === 1) {
+    const [only] = coins.values();
+    if (only) facts.push(F.coins(only));
+  } else {
+    // The one the line is about first, then the others as the events name them
+    const actor = text(lead.data, 'playerId');
+    const order = [...coins].sort(([a], [b]) => Number(b === actor) - Number(a === actor));
+    for (const [who, n] of order) if (n !== 0) facts.push(F.coinsOf(nameOf(who), n));
+  }
   return facts;
 }
 
@@ -685,7 +704,10 @@ function itemOf(entries: Entry[], refs: FeedRefs): FeedItem | null {
     icon: headline.icon,
     actor: headline.actor,
     line: headline.line,
-    facts: [...(headline.facts ?? []), ...factsOf(events, lead, object)],
+    facts: [
+      ...(headline.facts ?? []),
+      ...factsOf(events, lead, object, (id) => player({ playerId: id }).name),
+    ],
     quote: headline.quote ?? null,
     cover:
       headline.showcase?.kind === 'game' && headline.showcase.game.cover

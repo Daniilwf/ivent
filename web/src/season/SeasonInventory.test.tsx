@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import type { Schemas } from '../api/client';
 import { fakeServer, seasonId } from '../test/fakeServer';
 import { SeasonScreen } from './SeasonScreen';
-import { economyFixture } from './inventoryFixtures';
+import { betsFixture, economyFixture, shopFixture } from './inventoryFixtures';
 
 // The inventory on the season screen (D-441): only when the season plays items and I am one of its players; a
 // mechanic off is not shown at all, and nothing asks the server for it.
@@ -13,7 +13,11 @@ vi.mock('../api/realtime', () => ({
 
 const me = '10000000-0000-0000-0000-000000000001';
 
-function season(items: boolean, mine = true): Schemas['SeasonView'] {
+function season(
+  items: boolean,
+  mine = true,
+  more: { shop?: boolean; bets?: boolean } = {},
+): Schemas['SeasonView'] {
   return {
     id: seasonId,
     status: 'active',
@@ -61,14 +65,17 @@ function season(items: boolean, mine = true): Schemas['SeasonView'] {
     zones: [],
     mapMode: 'linear',
     name: 'Тестовый сезон',
-    economy: { items, shop: false, bets: false },
+    economy: { items, shop: more.shop ?? false, bets: more.bets ?? false },
   };
 }
 
 function open(view: Schemas['SeasonView']) {
   const server = fakeServer({
     [`GET /api/seasons/${seasonId}`]: view,
-    [`GET /api/seasons/${seasonId}/economy`]: economyFixture(),
+    [`GET /api/seasons/${seasonId}/economy`]: economyFixture({
+      shop: shopFixture(),
+      bets: betsFixture(),
+    }),
   });
   render(<SeasonScreen seasonId={seasonId} onSignedOut={() => {}} />);
   return server;
@@ -95,5 +102,26 @@ describe('the inventory on the season screen', () => {
     expect(await screen.findByTestId('turn')).toBeInTheDocument();
     expect(screen.queryByTestId('inventory')).not.toBeInTheDocument();
     expect(server.sent('GET', '/economy')).toHaveLength(0);
+  });
+
+  it('shows the shop and the bets only when the season plays them (D-446)', async () => {
+    open(season(true, true, { shop: true, bets: true }));
+    expect(await screen.findByTestId('shop')).toBeInTheDocument();
+    expect(screen.getByTestId('bets')).toBeInTheDocument();
+  });
+
+  it('keeps the shop and the bets hidden when they are off', async () => {
+    open(season(true));
+    expect(await screen.findByTestId('item-bird-thief')).toBeInTheDocument();
+    expect(screen.queryByTestId('shop')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('bets')).not.toBeInTheDocument();
+  });
+
+  it('shows the bets without the inventory when bets play without items', async () => {
+    const server = open(season(false, true, { bets: true }));
+    expect(await screen.findByTestId('bets')).toBeInTheDocument();
+    expect(screen.queryByTestId('inventory')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('shop')).not.toBeInTheDocument();
+    expect(server.sent('GET', '/economy')).toHaveLength(1);
   });
 });
