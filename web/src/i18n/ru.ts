@@ -144,6 +144,38 @@ const rejection = {
   'site.maintenance': 'Идёт обслуживание: сайт на минуту только для чтения. Повтори чуть позже.',
   'bugReport.invalid': 'Опиши, что случилось (до 4000 символов).',
   'bugReport.screenshotUnknown': 'Скриншот не найден. Отправь отчёт ещё раз.',
+  // Stage 4: items, the shop and bets (D-441)
+  'item.unknown': 'Этого предмета у тебя уже нет. Обнови страницу.',
+  'item.notAnItem': 'Это эффект: он действует сам, использовать его не нужно.',
+  'item.wrongWindow': 'Сейчас этот предмет не используется: дождись его момента хода.',
+  'item.notStackable': 'Этот предмет не складывается с собой: прошлый ещё действует.',
+  'item.targetRequired': 'Выбери, на кого использовать предмет.',
+  'item.invalidTarget': 'На этого игрока предмет не действует. Выбери другого.',
+  'item.noTarget': 'Сейчас этот предмет не на кого использовать.',
+  'item.invalidChoice': 'Такого ответа нет. Обнови страницу и выбери снова.',
+  'item.hostileCap': 'На этом игроке уже висит враждебный эффект: больше нельзя.',
+  'item.notApplicable': 'Сейчас этот предмет ничего не изменит.',
+  'map.branchChoicePending':
+    'Кто-то, кого сдвинет предмет, выбирает ветку на развилке: попробуй чуть позже.',
+  'inventory.frozen': 'Ты финишировал первым: инвентарь заморожен.',
+  'inventory.full': 'Инвентарь полон: сначала используй что-нибудь.',
+  'content.unknownObject': 'Такого предмета нет в контенте сезона.',
+  'content.invalid': 'В пакете контента есть ошибки.',
+  'content.unchanged': 'Пакет совпадает с загруженным: обновлять нечего.',
+  'shop.noOffer': 'Сначала ролльни магазин.',
+  'shop.offerExpired': 'Время лотов вышло: ролльни магазин заново.',
+  'shop.unknownLot': 'Такого лота нет. Обнови страницу.',
+  'shop.lotSold': 'Этот лот уже куплен.',
+  'shop.empty': 'В магазине сезона пока ничего не продаётся.',
+  'coins.inDebt': 'Ты в минусе по монеткам: покупать нельзя.',
+  'bet.onSelf': 'На себя ставить нельзя.',
+  'bet.noRun': 'Этот игрок сейчас ничего не проходит.',
+  'bet.windowClosed': 'Ставки на эту игру уже закрыты.',
+  'bet.invalidDays': 'Выбери срок из предложенных.',
+  'bet.invalidStake': 'Ставка больше лимита сезона.',
+  'bet.tooMany': 'У тебя уже максимум открытых ставок.',
+  'bet.onFirst': 'На финишировавшего первым не ставят.',
+  'bet.alreadyPlaced': 'На эту игру ты уже поставил.',
   unknown: 'Действие отклонено. Попробуй ещё раз.',
 } as const;
 
@@ -186,6 +218,20 @@ const techReroll = 'Тех-реролл';
 
 const feedLines = {
   seasonCreated: <T>(name: string): Line<T> => [`Сезон «${name}» создан`],
+  // Stage 4 (D-444): items, the shop, bets
+  itemUsed: <T>(p: T, item: string, targets: T[]): Line<T> =>
+    targets.length === 0
+      ? [p, ` использует «${item}»`]
+      : [p, ` использует «${item}» на `, ...targets.flatMap((t, i) => (i === 0 ? [t] : [', ', t]))],
+  inventoryGiven: <T>(p: T, item: string): Line<T> => [p, `: админ выдаёт «${item}»`],
+  inventoryTaken: <T>(p: T, item: string): Line<T> => [p, `: админ забирает «${item}»`],
+  inventoryAdjusted: <T>(p: T): Line<T> => [p, ': админ правит инвентарь'],
+  contentPublished: <T>(version: number): Line<T> => [
+    `Предметы сезона обновлены, версия ${version}`,
+  ],
+  shopRolled: <T>(p: T): Line<T> => [p, ' роллит магазин'],
+  lotBought: <T>(p: T, item: string): Line<T> => [p, ` покупает «${item}»`],
+  betPlaced: <T>(p: T, on: T): Line<T> => [p, ' ставит на ', on],
   seasonStatus: <T>(to: 'draft' | 'active' | 'closing' | 'finished' | 'archived'): Line<T> => [
     {
       draft: 'Сезон снова в подготовке',
@@ -637,6 +683,7 @@ export const ru = {
       ['offer', 'Результат ролла'],
       ['complete', 'Завершение'],
       ['proof', 'Пруф'],
+      ['inventory', 'Инвентарь'],
       ['pool', 'Игры пула'],
       ['rules', 'Правила сезона'],
       ['dialogs', 'Окна'],
@@ -780,6 +827,13 @@ export const ru = {
       title: 'Админка',
       lead: 'Прохождение в очереди пруфов: финиш сверху с золотой меткой, закрытый лимитом ролл — предупреждением. Одобрение — главное действие только у первой карточки, реджект подтверждается.',
     },
+    inventory: {
+      title: 'Инвентарь',
+      lead: 'Предметы, эффекты и спецроллы игрока. «Использовать» — только в окно предмета; лист предлагает только тех, на кого предмет подействует.',
+      buttons:
+        'Кнопка «Использовать»: наведение, фокус, нажатие; вне окна — подсказка вместо кнопки',
+      openSheet: 'Открыть лист «Использовать»',
+    },
     dialogs: {
       title: 'Окна',
       lead: 'Подтверждение опасного действия показывает последствия. Лидерборд на телефоне выезжает снизу.',
@@ -892,6 +946,47 @@ export const ru = {
     tooOften: 'Слишком много отчётов за час. Попробуй позже.',
     failed: 'Отчёт не отправился. Попробуй ещё раз.',
   },
+  inventory: {
+    title: 'Инвентарь',
+    coins: (n: number) => coins(n),
+    count: (n: number, limit: number) => `Предметов ${n} из ${limit}`,
+    emptyTitle: 'В инвентаре пусто',
+    emptyText: 'Предметы дают клетки, лутбоксы и магазин. Как появятся — будут здесь.',
+    loadError: 'Инвентарь не загрузился. Проверь соединение и попробуй ещё раз.',
+    loadErrorTitle: 'Инвентарь не загрузился',
+    use: 'Использовать',
+    useTitle: (name: string) => `Использовать «${name}»`,
+    target: 'На кого',
+    targetHint: 'Только те, на кого предмет действует сейчас',
+    pickObject: 'Какой предмет',
+    noObjects: 'У этого игрока нет подходящих предметов',
+    pick: 'Выбери',
+    used: (name: string) => `«${name}» использован.`,
+    kinds: {
+      item: 'Предмет',
+      effect: 'Эффект',
+      specialRoll: 'Спецролл',
+      event: 'Ивент',
+      achievement: 'Достижение',
+    },
+    actsAlone: 'Действует сам',
+    rarity: { common: 'Обычный', epic: 'Эпический', legendary: 'Легендарный' },
+    hostile: 'Враждебный',
+    from: (name: string) => `От игрока ${name}`,
+    usesLeft: (n: number) =>
+      `Осталось ${n} ${plural(n, 'использование', 'использования', 'использований')}`,
+    runsLeft: (n: number) =>
+      `Ещё на ${n} ${plural(n, 'прохождение', 'прохождения', 'прохождений')}`,
+    until: (time: string) => `До ${time}`,
+    // When an item is used (SPEC «Окна использования»): said when it is not its moment
+    windows: {
+      beforeRoll: 'Используется перед роллом',
+      afterRoll: 'Используется после ролла, до старта игры',
+      beforeDice: 'Используется во время игры, до броска',
+      afterDice: 'Используется сразу после броска за прохождение',
+      anytime: 'Используется в любой момент',
+    },
+  },
   effects: {
     title: 'Нужно разыграть',
     drawEvent: (kind: 'good' | 'bad', source: keyof typeof effectSources) =>
@@ -1001,6 +1096,7 @@ export const ru = {
     undoneHint: 'Админ откатил это действие: оно больше не считается',
     someone: 'Игрок',
     someGame: 'игра',
+    someItem: 'предмет',
     fresh: (n: number) =>
       `${n} ${plural(n, 'новая запись', 'новые записи', 'новых записей')} в ленте`,
     emptyTitle: 'В ленте пока пусто',
@@ -1040,6 +1136,10 @@ export const ru = {
       moved: 'Фишка переставлена',
       teleport: 'Телепорт',
       branchWaiting: 'Развилка: ждёт выбора ветки',
+      intercepted: (item: string) => `Перехвачено: «${item}»`,
+      gotObject: (item: string) => `Получено: «${item}»`,
+      lostObject: (item: string) => `Не влезло в инвентарь: «${item}»`,
+      stake: (n: number) => `Ставка: ${coins(n)}`,
     },
     rating: (n: number) => `${n} из 10`,
     ratingLabel: (n: number) => `Оценка: ${n} из 10`,

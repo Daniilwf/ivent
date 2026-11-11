@@ -540,3 +540,115 @@ describe('feed pages', () => {
     expect(started?.cover).toBeNull();
   });
 });
+
+describe('feed lines of the economy (D-444)', () => {
+  const withObjects = withRefs(emptyRefs(), {
+    ...page,
+    objects: [
+      { id: 'bird-thief', name: 'Птичкерс' },
+      { id: 'orange', name: 'Апельсин' },
+      { id: 'shield', name: 'Щит' },
+    ],
+  });
+  const line = (entries: Entry[]) => feedDays(entries, withObjects, now)[0]?.items[0];
+
+  it('names the item used, its target and the coins it moved', () => {
+    const item = line([
+      entry('u2', 'coins-changed', { playerId: vasya, delta: 3, reason: 'item', runId: null }),
+      entry('u2', 'coins-changed', { playerId: petya, delta: -3, reason: 'item', runId: null }),
+      entry('u2', 'item-used', {
+        playerId: vasya,
+        instanceId: 'i',
+        objectId: 'bird-thief',
+        targets: [petya],
+        choices: [],
+      }),
+      entry('u2', 'object-removed', {
+        playerId: vasya,
+        instanceId: 'i',
+        objectId: 'bird-thief',
+        reason: 'used',
+      }),
+    ]);
+
+    expect(text(item)).toBe(ru.feed.lines.itemUsed<string>('Вася', 'Птичкерс', ['Петя']).join(''));
+    expect(refsOf(item).map((r) => (r.kind === 'player' ? r.player.name : ''))).toEqual([
+      'Вася',
+      'Петя',
+    ]);
+    expect(item?.icon).toBe('item');
+  });
+
+  it('leaves the user out of the targets of an item on himself, and says an interception', () => {
+    const self = line([
+      entry('u3', 'item-used', {
+        playerId: vasya,
+        instanceId: 'i',
+        objectId: 'orange',
+        targets: [vasya],
+        choices: [],
+      }),
+    ]);
+    expect(text(self)).toBe(ru.feed.lines.itemUsed<string>('Вася', 'Апельсин', []).join(''));
+
+    const stopped = line([
+      entry('u4', 'hostile-intercepted', {
+        playerId: petya,
+        instanceId: 's',
+        objectId: 'shield',
+        fromPlayerId: vasya,
+      }),
+      entry('u4', 'item-used', {
+        playerId: vasya,
+        instanceId: 'i',
+        objectId: 'bird-thief',
+        targets: [petya],
+        choices: [],
+      }),
+    ]);
+    expect(stopped?.facts).toContain(ru.feed.facts.intercepted('Щит'));
+  });
+
+  it('says what the admin gave or took, with the comment, and a new content version', () => {
+    const given = line([
+      entry('a1', 'object-given', {
+        playerId: vasya,
+        item: { instanceId: 'i', objectId: 'orange' },
+        source: 'admin',
+      }),
+      entry('a1', 'inventory-adjusted', { playerId: vasya, comment: 'Подарок' }),
+    ]);
+    expect(text(given)).toBe(ru.feed.lines.inventoryGiven<string>('Вася', 'Апельсин').join(''));
+    expect(given?.quote?.text).toBe('Подарок');
+
+    const content = line([
+      entry('c1', 'content-published', { version: 2, pack: {}, comment: 'Новые предметы' }),
+    ]);
+    expect(text(content)).toBe(ru.feed.lines.contentPublished<string>(2).join(''));
+  });
+
+  it('says a purchase and a bet with its stake', () => {
+    const bought = line([
+      entry('b1', 'coins-changed', {
+        playerId: vasya,
+        delta: -10,
+        reason: 'purchase',
+        runId: null,
+      }),
+      entry('b1', 'lot-bought', {
+        playerId: vasya,
+        lot: 0,
+        item: { objectId: 'orange' },
+        price: 10,
+      }),
+    ]);
+    expect(text(bought)).toBe(ru.feed.lines.lotBought<string>('Вася', 'Апельсин').join(''));
+    expect(bought?.facts).toContain(ru.feed.facts.coins(-10));
+
+    const bet = line([
+      entry('b2', 'bet-placed', { playerId: vasya, bet: { onPlayerId: petya, stake: 5 } }),
+    ]);
+    expect(text(bet)).toBe(ru.feed.lines.betPlaced<string>('Вася', 'Петя').join(''));
+    expect(bet?.facts).toContain(ru.feed.facts.stake(5));
+  });
+});

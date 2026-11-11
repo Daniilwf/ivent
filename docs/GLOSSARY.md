@@ -201,6 +201,11 @@
 | Колесо лутбокса | взвешенный список объектов для `spinWheel` | `WheelDefinition`, `WheelEntrySpec`, событие `WheelSpun` |
 | Использовать | применить свой предмет с целью и ответами | команда `UseItem`, событие `ItemUsed` |
 | Правка инвентаря | админ выдаёт или забирает объект с комментарием | команда `AdjustInventory`, событие `InventoryAdjusted` |
+| Инвентарь | всё, что игрок держит: предметы, эффекты, спецроллы; раздел «Инвентарь» на экране сезона | `PlayerEconomy.Inventory`, API `GET /api/seasons/{id}/economy` (`EconomyView`, `InventoryItemView`), экран `season/Inventory.tsx` |
+| План предмета | что экран предлагает для объекта: открыто ли «Использовать», почему нет, на кого можно, какие ответы нужны | `ItemPlan`, `ItemPlans.Of`, шаг ответа — `ItemStep` (`ItemStepKind`: `Choice`, `PickObject`) |
+| Цель предмета («На кого») | игрок, выбранный для предмета с селектором `chosen`; экран предлагает только тех, кого примет движок | `UseItem.TargetPlayerId`, `ItemPlan.Targets`, `Targets.Choosable` |
+| Ответ предмета | выбор для `requestChoice` или объект цели для `takeObject` с `pick: chosen` | `UseItem.Choices`, `ItemStepView` |
+| План магазина | цена и способ оплаты следующего ролла магазина, отказ движка, лоты, пока не истекли | `ShopPlan`, `ShopPlans.Of`, API `ShopView` |
 | Срабатывание эффекта | эффект или спецролл игрока сработал на своём триггере | `EffectTriggered`, `Firing` |
 | Бросок эффекта | кубики из значения эффекта (`$roll`) | `EffectRolled` |
 | Изменение ролла | фильтр или выбор из N для следующего ролла; на ролл фиксируется до старта игры | `RollModifier`, `NextRollModified`, `RollModifiersApplied` (`PlayerEconomy.NextRoll`, `CurrentRoll`) |

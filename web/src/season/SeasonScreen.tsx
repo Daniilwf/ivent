@@ -12,6 +12,7 @@ import { CompletionMoment } from './CompletionMoment';
 import { AvatarSection } from './AvatarSection';
 import { ProofSection } from './ProofForm';
 import { ManualEffectItem, type EffectOutcome } from './ManualEffectItem';
+import { InventorySection } from './Inventory';
 import { RunActions } from './RunActions';
 import { seasonPicture } from './seasonView';
 import { linearBoard } from '../board/linearBoard';
@@ -932,6 +933,15 @@ export function SeasonScreen({
         </ol>
       </section>
 
+      {/* Items on (D-441): my inventory under the map on a phone, under my turn on a desktop; off — not shown at all */}
+      {me && season.economy?.items ? (
+        <InventorySection
+          seasonId={seasonId}
+          version={season.lastSequence}
+          onSignedOut={onSignedOut}
+          className="desk:col-start-1 desk:w-96"
+        />
+      ) : null}
       {graphMode ? (
         <MapLegend
           zones={season.zones}
