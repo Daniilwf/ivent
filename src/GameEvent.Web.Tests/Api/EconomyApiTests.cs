@@ -487,6 +487,32 @@ public sealed class EconomyApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_pack_past_its_limit_is_said_at_pack_and_a_body_past_the_request_limit_is_413()
+    {
+        await FeaturesAsync();
+        var admin = await _site.SignedInAsync("admin");
+        static StringContent Body(int padding) => new(
+            $"{{\"commandId\":\"{Guid.NewGuid()}\",\"comment\":\"x\",\"pack\":{{\"objects\":[],\"wheels\":[],\"pad\":\"{new string('x', padding)}\"}}}}",
+            System.Text.Encoding.UTF8,
+            "application/json");
+
+        // Past the small API limit but within the pack's own: read and refused at «pack», not cut off
+        var over = await admin.PostAsync(AdminUrl("content"), Body(Economy.AdminEconomyEndpoints.MaxPackLength), Ct);
+        Assert.Equal(HttpStatusCode.BadRequest, over.StatusCode);
+        var errors = JsonDocument.Parse(await over.Content.ReadAsStringAsync(Ct)).RootElement.GetProperty("errors");
+        Assert.True(errors.TryGetProperty("pack", out _), errors.ToString());
+
+        Assert.Equal(
+            HttpStatusCode.RequestEntityTooLarge,
+            (await admin.PostAsync(AdminUrl("content"), Body((int)Economy.AdminEconomyEndpoints.MaxContentRequestBytes), Ct)).StatusCode);
+
+        // Only the publication of a pack is exempt: another admin body keeps the small limit
+        Assert.Equal(
+            HttpStatusCode.RequestEntityTooLarge,
+            (await admin.PostAsync(AdminUrl($"players/{_site.Players["vasya"]}/inventory"), Body((int)Hosting.WebSecurity.ApiBodyLimitBytes), Ct)).StatusCode);
+    }
+
+    [Fact]
     public async Task With_items_off_a_pack_is_refused_by_the_engine()
     {
         var admin = await _site.SignedInAsync("admin");

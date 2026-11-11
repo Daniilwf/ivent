@@ -47,6 +47,23 @@ public static class AdminEconomyEndpoints
     /// <summary>The largest pack a request carries, in characters of its JSON; the repository's whole content is far less.</summary>
     public const int MaxPackLength = 1_000_000;
 
+    /// <summary>
+    /// The body limit of a pack's publication: the one admin body past the small API limit besides the map (D-442). Above
+    /// <see cref="MaxPackLength"/> (a character is at least a byte), so a pack too long is said at «pack», a body past
+    /// this is 413 before it is read.
+    /// </summary>
+    public const long MaxContentRequestBytes = 1024 * 1024;
+
+    /// <summary>Whether the request publishes a content pack: <c>POST /api/admin/seasons/{id}/content</c>.</summary>
+    public static bool IsContentBody(HttpRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var segments = request.Path.Value?.Split('/', StringSplitOptions.RemoveEmptyEntries) ?? [];
+        return HttpMethods.IsPost(request.Method)
+            && segments is ["api", "admin", "seasons", var id, "content"]
+            && Guid.TryParse(id, out _);
+    }
+
     public static void MapAdminEconomy(this RouteGroupBuilder api)
     {
         ArgumentNullException.ThrowIfNull(api);
