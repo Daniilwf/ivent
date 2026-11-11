@@ -96,6 +96,24 @@ public class ExtraDieSidesTests
     }
 
     [Fact]
+    public void A_reroll_after_the_throw_keeps_an_extra_die_of_its_own_kind()
+    {
+        // Hard plays d6 by hours; the rose's d4 stays a d4 when the throw is rerolled
+        var s = Playing();
+        s.Give("Вася", "rose");
+        s.Used("Вася", "rose");
+        s.Complete("Вася", Engine.Runs.Difficulty.Hard);
+        Assert.Equal(4, Assert.Single(s.State.Runs.Values.Single().DiceMods.ExtraDice).Sides);
+        s.Give("Вася", "reroll-dice");
+
+        s.Used("Вася", "reroll-dice");
+
+        var run = s.State.Runs.Values.Single();
+        Assert.All(run.Dice, d => Assert.Equal(6, d.Sides));
+        Assert.Equal(4, Assert.Single(run.DiceMods.ExtraDice).Sides);
+    }
+
+    [Fact]
     public void After_the_throw_an_extra_die_of_its_kind_adds_its_points_and_steps()
     {
         var late = Item("late-d6", DiceWhen.Current, DiceStage.Count, 1, 6, UseWindow.AfterDice);
@@ -109,6 +127,25 @@ public class ExtraDieSidesTests
         var added = Assert.Single(s.LastEvents<Engine.Runs.RunDiceModified>());
         Assert.Equal((6, 5), (Assert.Single(added.Rolled).Sides, Assert.Single(added.Rolled).Value));
         Assert.Equal((7, "c7"), (s.Player("Вася").Points, s.Player("Вася").CellId));
+    }
+
+    [Fact]
+    public void After_a_d8_die_an_extra_die_after_the_throw_is_of_the_runs_kind()
+    {
+        // The item's single d8 is of its own kind (D-481): a plain extra die is the run's d4
+        var late = Item("late-die", DiceWhen.Current, DiceStage.Count, 1, null, UseWindow.AfterDice);
+        var s = Playing(late);
+        s.Give("Вася", "d8-die");
+        s.Used("Вася", "d8-die");
+        s.NextRandom(5).Complete("Вася");
+        s.Give("Вася", "late-die");
+
+        s.NextRandom(3).Used("Вася", "late-die");
+
+        var run = s.State.Runs.Values.Single();
+        Assert.Equal([(8, 5)], run.Dice.Select(d => (d.Sides, d.Value)));
+        Assert.Equal((4, 3), (Assert.Single(run.DiceMods.ExtraDice).Sides, run.DiceMods.ExtraDice[0].Value));
+        Assert.Equal(8, s.Player("Вася").Points);
     }
 
     [Theory]

@@ -126,11 +126,12 @@ internal static class Corrections
         var newRule = CompletionRoll.DieFor(difficulty, run.Snapshot.DieByDifficulty);
 
         // Dice whose sides an item set keep them (D-408): only the difficulty's event follows the change
+        // and an item's single die stays that one die of its own kind (D-481); the challenge dice are not the item's
         var sides = run.Mods?.Sides ?? newRule.Sides;
-        EquatableArray<DieChange> Recalculate(EquatableArray<Die> dice) =>
+        static EquatableArray<DieChange> Recalculate(EquatableArray<Die> dice, int sides) =>
             [.. dice.Select(d => new DieChange(d, new Die(sides, (int)Math.Ceiling((decimal)d.Value * sides / d.Sides))))];
-        var dice = Recalculate(run.Dice);
-        var challenge = Recalculate(run.ChallengeDice);
+        var dice = Recalculate(run.Dice, run.Mods?.SingleDie ?? sides);
+        var challenge = Recalculate(run.ChallengeDice, sides);
         var changed = new RunDifficultyChanged(
             run.RunId, run.PlayerId, old, difficulty, dice, challenge, comment, context.Clock.UtcNow);
         var delta = CompletionRoll.Total(SeasonEngine.Apply(state, changed).Runs[run.RunId]) - CompletionRoll.Total(run);

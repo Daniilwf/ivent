@@ -89,28 +89,28 @@ internal static class DicePipeline
             return;
         }
 
-        var sides = run.Mods?.Sides ?? (run.Dice.Count > 0 ? run.Dice[0].Sides : (int?)null) ?? CompletionRoll.DieFor(run.Difficulty!.Value, run.Snapshot.DieByDifficulty).Sides;
+        // The run's kind of die: an item's single die is of its own kind (D-481)
+        var sides = run.Mods?.Sides ?? (run.Mods?.SingleDie is null && run.Dice.Count > 0 ? run.Dice[0].Sides : (int?)null) ?? CompletionRoll.DieFor(run.Difficulty!.Value, run.Snapshot.DieByDifficulty).Sides;
         var random = effect.Context.Random;
         var before = CompletionRoll.Total(run);
+        // Every die is thrown again as its own kind: an extra die of its kind (D-475) and an item's single die (D-481) keep it
+        EquatableArray<Die> Again(EquatableArray<Die> dice, Func<Die, bool> which) =>
+            [.. dice.Select(d => which(d) ? CompletionRoll.Roll(1, d.Sides, random)[0] : d)];
         switch (stage)
         {
             case DiceStage.Reroll when change.Filter == DieFilter.BelowAverage:
-                // Only the dice below their average, each of its own kind (D-481)
-                EquatableArray<Die> Again(EquatableArray<Die> dice) =>
-                    [.. dice.Select(d => d.Value < d.Sides / 2 ? CompletionRoll.Roll(1, d.Sides, random)[0] : d)];
-                var dice = Again(run.Dice);
-                var challenge = Again(run.ChallengeDice);
-                effect.Emit(new RunDiceRerolled(runId, run.PlayerId, effect.ObjectId, dice, challenge, Again(run.DiceMods.ExtraDice)));
+                // Only the dice below their average (D-481)
+                static bool Below(Die d) => d.Value < d.Sides / 2;
+                effect.Emit(new RunDiceRerolled(
+                    runId, run.PlayerId, effect.ObjectId, Again(run.Dice, Below), Again(run.ChallengeDice, Below), Again(run.DiceMods.ExtraDice, Below)));
                 break;
             case DiceStage.Reroll:
                 RunDiceRerolled? rerolled = null;
                 for (var i = 0; i < Math.Max(1, value.Number); i++)
                 {
+                    static bool All(Die d) => true;
                     rerolled = new RunDiceRerolled(
-                        runId, run.PlayerId, effect.ObjectId,
-                        CompletionRoll.Roll(run.Dice.Count, sides, random),
-                        CompletionRoll.Roll(run.ChallengeDice.Count, sides, random),
-                        CompletionRoll.Roll(run.DiceMods.ExtraDice.Count, sides, random));
+                        runId, run.PlayerId, effect.ObjectId, Again(run.Dice, All), Again(run.ChallengeDice, All), Again(run.DiceMods.ExtraDice, All));
                 }
 
                 effect.Emit(rerolled!);

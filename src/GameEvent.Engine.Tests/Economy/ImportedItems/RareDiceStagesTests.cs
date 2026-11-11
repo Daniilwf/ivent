@@ -42,6 +42,44 @@ public class RareDiceStagesTests
         Assert.Equal(7, s.Player("Вася").Points);
     }
 
+    [Fact]
+    public void A_d8_die_keeps_its_one_d8_through_a_change_of_difficulty()
+    {
+        var s = Playing("Gothic");
+        s.Give("Вася", "d8-die");
+        s.Used("Вася", "d8-die");
+        s.NextRandom(5).Complete("Вася");
+        Assert.Equal(5, s.Player("Вася").Points);
+
+        // Hard plays d6: the item's d8 is not recalculated into the difficulty's die (D-481, D-408)
+        s.Act(new ChangeRunDifficulty(Run(s).RunId, Difficulty.Hard, "Уточнил сложность"));
+
+        ScenarioAssert.Accepted(s);
+        Assert.Equal([(8, 5)], Run(s).Dice.Select(d => (d.Sides, d.Value)));
+        Assert.Equal(5, s.Player("Вася").Points);
+    }
+
+    [Fact]
+    public void A_reroll_after_a_d8_die_throws_one_d8_again_and_the_challenge_dice_of_the_difficulty()
+    {
+        var s = ImportedItemsSeason.New();
+        s.WithRuleset(r => r with { Features = r.Features with { Challenges = true } }).WithGame("Gothic", 12, "Horror");
+        s.RollTitle("Вася", "Gothic").Start("Вася");
+        s.Give("Вася", "d8-die");
+        s.Used("Вася", "d8-die");
+        s.Complete("Вася", Difficulty.Hard, challengeDone: true);
+        var challenge = Run(s).ChallengeDice.Count;
+        Assert.True(challenge > 0);
+        s.Give("Вася", "reroll-dice");
+
+        s.NextRandom(8).Used("Вася", "reroll-dice");
+
+        var run = Run(s);
+        Assert.Equal([(8, 8)], run.Dice.Select(d => (d.Sides, d.Value)));
+        Assert.Equal(challenge, run.ChallengeDice.Count);
+        Assert.All(run.ChallengeDice, d => Assert.Equal(6, d.Sides));
+    }
+
     [Theory]
     [InlineData("1", 1)]
     [InlineData("3", 3)]
