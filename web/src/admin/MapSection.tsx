@@ -49,7 +49,7 @@ type Check =
   { kind: 'checking' } | { kind: 'failed' } | { kind: 'done'; result: Schemas['MapCheckView'] };
 
 /** How long the editor waits after the last change before it asks the server to check the draft */
-const checkDelayMs = 400;
+export const checkDelayMs = 400;
 
 const types: CellType[] = [
   'start',

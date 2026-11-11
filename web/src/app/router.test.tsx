@@ -1,7 +1,7 @@
 import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Link } from './Link';
-import { navigate, paths, routeOf, usePath } from './router';
+import { navigate, paths, routeOf, usePageHeading, usePath } from './router';
 
 // H5: the site's pages by address (D-150) — links open them without a reload, back and forward work.
 
@@ -10,6 +10,29 @@ const id = '0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d';
 function Where() {
   return <p data-testid="where">{usePath()}</p>;
 }
+
+function Page() {
+  const heading = usePageHeading();
+  return (
+    <>
+      <h1 ref={heading} tabIndex={-1}>
+        Страница
+      </h1>
+      <input aria-label="Поле" />
+    </>
+  );
+}
+
+/** One frame of the page: usePageHeading moves the focus on the next one */
+const nextFrame = () =>
+  act(
+    () =>
+      new Promise<void>((done) => {
+        requestAnimationFrame(() => {
+          done();
+        });
+      }),
+  );
 
 describe('router', () => {
   afterEach(() => {
@@ -80,6 +103,26 @@ describe('router', () => {
     });
 
     expect(screen.getByTestId('where')).toHaveTextContent(/^\/$/);
+  });
+
+  // FL-1: a link followed in one test left the next tests' first page taking the focus to its heading a frame late,
+  // in the middle of their typing. The two tests run in this order: the second is a new visit
+  it('a page opened by a link takes the focus to its heading', async () => {
+    act(() => {
+      navigate('/pool');
+    });
+    render(<Page />);
+    await nextFrame();
+
+    expect(screen.getByRole('heading', { name: 'Страница' })).toHaveFocus();
+  });
+
+  it('the first page of a test is the first of a visit: the focus stays where the reader put it', async () => {
+    render(<Page />);
+    screen.getByRole('textbox', { name: 'Поле' }).focus();
+    await nextFrame();
+
+    expect(screen.getByRole('textbox', { name: 'Поле' })).toHaveFocus();
   });
 
   it('does not stack the same page twice', () => {
