@@ -14,6 +14,8 @@ export type Completion = {
   review?: { rating: number; text?: string };
 };
 
+// SeasonEndpoints.MaxHours of the server
+const maxHours = 1000;
 const ratings = Array.from({ length: 10 }, (_, i) => i + 1);
 const difficulties = difficultyValues.map((d) => ({ value: d, label: ru.difficulty[d] }));
 
@@ -60,7 +62,13 @@ export function CompleteForm({
 
     if (needsHours) {
       const estimatedHours = Number(hours.replace(',', '.'));
-      if (hours.trim() === '' || !Number.isFinite(estimatedHours) || estimatedHours <= 0)
+      // The server takes more than 0 and at most SeasonEndpoints.MaxHours (K1S-5)
+      if (
+        hours.trim() === '' ||
+        !Number.isFinite(estimatedHours) ||
+        estimatedHours <= 0 ||
+        estimatedHours > maxHours
+      )
         found.push({ field: 'hours', text: ru.turn.hoursInvalid });
       if (source.trim() === '') found.push({ field: 'source', text: ru.turn.hoursSourceRequired });
       completion.estimatedHours = estimatedHours;

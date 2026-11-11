@@ -445,7 +445,12 @@ describe('SeasonScreen', () => {
     });
     render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
 
+    // K1S-7: the game is gone for the whole season, so the click asks first and sends nothing
     await userEvent.click(await screen.findByTestId('already-played'));
+    const confirm = await screen.findByTestId('already-played-confirm');
+    expect(confirm).toHaveTextContent(ru.turn.alreadyPlayedTitle('Silent Hill'));
+    expect(bodies).toHaveLength(0);
+    await userEvent.click(screen.getByTestId('already-played-confirm-yes'));
 
     await vi.waitFor(() => {
       expect(bodies).toHaveLength(1);
@@ -511,6 +516,7 @@ describe('SeasonScreen', () => {
     render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
 
     await userEvent.click(await screen.findByTestId('already-played-opt-2'));
+    await userEvent.click(await screen.findByTestId('already-played-opt-2-confirm-yes'));
 
     await vi.waitFor(() => {
       expect(bodies).toHaveLength(1);
@@ -2095,6 +2101,7 @@ describe('SeasonScreen wheel (H3, D-136)', () => {
     render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
 
     await userEvent.click(await screen.findByTestId('already-played'));
+    await userEvent.click(await screen.findByTestId('already-played-confirm-yes'));
 
     const wheel = await screen.findByTestId('wheel');
     for (const sector of roll.sectors) {

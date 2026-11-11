@@ -65,6 +65,8 @@ const rejection = {
   'pool.removed': 'Эту игру админ убрал из пула.',
   'turn.wrongPhase': 'Это действие сейчас недоступно: обнови страницу.',
   'turn.choicePending': 'Сначала сделай выбор.',
+  'turn.stale':
+    'Ход уже изменился — например, в другой вкладке. Посмотри, что сейчас на экране, и реши ещё раз.',
   'turn.noPendingChoice': 'Этот выбор уже сделан или снят. Обнови страницу.',
   'turn.unknownOption': 'Такого варианта нет. Обнови страницу.',
   'roll.noAvailableGames': 'Нет доступных игр для ролла. Сообщи админу.',
@@ -129,6 +131,8 @@ const rejection = {
   'season.deadlinePassed': 'Дедлайн прошёл: броски закрыты, пруфы принимаются.',
   'season.deadlineNotReached': 'Дедлайн ещё не наступил.',
   'season.proofsPending': 'Сначала проверь все пруфы: итоги — только после проверки.',
+  'season.effectsPending':
+    'Сначала разыграйте ручные эффекты: отметь каждый «применено» или «не применимо» в разделе «Эффекты».',
   'season.notActive': 'Сезон сейчас не идёт.',
   'player.finished': 'Позиция финишировавшего меняется только через его прохождения.',
   'player.unknown': 'Ты не участвуешь в этом сезоне.',
@@ -158,6 +162,8 @@ const plural = (n: number, one: string, few: string, many: string) => {
   if (ones >= 2 && ones <= 4) return few;
   return many;
 };
+// 1 очко, 2 очка, 5 очков
+const points = (n: number) => `${n} ${plural(n, 'очко', 'очка', 'очков')}`;
 // A change with its sign: +7, −3 (a real minus)
 const signed = (n: number) => (n < 0 ? `−${Math.abs(n)}` : `+${n}`);
 const hoursText = (n: number) => `${n.toLocaleString('ru-RU')} ч`;
@@ -350,10 +356,12 @@ export const ru = {
             : price === 0
               ? 'Реролл — бесплатно'
               : `Реролл — ${coins(price)}`,
-    rerollConfirm: (payment: RerollPayment, price: number) =>
+    rerollConfirm: (payment: RerollPayment, price: number, balance: number | null = null) =>
       payment === 'badEvent'
         ? 'За этот реролл тебе достанется плохой ивент. Продолжить?'
-        : `Реролл стоит ${coins(price)}. Потратить?`,
+        : balance === null
+          ? `Реролл стоит ${coins(price)}. Потратить?`
+          : `Реролл стоит ${coins(price)}, у тебя ${coins(balance)}. Потратить?`,
     rerollConfirmYes: 'Да, реролл',
     rerollConfirmNo: 'Отмена',
     drop: 'Дропнуть',
@@ -424,6 +432,13 @@ export const ru = {
     gameMark: (player: string, kind: 'dropped' | 'techRerolled') =>
       kind === 'dropped' ? `Дропнул ${player}` : `Тех-реролл у ${player}`,
     alreadyPlayedGame: (title: string) => `Уже проходил: ${title}`,
+    // K1S-7: the choice is for the whole season, so it is asked first
+    alreadyPlayedTitle: (title: string) => `«${title}» — уже проходил?`,
+    alreadyPlayedConsequences: [
+      'Игра больше не выпадет тебе в этом сезоне',
+      'Сразу новый ролл — бесплатно, это не реролл',
+    ],
+    alreadyPlayedYes: 'Да, уже проходил',
     choose: 'Выбери одну из выпавших игр',
     pick: 'Выбрать:',
     pickShort: 'Выбрать',
@@ -445,7 +460,7 @@ export const ru = {
         .join(', ')}.`,
     hours: 'Часы (оценка)',
     hoursHint: 'У игры нет данных о длине: укажи оценку.',
-    hoursInvalid: 'Укажи число часов больше нуля.',
+    hoursInvalid: 'Укажи число часов: больше нуля и не больше 1000.',
     hoursSource: 'Источник оценки',
     hoursSourceHint: 'Ссылка, например на HowLongToBeat, или короткая пометка.',
     hoursSourceRequired: 'Укажи источник оценки: ссылку или пометку.',
@@ -464,6 +479,18 @@ export const ru = {
     lastDice: (title: string, dice: number[], total: number, sides: number[] = []) =>
       `Кубы за прохождение (${title}): ${dice.join(' + ')} — итого ${total.toLocaleString('ru-RU')}${sides.length === 0 ? '' : ` (${sides.map((n) => `d${String(n)}`).join(' и ')})`}`,
     spectator: 'Ты смотришь сезон как зритель.',
+    // K1S-19: the admin outside the season is not a spectator (GLOSSARY: a separate role)
+    adminTitle: 'Ты админ',
+    admin: 'Ты не играешь в этом сезоне. Ходы — в ленте, проверка пруфов и правки — в админке.',
+    // K1S-13: a season not started yet
+    draftTitle: 'Сезон ещё не начался',
+    draftText:
+      'Ходить можно будет, когда админ запустит сезон. Пока можно посмотреть карту и правила.',
+    // K1S-1, K1S-9: the other runs on the card
+    checksTitle: 'Другие прохождения',
+    checkWaiting: (title: string, total: number) =>
+      `${title}: ждёт проверки, +${points(total)}. Пруф можно дослать.`,
+    checkRejected: (title: string) => `Прохождение отклонено (${title}): очки и клетки сняты.`,
   },
   difficulty: {
     easy: 'Лёгкая',
@@ -474,6 +501,9 @@ export const ru = {
   proof: {
     title: 'Пруф',
     lead: 'Хватит одного: ссылки, скрины или свидетель.',
+    // K1S-2: a new send replaces the waiting proof, so the form starts with it
+    replaces:
+      'В форме — отправленный пруф. Поправь или добавь: новая отправка заменит его целиком.',
     link: 'Ссылка на скрин или видео',
     linkNumber: (n: number) => `Ссылка ${n}: скрин или видео`,
     addLink: 'Ещё ссылка',
@@ -587,6 +617,9 @@ export const ru = {
     sheet: (place: number, points: number) => `Ты на ${place} месте, ${points} очк.`,
     sheetPeek: (leader: string, place: number) => `Лидирует ${leader} · ты ${place}-й`,
     sheetLeader: (leader: string) => `Лидирует ${leader}`,
+    // K1S-19: several level at the top — nobody leads
+    sheetShared: (points: number) => `Ты делишь 1 место, ${points} очк.`,
+    sheetNoLeader: 'Лидера пока нет',
     rule: 'Первый — кто первым дошёл до финиша, дальше по очкам',
     nowPlaying: 'Сейчас проходишь',
     complete: 'Завершить прохождение',
@@ -624,15 +657,15 @@ export const ru = {
       sides: (n: number) => `d${String(n)}`,
       // «до»: steps past the finish burn, the points do not
       result: (plain: number[], challenge: number[], total: number) =>
-        `${plain.join(' + ')}${challenge.length === 0 ? '' : ` + ${challenge.join(' + ')} за челлендж`}. Итого +${total} очков и до ${total} клеток вперёд`,
+        `${plain.join(' + ')}${challenge.length === 0 ? '' : ` + ${challenge.join(' + ')} за челлендж`}. Итого +${points(total)} и до ${total} ${plural(total, 'клетки', 'клеток', 'клеток')} вперёд`,
       // The frozen first plays in free mode: dice only, no points (Q-3)
       resultFree: (plain: number[], challenge: number[]) =>
         `${plain.join(' + ')}${challenge.length === 0 ? '' : ` + ${challenge.join(' + ')} за челлендж`}. Свободный режим: очки не начисляются`,
       resultStay: (plain: number[], challenge: number[], total: number) =>
-        `${plain.join(' + ')}${challenge.length === 0 ? '' : ` + ${challenge.join(' + ')} за челлендж`}. Итого +${total} очков, фишка стоит на месте`,
+        `${plain.join(' + ')}${challenge.length === 0 ? '' : ` + ${challenge.join(' + ')} за челлендж`}. Итого +${points(total)}, фишка стоит на месте`,
       // The dice's result, shown big once the token stands
-      after: (total: number, at: string) => `+${total} очков. ${at}`,
-      afterStay: (total: number) => `+${total} очков, фишка стоит на месте`,
+      after: (total: number, at: string) => `+${points(total)}. ${at}`,
+      afterStay: (total: number) => `+${points(total)}, фишка стоит на месте`,
       afterFree: 'Свободный режим: очки не начисляются',
       // The completion's moment, said once when the token stands: the game, the dice and where the token is now
       announce: (title: string, dice: string, at: string) =>
@@ -1018,6 +1051,8 @@ export const ru = {
     deadline: (text: string) => `Дедлайн: ${text}`,
     closing: 'Дедлайн прошёл: броски закрыты, пруфы принимаются.',
     finished: 'Сезон завершён. Итоги ниже.',
+    // K1S-3: my balance, what a paid reroll spends
+    coins: (n: number) => `У тебя ${coins(n)}`,
   },
   leaderboard: {
     title: 'Лидерборд',
@@ -1084,6 +1119,9 @@ export const ru = {
       moved: 'Фишка переставлена',
       teleport: 'Телепорт',
       branchWaiting: 'Развилка: ждёт выбора ветки',
+      cellBonus: (n: number) => `${signed(n)} ${plural(n, 'очко', 'очка', 'очков')} — клетка-бонус`,
+      rolledNext: (title: string) => `Новый ролл: ${title}`,
+      rolledChoice: (n: number) => `Новый ролл: выбор из ${n} ${plural(n, 'игры', 'игр', 'игр')}`,
     },
     rating: (n: number) => `${n} из 10`,
     ratingLabel: (n: number) => `Оценка: ${n} из 10`,
@@ -1364,10 +1402,11 @@ export const ru = {
         `Тех-реролл — бесплатно, с причиной: слабый ПК, игра платная, не запускается, эмулятор не тянет или другое. Доступен ${hoursText(hours)} после ролла, позже — через админа.`,
     },
     finish: {
-      bonus: 'Финишировавшие не первыми один раз получают бонус:',
-      place: (place: number) => `${place}-е место`,
+      bonus: 'Финишировавшие не первыми один раз получают бонус по порядку финиша:',
+      // By the order of finishing, not the leaderboard's place: the places after the first go by points
+      place: (order: number) => `${order}-й на финише`,
       points: (n: number) => `+${n} очк.`,
-      after: (place: number) => `${place}-е и дальше`,
+      after: (order: number) => `${order}-й на финише и дальше`,
       noBonus: 'Бонуса за финиш не первым нет.',
       later: 'Финишировавшие не первыми продолжают набирать очки, но их фишка больше не двигается.',
       surplus: 'Лишние шаги после финиша сгорают.',
@@ -1422,7 +1461,7 @@ export const ru = {
       'finish.bonusAfterList': 'Бонус за финиш после списка',
       'map.linearLength': 'Клеток до финиша',
     } as Readonly<Record<string, string>>,
-    bonusField: (place: number) => `Бонус за финиш: ${place}-е место`,
+    bonusField: (order: number) => `Бонус за финиш: ${order}-й на финише`,
     values: {
       coins: 'монетки',
       badEvent: 'плохой ивент',
@@ -1688,6 +1727,7 @@ export const ru = {
       'pool.unknown': 'Игра не найдена. Обнови страницу.',
       'run.notTechRerolled': 'У этого прохождения не было тех-реролла.',
       'season.alreadyCreated': 'Такой сезон уже создан.',
+      'season.nameTaken': 'Сезон с таким названием уже есть: назови новый иначе.',
       'season.invalidName': 'Название сезона — от 1 до 100 символов.',
       'season.invalidTransition': 'Из этого статуса так перевести сезон нельзя.',
       'season.nothingToChange': 'Ничего не изменилось.',

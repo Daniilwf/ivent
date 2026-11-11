@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import type { Schemas } from '../api/client';
 import { moscowDay } from '../app/time';
 import { Cover } from '../board/GameCards';
 import { ru } from '../i18n/ru';
 import { Button } from '../ui/Button';
+import { ConfirmDanger } from '../ui/Dialogs';
 import { cx } from '../ui/cx';
 import { Tag } from '../ui/Marks';
 import { GameMarks } from './GameMarks';
@@ -49,11 +51,58 @@ function optionName(game: Offered) {
   ].join('. ');
 }
 
+/**
+ * «Уже проходил» asks first (K1S-7): the game is gone for the player for the whole season, as after a drop or a tech
+ * reroll
+ */
+function AlreadyPlayed({
+  title,
+  testId,
+  label,
+  variant,
+  pending,
+  onConfirm,
+}: {
+  title: string;
+  testId: string;
+  label?: string;
+  variant?: 'link';
+  pending: boolean;
+  onConfirm: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <ConfirmDanger
+      testId={`${testId}-confirm`}
+      open={open}
+      onOpenChange={setOpen}
+      trigger={
+        <Button
+          {...(variant ? { variant } : {})}
+          data-testid={testId}
+          {...(label ? { 'aria-label': label } : {})}
+          disabled={pending}
+        >
+          {ru.turn.alreadyPlayed}
+        </Button>
+      }
+      title={ru.turn.alreadyPlayedTitle(title)}
+      consequences={ru.turn.alreadyPlayedConsequences}
+      confirm={ru.turn.alreadyPlayedYes}
+      onConfirm={() => {
+        setOpen(false);
+        onConfirm();
+      }}
+    />
+  );
+}
+
 /** The rolled game: start it (the one main action), say it was played already, or reroll */
 export function OfferCard({
   offer,
   roll,
   price,
+  coins = null,
   pending,
   onStart,
   onAlreadyPlayed,
@@ -62,6 +111,7 @@ export function OfferCard({
   offer: Offered;
   roll: Roll | null;
   price: Schemas['RerollPriceView'] | null;
+  coins?: number | null;
   pending: boolean;
   onStart: () => void;
   onAlreadyPlayed: () => void;
@@ -95,10 +145,13 @@ export function OfferCard({
           {ru.turn.start}
         </Button>
         <div className="flex flex-wrap gap-3">
-          <Button data-testid="already-played" disabled={pending} onClick={onAlreadyPlayed}>
-            {ru.turn.alreadyPlayed}
-          </Button>
-          <RerollButton price={price} pending={pending} onReroll={onReroll} />
+          <AlreadyPlayed
+            title={offer.title}
+            testId="already-played"
+            pending={pending}
+            onConfirm={onAlreadyPlayed}
+          />
+          <RerollButton price={price} coins={coins} pending={pending} onReroll={onReroll} />
         </div>
         <Misses roll={roll} />
       </div>
@@ -111,6 +164,7 @@ export function ChoiceCard({
   choice,
   roll,
   price,
+  coins = null,
   pending,
   onChoose,
   onAlreadyPlayed,
@@ -119,6 +173,7 @@ export function ChoiceCard({
   choice: Schemas['ChoiceView'];
   roll: Roll | null;
   price: Schemas['RerollPriceView'] | null;
+  coins?: number | null;
   pending: boolean;
   onChoose: (optionId: string) => void;
   onAlreadyPlayed: (gameId: string) => void;
@@ -181,23 +236,22 @@ export function ChoiceCard({
               </span>
             </button>
             <div className="border-t-2 border-muted px-3">
-              <Button
+              <AlreadyPlayed
                 variant="link"
-                data-testid={`already-played-${id}`}
-                aria-label={ru.turn.alreadyPlayedGame(game.title)}
-                disabled={pending}
-                onClick={() => {
+                title={game.title}
+                testId={`already-played-${id}`}
+                label={ru.turn.alreadyPlayedGame(game.title)}
+                pending={pending}
+                onConfirm={() => {
                   onAlreadyPlayed(game.id);
                 }}
-              >
-                {ru.turn.alreadyPlayed}
-              </Button>
+              />
             </div>
           </li>
         ))}
       </ul>
       <div>
-        <RerollButton price={price} pending={pending} onReroll={onReroll} />
+        <RerollButton price={price} coins={coins} pending={pending} onReroll={onReroll} />
       </div>
       <Misses roll={roll} />
     </fieldset>

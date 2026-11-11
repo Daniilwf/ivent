@@ -1,0 +1,23 @@
+import { describe, expect, it } from 'vitest';
+import { ru } from './ru';
+
+// K1S-4: the completion's result said «+4 очков» and «до 1 клеток» for any total
+describe('the completion result in Russian', () => {
+  const d = ru.moments.dice;
+
+  it('puts the points in the right plural', () => {
+    expect(d.after(1, 'Фишка на клетке 2')).toBe('+1 очко. Фишка на клетке 2');
+    expect(d.after(4, 'Фишка на клетке 5')).toBe('+4 очка. Фишка на клетке 5');
+    expect(d.after(5, 'Фишка на клетке 6')).toBe('+5 очков. Фишка на клетке 6');
+    expect(d.after(12, '')).toMatch(/^\+12 очков/);
+    expect(d.after(22, '')).toMatch(/^\+22 очка/);
+    expect(d.afterStay(2)).toBe('+2 очка, фишка стоит на месте');
+  });
+
+  it('says «до 1 клетки» and «до 4 клеток» in the dice summary', () => {
+    expect(d.result([1], [], 1)).toBe('1. Итого +1 очко и до 1 клетки вперёд');
+    expect(d.result([2, 2], [], 4)).toBe('2 + 2. Итого +4 очка и до 4 клеток вперёд');
+    expect(d.result([3, 3], [], 21)).toContain('+21 очко и до 21 клетки вперёд');
+    expect(d.resultStay([1, 1], [], 2)).toBe('1 + 1. Итого +2 очка, фишка стоит на месте');
+  });
+});

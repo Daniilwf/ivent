@@ -314,6 +314,61 @@ describe('feed lines', () => {
     expect(item?.facts).toEqual([ru.feed.facts.moved, '+3 монетки']);
   });
 
+  // K1S-8: «Уже проходил» and the free roll after it are one command; the line said only the new game
+  it('leads «Уже проходил» with the excluded game and names the new roll as a fact', () => {
+    const item = one([
+      entry('c20', 'game-rolled', {
+        playerId: vasya,
+        gameId: celeste,
+        category: 'Platformer',
+        misses: [],
+      }),
+      entry('c20', 'game-excluded', { playerId: vasya, gameId: hollow, reason: 'alreadyPlayed' }),
+    ]);
+
+    expect(text(item)).toBe(
+      text({ line: ru.feed.lines.alreadyPlayed('Вася', 'Hollow Knight') } as FeedItem),
+    );
+    expect(item?.facts).toContain(ru.feed.facts.rolledNext('Celeste'));
+  });
+
+  // K1S-20: a drop that stopped on a bonus cell read as «+4 очка»: the penalty and the bonus are told apart
+  it('tells a bonus cell apart from the drop penalty', () => {
+    const item = one([
+      entry('c21', 'points-changed', {
+        playerId: vasya,
+        delta: 5,
+        reason: 'cellBonus',
+        runId: null,
+      }),
+      entry('c21', 'player-moved', {
+        playerId: vasya,
+        from: 'j',
+        to: 'a5',
+        steps: -1,
+        path: ['a5'],
+        reason: 'dropPenalty',
+      }),
+      entry('c21', 'points-changed', {
+        playerId: vasya,
+        delta: -1,
+        reason: 'dropPenalty',
+        runId: run1,
+      }),
+      entry('c21', 'run-dropped', {
+        playerId: vasya,
+        runId: run1,
+        penaltyDice: [{ sides: 2, value: 1 }],
+      }),
+    ]);
+
+    expect(item?.facts).toEqual([
+      ru.feed.facts.penalty([1]),
+      ru.feed.facts.pointsAndCells(-1),
+      ru.feed.facts.cellBonus(5),
+    ]);
+  });
+
   it('says why points or coins changed when that is the whole line', () => {
     const reward = one([
       entry('c11', 'coins-changed', {
