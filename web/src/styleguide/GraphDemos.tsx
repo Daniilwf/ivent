@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { MapBackgroundPanel } from '../admin/MapBackgroundPanel';
 import { CheckPanel } from '../admin/MapSection';
 import { MapCanvas } from '../admin/MapCanvas';
 import { branchOptions, graphBoard } from '../board/graphBoard';
@@ -7,6 +8,7 @@ import { MapView } from '../board/MapView';
 import type { Player } from '../board/types';
 import { ru } from '../i18n/ru';
 import { BranchChoice } from '../season/BranchChoice';
+import mapBackground from './mapBackground.svg';
 import { demoBranch, demoGraph, demoProblems } from './mapFixtures';
 
 const t = ru.styleguide;
@@ -86,6 +88,53 @@ export function EditorDemo() {
         onRetry={() => undefined}
         onSelect={setSelected}
       />
+    </div>
+  );
+}
+
+/** The picture made for the styleguide's map (scripts/map-background.mjs), at its own pixels */
+const demoBackground = { fileId: 'styleguide', width: 1240, height: 620, url: mapBackground };
+
+/** The map over the admin's picture, and the editor's background panel in each of its states (D-277) */
+export function MapBackgroundDemo() {
+  const { board, cellNumber } = useMemo(
+    () => graphBoard({ ...demoGraph, background: demoBackground }),
+    [],
+  );
+  const at = (id: string) => cellNumber.get(id) ?? 1;
+  const players: Player[] = [
+    { id: 'b1', name: 'Маша', token: 0, cell: at('s4'), points: 41, first: true },
+    { id: 'b2', name: 'Вася', token: 2, cell: at('c3'), points: 27, me: true },
+  ];
+  const s = t.mapBackground;
+  const states = [
+    { label: s.none, background: null, state: { kind: 'idle' as const } },
+    { label: s.uploading, background: null, state: { kind: 'uploading' as const } },
+    {
+      label: s.failed,
+      background: null,
+      state: { kind: 'failed' as const, reason: ru.upload.errors['file.tooLarge'] },
+    },
+    { label: s.ready, background: demoBackground, state: { kind: 'idle' as const } },
+  ];
+  return (
+    <div className="grid gap-4">
+      <MapView board={board} players={players} className="h-120 rounded-lg border-3 border-ink" />
+      <div className="grid gap-4 desk:grid-cols-2">
+        {states.map((x) => (
+          <div key={x.label} className="grid content-start gap-2">
+            <span className="text-sm text-ink-soft">{x.label}</span>
+            <MapBackgroundPanel
+              seasonId="styleguide"
+              background={x.background}
+              state={x.state}
+              pending={x.background !== null}
+              preview={mapBackground}
+              onChange={() => undefined}
+            />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

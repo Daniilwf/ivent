@@ -27,6 +27,18 @@ public sealed record FileLimits
     /// <summary>Frames of a GIF: every frame is decoded and re-quantised for the thumbnail.</summary>
     public int MaxFrames { get; init; } = 1000;
 
+    /// <summary>
+    /// The largest map background (D-278): a still picture the admin uploads once a season, a few for a draft. Within
+    /// <see cref="MaxUploadBytes"/>.
+    /// </summary>
+    public long MapBackgroundMaxBytes { get; init; } = 10L * 1024 * 1024;
+
+    /// <summary>
+    /// A map background's longer side after re-encoding (D-278): bigger than a screenshot's, since players zoom into
+    /// it; the decoded picture stays within a small server's memory (3200² × 3 bytes ≈ 30 MB, one picture at a time).
+    /// </summary>
+    public int MapBackgroundMaxLongSide { get; init; } = 3200;
+
     /// <summary>The longer side of the thumbnail for the map and lists.</summary>
     public int ThumbnailSize { get; init; } = 256;
 

@@ -145,10 +145,16 @@ for (const section of [
   'admin',
   'graph',
   'editor',
+  'map-background',
   'whats-new',
 ]) {
   test(`the styleguide section «${section}» looks as approved`, async ({ page }) => {
     await openStyleguide(page, section);
+    // The map's picture fades in once it is loaded (D-277): the screenshot waits for it
+    if (section === 'map-background')
+      await expect(page.locator('#map-background image[data-map-background]')).toHaveClass(
+        /opacity-100/,
+      );
     await expect(page.locator(`#${section}`)).toHaveScreenshot(`${section}.png`);
   });
 }

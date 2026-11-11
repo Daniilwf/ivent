@@ -66,6 +66,14 @@ public static class AdminMapEndpoints
                 || request.Path.Value?.EndsWith("/map/publish", StringComparison.Ordinal) == true);
     }
 
+    /// <summary>Whether <paramref name="path"/> is the upload of a map background (its body is a picture, D-278).</summary>
+    public static bool IsBackgroundUpload(string path)
+    {
+        ArgumentNullException.ThrowIfNull(path);
+        return path.StartsWith("/api/admin/seasons/", StringComparison.OrdinalIgnoreCase)
+            && path.EndsWith("/map/background", StringComparison.OrdinalIgnoreCase);
+    }
+
     public static void MapAdminMap(this RouteGroupBuilder api)
     {
         var map = api.MapGroup("/admin/seasons/{seasonId:guid}/map").WithTags("Admin").RequireAuthorization(Policies.Admin);
@@ -86,7 +94,32 @@ public static class AdminMapEndpoints
                     ? Task.FromResult<Results<Ok<CommandResponse>, ProblemHttpResult, ValidationProblem, NotFound, ForbidHttpResult>>(invalid)
                     : PublishAsync(seasonId, request.CommandId, new PublishMap(graph!, request.Comment!), user, db, bus, ct))
             .WithActionErrors();
+
+        // The picture under the map (D-278): stored like every upload, of its own kind; the draft names it, the publication carries it
+        map.MapPost("/background", UploadBackgroundAsync)
+            .DisableAntiforgery() // the group's CSRF filter checks the header token (D-26)
+            .RequireRateLimiting(Files.FileEndpoints.UploadRateLimit)
+            .Accepts<Files.FileUploadForm>("multipart/form-data")
+            .Produces<Files.StoredFileView>()
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces<RejectionProblem>(StatusCodes.Status409Conflict, "application/problem+json")
+            .Produces<RejectionProblem>(StatusCodes.Status413PayloadTooLarge, "application/problem+json")
+            .Produces<RejectionProblem>(StatusCodes.Status422UnprocessableEntity, "application/problem+json")
+            .Produces<RejectionProblem>(StatusCodes.Status429TooManyRequests, "application/problem+json")
+            .Produces<RejectionProblem>(StatusCodes.Status503ServiceUnavailable, "application/problem+json")
+            .Produces(StatusCodes.Status415UnsupportedMediaType)
+            .ProducesValidationProblem();
     }
+
+    /// <summary>
+    /// A map background (D-278): a JPEG, PNG, WebP or still GIF of at most <c>Files:MapBackgroundMaxBytes</c>, re-encoded
+    /// to WebP no longer than <c>Files:MapBackgroundMaxLongSide</c>. Refusals carry the codes of <c>POST /api/files</c>.
+    /// </summary>
+    private static async Task<IResult> UploadBackgroundAsync(
+        Guid seasonId, HttpRequest request, ClaimsPrincipal principal, [AsParameters] Files.FileServices services, CancellationToken ct) =>
+        await services.Db.Seasons.AnyAsync(s => s.Id == seasonId, ct)
+            ? await Files.FileEndpoints.UploadPictureAsync(request, principal, services, Engine.Files.FileKind.MapBackground, ct)
+            : TypedResults.NotFound();
 
     private static async Task<Results<Ok<AdminMapView>, NotFound>> GetAsync(Guid seasonId, GameEventDbContext db, CancellationToken ct)
     {
@@ -106,7 +139,7 @@ public static class AdminMapEndpoints
         return TypedResults.Ok(new AdminMapView(
             rules.Features.MapMode,
             season.Status,
-            SeasonMaps.ToView(current),
+            SeasonMaps.ToView(current, await SeasonMaps.BackgroundAsync(db, current, ct)),
             [.. players.Select(p => new MapPlayerView(
                 p.Id,
                 p.Name,
@@ -135,7 +168,12 @@ public static class AdminMapEndpoints
             return TypedResults.NotFound();
         }
 
-        IReadOnlyList<MapError> problems = [.. MapValidator.Validate(graph, state.Rules), .. MapPublicationChecks.For(state, graph)];
+        IReadOnlyList<MapError> problems =
+        [
+            .. MapValidator.Validate(graph, state.Rules),
+            .. MapPublicationChecks.For(state, graph),
+            .. await SeasonMaps.BackgroundProblemAsync(db, graph, ct) is { } background ? [background] : Array.Empty<MapError>(),
+        ];
         var warnings = ZoneWarnings.For(graph, state.Rules, state, await PoolReader.LoadAsync(db, ct));
         var open = state.Rules.Features.MapMode == MapMode.Graph && state.Status is SeasonStatus.Draft or SeasonStatus.Active;
         return TypedResults.Ok(new MapCheckView(
@@ -161,7 +199,19 @@ public static class AdminMapEndpoints
         TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["map"] = ["A map with cells and edges is required."] });
 
     private static async Task<Results<Ok<CommandResponse>, ProblemHttpResult, ValidationProblem, NotFound, ForbidHttpResult>> PublishAsync(
-        Guid seasonId, Guid commandId, ICommand command, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, CancellationToken ct) =>
-        await SeasonEndpoints.PrecheckAsync(seasonId, commandId, db, ct)
-            ?? await SeasonEndpoints.SendAsync(seasonId, commandId, command, user.UserId(), bus, ct);
+        Guid seasonId, Guid commandId, PublishMap command, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, CancellationToken ct)
+    {
+        if (await SeasonEndpoints.PrecheckAsync(seasonId, commandId, db, ct) is { } refused)
+        {
+            return refused;
+        }
+
+        // The engine knows no files: the site checks the picture the map names (D-277)
+        if (await SeasonMaps.BackgroundProblemAsync(db, command.Map, ct) is { } problem)
+        {
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["map.background"] = [$"{problem.Code}: {problem.Message}"] });
+        }
+
+        return await SeasonEndpoints.SendAsync(seasonId, commandId, command, user.UserId(), bus, ct);
+    }
 }

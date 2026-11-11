@@ -6,12 +6,19 @@ import type { Board, BoardCell, BoardEdge, BoardZone, CellKind, Point, ZoneTheme
 // Stage 2's map is the season's graph as the editor drew it (D-300): cells with their places, arrows, zones. The board
 // takes the places as they are (framed with a margin), numbers the cells from the start along the arrows, joins the
 // arrows into roads between junctions and draws each zone as a blob around its cells. A map without places (made
-// outside the editor) is laid out in columns by the distance from the start.
+// outside the editor) is laid out in columns by the distance from the start. A map over a picture (D-277) keeps its
+// places as the picture's pixels.
 
 export type MapCell = components['schemas']['CellView'];
 export type MapEdge = components['schemas']['EdgeView'];
 export type MapZone = components['schemas']['ZoneView'];
-export type GraphMap = { cells: MapCell[]; edges: MapEdge[]; zones: MapZone[] };
+export type MapBackground = components['schemas']['MapBackgroundView'];
+export type GraphMap = {
+  cells: MapCell[];
+  edges: MapEdge[];
+  zones: MapZone[];
+  background?: MapBackground | null | undefined;
+};
 
 /** The world's margin round the outermost cells, and the gap of the automatic layout */
 const margin = 90;
@@ -191,17 +198,22 @@ export function graphBoard(map: GraphMap): { board: Board; cellNumber: Map<strin
   );
   const xs = [...raw.values()].map((p) => p.x);
   const ys = [...raw.values()].map((p) => p.y);
-  const minX = xs.length > 0 ? Math.min(...xs) : 0;
-  const minY = ys.length > 0 ? Math.min(...ys) : 0;
-  const width = (xs.length > 0 ? Math.max(...xs) - minX : 0) + margin * 2;
-  const height = (ys.length > 0 ? Math.max(...ys) - minY : 0) + margin * 2;
+  // Over a picture the places are its pixels (D-277): no shift, the board is the picture (grown for a cell past it)
+  const picture = placed && map.background ? map.background : null;
+  const minX = picture ? 0 : xs.length > 0 ? Math.min(...xs) : 0;
+  const minY = picture ? 0 : ys.length > 0 ? Math.min(...ys) : 0;
+  const offset = picture ? 0 : margin;
+  const span = (values: number[], min: number) =>
+    (values.length > 0 ? Math.max(...values) - min : 0) + margin * 2;
+  const width = picture ? Math.max(picture.width, Math.max(0, ...xs) + margin) : span(xs, minX);
+  const height = picture ? Math.max(picture.height, Math.max(0, ...ys) + margin) : span(ys, minY);
 
   const cells: BoardCell[] = order.map((id) => {
     const c = byId.get(id) as MapCell;
     const p = raw.get(id) as Point;
     return {
-      x: p.x - minX + margin,
-      y: p.y - minY + margin,
+      x: p.x - minX + offset,
+      y: p.y - minY + offset,
       id: cellNumber.get(id) as number,
       kind: kinds[c.type],
       to: c.to ? cellNumber.get(c.to) : undefined,
@@ -218,7 +230,17 @@ export function graphBoard(map: GraphMap): { board: Board; cellNumber: Map<strin
       ? []
       : [{ id: z.id, name: z.name, theme: zoneTheme(i), outline: outline(inside) }];
   });
-  return { board: { width, height, cells, edges, roads: roads(cells, edges), zones }, cellNumber };
+  const background = picture
+    ? {
+        url: picture.url ?? `/api/files/${picture.fileId}`,
+        width: picture.width,
+        height: picture.height,
+      }
+    : undefined;
+  return {
+    board: { width, height, background, cells, edges, roads: roads(cells, edges), zones },
+    cellNumber,
+  };
 }
 
 /** Where a branch leads with the steps left (a hint for the choice, the server walks for real, D-304) */

@@ -36,6 +36,7 @@ public static class MapErrorCodes
     public const string ZoneDuplicate = "map.zoneDuplicate";
     public const string ZoneInvalid = "map.zoneInvalid";
     public const string ZoneUnsupported = "map.zoneUnsupported";
+    public const string BackgroundInvalid = "map.backgroundInvalid";
 }
 
 /// <summary>
@@ -53,6 +54,9 @@ public static class MapValidator
     public const int MaxEdges = 10_000;
     public const int MaxZones = 100;
     public const int MaxIdLength = 64;
+
+    /// <summary>The longest side of a background picture the map may name (D-277); the upload keeps far below it.</summary>
+    public const int MaxBackgroundSide = 16_384;
 
     public static IReadOnlyList<MapError> Validate(MapGraph map, Ruleset rules)
     {
@@ -134,6 +138,12 @@ public static class MapValidator
         CheckTeleportCycles(cells, Error);
         CheckReach(map, cells, exits, Error);
         CheckZones(map, cells, Error);
+        if (map.Background is { } background
+            && (background.FileId == Guid.Empty || background.Width is < 1 or > MaxBackgroundSide || background.Height is < 1 or > MaxBackgroundSide))
+        {
+            Error(MapErrorCodes.BackgroundInvalid, "background", $"A background names its picture and its size, 1–{MaxBackgroundSide} pixels a side.");
+        }
+
         return errors;
     }
 
