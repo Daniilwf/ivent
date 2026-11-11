@@ -34,8 +34,12 @@ public sealed class SessionRecord
     public bool IsActive(DateTimeOffset now) => RevokedAt is null && ExpiresAt > now;
 }
 
-/// <summary>The account signs in on a device: a new session; the queue gives it its id (in <see cref="SessionStarted"/>).</summary>
-public sealed record StartSession(Guid UserId, string? UserAgent, string? Address) : IAccountCommand, IOpenInMaintenance;
+/// <summary>
+/// The account signs in on a device: a new session; the queue gives it its id (in <see cref="SessionStarted"/>). With
+/// <see cref="MaxLive"/> live sessions already, the least recently seen end first (SES-2).
+/// </summary>
+public sealed record StartSession(Guid UserId, string? UserAgent, string? Address, int MaxLive = SessionRules.DefaultMaxLive)
+    : IAccountCommand, IOpenInMaintenance;
 
 /// <summary>
 /// A request of a live session after <see cref="SessionRules.TouchInterval"/>: its last request and its sliding end move.
@@ -65,6 +69,12 @@ public static class SessionRules
 
     /// <summary>The rejection of a command naming a session that is not live, or not this account's.</summary>
     public const string Unknown = "session.unknown";
+
+    /// <summary>
+    /// Live sessions an account keeps (<c>Security:MaxSessionsPerAccount</c>): a security limit, not a game number, so it
+    /// is the site's setting, not the ruleset's (SES-2).
+    /// </summary>
+    public const int DefaultMaxLive = 20;
 
     public const int MaxUserAgentLength = 256;
     public const int MaxAddressLength = 64;

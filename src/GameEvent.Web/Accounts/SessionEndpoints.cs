@@ -69,8 +69,7 @@ public static class SessionEndpoints
 
             var now = time.GetUtcNow();
             var current = principal.SessionId();
-            IReadOnlyList<SessionView> list = [.. (await db.Sessions.AsNoTracking().Where(s => s.UserId == userId && s.RevokedAt == null).ToListAsync(ct))
-                .Where(s => s.IsActive(now))
+            IReadOnlyList<SessionView> list = [.. (await db.Sessions.AsNoTracking().Where(s => s.UserId == userId && s.RevokedAt == null && s.ExpiresAt > now).ToListAsync(ct))
                 .OrderByDescending(s => s.Id == current)
                 .ThenByDescending(s => s.LastSeenAt)
                 .Select(s => new SessionView(s.Id, s.UserAgent, s.CreatedAt, s.LastSeenAt, s.Id == current))];
@@ -138,10 +137,11 @@ public static class SessionEndpoints
     public static async Task<Dictionary<Guid, int>> LiveCountsAsync(GameEventDbContext db, DateTimeOffset now, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(db);
-        return (await db.Sessions.AsNoTracking().Where(s => s.RevokedAt == null).ToListAsync(ct))
-            .Where(s => s.IsActive(now))
+        return await db.Sessions.AsNoTracking()
+            .Where(s => s.RevokedAt == null && s.ExpiresAt > now)
             .GroupBy(s => s.UserId)
-            .ToDictionary(g => g.Key, g => g.Count());
+            .Select(g => new { g.Key, Count = g.Count() })
+            .ToDictionaryAsync(g => g.Key, g => g.Count, ct);
     }
 
     private static ValidationProblem Invalid() =>

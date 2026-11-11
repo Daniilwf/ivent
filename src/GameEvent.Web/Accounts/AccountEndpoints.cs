@@ -70,7 +70,7 @@ public static partial class AccountEndpoints
 
     private static async Task<Results<Ok<CurrentUser>, UnauthorizedHttpResult, ValidationProblem, StatusCodeHttpResult>> LoginAsync(
         LoginRequest request, HttpContext http, GameEventDbContext db, Passwords passwords, LoginThrottle throttle, LoginDevices devices,
-        CommandBus bus, IIdGenerator ids, ILoggerFactory loggers, CancellationToken ct)
+        CommandBus bus, IIdGenerator ids, IConfiguration configuration, ILoggerFactory loggers, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(request.Login) || string.IsNullOrEmpty(request.Password)
             || request.Login.Length > 64 || request.Password.Length > 256)
@@ -109,9 +109,11 @@ public static partial class AccountEndpoints
                 new CommandEnvelope(ids.NewId(), Guid.Empty, new EndSessions(previousUser, Engine.Accounts.SessionEndReason.SignedOut, Only: previous), previousUser), ct);
         }
 
-        // Every sign-in is a new session with a new id: a cookie planted before it names none of it (D-466)
+        // Every sign-in is a new session with a new id: a cookie planted before it names none of it (D-466); the
+        // account keeps at most this many live ones (SES-2)
+        var maxSessions = configuration.GetValue("Security:MaxSessionsPerAccount", SessionRules.DefaultMaxLive);
         var started = await bus.SendAsync(
-            new CommandEnvelope(ids.NewId(), Guid.Empty, new StartSession(user!.Id, http.Request.Headers.UserAgent.ToString(), address), user.Id), ct);
+            new CommandEnvelope(ids.NewId(), Guid.Empty, new StartSession(user!.Id, http.Request.Headers.UserAgent.ToString(), address, maxSessions), user.Id), ct);
         if (!started.IsAccepted)
         {
             return TypedResults.Unauthorized();

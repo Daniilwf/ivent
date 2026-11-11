@@ -136,7 +136,7 @@ public sealed partial class DeadlineScheduler(
         bool any;
         await using (var db = await dbFactory.CreateDbContextAsync(ct))
         {
-            any = (await db.Sessions.AsNoTracking().ToListAsync(ct)).Any(s => !s.IsActive(now));
+            any = await db.Sessions.AnyAsync(s => s.RevokedAt != null || s.ExpiresAt <= now, ct);
         }
 
         if (any)

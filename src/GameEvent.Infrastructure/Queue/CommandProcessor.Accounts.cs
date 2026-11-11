@@ -139,7 +139,7 @@ public sealed partial class CommandProcessor
 
                     var temporary = AccountRules.TemporaryPassword();
                     var sessions = await LiveSessionsAsync(db, user.Id, SessionNow, ct);
-                    return ([new AccountPasswordReset(user.Id)], () =>
+                    return ([new AccountPasswordReset(user.Id), .. Ended(user.Id, sessions, SessionEndReason.AccountChanged)], () =>
                     {
                         user.PasswordHash = passwords.Hash(user, temporary);
                         user.MustChangePassword = true;
@@ -167,13 +167,13 @@ public sealed partial class CommandProcessor
                     }
 
                     // The device that changed it stays signed in; every other session ends (D-467)
-                    var others = await LiveSessionsAsync(db, user.Id, SessionNow, ct);
-                    return ([new AccountPasswordChanged(user.Id)], () =>
+                    var others = (await LiveSessionsAsync(db, user.Id, SessionNow, ct)).Where(s => s.Id != change.KeepSession).ToList();
+                    return ([new AccountPasswordChanged(user.Id), .. Ended(user.Id, others, SessionEndReason.PasswordChanged)], () =>
                     {
                         user.PasswordHash = passwords.Hash(user, change.NewPassword);
                         user.MustChangePassword = false;
                         user.SecurityStamp = AccountRules.NewStamp();
-                        EndAll(others.Where(s => s.Id != change.KeepSession), SessionNow);
+                        EndAll(others, SessionNow);
                     }, null, null);
                 }
 
@@ -205,7 +205,7 @@ public sealed partial class CommandProcessor
                     }
 
                     var sessions = user.Role != edit.Role ? await LiveSessionsAsync(db, user.Id, SessionNow, ct) : [];
-                    return ([new AccountChanged(user.Id, edit.Name.Trim(), AccountRules.ToLog(edit.Role))], () =>
+                    return ([new AccountChanged(user.Id, edit.Name.Trim(), AccountRules.ToLog(edit.Role)), .. Ended(user.Id, sessions, SessionEndReason.AccountChanged)], () =>
                     {
                         // A new role ends the account's sessions (D-67, D-467)
                         if (user.Role != edit.Role)
@@ -237,7 +237,7 @@ public sealed partial class CommandProcessor
                     }
 
                     var sessions = await LiveSessionsAsync(db, user.Id, SessionNow, ct);
-                    return ([new AccountDeleted(user.Id)], () =>
+                    return ([new AccountDeleted(user.Id), .. Ended(user.Id, sessions, SessionEndReason.AccountChanged)], () =>
                     {
                         user.IsDeleted = true;
                         user.SecurityStamp = AccountRules.NewStamp();
@@ -307,6 +307,11 @@ public sealed partial class CommandProcessor
                         return ([], null, null, new Rejection(AccountRules.Unknown, $"Account {start.UserId} does not exist."));
                     }
 
+                    // Over the limit the least recently seen sessions end in the same command (SES-2)
+                    var live = await LiveSessionsAsync(db, start.UserId, now, ct);
+                    var over = live.OrderBy(s => s.LastSeenAt).ThenBy(s => s.CreatedAt)
+                        .Take(Math.Max(0, live.Count - Math.Max(1, start.MaxLive) + 1))
+                        .ToList();
                     var session = new SessionRecord
                     {
                         Id = SessionRules.NewId(),
@@ -317,7 +322,11 @@ public sealed partial class CommandProcessor
                         UserAgent = Cut(start.UserAgent, SessionRules.MaxUserAgentLength),
                         Address = Cut(start.Address, SessionRules.MaxAddressLength),
                     };
-                    return ([new SessionStarted(start.UserId, session.Id)], () => db.Sessions.Add(session), null, null);
+                    return ([.. Ended(start.UserId, over, SessionEndReason.Limit), new SessionStarted(start.UserId, session.Id)], () =>
+                    {
+                        EndAll(over, now);
+                        db.Sessions.Add(session);
+                    }, null, null);
                 }
 
             case TouchSession touch:
@@ -355,7 +364,7 @@ public sealed partial class CommandProcessor
 
             case PurgeSessions:
                 {
-                    var gone = (await db.Sessions.ToListAsync(ct)).Where(s => !s.IsActive(now)).ToList();
+                    var gone = await db.Sessions.Where(s => s.RevokedAt != null || s.ExpiresAt <= now).ToListAsync(ct);
                     return ([], () => db.Sessions.RemoveRange(gone), null, null);
                 }
 
@@ -364,9 +373,13 @@ public sealed partial class CommandProcessor
         }
     }
 
-    // Times are compared in memory, as elsewhere: a handful of rows per account
-    private static async Task<List<SessionRecord>> LiveSessionsAsync(GameEventDbContext db, Guid userId, DateTimeOffset now, CancellationToken ct) =>
-        [.. (await db.Sessions.Where(s => s.UserId == userId && s.RevokedAt == null).ToListAsync(ct)).Where(s => s.IsActive(now))];
+    // Times compare in SQL: they are stored as UTC ticks (UtcTicksConverter), which sort as the moments do
+    private static Task<List<SessionRecord>> LiveSessionsAsync(GameEventDbContext db, Guid userId, DateTimeOffset now, CancellationToken ct) =>
+        db.Sessions.Where(s => s.UserId == userId && s.RevokedAt == null && s.ExpiresAt > now).ToListAsync(ct);
+
+    /// <summary>The log's record of the sessions a command ends, none when it ends none.</summary>
+    private static IGameEvent[] Ended(Guid userId, List<SessionRecord> sessions, SessionEndReason reason) =>
+        sessions.Count == 0 ? [] : [new SessionsEnded(userId, [.. sessions.Select(s => s.Id)], reason)];
 
     private static void EndAll(IEnumerable<SessionRecord> sessions, DateTimeOffset now)
     {

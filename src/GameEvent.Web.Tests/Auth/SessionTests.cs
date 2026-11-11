@@ -118,6 +118,75 @@ public sealed class SessionTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task An_account_keeps_at_most_twenty_live_sessions_and_the_oldest_ends()
+    {
+        // SES-2: a script signing in without the cookie would pile up live rows for 30 days each
+        var first = await DeviceAsync("vasya");
+        var firstId = (await SessionsAsync(first))[0].GetProperty("id").GetGuid();
+        _site.Wall.Advance(TimeSpan.FromSeconds(1));
+        var devices = new List<Device>();
+        for (var i = 0; i < 20; i++)
+        {
+            devices.Add(await DeviceAsync("vasya"));
+            _site.Wall.Advance(TimeSpan.FromSeconds(1));
+        }
+
+        await using var db = _site.NewDb();
+        var vasyaId = _site.Users["vasya"];
+        Assert.Equal(20, await db.Sessions.CountAsync(s => s.UserId == vasyaId && s.RevokedAt == null, Ct));
+        Assert.NotNull((await db.Sessions.SingleAsync(s => s.Id == firstId, Ct)).RevokedAt);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await first.Client.GetAsync("/api/auth/me", Ct)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await devices[0].Client.GetAsync("/api/auth/me", Ct)).StatusCode);
+        Assert.Contains(await db.Events.Where(e => e.Type == "sessions-ended").Select(e => e.Data).ToListAsync(Ct), d => d.Contains("\"limit\"", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Sign_out_without_the_pages_token_ends_nothing()
+    {
+        var vasya = await DeviceAsync("vasya");
+        var forged = CopyOf(vasya, withToken: false);
+
+        Assert.Equal(HttpStatusCode.BadRequest, (await forged.Client.PostAsync("/api/auth/logout", null, Ct)).StatusCode);
+
+        Assert.Equal(HttpStatusCode.OK, (await vasya.Client.GetAsync("/api/auth/me", Ct)).StatusCode);
+    }
+
+    [Theory]
+    [InlineData("reset", "accountChanged")]
+    [InlineData("role", "accountChanged")]
+    [InlineData("delete", "accountChanged")]
+    [InlineData("ownPassword", "passwordChanged")]
+    public async Task Account_changes_log_the_sessions_they_end(string action, string reason)
+    {
+        var phone = await DeviceAsync("vasya");
+        var desktop = await DeviceAsync("vasya");
+        var vasyaId = _site.Users["vasya"];
+        if (action == "ownPassword")
+        {
+            (await desktop.Client.PostAsJsonAsync("/api/auth/password", new { commandId = Guid.NewGuid(), currentPassword = SiteFactory.Password, newPassword = "новый-пароль-1" }, Ct)).EnsureSuccessStatusCode();
+        }
+        else
+        {
+            var admin = await _site.SignedInAsync("admin");
+            var path = action switch
+            {
+                "reset" => $"/api/admin/accounts/{vasyaId}/reset-password",
+                "delete" => $"/api/admin/accounts/{vasyaId}/delete",
+                _ => $"/api/admin/accounts/{vasyaId}",
+            };
+            (await admin.PostAsJsonAsync(path, new { commandId = Guid.NewGuid(), name = "vasya", role = "spectator" }, Ct)).EnsureSuccessStatusCode();
+        }
+
+        await using var db = _site.NewDb();
+        var ended = await db.Events.Where(e => e.Type == "sessions-ended").Select(e => e.Data).ToListAsync(Ct);
+        var data = Assert.Single(ended);
+        Assert.Contains($"\"{reason}\"", data, StringComparison.Ordinal);
+        var revoked = await db.Sessions.Where(s => s.UserId == vasyaId && s.RevokedAt != null).Select(s => s.Id).ToListAsync(Ct);
+        Assert.Equal(action == "ownPassword" ? 1 : 2, revoked.Count);
+        Assert.All(revoked, id => Assert.Contains(id.ToString(), data, StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task Signing_in_and_out_works_while_the_site_only_reads()
     {
         _site.Services.GetRequiredService<Infrastructure.Site.MaintenanceMode>().TurnOn();

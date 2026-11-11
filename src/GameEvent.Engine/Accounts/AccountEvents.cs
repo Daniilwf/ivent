@@ -41,12 +41,19 @@ public sealed record AccountAvatarChanged(Guid UserId, Guid? FileId) : IGameEven
 [EventType("account-restored")]
 public sealed record AccountRestored(Guid UserId) : IGameEvent;
 
-/// <summary>Who ended sessions (D-466): the owner on this or one device, the owner on the other devices, or the admin.</summary>
+/// <summary>
+/// Why sessions ended (D-466, D-467): the owner on this or one device, the owner on the other devices, the admin, the
+/// owner's own password change, the admin's change of the account (password reset, role, deletion), or a new sign-in
+/// over the account's limit of live sessions (SES-2).
+/// </summary>
 public enum SessionEndReason
 {
     SignedOut,
     OtherDevices,
     Admin,
+    PasswordChanged,
+    AccountChanged,
+    Limit,
 }
 
 // Sessions (D-466): a sign-in on one device. The log names a session by its id only; the device and the address stay
