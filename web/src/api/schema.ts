@@ -6813,6 +6813,12 @@ export interface components {
             duplicate: boolean;
             avatar: null | components["schemas"]["FileLinkView"];
         };
+        BetOptionView: {
+            /** Format: int32 */
+            days: number;
+            /** Format: double */
+            multiplier: number;
+        };
         BetRules: {
             /** Format: int32 */
             maxStake: number;
@@ -6823,14 +6829,48 @@ export interface components {
             deadlineOptionsDays: components["schemas"]["EquatableArrayOfint"];
             payoutByHoursPerDay: components["schemas"]["EquatableArrayOfPayoutStep"];
         };
+        /**
+         * @description A run I may bet on: whose (name and token colour), the game and its hours of the roll's snapshot, when bets on it close,
+         *     and the multiplier of each deadline.
+         */
+        BetRunView: {
+            /** Format: uuid */
+            playerId: string;
+            name: string;
+            /** Format: int32 */
+            token: number;
+            /** Format: uuid */
+            runId: string;
+            /** Format: uuid */
+            gameId: string;
+            gameTitle: string;
+            /** Format: double */
+            hours: null | number;
+            /** Format: date-time */
+            closesAt: string;
+            options: components["schemas"]["BetOptionView"][];
+        };
         /** @enum {unknown} */
         BetStatus: "open" | "won" | "lost" | "revoked";
-        /** @description My bets and the rules of a new one: deadlines in days and the largest stake. */
+        /**
+         * @description My bets and the rules of a new one: deadlines in days and the largest stake of the season (D-414). From the bets plan
+         *     (D-446): `refusal` — the engine's code when no bet is placed now, `openBets` of `maxOpenBets`,
+         *     `stakeLimit` — the largest stake I can place (the season's limit or my coins), `runs` — exactly the runs a
+         *     bet is accepted on now.
+         */
         BetsView: {
             bets: components["schemas"]["BetView"][];
             deadlineOptionsDays: number[];
             /** Format: int32 */
             maxStake: number;
+            refusal: null | string;
+            /** Format: int32 */
+            openBets: number;
+            /** Format: int32 */
+            maxOpenBets: number;
+            /** Format: int32 */
+            stakeLimit: number;
+            runs: components["schemas"]["BetRunView"][];
         };
         BetView: {
             /** Format: uuid */
@@ -6851,6 +6891,7 @@ export interface components {
             status: components["schemas"]["BetStatus"];
             /** Format: int32 */
             payout: number;
+            gameTitle: string;
         };
         /** @description One line of the context a page sends: when (by the browser's clock) and what. */
         BugContextEntryView: {
@@ -8404,6 +8445,7 @@ export interface components {
             background?: null | components["schemas"]["MapBackgroundView"];
             economy?: null | components["schemas"]["EconomyFeaturesView"];
         };
+        /** @description A lot of my offer; `refusal` — the engine's code when buying it is refused now (sold, too few coins, the inventory full…), D-446. */
         ShopLotView: {
             /** Format: int32 */
             lot: number;
@@ -8414,6 +8456,7 @@ export interface components {
             /** Format: int32 */
             price: number;
             sold: boolean;
+            refusal: null | string;
         };
         /**
          * @description How a shop roll was paid.

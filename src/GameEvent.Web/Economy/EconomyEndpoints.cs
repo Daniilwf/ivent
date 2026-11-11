@@ -95,13 +95,36 @@ public sealed record TargetObjectsView(Guid PlayerId, IReadOnlyList<ItemOptionVi
 /// </summary>
 public sealed record ShopView(ShopPayment Payment, int Price, int FreeRolls, string? Refusal, DateTimeOffset? ExpiresAt, IReadOnlyList<ShopLotView> Lots);
 
-public sealed record ShopLotView(int Lot, string ObjectId, string Name, string Description, Rarity Rarity, int Price, bool Sold);
+/// <summary>A lot of my offer; <c>refusal</c> — the engine's code when buying it is refused now (sold, too few coins, the inventory full…), D-446.</summary>
+public sealed record ShopLotView(int Lot, string ObjectId, string Name, string Description, Rarity Rarity, int Price, bool Sold, string? Refusal);
 
-/// <summary>My bets and the rules of a new one: deadlines in days and the largest stake.</summary>
-public sealed record BetsView(IReadOnlyList<BetView> Bets, IReadOnlyList<int> DeadlineOptionsDays, int MaxStake);
+/// <summary>
+/// My bets and the rules of a new one: deadlines in days and the largest stake of the season (D-414). From the bets plan
+/// (D-446): <c>refusal</c> — the engine's code when no bet is placed now, <c>openBets</c> of <c>maxOpenBets</c>,
+/// <c>stakeLimit</c> — the largest stake I can place (the season's limit or my coins), <c>runs</c> — exactly the runs a
+/// bet is accepted on now.
+/// </summary>
+public sealed record BetsView(
+    IReadOnlyList<BetView> Bets,
+    IReadOnlyList<int> DeadlineOptionsDays,
+    int MaxStake,
+    string? Refusal,
+    int OpenBets,
+    int MaxOpenBets,
+    int StakeLimit,
+    IReadOnlyList<BetRunView> Runs);
 
 public sealed record BetView(
-    Guid BetId, Guid OnPlayerId, string OnPlayer, Guid RunId, DateTimeOffset PlacedAt, DateTimeOffset Deadline, int Stake, decimal Multiplier, BetStatus Status, int Payout);
+    Guid BetId, Guid OnPlayerId, string OnPlayer, Guid RunId, DateTimeOffset PlacedAt, DateTimeOffset Deadline, int Stake, decimal Multiplier, BetStatus Status, int Payout, string GameTitle);
+
+/// <summary>
+/// A run I may bet on: whose (name and token colour), the game and its hours of the roll's snapshot, when bets on it close,
+/// and the multiplier of each deadline.
+/// </summary>
+public sealed record BetRunView(
+    Guid PlayerId, string Name, int Token, Guid RunId, Guid GameId, string GameTitle, decimal? Hours, DateTimeOffset ClosesAt, IReadOnlyList<BetOptionView> Options);
+
+public sealed record BetOptionView(int Days, decimal Multiplier);
 
 /// <summary>
 /// The player's economy over HTTP (stage 4, D-441): the view of my inventory, shop and bets, and the actions — use an item,
@@ -256,17 +279,35 @@ public static class EconomyEndpoints
                 [.. (plan.Offer?.Lots ?? []).Select((lot, i) =>
                 {
                     var definition = state.Catalog.Get(lot.ObjectId);
-                    return new ShopLotView(i, lot.ObjectId, definition.Name, definition.Description, lot.Rarity, lot.Price, lot.Sold);
+                    return new ShopLotView(i, lot.ObjectId, definition.Name, definition.Description, lot.Rarity, lot.Price, lot.Sold, plan.LotRefusals[i]);
                 })]);
         }
 
-        BetsView? bets = features.Bets
-            ? new BetsView(
+        BetsView? bets = null;
+        if (features.Bets && BetPlans.Of(state, now, me.PlayerId) is { } betPlan)
+        {
+            var titles = pool.Games.ToDictionary(g => g.Id, g => g.Title);
+            string Title(Guid runId) => state.Runs.TryGetValue(runId, out var run) ? titles.GetValueOrDefault(run.GameId, "") : "";
+            bets = new BetsView(
                 [.. me.Wallet.Bets.OrderByDescending(b => b.PlacedAt).Select(b => new BetView(
-                    b.BetId, b.OnPlayerId, names.GetValueOrDefault(b.OnPlayerId, ""), b.RunId, b.PlacedAt, b.Deadline, b.Stake, b.Multiplier, b.Status, b.Payout))],
+                    b.BetId, b.OnPlayerId, names.GetValueOrDefault(b.OnPlayerId, ""), b.RunId, b.PlacedAt, b.Deadline, b.Stake, b.Multiplier, b.Status, b.Payout, Title(b.RunId)))],
                 [.. state.Rules.Bets.DeadlineOptionsDays],
-                state.Rules.Bets.MaxStake)
-            : null;
+                state.Rules.Bets.MaxStake,
+                betPlan.Refusal,
+                betPlan.OpenBets,
+                betPlan.MaxOpenBets,
+                betPlan.MaxStake,
+                [.. betPlan.Runs.Select(r => new BetRunView(
+                    r.PlayerId,
+                    names[r.PlayerId],
+                    tokens.GetValueOrDefault(r.PlayerId),
+                    r.RunId,
+                    r.GameId,
+                    titles.GetValueOrDefault(r.GameId, ""),
+                    r.Hours,
+                    r.ClosesAt,
+                    [.. r.Options.Select(o => new BetOptionView(o.Days, o.Multiplier))]))]);
+        }
 
         return TypedResults.Ok(new EconomyView(me.Coins, state.Rules.Economy.InventoryLimit, shop, bets, items));
     }
