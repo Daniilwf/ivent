@@ -1834,6 +1834,9 @@ export const ru = {
           'Стадия «число кубиков» добавляет кубики: 1 или больше.',
         'A wheel has entries with weights of 0 or more, and some weight in all.':
           'У колеса — объекты с весами от 0, и хотя бы один вес больше нуля.',
+        'A list item is an object, not null.': 'Элемент списка — объект, а не null.',
+        'A value of a wrong type.': 'Значение не того типа.',
+        'An action needs «type», written first.': 'Действию нужно поле type, первым.',
       } as Readonly<Record<string, string>>,
       serverPatterns: [
         [
@@ -1847,6 +1850,10 @@ export const ru = {
         ],
         [/^Object «(.+)» is listed twice\.$/u, (id: string) => `Объект «${id}» в пакете дважды.`],
         [/^Wheel «(.+)» is listed twice\.$/u, (id: string) => `Колесо «${id}» в пакете дважды.`],
+        [/^Field «(.+)» is required\.$/u, (name: string) => `Нужно поле «${name}».`],
+        [/^Fields (.+) are required\.$/u, (names: string) => `Нужны поля ${names}.`],
+        [/^Field «(.+)» is unknown\.$/u, (name: string) => `Неизвестное поле «${name}».`],
+        [/^Field «(.+)» is given twice\.$/u, (name: string) => `Поле «${name}» указано дважды.`],
         [/^1–(\d+) characters\.$/u, (max: string) => `От 1 до ${max} символов.`],
         [
           /^An id is lowercase words/u,

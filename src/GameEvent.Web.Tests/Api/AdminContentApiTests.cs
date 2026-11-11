@@ -178,6 +178,8 @@ public sealed class AdminContentApiTests : IAsyncLifetime
     [InlineData("""{"objects":[{"id":"x","kind":"wand","name":"X","description":"Y"}]}""", "objects[0].kind")]
     [InlineData("""{"objects":[{"id":"x","kind":"item","name":"X","description":"Y","colour":"red"}]}""", "objects[0]")]
     [InlineData("""{"objects":[{"id":"x","kind":"item","name":"X","description":"Y","window":"anytime","effect":{"actions":[{"type":"explode"}]}}]}""", "objects[0].effect.actions[0]")]
+    [InlineData("""{"objects":[],"wheels":[{"id":"w","entries":[]}]}""", "wheels[0]")]
+    [InlineData("""{"objects":[{"id":"x","kind":"item","name":"X","description":"Y","window":"anytime","effect":{"conditions":[],"actions":[]}}]}""", "objects[0].effect")]
     public async Task A_value_of_a_wrong_type_is_named_with_its_path(string pack, string path)
     {
         var admin = await _site.SignedInAsync("admin");
@@ -194,6 +196,46 @@ public sealed class AdminContentApiTests : IAsyncLifetime
         Assert.DoesNotContain("Path:", message, StringComparison.Ordinal);
         Assert.DoesNotContain("Invalid list item", message, StringComparison.Ordinal);
         Assert.DoesNotContain("$.", message, StringComparison.Ordinal);
+        // Our own words, never the parser's .NET type names (SEC-2)
+        Assert.DoesNotContain("GameEvent.", message, StringComparison.Ordinal);
+        Assert.DoesNotContain("System.", message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("""{"objects":[],"wheels":[{"id":"w","entries":[]}]}""", "wheels[0]", "Field «name» is required.")]
+    [InlineData("""{"objects":[{"id":"x","kind":"item","name":"X","description":"Y","colour":"red"}]}""", "objects[0].colour", "Field «colour» is unknown.")]
+    [InlineData("""{"objects":[{"id":"x","kind":"item","name":"X","description":"Y","price":"ten"}]}""", "objects[0].price", "A value of a wrong type.")]
+    public async Task A_missing_unknown_or_mistyped_field_is_told_in_our_words(string pack, string path, string message)
+    {
+        var admin = await _site.SignedInAsync("admin");
+
+        var check = await ApiCalls.OkAsync(await admin.PostAsync($"{Admin}/check", Raw(pack), Ct));
+
+        var problem = Assert.Single(check.GetProperty("problems").EnumerateArray());
+        Assert.Equal((path, message), (problem.GetProperty("path").GetString(), problem.GetProperty("message").GetString()));
+    }
+
+    [Theory]
+    [InlineData("""{"objects":[null],"wheels":[]}""", "objects[0]")]
+    [InlineData("""{"objects":[],"wheels":[null]}""", "wheels[0]")]
+    [InlineData("""{"objects":[],"wheels":[{"id":"w","name":"W","entries":[null]}]}""", "wheels[0].entries[0]")]
+    [InlineData("""{"objects":[{"id":"x","kind":"item","name":"X","description":"Y","window":"anytime","effect":{"actions":[null]}}]}""", "objects[0].effect.actions[0]")]
+    public async Task A_null_in_a_list_of_the_pack_is_a_problem_at_its_place_not_a_500(string pack, string path)
+    {
+        var admin = await _site.SignedInAsync("admin");
+        await ItemsOnAsync();
+
+        var check = await ApiCalls.OkAsync(await admin.PostAsync($"{Admin}/check", Raw(pack), Ct));
+        Assert.False(check.GetProperty("valid").GetBoolean());
+        Assert.Equal(path, Assert.Single(check.GetProperty("problems").EnumerateArray()).GetProperty("path").GetString());
+
+        var published = await admin.PostAsync(
+            $"{Admin}/publish",
+            Raw($$"""{"commandId":"{{Guid.NewGuid()}}","expectedVersion":0,"pack":{{pack}},"comment":"Пусто"}"""),
+            Ct);
+        Assert.Equal(HttpStatusCode.BadRequest, published.StatusCode);
+        var problem = JsonDocument.Parse(await published.Content.ReadAsStringAsync(Ct)).RootElement;
+        Assert.Equal([path], problem.GetProperty("errors").EnumerateArray().Select(e => e.GetProperty("path").GetString()));
     }
 
     [Fact]

@@ -101,6 +101,26 @@ public class ContentPackTests
         Assert.Contains("$.wheels[0].entries[0].objectId", paths);
     }
 
+    [Fact]
+    public void A_null_in_the_objects_or_the_wheels_is_named_at_its_place_and_the_rest_is_still_checked()
+    {
+        var examples = EconomyScenario.Examples();
+        // A list item the strict reader lets through as null (nullable annotations do not reach list items)
+        var pack = new ContentPack
+        {
+            Objects = [null!, examples["orange"]],
+            Wheels = [new WheelDefinition { Id = "w", Name = "Колесо", Entries = [new WheelEntrySpec { ObjectId = "ghost", Weight = 1 }] }, null!],
+        };
+
+        var errors = ContentPublishing.Check(pack);
+
+        var paths = errors.Select(e => e.Path).ToList();
+        Assert.Contains("$.objects[0]", paths);
+        Assert.Contains("$.wheels[1]", paths);
+        Assert.Contains("$.wheels[0].entries[0].objectId", paths);
+        Assert.Equal(3, errors.Count);
+    }
+
     [Theory]
     [InlineData("runCondition")]
     [InlineData("deck")]

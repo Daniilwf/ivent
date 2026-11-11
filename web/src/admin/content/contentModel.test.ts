@@ -29,6 +29,12 @@ describe('The content model', () => {
 
   it('tells an unknown server message as it came, marked as the server’s', () => {
     expect(serverText('A brand new rule.')).toBe('Сервер: A brand new rule.');
+    // The reader's messages in the server's own words (SEC-2)
+    expect(serverText('Field «name» is required.')).toBe('Нужно поле «name».');
+    expect(serverText('Field «colour» is unknown.')).toBe('Неизвестное поле «colour».');
+    expect(serverText('A list item is an object, not null.')).toBe(
+      'Элемент списка — объект, а не null.',
+    );
   });
 
   it('says what is not JSON and what is not an object', () => {

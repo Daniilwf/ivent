@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 using GameEvent.Engine.Content;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Rulesets;
@@ -71,7 +72,7 @@ public sealed record PublishContentRequest(Guid CommandId, int ExpectedVersion, 
 /// The content editor's API (4.12): read the content in force with its versions, one older version, the schema, check a
 /// pack and publish it through the queue (a command, invariant 2). Admin only.
 /// </summary>
-public static class AdminContentEndpoints
+public static partial class AdminContentEndpoints
 {
     /// <summary>
     /// A pack is bigger than the API's small JSON: the imported pack of the old season is about 300 KB. Past this size the
@@ -279,6 +280,14 @@ public static class AdminContentEndpoints
     /// <summary>The problems of a pack: its types (the first one the strict reader meets), then every content rule.</summary>
     private static List<ContentProblemView> Problems(JsonObject json, out ContentPack? pack)
     {
+        // The reader lets a null list item through at any depth (nullable annotations do not reach list items, SEC-1)
+        var nulls = NullItems(json, "$").Select(at => new ContentProblemView(Path(at), NullItem)).ToList();
+        if (nulls.Count > 0)
+        {
+            pack = null;
+            return nulls;
+        }
+
         try
         {
             pack = ContentJson.Parse<ContentPack>(json.ToJsonString());
@@ -308,6 +317,15 @@ public static class AdminContentEndpoints
 
         return problems;
     }
+
+    private const string NullItem = "A list item is an object, not null.";
+
+    private static IEnumerable<string> NullItems(JsonNode? node, string at) => node switch
+    {
+        JsonArray array => array.SelectMany((item, i) => item is null ? [$"{at}[{i}]"] : NullItems(item, $"{at}[{i}]")),
+        JsonObject obj => obj.SelectMany(p => NullItems(p.Value, $"{at}.{p.Key}")),
+        _ => [],
+    };
 
     private static async Task<JsonObject?> ReadObjectAsync(HttpRequest http, CancellationToken ct)
     {
@@ -357,8 +375,58 @@ public static class AdminContentEndpoints
             message = message[(own.Length + 2)..];
         }
 
-        return (Path(path), message);
+        return (Path(path), Words(message));
     }
+
+    /// <summary>
+    /// The reader's message in our words: it names .NET types («…for type 'GameEvent.Engine.Content.WheelDefinition'…»),
+    /// which tell the admin nothing and show the inside of the site (SEC-2). Our converters' own messages pass as they are.
+    /// </summary>
+    private static string Words(string message)
+    {
+        if (MissingFields().Match(message) is { Success: true } missing)
+        {
+            var names = Quoted().Matches(missing.Groups[1].Value).Select(m => $"«{m.Groups[1].Value}»").ToList();
+            return names.Count == 1 ? $"Field {names[0]} is required." : $"Fields {string.Join(", ", names)} are required.";
+        }
+
+        if (UnknownField().Match(message) is { Success: true } unknown)
+        {
+            return $"Field «{unknown.Groups[1].Value}» is unknown.";
+        }
+
+        if (DuplicateField().Match(message) is { Success: true } duplicate)
+        {
+            return $"Field «{duplicate.Groups[1].Value}» is given twice.";
+        }
+
+        if (message.StartsWith("An action needs «type»", StringComparison.Ordinal))
+        {
+            return "An action needs «type», written first.";
+        }
+
+        if (message.StartsWith("The JSON value could not be converted", StringComparison.Ordinal) || DotNetName().IsMatch(message))
+        {
+            return "A value of a wrong type.";
+        }
+
+        return message;
+    }
+
+    [GeneratedRegex(@"missing required properties including: (.+)$")]
+    private static partial Regex MissingFields();
+
+    [GeneratedRegex(@"'([^']*)'")]
+    private static partial Regex Quoted();
+
+    [GeneratedRegex(@"^The JSON property '([^']*)' could not be mapped")]
+    private static partial Regex UnknownField();
+
+    [GeneratedRegex(@"^Duplicate property '([^']*)'")]
+    private static partial Regex DuplicateField();
+
+    [GeneratedRegex(@"(?:GameEvent|System|Microsoft)\.\w")]
+    private static partial Regex DotNetName();
 
     // "$.objects[0].name" → "objects[0].name"; no path (the document itself) → "pack".
     private static string Path(string? jsonPath) =>
