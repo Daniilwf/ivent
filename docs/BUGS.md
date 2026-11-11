@@ -50,6 +50,26 @@
 - **Тест:** `src/GameEvent.Architecture.Tests/PlayerTransferTests.cs`.
 - **Исправлено:** тест написан. Передача предмета `takeObject.mode: give` (D-478) противоречит строке «прямых переводов нет» — вынесено заказчику (D-634, **нужно решение**), строка дыры 🟨.
 
+### SEC-1. Пакет контента с null в списке объектов или колёс давал 500
+
+- **Найдено:** ревью безопасности редактора контента (2026-11-11, ветка `feat/effect-editor`).
+- **Шаги:** админ, `POST /api/admin/seasons/{id}/content/check` (или `/publish`) с телом `{"objects":[null],"wheels":[]}` или `{"objects":[],"wheels":[null]}`, либо с null глубже — в `entries` колеса или `actions` эффекта.
+- **Ожидалось:** проверка отвечает 200 `valid: false` с ошибкой у `objects[0]` / `wheels[0]`, публикация — 400 с той же ошибкой.
+- **Получилось:** 500: строгое чтение пропускает null внутри списка (аннотации допустимости null не доходят до элементов коллекций), `ContentPublishing.Check` разыменовывал его.
+- **Важность:** низкая — только админ, сайт не падает, но ответ 500 и исключение в журнале ошибок.
+- **Тест:** `src/GameEvent.Engine.Tests/Economy/ContentPackTests.cs` («A_null_in_the_objects_or_the_wheels_is_named_at_its_place_and_the_rest_is_still_checked»), `src/GameEvent.Web.Tests/Api/AdminContentApiTests.cs` («A_null_in_a_list_of_the_pack_is_a_problem_at_its_place_not_a_500»).
+- **Исправление:** `ContentPublishing.Check` первым делом называет каждый null в `$.objects[i]` и `$.wheels[i]` («A list item is an object, not null.») и дальше его пропускает; API ещё до чтения называет null в любом списке пакета (`wheels[0].entries[0]`, `objects[0].effect.actions[0]` — те же 500 глубже). Исправлено.
+
+### SEC-2. Ошибки чтения пакета контента показывали имена типов .NET
+
+- **Найдено:** ревью безопасности редактора контента (2026-11-11, ветка `feat/effect-editor`).
+- **Шаги:** админ проверяет пакет с колесом без `name`, с лишним полем `colour` или ценой `"ten"`.
+- **Ожидалось:** сообщение своими словами: нет поля, неизвестное поле, не тот тип.
+- **Получилось:** сообщение System.Text.Json как есть: «JSON deserialization for type 'GameEvent.Engine.Content.WheelDefinition' was missing required properties…», «…could not be converted to System.Nullable`1[System.Int32]» — внутреннее устройство сайта и ничего не говорящий админу текст.
+- **Важность:** заметка — раскрытие имён типов только админу.
+- **Тест:** `AdminContentApiTests` («A_value_of_a_wrong_type_is_named_with_its_path» — в сообщении нет `GameEvent.` и `System.`; «A_missing_unknown_or_mistyped_field_is_told_in_our_words»); перевод — `web/src/admin/content/contentModel.test.ts`.
+- **Исправление:** `AdminContentEndpoints.Words` пересказывает сообщения чтения: «Field «name» is required.», «Field «colour» is unknown.», «Field «x» is given twice.», «A value of a wrong type.»; всё прочее с именем типа .NET — «A value of a wrong type.». Русский перевод — в словаре (`serverMessages`, `serverPatterns`). Исправлено.
+
 ### IT-1. Враждебный предмет с ответом игрока отказывал, если цель под щитом
 
 - **Найдено:** импорт пакета предметов, шаг 1 (2026-11-11), сценарный тест «Эффектной крысы».
@@ -59,6 +79,7 @@
 - **Важность:** средняя — защита пассивная и не должна раскрываться отказом.
 - **Тест:** `src/GameEvent.Engine.Tests/Economy/ImportedItems/BaseFormatItemsTests.cs` («An_effect_rat_steals_the_chosen_effect»).
 - **Исправление:** перехват забирает ответы, данные для этой цели (`EffectRun.Run`).
+
 ### Q-1. Мутационный счёт движка 100% не проверял ни одного мутанта
 
 - **Найдено:** разбор ночного прогона Stryker 2026-10-04 (поток качества, 2026-11-10).

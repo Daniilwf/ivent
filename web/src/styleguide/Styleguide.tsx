@@ -13,6 +13,8 @@ import { CompleteForm } from '../season/CompleteForm';
 import { ProofSection } from '../season/ProofForm';
 import { ChoiceCard, OfferCard } from '../season/RollResult';
 import { RunActions } from '../season/RunActions';
+import { DrawnEventCard } from '../season/DrawnEventCard';
+import type { Schemas } from '../api/client';
 import { MyFinish } from '../season/MyFinish';
 import { Leaderboard } from '../board/Leaderboard';
 import { cellsToFinish } from '../board/geometry';
@@ -52,11 +54,52 @@ import {
   demoProfileEmpty,
 } from './feedFixtures';
 import { AdminDemos } from './AdminDemos';
+import { ContentDemos } from './ContentDemos';
 
 // The styleguide's cards act on nothing
 const noop = () => undefined;
 
 const t = ru.styleguide;
+
+// The four kinds of decks, a long name and an event without text (stage 5)
+const drawnEvents: Schemas['DrawnEventView'][] = [
+  {
+    sequence: 1,
+    deck: 'good',
+    kind: 'good',
+    objectId: 'tailwind',
+    name: 'Попутный ветер',
+    description: 'В следующем броске за прохождение на один кубик больше.',
+    source: 'cell',
+  },
+  {
+    sequence: 2,
+    deck: 'bad',
+    kind: 'bad',
+    objectId: 'horror-week',
+    name: 'Хоррор-неделя',
+    description: 'Следующая игра будет хоррором.',
+    source: 'item',
+  },
+  {
+    sequence: 3,
+    deck: 'risky',
+    kind: 'risky',
+    objectId: 'gamble',
+    name: 'Рискнёшь? Кинь кубик и узнай, куда тебя занесёт на этот раз',
+    description: 'Кинь d6: на 1–3 назад на 3 клетки, на 4–6 вперёд на 3.',
+    source: 'cell',
+  },
+  {
+    sequence: 4,
+    deck: 'special',
+    kind: 'special',
+    objectId: 'quiet',
+    name: 'Тишина',
+    description: '',
+    source: 'cell',
+  },
+];
 
 function Section({
   id,
@@ -636,6 +679,10 @@ export function Styleguide() {
         <EditorDemo />
       </Section>
 
+      <Section id="content" title={t.content.title} lead={t.content.lead}>
+        <ContentDemos />
+      </Section>
+
       <Section id="map-background" title={t.mapBackground.title} lead={t.mapBackground.lead}>
         <MapBackgroundDemo />
       </Section>
@@ -665,6 +712,14 @@ export function Styleguide() {
             place={4}
             rollsOpen={false}
           />
+        </div>
+      </Section>
+
+      <Section id="drawn-event" title={t.drawnEvent.title} lead={t.drawnEvent.lead}>
+        <div className="grid items-start gap-4 desk:grid-cols-2">
+          {drawnEvents.map((drawn) => (
+            <DrawnEventCard key={drawn.sequence} drawn={drawn} />
+          ))}
         </div>
       </Section>
 

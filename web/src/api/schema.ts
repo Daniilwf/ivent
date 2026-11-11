@@ -1489,6 +1489,59 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/content/schema": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/schema+json": components["schemas"]["JsonObject"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/seasons": {
         parameters: {
             query?: never;
@@ -3798,6 +3851,339 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/seasons/{seasonId}/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminContentView"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Too Many Requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/seasons/{seasonId}/content/versions/{version}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                    version: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ContentVersionView"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Too Many Requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/seasons/{seasonId}/content/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["JsonObject"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ContentCheckView"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Payload Too Large */
+                413: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Too Many Requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/seasons/{seasonId}/content/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["PublishContentRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CommandResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+                /** @description Payload Too Large */
+                413: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/seasons": {
         parameters: {
             query?: never;
@@ -5993,6 +6379,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/test/seasons/{seasonId}/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["TestContentRequest"];
+                };
+            };
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -6077,6 +6527,20 @@ export interface components {
             occurredAt: string;
             undone: boolean;
             events: string[];
+        };
+        /**
+         * @description The season's content in the editor (4.12, D-490): whether items are on (the editor works either way, a pack is
+         *     published only with `features.items`), the season's status, the version in force, the pack in force as content
+         *     JSON (CONTENT.md; null fields left out), the definitions deleted on the way and the versions, newest first.
+         */
+        AdminContentView: {
+            itemsEnabled: boolean;
+            status: components["schemas"]["SeasonStatus"];
+            /** Format: int32 */
+            version: number;
+            pack: components["schemas"]["JsonElement"];
+            deleted: components["schemas"]["DeletedObjectView"][];
+            history: components["schemas"]["ContentVersionInfo"][];
         };
         /** @description A pending manual effect of any player, oldest first, for the admin to resolve (D-102). */
         AdminManualEffectView: {
@@ -6388,6 +6852,44 @@ export interface components {
             challengeDone: boolean;
             review?: null | components["schemas"]["ReviewInput"];
         };
+        /** @description The check of a pack: every problem at once, the types' and the content rules'. */
+        ContentCheckView: {
+            valid: boolean;
+            problems: components["schemas"]["ContentProblemView"][];
+        };
+        /**
+         * @description A problem of a pack: the JSON path of its field (`objects[2].effect.actions[0].steps`, `pack` for the
+         *     whole) and the engine's English message, shown as it is next to the field (D-181, D-492).
+         */
+        ContentProblemView: {
+            path: string;
+            message: string;
+        };
+        /**
+         * @description One published version of the season's content: who published it, when and why, its size, and which objects and
+         *     wheels it added, changed or removed against the version before it.
+         */
+        ContentVersionInfo: {
+            /** Format: int32 */
+            version: number;
+            /** Format: date-time */
+            at: string;
+            authorName: null | string;
+            comment: string;
+            /** Format: int32 */
+            objects: number;
+            /** Format: int32 */
+            wheels: number;
+            added: string[];
+            changed: string[];
+            removed: string[];
+        };
+        /** @description One version's pack, for the history and the export of an older version. */
+        ContentVersionView: {
+            /** Format: int32 */
+            version: number;
+            pack: components["schemas"]["JsonElement"];
+        };
         /** @description An admin comment on a change to a player's runs; required, the log shows it. */
         ConvertToDropRequest: {
             /** Format: uuid */
@@ -6442,6 +6944,14 @@ export interface components {
             /** Format: int32 */
             token?: null | number;
         };
+        /** @description A definition that an earlier pack had and the one in force does not (soft deletion, invariant 11). */
+        DeletedObjectView: {
+            id: string;
+            kind: components["schemas"]["ObjectKind"];
+            name: string;
+            /** Format: int32 */
+            deletedIn: number;
+        };
         /** @description The admin takes a game out of the pool: `reason` is required (1–500 characters, D-208). */
         DeleteGameRequest: {
             /** Format: uuid */
@@ -6494,6 +7004,21 @@ export interface components {
             /** Format: int32 */
             sides: number;
             grantEvent: null | components["schemas"]["EventKind"];
+        };
+        /**
+         * @description The event I drew last (D-500, stage 5): `sequence` — its place in the log, so the page shows a new one as new;
+         *     `deck` and `kind` — where it came from; `name` and `description` — its card from the content in
+         *     force when it was drawn; `source` — a cell or an item.
+         */
+        DrawnEventView: {
+            /** Format: int64 */
+            sequence: number;
+            deck: string;
+            kind: components["schemas"]["EventKind"];
+            objectId: string;
+            name: string;
+            description: string;
+            source: components["schemas"]["EventSource"];
         };
         /** @description The drop penalty: `count` dice of `sides`, what they take, and whether a bad event follows. */
         DropPenaltyView: {
@@ -6603,8 +7128,26 @@ export interface components {
             stackTrace: string;
             traceId: string;
         };
-        /** @enum {unknown} */
-        EventKind: "good" | "bad";
+        /**
+         * @description The kind of an event (SPEC «Ивенты»): good, bad, special, risky. A drawn event has the kind of its deck (D-501); the
+         *     standard decks are the wheels named like the kinds. Special and risky came with stage 5: a build before it cannot read
+         *     them, and they are written only once events are on.
+         * @enum {unknown}
+         */
+        EventKind: "good" | "bad" | "special" | "risky";
+        /** @description The rules of event decks (SPEC «Ивенты», D-500…D-502). */
+        EventRules: {
+            /**
+             * @description The deck an event cell draws from when the zone of the player's cell has no deck of the content (D-502): the
+             *     standard deck of this kind.
+             */
+            defaultDeck: components["schemas"]["EventKind"];
+        };
+        /**
+         * @description Where a drawn event came from (GLOSSARY «Источник ивента»); stage 5 adds the drop, the paid reroll and the difficulty.
+         * @enum {unknown}
+         */
+        EventSource: "cell" | "item";
         /** @enum {unknown} */
         ExclusionReason: "alreadyPlayed" | "dropped" | "techRerolled";
         /** @description Feature flags: a disabled mechanic is invisible in the interface and refused by the engine. */
@@ -6655,6 +7198,11 @@ export interface components {
             hasPage: boolean;
             cover?: null | components["schemas"]["FileLinkView"];
         };
+        /** @description An object of the content the page's events name (stage 5: the drawn events), by its latest card. */
+        FeedObjectView: {
+            id: string;
+            name: string;
+        };
         /**
          * @description A player of the season, for the feed's lines (H5, D-150): the name, the account for the profile link (`hasProfile` —
          *     false once the account is deleted), the avatar and `token` — the colour of their token in the season (PlayerTokens).
@@ -6679,7 +7227,8 @@ export interface components {
         };
         /**
          * @description A page of the feed, newest first; `nextBefore` — the sequence to ask before for the next page, none at the start of
-         *     the log. `players` — every player of the season; `games` and `runs` — those the page's events name (D-150).
+         *     the log. `players` — every player of the season; `games` and `runs` — those the page's events name (D-150);
+         *     `objects` — the content objects they name (the drawn events).
          */
         FeedView: {
             entries: components["schemas"]["FeedEntryView"][];
@@ -6688,6 +7237,7 @@ export interface components {
             players: components["schemas"]["FeedPlayerView"][];
             games: components["schemas"]["FeedGameView"][];
             runs: components["schemas"]["FeedRunView"][];
+            objects?: null | components["schemas"]["FeedObjectView"][];
         };
         /** @description A picture by link (D-117): https from Tenor, Giphy or Klipy; the server downloads it and stores it as an upload. */
         FileFromUrlRequest: {
@@ -6888,7 +7438,7 @@ export interface components {
          * @description What created a manual effect; C11 adds item, cell and event sources.
          * @enum {unknown}
          */
-        ManualEffectSource: "paidReroll" | "drop" | "difficulty" | "item";
+        ManualEffectSource: "paidReroll" | "drop" | "difficulty" | "item" | "event";
         /** @description A manual effect the player still has to play out (D-10, D-93); the player resolves it (D-102). */
         ManualEffectView: {
             /** Format: uuid */
@@ -7001,6 +7551,7 @@ export interface components {
          *     `dropPenalty.count` counts the extra dice of the drops in a row before this run (D-205, D-324).
          *     `wishRerollOpen` — whether the player may give the game up by wish now (D-206, D-325; always set, optional for older clients): a tech reroll with the
          *     reason `wish`, within the window, for a game with a listed tag the roll did not impose.
+         *     `lastEvent` — the event I drew last (stage 5), while `features.events` is on; null before the first draw.
          */
         MyTurnView: {
             /** Format: uuid */
@@ -7025,11 +7576,17 @@ export interface components {
             difficultyDice?: null | components["schemas"]["DifficultyDieView"][];
             lastMove?: null | components["schemas"]["MoveView"];
             wishRerollOpen?: null | boolean;
+            lastEvent?: null | components["schemas"]["DrawnEventView"];
         };
         NominationRules: {
             auto: components["schemas"]["EquatableArrayOfAutoNomination"];
             voted: components["schemas"]["EquatableArrayOfVotedNomination"];
         };
+        /**
+         * @description What an object is (CONTENT.md «Определение объекта», GLOSSARY).
+         * @enum {unknown}
+         */
+        ObjectKind: "item" | "effect" | "specialRoll" | "event" | "achievement";
         /**
          * @description A game offered to the player, with the hours fixed at roll time, marks from other players (SPEC «Статусы игры») and
          *     the pool's cover, if it has one (D-222).
@@ -7232,6 +7789,18 @@ export interface components {
             comment: null | string;
             files: components["schemas"]["FileLinkView"][];
         };
+        /**
+         * @description Publish a new version of the season's content (D-400) made from `expectedVersion` (D-491); `comment` goes
+         *     to the public log, at most 500 characters.
+         */
+        PublishContentRequest: {
+            /** Format: uuid */
+            commandId: string;
+            /** Format: int32 */
+            expectedVersion: number;
+            pack: components["schemas"]["JsonElement"];
+            comment: string;
+        };
         /** @description Publish a new version of the map (D-300, D-308); `comment` goes to the public log, at most 500 characters. */
         PublishMapRequest: {
             /** Format: uuid */
@@ -7406,6 +7975,7 @@ export interface components {
             social: components["schemas"]["SocialRules"];
             nominations: components["schemas"]["NominationRules"];
             weeklyChallenge: components["schemas"]["WeeklyChallengeRules"];
+            events?: null | components["schemas"]["EventRules"];
         };
         /**
          * @description One changed value between two versions of the rules: the JSON path (for example `reward.diceCount.max`)
@@ -7696,6 +8266,15 @@ export interface components {
             /** Format: double */
             shiftMinutes: number;
         };
+        /**
+         * @description A content pack for a season of the tests (stage 5, D-534): `objects` and `wheels` — the JSON texts of content
+         *     files, as `content/` holds them; published by the admin's `PublishContent` with `comment`.
+         */
+        TestContentRequest: {
+            objects: null | string[];
+            wheels: null | string[];
+            comment: null | string;
+        };
         /** @description Seed the randomness (the same rolls and dice every time), or null for unpredictable randomness again. */
         TestRandomRequest: {
             /** Format: int32 */
@@ -7830,14 +8409,16 @@ export const coopRoundUpForValues: ReadonlyArray<FlattenedDeepRequired<component
 export const diceStageValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["DiceStage"]> = ["count", "sides", "add", "multiply", "reroll", "min", "max", "singleDie", "setOne", "replaceValue", "fixAverage", "bonusPerEven", "percent"];
 export const difficultyValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["Difficulty"]> = ["easy", "normal", "hard", "extreme"];
 export const emptyPoolFallbackValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["EmptyPoolFallback"]> = ["dropZoneFilter"];
-export const eventKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["EventKind"]> = ["good", "bad"];
+export const eventKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["EventKind"]> = ["good", "bad", "special", "risky"];
+export const eventSourceValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["EventSource"]> = ["cell", "item"];
 export const exclusionReasonValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ExclusionReason"]> = ["alreadyPlayed", "dropped", "techRerolled"];
 export const gameMarkKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["GameMarkKind"]> = ["dropped", "techRerolled"];
 export const mandatoryEventValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["MandatoryEvent"]> = ["bad", "none"];
 export const manualEffectOutcomeValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ManualEffectOutcome"]> = ["applied", "notApplicable"];
-export const manualEffectSourceValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ManualEffectSource"]> = ["paidReroll", "drop", "difficulty", "item"];
+export const manualEffectSourceValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ManualEffectSource"]> = ["paidReroll", "drop", "difficulty", "item", "event"];
 export const mapModeValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["MapMode"]> = ["linear", "graph"];
 export const moveReasonValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["MoveReason"]> = ["completionRoll", "startingCell", "adminAdjustment", "dropPenalty", "runCorrection", "proofRejected", "teleport", "item", "itemTeleport", "diceModified"];
+export const objectKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ObjectKind"]> = ["item", "effect", "specialRoll", "event", "achievement"];
 export const proofStatusValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ProofStatus"]> = ["pending", "approved", "rejected"];
 export const rerollCostKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["RerollCostKind"]> = ["coins", "badEvent"];
 export const rerollPaymentValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["RerollPayment"]> = ["freeThisRoll", "freeRerollResource", "coins", "badEvent", "freeMode"];

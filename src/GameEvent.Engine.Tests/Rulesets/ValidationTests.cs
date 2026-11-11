@@ -219,7 +219,8 @@ public class ValidationTests
         { "two active runs", r => r with { Season = r.Season with { MaxActiveRunsPerPlayer = 2 } }, "season.maxActiveRunsPerPlayer" },
         // Items, the shop and bets are played since stage 4 (D-415); the shop sells items and needs them
         { "shop without items", Flags(f => f with { Shop = true }), "features.shop" },
-        { "events", Flags(f => f with { Events = true }), "features.events" },
+        // Events are played since stage 5 (D-530): they are content, so they need items
+        { "events without items", r => Flags(f => f with { Events = true })(r) with { Events = new EventRules { DefaultDeck = EventKind.Risky } }, "features.events" },
         { "polls", Flags(f => f with { Polls = true }), "features.polls" },
         { "achievements", Flags(f => f with { Achievements = true }), "features.achievements" },
         { "weekly challenge", Flags(f => f with { WeeklyChallenge = true }), "features.weeklyChallenge" },

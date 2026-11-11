@@ -183,6 +183,9 @@
 | Предупреждение о зоне | в зоне меньше `map.minZoneGames` доступных игр | `ZoneWarnings`, `ZoneGamesWarning` |
 | Проверка публикации | что мешает опубликовать правильную карту сейчас: клетки под игроками, выбор ветки | `MapPublicationChecks`, `MapCheckView`, `POST /api/admin/seasons/{id}/map/check` |
 | Редактор карты | раздел «Карта» админки: холст, панели клетки и зон, проверка, публикация | `MapSection`, `MapCanvas` (React Flow) |
+| Редактор контента | раздел «Контент» админки: объекты и колёса сезона, форма и JSON по схеме, ошибки у полей, шаблоны действий, загрузка и выгрузка пакета, версии | `ContentSection`, `ObjectEditor`, `ObjectForm`; API — `AdminContentEndpoints` |
+| Версия контента | номер публикации пакета контента в сезоне; новая версия собирается из той, что в силе | `ContentCatalog.Version`, `PublishContent.ExpectedVersion`, отказ `content.versionChanged` |
+| Шаблон действия | базовое действие с примером параметров, которое редактор вставляет в эффект | `actionTemplate` (`web/src/admin/content/templates.ts`) |
 | Черновик карты | неопубликованные правки карты в браузере админа | `Draft`, `mapDraft.ts` (`loadDraft`, `saveDraft`) |
 | Последний ход | отрезки последнего перемещения моей фишки для анимации | `MoveView`, `MoveLegView`, `MyTurnView.LastMove` |
 | Ветка (в выборе) | выход развилки, пронумерованный на карте и в кнопках | `BranchOption`, `BranchChoice`, `ChoiceView.Steps` |
@@ -195,6 +198,7 @@
 | Предмет | одноразовый объект, используется вручную | `ObjectKind.Item` |
 | Эффект | объект, который действует сам по триггеру | `ObjectKind.Effect` |
 | Спецролл | объект, задающий, откуда роллить следующую игру | `ObjectKind.SpecialRoll` |
+| Можно несколько сразу | пометка объекта: несколько одинаковых можно применить за раз (поле `stackable`) | `ObjectDefinition.Stackable` |
 | Ивент | карточка из колоды | `ObjectKind.Event` |
 | Вид ивента | хороший, плохой; с этапа 5 — ещё специвент и рискованный; у вытянутого — вид колоды (D-501) | `EventKind` (`Good`, `Bad`; этап 5 — `Special`, `Risky`) |
 | Колода | колесо с ивентами одного вида (D-501) | `WheelDefinition` с полем `Deck` (вид ивентов) |
@@ -250,13 +254,14 @@
 | Термин | Что значит | В коде |
 | --- | --- | --- |
 | Вытянуть ивент | взять ивент из колоды по весу и сразу разыграть его на вытянувшего (D-500) | действие `drawEvent` (`DrawEventAction`), событие `EventDrawn` |
-| Источник ивента | откуда ивент: клетка, дроп, платный реролл, сложность, предмет, общий ивент | `EventSource` |
+| Источник ивента | откуда ивент: клетка, дроп, платный реролл, сложность, предмет, общий ивент | `EventSource` (5.1: `Cell`, `Item`) |
+| Вытянутый ивент | карточка ивента, который игрок вытянул последним, в его карточке хода | `DrawnEventView`, `me.lastEvent`; экран — `DrawnEventCard` |
 | Хороший ивент, плохой ивент | ивент из колоды `good` / `bad` | `EventKind.Good`, `EventKind.Bad`, колоды `good`, `bad` |
 | Специвент | ивент из колоды `special`; применяется первым | `EventKind.Special`, колода `special` |
 | Рискованный ивент | ивент с исходом по броску («кинь d6: 1–3 плохо, 4–6 хорошо»), колода `risky` | `EventKind.Risky`, блок `outcomes` |
 | Колода зоны | колода зоны клетки, где стоит игрок; клетка `deck: zone` | `ZoneDefinition.Deck`, `DeckRef.Zone` |
 | Колода по умолчанию | колода клетки ивента вне зоны с колодой | `events.defaultDeck` |
-| Пустая колода | у колоды нет живых записей: ивент уходит в ручное разрешение | событие `EventDrawMissed` |
+| Пустая колода | колоды нет в контенте или у неё нет живых записей: ивент уходит в ручное разрешение (D-501, D-535) | событие `EventDrawMissed`, `ManualEffectSource.Event` |
 | Накопленные ивенты | ожидающие последствия ивентов, применяемые по порядку «специвент, хороший, плохой» | `RollModifier.EventKind`, `DiceModifier.EventKind`, `events.applyOrder` |
 | Условие прохождения | требование ивента к следующему прохождению («пройди на сложной»), видно на странице прохождения | `modifyNextRoll.runCondition` (`ConditionSpec`), `RunSnapshot.Conditions`, события `RunConditionAttached`, `RunConditionChecked` |
 | Невыполненное условие | прохождение не выполнило условие: по умолчанию без кубов, с монетками | `UnmetConditionPolicy` (`NoDiceKeepCoins`, `CountAsDrop`, `Ignore`), причины `PointsReason.ConditionUnmet`, `MoveReason.ConditionUnmet` |
