@@ -1,4 +1,5 @@
 import {
+  Boxes,
   Bug,
   CalendarCog,
   ClipboardCheck,
@@ -46,6 +47,10 @@ import { useSeasonVersion } from '../app/useSeasonVersion';
 
 // The map editor (@xyflow/react) loads apart from the site: the players never download it
 const MapSection = lazy(async () => ({ default: (await import('./MapSection')).MapSection }));
+// The content editor too (4.12): only the admin opens it, the main page's budget stays as it was
+const ContentSection = lazy(async () => ({
+  default: (await import('./content/ContentSection')).ContentSection,
+}));
 
 const t = ru.admin;
 
@@ -58,6 +63,7 @@ const sections: { id: AdminSectionId; icon: ReactNode; season: boolean }[] = [
   { id: 'effects', icon: <Sparkles size={20} aria-hidden />, season: true },
   { id: 'rules', icon: <FileJson size={20} aria-hidden />, season: true },
   { id: 'map', icon: <MapIcon size={20} aria-hidden />, season: true },
+  { id: 'content', icon: <Boxes size={20} aria-hidden />, season: true },
   { id: 'season', icon: <CalendarCog size={20} aria-hidden />, season: false },
   { id: 'pool', icon: <Library size={20} aria-hidden />, season: false },
   { id: 'accounts', icon: <UserCog size={20} aria-hidden />, season: false },
@@ -250,6 +256,12 @@ export function AdminScreen({
         return (
           <Suspense fallback={<p>{ru.ui.loading}</p>}>
             <MapSection seasonId={id} version={version} />
+          </Suspense>
+        );
+      case 'content':
+        return (
+          <Suspense fallback={<p>{ru.ui.loading}</p>}>
+            <ContentSection seasonId={id} version={version} />
           </Suspense>
         );
       case 'season':
