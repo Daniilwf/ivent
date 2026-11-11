@@ -106,6 +106,11 @@ public sealed partial class CommandProcessor
                         return Reject(AccountRules.LoginTaken, $"Login «{login}» is taken (deleted accounts keep theirs).");
                     }
 
+                    if (role == Role.Player && await IsPlayerNameTakenAsync(db, name, except: null, ct))
+                    {
+                        return Reject(AccountRules.NameTaken, $"Another player is called «{name.Trim()}»: the leaderboard and the feed would show two.");
+                    }
+
                     if (password is not null && !AccountRules.IsValidPassword(password, login))
                     {
                         return Reject(AccountRules.PasswordInvalid, $"A password is {AccountRules.MinPasswordLength}–{AccountRules.MaxPasswordLength} characters and not the login.");
@@ -134,6 +139,12 @@ public sealed partial class CommandProcessor
                     if (await db.Users.SingleOrDefaultAsync(u => u.Id == reset.UserId, ct) is not { } user)
                     {
                         return Reject(AccountRules.Unknown, $"Account {reset.UserId} does not exist.");
+                    }
+
+                    // Restoring disables whatever password it had (D-106), so a password given now would never work (D-613)
+                    if (user.IsDeleted)
+                    {
+                        return Reject(AccountRules.Deleted, "The account is deleted: restore it, then reset its password.");
                     }
 
                     var temporary = AccountRules.TemporaryPassword();
@@ -196,6 +207,18 @@ public sealed partial class CommandProcessor
                     if (user.Role == Role.Admin && edit.Role != Role.Admin && !user.IsDeleted && await IsLastAdminAsync(db, user.Id, ct))
                     {
                         return Reject(AccountRules.LastAdmin, "The last admin keeps the role.");
+                    }
+
+                    if (edit.Role == Role.Player && !user.IsDeleted && await IsPlayerNameTakenAsync(db, edit.Name, user.Id, ct))
+                    {
+                        return Reject(AccountRules.NameTaken, $"Another player is called «{edit.Name.Trim()}»: the leaderboard and the feed would show two.");
+                    }
+
+                    // An admin who plays has two accounts (SPEC «Аккаунты»): a player of a season that is not over does
+                    // not become one, or they would check their own proofs and correct their own points (D-610)
+                    if (edit.Role == Role.Admin && user.Role != Role.Admin && await IsInUnfinishedSeasonAsync(db, user.Id, ct))
+                    {
+                        return Reject(AccountRules.InSeason, "The account plays in a season that is not over: an admin who plays has a second account.");
                     }
 
                     return ([new AccountChanged(user.Id, edit.Name.Trim(), AccountRules.ToLog(edit.Role))], () =>
@@ -279,6 +302,23 @@ public sealed partial class CommandProcessor
             default:
                 throw new InvalidOperationException($"Unknown account command {command.GetType().Name}.");
         }
+    }
+
+    private static async Task<bool> IsPlayerNameTakenAsync(GameEventDbContext db, string name, Guid? except, CancellationToken ct)
+    {
+        var wanted = AccountRules.NormalizeName(name);
+        var names = await db.Users.AsNoTracking()
+            .Where(u => u.Role == Role.Player && !u.IsDeleted && u.Id != except)
+            .Select(u => u.Name)
+            .ToListAsync(ct);
+        return names.Any(n => AccountRules.NormalizeName(n) == wanted);
+    }
+
+    private static async Task<bool> IsInUnfinishedSeasonAsync(GameEventDbContext db, Guid userId, CancellationToken ct)
+    {
+        var seasonIds = await db.SeasonPlayers.AsNoTracking().Where(p => p.UserId == userId).Select(p => p.SeasonId).ToListAsync(ct);
+        return await db.Seasons.AsNoTracking().AnyAsync(
+            s => seasonIds.Contains(s.Id) && s.Status != Engine.Seasons.SeasonStatus.Finished && s.Status != Engine.Seasons.SeasonStatus.Archived, ct);
     }
 
     private static Task<bool> IsLastAdminAsync(GameEventDbContext db, Guid userId, CancellationToken ct) =>

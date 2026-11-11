@@ -55,7 +55,8 @@ type DropPenalty = {
   badEvent: boolean;
 };
 
-type RerollPayment = 'freeThisRoll' | 'freeRerollResource' | 'coins' | 'badEvent' | 'freeMode';
+type RerollPayment =
+  'freeThisRoll' | 'freeRerollResource' | 'coins' | 'badEvent' | 'freeMode' | 'gameDeleted';
 
 const rejection = {
   'pool.duplicate': 'Такая игра уже есть в пуле.',
@@ -72,6 +73,7 @@ const rejection = {
   'roll.tooManyUnchecked':
     'Слишком много прохождений ждут проверки админом. Новый ролл откроется, когда их станет меньше лимита сезона.',
   'roll.gameNotOffered': 'Эта игра тебе сейчас не предложена. Обнови страницу.',
+  'roll.gameDeleted': 'Админ убрал эту игру из пула. Сделай реролл — он бесплатный.',
   'proof.invalidLink': 'Ссылка должна начинаться с http:// или https://, ссылок не больше пяти.',
   'proof.empty': 'Добавь ссылку на пруф или выбери свидетеля.',
   'proof.witnessInvalid': 'Свидетелем может быть только другой игрок сезона.',
@@ -105,11 +107,16 @@ const rejection = {
     'Этот запрос уже выполнен. Если пароль ещё нужно сменить — отправь форму заново.',
   'account.stale': 'Аккаунт изменился, пока шёл запрос. Войди заново.',
   'account.roleInvalid': 'Неизвестная роль.',
-  'account.passwordInvalid': 'Пароль — от 8 символов, не совпадает с логином и с текущим паролем.',
+  'account.passwordInvalid':
+    'Пароль — от 8 символов, не из одних пробелов, не совпадает с логином и с текущим паролем.',
   'account.loginInvalid':
     'Логин — от 2 до 32 латинских букв, цифр, точек, дефисов и подчёркиваний.',
   'account.loginTaken': 'Такой логин уже занят.',
-  'account.nameInvalid': 'Имя — от 1 до 64 символов.',
+  'account.nameInvalid':
+    'Имя — от 1 до 64 символов, хотя бы один видимый, без невидимых и управляющих символов.',
+  'account.nameTaken': 'Другой игрок уже носит это имя: в лидерборде и ленте их не различить.',
+  'account.inSeason':
+    'Этот аккаунт играет в незавершённом сезоне. Админу, который играет, нужен второй аккаунт.',
   'account.lastAdmin': 'Последний админ остаётся админом.',
   'account.deleted': 'Аккаунт уже удалён.',
   'account.notDeleted': 'Аккаунт не удалён.',
@@ -341,7 +348,7 @@ export const ru = {
     alreadyPlayed: 'Уже проходил',
     reroll: 'Реролл',
     rerollFor: (payment: RerollPayment, price: number) =>
-      payment === 'freeThisRoll' || payment === 'freeMode'
+      payment === 'freeThisRoll' || payment === 'freeMode' || payment === 'gameDeleted'
         ? 'Реролл — бесплатно'
         : payment === 'freeRerollResource'
           ? 'Реролл — купон реролла'
@@ -1076,6 +1083,7 @@ export const ru = {
         coins: 'Реролл за монетки',
         badEvent: 'Реролл за плохой ивент',
         freeMode: 'Реролл в свободном режиме',
+        gameDeleted: 'Бесплатный реролл: игру убрали из пула',
       } as Record<string, string>,
       finish: (order: number) => `Финиш: ${order}-е место`,
       frozen: 'Очки заморожены: первый финиш',
@@ -1705,6 +1713,8 @@ export const ru = {
       completed: (time: string) => `Завершено ${time}`,
       claimed: (difficulty: string) => `Заявлено: ${difficulty}`,
       noHours: 'часы не указаны',
+      estimated: 'Часы — оценка игрока.',
+      estimateSource: 'Источник',
       dice: (total: number) => `кубы +${total}`,
       witness: (name: string) => `Свидетель: ${name}`,
       note: (text: string) => `Заметка: ${text}`,

@@ -19,6 +19,12 @@ internal static class RunLifecycle
 
         var player = state.Players[command.PlayerId];
         var offer = player.Offer ?? throw new InvalidOperationException($"Player {player.PlayerId} is Rolling without an offer.");
+
+        // D-615: a game the admin deleted from the pool (a duplicate) is not started; its reroll is free
+        if (Rolls.Rolling.IsDeleted(context, offer.GameId))
+        {
+            return Decision.Reject(RejectionCodes.GameDeleted, "The offered game was deleted from the pool: reroll it, for free.");
+        }
         return Decision.Accept(new RunStarted(
             context.Ids.NewId(), player.PlayerId, offer.GameId, offer.Snapshot, offer.RolledAt, context.Clock.UtcNow));
     }

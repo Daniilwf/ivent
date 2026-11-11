@@ -24,6 +24,12 @@ internal static class RulesetChanges
             return Decision.Reject(RejectionCodes.SeasonNotCreated, "Create the season first.");
         }
 
+        // D-614: the rules a finished season was played by are part of its results, fixed like them
+        if (SeasonSetup.IsOver(state))
+        {
+            return Decision.Reject(RejectionCodes.SeasonClosed, $"The season is {state.Status}: results are fixed.");
+        }
+
         if (command.ExpectedVersion is { } expected && expected != state.RulesetVersion)
         {
             return Decision.Reject(

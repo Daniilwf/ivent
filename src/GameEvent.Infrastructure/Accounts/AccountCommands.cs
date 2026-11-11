@@ -85,15 +85,48 @@ public static partial class AccountRules
     public const string Stale = "account.stale";
     public const string RoleInvalid = "account.roleInvalid";
     public const string AdminExists = "account.adminExists";
+    public const string NameTaken = "account.nameTaken";
+    public const string InSeason = "account.inSeason";
 
     /// <summary>Latin letters, digits, dot, dash, underscore; 2–32 characters (logins are typed on phones too).</summary>
     public static bool IsValidLogin(string? login) =>
         login is not null && login.Length is >= MinLoginLength and <= MaxLoginLength && LoginPattern().IsMatch(login);
 
-    public static bool IsValidName(string? name) => !string.IsNullOrWhiteSpace(name) && name.Trim().Length <= MaxNameLength;
+    /// <summary>
+    /// 1–64 characters, at least one of them visible, and none that is a control or a format character (zero width,
+    /// direction marks) except the joiner emoji sequences need (D-611): a name on the leaderboard identifies a player.
+    /// </summary>
+    public static bool IsValidName(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name) || name.Trim().Length > MaxNameLength)
+        {
+            return false;
+        }
+
+        var visible = false;
+        foreach (var c in name)
+        {
+            var category = char.GetUnicodeCategory(c);
+            if (category == System.Globalization.UnicodeCategory.Control
+                || (category == System.Globalization.UnicodeCategory.Format && c != ZeroWidthJoiner))
+            {
+                return false;
+            }
+
+            visible |= c != ZeroWidthJoiner && !char.IsWhiteSpace(c) && category is not (System.Globalization.UnicodeCategory.NonSpacingMark
+                or System.Globalization.UnicodeCategory.EnclosingMark or System.Globalization.UnicodeCategory.SpacingCombiningMark);
+        }
+
+        return visible;
+    }
+
+    private const char ZeroWidthJoiner = '‍';
+
+    /// <summary>The form two names are compared in: the same letters in another case are the same name (D-612).</summary>
+    public static string NormalizeName(string name) => name.Trim().ToUpperInvariant();
 
     public static bool IsValidPassword(string? password, string login) =>
-        password is not null && password.Length is >= MinPasswordLength and <= MaxPasswordLength
+        !string.IsNullOrWhiteSpace(password) && password.Length is >= MinPasswordLength and <= MaxPasswordLength
         && !string.Equals(password, login, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>A temporary password from the system's cryptographic generator, never the game's random source (D-106).</summary>

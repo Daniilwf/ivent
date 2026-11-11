@@ -194,6 +194,37 @@ public sealed class CompletionRewardApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task The_proof_queue_shows_the_admin_the_source_of_a_players_estimate()
+    {
+        // K1A: SPEC «Часы и кубы» — the player estimates with a source, the admin may correct it, so the admin sees both
+        await RemovePoolHoursAsync();
+        var vasya = await _site.SignedInAsync("vasya");
+        await PostAsync(vasya, Url("roll"), new { commandId = Guid.NewGuid() });
+        await PostAsync(vasya, Url("start"), new { commandId = Guid.NewGuid() });
+        await PostAsync(vasya, Url("complete"), new { commandId = Guid.NewGuid(), difficulty = "normal", estimatedHours = 6, hoursSource = Source });
+
+        var admin = await _site.SignedInAsync("admin");
+        using var queue = JsonDocument.Parse(await admin.GetStringAsync($"/api/admin/seasons/{SiteFactory.SeasonId}/proofs", Ct));
+        var item = Assert.Single(queue.RootElement.EnumerateArray());
+        Assert.Equal(6m, item.GetProperty("hours").GetDecimal());
+        Assert.Equal(Source, item.GetProperty("hoursSource").GetString());
+    }
+
+    [Fact]
+    public async Task Hours_from_the_pool_have_no_source_in_the_proof_queue()
+    {
+        var vasya = await _site.SignedInAsync("vasya");
+        await PostAsync(vasya, Url("roll"), new { commandId = Guid.NewGuid() });
+        await PostAsync(vasya, Url("start"), new { commandId = Guid.NewGuid() });
+        await PostAsync(vasya, Url("complete"), new { commandId = Guid.NewGuid(), difficulty = "normal" });
+
+        var admin = await _site.SignedInAsync("admin");
+        using var queue = JsonDocument.Parse(await admin.GetStringAsync($"/api/admin/seasons/{SiteFactory.SeasonId}/proofs", Ct));
+        var item = Assert.Single(queue.RootElement.EnumerateArray());
+        Assert.Equal(JsonValueKind.Null, item.GetProperty("hoursSource").ValueKind);
+    }
+
+    [Fact]
     public async Task Active_run_shows_the_hours_of_the_roll_even_when_the_pool_gets_hours_after_it()
     {
         // D-138: the completion counts the snapshot's hours, so the view must not hide the estimate the engine asks for

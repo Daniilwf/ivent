@@ -589,7 +589,10 @@ public static class SeasonEndpoints
             var roll = turnsOpen && (offer is not null || choice is not null)
                 ? await RollOf(db, seasonId, mine.Id, offer, choice, players, ct)
                 : null;
-            var price = mine.Frozen ? (Payment: RerollPayment.FreeMode, Coins: 0) : RerollPrice.Next(mine.RerollsThisRoll, coupons, rules.Roll);
+            // D-615: a game the admin deleted from the pool is rerolled for free
+            (RerollPayment Payment, int Coins) price = mine.Frozen ? (RerollPayment.FreeMode, 0)
+                : offer is not null && games.TryGetValue(offer.GameId, out var offered) && offered.IsDeleted ? (RerollPayment.GameDeleted, 0)
+                : RerollPrice.Next(mine.RerollsThisRoll, coupons, rules.Roll);
             var now = clock.UtcNow;
 
             // Other players' drops and tech rerolls of the offered games (SPEC «Статусы игры в сезоне»: a mark).

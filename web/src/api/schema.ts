@@ -7163,7 +7163,8 @@ export interface components {
          *     set, optional for older clients). `dropPenalty`: the drop penalty «Отклонить со штрафом дропа» would throw on top of
          *     the reject (D-327, D-262) under the season's rules, with the drops in a row before the run (D-324); null for the frozen
          *     first, who loses nothing (D-99); `affectsPosition` is false for a finisher whose finish this run does not decide
-         *     (his position is fixed); always set, optional for older clients.
+         *     (his position is fixed); always set, optional for older clients. `hoursSource`: where the player's estimate of
+         *     the hours comes from, when the pool had none (SPEC «Часы и кубы», K1A); null for the pool's hours.
          */
         ProofQueueItemView: {
             /** Format: uuid */
@@ -7190,6 +7191,7 @@ export interface components {
             /** Format: int32 */
             cellBonus?: null | number;
             dropPenalty?: null | components["schemas"]["DropPenaltyView"];
+            hoursSource?: null | string;
         };
         /**
          * @description The proof of the player's own completed run: links (http/https), screenshots the player uploaded (`files` — ids
@@ -7264,7 +7266,7 @@ export interface components {
          * @description How a reroll was paid for.
          * @enum {unknown}
          */
-        RerollPayment: "freeThisRoll" | "freeRerollResource" | "coins" | "badEvent" | "freeMode";
+        RerollPayment: "freeThisRoll" | "freeRerollResource" | "coins" | "badEvent" | "freeMode" | "gameDeleted";
         /** @description What the next reroll costs, computed by the engine's rule (D-93); only while a game is offered. */
         RerollPriceView: {
             payment: components["schemas"]["RerollPayment"];
@@ -7819,7 +7821,7 @@ export const mapModeValues: ReadonlyArray<FlattenedDeepRequired<components>["sch
 export const moveReasonValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["MoveReason"]> = ["completionRoll", "startingCell", "adminAdjustment", "dropPenalty", "runCorrection", "proofRejected", "teleport", "item", "itemTeleport", "diceModified"];
 export const proofStatusValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ProofStatus"]> = ["pending", "approved", "rejected"];
 export const rerollCostKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["RerollCostKind"]> = ["coins", "badEvent"];
-export const rerollPaymentValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["RerollPayment"]> = ["freeThisRoll", "freeRerollResource", "coins", "badEvent", "freeMode"];
+export const rerollPaymentValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["RerollPayment"]> = ["freeThisRoll", "freeRerollResource", "coins", "badEvent", "freeMode", "gameDeleted"];
 export const roleValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["Role"]> = ["player", "admin", "spectator"];
 export const rollMissReasonValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["RollMissReason"]> = ["completedInSeason", "beingPlayed"];
 export const roundingValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["Rounding"]> = ["nearest", "floor", "ceil"];

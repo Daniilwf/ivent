@@ -422,6 +422,31 @@ public sealed class SeasonApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task An_offer_the_admin_deleted_from_the_pool_is_not_started_and_rerolls_for_free()
+    {
+        // K1A, D-615: the admin deletes a duplicate that is Вася's offer
+        var vasya = await _site.SignedInAsync("vasya");
+        await PostAsync(vasya, "roll", new { commandId = Guid.NewGuid() });
+        var gameId = (await MeJsonAsync(vasya)).GetProperty("offer").GetProperty("id").GetGuid();
+        var admin = await _site.SignedInAsync("admin");
+        var deleted = await admin.PostAsJsonAsync($"/api/admin/pool/{gameId}/delete", new { commandId = Guid.NewGuid(), reason = "Дубль" }, Ct);
+        Assert.True(deleted.IsSuccessStatusCode);
+
+        var start = await vasya.PostAsJsonAsync(Url("start"), new { commandId = Guid.NewGuid() }, Ct);
+        Assert.Equal(HttpStatusCode.Conflict, start.StatusCode);
+        using (var problem = JsonDocument.Parse(await start.Content.ReadAsStringAsync(Ct)))
+        {
+            Assert.Equal("roll.gameDeleted", problem.RootElement.GetProperty("code").GetString());
+        }
+
+        AssertNextReroll(await MeJsonAsync(vasya), "gameDeleted", 0);
+        await PostAsync(vasya, "reroll", new { commandId = Guid.NewGuid() });
+        var me = await MeJsonAsync(vasya);
+        Assert.NotEqual(gameId, me.GetProperty("offer").GetProperty("id").GetGuid());
+        AssertNextReroll(me, "freeThisRoll", 0);
+    }
+
+    [Fact]
     public async Task Next_reroll_price_follows_the_payment_order_while_rolling()
     {
         var price = RulesetJson.Default().Roll.RerollCost.Amount!.Value;

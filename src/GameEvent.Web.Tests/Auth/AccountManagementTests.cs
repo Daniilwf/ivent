@@ -188,6 +188,8 @@ public sealed class AccountManagementTests : IAsyncLifetime
     [InlineData("short1", "account.passwordInvalid")]
     [InlineData("vasya", "account.passwordInvalid")]
     [InlineData(SiteFactory.Password, "account.passwordInvalid")]
+    [InlineData("        ", "account.passwordInvalid")]
+    [InlineData(" 	       ", "account.passwordInvalid")]
     public async Task A_new_password_follows_the_rules(string newPassword, string code)
     {
         var vasya = await _site.SignedInAsync("vasya");
@@ -467,6 +469,83 @@ public sealed class AccountManagementTests : IAsyncLifetime
 
         Assert.Equal(HttpStatusCode.Forbidden, roll.StatusCode);
         Assert.Equal("account.mustChangePassword", await CodeAsync(roll));
+    }
+
+    // ---- Exploratory testing of stages 1 and 2 (K1A) ----
+
+    [Theory]
+    [InlineData("​")]
+    [InlineData("‍‍")]
+    [InlineData("‮админ")]
+    [InlineData("Вася⁦")]
+    [InlineData("Вася")]
+    [InlineData("️")]
+    public async Task An_invisible_name_or_one_with_control_characters_is_refused(string name)
+    {
+        var admin = await _site.SignedInAsync("admin");
+
+        var created = await admin.PostAsJsonAsync("/api/admin/accounts", new { commandId = Guid.NewGuid(), login = "ghost", name, role = "player" }, Ct);
+        var renamed = await admin.PostAsJsonAsync($"/api/admin/accounts/{_site.Users["masha"]}", new { commandId = Guid.NewGuid(), name, role = "player" }, Ct);
+
+        Assert.Equal("account.nameInvalid", await CodeAsync(created));
+        Assert.Equal("account.nameInvalid", await CodeAsync(renamed));
+    }
+
+    [Theory]
+    [InlineData("👨‍👩‍👧‍👦🔥💀")]
+    [InlineData("Ёж ❤️")]
+    [InlineData("Zoë")]
+    public async Task An_emoji_or_accented_name_is_accepted(string name)
+    {
+        var admin = await _site.SignedInAsync("admin");
+
+        var created = await CreateAsync(admin, "emoji", name, "player");
+
+        Assert.Equal(name, created.GetProperty("account").GetProperty("name").GetString());
+    }
+
+    [Fact]
+    public async Task A_player_name_another_player_has_is_refused()
+    {
+        var admin = await _site.SignedInAsync("admin");
+
+        var created = await admin.PostAsJsonAsync("/api/admin/accounts", new { commandId = Guid.NewGuid(), login = "vasya2", name = " Vasya ", role = "player" }, Ct);
+        var renamed = await admin.PostAsJsonAsync($"/api/admin/accounts/{_site.Users["masha"]}", new { commandId = Guid.NewGuid(), name = "PETYA", role = "player" }, Ct);
+
+        Assert.Equal("account.nameTaken", await CodeAsync(created));
+        Assert.Equal("account.nameTaken", await CodeAsync(renamed));
+
+        // An admin or a spectator may share a player's name (the admin who plays has two accounts); a deleted one frees it
+        await CreateAsync(admin, "vasya-admin", "vasya", "admin");
+        await PostOkAsync(admin, $"/api/admin/accounts/{_site.Users["masha"]}/delete", new { commandId = Guid.NewGuid() });
+        await CreateAsync(admin, "masha2", "masha", "player");
+    }
+
+    [Fact]
+    public async Task An_account_in_a_running_season_is_not_made_an_admin()
+    {
+        var admin = await _site.SignedInAsync("admin");
+
+        var promoted = await admin.PostAsJsonAsync($"/api/admin/accounts/{_site.Users["vasya"]}", new { commandId = Guid.NewGuid(), name = "vasya", role = "admin" }, Ct);
+
+        Assert.Equal(HttpStatusCode.Conflict, promoted.StatusCode);
+        Assert.Equal("account.inSeason", await CodeAsync(promoted));
+
+        // An account that plays in no season may become an admin
+        await PostOkAsync(admin, $"/api/admin/accounts/{_site.Users["masha"]}", new { commandId = Guid.NewGuid(), name = "masha", role = "admin" });
+    }
+
+    [Fact]
+    public async Task A_deleted_account_gets_no_temporary_password()
+    {
+        var admin = await _site.SignedInAsync("admin");
+        var id = _site.Users["masha"];
+        await PostOkAsync(admin, $"/api/admin/accounts/{id}/delete", new { commandId = Guid.NewGuid() });
+
+        var reset = await admin.PostAsJsonAsync($"/api/admin/accounts/{id}/reset-password", new { commandId = Guid.NewGuid() }, Ct);
+
+        Assert.Equal(HttpStatusCode.Conflict, reset.StatusCode);
+        Assert.Equal("account.deleted", await CodeAsync(reset));
     }
 
     // ---- Helpers ----
