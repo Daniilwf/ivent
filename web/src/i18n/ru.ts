@@ -45,7 +45,23 @@ const effectSources = {
   drop: '(за дроп)',
   difficulty: '(за сложность)',
   item: '(от предмета)',
+  event: '(из колоды)',
 } as const;
+
+// The kinds of events (GLOSSARY «Вид ивента», D-501): as a name and as words after «и» / «тянет»
+type EventKind = 'good' | 'bad' | 'special' | 'risky';
+const eventKindNames: Record<EventKind, string> = {
+  good: 'Хороший ивент',
+  bad: 'Плохой ивент',
+  special: 'Специвент',
+  risky: 'Рискованный ивент',
+};
+const eventKindWords: Record<EventKind, string> = {
+  good: 'хороший ивент',
+  bad: 'плохой ивент',
+  special: 'специвент',
+  risky: 'рискованный ивент',
+};
 
 type DropPenalty = {
   count: number;
@@ -255,9 +271,12 @@ const feedLines = {
   ],
   finished: <T>(p: T, order: number): Line<T> => [p, ` финиширует ${order}-м!`],
   finishRevoked: <T>(p: T): Line<T> => [p, ': финиш отменён'],
-  effectDrawn: <T>(p: T, kind: 'good' | 'bad'): Line<T> => [
+  effectDrawn: <T>(p: T, kind: EventKind): Line<T> => [p, ` тянет ${eventKindWords[kind]}`],
+  // A card drawn from a deck and played at once (D-500)
+  eventDrawn: <T>(p: T, name: string): Line<T> => [p, ` вытягивает «${name}»`],
+  eventDrawMissed: <T>(p: T, kind: EventKind): Line<T> => [
     p,
-    kind === 'bad' ? ' тянет плохой ивент' : ' тянет хороший ивент',
+    `: колода пуста, ${eventKindWords[kind]} — вручную`,
   ],
   effectResolved: <T>(p: T, applied: boolean): Line<T> => [
     p,
@@ -439,11 +458,11 @@ export const ru = {
     difficulty: 'Сложность',
     difficultyHint: 'На какой сложности проходил. Админ сверит её с пруфом',
     // The die of each difficulty and the event it grants, from the run's snapshot
-    difficultyDice: (dice: { label: string; sides: number; grant: 'good' | 'bad' | null }[]) =>
+    difficultyDice: (dice: { label: string; sides: number; grant: EventKind | null }[]) =>
       `Кубы: ${dice
         .map(
           (d) =>
-            `${d.label} — d${String(d.sides)}${d.grant === 'good' ? ' и хороший ивент' : d.grant === 'bad' ? ' и плохой ивент' : ''}`,
+            `${d.label} — d${String(d.sides)}${d.grant ? ` и ${eventKindWords[d.grant]}` : ''}`,
         )
         .join(', ')}.`,
     hours: 'Часы (оценка)',
@@ -840,6 +859,10 @@ export const ru = {
       lead: 'Карта сезона из редактора: развилка в две зоны, телепорты-змея и шорткат, чекпоинт, бонусы. На развилке кольца с номерами — ветки, выбор под ними. Зоны объяснены под картой.',
       phone: 'Телефон: выбор ветки в карточке хода',
     },
+    drawnEvent: {
+      title: 'Вытянутый ивент',
+      lead: 'Карточка ивента, который игрок вытянул последним: вид колоды, откуда он, название и текст. Ивент уже разыгран при вытягивании. Четыре вида, длинное название и ивент без текста.',
+    },
     content: {
       title: 'Редактор контента',
       lead: 'Предмет в форме: ошибка схемы — у своего поля и в списке сверху со ссылкой «Перейти к полю». Ниже — как объекты увидят игроки.',
@@ -946,10 +969,17 @@ export const ru = {
     tooOften: 'Слишком много отчётов за час. Попробуй позже.',
     failed: 'Отчёт не отправился. Попробуй ещё раз.',
   },
+  // Events drawn from decks (stage 5, D-500): the card of the one I drew last
+  events: {
+    lastTitle: 'Вытянутый ивент',
+    kinds: eventKindNames,
+    sources: { cell: 'с клетки ивента', item: 'от предмета' } as Record<'cell' | 'item', string>,
+    played: 'Разыгран сразу, как вытянут. Что он меняет в будущем, сработает само в свой момент.',
+  },
   effects: {
     title: 'Нужно разыграть',
-    drawEvent: (kind: 'good' | 'bad', source: keyof typeof effectSources) =>
-      `${kind === 'bad' ? 'Плохой ивент' : 'Хороший ивент'} ${effectSources[source]}`,
+    drawEvent: (kind: EventKind, source: keyof typeof effectSources) =>
+      `${eventKindNames[kind]} ${effectSources[source]}`,
     comment: 'Комментарий',
     applied: 'Применено',
     notApplicable: 'Не применимо',
@@ -1090,6 +1120,8 @@ export const ru = {
       finish: (order: number) => `Финиш: ${order}-е место`,
       frozen: 'Очки заморожены: первый финиш',
       chainCut: 'Цепочка эффектов оборвана',
+      eventDrawn: (name: string) => `Ивент «${name}»`,
+      eventDrawMissed: 'Колода пуста: ивент вручную',
       afterFinish: 'После финиша',
       moved: 'Фишка переставлена',
       teleport: 'Телепорт',
@@ -1337,8 +1369,7 @@ export const ru = {
       byDifficulty: 'Кубик зависит от сложности',
       difficulty: 'Сложность',
       die: 'Кубик',
-      withEvent: (sides: number, kind: 'good' | 'bad') =>
-        `d${sides} и ${kind === 'good' ? 'хороший' : 'плохой'} ивент`,
+      withEvent: (sides: number, kind: EventKind) => `d${sides} и ${eventKindWords[kind]}`,
       normalOrNone: 'Нормальная или сложностей нет',
       points: 'Сумма кубиков идёт и в очки, и в клетки: фишка двигается на столько же.',
       proofFirst: 'Кубы кидаются сразу, пруф проверяется позже. Сложность засчитывается по пруфу.',

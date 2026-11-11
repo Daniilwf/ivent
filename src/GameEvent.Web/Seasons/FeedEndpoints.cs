@@ -38,14 +38,19 @@ public sealed record FeedRunView(Guid Id, Guid GameId);
 
 /// <summary>
 /// A page of the feed, newest first; <c>nextBefore</c> — the sequence to ask before for the next page, none at the start of
-/// the log. <c>players</c> — every player of the season; <c>games</c> and <c>runs</c> — those the page's events name (D-150).
+/// the log. <c>players</c> — every player of the season; <c>games</c> and <c>runs</c> — those the page's events name (D-150);
+/// <c>objects</c> — the content objects they name (the drawn events).
 /// </summary>
 public sealed record FeedView(
     IReadOnlyList<FeedEntryView> Entries,
     long? NextBefore,
     IReadOnlyList<FeedPlayerView> Players,
     IReadOnlyList<FeedGameView> Games,
-    IReadOnlyList<FeedRunView> Runs);
+    IReadOnlyList<FeedRunView> Runs,
+    IReadOnlyList<FeedObjectView>? Objects = null);
+
+/// <summary>An object of the content the page's events name (stage 5: the drawn events), by its latest card.</summary>
+public sealed record FeedObjectView(string Id, string Name);
 
 /// <summary>
 /// A season a user took part in, with their points and, once the season finished, their place. <c>token</c> — their place in
@@ -156,10 +161,28 @@ public static class FeedEndpoints
         }).OfType<FeedEntryView>()];
         var nextBefore = rows.Count == limit && rows[^1].Sequence > 1 ? rows[^1].Sequence : (long?)null;
         var (players, games, runs) = await ReferencesAsync(db, seasonId, entries, admin, ct);
-        return TypedResults.Ok(new FeedView(entries, nextBefore, players, games, runs));
+        return TypedResults.Ok(new FeedView(entries, nextBefore, players, games, runs, await ObjectsAsync(db, seasonId, entries, ct)));
     }
 
     private const string DiscardedChoice = "choice-discarded";
+
+    private static readonly string s_drawnType = EventCatalog.Describe(typeof(Engine.Decks.EventDrawn)).Name;
+
+    /// <summary>The names of the events the page's draws name, from every pack the season published; none when the page draws nothing.</summary>
+    private static async Task<IReadOnlyList<FeedObjectView>> ObjectsAsync(GameEventDbContext db, Guid seasonId, IReadOnlyList<FeedEntryView> entries, CancellationToken ct)
+    {
+        var ids = entries.Where(e => e.Type == s_drawnType && e.Data.TryGetProperty("objectId", out _))
+            .Select(e => e.Data.GetProperty("objectId").GetString())
+            .OfType<string>()
+            .ToHashSet(StringComparer.Ordinal);
+        if (ids.Count == 0)
+        {
+            return [];
+        }
+
+        var cards = await EventViews.CardsAsync(db, seasonId, ct);
+        return [.. ids.Order(StringComparer.Ordinal).Select(id => new FeedObjectView(id, cards.GetValueOrDefault(id)?.Name ?? id))];
+    }
 
     /// <summary>The ids of every branch choice the season asked for: few, one per fork a move stopped at.</summary>
     private static async Task<HashSet<Guid>> BranchChoiceIdsAsync(GameEventDbContext db, Guid seasonId, CancellationToken ct)

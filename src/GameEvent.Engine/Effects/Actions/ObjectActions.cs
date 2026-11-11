@@ -1,7 +1,6 @@
 using GameEvent.Engine.Content;
 using GameEvent.Engine.Inventory;
 using GameEvent.Engine.Kernel;
-using GameEvent.Engine.Rulesets;
 
 namespace GameEvent.Engine.Effects.Actions;
 
@@ -216,25 +215,13 @@ internal sealed class TransformObjectHandler : ActionHandler<TransformObjectActi
 }
 
 /// <summary>
-/// <c>drawEvent</c>: while <c>features.events</c> is off (stage 5) the event is drawn by hand — a manual effect «draw a
-/// good/bad event» (D-10, D-410).
+/// <c>drawEvent</c>: the target draws an event from the deck and plays it at once (D-500, D-501); while
+/// <c>features.events</c> is off the event is drawn by hand — a manual effect «draw a good/bad event» (D-10, D-410).
 /// </summary>
 internal sealed class DrawEventHandler : ActionHandler<DrawEventAction>
 {
-    public static EventKind? KindOf(string deck) => deck switch
-    {
-        "good" => EventKind.Good,
-        "bad" => EventKind.Bad,
-        _ => null,
-    };
-
-    protected override void Execute(DrawEventAction action, EffectRun run)
-    {
-        if (KindOf(action.Deck) is { } kind)
-        {
-            run.Emit(new ManualEffectCreated(run.Context.Ids.NewId(), run.ActionTarget(action), kind, ManualEffectSource.Item, RunId: null));
-        }
-    }
+    protected override void Execute(DrawEventAction action, EffectRun run) =>
+        run.Emit(Decks.EventDraws.Draw(run.State, run.Context, run.ActionTarget(action), action.Deck, Decks.EventSource.Item));
 }
 
 /// <summary><c>spinWheel</c>: a loot wheel of the content picks an object by weight (only live ones), and it is given.</summary>
@@ -254,8 +241,7 @@ internal sealed class SpinWheelHandler : ActionHandler<SpinWheelAction>
             return;
         }
 
-        var ticket = run.Context.Random.NextInt(0, entries.Sum(e => e.Weight));
-        var entry = entries.First(e => (ticket -= e.Weight) < 0);
+        var entry = Weighted.Pick(entries, run.Context.Random);
         var target = run.ActionTarget(action);
         run.Emit(new WheelSpun(target, wheel.Id, entry.ObjectId));
         run.Emit(Inventories.Give(run.State, run.Context, target, catalog.Live(entry.ObjectId)!, null, ObjectSource.Effect, run.UserId));

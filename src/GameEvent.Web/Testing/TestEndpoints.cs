@@ -42,6 +42,12 @@ public sealed record TestRandomRequest(int? Seed);
 /// </summary>
 public sealed record TestScenarioRequest(string? Player = null, Guid? PlayerId = null);
 
+/// <summary>
+/// A content pack for a season of the tests (stage 5, D-534): <c>objects</c> and <c>wheels</c> — the JSON texts of content
+/// files, as <c>content/</c> holds them; published by the admin's <c>PublishContent</c> with <c>comment</c>.
+/// </summary>
+public sealed record TestContentRequest(IReadOnlyList<string>? Objects, IReadOnlyList<string>? Wheels, string? Comment);
+
 /// <summary>What a scenario did: the commands it sent, in order.</summary>
 public sealed record TestScenarioView(string Scenario, IReadOnlyList<string> Commands);
 
@@ -101,6 +107,41 @@ public static class TestEndpoints
         test.MapPost("/clock", MoveClock).ProducesProblem(StatusCodes.Status409Conflict);
         test.MapPost("/random", SeedRandom).ProducesProblem(StatusCodes.Status409Conflict);
         test.MapPost("/seasons/{seasonId:guid}/scenarios/{name}", RunScenarioAsync).ProducesProblem(StatusCodes.Status409Conflict);
+        test.MapPost("/seasons/{seasonId:guid}/content", PublishContentAsync).ProducesProblem(StatusCodes.Status409Conflict);
+    }
+
+    /// <summary>
+    /// Publishes a pack of content files into a season (D-534): until the admin's content page (4.10), the E2E scenarios of
+    /// events load their decks here. The engine checks the pack as for any publication.
+    /// </summary>
+    private static async Task<Results<NoContent, NotFound, ValidationProblem, ProblemHttpResult>> PublishContentAsync(
+        Guid seasonId, TestContentRequest request, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, CancellationToken ct)
+    {
+        if (!await db.Seasons.AnyAsync(x => x.Id == seasonId, ct))
+        {
+            return TypedResults.NotFound();
+        }
+
+        if ((request.Objects ?? []).Any(o => o is null) || (request.Wheels ?? []).Any(w => w is null))
+        {
+            return Invalid("objects", "Every content file is a JSON text.");
+        }
+
+        Engine.Content.ContentPack pack;
+        try
+        {
+            pack = Engine.Content.ContentFiles.Pack(
+                (request.Objects ?? []).Select((json, i) => ($"object-{i:D4}.json", json)),
+                (request.Wheels ?? []).Select((json, i) => ($"wheel-{i:D4}.json", json)));
+        }
+        catch (System.Text.Json.JsonException e)
+        {
+            return Invalid("objects", e.Message);
+        }
+
+        var outcome = await bus.SendAsync(
+            new CommandEnvelope(Guid.NewGuid(), seasonId, new Engine.Content.PublishContent(pack, request.Comment ?? ""), user.UserId()), ct);
+        return outcome.IsAccepted ? TypedResults.NoContent() : Problem(outcome.Rejection!.Code, outcome.Rejection.Detail);
     }
 
     private static Results<Ok<TestClockView>, ProblemHttpResult, ValidationProblem> MoveClock(TestClockRequest? request, IClock clock)

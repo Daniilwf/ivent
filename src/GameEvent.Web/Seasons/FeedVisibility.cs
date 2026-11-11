@@ -105,6 +105,10 @@ public static class FeedVisibility
         ["shop-price-restarted"] = Access.Public,
         ["bet-placed"] = Access.Public,
         ["bet-settled"] = Access.Public,
+
+        // Events (stage 5): what a deck gave is public, as the effects that follow it
+        ["event-drawn"] = Access.Public,
+        ["event-draw-missed"] = Access.Public,
         ["account-created"] = Access.NotInFeed,
         ["account-password-reset"] = Access.NotInFeed,
         ["account-password-changed"] = Access.NotInFeed,

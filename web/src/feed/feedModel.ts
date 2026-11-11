@@ -64,14 +64,19 @@ export type FeedRefs = {
   games: Map<string, FeedGame>;
   /** A run's game */
   runs: Map<string, string>;
+  /** A content object's name (the drawn events, stage 5) */
+  objects: Map<string, string>;
 };
 
 export function emptyRefs(): FeedRefs {
-  return { players: new Map(), games: new Map(), runs: new Map() };
+  return { players: new Map(), games: new Map(), runs: new Map(), objects: new Map() };
 }
 
 /** The refs with a page's names added (players are the whole season each time: the latest list wins) */
-export function withRefs(refs: FeedRefs, page: Pick<Page, 'players' | 'games' | 'runs'>): FeedRefs {
+export function withRefs(
+  refs: FeedRefs,
+  page: Pick<Page, 'players' | 'games' | 'runs'> & Partial<Pick<Page, 'objects'>>,
+): FeedRefs {
   const players = page.players.length
     ? new Map(
         page.players.map((p) => [
@@ -97,7 +102,9 @@ export function withRefs(refs: FeedRefs, page: Pick<Page, 'players' | 'games' | 
     });
   const runs = new Map(refs.runs);
   for (const r of page.runs) runs.set(r.id, r.gameId);
-  return { players, games, runs };
+  const objects = new Map(refs.objects);
+  for (const o of page.objects ?? []) objects.set(o.id, o.name);
+  return { players, games, runs, objects };
 }
 
 /** Entries of several pages as one list, newest first, each sequence once (a fresh page replaces what it repeats) */
@@ -143,7 +150,13 @@ type Context = {
   player: (d: Data) => FeedPlayer;
   playerRef: (d: Data) => FeedRef;
   gameRef: (d: Data) => FeedRef;
+  /** A content object's name, its id when the page did not name it */
+  objectName: (d: Data) => string;
 };
+
+type EventKind = 'good' | 'bad' | 'special' | 'risky';
+const eventKind = (value: string | null): EventKind =>
+  value === 'bad' || value === 'special' || value === 'risky' ? value : 'good';
 
 const L = ru.feed.lines;
 const F = ru.feed.facts;
@@ -434,11 +447,27 @@ const headlines: [string, (d: Data, c: Context) => Headline][] = [
     }),
   ],
   [
+    'event-drawn',
+    (d, c) => ({
+      icon: 'effect',
+      actor: c.player(d),
+      line: L.eventDrawn(c.playerRef(d), c.objectName(d)),
+    }),
+  ],
+  [
+    'event-draw-missed',
+    (d, c) => ({
+      icon: 'effect',
+      actor: c.player(d),
+      line: L.eventDrawMissed(c.playerRef(d), eventKind(text(d, 'kind'))),
+    }),
+  ],
+  [
     'manual-effect-created',
     (d, c) => ({
       icon: 'effect',
       actor: c.player(d),
-      line: L.effectDrawn(c.playerRef(d), text(d, 'drawEvent') === 'bad' ? 'bad' : 'good'),
+      line: L.effectDrawn(c.playerRef(d), eventKind(text(d, 'drawEvent'))),
     }),
   ],
   [
@@ -464,12 +493,16 @@ const headlines: [string, (d: Data, c: Context) => Headline][] = [
 ];
 
 const effectSource = (value: string | null) =>
-  value === 'paidReroll' || value === 'drop' || value === 'difficulty' || value === 'item'
+  value === 'paidReroll' ||
+  value === 'drop' ||
+  value === 'difficulty' ||
+  value === 'item' ||
+  value === 'event'
     ? value
     : 'drop';
 
 /** The facts the rest of a command's events add to its line: dice, points and cells, coins, the finish, events drawn */
-function factsOf(events: Event[], lead: Event): string[] {
+function factsOf(events: Event[], lead: Event, context: Context): string[] {
   const facts: string[] = [];
   let points = 0;
   let cells = 0;
@@ -512,12 +545,17 @@ function factsOf(events: Event[], lead: Event): string[] {
         facts.push(F.frozen);
         break;
       case 'manual-effect-created':
-        facts.push(
-          ru.effects.drawEvent(
-            text(d, 'drawEvent') === 'bad' ? 'bad' : 'good',
-            effectSource(text(d, 'source')),
-          ),
-        );
+        // A drawn event's own manual effect is told by the draw
+        if (text(d, 'source') !== 'event')
+          facts.push(
+            ru.effects.drawEvent(eventKind(text(d, 'drawEvent')), effectSource(text(d, 'source'))),
+          );
+        break;
+      case 'event-drawn':
+        facts.push(F.eventDrawn(context.objectName(d)));
+        break;
+      case 'event-draw-missed':
+        facts.push(F.eventDrawMissed);
         break;
       case 'game-rerolled':
         facts.push(F.reroll[text(d, 'payment') ?? ''] ?? F.reroll['freeThisRoll'] ?? '');
@@ -570,6 +608,10 @@ function itemOf(entries: Entry[], refs: FeedRefs): FeedItem | null {
         game: refs.games.get(id) ?? { id, title: ru.feed.someGame, hasPage: false },
       };
     },
+    objectName: (d) => {
+      const id = text(d, 'objectId') ?? '';
+      return refs.objects.get(id) ?? id;
+    },
   };
 
   let lead: Event | undefined;
@@ -593,7 +635,7 @@ function itemOf(entries: Entry[], refs: FeedRefs): FeedItem | null {
     icon: headline.icon,
     actor: headline.actor,
     line: headline.line,
-    facts: [...(headline.facts ?? []), ...factsOf(events, lead)],
+    facts: [...(headline.facts ?? []), ...factsOf(events, lead, context)],
     quote: headline.quote ?? null,
     cover:
       headline.showcase?.kind === 'game' && headline.showcase.game.cover

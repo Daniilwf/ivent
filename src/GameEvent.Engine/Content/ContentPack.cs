@@ -12,8 +12,9 @@ public sealed record WheelEntrySpec
 }
 
 /// <summary>
-/// A wheel of objects (a loot box): <c>spinWheel</c> picks one entry by weight and gives its object (D-401). Wheels of
-/// categories and decks of events stay with their own mechanics.
+/// A wheel of objects (SPEC «Колёса и колоды — одна сущность»): a loot box — <c>spinWheel</c> picks one entry by weight
+/// and gives its object (D-401) — or, with <see cref="Deck"/>, a deck of events — <c>drawEvent</c> picks one by weight and
+/// plays it at once (D-500, D-501). Wheels of categories stay with the roll.
 /// </summary>
 public sealed record WheelDefinition
 {
@@ -22,6 +23,13 @@ public sealed record WheelDefinition
     public required string Name { get; init; }
 
     public required EquatableArray<WheelEntrySpec> Entries { get; init; }
+
+    /// <summary>
+    /// The kind of the events of a deck (D-501): its entries are events, and a drawn one is of this kind. Missing — a loot
+    /// wheel, as before stage 5; not written then, so the packs of stage 4 log as they did.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public Rulesets.EventKind? Deck { get; init; }
 }
 
 /// <summary>

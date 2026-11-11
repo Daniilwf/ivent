@@ -1,0 +1,6 @@
+{
+  "id": "risky",
+  "name": "Рискованные ивенты",
+  "deck": "risky",
+  "entries": [{ "objectId": "gamble", "weight": 1 }]
+}

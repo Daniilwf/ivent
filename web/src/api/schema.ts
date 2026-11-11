@@ -6379,6 +6379,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/test/seasons/{seasonId}/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["TestContentRequest"];
+                };
+            };
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -6937,6 +7001,21 @@ export interface components {
             sides: number;
             grantEvent: null | components["schemas"]["EventKind"];
         };
+        /**
+         * @description The event I drew last (D-500, stage 5): `sequence` — its place in the log, so the page shows a new one as new;
+         *     `deck` and `kind` — where it came from; `name` and `description` — its card from the content in
+         *     force when it was drawn; `source` — a cell or an item.
+         */
+        DrawnEventView: {
+            /** Format: int64 */
+            sequence: number;
+            deck: string;
+            kind: components["schemas"]["EventKind"];
+            objectId: string;
+            name: string;
+            description: string;
+            source: components["schemas"]["EventSource"];
+        };
         /** @description The drop penalty: `count` dice of `sides`, what they take, and whether a bad event follows. */
         DropPenaltyView: {
             /** Format: int32 */
@@ -7045,8 +7124,26 @@ export interface components {
             stackTrace: string;
             traceId: string;
         };
-        /** @enum {unknown} */
-        EventKind: "good" | "bad";
+        /**
+         * @description The kind of an event (SPEC «Ивенты»): good, bad, special, risky. A drawn event has the kind of its deck (D-501); the
+         *     standard decks are the wheels named like the kinds. Special and risky came with stage 5: a build before it cannot read
+         *     them, and they are written only once events are on.
+         * @enum {unknown}
+         */
+        EventKind: "good" | "bad" | "special" | "risky";
+        /** @description The rules of event decks (SPEC «Ивенты», D-500…D-502). */
+        EventRules: {
+            /**
+             * @description The deck an event cell draws from when the zone of the player's cell has no deck of the content (D-502): the
+             *     standard deck of this kind.
+             */
+            defaultDeck: components["schemas"]["EventKind"];
+        };
+        /**
+         * @description Where a drawn event came from (GLOSSARY «Источник ивента»); stage 5 adds the drop, the paid reroll and the difficulty.
+         * @enum {unknown}
+         */
+        EventSource: "cell" | "item";
         /** @enum {unknown} */
         ExclusionReason: "alreadyPlayed" | "dropped" | "techRerolled" | null;
         /** @description Feature flags: a disabled mechanic is invisible in the interface and refused by the engine. */
@@ -7097,6 +7194,11 @@ export interface components {
             hasPage: boolean;
             cover?: null | components["schemas"]["FileLinkView"];
         };
+        /** @description An object of the content the page's events name (stage 5: the drawn events), by its latest card. */
+        FeedObjectView: {
+            id: string;
+            name: string;
+        };
         /**
          * @description A player of the season, for the feed's lines (H5, D-150): the name, the account for the profile link (`hasProfile` —
          *     false once the account is deleted), the avatar and `token` — the colour of their token in the season (PlayerTokens).
@@ -7121,7 +7223,8 @@ export interface components {
         };
         /**
          * @description A page of the feed, newest first; `nextBefore` — the sequence to ask before for the next page, none at the start of
-         *     the log. `players` — every player of the season; `games` and `runs` — those the page's events name (D-150).
+         *     the log. `players` — every player of the season; `games` and `runs` — those the page's events name (D-150);
+         *     `objects` — the content objects they name (the drawn events).
          */
         FeedView: {
             entries: components["schemas"]["FeedEntryView"][];
@@ -7130,6 +7233,7 @@ export interface components {
             players: components["schemas"]["FeedPlayerView"][];
             games: components["schemas"]["FeedGameView"][];
             runs: components["schemas"]["FeedRunView"][];
+            objects?: null | components["schemas"]["FeedObjectView"][];
         };
         /** @description A picture by link (D-117): https from Tenor, Giphy or Klipy; the server downloads it and stores it as an upload. */
         FileFromUrlRequest: {
@@ -7330,7 +7434,7 @@ export interface components {
          * @description What created a manual effect; C11 adds item, cell and event sources.
          * @enum {unknown}
          */
-        ManualEffectSource: "paidReroll" | "drop" | "difficulty" | "item";
+        ManualEffectSource: "paidReroll" | "drop" | "difficulty" | "item" | "event";
         /** @description A manual effect the player still has to play out (D-10, D-93); the player resolves it (D-102). */
         ManualEffectView: {
             /** Format: uuid */
@@ -7443,6 +7547,7 @@ export interface components {
          *     `dropPenalty.count` counts the extra dice of the drops in a row before this run (D-205, D-324).
          *     `wishRerollOpen` — whether the player may give the game up by wish now (D-206, D-325; always set, optional for older clients): a tech reroll with the
          *     reason `wish`, within the window, for a game with a listed tag the roll did not impose.
+         *     `lastEvent` — the event I drew last (stage 5), while `features.events` is on; null before the first draw.
          */
         MyTurnView: {
             /** Format: uuid */
@@ -7467,6 +7572,7 @@ export interface components {
             difficultyDice?: null | components["schemas"]["DifficultyDieView"][];
             lastMove?: null | components["schemas"]["MoveView"];
             wishRerollOpen?: null | boolean;
+            lastEvent?: null | components["schemas"]["DrawnEventView"];
         };
         NominationRules: {
             auto: components["schemas"]["EquatableArrayOfAutoNomination"];
@@ -7865,6 +7971,7 @@ export interface components {
             social: components["schemas"]["SocialRules"];
             nominations: components["schemas"]["NominationRules"];
             weeklyChallenge: components["schemas"]["WeeklyChallengeRules"];
+            events?: null | components["schemas"]["EventRules"];
         };
         /**
          * @description One changed value between two versions of the rules: the JSON path (for example `reward.diceCount.max`)
@@ -8151,6 +8258,15 @@ export interface components {
             /** Format: double */
             shiftMinutes: number;
         };
+        /**
+         * @description A content pack for a season of the tests (stage 5, D-534): `objects` and `wheels` — the JSON texts of content
+         *     files, as `content/` holds them; published by the admin's `PublishContent` with `comment`.
+         */
+        TestContentRequest: {
+            objects: null | string[];
+            wheels: null | string[];
+            comment: null | string;
+        };
         /** @description Seed the randomness (the same rolls and dice every time), or null for unpredictable randomness again. */
         TestRandomRequest: {
             /** Format: int32 */
@@ -8285,10 +8401,11 @@ export const coopRoundUpForValues: ReadonlyArray<FlattenedDeepRequired<component
 export const diceStageValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["DiceStage"]> = ["count", "sides", "add", "multiply", "reroll", "min", "max", "singleDie", "setOne", "replaceValue", "fixAverage", "bonusPerEven", "percent"];
 export const difficultyValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["Difficulty"]> = ["easy", "normal", "hard", "extreme"];
 export const emptyPoolFallbackValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["EmptyPoolFallback"]> = ["dropZoneFilter"];
-export const eventKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["EventKind"]> = ["good", "bad"];
+export const eventKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["EventKind"]> = ["good", "bad", "special", "risky"];
+export const eventSourceValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["EventSource"]> = ["cell", "item"];
 export const gameMarkKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["GameMarkKind"]> = ["dropped", "techRerolled"];
 export const mandatoryEventValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["MandatoryEvent"]> = ["bad", "none"];
-export const manualEffectSourceValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ManualEffectSource"]> = ["paidReroll", "drop", "difficulty", "item"];
+export const manualEffectSourceValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ManualEffectSource"]> = ["paidReroll", "drop", "difficulty", "item", "event"];
 export const mapModeValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["MapMode"]> = ["linear", "graph"];
 export const moveReasonValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["MoveReason"]> = ["completionRoll", "startingCell", "adminAdjustment", "dropPenalty", "runCorrection", "proofRejected", "teleport", "item", "itemTeleport", "diceModified"];
 export const objectKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ObjectKind"]> = ["item", "effect", "specialRoll", "event", "achievement"];
