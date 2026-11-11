@@ -206,6 +206,7 @@ const feedLines = {
   adjusted: <T>(p: T): Line<T> => [p, ': правка админа'],
   offerDiscarded: <T>(p: T, g: T): Line<T> => [p, ': админ снимает ', g],
   choiceDiscarded: <T>(p: T): Line<T> => [p, ': админ снимает выбор игры'],
+  branchDiscarded: <T>(p: T): Line<T> => [p, ': админ снимает выбор ветки на развилке'],
   rolled: <T>(p: T, g: T): Line<T> => [p, ' выкручивает ', g],
   choiceRolled: <T>(p: T, count: number): Line<T> => [
     p,
