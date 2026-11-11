@@ -148,6 +148,26 @@ describe('The players', () => {
     expect(await screen.findByText(t.adjusted('Вася'))).toBeInTheDocument();
   });
 
+  it.each([
+    ['adjust-open', 'adjust-form', 'adjust-cell', {}],
+    ['tech-reroll-open', 'tech-reroll-form', 'tech-reroll-reason', { phase: 'playing' as const }],
+  ])(
+    'brings the opened form into view and into focus on a phone: %s (K1A)',
+    async (button, formId, firstField, over) => {
+      const scrolled = vi.fn();
+      Element.prototype.scrollIntoView = scrolled;
+      open([player(over)]);
+
+      await userEvent.click(await screen.findByTestId(button));
+
+      const form = screen.getByTestId(formId);
+      await waitFor(() => {
+        expect(within(form).getByTestId(firstField)).toHaveFocus();
+      });
+      expect(scrolled.mock.contexts).toContain(form);
+    },
+  );
+
   it('checks the correction at its fields before sending', async () => {
     const server = open([player({})]);
 

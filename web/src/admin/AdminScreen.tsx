@@ -27,6 +27,7 @@ import { BottomSheet } from '../ui/Dialogs';
 import { AsyncState } from '../ui/AsyncState';
 import { EmptyState } from '../ui/States';
 import { cx } from '../ui/cx';
+import { inlineLink } from '../ui/buttonStyles';
 import { useDesk } from '../ui/useDesk';
 import { AccountsSection } from './AccountsSection';
 import { BugsSection } from './BugsSection';
@@ -44,6 +45,7 @@ import { SectionHead } from './common';
 import { answerOf, useLoaded } from '../app/useLoaded';
 import { useSeasonVersion } from '../app/useSeasonVersion';
 import { reportWaitingProofs } from './waitingProofs';
+import { keepSeason, keptSeason } from './pickedSeason';
 
 // The map editor (@xyflow/react) loads apart from the site: the players never download it
 const MapSection = lazy(async () => ({ default: (await import('./MapSection')).MapSection }));
@@ -93,7 +95,14 @@ export function AdminScreen({
 }) {
   const section = adminSection(sectionName);
   const desk = useDesk();
-  const [seasonId, setSeasonId] = useState(currentSeasonId);
+  // The season opened in «Сезон» stays across a reload and in a new tab (K1A); one the site no longer lists gives way
+  // to the current one
+  const [kept, setKept] = useState(keptSeason);
+  const seasons = useLoaded(useCallback(async () => answerOf(await api.GET('/api/seasons')), []));
+  const listed = seasons.kind === 'ready' ? seasons.value : null;
+  const seasonId =
+    kept && (listed === null || listed.some((s) => s.id === kept)) ? kept : currentSeasonId;
+  const season = listed?.find((s) => s.id === seasonId) ?? null;
   const version = useSeasonVersion(seasonId, { throttleMs: refreshEveryMs });
   const [sheet, setSheet] = useState(false);
   // A section picked in the sheet takes the focus to its heading, not back to the «Разделы» button
@@ -215,6 +224,21 @@ export function AdminScreen({
             )
           }
         />
+        {needsSeason && season ? (
+          // Which season the queue, the players and the log belong to (K1A)
+          <p
+            className="flex flex-wrap items-center gap-x-3 gap-y-1"
+            data-testid="admin-season-name"
+          >
+            <span>{t.seasonOf(season.name, ru.seasonStatus[season.status] ?? season.status)}</span>
+            <Link
+              to={href('season')}
+              className={cx(inlineLink, 'inline-flex min-h-11 items-center')}
+            >
+              {t.changeSeason}
+            </Link>
+          </p>
+        ) : null}
         {needsSeason && !seasonId ? (
           <EmptyState
             level={2}
@@ -262,8 +286,9 @@ export function AdminScreen({
           <SeasonSection
             seasonId={seasonId}
             version={version}
-            onPick={(picked) => {
-              setSeasonId(picked);
+            onPick={(id) => {
+              setKept(id);
+              keepSeason(id);
             }}
           />
         );

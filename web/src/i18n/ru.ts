@@ -1490,6 +1490,8 @@ export const ru = {
     noSeasonTitle: 'Сезона пока нет',
     noSeasonText: 'Создай сезон в разделе «Сезон», и здесь появятся игроки и пруфы.',
     toSeason: 'Открыть «Сезон»',
+    seasonOf: (name: string, status: string) => `Сезон: ${name} (${status.toLowerCase()})`,
+    changeSeason: 'Сменить сезон',
     loadErrorTitle: 'Не загрузилось',
     failed: 'Не получилось. Попробуй ещё раз.',
     invalid: 'Сервер не принял значения: проверь поля.',
