@@ -2,384 +2,562 @@
   "cells": [
     {
       "id": "start",
-      "type": "start"
+      "type": "start",
+      "x": 55,
+      "y": 0
     },
     {
       "id": "a1",
-      "type": "empty"
+      "type": "empty",
+      "x": 238,
+      "y": 0
     },
     {
       "id": "a2",
-      "type": "empty"
+      "type": "empty",
+      "x": 422,
+      "y": 0
     },
     {
       "id": "a3",
-      "type": "empty"
+      "type": "empty",
+      "x": 605,
+      "y": 0
     },
     {
       "id": "a4",
-      "type": "empty"
+      "type": "empty",
+      "x": 788,
+      "y": 0
     },
     {
       "id": "a5",
-      "type": "empty"
+      "type": "empty",
+      "x": 972,
+      "y": 0
     },
     {
       "id": "a6",
-      "type": "empty"
+      "type": "empty",
+      "x": 1155,
+      "y": 0
     },
     {
       "id": "a7",
-      "type": "empty"
+      "type": "empty",
+      "x": 1338,
+      "y": 0
     },
     {
       "id": "a8",
-      "type": "empty"
+      "type": "empty",
+      "x": 1522,
+      "y": 0
     },
     {
       "id": "a9",
-      "type": "empty"
+      "type": "empty",
+      "x": 1705,
+      "y": 0
     },
     {
       "id": "f1",
-      "type": "fork"
+      "type": "fork",
+      "x": 1870,
+      "y": 331
     },
     {
       "id": "p1",
-      "type": "empty"
+      "type": "empty",
+      "x": 1760,
+      "y": 220
     },
     {
       "id": "p2",
-      "type": "empty"
+      "type": "empty",
+      "x": 1654,
+      "y": 220
     },
     {
       "id": "p3",
-      "type": "empty"
+      "type": "empty",
+      "x": 1547,
+      "y": 220
     },
     {
       "id": "p4",
-      "type": "empty"
+      "type": "empty",
+      "x": 1441,
+      "y": 220
     },
     {
       "id": "p5",
-      "type": "empty"
+      "type": "empty",
+      "x": 1335,
+      "y": 220
     },
     {
       "id": "p6",
-      "type": "empty"
+      "type": "empty",
+      "x": 1228,
+      "y": 220
     },
     {
       "id": "p7",
-      "type": "empty"
+      "type": "empty",
+      "x": 1122,
+      "y": 220
     },
     {
       "id": "p8",
       "type": "pointsBonus",
-      "amount": 3
+      "amount": 3,
+      "x": 1016,
+      "y": 220
     },
     {
       "id": "p9",
-      "type": "empty"
+      "type": "empty",
+      "x": 909,
+      "y": 220
     },
     {
       "id": "p10",
-      "type": "empty"
+      "type": "empty",
+      "x": 803,
+      "y": 220
     },
     {
       "id": "p11",
-      "type": "empty"
+      "type": "empty",
+      "x": 697,
+      "y": 220
     },
     {
       "id": "p12",
-      "type": "empty"
+      "type": "empty",
+      "x": 590,
+      "y": 220
     },
     {
       "id": "p13",
-      "type": "empty"
+      "type": "empty",
+      "x": 484,
+      "y": 220
     },
     {
       "id": "p14",
-      "type": "empty"
+      "type": "empty",
+      "x": 378,
+      "y": 220
     },
     {
       "id": "p15",
-      "type": "empty"
+      "type": "empty",
+      "x": 271,
+      "y": 220
     },
     {
       "id": "p16",
-      "type": "empty"
+      "type": "empty",
+      "x": 165,
+      "y": 220
     },
     {
       "id": "s1",
       "type": "empty",
-      "zone": "horror-swamp"
+      "zone": "horror-swamp",
+      "x": 1760,
+      "y": 440
     },
     {
       "id": "s2",
       "type": "empty",
-      "zone": "horror-swamp"
+      "zone": "horror-swamp",
+      "x": 1600,
+      "y": 440
     },
     {
       "id": "s3",
       "type": "empty",
-      "zone": "horror-swamp"
+      "zone": "horror-swamp",
+      "x": 1441,
+      "y": 440
     },
     {
       "id": "s4",
       "type": "empty",
-      "zone": "horror-swamp"
+      "zone": "horror-swamp",
+      "x": 1282,
+      "y": 440
     },
     {
       "id": "s5",
       "type": "empty",
-      "zone": "horror-swamp"
+      "zone": "horror-swamp",
+      "x": 1122,
+      "y": 440
     },
     {
       "id": "s6",
       "type": "empty",
-      "zone": "horror-swamp"
+      "zone": "horror-swamp",
+      "x": 962,
+      "y": 440
     },
     {
       "id": "s7",
       "type": "empty",
-      "zone": "horror-swamp"
+      "zone": "horror-swamp",
+      "x": 803,
+      "y": 440
     },
     {
       "id": "s8",
       "type": "empty",
-      "zone": "horror-swamp"
+      "zone": "horror-swamp",
+      "x": 644,
+      "y": 440
     },
     {
       "id": "s9",
       "type": "teleport",
       "to": "s2",
-      "zone": "horror-swamp"
+      "zone": "horror-swamp",
+      "x": 484,
+      "y": 440
     },
     {
       "id": "s10",
       "type": "empty",
-      "zone": "horror-swamp"
+      "zone": "horror-swamp",
+      "x": 324,
+      "y": 440
     },
     {
       "id": "s11",
       "type": "empty",
-      "zone": "horror-swamp"
+      "zone": "horror-swamp",
+      "x": 165,
+      "y": 440
     },
     {
       "id": "j1",
-      "type": "checkpoint"
+      "type": "checkpoint",
+      "x": 0,
+      "y": 331
     },
     {
       "id": "b1",
-      "type": "empty"
+      "type": "empty",
+      "x": 110,
+      "y": 660
     },
     {
       "id": "b2",
-      "type": "empty"
+      "type": "empty",
+      "x": 309,
+      "y": 660
     },
     {
       "id": "b3",
-      "type": "empty"
+      "type": "empty",
+      "x": 509,
+      "y": 660
     },
     {
       "id": "b4",
-      "type": "empty"
+      "type": "empty",
+      "x": 708,
+      "y": 660
     },
     {
       "id": "b5",
-      "type": "empty"
+      "type": "empty",
+      "x": 908,
+      "y": 660
     },
     {
       "id": "b6",
-      "type": "empty"
+      "type": "empty",
+      "x": 1107,
+      "y": 660
     },
     {
       "id": "b7",
-      "type": "empty"
+      "type": "empty",
+      "x": 1306,
+      "y": 660
     },
     {
       "id": "b8",
-      "type": "empty"
+      "type": "empty",
+      "x": 1506,
+      "y": 660
     },
     {
       "id": "b9",
-      "type": "empty"
+      "type": "empty",
+      "x": 1705,
+      "y": 660
     },
     {
       "id": "f2",
-      "type": "fork"
+      "type": "fork",
+      "x": 1870,
+      "y": 991
     },
     {
       "id": "l1",
-      "type": "empty"
+      "type": "empty",
+      "x": 1760,
+      "y": 880
     },
     {
       "id": "l2",
-      "type": "empty"
+      "type": "empty",
+      "x": 1660,
+      "y": 880
     },
     {
       "id": "l3",
-      "type": "empty"
+      "type": "empty",
+      "x": 1561,
+      "y": 880
     },
     {
       "id": "l4",
-      "type": "empty"
+      "type": "empty",
+      "x": 1461,
+      "y": 880
     },
     {
       "id": "l5",
-      "type": "empty"
+      "type": "empty",
+      "x": 1361,
+      "y": 880
     },
     {
       "id": "l6",
-      "type": "empty"
+      "type": "empty",
+      "x": 1262,
+      "y": 880
     },
     {
       "id": "l7",
-      "type": "empty"
+      "type": "empty",
+      "x": 1162,
+      "y": 880
     },
     {
       "id": "l8",
-      "type": "empty"
+      "type": "empty",
+      "x": 1062,
+      "y": 880
     },
     {
       "id": "l9",
       "type": "pointsBonus",
-      "amount": 3
+      "amount": 3,
+      "x": 962,
+      "y": 880
     },
     {
       "id": "l10",
-      "type": "empty"
+      "type": "empty",
+      "x": 863,
+      "y": 880
     },
     {
       "id": "l11",
-      "type": "empty"
+      "type": "empty",
+      "x": 763,
+      "y": 880
     },
     {
       "id": "l12",
-      "type": "empty"
+      "type": "empty",
+      "x": 663,
+      "y": 880
     },
     {
       "id": "l13",
-      "type": "empty"
+      "type": "empty",
+      "x": 564,
+      "y": 880
     },
     {
       "id": "l14",
-      "type": "empty"
+      "type": "empty",
+      "x": 464,
+      "y": 880
     },
     {
       "id": "l15",
-      "type": "empty"
+      "type": "empty",
+      "x": 364,
+      "y": 880
     },
     {
       "id": "l16",
-      "type": "empty"
+      "type": "empty",
+      "x": 265,
+      "y": 880
     },
     {
       "id": "l17",
-      "type": "empty"
+      "type": "empty",
+      "x": 165,
+      "y": 880
     },
     {
       "id": "q1",
       "type": "empty",
-      "zone": "quick"
+      "zone": "quick",
+      "x": 1760,
+      "y": 1100
     },
     {
       "id": "q2",
       "type": "empty",
-      "zone": "quick"
+      "zone": "quick",
+      "x": 1583,
+      "y": 1100
     },
     {
       "id": "q3",
       "type": "empty",
-      "zone": "quick"
+      "zone": "quick",
+      "x": 1406,
+      "y": 1100
     },
     {
       "id": "q4",
       "type": "teleport",
       "to": "j2",
-      "zone": "quick"
+      "zone": "quick",
+      "x": 1228,
+      "y": 1100
     },
     {
       "id": "q5",
       "type": "empty",
-      "zone": "quick"
+      "zone": "quick",
+      "x": 1051,
+      "y": 1100
     },
     {
       "id": "q6",
       "type": "empty",
-      "zone": "quick"
+      "zone": "quick",
+      "x": 874,
+      "y": 1100
     },
     {
       "id": "q7",
       "type": "empty",
-      "zone": "quick"
+      "zone": "quick",
+      "x": 697,
+      "y": 1100
     },
     {
       "id": "q8",
       "type": "empty",
-      "zone": "quick"
+      "zone": "quick",
+      "x": 519,
+      "y": 1100
     },
     {
       "id": "q9",
       "type": "empty",
-      "zone": "quick"
+      "zone": "quick",
+      "x": 342,
+      "y": 1100
     },
     {
       "id": "q10",
       "type": "empty",
-      "zone": "quick"
+      "zone": "quick",
+      "x": 165,
+      "y": 1100
     },
     {
       "id": "j2",
-      "type": "checkpoint"
+      "type": "checkpoint",
+      "x": 0,
+      "y": 991
     },
     {
       "id": "e1",
-      "type": "empty"
+      "type": "empty",
+      "x": 110,
+      "y": 1320
     },
     {
       "id": "e2",
-      "type": "empty"
+      "type": "empty",
+      "x": 255,
+      "y": 1320
     },
     {
       "id": "e3",
-      "type": "empty"
+      "type": "empty",
+      "x": 400,
+      "y": 1320
     },
     {
       "id": "e4",
-      "type": "empty"
+      "type": "empty",
+      "x": 545,
+      "y": 1320
     },
     {
       "id": "e5",
-      "type": "empty"
+      "type": "empty",
+      "x": 690,
+      "y": 1320
     },
     {
       "id": "e6",
-      "type": "empty"
+      "type": "empty",
+      "x": 835,
+      "y": 1320
     },
     {
       "id": "e7",
-      "type": "empty"
+      "type": "empty",
+      "x": 980,
+      "y": 1320
     },
     {
       "id": "e8",
-      "type": "empty"
+      "type": "empty",
+      "x": 1125,
+      "y": 1320
     },
     {
       "id": "e9",
-      "type": "empty"
+      "type": "empty",
+      "x": 1270,
+      "y": 1320
     },
     {
       "id": "e10",
-      "type": "empty"
+      "type": "empty",
+      "x": 1415,
+      "y": 1320
     },
     {
       "id": "e11",
-      "type": "empty"
+      "type": "empty",
+      "x": 1560,
+      "y": 1320
     },
     {
       "id": "finish",
-      "type": "finish"
+      "type": "finish",
+      "x": 1705,
+      "y": 1320
     }
   ],
   "edges": [
