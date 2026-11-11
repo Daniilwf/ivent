@@ -119,4 +119,7 @@ public static class RejectionCodes
     public const string BetTooMany = "bet.tooMany";
     public const string BetOnFirst = "bet.onFirst";
     public const string BetAlreadyPlaced = "bet.alreadyPlaced";
+
+    /// <summary>A content pack over the size limits of <c>ContentPublishing</c> (SEC-7, D-653).</summary>
+    public const string ContentTooLarge = "content.tooLarge";
 }

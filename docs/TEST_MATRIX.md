@@ -565,3 +565,14 @@ API, экраны инвентаря и магазина, редактор эф�
 
 | DP1 | Обрезанный GIF отклоняется `file.broken` и не сохраняется, в том числе обрезанный сразу после байта 0x3B внутри данных; GIF с байтами после завершающего тоже отклоняется (DP-1, D-252) | `src/GameEvent.Web.Tests/Files/FileUploadTests.cs` («A_cut_off_gif_is_refused_and_nothing_is_kept», «A_gif_cut_off_right_after_a_byte_that_looks_like_the_trailer_is_refused», «A_gif_with_bytes_after_its_trailer_is_refused») | ✅ |
 | DP2 | Наклейка игрока в истории игры и в профиле окрашена токеном фишки сезона (D-251) | `web/src/feed/GameScreen.test.tsx`, `web/src/feed/ProfileScreen.test.tsx` | ✅ |
+
+## Границы чисел экономики и контента (SEC-5…SEC-7, D-651…D-653)
+
+| ID | Правило | Тесты | Статус |
+| --- | --- | --- | --- |
+| NB1 | Числа магазина, ставок, отражения и веса редкостей вне границ — ошибка у поля; на краях — без ошибки; конфиг по умолчанию проходит (D-651) | `src/GameEvent.Engine.Tests/Rulesets/RulesetValidatorTests.cs`, `src/GameEvent.Web.Tests/Api/RulesApiTests.cs` («A_number_out_of_its_safe_range_is_refused_at_its_path») | ✅ |
+| NB2 | Цена ролла магазина не уходит ниже 0 и не переворачивается; выплата ставки зажата, не бросает исключение (D-651) | `src/GameEvent.Engine.Tests/Economy/NumberBoundsTests.cs` | ✅ |
+| NB3 | `modifyDice`, `changeResource.amount`, цена предмета и множитель цен зоны за потолком — ошибка у поля (D-652) | `src/GameEvent.Engine.Tests/Content/ContentValidatorTests.cs` | ✅ |
+| NB4 | Отражённый удар на потолке уходит целиком и не меняет знак; журнал очков, монеток и ресурсов насыщается на краях (D-652) | `src/GameEvent.Engine.Tests/Economy/NumberBoundsTests.cs` | ✅ |
+| NB5 | Не-админ видит в ленте публикации контента версию, комментарий и число объектов, админ — пакет (D-653) | `src/GameEvent.Web.Tests/Api/FeedVisibilityTests.cs` («Others_see_a_content_publications_version_comment_and_size_not_the_pack») | ✅ |
+| NB6 | Пакет больше 1000 объектов, 100 колёс или 200 записей в колесе — отказ `content.tooLarge`; на пределе — публикуется (D-653) | `src/GameEvent.Engine.Tests/Economy/ContentPackTests.cs` | ✅ |

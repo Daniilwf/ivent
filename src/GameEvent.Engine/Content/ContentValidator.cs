@@ -15,6 +15,14 @@ public static partial class ContentValidator
     public const int MaxNameLength = 100;
     public const int MaxDescriptionLength = 1000;
 
+    // Safety ceilings, not balance (SEC-6, D-652): an item cannot cost, give or take more than a season can hold,
+    // nor multiply dice or prices past what keeps the arithmetic in range.
+    public const int MaxPrice = 1_000_000;
+    public const int MaxResourceAmount = 1_000_000;
+    public const int MaxDiceMultiplier = 10;
+    public const int MaxDiceAddition = 1_000;
+    public const decimal MaxShopPriceMultiplier = 10;
+
     /// <summary>The errors of <paramref name="definition"/>; empty when it is valid.</summary>
     public static IReadOnlyList<ContentError> Check(ObjectDefinition definition)
     {
@@ -30,6 +38,11 @@ public static partial class ContentValidator
         if (definition.Price is < 0)
         {
             Error("$.price", "A price is 0 or more; null means not for sale.");
+        }
+
+        if (definition.Price is > MaxPrice)
+        {
+            Error("$.price", $"A price is at most {MaxPrice}.");
         }
 
         if (kind != ObjectKind.Item && definition.Price is not null)
@@ -205,6 +218,11 @@ public static partial class ContentValidator
             Error("$.shopPriceMultiplier", "A multiplier is above 0.");
         }
 
+        if (zone.ShopPriceMultiplier is > MaxShopPriceMultiplier)
+        {
+            Error("$.shopPriceMultiplier", $"A multiplier is at most {MaxShopPriceMultiplier}.");
+        }
+
         return errors;
     }
 
@@ -331,6 +349,11 @@ public static partial class ContentValidator
                 {
                     error($"{at}.target", "«give» hands the user's object to the effect's target, not to himself.");
                 }
+            }
+
+            if (actions[i] is ChangeResourceAction { Amount: { Kind: ContentValueKind.Number, Number: < -MaxResourceAmount or > MaxResourceAmount } })
+            {
+                error($"{at}.amount", $"An amount is within ±{MaxResourceAmount}.");
             }
 
             switch (actions[i])
@@ -481,6 +504,11 @@ public static partial class ContentValidator
     // reference to the player's answer (D-481).
     private static void CheckDiceValue(DiceStage stage, ContentValue value, string path, Action<string, string> error)
     {
+        if (stage is DiceStage.Add && value is { Kind: ContentValueKind.Number } && Math.Abs((long)value.Number) > MaxDiceAddition)
+        {
+            error(path, $"«add» takes a number within ±{MaxDiceAddition}.");
+        }
+
         if (stage is DiceStage.Add || (stage is DiceStage.SetOne && value.Kind == ContentValueKind.Reference && !value.Negative))
         {
             return;
@@ -507,7 +535,21 @@ public static partial class ContentValidator
         {
             error(path, $"The «{stage}» stage takes a number of 1 or more.");
         }
+        else if (Ceiling(stage) is { } ceiling && Math.Abs((long)value.Number) > ceiling)
+        {
+            error(path, $"The «{stage}» stage takes a number of at most {ceiling}.");
+        }
     }
+
+    // SEC-6 (D-652): how far one stage may move the dice — a count or a reroll within the dice of a value, sides within
+    // a die's, a multiplication within ten times.
+    private static int? Ceiling(DiceStage stage) => stage switch
+    {
+        DiceStage.Count or DiceStage.Reroll => ContentValue.MaxDice,
+        DiceStage.Sides => ContentValue.MaxSides,
+        DiceStage.Multiply => MaxDiceMultiplier,
+        _ => null,
+    };
 
     private static void CheckOutcomes(OutcomesSpec outcomes, string path, Scope scope, Action<string, string> error)
     {

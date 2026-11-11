@@ -57,6 +57,59 @@ public class ContentPackTests
         Assert.StartsWith("broken.json:", e.Message, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData(ContentPublishing.MaxObjects + 1, 0, 0)]
+    [InlineData(1, ContentPublishing.MaxWheels + 1, 1)]
+    [InlineData(1, 1, ContentPublishing.MaxWheelEntries + 1)]
+    public void A_pack_over_the_size_limits_is_refused_before_it_is_checked(int objects, int wheels, int entries)
+    {
+        // SEC-7 (D-653): 1000 objects and 100 wheels, as the admin's content API; 200 entries in a wheel
+        var s = Season();
+        var orange = EconomyScenario.ExamplePack("orange").Objects[0];
+        var pack = new ContentPack
+        {
+            Objects = [.. Enumerable.Range(0, objects).Select(i => orange with { Id = $"orange-{i}" })],
+            Wheels =
+            [
+                .. Enumerable.Range(0, wheels).Select(w => new WheelDefinition
+                {
+                    Id = $"wheel-{w}",
+                    Name = "Колесо",
+                    Entries = [.. Enumerable.Range(0, entries).Select(_ => new WheelEntrySpec { ObjectId = "orange-0", Weight = 1 })],
+                }),
+            ],
+        };
+
+        s.Act(new PublishContent(pack, "Огромный пакет"));
+
+        Assert.Equal(RejectionCodes.ContentTooLarge, s.Last.Rejection!.Code);
+        Assert.Equal(0, s.State.Catalog.Version);
+    }
+
+    [Fact]
+    public void A_pack_at_the_size_limits_is_published()
+    {
+        var s = Season();
+        var orange = EconomyScenario.ExamplePack("orange").Objects[0];
+        var pack = new ContentPack
+        {
+            Objects = [.. Enumerable.Range(0, ContentPublishing.MaxObjects).Select(i => orange with { Id = $"orange-{i}" })],
+            Wheels =
+            [
+                new WheelDefinition
+                {
+                    Id = "wheel",
+                    Name = "Колесо",
+                    Entries = [.. Enumerable.Range(0, ContentPublishing.MaxWheelEntries).Select(_ => new WheelEntrySpec { ObjectId = "orange-0", Weight = 1 })],
+                },
+            ],
+        };
+
+        s.Act(new PublishContent(pack, "Пакет на пределе"));
+
+        Assert.True(s.Last.IsAccepted, s.Last.Rejection?.ToString());
+    }
+
     [Fact]
     public void Content_files_are_taken_in_the_order_of_their_names()
     {

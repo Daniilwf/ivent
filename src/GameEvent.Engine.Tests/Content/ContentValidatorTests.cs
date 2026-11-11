@@ -789,4 +789,71 @@ public class ContentValidatorTests
 
         Assert.Equal(error ? ["$.effect.duration"] : [], Paths(json));
     }
+
+    // ---- SEC-6 (D-652): the numbers of content stay where the arithmetic holds ----
+
+    [Theory]
+    [InlineData("count", ContentValue.MaxDice, true)]
+    [InlineData("count", ContentValue.MaxDice + 1, false)]
+    [InlineData("count", -ContentValue.MaxDice - 1, false)]
+    [InlineData("reroll", ContentValue.MaxDice, true)]
+    [InlineData("reroll", ContentValue.MaxDice + 1, false)]
+    [InlineData("sides", ContentValue.MaxSides, true)]
+    [InlineData("sides", ContentValue.MaxSides + 1, false)]
+    [InlineData("multiply", ContentValidator.MaxDiceMultiplier, true)]
+    [InlineData("multiply", ContentValidator.MaxDiceMultiplier + 1, false)]
+    [InlineData("add", ContentValidator.MaxDiceAddition, true)]
+    [InlineData("add", ContentValidator.MaxDiceAddition + 1, false)]
+    [InlineData("add", -ContentValidator.MaxDiceAddition - 1, false)]
+    [InlineData("add", int.MaxValue, false)]
+    public void A_dice_stage_takes_numbers_up_to_its_ceiling(string stage, int value, bool valid)
+    {
+        var json = Orange.Replace(
+            "{\"type\":\"move\",\"steps\":1}",
+            $"{{\"type\":\"modifyDice\",\"when\":\"next\",\"stage\":\"{stage}\",\"value\":{value}}}",
+            StringComparison.Ordinal);
+
+        Assert.Equal(!valid, Errors(json).Any(e => e.Path == "$.effect.actions[0].value"));
+    }
+
+    [Theory]
+    [InlineData(ContentValidator.MaxResourceAmount, true)]
+    [InlineData(-ContentValidator.MaxResourceAmount, true)]
+    [InlineData(ContentValidator.MaxResourceAmount + 1, false)]
+    [InlineData(-ContentValidator.MaxResourceAmount - 1, false)]
+    [InlineData(int.MinValue, false)]
+    public void A_resource_changes_by_at_most_a_million(int amount, bool valid)
+    {
+        foreach (var resource in new[] { "coins", "points", "freeShopRolls" })
+        {
+            var json = Orange.Replace(
+                "{\"type\":\"move\",\"steps\":1}",
+                $"{{\"type\":\"changeResource\",\"resource\":\"{resource}\",\"amount\":{amount}}}",
+                StringComparison.Ordinal);
+
+            Assert.Equal(!valid, Errors(json).Any(e => e.Path == "$.effect.actions[0].amount"));
+        }
+    }
+
+    [Theory]
+    [InlineData(ContentValidator.MaxPrice, true)]
+    [InlineData(ContentValidator.MaxPrice + 1, false)]
+    [InlineData(int.MaxValue, false)]
+    public void An_item_costs_at_most_a_million(int price, bool valid)
+    {
+        var json = Orange.Replace("\"price\":10", $"\"price\":{price}", StringComparison.Ordinal);
+
+        Assert.Equal(!valid, Errors(json).Any(e => e.Path == "$.price"));
+    }
+
+    [Theory]
+    [InlineData(10, true)]
+    [InlineData(10.01, false)]
+    [InlineData(1000000, false)]
+    public void A_zone_multiplies_shop_prices_at_most_tenfold(double multiplier, bool valid)
+    {
+        var zone = new ZoneDefinition { Id = "swamp", Name = "Болото", ShopPriceMultiplier = (decimal)multiplier };
+
+        Assert.Equal(!valid, Said(ContentValidator.Check(zone)).Any(e => e.Path == "$.shopPriceMultiplier"));
+    }
 }
