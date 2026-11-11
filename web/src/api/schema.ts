@@ -7479,7 +7479,9 @@ export interface components {
          * @description A game's status in the season as the pool page shows it (SPEC «Статусы игры в сезоне», H6, D-160): `taken` —
          *     completed in the season or being played (an offer and a pending option count), with the player and, for a completed
          *     game, when; `marks` — other players who dropped or tech-rerolled it (the game is free again);
-         *     `excludedForMe` — why it never comes to the viewer again. Only games with something to show are listed.
+         *     `excludedForMe` — why it never comes to the viewer again; `offered` — the game is taken as an offer or an
+         *     option still waiting for «Начать», not played yet (K1A; always set, optional for older clients). Only games with
+         *     something to show are listed.
          */
         SeasonGameView: {
             /** Format: uuid */
@@ -7490,6 +7492,8 @@ export interface components {
             completedAt: null | string;
             marks: components["schemas"]["GameMarkView"][];
             excludedForMe: null | components["schemas"]["ExclusionReason"];
+            /** @default false */
+            offered: boolean;
         };
         /**
          * @description The answer to joining a season (E3, D-122): the last sequence of its log now, and what was committed after the

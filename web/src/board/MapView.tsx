@@ -19,6 +19,7 @@ import { cx } from '../ui/cx';
 import { blobPath, cellById, polylinePath, zoneAt } from './geometry';
 import { zoneFill } from './graphBoard';
 import type { Board, BoardBackground, BoardZone, Player, Point, ZoneTheme } from './types';
+import { initial } from '../ui/initial';
 
 const t = ru.board;
 
@@ -224,7 +225,7 @@ export function MapSticker({
           dominantBaseline="central"
           style={{ fill: token.ink, fontSize: size * 0.48 }}
         >
-          {player.name.slice(0, 1)}
+          {initial(player.name)}
         </text>
       )}
       {player.me ? (

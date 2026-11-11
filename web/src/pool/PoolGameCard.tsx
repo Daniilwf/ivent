@@ -36,7 +36,7 @@ export function GameStatus({
         </Chip>
       ) : status?.taken === 'beingPlayed' ? (
         <Chip tone="info" icon={<Gamepad2 size={16} aria-hidden className="text-info" />}>
-          {t.playing(status.takenBy ?? '')}
+          {status.offered ? t.offered(status.takenBy ?? '') : t.playing(status.takenBy ?? '')}
         </Chip>
       ) : status?.excludedForMe ? (
         <Chip icon={<Ban size={16} aria-hidden className="text-ink-soft" />}>

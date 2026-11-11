@@ -114,6 +114,40 @@ describe('My avatar', () => {
     expect(onChanged).not.toHaveBeenCalled();
   });
 
+  it.each([
+    'https://tenor.com/view/cat-gif-123',
+    'https://giphy.com/gifs/cat-abc',
+    'https://www.tenor.com/view/x',
+  ])(
+    'tells which link to paste when given the page of a GIF instead of the GIF itself: %s (K1A)',
+    async (link) => {
+      const sent = serve(() => json(500, {}));
+      render(<AvatarSection onChanged={vi.fn()} />);
+
+      await userEvent.type(screen.getByTestId('avatar-link'), link);
+      await userEvent.click(screen.getByRole('button', { name: ru.avatar.useLink }));
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(ru.avatar.pageLink);
+      expect(sent.filter((x) => x.method !== 'GET')).toHaveLength(0);
+    },
+  );
+
+  it('the refusal of another site says what link works', () => {
+    expect(ru.upload.errors['file.hostNotAllowed']).toMatch(/media\.tenor\.com/);
+  });
+
+  it('refuses a file over the limit before sending it (K1A)', async () => {
+    const sent = serve(() => json(500, {}));
+    render(<AvatarSection onChanged={vi.fn()} />);
+    const huge = picture();
+    Object.defineProperty(huge, 'size', { value: 40 * 1024 * 1024 });
+
+    await userEvent.upload(screen.getByTestId('avatar-file'), huge);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(ru.upload.errors['file.tooLarge']);
+    expect(sent.filter((x) => x.method !== 'GET')).toHaveLength(0);
+  });
+
   it('asks for a link before sending an empty one', async () => {
     const sent = serve(() => json(500, {}));
     render(<AvatarSection onChanged={vi.fn()} />);

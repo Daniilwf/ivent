@@ -79,9 +79,25 @@ export function usePath(): string {
   return useSyncExternalStore(subscribe, () => globalThis.location.pathname);
 }
 
+const reopenListeners = new Set<() => void>();
+
+/**
+ * Called when a link opens the page already at the address (the header's link to the current section): whatever was
+ * opened over it, like the password form, closes (K1A, D-150). Returns the unsubscribe.
+ */
+export function onReopen(listener: () => void): () => void {
+  reopenListeners.add(listener);
+  return () => {
+    reopenListeners.delete(listener);
+  };
+}
+
 /** Opens a page of the site without reloading it; a new page starts at the top */
 export function navigate(to: string) {
-  if (to === globalThis.location.pathname) return;
+  if (to === globalThis.location.pathname) {
+    for (const listener of reopenListeners) listener();
+    return;
+  }
   globalThis.history.pushState(null, '', to);
   navigated = true;
   globalThis.scrollTo(0, 0);

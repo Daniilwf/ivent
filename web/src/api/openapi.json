@@ -10427,9 +10427,13 @@
                 "$ref": "#/components/schemas/ExclusionReason"
               }
             ]
+          },
+          "offered": {
+            "type": "boolean",
+            "default": false
           }
         },
-        "description": "A game's status in the season as the pool page shows it (SPEC «Статусы игры в сезоне», H6, D-160): `taken` —\ncompleted in the season or being played (an offer and a pending option count), with the player and, for a completed\ngame, when; `marks` — other players who dropped or tech-rerolled it (the game is free again);\n`excludedForMe` — why it never comes to the viewer again. Only games with something to show are listed."
+        "description": "A game's status in the season as the pool page shows it (SPEC «Статусы игры в сезоне», H6, D-160): `taken` —\ncompleted in the season or being played (an offer and a pending option count), with the player and, for a completed\ngame, when; `marks` — other players who dropped or tech-rerolled it (the game is free again);\n`excludedForMe` — why it never comes to the viewer again; `offered` — the game is taken as an offer or an\noption still waiting for «Начать», not played yet (K1A; always set, optional for older clients). Only games with\nsomething to show are listed."
       },
       "SeasonJoin": {
         "required": [

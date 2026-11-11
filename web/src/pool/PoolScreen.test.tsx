@@ -255,6 +255,24 @@ describe('the pool page', () => {
     });
   });
 
+  it('says an offer nobody started yet is offered, not played (K1A)', async () => {
+    serve({
+      ...base,
+      [`GET /api/seasons/${seasonId}/games`]: () =>
+        json(
+          200,
+          demoStatuses.map((s) => (s.taken === 'beingPlayed' ? { ...s, offered: true } : s)),
+        ),
+    });
+    renderPool();
+    await waitFor(() => {
+      expect(cards()).toHaveLength(demoPoolGames.length);
+    });
+
+    expect(card('Dead Space')).toHaveTextContent(t.offered('Петя'));
+    expect(card('Dead Space')).not.toHaveTextContent('Сейчас играет');
+  });
+
   it('keeps the pool when only the statuses fail, and says so', async () => {
     serve({ ...base, [`GET /api/seasons/${seasonId}/games`]: () => json(500, {}) });
     renderPool();

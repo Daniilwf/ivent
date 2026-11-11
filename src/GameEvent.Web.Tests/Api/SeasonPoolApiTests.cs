@@ -76,6 +76,21 @@ public sealed class SeasonPoolApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task An_offer_not_started_yet_is_marked_as_offered()
+    {
+        // K1A: glossary «Предложенная игра» — reserved for the player until «Начать», not played yet
+        var vasya = _site.Players["vasya"];
+        await _site.SendAsync(new RollGame(vasya));
+
+        Assert.True(Assert.Single(await GamesAsync("petya")).Offered);
+        Assert.True(Assert.Single(await GamesAsync("vasya")).Offered);
+
+        await _site.SendAsync(new StartRun(vasya));
+
+        Assert.False(Assert.Single(await GamesAsync("petya")).Offered);
+    }
+
+    [Fact]
     public async Task Completed_game_says_who_and_when()
     {
         var vasya = _site.Players["vasya"];

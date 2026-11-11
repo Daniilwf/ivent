@@ -511,6 +511,8 @@ export const ru = {
     link: 'Или ссылка на гифку (Tenor, Giphy, Klipy)',
     useLink: 'Взять по ссылке',
     linkRequired: 'Вставь ссылку.',
+    pageLink:
+      'Это ссылка на страницу, а нужна ссылка на саму гифку. Открой гифку, нажми на неё правой кнопкой или подержи палец и выбери «Копировать адрес картинки» — ссылка начнётся с media.tenor.com или media.giphy.com.',
     remove: 'Убрать аватарку',
   },
   upload: {
@@ -528,7 +530,8 @@ export const ru = {
       'file.busy': 'Сервер занят другими картинками. Попробуй через минуту.',
       'file.downloadsPerHour': 'Лимит скачиваний по ссылке на этот час исчерпан.',
       'file.urlInvalid': 'Нужна ссылка, начинающаяся с https://.',
-      'file.hostNotAllowed': 'Ссылки принимаются только с Tenor, Giphy и Klipy.',
+      'file.hostNotAllowed':
+        'Нужна ссылка на саму гифку с Tenor, Giphy или Klipy — она начинается с media.tenor.com, media.giphy.com или i.giphy.com.',
       'file.addressNotPublic': 'По этой ссылке картинку взять нельзя.',
       'file.downloadFailed': 'Не удалось скачать картинку по ссылке.',
     },
@@ -547,6 +550,7 @@ export const ru = {
     noSeasonText: 'Когда админ заведёт сезон, здесь появятся карта, лидерборд и твой ход.',
     loadErrorTitle: 'Сайт не загрузился',
     loadErrorText: 'Сервер не ответил. Проверь интернет и попробуй ещё раз.',
+    tooOftenText: 'Слишком много запросов подряд. Подожди минуту и попробуй ещё раз.',
     loginLead: 'Настольная игра, где ходы зарабатываются прохождением видеоигр.',
     meeples: 'ИВЕНТ',
   },
@@ -1131,7 +1135,8 @@ export const ru = {
       techRerolled: techReroll,
       rejected: 'Отклонено',
     } as Record<string, string>,
-    played: (hours: number) => `${hoursText(hours)} в игре`,
+    // Glossary «Часы»: the length of the game the run counted (HowLongToBeat or the player's estimate), not time played
+    played: (hours: number) => `длина ${hoursText(hours)}`,
     noRunsTitle: 'Эту игру ещё никто не брал',
     noRunsText: 'Когда она выпадет на колесе, прохождения и отзывы появятся здесь.',
     errorTitle: 'Страница игры не загрузилась',
@@ -1180,6 +1185,8 @@ export const ru = {
     completed: (player: string, day: string | null) =>
       day ? `Уже прошёл ${player}, ${day}` : `Уже прошёл ${player}`,
     playing: (player: string) => `Сейчас играет ${player}`,
+    // Glossary «Предложенная игра»: reserved for the player until «Начать», not played yet
+    offered: (player: string) => `Выпала игроку ${player}, ещё не начата`,
     excluded: {
       alreadyPlayed: 'Тебе не выпадет: ты уже проходил',
       dropped: 'Тебе не выпадет: ты дропнул',
