@@ -29,7 +29,7 @@ export function seasonPicture(
       token: p.token,
       avatar: p.avatar?.thumbnailUrl,
       // A cell the chain does not know (it should not happen) draws no token rather than a wrong one at the start
-      cell: cellNumber.get(p.cellId) ?? 0,
+      cell: cellNumber.get(p.cellId) ?? -1,
       points: p.points,
       me: p.id === season.me?.playerId,
       first: row?.isFirst === true,

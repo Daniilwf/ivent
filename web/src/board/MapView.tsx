@@ -575,7 +575,7 @@ export function MapView({
   ref,
   options = [],
 }: MapViewProps) {
-  const start = focus ? cellById(board, focus) : null;
+  const start = focus !== undefined ? cellById(board, focus) : null;
   const meAt = players.find((p) => p.me);
   const { viewBox, svg, handlers, zoomAt, centerOn, reset } = usePanZoom(
     board,

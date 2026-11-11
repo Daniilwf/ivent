@@ -4,7 +4,7 @@ import { catmullRom } from './geometry';
 import type { Board, BoardCell, BoardEdge, BoardZone, CellKind, Point, ZoneTheme } from './types';
 
 // Stage 2's map is the season's graph as the editor drew it (D-300): cells with their places, arrows, zones. The board
-// takes the places as they are (framed with a margin), numbers the cells from the start along the arrows, joins the
+// takes the places as they are (framed with a margin), numbers the cells from 0 at the start along the arrows, joins the
 // arrows into roads between junctions and draws each zone as a blob around its cells. A map without places (made
 // outside the editor) is laid out in columns by the distance from the start. A map over a picture (D-277) keeps its
 // places as the picture's pixels.
@@ -67,28 +67,70 @@ export function exitsOf(edges: MapEdge[], id: string): MapEdge[] {
     );
 }
 
-/** The cells in the order of a walk from the start: breadth first along the arrows (default first), then teleports */
+/**
+ * The cells in the order of their numbers (K1M-1, K1M-3, D-622): the start first, then every cell after all the cells
+ * whose arrows lead into it, so the numbers grow along every way; a branch is numbered in a row (the default first)
+ * before the next one, and the merge after both. A teleport's destination no arrow brings to waits for the teleport. A
+ * ring of arrows (a draft) is broken at the cell found first; a cell no way reaches still gets a number, after the others.
+ */
 function numbering(map: GraphMap): string[] {
   const start = map.cells.find((c) => c.type === 'start');
-  const order: string[] = [];
-  const seen = new Set<string>();
-  const queue = start ? [start.id] : [];
-  if (start) seen.add(start.id);
   const byId = new Map(map.cells.map((c) => [c.id, c]));
-  while (queue.length > 0) {
-    const id = queue.shift() as string;
-    order.push(id);
+  // The cells a way from the start reaches, in the order a breadth-first walk finds them
+  const found: string[] = [];
+  const reached = new Set<string>();
+  if (start) {
+    found.push(start.id);
+    reached.add(start.id);
+  }
+  for (let i = 0; i < found.length; i++) {
+    const id = found[i] as string;
     const next = exitsOf(map.edges, id).map((e) => e.to);
     const to = byId.get(id)?.to;
     if (to) next.push(to);
     for (const n of next)
-      if (!seen.has(n) && byId.has(n)) {
-        seen.add(n);
-        queue.push(n);
+      if (!reached.has(n) && byId.has(n)) {
+        reached.add(n);
+        found.push(n);
       }
   }
-  // A cell no way reaches (a draft in the editor) still gets a number, after the others
-  for (const c of map.cells) if (!seen.has(c.id)) order.push(c.id);
+  const waiting = new Map<string, number>();
+  for (const e of map.edges)
+    if (reached.has(e.from) && reached.has(e.to) && e.from !== e.to)
+      waiting.set(e.to, (waiting.get(e.to) ?? 0) + 1);
+
+  const order: string[] = [];
+  const done = new Set<string>();
+  const ready: string[] = start ? [start.id] : [];
+  let last: string | null = null;
+  while (order.length < found.length) {
+    const after: string[] = last === null ? [] : exitsOf(map.edges, last).map((e) => e.to);
+    const pick: string =
+      after.find((id) => ready.includes(id)) ??
+      ready[0] ??
+      (found.find((id) => !done.has(id)) as string);
+    const at = ready.indexOf(pick);
+    if (at >= 0) ready.splice(at, 1);
+    done.add(pick);
+    order.push(pick);
+    last = pick;
+    for (const e of exitsOf(map.edges, pick)) {
+      if (done.has(e.to) || !reached.has(e.to)) continue;
+      const left = (waiting.get(e.to) ?? 1) - 1;
+      waiting.set(e.to, left);
+      if (left <= 0 && !ready.includes(e.to)) ready.push(e.to);
+    }
+    const to = byId.get(pick)?.to;
+    if (
+      to &&
+      reached.has(to) &&
+      !done.has(to) &&
+      (waiting.get(to) ?? 0) <= 0 &&
+      !ready.includes(to)
+    )
+      ready.push(to);
+  }
+  for (const c of map.cells) if (!done.has(c.id)) order.push(c.id);
   return order;
 }
 
@@ -186,7 +228,7 @@ function roads(cells: BoardCell[], edges: BoardEdge[]): Point[][] {
 /** The board of the season's graph map, and the board's number for each of the server's cell ids */
 export function graphBoard(map: GraphMap): { board: Board; cellNumber: Map<string, number> } {
   const order = numbering(map);
-  const cellNumber = new Map(order.map((id, i) => [id, i + 1]));
+  const cellNumber = new Map(order.map((id, i) => [id, i]));
   const byId = new Map(map.cells.map((c) => [c.id, c]));
   const placed = map.cells.length > 0 && map.cells.every((c) => c.x != null && c.y != null);
   const auto = placed ? null : layout(order, map);

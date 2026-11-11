@@ -1,6 +1,7 @@
 import { Moon, UserPlus, Users } from 'lucide-react';
 import { useCallback, useState, type SyntheticEvent } from 'react';
 import { api, type Schemas } from '../api/client';
+import { seasonBoard } from '../board/seasonBoard';
 import { moscowTime } from '../app/time';
 import { ru } from '../i18n/ru';
 import { techRerollReasons, type TechRerollReason } from '../season/techRerollReasons';
@@ -18,14 +19,23 @@ import { answerOf, useLoaded } from '../app/useLoaded';
 const t = ru.admin.players;
 
 type Player = Schemas['AdminPlayerView'];
-type Cell = Schemas['SeasonView']['cells'][number];
+/** A cell of the season with its number on the player's map (K1M-1) */
+type Cell = Schemas['SeasonView']['cells'][number] & { number: number };
 
-/** The cells as the admin picks them: by their number along the chain, the start and the finish named */
+/** The cells as the admin picks them: by their number on the player's map (K1M-1), the start and the finish named */
 function cellOptions(cells: readonly Cell[]) {
-  return cells.map((cell, i) => ({
+  return cells.map((cell) => ({
     id: cell.id,
-    label: t.cellOption(i, t.cellKinds[cell.type] ?? ''),
+    label: t.cellOption(cell.number, t.cellKinds[cell.type] ?? ''),
   }));
+}
+
+/** The season's cells in the order of their numbers on the player's map */
+function numbered(season: Schemas['SeasonView']): Cell[] {
+  const { cellNumber } = seasonBoard(season);
+  return season.cells
+    .map((c) => ({ ...c, number: cellNumber.get(c.id) ?? -1 }))
+    .sort((a, b) => a.number - b.number);
 }
 
 /** The season's players: balances, turn, the inactivity hint, and the admin's corrections */
@@ -38,7 +48,10 @@ export function PlayersSection({ seasonId, version }: { seasonId: string; versio
       ]);
       if (!players.data) return answerOf(players);
       if (!season.data) return answerOf(season);
-      return { kind: 'ready' as const, value: { players: players.data, cells: season.data.cells } };
+      return {
+        kind: 'ready' as const,
+        value: { players: players.data, cells: numbered(season.data) },
+      };
     }, [seasonId]),
     { version },
   );
@@ -114,7 +127,7 @@ function PlayerRow({
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
-  const index = cells.findIndex((c) => c.id === player.cellId);
+  const index = cells.find((c) => c.id === player.cellId)?.number ?? -1;
   const path = { seasonId, playerId: player.id };
 
   async function setInactive(isInactive: boolean) {

@@ -11,21 +11,21 @@ const chain = (n: number): ChainCell[] =>
 describe('the board of a chain of cells (stage 1)', () => {
   it('keeps the order: a walk from the start passes every cell once and ends at the finish', () => {
     const { board } = linearBoard(chain(30));
-    const path = walk(board, 1, 100);
-    expect(path).toEqual(Array.from({ length: 30 }, (_, i) => i + 1));
+    const path = walk(board, 0, 100);
+    expect(path).toEqual(Array.from({ length: 30 }, (_, i) => i));
     expect(board.cells[0]?.kind).toBe('start');
     expect(board.cells.at(-1)?.kind).toBe('finish');
-    expect(cellsToFinish(board, 1)).toBe(29);
+    expect(cellsToFinish(board, 0)).toBe(29);
   });
 
-  it('numbers the server cells in their order', () => {
+  it('numbers the server cells in their order, the start 0 as the admin counts it (K1M-1)', () => {
     const { cellNumber } = linearBoard(chain(5));
     expect([...cellNumber.entries()]).toEqual([
-      ['c0', 1],
-      ['c1', 2],
-      ['c2', 3],
-      ['c3', 4],
-      ['c4', 5],
+      ['c0', 0],
+      ['c1', 1],
+      ['c2', 2],
+      ['c3', 3],
+      ['c4', 4],
     ]);
   });
 

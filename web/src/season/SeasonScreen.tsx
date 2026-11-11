@@ -17,7 +17,8 @@ import { MyFinish } from './MyFinish';
 import { seasonPicture } from './seasonView';
 import { linearBoard } from '../board/linearBoard';
 import { Cover, RunCard } from '../board/GameCards';
-import { branchOptions, graphBoard, legsPath } from '../board/graphBoard';
+import { branchOptions, legsPath } from '../board/graphBoard';
+import { seasonBoard } from '../board/seasonBoard';
 import { MapLegend } from '../board/MapLegend';
 import { cellById, cellsToFinish } from '../board/geometry';
 import { TokenMove } from '../board/TokenMove';
@@ -294,15 +295,7 @@ export function SeasonScreen({
       ])
     : '';
   const chain = useMemo(
-    () =>
-      season && graphMode
-        ? graphBoard({
-            cells: season.cells,
-            edges: season.edges,
-            zones: season.zones,
-            background: season.background ?? null,
-          })
-        : linearBoard(season?.cells ?? []),
+    () => (season ? seasonBoard(season) : linearBoard([])),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- the key stands for the map
     [mapKey],
   );
@@ -904,7 +897,7 @@ export function SeasonScreen({
             ref={camera}
             board={board}
             players={shownPlayers}
-            focus={shownMine && shownMine.cell > 0 ? shownMine.cell : undefined}
+            focus={shownMine && shownMine.cell >= 0 ? shownMine.cell : undefined}
             tools="auto"
             options={options?.map((o) => o.cell)}
             className="h-105 rounded-lg border-3 border-ink desk:h-190"
@@ -927,31 +920,28 @@ export function SeasonScreen({
         </div>
         {/* The map in words: every cell and who stands there (also what the tests and screen readers read) */}
         <ol data-testid="cells" className="sr-only">
-          {(graphMode
-            ? [...season.cells].sort(
-                (a, b) => (cellNumber.get(a.id) ?? 0) - (cellNumber.get(b.id) ?? 0),
-              )
-            : season.cells
-          ).map((cell, i) => {
-            const here = season.players.filter((p) => p.cellId === cell.id);
-            return (
-              <li key={cell.id} data-testid={`cell-${cell.id}`}>
-                {cell.type === 'start'
-                  ? ru.map.start
-                  : cell.type === 'finish'
-                    ? ru.map.finish
-                    : graphMode
-                      ? cellWords(cell, season, cellNumber)
-                      : ru.map.cellNumber(i + 1)}
-                {here.map((p) => (
-                  <span key={p.id} data-testid={`token-${p.id}`}>
-                    {' '}
-                    {p.name}
-                  </span>
-                ))}
-              </li>
-            );
-          })}
+          {[...season.cells]
+            .sort((a, b) => (cellNumber.get(a.id) ?? 0) - (cellNumber.get(b.id) ?? 0))
+            .map((cell) => {
+              const here = season.players.filter((p) => p.cellId === cell.id);
+              return (
+                <li key={cell.id} data-testid={`cell-${cell.id}`}>
+                  {cell.type === 'start'
+                    ? ru.map.start
+                    : cell.type === 'finish'
+                      ? ru.map.finish
+                      : graphMode
+                        ? cellWords(cell, season, cellNumber)
+                        : ru.map.cellNumber(cellNumber.get(cell.id) ?? 0)}
+                  {here.map((p) => (
+                    <span key={p.id} data-testid={`token-${p.id}`}>
+                      {' '}
+                      {p.name}
+                    </span>
+                  ))}
+                </li>
+              );
+            })}
         </ol>
       </section>
 

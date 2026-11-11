@@ -174,6 +174,16 @@ public class GraphInvariantTests
             Cells = [.. map.Cells.Select(c => c.Type == CellType.Teleport && teleports.Contains(c.To!) ? new Cell(c.Id, CellType.Empty) : c)],
         };
 
+        // A snake may not lead back past a checkpoint (D-620): such a teleport stays a plain cell
+        var overCheckpoints = MapValidator.Validate(map, TestRuleset.Create())
+            .Where(e => e.Code == MapErrorCodes.TeleportPastCheckpoint)
+            .Select(e => e.Subject)
+            .ToHashSet();
+        map = map with
+        {
+            Cells = [.. map.Cells.Select(c => overCheckpoints.Contains(c.Id) ? new Cell(c.Id, CellType.Empty) : c)],
+        };
+
         if (zoneCells.Count > 0)
         {
             var zone = new ZoneDefinition
