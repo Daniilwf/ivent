@@ -334,7 +334,8 @@ function PhoneView({ view, notices }: { view: AdminMap; notices: React.ReactNode
           id: p.playerId,
           name: p.name,
           token: i,
-          cell: cellNumber.get(p.cellId) ?? 0,
+          // Number 0 is the start: a cell the map does not know draws no token rather than a wrong one there
+          cell: cellNumber.get(p.cellId) ?? -1,
           points: 0,
         }))}
         tools="top"

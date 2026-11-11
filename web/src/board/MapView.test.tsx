@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
+import { onDesktop } from '../test/desk';
 import userEvent from '@testing-library/user-event';
 import { ru } from '../i18n/ru';
 import { graphBoard } from './graphBoard';
@@ -181,6 +182,37 @@ describe('the camera of the map', () => {
     };
     for (const c of board.cells) expect(covered(c, 30), `cell ${c.id}`).toBe(false);
     for (const p of ['p0', 'p1', 'p2']) expect(covered(stickerAt(p), 25), p).toBe(false);
+  });
+
+  it('keeps the board clear of the zoom buttons at the bottom of a desktop frame narrower than 900 px (K1M-6)', () => {
+    // At 1440×900 the map stands in the second column of the season screen: a frame of about 730 × 760 px
+    onDesktop();
+    frame = { width: 730, height: 760 };
+    const board = dev();
+    render(<MapView board={board} players={crowd(3, 10)} focus={10} tools="auto" />);
+
+    // The world reaches below the board by the buttons' strip, not above it
+    const v = viewBox();
+    const scale = frame.width / v.w;
+    expect(v.y + v.h).toBeGreaterThanOrEqual(board.height + 64 / scale);
+
+    // The zoom buttons: three of 44 px with 8 px between, 12 px from the bottom right corner
+    const tools = {
+      left: frame.width - 12 - 148,
+      right: frame.width - 12,
+      top: frame.height - 56,
+      bottom: frame.height - 12,
+    };
+    const covered = (p: { x: number; y: number }, r: number) => {
+      const s = onScreen(p);
+      return (
+        s.x + r * s.scale > tools.left &&
+        s.x - r * s.scale < tools.right &&
+        s.y + r * s.scale > tools.top &&
+        s.y - r * s.scale < tools.bottom
+      );
+    };
+    for (const c of board.cells) expect(covered(c, 30), `cell ${c.id}`).toBe(false);
   });
 });
 

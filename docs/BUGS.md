@@ -63,7 +63,7 @@
 - **Получилось:** `canPublish: true`, очки игрока стали −2147483648, лидерборд показал их же; −1 000 000 тоже проходил.
 - **Важность:** средняя.
 - **Тест:** `Engine.Tests/Map/MapValidatorTests.A_points_bonus_stays_within_its_ceiling` (int.MaxValue, int.MinValue, −1 000 000, потолок + 1).
-- **Исправление:** бонус клетки — не больше 10 000 по модулю (потолок безопасности, как `MaxCells`, D-621).
+- **Исправление:** бонус клетки — не больше 10 000 по модулю (потолок безопасности, как `MaxCells`, D-621); текст проблемы в редакторе называет эти пределы (`MapSection.test.tsx` «names the bounds when a bonus is past them»).
 
 ### K1M-6. На телефоне первая камера резала мою фишку, а кнопки зума закрывали клетки
 
@@ -72,7 +72,7 @@
 - **Ожидалось:** первый экран понятен, ничего не обрезано (DESIGN, «Сначала телефон»).
 - **Получилось:** своя фишка и «ты» уходили за левый край рамки; «+ − ⌖» стояли поверх клеток верхнего ряда и фишек у старта.
 - **Важность:** низкая.
-- **Тест:** `web/src/board/MapView.test.tsx` «opens on a phone with my token whole in the frame and clear of the zoom buttons».
+- **Тест:** `web/src/board/MapView.test.tsx` «opens on a phone with my token whole in the frame and clear of the zoom buttons»; на десктопе (рамка уже 900 px, кнопки снизу) — «keeps the board clear of the zoom buttons at the bottom of a desktop frame narrower than 900 px».
 - **Исправление:** первая камера на телефоне может показать поле за краем доски, а на стороне кнопок — их полосу: фишки у края целы, кнопки стоят над полем, а не над клетками (D-623).
 
 ### K1M-7. На телефоне нельзя было узнать, чья фишка и кто под «+N»

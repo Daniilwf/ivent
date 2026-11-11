@@ -16,6 +16,7 @@ import { playerToken } from '../design/players';
 import { ru } from '../i18n/ru';
 import { IconButton } from '../ui/Button';
 import { cx } from '../ui/cx';
+import { useDesk } from '../ui/useDesk';
 import { blobPath, cellById, polylinePath, zoneAt } from './geometry';
 import { zoneFill } from './graphBoard';
 import type { Board, BoardBackground, BoardZone, Player, Point, ZoneTheme } from './types';
@@ -436,15 +437,10 @@ function usePanZoom(
   }, []);
 
   const ratio = box.height / box.width;
-  // The zoom buttons stand at the top of a phone's frame and at the bottom of a desktop's (tools="auto")
-  const side =
-    toolsAt === 'none'
-      ? null
-      : toolsAt === 'auto'
-        ? box.width >= 900
-          ? 'bottom'
-          : 'top'
-        : toolsAt;
+  // The zoom buttons stand at the top of a phone's page and at the bottom of a desktop's (tools="auto"): by the
+  // page's `desk` breakpoint, as the buttons' own classes, not by the frame's width (a desktop's frame is narrower)
+  const desk = useDesk();
+  const side = toolsAt === 'none' ? null : toolsAt === 'auto' ? (desk ? 'bottom' : 'top') : toolsAt;
   const gap = side ? toolsRoom : 0;
 
   // The world the camera may show (K1M-2): the board with room round its edge and, on the buttons' side, the strip
