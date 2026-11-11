@@ -20,7 +20,7 @@ const drawSeconds = 0.9;
 /**
  * The event I drew last (D-500): its kind and where it came from, its name and its text, already played. A card drawn
  * while the page is open (`fresh`) comes off the deck and turns face up — a key moment (DESIGN.md «Движение»); a click
- * shows it at once, and with reduced motion it just stands there.
+ * shows it at once, and with reduced motion it just stands there. Once it stands, it is an ordinary card.
  */
 export function DrawnEventCard({ drawn, fresh = false }: { drawn: Drawn; fresh?: boolean }) {
   const t = ru.events;
@@ -40,6 +40,9 @@ export function DrawnEventCard({ drawn, fresh = false }: { drawn: Drawn; fresh?:
           animated ? { duration: drawSeconds, ease: [0.2, 0.7, 0.3, 1] } : { duration: 0 }
         }
         onClick={() => {
+          if (animated) setSkipped(true);
+        }}
+        onAnimationComplete={() => {
           if (animated) setSkipped(true);
         }}
       >
