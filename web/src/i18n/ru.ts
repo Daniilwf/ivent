@@ -1876,6 +1876,8 @@ export const ru = {
       dependents: 'От этого действия зависят более поздние. Сначала откати их:',
       dependentUnknown: 'действие за пределами показанного лога',
       events: (n: number) => `событий: ${n}`,
+      comment: (text: string) => `Комментарий: ${text}`,
+      about: (subject: string) => `Касается: ${subject}`,
       commands: {
         CreateSeason: 'Создание сезона',
         ChangeSeasonStatus: 'Смена статуса сезона',

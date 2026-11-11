@@ -6062,9 +6062,27 @@
             "items": {
               "type": "string"
             }
+          },
+          "playerName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "gameTitle": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "comment": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         },
-        "description": "A command of the season log, newest first (D-104): what the admin picks to undo. `undone` — undone already;\n`events` — the types of its events in order."
+        "description": "A command of the season log, newest first (D-104): what the admin picks to undo. `undone` — undone already;\n`events` — the types of its events in order; `playerName`, `gameTitle`, `comment` — whom and what\nthe command touched, from its first event that names them, so identical rows are told apart before an undo (K1A;\nnull when none does)."
       },
       "AdminManualEffectView": {
         "required": [

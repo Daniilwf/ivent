@@ -6066,7 +6066,9 @@ export interface components {
         };
         /**
          * @description A command of the season log, newest first (D-104): what the admin picks to undo. `undone` — undone already;
-         *     `events` — the types of its events in order.
+         *     `events` — the types of its events in order; `playerName`, `gameTitle`, `comment` — whom and what
+         *     the command touched, from its first event that names them, so identical rows are told apart before an undo (K1A;
+         *     null when none does).
          */
         AdminCommandView: {
             /** Format: uuid */
@@ -6077,6 +6079,9 @@ export interface components {
             occurredAt: string;
             undone: boolean;
             events: string[];
+            playerName?: null | string;
+            gameTitle?: null | string;
+            comment?: null | string;
         };
         /** @description A pending manual effect of any player, oldest first, for the admin to resolve (D-102). */
         AdminManualEffectView: {

@@ -110,6 +110,48 @@ describe('The season log', () => {
     expect(items[1]).toHaveTextContent(t.dependentUnknown);
   });
 
+  it('says whom and what each command touched and its comment, in the row, the dialog and the dependents (K1A)', async () => {
+    open({
+      'GET /api/admin/seasons/*/commands': [
+        command({
+          commandId: 'a2',
+          commandType: 'AdjustPlayer',
+          authorName: 'Админ',
+          playerName: 'Лось',
+          comment: 'За стрим',
+        }),
+        command({
+          commandId: 'a1',
+          commandType: 'AdjustPlayer',
+          authorName: 'Админ',
+          playerName: 'Волк',
+          gameTitle: 'Celeste',
+        }),
+      ],
+      'POST /api/admin/seasons/*/undo': answer(409, {
+        title: 'Rejected',
+        status: 409,
+        code: 'undo.dependents',
+        related: ['a2'],
+      }),
+    });
+
+    const second = await screen.findByTestId('command-a2');
+    expect(second).toHaveTextContent('Лось');
+    expect(second).toHaveTextContent(t.comment('За стрим'));
+    const first = screen.getByTestId('command-a1');
+    expect(first).toHaveTextContent('Волк');
+    expect(first).toHaveTextContent('«Celeste»');
+
+    await userEvent.click(within(first).getByTestId('undo'));
+    const dialog = await screen.findByRole('alertdialog');
+    expect(dialog).toHaveTextContent(t.about('Волк · «Celeste»'));
+    await userEvent.type(within(dialog).getByTestId('undo-comment'), 'Ошибка');
+    await userEvent.click(within(dialog).getByRole('button', { name: t.undoConfirm }));
+    const dependents = await within(dialog).findByTestId('undo-dependents');
+    expect(dependents).toHaveTextContent('Лось');
+  });
+
   it('shows more of the log on request', async () => {
     const many = Array.from({ length: 50 }, (_, i) => command({ commandId: `m${i}` }));
     const server = open({ 'GET /api/admin/seasons/*/commands': many });
