@@ -215,7 +215,7 @@ public static class AdminPlayerEndpoints
         var joined = decoded.Where(e => e.Event is SeasonPlayerAdded).GroupBy(e => ((SeasonPlayerAdded)e.Event).PlayerId).ToDictionary(g => g.Key, g => g.Max(e => e.OccurredAt));
         var now = clock.UtcNow;
         IReadOnlyList<AdminPlayerView> views = [.. players
-            .OrderBy(p => p.Name, StringComparer.Ordinal)
+            .OrderBy(p => p.Name, PlayerTokens.NameOrder)
             .Select(p =>
             {
                 DateTimeOffset? last = lastActions.TryGetValue(p.UserId, out var at) ? at : null;

@@ -133,9 +133,9 @@ public static class AdminMapEndpoints
         var rules = JsonSerializer.Deserialize<Ruleset>(season.RulesetJson, EngineJson.Options)!;
         var players = await db.SeasonPlayers.AsNoTracking()
             .Where(p => p.SeasonId == seasonId)
-            .OrderBy(p => p.Name)
             .Select(p => new { p.Id, p.Name, p.CellId, p.FinishOrder, p.ChoiceJson })
             .ToListAsync(ct);
+        players = [.. players.OrderBy(p => p.Name, PlayerTokens.NameOrder)];
         return TypedResults.Ok(new AdminMapView(
             rules.Features.MapMode,
             season.Status,
