@@ -222,7 +222,11 @@ const feedLines = {
   itemUsed: <T>(p: T, item: string, targets: T[]): Line<T> =>
     targets.length === 0
       ? [p, ` использует «${item}»`]
-      : [p, ` использует «${item}» на `, ...targets.flatMap((t, i) => (i === 0 ? [t] : [', ', t]))],
+      : [
+          p,
+          ` использует «${item}». ${targets.length === 1 ? 'Цель' : 'Цели'}: `,
+          ...targets.flatMap((t, i) => (i === 0 ? [t] : [', ', t])),
+        ],
   inventoryGiven: <T>(p: T, item: string): Line<T> => [p, `: админ выдаёт «${item}»`],
   inventoryTaken: <T>(p: T, item: string): Line<T> => [p, `: админ забирает «${item}»`],
   inventoryAdjusted: <T>(p: T): Line<T> => [p, ': админ правит инвентарь'],

@@ -230,7 +230,7 @@ export function ItemRow({
     <li
       aria-labelledby={titleId}
       data-testid={`item-${item.objectId}`}
-      className="grid gap-2 rounded-md border-2 border-muted p-3"
+      className="grid gap-2 border-t-2 border-muted pt-3 first:border-t-0 first:pt-0"
     >
       <div className="flex flex-wrap items-center gap-2">
         <h3 id={titleId} className="font-display font-heavy wrap-anywhere">
@@ -334,10 +334,10 @@ export function UseItemDialog({
         if (!next && !busy) onClose();
       }}
       title={ru.inventory.useTitle(item.name)}
-      description={[item.description]}
       testId="use-item"
       {...(returnFocus ? { returnFocus } : {})}
     >
+      <p className="max-w-prose wrap-anywhere">{item.description}</p>
       <form
         className="grid gap-4"
         onSubmit={(e) => {
