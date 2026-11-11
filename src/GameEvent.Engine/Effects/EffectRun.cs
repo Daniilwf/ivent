@@ -34,6 +34,9 @@ internal sealed class EffectRun
     private readonly IReadOnlyList<string> _choices;
     private int _choiceIndex;
 
+    // The actions aimed at the user ran: with several targets they run once per use (D-480)
+    private bool _selfDone;
+
     public EffectRun(
         SeasonState state,
         EngineContext context,
@@ -246,9 +249,16 @@ internal sealed class EffectRun
 
     private void RunActions(EquatableArray<ActionSpec> actions)
     {
+        var selfDone = _selfDone;
         foreach (var action in actions)
         {
+            if (selfDone && action.Target == Content.ActionTarget.Self && TargetId != UserId)
+            {
+                continue;
+            }
+
             Actions.BaseActionRegistry.ByType[action.GetType()].Execute(action, this);
+            _selfDone |= action.Target == Content.ActionTarget.Self;
             if (Refusal is not null)
             {
                 return;

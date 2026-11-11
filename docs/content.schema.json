@@ -97,7 +97,9 @@
                       "all",
                       "leader",
                       "higherPoints",
-                      "lowerPoints"
+                      "lowerPoints",
+                      "withinCells",
+                      "nearestBehind"
                     ]
                   },
                   "among": {
@@ -108,6 +110,15 @@
                     ]
                   },
                   "excludeSelf": {
+                    "type": "boolean"
+                  },
+                  "cells": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "includeSameCell": {
                     "type": "boolean"
                   }
                 },

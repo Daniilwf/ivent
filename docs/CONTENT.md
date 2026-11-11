@@ -46,7 +46,7 @@
 
 | Поле | Значения |
 | --- | --- |
-| `target` | `selector`: `self`, `chosen`, `randomActive`, `all`, `leader`, `higherPoints`, `lowerPoints`; `among` — ограничить выбор для `chosen` и `randomActive`: `higherPoints`, `lowerPoints`; `excludeSelf` — исключить себя |
+| `target` | `selector`: `self`, `chosen`, `randomActive`, `all`, `leader`, `higherPoints`, `lowerPoints`, `withinCells`, `nearestBehind`; `among` — ограничить выбор для `chosen` и `randomActive`: `higherPoints`, `lowerPoints`; `excludeSelf` — исключить себя; у `withinCells` — `cells`: все в пределах стольких клеток по рёбрам карты в обе стороны, стоящие на клетке использующего — при `includeSameCell`; `nearestBehind` — ближайший позади по расстоянию до финиша, при равенстве — все (D-480) |
 | `trigger` | для эффектов: `beforeRoll`, `afterRoll`, `runCompleted`, `beforeDice`, `afterDice`, `moveStep`, `stop`, `pass`, `drop`, `techReroll`, `time`, `hostileIncoming`, `runEnded` (прохождение или дроп, D-479) |
 | `duration` | `{ "uses": N }`, `{ "hours": N }`, `{ "runs": N }` или `{ "untilTriggered": true }` |
 | `condition` | условие срабатывания, см. «Условия» |
@@ -57,7 +57,7 @@
 
 **Значения** в действиях: целое число, строка с кубиками (`"1d6"`, `"2d4"`, `"-1d6"`) или ссылка: `"$roll"` — результат последнего броска в этом эффекте, `"$choice"` — последний выбор игрока, `"$result"` — итог голосования, `"$имя"` — параметр, переданный через `params` в `giveObject`, `"-$roll"` — со знаком минус.
 
-**Цель действия**: по умолчанию цель эффекта; поле `"target": "self"` у действия переопределяет её.
+**Цель действия**: по умолчанию цель эффекта; поле `"target": "self"` у действия переопределяет её. При нескольких целях действие на себя выполняется один раз за использование (D-480).
 
 ## Базовые действия
 
@@ -372,6 +372,23 @@
   "effect": {
     "trigger": "runEnded", "duration": { "untilTriggered": true }, "counter": { "start": 3 },
     "actions": [{ "type": "roll", "dice": "1d6" }, { "type": "move", "steps": "-$roll" }]
+  }
+}
+```
+
+### 18. Копьё — все в пределах пяти клеток
+
+```json
+{
+  "id": "spear", "kind": "item", "name": "Копье",
+  "description": "Оружие. Все игроки в пределах пяти клеток от тебя по карте, включая стоящих с тобой на одной клетке, идут на 1 клетку назад и теряют 1 монетку. Если у жертвы −30 монеток или меньше (порог из правил сезона), урон монетками удваивается и достаётся тебе.",
+  "rarity": "common", "price": null, "window": "anytime", "hostile": true, "stackable": false, "tags": ["weapon"],
+  "effect": {
+    "target": { "selector": "withinCells", "cells": 5, "includeSameCell": true, "excludeSelf": true },
+    "actions": [
+      { "type": "move", "steps": -1 },
+      { "type": "changeResource", "resource": "coins", "amount": -1, "reflect": true }
+    ]
   }
 }
 ```

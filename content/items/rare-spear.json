@@ -1,0 +1,34 @@
+{
+  "id": "rare-spear",
+  "kind": "item",
+  "name": "Редкое Копье",
+  "description": "Оружие. Все игроки в пределах десяти клеток от тебя по карте, включая стоящих с тобой на одной клетке, идут на 1 клетку назад и теряют 1 монетку. Если у жертвы −30 монеток или меньше (порог из правил сезона), урон монетками удваивается и достаётся тебе.",
+  "rarity": "epic",
+  "price": 22,
+  "window": "anytime",
+  "hostile": true,
+  "stackable": false,
+  "tags": [
+    "weapon"
+  ],
+  "effect": {
+    "target": {
+      "selector": "withinCells",
+      "cells": 10,
+      "includeSameCell": true,
+      "excludeSelf": true
+    },
+    "actions": [
+      {
+        "type": "move",
+        "steps": -1
+      },
+      {
+        "type": "changeResource",
+        "resource": "coins",
+        "amount": -1,
+        "reflect": true
+      }
+    ]
+  }
+}

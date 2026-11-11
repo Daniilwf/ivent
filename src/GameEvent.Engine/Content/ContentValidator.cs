@@ -137,6 +137,19 @@ public static partial class ContentValidator
             error($"{path}.target.among", "«among» narrows only «chosen» and «randomActive».");
         }
 
+        if (effect.Target is { } reach)
+        {
+            if (reach.Selector == TargetSelector.WithinCells && reach.Cells is not (>= 1))
+            {
+                error($"{path}.target.cells", "«withinCells» reaches 1 cell or more.");
+            }
+
+            if (reach.Selector != TargetSelector.WithinCells && (reach.Cells is not null || reach.IncludeSameCell))
+            {
+                error($"{path}.target", "«cells» and «includeSameCell» belong to «withinCells».");
+            }
+        }
+
         if (effect.Duration is { } duration)
         {
             CheckDuration(duration, $"{path}.duration", error);

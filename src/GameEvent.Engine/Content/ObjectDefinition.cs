@@ -72,6 +72,12 @@ public enum TargetSelector
     Leader,
     HigherPoints,
     LowerPoints,
+
+    /// <summary>Everyone at most <see cref="TargetSpec.Cells"/> cells away along the map (D-480).</summary>
+    WithinCells,
+
+    /// <summary>The closest player behind the user, all of them on a tie (D-480).</summary>
+    NearestBehind,
 }
 
 /// <summary>Narrows <see cref="TargetSelector.Chosen"/> and <see cref="TargetSelector.RandomActive"/>.</summary>
@@ -179,6 +185,14 @@ public sealed record TargetSpec
     public Among? Among { get; init; }
 
     public bool ExcludeSelf { get; init; }
+
+    /// <summary>The reach of <see cref="TargetSelector.WithinCells"/>: cells along the map's edges either way.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? Cells { get; init; }
+
+    /// <summary><see cref="TargetSelector.WithinCells"/> reaches those on the user's own cell too.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool IncludeSameCell { get; init; }
 }
 
 /// <summary>How long an effect lives: exactly one of the fields.</summary>
