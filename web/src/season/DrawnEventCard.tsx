@@ -6,7 +6,7 @@ import { cx } from '../ui/cx';
 
 type Drawn = Schemas['DrawnEventView'];
 
-// The tone of each kind of event (GLOSSARY «Вид ивента»): only tokens, the text stays ink for contrast
+// The tone of each kind of event (GLOSSARY «Вид ивента»): only tokens, each text on its soft fill passes AA
 const tones: Record<Drawn['kind'], string> = {
   good: 'bg-success-soft text-success',
   bad: 'bg-danger-soft text-danger',
@@ -33,7 +33,7 @@ export function DrawnEventCard({ drawn, fresh = false }: { drawn: Drawn; fresh?:
         data-testid="drawn-event"
         data-drawing={animated ? 'true' : undefined}
         aria-labelledby={`drawn-event-${String(drawn.sequence)}`}
-        className="grid min-w-0 gap-2 rounded-lg border-2 border-ink bg-card p-4"
+        className="grid min-w-0 gap-1 rounded-lg border-2 border-ink bg-card p-4"
         initial={animated ? { rotateY: -90, y: -24, scale: 0.92, opacity: 0 } : false}
         animate={{ rotateY: 0, y: 0, scale: 1, opacity: 1 }}
         transition={

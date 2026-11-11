@@ -544,7 +544,8 @@ export function SeasonScreen({
           </div>
         )}
         {/* The event comes after the move that stopped on its cell: the card reads after the throw (design review) */}
-        {me.lastEvent ? (
+        {/* Key moments one after another (DESIGN.md «Движение»): a fresh card waits for the token to stop */}
+        {me.lastEvent && !(freshDraw && moving) ? (
           <DrawnEventCard key={me.lastEvent.sequence} drawn={me.lastEvent} fresh={freshDraw} />
         ) : null}
       </section>
@@ -859,6 +860,12 @@ export function SeasonScreen({
         {/* The result is said once, when the wheel stops, and outlives the wheel */}
         <p className="sr-only" aria-live="polite" data-testid="roll-announce">
           {announced}
+        </p>
+        {/* A card drawn while the page is open is said once, when it is drawn on screen */}
+        <p className="sr-only" aria-live="polite" data-testid="draw-announce">
+          {freshDraw && !moving && me?.lastEvent
+            ? ru.events.announce(me.lastEvent.kind, me.lastEvent.name)
+            : ''}
         </p>
         {me?.phase === 'playing' && me.activeRun && (
           <div data-testid="active-run" className="grid gap-4">

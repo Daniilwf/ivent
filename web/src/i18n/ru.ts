@@ -971,10 +971,11 @@ export const ru = {
   },
   // Events drawn from decks (stage 5, D-500): the card of the one I drew last
   events: {
-    lastTitle: 'Вытянутый ивент',
     kinds: eventKindNames,
+    // Said once for a card drawn while the page is open, as the dice are
+    announce: (kind: EventKind, name: string) => `Вытянут ${eventKindWords[kind]}: «${name}»`,
     sources: { cell: 'с клетки ивента', item: 'от предмета' } as Record<'cell' | 'item', string>,
-    played: 'Разыгран сразу, как вытянут. Что он меняет в будущем, сработает само в свой момент.',
+    played: 'Уже разыгран — дальше сработает сам.',
   },
   effects: {
     title: 'Нужно разыграть',
