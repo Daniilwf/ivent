@@ -144,6 +144,7 @@ for (const section of [
   'admin',
   'graph',
   'editor',
+  'content',
   'map-background',
   'whats-new',
 ]) {
