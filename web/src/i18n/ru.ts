@@ -1,5 +1,15 @@
 // The single dictionary of interface texts. Terms come from docs/GLOSSARY.md.
 
+// A Russian noun after a number: 1 очко, 2 очка, 5 очков
+const plural = (n: number, one: string, few: string, many: string) => {
+  const tens = Math.abs(n) % 100;
+  const ones = Math.abs(n) % 10;
+  if (tens >= 11 && tens <= 14) return many;
+  if (ones === 1) return one;
+  if (ones >= 2 && ones <= 4) return few;
+  return many;
+};
+
 // игра / игры / игр
 const games = (n: number) => {
   const tens = n % 100;
@@ -10,20 +20,9 @@ const games = (n: number) => {
   return `${n} игр`;
 };
 
-// монетка / монетки / монеток
-const coins = (n: number) => {
-  const tens = n % 100;
-  const ones = n % 10;
-  const word =
-    tens >= 11 && tens <= 14
-      ? 'монеток'
-      : ones === 1
-        ? 'монетка'
-        : ones >= 2 && ones <= 4
-          ? 'монетки'
-          : 'монеток';
-  return `${n.toLocaleString('ru-RU')} ${word}`;
-};
+// монетка / монетки / монеток; a debt with a real minus: −2 монетки
+const coins = (n: number) =>
+  `${n < 0 ? '−' : ''}${Math.abs(n).toLocaleString('ru-RU')} ${plural(n, 'монетка', 'монетки', 'монеток')}`;
 
 // прохождение / прохождения / прохождений
 const runs = (n: number) => {
@@ -68,7 +67,7 @@ const rejection = {
   'turn.noPendingChoice': 'Этот выбор уже сделан или снят. Обнови страницу.',
   'turn.unknownOption': 'Такого варианта нет. Обнови страницу.',
   'roll.noAvailableGames': 'Нет доступных игр для ролла. Сообщи админу.',
-  'roll.notEnoughCoins': 'Не хватает монеток на реролл.',
+  'roll.notEnoughCoins': 'Не хватает монеток.',
   'roll.tooManyUnchecked':
     'Слишком много прохождений ждут проверки админом. Новый ролл откроется, когда их станет меньше лимита сезона.',
   'roll.gameNotOffered': 'Эта игра тебе сейчас не предложена. Обнови страницу.',
@@ -179,17 +178,17 @@ const rejection = {
   unknown: 'Действие отклонено. Попробуй ещё раз.',
 } as const;
 
+// What an object of the inventory is (GLOSSARY «Объект»)
+const objectKinds = {
+  item: 'Предмет',
+  effect: 'Эффект',
+  specialRoll: 'Спецролл',
+  event: 'Ивент',
+  achievement: 'Достижение',
+} as const;
+
 // H5: the feed, the profile and the game page
 
-// A Russian noun after a number: 1 очко, 2 очка, 5 очков
-const plural = (n: number, one: string, few: string, many: string) => {
-  const tens = Math.abs(n) % 100;
-  const ones = Math.abs(n) % 10;
-  if (tens >= 11 && tens <= 14) return many;
-  if (ones === 1) return one;
-  if (ones >= 2 && ones <= 4) return few;
-  return many;
-};
 // A change with its sign: +7, −3 (a real minus)
 const signed = (n: number) => (n < 0 ? `−${Math.abs(n)}` : `+${n}`);
 const hoursText = (n: number) => `${n.toLocaleString('ru-RU')} ч`;
@@ -1007,19 +1006,18 @@ export const ru = {
     target: 'На кого',
     targetHint: 'Только те, на кого предмет действует сейчас',
     pickObject: 'Какой предмет',
-    noObjects: 'У этого игрока нет подходящих предметов',
+    noObjects: 'Подходящих предметов нет',
     pick: 'Выбери',
-    used: (name: string) => `«${name}» использован.`,
-    kinds: {
-      item: 'Предмет',
-      effect: 'Эффект',
-      specialRoll: 'Спецролл',
-      event: 'Ивент',
-      achievement: 'Достижение',
+    // Names come in every gender: a text bound to a name never agrees with it
+    used: (name: string) => `Использовано: «${name}»`,
+    kinds: objectKinds,
+    actsAloneChip: (kind: keyof typeof objectKinds) => `${objectKinds[kind]}: действует сам`,
+    rarity: {
+      common: 'Редкость: обычная',
+      epic: 'Редкость: эпическая',
+      legendary: 'Редкость: легендарная',
     },
-    actsAlone: 'Действует сам',
-    rarity: { common: 'Обычный', epic: 'Эпический', legendary: 'Легендарный' },
-    hostile: 'Враждебный',
+    hostile: 'Против других',
     from: (name: string) => `От игрока ${name}`,
     usesLeft: (n: number) =>
       `Осталось ${n} ${plural(n, 'использование', 'использования', 'использований')}`,

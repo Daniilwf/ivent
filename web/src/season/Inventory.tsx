@@ -150,9 +150,6 @@ export function InventoryPanel({
           {ru.inventory.coins(economy.coins)}
         </p>
       ) : null}
-      <p className="sr-only" aria-live="polite" data-testid="inventory-announce">
-        {done ?? ''}
-      </p>
       {done ? <Notice tone="success">{done}</Notice> : null}
       {state.kind === 'loading' ? (
         <div className="grid gap-3" aria-busy="true">
@@ -250,9 +247,7 @@ export function ItemRow({
       <p className="max-w-prose text-sm wrap-anywhere">{item.description}</p>
       {facts.length > 0 || item.expiresAt || item.fromPlayer || !isItem ? (
         <div className="flex flex-wrap gap-2">
-          {!isItem ? (
-            <Chip tone="info">{`${ru.inventory.kinds[item.kind]}: ${ru.inventory.actsAlone.toLowerCase()}`}</Chip>
-          ) : null}
+          {!isItem ? <Chip tone="info">{ru.inventory.actsAloneChip(item.kind)}</Chip> : null}
           {facts.map((f) => (
             <Chip key={f}>{f}</Chip>
           ))}
@@ -323,9 +318,14 @@ export function UseItemDialog({
       ? (step.objectsByTarget?.find((t) => t.playerId === (target ?? ''))?.objects ??
         (item.choosesTarget ? [] : (step.objectsByTarget?.[0]?.objects ?? [])))
       : step.options;
+  // An object to pick from a target who has none asks no answer: the engine takes nothing and reads none (D-440)
+  const asked = (step: Schemas['ItemStepView']) =>
+    step.kind !== 'pickObject' ||
+    (item.choosesTarget && target === null) ||
+    optionsOf(step).length > 0;
   const ready =
     (!item.choosesTarget || target !== null) &&
-    item.steps.every((step, i) => answers[i] && optionsOf(step).some((o) => o.id === answers[i]));
+    item.steps.every((step, i) => !asked(step) || optionsOf(step).some((o) => o.id === answers[i]));
 
   return (
     <FormDialog
@@ -347,7 +347,9 @@ export function UseItemDialog({
           setError(null);
           void onUse({
             targetPlayerId: item.choosesTarget ? target : null,
-            choices: answers.filter((a): a is string => a !== null),
+            choices: item.steps
+              .map((step, i) => (asked(step) ? answers[i] : null))
+              .filter((a): a is string => a != null),
           }).then((result) => {
             setBusy(false);
             if (!result.ok) setError(result.message);
@@ -420,7 +422,7 @@ export function UseItemDialog({
                   </option>
                 ))}
               </Select>
-              {step.kind === 'pickObject' && target && options.length === 0 ? (
+              {step.kind === 'pickObject' && !asked(step) ? (
                 <span className="text-sm text-ink-soft">{ru.inventory.noObjects}</span>
               ) : null}
             </div>
