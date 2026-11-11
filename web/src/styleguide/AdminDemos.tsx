@@ -23,6 +23,9 @@ const base: Schemas['ProofQueueItemView'] = {
   decidesFinish: true,
   files: [],
   rollClosed: false,
+  cellBonus: 2,
+  // D-262: the penalty «Отклонить со штрафом дропа» names in its confirmation
+  dropPenalty: { count: 2, sides: 4, affectsPoints: true, affectsPosition: true, badEvent: true },
 };
 
 /** The admin's shared pieces: a run in the proof queue (the finish, the roll closed by the limit) */

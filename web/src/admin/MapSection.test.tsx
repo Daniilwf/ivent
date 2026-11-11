@@ -19,7 +19,8 @@ import {
   setDefaultBranch,
   type Draft,
 } from './mapDraft';
-import { MapSection } from './MapSection';
+import { checkDelayMs, MapSection } from './MapSection';
+import { pastTheDelay } from '../test/waits';
 
 const t = ru.admin.map;
 
@@ -45,6 +46,8 @@ const view = (overrides: Partial<Schemas['AdminMapView']> = {}): Schemas['AdminM
 });
 
 const ok = { canPublish: true, problems: [], warnings: [] };
+// The editor asks the server to check the draft once the edits rest (FL-2)
+const afterEdit = pastTheDelay(checkDelayMs);
 
 beforeEach(() => {
   localStorage.clear();
@@ -166,14 +169,14 @@ describe('the map editor', () => {
     render(<MapSection seasonId={seasonId} version={0} />);
 
     // The published map as it is: nothing to publish
-    expect(await screen.findByText(t.check.unchanged)).toBeInTheDocument();
+    expect(await screen.findByText(t.check.unchanged, {}, afterEdit)).toBeInTheDocument();
     expect(screen.getByTestId('map-publish-button')).toBeDisabled();
 
     await userEvent.selectOptions(screen.getByTestId('map-cell-pick'), 'c1');
     expect(screen.getByTestId('map-cell')).toHaveTextContent(t.cell.players('Вася'));
     await userEvent.click(screen.getByTestId('map-cell-remove'));
 
-    const problems = await screen.findByTestId('map-problems');
+    const problems = await screen.findByTestId('map-problems', {}, afterEdit);
     expect(problems).toHaveTextContent(t.check.problems(2));
     expect(problems).toHaveTextContent(t.problem['map.occupiedCellRemoved']?.('c1') ?? '');
     expect(problems).toHaveTextContent(t.problem['map.deadEnd']?.('start') ?? '');
@@ -196,7 +199,7 @@ describe('the map editor', () => {
       'POST /api/admin/seasons/*/map/publish': { duplicate: false, events: [] },
     });
     render(<MapSection seasonId={seasonId} version={0} />);
-    await screen.findByText(t.check.unchanged);
+    await screen.findByText(t.check.unchanged, {}, afterEdit);
 
     // A new cell c2 between c1 and the finish, c1 a fork
     await userEvent.click(screen.getByTestId('map-add-cell'));
@@ -209,7 +212,7 @@ describe('the map editor', () => {
     await userEvent.click(screen.getByTestId('map-arrow-add'));
     expect(within(screen.getByTestId('map-exit-finish')).getByRole('checkbox')).toBeChecked();
 
-    expect(await screen.findByText(t.check.ok)).toBeInTheDocument();
+    expect(await screen.findByText(t.check.ok, {}, afterEdit)).toBeInTheDocument();
     // No comment, no window
     await userEvent.click(screen.getByTestId('map-publish-button'));
     expect(await screen.findByText(ru.admin.commentRequired)).toBeInTheDocument();
@@ -242,7 +245,7 @@ describe('the map editor', () => {
       }),
     });
     render(<MapSection seasonId={seasonId} version={0} />);
-    await screen.findByText(t.check.ok);
+    await screen.findByText(t.check.ok, {}, afterEdit);
 
     await userEvent.type(screen.getByTestId('map-publish-comment'), 'Новая');
     await userEvent.click(screen.getByTestId('map-publish-button'));
@@ -286,9 +289,28 @@ describe('the map editor', () => {
     });
     render(<MapSection seasonId={seasonId} version={0} />);
 
-    expect(await screen.findByText(t.check.warning('Болото ужаса', 4, 15))).toBeInTheDocument();
+    expect(
+      await screen.findByText(t.check.warning('Болото ужаса', 4, 15), {}, afterEdit),
+    ).toBeInTheDocument();
     expect(screen.getByText(t.check.ok)).toBeInTheDocument();
     expect(screen.getByTestId('map-publish-button')).toBeEnabled();
+  });
+
+  it("keeps the map's settings in one column beside the cell panel", async () => {
+    onDesktop();
+    fakeServer({
+      'GET /api/admin/seasons/*/map': view(),
+      'POST /api/admin/seasons/*/map/check': ok,
+    });
+    render(<MapSection seasonId={seasonId} version={0} />);
+
+    const settings = await screen.findByTestId('map-settings');
+    // The background and the zones stacked together: the two-column grid never wraps a third panel under the cell
+    expect([...settings.children].map((c) => c.getAttribute('data-testid'))).toEqual([
+      'map-background',
+      'map-zones',
+    ]);
+    expect(settings.parentElement?.children).toHaveLength(2);
   });
 
   it('says when the kept draft was dropped because the map was published since', async () => {

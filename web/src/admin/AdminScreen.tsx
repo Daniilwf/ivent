@@ -15,7 +15,7 @@ import {
   Users,
   Wrench,
 } from 'lucide-react';
-import { lazy, Suspense, useCallback, useRef, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { api, type Schemas } from '../api/client';
 import { Link } from '../app/Link';
 import { NotFoundPage } from '../app/NotFound';
@@ -44,6 +44,7 @@ import { TestToolsSection } from './TestToolsSection';
 import { SectionHead } from './common';
 import { answerOf, useLoaded } from '../app/useLoaded';
 import { useSeasonVersion } from '../app/useSeasonVersion';
+import { reportWaitingProofs } from './waitingProofs';
 
 // The map editor (@xyflow/react) loads apart from the site: the players never download it
 const MapSection = lazy(async () => ({ default: (await import('./MapSection')).MapSection }));
@@ -114,6 +115,10 @@ export function AdminScreen({
     { version },
   );
   const waiting = proofs.kind === 'ready' ? proofs.value.length : null;
+  // The header's count follows the page's reads (D-263)
+  useEffect(() => {
+    if (seasonId && waiting !== null) reportWaitingProofs(seasonId, waiting);
+  }, [seasonId, waiting]);
 
   // Which copy of the site this is: the test tools' section is there only where the test endpoints are
   const status = useLoaded(

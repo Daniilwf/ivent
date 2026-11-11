@@ -206,6 +206,7 @@ const feedLines = {
   adjusted: <T>(p: T): Line<T> => [p, ': правка админа'],
   offerDiscarded: <T>(p: T, g: T): Line<T> => [p, ': админ снимает ', g],
   choiceDiscarded: <T>(p: T): Line<T> => [p, ': админ снимает выбор игры'],
+  branchDiscarded: <T>(p: T): Line<T> => [p, ': админ снимает выбор ветки на развилке'],
   rolled: <T>(p: T, g: T): Line<T> => [p, ' выкручивает ', g],
   choiceRolled: <T>(p: T, count: number): Line<T> => [
     p,
@@ -316,6 +317,25 @@ export const ru = {
     closingTitle: 'Ждём проверку пруфов',
     closingText: 'Броски закрыты. Пруфы ещё можно дослать — итоги после проверки всех.',
     todo: (count: number) => `Сначала дела: ${count}`,
+    // The player's own finish on the turn card (D-99, D-260): the place, provisional until the proofs are checked, frozen
+    // for the first; the season goes on for them (SPEC: the first plays on without counting, the later finishers score)
+    myFinish: {
+      title: 'Ты на финише',
+      firstProvisional:
+        'Первое место — твоё, пока предварительно: станет окончательным, когда админ проверит пруфы.',
+      firstProvisionalNext: 'Пока идёт проверка, очки за прохождения считаются как обычно.',
+      firstFrozen: 'Первое место — твоё. Очки заморожены, на других ты больше не влияешь.',
+      firstFrozenNext:
+        'Можно играть дальше без зачёта: рероллы бесплатны, твои игры не закрываются для остальных.',
+      // A later finisher's place goes by points (D-100): the leaderboard's, not the order of finishing
+      later: (place: number | null) =>
+        place === null
+          ? 'Бонус за финиш получен, фишка остаётся здесь.'
+          : `Сейчас ${String(place)}-е место: бонус за финиш получен, фишка остаётся здесь.`,
+      laterNext: 'Играй дальше: кубы за прохождения ещё дают очки, место — по очкам.',
+      // Past the deadline no one rolls (SPEC «После дедлайна»): the place waits for the proofs
+      closedNext: 'Броски закрыты — место станет окончательным после проверки пруфов.',
+    },
     roll: 'Крутить колесо',
     start: 'Начать',
     alreadyPlayed: 'Уже проходил',
@@ -389,6 +409,18 @@ export const ru = {
     techRerollClosed:
       'Окно тех-реролла закрылось. Если с игрой техническая проблема, напиши админу.',
     techRerollUntil: (time: string) => `Тех-реролл сам можно сделать до ${time}.`,
+    // D-206, D-325, D-261: a free give-up of a game of a listed genre, a tech reroll with the reason «wish»
+    wishReroll: 'Реролл по желанию',
+    wishRerollTitle: (title: string) => `Реролл по желанию: «${title}»`,
+    wishRerollConsequences: [
+      'Бесплатно: очки и клетки не меняются, штрафа нет',
+      'Игра вернётся в пул — тебе она больше не выпадет в этом сезоне',
+      'Сразу новый ролл',
+      'Можно только в окне тех-реролла и только для жанров из правил сезона',
+    ],
+    wishRerollUntil: (time: string) => `Окно закроется ${time}.`,
+    wishRerollConfirm: 'Да, реролл по желанию',
+    wishRerollCancel: 'Отмена',
     gameMark: (player: string, kind: 'dropped' | 'techRerolled') =>
       kind === 'dropped' ? `Дропнул ${player}` : `Тех-реролл у ${player}`,
     alreadyPlayedGame: (title: string) => `Уже проходил: ${title}`,
@@ -484,6 +516,7 @@ export const ru = {
       'file.tooOften': 'Слишком много загрузок подряд. Подожди минуту.',
       'file.tooManyPixels': 'Картинка слишком большого разрешения.',
       'file.tooManyFrames': 'В GIF слишком много кадров.',
+      'file.notStill': 'Нужна неподвижная картинка, не анимация.',
       'file.dailyLimit': 'На сегодня лимит загрузок исчерпан.',
       'file.busy': 'Сервер занят другими картинками. Попробуй через минуту.',
       'file.downloadsPerHour': 'Лимит скачиваний по ссылке на этот час исчерпан.',
@@ -499,6 +532,9 @@ export const ru = {
   },
   shell: {
     menu: (name: string) => `Меню: ${name}`,
+    // D-359, D-263: the admin's count of runs waiting for a proof check
+    menuWaiting: (name: string, waiting: number) =>
+      `Меню: ${name}. Ждут проверки пруфов: ${waiting}`,
     changePassword: 'Сменить пароль',
     noSeasonTitle: 'Сезон ещё не начался',
     noSeasonText: 'Когда админ заведёт сезон, здесь появятся карта, лидерборд и твой ход.',
@@ -664,7 +700,7 @@ export const ru = {
     },
     shell: {
       title: 'Шапка',
-      lead: 'Название, знак потери связи, сообщение о баге и моё меню. На телефоне 390 px — без связи, знак только иконкой; ниже — широкая, связь есть.',
+      lead: 'Название, знак потери связи, сообщение о баге и моё меню. На телефоне 390 px — без связи, знак только иконкой; ниже — широкая, связь есть; у админа на кнопке меню — сколько прохождений ждут проверки пруфов (больше 99 — «99+»).',
     },
     states: {
       normal: 'Обычное',
@@ -807,6 +843,14 @@ export const ru = {
       markup:
         'Разметка в названии и описании показывается текстом: «<img>» не становится картинкой.',
     },
+    mapBackground: {
+      title: 'Фон карты',
+      lead: 'Картинка админа под клетками карты-графа: клетки стоят на её пикселях, зон поверх неё нет: картинка и есть мир, а зону клетки показывает цветной ободок вокруг неё и табличка с названием. Без фона карта рисуется доской из зон. Ниже — панель редактора во всех состояниях: нет фона, загрузка, ошибка, фон есть.',
+      none: 'Нет фона',
+      uploading: 'Загрузка',
+      failed: 'Ошибка',
+      ready: 'Фон есть, черновик',
+    },
     editor: {
       title: 'Редактор карты',
       lead: 'Холст React Flow: клетки перетаскиваются, стрелки тянутся от правого края. Красная рамка — клетка с ошибкой проверки. Ниже — проверка словами.',
@@ -857,7 +901,7 @@ export const ru = {
     },
     finish: {
       title: 'Финиш',
-      lead: 'Первый дошедший до финиша. Место предварительное, пока админ не проверит пруфы.',
+      lead: 'Первый дошедший до финиша. Место предварительное, пока админ не проверит пруфы. Ниже — карточка хода финишировавшего: первый предварительно, первый после проверки, финишировавший позже.',
       go: 'Дойти до финиша',
       again: 'Ещё раз',
     },
@@ -1102,6 +1146,7 @@ export const ru = {
     rules: 'Правила',
     profile: 'Мой профиль',
     admin: 'Админка',
+    adminWaiting: (waiting: number) => `Админка, ждут проверки пруфов: ${waiting}`,
   },
   // H6: the pool of games (SPEC «Пул игр», «Статусы игры в сезоне», «Дубли»)
   pool: {
@@ -1831,6 +1876,19 @@ export const ru = {
       cellsList: 'Клетка',
       fit: 'Показать всю карту',
       noSelection: 'Выбери клетку на холсте или в списке.',
+      background: {
+        title: 'Фон карты',
+        none: 'Фона нет: игроки видят доску из зон. Загрузи картинку — клетки встанут поверх неё.',
+        formats: 'Неподвижная картинка JPEG, PNG или WebP.',
+        placement: 'Места клеток считаются в пикселях картинки: расставь клетки по ней.',
+        upload: 'Загрузить картинку',
+        replace: 'Заменить картинку',
+        remove: 'Убрать фон',
+        uploading: 'Загружаем картинку…',
+        size: (width: number, height: number) => `${width} × ${height} пикселей`,
+        preview: 'Фон карты, уменьшенная копия',
+        draftOnly: 'Фон попадёт к игрокам вместе с картой, когда ты её опубликуешь.',
+      },
       cell: {
         title: (id: string) => `Клетка «${id}»`,
         type: 'Тип',
@@ -1938,6 +1996,9 @@ export const ru = {
         'map.zoneUnknown': (s: string) => `У клетки «${s}» зона, которой нет в списке.`,
         'map.zoneDuplicate': (s: string) => `Две зоны с id «${s}».`,
         'map.zoneInvalid': (s: string) => `Зона «${s}» заполнена с ошибкой.`,
+        'map.backgroundInvalid': () => 'У фона нет файла или размера: загрузи картинку заново.',
+        'map.backgroundUnknown': () =>
+          'Фона нет на сайте или его размер не совпадает: загрузи картинку заново или убери фон.',
         'map.zoneUnsupported': (s: string) =>
           `Зона «${s}»: кубы пока меняются только числом кубиков или добавкой к сумме.`,
         'map.occupiedCellRemoved': (s: string) =>
@@ -2046,6 +2107,29 @@ export const ru = {
         'Игра снова станет доступна для ролла',
       ],
       rejectConfirm: 'Отклонить прохождение',
+      // D-327, D-262: for obvious cheating — the reject, then the season's drop penalty on what is left
+      rejectPenalty: 'Отклонить со штрафом дропа',
+      rejectPenaltyTitle: (game: string, player: string) =>
+        `Отклонить «${game}» (${player}) со штрафом дропа?`,
+      rejectPenaltyConsequences: (penalty: DropPenalty | null): string[] => {
+        // The frozen first loses nothing (D-99)
+        if (!penalty) return ['Штрафа не будет: игрок уже первый, его очки заморожены'];
+        const takes = [
+          penalty.affectsPoints ? 'очки' : null,
+          penalty.affectsPosition ? 'клетки (не дальше чекпоинта и старта)' : null,
+        ]
+          .filter((part) => part !== null)
+          .join(' и ');
+        return [
+          takes === ''
+            ? 'Затем штраф дропа без кубов'
+            : `Затем штраф дропа: кубы ${String(penalty.count)}d${String(penalty.sides)} отнимут ${takes}`,
+          ...(penalty.badEvent ? ['И плохой ивент, как за дроп'] : []),
+          'Прохождение останется отклонённым, а не дропнутым',
+        ];
+      },
+      rejectPenaltyConfirm: 'Отклонить со штрафом',
+      rejectedPenalty: (game: string) => `Отклонено со штрафом дропа: ${game}`,
       rejectCommentHint: 'Что не так с пруфом: игрок увидит этот комментарий',
       approved: (game: string) => `Одобрено: ${game}`,
       rejected: (game: string) => `Отклонено: ${game}`,

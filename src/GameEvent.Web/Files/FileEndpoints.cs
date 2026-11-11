@@ -108,7 +108,8 @@ public static class FileEndpoints
         HttpMethods.IsPost(request.Method)
         && request.Path.Value?.TrimEnd('/') is { } path
         && (string.Equals(path, "/api/files", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(path, BugReports.BugReportEndpoints.ScreenshotPath, StringComparison.OrdinalIgnoreCase));
+            || string.Equals(path, BugReports.BugReportEndpoints.ScreenshotPath, StringComparison.OrdinalIgnoreCase)
+            || Map.AdminMapEndpoints.IsBackgroundUpload(path));
 
     public static void MapFiles(this RouteGroupBuilder api)
     {
@@ -155,7 +156,8 @@ public static class FileEndpoints
     /// <summary>
     /// An upload as <c>POST /api/files</c> takes it, of the given kind (D-121): a bug report's screenshot has its own daily
     /// limit, so a user at the upload limit still reports, and is a still picture of at most
-    /// <see cref="BugReportRules.ScreenshotMaxBytes"/>; nothing else on the site may show it.
+    /// <see cref="BugReportRules.ScreenshotMaxBytes"/>; nothing else on the site may show it. A map background (D-278) is
+    /// a still picture of at most <see cref="FileLimits.MapBackgroundMaxBytes"/>, reduced to its own long side.
     /// </summary>
     internal static async Task<IResult> UploadPictureAsync(
         HttpRequest request, ClaimsPrincipal principal, FileServices services, FileKind kind, CancellationToken ct)
@@ -266,8 +268,16 @@ public static class FileEndpoints
     private static int DailyLimitOf(FileKind kind, FileLimits limits) =>
         kind == FileKind.BugScreenshot ? BugReportRules.ScreenshotsPerDay : limits.UploadsPerDay;
 
-    private static long MaxBytes(FileKind kind, FileLimits limits) =>
-        kind == FileKind.BugScreenshot ? Math.Min(limits.MaxUploadBytes, BugReportRules.ScreenshotMaxBytes) : limits.MaxUploadBytes;
+    private static long MaxBytes(FileKind kind, FileLimits limits) => kind switch
+    {
+        FileKind.BugScreenshot => Math.Min(limits.MaxUploadBytes, BugReportRules.ScreenshotMaxBytes),
+        FileKind.MapBackground => Math.Min(limits.MaxUploadBytes, limits.MapBackgroundMaxBytes),
+        _ => limits.MaxUploadBytes,
+    };
+
+    /// <summary>A picture is reduced to the long side of its kind: a map background keeps more of itself (D-278).</summary>
+    private static FileLimits ProcessingLimits(FileKind kind, FileLimits limits) =>
+        kind == FileKind.MapBackground ? limits with { MaxLongSide = limits.MapBackgroundMaxLongSide } : limits;
 
     private static async Task<IResult> StoreAsync(byte[] content, Guid commandId, Guid ownerId, FileServices services, CancellationToken ct) =>
         (await StoreFileAsync(content, commandId, ownerId, services, ct)).Answer;
@@ -289,7 +299,7 @@ public static class FileEndpoints
         Engine.Kernel.Rejection? rejection;
         try
         {
-            (processed, rejection) = await Task.Run(() => ImageProcessor.Process(content, limits), CancellationToken.None);
+            (processed, rejection) = await Task.Run(() => ImageProcessor.Process(content, ProcessingLimits(kind, limits)), CancellationToken.None);
         }
         finally
         {
@@ -303,9 +313,9 @@ public static class FileEndpoints
                 : Problem(StatusCodes.Status422UnprocessableEntity, "The picture was refused.", rejection.Detail, rejection.Code), null);
         }
 
-        if (kind == FileKind.BugScreenshot && processed.Frames > 1)
+        if (kind is (FileKind.BugScreenshot or FileKind.MapBackground) && processed.Frames > 1)
         {
-            return (Problem(StatusCodes.Status422UnprocessableEntity, "The picture was refused.", "A screenshot is a still picture.", FileRules.NotStill), null);
+            return (Problem(StatusCodes.Status422UnprocessableEntity, "The picture was refused.", "A screenshot or a map background is a still picture.", FileRules.NotStill), null);
         }
 
         // The bytes go to disk first; the queue then records whose they are. From here the request is not cancelled: a

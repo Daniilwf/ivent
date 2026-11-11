@@ -123,6 +123,8 @@ internal static class MapPublishing
         ArgumentNullException.ThrowIfNull(map);
         var cells = path.Segments[^1].Cells;
         var edges = map.Edges.Select(x => (x.From, x.To)).ToHashSet();
+
+        // Stryker disable once Linq : equivalent — a missing cell of a longer segment misses its arrow too, and a one-cell segment is the player's own cell
         return cells.All(map.HasCell) && cells.Zip(cells.Skip(1)).All(edges.Contains);
     }
 }

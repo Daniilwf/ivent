@@ -47,8 +47,22 @@ public sealed record ZoneView(
     string? Deck = null,
     decimal? ShopPriceMultiplier = null);
 
-/// <summary>A whole map: what the editor loads, checks and publishes.</summary>
-public sealed record MapGraphView(IReadOnlyList<CellView>? Cells, IReadOnlyList<EdgeView>? Edges, IReadOnlyList<ZoneView>? Zones);
+/// <summary>
+/// The picture under the map (D-277): an uploaded map background (<c>POST …/map/background</c>) and its natural size in
+/// pixels — the cells' <c>x</c>, <c>y</c> are in this picture's space. <c>url</c> serves it (the server fills it in; a
+/// request may leave it out).
+/// </summary>
+public sealed record MapBackgroundView(Guid FileId, int Width, int Height)
+{
+    public string Url => $"/api/files/{FileId}";
+}
+
+/// <summary>
+/// A whole map: what the editor loads, checks and publishes. <c>background</c> — the picture under the cells, or null:
+/// the screens then draw the zones' board (D-277).
+/// </summary>
+public sealed record MapGraphView(
+    IReadOnlyList<CellView>? Cells, IReadOnlyList<EdgeView>? Edges, IReadOnlyList<ZoneView>? Zones, MapBackgroundView? Background = null);
 
 /// <summary>
 /// One leg of my latest move: the cells entered from <c>from</c> in order. <c>reason</c> <c>teleport</c> is a transfer,
@@ -65,6 +79,9 @@ public sealed record MoveView(long Sequence, IReadOnlyList<MoveLegView> Legs);
 /// <summary>The season's map as the log has it now, and conversions between the engine's map and the API's.</summary>
 public static class SeasonMaps
 {
+    /// <summary>The code of a background that is not an uploaded map background of its size (D-277).</summary>
+    public const string BackgroundUnknown = "map.backgroundUnknown";
+
     private static readonly string s_published = EventCatalog.Describe(typeof(MapPublished)).Name;
     private static readonly string s_moved = EventCatalog.Describe(typeof(PlayerMoved)).Name;
 
@@ -146,10 +163,46 @@ public static class SeasonMaps
             zone.ShopPriceMultiplier);
     }
 
-    public static MapGraphView ToView(MapGraph map)
+    /// <summary>The map as the screens get it; <paramref name="background"/> — whether its picture is there to show (<see cref="BackgroundAsync"/>).</summary>
+    public static MapGraphView ToView(MapGraph map, MapBackgroundView? background = null)
     {
         ArgumentNullException.ThrowIfNull(map);
-        return new([.. map.Cells.Select(ToView)], [.. map.Edges.Select(ToView)], [.. map.Zones.Select(ToView)]);
+        return new([.. map.Cells.Select(ToView)], [.. map.Edges.Select(ToView)], [.. map.Zones.Select(ToView)], background);
+    }
+
+    /// <summary>
+    /// The map's background as the screens show it (D-277): null when the map has none or its file is not on this site —
+    /// a season copied by an archive carries no files (D-105), and the screens then draw the zones' board.
+    /// </summary>
+    public static async Task<MapBackgroundView?> BackgroundAsync(GameEventDbContext db, MapGraph map, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(db);
+        ArgumentNullException.ThrowIfNull(map);
+        return map.Background is { } b
+            && await db.Files.AsNoTracking().AnyAsync(f => f.Id == b.FileId && !f.IsDeleted && f.Kind == Engine.Files.FileKind.MapBackground, ct)
+            ? new MapBackgroundView(b.FileId, b.Width, b.Height)
+            : null;
+    }
+
+    /// <summary>
+    /// The problem of a draft's background on this site (D-277), apart from the engine's checks of its size: the file is
+    /// an uploaded map background, still there, of the size the map says. Null when the draft has no background.
+    /// </summary>
+    public static async Task<MapError?> BackgroundProblemAsync(GameEventDbContext db, MapGraph map, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(db);
+        ArgumentNullException.ThrowIfNull(map);
+        if (map.Background is not { } b)
+        {
+            return null;
+        }
+
+        var fits = await db.Files.AsNoTracking().AnyAsync(
+            f => f.Id == b.FileId && !f.IsDeleted && f.Kind == Engine.Files.FileKind.MapBackground && f.Frames == 1 && f.Width == b.Width && f.Height == b.Height,
+            ct);
+        return fits
+            ? null
+            : new MapError(BackgroundUnknown, "background", "The background is an uploaded map background of the size the map gives.");
     }
 
     /// <summary>The engine's map of a request; null when a list or an entry is missing (the request is malformed).</summary>
@@ -174,6 +227,7 @@ public static class SeasonMaps
             })],
             [.. edges.Select(e => new Edge(e.From ?? "", e.To ?? "", e.IsDefaultForward, e.IsPrimaryBackward))])
         {
+            Background = view.Background is { } b ? new MapBackground(b.FileId, b.Width, b.Height) : null,
             Zones = [.. (view.Zones ?? []).Select(z => new ZoneDefinition
             {
                 Id = z.Id ?? "",
