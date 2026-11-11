@@ -20,15 +20,19 @@ async function accepted(world: World, type: string): Promise<number> {
 /**
  * Clicks the same button in every tab at once: the buttons are taken first and clicked together, without Playwright's
  * retries. The first click's live update may take the button away in the other tab; its click then does nothing,
- * which is the point: the step still happens once.
+ * which is the point: the step still happens once. `firstTwice` clicks twice in the first tab, like a double click.
  */
-async function clickTogether(tabs: Page[], testId: string) {
+async function clickTogether(tabs: Page[], testId: string, firstTwice = false) {
   const buttons = await Promise.all(tabs.map((tab) => tab.getByTestId(testId).elementHandle()));
   await Promise.all(
-    buttons.map((button) =>
-      button.evaluate((b) => {
-        if (b instanceof HTMLElement) b.click();
-      }),
+    buttons.map((button, i) =>
+      button.evaluate(
+        (b, times) => {
+          if (!(b instanceof HTMLElement)) return;
+          for (let n = 0; n < times; n++) b.click();
+        },
+        firstTwice && i === 0 ? 2 : 1,
+      ),
     ),
   );
 }
@@ -46,7 +50,7 @@ test('two tabs: the same step clicked in both at once happens once, and both tab
   for (const tab of tabs) await expect(tab.getByTestId('roll')).toBeVisible();
 
   // The roll: a double click in one tab and a click in the other, together
-  await Promise.all([first.getByTestId('roll').dblclick(), second.getByTestId('roll').click()]);
+  await clickTogether(tabs, 'roll', true);
   for (const tab of tabs) await expect(tab.getByTestId('offer')).toBeVisible();
   const title = await first.locator('#roll-result-title').textContent();
   await expect(second.locator('#roll-result-title')).toHaveText(title ?? '');

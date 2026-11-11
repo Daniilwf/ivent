@@ -60,6 +60,11 @@ globalThis.addEventListener('popstate', () => {
   navigated = true;
 });
 
+/** Tests only: the next page is the first of a new visit again (a test is a new visit, setup.ts) */
+export function forgetNavigation() {
+  navigated = false;
+}
+
 function subscribe(listener: () => void) {
   listeners.add(listener);
   globalThis.addEventListener('popstate', listener);
