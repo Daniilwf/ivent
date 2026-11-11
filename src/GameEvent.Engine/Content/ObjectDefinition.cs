@@ -429,6 +429,13 @@ public sealed record TakeObjectAction : ActionSpec
     /// <summary>Every matching object (D-476); then there is nothing to pick and no <see cref="Count"/>.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public bool All { get; init; }
+
+    /// <summary>
+    /// The use is refused (<c>item.nothingToTake</c>) when the target has nothing the filter lets through: an exchange or a
+    /// theft «взамен» that would otherwise be a gift (D-487). <c>give</c> is refused without it (D-478).
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool Required { get; init; }
 }
 
 public enum TransformMode

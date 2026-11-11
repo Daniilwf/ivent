@@ -222,7 +222,7 @@
 | Перехват | пассивная защита, гасящая враждебный эффект | `Intercept`, событие `HostileIntercepted` |
 | Отражение урона | урон монетками по цели на пороге `effects.reflect.coinsAtMost` и ниже достаётся использующему, умноженный (D-474) | `ChangeResourceAction.Reflect`, `CoinReflect` |
 | Счётчик эффекта | обратный отсчёт эффекта: срабатывания триггера уменьшают его, на нуле эффект действует; зелья меняют и сбрасывают (D-479) | `EffectSpec.Counter`, `InventoryObject.Counter`, `TransformMode.AddCounter`, `ResetCounters`, триггер `RunEnded` |
-| Передача объекта | игрок отдаёт свой объект другому предметом; отданное — его дело на получателе (D-478) | `TakeMode.Give`, `ObjectTransferred.Given`, отказ `item.nothingToGive` |
+| Передача объекта | игрок отдаёт свой объект другому предметом; отданное — его дело на получателе (D-478) | `TakeMode.Give`, `ObjectTransferred.Given`, отказ `item.nothingToGive`; кража «взамен» с `required` — отказ `item.nothingToTake` (D-487) |
 | Неукрадываемый, неуничтожимый | флаги объекта: эффекты не забирают и не передают / не уничтожают и не превращают его (D-478) | `ObjectDefinition.Unstealable`, `Undestroyable` |
 | Условие использования | когда предмет можно использовать, например «при нуле монеток» (D-483) | `ObjectDefinition.UseCondition`, статистика `ContentStat.Coins`, отказ `item.conditionNotMet` |
 | Ветвление по выбору | исходы эффекта по ответу игрока, а не по броску (D-482) | `OutcomesSpec.Choice`, `OutcomeCase.Option` |
