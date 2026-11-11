@@ -1,5 +1,7 @@
 using System.Text.Json;
+using GameEvent.Engine.Content;
 using GameEvent.Engine.Kernel;
+using GameEvent.Engine.Map;
 using GameEvent.Engine.Players;
 using GameEvent.Engine.Pool;
 using GameEvent.Engine.Rulesets;
@@ -14,8 +16,10 @@ namespace GameEvent.Web.Hosting;
 
 /// <summary>
 /// Small seed for local development (`dotnet run -- seed-dev`, Development only, F2, D-126): an admin, five players, a
-/// spectator, the 50 games of content/pool.dev.json and a running season. Everything goes through the command queue, the
-/// pool too; a re-run adds only what is missing.
+/// spectator, the 50 games of content/pool.dev.json and a running season. Stage 5 (5.2): the season plays on the graph
+/// map content/map.dev.json with event cells, items and events on, and the content of the repository published — the
+/// items and wheels with the events and decks (D-533). Everything goes through the command queue, the pool too; a re-run
+/// adds only what is missing.
 /// </summary>
 public static class DevSeed
 {
@@ -40,7 +44,7 @@ public static class DevSeed
             ?? throw new InvalidOperationException("DevSeed:Password is not set (appsettings.Development.json).");
         await SeedAccountsAsync(bus, factory, s_users, password, ct);
         await SeedPoolAsync(bus, factory, Path.Combine(contentRoot, "content", "pool.dev.json"), ct);
-        await SeedSeasonAsync(bus, factory, ct);
+        await SeedSeasonAsync(bus, factory, contentRoot, ct);
     }
 
     /// <summary>The accounts that are not there yet, through the queue like any account (D-106), with a known password.</summary>
@@ -77,12 +81,16 @@ public static class DevSeed
     }
 
     /// <summary>Creates the season and adds every player who is not in it yet: safe to re-run after a partial seed.</summary>
-    private static async Task SeedSeasonAsync(CommandBus bus, IDbContextFactory<GameEventDbContext> factory, CancellationToken ct)
+    private static async Task SeedSeasonAsync(CommandBus bus, IDbContextFactory<GameEventDbContext> factory, string contentRoot, CancellationToken ct)
     {
         await using var db = await factory.CreateDbContextAsync(ct);
         if (!await db.Seasons.AnyAsync(s => s.Id == SeasonId, ct))
         {
-            await SendAsync(bus, SeasonId, new CreateSeason(SeasonId, "Сезон разработки", RulesetJson.Default()), ct);
+            var rules = RulesetJson.Default();
+            rules = rules with { Features = rules.Features with { MapMode = MapMode.Graph, Items = true, Events = true } };
+            var map = ContentJson.Parse<MapGraph>(await File.ReadAllTextAsync(Path.Combine(contentRoot, "content", "map.dev.json"), ct));
+            await SendAsync(bus, SeasonId, new CreateSeason(SeasonId, "Сезон разработки", rules, Map: map), ct);
+            await SendAsync(bus, SeasonId, new PublishContent(Pack(contentRoot), "Предметы и колоды ивентов"), ct);
         }
 
         if (await db.Seasons.AnyAsync(s => s.Id == SeasonId && s.Status == SeasonStatus.Draft, ct))
@@ -96,6 +104,15 @@ public static class DevSeed
         {
             await SendAsync(bus, SeasonId, new AddSeasonPlayer(Guid.CreateVersion7(), player.Id, player.Name), ct);
         }
+    }
+
+    /// <summary>The content of the repository with events (D-533): items and events, wheels and decks.</summary>
+    internal static ContentPack Pack(string contentRoot)
+    {
+        IEnumerable<(string, string)> Read(params string[] dirs) =>
+            dirs.SelectMany(d => Directory.EnumerateFiles(Path.Combine(contentRoot, "content", d), "*.json"))
+                .Select(f => (Path.GetFileName(f), File.ReadAllText(f)));
+        return ContentFiles.Pack(Read("items", "events"), Read("wheels", "decks"));
     }
 
     internal static async Task SendAsync(CommandBus bus, Guid seasonId, ICommand command, CancellationToken ct, Guid? authorId = null)
