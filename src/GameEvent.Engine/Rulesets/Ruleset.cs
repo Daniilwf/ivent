@@ -359,6 +359,24 @@ public sealed record EffectRules
     public required HostileCap HostileCap { get; init; }
 
     public required bool AttacksOnlyOnHigherPoints { get; init; }
+
+    /// <summary>
+    /// Coin damage marked <c>reflect</c> that goes back to the attacker (D-474, the import's weapons). Missing — nothing is
+    /// reflected: a season created before the rule keeps playing as it did (D-50). Not written while missing.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public CoinReflect? Reflect { get; init; }
+}
+
+/// <summary>
+/// Reflection of coin damage (D-474): when the target has at most <see cref="CoinsAtMost"/> coins, the damage goes to the
+/// one who used the effect, times <see cref="Multiplier"/>.
+/// </summary>
+public sealed record CoinReflect
+{
+    public required int CoinsAtMost { get; init; }
+
+    public required int Multiplier { get; init; }
 }
 
 public sealed record InteractionRules

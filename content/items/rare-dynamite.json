@@ -1,0 +1,32 @@
+{
+  "id": "rare-dynamite",
+  "kind": "item",
+  "name": "Редкий Динамит",
+  "description": "Оружие. Выбранный другой игрок идёт на 3 клетки вперёд и теряет 4 монетки. Если у жертвы −30 монеток или меньше (порог из правил сезона), урон монетками удваивается и достаётся тебе.",
+  "rarity": "epic",
+  "price": 20,
+  "window": "anytime",
+  "hostile": true,
+  "stackable": false,
+  "tags": [
+    "weapon"
+  ],
+  "effect": {
+    "target": {
+      "selector": "chosen",
+      "excludeSelf": true
+    },
+    "actions": [
+      {
+        "type": "move",
+        "steps": 3
+      },
+      {
+        "type": "changeResource",
+        "resource": "coins",
+        "amount": -4,
+        "reflect": true
+      }
+    ]
+  }
+}

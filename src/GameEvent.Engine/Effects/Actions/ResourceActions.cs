@@ -23,6 +23,14 @@ internal sealed class ChangeResourceHandler : ActionHandler<ChangeResourceAction
                 run.Emit(new PointsChanged(target, amount, PointsReason.Item, RunId: null));
                 break;
             case Coins:
+                if (action.Reflect && amount < 0 && target != run.UserId
+                    && run.State.Rules.Effects.Reflect is { } reflect && run.State.Players[target].Coins <= reflect.CoinsAtMost)
+                {
+                    // The damage goes back to the attacker (D-474)
+                    target = run.UserId;
+                    amount *= reflect.Multiplier;
+                }
+
                 var coins = run.State.Players[target].Coins;
                 if (!run.State.Rules.Economy.AllowNegativeCoins && amount < 0 && coins + amount < 0)
                 {

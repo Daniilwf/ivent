@@ -62,7 +62,7 @@
 | `type` | Параметры |
 | --- | --- |
 | `move` | `steps`: число, кубики или ссылка; минус — назад |
-| `changeResource` | `resource`: `points`, `coins` или свой ключ; `amount` |
+| `changeResource` | `resource`: `points`, `coins` или свой ключ; `amount`; `reflect: true` — монетки, снятые с цели, у которой их не больше `effects.reflect.coinsAtMost`, снимаются с использующего, умноженные на `effects.reflect.multiplier` (D-474) |
 | `roll` | `dice`: результат доступен как `$roll` |
 | `giveObject` | `objectId`, `params` для параметризованных объектов |
 | `takeObject` | `mode`: `take`, `steal`, `destroy`; `filter`; `pick`: `random` или `chosen` (ответ — id экземпляра) |
@@ -279,6 +279,23 @@
     "actions": [
       { "type": "takeObject", "mode": "destroy", "pick": "chosen", "filter": { "kind": "item", "excludeTags": ["gremlin"] } },
       { "type": "changeResource", "resource": "coins", "amount": -1, "target": "self" }
+    ]
+  }
+}
+```
+
+### 12. Граната — урон монетками отражается от бедной цели
+
+```json
+{
+  "id": "grenade", "kind": "item", "name": "Граната",
+  "description": "Оружие. Выбранный другой игрок идёт на 1 клетку назад и теряет 2 монетки. Если у жертвы −30 монеток или меньше (порог из правил сезона), урон монетками удваивается и достаётся тебе.",
+  "rarity": "common", "price": null, "window": "anytime", "hostile": true, "stackable": false, "tags": ["weapon"],
+  "effect": {
+    "target": { "selector": "chosen", "excludeSelf": true },
+    "actions": [
+      { "type": "move", "steps": -1 },
+      { "type": "changeResource", "resource": "coins", "amount": -2, "reflect": true }
     ]
   }
 }

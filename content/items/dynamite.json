@@ -1,0 +1,32 @@
+{
+  "id": "dynamite",
+  "kind": "item",
+  "name": "Динамит",
+  "description": "Оружие. Выбранный другой игрок идёт на 1 клетку вперёд и теряет 2 монетки. Если у жертвы −30 монеток или меньше (порог из правил сезона), урон монетками удваивается и достаётся тебе.",
+  "rarity": "common",
+  "price": null,
+  "window": "anytime",
+  "hostile": true,
+  "stackable": false,
+  "tags": [
+    "weapon"
+  ],
+  "effect": {
+    "target": {
+      "selector": "chosen",
+      "excludeSelf": true
+    },
+    "actions": [
+      {
+        "type": "move",
+        "steps": 1
+      },
+      {
+        "type": "changeResource",
+        "resource": "coins",
+        "amount": -2,
+        "reflect": true
+      }
+    ]
+  }
+}

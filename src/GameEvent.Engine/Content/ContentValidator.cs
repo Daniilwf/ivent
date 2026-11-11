@@ -287,6 +287,9 @@ public static partial class ContentValidator
                 case ChangeResourceAction change when string.IsNullOrWhiteSpace(change.Resource):
                     error($"{at}.resource", "A resource is «points», «coins» or another key.");
                     break;
+                case ChangeResourceAction { Reflect: true } change when change.Resource != "coins" || change.Target == ActionTarget.Self:
+                    error($"{at}.reflect", "Only coins taken from the effect's target are reflected.");
+                    break;
                 case RollAction roll when roll.Dice.Kind != ContentValueKind.Dice || roll.Dice.Negative:
                     error($"{at}.dice", "A roll needs dice such as «1d6», without a minus.");
                     break;

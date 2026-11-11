@@ -274,6 +274,13 @@ public sealed record ChangeResourceAction : ActionSpec
     public required string Resource { get; init; }
 
     public required ContentValue Amount { get; init; }
+
+    /// <summary>
+    /// Coins taken from the effect's target go to the one who used it instead, multiplied, when the target is at or below
+    /// <c>effects.reflect.coinsAtMost</c> (D-474). Only for coins taken from another player.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool Reflect { get; init; }
 }
 
 /// <summary>Roll dice; the result is <c>$roll</c> for the next actions.</summary>

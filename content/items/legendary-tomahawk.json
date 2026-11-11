@@ -1,0 +1,35 @@
+{
+  "id": "legendary-tomahawk",
+  "kind": "item",
+  "name": "Легендарный Томагавк Ковра",
+  "description": "Оружие. Брось d12: выбранный другой игрок теряет столько монеток и идёт на столько же клеток назад.",
+  "rarity": "legendary",
+  "price": null,
+  "window": "anytime",
+  "hostile": true,
+  "stackable": false,
+  "tags": [
+    "weapon"
+  ],
+  "effect": {
+    "target": {
+      "selector": "chosen",
+      "excludeSelf": true
+    },
+    "actions": [
+      {
+        "type": "roll",
+        "dice": "1d12"
+      },
+      {
+        "type": "changeResource",
+        "resource": "coins",
+        "amount": "-$roll"
+      },
+      {
+        "type": "move",
+        "steps": "-$roll"
+      }
+    ]
+  }
+}

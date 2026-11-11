@@ -1,0 +1,32 @@
+{
+  "id": "better-grenade",
+  "kind": "item",
+  "name": "Улучшенная Граната",
+  "description": "Оружие. Выбранный другой игрок идёт на 2 клетки назад и теряет 3 монетки. Если у жертвы −30 монеток или меньше (порог из правил сезона), урон монетками удваивается и достаётся тебе.",
+  "rarity": "common",
+  "price": 16,
+  "window": "anytime",
+  "hostile": true,
+  "stackable": false,
+  "tags": [
+    "weapon"
+  ],
+  "effect": {
+    "target": {
+      "selector": "chosen",
+      "excludeSelf": true
+    },
+    "actions": [
+      {
+        "type": "move",
+        "steps": -2
+      },
+      {
+        "type": "changeResource",
+        "resource": "coins",
+        "amount": -3,
+        "reflect": true
+      }
+    ]
+  }
+}
