@@ -276,4 +276,18 @@ public class CellStopTests
 
         Assert.Equal("k", s.Player("Вася").CellId);
     }
+
+    [Fact]
+    public void A_paused_move_a_transfer_or_a_non_triggering_move_stops_on_no_cell()
+    {
+        // Found by mutation testing (D-282): the cell's events come only from a stop of a triggering move
+        var s = Pool(BonusMap());
+        var vasya = s.PlayerId("Вася");
+        PlayerMoved Move(int steps, MoveReason reason, bool paused = false) => new(vasya, "a", "p", steps, ["p"], reason, null, paused);
+
+        Assert.Empty(CellStops.After(s.State, Move(1, MoveReason.CompletionRoll, paused: true), s.Context()));
+        Assert.Empty(CellStops.After(s.State, Move(0, MoveReason.CompletionRoll), s.Context()));
+        Assert.Empty(CellStops.After(s.State, Move(1, MoveReason.RunCorrection), s.Context()));
+        Assert.NotEmpty(CellStops.After(s.State, Move(1, MoveReason.CompletionRoll), s.Context()));
+    }
 }

@@ -48,6 +48,11 @@ public class ValidationEdgeTests
         // D-96 (3): a typo in the coin reward must not break every completion
         { "millions of coins per hour", r => r with { Reward = r.Reward with { Coins = r.Reward.Coins with { PerHour = 1_000_001 } } }, "reward.coins.perHour" },
         { "millions of minimum coins", r => r with { Reward = r.Reward with { Coins = r.Reward.Coins with { Min = 1_000_001 } } }, "reward.coins.min" },
+        // Found by mutation testing (D-282)
+        { "blank wish reroll tag", r => r with { Roll = r.Roll with { WishRerollTags = ["Horror", " "] } }, "roll.wishRerollTags" },
+        { "no unchecked runs", r => r with { Season = r.Season with { MaxUncheckedRuns = 0 } }, "season.maxUncheckedRuns" },
+        { "negative zone games", r => r with { Map = r.Map with { MinZoneGames = -1 } }, "map.minZoneGames" },
+        { "too many challenge dice", r => r with { Reward = r.Reward with { ChallengeBonus = new ChallengeBonus { ExtraDice = 1_001 } } }, "reward.challengeBonus.extraDice" },
         {
             "length filter not implemented",
             r => r with { Roll = r.Roll with { LastDaysLengthFilter = r.Roll.LastDaysLengthFilter with { Enabled = true } } },
@@ -62,6 +67,23 @@ public class ValidationEdgeTests
         var errors = RulesetValidator.Validate(change(TestRuleset.Create()));
 
         Assert.True(errors.Any(e => e.Path == path), $"{what}: expected an error on {path}, got [{string.Join(", ", errors.Select(e => e.Path))}]");
+        Assert.All(errors, e => Assert.False(string.IsNullOrWhiteSpace(e.Message), $"{what}: the error at {e.Path} has no message"));
+    }
+
+    [Fact]
+    public void Dice_min_above_max_names_the_max()
+    {
+        var r = TestRuleset.Create();
+
+        var error = Assert.Single(RulesetValidator.Validate(r with { Reward = r.Reward with { DiceCount = r.Reward.DiceCount with { Min = 9, Max = 3 } } }));
+
+        Assert.Equal(new RulesetError("reward.diceCount.min", "must not exceed max (3)"), error);
+    }
+
+    [Fact]
+    public void A_missing_ruleset_is_refused()
+    {
+        Assert.Throws<ArgumentNullException>(() => RulesetValidator.Validate(null!));
     }
 
     [Fact]
