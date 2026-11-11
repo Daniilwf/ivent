@@ -1,0 +1,52 @@
+{
+  "id": "cheaters-die",
+  "kind": "item",
+  "name": "Читерский кубик",
+  "description": "Сам выбираешь значение одного кубика следующего броска за прохождение (не больше его граней); если кубиков несколько — только одного.",
+  "rarity": "legendary",
+  "price": 75,
+  "window": "beforeDice",
+  "hostile": false,
+  "stackable": false,
+  "effect": {
+    "target": {
+      "selector": "self"
+    },
+    "actions": [
+      {
+        "type": "requestChoice",
+        "prompt": "Какое значение на одном кубике?",
+        "options": {
+          "list": [
+            "1",
+            "2",
+            "3",
+            "4",
+            "5",
+            "6",
+            "7",
+            "8",
+            "9",
+            "10",
+            "11",
+            "12",
+            "13",
+            "14",
+            "15",
+            "16",
+            "17",
+            "18",
+            "19",
+            "20"
+          ]
+        }
+      },
+      {
+        "type": "modifyDice",
+        "when": "next",
+        "stage": "setOne",
+        "value": "$choice"
+      }
+    ]
+  }
+}

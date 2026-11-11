@@ -24,7 +24,10 @@ public class ContentPackTests
         var pack = EconomyScenario.RepositoryPack();
 
         Assert.Empty(ContentPublishing.Check(pack));
-        Assert.InRange(pack.Objects.Count(o => o.Kind == ObjectKind.Item), 20, 30);
+
+        // The first 20–30 items of task 4.1, and beside them the items imported from the old pack (D-471)
+        var imported = ImportedItems.ImportedItemsCatalog.ImportedIds();
+        Assert.InRange(pack.Objects.Count(o => o.Kind == ObjectKind.Item && !imported.Contains(o.Id)), 20, 30);
         Assert.Contains(pack.Wheels, w => w.Id == "lootbox");
     }
 

@@ -102,7 +102,12 @@ public static class ContentPublishing
             error($"{at}.effect.target", "An effect that acts on its own has nobody to choose its target.");
         }
 
-        var rolled = effect.Outcomes is not null;
+        var rolled = effect.Outcomes is { Roll: not null };
+        if (triggered && effect.Outcomes is { Choice: not null })
+        {
+            error($"{at}.effect.outcomes.choice", "An effect that acts on its own has nobody to ask.");
+        }
+
         var actions = effect.Actions.Concat(effect.Outcomes?.Cases.SelectMany(c => c.Actions) ?? []).ToList();
         for (var i = 0; i < actions.Count; i++)
         {
@@ -117,9 +122,11 @@ public static class ContentPublishing
                     break;
                 case RequestChoiceAction when triggered:
                 case TakeObjectAction { Pick: Pick.Chosen } when triggered:
+                case MoveAction { Direction: MoveDirection.Chosen } when triggered:
                     error(path, "An effect that acts on its own has nobody to ask.");
                     break;
                 case RequestChoiceAction when rolled:
+                case MoveAction { Direction: MoveDirection.Chosen } when rolled:
                     error(path, "A choice is asked before any roll: the player answers when using the item.");
                     break;
                 case ModifyDiceAction { Stage: DiceStage.Count, Value: { Kind: ContentValueKind.Number, Number: < 1 } }:

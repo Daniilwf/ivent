@@ -1,0 +1,49 @@
+{
+  "id": "sugar-cube",
+  "kind": "item",
+  "name": "Кубик сахара",
+  "description": "На выбор: дополнительный d6 к следующему броску за прохождение или 3 монетки.",
+  "rarity": "common",
+  "price": null,
+  "window": "beforeDice",
+  "hostile": false,
+  "stackable": false,
+  "tags": ["edible"],
+  "effect": {
+    "target": {
+      "selector": "self"
+    },
+    "outcomes": {
+      "choice": {
+        "prompt": "Что берёшь?",
+        "options": {
+          "list": ["+1d6 к броску", "+3 монетки"]
+        }
+      },
+      "cases": [
+        {
+          "option": "+1d6 к броску",
+          "actions": [
+            {
+              "type": "modifyDice",
+              "when": "next",
+              "stage": "count",
+              "value": 1,
+              "sides": 6
+            }
+          ]
+        },
+        {
+          "option": "+3 монетки",
+          "actions": [
+            {
+              "type": "changeResource",
+              "resource": "coins",
+              "amount": 3
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

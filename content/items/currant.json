@@ -1,0 +1,28 @@
+{
+  "id": "currant",
+  "kind": "item",
+  "name": "Смородинка",
+  "description": "Брось d4 и получи столько монеток.",
+  "rarity": "common",
+  "price": null,
+  "window": "anytime",
+  "hostile": false,
+  "stackable": true,
+  "tags": ["edible"],
+  "effect": {
+    "target": {
+      "selector": "self"
+    },
+    "actions": [
+      {
+        "type": "roll",
+        "dice": "1d4"
+      },
+      {
+        "type": "changeResource",
+        "resource": "coins",
+        "amount": "$roll"
+      }
+    ]
+  }
+}

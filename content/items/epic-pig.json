@@ -1,0 +1,28 @@
+{
+  "id": "epic-pig",
+  "kind": "item",
+  "name": "Эпическая Свинья",
+  "description": "Отдай выбранному другому игроку все свои эффекты.",
+  "rarity": "epic",
+  "price": null,
+  "window": "anytime",
+  "hostile": true,
+  "stackable": false,
+  "tags": ["pig"],
+  "effect": {
+    "target": {
+      "selector": "chosen",
+      "excludeSelf": true
+    },
+    "actions": [
+      {
+        "type": "takeObject",
+        "mode": "give",
+        "all": true,
+        "filter": {
+          "kind": "effect"
+        }
+      }
+    ]
+  }
+}

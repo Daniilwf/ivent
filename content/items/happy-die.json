@@ -1,0 +1,24 @@
+{
+  "id": "happy-die",
+  "kind": "item",
+  "name": "Счастливый кубик",
+  "description": "В следующем броске за прохождение каждый кубик с чётным значением даёт ещё одну клетку и очко — вместе с броском.",
+  "rarity": "epic",
+  "price": 30,
+  "window": "beforeDice",
+  "hostile": false,
+  "stackable": false,
+  "effect": {
+    "target": {
+      "selector": "self"
+    },
+    "actions": [
+      {
+        "type": "modifyDice",
+        "when": "next",
+        "stage": "bonusPerEven",
+        "value": 1
+      }
+    ]
+  }
+}

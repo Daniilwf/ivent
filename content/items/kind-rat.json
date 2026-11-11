@@ -1,0 +1,38 @@
+{
+  "id": "kind-rat",
+  "kind": "item",
+  "name": "Добрая Крыса",
+  "description": "Укради предмет на выбор у другого игрока; взамен он получает 2 монетки и идёт на 1 клетку вперёд. Крысиные предметы не крадёт.",
+  "rarity": "epic",
+  "price": 35,
+  "window": "anytime",
+  "hostile": true,
+  "stackable": false,
+  "tags": ["rat"],
+  "effect": {
+    "target": {
+      "selector": "chosen",
+      "excludeSelf": true
+    },
+    "actions": [
+      {
+        "type": "takeObject",
+        "mode": "steal",
+        "pick": "chosen",
+        "filter": {
+          "kind": "item",
+          "excludeTags": ["rat"]
+        }
+      },
+      {
+        "type": "changeResource",
+        "resource": "coins",
+        "amount": 2
+      },
+      {
+        "type": "move",
+        "steps": 1
+      }
+    ]
+  }
+}

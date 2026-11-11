@@ -1,0 +1,28 @@
+{
+  "id": "slippery-banana",
+  "kind": "item",
+  "name": "Банан",
+  "description": "Иди на 1 клетку вперёд, а ближайший игрок позади тебя — на 1 клетку назад; если ближайших несколько, назад идут все. Нельзя использовать, если позади никого нет.",
+  "rarity": "common",
+  "price": 10,
+  "window": "anytime",
+  "hostile": false,
+  "stackable": true,
+  "tags": ["edible"],
+  "effect": {
+    "target": {
+      "selector": "nearestBehind"
+    },
+    "actions": [
+      {
+        "type": "move",
+        "steps": 1,
+        "target": "self"
+      },
+      {
+        "type": "move",
+        "steps": -1
+      }
+    ]
+  }
+}

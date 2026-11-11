@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using GameEvent.Engine.Content;
 using GameEvent.Engine.Kernel;
 
@@ -63,9 +64,18 @@ public sealed record ObjectGiven(Guid PlayerId, InventoryObject Item, ObjectSour
 [EventType("object-removed")]
 public sealed record ObjectRemoved(Guid PlayerId, Guid InstanceId, string ObjectId, ObjectRemoval Reason) : IGameEvent;
 
-/// <summary>An object went from <see cref="PlayerId"/> to <see cref="ToPlayerId"/> (<c>takeObject</c> with <c>take</c> or <c>steal</c>).</summary>
+/// <summary>
+/// An object went from <see cref="PlayerId"/> to <see cref="ToPlayerId"/> (<c>takeObject</c> with <c>take</c> or <c>steal</c>);
+/// <see cref="Given"/> — handed over by its holder (<c>give</c>, D-478): then it is his doing on the receiver, a hostile
+/// one counts as from him. Written only when set.
+/// </summary>
 [EventType("object-transferred")]
-public sealed record ObjectTransferred(Guid PlayerId, Guid ToPlayerId, Guid InstanceId, string ObjectId) : IGameEvent;
+public sealed record ObjectTransferred(
+    Guid PlayerId,
+    Guid ToPlayerId,
+    Guid InstanceId,
+    string ObjectId,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] bool Given = false) : IGameEvent;
 
 /// <summary>
 /// An object held changed: a use of an effect fired, a run of its lifetime passed, a note was added or it was turned into
