@@ -7160,7 +7160,10 @@ export interface components {
          *     difficulty or a reject changes. `reachedFinish`: this run's latest move stands on the finish.
          *     `rollClosed`: the player's next roll is closed by the limit of unchecked runs (D-134) until the admin checks one.
          *     `cellBonus`: the points bonus of the cell the run's move stopped on, which a reject takes back too (D-327; always
-         *     set, optional for older clients).
+         *     set, optional for older clients). `dropPenalty`: the drop penalty «Отклонить со штрафом дропа» would throw on top of
+         *     the reject (D-327, D-262) under the season's rules, with the drops in a row before the run (D-324); null for the frozen
+         *     first, who loses nothing (D-99); `affectsPosition` is false for a finisher whose finish this run does not decide
+         *     (his position is fixed); always set, optional for older clients.
          */
         ProofQueueItemView: {
             /** Format: uuid */
@@ -7186,6 +7189,7 @@ export interface components {
             rollClosed: boolean;
             /** Format: int32 */
             cellBonus?: null | number;
+            dropPenalty?: null | components["schemas"]["DropPenaltyView"];
         };
         /**
          * @description The proof of the player's own completed run: links (http/https), screenshots the player uploaded (`files` — ids

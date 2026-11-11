@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using GameEvent.Engine.Kernel;
+using GameEvent.Engine.Map;
 using GameEvent.Engine.Players;
 using GameEvent.Engine.Proofs;
 using GameEvent.Engine.Rulesets;
@@ -29,7 +30,11 @@ public sealed class AdminProofApiTests : IAsyncLifetime
 {
     private const string Link = "https://imgur.com/a/credits";
 
-    private readonly SiteFactory _site = new();
+    private readonly SteerableRandom _random = new();
+
+    private readonly SiteFactory _site;
+
+    public AdminProofApiTests() => _site = new() { Random = _random };
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
@@ -150,6 +155,104 @@ public sealed class AdminProofApiTests : IAsyncLifetime
         var items = queue.RootElement.EnumerateArray().ToList();
         Assert.Equal([petyaRun, vasyaRun], items.Select(i => i.GetProperty("runId").GetGuid()));
         Assert.True(items[0].GetProperty("reachedFinish").GetBoolean());
+    }
+
+    [Fact]
+    public async Task Queue_item_carries_the_drop_penalty_a_reject_with_penalty_would_throw()
+    {
+        // D-327, D-262: the confirmation of «Отклонить со штрафом дропа» names the penalty; after a drop in a row it has the
+        // extra die (D-324): the default 2d4 plus drop.consecutiveExtraDice = 1
+        var vasya = await _site.SignedInAsync("vasya");
+        await PostOkAsync(vasya, PlayerUrl("roll"), new { commandId = Guid.NewGuid() });
+        await PostOkAsync(vasya, PlayerUrl("start"), new { commandId = Guid.NewGuid() });
+        await PostOkAsync(vasya, PlayerUrl("drop"), new { commandId = Guid.NewGuid() });
+        _site.Clock.UtcNow = _site.Clock.UtcNow.AddHours(1);
+        await CompletedAsync("vasya");
+        await CompletedAsync("petya");
+        var admin = await _site.SignedInAsync("admin");
+
+        using var queue = JsonDocument.Parse(await admin.GetStringAsync(QueueUrl(), Ct));
+
+        var items = queue.RootElement.EnumerateArray().ToDictionary(i => i.GetProperty("playerName").GetString()!);
+        var drop = RulesetJson.Default().Drop;
+        var afterDrop = items["vasya"].GetProperty("dropPenalty");
+        Assert.Equal(drop.PenaltyDice.Count + 1, afterDrop.GetProperty("count").GetInt32());
+        Assert.Equal(drop.PenaltyDice.Sides, afterDrop.GetProperty("sides").GetInt32());
+        Assert.Equal(drop.AffectsPoints, afterDrop.GetProperty("affectsPoints").GetBoolean());
+        Assert.Equal(drop.AffectsPosition, afterDrop.GetProperty("affectsPosition").GetBoolean());
+        Assert.True(afterDrop.GetProperty("badEvent").GetBoolean());
+        Assert.Equal(drop.PenaltyDice.Count, items["petya"].GetProperty("dropPenalty").GetProperty("count").GetInt32());
+    }
+
+    [Fact]
+    public async Task Queue_item_of_the_frozen_first_has_no_drop_penalty()
+    {
+        // D-99: the frozen first loses nothing, a reject with the drop penalty included
+        var beforeFinish = $"c{RulesetJson.Default().Map.LinearLength - 1}";
+        await _site.SendAsync(new AdjustPlayer(_site.Players["vasya"], "Перенос для теста", CellId: beforeFinish));
+        var finishRun = await CompletedAsync("vasya");
+        var admin = await _site.SignedInAsync("admin");
+        await PostOkAsync(admin, Url("approve", finishRun), new { commandId = Guid.NewGuid(), comment = "Видел на стриме" });
+        _site.Clock.UtcNow = _site.Clock.UtcNow.AddHours(1);
+        var later = await CompletedAsync("vasya");
+
+        using var queue = JsonDocument.Parse(await admin.GetStringAsync(QueueUrl(), Ct));
+
+        var item = Assert.Single(queue.RootElement.EnumerateArray().ToList());
+        Assert.Equal(later, item.GetProperty("runId").GetGuid());
+        Assert.Equal(JsonValueKind.Null, item.GetProperty("dropPenalty").ValueKind);
+    }
+
+    [Fact]
+    public async Task Queue_item_of_a_later_finishers_run_after_the_finish_takes_no_cells()
+    {
+        // D-99: a later finisher's position is fixed; the penalty takes his points only
+        var beforeFinish = $"c{RulesetJson.Default().Map.LinearLength - 1}";
+        await _site.SendAsync(new AdjustPlayer(_site.Players["vasya"], "Перенос для теста", CellId: beforeFinish));
+        await CompletedAsync("vasya");
+        _site.Clock.UtcNow = _site.Clock.UtcNow.AddHours(1);
+        await _site.SendAsync(new AdjustPlayer(_site.Players["petya"], "Перенос для теста", CellId: beforeFinish));
+        await CompletedAsync("petya");
+        _site.Clock.UtcNow = _site.Clock.UtcNow.AddHours(1);
+        var later = await CompletedAsync("petya");
+        var admin = await _site.SignedInAsync("admin");
+
+        using var queue = JsonDocument.Parse(await admin.GetStringAsync(QueueUrl(), Ct));
+
+        var item = queue.RootElement.EnumerateArray().Single(i => i.GetProperty("runId").GetGuid() == later);
+        var drop = RulesetJson.Default().Drop;
+        var penalty = item.GetProperty("dropPenalty");
+        Assert.Equal(drop.PenaltyDice.Count, penalty.GetProperty("count").GetInt32());
+        Assert.Equal(drop.AffectsPoints, penalty.GetProperty("affectsPoints").GetBoolean());
+        Assert.False(penalty.GetProperty("affectsPosition").GetBoolean());
+    }
+
+    [Fact]
+    public async Task Queue_item_of_an_earlier_run_the_finish_surplus_covers_takes_no_cells()
+    {
+        // Q-3, D-327: Вася moves with all ones, then from the cell before the finish with all the highest dice — the surplus
+        // covers the first run, so its reject keeps the finish and the penalty cannot move him
+        _random.Lowest = true;
+        var earlier = await CompletedAsync("vasya");
+        _random.Lowest = false;
+        _site.Clock.UtcNow = _site.Clock.UtcNow.AddHours(1);
+        var beforeFinish = $"c{RulesetJson.Default().Map.LinearLength - 1}";
+        await _site.SendAsync(new AdjustPlayer(_site.Players["vasya"], "Перенос для теста", CellId: beforeFinish));
+        _random.Highest = true;
+        await CompletedAsync("vasya");
+        _random.Highest = false;
+        var admin = await _site.SignedInAsync("admin");
+
+        using var queue = JsonDocument.Parse(await admin.GetStringAsync(QueueUrl(), Ct));
+
+        var item = queue.RootElement.EnumerateArray().Single(i => i.GetProperty("runId").GetGuid() == earlier);
+        Assert.True(item.GetProperty("decidesFinish").GetBoolean());
+        Assert.False(item.GetProperty("dropPenalty").GetProperty("affectsPosition").GetBoolean());
+
+        await PostOkAsync(admin, Url("reject-with-penalty", earlier), new { commandId = Guid.NewGuid(), comment = "На скрине другая игра" });
+        await using var db = _site.NewDb();
+        var vasya = await db.SeasonPlayers.SingleAsync(p => p.Id == _site.Players["vasya"], Ct);
+        Assert.Equal((LinearMap.FinishId, (int?)1), (vasya.CellId, vasya.FinishOrder));
     }
 
     [Fact]
@@ -695,5 +798,18 @@ public sealed class AdminProofApiTests : IAsyncLifetime
     {
         using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync(Ct));
         return [.. doc.RootElement.GetProperty("events").EnumerateArray().Select(e => e.GetProperty("type").GetString()!)];
+    }
+
+    /// <summary>The site's seeded randomness, steered to the lowest or the highest value of every draw when a test asks.</summary>
+    private sealed class SteerableRandom : IRandomSource
+    {
+        private readonly Queue.SeededRandom _seeded = new(11);
+
+        public bool Lowest { get; set; }
+
+        public bool Highest { get; set; }
+
+        public int NextInt(int minInclusive, int maxExclusive) =>
+            Lowest ? minInclusive : Highest ? maxExclusive - 1 : _seeded.NextInt(minInclusive, maxExclusive);
     }
 }
