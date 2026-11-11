@@ -85,7 +85,6 @@ public static partial class AccountRules
     public const string Stale = "account.stale";
     public const string RoleInvalid = "account.roleInvalid";
     public const string AdminExists = "account.adminExists";
-    public const string NameTaken = "account.nameTaken";
     public const string InSeason = "account.inSeason";
 
     /// <summary>Latin letters, digits, dot, dash, underscore; 2–32 characters (logins are typed on phones too).</summary>
@@ -121,9 +120,6 @@ public static partial class AccountRules
     }
 
     private const char ZeroWidthJoiner = '‍';
-
-    /// <summary>The form two names are compared in: the same letters in another case are the same name (D-612).</summary>
-    public static string NormalizeName(string name) => name.Trim().ToUpperInvariant();
 
     public static bool IsValidPassword(string? password, string login) =>
         !string.IsNullOrWhiteSpace(password) && password.Length is >= MinPasswordLength and <= MaxPasswordLength

@@ -106,11 +106,6 @@ public sealed partial class CommandProcessor
                         return Reject(AccountRules.LoginTaken, $"Login «{login}» is taken (deleted accounts keep theirs).");
                     }
 
-                    if (role == Role.Player && await IsPlayerNameTakenAsync(db, name, except: null, ct))
-                    {
-                        return Reject(AccountRules.NameTaken, $"Another player is called «{name.Trim()}»: the leaderboard and the feed would show two.");
-                    }
-
                     if (password is not null && !AccountRules.IsValidPassword(password, login))
                     {
                         return Reject(AccountRules.PasswordInvalid, $"A password is {AccountRules.MinPasswordLength}–{AccountRules.MaxPasswordLength} characters and not the login.");
@@ -209,11 +204,6 @@ public sealed partial class CommandProcessor
                         return Reject(AccountRules.LastAdmin, "The last admin keeps the role.");
                     }
 
-                    if (edit.Role == Role.Player && !user.IsDeleted && await IsPlayerNameTakenAsync(db, edit.Name, user.Id, ct))
-                    {
-                        return Reject(AccountRules.NameTaken, $"Another player is called «{edit.Name.Trim()}»: the leaderboard and the feed would show two.");
-                    }
-
                     // An admin who plays has two accounts (SPEC «Аккаунты»): a player of a season that is not over does
                     // not become one, or they would check their own proofs and correct their own points (D-610)
                     if (edit.Role == Role.Admin && user.Role != Role.Admin && await IsInUnfinishedSeasonAsync(db, user.Id, ct))
@@ -302,16 +292,6 @@ public sealed partial class CommandProcessor
             default:
                 throw new InvalidOperationException($"Unknown account command {command.GetType().Name}.");
         }
-    }
-
-    private static async Task<bool> IsPlayerNameTakenAsync(GameEventDbContext db, string name, Guid? except, CancellationToken ct)
-    {
-        var wanted = AccountRules.NormalizeName(name);
-        var names = await db.Users.AsNoTracking()
-            .Where(u => u.Role == Role.Player && !u.IsDeleted && u.Id != except)
-            .Select(u => u.Name)
-            .ToListAsync(ct);
-        return names.Any(n => AccountRules.NormalizeName(n) == wanted);
     }
 
     private static async Task<bool> IsInUnfinishedSeasonAsync(GameEventDbContext db, Guid userId, CancellationToken ct)

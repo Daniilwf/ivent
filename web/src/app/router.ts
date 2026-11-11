@@ -1,4 +1,4 @@
-import { useEffect, useRef, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 
 // The site's pages by address (H5, D-150; one router for every page, D-202): a few paths, so no router library. A
 // link changes the address without reloading the page (Link.tsx); the browser's back and forward buttons work as usual.
@@ -56,13 +56,70 @@ const listeners = new Set<() => void>();
 // A page that mounts after the address changed inside the site (a link, back or forward) was opened by the reader;
 // the first page of a visit was not
 let navigated = false;
+// The current page was opened by Back or Forward: its entry keeps what it showed and where it was scrolled (K1A)
+let popped = false;
 globalThis.addEventListener('popstate', () => {
   navigated = true;
+  popped = true;
 });
+// The site puts the scroll back itself once a list is there again: the browser would do it before the list loads
+if ('scrollRestoration' in globalThis.history) globalThis.history.scrollRestoration = 'manual';
+
+/** What this history entry keeps: the scroll position and the values of `useEntryState` */
+function entryState(): Record<string, unknown> {
+  const state: unknown = globalThis.history.state;
+  return typeof state === 'object' && state !== null ? (state as Record<string, unknown>) : {};
+}
+
+function keepInEntry(key: string, value: unknown) {
+  globalThis.history.replaceState({ ...entryState(), [key]: value }, '');
+}
+
+/**
+ * A page's value kept in its history entry (a search, the pages of a list shown): Back to the page brings it back,
+ * a new visit by a link starts from `initial` (K1A)
+ */
+export function useEntryState<T>(
+  key: string,
+  initial: T,
+): [T, (next: T | ((now: T) => T)) => void] {
+  const [value, setValue] = useState<T>(() => {
+    const kept = entryState()[key];
+    return popped && kept !== undefined ? (kept as T) : initial;
+  });
+  const set = (next: T | ((now: T) => T)) => {
+    setValue((now) => {
+      const resolved = typeof next === 'function' ? (next as (now: T) => T)(now) : next;
+      keepInEntry(key, resolved);
+      return resolved;
+    });
+  };
+  return [value, set];
+}
+
+/**
+ * Back to a page: once its content is there (`ready`), the scroll goes where the reader left it, once (K1A). A page
+ * opened by a link starts at the top as before.
+ */
+export function useRestoredScroll(ready: boolean) {
+  const [restore] = useState(() => (popped ? entryState().scrollY : undefined));
+  const done = useRef(false);
+  useEffect(() => {
+    if (!ready || done.current || typeof restore !== 'number') return;
+    done.current = true;
+    const frame = requestAnimationFrame(() => {
+      globalThis.scrollTo(0, restore);
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+    };
+  }, [ready, restore]);
+}
 
 /** Tests only: the next page is the first of a new visit again (a test is a new visit, setup.ts) */
 export function forgetNavigation() {
   navigated = false;
+  popped = false;
 }
 
 function subscribe(listener: () => void) {
@@ -98,8 +155,11 @@ export function navigate(to: string) {
     for (const listener of reopenListeners) listener();
     return;
   }
+  // The page left keeps where it was scrolled, for Back
+  keepInEntry('scrollY', globalThis.scrollY);
   globalThis.history.pushState(null, '', to);
   navigated = true;
+  popped = false;
   globalThis.scrollTo(0, 0);
   for (const listener of listeners) listener();
 }

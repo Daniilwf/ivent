@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react';
+import { useEntryState } from '../app/router';
 import { ru } from '../i18n/ru';
 import { Button } from '../ui/Button';
 
@@ -13,8 +14,12 @@ export const pageSize = 60;
 export function usePaging<T>(
   items: readonly T[],
   key: string,
+  /** Keeps the pages shown in the history entry under this name: Back to the list brings them back (K1A) */
+  kept?: string,
 ): { page: readonly T[]; more: ReactNode } {
-  const [showing, setShowing] = useState({ key: '', count: pageSize });
+  const local = useState({ key: '', count: pageSize });
+  const entry = useEntryState(kept ?? 'paging', { key: '', count: pageSize });
+  const [showing, setShowing] = kept ? entry : local;
   const visible = showing.key === key ? showing.count : pageSize;
   const left = items.length - visible;
   return {

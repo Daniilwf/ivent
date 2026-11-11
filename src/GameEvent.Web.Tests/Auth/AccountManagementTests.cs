@@ -505,23 +505,6 @@ public sealed class AccountManagementTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task A_player_name_another_player_has_is_refused()
-    {
-        var admin = await _site.SignedInAsync("admin");
-
-        var created = await admin.PostAsJsonAsync("/api/admin/accounts", new { commandId = Guid.NewGuid(), login = "vasya2", name = " Vasya ", role = "player" }, Ct);
-        var renamed = await admin.PostAsJsonAsync($"/api/admin/accounts/{_site.Users["masha"]}", new { commandId = Guid.NewGuid(), name = "PETYA", role = "player" }, Ct);
-
-        Assert.Equal("account.nameTaken", await CodeAsync(created));
-        Assert.Equal("account.nameTaken", await CodeAsync(renamed));
-
-        // An admin or a spectator may share a player's name (the admin who plays has two accounts); a deleted one frees it
-        await CreateAsync(admin, "vasya-admin", "vasya", "admin");
-        await PostOkAsync(admin, $"/api/admin/accounts/{_site.Users["masha"]}/delete", new { commandId = Guid.NewGuid() });
-        await CreateAsync(admin, "masha2", "masha", "player");
-    }
-
-    [Fact]
     public async Task An_account_in_a_running_season_is_not_made_an_admin()
     {
         var admin = await _site.SignedInAsync("admin");
