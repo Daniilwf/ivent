@@ -1,0 +1,13 @@
+{
+  "id": "tailwind",
+  "kind": "event",
+  "name": "Попутный ветер",
+  "description": "В следующем броске за прохождение на один кубик больше.",
+  "rarity": "common",
+  "price": null,
+  "hostile": false,
+  "effect": {
+    "target": { "selector": "self" },
+    "actions": [{ "type": "modifyDice", "when": "next", "stage": "count", "value": 1 }]
+  }
+}

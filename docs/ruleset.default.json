@@ -114,5 +114,8 @@
   },
   "weeklyChallenge": {
     "defaultRewardCoins": 10
+  },
+  "events": {
+    "defaultDeck": "risky"
   }
 }
