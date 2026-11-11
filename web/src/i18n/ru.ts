@@ -126,6 +126,7 @@ const rejection = {
   'player.commentTooLong': 'Комментарий слишком длинный: не больше 500 символов.',
   'effect.notYours': 'Это не твой эффект.',
   'effect.unknownOutcome': 'Неизвестный исход.',
+  'item.nothingToGive': 'Отдать нечего: у тебя нет того, что этот предмет передаёт.',
   'season.deadlinePassed': 'Дедлайн прошёл: броски закрыты, пруфы принимаются.',
   'season.deadlineNotReached': 'Дедлайн ещё не наступил.',
   'season.proofsPending': 'Сначала проверь все пруфы: итоги — только после проверки.',

@@ -32,6 +32,7 @@
 | `stackable` | можно ли применить несколько одинаковых за раз |
 | `manual` | `true` — автоматики нет, эффект уходит в ручное разрешение |
 | `proof` | `media` — для IRL-ивентов нужен фото- или видеопруф |
+| `unstealable`, `undestroyable` | эффекты не забирают, не крадут и не передают объект / не уничтожают и не превращают его; правка админа действует (D-478) |
 | `tags` | теги самого объекта: `edible`, `rat`, `gremlin`, `pig`, `weapon`, `potion`…; строчные слова через дефис, каждое один раз. Нужны фильтрам вроде «не крадёт крысиные» (`excludeTags`) и лутбоксам; это не теги игр (D-470) |
 | `effect` | что происходит; у объектов с `manual: true` может отсутствовать |
 
@@ -65,7 +66,7 @@
 | `changeResource` | `resource`: `points`, `coins` или свой ключ; `amount`; `reflect: true` — монетки, снятые с цели, у которой их не больше `effects.reflect.coinsAtMost`, снимаются с использующего, умноженные на `effects.reflect.multiplier` (D-474) |
 | `roll` | `dice`: результат доступен как `$roll` |
 | `giveObject` | `objectId`, `params` для параметризованных объектов |
-| `takeObject` | `mode`: `take`, `steal`, `destroy`; `filter`; `pick`: `random` или `chosen` (ответ — id экземпляра); `count`: сколько объектов — число от 1 или ссылка (`$roll`), `all: true` — все подходящие (D-476). При `chosen` число просит ответ на каждый объект, а ссылка забирает все оставшиеся ответы как список по порядку, недостающие берутся случайно |
+| `takeObject` | `mode`: `take`, `steal`, `destroy`, `give` (отдать свой объект цели; нечего отдать — отказ `item.nothingToGive`, D-478); `filter`; `pick`: `random` или `chosen` (ответ — id экземпляра); `count`: сколько объектов — число от 1 или ссылка (`$roll`), `all: true` — все подходящие (D-476). При `chosen` число просит ответ на каждый объект, а ссылка забирает все оставшиеся ответы как список по порядку, недостающие берутся случайно |
 | `transformObject` | `mode`: `transform` (`into`) или `annotate` (`note`) |
 | `drawEvent` | `deck`: `good`, `bad`, `special`, `risky`, `zone` или id колоды |
 | `spinWheel` | `wheel`: id колеса |
@@ -342,6 +343,20 @@
       { "type": "move", "steps": 1, "direction": "chosen" },
       { "type": "changeResource", "resource": "coins", "amount": -2, "reflect": true }
     ]
+  }
+}
+```
+
+### 16. Свинья — отдать свой эффект другому
+
+```json
+{
+  "id": "pig", "kind": "item", "name": "Свинья",
+  "description": "Отдай выбранному другому игроку один свой эффект на выбор.",
+  "rarity": "common", "price": null, "window": "anytime", "hostile": true, "stackable": false, "tags": ["pig"],
+  "effect": {
+    "target": { "selector": "chosen", "excludeSelf": true },
+    "actions": [{ "type": "takeObject", "mode": "give", "pick": "chosen", "filter": { "kind": "effect" } }]
   }
 }
 ```

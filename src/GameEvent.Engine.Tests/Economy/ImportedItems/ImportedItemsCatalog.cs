@@ -50,6 +50,11 @@ public class ImportedItemsCatalog
             Assert.Equal((bool?)original["stackable"] ?? false, item.Stackable);
             Assert.Equal(original["tags"]!.AsArray().Select(t => (string)t!).ToList(), [.. item.Tags ?? []]);
             Assert.False(item.Manual);
+
+            // A flag the pack has is kept; a text that promises one more («невозможно уничтожить») adds it (D-478)
+            Assert.True(item.Unstealable || !((bool?)original["unstealable"] ?? false));
+            Assert.True(item.Undestroyable || !((bool?)original["undestroyable"] ?? false));
+            Assert.Equal(item.Description.Contains("невозможно украсть", StringComparison.OrdinalIgnoreCase), item.Unstealable);
         }
     }
 

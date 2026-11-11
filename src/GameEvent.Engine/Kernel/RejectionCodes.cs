@@ -93,6 +93,9 @@ public static class RejectionCodes
     public const string ItemInvalidTarget = "item.invalidTarget";
     public const string ItemNoTarget = "item.noTarget";
     public const string ItemInvalidChoice = "item.invalidChoice";
+
+    /// <summary>An effect that hands over one of the user's objects, and he has none it may give (D-478).</summary>
+    public const string ItemNothingToGive = "item.nothingToGive";
     public const string ItemHostileCap = "item.hostileCap";
     public const string ItemNotApplicable = "item.notApplicable";
     public const string InventoryFrozen = "inventory.frozen";

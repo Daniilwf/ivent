@@ -331,10 +331,10 @@
 | 3 ✅ | `modifyDice.countWithSides` — доп. кубик заданных граней (D-475) | +6 (Шляпа ждёт `useCondition`) | 59 |
 | 4 ✅ | `takeObject.count` (число, `$roll`) и `all: true` (D-476) | +5 (вместе с двумя `count: 2` шага 1) | 64 |
 | 5 ✅ | `move.direction` — `chosen` (ответ `forward`/`back`), `away` от стреляющего (D-477) | +5 | 69 |
-| 6 | `takeObject.give` — отдать свой объект (свиньи) | +4 | 93 |
+| 6 ✅ | `takeObject.give` — отдать свой объект (свиньи), флаги `unstealable`/`undestroyable` (D-478) | +6 (с Кьюкьюшкой и Шредингером шага 1) | 75 |
 | 7 | `counters` — эффекты со счётчиком (в том числе эффект `bomb`: `counter`, `onCounterZero`) | +5 | 98 |
 | 8 | `selector:withinCells`, затем `selector:nearestBehind` | +4, +1 | 103 |
 | 9 | редкие стадии броска по одному: `setOne`, `singleDie`, `replaceValue`, `fixAverage`, `bonusPerEven`, `rerollFilter` | +7 | 110 |
 | 10 | `outcomes.choice`, `roll.as`, `useCondition`, `intercept.badEvent` (эффект Бабл) | +4 | 114 |
 
-Отдельно — флаги объекта `unstealable` / `undestroyable` (сейчас движок их не знает): нужны двум предметам, лучше вместе с шагом 6 (передача и кража). Правила импорта из README пакета: «золото» → «монетки» по GLOSSARY, редкость по приставке, `price: null` — не продаётся, теги — дополнение к CONTENT.md, сценарный тест на каждый импортированный предмет, спорное — в DECISIONS «нужно решение». Текстовые 269 остаются в `items.manual.json` выключенными и в `content/items` не попадают; лутбоксы ссылаются на ручные предметы и ждут (D-471). Импорт идёт в ветке `feat/items-import`: файлы `content/items/<английский id>.json`, соответствие — столбец «Импорт» в `TRIAGE.csv`.
+Флаги объекта `unstealable` / `undestroyable` сделаны в шаге 6 (D-478). Правила импорта из README пакета: «золото» → «монетки» по GLOSSARY, редкость по приставке, `price: null` — не продаётся, теги — дополнение к CONTENT.md, сценарный тест на каждый импортированный предмет, спорное — в DECISIONS «нужно решение». Текстовые 269 остаются в `items.manual.json` выключенными и в `content/items` не попадают; лутбоксы ссылаются на ручные предметы и ждут (D-471). Импорт идёт в ветке `feat/items-import`: файлы `content/items/<английский id>.json`, соответствие — столбец «Импорт» в `TRIAGE.csv`.

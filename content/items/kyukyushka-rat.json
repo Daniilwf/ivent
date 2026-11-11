@@ -1,0 +1,41 @@
+{
+  "id": "kyukyushka-rat",
+  "kind": "item",
+  "name": "Крыса-кьюкьюшка",
+  "description": "Отдай другому игроку один свой предмет на выбор и укради у него предмет на выбор. Нельзя использовать, если отдать нечего. Крысиные предметы не крадёт.",
+  "rarity": "common",
+  "price": null,
+  "window": "anytime",
+  "hostile": true,
+  "stackable": false,
+  "tags": [
+    "rat"
+  ],
+  "effect": {
+    "target": {
+      "selector": "chosen",
+      "excludeSelf": true
+    },
+    "actions": [
+      {
+        "type": "takeObject",
+        "mode": "give",
+        "pick": "chosen",
+        "filter": {
+          "kind": "item"
+        }
+      },
+      {
+        "type": "takeObject",
+        "mode": "steal",
+        "pick": "chosen",
+        "filter": {
+          "kind": "item",
+          "excludeTags": [
+            "rat"
+          ]
+        }
+      }
+    ]
+  }
+}

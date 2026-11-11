@@ -122,6 +122,14 @@ public sealed record ObjectDefinition
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public EquatableArray<string>? Tags { get; init; }
 
+    /// <summary>Never changes hands by an effect: not taken, stolen or given (D-478). Admin corrections still apply.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool Unstealable { get; init; }
+
+    /// <summary>Never destroyed or transformed by an effect (D-478). Admin corrections still apply.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool Undestroyable { get; init; }
+
     /// <summary>Achievements only: counted per season or over all seasons.</summary>
     public AchievementScope? Scope { get; init; }
 
@@ -315,6 +323,9 @@ public enum TakeMode
     Take,
     Steal,
     Destroy,
+
+    /// <summary>The user hands one of his own objects to the target (D-478); refused when he has none to give.</summary>
+    Give,
 }
 
 public enum Pick

@@ -64,6 +64,12 @@
             ]
           },
           "tags": true,
+          "unstealable": {
+            "type": "boolean"
+          },
+          "undestroyable": {
+            "type": "boolean"
+          },
           "scope": {
             "enum": [
               "season",
@@ -374,7 +380,8 @@
                           "enum": [
                             "take",
                             "steal",
-                            "destroy"
+                            "destroy",
+                            "give"
                           ]
                         },
                         "filter": {
@@ -951,7 +958,8 @@
                                     "enum": [
                                       "take",
                                       "steal",
-                                      "destroy"
+                                      "destroy",
+                                      "give"
                                     ]
                                   },
                                   "filter": {

@@ -1,5 +1,6 @@
 using GameEvent.Engine.Content;
 using GameEvent.Engine.Inventory;
+using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Rulesets;
 
 namespace GameEvent.Engine.Effects.Actions;
@@ -7,9 +8,15 @@ namespace GameEvent.Engine.Effects.Actions;
 /// <summary>Which objects of an inventory an action may take or change (CONTENT.md <c>filter</c>), in the order they came.</summary>
 internal static class ObjectFilters
 {
-    public static IReadOnlyList<InventoryObject> Matching(EffectRun run, Guid playerId, ObjectFilterSpec? filter) =>
+    /// <summary>
+    /// The player's objects the filter lets through, without those the action may not touch (D-478): an unstealable one
+    /// never changes hands (<paramref name="moves"/>), an undestroyable one is never destroyed or transformed.
+    /// </summary>
+    public static IReadOnlyList<InventoryObject> Matching(EffectRun run, Guid playerId, ObjectFilterSpec? filter, bool moves = false) =>
         [.. run.State.Players[playerId].Wallet.Inventory
-            .Where(o => filter is null || Matches(run.State.Catalog.Get(o.ObjectId), o, filter))
+            .Where(o => run.State.Catalog.Get(o.ObjectId) is var definition
+                && (filter is null || Matches(definition, o, filter))
+                && (moves ? !definition.Unstealable : !definition.Undestroyable))
             .OrderBy(o => o.Acquired)];
 
     private static bool Matches(ObjectDefinition definition, InventoryObject item, ObjectFilterSpec filter) =>
@@ -65,10 +72,19 @@ internal sealed class TakeObjectHandler : ActionHandler<TakeObjectAction>
 {
     protected override void Execute(TakeObjectAction action, EffectRun run)
     {
-        var from = run.ActionTarget(action);
+        // Giving hands the user's own object to the target; the other modes work on the target's objects
+        var giving = action.Mode == TakeMode.Give;
+        var from = giving ? run.UserId : run.ActionTarget(action);
+        var to = giving ? run.ActionTarget(action) : run.UserId;
+        if (giving && ObjectFilters.Matching(run, from, action.Filter, moves: true).Count == 0)
+        {
+            run.Refuse(RejectionCodes.ItemNothingToGive, $"The user of «{run.ObjectId}» has nothing it may give.");
+            return;
+        }
+
         foreach (var item in Picked(action, run, from))
         {
-            Take(action, run, from, item);
+            Take(action, run, from, to, item);
             if (run.Refusal is not null)
             {
                 return;
@@ -78,7 +94,7 @@ internal sealed class TakeObjectHandler : ActionHandler<TakeObjectAction>
 
     private static List<InventoryObject> Picked(TakeObjectAction action, EffectRun run, Guid from)
     {
-        var candidates = ObjectFilters.Matching(run, from, action.Filter).ToList();
+        var candidates = ObjectFilters.Matching(run, from, action.Filter, moves: action.Mode != TakeMode.Destroy).ToList();
         if (action.All)
         {
             return candidates;
@@ -117,7 +133,7 @@ internal sealed class TakeObjectHandler : ActionHandler<TakeObjectAction>
         return picked;
     }
 
-    private static void Take(TakeObjectAction action, EffectRun run, Guid from, InventoryObject item)
+    private static void Take(TakeObjectAction action, EffectRun run, Guid from, Guid to, InventoryObject item)
     {
         if (action.Mode == TakeMode.Destroy)
         {
@@ -125,7 +141,6 @@ internal sealed class TakeObjectHandler : ActionHandler<TakeObjectAction>
             return;
         }
 
-        var to = run.UserId;
         if (to == from)
         {
             return;
@@ -138,7 +153,7 @@ internal sealed class TakeObjectHandler : ActionHandler<TakeObjectAction>
             return;
         }
 
-        run.Emit(new ObjectTransferred(from, to, item.InstanceId, item.ObjectId));
+        run.Emit(new ObjectTransferred(from, to, item.InstanceId, item.ObjectId, Given: action.Mode == TakeMode.Give));
     }
 }
 

@@ -290,6 +290,10 @@ public static partial class ContentValidator
             if (actions[i] is TakeObjectAction take)
             {
                 CheckCount(take, actions.Skip(i + 1), at, error);
+                if (take is { Mode: TakeMode.Give, Target: ActionTarget.Self })
+                {
+                    error($"{at}.target", "«give» hands the user's object to the effect's target, not to himself.");
+                }
             }
 
             switch (actions[i])
