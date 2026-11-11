@@ -440,9 +440,6 @@ export function SeasonScreen({
               ? ru.turn.afterGame(me.lastCompleted.game.title)
               : ru.turn.after}
         </h3>
-        {me.lastEvent ? (
-          <DrawnEventCard key={me.lastEvent.sequence} drawn={me.lastEvent} fresh={freshDraw} />
-        ) : null}
         {me.manualEffects.length > 0 && (
           <section
             aria-labelledby="effects-title"
@@ -546,6 +543,10 @@ export function SeasonScreen({
             </details>
           </div>
         )}
+        {/* The event comes after the move that stopped on its cell: the card reads after the throw (design review) */}
+        {me.lastEvent ? (
+          <DrawnEventCard key={me.lastEvent.sequence} drawn={me.lastEvent} fresh={freshDraw} />
+        ) : null}
       </section>
     ) : null;
   // The wheel's stage: on a desktop it takes the map's place and stays with the result until I answer or close it,
