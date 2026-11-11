@@ -126,6 +126,11 @@ public static class RulesetValidator
             Error("effects.reflect.multiplier", "must be at least 1");
         }
 
+        if (ruleset.Features.Events && ruleset.Events is null)
+        {
+            Error("events", "is required when features.events is on");
+        }
+
         if (ruleset.Effects.MaxEventsPerCommand < 1)
         {
             Error("effects.maxEventsPerCommand", "must be at least 1");

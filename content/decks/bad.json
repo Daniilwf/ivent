@@ -1,0 +1,9 @@
+{
+  "id": "bad",
+  "name": "Плохие ивенты",
+  "deck": "bad",
+  "entries": [
+    { "objectId": "horror-week", "weight": 2 },
+    { "objectId": "karaoke", "weight": 1 }
+  ]
+}
