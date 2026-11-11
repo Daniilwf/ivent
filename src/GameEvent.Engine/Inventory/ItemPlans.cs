@@ -77,7 +77,7 @@ public static class ItemPlans
 
         var chooses = effect.Target?.Selector == TargetSelector.Chosen;
         var targets = chooses ? Targets.Choosable(state, definition, player.PlayerId) : [];
-        if (refusal is null && chooses && targets.Count == 0)
+        if (refusal is null && (chooses ? targets.Count == 0 : Targets.HasNobody(state, definition, player.PlayerId)))
         {
             refusal = RejectionCodes.ItemNoTarget;
         }
@@ -91,7 +91,8 @@ public static class ItemPlans
                     steps.Add(new ItemStep(ItemStepKind.Choice, request.Prompt, request.Options.From, [.. RequestChoiceHandler.Options(request.Options, state, pool)]));
                     break;
                 case TakeObjectAction { Pick: Pick.Chosen } take:
-                    // Whose objects: the user's own (target «self»), else each player the target may be
+                    // Whose objects: the user's own (target «self»), else each player the target may be; the item being used
+                    // is spent before its effect runs, so it is never an answer. An owner with no object asks no answer.
                     var owners = take.Target == ActionTarget.Self || !chooses ? [player.PlayerId] : targets;
                     steps.Add(new ItemStep(
                         ItemStepKind.PickObject,
@@ -100,7 +101,7 @@ public static class ItemPlans
                         [],
                         owners.ToImmutableSortedDictionary(
                             id => id,
-                            id => (EquatableArray<string>)[.. ObjectFilters.Matching(state, id, take.Filter).Select(o => o.InstanceId.ToString("N"))])));
+                            id => (EquatableArray<string>)[.. ObjectFilters.Matching(state, id, take.Filter).Where(o => o.InstanceId != item.InstanceId).Select(o => o.InstanceId.ToString("N"))])));
                     break;
                 default:
                     break;

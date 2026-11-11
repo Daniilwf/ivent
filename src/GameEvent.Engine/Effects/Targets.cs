@@ -55,6 +55,24 @@ internal static class Targets
     public static IReadOnlyList<Guid> Choosable(SeasonState state, ObjectDefinition definition, Guid userId) =>
         [.. Candidates(state, definition, definition.Effect?.Target, userId).Select(p => p.PlayerId)];
 
+    /// <summary>
+    /// Whether a selector other than <c>chosen</c> finds nobody for <paramref name="userId"/>: decided without a roll,
+    /// exactly when <see cref="ForUse"/> refuses with <c>item.noTarget</c> (D-440) — <c>self</c> for a finisher's move,
+    /// <c>randomActive</c> with nobody active, any other with no candidate.
+    /// </summary>
+    public static bool HasNobody(SeasonState state, ObjectDefinition definition, Guid userId)
+    {
+        var spec = definition.Effect?.Target;
+        var candidates = Candidates(state, definition, spec, userId);
+        return (spec?.Selector ?? TargetSelector.Self) switch
+        {
+            TargetSelector.Chosen => false,
+            TargetSelector.Self => !candidates.Any(p => p.PlayerId == userId) && PositionOnly(definition.Effect),
+            TargetSelector.RandomActive => !candidates.Any(p => !p.IsInactive),
+            _ => candidates.Count == 0,
+        };
+    }
+
     /// <summary>The targets of an effect that fired for its owner (no one chooses: <c>chosen</c> reaches nobody).</summary>
     public static IReadOnlyList<Guid> ForTriggered(SeasonState state, EngineContext context, ObjectDefinition definition, Guid ownerId) =>
         definition.Effect?.Target?.Selector == TargetSelector.Chosen ? [] : Resolve(state, context, definition, definition.Effect?.Target, ownerId);
