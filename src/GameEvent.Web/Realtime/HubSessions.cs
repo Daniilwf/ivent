@@ -42,6 +42,9 @@ public sealed class HubSessions : ICommittedEventsListener
             {
                 foreach (var connection in _connections.Values.Where(c => c.UserIdentifier == id.ToString()).ToList())
                 {
+                    // Forget it before aborting: the client may see the close before the server runs OnDisconnectedAsync,
+                    // and an ended session must not count as open in the meantime
+                    Remove(connection.ConnectionId);
                     connection.Abort();
                 }
             }

@@ -1,8 +1,10 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using GameEvent.Engine.Kernel;
+using GameEvent.Engine.Map;
 using GameEvent.Engine.Runs;
 using GameEvent.Engine.Seasons;
+using GameEvent.Engine.Turns;
 using GameEvent.Infrastructure.Database;
 using GameEvent.Web.Accounts;
 using GameEvent.Web.Files;
@@ -132,10 +134,19 @@ public static class FeedEndpoints
             .Take(limit)
             .ToListAsync(ct);
         var authors = await db.NamesAsync(rows.Select(r => r.AuthorId).OfType<Guid>(), ct);
+        var branchChoices = rows.Any(r => r.Type == DiscardedChoice)
+            ? await BranchChoiceIdsAsync(db, seasonId, ct)
+            : [];
         IReadOnlyList<FeedEntryView> entries = [.. rows.Select(r =>
         {
             var decoded = EventCodec.Decode(new StoredEvent(r.Type, r.Version, r.Data));
             var data = (JsonObject)JsonSerializer.SerializeToNode(decoded, decoded.GetType(), EngineJson.Options)!;
+            if (decoded is ChoiceDiscarded discarded)
+            {
+                // The log keeps only the choice's id: the feed names what was discarded, a branch or a game (MP-1)
+                data["kind"] = branchChoices.Contains(discarded.ChoiceId) ? "branch" : "game";
+            }
+
             return FeedVisibility.Shown(r.Type, data, admin, viewerPlayerId) is not { } shown
                 ? null
                 : new FeedEntryView(
@@ -151,6 +162,23 @@ public static class FeedEndpoints
         var (players, games, runs) = await ReferencesAsync(db, seasonId, entries, admin, ct);
         return TypedResults.Ok(new FeedView(entries, nextBefore, players, games, runs, await ObjectsAsync(db, seasonId, entries, ct)));
     }
+
+    private const string DiscardedChoice = "choice-discarded";
+
+    /// <summary>The ids of every branch choice the season asked for: few, one per fork a move stopped at.</summary>
+    private static async Task<HashSet<Guid>> BranchChoiceIdsAsync(GameEventDbContext db, Guid seasonId, CancellationToken ct)
+    {
+        var requested = await db.Events.AsNoTracking()
+            .Where(e => e.SeasonId == seasonId && e.Type == BranchChoiceRequestedType)
+            .Select(e => new { e.Type, e.Version, e.Data })
+            .ToListAsync(ct);
+        return [.. requested
+            .Select(e => EventCodec.Decode(new StoredEvent(e.Type, e.Version, e.Data)))
+            .OfType<BranchChoiceRequested>()
+            .Select(e => e.ChoiceId)];
+    }
+
+    private const string BranchChoiceRequestedType = "branch-choice-requested";
 
     /// <summary>
     /// The names the page's events point to by id (D-150): the season's players in the season screen's order, the runs the

@@ -62,6 +62,30 @@ public sealed class DemoSeedTests : IAsyncLifetime
         Assert.True(await db.SeasonPlayers.AnyAsync(p => p.SeasonId == DemoSeed.SeasonId && p.Phase == TurnPhase.Playing, Ct));
         Assert.True(await db.SeasonPlayers.AnyAsync(p => p.SeasonId == DemoSeed.SeasonId && p.IsInactive, Ct));
         Assert.True(await db.SeasonPlayers.AnyAsync(p => p.SeasonId == DemoSeed.SeasonId && p.Frozen, Ct));
+        // Stage 2 on the graph map (D-270): forks chosen and one left waiting, a teleport taken, a zone's cells reached,
+        // and the whole map published mid-season while players stood on it
+        Assert.Empty(new[] { "map-published", "branch-choice-requested", "choice-made" }.Except(types));
+        var published = events.Single(e => e.Type == "map-published");
+        Assert.Contains(events, e => e.Type == "player-moved" && e.Sequence < published.Sequence);
+        Assert.Contains(events, e => e.Type == "player-moved" && JsonDocument.Parse(e.Data).RootElement.GetProperty("reason").GetString() == "teleport");
+        var map = DemoSeed.DemoMap(RepositoryRoot()).Published;
+        var cells = await db.SeasonPlayers.Where(p => p.SeasonId == DemoSeed.SeasonId).Select(p => p.CellId).ToListAsync(Ct);
+        Assert.Contains(events, e => e.Type == "player-moved" && map.CellById(JsonDocument.Parse(e.Data).RootElement.GetProperty("to").GetString()!).Zone is not null);
+        Assert.True(cells.Distinct().Count() > 5, $"the players stand on {cells.Distinct().Count()} cells only");
+        var choices = await db.SeasonPlayers.Where(p => p.SeasonId == DemoSeed.SeasonId && p.ChoiceJson != null).Select(p => p.ChoiceJson!).ToListAsync(Ct);
+        Assert.Contains(choices, c => JsonDocument.Parse(c).RootElement.GetProperty("kind").GetString() == "branch");
+        var season = await db.Seasons.SingleAsync(s => s.Id == DemoSeed.SeasonId, Ct);
+        Assert.Contains("\"graph\"", season.RulesetJson, StringComparison.Ordinal);
+
+        // The map is drawn over our own picture (D-279): an uploaded map background, every cell on it, and the screen has it
+        var inForce = await Web.Map.SeasonMaps.CurrentAsync(db, DemoSeed.SeasonId, Ct);
+        var background = inForce!.Background;
+        Assert.NotNull(background);
+        var picture = await db.Files.SingleAsync(f => f.Id == background.FileId, Ct);
+        Assert.Equal((Engine.Files.FileKind.MapBackground, background.Width, background.Height), (picture.Kind, picture.Width, picture.Height));
+        Assert.All(inForce.Cells, c => Assert.True(c.X > 0 && c.X < background.Width && c.Y > 0 && c.Y < background.Height, $"cell {c.Id} is off the picture"));
+        Assert.NotNull(await Web.Map.SeasonMaps.BackgroundAsync(db, inForce, Ct));
+
         var integrity = await SeasonIntegrity.CheckAsync(db, DemoSeed.SeasonId, Ct);
         Assert.True(integrity!.IsIntact, string.Join("; ", integrity.Differences));
 

@@ -463,7 +463,15 @@ const headlines: [string, (d: Data, c: Context) => Headline][] = [
   ],
   [
     'choice-discarded',
-    (d, c) => ({ icon: 'admin', actor: c.player(d), line: L.choiceDiscarded(c.playerRef(d)) }),
+    (d, c) => ({
+      icon: 'admin',
+      actor: c.player(d),
+      // The server names the kind of the discarded choice (MP-1)
+      line:
+        text(d, 'kind') === 'branch'
+          ? L.branchDiscarded(c.playerRef(d))
+          : L.choiceDiscarded(c.playerRef(d)),
+    }),
   ],
   [
     'player-finish-revoked',

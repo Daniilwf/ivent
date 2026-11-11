@@ -9,12 +9,29 @@ import type { Schemas } from '../api/client';
 export type Cell = Schemas['CellView'];
 export type Edge = Schemas['EdgeView'];
 export type Zone = Schemas['ZoneView'];
-export type Draft = { cells: Cell[]; edges: Edge[]; zones: Zone[] };
+export type Background = Schemas['MapBackgroundView'];
+/** `background` — the picture under the cells (D-277); none or null: the zones' board */
+export type Draft = {
+  cells: Cell[];
+  edges: Edge[];
+  zones: Zone[];
+  background?: Background | null | undefined;
+};
 export type CellType = Cell['type'];
 
 /** The draft of a map that came from the server: lists only, no nulls where the editor expects values */
 export function draftOf(map: Schemas['MapGraphView']): Draft {
-  return { cells: map.cells ?? [], edges: map.edges ?? [], zones: map.zones ?? [] };
+  return {
+    cells: map.cells ?? [],
+    edges: map.edges ?? [],
+    zones: map.zones ?? [],
+    background: map.background ?? null,
+  };
+}
+
+/** A new picture under the map, or none (D-277): the places stay, they are the picture's pixels */
+export function setBackground(draft: Draft, background: Background | null): Draft {
+  return { ...draft, background };
 }
 
 /** A new id not used by any cell: `c1`, `c2`… */
@@ -157,7 +174,7 @@ export function removeZone(draft: Draft, id: string): Draft {
  * The draft as the server takes it: optional fields left out when empty, so a draft equals the published map when
  * nothing changed (the check says «nothing to publish» then)
  */
-export function normalized(draft: Draft): Draft {
+export function normalized(draft: Draft): Omit<Draft, 'background'> & { background?: Background } {
   // Keys in one fixed order, whatever order the edits added them in: the server's map and a draft of the same map
   // serialize alike (sameMap compares the text)
   const clean = <T extends object>(o: T, order: readonly (keyof T)[]): T =>
@@ -192,6 +209,16 @@ export function normalized(draft: Draft): Draft {
       if (zone.diceModifier) zone.diceModifier = clean(zone.diceModifier, ['stage', 'value']);
       return zone;
     }),
+    // The picture is its file and size; the link is the server's to give
+    ...(draft.background
+      ? {
+          background: {
+            fileId: draft.background.fileId,
+            width: draft.background.width,
+            height: draft.background.height,
+          },
+        }
+      : {}),
   };
 }
 

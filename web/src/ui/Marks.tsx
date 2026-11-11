@@ -77,6 +77,35 @@ export function Badge({
   );
 }
 
+/**
+ * How many things wait for me (D-263): proofs to check, later votes or challenges. A to-do, not an alarm — the action
+ * fill, never danger, which is kept for drop, undo, reject and delete. 99+ at most; hidden from screen readers, so the
+ * control it sits on says the number in words. Nothing for zero.
+ */
+export function CountBadge({
+  count,
+  className,
+  'data-testid': testId,
+}: {
+  count: number;
+  className?: string;
+  'data-testid'?: string;
+}) {
+  if (count <= 0) return null;
+  return (
+    <span
+      data-testid={testId}
+      aria-hidden
+      className={cx(
+        'inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-action px-1 text-xs font-bold text-on-color tabular-nums',
+        className,
+      )}
+    >
+      {count > 99 ? '99+' : String(count)}
+    </span>
+  );
+}
+
 /** A game's genre or feature */
 export function Tag({ children }: { children: ReactNode }) {
   return <span className="rounded-full bg-muted px-2 text-xs">{children}</span>;

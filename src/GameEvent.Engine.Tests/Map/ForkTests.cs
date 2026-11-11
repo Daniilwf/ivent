@@ -343,4 +343,23 @@ public class ForkTests
 
         Assert.Equal(s.State, SeasonEngine.Replay(s.Log.Select(e => EventCodec.Decode(EventCodec.Encode(e)))));
     }
+
+    [Fact]
+    public void New_map_waits_for_a_pending_branch()
+    {
+        // D-305: the steps left at the fork lead from a fork of the current map; the editor shows why (found by mutation testing, D-282)
+        var s = Playing();
+        s.NextRandom(2, 2, 2).Complete("Вася");
+        var longer = MapBuilder.New().Path("start", "a", "f", "b1", "j", "k", "l", "m", "n", "finish").Path("f", "c1", "j").Build();
+
+        var pending = Assert.Single(MapPublicationChecks.For(s.State, longer));
+        Assert.Equal((RejectionCodes.BranchChoicePending, "map"), (pending.Code, pending.Subject));
+        Assert.False(string.IsNullOrWhiteSpace(pending.Message));
+        ScenarioAssert.RejectsWithoutChanges(s, x => x.Act(new PublishMap(longer, "Длиннее")), RejectionCodes.BranchChoicePending);
+
+        s.ChooseBranch("Вася", "c1");
+        Assert.Empty(MapPublicationChecks.For(s.State, longer));
+        s.Act(new PublishMap(longer, "Длиннее"));
+        ScenarioAssert.Accepted(s);
+    }
 }

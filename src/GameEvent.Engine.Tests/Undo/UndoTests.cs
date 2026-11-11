@@ -457,6 +457,10 @@ public class UndoTests
         ScenarioAssert.RejectsWithoutChanges(s, x => x.Act(new UndoCommand(bonus, comment)), RejectionCodes.CommentRequired);
         ScenarioAssert.RejectsWithoutChanges(
             s, x => x.Act(new UndoCommand(bonus, new string('я', Limits.MaxCommentLength + 1))), RejectionCodes.CommentTooLong);
+
+        // A comment of exactly the limit is fine (found by mutation testing, D-282)
+        s.Act(new UndoCommand(bonus, new string('я', Limits.MaxCommentLength)));
+        ScenarioAssert.Accepted(s);
     }
 
     [Fact]

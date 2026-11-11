@@ -85,7 +85,8 @@ public sealed record LoggedEventView(long Sequence, string Type);
 /// The season screen's data. <c>status</c> and <c>deadline</c> (UTC; the screen shows it in Moscow time) follow the
 /// lifecycle (D-101); after the finish <c>leaderboard</c> is the recorded result. The map is the one in force (the
 /// latest published, D-300): <c>cells</c>, <c>edges</c> and <c>zones</c>; <c>mapMode</c> says whether the season plays
-/// on the linear chain of stage 1 or on the graph (D-301).
+/// on the linear chain of stage 1 or on the graph (D-301); <c>background</c> — the picture under the cells, null when
+/// the map has none or its file is not on this site (D-277).
 /// </summary>
 public sealed record SeasonView(
     Guid Id,
@@ -100,6 +101,7 @@ public sealed record SeasonView(
     IReadOnlyList<EdgeView> Edges,
     IReadOnlyList<ZoneView> Zones,
     MapMode MapMode,
+    MapBackgroundView? Background = null,
     EconomyFeaturesView? Economy = null);
 
 /// <summary>
@@ -698,6 +700,7 @@ public static class SeasonEndpoints
             [.. map.Edges.Select(SeasonMaps.ToView)],
             [.. map.Zones.Select(SeasonMaps.ToView)],
             rules.Features.MapMode,
+            await SeasonMaps.BackgroundAsync(db, map, ct),
             new EconomyFeaturesView(rules.Features.Items, rules.Features.Shop, rules.Features.Bets)));
     }
 

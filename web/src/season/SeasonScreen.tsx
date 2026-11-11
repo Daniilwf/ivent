@@ -14,6 +14,7 @@ import { ProofSection } from './ProofForm';
 import { ManualEffectItem, type EffectOutcome } from './ManualEffectItem';
 import { InventorySection } from './Inventory';
 import { RunActions } from './RunActions';
+import { MyFinish } from './MyFinish';
 import { seasonPicture } from './seasonView';
 import { linearBoard } from '../board/linearBoard';
 import { Cover, RunCard } from '../board/GameCards';
@@ -285,12 +286,23 @@ export function SeasonScreen({
   const graphMode = season?.mapMode === 'graph';
   // The map is drawn again only when it changes (a publication), not on every refresh of the season
   const mapKey = season
-    ? JSON.stringify([season.mapMode, season.cells, graphMode ? season.edges : [], season.zones])
+    ? JSON.stringify([
+        season.mapMode,
+        season.cells,
+        graphMode ? season.edges : [],
+        season.zones,
+        season.background ?? null,
+      ])
     : '';
   const chain = useMemo(
     () =>
       season && graphMode
-        ? graphBoard({ cells: season.cells, edges: season.edges, zones: season.zones })
+        ? graphBoard({
+            cells: season.cells,
+            edges: season.edges,
+            zones: season.zones,
+            background: season.background ?? null,
+          })
         : linearBoard(season?.cells ?? []),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- the key stands for the map
     [mapKey],
@@ -751,6 +763,15 @@ export function SeasonScreen({
         {!me && <p className="text-ink-soft">{ru.turn.spectator}</p>}
         {me && finished && <p className="text-ink-soft">{ru.turn.finishedText}</p>}
         {me && closing && <p className="text-ink-soft">{ru.turn.closingText}</p>}
+        {/* D-260: a finisher's season goes on; the card says where he stands and what his next runs give */}
+        {me?.finish && !finished ? (
+          <MyFinish
+            finish={me.finish}
+            first={rows.find((r) => r.player.me)?.isFirst === true}
+            place={rows.find((r) => r.player.me)?.place ?? null}
+            rollsOpen={turnsOpen}
+          />
+        ) : null}
         {/* A refusal is said at the top of the card, where the eye is after the action */}
         {message && <Notice tone="danger">{message}</Notice>}
         {/* A phone scrolls the dice into view: the completion button was low on the screen */}
@@ -860,6 +881,8 @@ export function SeasonScreen({
               dropPenalty={me.dropPenalty}
               techRerollOpen={me.techRerollOpen}
               techRerollUntil={me.techRerollUntil ?? null}
+              wishRerollOpen={me.wishRerollOpen === true}
+              onWishReroll={() => void act({ kind: 'techReroll', reason: 'wish', comment: null })}
               frozen={me.finish?.frozen === true}
               pending={pending}
               onDrop={() => void act({ kind: 'drop' })}
