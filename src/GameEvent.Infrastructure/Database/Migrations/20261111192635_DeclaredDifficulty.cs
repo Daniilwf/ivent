@@ -21,9 +21,9 @@ namespace GameEvent.Infrastructure.Database.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropColumn(
-                name: "DeclaredDifficulty",
-                table: "Run");
+            // SQLite drops a column in place (3.35+): a rebuilt table would change the text of the schema the rollback check
+            // compares with the previous release (J5, as the Economy migration does).
+            migrationBuilder.Sql("ALTER TABLE \"Run\" DROP COLUMN \"DeclaredDifficulty\";");
         }
     }
 }
