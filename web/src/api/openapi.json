@@ -6768,6 +6768,24 @@
         },
         "description": "An answer to the pending choice: its id and the picked option's id."
       },
+      "CoinReflect": {
+        "required": [
+          "coinsAtMost",
+          "multiplier"
+        ],
+        "type": "object",
+        "properties": {
+          "coinsAtMost": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "multiplier": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "Reflection of coin damage (D-474): when the target has at most int CoinReflect.CoinsAtMost coins, the damage goes to the\none who used the effect, times int CoinReflect.Multiplier."
+      },
       "CoinReward": {
         "required": [
           "perHour",
@@ -7138,9 +7156,15 @@
           "multiply",
           "reroll",
           "min",
-          "max"
+          "max",
+          "singleDie",
+          "setOne",
+          "replaceValue",
+          "fixAverage",
+          "bonusPerEven",
+          "percent"
         ],
-        "description": "A stage of the dice pipeline (D-14)."
+        "description": "A stage of the dice pipeline (D-14); the rare ones from DiceStage.SingleDie on came with the import (D-481)."
       },
       "DieByDifficulty": {
         "required": [
@@ -7414,6 +7438,17 @@
           },
           "attacksOnlyOnHigherPoints": {
             "type": "boolean"
+          },
+          "reflect": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "Coin damage marked `reflect` that goes back to the attacker (D-474, the import's weapons). Missing — nothing is\nreflected: a season created before the rule keeps playing as it did (D-50). Not written while missing.",
+                "$ref": "#/components/schemas/CoinReflect"
+              }
+            ]
           }
         }
       },
