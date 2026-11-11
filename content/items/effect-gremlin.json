@@ -1,0 +1,33 @@
+{
+  "id": "effect-gremlin",
+  "kind": "item",
+  "name": "Эффектный Гремлин",
+  "description": "Уничтожь эффект на выбор у любого игрока, хоть у себя. Плата — 2 монетки.",
+  "rarity": "common",
+  "price": null,
+  "window": "anytime",
+  "hostile": true,
+  "stackable": false,
+  "tags": ["gremlin"],
+  "effect": {
+    "target": {
+      "selector": "chosen"
+    },
+    "actions": [
+      {
+        "type": "takeObject",
+        "mode": "destroy",
+        "pick": "chosen",
+        "filter": {
+          "kind": "effect"
+        }
+      },
+      {
+        "type": "changeResource",
+        "resource": "coins",
+        "amount": -2,
+        "target": "self"
+      }
+    ]
+  }
+}

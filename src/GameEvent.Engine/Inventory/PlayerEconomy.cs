@@ -11,7 +11,8 @@ namespace GameEvent.Engine.Inventory;
 /// <see cref="ExpiresAt"/>; none of them — until it fires once (<c>untilTriggered</c>) or for the season.
 /// <see cref="FromPlayerId"/> — who put it on the player, when that was another player (a hostile effect).
 /// <see cref="Acquired"/> — the number of the player's acquisition, so objects apply in the order they came (SPEC
-/// «Спецролл … по порядку получения»).
+/// «Спецролл … по порядку получения»). <see cref="Counter"/> — what is left of an effect's countdown (D-479); written only
+/// when it has one.
 /// </summary>
 public sealed record InventoryObject(
     Guid InstanceId,
@@ -24,7 +25,8 @@ public sealed record InventoryObject(
     int? UsesLeft = null,
     int? RunsLeft = null,
     DateTimeOffset? ExpiresAt = null,
-    EquatableArray<string> Notes = default);
+    EquatableArray<string> Notes = default,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? Counter = null);
 
 /// <summary>
 /// A change of the next roll by an item or an effect (CONTENT.md <c>modifyNextRoll</c>): a filter with its parameters
@@ -34,9 +36,16 @@ public sealed record RollModifier(string ObjectId, GameFilterSpec? Filter, int? 
 
 /// <summary>
 /// A change of the next throw for a completion (CONTENT.md <c>modifyDice</c> with <c>when: next</c>), waiting for it:
-/// the stage and the value with its references resolved (dice are rolled when the throw happens).
+/// the stage and the value with its references resolved (dice are rolled when the throw happens). <see cref="Sides"/> — the
+/// kind of extra dice of a <c>count</c> stage when it is their own (D-475); written only when set.
 /// </summary>
-public sealed record DiceModifier(string ObjectId, DiceStage Stage, ContentValue Value, bool Hostile = false);
+public sealed record DiceModifier(
+    string ObjectId,
+    DiceStage Stage,
+    ContentValue Value,
+    bool Hostile = false,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? Sides = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? From = null);
 
 /// <summary>A lot of the personal shop offer (SPEC «Магазин»): the object, its price in coins, whether it was bought.</summary>
 public sealed record ShopLot(string ObjectId, Rarity Rarity, int Price, bool Sold = false);

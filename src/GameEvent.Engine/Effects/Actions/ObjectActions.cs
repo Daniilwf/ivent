@@ -1,5 +1,6 @@
 using GameEvent.Engine.Content;
 using GameEvent.Engine.Inventory;
+using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Rulesets;
 
 namespace GameEvent.Engine.Effects.Actions;
@@ -7,16 +8,24 @@ namespace GameEvent.Engine.Effects.Actions;
 /// <summary>Which objects of an inventory an action may take or change (CONTENT.md <c>filter</c>), in the order they came.</summary>
 internal static class ObjectFilters
 {
-    public static IReadOnlyList<InventoryObject> Matching(EffectRun run, Guid playerId, ObjectFilterSpec? filter) =>
+    /// <summary>
+    /// The player's objects the filter lets through, without those the action may not touch (D-478): an unstealable one
+    /// never changes hands (<paramref name="moves"/>), an undestroyable one is never destroyed or transformed.
+    /// </summary>
+    public static IReadOnlyList<InventoryObject> Matching(EffectRun run, Guid playerId, ObjectFilterSpec? filter, bool moves = false) =>
         [.. run.State.Players[playerId].Wallet.Inventory
-            .Where(o => filter is null || Matches(run.State.Catalog.Get(o.ObjectId), o, filter))
+            .Where(o => run.State.Catalog.Get(o.ObjectId) is var definition
+                && (filter is null || Matches(definition, o, filter))
+                && (moves ? !definition.Unstealable : !definition.Undestroyable))
             .OrderBy(o => o.Acquired)];
 
     private static bool Matches(ObjectDefinition definition, InventoryObject item, ObjectFilterSpec filter) =>
         (filter.Kind is not { } kind || item.Kind == kind)
         && (filter.Rarity is not { } rarity || definition.Rarity == rarity)
         && (filter.ObjectId is not { } id || item.ObjectId == id)
-        && (filter.Hostile is not { } hostile || definition.Hostile == hostile);
+        && (filter.Hostile is not { } hostile || definition.Hostile == hostile)
+        && (filter.HasCounter is not { } counted || (item.Counter is not null) == counted)
+        && (filter.ExcludeTags is not { } excluded || !(definition.Tags ?? []).Any(t => excluded.Contains(t, StringComparer.Ordinal)));
 
     /// <summary>One of <paramref name="candidates"/>: at random, or the one the player named (its instance id).</summary>
     public static InventoryObject? Pick(EffectRun run, IReadOnlyList<InventoryObject> candidates, Pick pick)
@@ -56,25 +65,83 @@ internal sealed class GiveObjectHandler : ActionHandler<GiveObjectAction>
 
 /// <summary>
 /// <c>takeObject</c>: <c>take</c> and <c>steal</c> move the object to the one who used the effect (an item that does not
-/// fit is lost, D-406), <c>destroy</c> removes it.
+/// fit is lost, D-406), <c>destroy</c> removes it. Several objects with <c>count</c> or <c>all</c> (D-476): a fixed count
+/// chosen asks one answer per object; a count known only at the use (<c>$roll</c>) takes the answers left as a list of
+/// preference and the rest at random.
 /// </summary>
 internal sealed class TakeObjectHandler : ActionHandler<TakeObjectAction>
 {
     protected override void Execute(TakeObjectAction action, EffectRun run)
     {
-        var from = run.ActionTarget(action);
-        if (ObjectFilters.Pick(run, ObjectFilters.Matching(run, from, action.Filter), action.Pick) is not { } item)
+        // Giving hands the user's own object to the target; the other modes work on the target's objects
+        var giving = action.Mode == TakeMode.Give;
+        var from = giving ? run.UserId : run.ActionTarget(action);
+        var to = giving ? run.ActionTarget(action) : run.UserId;
+        if (giving && ObjectFilters.Matching(run, from, action.Filter, moves: true).Count == 0)
         {
+            run.Refuse(RejectionCodes.ItemNothingToGive, $"The user of «{run.ObjectId}» has nothing it may give.");
             return;
         }
 
+        foreach (var item in Picked(action, run, from))
+        {
+            Take(action, run, from, to, item);
+            if (run.Refusal is not null)
+            {
+                return;
+            }
+        }
+    }
+
+    private static List<InventoryObject> Picked(TakeObjectAction action, EffectRun run, Guid from)
+    {
+        var candidates = ObjectFilters.Matching(run, from, action.Filter, moves: action.Mode != TakeMode.Destroy).ToList();
+        if (action.All)
+        {
+            return candidates;
+        }
+
+        var count = action.Count is { } value ? run.Number(value) : 1;
+        var picked = new List<InventoryObject>();
+        if (action.Pick == Pick.Chosen && action.Count is { Kind: ContentValueKind.Reference })
+        {
+            if (run.RemainingChoices([.. candidates.Select(o => o.InstanceId.ToString("N"))]) is not { } preferred)
+            {
+                return [];
+            }
+
+            foreach (var answer in preferred.Take(count))
+            {
+                var chosen = candidates.Single(o => o.InstanceId.ToString("N") == answer);
+                picked.Add(chosen);
+                candidates.Remove(chosen);
+            }
+        }
+
+        // A fixed count chosen asks one answer per object; the rest of a count known only now goes at random
+        var pick = action.Pick == Pick.Chosen && action.Count is not { Kind: ContentValueKind.Reference } ? Pick.Chosen : Pick.Random;
+        while (picked.Count < count && candidates.Count > 0)
+        {
+            if (ObjectFilters.Pick(run, candidates, pick) is not { } next)
+            {
+                return [];
+            }
+
+            picked.Add(next);
+            candidates.Remove(next);
+        }
+
+        return picked;
+    }
+
+    private static void Take(TakeObjectAction action, EffectRun run, Guid from, Guid to, InventoryObject item)
+    {
         if (action.Mode == TakeMode.Destroy)
         {
             run.Emit(new ObjectRemoved(from, item.InstanceId, item.ObjectId, ObjectRemoval.Destroyed));
             return;
         }
 
-        var to = run.UserId;
         if (to == from)
         {
             return;
@@ -87,7 +154,7 @@ internal sealed class TakeObjectHandler : ActionHandler<TakeObjectAction>
             return;
         }
 
-        run.Emit(new ObjectTransferred(from, to, item.InstanceId, item.ObjectId));
+        run.Emit(new ObjectTransferred(from, to, item.InstanceId, item.ObjectId, Given: action.Mode == TakeMode.Give));
     }
 }
 
@@ -97,6 +164,12 @@ internal sealed class TransformObjectHandler : ActionHandler<TransformObjectActi
     protected override void Execute(TransformObjectAction action, EffectRun run)
     {
         var owner = run.ActionTarget(action);
+        if (action.Mode is TransformMode.AddCounter or TransformMode.ResetCounters)
+        {
+            Counters(action, run, owner);
+            return;
+        }
+
         if (ObjectFilters.Pick(run, ObjectFilters.Matching(run, owner, action.Filter), Pick.Random) is not { } item)
         {
             return;
@@ -115,6 +188,30 @@ internal sealed class TransformObjectHandler : ActionHandler<TransformObjectActi
 
         var fresh = Inventories.New(run.State, run.Context, owner, into, item.Params, item.FromPlayerId);
         run.Emit(new ObjectChanged(owner, fresh with { InstanceId = item.InstanceId, Acquired = item.Acquired, Notes = item.Notes }));
+    }
+
+    // Every matching countdown changes; one brought to zero goes off at once, for its owner (D-479).
+    private static void Counters(TransformObjectAction action, EffectRun run, Guid owner)
+    {
+        var by = action.Value is { } value ? run.Number(value) : 0;
+        foreach (var item in ObjectFilters.Matching(run, owner, action.Filter).Where(o => o.Counter is not null))
+        {
+            var start = run.State.Catalog.Get(item.ObjectId).Effect?.Counter?.Start ?? item.Counter!.Value;
+            var counter = action.Mode == TransformMode.ResetCounters ? start : item.Counter!.Value + by;
+            if (counter > 0)
+            {
+                if (counter != item.Counter)
+                {
+                    run.Emit(new ObjectChanged(owner, item with { Counter = counter }));
+                }
+
+                continue;
+            }
+
+            var spent = item with { Counter = 0 };
+            run.Emit(new ObjectChanged(owner, spent));
+            Effects.Firing.GoOff(run, owner, spent);
+        }
     }
 }
 

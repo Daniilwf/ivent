@@ -1,0 +1,24 @@
+{
+  "id": "mythic-boots",
+  "kind": "item",
+  "name": "Мифические Сапоги-скороходы",
+  "description": "К следующему броску за прохождение прибавляется половина его результата (с модификаторами), с округлением к нулю.",
+  "rarity": "legendary",
+  "price": null,
+  "window": "beforeDice",
+  "hostile": false,
+  "stackable": false,
+  "effect": {
+    "target": {
+      "selector": "self"
+    },
+    "actions": [
+      {
+        "type": "modifyDice",
+        "when": "next",
+        "stage": "percent",
+        "value": 150
+      }
+    ]
+  }
+}

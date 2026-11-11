@@ -61,6 +61,7 @@
 | Причина удаления игры | почему админ убрал игру из пула; обязательна, её видит тот, кто добавляет игру снова (D-208) | `DeleteGame.Reason`, `GameDeleted.Reason`, `GameRecord.DeletionReason`, `PoolGameView.DeletionReason`, `SimilarGameView.DeletionReason` |
 | Убрана из пула | та же игра удалена админом: добавить заново нельзя, только вернуть в пул (D-208, D-241) | отказ `pool.removed`, `SimilarGameView.IsDeleted` |
 | Тег | метка жанра или свойства игры | `Tag` |
+| Тег объекта | метка самого предмета или эффекта: съедобный, крысиный, гремлинский, свиной, оружие, зелье; по ней фильтр действия пропускает объекты (D-470) | `ObjectDefinition.Tags`, `ObjectFilterSpec.ExcludeTags` |
 | Категория | тег с весом на колесе категорий | `Category`, `SetCategory`, `RemoveCategory`, события `CategorySet`, `CategoryRemoved` |
 | Часы | длина игры по HowLongToBeat, основной сюжет | `Game.Hours`, `RunSnapshot.Hours` |
 | Условие прохождения | что считается прохождением для бесконечной или мультиплеерной игры | `GameRecord.CompletionCondition`, `GameCard.CompletionCondition` |
@@ -219,6 +220,12 @@
 | Селектор целей | правило выбора, на кого действует эффект | `TargetSelector` |
 | Враждебный эффект | эффект, наложенный другим игроком во вред | `IsHostile` |
 | Перехват | пассивная защита, гасящая враждебный эффект | `Intercept`, событие `HostileIntercepted` |
+| Отражение урона | урон монетками по цели на пороге `effects.reflect.coinsAtMost` и ниже достаётся использующему, умноженный (D-474) | `ChangeResourceAction.Reflect`, `CoinReflect` |
+| Счётчик эффекта | обратный отсчёт эффекта: срабатывания триггера уменьшают его, на нуле эффект действует; зелья меняют и сбрасывают (D-479) | `EffectSpec.Counter`, `InventoryObject.Counter`, `TransformMode.AddCounter`, `ResetCounters`, триггер `RunEnded` |
+| Передача объекта | игрок отдаёт свой объект другому предметом; отданное — его дело на получателе (D-478) | `TakeMode.Give`, `ObjectTransferred.Given`, отказ `item.nothingToGive` |
+| Неукрадываемый, неуничтожимый | флаги объекта: эффекты не забирают и не передают / не уничтожают и не превращают его (D-478) | `ObjectDefinition.Unstealable`, `Undestroyable` |
+| Условие использования | когда предмет можно использовать, например «при нуле монеток» (D-483) | `ObjectDefinition.UseCondition`, статистика `ContentStat.Coins`, отказ `item.conditionNotMet` |
+| Ветвление по выбору | исходы эффекта по ответу игрока, а не по броску (D-482) | `OutcomesSpec.Choice`, `OutcomeCase.Option` |
 | Ручной эффект | текстовый эффект, ждущий разрешения игроком или админом | `PendingManualEffect`, событие `ManualEffectCreated`, источник `ManualEffectSource`, разрешение `ManualEffectResolved` (`ManualEffectOutcome`: `Applied`, `NotApplicable`), разрешение — `ResolveManualEffect` |
 | Правка часов прохождения | админ меняет часы после броска: кубики докидываются или снимаются с конца | команда `CorrectRunHours`, событие `RunHoursCorrected`, причины `*.RunCorrection` |
 | Смена сложности прохождения | админ меняет сложность по пруфу: каждый кубик пересчитывается | команда `ChangeRunDifficulty`, событие `RunDifficultyChanged`, `DieChange` |

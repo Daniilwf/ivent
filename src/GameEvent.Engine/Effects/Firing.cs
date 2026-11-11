@@ -36,6 +36,14 @@ internal static class Firing
 
         var run = new EffectRun(state, context, ownerId, item.ObjectId, definition.Hostile, item.Params, dice: dice, runId: runId);
         run.Emit(new EffectTriggered(ownerId, item.InstanceId, item.ObjectId, trigger));
+
+        // A countdown lowers its counter instead of acting, until it reaches zero (D-479)
+        if (effect.Counter is not null && item.Counter is > 1)
+        {
+            run.Emit(new ObjectChanged(ownerId, item with { Counter = item.Counter - 1 }));
+            return run;
+        }
+
         run.Run(effect, Targets.ForTriggered(run.State, context, definition, ownerId));
 
         // The object may be gone already (an effect that takes its own kind); a use is spent only on one still held.
@@ -45,6 +53,23 @@ internal static class Firing
         }
 
         return run;
+    }
+
+    /// <summary>
+    /// A countdown that reached zero outside its trigger (a potion of time, D-479): its actions run now for its owner, and
+    /// it is spent as after a firing. The events go into <paramref name="parent"/>.
+    /// </summary>
+    public static void GoOff(EffectRun parent, Guid ownerId, InventoryObject item)
+    {
+        var definition = parent.State.Catalog.Get(item.ObjectId);
+        var run = new EffectRun(parent.State, parent.Context, ownerId, item.ObjectId, definition.Hostile, item.Params);
+        run.Run(definition.Effect!, Targets.ForTriggered(run.State, parent.Context, definition, ownerId));
+        if (run.State.Players[ownerId].Wallet.Find(item.InstanceId) is { } still && Inventories.AfterFiring(run.State, ownerId, still) is { } spent)
+        {
+            run.Emit(spent);
+        }
+
+        parent.Emit(run.Events);
     }
 
     /// <summary>Fires every subscribed object in turn on the state the ones before left; the events in order.</summary>

@@ -6335,6 +6335,16 @@ export interface components {
             choiceId: string;
             optionId: string;
         };
+        /**
+         * @description Reflection of coin damage (D-474): when the target has at most int CoinReflect.CoinsAtMost coins, the damage goes to the
+         *     one who used the effect, times int CoinReflect.Multiplier.
+         */
+        CoinReflect: {
+            /** Format: int32 */
+            coinsAtMost: number;
+            /** Format: int32 */
+            multiplier: number;
+        };
         CoinReward: {
             /** Format: double */
             perHour: number;
@@ -6444,10 +6454,10 @@ export interface components {
             max: number;
         };
         /**
-         * @description A stage of the dice pipeline (D-14).
+         * @description A stage of the dice pipeline (D-14); the rare ones from DiceStage.SingleDie on came with the import (D-481).
          * @enum {unknown}
          */
-        DiceStage: "count" | "sides" | "add" | "multiply" | "reroll" | "min" | "max";
+        DiceStage: "count" | "sides" | "add" | "multiply" | "reroll" | "min" | "max" | "singleDie" | "setOne" | "replaceValue" | "fixAverage" | "bonusPerEven" | "percent";
         DieByDifficulty: {
             easy: components["schemas"]["DieRule"];
             normal: components["schemas"]["DieRule"];
@@ -6528,6 +6538,7 @@ export interface components {
             maxEventsPerCommand: number;
             hostileCap: components["schemas"]["HostileCap"];
             attacksOnlyOnHigherPoints: boolean;
+            reflect?: null | components["schemas"]["CoinReflect"];
         };
         /** @enum {unknown} */
         EmptyPoolFallback: "dropZoneFilter";
@@ -7808,7 +7819,7 @@ export const bugReportStatusValues: ReadonlyArray<FlattenedDeepRequired<componen
 export const cellTypeValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["CellType"]> = ["start", "empty", "finish", "fork", "teleport", "checkpoint", "pointsBonus", "event", "shop"];
 export const choiceKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ChoiceKind"]> = ["game", "branch"];
 export const coopRoundUpForValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["CoopRoundUpFor"]> = ["roller"];
-export const diceStageValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["DiceStage"]> = ["count", "sides", "add", "multiply", "reroll", "min", "max"];
+export const diceStageValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["DiceStage"]> = ["count", "sides", "add", "multiply", "reroll", "min", "max", "singleDie", "setOne", "replaceValue", "fixAverage", "bonusPerEven", "percent"];
 export const difficultyValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["Difficulty"]> = ["easy", "normal", "hard", "extreme"];
 export const emptyPoolFallbackValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["EmptyPoolFallback"]> = ["dropZoneFilter"];
 export const eventKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["EventKind"]> = ["good", "bad"];

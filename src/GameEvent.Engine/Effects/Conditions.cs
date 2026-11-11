@@ -31,6 +31,7 @@ internal static class Conditions
             ContentStat.RunHours => run?.Hours >= condition.Gte,
             ContentStat.AllDiceMax => run is not null && AllMax(run, condition.MinDice ?? 1),
             ContentStat.CompletedStreakWithTag => Streak(state, context, ownerId, condition.Tag!) >= condition.Gte,
+            ContentStat.Coins => state.Players[ownerId].Coins is var coins && !(coins < condition.Gte) && !(coins > condition.Lte),
             _ => false,
         };
     }

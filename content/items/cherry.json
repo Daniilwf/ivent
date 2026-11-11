@@ -1,0 +1,65 @@
+{
+  "id": "cherry",
+  "kind": "item",
+  "name": "Вишенка",
+  "description": "Брось d4: 1 — теряешь 3 монетки, 2 — получаешь 1 монетку, 3 — 2 монетки, 4 — идёшь на 1 клетку вперёд.",
+  "rarity": "common",
+  "price": null,
+  "window": "anytime",
+  "hostile": false,
+  "stackable": true,
+  "tags": ["edible"],
+  "effect": {
+    "target": {
+      "selector": "self"
+    },
+    "outcomes": {
+      "roll": "1d4",
+      "cases": [
+        {
+          "from": 1,
+          "to": 1,
+          "actions": [
+            {
+              "type": "changeResource",
+              "resource": "coins",
+              "amount": -3
+            }
+          ]
+        },
+        {
+          "from": 2,
+          "to": 2,
+          "actions": [
+            {
+              "type": "changeResource",
+              "resource": "coins",
+              "amount": 1
+            }
+          ]
+        },
+        {
+          "from": 3,
+          "to": 3,
+          "actions": [
+            {
+              "type": "changeResource",
+              "resource": "coins",
+              "amount": 2
+            }
+          ]
+        },
+        {
+          "from": 4,
+          "to": 4,
+          "actions": [
+            {
+              "type": "move",
+              "steps": 1
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

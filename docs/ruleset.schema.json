@@ -570,6 +570,25 @@
         },
         "attacksOnlyOnHigherPoints": {
           "type": "boolean"
+        },
+        "reflect": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "properties": {
+            "coinsAtMost": {
+              "type": "integer"
+            },
+            "multiplier": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "coinsAtMost",
+            "multiplier"
+          ],
+          "additionalProperties": false
         }
       },
       "required": [
