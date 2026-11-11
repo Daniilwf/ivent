@@ -65,6 +65,21 @@ public sealed class SessionTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Signing_in_again_in_the_same_browser_ends_its_previous_session()
+    {
+        // SES-1: the browser's old session would stay live, unseen, for 30 days
+        var vasya = await DeviceAsync("vasya");
+        var copy = CopyOf(vasya);
+
+        var again = await vasya.Client.PostAsJsonAsync("/api/auth/login", new { login = "petya", password = SiteFactory.Password }, Ct);
+        Assert.Equal(HttpStatusCode.OK, again.StatusCode);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, (await copy.Client.GetAsync("/api/auth/me", Ct)).StatusCode);
+        await using var db = _site.NewDb();
+        Assert.NotNull((await db.Sessions.SingleAsync(s => s.UserId == _site.Users["vasya"], Ct)).RevokedAt);
+    }
+
+    [Fact]
     public async Task Sign_out_ends_the_session_and_a_copy_of_the_cookie_made_before_gets_401()
     {
         var vasya = await DeviceAsync("vasya");

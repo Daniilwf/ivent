@@ -101,6 +101,13 @@ public static partial class AccountEndpoints
         throttle.Succeeded(normalized, address);
         devices.Remember(http, normalized);
 
+        // A browser signing in again leaves its previous session behind: it ends, not lingers unseen (SES-1)
+        if (http.User.UserId() is { } previousUser && http.User.SessionId() is { } previous)
+        {
+            await bus.SendAsync(
+                new CommandEnvelope(ids.NewId(), Guid.Empty, new EndSessions(previousUser, Engine.Accounts.SessionEndReason.SignedOut, Only: previous), previousUser), ct);
+        }
+
         // Every sign-in is a new session with a new id: a cookie planted before it names none of it (D-466)
         var started = await bus.SendAsync(
             new CommandEnvelope(ids.NewId(), Guid.Empty, new StartSession(user!.Id, http.Request.Headers.UserAgent.ToString(), address), user.Id), ct);
