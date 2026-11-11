@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import type { Schemas } from '../api/client';
 import { ru } from '../i18n/ru';
@@ -40,5 +40,17 @@ describe('DrawnEventCard', () => {
     expect(screen.getByTestId('drawn-event-kind')).toHaveTextContent('Специвент');
     rerender(<DrawnEventCard drawn={{ ...drawn, kind: 'bad' }} />);
     expect(screen.getByTestId('drawn-event-kind')).toHaveTextContent('Плохой ивент');
+  });
+
+  it('draws a fresh card off the deck, a click shows it at once, and an old card just stands', () => {
+    const { rerender } = render(<DrawnEventCard drawn={drawn} fresh />);
+    const card = screen.getByTestId('drawn-event');
+    expect(card).toHaveAttribute('data-drawing', 'true');
+
+    fireEvent.click(card);
+    expect(screen.getByTestId('drawn-event')).not.toHaveAttribute('data-drawing');
+
+    rerender(<DrawnEventCard key="old" drawn={drawn} />);
+    expect(screen.getByTestId('drawn-event')).not.toHaveAttribute('data-drawing');
   });
 });

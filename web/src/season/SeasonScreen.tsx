@@ -349,6 +349,13 @@ export function SeasonScreen({
       });
     if (season) branchSeen.current = branchId;
   }, [branchId, season]);
+  // An event drawn while the page is open is drawn on screen (a key moment); one drawn before it opened just stands
+  // there. The first loaded view sets the base during render, so the new card mounts already knowing it is fresh.
+  const drawnSequence = season?.me?.lastEvent?.sequence ?? null;
+  const [drawBase, setDrawBase] = useState<{ sequence: number | null } | null>(null);
+  if (season && drawBase === null) setDrawBase({ sequence: drawnSequence });
+  const freshDraw =
+    drawBase !== null && drawnSequence !== null && drawnSequence !== drawBase.sequence;
   const [retrying, setRetrying] = useState(false);
 
   if (loadFailed && !season)
@@ -433,7 +440,9 @@ export function SeasonScreen({
               ? ru.turn.afterGame(me.lastCompleted.game.title)
               : ru.turn.after}
         </h3>
-        {me.lastEvent ? <DrawnEventCard drawn={me.lastEvent} /> : null}
+        {me.lastEvent ? (
+          <DrawnEventCard key={me.lastEvent.sequence} drawn={me.lastEvent} fresh={freshDraw} />
+        ) : null}
         {me.manualEffects.length > 0 && (
           <section
             aria-labelledby="effects-title"
