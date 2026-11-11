@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Players;
 using GameEvent.Engine.Seasons;
@@ -128,6 +129,27 @@ public sealed class TurnCardApiTests : IAsyncLifetime
         Assert.Empty((await MeAsync(vasya)).GetProperty("checks").EnumerateArray());
     }
 
+    [Fact]
+    public async Task A_rejection_leaves_the_card_after_the_next_roll_that_offers_a_choice_of_games()
+    {
+        var vasya = await _site.SignedInAsync("vasya");
+        var admin = await _site.SignedInAsync("admin");
+        var first = await PlayOneAsync(vasya);
+        await PlayOneAsync(vasya);
+        _site.Clock.UtcNow = _site.Clock.UtcNow.AddMinutes(5);
+        await PostOkAsync(admin, $"/api/admin/seasons/{SiteFactory.SeasonId}/runs/{first}/reject", new { commandId = Guid.NewGuid(), comment = "На ссылке нет титров" });
+        Assert.Single((await MeAsync(vasya)).GetProperty("checks").EnumerateArray());
+
+        // The next roll offers two games: it makes neither a run nor an offer, and still moves on
+        await ChangeRulesAsync(admin, ruleset => ruleset["roll"]!["choiceCount"] = 2);
+        _site.Clock.UtcNow = _site.Clock.UtcNow.AddMinutes(5);
+        await PostOkAsync(vasya, $"{Season}/roll");
+
+        var me = await MeAsync(vasya);
+        Assert.Equal(JsonValueKind.Object, me.GetProperty("choice").ValueKind);
+        Assert.Empty(me.GetProperty("checks").EnumerateArray());
+    }
+
     // ---- K1S-2: the form shows the proof that was sent ----
 
     [Fact]
@@ -230,6 +252,20 @@ public sealed class TurnCardApiTests : IAsyncLifetime
         await AssertConflictAsync(response, "season.nameTaken");
     }
 
+    [Fact]
+    public async Task A_retry_of_the_same_season_is_not_a_name_clash()
+    {
+        var admin = await _site.SignedInAsync("admin");
+        var request = new { commandId = Guid.NewGuid(), seasonId = Guid.NewGuid(), name = "Зимний сезон" };
+        var created = await admin.PostAsJsonAsync("/api/admin/seasons", request, Ct);
+        Assert.True(created.IsSuccessStatusCode, await created.Content.ReadAsStringAsync(Ct));
+
+        var retry = await admin.PostAsJsonAsync("/api/admin/seasons", request, Ct);
+
+        Assert.True(retry.IsSuccessStatusCode, await retry.Content.ReadAsStringAsync(Ct));
+        Assert.Equal(created.StatusCode, retry.StatusCode);
+    }
+
     // ---- Helpers ----
 
     private static async Task AssertConflictAsync(HttpResponseMessage response, string code)
@@ -260,6 +296,18 @@ public sealed class TurnCardApiTests : IAsyncLifetime
         await PostOkAsync(player, $"{Season}/start");
         await PostOkAsync(player, $"{Season}/complete", new { commandId = Guid.NewGuid(), difficulty = "normal" });
         return (await MeAsync(player)).GetProperty("lastCompleted").GetProperty("id").GetGuid();
+    }
+
+    private static async Task ChangeRulesAsync(HttpClient admin, Action<JsonNode> change)
+    {
+        using var current = JsonDocument.Parse(await admin.GetStringAsync($"{Season}/rules", Ct));
+        var ruleset = JsonNode.Parse(current.RootElement.GetProperty("ruleset").GetRawText())!;
+        change(ruleset);
+        var response = await admin.PutAsJsonAsync(
+            $"/api/admin/seasons/{SiteFactory.SeasonId}/rules",
+            new { commandId = Guid.NewGuid(), expectedVersion = current.RootElement.GetProperty("version").GetInt32(), ruleset },
+            Ct);
+        Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync(Ct));
     }
 
     private static async Task<JsonElement> MeAsync(HttpClient player) =>

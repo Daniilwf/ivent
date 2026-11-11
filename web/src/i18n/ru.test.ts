@@ -21,3 +21,25 @@ describe('the completion result in Russian', () => {
     expect(d.resultStay([1, 1], [], 2)).toBe('1 + 1. Итого +2 очка, фишка стоит на месте');
   });
 });
+
+// Review of K1S: the texts name things by the glossary and the sections by their own names
+describe('the season texts follow the glossary', () => {
+  it('sends the admin to the section that exists, speaking to them as «ты»', () => {
+    const text = ru.rejection['season.effectsPending'];
+    expect(text).toContain(`«${ru.admin.sections.effects}»`);
+    expect(text).not.toMatch(/разыграйте/);
+  });
+
+  it('calls the bonus cell «бонус очков»', () => {
+    expect(ru.feed.facts.cellBonus(3)).toBe('+3 очка — бонус очков');
+  });
+
+  it('does not list only a part of what a rejection takes', () => {
+    for (const line of [
+      ru.turn.lastRejected('Silent Hill'),
+      ru.turn.checkRejected('Silent Hill'),
+    ]) {
+      expect(line).toBe('Прохождение отклонено (Silent Hill): снято всё, что дал ход.');
+    }
+  });
+});

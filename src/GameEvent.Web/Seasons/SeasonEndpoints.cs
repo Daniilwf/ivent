@@ -746,7 +746,11 @@ public static class SeasonEndpoints
                 .MaxAsync(r => (DateTimeOffset?)r.RolledAt, ct);
             var player = await db.SeasonPlayers.AsNoTracking().SingleAsync(p => p.Id == playerId, ct);
             var offered = player.OfferJson is null ? null : JsonSerializer.Deserialize<RollOffer>(player.OfferJson, EngineJson.Options);
-            var since = new[] { lastRoll, offered?.RolledAt }.OfType<DateTimeOffset>().DefaultIfEmpty(DateTimeOffset.MinValue).Max();
+            // A roll that offers a choice of games makes neither a run nor an offer: its options carry its time
+            var choice = player.ChoiceJson is null ? null : JsonSerializer.Deserialize<PendingChoice>(player.ChoiceJson, EngineJson.Options);
+            var chosen = choice?.Options.Select(o => o.Game?.RolledAt).OfType<DateTimeOffset>() ?? [];
+            var since = new[] { lastRoll, offered?.RolledAt }.Concat(chosen.Select(t => (DateTimeOffset?)t))
+                .OfType<DateTimeOffset>().DefaultIfEmpty(DateTimeOffset.MinValue).Max();
             var rows = await db.Events.AsNoTracking()
                 .Where(e => e.SeasonId == seasonId && e.Type == s_rejectedType && e.OccurredAt >= since && e.UndoneByEventId == null)
                 .ToListAsync(ct);

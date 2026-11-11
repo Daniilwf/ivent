@@ -57,6 +57,9 @@ type DropPenalty = {
 
 type RerollPayment = 'freeThisRoll' | 'freeRerollResource' | 'coins' | 'badEvent' | 'freeMode';
 
+// The admin's section the refusals send to, by its own name
+const effectsSection = 'Ручные эффекты';
+
 const rejection = {
   'pool.duplicate': 'Такая игра уже есть в пуле.',
   'pool.similar': 'В пуле есть похожее название: проверь и подтверди.',
@@ -131,8 +134,7 @@ const rejection = {
   'season.deadlinePassed': 'Дедлайн прошёл: броски закрыты, пруфы принимаются.',
   'season.deadlineNotReached': 'Дедлайн ещё не наступил.',
   'season.proofsPending': 'Сначала проверь все пруфы: итоги — только после проверки.',
-  'season.effectsPending':
-    'Сначала разыграйте ручные эффекты: отметь каждый «применено» или «не применимо» в разделе «Эффекты».',
+  'season.effectsPending': `Сначала разыграй ручные эффекты: отметь каждый «применено» или «не применимо» в разделе «${effectsSection}».`,
   'season.notActive': 'Сезон сейчас не идёт.',
   'player.finished': 'Позиция финишировавшего меняется только через его прохождения.',
   'player.unknown': 'Ты не участвуешь в этом сезоне.',
@@ -470,7 +472,7 @@ export const ru = {
     reviewNoRating: 'Без оценки',
     reviewText: 'Отзыв',
     reviewRatingRequired: 'Чтобы оставить отзыв, поставь оценку от 1 до 10.',
-    lastRejected: (title: string) => `Прохождение отклонено (${title}): очки и клетки сняты.`,
+    lastRejected: (title: string) => `Прохождение отклонено (${title}): снято всё, что дал ход.`,
     lastChallengeDice: (dice: number[]) => `Кубы за челлендж: ${dice.join(' + ')}`,
     lastReview: (rating: number, text: string | null) =>
       text
@@ -490,7 +492,7 @@ export const ru = {
     checksTitle: 'Другие прохождения',
     checkWaiting: (title: string, total: number) =>
       `${title}: ждёт проверки, +${points(total)}. Пруф можно дослать.`,
-    checkRejected: (title: string) => `Прохождение отклонено (${title}): очки и клетки сняты.`,
+    checkRejected: (title: string) => `Прохождение отклонено (${title}): снято всё, что дал ход.`,
   },
   difficulty: {
     easy: 'Лёгкая',
@@ -1119,7 +1121,7 @@ export const ru = {
       moved: 'Фишка переставлена',
       teleport: 'Телепорт',
       branchWaiting: 'Развилка: ждёт выбора ветки',
-      cellBonus: (n: number) => `${signed(n)} ${plural(n, 'очко', 'очка', 'очков')} — клетка-бонус`,
+      cellBonus: (n: number) => `${signed(n)} ${plural(n, 'очко', 'очка', 'очков')} — бонус очков`,
       rolledNext: (title: string) => `Новый ролл: ${title}`,
       rolledChoice: (n: number) => `Новый ролл: выбор из ${n} ${plural(n, 'игры', 'игр', 'игр')}`,
     },
@@ -1485,7 +1487,7 @@ export const ru = {
       proofs: 'Пруфы',
       players: 'Игроки',
       log: 'Лог',
-      effects: 'Ручные эффекты',
+      effects: effectsSection,
       pool: 'Пул и категории',
       rules: 'Правила',
       season: 'Сезон',
