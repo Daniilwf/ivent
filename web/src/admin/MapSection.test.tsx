@@ -458,7 +458,7 @@ describe('the map editor', () => {
       version: 1,
       map: {
         ...published,
-        cells: published.cells?.map((c) =>
+        cells: (published.cells ?? []).map((c) =>
           c.id === 'c1' ? { ...c, type: 'pointsBonus', amount: 9 } : c,
         ),
       },
@@ -488,7 +488,9 @@ describe('the map editor', () => {
       version: 1,
       map: {
         ...published,
-        cells: published.cells?.map((c) => (c.id === 'c1' ? { ...c, type: 'checkpoint' } : c)),
+        cells: (published.cells ?? []).map((c) =>
+          c.id === 'c1' ? { ...c, type: 'checkpoint' } : c,
+        ),
       },
     });
     rerender(<MapSection seasonId={seasonId} version={1} />);

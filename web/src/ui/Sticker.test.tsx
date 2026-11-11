@@ -19,7 +19,7 @@ describe('the first character of a name', () => {
   });
 
   it('is what the sticker shows', () => {
-    const { container } = render(<Sticker player={{ name: '🔥Вася', token: 1, avatar: null }} />);
+    const { container } = render(<Sticker player={{ name: '🔥Вася', token: 1 }} />);
     expect(container.textContent).toBe('🔥');
   });
 });

@@ -101,7 +101,7 @@ export function GameDetails({
         </div>
       </header>
       {game.completionCondition ? (
-        <p className="max-w-prose text-ink-soft">
+        <p className="max-w-prose text-ink-soft wrap-anywhere">
           {ru.gamePage.condition(game.completionCondition)}
         </p>
       ) : null}

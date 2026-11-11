@@ -215,6 +215,9 @@ function DeadlinePanel({ seasonId, season, onDone, onFailed }: Props) {
     }
   }
 
+  // A deadline within a day asks again: once it passes the season closes for good (D-101), so a typo must not (K1A)
+  const [soon, setSoon] = useState<string | null>(null);
+
   function submit(e: SyntheticEvent) {
     e.preventDefault();
     if (value === '') {
@@ -222,7 +225,13 @@ function DeadlinePanel({ seasonId, season, onDone, onFailed }: Props) {
       return;
     }
     setError(undefined);
-    void send(moscowInput(value));
+    const deadline = moscowInput(value);
+    const at = Date.parse(deadline);
+    if (Number.isFinite(at) && at > Date.now() && at - Date.now() < dayMs) {
+      setSoon(deadline);
+      return;
+    }
+    void send(deadline);
   }
 
   return (
@@ -262,11 +271,28 @@ function DeadlinePanel({ seasonId, season, onDone, onFailed }: Props) {
               </Button>
             ) : null}
           </div>
+          <ConfirmDanger
+            open={soon !== null}
+            onOpenChange={(next) => {
+              if (!next) setSoon(null);
+            }}
+            title={t.deadlineSoonTitle}
+            consequences={soon ? t.deadlineSoonConsequences(moscowTime(soon)) : []}
+            confirm={t.deadlineSoonConfirm}
+            busy={busy === 'set'}
+            onConfirm={() => {
+              const deadline = soon;
+              setSoon(null);
+              if (deadline) void send(deadline);
+            }}
+          />
         </form>
       ) : null}
     </Panel>
   );
 }
+
+const dayMs = 24 * 60 * 60 * 1000;
 
 function IntegrityPanel({ seasonId }: { seasonId: string }) {
   const [busy, setBusy] = useState(false);

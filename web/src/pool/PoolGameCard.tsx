@@ -5,6 +5,7 @@ import { Link } from '../app/Link';
 import { paths } from '../app/router';
 import { ru } from '../i18n/ru';
 import { inlineLink } from '../ui/buttonStyles';
+import { cx } from '../ui/cx';
 import { Chip } from '../ui/Marks';
 import { GameMarks } from '../season/GameMarks';
 import { GameFacts } from './GameFacts';
@@ -75,7 +76,11 @@ export function PoolGameCard({
       <div className="grid min-w-0 content-start justify-items-start gap-2">
         <h2 className="font-display text-lg font-heavy text-balance wrap-anywhere">
           {/* The game's page: its runs and reviews in every season */}
-          <Link to={paths.game(game.id)} className={inlineLink}>
+          {/* A tap target of 44 px on a phone (DESIGN.md «Компоненты и состояния»), K1A */}
+          <Link
+            to={paths.game(game.id)}
+            className={cx(inlineLink, 'inline-flex min-h-11 items-center')}
+          >
             {game.title}
           </Link>
         </h2>
@@ -85,7 +90,9 @@ export function PoolGameCard({
       {note || game.author ? (
         <div className="col-span-2 grid gap-1 text-sm">
           {note ? <p className="max-w-prose wrap-anywhere">{note}</p> : null}
-          {game.author ? <p className="text-ink-soft">{t.author(game.author)}</p> : null}
+          {game.author ? (
+            <p className="text-ink-soft wrap-anywhere">{t.author(game.author)}</p>
+          ) : null}
         </div>
       ) : null}
     </li>

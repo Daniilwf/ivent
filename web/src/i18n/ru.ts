@@ -2042,6 +2042,14 @@ export const ru = {
       deadlineHint: 'Дата и время по Москве',
       deadlineRequired: 'Выбери дату и время.',
       setDeadline: 'Сохранить дедлайн',
+      // D-101: after the deadline the season closes and does not reopen; a typo of a day is caught here (K1A)
+      deadlineSoonTitle: 'Дедлайн меньше чем через сутки?',
+      deadlineSoonConsequences: (when: string) => [
+        `Дедлайн: ${when}`,
+        'После него броски закроются, а сезон уйдёт в проверку пруфов',
+        'Вернуть сезон в «идёт» или продлить дедлайн потом будет нельзя — проверь дату',
+      ],
+      deadlineSoonConfirm: 'Да, поставить',
       removeDeadline: 'Убрать дедлайн',
       deadlineSaved: 'Дедлайн сохранён.',
       deadlineRemoved: 'Дедлайн убран.',
