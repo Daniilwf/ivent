@@ -330,7 +330,7 @@
 | 2 ✅ | `reflect` — урон монетками уходит стреляющему вдвойне при пороге из конфига (`effects.reflect`, −30 и ×2, D-474) | +9 | 53 |
 | 3 ✅ | `modifyDice.countWithSides` — доп. кубик заданных граней (D-475) | +6 (Шляпа ждёт `useCondition`) | 59 |
 | 4 ✅ | `takeObject.count` (число, `$roll`) и `all: true` (D-476) | +5 (вместе с двумя `count: 2` шага 1) | 64 |
-| 5 | `move.direction` — `$choice` вперёд/назад, `away` от стреляющего | +5 | 89 |
+| 5 ✅ | `move.direction` — `chosen` (ответ `forward`/`back`), `away` от стреляющего (D-477) | +5 | 69 |
 | 6 | `takeObject.give` — отдать свой объект (свиньи) | +4 | 93 |
 | 7 | `counters` — эффекты со счётчиком (в том числе эффект `bomb`: `counter`, `onCounterZero`) | +5 | 98 |
 | 8 | `selector:withinCells`, затем `selector:nearestBehind` | +4, +1 | 103 |

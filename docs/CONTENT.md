@@ -61,7 +61,7 @@
 
 | `type` | Параметры |
 | --- | --- |
-| `move` | `steps`: число, кубики или ссылка; минус — назад |
+| `move` | `steps`: число, кубики или ссылка; минус — назад; `direction` (D-477): `chosen` — игрок отвечает `forward` или `back` (интерфейс называет их своими словами), `away` — от использующего: вперёд, если цель ближе к финишу, назад, если дальше, на равном расстоянии — на месте |
 | `changeResource` | `resource`: `points`, `coins` или свой ключ; `amount`; `reflect: true` — монетки, снятые с цели, у которой их не больше `effects.reflect.coinsAtMost`, снимаются с использующего, умноженные на `effects.reflect.multiplier` (D-474) |
 | `roll` | `dice`: результат доступен как `$roll` |
 | `giveObject` | `objectId`, `params` для параметризованных объектов |
@@ -324,6 +324,23 @@
     "actions": [
       { "type": "roll", "dice": "1d4" },
       { "type": "takeObject", "mode": "destroy", "pick": "chosen", "count": "$roll", "filter": { "kind": "item" } }
+    ]
+  }
+}
+```
+
+### 15. Пистолет — толчок вперёд или назад на выбор
+
+```json
+{
+  "id": "pistol", "kind": "item", "name": "Пистолет",
+  "description": "Оружие. Выбранный другой игрок идёт на 1 клетку вперёд или назад — на твой выбор — и теряет 2 монетки. Если у жертвы −30 монеток или меньше (порог из правил сезона), урон монетками удваивается и достаётся тебе.",
+  "rarity": "common", "price": null, "window": "anytime", "hostile": true, "stackable": false, "tags": ["weapon"],
+  "effect": {
+    "target": { "selector": "chosen", "excludeSelf": true },
+    "actions": [
+      { "type": "move", "steps": 1, "direction": "chosen" },
+      { "type": "changeResource", "resource": "coins", "amount": -2, "reflect": true }
     ]
   }
 }

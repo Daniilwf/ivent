@@ -282,6 +282,11 @@ public static partial class ContentValidator
                 _ => null,
             };
             CheckTags(objectFilter?.ExcludeTags, $"{at}.filter.excludeTags", error, empty: false);
+            if (actions[i] is MoveAction { Direction: not null } directed && (directed.Steps.Negative || directed.Steps.Number < 0))
+            {
+                error($"{at}.steps", "With a «direction» the steps count cells; the direction says which way.");
+            }
+
             if (actions[i] is TakeObjectAction take)
             {
                 CheckCount(take, actions.Skip(i + 1), at, error);
@@ -359,7 +364,7 @@ public static partial class ContentValidator
             }
 
             rolled |= actions[i] is RollAction;
-            chose |= actions[i] is RequestChoiceAction;
+            chose |= actions[i] is RequestChoiceAction or MoveAction { Direction: MoveDirection.Chosen };
         }
     }
 

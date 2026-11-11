@@ -1,0 +1,33 @@
+{
+  "id": "slingshot",
+  "kind": "item",
+  "name": "Рогатка",
+  "description": "Оружие. Выбранный другой игрок идёт на 1 клетку от тебя: вперёд, если он впереди, назад, если позади (на твоей клетке — стоит), и теряет 2 монетки. Если у жертвы −30 монеток или меньше (порог из правил сезона), урон монетками удваивается и достаётся тебе.",
+  "rarity": "common",
+  "price": null,
+  "window": "anytime",
+  "hostile": true,
+  "stackable": false,
+  "tags": [
+    "weapon"
+  ],
+  "effect": {
+    "target": {
+      "selector": "chosen",
+      "excludeSelf": true
+    },
+    "actions": [
+      {
+        "type": "move",
+        "steps": 1,
+        "direction": "away"
+      },
+      {
+        "type": "changeResource",
+        "resource": "coins",
+        "amount": -2,
+        "reflect": true
+      }
+    ]
+  }
+}

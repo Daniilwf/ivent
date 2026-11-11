@@ -262,10 +262,23 @@ public abstract record ActionSpec
     public ActionTarget? Target { get; init; }
 }
 
-/// <summary>Move by <see cref="Steps"/> cells; a minus goes back.</summary>
+/// <summary>Which way a push goes when its sign does not say it (D-477).</summary>
+public enum MoveDirection
+{
+    /// <summary>The player answers <c>forward</c> or <c>back</c> with the use.</summary>
+    Chosen,
+
+    /// <summary>Away from the one who used it: forward when the target is closer to the finish, back when farther.</summary>
+    Away,
+}
+
+/// <summary>Move by <see cref="Steps"/> cells; a minus goes back, unless <see cref="Direction"/> says the way.</summary>
 public sealed record MoveAction : ActionSpec
 {
     public required ContentValue Steps { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public MoveDirection? Direction { get; init; }
 }
 
 /// <summary>Change <c>points</c>, <c>coins</c> or another resource by <see cref="Amount"/>.</summary>

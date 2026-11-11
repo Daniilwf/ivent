@@ -117,9 +117,11 @@ public static class ContentPublishing
                     break;
                 case RequestChoiceAction when triggered:
                 case TakeObjectAction { Pick: Pick.Chosen } when triggered:
+                case MoveAction { Direction: MoveDirection.Chosen } when triggered:
                     error(path, "An effect that acts on its own has nobody to ask.");
                     break;
                 case RequestChoiceAction when rolled:
+                case MoveAction { Direction: MoveDirection.Chosen } when rolled:
                     error(path, "A choice is asked before any roll: the player answers when using the item.");
                     break;
                 case ModifyDiceAction { Stage: DiceStage.Count, Value: { Kind: ContentValueKind.Number, Number: < 1 } }:
