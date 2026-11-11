@@ -267,6 +267,7 @@ public static partial class ContentValidator
                 ChangeResourceAction a => [("amount", a.Amount)],
                 RollAction a => [("dice", a.Dice)],
                 ModifyDiceAction a => [("value", a.Value)],
+                TakeObjectAction { Count: { } count } => [("count", count)],
                 _ => Array.Empty<(string, ContentValue)>(),
             };
             foreach (var (field, value) in values)
@@ -281,6 +282,10 @@ public static partial class ContentValidator
                 _ => null,
             };
             CheckTags(objectFilter?.ExcludeTags, $"{at}.filter.excludeTags", error, empty: false);
+            if (actions[i] is TakeObjectAction take)
+            {
+                CheckCount(take, actions.Skip(i + 1), at, error);
+            }
 
             switch (actions[i])
             {
@@ -355,6 +360,27 @@ public static partial class ContentValidator
 
             rolled |= actions[i] is RollAction;
             chose |= actions[i] is RequestChoiceAction;
+        }
+    }
+
+    // A count is 1 or more, or a reference; «all» takes everything, so it has no count and nothing to pick. A count known
+    // only at the use, chosen, takes every answer left: no choice may come after it (D-476).
+    private static void CheckCount(TakeObjectAction take, IEnumerable<ActionSpec> after, string at, Action<string, string> error)
+    {
+        if (take.Count is { Kind: not ContentValueKind.Reference } count && (count.Kind != ContentValueKind.Number || count.Number < 1))
+        {
+            error($"{at}.count", "A count is a whole number of 1 or more or a reference such as «$roll».");
+        }
+
+        if (take.All && (take.Count is not null || take.Pick == Pick.Chosen))
+        {
+            error($"{at}.all", "«all» takes every matching object: no «count» and no «pick: chosen».");
+        }
+
+        if (take is { Pick: Pick.Chosen, Count.Kind: ContentValueKind.Reference }
+            && after.Any(a => a is RequestChoiceAction or TakeObjectAction { Pick: Pick.Chosen }))
+        {
+            error($"{at}.count", "A chosen count known only at the use takes every answer left: no choice comes after it.");
         }
     }
 

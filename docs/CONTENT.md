@@ -65,7 +65,7 @@
 | `changeResource` | `resource`: `points`, `coins` или свой ключ; `amount`; `reflect: true` — монетки, снятые с цели, у которой их не больше `effects.reflect.coinsAtMost`, снимаются с использующего, умноженные на `effects.reflect.multiplier` (D-474) |
 | `roll` | `dice`: результат доступен как `$roll` |
 | `giveObject` | `objectId`, `params` для параметризованных объектов |
-| `takeObject` | `mode`: `take`, `steal`, `destroy`; `filter`; `pick`: `random` или `chosen` (ответ — id экземпляра) |
+| `takeObject` | `mode`: `take`, `steal`, `destroy`; `filter`; `pick`: `random` или `chosen` (ответ — id экземпляра); `count`: сколько объектов — число от 1 или ссылка (`$roll`), `all: true` — все подходящие (D-476). При `chosen` число просит ответ на каждый объект, а ссылка забирает все оставшиеся ответы как список по порядку, недостающие берутся случайно |
 | `transformObject` | `mode`: `transform` (`into`) или `annotate` (`note`) |
 | `drawEvent` | `deck`: `good`, `bad`, `special`, `risky`, `zone` или id колоды |
 | `spinWheel` | `wheel`: id колеса |
@@ -309,6 +309,23 @@
   "description": "В следующем броске за прохождение есть дополнительный d6.",
   "rarity": "epic", "price": 45, "window": "beforeDice", "hostile": false, "stackable": true,
   "effect": { "target": { "selector": "self" }, "actions": [{ "type": "modifyDice", "when": "next", "stage": "count", "value": 1, "sides": 6 }] }
+}
+```
+
+### 14. Плазмаган — уничтожить столько предметов, сколько выпало
+
+```json
+{
+  "id": "plasma-gun", "kind": "item", "name": "Плазмаган",
+  "description": "Оружие. Брось d4: у выбранного другого игрока уничтожается столько предметов. Назови их заранее по порядку; если назвал меньше — остальные случайные, если выпало больше, чем у него есть, — уничтожаются все.",
+  "rarity": "common", "price": 20, "window": "anytime", "hostile": true, "stackable": false, "tags": ["weapon"],
+  "effect": {
+    "target": { "selector": "chosen", "excludeSelf": true },
+    "actions": [
+      { "type": "roll", "dice": "1d4" },
+      { "type": "takeObject", "mode": "destroy", "pick": "chosen", "count": "$roll", "filter": { "kind": "item" } }
+    ]
+  }
 }
 ```
 

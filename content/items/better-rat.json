@@ -1,0 +1,34 @@
+{
+  "id": "better-rat",
+  "kind": "item",
+  "name": "Улучшенная Крыса",
+  "description": "Укради два предмета на выбор у другого игрока. Крысиные предметы не крадёт.",
+  "rarity": "common",
+  "price": 25,
+  "window": "anytime",
+  "hostile": true,
+  "stackable": false,
+  "tags": [
+    "rat"
+  ],
+  "effect": {
+    "target": {
+      "selector": "chosen",
+      "excludeSelf": true
+    },
+    "actions": [
+      {
+        "type": "takeObject",
+        "mode": "steal",
+        "pick": "chosen",
+        "count": 2,
+        "filter": {
+          "kind": "item",
+          "excludeTags": [
+            "rat"
+          ]
+        }
+      }
+    ]
+  }
+}

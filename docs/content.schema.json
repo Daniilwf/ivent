@@ -416,6 +416,17 @@
                             "chosen"
                           ]
                         },
+                        "count": {
+                          "description": "A whole number, dice («1d6», «-1d6») or a reference («$roll», «-$roll», «$choice», «$name»).",
+                          "type": [
+                            "integer",
+                            "string"
+                          ],
+                          "pattern": "^(-?([1-9][0-9]?)?d[1-9][0-9]{0,2}|-?\\$[a-zA-Z][a-zA-Z0-9]{0,39})$"
+                        },
+                        "all": {
+                          "type": "boolean"
+                        },
                         "target": {
                           "enum": [
                             "self",
@@ -974,6 +985,17 @@
                                       "random",
                                       "chosen"
                                     ]
+                                  },
+                                  "count": {
+                                    "description": "A whole number, dice («1d6», «-1d6») or a reference («$roll», «-$roll», «$choice», «$name»).",
+                                    "type": [
+                                      "integer",
+                                      "string"
+                                    ],
+                                    "pattern": "^(-?([1-9][0-9]?)?d[1-9][0-9]{0,2}|-?\\$[a-zA-Z][a-zA-Z0-9]{0,39})$"
+                                  },
+                                  "all": {
+                                    "type": "boolean"
                                   },
                                   "target": {
                                     "enum": [

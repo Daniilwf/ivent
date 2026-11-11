@@ -1,0 +1,35 @@
+{
+  "id": "plasma-gun",
+  "kind": "item",
+  "name": "Плазмаган",
+  "description": "Оружие. Брось d4: у выбранного другого игрока уничтожается столько предметов. Назови их заранее по порядку; если назвал меньше — остальные случайные, если выпало больше, чем у него есть, — уничтожаются все.",
+  "rarity": "common",
+  "price": 20,
+  "window": "anytime",
+  "hostile": true,
+  "stackable": false,
+  "tags": [
+    "weapon"
+  ],
+  "effect": {
+    "target": {
+      "selector": "chosen",
+      "excludeSelf": true
+    },
+    "actions": [
+      {
+        "type": "roll",
+        "dice": "1d4"
+      },
+      {
+        "type": "takeObject",
+        "mode": "destroy",
+        "pick": "chosen",
+        "count": "$roll",
+        "filter": {
+          "kind": "item"
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "id": "rare-gremlin",
+  "kind": "item",
+  "name": "Редкий Гремлин",
+  "description": "Уничтожь все предметы у выбранного игрока, хоть у себя. Плата — 10 монеток. Гремлинские предметы гремлину не по зубам.",
+  "rarity": "epic",
+  "price": 20,
+  "window": "anytime",
+  "hostile": true,
+  "stackable": false,
+  "tags": [
+    "gremlin"
+  ],
+  "effect": {
+    "target": {
+      "selector": "chosen"
+    },
+    "actions": [
+      {
+        "type": "takeObject",
+        "mode": "destroy",
+        "all": true,
+        "filter": {
+          "kind": "item",
+          "excludeTags": [
+            "gremlin"
+          ]
+        }
+      },
+      {
+        "type": "changeResource",
+        "resource": "coins",
+        "amount": -10,
+        "target": "self"
+      }
+    ]
+  }
+}

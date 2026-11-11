@@ -57,18 +57,68 @@ internal sealed class GiveObjectHandler : ActionHandler<GiveObjectAction>
 
 /// <summary>
 /// <c>takeObject</c>: <c>take</c> and <c>steal</c> move the object to the one who used the effect (an item that does not
-/// fit is lost, D-406), <c>destroy</c> removes it.
+/// fit is lost, D-406), <c>destroy</c> removes it. Several objects with <c>count</c> or <c>all</c> (D-476): a fixed count
+/// chosen asks one answer per object; a count known only at the use (<c>$roll</c>) takes the answers left as a list of
+/// preference and the rest at random.
 /// </summary>
 internal sealed class TakeObjectHandler : ActionHandler<TakeObjectAction>
 {
     protected override void Execute(TakeObjectAction action, EffectRun run)
     {
         var from = run.ActionTarget(action);
-        if (ObjectFilters.Pick(run, ObjectFilters.Matching(run, from, action.Filter), action.Pick) is not { } item)
+        foreach (var item in Picked(action, run, from))
         {
-            return;
+            Take(action, run, from, item);
+            if (run.Refusal is not null)
+            {
+                return;
+            }
+        }
+    }
+
+    private static List<InventoryObject> Picked(TakeObjectAction action, EffectRun run, Guid from)
+    {
+        var candidates = ObjectFilters.Matching(run, from, action.Filter).ToList();
+        if (action.All)
+        {
+            return candidates;
         }
 
+        var count = action.Count is { } value ? run.Number(value) : 1;
+        var picked = new List<InventoryObject>();
+        if (action.Pick == Pick.Chosen && action.Count is { Kind: ContentValueKind.Reference })
+        {
+            if (run.RemainingChoices([.. candidates.Select(o => o.InstanceId.ToString("N"))]) is not { } preferred)
+            {
+                return [];
+            }
+
+            foreach (var answer in preferred.Take(count))
+            {
+                var chosen = candidates.Single(o => o.InstanceId.ToString("N") == answer);
+                picked.Add(chosen);
+                candidates.Remove(chosen);
+            }
+        }
+
+        // A fixed count chosen asks one answer per object; the rest of a count known only now goes at random
+        var pick = action.Pick == Pick.Chosen && action.Count is not { Kind: ContentValueKind.Reference } ? Pick.Chosen : Pick.Random;
+        while (picked.Count < count && candidates.Count > 0)
+        {
+            if (ObjectFilters.Pick(run, candidates, pick) is not { } next)
+            {
+                return [];
+            }
+
+            picked.Add(next);
+            candidates.Remove(next);
+        }
+
+        return picked;
+    }
+
+    private static void Take(TakeObjectAction action, EffectRun run, Guid from, InventoryObject item)
+    {
         if (action.Mode == TakeMode.Destroy)
         {
             run.Emit(new ObjectRemoved(from, item.InstanceId, item.ObjectId, ObjectRemoval.Destroyed));

@@ -1,0 +1,39 @@
+{
+  "id": "double-gremlin",
+  "kind": "item",
+  "name": "Двойной Гремлин",
+  "description": "Уничтожь два предмета на выбор у любого игрока, хоть у себя. Плата — 2 монетки. Гремлинские предметы гремлину не по зубам.",
+  "rarity": "common",
+  "price": 15,
+  "window": "anytime",
+  "hostile": true,
+  "stackable": false,
+  "tags": [
+    "gremlin"
+  ],
+  "effect": {
+    "target": {
+      "selector": "chosen"
+    },
+    "actions": [
+      {
+        "type": "takeObject",
+        "mode": "destroy",
+        "pick": "chosen",
+        "count": 2,
+        "filter": {
+          "kind": "item",
+          "excludeTags": [
+            "gremlin"
+          ]
+        }
+      },
+      {
+        "type": "changeResource",
+        "resource": "coins",
+        "amount": -2,
+        "target": "self"
+      }
+    ]
+  }
+}

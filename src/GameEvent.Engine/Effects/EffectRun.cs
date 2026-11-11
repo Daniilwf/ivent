@@ -134,6 +134,30 @@ internal sealed class EffectRun
         return answer;
     }
 
+    /// <summary>
+    /// Every answer not used yet, now used: a list of preference for a count known only at the use (D-476). Each must be one
+    /// of <paramref name="options"/> and given once; otherwise null and a refusal.
+    /// </summary>
+    public IReadOnlyList<string>? RemainingChoices(IReadOnlyCollection<string> options)
+    {
+        var answers = _choices.Skip(_choiceIndex).ToList();
+        _choiceIndex = _choices.Count;
+        if (answers.FirstOrDefault(a => !options.Contains(a, StringComparer.Ordinal)) is { } wrong)
+        {
+            Refuse(RejectionCodes.ItemInvalidChoice, $"«{wrong}» is not one of the options of «{ObjectId}».");
+            return null;
+        }
+
+        if (answers.Distinct(StringComparer.Ordinal).Count() != answers.Count)
+        {
+            Refuse(RejectionCodes.ItemInvalidChoice, $"An answer to «{ObjectId}» is given twice.");
+            return null;
+        }
+
+        LastChoice = answers.LastOrDefault() ?? LastChoice;
+        return answers;
+    }
+
     /// <summary>A value as a number (CONTENT.md «Значения»): dice are rolled now and logged, references resolved.</summary>
     public int Number(ContentValue value)
     {

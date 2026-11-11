@@ -333,6 +333,14 @@ public sealed record TakeObjectAction : ActionSpec
     public ObjectFilterSpec? Filter { get; init; }
 
     public Pick Pick { get; init; } = Pick.Random;
+
+    /// <summary>How many objects (D-476): a number of 1 or more or a reference such as <c>$roll</c>; missing — one.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ContentValue? Count { get; init; }
+
+    /// <summary>Every matching object (D-476); then there is nothing to pick and no <see cref="Count"/>.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool All { get; init; }
 }
 
 public enum TransformMode
