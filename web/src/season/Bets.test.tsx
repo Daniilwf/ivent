@@ -67,7 +67,7 @@ describe('the bets', () => {
       days: 3,
       stake: 5,
     });
-    expect(screen.getByTestId('bets-announce')).toHaveTextContent(ru.bets.placed('Петя'));
+    expect(screen.getByRole('status')).toHaveTextContent(ru.bets.placed('Петя'));
   });
 
   it('keeps the press closed for a stake beyond my limit and says the limit', async () => {

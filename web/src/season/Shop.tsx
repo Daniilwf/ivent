@@ -72,9 +72,6 @@ export function ShopPanel({
           </Chip>
         ) : null}
       </div>
-      <p className="sr-only" aria-live="polite" data-testid="shop-announce">
-        {done ?? ''}
-      </p>
       {state.kind === 'loading' ? (
         <div className="grid gap-3" aria-busy="true">
           <p className="sr-only">{ru.ui.loading}</p>

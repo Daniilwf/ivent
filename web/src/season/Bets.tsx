@@ -58,9 +58,6 @@ export function BetsPanel({
           </span>
         ) : null}
       </div>
-      <p className="sr-only" aria-live="polite" data-testid="bets-announce">
-        {done ?? ''}
-      </p>
       {state.kind === 'loading' ? (
         <div className="grid gap-3" aria-busy="true">
           <p className="sr-only">{ru.ui.loading}</p>

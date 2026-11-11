@@ -132,6 +132,8 @@ describe('«Использовать»', () => {
     expect(sent?.body).toMatchObject({ targetPlayerId: kolya, choices: [] });
     expect(typeof (sent?.body as { commandId: unknown }).commandId).toBe('string');
     expect(screen.getByRole('status')).toHaveTextContent(ru.inventory.used('Птичкерс'));
+    // One live region says it: a second hidden copy would be read out twice
+    expect(screen.getAllByText(ru.inventory.used('Птичкерс'))).toHaveLength(1);
   });
 
   it('asks each answer of the item and sends them in order', async () => {
@@ -215,6 +217,80 @@ describe('«Использовать»', () => {
     });
   });
 
+  it('asks no object of a target who has none, and sends no answer for it', async () => {
+    const steal = itemFixture({
+      objectId: 'pickpocket',
+      name: 'Выбор вора',
+      steps: [
+        {
+          kind: 'pickObject',
+          prompt: null,
+          options: [],
+          objectsByTarget: [
+            { playerId: petya, objects: [{ id: 'aa', label: 'Апельсин' }] },
+            { playerId: kolya, objects: [] },
+          ],
+        },
+      ],
+    });
+    const server = fakeServer({
+      [economyUrl]: economyFixture({ items: [steal] }),
+      [useUrl]: { duplicate: false, events: [] },
+    });
+    renderSection();
+    await userEvent.click(await screen.findByTestId('use-pickpocket'));
+    const sheet = await screen.findByTestId('use-item');
+
+    // A pick for Петя first, then Коля, who has nothing: the stale pick is not sent
+    await userEvent.click(within(sheet).getByText('Петя'));
+    await userEvent.selectOptions(within(sheet).getByLabelText(ru.inventory.pickObject), 'aa');
+    await userEvent.click(within(sheet).getByText('Коля'));
+    const confirm = within(sheet).getByTestId('use-item-confirm');
+    expect(confirm).toBeEnabled();
+    await userEvent.click(confirm);
+
+    await waitFor(() => {
+      expect(server.sent('POST', '/use')[0]?.body).toMatchObject({
+        targetPlayerId: kolya,
+        choices: [],
+      });
+    });
+  });
+
+  it('asks no object of my own inventory when nothing else fits', async () => {
+    const swap = itemFixture({
+      objectId: 'swap-own',
+      name: 'Обмен',
+      choosesTarget: false,
+      targets: [],
+      steps: [
+        {
+          kind: 'pickObject',
+          prompt: null,
+          options: [],
+          objectsByTarget: [{ playerId: petya, objects: [] }],
+        },
+      ],
+    });
+    const server = fakeServer({
+      [economyUrl]: economyFixture({ items: [swap] }),
+      [useUrl]: { duplicate: false, events: [] },
+    });
+    renderSection();
+    await userEvent.click(await screen.findByTestId('use-swap-own'));
+    const sheet = await screen.findByTestId('use-item');
+
+    expect(within(sheet).getByText(ru.inventory.noObjects)).toBeInTheDocument();
+    await userEvent.click(within(sheet).getByTestId('use-item-confirm'));
+
+    await waitFor(() => {
+      expect(server.sent('POST', '/use')[0]?.body).toMatchObject({
+        targetPlayerId: null,
+        choices: [],
+      });
+    });
+  });
+
   it('keeps the sheet open with the refusal in Russian', async () => {
     fakeServer({
       [economyUrl]: economyFixture(),
@@ -255,5 +331,65 @@ describe('«Использовать»', () => {
       (code) => !(ru.rejection as Record<string, string | undefined>)[code],
     );
     expect(missing).toEqual([]);
+  });
+});
+
+// Item names come in every gender (Банан, Подлянка, Зелье): no text bound to a name agrees with it
+describe('texts bound to an item name', () => {
+  const names = ['Банан', 'Подлянка', 'Зелье'];
+
+  it.each(names)('read right for «%s»', async (name) => {
+    const item = itemFixture({ objectId: 'x', name, rarity: 'epic', hostile: true });
+    const server = fakeServer({
+      [economyUrl]: economyFixture({ items: [item] }),
+      [useUrl]: { duplicate: false, events: [] },
+    });
+    renderSection();
+
+    const row = await screen.findByTestId('item-x');
+    expect(within(row).getByText('Редкость: эпическая')).toBeInTheDocument();
+    expect(within(row).getByText('Против других')).toBeInTheDocument();
+    await userEvent.click(within(row).getByTestId('use-x'));
+    await userEvent.click(within(await screen.findByTestId('use-item')).getByText('Коля'));
+    await userEvent.click(screen.getByTestId('use-item-confirm'));
+
+    await waitFor(() => {
+      expect(server.sent('POST', '/use')).toHaveLength(1);
+    });
+    expect(await screen.findByRole('status')).toHaveTextContent(`Использовано: «${name}»`);
+  });
+
+  it('give every rarity as a label and a value', () => {
+    expect(Object.values(ru.inventory.rarity)).toEqual([
+      'Редкость: обычная',
+      'Редкость: эпическая',
+      'Редкость: легендарная',
+    ]);
+  });
+
+  it('name what acts on its own as a ready chip', async () => {
+    fakeServer({ [economyUrl]: economyFixture() });
+    renderSection();
+
+    const effect = await screen.findByTestId('item-curse-effect');
+    expect(within(effect).getByText(ru.inventory.actsAloneChip('effect'))).toBeInTheDocument();
+    expect(ru.inventory.actsAloneChip('effect')).toBe('Эффект: действует сам');
+  });
+});
+
+describe('coins in words', () => {
+  it.each([
+    [1, '1 монетка'],
+    [2, '2 монетки'],
+    [5, '5 монеток'],
+    [-1, '−1 монетка'],
+    [-2, '−2 монетки'],
+    [-12, '−12 монеток'],
+  ])('%i reads «%s»', (n, text) => {
+    expect(ru.inventory.coins(n)).toBe(text);
+  });
+
+  it('a refusal for coins says no reroll when it is the shop or a bet', () => {
+    expect(ru.rejection['roll.notEnoughCoins']).not.toMatch(/реролл/i);
   });
 });

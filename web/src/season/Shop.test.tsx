@@ -39,9 +39,7 @@ describe('the shop', () => {
     expect(
       screen.getByRole('button', { name: ru.shop.buyNamed('Апельсин', 4) }),
     ).toBeInTheDocument();
-    expect(screen.getByTestId('lot-why-1')).toHaveTextContent(
-      ru.shop.refusals['roll.notEnoughCoins'] ?? '',
-    );
+    expect(screen.getByTestId('lot-why-1')).toHaveTextContent(ru.rejection['roll.notEnoughCoins']);
     expect(within(screen.getByTestId('lot-2')).getByText(ru.shop.sold)).toBeInTheDocument();
     expect(screen.queryByTestId('buy-1')).not.toBeInTheDocument();
     expect(screen.queryByTestId('buy-2')).not.toBeInTheDocument();
@@ -61,9 +59,7 @@ describe('the shop', () => {
     const body = server.sent('POST', '/shop/buy')[0]?.body as { lot: number; commandId: string };
     expect(body.lot).toBe(0);
     expect(typeof body.commandId).toBe('string');
-    expect(await screen.findByTestId('shop-announce')).toHaveTextContent(
-      ru.shop.bought('Апельсин'),
-    );
+    expect(await screen.findByRole('status')).toHaveTextContent(ru.shop.bought('Апельсин'));
     // The economy loads again after the purchase
     await waitFor(() => {
       expect(server.sent('GET', '/economy').length).toBeGreaterThanOrEqual(2);
@@ -106,7 +102,7 @@ describe('the shop', () => {
     await waitFor(() => {
       expect(server.sent('POST', '/shop/roll')).toHaveLength(1);
     });
-    expect(await screen.findByTestId('shop-announce')).toHaveTextContent(ru.shop.rollAnnounce);
+    expect(await screen.findByRole('status')).toHaveTextContent(ru.shop.rollAnnounce);
   });
 
   it('closes the roll and says why when the engine refuses it', async () => {

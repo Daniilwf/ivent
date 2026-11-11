@@ -81,9 +81,7 @@ test('the shop and a bet: roll, buy a lot, bet on a run', async ({ browser }, te
   if (!lot) throw new Error('No lot for sale.');
   await shop.getByTestId(`buy-${String(lot.lot)}`).click();
 
-  await expect(shop.getByTestId('shop-announce')).toHaveText(
-    `«${lot.name}» куплен и лежит в инвентаре.`,
-  );
+  await expect(shop.getByRole('status')).toHaveText(`Куплено: «${lot.name}». Уже в инвентаре.`);
   await expect(shop.getByTestId(`lot-${String(lot.lot)}`)).toContainText('Куплено');
   await expect(page.getByTestId(`item-${lot.objectId}`)).toBeVisible();
   const bought = await economy();
@@ -104,7 +102,7 @@ test('the shop and a bet: roll, buy a lot, bet on a run', async ({ browser }, te
   await sheet.getByTestId('bet-confirm').click();
 
   await expect(sheet).toBeHidden();
-  await expect(bets.getByTestId('bets-announce')).toHaveText('Ставка на игрока Петя принята.');
+  await expect(bets.getByRole('status')).toHaveText('Ставка на игрока Петя принята.');
   await expect(bets.getByTestId('my-bets')).toContainText('Петя');
   await expect(bets.getByTestId('bet-runs')).toHaveCount(0);
   const after = await economy();

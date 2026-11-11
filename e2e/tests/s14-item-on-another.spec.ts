@@ -68,7 +68,7 @@ test('an item on another player: the target is offered, the use is seen live by 
 
   // Вася sees it done, the item gone and the stolen coins
   await expect(sheet).toBeHidden();
-  await expect(vasyaPage.getByTestId('inventory')).toContainText('«Птичкерс» использован.');
+  await expect(vasyaPage.getByTestId('inventory')).toContainText('Использовано: «Птичкерс»');
   await expect(vasyaPage.getByTestId('item-bird-thief')).toHaveCount(0);
   const economy = await (
     await apiOf(vasya)
