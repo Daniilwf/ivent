@@ -23,7 +23,11 @@ type Sent = { url: string; method: string | undefined; body: FormData };
 
 function serveUploads(answers: Response[]) {
   const requests: Sent[] = [];
-  const fetch = vi.fn((url: string, init?: RequestInit) => {
+  const fetch = vi.fn((input: Request | string, init?: RequestInit) => {
+    // The page asks the site its upload limits first (D-617); this site names none, so the server answers for itself
+    if (typeof input !== 'string' && input.url.endsWith('/api/status'))
+      return Promise.resolve(json(404, {}));
+    const url = typeof input === 'string' ? input : input.url;
     requests.push({ url, method: init?.method, body: init?.body as FormData });
     return Promise.resolve(answers.shift() ?? json(500, {}));
   });
@@ -132,6 +136,8 @@ describe('Screenshots in the proof', () => {
         if (url.endsWith('/api/auth/antiforgery')) {
           return Promise.resolve(json(200, { headerName: 'X-CSRF-TOKEN', token: 'token-1' }));
         }
+        // The upload limits asked first (D-617): this site names none
+        if (url.endsWith('/api/status')) return Promise.resolve(json(404, {}));
         sent.push({ url, headers: (init?.headers ?? {}) as Record<string, string> });
         return Promise.resolve(json(200, shot(1)));
       }),
