@@ -10,7 +10,7 @@ using GameEvent.Engine.Tests.Support;
 namespace GameEvent.Engine.Tests.Economy;
 
 /// <summary>
-/// Defence in depth behind the validators (SEC-5, SEC-6; D-651, D-652): the shop price, a bet's payout, reflection and the
+/// Defence in depth behind the validators (NB-SEC-1, NB-SEC-2; D-651, D-652): the shop price, a bet's payout, reflection and the
 /// ledger stay in range even with numbers the validators would refuse today (a ruleset or a pack logged before them).
 /// </summary>
 public class NumberBoundsTests

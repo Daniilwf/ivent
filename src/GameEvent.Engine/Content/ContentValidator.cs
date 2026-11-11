@@ -15,7 +15,7 @@ public static partial class ContentValidator
     public const int MaxNameLength = 100;
     public const int MaxDescriptionLength = 1000;
 
-    // Safety ceilings, not balance (SEC-6, D-652): an item cannot cost, give or take more than a season can hold,
+    // Safety ceilings, not balance (NB-SEC-2, D-652): an item cannot cost, give or take more than a season can hold,
     // nor multiply dice or prices past what keeps the arithmetic in range.
     public const int MaxPrice = 1_000_000;
     public const int MaxResourceAmount = 1_000_000;
@@ -541,7 +541,7 @@ public static partial class ContentValidator
         }
     }
 
-    // SEC-6 (D-652): how far one stage may move the dice — a count or a reroll within the dice of a value, sides within
+    // NB-SEC-2 (D-652): how far one stage may move the dice — a count or a reroll within the dice of a value, sides within
     // a die's, a multiplication within ten times.
     private static int? Ceiling(DiceStage stage) => stage switch
     {

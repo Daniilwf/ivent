@@ -24,7 +24,7 @@ public static class FeedVisibility
 
         /// <summary>
         /// A content publication: the admin sees the whole pack, everyone else its <c>version</c>, <c>comment</c> and
-        /// <c>objectCount</c> (SEC-7, D-653): the pack holds unpublished numbers and every effect of every item.
+        /// <c>objectCount</c> (NB-SEC-3, D-653): the pack holds unpublished numbers and every effect of every item.
         /// </summary>
         ContentSummary,
 

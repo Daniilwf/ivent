@@ -63,7 +63,7 @@ public class ContentPackTests
     [InlineData(1, 1, ContentPublishing.MaxWheelEntries + 1)]
     public void A_pack_over_the_size_limits_is_refused_before_it_is_checked(int objects, int wheels, int entries)
     {
-        // SEC-7 (D-653): 1000 objects and 100 wheels, as the admin's content API; 200 entries in a wheel
+        // NB-SEC-3 (D-653): 1000 objects and 100 wheels, as the admin's content API; 200 entries in a wheel
         var s = Season();
         var orange = EconomyScenario.ExamplePack("orange").Objects[0];
         var pack = new ContentPack
@@ -152,6 +152,26 @@ public class ContentPackTests
         Assert.Contains("$.objects[7].effect.actions[0]", paths);
         Assert.Contains("$.objects[8].effect.actions[0].wheel", paths);
         Assert.Contains("$.wheels[0].entries[0].objectId", paths);
+    }
+
+    [Fact]
+    public void A_null_in_the_objects_or_the_wheels_is_named_at_its_place_and_the_rest_is_still_checked()
+    {
+        var examples = EconomyScenario.Examples();
+        // A list item the strict reader lets through as null (nullable annotations do not reach list items)
+        var pack = new ContentPack
+        {
+            Objects = [null!, examples["orange"]],
+            Wheels = [new WheelDefinition { Id = "w", Name = "Колесо", Entries = [new WheelEntrySpec { ObjectId = "ghost", Weight = 1 }] }, null!],
+        };
+
+        var errors = ContentPublishing.Check(pack);
+
+        var paths = errors.Select(e => e.Path).ToList();
+        Assert.Contains("$.objects[0]", paths);
+        Assert.Contains("$.wheels[1]", paths);
+        Assert.Contains("$.wheels[0].entries[0].objectId", paths);
+        Assert.Equal(3, errors.Count);
     }
 
     [Theory]
@@ -249,6 +269,27 @@ public class ContentPackTests
         s.Act(new PublishContent(EconomyScenario.ExamplePack("shield-effect", "orange", "shield"), "Ещё раз"));
 
         Assert.Equal(RejectionCodes.ContentUnchanged, s.Last.Rejection!.Code);
+    }
+
+    [Fact]
+    public void A_pack_made_from_an_older_version_is_refused_and_one_from_the_version_in_force_is_published()
+    {
+        // D-491: the editor sends the version it was opened on, so two admins never overwrite each other silently
+        var s = Season().WithContent(EconomyScenario.ExamplePack("orange"));
+        var bigger = EconomyScenario.ExamplePack("orange", "shield", "shield-effect");
+
+        s.Act(new PublishContent(bigger, "Старый редактор", ExpectedVersion: 0));
+        Assert.Equal(RejectionCodes.ContentVersionChanged, s.Last.Rejection!.Code);
+        Assert.Equal(1, s.State.Catalog.Version);
+
+        s.Act(new PublishContent(bigger, "Свежий редактор", ExpectedVersion: 1));
+        Assert.True(s.Last.IsAccepted);
+        Assert.Equal(2, s.State.Catalog.Version);
+
+        // Without a version (a pack loaded by a script or a seed) it is taken as before
+        s.Act(new PublishContent(EconomyScenario.ExamplePack("orange"), "Без версии"));
+        Assert.True(s.Last.IsAccepted);
+        Assert.Equal(3, s.State.Catalog.Version);
     }
 
     [Fact]

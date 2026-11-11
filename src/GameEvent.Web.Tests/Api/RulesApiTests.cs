@@ -216,7 +216,7 @@ public sealed class RulesApiTests : IAsyncLifetime
     [InlineData("bets.maxStake", 0)]
     public async Task A_number_out_of_its_safe_range_is_refused_at_its_path(string path, int value)
     {
-        // SEC-5 (D-651): a negative step made a shop roll pay coins, a huge lifetime threw inside the player's command
+        // NB-SEC-1 (D-651): a negative step made a shop roll pay coins, a huge lifetime threw inside the player's command
         var admin = await _site.SignedInAsync("admin");
         var parts = path.Split('.');
 

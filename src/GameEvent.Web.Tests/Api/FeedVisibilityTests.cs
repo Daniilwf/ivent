@@ -88,7 +88,7 @@ public sealed class FeedVisibilityTests : IAsyncLifetime
     [Fact]
     public async Task Others_see_a_content_publications_version_comment_and_size_not_the_pack()
     {
-        // SEC-7 (D-653): the pack holds every effect and unpublished price; only the admin reads it in the feed
+        // NB-SEC-3 (D-653): the pack holds every effect and unpublished price; only the admin reads it in the feed
         await using (var db = _site.NewDb())
         {
             var (state, _) = await EventLogReader.ReplaySeasonAsync(db, SiteFactory.SeasonId, Ct);

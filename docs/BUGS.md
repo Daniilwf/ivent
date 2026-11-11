@@ -15,6 +15,26 @@
 
 ## Исправленные
 
+### CE-SEC-1. Пакет контента с null в списке объектов или колёс давал 500
+
+- **Найдено:** ревью безопасности редактора контента (2026-11-11, ветка `feat/effect-editor`).
+- **Шаги:** админ, `POST /api/admin/seasons/{id}/content/check` (или `/publish`) с телом `{"objects":[null],"wheels":[]}` или `{"objects":[],"wheels":[null]}`, либо с null глубже — в `entries` колеса или `actions` эффекта.
+- **Ожидалось:** проверка отвечает 200 `valid: false` с ошибкой у `objects[0]` / `wheels[0]`, публикация — 400 с той же ошибкой.
+- **Получилось:** 500: строгое чтение пропускает null внутри списка (аннотации допустимости null не доходят до элементов коллекций), `ContentPublishing.Check` разыменовывал его.
+- **Важность:** низкая — только админ, сайт не падает, но ответ 500 и исключение в журнале ошибок.
+- **Тест:** `src/GameEvent.Engine.Tests/Economy/ContentPackTests.cs` («A_null_in_the_objects_or_the_wheels_is_named_at_its_place_and_the_rest_is_still_checked»), `src/GameEvent.Web.Tests/Api/AdminContentApiTests.cs` («A_null_in_a_list_of_the_pack_is_a_problem_at_its_place_not_a_500»).
+- **Исправление:** `ContentPublishing.Check` первым делом называет каждый null в `$.objects[i]` и `$.wheels[i]` («A list item is an object, not null.») и дальше его пропускает; API ещё до чтения называет null в любом списке пакета (`wheels[0].entries[0]`, `objects[0].effect.actions[0]` — те же 500 глубже). Исправлено.
+
+### CE-SEC-2. Ошибки чтения пакета контента показывали имена типов .NET
+
+- **Найдено:** ревью безопасности редактора контента (2026-11-11, ветка `feat/effect-editor`).
+- **Шаги:** админ проверяет пакет с колесом без `name`, с лишним полем `colour` или ценой `"ten"`.
+- **Ожидалось:** сообщение своими словами: нет поля, неизвестное поле, не тот тип.
+- **Получилось:** сообщение System.Text.Json как есть: «JSON deserialization for type 'GameEvent.Engine.Content.WheelDefinition' was missing required properties…», «…could not be converted to System.Nullable`1[System.Int32]» — внутреннее устройство сайта и ничего не говорящий админу текст.
+- **Важность:** заметка — раскрытие имён типов только админу.
+- **Тест:** `AdminContentApiTests` («A_value_of_a_wrong_type_is_named_with_its_path» — в сообщении нет `GameEvent.` и `System.`; «A_missing_unknown_or_mistyped_field_is_told_in_our_words»); перевод — `web/src/admin/content/contentModel.test.ts`.
+- **Исправление:** `AdminContentEndpoints.Words` пересказывает сообщения чтения: «Field «name» is required.», «Field «colour» is unknown.», «Field «x» is given twice.», «A value of a wrong type.»; всё прочее с именем типа .NET — «A value of a wrong type.». Русский перевод — в словаре (`serverMessages`, `serverPatterns`). Исправлено.
+
 ### IT-1. Враждебный предмет с ответом игрока отказывал, если цель под щитом
 
 - **Найдено:** импорт пакета предметов, шаг 1 (2026-11-11), сценарный тест «Эффектной крысы».
@@ -24,7 +44,7 @@
 - **Важность:** средняя — защита пассивная и не должна раскрываться отказом.
 - **Тест:** `src/GameEvent.Engine.Tests/Economy/ImportedItems/BaseFormatItemsTests.cs` («An_effect_rat_steals_the_chosen_effect»).
 - **Исправление:** перехват забирает ответы, данные для этой цели (`EffectRun.Run`).
-### SEC-5. Числа магазина и ставок в правилах сезона не имели границ
+### NB-SEC-1. Числа магазина и ставок в правилах сезона не имели границ
 
 - **Найдено:** аудит безопасности 2026-11 (чтение `RulesetValidator`: у экономики проверялись только веса редкостей, у ставок — только ступени выплат).
 - **Шаги:** админ сохраняет правила с `economy.shop.rerollCostStep: -5` (или `bets.deadlineOptionsDays: [0]`, огромным `lotLifetimeMinutes`, множителем выплаты `1e20`, весами по 2 000 000 000), игрок крутит магазин или ставит, цель ставки проходит игру.
@@ -34,7 +54,7 @@
 - **Тест:** `src/GameEvent.Engine.Tests/Rulesets/RulesetValidatorTests.cs` (каждое поле: −1, 0, за потолком, на краях), `src/GameEvent.Engine.Tests/Economy/NumberBoundsTests.cs` (цена ролла и выплата зажаты), `src/GameEvent.Web.Tests/Api/RulesApiTests.cs` («A_number_out_of_its_safe_range_is_refused_at_its_path»).
 - **Исправление:** границы полей экономики, ставок, отражения и весов в `RulesetValidator`; цена ролла считается в `long` и зажимается в [0, int.MaxValue], выплата — в `decimal` с зажимом (D-651). **Исправлено.**
 
-### SEC-6. Числа контента могли переполнить очки и монетки
+### NB-SEC-2. Числа контента могли переполнить очки и монетки
 
 - **Найдено:** аудит безопасности 2026-11 (чтение `ContentValidator` и `PointsLedger`).
 - **Шаги:** опубликовать предмет с `changeResource.amount: -2000000000` и `reflect: true` (или `modifyDice` со `multiply: 1000000`, ценой 2 000 000 000, зоной с `shopPriceMultiplier: 1000`), использовать его.
@@ -44,7 +64,7 @@
 - **Тест:** `src/GameEvent.Engine.Tests/Content/ContentValidatorTests.cs` (каждое поле на шаг за потолком), `src/GameEvent.Engine.Tests/Economy/NumberBoundsTests.cs` («A_reflected_hit_at_the_cap_goes_back_whole_and_keeps_its_sign», «The_ledger_stops_at_the_ends_of_a_number_instead_of_changing_sign»).
 - **Исправление:** потолки `modifyDice` (count/reroll ≤ 20 кубов, sides ≤ 100, multiply ≤ 10, add ±1000), `changeResource.amount` ±1 000 000, цена ≤ 1 000 000, множитель цен зоны ≤ 10; журнал очков, монеток и ресурсов и умножение отражения насыщаются на краях `int` (`Saturating`, D-652). **Исправлено.**
 
-### SEC-7. Лента показывала всем пакет контента целиком
+### NB-SEC-3. Лента показывала всем пакет контента целиком
 
 - **Найдено:** аудит безопасности 2026-11 (`FeedVisibility`: `content-published` публичный).
 - **Шаги:** админ публикует контент; игрок или зритель открывает ленту.

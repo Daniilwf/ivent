@@ -790,7 +790,7 @@ public class ContentValidatorTests
         Assert.Equal(error ? ["$.effect.duration"] : [], Paths(json));
     }
 
-    // ---- SEC-6 (D-652): the numbers of content stay where the arithmetic holds ----
+    // ---- NB-SEC-2 (D-652): the numbers of content stay where the arithmetic holds ----
 
     [Theory]
     [InlineData("count", ContentValue.MaxDice, true)]

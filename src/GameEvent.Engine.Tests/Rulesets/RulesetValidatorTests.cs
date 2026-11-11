@@ -4,7 +4,7 @@ using GameEvent.Engine.Tests.Support;
 namespace GameEvent.Engine.Tests.Rulesets;
 
 /// <summary>
-/// The safety ceilings of the economy and the bets (SEC-5, D-651): every number the shop, the bets and reflection compute
+/// The safety ceilings of the economy and the bets (NB-SEC-1, D-651): every number the shop, the bets and reflection compute
 /// with has a floor and a ceiling, each reported at its JSON path. Below the floor a shop roll paid coins or a bet divided by
 /// zero; over the ceiling a lot's lifetime, a payout or a weight sum went out of range inside someone's command.
 /// </summary>

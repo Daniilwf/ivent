@@ -96,7 +96,7 @@ internal static class Betting
 
     /// <summary>
     /// The coins a won bet pays: the stake times its multiplier, rounded down and clamped to the coins a player can hold
-    /// (SEC-5, D-651) — a multiplier the ruleset once allowed must not throw inside the target's own completion.
+    /// (NB-SEC-1, D-651) — a multiplier the ruleset once allowed must not throw inside the target's own completion.
     /// </summary>
     public static int Payout(Bet bet)
     {

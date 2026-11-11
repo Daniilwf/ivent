@@ -95,7 +95,7 @@ public static class RulesetValidator
             Within($"economy.rarityWeights.{name}", weight, 0, MaxWeight);
         }
 
-        // SEC-5: a negative step made a shop roll pay coins, a huge lifetime threw in AddMinutes (D-651)
+        // NB-SEC-1: a negative step made a shop roll pay coins, a huge lifetime threw in AddMinutes (D-651)
         Within("economy.inventoryLimit", economy.InventoryLimit, 0, MaxInventoryLimit);
         Within("economy.shop.rollCost", economy.Shop.RollCost, 0, MaxCoins);
         Within("economy.shop.rerollCostStep", economy.Shop.RerollCostStep, 0, MaxCoins);
