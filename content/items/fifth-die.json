@@ -1,0 +1,25 @@
+{
+  "id": "fifth-die",
+  "kind": "item",
+  "name": "Пятый кубик",
+  "description": "В следующем броске за прохождение каждый кубик, на котором выпало 5, считается за 7.",
+  "rarity": "epic",
+  "price": 30,
+  "window": "beforeDice",
+  "hostile": false,
+  "stackable": false,
+  "effect": {
+    "target": {
+      "selector": "self"
+    },
+    "actions": [
+      {
+        "type": "modifyDice",
+        "when": "next",
+        "stage": "replaceValue",
+        "value": 7,
+        "from": 5
+      }
+    ]
+  }
+}

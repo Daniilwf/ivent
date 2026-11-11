@@ -1,0 +1,27 @@
+{
+  "id": "mossy-scarf",
+  "kind": "item",
+  "name": "Мшистый шарф",
+  "description": "Увеличивает на 1 счётчики всех твоих эффектов со счётчиком.",
+  "rarity": "epic",
+  "price": 30,
+  "window": "anytime",
+  "hostile": false,
+  "stackable": true,
+  "effect": {
+    "target": {
+      "selector": "self"
+    },
+    "actions": [
+      {
+        "type": "transformObject",
+        "mode": "addCounter",
+        "value": 1,
+        "filter": {
+          "kind": "effect",
+          "hasCounter": true
+        }
+      }
+    ]
+  }
+}

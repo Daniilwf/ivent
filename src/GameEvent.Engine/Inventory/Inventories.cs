@@ -52,7 +52,8 @@ internal static class Inventories
             parameters is { Count: > 0 } ? parameters : null,
             duration?.Uses,
             duration?.Runs,
-            duration?.Hours is { } hours ? context.Clock.UtcNow.AddHours(hours) : null);
+            duration?.Hours is { } hours ? context.Clock.UtcNow.AddHours(hours) : null,
+            Counter: definition.Effect?.Counter?.Start);
     }
 
     /// <summary>
@@ -96,9 +97,12 @@ internal static class Inventories
         var item = state.Players[e.PlayerId].Wallet.Find(e.InstanceId)
             ?? throw new InvalidOperationException($"Object {e.InstanceId} is not held by {e.PlayerId}.");
         state = Update(state, e.PlayerId, w => w with { Inventory = Without(w, e.InstanceId) });
+        // Handed over (D-478): the giver's doing, like an object he put on the receiver; taken: the taker's own
+        var from = e.Given ? e.PlayerId : (Guid?)null;
+        var hostile = e.Given && state.Catalog.Get(item.ObjectId).Hostile;
         return Update(state, e.ToPlayerId, w => w with
         {
-            Inventory = [.. w.Inventory, item with { Acquired = w.Acquisitions + 1, FromPlayerId = null, Hostile = false }],
+            Inventory = [.. w.Inventory, item with { Acquired = w.Acquisitions + 1, FromPlayerId = from, Hostile = hostile }],
             Acquisitions = w.Acquisitions + 1,
         });
     }

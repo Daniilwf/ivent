@@ -1,0 +1,30 @@
+{
+  "id": "schrodinger-rat",
+  "kind": "item",
+  "name": "Крыса Шредингера",
+  "description": "Укради предмет на выбор у другого игрока. Крысиные предметы не крадёт. Её нельзя уничтожить или превратить во что-либо.",
+  "rarity": "common",
+  "price": null,
+  "window": "anytime",
+  "hostile": true,
+  "stackable": false,
+  "tags": ["rat"],
+  "undestroyable": true,
+  "effect": {
+    "target": {
+      "selector": "chosen",
+      "excludeSelf": true
+    },
+    "actions": [
+      {
+        "type": "takeObject",
+        "mode": "steal",
+        "pick": "chosen",
+        "filter": {
+          "kind": "item",
+          "excludeTags": ["rat"]
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "id": "cursed-boots",
+  "kind": "item",
+  "name": "Проклятые Сапоги-скороходы",
+  "description": "+5 к следующему броску за прохождение (к сумме кубиков с модификаторами), но теряешь 10 монеток.",
+  "rarity": "common",
+  "price": 25,
+  "window": "beforeDice",
+  "hostile": false,
+  "stackable": false,
+  "effect": {
+    "target": {
+      "selector": "self"
+    },
+    "actions": [
+      {
+        "type": "modifyDice",
+        "when": "next",
+        "stage": "add",
+        "value": 5
+      },
+      {
+        "type": "changeResource",
+        "resource": "coins",
+        "amount": -10
+      }
+    ]
+  }
+}

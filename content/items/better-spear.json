@@ -1,0 +1,32 @@
+{
+  "id": "better-spear",
+  "kind": "item",
+  "name": "Улучшенное Копье",
+  "description": "Оружие. Все игроки в пределах пятнадцати клеток от тебя по карте, включая стоящих с тобой на одной клетке, идут на 1 клетку назад и теряют 1 монетку. Если у жертвы монеток не больше порога из правил сезона, урон монетками достаётся тебе, умноженный по тем же правилам.",
+  "rarity": "common",
+  "price": 26,
+  "window": "anytime",
+  "hostile": true,
+  "stackable": false,
+  "tags": ["weapon"],
+  "effect": {
+    "target": {
+      "selector": "withinCells",
+      "cells": 15,
+      "includeSameCell": true,
+      "excludeSelf": true
+    },
+    "actions": [
+      {
+        "type": "move",
+        "steps": -1
+      },
+      {
+        "type": "changeResource",
+        "resource": "coins",
+        "amount": -1,
+        "reflect": true
+      }
+    ]
+  }
+}

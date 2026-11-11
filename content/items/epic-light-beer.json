@@ -1,0 +1,30 @@
+{
+  "id": "epic-light-beer",
+  "kind": "item",
+  "name": "Эпическое Светлое Пиво",
+  "description": "Бахни пивка для рывка: иди на 1, 2 или 3 клетки вперёд на выбор.",
+  "rarity": "epic",
+  "price": null,
+  "window": "anytime",
+  "hostile": false,
+  "stackable": true,
+  "tags": ["edible"],
+  "effect": {
+    "target": {
+      "selector": "self"
+    },
+    "actions": [
+      {
+        "type": "requestChoice",
+        "prompt": "На сколько клеток вперёд?",
+        "options": {
+          "list": ["1", "2", "3"]
+        }
+      },
+      {
+        "type": "move",
+        "steps": "$choice"
+      }
+    ]
+  }
+}

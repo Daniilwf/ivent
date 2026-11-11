@@ -1,0 +1,24 @@
+{
+  "id": "shashlik",
+  "kind": "item",
+  "name": "Шашлык",
+  "description": "Получаешь 4 монетки.",
+  "rarity": "common",
+  "price": 25,
+  "window": "anytime",
+  "hostile": false,
+  "stackable": true,
+  "tags": ["edible"],
+  "effect": {
+    "target": {
+      "selector": "self"
+    },
+    "actions": [
+      {
+        "type": "changeResource",
+        "resource": "coins",
+        "amount": 4
+      }
+    ]
+  }
+}
