@@ -85,13 +85,14 @@ public static partial class AccountEndpoints
         var normalized = UserRecord.Normalize(request.Login);
         var logger = loggers.CreateLogger(typeof(AccountEndpoints));
         var address = WebSecurity.ClientKey(http.Connection.RemoteIpAddress);
-        if (!throttle.TryBegin(normalized, address, devices.IsKnown(http, normalized)))
+        // The account is read before the throttle: the device cookie counts only for the account as it is now (SEC-4)
+        var user = await db.Users.AsNoTracking().SingleOrDefaultAsync(u => u.NormalizedLogin == normalized && !u.IsDeleted, ct);
+        if (!throttle.TryBegin(normalized, address, devices.IsKnown(http, user)))
         {
             LogLoginThrottled(logger, TypedLogin(null, normalized), address);
             return TypedResults.StatusCode(StatusCodes.Status429TooManyRequests);
         }
 
-        var user = await db.Users.AsNoTracking().SingleOrDefaultAsync(u => u.NormalizedLogin == normalized && !u.IsDeleted, ct);
         if (!passwords.Verify(user, request.Password))
         {
             LogLoginFailed(logger, TypedLogin(user, normalized), address);
@@ -99,7 +100,7 @@ public static partial class AccountEndpoints
         }
 
         throttle.Succeeded(normalized, address);
-        devices.Remember(http, normalized);
+        devices.Remember(http, user!);
 
         // A browser signing in again leaves its previous session behind: it ends, not lingers unseen (SES-1)
         if (http.User.UserId() is { } previousUser && http.User.SessionId() is { } previous)

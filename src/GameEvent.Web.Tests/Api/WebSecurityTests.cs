@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using GameEvent.Infrastructure.Accounts;
+using GameEvent.Web.Accounts;
 using GameEvent.Web.Hosting;
 
 namespace GameEvent.Web.Tests.Api;
@@ -90,6 +91,63 @@ public sealed class WebSecurityTests : IAsyncLifetime
 
         Assert.Equal(HttpStatusCode.TooManyRequests, (await guesser.PostAsJsonAsync("/api/auth/login", new { login = "petya", password = SiteFactory.Password }, Ct)).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await owner.PostAsJsonAsync("/api/auth/login", new { login = "petya", password = SiteFactory.Password }, Ct)).StatusCode);
+    }
+
+    [Fact]
+    public async Task A_browser_that_signed_in_before_a_password_change_is_held_by_the_ceiling_again()
+    {
+        // SEC-4: the device cookie is tied to the account's security stamp; once the password changes (or the account is
+        // deleted and the login reused) a browser that got in with the old password is a stranger again
+        using var site = _site.WithWebHostBuilder(b =>
+        {
+            b.UseSetting("Security:LoginFailuresPerLogin", "3");
+            b.UseSetting("Security:LoginFailuresPerAddress", "100");
+        });
+        var former = await KnownBrowserAsync(site, "petya");
+        await ChangeUserAsync("petya", u => u.SecurityStamp = Guid.NewGuid().ToString("N"));
+
+        await ReachCeilingAsync(site, "petya");
+
+        Assert.Equal(HttpStatusCode.TooManyRequests, (await former.PostAsJsonAsync("/api/auth/login", new { login = "petya", password = SiteFactory.Password }, Ct)).StatusCode);
+    }
+
+    [Fact]
+    public async Task A_device_cookie_past_its_lifetime_is_a_stranger()
+    {
+        using var site = _site.WithWebHostBuilder(b =>
+        {
+            b.UseSetting("Security:LoginFailuresPerLogin", "3");
+            b.UseSetting("Security:LoginFailuresPerAddress", "100");
+        });
+        var owner = await KnownBrowserAsync(site, "petya");
+        _site.Clock.UtcNow = _site.Clock.UtcNow.Add(LoginDevices.Lifetime).AddDays(1);
+
+        await ReachCeilingAsync(site, "petya");
+
+        Assert.Equal(HttpStatusCode.TooManyRequests, (await owner.PostAsJsonAsync("/api/auth/login", new { login = "petya", password = SiteFactory.Password }, Ct)).StatusCode);
+    }
+
+    private static async Task<HttpClient> KnownBrowserAsync(Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactory<Program> site, string login)
+    {
+        var browser = site.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions { HandleCookies = true });
+        await SiteFactory.RefreshCsrfAsync(browser);
+        Assert.Equal(HttpStatusCode.OK, (await browser.PostAsJsonAsync("/api/auth/login", new { login, password = SiteFactory.Password }, Ct)).StatusCode);
+        await SiteFactory.RefreshCsrfAsync(browser);
+        Assert.Equal(HttpStatusCode.NoContent, (await browser.PostAsync("/api/auth/logout", null, Ct)).StatusCode);
+        await SiteFactory.RefreshCsrfAsync(browser);
+        return browser;
+    }
+
+    private static async Task ReachCeilingAsync(Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactory<Program> site, string login)
+    {
+        var guesser = site.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions { HandleCookies = true });
+        await SiteFactory.RefreshCsrfAsync(guesser);
+        for (var i = 0; i < 3; i++)
+        {
+            await guesser.PostAsJsonAsync("/api/auth/login", new { login, password = "guess-" + i }, Ct);
+        }
+
+        Assert.Equal(HttpStatusCode.TooManyRequests, (await guesser.PostAsJsonAsync("/api/auth/login", new { login, password = SiteFactory.Password }, Ct)).StatusCode);
     }
 
     [Fact]

@@ -108,4 +108,23 @@ public class LoginThrottleTests
 
         Assert.True(throttle.TrackedKeys <= 2, $"{throttle.TrackedKeys} keys are still tracked.");
     }
+
+    [Fact]
+    public void The_per_login_ceiling_outlives_a_sweep_after_the_address_window()
+    {
+        // SEC-3 review: a sweep by the shorter address window would drop the ceiling's counts after 15 minutes, not 60
+        var throttle = Throttle(perLogin: 10);
+        for (var i = 0; i < 10; i++)
+        {
+            Assert.True(throttle.TryBegin("petya", $"203.0.113.{i}"));
+        }
+
+        _clock.UtcNow = _clock.UtcNow.AddMinutes(25);
+        throttle.TryBegin("vasya", "198.51.100.1"); // the sweep runs
+
+        Assert.False(throttle.TryBegin("petya", "203.0.113.200"));
+
+        _clock.UtcNow = _clock.UtcNow.AddMinutes(36);
+        Assert.True(throttle.TryBegin("petya", "203.0.113.200"));
+    }
 }
