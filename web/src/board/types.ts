@@ -25,9 +25,14 @@ export type BoardEdge = { from: number; to: number };
 
 export type BoardZone = { id: string; name: string; theme: ZoneTheme; outline: Point[] };
 
+/** The picture the map is drawn over (D-277): the cells' places are its pixels */
+export type BoardBackground = { url: string; width: number; height: number };
+
 export type Board = {
   width: number;
   height: number;
+  /** The picture under the cells; without it the board draws its world of zones */
+  background?: BoardBackground | undefined;
   cells: BoardCell[];
   edges: BoardEdge[];
   /** The road drawn under the cells: one polyline per stretch between forks */

@@ -16,7 +16,15 @@ public class MapValidatorTests
         Features = TestRuleset.Create().Features with { MapMode = MapMode.Graph },
     };
 
-    private static IReadOnlyList<MapError> Check(MapBuilder map, Ruleset? rules = null) => MapValidator.Validate(map.Build(), rules ?? s_rules);
+    private static IReadOnlyList<MapError> Check(MapBuilder map, Ruleset? rules = null) => Validate(map.Build(), rules ?? s_rules);
+
+    /// <summary>The errors of <paramref name="map"/>; each tells the admin what is wrong, not only its code (D-282).</summary>
+    private static IReadOnlyList<MapError> Validate(MapGraph map, Ruleset rules)
+    {
+        var errors = MapValidator.Validate(map, rules);
+        Assert.All(errors, e => Assert.False(string.IsNullOrWhiteSpace(e.Message), $"{e.Code} at {e.Subject} has no message"));
+        return errors;
+    }
 
     private static MapBuilder Fork() =>
         MapBuilder.New().Path("start", "a", "f", "b1", "j", "finish").Path("f", "c1", "j");
@@ -30,8 +38,8 @@ public class MapValidatorTests
     public void Linear_map_is_a_valid_graph()
     {
         // MP1: stage 1's chain is the same graph and passes every check
-        Assert.Empty(MapValidator.Validate(LinearMap.Generate(30), s_rules));
-        Assert.Empty(MapValidator.Validate(LinearMap.Generate(1), s_rules));
+        Assert.Empty(Validate(LinearMap.Generate(30), s_rules));
+        Assert.Empty(Validate(LinearMap.Generate(1), s_rules));
     }
 
     [Fact]
@@ -67,7 +75,7 @@ public class MapValidatorTests
         var duplicate = MapBuilder.New().Path("start", "a", "finish");
         var map = duplicate.Build();
         map = map with { Cells = [.. map.Cells, new Cell("a", CellType.Empty)] };
-        Assert.Contains(MapValidator.Validate(map, s_rules), e => e.Code == MapErrorCodes.CellDuplicate && e.Subject == "a");
+        Assert.Contains(Validate(map, s_rules), e => e.Code == MapErrorCodes.CellDuplicate && e.Subject == "a");
 
         var blank = MapBuilder.New().Path("start", " ", "finish");
         Assert.Contains(Check(blank), e => e.Code == MapErrorCodes.CellIdInvalid);
@@ -96,7 +104,7 @@ public class MapValidatorTests
             ],
         };
 
-        var errors = MapValidator.Validate(map, s_rules);
+        var errors = Validate(map, s_rules);
 
         Assert.Contains(errors, e => e.Code == MapErrorCodes.EdgeUnknownCell && e.Subject == "a→ghost");
         Assert.Contains(errors, e => e.Code == MapErrorCodes.EdgeSelfLoop && e.Subject == "a→a");
@@ -321,6 +329,44 @@ public class MapValidatorTests
         var errors = Check(MapBuilder.New().Path(ids));
 
         Assert.Equal([MapErrorCodes.TooLarge], errors.Select(e => e.Code));
+    }
+
+    // ---- Edges of each rule (found by mutation testing, D-282) ----
+
+    [Fact]
+    public void Event_and_shop_cells_need_their_deck_and_grants()
+    {
+        var rules = s_rules with { Features = s_rules.Features with { Events = true, Shop = true } };
+        var map = MapBuilder.New().Path("start", "e", "s", "finish").Cell("e", CellType.Event).Cell("s", CellType.Shop, c => c with { Grants = " " });
+
+        var errors = Check(map, rules);
+
+        Assert.Equal([(MapErrorCodes.CellParameter, "e"), (MapErrorCodes.CellParameter, "s")], errors.Select(e => (e.Code, e.Subject)));
+        Assert.Empty(Check(MapBuilder.New().Path("start", "e", "s", "finish")
+            .Cell("e", CellType.Event, c => c with { Deck = "zone" }).Cell("s", CellType.Shop, c => c with { Grants = "shop-coupon" }), rules));
+    }
+
+    [Fact]
+    public void Teleport_cycle_is_reported_once_with_its_way_round()
+    {
+        var map = MapBuilder.New().Path("start", "a", "b", "finish").Teleport("a", to: "b").Teleport("b", to: "a");
+
+        var cycle = Assert.Single(Check(map), e => e.Code == MapErrorCodes.TeleportCycle);
+
+        Assert.Equal(new MapError(MapErrorCodes.TeleportCycle, "a", "Teleports lead in a circle: a → b → a."), cycle);
+    }
+
+    [Fact]
+    public void A_zone_listed_twice_is_checked_once()
+    {
+        var zone = new ZoneDefinition { Id = "z", Name = " " };
+        var map = MapBuilder.New().Path("start", "a", "finish").Zone(zone, "a").Zone(zone);
+
+        var errors = Check(map);
+
+        Assert.Equal(2, errors.Count);
+        Assert.Single(errors, e => e.Code == MapErrorCodes.ZoneInvalid);
+        Assert.Single(errors, e => e.Code == MapErrorCodes.ZoneDuplicate);
     }
 }
 

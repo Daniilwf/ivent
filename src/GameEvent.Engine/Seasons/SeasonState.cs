@@ -67,7 +67,8 @@ public sealed record SeasonState(
         && Result == other.Result
         && Catalog == other.Catalog;
 
-    public override int GetHashCode() => HashCode.Combine(SeasonId, Players.Count, Runs.Count);
+    // Explicit type arguments: a mutated count still compiles, so mutation testing keeps this method (D-281)
+    public override int GetHashCode() => HashCode.Combine<Guid, int, int>(SeasonId, Players.Count, Runs.Count);
 }
 
 /// <summary>Season lifecycle (GLOSSARY «Статус сезона»): draft → active → closing → finished → archived.</summary>

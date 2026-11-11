@@ -9,6 +9,7 @@ import {
   type Node as FlowNode,
   type NodeProps,
   useReactFlow,
+  ViewportPortal,
 } from '@xyflow/react';
 import '@xyflow/react/dist/base.css';
 import { Flag, GitFork, Maximize, Minus, Orbit, Play, Plus, Trophy, Users } from 'lucide-react';
@@ -97,6 +98,9 @@ const nodeTypes = { cell: CellBox };
  * places the cards would overlap. The draft keeps the map's places; a drop divides back.
  */
 const spread = 1.4;
+
+/** About half of a cell's card on the canvas: from its corner (its place) to its number's centre */
+const cardHalf = { x: 26, y: 26 };
 
 /** The zoom buttons of the player's map, on the canvas */
 function CanvasTools() {
@@ -256,6 +260,25 @@ export function MapCanvas({
         }}
       >
         <Background />
+        {draft.background ? (
+          // The picture under the cells (D-277), at the canvas's spread of the places; under the arrows and cards
+          <ViewportPortal>
+            <img
+              src={draft.background.url ?? `/api/files/${draft.background.fileId}`}
+              alt=""
+              draggable={false}
+              data-testid="canvas-background"
+              className="pointer-events-none absolute top-0 left-0 -z-1 max-w-none select-none"
+              style={{
+                width: draft.background.width * spread,
+                height: draft.background.height * spread,
+                // A card stands with its corner on the place; the picture moves by about half a card so the place it
+                // marks falls under the card's number, as on the players' map
+                transform: `translate(${String(-cardHalf.x)}px, ${String(-cardHalf.y)}px)`,
+              }}
+            />
+          </ViewportPortal>
+        ) : null}
         <CanvasTools />
       </ReactFlow>
     </div>
