@@ -585,6 +585,7 @@ export function MapView({
   useImperativeHandle(ref, () => ({ centerOn, reset }));
   const props = useMemo(() => scenery(board), [board]);
   const signs = useMemo(() => signSpots(board), [board]);
+  const zoneTheme = useMemo(() => new Map(board.zones.map((z) => [z.id, z.theme])), [board]);
   const me = players.find((p) => p.me);
   // My cell is marked only while my sticker stands on it; a moving token is drawn by the caller
   const myCell = me && !hide.includes(me.id) ? me.cell : null;
@@ -617,32 +618,21 @@ export function MapView({
             GPU's texture limit and render in part). Zones carry their own outline: no black underlay either. The
             admin's picture (D-277) is the one exception: one image, at most a few thousand pixels a side. */}
         {board.background ? <BackgroundPicture picture={board.background} /> : null}
-        {board.zones.map((z: BoardZone) =>
-          board.background ? (
-            // Over a picture a zone is its dashed outline: the picture is the world
-            <path
-              key={z.id}
-              d={blobPath(z.outline)}
-              fill="none"
-              stroke={ink}
-              strokeWidth={4}
-              strokeDasharray="14 10"
-              strokeLinejoin="round"
-              opacity={0.7}
-              data-zone={z.id}
-            />
-          ) : (
-            <path
-              key={z.id}
-              d={blobPath(z.outline)}
-              fill={zoneFill[z.theme]}
-              stroke={ink}
-              strokeWidth={6}
-              strokeLinejoin="round"
-              data-zone={z.id}
-            />
-          ),
-        )}
+        {/* Over a picture the zones are not drawn (D-277): the picture is the world, a computed shape would never
+            match its areas. Each cell then carries its zone as a ring, below. */}
+        {board.background
+          ? null
+          : board.zones.map((z: BoardZone) => (
+              <path
+                key={z.id}
+                d={blobPath(z.outline)}
+                fill={zoneFill[z.theme]}
+                stroke={ink}
+                strokeWidth={6}
+                strokeLinejoin="round"
+                data-zone={z.id}
+              />
+            ))}
         {props.map((p, i) => (
           <PropShape key={i} prop={p} />
         ))}
@@ -725,8 +715,20 @@ export function MapView({
             'pointer-events-none font-display font-bold',
             big ? 'text-xs' : 'text-sm',
           );
+          const ring = board.background ? zoneTheme.get(c.zone ?? '') : undefined;
           return (
             <g key={c.id} data-cell={c.id}>
+              {ring ? (
+                <circle
+                  cx={c.x}
+                  cy={c.y}
+                  r={(big ? 30 : c.kind === 'fork' ? 24 : 18) + 8}
+                  fill={zoneFill[ring]}
+                  stroke={ink}
+                  strokeWidth={2.5}
+                  data-cell-zone={c.zone}
+                />
+              ) : null}
               {c.kind === 'fork' ? (
                 <rect
                   x={c.x - 17}

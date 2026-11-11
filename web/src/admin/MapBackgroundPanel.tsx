@@ -95,7 +95,7 @@ export function MapBackgroundPanel({
           {t.none}
         </p>
       )}
-      <p className="text-sm text-ink-soft">{t.hint}</p>
+      <p className="text-sm text-ink-soft">{background ? t.placement : t.formats}</p>
       <div className="flex flex-wrap items-center gap-3">
         <FilePicker
           label={background ? t.replace : t.upload}

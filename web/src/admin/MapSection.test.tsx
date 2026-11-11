@@ -291,6 +291,23 @@ describe('the map editor', () => {
     expect(screen.getByTestId('map-publish-button')).toBeEnabled();
   });
 
+  it("keeps the map's settings in one column beside the cell panel", async () => {
+    onDesktop();
+    fakeServer({
+      'GET /api/admin/seasons/*/map': view(),
+      'POST /api/admin/seasons/*/map/check': ok,
+    });
+    render(<MapSection seasonId={seasonId} version={0} />);
+
+    const settings = await screen.findByTestId('map-settings');
+    // The background and the zones stacked together: the two-column grid never wraps a third panel under the cell
+    expect([...settings.children].map((c) => c.getAttribute('data-testid'))).toEqual([
+      'map-background',
+      'map-zones',
+    ]);
+    expect(settings.parentElement?.children).toHaveLength(2);
+  });
+
   it('says when the kept draft was dropped because the map was published since', async () => {
     onDesktop();
     const older = { cells: [{ id: 'start', type: 'start' as const }], edges: [], zones: [] };

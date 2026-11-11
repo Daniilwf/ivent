@@ -78,6 +78,9 @@ describe('the background panel', () => {
     render(<MapBackgroundPanel seasonId={seasonId} background={null} onChange={onChange} />);
 
     expect(screen.getByTestId('map-background-none')).toHaveTextContent(t.none);
+    // One explanation per state: without a picture, what to upload; placing cells comes once there is one
+    expect(screen.getByText(t.formats)).toBeInTheDocument();
+    expect(screen.queryByText(t.placement)).toBeNull();
     expect(screen.queryByTestId('map-background-remove')).toBeNull();
     await userEvent.upload(screen.getByTestId('map-background-file'), picture());
 
@@ -112,6 +115,8 @@ describe('the background panel', () => {
       stored.thumbnailUrl,
     );
     expect(screen.getByTestId('map-background-size')).toHaveTextContent(t.size(1600, 900));
+    expect(screen.getByText(t.placement)).toBeInTheDocument();
+    expect(screen.queryByText(t.formats)).toBeNull();
     expect(screen.getByText(t.draftOnly)).toBeInTheDocument();
     expect(screen.getByText(t.replace)).toBeInTheDocument();
 

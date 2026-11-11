@@ -2,7 +2,7 @@ import { onDesktop } from '../test/desk';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Schemas } from '../api/client';
-import { branchOptions, graphBoard, legsPath } from '../board/graphBoard';
+import { branchOptions, graphBoard, legsPath, zoneFill, zoneTheme } from '../board/graphBoard';
 import { ru } from '../i18n/ru';
 import { fakeServer, seasonId } from '../test/fakeServer';
 import { SeasonScreen } from './SeasonScreen';
@@ -380,7 +380,7 @@ describe('the season screen on the graph map', () => {
     expect(token(me)).not.toBe(token(other));
   });
 
-  it('draws the background picture under the cells, and the zones only as outlines over it', async () => {
+  it('draws the background picture under the cells, and marks the zones on the cells, not as blobs', async () => {
     fakeServer({
       ...common,
       'GET /api/seasons/*': {
@@ -399,8 +399,16 @@ describe('the season screen on the graph map', () => {
     ]);
     // Under everything: the first thing the map draws
     expect(picture?.parentElement?.firstElementChild).toBe(picture);
-    // The picture is the world: the zones are outlines, not painted blobs
-    expect(document.querySelector('[data-zone="swamp"]')?.getAttribute('fill')).toBe('none');
+    // The picture is the world: no computed zone shape over it, its own areas would disagree with one (D-277)
+    expect(document.querySelectorAll('svg[role="application"] [data-zone]')).toHaveLength(0);
+    // A cell says its zone itself: a halo in the zone's colour round each of the swamp's two cells
+    const rings = document.querySelectorAll('svg[role="application"] [data-cell-zone="swamp"]');
+    expect(rings).toHaveLength(2);
+    // The swamp is the map's first zone: it wears the first zone's colour, as on its legend swatch
+    expect(rings[0]?.getAttribute('fill')).toBe(zoneFill[zoneTheme(0)]);
+    // The zone's sign stays: the name is read on the map
+    const map = document.querySelector('svg[role="application"]') as unknown as HTMLElement;
+    expect(within(map).getByText('Болото ужаса')).toBeTruthy();
   });
 
   it('draws the zones board when the map has no background', async () => {
