@@ -73,8 +73,9 @@ internal static class Corrections
         }
 
         // The count stage only (D-14): missing dice are rolled and appended, extra ones leave from the end.
-        var count = CompletionRoll.Count(command.Hours, run.Snapshot);
-        var sides = run.Mods?.Sides ?? CompletionRoll.DieFor(run.Difficulty!.Value, run.Snapshot.DieByDifficulty).Sides;
+        // An item's single die stays one die whatever the hours (D-481)
+        var count = run.Mods?.SingleDie is not null ? 1 : CompletionRoll.Count(command.Hours, run.Snapshot);
+        var sides = run.Mods?.SingleDie ?? run.Mods?.Sides ?? CompletionRoll.DieFor(run.Difficulty!.Value, run.Snapshot.DieByDifficulty).Sides;
         var added = count > run.Dice.Count ? CompletionRoll.Roll(count - run.Dice.Count, sides, context.Random) : [];
         EquatableArray<Die> removed = [.. run.Dice.Skip(count)];
 

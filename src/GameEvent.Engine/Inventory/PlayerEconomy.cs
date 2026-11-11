@@ -44,7 +44,8 @@ public sealed record DiceModifier(
     DiceStage Stage,
     ContentValue Value,
     bool Hostile = false,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? Sides = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? Sides = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? From = null);
 
 /// <summary>A lot of the personal shop offer (SPEC «Магазин»): the object, its price in coins, whether it was bought.</summary>
 public sealed record ShopLot(string ObjectId, Rarity Rarity, int Price, bool Sold = false);

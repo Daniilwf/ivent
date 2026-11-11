@@ -1,0 +1,24 @@
+{
+  "id": "d8-die",
+  "kind": "item",
+  "name": "d8-кубик",
+  "description": "В следующем броске за прохождение вместо положенных кубиков бросаешь один d8.",
+  "rarity": "common",
+  "price": 15,
+  "window": "beforeDice",
+  "hostile": false,
+  "stackable": false,
+  "effect": {
+    "target": {
+      "selector": "self"
+    },
+    "actions": [
+      {
+        "type": "modifyDice",
+        "when": "next",
+        "stage": "singleDie",
+        "value": 8
+      }
+    ]
+  }
+}

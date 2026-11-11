@@ -72,7 +72,7 @@
 | `drawEvent` | `deck`: `good`, `bad`, `special`, `risky`, `zone` или id колоды |
 | `spinWheel` | `wheel`: id колеса |
 | `modifyNextRoll` | `filter`, `choiceCount`, `runCondition` |
-| `modifyDice` | `when`: `current` или `next`; `stage`: `count`, `sides`, `add`, `multiply`, `reroll`, `min`, `max`; `value`; у `count` — `sides`: дополнительные кубики своего вида (d6 рядом с d4 прохождения, D-475) |
+| `modifyDice` | `when`: `current` или `next`; `stage`: `count`, `sides`, `add`, `multiply`, `reroll`, `min`, `max`, `singleDie`, `setOne`, `replaceValue`, `fixAverage`, `bonusPerEven`, `percent`; `value`; у `count` — `sides`: дополнительные кубики своего вида (d6 рядом с d4 прохождения, D-475). Редкие этапы (D-481): `singleDie` — вместо кубиков по часам один кубик на `value` граней; `setOne` — первый кубик показывает `value` (число или `$choice`), не больше своих граней; `replaceValue` — каждый кубик с `from` считается за `value`; `fixAverage` — каждый кубик показывает половину граней; `bonusPerEven` — `value` за каждый чётный кубик; `percent` — сумма с модификаторами × `value`/100 с округлением к нулю; у `reroll` — `filter: belowAverage`: перебросить только кубики ниже половины граней |
 | `teleport` | `cell`: id клетки или `nearestShortcut` |
 | `requestChoice` | `prompt`, `options`: `{ "from": "categories" }`, `players`, `games` или `{ "list": [...] }`; результат — `$choice` |
 
@@ -390,6 +390,17 @@
       { "type": "changeResource", "resource": "coins", "amount": -1, "reflect": true }
     ]
   }
+}
+```
+
+### 19. Средний кубик — каждый кубик показывает среднее
+
+```json
+{
+  "id": "middle-die", "kind": "item", "name": "Средний кубик",
+  "description": "В следующем броске за прохождение каждый кубик показывает своё среднее: d4 — 2, d6 — 3, d8 — 4, d10 — 5, d12 — 6, d20 — 10.",
+  "rarity": "epic", "price": 50, "window": "beforeDice", "hostile": false, "stackable": false,
+  "effect": { "target": { "selector": "self" }, "actions": [{ "type": "modifyDice", "when": "next", "stage": "fixAverage", "value": 1 }] }
 }
 ```
 

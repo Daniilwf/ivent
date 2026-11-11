@@ -27,7 +27,10 @@ internal static class DicePipeline
         int count, DieRule die, int challengeCount, IReadOnlyList<ThrowChange> changes, IRandomSource random)
     {
         var sides = changes.LastOrDefault(c => c.Stage == DiceStage.Sides)?.Value.Number ?? die.Sides;
-        var dice = CompletionRoll.Roll(count, sides, random);
+
+        // One die of its own instead of the run's dice by hours (D-481)
+        var single = changes.LastOrDefault(c => c.Stage == DiceStage.SingleDie)?.Value.Number;
+        var dice = single is { } singleSides ? CompletionRoll.Roll(1, singleSides, random) : CompletionRoll.Roll(count, sides, random);
         var challenge = CompletionRoll.Roll(challengeCount, sides, random);
         if (changes.Count == 0)
         {
@@ -51,10 +54,21 @@ internal static class DicePipeline
             ],
         };
         var rolled = new List<Die>();
-        foreach (var change in changes.Where(c => c.Stage is DiceStage.Add or DiceStage.Multiply or DiceStage.Min or DiceStage.Max)
-            .OrderBy(c => c.Stage is DiceStage.Add ? 0 : c.Stage is DiceStage.Multiply ? 1 : 2))
+        if (single is not null)
         {
-            mods = mods.With(change.Stage, Number(change.Value, random, rolled), change.ObjectId);
+            mods = mods with { SingleDie = single };
+        }
+
+        foreach (var change in changes.Where(c => c.Stage is not (DiceStage.Count or DiceStage.Sides or DiceStage.Reroll or DiceStage.SingleDie))
+            .OrderBy(c => c.Stage switch
+            {
+                DiceStage.Add => 0,
+                DiceStage.Multiply or DiceStage.Percent => 1,
+                DiceStage.Min or DiceStage.Max => 2,
+                _ => 0,
+            }))
+        {
+            mods = mods.With(change.Stage, Number(change.Value, random, rolled), change.ObjectId, change.From);
         }
 
         return new CompletionThrow(dice, challenge, mods, [.. rolled]);
@@ -64,8 +78,9 @@ internal static class DicePipeline
     /// A <c>current</c> change after the throw (the <c>afterDice</c> window or trigger): a reroll replaces the dice, a count
     /// adds dice, the other stages change the mods; points and position follow the difference like a correction (D-408).
     /// </summary>
-    public static void AfterThrow(EffectRun effect, Guid runId, DiceStage stage, ContentValue value, int? extraSides = null)
+    public static void AfterThrow(EffectRun effect, Guid runId, ThrowChange change)
     {
+        var (stage, value, extraSides) = (change.Stage, change.Value, change.Sides);
         var run = effect.State.Runs[runId];
 
         // The throw's move waits at a fork: that step has begun, a change after the throw would move the token off it (D-416)
@@ -79,6 +94,14 @@ internal static class DicePipeline
         var before = CompletionRoll.Total(run);
         switch (stage)
         {
+            case DiceStage.Reroll when change.Filter == DieFilter.BelowAverage:
+                // Only the dice below their average, each of its own kind (D-481)
+                EquatableArray<Die> Again(EquatableArray<Die> dice) =>
+                    [.. dice.Select(d => d.Value < d.Sides / 2 ? CompletionRoll.Roll(1, d.Sides, random)[0] : d)];
+                var dice = Again(run.Dice);
+                var challenge = Again(run.ChallengeDice);
+                effect.Emit(new RunDiceRerolled(runId, run.PlayerId, effect.ObjectId, dice, challenge, Again(run.DiceMods.ExtraDice)));
+                break;
             case DiceStage.Reroll:
                 RunDiceRerolled? rerolled = null;
                 for (var i = 0; i < Math.Max(1, value.Number); i++)
@@ -101,12 +124,12 @@ internal static class DicePipeline
                 };
                 effect.Emit(new RunDiceModified(runId, run.PlayerId, withDice, added));
                 break;
-            case DiceStage.Sides:
-                // The dice are on the table: their sides do not change any more.
+            case DiceStage.Sides or DiceStage.SingleDie:
+                // The dice are on the table: their sides and number do not change any more.
                 return;
             default:
                 var rolled = new List<Die>();
-                var mods = run.DiceMods.With(stage, Number(value, random, rolled), effect.ObjectId);
+                var mods = run.DiceMods.With(stage, Number(value, random, rolled), effect.ObjectId, change.From);
                 effect.Emit(new RunDiceModified(runId, run.PlayerId, mods, [.. rolled]));
                 break;
         }
@@ -141,7 +164,7 @@ internal static class DicePipeline
             return ([], state, []);
         }
 
-        var changes = state.Players[playerId].Wallet.NextDice.Select(m => new ThrowChange(m.ObjectId, m.Stage, m.Value, m.Sides)).ToList();
+        var changes = state.Players[playerId].Wallet.NextDice.Select(m => new ThrowChange(m.ObjectId, m.Stage, m.Value, m.Sides, m.From)).ToList();
         var events = new List<IGameEvent>();
         foreach (var item in Firing.Subscribed(state, playerId, Trigger.BeforeDice))
         {

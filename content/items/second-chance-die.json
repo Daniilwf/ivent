@@ -1,0 +1,25 @@
+{
+  "id": "second-chance-die",
+  "kind": "item",
+  "name": "Кубик второго шанса",
+  "description": "Сразу после броска за прохождение перебрось все кубики ниже среднего: d4 — 1, d6 — до 2, d8 — до 3, d10 — до 4, d12 — до 5, d20 — до 9.",
+  "rarity": "common",
+  "price": null,
+  "window": "afterDice",
+  "hostile": false,
+  "stackable": true,
+  "effect": {
+    "target": {
+      "selector": "self"
+    },
+    "actions": [
+      {
+        "type": "modifyDice",
+        "when": "current",
+        "stage": "reroll",
+        "value": 1,
+        "filter": "belowAverage"
+      }
+    ]
+  }
+}

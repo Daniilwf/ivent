@@ -21,7 +21,7 @@ public enum DiceScope
 }
 
 /// <summary>A change of the throw being made, collected while <c>beforeDice</c> effects fire (D-408).</summary>
-internal sealed record ThrowChange(string ObjectId, DiceStage Stage, ContentValue Value, int? Sides = null);
+internal sealed record ThrowChange(string ObjectId, DiceStage Stage, ContentValue Value, int? Sides = null, int? From = null, DieFilter? Filter = null);
 
 /// <summary>
 /// One run of an effect (SPEC «Архитектура движка правил»: trigger, condition, targets, actions): the actions of an

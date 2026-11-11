@@ -742,7 +742,13 @@
                             "multiply",
                             "reroll",
                             "min",
-                            "max"
+                            "max",
+                            "singleDie",
+                            "setOne",
+                            "replaceValue",
+                            "fixAverage",
+                            "bonusPerEven",
+                            "percent"
                           ]
                         },
                         "value": {
@@ -757,6 +763,18 @@
                           "type": [
                             "integer",
                             "null"
+                          ]
+                        },
+                        "from": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        },
+                        "filter": {
+                          "enum": [
+                            "belowAverage",
+                            null
                           ]
                         },
                         "target": {
@@ -1342,7 +1360,13 @@
                                       "multiply",
                                       "reroll",
                                       "min",
-                                      "max"
+                                      "max",
+                                      "singleDie",
+                                      "setOne",
+                                      "replaceValue",
+                                      "fixAverage",
+                                      "bonusPerEven",
+                                      "percent"
                                     ]
                                   },
                                   "value": {
@@ -1357,6 +1381,18 @@
                                     "type": [
                                       "integer",
                                       "null"
+                                    ]
+                                  },
+                                  "from": {
+                                    "type": [
+                                      "integer",
+                                      "null"
+                                    ]
+                                  },
+                                  "filter": {
+                                    "enum": [
+                                      "belowAverage",
+                                      null
                                     ]
                                   },
                                   "target": {

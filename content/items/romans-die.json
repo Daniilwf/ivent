@@ -1,0 +1,34 @@
+{
+  "id": "romans-die",
+  "kind": "item",
+  "name": "Кубик Романа",
+  "description": "Один кубик следующего броска за прохождение покажет 1 или 3 — на твой выбор.",
+  "rarity": "common",
+  "price": null,
+  "window": "beforeDice",
+  "hostile": false,
+  "stackable": false,
+  "effect": {
+    "target": {
+      "selector": "self"
+    },
+    "actions": [
+      {
+        "type": "requestChoice",
+        "prompt": "1 или 3?",
+        "options": {
+          "list": [
+            "1",
+            "3"
+          ]
+        }
+      },
+      {
+        "type": "modifyDice",
+        "when": "next",
+        "stage": "setOne",
+        "value": "$choice"
+      }
+    ]
+  }
+}

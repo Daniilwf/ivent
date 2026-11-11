@@ -334,7 +334,7 @@
 | 6 ✅ | `takeObject.give` — отдать свой объект (свиньи), флаги `unstealable`/`undestroyable` (D-478) | +6 (с Кьюкьюшкой и Шредингером шага 1) | 75 |
 | 7 ✅ | `counters` — эффекты со счётчиком, триггер `runEnded`, `addCounter`/`resetCounters`, фильтр `hasCounter` (D-479; эффект `bomb` — `time-bomb`) | +5 | 80 |
 | 8 ✅ | `selector:withinCells`, затем `selector:nearestBehind`; действие на себя при нескольких целях — один раз (D-480) | +4, +1 | 85 |
-| 9 | редкие стадии броска по одному: `setOne`, `singleDie`, `replaceValue`, `fixAverage`, `bonusPerEven`, `rerollFilter` | +7 | 110 |
+| 9 ✅ | редкие стадии броска: `setOne`, `singleDie`, `replaceValue`, `fixAverage`, `bonusPerEven`, `reroll.filter`, `percent` вместо `multiply: 1.5` (D-481) | +8 (с Мифическими сапогами шага 1) | 93 |
 | 10 | `outcomes.choice`, `roll.as`, `useCondition`, `intercept.badEvent` (эффект Бабл) | +4 | 114 |
 
 Флаги объекта `unstealable` / `undestroyable` сделаны в шаге 6 (D-478). Правила импорта из README пакета: «золото» → «монетки» по GLOSSARY, редкость по приставке, `price: null` — не продаётся, теги — дополнение к CONTENT.md, сценарный тест на каждый импортированный предмет, спорное — в DECISIONS «нужно решение». Текстовые 269 остаются в `items.manual.json` выключенными и в `content/items` не попадают; лутбоксы ссылаются на ручные предметы и ждут (D-471). Импорт идёт в ветке `feat/items-import`: файлы `content/items/<английский id>.json`, соответствие — столбец «Импорт» в `TRIAGE.csv`.

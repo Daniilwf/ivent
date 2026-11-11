@@ -456,7 +456,7 @@ public enum DiceWhen
     Next,
 }
 
-/// <summary>A stage of the dice pipeline (D-14).</summary>
+/// <summary>A stage of the dice pipeline (D-14); the rare ones from <see cref="SingleDie"/> on came with the import (D-481).</summary>
 public enum DiceStage
 {
     Count,
@@ -466,6 +466,31 @@ public enum DiceStage
     Reroll,
     Min,
     Max,
+
+    /// <summary>The run's dice by hours become one die of <c>value</c> sides.</summary>
+    SingleDie,
+
+    /// <summary>One thrown die (the first) shows <c>value</c>, never above its sides.</summary>
+    SetOne,
+
+    /// <summary>Every die showing <c>from</c> counts as <c>value</c>.</summary>
+    ReplaceValue,
+
+    /// <summary>Every thrown die shows its average: half its sides, rounded down.</summary>
+    FixAverage,
+
+    /// <summary><c>value</c> more for every die showing an even number.</summary>
+    BonusPerEven,
+
+    /// <summary>The total after additions, times <c>value</c> per cent, rounded toward zero.</summary>
+    Percent,
+}
+
+/// <summary>Which dice a <c>reroll</c> after the throw takes (D-481).</summary>
+public enum DieFilter
+{
+    /// <summary>Those below their average (half the sides): d4 — 1, d6 — up to 2, d20 — up to 9.</summary>
+    BelowAverage,
 }
 
 public sealed record ModifyDiceAction : ActionSpec
@@ -481,6 +506,14 @@ public sealed record ModifyDiceAction : ActionSpec
     /// </summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public int? Sides { get; init; }
+
+    /// <summary>With <c>stage: replaceValue</c>: the face that counts as <c>value</c> (D-481).</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? From { get; init; }
+
+    /// <summary>With <c>stage: reroll</c>: only the dice the filter takes (D-481).</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public DieFilter? Filter { get; init; }
 }
 
 /// <summary>Move without walking to a cell id or <c>nearestShortcut</c>.</summary>

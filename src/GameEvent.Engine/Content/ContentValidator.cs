@@ -341,6 +341,16 @@ public static partial class ContentValidator
                         error($"{at}.sides", $"«sides» gives the extra dice of «count» their kind: 2–{ContentValue.MaxSides}.");
                     }
 
+                    if ((modify.Stage == DiceStage.ReplaceValue) != (modify.From is not null) || modify.From is < 1)
+                    {
+                        error($"{at}.from", "«replaceValue» names the face («from», 1 or more) that counts as «value»; other stages have none.");
+                    }
+
+                    if (modify.Filter is not null && modify.Stage != DiceStage.Reroll)
+                    {
+                        error($"{at}.filter", "Only «reroll» takes a filter of dice.");
+                    }
+
                     break;
                 case ModifyNextRollAction next when next.Filter is null && next.ChoiceCount is null && next.RunCondition is null:
                     error(at, "«modifyNextRoll» changes a filter, the choice count or the run condition.");
@@ -457,11 +467,25 @@ public static partial class ContentValidator
         }
     }
 
-    // Counts, sides, rerolls and bounds are plain numbers; additions may be dice or a reference.
+    // Counts, sides, rerolls and bounds are plain numbers; additions may be dice or a reference, a die set by «setOne» a
+    // reference to the player's answer (D-481).
     private static void CheckDiceValue(DiceStage stage, ContentValue value, string path, Action<string, string> error)
     {
-        if (stage is DiceStage.Add)
+        if (stage is DiceStage.Add || (stage is DiceStage.SetOne && value.Kind == ContentValueKind.Reference && !value.Negative))
         {
+            return;
+        }
+
+        if (stage is DiceStage.SingleDie && value is { Kind: ContentValueKind.Number, Number: < 2 or > ContentValue.MaxSides })
+        {
+            error(path, $"«singleDie» is a die of 2–{ContentValue.MaxSides} sides.");
+            return;
+        }
+
+        if (stage is DiceStage.SetOne or DiceStage.ReplaceValue or DiceStage.BonusPerEven or DiceStage.Percent or DiceStage.FixAverage
+            && value is { Kind: ContentValueKind.Number, Number: < 1 })
+        {
+            error(path, $"The «{stage}» stage takes a number of 1 or more.");
             return;
         }
 
