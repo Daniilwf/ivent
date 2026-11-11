@@ -324,6 +324,9 @@ public sealed class Scenario
         var rules = Ruleset;
         using var _ = Recording(() => $"s.Act({CommandCode(command, rules)});");
         Last = SeasonEngine.Execute(State, command, Context());
+
+        // A refusal says why, for the log and the admin's error page, not only its code (D-282)
+        Assert.True(Last.IsAccepted || !string.IsNullOrWhiteSpace(Last.Rejection!.Detail), $"Rejection {Last.Rejection?.Code} has no detail.");
         if (Last.IsAccepted)
         {
             _log.AddRange(Last.Events);

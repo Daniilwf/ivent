@@ -388,4 +388,16 @@ public class ZoneTests
         s.RollTitle("Вася", "Portal").Start("Вася").NextRandom(4, 4).Act(new DropRun(s.PlayerId("Вася")));
         Assert.Equal("j", s.Player("Вася").CellId);
     }
+
+    [Fact]
+    public void Zone_warnings_refuse_missing_inputs()
+    {
+        var s = Season();
+        var (map, rules, state, pool) = (s.State.Map, s.State.Rules, s.State, s.Context().Pool);
+
+        Assert.Throws<ArgumentNullException>(() => ZoneWarnings.For(null!, rules, state, pool));
+        Assert.Throws<ArgumentNullException>(() => ZoneWarnings.For(map, null!, state, pool));
+        Assert.Throws<ArgumentNullException>(() => ZoneWarnings.For(map, rules, null!, pool));
+        Assert.Throws<ArgumentNullException>(() => ZoneWarnings.For(map, rules, state, null!));
+    }
 }

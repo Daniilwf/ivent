@@ -15,7 +15,14 @@ public class ContentValidatorTests
          "effect":{"target":{"selector":"self"},"actions":[{"type":"move","steps":1}]}}
         """;
 
-    private static IReadOnlyList<ContentError> Errors(string json) => ContentValidator.Check(ContentJson.Parse<ObjectDefinition>(json));
+    private static IReadOnlyList<ContentError> Errors(string json) => Said(ContentValidator.Check(ContentJson.Parse<ObjectDefinition>(json)));
+
+    /// <summary>Every error tells the content author what is wrong, not only where.</summary>
+    private static IReadOnlyList<ContentError> Said(IReadOnlyList<ContentError> errors)
+    {
+        Assert.All(errors, e => Assert.False(string.IsNullOrWhiteSpace(e.Message), $"{e.Path} has no message"));
+        return errors;
+    }
 
     private static void AssertError(string json, string path)
     {
@@ -279,7 +286,7 @@ public class ContentValidatorTests
             new() { Id = "c5", Type = ContentCellType.Checkpoint },
         ];
 
-        var errors = ContentValidator.Check(cells);
+        var errors = Said(ContentValidator.Check(cells));
 
         Assert.Equal(["$[0].grants", "$[1].deck", "$[2].to", "$[3].amount"], errors.Select(e => e.Path));
     }
@@ -289,7 +296,7 @@ public class ContentValidatorTests
     {
         CellDefinition[] cells = [new() { Id = "c1", Type = ContentCellType.Checkpoint }, new() { Id = "c1", Type = ContentCellType.Checkpoint }];
 
-        Assert.Contains(ContentValidator.Check(cells), e => e.Path == "$");
+        Assert.Contains(Said(ContentValidator.Check(cells)), e => e.Path == "$");
     }
 
     [Fact]
@@ -297,7 +304,7 @@ public class ContentValidatorTests
     {
         var zone = new ZoneDefinition { Id = "swamp", Name = "Болото", DropPenaltyMultiplier = 0, ShopPriceMultiplier = -1 };
 
-        var paths = ContentValidator.Check(zone).Select(e => e.Path).ToList();
+        var paths = Said(ContentValidator.Check(zone)).Select(e => e.Path).ToList();
 
         Assert.Equal(["$.dropPenaltyMultiplier", "$.shopPriceMultiplier"], paths);
     }
@@ -312,7 +319,7 @@ public class ContentValidatorTests
             DiceModifier = new DiceModifierSpec { Stage = DiceStage.Min, Value = ContentValue.TryParse("1d6")! },
         };
 
-        Assert.Contains(ContentValidator.Check(zone), e => e.Path == "$.diceModifier.value");
+        Assert.Contains(Said(ContentValidator.Check(zone)), e => e.Path == "$.diceModifier.value");
     }
 
     [Fact]
@@ -327,7 +334,7 @@ public class ContentValidatorTests
             OnResult = new EffectSpec(),
         };
 
-        var paths = ContentValidator.Check(poll).Select(e => e.Path).ToList();
+        var paths = Said(ContentValidator.Check(poll)).Select(e => e.Path).ToList();
 
         Assert.Contains("$.closesInHours", paths);
         Assert.Contains("$.onResult", paths);
@@ -346,7 +353,7 @@ public class ContentValidatorTests
             Check = ChallengeCheck.Auto,
         };
 
-        Assert.Contains(ContentValidator.Check(challenge), e => e.Path == "$.reward.coins");
+        Assert.Contains(Said(ContentValidator.Check(challenge)), e => e.Path == "$.reward.coins");
     }
 
     // ---- Values ----
@@ -515,7 +522,7 @@ public class ContentValidatorTests
             },
         };
 
-        Assert.Equal(["$.onResult"], ContentValidator.Check(poll).Select(e => e.Path));
+        Assert.Equal(["$.onResult"], Said(ContentValidator.Check(poll)).Select(e => e.Path));
     }
 
     [Theory]
@@ -558,7 +565,7 @@ public class ContentValidatorTests
             Check = ChallengeCheck.Auto,
         };
 
-        Assert.Equal(["$.condition"], ContentValidator.Check(challenge).Select(e => e.Path));
+        Assert.Equal(["$.condition"], Said(ContentValidator.Check(challenge)).Select(e => e.Path));
     }
 
     [Fact]
@@ -568,7 +575,7 @@ public class ContentValidatorTests
             Orange.Replace("{\"type\":\"move\",\"steps\":1}", "{\"type\":\"modifyNextRoll\",\"filter\":{\"minHours\":5,\"maxHours\":1}}", StringComparison.Ordinal),
             "$.effect.actions[0].filter.minHours");
         Assert.Contains(
-            ContentValidator.Check(new ZoneDefinition { Id = "swamp", Name = "Болото", RollFilter = new GameFilterSpec() }),
+            Said(ContentValidator.Check(new ZoneDefinition { Id = "swamp", Name = "Болото", RollFilter = new GameFilterSpec() })),
             e => e.Path == "$.rollFilter");
     }
 
@@ -611,5 +618,175 @@ public class ContentValidatorTests
 
         Assert.Equal((TakeMode.Steal, (ObjectKind?)ObjectKind.Item, (Rarity?)Rarity.Epic, Pick.Chosen), (take.Mode, take.Filter!.Kind, take.Filter.Rarity, take.Pick));
         Assert.Empty(Errors(json));
+    }
+
+    // ---- Edges of each rule (found by mutation testing, D-282) ----
+
+    private static string WithAction(string action) =>
+        Orange.Replace("{\"type\":\"move\",\"steps\":1}", action, StringComparison.Ordinal);
+
+    private static IEnumerable<string> Paths(string json) => Errors(json).Select(e => e.Path);
+
+    private static PollDefinition Poll(string question, ChoiceOptionsSpec? options = null) => new()
+    {
+        Question = question,
+        Options = options ?? new ChoiceOptionsSpec { From = ChoiceSource.Categories },
+        Voters = PollVoters.Players,
+        ClosesInHours = 24,
+    };
+
+    private static WeeklyChallengeDefinition Challenge(
+        string id = "old-school", string name = "Олдскул", string description = "Пройди старую игру.", int? coins = 10) => new()
+        {
+            Id = id,
+            Name = name,
+            Description = description,
+            Condition = new ConditionSpec { Stat = ContentStat.RunHours, Gte = 20 },
+            Reward = new RewardSpec { Coins = coins },
+            Check = ChallengeCheck.Auto,
+        };
+
+    [Fact]
+    public void Every_check_refuses_a_missing_definition()
+    {
+        Assert.Throws<ArgumentNullException>(() => ContentValidator.Check((ObjectDefinition)null!));
+        Assert.Throws<ArgumentNullException>(() => ContentValidator.Check((ZoneDefinition)null!));
+        Assert.Throws<ArgumentNullException>(() => ContentValidator.Check((IReadOnlyList<CellDefinition>)null!));
+        Assert.Throws<ArgumentNullException>(() => ContentValidator.Check((PollDefinition)null!));
+        Assert.Throws<ArgumentNullException>(() => ContentValidator.Check((WeeklyChallengeDefinition)null!));
+        Assert.Throws<ArgumentNullException>(() => ContentValidator.CheckEffect(null!, "$", (_, _) => { }));
+        Assert.Throws<ArgumentNullException>(() => ContentValidator.CheckEffect(new EffectSpec(), "$", null!));
+    }
+
+    [Fact]
+    public void A_blank_description_is_an_error()
+    {
+        Assert.Equal(["$.description"], Paths(Orange.Replace("\"description\":\"Иди на 1 клетку вперёд.\"", "\"description\":\" \"", StringComparison.Ordinal)));
+    }
+
+    [Fact]
+    public void A_free_item_is_fine()
+    {
+        Assert.Empty(Errors(Orange.Replace("\"price\":10", "\"price\":0", StringComparison.Ordinal)));
+    }
+
+    [Fact]
+    public void Cell_ids_are_checked()
+    {
+        CellDefinition[] cells = [new() { Id = "c1", Type = ContentCellType.Checkpoint }, new() { Id = "Bad Id", Type = ContentCellType.Checkpoint }];
+
+        Assert.Equal(["$[1].id"], Said(ContentValidator.Check(cells)).Select(e => e.Path));
+    }
+
+    [Fact]
+    public void A_poll_question_is_up_to_twice_a_name_and_its_options_are_checked()
+    {
+        Assert.Empty(Said(ContentValidator.Check(Poll(new string('?', ContentValidator.MaxNameLength * 2)))));
+        Assert.Equal(["$.question"], Said(ContentValidator.Check(Poll(new string('?', (ContentValidator.MaxNameLength * 2) + 1)))).Select(e => e.Path));
+        Assert.Equal(["$.question"], Said(ContentValidator.Check(Poll(" "))).Select(e => e.Path));
+        Assert.Equal(["$.options"], Said(ContentValidator.Check(Poll("Какой жанр?", new ChoiceOptionsSpec()))).Select(e => e.Path));
+    }
+
+    [Fact]
+    public void A_challenge_checks_its_id_name_description_and_pays_at_least_one_coin()
+    {
+        Assert.Empty(Said(ContentValidator.Check(Challenge(coins: 1))));
+        Assert.Equal(["$.id"], Said(ContentValidator.Check(Challenge(id: "Old School"))).Select(e => e.Path));
+        Assert.Equal(["$.name"], Said(ContentValidator.Check(Challenge(name: " "))).Select(e => e.Path));
+        Assert.Equal(["$.description"], Said(ContentValidator.Check(Challenge(description: ""))).Select(e => e.Path));
+        Assert.Equal(["$.reward.coins"], Said(ContentValidator.Check(Challenge(coins: 0))).Select(e => e.Path));
+    }
+
+    [Fact]
+    public void A_choice_of_two_games_is_fine()
+    {
+        Assert.Empty(Errors(WithAction("{\"type\":\"modifyNextRoll\",\"choiceCount\":2}")));
+    }
+
+    [Theory]
+    [InlineData("{\"type\":\"drawEvent\",\"deck\":\"good\"}")]
+    [InlineData("{\"type\":\"spinWheel\",\"wheel\":\"genres\"}")]
+    [InlineData("{\"type\":\"teleport\",\"cell\":\"nearestShortcut\"}")]
+    [InlineData("{\"type\":\"transformObject\",\"mode\":\"annotate\",\"note\":\"x2\"}")]
+    [InlineData("{\"type\":\"requestChoice\",\"prompt\":\"Кого?\",\"options\":{\"list\":[\"a\",\"b\"]}}")]
+    public void Actions_with_their_parameters_are_fine(string action)
+    {
+        Assert.Empty(Errors(WithAction(action)));
+    }
+
+    [Fact]
+    public void Transform_into_nothing_and_an_empty_note_are_named()
+    {
+        var into = Assert.Single(Errors(WithAction("{\"type\":\"transformObject\",\"mode\":\"transform\",\"into\":\"\"}")));
+        Assert.Equal(new ContentError("$.effect.actions[0].into", "«transform» names the object to turn into."), into);
+        Assert.Equal(["$.effect.actions[0].note"], Paths(WithAction("{\"type\":\"transformObject\",\"mode\":\"annotate\",\"note\":\"\"}")));
+    }
+
+    [Fact]
+    public void A_choice_prompt_is_up_to_twice_a_name()
+    {
+        static string Request(string prompt) =>
+            WithAction("{\"type\":\"requestChoice\",\"prompt\":\"" + prompt + "\",\"options\":{\"from\":\"players\"}}");
+
+        Assert.Empty(Errors(Request(new string('?', ContentValidator.MaxNameLength * 2))));
+        Assert.Equal(["$.effect.actions[0].prompt"], Paths(Request(new string('?', (ContentValidator.MaxNameLength * 2) + 1))));
+        Assert.Equal(["$.effect.actions[0].prompt"], Paths(Request(" ")));
+    }
+
+    [Fact]
+    public void A_second_roll_or_choice_keeps_the_reference_valid()
+    {
+        Assert.Empty(Errors(WithAction("{\"type\":\"roll\",\"dice\":\"1d6\"},{\"type\":\"roll\",\"dice\":\"1d4\"},{\"type\":\"move\",\"steps\":\"$roll\"}")));
+        Assert.Empty(Errors(WithAction(
+            "{\"type\":\"requestChoice\",\"prompt\":\"?\",\"options\":{\"from\":\"players\"}},"
+            + "{\"type\":\"requestChoice\",\"prompt\":\"?\",\"options\":{\"from\":\"categories\"}},"
+            + "{\"type\":\"giveObject\",\"objectId\":\"forced-genre\",\"params\":{\"tag\":\"$choice\"}}")));
+    }
+
+    [Theory]
+    [InlineData("$")]
+    [InlineData("-$")]
+    public void A_parameter_reference_without_a_name_is_an_error(string value)
+    {
+        Assert.Equal(
+            ["$.effect.actions[0].params.tag"],
+            Paths(WithAction("{\"type\":\"giveObject\",\"objectId\":\"forced-genre\",\"params\":{\"tag\":\"" + value + "\"}}")));
+    }
+
+    [Fact]
+    public void Outcomes_not_picked_by_dice_are_one_error()
+    {
+        var json = Orange.Replace(
+            "\"actions\":[{\"type\":\"move\",\"steps\":1}]",
+            "\"outcomes\":{\"roll\":\"-1d6\",\"cases\":[{\"from\":1,\"to\":3,\"actions\":[]}]}",
+            StringComparison.Ordinal);
+
+        Assert.Equal(["$.effect.outcomes.roll"], Paths(json));
+    }
+
+    [Fact]
+    public void A_case_may_cover_a_single_result()
+    {
+        var json = Orange.Replace(
+            "\"actions\":[{\"type\":\"move\",\"steps\":1}]",
+            "\"outcomes\":{\"roll\":\"1d2\",\"cases\":[{\"from\":1,\"to\":1,\"actions\":[]},{\"from\":2,\"to\":2,\"actions\":[]}]}",
+            StringComparison.Ordinal);
+
+        Assert.Empty(Errors(json));
+    }
+
+    [Theory]
+    [InlineData("{\"hours\":0}", true)]
+    [InlineData("{\"runs\":0}", true)]
+    [InlineData("{\"hours\":-1}", true)]
+    [InlineData("{\"uses\":1}", false)]
+    [InlineData("{\"hours\":1}", false)]
+    [InlineData("{\"runs\":1}", false)]
+    [InlineData("{\"untilTriggered\":true}", false)]
+    public void Each_duration_field_is_positive(string duration, bool error)
+    {
+        var json = $$$"""{"id":"a","kind":"effect","name":"A","description":"B","effect":{"trigger":"beforeRoll","duration":{{{duration}}},"actions":[{"type":"move","steps":1}]}}""";
+
+        Assert.Equal(error ? ["$.effect.duration"] : [], Paths(json));
     }
 }

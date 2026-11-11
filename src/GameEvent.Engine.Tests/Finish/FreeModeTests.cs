@@ -489,4 +489,39 @@ public class FreeModeTests
         ScenarioAssert.RejectsWithoutChanges(s, x => x.Roll("Маша"), RejectionCodes.NoAvailableGames);
         Assert.Contains(s.State.Runs.Values, r => r.GameId == game && r.Status == RunStatus.Completed);
     }
+
+    // ---- Found by mutation testing (D-282) ----
+
+    [Fact]
+    public void Frozen_first_completion_keeps_the_review()
+    {
+        var s = New();
+        FrozenFirst(s, "Вася");
+        var runId = Playing(s, "Вася");
+
+        s.NextRandom(2, 2).Complete("Вася", review: new RunReview(9, "Ещё раз"));
+
+        ScenarioAssert.Accepted(s);
+        Assert.Equal(typeof(RunReviewed), s.Last.Events[^1].GetType());
+        Assert.Equal(new RunReview(9, "Ещё раз"), s.State.Runs[runId].Review);
+    }
+
+    [Fact]
+    public void Reject_after_the_freeze_drops_the_difficulty_event_the_run_earned_before_it()
+    {
+        // Вася finished first and played on at «выше сложной» before his finish was approved: the good event waits
+        var s = New();
+        var finishing = FinishRun(s, "Вася");
+        var (later, _) = Complete(s, "Вася", [2, 2], Difficulty.Extreme);
+        var pending = Assert.Single(s.State.ManualEffects.Values);
+        Approve(s, finishing);
+        Assert.True(s.Player("Вася").Finish!.Frozen);
+
+        Reject(s, later);
+
+        ScenarioAssert.Accepted(s);
+        var resolved = Assert.Single(s.LastEvents<ManualEffectResolved>());
+        Assert.Equal((pending.EffectId, ManualEffectOutcome.NotApplicable), (resolved.EffectId, resolved.Outcome));
+        Assert.Empty(s.State.ManualEffects);
+    }
 }

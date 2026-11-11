@@ -47,6 +47,15 @@ public partial class PlayerAdminInvariantTests
     }
 
     [Fact]
+    public void A_recalculation_moves_a_later_finishers_bonus_without_a_finish_or_a_revoke()
+    {
+        // INV-1, the shrunk game of a long run: Вася finishes first and is frozen, Маша finishes second with the bonus of
+        // [10, 8, 6, 4], the list becomes [15, 13, 11, 9] and the admin's recalculation (D-113) lifts her bonus to 15
+        // in a command with no finish and no revoke — the one way besides those that a bonus moves
+        Invariants_hold_in_the_combined_game(0, [224, 12, 0, 33, 36, 80, 12, 98, 37, 104, 0, 38, 42, 220, 16, 57, 204, 192, 192]);
+    }
+
+    [Fact]
     public void Combined_variant_reaches_undos_rule_changes_and_disabled_mechanics()
     {
         // The generator must exercise what it adds, not only allow it: over fixed scripts undos are accepted (also of a
