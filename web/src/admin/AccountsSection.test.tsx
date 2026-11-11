@@ -17,12 +17,13 @@ const account = (id: string, login: string, name: string, extra: object = {}) =>
   mustChangePassword: false,
   isDeleted: false,
   createdAt: '2026-09-01T00:00:00Z',
+  sessions: 0,
   ...extra,
 });
 
 const accounts = [
   account(adminUser.id, 'admin', 'Админ', { role: 'admin' }),
-  account('u1', 'vasya', 'Вася', { mustChangePassword: true }),
+  account('u1', 'vasya', 'Вася', { mustChangePassword: true, sessions: 2 }),
   account('u2', 'old', 'Старый', { isDeleted: true }),
 ];
 
@@ -125,6 +126,51 @@ describe('The accounts', () => {
 
     expect(await screen.findByTestId('temporary-password')).toHaveTextContent('novyi-parol-7');
     expect(server.sent('POST', '/u1/reset-password')).toHaveLength(1);
+  });
+
+  it('shows how many devices each account is signed in on', async () => {
+    open();
+
+    expect(await screen.findByTestId('account-vasya')).toHaveTextContent(t.sessions(2));
+    expect(
+      within(screen.getByTestId('account-admin')).getByTestId('account-sessions'),
+    ).toHaveTextContent(t.sessions(0));
+    // Nothing to end: no button; a deleted account says nothing about devices
+    expect(
+      within(screen.getByTestId('account-admin')).queryByTestId('account-end-sessions'),
+    ).toBeNull();
+    expect(within(screen.getByTestId('account-old')).queryByTestId('account-sessions')).toBeNull();
+  });
+
+  it('signs a player out everywhere after a confirmation', async () => {
+    const server = open({ 'POST /api/admin/accounts/*/end-sessions': actionOk(null) });
+
+    await userEvent.click(
+      within(await screen.findByTestId('account-vasya')).getByTestId('account-end-sessions'),
+    );
+    const dialog = await screen.findByRole('alertdialog');
+    expect(within(dialog).getByText(t.endSessionsConsequences[1])).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: t.endSessionsConfirm }));
+
+    expect(await screen.findByText(t.endSessionsOk('Вася'))).toBeInTheDocument();
+    const sent = server.sent('POST', '/u1/end-sessions')[0]?.body as
+      { commandId?: unknown } | undefined;
+    expect(typeof sent?.commandId).toBe('string');
+  });
+
+  it('says a refused sign-out everywhere', async () => {
+    open({ 'POST /api/admin/accounts/*/end-sessions': answer(404) });
+
+    await userEvent.click(
+      within(await screen.findByTestId('account-vasya')).getByTestId('account-end-sessions'),
+    );
+    await userEvent.click(
+      within(await screen.findByRole('alertdialog')).getByRole('button', {
+        name: t.endSessionsConfirm,
+      }),
+    );
+
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
   });
 
   it('deletes after a confirmation and restores; my own account has no delete', async () => {

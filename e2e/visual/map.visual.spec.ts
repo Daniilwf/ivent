@@ -138,6 +138,7 @@ for (const section of [
   'proof',
   'feed',
   'profile',
+  'sessions',
   'game',
   'pool',
   'rules',
