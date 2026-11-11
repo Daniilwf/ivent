@@ -20,6 +20,22 @@ public class ReflectTests
         ImportedItemsSeason.New(mapLength: mapLength)
             .WithRuleset(r => r with { Effects = r.Effects with { Reflect = new CoinReflect { CoinsAtMost = -30, Multiplier = 2 } } });
 
+    [Fact]
+    public void The_texts_of_the_reflecting_items_do_not_name_the_seasons_numbers()
+    {
+        // The threshold and the multiplier live in the ruleset (invariant 5, D-474): a text naming them goes stale
+        var reflecting = EconomyScenario.RepositoryPack().Objects
+            .Where(o => System.Text.Json.JsonSerializer.Serialize(o, EngineJson.Options).Contains("\"reflect\":true", StringComparison.Ordinal))
+            .ToList();
+
+        Assert.NotEmpty(reflecting);
+        Assert.All(reflecting, o =>
+        {
+            Assert.DoesNotContain("30", o.Description, StringComparison.Ordinal);
+            Assert.DoesNotContain("удва", o.Description, StringComparison.OrdinalIgnoreCase);
+        });
+    }
+
     [Theory]
     [InlineData("grenade", -1, -2)]
     [InlineData("better-grenade", -2, -3)]
