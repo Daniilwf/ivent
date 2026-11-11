@@ -7243,8 +7243,9 @@ export interface components {
             shop: components["schemas"]["ShopRules"];
         };
         /**
-         * @description My economy in the season (D-441): coins, the inventory with what each object allows now, the shop when
-         *     `features.shop` is on, the bets when `features.bets` is on. `inventoryLimit` counts items only (D-406).
+         * @description My economy in the season (D-441): coins, the inventory with what each object allows now when `features.items` is
+         *     on (null when off: bets play without items), the shop when `features.shop` is on, the bets when
+         *     `features.bets` is on. `inventoryLimit` counts items only (D-406).
          */
         EconomyView: {
             /** Format: int32 */
@@ -7253,7 +7254,7 @@ export interface components {
             inventoryLimit: number;
             shop: null | components["schemas"]["ShopView"];
             bets: null | components["schemas"]["BetsView"];
-            items: components["schemas"]["InventoryItemView"][];
+            items: null | components["schemas"]["InventoryItemView"][];
         };
         /**
          * @description An arrow of the map: `isDefaultForward` — the default branch (every exit of a plain cell, one exit of a fork);
@@ -7620,16 +7621,21 @@ export interface components {
          * @description What the player answers when using an item, in the order the engine asks (D-407).
          * @enum {unknown}
          */
-        ItemStepKind: "choice" | "pickObject";
+        ItemStepKind: "choice" | "pickObject" | "direction";
         /**
-         * @description An answer to give: a choice (`options`) or an object of the target (`objectsByTarget`: for each possible
-         *     target, its objects that fit). `prompt` — the content's question.
+         * @description An answer to give: a choice (`options`), a direction (`options` `forward` and `back`, the screen
+         *     names them) or objects of the target (`objectsByTarget`: for each possible target, its objects that fit) —
+         *     `count` different ones (all of them when fewer), or with `ranked` any number in order of preference, the rest
+         *     taken at random (D-476). `prompt` — the content's question.
          */
         ItemStepView: {
             kind: components["schemas"]["ItemStepKind"];
             prompt: null | string;
             options: components["schemas"]["ItemOptionView"][];
             objectsByTarget: null | components["schemas"]["TargetObjectsView"][];
+            /** Format: int32 */
+            count: number;
+            ranked: boolean;
         };
         /** @description A player an item may target: the name and the token colour (as on the map). */
         ItemTargetView: {
@@ -8706,7 +8712,7 @@ export const difficultyValues: ReadonlyArray<FlattenedDeepRequired<components>["
 export const emptyPoolFallbackValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["EmptyPoolFallback"]> = ["dropZoneFilter"];
 export const eventKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["EventKind"]> = ["good", "bad"];
 export const gameMarkKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["GameMarkKind"]> = ["dropped", "techRerolled"];
-export const itemStepKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ItemStepKind"]> = ["choice", "pickObject"];
+export const itemStepKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ItemStepKind"]> = ["choice", "pickObject", "direction"];
 export const mandatoryEventValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["MandatoryEvent"]> = ["bad", "none"];
 export const manualEffectSourceValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ManualEffectSource"]> = ["paidReroll", "drop", "difficulty", "item"];
 export const mapModeValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["MapMode"]> = ["linear", "graph"];

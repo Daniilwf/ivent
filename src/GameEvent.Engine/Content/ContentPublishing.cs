@@ -108,10 +108,21 @@ public static class ContentPublishing
             error($"{at}.effect.outcomes.choice", "An effect that acts on its own has nobody to ask.");
         }
 
+        // What the screen asks is known before the use (D-440): not inside a branch whose case a roll or the answer picks,
+        // not the objects of a target the selector picks (a list of preference asks last, ContentValidator).
+        var byRoll = rolled;
+        var byChoice = effect.Outcomes is { Choice: not null };
+        var picksTarget = effect.Target?.Selector is not (null or TargetSelector.Self or TargetSelector.Chosen);
         var actions = effect.Actions.Concat(effect.Outcomes?.Cases.SelectMany(c => c.Actions) ?? []).ToList();
         for (var i = 0; i < actions.Count; i++)
         {
             var path = $"{at}.effect.actions[{i}]";
+            var asks = actions[i] is RequestChoiceAction or TakeObjectAction { Pick: Pick.Chosen, All: false } or MoveAction { Direction: MoveDirection.Chosen };
+            if (!triggered && asks && byChoice)
+            {
+                error(path, "A branch by the player's answer asks nothing more: the questions after it would depend on it.");
+            }
+
             switch (actions[i])
             {
                 case ModifyNextRollAction { RunCondition: not null }:
@@ -127,7 +138,11 @@ public static class ContentPublishing
                     break;
                 case RequestChoiceAction when rolled:
                 case MoveAction { Direction: MoveDirection.Chosen } when rolled:
+                case TakeObjectAction { Pick: Pick.Chosen, All: false } when byRoll:
                     error(path, "A choice is asked before any roll: the player answers when using the item.");
+                    break;
+                case TakeObjectAction { Pick: Pick.Chosen, All: false } take when picksTarget && take.Target != ActionTarget.Self:
+                    error(path, "The selector picks the target only at the use: whose objects, or whom a given one goes to, is not known before.");
                     break;
                 case ModifyDiceAction { Stage: DiceStage.Count, Value: { Kind: ContentValueKind.Number, Number: < 1 } }:
                     error($"{path}.value", "The «count» stage adds dice: 1 or more.");

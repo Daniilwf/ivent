@@ -8471,13 +8471,16 @@
             ]
           },
           "items": {
-            "type": "array",
+            "type": [
+              "null",
+              "array"
+            ],
             "items": {
               "$ref": "#/components/schemas/InventoryItemView"
             }
           }
         },
-        "description": "My economy in the season (D-441): coins, the inventory with what each object allows now, the shop when\n`features.shop` is on, the bets when `features.bets` is on. `inventoryLimit` counts items only (D-406)."
+        "description": "My economy in the season (D-441): coins, the inventory with what each object allows now when `features.items` is\non (null when off: bets play without items), the shop when `features.shop` is on, the bets when\n`features.bets` is on. `inventoryLimit` counts items only (D-406)."
       },
       "EdgeView": {
         "required": [
@@ -9521,7 +9524,8 @@
       "ItemStepKind": {
         "enum": [
           "choice",
-          "pickObject"
+          "pickObject",
+          "direction"
         ],
         "description": "What the player answers when using an item, in the order the engine asks (D-407)."
       },
@@ -9530,7 +9534,9 @@
           "kind",
           "prompt",
           "options",
-          "objectsByTarget"
+          "objectsByTarget",
+          "count",
+          "ranked"
         ],
         "type": "object",
         "properties": {
@@ -9557,9 +9563,16 @@
             "items": {
               "$ref": "#/components/schemas/TargetObjectsView"
             }
+          },
+          "count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "ranked": {
+            "type": "boolean"
           }
         },
-        "description": "An answer to give: a choice (`options`) or an object of the target (`objectsByTarget`: for each possible\ntarget, its objects that fit). `prompt` — the content's question."
+        "description": "An answer to give: a choice (`options`), a direction (`options` `forward` and `back`, the screen\nnames them) or objects of the target (`objectsByTarget`: for each possible target, its objects that fit) —\n`count` different ones (all of them when fewer), or with `ranked` any number in order of preference, the rest\ntaken at random (D-476). `prompt` — the content's question."
       },
       "ItemTargetView": {
         "required": [

@@ -1010,6 +1010,13 @@ export const ru = {
     targetHint: 'Только те, на кого предмет действует сейчас',
     pickObject: 'Какой предмет',
     noObjects: 'Подходящих предметов нет',
+    pickObjectNumbered: (n: number) => `Какой предмет, ${n}-й`,
+    preference: (n: number) => `${n}-й по желанию`,
+    preferenceHint:
+      'Сколько предметов — решит бросок. Отметь, какие важнее, остальные выберутся случайно.',
+    direction: 'Куда двигать',
+    forward: 'Вперёд',
+    back: 'Назад',
     pick: 'Выбери',
     // Names come in every gender: a text bound to a name never agrees with it
     used: (name: string) => `Использовано: «${name}»`,
