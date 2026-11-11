@@ -13,6 +13,7 @@ import { commentProblem, refusal } from '../actions';
 import {
   inspect,
   prefixOf,
+  sameContent,
   serverProblems,
   withItem,
   type Collection,
@@ -107,7 +108,9 @@ export function ObjectEditor({
     ...(taken && id ? [{ path: 'id', text: t.idTaken(id), source: 'schema' as const }] : []),
     ...(fresh?.own ?? []),
   ];
-  const changed = text !== original || index === null;
+  // The same content in another order (a field taken out and put back) is not a change: there is nothing to save
+  const changed =
+    index === null || (value === null ? text !== original : !sameContent(value, initial));
   const blocked = checked.parse !== null || checked.problems.length > 0 || taken;
   const title =
     typeof initial.name === 'string' && initial.name !== '' ? initial.name : t.previewEmpty;

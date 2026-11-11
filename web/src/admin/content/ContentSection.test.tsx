@@ -269,6 +269,19 @@ describe('The content editor', () => {
     expect(await screen.findByText(t.saved(3))).toBeInTheDocument();
   });
 
+  it('has nothing to save when a field is taken out and put back as it was', async () => {
+    const user = userEvent.setup();
+    open();
+    await openOrange(user);
+
+    await user.selectOptions(screen.getByTestId('content-field-window'), '');
+    expect(screen.getByTestId('content-save')).toBeEnabled();
+    await user.selectOptions(screen.getByTestId('content-field-window'), 'anytime');
+
+    expect(screen.getByTestId('content-save')).toBeDisabled();
+    expect(screen.queryByText(t.dirty)).not.toBeInTheDocument();
+  });
+
   it('asks for a comment before saving', async () => {
     const user = userEvent.setup();
     const server = open({ 'POST /api/admin/seasons/*/content/publish': published });

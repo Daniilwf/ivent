@@ -156,6 +156,9 @@ export const prefixOf = (collection: Collection, index: number) => `${collection
 
 const idOf = (item: Json) => (typeof item.id === 'string' ? item.id : '');
 
+/** Whether two definitions say the same: the order of the fields and fields left null do not count */
+export const sameContent = (a: unknown, b: unknown) => stable(a) === stable(b);
+
 /** JSON text with the keys of every object sorted: the same content written in another order reads the same */
 function stable(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(stable).join(',')}]`;
