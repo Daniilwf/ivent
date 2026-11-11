@@ -7,6 +7,7 @@ using GameEvent.Engine.Rulesets;
 using GameEvent.Engine.Seasons;
 using GameEvent.Engine.Turns;
 using GameEvent.Web.Seasons;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace GameEvent.Web.Tests.Api;
 
@@ -71,9 +72,12 @@ public sealed class SeasonApiTests : IAsyncLifetime
     [Fact]
     public async Task Current_season_is_the_latest_one_the_player_plays_in_and_the_latest_for_others()
     {
-        // Given a later season without Вася
+        // Given a later running season without Вася (D-601: a running season comes before a draft, so it is started)
         _site.Clock.UtcNow = _site.Clock.UtcNow.AddDays(1);
         var later = await _site.CreateSeasonAsync();
+        var started = await _site.Services.GetRequiredService<Infrastructure.Queue.CommandBus>()
+            .SendAsync(new Infrastructure.Queue.CommandEnvelope(Guid.NewGuid(), later, new ChangeSeasonStatus(SeasonStatus.Active), AuthorId: null), Ct);
+        Assert.True(started.IsAccepted);
 
         // Then Вася keeps his season, a spectator and a player outside both see the latest one
         Assert.Equal(SiteFactory.SeasonId, await CurrentAsync("vasya"));

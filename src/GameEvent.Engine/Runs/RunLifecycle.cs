@@ -19,6 +19,11 @@ internal static class RunLifecycle
 
         var player = state.Players[command.PlayerId];
         var offer = player.Offer ?? throw new InvalidOperationException($"Player {player.PlayerId} is Rolling without an offer.");
+        if (command.GameId is { } seen && seen != offer.GameId)
+        {
+            return Decision.Reject(RejectionCodes.TurnStale, "The player saw another offered game.");
+        }
+
         return Decision.Accept(new RunStarted(
             context.Ids.NewId(), player.PlayerId, offer.GameId, offer.Snapshot, offer.RolledAt, context.Clock.UtcNow));
     }

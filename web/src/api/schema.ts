@@ -6491,10 +6491,12 @@ export interface components {
             affectsPosition: boolean;
             badEvent: boolean;
         };
-        /** @description Drop the active run with the penalty (D-09, D-94). */
+        /** @description Drop the active run with the penalty (D-09, D-94); `runId` — the run the page showed (D-600). */
         DropRequest: {
             /** Format: uuid */
             commandId: string;
+            /** Format: uuid */
+            runId?: null | string;
         };
         DropRules: {
             penaltyDice: components["schemas"]["PenaltyDice"];
@@ -6986,6 +6988,9 @@ export interface components {
          *     `dropPenalty.count` counts the extra dice of the drops in a row before this run (D-205, D-324).
          *     `wishRerollOpen` — whether the player may give the game up by wish now (D-206, D-325; always set, optional for older clients): a tech reroll with the
          *     reason `wish`, within the window, for a game with a listed tag the roll did not impose.
+         *     `coins` — my balance, what a paid reroll spends (K1S-3). `checks` — my other runs that still take a proof
+         *     (completed, the proof neither approved nor rejected) and the runs rejected since my latest roll, newest first; the
+         *     latest completed run is `lastCompleted` and never here (K1S-1, K1S-9, D-602).
          */
         MyTurnView: {
             /** Format: uuid */
@@ -7010,6 +7015,9 @@ export interface components {
             difficultyDice?: null | components["schemas"]["DifficultyDieView"][];
             lastMove?: null | components["schemas"]["MoveView"];
             wishRerollOpen?: null | boolean;
+            /** Format: int32 */
+            coins?: null | number;
+            checks?: null | components["schemas"]["CompletedRunView"][];
         };
         NominationRules: {
             auto: components["schemas"]["EquatableArrayOfAutoNomination"];
@@ -7209,13 +7217,15 @@ export interface components {
          * @enum {unknown}
          */
         ProofStatus: "pending" | "approved" | "rejected";
-        /** @description The proof of a run and how the admin checked it. */
+        /** @description The proof of a run and how the admin checked it; `witnessId` — the player who saw the run, if named. */
         ProofView: {
             status: components["schemas"]["ProofStatus"];
             links: string[];
             note: null | string;
             comment: null | string;
             files: components["schemas"]["FileLinkView"][];
+            /** Format: uuid */
+            witnessId?: null | string;
         };
         /** @description Publish a new version of the map (D-300, D-308); `comment` goes to the public log, at most 500 characters. */
         PublishMapRequest: {
@@ -7271,10 +7281,14 @@ export interface components {
             /** Format: int32 */
             coins: number;
         };
-        /** @description A reroll of the offered game or the whole pending choice; the price follows D-07. */
+        /**
+         * @description A reroll of the offered game or the whole pending choice; the price follows D-07. `expectedPayment` — the price
+         *     the page showed: a reroll paid otherwise now is refused (409 turn.stale, D-600), so an old tab never spends without asking.
+         */
         RerollRequest: {
             /** Format: uuid */
             commandId: string;
+            expectedPayment?: null | components["schemas"]["RerollPayment"];
         };
         /**
          * @description Resolve a pending manual effect (D-102): `outcome` «applied» or «notApplicable»; `comment` is required for
@@ -7626,9 +7640,12 @@ export interface components {
             commentsPerDay: number;
             spectatorsCanVote: boolean;
         };
+        /** @description Start the offered game; `gameId` — the game the page showed: another one offered now is refused (409 turn.stale, D-600). */
         StartRequest: {
             /** Format: uuid */
             commandId: string;
+            /** Format: uuid */
+            gameId?: null | string;
         };
         /**
          * @description A stored file (D-108): `url` serves the file, `thumbnailUrl` the small one for the map and lists.

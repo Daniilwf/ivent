@@ -117,6 +117,11 @@ internal static class Rolling
 
         // D-07, D-93: a free reroll of this roll, then a coupon, then the price.
         var (payment, price) = RerollPrice.For(player, state.Rules.Roll);
+        if (command.ExpectedPayment is { } expected && expected != payment)
+        {
+            return Decision.Reject(RejectionCodes.TurnStale, $"The player saw a reroll paid by {expected}; it is paid by {payment} now.");
+        }
+
         var givenUp = player.Offer is { } offer
             ? new HashSet<Guid> { offer.GameId }
             : player.Choice!.Options.Select(o => o.Game?.GameId).OfType<Guid>().ToHashSet();

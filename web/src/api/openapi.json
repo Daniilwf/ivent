@@ -7416,9 +7416,16 @@
           "commandId": {
             "type": "string",
             "format": "uuid"
+          },
+          "runId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           }
         },
-        "description": "Drop the active run with the penalty (D-09, D-94)."
+        "description": "Drop the active run with the penalty (D-09, D-94); `runId` — the run the page showed (D-600)."
       },
       "DropRules": {
         "required": [
@@ -8916,9 +8923,25 @@
               "null",
               "boolean"
             ]
+          },
+          "coins": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "checks": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/CompletedRunView"
+            }
           }
         },
-        "description": "The signed-in player's own turn. While playing: `dropHintMinutes` is `roll.minPlayMinutesBeforeDrop` until\nthat much has been played by the server clock (only a hint: D-09), then null; `dropPenalty` is what a drop costs\nunder the rules in force; `techRerollOpen` says whether the player may still tech-reroll themselves (D-94);\n`challengesEnabled` says whether a challenge may be claimed on completion (`features.challenges`, D-96);\n`techRerollUntil` is when the player's own tech reroll window closes (the roll time plus the run's snapshot of\n`roll.techRerollWindowHours`), null while not playing. The active run's game carries the hours of the roll's\nsnapshot, the ones the completion counts (D-44): the pool may have got hours since (D-138). `difficultyDice` —\nwhile playing, the die each difficulty gives under the run's snapshot and the event it grants, if any.\n`dropPenalty.count` counts the extra dice of the drops in a row before this run (D-205, D-324).\n`wishRerollOpen` — whether the player may give the game up by wish now (D-206, D-325; always set, optional for older clients): a tech reroll with the\nreason `wish`, within the window, for a game with a listed tag the roll did not impose."
+        "description": "The signed-in player's own turn. While playing: `dropHintMinutes` is `roll.minPlayMinutesBeforeDrop` until\nthat much has been played by the server clock (only a hint: D-09), then null; `dropPenalty` is what a drop costs\nunder the rules in force; `techRerollOpen` says whether the player may still tech-reroll themselves (D-94);\n`challengesEnabled` says whether a challenge may be claimed on completion (`features.challenges`, D-96);\n`techRerollUntil` is when the player's own tech reroll window closes (the roll time plus the run's snapshot of\n`roll.techRerollWindowHours`), null while not playing. The active run's game carries the hours of the roll's\nsnapshot, the ones the completion counts (D-44): the pool may have got hours since (D-138). `difficultyDice` —\nwhile playing, the die each difficulty gives under the run's snapshot and the event it grants, if any.\n`dropPenalty.count` counts the extra dice of the drops in a row before this run (D-205, D-324).\n`wishRerollOpen` — whether the player may give the game up by wish now (D-206, D-325; always set, optional for older clients): a tech reroll with the\nreason `wish`, within the window, for a game with a listed tag the roll did not impose.\n`coins` — my balance, what a paid reroll spends (K1S-3). `checks` — my other runs that still take a proof\n(completed, the proof neither approved nor rejected) and the runs rejected since my latest roll, newest first; the\nlatest completed run is `lastCompleted` and never here (K1S-1, K1S-9, D-602)."
       },
       "NominationRules": {
         "required": [
@@ -9612,9 +9635,16 @@
             "items": {
               "$ref": "#/components/schemas/FileLinkView"
             }
+          },
+          "witnessId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           }
         },
-        "description": "The proof of a run and how the admin checked it."
+        "description": "The proof of a run and how the admin checked it; `witnessId` — the player who saw the run, if named."
       },
       "PublishMapRequest": {
         "required": [
@@ -9788,9 +9818,19 @@
           "commandId": {
             "type": "string",
             "format": "uuid"
+          },
+          "expectedPayment": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/RerollPayment"
+              }
+            ]
           }
         },
-        "description": "A reroll of the offered game or the whole pending choice; the price follows D-07."
+        "description": "A reroll of the offered game or the whole pending choice; the price follows D-07. `expectedPayment` — the price\nthe page showed: a reroll paid otherwise now is refused (409 turn.stale, D-600), so an old tab never spends without asking."
       },
       "ResolveEffectRequest": {
         "required": [
@@ -10826,8 +10866,16 @@
           "commandId": {
             "type": "string",
             "format": "uuid"
+          },
+          "gameId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           }
-        }
+        },
+        "description": "Start the offered game; `gameId` — the game the page showed: another one offered now is refused (409 turn.stale, D-600)."
       },
       "StoredFileView": {
         "required": [
