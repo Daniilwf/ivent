@@ -173,6 +173,7 @@ export function App() {
     return (
       <Shell
         user={signedIn.user}
+        seasonId={signedIn.seasonId}
         onChangePassword={() => {
           setState({ ...signedIn, ownPassword: path });
         }}

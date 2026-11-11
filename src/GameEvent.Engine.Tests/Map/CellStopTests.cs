@@ -144,6 +144,24 @@ public class CellStopTests
     }
 
     [Fact]
+    public void Players_stopping_on_one_cell_stand_there_together_and_each_gets_its_bonus()
+    {
+        // SPEC «Несколько игроков на клетке просто стоят вместе»: the second to stop is neither bumped nor refused
+        var s = Pool(BonusMap());
+        Throw(s, "Silent Hill", 2);
+
+        s.RollTitle("Петя", "Fatal Frame").Start("Петя").NextRandom(2).Complete("Петя");
+
+        ScenarioAssert.Accepted(s);
+        Assert.Equal("p", s.Player("Вася").CellId);
+        Assert.Equal("p", s.Player("Петя").CellId);
+        Assert.Equal(5, s.Player("Вася").Points);
+        Assert.Equal(5, s.Player("Петя").Points);
+        // Петя's move moved Петя only
+        Assert.Equal(s.PlayerId("Петя"), Assert.Single(s.LastEvents<PlayerMoved>()).PlayerId);
+    }
+
+    [Fact]
     public void Passing_a_bonus_gives_nothing()
     {
         var s = Pool(BonusMap());
