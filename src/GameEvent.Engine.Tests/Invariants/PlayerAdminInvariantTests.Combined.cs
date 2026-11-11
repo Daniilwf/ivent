@@ -411,7 +411,7 @@ public partial class PlayerAdminInvariantTests
                 or PointsChanged { Reason: PointsReason.CellBonus } => "graphMap",
 
             // Events of stage 5 (D-500…): draws from decks and the events played by hand
-            Engine.Events.EventDrawn or Engine.Events.EventDrawMissed or ManualEffectCreated { Source: ManualEffectSource.Event } => "events",
+            Engine.Decks.EventDrawn or Engine.Decks.EventDrawMissed or ManualEffectCreated { Source: ManualEffectSource.Event } => "events",
 
             // The economy of stage 4 (D-400…): items and their effects, the shop, bets — each under its flag
             Engine.Content.ContentPublished or Engine.Inventory.ObjectGiven or Engine.Inventory.ObjectRemoved or Engine.Inventory.ObjectTransferred

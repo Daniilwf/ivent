@@ -5,7 +5,7 @@ using GameEvent.Engine.Map;
 using GameEvent.Engine.Rulesets;
 using GameEvent.Engine.Seasons;
 
-namespace GameEvent.Engine.Events;
+namespace GameEvent.Engine.Decks;
 
 /// <summary>Where a drawn event came from (GLOSSARY «Источник ивента»); stage 5 adds the drop, the paid reroll and the difficulty.</summary>
 public enum EventSource
@@ -111,7 +111,7 @@ internal static class EventDraws
         var deckKind = kind ?? state.Rules.Events?.DefaultDeck ?? EventKind.Risky;
         var catalog = state.Catalog;
         var entries = catalog.Wheels.TryGetValue(deckId, out var wheel) && wheel.Deck is not null
-            ? wheel.Entries.Where(e => e.Weight > 0 && catalog.Live(e.ObjectId) is { Kind: ObjectKind.Event }).ToList()
+            ? wheel.Entries.Where(e => catalog.Live(e.ObjectId) is { Kind: ObjectKind.Event }).ToList()
             : [];
         if (entries.Count == 0)
         {
@@ -125,25 +125,11 @@ internal static class EventDraws
         var entry = Weighted.Pick(entries, context.Random);
         var definition = catalog.Live(entry.ObjectId)!;
         var drawn = new EventDrawn(playerId, deckId, definition.Id, deckKind, source);
-        if (definition.Effect is not { } effect)
-        {
-            // Text without automation (karaoke): the player or the admin resolves it (D-410)
-            return [drawn, new ManualEffectCreated(context.Ids.NewId(), playerId, DrawEvent: null, ManualEffectSource.Event, RunId: null) { ObjectId = definition.Id }];
-        }
-
+        // The pack keeps only events with an effect on the drawer (D-536): they are played at once, never hostile
+        var effect = definition.Effect!;
         var run = new EffectRun(SeasonEngine.Apply(state, drawn), context, playerId, definition.Id, hostile: false, parameters: null);
         run.Run(effect, Targets.ForTriggered(run.State, context, definition, playerId));
         return [drawn, .. run.Events];
-    }
-}
-
-/// <summary>A pick by weight (SPEC «Колёса и колоды — одна сущность»): one ticket over the sum of the weights, entries in order.</summary>
-internal static class Weighted
-{
-    public static WheelEntrySpec Pick(IReadOnlyList<WheelEntrySpec> entries, IRandomSource random)
-    {
-        var ticket = random.NextInt(0, entries.Sum(e => e.Weight));
-        return entries.First(e => (ticket -= e.Weight) < 0);
     }
 }
 

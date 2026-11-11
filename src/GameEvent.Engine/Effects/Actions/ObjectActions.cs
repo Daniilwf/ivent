@@ -221,7 +221,7 @@ internal sealed class TransformObjectHandler : ActionHandler<TransformObjectActi
 internal sealed class DrawEventHandler : ActionHandler<DrawEventAction>
 {
     protected override void Execute(DrawEventAction action, EffectRun run) =>
-        run.Emit(Events.EventDraws.Draw(run.State, run.Context, run.ActionTarget(action), action.Deck, Events.EventSource.Item));
+        run.Emit(Decks.EventDraws.Draw(run.State, run.Context, run.ActionTarget(action), action.Deck, Decks.EventSource.Item));
 }
 
 /// <summary><c>spinWheel</c>: a loot wheel of the content picks an object by weight (only live ones), and it is given.</summary>
@@ -230,7 +230,7 @@ internal sealed class SpinWheelHandler : ActionHandler<SpinWheelAction>
     protected override void Execute(SpinWheelAction action, EffectRun run)
     {
         var catalog = run.State.Catalog;
-        if (!catalog.Wheels.TryGetValue(action.Wheel, out var wheel) || wheel.Deck is not null)
+        if (!catalog.Wheels.TryGetValue(action.Wheel, out var wheel))
         {
             return;
         }
@@ -241,7 +241,7 @@ internal sealed class SpinWheelHandler : ActionHandler<SpinWheelAction>
             return;
         }
 
-        var entry = Events.Weighted.Pick(entries, run.Context.Random);
+        var entry = Weighted.Pick(entries, run.Context.Random);
         var target = run.ActionTarget(action);
         run.Emit(new WheelSpun(target, wheel.Id, entry.ObjectId));
         run.Emit(Inventories.Give(run.State, run.Context, target, catalog.Live(entry.ObjectId)!, null, ObjectSource.Effect, run.UserId));

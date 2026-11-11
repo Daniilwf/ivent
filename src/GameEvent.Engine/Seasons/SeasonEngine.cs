@@ -198,7 +198,7 @@ public static class SeasonEngine
 
             // Facts for the log and the feed that change nothing by themselves: their consequences are their own events.
             ObjectLost or ItemUsed or EffectTriggered or EffectRolled or HostileIntercepted or WheelSpun or InventoryAdjusted => state,
-            Events.EventDrawn or Events.EventDrawMissed => state,
+            Decks.EventDrawn or Decks.EventDrawMissed => state,
             _ => throw new ArgumentException($"Unknown event {gameEvent.GetType().Name}.", nameof(gameEvent)),
         };
 

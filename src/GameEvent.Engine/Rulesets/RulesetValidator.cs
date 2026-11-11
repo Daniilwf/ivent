@@ -131,6 +131,16 @@ public static class RulesetValidator
             Error("events", "is required when features.events is on");
         }
 
+        // Special and risky events are drawn from decks: without events they could not even be played by hand (D-530)
+        var difficulties = ruleset.Reward.DieByDifficulty;
+        foreach (var (name, rule) in new[] { ("easy", difficulties.Easy), ("normal", difficulties.Normal), ("hard", difficulties.Hard), ("extreme", difficulties.Extreme) })
+        {
+            if (!ruleset.Features.Events && rule.GrantEvent is EventKind.Special or EventKind.Risky)
+            {
+                Error($"reward.dieByDifficulty.{name}.grantEvent", "special and risky events need features.events");
+            }
+        }
+
         if (ruleset.Effects.MaxEventsPerCommand < 1)
         {
             Error("effects.maxEventsPerCommand", "must be at least 1");

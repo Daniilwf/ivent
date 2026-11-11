@@ -43,7 +43,7 @@ internal static class EffectChain
         SeasonState state, IReadOnlyList<IGameEvent> commandEvents, EngineContext context)
     {
         // Event cells (D-502) and the effects of items and cells (D-412) react first, then any handlers of the context (tests, D-24).
-        IReadOnlyList<ITriggerHandler> handlers = [Events.EventCells.Instance, EffectTriggers.Instance, .. context.Triggers ?? []];
+        IReadOnlyList<ITriggerHandler> handlers = [Decks.EventCells.Instance, EffectTriggers.Instance, .. context.Triggers ?? []];
 
         var written = new List<IGameEvent>();
         var total = commandEvents.Count;

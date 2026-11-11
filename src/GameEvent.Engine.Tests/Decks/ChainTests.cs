@@ -1,12 +1,12 @@
 using GameEvent.Engine.Effects;
-using GameEvent.Engine.Events;
+using GameEvent.Engine.Decks;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Map;
 using GameEvent.Engine.Players;
 using GameEvent.Engine.Rulesets;
 using GameEvent.Engine.Tests.Support;
 
-namespace GameEvent.Engine.Tests.Events;
+namespace GameEvent.Engine.Tests.Decks;
 
 /// <summary>
 /// The chain limit on events (SPEC «Лимит цепочки», invariant 8, EV31, EV47): a draw and the actions of its event are one

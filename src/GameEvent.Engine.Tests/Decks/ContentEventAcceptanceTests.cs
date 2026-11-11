@@ -1,6 +1,6 @@
 using GameEvent.Engine.Content;
 using GameEvent.Engine.Effects;
-using GameEvent.Engine.Events;
+using GameEvent.Engine.Decks;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Map;
 using GameEvent.Engine.Players;
@@ -10,7 +10,7 @@ using GameEvent.Engine.Scoring;
 using GameEvent.Engine.Tests.Content;
 using GameEvent.Engine.Tests.Support;
 
-namespace GameEvent.Engine.Tests.Events;
+namespace GameEvent.Engine.Tests.Decks;
 
 /// <summary>
 /// Acceptance of docs/CONTENT.md «Примеры ивентов» 1, 2, 4 and «Зона, клетки…» (EV14, EV15): each example is published
@@ -300,5 +300,8 @@ public class ContentEventAcceptanceTests
         var missed = Assert.Single(s.LastEvents<EventDrawMissed>());
         Assert.Equal((s.PlayerId("Вася"), "horror-bad", EventSource.Cell), (missed.PlayerId, missed.Deck, missed.Source));
         Assert.Single(s.LastEvents<ManualEffectCreated>(), m => m.Source == ManualEffectSource.Event && m.DrawEvent == missed.Kind);
+
+        // «horror-bad» is not a standard name: the kind is the default deck's (D-535)
+        Assert.Equal(EventKind.Risky, missed.Kind);
     }
 }

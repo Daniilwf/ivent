@@ -43,7 +43,7 @@ public static class ContentPublishing
             Supported(definition, at, events, Error);
             if (definition.Effect is { } effect)
             {
-                References(effect, $"{at}.effect", ids, wheels, decks, Error);
+                References(effect, $"{at}.effect", ids, eventIds, wheels, decks, Error);
             }
         }
 
@@ -85,6 +85,11 @@ public static class ContentPublishing
                 ? "Events are played once features.events is on."
                 : $"{definition.Kind} objects come with their stage (achievements — 6).");
             return;
+        }
+
+        if (definition.Kind == ObjectKind.Event)
+        {
+            Event(definition, at, error);
         }
 
         if (definition.Effect is not { } effect)
@@ -158,6 +163,34 @@ public static class ContentPublishing
         }
     }
 
+    // What an event plays in 5.1 (D-536): its effect at once on the one who drew it. Text by hand (IRL), a condition and
+    // other targets come with 5.3 and are refused until then rather than ignored.
+    private static void Event(ObjectDefinition definition, string at, Action<string, string> error)
+    {
+        if (definition.Manual)
+        {
+            error($"{at}.manual", "An event played by hand comes with task 5.3.");
+        }
+
+        if (definition.Hostile)
+        {
+            error($"{at}.hostile", "An event is played on the one who drew it: it is not hostile.");
+        }
+
+        if (definition.Effect is { } effect)
+        {
+            if (effect.Condition is not null)
+            {
+                error($"{at}.effect.condition", "An event plays when drawn, without a condition.");
+            }
+
+            if (effect.Target is { Selector: not TargetSelector.Self })
+            {
+                error($"{at}.effect.target", "An event acts on the one who drew it («self»).");
+            }
+        }
+    }
+
     // A deck holds events only, and a loot wheel none (D-501): a drawn event is played, never kept. The standard decks are
     // the wheels named like the kinds, and of that kind.
     private static void Deck(WheelDefinition wheel, string at, bool events, HashSet<string> eventIds, Action<string, string> error)
@@ -194,7 +227,7 @@ public static class ContentPublishing
             }
         }
 
-        if (Events.EventDraws.KindOf(wheel.Id) is { } named && wheel.Deck != named)
+        if (events && Decks.EventDraws.KindOf(wheel.Id) is { } named && wheel.Deck != named)
         {
             error($"{at}.deck", $"«{wheel.Id}» is the standard deck of its kind: «deck» is «{wheel.Id}».");
         }
@@ -202,7 +235,7 @@ public static class ContentPublishing
 
     // giveObject, transformObject, spinWheel and drawEvent name objects, wheels and decks of the same pack.
     private static void References(
-        EffectSpec effect, string at, HashSet<string> ids, HashSet<string> wheels, HashSet<string> decks, Action<string, string> error)
+        EffectSpec effect, string at, HashSet<string> ids, HashSet<string> eventIds, HashSet<string> wheels, HashSet<string> decks, Action<string, string> error)
     {
         var actions = effect.Actions.Select((a, i) => (a, $"{at}.actions[{i}]"))
             .Concat(effect.Outcomes?.Cases.SelectMany((c, ci) => c.Actions.Select((a, i) => (a, $"{at}.outcomes.cases[{ci}].actions[{i}]"))) ?? []);
@@ -210,6 +243,12 @@ public static class ContentPublishing
         {
             switch (action)
             {
+                case GiveObjectAction give when eventIds.Contains(give.ObjectId):
+                    error($"{path}.objectId", $"«{give.ObjectId}» is an event: events are drawn from decks, not given.");
+                    break;
+                case TransformObjectAction { Mode: TransformMode.Transform, Into: { } eventInto } when eventIds.Contains(eventInto):
+                    error($"{path}.into", $"«{eventInto}» is an event: events are drawn from decks, not kept.");
+                    break;
                 case GiveObjectAction give when !ids.Contains(give.ObjectId):
                     error($"{path}.objectId", $"«{give.ObjectId}» is not an object of the pack.");
                     break;
@@ -221,7 +260,7 @@ public static class ContentPublishing
                         ? $"«{spin.Wheel}» is a deck: its events are drawn with drawEvent."
                         : $"«{spin.Wheel}» is not a wheel of the pack.");
                     break;
-                case DrawEventAction draw when Events.EventDraws.KindOf(draw.Deck) is null && draw.Deck != Events.DeckRef.Zone && !decks.Contains(draw.Deck):
+                case DrawEventAction draw when Decks.EventDraws.KindOf(draw.Deck) is null && draw.Deck != Decks.DeckRef.Zone && !decks.Contains(draw.Deck):
                     error($"{path}.deck", $"«{draw.Deck}» is not a deck of the pack.");
                     break;
                 default:
