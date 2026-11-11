@@ -5,6 +5,8 @@ import { demoCategories, demoGame, demoPoolGames, demoStatuses } from './demoPoo
 import { PoolScreen } from './PoolScreen';
 import { pageSize } from './usePaging';
 import { json } from '../test/fakeServer';
+import { pastTheDelay } from '../test/waits';
+import { similarDelayMs } from './GameForm';
 
 // H6: the pool page — covers, search and filters, the game's status in the season, adding a game with a warning
 // about alike titles (SPEC «Пул игр», «Статусы игры в сезоне», «Дубли»).
@@ -434,6 +436,8 @@ describe('adding a game', () => {
   }
 
   const similarNone: Handler = () => json(200, []);
+  // The form asks about alike titles once the typing rests (FL-2)
+  const afterTyping = pastTheDelay(similarDelayMs);
 
   it('asks for a title and a category before sending', async () => {
     const { seen, dialog } = await openForm({ 'GET /api/pool/similar': similarNone });
@@ -508,7 +512,7 @@ describe('adding a game', () => {
     });
 
     await userEvent.type(within(dialog).getByLabelText(t.form.name), 'Dice & Fold');
-    const warning = await within(dialog).findByTestId('similar-games');
+    const warning = await within(dialog).findByTestId('similar-games', {}, afterTyping);
     expect(warning).toHaveTextContent(t.form.similarTitle);
     expect(warning).toHaveTextContent('Dice Fold');
 
@@ -537,7 +541,9 @@ describe('adding a game', () => {
 
     await userEvent.type(within(dialog).getByLabelText(t.form.name), 'alan wake');
 
-    expect(await within(dialog).findByText(t.form.same('Alan Wake'))).toBeInTheDocument();
+    expect(
+      await within(dialog).findByText(t.form.same('Alan Wake'), {}, afterTyping),
+    ).toBeInTheDocument();
     expect(within(dialog).getByRole('button', { name: t.form.submit })).toBeDisabled();
     expect(seen.some((r) => r.key === 'POST /api/pool')).toBe(false);
   });
@@ -559,7 +565,7 @@ describe('adding a game', () => {
     await userEvent.type(within(dialog).getByLabelText(t.form.name), 'outlast');
 
     expect(
-      await within(dialog).findByText('Эта игра убрана из пула: Слишком страшная'),
+      await within(dialog).findByText('Эта игра убрана из пула: Слишком страшная', {}, afterTyping),
     ).toBeInTheDocument();
     expect(within(dialog).getByText(t.form.removedHint)).toBeInTheDocument();
     expect(within(dialog).getByRole('button', { name: t.form.submit })).toBeDisabled();
@@ -577,7 +583,9 @@ describe('adding a game', () => {
 
     await userEvent.type(within(dialog).getByLabelText(t.form.name), 'Alan Wake');
 
-    expect(await within(dialog).findByText(t.form.same('Alan Wake'))).toBeInTheDocument();
+    expect(
+      await within(dialog).findByText(t.form.same('Alan Wake'), {}, afterTyping),
+    ).toBeInTheDocument();
     expect(within(dialog).queryByText(t.form.removed('Дубль'))).toBeNull();
   });
 
@@ -591,7 +599,7 @@ describe('adding a game', () => {
 
     await userEvent.type(within(dialog).getByLabelText(t.form.name), 'Dice & Fold');
 
-    const warning = await within(dialog).findByTestId('similar-games');
+    const warning = await within(dialog).findByTestId('similar-games', {}, afterTyping);
     expect(warning).toHaveTextContent(t.form.similarRemovedTitle);
     expect(warning).not.toHaveTextContent(t.form.similarTitle);
     expect(warning).toHaveTextContent('Dice Fold');
