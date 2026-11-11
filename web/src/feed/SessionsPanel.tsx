@@ -139,6 +139,8 @@ export function SessionList({
         <div>
           <Button
             variant="quiet"
+            // A long Russian label: it wraps on a phone instead of pushing the page wider
+            className="text-center whitespace-normal!"
             icon={<LogOut size={20} aria-hidden />}
             loading={busy === 'others'}
             disabled={busy !== null && busy !== 'others'}
