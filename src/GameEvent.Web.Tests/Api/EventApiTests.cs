@@ -53,6 +53,26 @@ public sealed class EventApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task The_admin_content_editor_checks_and_publishes_events_and_decks_by_the_season_flag()
+    {
+        var admin = await _site.SignedInAsync("admin");
+        var editor = $"/api/admin/seasons/{SiteFactory.SeasonId}/content";
+        var pack = EventPack();
+
+        // Events off: the editor's check refuses the events as the engine would (D-532)
+        await SwitchOnAsync(admin, events: false);
+        var off = await ApiCalls.OkAsync(await admin.PostAsJsonAsync($"{editor}/check", pack, Ct));
+        Assert.False(off.GetProperty("valid").GetBoolean());
+
+        await SwitchOnEventsAsync(admin);
+        var on = await ApiCalls.OkAsync(await admin.PostAsJsonAsync($"{editor}/check", pack, Ct));
+        Assert.True(on.GetProperty("valid").GetBoolean(), on.ToString());
+        var version = (await ApiCalls.OkAsync(await admin.GetAsync(editor, Ct))).GetProperty("version").GetInt32();
+        await ApiCalls.PostOkAsync(admin, $"{editor}/publish", new { commandId = Guid.NewGuid(), expectedVersion = version, pack, comment = "Колоды" });
+        Assert.Equal(version + 1, (await ApiCalls.OkAsync(await admin.GetAsync(editor, Ct))).GetProperty("version").GetInt32());
+    }
+
+    [Fact]
     public async Task Without_events_the_view_has_no_drawn_event_and_a_pack_with_events_is_refused()
     {
         var admin = await _site.SignedInAsync("admin");
@@ -130,10 +150,25 @@ public sealed class EventApiTests : IAsyncLifetime
         return new JsonObject { ["cells"] = cells, ["edges"] = edges, ["zones"] = new JsonArray() };
     }
 
+    /// <summary>The same files as one pack JSON, as the admin's content editor sends it.</summary>
+    private static JsonObject EventPack()
+    {
+        var (objectFiles, wheelFiles) = RepositoryFiles();
+        var objects = new JsonArray([.. objectFiles.Select(j => JsonNode.Parse(j))]);
+        var wheels = new JsonArray([.. wheelFiles.Select(j => JsonNode.Parse(j))]);
+        return new JsonObject { ["objects"] = objects, ["wheels"] = wheels };
+    }
+
     private static Task PublishRepositoryContentAsync(HttpClient admin) => ApiCalls.PostOkAsync(admin, Content, RepositoryContent());
 
     /// <summary>The events and decks of the repository (D-533) with the one item they give (forced-genre), as their files.</summary>
     private static object RepositoryContent()
+    {
+        var (objects, wheels) = RepositoryFiles();
+        return new { objects, wheels, comment = "Ивенты" };
+    }
+
+    private static (string[] Objects, string[] Wheels) RepositoryFiles()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
         while (directory is not null && !Directory.Exists(Path.Combine(directory.FullName, "content", "decks")))
@@ -144,12 +179,7 @@ public sealed class EventApiTests : IAsyncLifetime
         var content = Path.Combine(directory?.FullName ?? throw new InvalidOperationException("No content/ found."), "content");
         string[] Read(string dir) =>
             [.. Directory.EnumerateFiles(Path.Combine(content, dir), "*.json").Order(StringComparer.Ordinal).Select(File.ReadAllText)];
-        return new
-        {
-            objects = (string[])[.. Read("events"), File.ReadAllText(Path.Combine(content, "items", "forced-genre.json"))],
-            wheels = Read("decks"),
-            comment = "Ивенты",
-        };
+        return ([.. Read("events"), File.ReadAllText(Path.Combine(content, "items", "forced-genre.json"))], Read("decks"));
     }
 
     private static async Task<JsonElement> MeAsync(HttpClient player) =>

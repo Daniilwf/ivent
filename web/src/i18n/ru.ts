@@ -702,6 +702,7 @@ export const ru = {
       ['map', 'Карта'],
       ['graph', 'Карта-граф'],
       ['editor', 'Редактор карты'],
+      ['content', 'Редактор контента'],
       ['wheel', 'Колесо'],
       ['dice', 'Кубики'],
       ['move', 'Ход фишки'],
@@ -861,6 +862,12 @@ export const ru = {
     drawnEvent: {
       title: 'Вытянутый ивент',
       lead: 'Карточка ивента, который игрок вытянул последним: вид колоды, откуда он, название и текст. Ивент уже разыгран при вытягивании. Четыре вида, длинное название и ивент без текста.',
+    },
+    content: {
+      title: 'Редактор контента',
+      lead: 'Предмет в форме: ошибка схемы — у своего поля и в списке сверху со ссылкой «Перейти к полю». Ниже — как объекты увидят игроки.',
+      markup:
+        'Разметка в названии и описании показывается текстом: «<img>» не становится картинкой.',
     },
     mapBackground: {
       title: 'Фон карты',
@@ -1490,6 +1497,7 @@ export const ru = {
       site: 'Обслуживание',
       test: 'Инструменты для тестов',
       map: 'Карта',
+      content: 'Контент',
     },
     leads: {
       proofs: 'Финиши сверху, дальше по времени завершения. Проверь пруф и одобри или отклони.',
@@ -1505,6 +1513,8 @@ export const ru = {
       site: 'На время выкладки сайт можно перевести в режим только для чтения.',
       test: 'Готовые ситуации для ручной проверки, время и случайность сайта. Раздел есть только при разработке и в тестах.',
       map: 'Клетки, стрелки и зоны карты сезона. Игроки увидят правки только после публикации.',
+      content:
+        'Предметы, эффекты, спецроллы и колёса сезона. Каждое сохранение — новая версия контента в логе.',
     },
     noSeasonTitle: 'Сезона пока нет',
     noSeasonText: 'Создай сезон в разделе «Сезон», и здесь появятся игроки и пруфы.',
@@ -1521,6 +1531,384 @@ export const ru = {
     system: 'Система',
     save: 'Сохранить',
     edit: 'Изменить',
+    // 4.12: the content editor (D-490…D-499)
+    content: {
+      itemsOff:
+        'Предметы в этом сезоне выключены (features.items в «Правилах»). Контент можно смотреть, править, проверять и выгружать; сохранить новую версию — после включения предметов.',
+      closed: 'Сезон закрыт: новую версию контента уже не сохранить.',
+      phone:
+        'Редактор контента работает на компьютере: на телефоне контент можно только посмотреть.',
+      version: (n: number) => (n === 0 ? 'Контент сезона' : `Версия контента ${n}`),
+      emptyTitle: 'Контента ещё нет',
+      empty: 'Создай объект или загрузи пакет из файла.',
+      loadPack: 'Загрузить пакет',
+      emptyKind: 'Здесь пока пусто.',
+      kinds: {
+        item: 'Предметы',
+        effect: 'Эффекты',
+        specialRoll: 'Спецроллы',
+        wheels: 'Колёса',
+        deleted: 'Удалённые',
+      } as Readonly<Record<string, string>>,
+      kindsLabel: 'Что показать',
+      kindOne: {
+        item: 'Предмет',
+        effect: 'Эффект',
+        specialRoll: 'Спецролл',
+        event: 'Ивент',
+        achievement: 'Достижение',
+        wheel: 'Колесо лутбокса',
+      } as Readonly<Record<string, string>>,
+      open: 'Открыть',
+      openNamed: (name: string) => `Открыть «${name}»`,
+      opened: 'Открыт',
+      deletedIn: (version: number) => `удалён в версии ${version}`,
+      entries: (n: number) => `${n} ${plural(n, 'объект', 'объекта', 'объектов')}`,
+      create: 'Создать',
+      createKind: 'Новый объект',
+      newName: 'Новый объект',
+      newDescription: 'Опиши, что делает объект.',
+      newWheelName: 'Новый лутбокс',
+      export: 'Выгрузить пакет',
+      exportVersion: (n: number) => `Выгрузить версию ${n}`,
+      importPanel: 'Импорт пакета',
+      importPick: 'Загрузить пакет из файла',
+      importHint: 'JSON с полями objects и wheels, до 1 МБ',
+      importTooBig: 'Файл больше 1 МБ: такой пакет сервер не примет.',
+      importNotJson: (line: number, column: number) =>
+        `В файле не JSON: ошибка в строке ${line}, символ ${column}.`,
+      importNotPack: 'В файле не пакет контента: нужен объект с полями objects и wheels.',
+      importTitle: (name: string) => `Пакет из файла «${name}»`,
+      importSummary: (objects: number, wheels: number) =>
+        `${objects} ${plural(objects, 'объект', 'объекта', 'объектов')}, ${wheels} ${plural(wheels, 'колесо', 'колеса', 'колёс')}.`,
+      importDiff: (added: number, changed: number, removed: number) =>
+        `Новых: ${added}, изменённых: ${changed}, удалённых: ${removed}.`,
+      importValid: 'Пакет проходит проверку сервера.',
+      importChecking: 'Сервер проверяет пакет…',
+      importPublish: 'Опубликовать пакет',
+      importCancel: 'Отменить',
+      importConfirmTitle: 'Опубликовать пакет из файла?',
+      importConsequences: [
+        'Пакет заменит весь контент сезона новой версией.',
+        'Объекты, которых нет в файле, станут удалёнными: у игроков они продолжат работать, но в магазин и колёса не попадут.',
+      ],
+      editorTitle: (name: string) => `Редактор: ${name}`,
+      close: 'Закрыть редактор',
+      views: { form: 'Форма', json: 'JSON' } as Readonly<Record<string, string>>,
+      viewsLabel: 'Вид редактора',
+      json: 'Определение объекта (JSON)',
+      jsonHint:
+        'Поля проверяются по схеме, пока печатаешь; ссылки на другие объекты проверяет сервер',
+      wheelJson: 'Колесо лутбокса (JSON)',
+      formBroken: 'Форма не открывается, пока JSON не разбирается. Исправь его во вкладке «JSON».',
+      inJson: 'Правится во вкладке «JSON».',
+      parseError: (line: number, column: number) =>
+        `Ошибка в JSON: строка ${line}, символ ${column}.`,
+      notJson: 'JSON не разбирается',
+      showPlace: 'Показать место',
+      problemsTitle: (n: number) => `${n} ${plural(n, 'ошибка', 'ошибки', 'ошибок')} в объекте`,
+      otherProblems: 'Ошибки в других объектах пакета',
+      goToField: 'Перейти к полю',
+      root: 'объект целиком',
+      serverSays: (message: string) => `Сервер: ${message}`,
+      check: 'Проверить на сервере',
+      checked: 'Сервер проверил: ошибок нет.',
+      checkedProblems: (n: number) =>
+        `Сервер проверил: ${n} ${plural(n, 'ошибка', 'ошибки', 'ошибок')} в пакете, они в списке выше.`,
+      checkFailed: 'Проверка не удалась. Попробуй ещё раз.',
+      save: 'Сохранить новую версию',
+      saved: (version: number) => `Сохранено: версия контента ${version}.`,
+      fixFirst: 'Сначала исправь ошибки.',
+      nothingNew: 'Правок нет.',
+      remove: 'Удалить объект',
+      removeWheel: 'Удалить колесо',
+      removeTitle: (name: string) => `Удалить «${name}»?`,
+      removeConsequences: [
+        'Сохранится новая версия контента без этого объекта.',
+        'У игроков, которые его держат, он продолжит работать; в магазине и колёсах его больше не будет.',
+      ],
+      removed: (name: string, version: number) => `«${name}» удалён: версия контента ${version}.`,
+      comment: 'Комментарий к версии',
+      commentHint: 'Попадёт в лог сезона, до 500 символов',
+      dirty: 'Есть несохранённые правки.',
+      discard: 'Отменить правки',
+      idTaken: (id: string) => `Код «${id}» уже занят другим объектом.`,
+      templates: 'Шаблон действия',
+      templatesHint: 'Вставит базовое действие с примером параметров в конец списка действий',
+      insert: 'Вставить действие',
+      noActionsList: 'У эффекта исходы по броску: действия вставляются в JSON, в нужный исход.',
+      preview: 'Как увидят игроки',
+      previewHint:
+        'Название и описание — как в интерфейсе игрока. Словами эффект не пересказывается: игрок читает описание.',
+      previewEmpty: 'Без названия',
+      hostile: 'Против другого игрока',
+      stackable: 'Можно несколько сразу',
+      manual: 'Ручной',
+      notForSale: 'не продаётся',
+      price: (n: number) => `${n} ${plural(n, 'монетка', 'монетки', 'монеток')}`,
+      history: 'Версии контента',
+      historyEmpty: 'Версий пока нет.',
+      historyRow: (version: number, at: string, author: string) =>
+        `Версия ${version} · ${at} · ${author}`,
+      historyChanges: (added: number, changed: number, removed: number) =>
+        [
+          added ? `новых ${added}` : '',
+          changed ? `изменено ${changed}` : '',
+          removed ? `удалено ${removed}` : '',
+        ]
+          .filter(Boolean)
+          .join(', ') || 'объекты не менялись',
+      historyCounts: (objects: number, wheels: number) =>
+        `${objects} ${plural(objects, 'объект', 'объекта', 'объектов')}, ${wheels} ${plural(wheels, 'колесо', 'колеса', 'колёс')}`,
+      objectHistory: 'История объекта',
+      objectHistoryEmpty: 'Объект ещё не сохранён ни в одной версии.',
+      objectChange: { added: 'добавлен', changed: 'изменён', removed: 'удалён' } as Readonly<
+        Record<string, string>
+      >,
+      system: 'Система',
+      fields: {
+        id: 'Код',
+        idHint: 'Строчные латинские слова через дефис, например lucky-die',
+        kind: 'Что это',
+        name: 'Название',
+        description: 'Описание для игрока',
+        rarity: 'Редкость',
+        price: 'Цена в магазине',
+        priceHint: 'В монетках; пусто — не продаётся',
+        window: 'Окно использования',
+        hostile: 'Против другого игрока (враждебный)',
+        stackable: 'Можно несколько сразу',
+        manual: 'Ручной: эффект разыгрывает админ',
+        effect: 'Эффект',
+        trigger: 'Триггер',
+        target: 'Цель',
+        among: 'Только среди',
+        excludeSelf: 'Кроме себя',
+        duration: 'Срок',
+        durationValue: 'Сколько',
+        intercept: 'Перехват',
+        actions: 'Действия',
+        actionTarget: 'Кому',
+        condition: 'Условие',
+        outcomes: 'Исходы по броску',
+        actionType: 'Базовое действие',
+        wheelName: 'Название колеса',
+        entries: 'Объекты колеса и веса',
+        weight: 'Вес',
+        none: '— не задано —',
+      } as Readonly<Record<string, string>>,
+      action: (n: number, name: string) => `Действие ${n}: ${name}`,
+      moveUp: (n: number) => `Поднять действие ${n}`,
+      moveDown: (n: number) => `Опустить действие ${n}`,
+      removeAction: (n: number) => `Убрать действие ${n}`,
+      entry: (n: number) => `Объект ${n}`,
+      removeEntry: (n: number) => `Убрать объект ${n} из колеса`,
+      addEntry: 'Добавить объект',
+      durations: {
+        none: 'Без срока',
+        uses: 'Использований',
+        hours: 'Часов',
+        runs: 'Прохождений',
+        untilTriggered: 'До срабатывания',
+      } as Readonly<Record<string, string>>,
+      values: {
+        kind: {
+          item: 'предмет',
+          effect: 'эффект',
+          specialRoll: 'спецролл',
+          event: 'ивент',
+          achievement: 'достижение',
+        },
+        rarity: { common: 'обычный', epic: 'эпический', legendary: 'легендарный' },
+        window: {
+          beforeRoll: 'перед роллом',
+          afterRoll: 'после ролла',
+          beforeDice: 'перед броском кубов',
+          afterDice: 'после броска кубов',
+          anytime: 'в любой момент',
+        },
+        trigger: {
+          beforeRoll: 'перед роллом',
+          afterRoll: 'после ролла',
+          runCompleted: 'прохождение завершено',
+          beforeDice: 'перед броском кубов',
+          afterDice: 'после броска кубов',
+          moveStep: 'каждый шаг фишки',
+          stop: 'остановка на клетке',
+          pass: 'проход через клетку',
+          drop: 'дроп',
+          techReroll: 'тех-реролл',
+          time: 'по времени',
+          hostileIncoming: 'входящий враждебный эффект',
+        },
+        selector: {
+          self: 'сам',
+          chosen: 'выбранный игрок',
+          randomActive: 'случайный активный',
+          all: 'все',
+          leader: 'лидер',
+          higherPoints: 'все выше по очкам',
+          lowerPoints: 'все ниже по очкам',
+        },
+        among: { higherPoints: 'выше по очкам', lowerPoints: 'ниже по очкам' },
+        intercept: { hostile: 'враждебный эффект' },
+        target: { self: 'тот, кто использовал' },
+        when: { current: 'этот бросок', next: 'следующий бросок' },
+        stage: {
+          count: 'число кубиков',
+          sides: 'грани',
+          add: 'прибавка',
+          multiply: 'множитель',
+          reroll: 'переброс',
+          min: 'не меньше',
+          max: 'не больше',
+        },
+        mode: {
+          take: 'забрать',
+          steal: 'украсть',
+          destroy: 'уничтожить',
+          transform: 'превратить',
+          annotate: 'пометить',
+        },
+        pick: { random: 'случайный', chosen: 'на выбор' },
+      } as Readonly<Record<string, Readonly<Record<string, string>>>>,
+      actions: {
+        move: {
+          name: 'Сдвинуть фишку',
+          hint: 'steps: клеток вперёд, минус — назад; можно «1d6» или «$roll»',
+        },
+        changeResource: {
+          name: 'Изменить ресурс',
+          hint: 'resource: points, coins или другой; amount: сколько, минус отнимает',
+        },
+        roll: { name: 'Бросить кубы', hint: 'dice: например «1d6»; результат дальше — «$roll»' },
+        giveObject: { name: 'Выдать объект', hint: 'objectId: код объекта из этого пакета' },
+        takeObject: {
+          name: 'Забрать объект',
+          hint: 'mode: take, steal или destroy; filter — какие объекты',
+        },
+        transformObject: {
+          name: 'Превратить объект',
+          hint: 'mode: transform (into — во что) или annotate (note — пометка)',
+        },
+        drawEvent: {
+          name: 'Вытянуть ивент',
+          hint: 'deck: good или bad (до этапа ивентов — вручную)',
+        },
+        spinWheel: { name: 'Крутить колесо', hint: 'wheel: код колеса лутбокса из этого пакета' },
+        modifyNextRoll: {
+          name: 'Изменить следующий ролл',
+          hint: 'filter — теги и часы игры, choiceCount — выбор из N игр',
+        },
+        modifyDice: {
+          name: 'Изменить кубы',
+          hint: 'when, stage и value — какую стадию броска и на сколько',
+        },
+        teleport: { name: 'Телепорт', hint: 'cell: код клетки или nearestShortcut' },
+        requestChoice: {
+          name: 'Спросить выбор',
+          hint: 'prompt — вопрос, options — варианты; ответ дальше — «$choice»',
+        },
+      } as Readonly<Record<string, { name: string; hint: string }>>,
+      problem: {
+        required: 'Обязательное поле',
+        unknown: 'Такого поля нет',
+        type: (expected: string) => `Нужно ${expected}`,
+        enum: (values: string) => `Одно из: ${values}`,
+        pattern: 'Нужно целое число, кубы («1d6», «-1d6») или ссылка («$roll», «$choice»)',
+      },
+      // The server's checks speak English for the log (D-492): the common ones are told in Russian by their exact text
+      serverMessages: {
+        'Only items are sold in the shop.':
+          'В магазине продаются только предметы: у остальных цены нет.',
+        'An item needs a window of use.': 'Предмету нужно окно использования.',
+        'Only items have a window of use.': 'Окно использования бывает только у предметов.',
+        'An object without an effect must be manual.': 'Объект без эффекта должен быть ручным.',
+        'A price is 0 or more; null means not for sale.':
+          'Цена — 0 или больше; пусто — не продаётся.',
+        'An effect has either actions or outcomes, not both.':
+          'У эффекта либо действия, либо исходы по броску — не то и другое.',
+        'An effect needs actions, outcomes or an interception.':
+          'Эффекту нужны действия, исходы по броску или перехват.',
+        '«among» narrows only «chosen» and «randomActive».':
+          '«Только среди» уточняет лишь «выбранный игрок» и «случайный активный».',
+        'A resource is «points», «coins» or another key.': 'Ресурс — points, coins или другое имя.',
+        'A roll needs dice such as «1d6», without a minus.':
+          'Броску нужны кубы вида «1d6», без минуса.',
+        'A choice is among at least 2 games.': 'Выбор — минимум из 2 игр.',
+        '«transform» names the object to turn into.': 'Для превращения назови объект в поле into.',
+        '«annotate» needs a note.': 'Для пометки нужен текст в поле note.',
+        'A wheel id is required.': 'Нужен код колеса.',
+        'A cell id or «nearestShortcut» is required.': 'Нужен код клетки или nearestShortcut.',
+        '«$roll» needs a «roll» action before it.':
+          '«$roll» работает только после действия «Бросить кубы».',
+        '«$choice» needs a «requestChoice» action before it.':
+          '«$choice» работает только после действия «Спросить выбор».',
+        'A duration is exactly one of «uses», «hours», «runs», «untilTriggered».':
+          'Срок — ровно одно из: использований, часов, прохождений, до срабатывания.',
+        'A duration is positive.': 'Срок — больше нуля.',
+        'Options come either «from» a source or as a «list».':
+          'Варианты — либо из источника (from), либо списком (list).',
+        'A list offers at least 2 non-empty options.':
+          'В списке нужно минимум 2 непустых варианта.',
+        'An effect that acts on its own has nobody to choose its target.':
+          'Эффект, который срабатывает сам, не может просить выбрать цель.',
+        'An effect that acts on its own has nobody to ask.':
+          'Эффект, который срабатывает сам, не может ничего спрашивать.',
+        'A special roll acts before a roll («beforeRoll»).':
+          'Спецролл срабатывает перед роллом (beforeRoll).',
+        'The «time» trigger is not played by this build yet.':
+          'Триггер «по времени» эта версия сайта ещё не играет.',
+        'A reroll changes the throw just made: «current».':
+          'Переброс меняет только что сделанный бросок: when — current.',
+        'The «count» stage adds dice: 1 or more.':
+          'Стадия «число кубиков» добавляет кубики: 1 или больше.',
+        'A wheel has entries with weights of 0 or more, and some weight in all.':
+          'У колеса — объекты с весами от 0, и хотя бы один вес больше нуля.',
+        'A list item is an object, not null.': 'Элемент списка — объект, а не null.',
+        'A value of a wrong type.': 'Значение не того типа.',
+        'An action needs «type», written first.': 'Действию нужно поле type, первым.',
+      } as Readonly<Record<string, string>>,
+      serverPatterns: [
+        [
+          /^«(.+)» is not an object of the pack\.$/u,
+          (id: string) => `Объекта «${id}» нет в пакете.`,
+        ],
+        [/^«(.+)» is not a wheel of the pack\.$/u, (id: string) => `Колеса «${id}» нет в пакете.`],
+        [
+          /^«(.*)» is neither dice/u,
+          (text: string) => `«${text}» — не кубы и не ссылка: нужно «1d6», «-1d6» или «$roll».`,
+        ],
+        [/^Object «(.+)» is listed twice\.$/u, (id: string) => `Объект «${id}» в пакете дважды.`],
+        [/^Wheel «(.+)» is listed twice\.$/u, (id: string) => `Колесо «${id}» в пакете дважды.`],
+        [/^Field «(.+)» is required\.$/u, (name: string) => `Нужно поле «${name}».`],
+        [/^Fields (.+) are required\.$/u, (names: string) => `Нужны поля ${names}.`],
+        [/^Field «(.+)» is unknown\.$/u, (name: string) => `Неизвестное поле «${name}».`],
+        [/^Field «(.+)» is given twice\.$/u, (name: string) => `Поле «${name}» указано дважды.`],
+        [/^1–(\d+) characters\.$/u, (max: string) => `От 1 до ${max} символов.`],
+        [
+          /^An id is lowercase words/u,
+          () => 'Код — строчные латинские слова через дефис, до 50 символов (например lucky-die).',
+        ],
+        [/^A (\w+) needs a trigger\.$/u, () => 'Этому объекту нужен триггер.'],
+        [
+          /^A (\w+) acts when it is used or drawn, without a trigger\.$/u,
+          () =>
+            'Этот объект срабатывает, когда его используют или вытягивают: триггер ему не нужен.',
+        ],
+        [
+          /^At most (\d+) objects in one pack\.$/u,
+          (n: string) => `В пакете — не больше ${n} объектов.`,
+        ],
+        [
+          /^At most (\d+) wheels in one pack\.$/u,
+          (n: string) => `В пакете — не больше ${n} колёс.`,
+        ],
+      ] as readonly (readonly [RegExp, (match: string) => string])[],
+      valueHint: 'Число, кубы «1d6» или ссылка «$roll»',
+      schemaFailed: 'Схема не загрузилась: объект проверит только сервер.',
+      failed: 'Не сохранилось. Попробуй ещё раз.',
+    },
     // 2.11: the map editor
     map: {
       linear:
@@ -1703,6 +2091,10 @@ export const ru = {
       'test.noActiveRun': 'Прохождение не началось. Попробуй ещё раз.',
       'map.invalid': 'В карте есть ошибки: исправь те, что в проверке.',
       'map.unchanged': 'Карта не изменилась: публиковать нечего.',
+      'content.invalid': 'В пакете есть ошибки: исправь те, что у полей.',
+      'content.unchanged': 'Контент не изменился: сохранять нечего.',
+      'content.versionChanged':
+        'Контент изменили, пока ты редактировал: обнови страницу и внеси правки в новую версию.',
       'map.occupiedCellRemoved': 'На удалённой клетке стоят игроки: верни клетку или перенеси их.',
       'map.occupiedCellRetyped':
         'Финиш нельзя ставить под игрока, который не финишировал, и убирать из-под финишировавшего.',
@@ -1968,6 +2360,7 @@ export const ru = {
       unknownField: (path: string) => `${path}: такого поля нет`,
       wrongType: (path: string, expected: string) => `${path}: нужно ${expected}`,
       notInList: (path: string, values: string) => `${path}: одно из ${values}`,
+      badFormat: (path: string) => `${path}: значение не того вида`,
       types: {
         integer: 'целое число',
         number: 'число',

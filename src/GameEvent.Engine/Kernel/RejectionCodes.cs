@@ -85,6 +85,9 @@ public static class RejectionCodes
     public const string ReviewTooLong = "review.tooLong";
     public const string ContentInvalid = "content.invalid";
     public const string ContentUnchanged = "content.unchanged";
+
+    /// <summary>The pack was made from an older content version than the one in force (D-491).</summary>
+    public const string ContentVersionChanged = "content.versionChanged";
     public const string ItemUnknown = "item.unknown";
     public const string ItemNotAnItem = "item.notAnItem";
     public const string ItemWrongWindow = "item.wrongWindow";
