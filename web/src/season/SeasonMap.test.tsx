@@ -333,6 +333,32 @@ describe('the season screen on the graph map', () => {
     expect(screen.getByTestId('roll')).toBeInTheDocument();
   });
 
+  it('draws players standing on one cell side by side, none hidden under another', async () => {
+    const view = season('b1');
+    const other = '10000000-0000-0000-0000-000000000002';
+    const [player] = view.players;
+    const [row] = view.leaderboard;
+    if (!player || !row) throw new Error('No player in the season');
+    const both = {
+      ...view,
+      players: [...view.players, { ...player, id: other, name: 'Петя', token: 1 }],
+      leaderboard: [...view.leaderboard, { ...row, playerId: other, place: 2 }],
+    } satisfies Schemas['SeasonView'];
+    fakeServer({ ...common, 'GET /api/seasons/*': () => ({ body: both }) });
+    const { container } = render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    await screen.findByTestId('cell-b1');
+    const token = (id: string) =>
+      container
+        .querySelector(`svg[role="application"] [data-player="${id}"]`)
+        ?.getAttribute('transform')
+        ?.match(/translate\([^)]*\)/)?.[0];
+    // Where each sticker stands, its tilt aside
+    expect(token(me)).toBeTruthy();
+    expect(token(other)).toBeTruthy();
+    expect(token(me)).not.toBe(token(other));
+  });
+
   it('draws the linear season as before: no legend, no branch', async () => {
     fakeServer({
       ...common,

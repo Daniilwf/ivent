@@ -39,6 +39,7 @@ public sealed record PlayerPath(EquatableArray<PathSegment> Segments)
         {
             foreach (var cell in moved.Path)
             {
+                // Stryker disable once Equality : equivalent — from two cells, dropping the last and starting afresh on it both leave [cell]
                 if (cells.Count >= 2 && cells[^2] == cell)
                 {
                     cells.RemoveAt(cells.Count - 1);

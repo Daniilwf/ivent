@@ -873,10 +873,12 @@ public partial class PlayerAdminInvariantTests
             }
         }
 
-        // Q-4: bonuses move only when the finishers change: a finish or a revoke in the same command
+        // Q-4: bonuses move only when the finishers change: a finish or a revoke in the same command — or by the admin's
+        // recalculation to the current list (D-113, INV-1), whose events CheckRuleChangeKeepsWhatWasGiven checks are bonuses only
         var finishersChanged = events.Any(e => e is PlayerFinished or PlayerFinishRevoked);
         Assert.True(
-            finishersChanged || !events.Any(e => e is PointsChanged { Reason: PointsReason.FinishBonus or PointsReason.FinishBonusRevoked }),
+            finishersChanged || command is RecalculateFinishBonuses
+                || !events.Any(e => e is PointsChanged { Reason: PointsReason.FinishBonus or PointsReason.FinishBonusRevoked }),
             "A bonus changed without a finish or a revoke.");
 
         // RR8 / D-99: only a run's completion finishes, right after its move onto the finish; the surplus is the steps burned
