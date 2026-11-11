@@ -61,14 +61,14 @@ public static class MapValidator
     public const int MaxBackgroundSide = 16_384;
 
     /// <summary>
-    /// How far from zero a cell may stand on the editor's canvas, either way (D-621): a map at most twice the biggest
+    /// How far from zero a cell may stand on the editor's canvas, either way (K1M-10, D-621): a map at most twice the biggest
     /// picture across; a typo such as 1e9 would make the player's camera fit a speck.
     /// </summary>
     public const int MaxCoordinate = 16_384;
 
     /// <summary>
     /// The largest points bonus of a cell, either way (D-621): a safety ceiling, not balance — points are an
-    /// <c>int</c> column and a pasted typo must not wrap them round.
+    /// <c>int</c> column and a pasted typo must not wrap them round (K1M-5).
     /// </summary>
     public const int MaxBonusAmount = 10_000;
 

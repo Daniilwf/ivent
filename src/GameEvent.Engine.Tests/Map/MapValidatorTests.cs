@@ -421,7 +421,7 @@ public class MapValidatorTests
     [InlineData(MapValidator.MaxCoordinate + 1, 0)]
     public void A_cell_stands_within_the_coordinate_ceiling(double x, double y)
     {
-        // K1M-6: a cell at x = 1e9 passed the check and the player's camera, fitting it, showed no cell at all
+        // K1M-10: a cell at x = 1e9 passed the check and the player's camera, fitting it, showed no cell at all
         var placed = MapBuilder.New().Path("start", "a", "finish").Build();
         MapGraph With(decimal ax, decimal ay) => placed with
         {
