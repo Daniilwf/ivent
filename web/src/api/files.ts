@@ -21,7 +21,10 @@ export class UploadError extends Error {
 export async function uploadFile(
   file: Blob,
   name = file instanceof File ? file.name : 'picture.png',
-  path: '/api/files' | '/api/bug-reports/screenshot' = '/api/files',
+  path:
+    | '/api/files'
+    | '/api/bug-reports/screenshot'
+    | `/api/admin/seasons/${string}/map/background` = '/api/files',
 ): Promise<StoredFile> {
   const form = new FormData();
   form.append('commandId', newCommandId());

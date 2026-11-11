@@ -85,7 +85,8 @@ public sealed record LoggedEventView(long Sequence, string Type);
 /// The season screen's data. <c>status</c> and <c>deadline</c> (UTC; the screen shows it in Moscow time) follow the
 /// lifecycle (D-101); after the finish <c>leaderboard</c> is the recorded result. The map is the one in force (the
 /// latest published, D-300): <c>cells</c>, <c>edges</c> and <c>zones</c>; <c>mapMode</c> says whether the season plays
-/// on the linear chain of stage 1 or on the graph (D-301).
+/// on the linear chain of stage 1 or on the graph (D-301); <c>background</c> — the picture under the cells, null when
+/// the map has none or its file is not on this site (D-277).
 /// </summary>
 public sealed record SeasonView(
     Guid Id,
@@ -99,7 +100,8 @@ public sealed record SeasonView(
     string Name,
     IReadOnlyList<EdgeView> Edges,
     IReadOnlyList<ZoneView> Zones,
-    MapMode MapMode);
+    MapMode MapMode,
+    MapBackgroundView? Background = null);
 
 /// <summary>
 /// A leaderboard row in place order (D-100): tied players share <c>place</c>; <c>isFirst</c> — the first finisher, on top
@@ -690,7 +692,8 @@ public static class SeasonEndpoints
             seasonRecord.Name,
             [.. map.Edges.Select(SeasonMaps.ToView)],
             [.. map.Zones.Select(SeasonMaps.ToView)],
-            rules.Features.MapMode));
+            rules.Features.MapMode,
+            await SeasonMaps.BackgroundAsync(db, map, ct)));
     }
 
     private static readonly string[] s_rollTypes =

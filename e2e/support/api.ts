@@ -53,6 +53,23 @@ export class Api {
     return ok<T>(await this.send('PUT', path, { commandId: commandId(), ...data }), `PUT ${path}`);
   }
 
+  /** An upload of a picture as the site sends one: a form with a command id and the file */
+  async upload<T = Schemas['StoredFileView']>(
+    path: string,
+    file: Buffer,
+    name: string,
+  ): Promise<T> {
+    const answer = await this.context.fetch(path, {
+      method: 'POST',
+      multipart: {
+        commandId: commandId(),
+        file: { name, mimeType: 'image/png', buffer: file },
+      },
+      headers: { [this.csrf.headerName]: this.csrf.token },
+    });
+    return ok<T>(answer, `POST ${path}`);
+  }
+
   /** The session's cookies, to open the site in a browser already signed in */
   async cookies() {
     return (await this.context.storageState()).cookies;

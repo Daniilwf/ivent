@@ -285,12 +285,23 @@ export function SeasonScreen({
   const graphMode = season?.mapMode === 'graph';
   // The map is drawn again only when it changes (a publication), not on every refresh of the season
   const mapKey = season
-    ? JSON.stringify([season.mapMode, season.cells, graphMode ? season.edges : [], season.zones])
+    ? JSON.stringify([
+        season.mapMode,
+        season.cells,
+        graphMode ? season.edges : [],
+        season.zones,
+        season.background ?? null,
+      ])
     : '';
   const chain = useMemo(
     () =>
       season && graphMode
-        ? graphBoard({ cells: season.cells, edges: season.edges, zones: season.zones })
+        ? graphBoard({
+            cells: season.cells,
+            edges: season.edges,
+            zones: season.zones,
+            background: season.background ?? null,
+          })
         : linearBoard(season?.cells ?? []),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- the key stands for the map
     [mapKey],

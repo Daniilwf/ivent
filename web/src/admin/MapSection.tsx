@@ -15,6 +15,7 @@ import { Notice } from '../ui/States';
 import { Panel } from '../ui/Surface';
 import { useDesk } from '../ui/useDesk';
 import { commentProblem, refusal } from './actions';
+import { MapBackgroundPanel } from './MapBackgroundPanel';
 import { MapCanvas } from './MapCanvas';
 import {
   addCell,
@@ -35,6 +36,7 @@ import {
   setCell,
   setCellType,
   setDefaultBranch,
+  setBackground,
   setPrimaryEntry,
   setZone,
   type CellType,
@@ -264,7 +266,18 @@ function MapEditor({
               <p className="text-sm text-ink-soft">{t.noSelection}</p>
             )}
           </Panel>
-          <ZonesPanel draft={draft} onChange={setDraft} />
+          {/* The map's own settings in one column, the selected cell in the other: the picture first, it is short */}
+          <div className="grid items-start gap-4" data-testid="map-settings">
+            <MapBackgroundPanel
+              seasonId={seasonId}
+              background={draft.background ?? null}
+              pending={draft.background?.fileId !== start.background?.fileId}
+              onChange={(next) => {
+                setDraft(setBackground(draft, next));
+              }}
+            />
+            <ZonesPanel draft={draft} onChange={setDraft} />
+          </div>
         </div>
       </div>
       <CheckPanel

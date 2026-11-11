@@ -40,7 +40,7 @@ import {
   demoWitnesses,
 } from './fixtures';
 import { DiceDemo, FinishDemo, MapDemo, MoveDemo, WheelDemo } from './MomentDemos';
-import { EditorDemo, GraphMapDemo } from './GraphDemos';
+import { EditorDemo, MapBackgroundDemo, GraphMapDemo } from './GraphDemos';
 import { FeedList, FeedSkeleton } from '../feed/FeedList';
 import { GameDetails } from '../feed/GameScreen';
 import { ProfileDetails } from '../feed/ProfileScreen';
@@ -634,6 +634,10 @@ export function Styleguide() {
 
       <Section id="editor" title={t.editor.title} lead={t.editor.lead}>
         <EditorDemo />
+      </Section>
+
+      <Section id="map-background" title={t.mapBackground.title} lead={t.mapBackground.lead}>
+        <MapBackgroundDemo />
       </Section>
 
       <Section id="wheel" title={t.wheel.title} lead={t.wheel.lead}>
