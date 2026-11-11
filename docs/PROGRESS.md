@@ -332,7 +332,7 @@
 | 4 ✅ | `takeObject.count` (число, `$roll`) и `all: true` (D-476) | +5 (вместе с двумя `count: 2` шага 1) | 64 |
 | 5 ✅ | `move.direction` — `chosen` (ответ `forward`/`back`), `away` от стреляющего (D-477) | +5 | 69 |
 | 6 ✅ | `takeObject.give` — отдать свой объект (свиньи), флаги `unstealable`/`undestroyable` (D-478) | +6 (с Кьюкьюшкой и Шредингером шага 1) | 75 |
-| 7 | `counters` — эффекты со счётчиком (в том числе эффект `bomb`: `counter`, `onCounterZero`) | +5 | 98 |
+| 7 ✅ | `counters` — эффекты со счётчиком, триггер `runEnded`, `addCounter`/`resetCounters`, фильтр `hasCounter` (D-479; эффект `bomb` — `time-bomb`) | +5 | 80 |
 | 8 | `selector:withinCells`, затем `selector:nearestBehind` | +4, +1 | 103 |
 | 9 | редкие стадии броска по одному: `setOne`, `singleDie`, `replaceValue`, `fixAverage`, `bonusPerEven`, `rerollFilter` | +7 | 110 |
 | 10 | `outcomes.choice`, `roll.as`, `useCondition`, `intercept.badEvent` (эффект Бабл) | +4 | 114 |

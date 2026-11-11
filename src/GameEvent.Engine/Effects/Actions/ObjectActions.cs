@@ -24,6 +24,7 @@ internal static class ObjectFilters
         && (filter.Rarity is not { } rarity || definition.Rarity == rarity)
         && (filter.ObjectId is not { } id || item.ObjectId == id)
         && (filter.Hostile is not { } hostile || definition.Hostile == hostile)
+        && (filter.HasCounter is not { } counted || (item.Counter is not null) == counted)
         && (filter.ExcludeTags is not { } excluded || !(definition.Tags ?? []).Any(t => excluded.Contains(t, StringComparer.Ordinal)));
 
     /// <summary>One of <paramref name="candidates"/>: at random, or the one the player named (its instance id).</summary>
@@ -163,6 +164,12 @@ internal sealed class TransformObjectHandler : ActionHandler<TransformObjectActi
     protected override void Execute(TransformObjectAction action, EffectRun run)
     {
         var owner = run.ActionTarget(action);
+        if (action.Mode is TransformMode.AddCounter or TransformMode.ResetCounters)
+        {
+            Counters(action, run, owner);
+            return;
+        }
+
         if (ObjectFilters.Pick(run, ObjectFilters.Matching(run, owner, action.Filter), Pick.Random) is not { } item)
         {
             return;
@@ -181,6 +188,30 @@ internal sealed class TransformObjectHandler : ActionHandler<TransformObjectActi
 
         var fresh = Inventories.New(run.State, run.Context, owner, into, item.Params, item.FromPlayerId);
         run.Emit(new ObjectChanged(owner, fresh with { InstanceId = item.InstanceId, Acquired = item.Acquired, Notes = item.Notes }));
+    }
+
+    // Every matching countdown changes; one brought to zero goes off at once, for its owner (D-479).
+    private static void Counters(TransformObjectAction action, EffectRun run, Guid owner)
+    {
+        var by = action.Value is { } value ? run.Number(value) : 0;
+        foreach (var item in ObjectFilters.Matching(run, owner, action.Filter).Where(o => o.Counter is not null))
+        {
+            var start = run.State.Catalog.Get(item.ObjectId).Effect?.Counter?.Start ?? item.Counter!.Value;
+            var counter = action.Mode == TransformMode.ResetCounters ? start : item.Counter!.Value + by;
+            if (counter > 0)
+            {
+                if (counter != item.Counter)
+                {
+                    run.Emit(new ObjectChanged(owner, item with { Counter = counter }));
+                }
+
+                continue;
+            }
+
+            var spent = item with { Counter = 0 };
+            run.Emit(new ObjectChanged(owner, spent));
+            Effects.Firing.GoOff(run, owner, spent);
+        }
     }
 }
 

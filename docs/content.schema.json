@@ -130,6 +130,7 @@
                   "techReroll",
                   "time",
                   "hostileIncoming",
+                  "runEnded",
                   null
                 ]
               },
@@ -420,6 +421,12 @@
                                 "null"
                               ]
                             },
+                            "hasCounter": {
+                              "type": [
+                                "boolean",
+                                "null"
+                              ]
+                            },
                             "excludeTags": true
                           },
                           "additionalProperties": false
@@ -461,7 +468,9 @@
                         "mode": {
                           "enum": [
                             "transform",
-                            "annotate"
+                            "annotate",
+                            "addCounter",
+                            "resetCounters"
                           ]
                         },
                         "filter": {
@@ -500,6 +509,12 @@
                                 "null"
                               ]
                             },
+                            "hasCounter": {
+                              "type": [
+                                "boolean",
+                                "null"
+                              ]
+                            },
                             "excludeTags": true
                           },
                           "additionalProperties": false
@@ -515,6 +530,14 @@
                             "string",
                             "null"
                           ]
+                        },
+                        "value": {
+                          "description": "A whole number, dice («1d6», «-1d6») or a reference («$roll», «-$roll», «$choice», «$name»).",
+                          "type": [
+                            "integer",
+                            "string"
+                          ],
+                          "pattern": "^(-?([1-9][0-9]?)?d[1-9][0-9]{0,2}|-?\\$[a-zA-Z][a-zA-Z0-9]{0,39})$"
                         },
                         "target": {
                           "enum": [
@@ -998,6 +1021,12 @@
                                           "null"
                                         ]
                                       },
+                                      "hasCounter": {
+                                        "type": [
+                                          "boolean",
+                                          "null"
+                                        ]
+                                      },
                                       "excludeTags": true
                                     },
                                     "additionalProperties": false
@@ -1039,7 +1068,9 @@
                                   "mode": {
                                     "enum": [
                                       "transform",
-                                      "annotate"
+                                      "annotate",
+                                      "addCounter",
+                                      "resetCounters"
                                     ]
                                   },
                                   "filter": {
@@ -1078,6 +1109,12 @@
                                           "null"
                                         ]
                                       },
+                                      "hasCounter": {
+                                        "type": [
+                                          "boolean",
+                                          "null"
+                                        ]
+                                      },
                                       "excludeTags": true
                                     },
                                     "additionalProperties": false
@@ -1093,6 +1130,14 @@
                                       "string",
                                       "null"
                                     ]
+                                  },
+                                  "value": {
+                                    "description": "A whole number, dice («1d6», «-1d6») or a reference («$roll», «-$roll», «$choice», «$name»).",
+                                    "type": [
+                                      "integer",
+                                      "string"
+                                    ],
+                                    "pattern": "^(-?([1-9][0-9]?)?d[1-9][0-9]{0,2}|-?\\$[a-zA-Z][a-zA-Z0-9]{0,39})$"
                                   },
                                   "target": {
                                     "enum": [
@@ -1388,6 +1433,21 @@
                 "required": [
                   "roll",
                   "cases"
+                ],
+                "additionalProperties": false
+              },
+              "counter": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "properties": {
+                  "start": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "start"
                 ],
                 "additionalProperties": false
               }

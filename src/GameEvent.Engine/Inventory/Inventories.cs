@@ -52,7 +52,8 @@ internal static class Inventories
             parameters is { Count: > 0 } ? parameters : null,
             duration?.Uses,
             duration?.Runs,
-            duration?.Hours is { } hours ? context.Clock.UtcNow.AddHours(hours) : null);
+            duration?.Hours is { } hours ? context.Clock.UtcNow.AddHours(hours) : null,
+            Counter: definition.Effect?.Counter?.Start);
     }
 
     /// <summary>

@@ -1,0 +1,30 @@
+{
+  "id": "kefir",
+  "kind": "item",
+  "name": "Кефир",
+  "description": "Уничтожает все твои эффекты со счётчиком без каких-либо последствий.",
+  "rarity": "epic",
+  "price": 40,
+  "window": "anytime",
+  "hostile": false,
+  "stackable": true,
+  "tags": [
+    "edible"
+  ],
+  "effect": {
+    "target": {
+      "selector": "self"
+    },
+    "actions": [
+      {
+        "type": "takeObject",
+        "mode": "destroy",
+        "all": true,
+        "filter": {
+          "kind": "effect",
+          "hasCounter": true
+        }
+      }
+    ]
+  }
+}

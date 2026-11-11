@@ -85,6 +85,19 @@ public static partial class ContentValidator
             Error("$.effect.duration", "Only effects and special rolls last; a duration elsewhere means nothing.");
         }
 
+        if (effect.Counter is { } counter)
+        {
+            if (kind is not (ObjectKind.Effect or ObjectKind.SpecialRoll))
+            {
+                Error("$.effect.counter", "Only effects and special rolls count down.");
+            }
+
+            if (counter.Start < 1)
+            {
+                Error("$.effect.counter.start", "A counter starts at 1 or more.");
+            }
+        }
+
         if (kind != ObjectKind.Effect && effect.Intercept is not null)
         {
             Error("$.effect.intercept", "Only an effect intercepts (an item gives such an effect, as «Щит» does).");
@@ -268,6 +281,7 @@ public static partial class ContentValidator
                 RollAction a => [("dice", a.Dice)],
                 ModifyDiceAction a => [("value", a.Value)],
                 TakeObjectAction { Count: { } count } => [("count", count)],
+                TransformObjectAction { Value: { } by } => [("value", by)],
                 _ => Array.Empty<(string, ContentValue)>(),
             };
             foreach (var (field, value) in values)
@@ -351,6 +365,12 @@ public static partial class ContentValidator
                     break;
                 case TransformObjectAction { Mode: TransformMode.Annotate, Note: null or "" }:
                     error($"{at}.note", "«annotate» needs a note.");
+                    break;
+                case TransformObjectAction { Mode: TransformMode.AddCounter, Value: null or { Kind: ContentValueKind.Number, Number: 0 } }:
+                    error($"{at}.value", "«addCounter» changes counters by a value other than 0.");
+                    break;
+                case TransformObjectAction { Mode: not TransformMode.AddCounter, Value: not null }:
+                    error($"{at}.value", "Only «addCounter» takes a value.");
                     break;
                 case DrawEventAction draw when string.IsNullOrWhiteSpace(draw.Deck):
                     error($"{at}.deck", "A deck is «good», «bad», «special», «risky», «zone» or a deck id.");

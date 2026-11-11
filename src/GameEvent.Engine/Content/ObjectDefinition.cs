@@ -57,6 +57,9 @@ public enum Trigger
     TechReroll,
     Time,
     HostileIncoming,
+
+    /// <summary>A run ended: completed or dropped (D-479, the time bomb).</summary>
+    RunEnded,
 }
 
 /// <summary>Whom an effect targets (SPEC «Селекторы»).</summary>
@@ -154,6 +157,19 @@ public sealed record EffectSpec
 
     /// <summary>A random branch: the roll picks the case whose range holds it.</summary>
     public OutcomesSpec? Outcomes { get; init; }
+
+    /// <summary>
+    /// A countdown (D-479): each firing of the trigger lowers the object's counter by one instead of acting; at zero the
+    /// actions run. Only effects and special rolls count.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public CounterSpec? Counter { get; init; }
+}
+
+/// <summary>The counter of an effect: where it starts (and where <c>resetCounters</c> puts it back).</summary>
+public sealed record CounterSpec
+{
+    public required int Start { get; init; }
 }
 
 public sealed record TargetSpec
@@ -345,6 +361,10 @@ public sealed record ObjectFilterSpec
 
     public bool? Hostile { get; init; }
 
+    /// <summary>Only objects with a counter (<c>true</c>) or without one (<c>false</c>), D-479.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? HasCounter { get; init; }
+
     /// <summary>Objects with any of these <see cref="ObjectDefinition.Tags"/> are left alone (D-470).</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public EquatableArray<string>? ExcludeTags { get; init; }
@@ -371,6 +391,12 @@ public enum TransformMode
 {
     Transform,
     Annotate,
+
+    /// <summary>Every matching object's counter changes by <see cref="TransformObjectAction.Value"/>; at zero it goes off (D-479).</summary>
+    AddCounter,
+
+    /// <summary>Every matching object's counter goes back to its start (D-479).</summary>
+    ResetCounters,
 }
 
 /// <summary>Turn an object into another (<see cref="Into"/>) or add a note to it.</summary>
@@ -383,6 +409,10 @@ public sealed record TransformObjectAction : ActionSpec
     public string? Into { get; init; }
 
     public string? Note { get; init; }
+
+    /// <summary>How much <c>addCounter</c> changes the counters by; a minus counts down.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ContentValue? Value { get; init; }
 }
 
 /// <summary>Draw an event from a deck: <c>good</c>, <c>bad</c>, <c>special</c>, <c>risky</c>, <c>zone</c> or a deck id.</summary>

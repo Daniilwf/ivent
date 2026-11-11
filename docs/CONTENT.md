@@ -47,11 +47,12 @@
 | Поле | Значения |
 | --- | --- |
 | `target` | `selector`: `self`, `chosen`, `randomActive`, `all`, `leader`, `higherPoints`, `lowerPoints`; `among` — ограничить выбор для `chosen` и `randomActive`: `higherPoints`, `lowerPoints`; `excludeSelf` — исключить себя |
-| `trigger` | для эффектов: `beforeRoll`, `afterRoll`, `runCompleted`, `beforeDice`, `afterDice`, `moveStep`, `stop`, `pass`, `drop`, `techReroll`, `time`, `hostileIncoming` |
+| `trigger` | для эффектов: `beforeRoll`, `afterRoll`, `runCompleted`, `beforeDice`, `afterDice`, `moveStep`, `stop`, `pass`, `drop`, `techReroll`, `time`, `hostileIncoming`, `runEnded` (прохождение или дроп, D-479) |
 | `duration` | `{ "uses": N }`, `{ "hours": N }`, `{ "runs": N }` или `{ "untilTriggered": true }` |
 | `condition` | условие срабатывания, см. «Условия» |
 | `intercept` | `hostile` — эффект гасит входящий враждебный эффект (пассивная защита) |
 | `actions` | список базовых действий, выполняются по порядку |
+| `counter` | `{ "start": 3 }` — обратный отсчёт эффекта или спецролла: каждое срабатывание триггера уменьшает счётчик экземпляра на 1 вместо действий, на нуле действия выполняются (D-479) |
 | `outcomes` | случайное ветвление: `{ "roll": "1d6", "cases": [{ "from": 1, "to": 3, "actions": [...] }] }` |
 
 **Значения** в действиях: целое число, строка с кубиками (`"1d6"`, `"2d4"`, `"-1d6"`) или ссылка: `"$roll"` — результат последнего броска в этом эффекте, `"$choice"` — последний выбор игрока, `"$result"` — итог голосования, `"$имя"` — параметр, переданный через `params` в `giveObject`, `"-$roll"` — со знаком минус.
@@ -67,7 +68,7 @@
 | `roll` | `dice`: результат доступен как `$roll` |
 | `giveObject` | `objectId`, `params` для параметризованных объектов |
 | `takeObject` | `mode`: `take`, `steal`, `destroy`, `give` (отдать свой объект цели; нечего отдать — отказ `item.nothingToGive`, D-478); `filter`; `pick`: `random` или `chosen` (ответ — id экземпляра); `count`: сколько объектов — число от 1 или ссылка (`$roll`), `all: true` — все подходящие (D-476). При `chosen` число просит ответ на каждый объект, а ссылка забирает все оставшиеся ответы как список по порядку, недостающие берутся случайно |
-| `transformObject` | `mode`: `transform` (`into`) или `annotate` (`note`) |
+| `transformObject` | `mode`: `transform` (`into`), `annotate` (`note`), `addCounter` (`value`: на сколько меняются счётчики всех подходящих; дошедший до нуля срабатывает сразу) или `resetCounters` (счётчики всех подходящих — к началу), D-479 |
 | `drawEvent` | `deck`: `good`, `bad`, `special`, `risky`, `zone` или id колоды |
 | `spinWheel` | `wheel`: id колеса |
 | `modifyNextRoll` | `filter`, `choiceCount`, `runCondition` |
@@ -80,7 +81,7 @@
 | Условие | Пример |
 | --- | --- |
 | Фильтр игры | `{ "tags": ["Horror"], "maxHours": 10, "minHours": 2, "releaseYearBefore": 2005 }` |
-| Фильтр объектов (`takeObject`, `transformObject`) | `{ "kind": "item", "rarity": "epic", "objectId": "orange", "hostile": true, "excludeTags": ["rat"] }`; `excludeTags` пропускает объекты с любым из этих тегов (D-470) |
+| Фильтр объектов (`takeObject`, `transformObject`) | `{ "kind": "item", "rarity": "epic", "objectId": "orange", "hostile": true, "hasCounter": true, "excludeTags": ["rat"] }`; `excludeTags` пропускает объекты с любым из этих тегов (D-470), `hasCounter` — только объекты со счётчиком или без (D-479) |
 | Условие на прохождение | `{ "difficultyAtLeast": "hard" }` |
 | Статистика игрока | `{ "stat": "hostileReceived", "gte": 5 }`, `{ "stat": "completedStreakWithTag", "tag": "Horror", "gte": 3 }`, `{ "stat": "allDiceMax", "minDice": 3 }`, `{ "stat": "runHours", "gte": 30 }` |
 
@@ -357,6 +358,20 @@
   "effect": {
     "target": { "selector": "chosen", "excludeSelf": true },
     "actions": [{ "type": "takeObject", "mode": "give", "pick": "chosen", "filter": { "kind": "effect" } }]
+  }
+}
+```
+
+### 17. Часовая бомба — эффект со счётчиком
+
+```json
+{
+  "id": "time-bomb", "kind": "effect", "name": "Часовая бомба",
+  "description": "Счётчик 3: каждое твоё прохождение или дроп уменьшает его на 1. На нуле — назад на d6.",
+  "rarity": "common", "price": null, "hostile": true,
+  "effect": {
+    "trigger": "runEnded", "duration": { "untilTriggered": true }, "counter": { "start": 3 },
+    "actions": [{ "type": "roll", "dice": "1d6" }, { "type": "move", "steps": "-$roll" }]
   }
 }
 ```
