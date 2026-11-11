@@ -8,7 +8,7 @@ namespace GameEvent.Web.Tests.Api;
 
 /// <summary>
 /// Lists of players by name follow the Russian alphabet (K1O-1, D-631): «Ёж» right after «Енот», not before «Аист». The
-/// season screen (its players feed the proof form's «Свидетель» list), the feed and the admin's «Игроки» page; the token
+/// season screen (its players feed the proof form's «Свидетель» list), the feed, the admin's «Игроки» page, map and pool stats; the token
 /// colours follow the same order (D-150).
 /// </summary>
 public sealed class PlayerNameOrderTests : IAsyncLifetime
@@ -96,5 +96,26 @@ public sealed class PlayerNameOrderTests : IAsyncLifetime
         var map = await OkAsync(await admin.GetAsync($"/api/admin/seasons/{SiteFactory.SeasonId}/map", Ct));
 
         Assert.Equal(s_ordered, map.GetProperty("players").EnumerateArray().Select(p => p.GetProperty("name").GetString()));
+    }
+
+    [Fact]
+    public async Task The_admins_pool_stats_list_the_players_without_games_in_russian_alphabetical_order()
+    {
+        // Given the pool is empty: every player is a «no games» signal
+        await using (var db = _site.NewDb())
+        {
+            foreach (var game in db.Games)
+            {
+                game.IsDeleted = true;
+            }
+
+            await db.SaveChangesAsync(Ct);
+        }
+
+        var admin = await _site.SignedInAsync("admin");
+
+        var stats = await OkAsync(await admin.GetAsync($"/api/admin/seasons/{SiteFactory.SeasonId}/pool-stats", Ct));
+
+        Assert.Equal(s_ordered, stats.GetProperty("playersWithoutGames").EnumerateArray().Select(p => p.GetProperty("name").GetString()));
     }
 }

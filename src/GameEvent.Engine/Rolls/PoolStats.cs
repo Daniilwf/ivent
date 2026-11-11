@@ -40,7 +40,7 @@ public static class PoolStats
 
     /// <summary>
     /// Idle, active players of a running season whose roll would find no game now (their exclusions and the filters
-    /// included), ordered by name: the signal for the admin (D-92). A player playing or holding an offer has a game.
+    /// included), ordered by name ordinally (the web re-sorts it in the Russian alphabet, D-631): the signal for the admin (D-92). A player playing or holding an offer has a game.
     /// </summary>
     public static IReadOnlyList<Guid> PlayersWithoutGames(SeasonState state, IPoolView pool)
     {

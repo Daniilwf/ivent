@@ -21,16 +21,22 @@ public static class PlayerTokens
 
     /// <summary>The season's players in token order: by name, then by id as the database stores it.</summary>
     public static List<SeasonPlayerRecord> InTokenOrder(this IEnumerable<SeasonPlayerRecord> players) =>
-        [.. players.OrderBy(p => p.Name, NameOrder).ThenBy(p => p.Id.ToString("D").ToUpperInvariant(), StringComparer.Ordinal)];
+        players.InTokenOrder(p => p.Name, p => p.Id);
+
+    /// <summary>Anything that names a season player, in token order: by name, then by id as the database stores it.</summary>
+    public static List<T> InTokenOrder<T>(this IEnumerable<T> players, Func<T, string> name, Func<T, Guid> id) =>
+        [.. players.OrderBy(name, NameOrder).ThenBy(p => id(p).ToString("D").ToUpperInvariant(), StringComparer.Ordinal)];
 
     /// <summary>The token of every player of the given seasons, by the season player's id.</summary>
     public static async Task<Dictionary<Guid, int>> TokensAsync(this GameEventDbContext db, IReadOnlyCollection<Guid> seasonIds, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(db);
+        // Only what the order needs: the rows carry JSON columns the tokens do not read
         var players = (await db.SeasonPlayers.AsNoTracking()
             .Where(p => seasonIds.Contains(p.SeasonId))
+            .Select(p => new { p.Id, p.SeasonId, p.Name })
             .ToListAsync(ct))
-            .InTokenOrder();
+            .InTokenOrder(p => p.Name, p => p.Id);
         return players.GroupBy(p => p.SeasonId).SelectMany(g => g.Select((p, i) => (p.Id, Token: i))).ToDictionary(x => x.Id, x => x.Token);
     }
 
