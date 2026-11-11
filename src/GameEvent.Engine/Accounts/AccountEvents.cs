@@ -40,3 +40,22 @@ public sealed record AccountAvatarChanged(Guid UserId, Guid? FileId) : IGameEven
 /// <summary>The admin restored a deleted account; it signs in again after a password reset.</summary>
 [EventType("account-restored")]
 public sealed record AccountRestored(Guid UserId) : IGameEvent;
+
+/// <summary>Who ended sessions (D-466): the owner on this or one device, the owner on the other devices, or the admin.</summary>
+public enum SessionEndReason
+{
+    SignedOut,
+    OtherDevices,
+    Admin,
+}
+
+// Sessions (D-466): a sign-in on one device. The log names a session by its id only; the device and the address stay
+// in the session table, which the cleanup empties of ended sessions.
+
+/// <summary>The account signed in on a device: a new session.</summary>
+[EventType("session-started")]
+public sealed record SessionStarted(Guid UserId, Guid SessionId) : IGameEvent;
+
+/// <summary>Sessions of the account ended before their time: their cookies no longer sign in, their hub connections close.</summary>
+[EventType("sessions-ended")]
+public sealed record SessionsEnded(Guid UserId, EquatableArray<Guid> SessionIds, SessionEndReason Reason) : IGameEvent;

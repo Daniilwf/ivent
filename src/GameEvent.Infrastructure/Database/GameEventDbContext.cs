@@ -10,6 +10,8 @@ public sealed class GameEventDbContext(DbContextOptions<GameEventDbContext> opti
 {
     public DbSet<UserRecord> Users => Set<UserRecord>();
 
+    public DbSet<SessionRecord> Sessions => Set<SessionRecord>();
+
     public DbSet<GameEventRecord> Events => Set<GameEventRecord>();
 
     public DbSet<SeasonRecord> Seasons => Set<SeasonRecord>();
@@ -56,6 +58,15 @@ public sealed class GameEventDbContext(DbContextOptions<GameEventDbContext> opti
             e.Property(x => x.NormalizedLogin).HasMaxLength(64);
             e.Property(x => x.Name).HasMaxLength(64);
             e.Property(x => x.Role).HasMaxLength(20);
+        });
+
+        modelBuilder.Entity<SessionRecord>(e =>
+        {
+            e.ToTable("Session");
+            e.HasOne<UserRecord>().WithMany().HasForeignKey(x => x.UserId);
+            e.HasIndex(x => x.UserId);
+            e.Property(x => x.UserAgent).HasMaxLength(SessionRules.MaxUserAgentLength);
+            e.Property(x => x.Address).HasMaxLength(SessionRules.MaxAddressLength);
         });
 
         modelBuilder.Entity<Files.FileRecord>(e =>

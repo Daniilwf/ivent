@@ -71,6 +71,7 @@ public sealed partial class DeadlineScheduler(
         }
 
         await FireTimersAsync(now, ct);
+        await PurgeSessionsAsync(now, ct);
 
         foreach (var (seasonId, deadline) in due)
         {
@@ -125,6 +126,28 @@ public sealed partial class DeadlineScheduler(
         }
     }
 
+    /// <summary>
+    /// Rows of ended and expired sessions go (D-469): the command only when there are any, so a quiet pass writes nothing.
+    /// Sessions are the accounts' data, so the queue drops them, like it ends them.
+    /// </summary>
+    private async Task PurgeSessionsAsync(DateTimeOffset now, CancellationToken ct)
+    {
+        bool any;
+        await using (var db = await dbFactory.CreateDbContextAsync(ct))
+        {
+            any = (await db.Sessions.AsNoTracking().ToListAsync(ct)).Any(s => !s.IsActive(now));
+        }
+
+        if (any)
+        {
+            var outcome = await bus.SendAsync(new CommandEnvelope(CommandIdFor("purge-sessions", Guid.Empty, now), Guid.Empty, new Accounts.PurgeSessions(), AuthorId: null), ct);
+            if (!outcome.IsAccepted)
+            {
+                LogSessionsPurgeRefused(logger, outcome.Rejection?.Code);
+            }
+        }
+    }
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         if (!settings.Enabled)
@@ -171,6 +194,9 @@ public sealed partial class DeadlineScheduler(
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Timers of season {SeasonId} were not fired: {Code}")]
     private static partial void LogTimersRefused(ILogger logger, Guid seasonId, string? code);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Ended sessions were not dropped: {Code}")]
+    private static partial void LogSessionsPurgeRefused(ILogger logger, string? code);
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Deadline scheduler pass failed")]
     private static partial void LogTickFailed(ILogger logger, Exception exception);

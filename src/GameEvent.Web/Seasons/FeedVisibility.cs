@@ -105,6 +105,8 @@ public static class FeedVisibility
         ["account-deleted"] = Access.NotInFeed,
         ["account-restored"] = Access.NotInFeed,
         ["account-avatar-changed"] = Access.NotInFeed,
+        ["session-started"] = Access.NotInFeed,
+        ["sessions-ended"] = Access.NotInFeed,
         ["file-stored"] = Access.NotInFeed,
         ["game-added"] = Access.NotInFeed,
         ["game-changed"] = Access.NotInFeed,
