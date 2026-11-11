@@ -5865,6 +5865,62 @@
           }
         }
       }
+    },
+    "/api/test/seasons/{seasonId}/content": {
+      "post": {
+        "tags": [
+          "Test"
+        ],
+        "parameters": [
+          {
+            "name": "seasonId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TestContentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -7401,6 +7457,43 @@
         },
         "description": "The die a difficulty gives on completion, and the event it grants (`good`, `bad`) or none."
       },
+      "DrawnEventView": {
+        "required": [
+          "sequence",
+          "deck",
+          "kind",
+          "objectId",
+          "name",
+          "description",
+          "source"
+        ],
+        "type": "object",
+        "properties": {
+          "sequence": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "deck": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/EventKind"
+          },
+          "objectId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "source": {
+            "$ref": "#/components/schemas/EventSource"
+          }
+        },
+        "description": "The event I drew last (D-500, stage 5): `sequence` — its place in the log, so the page shows a new one as new;\n`deck` and `kind` — where it came from; `name` and `description` — its card from the content in\nforce when it was drawn; `source` — a cell or an item."
+      },
       "DropPenaltyView": {
         "required": [
           "count",
@@ -7639,8 +7732,31 @@
       "EventKind": {
         "enum": [
           "good",
-          "bad"
-        ]
+          "bad",
+          "special",
+          "risky"
+        ],
+        "description": "The kind of an event (SPEC «Ивенты»): good, bad, special, risky. A drawn event has the kind of its deck (D-501); the\nstandard decks are the wheels named like the kinds. Special and risky came with stage 5: a build before it cannot read\nthem, and they are written only once events are on."
+      },
+      "EventRules": {
+        "required": [
+          "defaultDeck"
+        ],
+        "type": "object",
+        "properties": {
+          "defaultDeck": {
+            "description": "The deck an event cell draws from when the zone of the player's cell has no deck of the content (D-502): the\nstandard deck of this kind.",
+            "$ref": "#/components/schemas/EventKind"
+          }
+        },
+        "description": "The rules of event decks (SPEC «Ивенты», D-500…D-502)."
+      },
+      "EventSource": {
+        "enum": [
+          "cell",
+          "item"
+        ],
+        "description": "Where a drawn event came from (GLOSSARY «Источник ивента»); stage 5 adds the drop, the paid reroll and the difficulty."
       },
       "ExclusionReason": {
         "enum": [
@@ -7783,6 +7899,22 @@
         },
         "description": "A game an event of the page names; `hasPage` — the viewer may open its page (a deleted game is the admin's);\n`cover` — the pool's cover, as the season screen shows it (D-222)."
       },
+      "FeedObjectView": {
+        "required": [
+          "id",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "description": "An object of the content the page's events name (stage 5: the drawn events), by its latest card."
+      },
       "FeedPlayerView": {
         "required": [
           "id",
@@ -7883,9 +8015,18 @@
             "items": {
               "$ref": "#/components/schemas/FeedRunView"
             }
+          },
+          "objects": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/FeedObjectView"
+            }
           }
         },
-        "description": "A page of the feed, newest first; `nextBefore` — the sequence to ask before for the next page, none at the start of\nthe log. `players` — every player of the season; `games` and `runs` — those the page's events name (D-150)."
+        "description": "A page of the feed, newest first; `nextBefore` — the sequence to ask before for the next page, none at the start of\nthe log. `players` — every player of the season; `games` and `runs` — those the page's events name (D-150);\n`objects` — the content objects they name (the drawn events)."
       },
       "FileFromUrlRequest": {
         "required": [
@@ -8501,7 +8642,8 @@
           "paidReroll",
           "drop",
           "difficulty",
-          "item"
+          "item",
+          "event"
         ],
         "description": "What created a manual effect; C11 adds item, cell and event sources."
       },
@@ -8951,9 +9093,19 @@
               "null",
               "boolean"
             ]
+          },
+          "lastEvent": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/DrawnEventView"
+              }
+            ]
           }
         },
-        "description": "The signed-in player's own turn. While playing: `dropHintMinutes` is `roll.minPlayMinutesBeforeDrop` until\nthat much has been played by the server clock (only a hint: D-09), then null; `dropPenalty` is what a drop costs\nunder the rules in force; `techRerollOpen` says whether the player may still tech-reroll themselves (D-94);\n`challengesEnabled` says whether a challenge may be claimed on completion (`features.challenges`, D-96);\n`techRerollUntil` is when the player's own tech reroll window closes (the roll time plus the run's snapshot of\n`roll.techRerollWindowHours`), null while not playing. The active run's game carries the hours of the roll's\nsnapshot, the ones the completion counts (D-44): the pool may have got hours since (D-138). `difficultyDice` —\nwhile playing, the die each difficulty gives under the run's snapshot and the event it grants, if any.\n`dropPenalty.count` counts the extra dice of the drops in a row before this run (D-205, D-324).\n`wishRerollOpen` — whether the player may give the game up by wish now (D-206, D-325; always set, optional for older clients): a tech reroll with the\nreason `wish`, within the window, for a game with a listed tag the roll did not impose."
+        "description": "The signed-in player's own turn. While playing: `dropHintMinutes` is `roll.minPlayMinutesBeforeDrop` until\nthat much has been played by the server clock (only a hint: D-09), then null; `dropPenalty` is what a drop costs\nunder the rules in force; `techRerollOpen` says whether the player may still tech-reroll themselves (D-94);\n`challengesEnabled` says whether a challenge may be claimed on completion (`features.challenges`, D-96);\n`techRerollUntil` is when the player's own tech reroll window closes (the roll time plus the run's snapshot of\n`roll.techRerollWindowHours`), null while not playing. The active run's game carries the hours of the roll's\nsnapshot, the ones the completion counts (D-44): the pool may have got hours since (D-138). `difficultyDice` —\nwhile playing, the die each difficulty gives under the run's snapshot and the event it grants, if any.\n`dropPenalty.count` counts the extra dice of the drops in a row before this run (D-205, D-324).\n`wishRerollOpen` — whether the player may give the game up by wish now (D-206, D-325; always set, optional for older clients): a tech reroll with the\nreason `wish`, within the window, for a game with a listed tag the roll did not impose.\n`lastEvent` — the event I drew last (stage 5), while `features.events` is on; null before the first draw."
       },
       "NominationRules": {
         "required": [
@@ -10164,6 +10316,17 @@
           },
           "weeklyChallenge": {
             "$ref": "#/components/schemas/WeeklyChallengeRules"
+          },
+          "events": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The rules of events (stage 5). Missing — a season created before them reads as it did (D-50); needed once\n`features.events` is on (RulesetValidator). Not written while missing.",
+                "$ref": "#/components/schemas/EventRules"
+              }
+            ]
           }
         }
       },
@@ -10994,6 +11157,41 @@
           }
         },
         "description": "The site's clock as the test endpoints see it: now, whether it can be moved and how far it is from the real time\n(`shiftMinutes`, negative — in the past; H9, D-221)."
+      },
+      "TestContentRequest": {
+        "required": [
+          "objects",
+          "wheels",
+          "comment"
+        ],
+        "type": "object",
+        "properties": {
+          "objects": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "wheels": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "comment": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "A content pack for a season of the tests (stage 5, D-534): `objects` and `wheels` — the JSON texts of content\nfiles, as `content/` holds them; published by the admin's `PublishContent` with `comment`."
       },
       "TestRandomRequest": {
         "required": [

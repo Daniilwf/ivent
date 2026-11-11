@@ -127,6 +127,7 @@ public sealed record PlayerView(Guid Id, string Name, string CellId, int Points,
 /// <c>dropPenalty.count</c> counts the extra dice of the drops in a row before this run (D-205, D-324).
 /// <c>wishRerollOpen</c> — whether the player may give the game up by wish now (D-206, D-325; always set, optional for older clients): a tech reroll with the
 /// reason <c>wish</c>, within the window, for a game with a listed tag the roll did not impose.
+/// <c>lastEvent</c> — the event I drew last (stage 5), while <c>features.events</c> is on; null before the first draw.
 /// </summary>
 public sealed record MyTurnView(
     Guid PlayerId,
@@ -147,7 +148,8 @@ public sealed record MyTurnView(
     DateTimeOffset? TechRerollUntil = null,
     IReadOnlyList<DifficultyDieView>? DifficultyDice = null,
     MoveView? LastMove = null,
-    bool? WishRerollOpen = null);
+    bool? WishRerollOpen = null,
+    DrawnEventView? LastEvent = null);
 
 /// <summary>The die a difficulty gives on completion, and the event it grants (<c>good</c>, <c>bad</c>) or none.</summary>
 public sealed record DifficultyDieView(Difficulty Difficulty, int Sides, EventKind? GrantEvent);
@@ -670,7 +672,8 @@ public static class SeasonEndpoints
                     ],
                 // The token walks the real branch and teleport on the graph map; the chain of stage 1 needs no path
                 rules.Features.MapMode == MapMode.Graph ? await SeasonMaps.LastMoveAsync(db, seasonId, mine.Id, ct) : null,
-                wishRerollOpen);
+                wishRerollOpen,
+                rules.Features.Events ? await EventViews.LastDrawnAsync(db, seasonId, mine.Id, ct) : null);
         }
 
         // Avatars live on the accounts, across seasons (SPEC «Сезоны»)

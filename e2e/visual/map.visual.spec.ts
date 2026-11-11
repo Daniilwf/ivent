@@ -145,6 +145,7 @@ for (const section of [
   'graph',
   'editor',
   'map-background',
+  'drawn-event',
   'whats-new',
 ]) {
   test(`the styleguide section «${section}» looks as approved`, async ({ page }) => {
