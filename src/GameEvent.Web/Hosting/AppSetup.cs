@@ -101,6 +101,17 @@ public static class AppSetup
             {
                 document.Components.Schemas[type.Name] = await context.GetOrCreateSchemaAsync(type, null, ct);
             }
+
+            // An enum schema is shared: the first nullable use (`Difficulty?`) put null among its values, and the generated
+            // client then lost the list of values and made every use nullable. A nullable use says so itself (oneOf with
+            // null), so the shared schema keeps only the values (D-633).
+            foreach (var schema in document.Components.Schemas.Values.OfType<Microsoft.OpenApi.OpenApiSchema>())
+            {
+                if (schema.Enum is { Count: > 0 } values && values.Any(v => v is null))
+                {
+                    schema.Enum = [.. values.Where(v => v is not null)];
+                }
+            }
         }));
 
         // Local http only in Development and Test; everywhere else (staging too) cookies are Secure and __Host-.

@@ -188,6 +188,9 @@ public sealed class RunRecord
 
     public Difficulty? Difficulty { get; set; }
 
+    /// <summary>The difficulty named at the start (D-633); null — none named, or a run started before the column.</summary>
+    public Difficulty? DeclaredDifficulty { get; set; }
+
     public decimal? Hours { get; set; }
 
     public required string DiceJson { get; set; }

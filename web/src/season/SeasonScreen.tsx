@@ -40,7 +40,7 @@ import { Panel } from '../ui/Surface';
 type Season = Schemas['SeasonView'];
 type Command =
   | { kind: 'roll' }
-  | { kind: 'start' }
+  | { kind: 'start'; difficulty: Schemas['Difficulty'] }
   | { kind: 'reroll' }
   | { kind: 'drop' }
   | {
@@ -53,7 +53,7 @@ type Command =
     }
   | { kind: 'techReroll'; reason: NonNullable<Schemas['TechRerollReason']>; comment: string | null }
   | { kind: 'complete'; completion: Completion }
-  | { kind: 'choose'; choiceId: string; optionId: string }
+  | { kind: 'choose'; choiceId: string; optionId: string; difficulty?: Schemas['Difficulty'] }
   | { kind: 'alreadyPlayed'; gameId: string }
   | { kind: 'resolveEffect'; effectId: string; outcome: EffectOutcome; comment: string | null };
 type Loaded = { kind: 'season'; season: Season } | { kind: 'signedOut' } | { kind: 'failed' };
@@ -75,7 +75,10 @@ function send(seasonId: string, command: Command) {
     case 'roll':
       return api.POST('/api/seasons/{seasonId}/roll', { params, body: { commandId } });
     case 'start':
-      return api.POST('/api/seasons/{seasonId}/start', { params, body: { commandId } });
+      return api.POST('/api/seasons/{seasonId}/start', {
+        params,
+        body: { commandId, difficulty: command.difficulty },
+      });
     case 'reroll':
       return api.POST('/api/seasons/{seasonId}/reroll', { params, body: { commandId } });
     case 'drop':
@@ -108,7 +111,13 @@ function send(seasonId: string, command: Command) {
     case 'choose':
       return api.POST('/api/seasons/{seasonId}/choose', {
         params,
-        body: { commandId, choiceId: command.choiceId, optionId: command.optionId },
+        // A game choice starts the run on its difficulty (D-633); a branch has none
+        body: {
+          commandId,
+          choiceId: command.choiceId,
+          optionId: command.optionId,
+          ...(command.difficulty ? { difficulty: command.difficulty } : {}),
+        },
       });
     case 'alreadyPlayed':
       return api.POST('/api/seasons/{seasonId}/already-played', {
@@ -828,7 +837,9 @@ export function SeasonScreen({
             roll={me?.roll ?? null}
             price={me?.nextReroll ?? null}
             pending={pending}
-            onChoose={(optionId) => void act({ kind: 'choose', choiceId: choice.id, optionId })}
+            onChoose={(optionId, difficulty) =>
+              void act({ kind: 'choose', choiceId: choice.id, optionId, difficulty })
+            }
             onAlreadyPlayed={(gameId) => void act({ kind: 'alreadyPlayed', gameId })}
             onReroll={() => void act({ kind: 'reroll' })}
           />
@@ -839,7 +850,7 @@ export function SeasonScreen({
             roll={me?.roll ?? null}
             price={me?.nextReroll ?? null}
             pending={pending}
-            onStart={() => void act({ kind: 'start' })}
+            onStart={(difficulty) => void act({ kind: 'start', difficulty })}
             onAlreadyPlayed={() => void act({ kind: 'alreadyPlayed', gameId: offer.id })}
             onReroll={() => void act({ kind: 'reroll' })}
           />
@@ -871,6 +882,7 @@ export function SeasonScreen({
               needsHours={me.activeRun.game.hours == null}
               challengesEnabled={me.challengesEnabled}
               dice={me.difficultyDice ?? null}
+              declared={me.activeRun.declaredDifficulty ?? null}
               pending={pending}
               onComplete={(completion) => void act({ kind: 'complete', completion })}
             />

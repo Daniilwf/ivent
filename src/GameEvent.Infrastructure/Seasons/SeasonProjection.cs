@@ -185,6 +185,7 @@ internal static class SeasonProjection
             record.RolledAt = run.RolledAt;
             record.StartedAt = run.StartedAt;
             record.Difficulty = run.Difficulty;
+            record.DeclaredDifficulty = run.DeclaredDifficulty;
             record.Hours = run.Hours;
             record.DiceJson = JsonSerializer.Serialize(run.Dice, EngineJson.Options);
             record.ChallengeDiceJson = JsonSerializer.Serialize(run.ChallengeDice, EngineJson.Options);
@@ -369,7 +370,8 @@ internal static class SeasonProjection
                     replayed.Runs.GetValueOrDefault(r.Id)?.Gain ?? 0,
                     replayed.Runs.GetValueOrDefault(r.Id)?.CellPoints ?? 0,
                     r.DiceModsJson is null ? null : JsonSerializer.Deserialize<RunDiceMods>(r.DiceModsJson, EngineJson.Options),
-                    replayed.Runs.GetValueOrDefault(r.Id)?.CellObjects ?? default)),
+                    replayed.Runs.GetValueOrDefault(r.Id)?.CellObjects ?? default,
+                    r.DeclaredDifficulty)),
             ManualEffects = effects.ToImmutableSortedDictionary(
                 x => x.Id,
                 x => new PendingManualEffect(x.Id, x.PlayerId, x.ObjectId is null ? x.DrawEvent : null, x.Source, x.RunId) { ObjectId = x.ObjectId }),

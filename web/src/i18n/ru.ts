@@ -341,6 +341,9 @@ export const ru = {
     },
     roll: 'Крутить колесо',
     start: 'Начать',
+    // SPEC «Награда»: the die follows the difficulty named at the start; lowered on the way — the lower counts (D-633)
+    startDifficulty: 'На какой сложности начинаешь',
+    startDifficultyHint: 'При завершении выше неё не засчитается. Понизишь по ходу — укажешь ниже.',
     alreadyPlayed: 'Уже проходил',
     reroll: 'Реролл',
     rerollFor: (payment: RerollPayment, price: number) =>
@@ -438,6 +441,7 @@ export const ru = {
     completeTitle: 'Игра пройдена? Отметь прохождение',
     difficulty: 'Сложность',
     difficultyHint: 'На какой сложности проходил. Админ сверит её с пруфом',
+    difficultyDeclared: (difficulty: string) => `Начинал на «${difficulty}» — выше не засчитается`,
     // The die of each difficulty and the event it grants, from the run's snapshot
     difficultyDice: (dice: { label: string; sides: number; grant: 'good' | 'bad' | null }[]) =>
       `Кубы: ${dice
