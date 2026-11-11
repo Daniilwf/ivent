@@ -87,6 +87,7 @@ export function ObjectEditor({
   const [removing, setRemoving] = useState(false);
   const [template, setTemplate] = useState<ActionType>('move');
   const editor = useRef<HTMLTextAreaElement>(null);
+  const form = useRef<HTMLDivElement>(null);
 
   const wheel = collection === 'wheels';
   const schema = wheel ? schemas.wheel : schemas.object;
@@ -122,13 +123,36 @@ export function ObjectEditor({
     setOutcome(null);
   };
 
-  /** Selects the field in the JSON editor: the form view switches to JSON first */
+  /**
+   * Leads to the field in the view that is open (DESIGN.md, «Формы»): in the form — its control (or its error, for a
+   * part with no control of its own); in the JSON — the field's text selected. Only a part the form does not edit
+   * (a condition, the outcomes, an unknown field) switches the form to the JSON.
+   */
   function goTo(path: string) {
+    if (view === 'form' && !readOnly && value) {
+      const target = Array.from(
+        form.current?.querySelectorAll<HTMLElement>('[data-field-path]') ?? [],
+      ).find((el) => el.dataset.fieldPath === path);
+      if (target) {
+        target.focus();
+        target.scrollIntoView({ block: 'center' });
+        return;
+      }
+    }
+    select((json) => locate(json, path));
+  }
+
+  /** The JSON view with the cursor at the place where the text stops being JSON */
+  function showPlace(offset: number) {
+    select(() => ({ start: offset, end: offset }));
+  }
+
+  function select(place: (json: string) => { start: number; end: number } | null) {
     setView('json');
     requestAnimationFrame(() => {
       const area = editor.current;
       if (!area) return;
-      const found = locate(area.value, path);
+      const found = place(area.value);
       area.focus();
       if (found) area.setSelectionRange(found.start, found.end);
     });
@@ -161,7 +185,12 @@ export function ObjectEditor({
       });
       if (answer.data) {
         setServer({ text, ...serverProblems(answer.data.problems, prefixOf(collection, place)) });
-        if (answer.data.valid) setOutcome({ tone: 'success', text: t.checked });
+        // The answer to «Проверить» is said at once; the list above is not a live region
+        setOutcome(
+          answer.data.valid
+            ? { tone: 'success', text: t.checked }
+            : { tone: 'danger', text: t.checkedProblems(answer.data.problems.length) },
+        );
       } else setOutcome({ tone: 'danger', text: refusal(answer) });
     } catch {
       setOutcome({ tone: 'danger', text: t.checkFailed });
@@ -267,13 +296,28 @@ export function ObjectEditor({
         />
       )}
 
+      {/* While the admin types only the count is said, politely; the list itself is not a live region (DESIGN.md) */}
+      <p role="status" className="sr-only">
+        {checked.parse ? t.notJson : problems.length > 0 ? t.problemsTitle(problems.length) : ''}
+      </p>
       {problems.length > 0 || checked.parse ? (
-        <div
-          role="alert"
-          className="grid gap-2 rounded-md bg-danger-soft p-3"
-          data-testid="content-problems"
-        >
-          {checked.parse ? <p className="font-medium">{checked.parse}</p> : null}
+        <div className="grid gap-2 rounded-md bg-danger-soft p-3" data-testid="content-problems">
+          {checked.parse ? (
+            <div className="flex flex-wrap items-center gap-x-2">
+              <p className="mr-auto font-medium">
+                {t.parseError(checked.parse.line, checked.parse.column)}
+              </p>
+              <Button
+                variant="link"
+                icon={<Crosshair size={16} aria-hidden />}
+                onClick={() => {
+                  if (checked.parse) showPlace(checked.parse.offset);
+                }}
+              >
+                {t.showPlace}
+              </Button>
+            </div>
+          ) : null}
           {problems.length > 0 ? (
             <>
               <p className="font-bold">{t.problemsTitle(problems.length)}</p>
@@ -322,28 +366,30 @@ export function ObjectEditor({
 
       {view === 'form' && !readOnly ? (
         value ? (
-          wheel ? (
-            <WheelForm
-              value={value}
-              problems={problems}
-              ids={ids}
-              disabled={false}
-              onChange={(next) => {
-                edit(pretty(next));
-              }}
-            />
-          ) : (
-            <ObjectForm
-              value={value}
-              problems={problems}
-              schemas={schemas}
-              ids={ids}
-              disabled={false}
-              onChange={(next) => {
-                edit(pretty(next));
-              }}
-            />
-          )
+          <div ref={form}>
+            {wheel ? (
+              <WheelForm
+                value={value}
+                problems={problems}
+                ids={ids}
+                disabled={false}
+                onChange={(next) => {
+                  edit(pretty(next));
+                }}
+              />
+            ) : (
+              <ObjectForm
+                value={value}
+                problems={problems}
+                schemas={schemas}
+                ids={ids}
+                disabled={false}
+                onChange={(next) => {
+                  edit(pretty(next));
+                }}
+              />
+            )}
+          </div>
         ) : (
           <Notice tone="warning">{t.formBroken}</Notice>
         )

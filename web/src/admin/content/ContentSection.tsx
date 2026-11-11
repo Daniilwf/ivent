@@ -1,5 +1,5 @@
-import { Download, Plus } from 'lucide-react';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { Download, PackageOpen, Plus, Upload } from 'lucide-react';
+import { useCallback, useMemo, useRef, useState, type RefObject } from 'react';
 import { api, type Schemas } from '../../api/client';
 import { newCommandId } from '../../api/commands';
 import { answerOf, useLoaded } from '../../app/useLoaded';
@@ -10,7 +10,7 @@ import { Button } from '../../ui/Button';
 import { ConfirmDanger } from '../../ui/Dialogs';
 import { ChoiceGroup, Field, FilePicker, Select } from '../../ui/Field';
 import { Badge } from '../../ui/Marks';
-import { Notice } from '../../ui/States';
+import { EmptyState, Notice } from '../../ui/States';
 import { Panel } from '../../ui/Surface';
 import { useDesk } from '../../ui/useDesk';
 import { commentProblem, refusal } from '../actions';
@@ -26,6 +26,7 @@ import {
   type ContentSchemas,
   type Pack,
 } from './contentModel';
+import { jsonFault } from './jsonLocate';
 import { ObjectEditor } from './ObjectEditor';
 import { newKinds, newObject, type Json, type NewKind } from './templates';
 
@@ -104,6 +105,7 @@ function Workspace({
   const [filter, setFilter] = useState<Filter>('item');
   const [kind, setKind] = useState<NewKind>('item');
   const counter = useRef(0);
+  const importFile = useRef<HTMLInputElement>(null);
   // After a save the saved object stays open, at its place in the new version
   const [editing, setEditing] = useState<Open | null>(() => {
     if (!saved?.open) return null;
@@ -130,6 +132,48 @@ function Workspace({
     });
   };
 
+  // A season that never had content says so once, with the two ways to start (DESIGN.md, «Компоненты и состояния»)
+  const nothing =
+    view.version === 0 &&
+    pack.objects.length === 0 &&
+    pack.wheels.length === 0 &&
+    view.deleted.length === 0;
+  const create = (
+    <>
+      <Select
+        label={t.createKind}
+        value={kind}
+        data-testid="content-new-kind"
+        onChange={(e) => {
+          setKind(e.target.value as NewKind);
+        }}
+      >
+        {newKinds.map((k) => (
+          <option key={k} value={k}>
+            {t.kindOne[k] ?? k}
+          </option>
+        ))}
+      </Select>
+      <Button
+        icon={<Plus size={20} aria-hidden />}
+        data-testid="content-new"
+        onClick={() => {
+          openItem(
+            kind === 'wheel' ? 'wheels' : 'objects',
+            null,
+            newObject(kind, ids, {
+              name: t.newName,
+              description: t.newDescription,
+              wheel: t.newWheelName,
+            }),
+          );
+        }}
+      >
+        {t.create}
+      </Button>
+    </>
+  );
+
   const rows =
     filter === 'wheels'
       ? pack.wheels.map((w, index) => ({ item: w, index, collection: 'wheels' as const }))
@@ -148,146 +192,136 @@ function Workspace({
       {schemaFailed ? <Notice tone="info">{t.schemaFailed}</Notice> : null}
 
       <Panel title={t.version(view.version)} data-testid="content-list">
-        <ChoiceGroup
-          label={t.kindsLabel}
-          options={filters.map((f) => ({
-            value: f,
-            label: `${t.kinds[f] ?? f} · ${
-              f === 'wheels'
-                ? pack.wheels.length
-                : f === 'deleted'
-                  ? view.deleted.length
-                  : pack.objects.filter((o) => o.kind === f).length
-            }`,
-          }))}
-          value={filter}
-          onChange={setFilter}
-          data-testid="content-filter"
-        />
-        {view.version === 0 && pack.objects.length === 0 ? (
-          <p className="text-ink-soft">{t.empty}</p>
-        ) : null}
-        {filter === 'deleted' ? (
-          view.deleted.length === 0 ? (
-            <p className="text-ink-soft">{t.emptyKind}</p>
-          ) : (
-            <ul className="grid gap-2" data-testid="content-deleted">
-              {view.deleted.map((d) => (
-                <li
-                  key={d.id}
-                  className="flex flex-wrap items-center gap-x-3 gap-y-1 wrap-anywhere"
-                >
-                  <span className="font-bold">{d.name}</span>
-                  <code className="font-code text-sm text-ink-soft">{d.id}</code>
-                  <Badge tone="muted">{t.kindOne[d.kind] ?? d.kind}</Badge>
-                  <span className="text-sm text-ink-soft">{t.deletedIn(d.deletedIn)}</span>
-                </li>
-              ))}
-            </ul>
-          )
-        ) : rows.length === 0 ? (
-          <p className="text-ink-soft">{t.emptyKind}</p>
+        {nothing ? (
+          <EmptyState
+            icon={<PackageOpen size={28} aria-hidden />}
+            title={t.emptyTitle}
+            {...(desk ? { text: t.empty } : {})}
+            action={
+              desk ? (
+                <div className="flex flex-wrap items-end justify-center gap-3">
+                  {create}
+                  <Button
+                    icon={<Upload size={20} aria-hidden />}
+                    onClick={() => {
+                      importFile.current?.click();
+                    }}
+                  >
+                    {t.loadPack}
+                  </Button>
+                </div>
+              ) : undefined
+            }
+          />
         ) : (
-          <ul className="grid gap-1" data-testid="content-rows">
-            {rows.map(({ item, index, collection }) => {
-              const name = typeof item.name === 'string' ? item.name : '';
-              const id = typeof item.id === 'string' ? item.id : '';
-              const current = editing?.collection === collection && editing.index === index;
-              return (
-                <li
-                  key={`${collection}-${id}-${index}`}
-                  className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 rounded-md px-2 py-1 wrap-anywhere is-hover:bg-page"
-                  data-testid={`content-row-${id}`}
-                >
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                    <span className="font-bold">{name === '' ? t.previewEmpty : name}</span>
-                    <code className="font-code text-sm text-ink-soft">{id}</code>
-                    {collection === 'wheels' ? (
-                      <span className="text-sm text-ink-soft">
-                        {t.entries(Array.isArray(item.entries) ? item.entries.length : 0)}
-                      </span>
-                    ) : (
-                      <>
-                        {typeof item.rarity === 'string' ? (
-                          <Badge tone="muted">
-                            {t.values.rarity?.[item.rarity] ?? item.rarity}
-                          </Badge>
-                        ) : null}
-                        {item.kind === 'item' ? (
-                          <span className="text-sm text-ink-soft">
-                            {typeof item.price === 'number' ? t.price(item.price) : t.notForSale}
-                          </span>
-                        ) : null}
-                      </>
-                    )}
-                  </div>
-                  {current ? (
-                    <Badge tone="ink">{t.opened}</Badge>
-                  ) : (
-                    <Button
-                      variant="link"
-                      aria-label={t.openNamed(name === '' ? id : name)}
-                      data-testid={`content-open-${id}`}
-                      onClick={() => {
-                        openItem(collection, index, item);
-                      }}
+          <>
+            <ChoiceGroup
+              label={t.kindsLabel}
+              options={filters.map((f) => ({
+                value: f,
+                label: `${t.kinds[f] ?? f} · ${
+                  f === 'wheels'
+                    ? pack.wheels.length
+                    : f === 'deleted'
+                      ? view.deleted.length
+                      : pack.objects.filter((o) => o.kind === f).length
+                }`,
+              }))}
+              value={filter}
+              onChange={setFilter}
+              data-testid="content-filter"
+            />
+            {filter === 'deleted' ? (
+              view.deleted.length === 0 ? (
+                <p className="text-ink-soft">{t.emptyKind}</p>
+              ) : (
+                <ul className="grid gap-2" data-testid="content-deleted">
+                  {view.deleted.map((d) => (
+                    <li
+                      key={d.id}
+                      className="flex flex-wrap items-center gap-x-3 gap-y-1 wrap-anywhere"
                     >
-                      {t.open}
-                    </Button>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        )}
-        <div className="flex flex-wrap items-end gap-3 border-t-2 border-muted pt-3">
-          {desk ? (
-            <>
-              <Select
-                label={t.createKind}
-                value={kind}
-                data-testid="content-new-kind"
-                onChange={(e) => {
-                  setKind(e.target.value as NewKind);
-                }}
-              >
-                {newKinds.map((k) => (
-                  <option key={k} value={k}>
-                    {t.kindOne[k] ?? k}
-                  </option>
-                ))}
-              </Select>
-              <Button
-                icon={<Plus size={20} aria-hidden />}
-                data-testid="content-new"
-                onClick={() => {
-                  openItem(
-                    kind === 'wheel' ? 'wheels' : 'objects',
-                    null,
-                    newObject(kind, ids, {
-                      name: t.newName,
-                      description: t.newDescription,
-                      wheel: t.newWheelName,
-                    }),
+                      <span className="font-bold">{d.name}</span>
+                      <code className="font-code text-sm text-ink-soft">{d.id}</code>
+                      <Badge tone="muted">{t.kindOne[d.kind] ?? d.kind}</Badge>
+                      <span className="text-sm text-ink-soft">{t.deletedIn(d.deletedIn)}</span>
+                    </li>
+                  ))}
+                </ul>
+              )
+            ) : rows.length === 0 ? (
+              <p className="text-ink-soft">{t.emptyKind}</p>
+            ) : (
+              <ul className="grid gap-1" data-testid="content-rows">
+                {rows.map(({ item, index, collection }) => {
+                  const name = typeof item.name === 'string' ? item.name : '';
+                  const id = typeof item.id === 'string' ? item.id : '';
+                  const current = editing?.collection === collection && editing.index === index;
+                  return (
+                    <li
+                      key={`${collection}-${id}-${index}`}
+                      className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 rounded-md px-2 py-1 wrap-anywhere is-hover:bg-page"
+                      data-testid={`content-row-${id}`}
+                    >
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                        <span className="font-bold">{name === '' ? t.previewEmpty : name}</span>
+                        <code className="font-code text-sm text-ink-soft">{id}</code>
+                        {collection === 'wheels' ? (
+                          <span className="text-sm text-ink-soft">
+                            {t.entries(Array.isArray(item.entries) ? item.entries.length : 0)}
+                          </span>
+                        ) : (
+                          <>
+                            {typeof item.rarity === 'string' ? (
+                              <Badge tone="muted">
+                                {t.values.rarity?.[item.rarity] ?? item.rarity}
+                              </Badge>
+                            ) : null}
+                            {item.kind === 'item' ? (
+                              <span className="text-sm text-ink-soft">
+                                {typeof item.price === 'number'
+                                  ? t.price(item.price)
+                                  : t.notForSale}
+                              </span>
+                            ) : null}
+                          </>
+                        )}
+                      </div>
+                      {current ? (
+                        <Badge tone="ink">{t.opened}</Badge>
+                      ) : (
+                        <Button
+                          variant="link"
+                          aria-label={t.openNamed(name === '' ? id : name)}
+                          data-testid={`content-open-${id}`}
+                          onClick={() => {
+                            openItem(collection, index, item);
+                          }}
+                        >
+                          {t.open}
+                        </Button>
+                      )}
+                    </li>
                   );
+                })}
+              </ul>
+            )}
+            <div className="flex flex-wrap items-end gap-3 border-t-2 border-muted pt-3">
+              {desk ? create : null}
+              <Button
+                icon={<Download size={20} aria-hidden />}
+                disabled={view.version === 0}
+                data-testid="content-export"
+                className="desk:ml-auto"
+                onClick={() => {
+                  download(`content-v${view.version}.json`, pack);
                 }}
               >
-                {t.create}
+                {t.export}
               </Button>
-            </>
-          ) : null}
-          <Button
-            icon={<Download size={20} aria-hidden />}
-            disabled={view.version === 0}
-            data-testid="content-export"
-            className="desk:ml-auto"
-            onClick={() => {
-              download(`content-v${view.version}.json`, pack);
-            }}
-          >
-            {t.export}
-          </Button>
-        </div>
+            </div>
+          </>
+        )}
       </Panel>
 
       {editing ? (
@@ -313,7 +347,14 @@ function Workspace({
       ) : null}
 
       {desk ? (
-        <Import seasonId={seasonId} view={view} pack={pack} editable={editable} onSaved={onSaved} />
+        <Import
+          seasonId={seasonId}
+          view={view}
+          pack={pack}
+          editable={editable}
+          fileRef={importFile}
+          onSaved={onSaved}
+        />
       ) : null}
 
       <History seasonId={seasonId} view={view} />
@@ -336,12 +377,14 @@ function Import({
   view,
   pack,
   editable,
+  fileRef,
   onSaved,
 }: {
   seasonId: string;
   view: View;
   pack: Pack;
   editable: boolean;
+  fileRef: RefObject<HTMLInputElement | null>;
   onSaved: (next: { text: string; open: string | null }) => void;
 }) {
   const [imported, setImported] = useState<Imported | null>(null);
@@ -361,10 +404,13 @@ function Import({
       return;
     }
     let value: unknown;
+    const text = await file.text();
     try {
-      value = JSON.parse(await file.text());
-    } catch (e) {
-      setError(t.importNotJson(e instanceof Error ? e.message : ''));
+      value = JSON.parse(text);
+    } catch {
+      // Where it breaks, not the browser's English message (invariant 13)
+      const fault = jsonFault(text);
+      setError(t.importNotJson(fault?.line ?? 1, fault?.column ?? 1));
       return;
     }
     if (!isSchema(value) || !Array.isArray((value as Json).objects)) {
@@ -419,8 +465,9 @@ function Import({
   const valid = imported?.check.kind === 'done' && imported.check.result.valid;
 
   return (
-    <Panel title={t.importPick} data-testid="content-import">
+    <Panel title={t.importPanel} data-testid="content-import">
       <FilePicker
+        ref={fileRef}
         label={t.importPick}
         hint={t.importHint}
         accept="application/json,.json"

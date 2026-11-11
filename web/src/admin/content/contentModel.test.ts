@@ -1,5 +1,5 @@
 import { inspect, packDiff, serverProblems, serverText, withItem } from './contentModel';
-import { locate, places } from './jsonLocate';
+import { jsonFault, locate, places } from './jsonLocate';
 import { setIn } from './paths';
 
 // EE4 (D-492, D-495): problems by the path of their field — the server's split into the open object's and the rest,
@@ -32,7 +32,8 @@ describe('The content model', () => {
   });
 
   it('says what is not JSON and what is not an object', () => {
-    expect(inspect('{', null).parse).toMatch(/^Это не JSON/u);
+    // Where the text breaks, by line and character, never the browser's English message (invariant 13)
+    expect(inspect('{', null).parse).toEqual({ offset: 1, line: 1, column: 2 });
     expect(inspect('[]', null).problems).toHaveLength(1);
     expect(inspect('{"id":"x"}', null)).toEqual({ parse: null, value: { id: 'x' }, problems: [] });
   });
@@ -71,6 +72,29 @@ describe('The content model', () => {
     );
     expect(locate(text, '')).toEqual({ start: 0, end: text.length });
     expect(places('{"a": }')).toBeNull();
+  });
+
+  it('finds where a text stops being JSON: the line and the character, as JSON.parse would refuse it', () => {
+    const nbsp = String.fromCharCode(0xa0);
+    expect(jsonFault('{"a": 1}')).toBeNull();
+    expect(jsonFault('{\n  "id": 1,\n}')).toEqual({ offset: 13, line: 3, column: 1 });
+    expect(jsonFault('')).toEqual({ offset: 0, line: 1, column: 1 });
+    expect(jsonFault('{"a": 01}')).toEqual({ offset: 7, line: 1, column: 8 });
+    expect(jsonFault('{"a": "x\ty"}')).toEqual({ offset: 6, line: 1, column: 7 });
+    expect(jsonFault(`{"a": 1}${nbsp}`)).toEqual({ offset: 8, line: 1, column: 9 });
+    expect(jsonFault('[1] x')).toEqual({ offset: 4, line: 1, column: 5 });
+    for (const text of [
+      '{"a": 01}',
+      '{"a": "x\ty"}',
+      `{"a": 1}${nbsp}`,
+      '[1,]',
+      '{"a" 1}',
+      '-',
+      '1.',
+    ])
+      expect(() => {
+        JSON.parse(text);
+      }).toThrow();
   });
 
   it('sets and leaves out a field at a path without touching the original', () => {

@@ -9,6 +9,7 @@ import {
   type JsonSchema,
   type SchemaProblem,
 } from '../ruleSchema';
+import { jsonFault, type JsonFault } from './jsonLocate';
 import type { Json } from './templates';
 
 const t = ru.admin.content;
@@ -116,12 +117,13 @@ export function serverProblems(
 export function inspect(
   text: string,
   schema: JsonSchema | null,
-): { parse: string | null; value: Json | null; problems: Problem[] } {
+): { parse: JsonFault | null; value: Json | null; problems: Problem[] } {
   let value: unknown;
   try {
     value = JSON.parse(text);
-  } catch (e) {
-    return { parse: t.parseError(e instanceof Error ? e.message : ''), value: null, problems: [] };
+  } catch {
+    // Where it breaks, not the browser's English message (invariant 13)
+    return { parse: jsonFault(text), value: null, problems: [] };
   }
   if (!isSchema(value))
     return {

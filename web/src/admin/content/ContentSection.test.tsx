@@ -294,7 +294,7 @@ describe('The content editor', () => {
     expect(server.sent('POST', '/content/publish')).toHaveLength(0);
   });
 
-  it('puts the server’s error next to its field, in Russian, and leads to it in the JSON', async () => {
+  it('puts the server’s error next to its field, in Russian, and leads to it in the view that is open', async () => {
     const user = userEvent.setup();
     open({
       'POST /api/admin/seasons/*/content/publish': answer(400, {
@@ -316,14 +316,95 @@ describe('The content editor', () => {
     const problems = screen.getByTestId('content-problems');
     expect(within(problems).getByText('window')).toBeInTheDocument();
 
+    // In the form the link stays in the form: the field with its error gets the focus
     await user.click(within(problems).getByRole('button', { name: `${t.goToField}: window` }));
-    const json = await screen.findByTestId('content-json');
+    await waitFor(() => {
+      expect(screen.getByTestId('content-field-window')).toHaveFocus();
+    });
+    expect(screen.getByTestId('content-form')).toBeInTheDocument();
+    expect(screen.queryByTestId('content-json')).not.toBeInTheDocument();
+
+    // In the JSON the same link selects the field in the text
+    await user.click(screen.getByRole('radio', { name: 'JSON' }));
+    await user.click(
+      within(screen.getByTestId('content-problems')).getByRole('button', {
+        name: `${t.goToField}: window`,
+      }),
+    );
+    const json = screen.getByTestId('content-json');
     await waitFor(() => {
       expect(json).toHaveFocus();
     });
     // The object had no window any more: the selection is the whole object that should hold it
     const area = json as HTMLTextAreaElement;
     expect(area.value.slice(area.selectionStart, area.selectionEnd).startsWith('{')).toBe(true);
+  });
+
+  it('leads from the form to the JSON only for a part the form does not edit', async () => {
+    const user = userEvent.setup();
+    open();
+    await openOrange(user);
+    await user.click(screen.getByRole('radio', { name: 'JSON' }));
+    fireEvent.change(screen.getByTestId('content-json'), {
+      target: {
+        value: JSON.stringify(
+          { ...orange, effect: { ...orange.effect, condition: { always: true } } },
+          null,
+          2,
+        ),
+      },
+    });
+    await user.click(screen.getByRole('radio', { name: 'Форма' }));
+
+    await user.click(
+      within(screen.getByTestId('content-problems')).getByRole('button', {
+        name: `${t.goToField}: effect.condition`,
+      }),
+    );
+
+    const json = await screen.findByTestId('content-json');
+    await waitFor(() => {
+      expect(json).toHaveFocus();
+    });
+    const area = json as HTMLTextAreaElement;
+    expect(area.value.slice(area.selectionStart, area.selectionEnd)).toBe(
+      '{\n      "always": true\n    }',
+    );
+  });
+
+  it('does not re-announce the whole list of errors while typing; only their count, politely', async () => {
+    const user = userEvent.setup();
+    open();
+    const editor = await openOrange(user);
+
+    await user.clear(screen.getByTestId('content-field-effect.actions[0].steps'));
+    await user.type(screen.getByTestId('content-field-effect.actions[0].steps'), 'сто');
+
+    expect(within(editor).getByTestId('content-problems')).toHaveTextContent(
+      'effect.actions[0].steps',
+    );
+    // Neither the summary nor the field's own error is an alert while the admin types
+    expect(within(editor).queryAllByRole('alert')).toHaveLength(0);
+    expect(within(editor).getByRole('status')).toHaveTextContent(t.problemsTitle(1));
+    expect(screen.getByTestId('content-field-effect.actions[0].steps')).toHaveAccessibleDescription(
+      expect.stringContaining(t.problem.pattern),
+    );
+  });
+
+  it('says the answer of «Проверить» at once: the count of the server’s errors', async () => {
+    const user = userEvent.setup();
+    open({
+      'POST /api/admin/seasons/*/content/check': {
+        valid: false,
+        problems: [{ path: 'objects[0].window', message: 'An item needs a window of use.' }],
+      },
+    });
+    const editor = await openOrange(user);
+
+    await user.click(within(editor).getByTestId('content-check'));
+
+    expect(await within(editor).findByRole('alert')).toHaveTextContent(t.checkedProblems(1));
+    expect(within(editor).getByTestId('content-problems')).toHaveTextContent('window');
   });
 
   it('checks the JSON by the schema while typing and does not save what does not fit', async () => {
@@ -345,7 +426,15 @@ describe('The content editor', () => {
     expect(screen.getByTestId('content-save')).toBeDisabled();
 
     fireEvent.change(json, { target: { value: '{"id":' } });
-    expect(screen.getByTestId('content-problems')).toHaveTextContent(/Это не JSON/u);
+    // Where the text breaks, in Russian, never the browser's English message (invariant 13)
+    const problems = screen.getByTestId('content-problems');
+    expect(problems).toHaveTextContent(t.parseError(1, 7));
+    expect(problems).not.toHaveTextContent(/JSON at|Unexpected|position/u);
+    await user.click(within(problems).getByRole('button', { name: t.showPlace }));
+    await waitFor(() => {
+      expect(json).toHaveFocus();
+    });
+    expect((json as HTMLTextAreaElement).selectionStart).toBe(6);
     await user.click(screen.getByRole('radio', { name: 'Форма' }));
     expect(screen.getByText(t.formBroken)).toBeInTheDocument();
   });
@@ -476,6 +565,64 @@ describe('The content editor', () => {
     expect(problems).toHaveTextContent('objects[0].window');
     expect(problems).toHaveTextContent(t.serverMessages['An item needs a window of use.'] ?? '');
     expect(screen.getByTestId('content-import-publish')).toBeDisabled();
+  });
+
+  it('says where a file stops being JSON, in Russian, before asking the server', async () => {
+    const user = userEvent.setup();
+    const server = open();
+
+    await user.upload(
+      await screen.findByTestId('content-import-file'),
+      new File(['{"objects": [}'], 'broken.json'),
+    );
+
+    expect(await screen.findByText(t.importNotJson(1, 14))).toBeInTheDocument();
+    expect(screen.getByTestId('content-import')).not.toHaveTextContent(
+      /JSON at|Unexpected|position/u,
+    );
+    expect(server.sent('POST', '/content/check')).toHaveLength(0);
+  });
+
+  it('names the import panel by what it holds and the file button by what it does', async () => {
+    open();
+
+    const panel = await screen.findByTestId('content-import');
+    expect(within(panel).getByRole('heading', { name: t.importPanel })).toBeInTheDocument();
+    expect(within(panel).getByLabelText(new RegExp(t.importPick, 'u'))).toBeInTheDocument();
+    expect(t.importPanel).not.toBe(t.importPick);
+  });
+
+  it('says once that an empty season has no content and offers to create or load it', async () => {
+    const user = userEvent.setup();
+    open({}, view({ version: 0, pack: { objects: [], wheels: [] }, deleted: [], history: [] }));
+
+    const list = await screen.findByTestId('content-list');
+    expect(within(list).getByRole('heading', { name: t.emptyTitle })).toBeInTheDocument();
+    expect(screen.getAllByText(t.emptyTitle)).toHaveLength(1);
+    expect(screen.queryByText(t.emptyKind)).not.toBeInTheDocument();
+    expect(screen.queryByTestId('content-filter')).not.toBeInTheDocument();
+    expect(within(list).getByTestId('content-new')).toBeInTheDocument();
+
+    const click = vi.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(() => undefined);
+    await user.click(within(list).getByRole('button', { name: t.loadPack }));
+    expect(click).toHaveBeenCalled();
+    click.mockRestore();
+  });
+
+  it('marks a stackable object for players with the glossary term, the same as the form’s label', async () => {
+    const user = userEvent.setup();
+    open(
+      {},
+      view({ pack: { objects: [{ ...orange, stackable: true }, curse], wheels: [lootbox] } }),
+    );
+    await openOrange(user);
+
+    expect(
+      within(screen.getByTestId('content-preview')).getByText(t.stackable),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText(t.fields.stackable ?? '')).toBeChecked();
+    expect(t.fields.stackable).toBe(t.stackable);
+    expect(t.stackable).toBe('Можно несколько сразу');
   });
 
   it('refuses a file that is not a pack before asking the server', async () => {

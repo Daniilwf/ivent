@@ -49,9 +49,11 @@ export function ObjectForm({ value, problems, schemas, ids, disabled, onChange }
       {...(hint ? { hint } : {})}
       value={shown(getIn(value, path))}
       error={error(path)}
+      announce={false}
       disabled={disabled}
       spellCheck={false}
       data-testid={testId ?? `content-field-${pathText(path)}`}
+      data-field-path={pathText(path)}
       onChange={(e) => {
         set(path, e.target.value);
       }}
@@ -70,7 +72,7 @@ export function ObjectForm({ value, problems, schemas, ids, disabled, onChange }
       words={words}
       error={error(path)}
       disabled={disabled}
-      testId={`content-field-${pathText(path)}`}
+      path={pathText(path)}
       onChange={(next) => {
         set(path, next);
       }}
@@ -82,6 +84,7 @@ export function ObjectForm({ value, problems, schemas, ids, disabled, onChange }
       checked={getIn(value, path) === true}
       disabled={disabled}
       data-testid={`content-field-${pathText(path)}`}
+      data-field-path={pathText(path)}
       onChange={(e) => {
         set(path, e.target.checked ? true : undefined);
       }}
@@ -108,8 +111,10 @@ export function ObjectForm({ value, problems, schemas, ids, disabled, onChange }
           inputMode="numeric"
           value={shown(value.price)}
           error={error(['price'])}
+          announce={false}
           disabled={disabled}
           data-testid="content-field-price"
+          data-field-path="price"
           onChange={(e) => {
             set(['price'], wholeOr(e.target.value));
           }}
@@ -121,8 +126,10 @@ export function ObjectForm({ value, problems, schemas, ids, disabled, onChange }
         value={shown(value.description)}
         rows={3}
         error={error(['description'])}
+        announce={false}
         disabled={disabled}
         data-testid="content-field-description"
+        data-field-path="description"
         onChange={(e) => {
           set(['description'], e.target.value);
         }}
@@ -133,7 +140,7 @@ export function ObjectForm({ value, problems, schemas, ids, disabled, onChange }
         {flag(['manual'], f.manual ?? '')}
       </div>
       {error(['effect']) ? (
-        <p role="alert" className="text-sm font-medium text-danger">
+        <p tabIndex={-1} data-field-path="effect" className="text-sm font-medium text-danger">
           {error(['effect'])}
         </p>
       ) : null}
@@ -149,7 +156,9 @@ export function ObjectForm({ value, problems, schemas, ids, disabled, onChange }
             label={f.duration ?? ''}
             value={durationKind}
             error={error(['effect', 'duration'])}
+            announce={false}
             data-testid="content-field-effect.duration"
+            data-field-path="effect.duration"
             onChange={(e) => {
               const kind = e.target.value;
               set(
@@ -170,7 +179,9 @@ export function ObjectForm({ value, problems, schemas, ids, disabled, onChange }
               inputMode="numeric"
               value={shown(duration?.[durationKind])}
               error={error(['effect', 'duration', durationKind])}
+              announce={false}
               data-testid="content-field-effect.duration.value"
+              data-field-path={`effect.duration.${durationKind}`}
               onChange={(e) => {
                 set(['effect', 'duration', durationKind], wholeOr(e.target.value));
               }}
@@ -178,7 +189,11 @@ export function ObjectForm({ value, problems, schemas, ids, disabled, onChange }
           ) : null}
         </div>
         {error(['effect', 'target']) ? (
-          <p role="alert" className="text-sm font-medium text-danger">
+          <p
+            tabIndex={-1}
+            data-field-path="effect.target"
+            className="text-sm font-medium text-danger"
+          >
             {error(['effect', 'target'])}
           </p>
         ) : null}
@@ -201,7 +216,11 @@ export function ObjectForm({ value, problems, schemas, ids, disabled, onChange }
         <div className="grid gap-3">
           <h3 className="font-bold">{f.actions}</h3>
           {error(['effect', 'actions']) ? (
-            <p role="alert" className="text-sm font-medium text-danger">
+            <p
+              tabIndex={-1}
+              data-field-path="effect.actions"
+              className="text-sm font-medium text-danger"
+            >
               {error(['effect', 'actions'])}
             </p>
           ) : null}
@@ -312,7 +331,11 @@ function ActionCard({
       </div>
       {t.actions[type] ? <p className="text-sm text-ink-soft">{t.actions[type].hint}</p> : null}
       {error(base) ? (
-        <p role="alert" className="text-sm font-medium text-danger">
+        <p
+          tabIndex={-1}
+          data-field-path={pathText(base)}
+          className="text-sm font-medium text-danger"
+        >
           {error(base)}
         </p>
       ) : null}
@@ -325,7 +348,7 @@ function ActionCard({
           required
           error={error([...base, 'type'])}
           disabled={disabled}
-          testId={`content-field-${pathText([...base, 'type'])}`}
+          path={pathText([...base, 'type'])}
           onChange={(next) => {
             if (typeof next === 'string') onChange(actionTemplate(next as ActionType, ids));
           }}
@@ -337,7 +360,7 @@ function ActionCard({
           words={t.values.target ?? {}}
           error={error([...base, 'target'])}
           disabled={disabled}
-          testId={`content-field-${pathText([...base, 'target'])}`}
+          path={pathText([...base, 'target'])}
           onChange={(next) => {
             onChange(setIn(record, ['target'], next));
           }}
@@ -382,7 +405,8 @@ function ActionField({
   disabled: boolean;
   onChange: (next: unknown) => void;
 }) {
-  const testId = `content-field-${pathText(path)}`;
+  const at = pathText(path);
+  const testId = `content-field-${at}`;
   const types =
     schema?.type === undefined ? [] : Array.isArray(schema.type) ? schema.type : [schema.type];
   if (schema?.enum) {
@@ -396,7 +420,7 @@ function ActionField({
         required={required}
         error={error}
         disabled={disabled}
-        testId={testId}
+        path={at}
         onChange={onChange}
       />
     );
@@ -408,6 +432,7 @@ function ActionField({
         checked={value === true}
         disabled={disabled}
         data-testid={testId}
+        data-field-path={at}
         onChange={(e) => {
           onChange(e.target.checked ? true : undefined);
         }}
@@ -422,9 +447,11 @@ function ActionField({
         {...(schema.pattern !== undefined ? { hint: t.valueHint } : {})}
         value={shown(value)}
         error={error}
+        announce={false}
         disabled={disabled}
         spellCheck={false}
         data-testid={testId}
+        data-field-path={at}
         onChange={(e) => {
           const text = e.target.value;
           onChange(numeric ? wholeOr(text) : text === '' && !required ? undefined : text);
@@ -443,7 +470,7 @@ function EnumSelect({
   required = false,
   error,
   disabled,
-  testId,
+  path,
   onChange,
 }: {
   label: string;
@@ -453,7 +480,8 @@ function EnumSelect({
   required?: boolean;
   error: string | undefined;
   disabled: boolean;
-  testId: string;
+  /** The field's path: the place «Перейти к полю» leads to */
+  path: string;
   onChange: (next: string | undefined) => void;
 }) {
   const current = typeof value === 'string' ? value : '';
@@ -464,8 +492,10 @@ function EnumSelect({
       label={label}
       value={current}
       error={error}
+      announce={false}
       disabled={disabled}
-      data-testid={testId}
+      data-testid={`content-field-${path}`}
+      data-field-path={path}
       onChange={(e) => {
         onChange(e.target.value === '' ? undefined : e.target.value);
       }}
@@ -497,11 +527,7 @@ function InJson({
         {JSON.stringify(value)}
       </code>
       <p className="text-sm text-ink-soft">{t.inJson}</p>
-      {error ? (
-        <p role="alert" className="text-sm font-medium text-danger">
-          {error}
-        </p>
-      ) : null}
+      {error ? <p className="text-sm font-medium text-danger">{error}</p> : null}
     </div>
   );
 }
@@ -531,8 +557,10 @@ export function WheelForm({
           hint={f.idHint ?? ''}
           value={shown(value.id)}
           error={error(['id'])}
+          announce={false}
           disabled={disabled}
           data-testid="content-field-id"
+          data-field-path="id"
           onChange={(e) => {
             set(['id'], e.target.value);
           }}
@@ -541,8 +569,10 @@ export function WheelForm({
           label={f.wheelName ?? ''}
           value={shown(value.name)}
           error={error(['name'])}
+          announce={false}
           disabled={disabled}
           data-testid="content-field-name"
+          data-field-path="name"
           onChange={(e) => {
             set(['name'], e.target.value);
           }}
@@ -551,7 +581,7 @@ export function WheelForm({
       <fieldset className="grid gap-3" disabled={disabled}>
         <legend className="mb-1 font-bold">{f.entries}</legend>
         {error(['entries']) ? (
-          <p role="alert" className="text-sm font-medium text-danger">
+          <p tabIndex={-1} data-field-path="entries" className="text-sm font-medium text-danger">
             {error(['entries'])}
           </p>
         ) : null}
@@ -567,7 +597,7 @@ export function WheelForm({
                 required
                 error={error(['entries', i, 'objectId'])}
                 disabled={disabled}
-                testId={`content-field-entries[${i}].objectId`}
+                path={`entries[${i}].objectId`}
                 onChange={(next) => {
                   set(['entries', i, 'objectId'], next);
                 }}
@@ -578,8 +608,10 @@ export function WheelForm({
                 inputMode="numeric"
                 value={shown(record.weight)}
                 error={error(['entries', i, 'weight'])}
+                announce={false}
                 disabled={disabled}
                 data-testid={`content-field-entries[${i}].weight`}
+                data-field-path={`entries[${i}].weight`}
                 onChange={(e) => {
                   set(['entries', i, 'weight'], wholeOr(e.target.value));
                 }}
