@@ -60,14 +60,14 @@ public static class SessionEndpoints
         var sessions = api.MapGroup("/auth/sessions").WithTags("Auth").RequireAuthorization();
 
         sessions.MapGet("", async Task<Results<Ok<IReadOnlyList<SessionView>>, UnauthorizedHttpResult>> (
-            ClaimsPrincipal principal, GameEventDbContext db, IClock clock, CancellationToken ct) =>
+            ClaimsPrincipal principal, GameEventDbContext db, TimeProvider time, CancellationToken ct) =>
         {
             if (principal.UserId() is not { } userId)
             {
                 return TypedResults.Unauthorized();
             }
 
-            var now = clock.UtcNow;
+            var now = time.GetUtcNow();
             var current = principal.SessionId();
             IReadOnlyList<SessionView> list = [.. (await db.Sessions.AsNoTracking().Where(s => s.UserId == userId && s.RevokedAt == null).ToListAsync(ct))
                 .Where(s => s.IsActive(now))

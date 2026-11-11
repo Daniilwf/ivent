@@ -1,7 +1,6 @@
 using System.Net;
 using System.Net.Sockets;
 using System.Security.Claims;
-using GameEvent.Engine.Kernel;
 using GameEvent.Infrastructure.Accounts;
 using GameEvent.Infrastructure.Database;
 using Microsoft.AspNetCore.Authentication;
@@ -43,7 +42,8 @@ public static class WebSecurity
         var session = principal?.SessionId() is { } sessionId
             ? await db.Sessions.AsNoTracking().SingleOrDefaultAsync(s => s.Id == sessionId, ct)
             : null;
-        var now = services.GetRequiredService<IClock>().UtcNow;
+        // The wall clock of the cookie itself, not the movable game clock (D-469)
+        var now = services.GetRequiredService<TimeProvider>().GetUtcNow();
 
         var valid = user is { IsDeleted: false }
             && principal is not null

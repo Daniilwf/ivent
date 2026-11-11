@@ -26,8 +26,15 @@ public sealed partial class CommandProcessor(
     Accounts.IPasswords passwords,
     IEnumerable<ICommittedEventsListener> listeners,
     ILogger<CommandProcessor> logger,
-    Site.MaintenanceMode? maintenance = null) : BackgroundService
+    Site.MaintenanceMode? maintenance = null,
+    TimeProvider? time = null) : BackgroundService
 {
+    /// <summary>
+    /// The time of sessions (D-469): the wall clock the cookie's own expiry uses, not the game's <see cref="IClock"/>, which
+    /// the test copy moves by months — a moved game clock must not sign the admin out.
+    /// </summary>
+    private DateTimeOffset SessionNow => (time ?? TimeProvider.System).GetUtcNow();
+
     private readonly Dictionary<Guid, (SeasonState State, long LastSequence)> _cache = [];
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)

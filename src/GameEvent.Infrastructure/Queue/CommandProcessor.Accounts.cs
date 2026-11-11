@@ -20,7 +20,7 @@ public sealed partial class CommandProcessor
         var now = clock.UtcNow;
         var (events, apply, secret, rejection) = command switch
         {
-            StartSession or TouchSession or EndSessions or PurgeSessions => await DecideSessionAsync(db, command, now, ct),
+            StartSession or TouchSession or EndSessions or PurgeSessions => await DecideSessionAsync(db, command, SessionNow, ct),
             IAccountCommand account => await DecideAccountAsync(db, account, now, ct),
             Files.RecordFile file => await DecideFileAsync(db, file, now, ct),
             Pool.AddGame or Pool.ChangeGame or Pool.DeleteGame or Pool.RestoreGame or Pool.SetCategory or Pool.RemoveCategory
@@ -138,13 +138,13 @@ public sealed partial class CommandProcessor
                     }
 
                     var temporary = AccountRules.TemporaryPassword();
-                    var sessions = await LiveSessionsAsync(db, user.Id, now, ct);
+                    var sessions = await LiveSessionsAsync(db, user.Id, SessionNow, ct);
                     return ([new AccountPasswordReset(user.Id)], () =>
                     {
                         user.PasswordHash = passwords.Hash(user, temporary);
                         user.MustChangePassword = true;
                         user.SecurityStamp = AccountRules.NewStamp();
-                        EndAll(sessions, now);
+                        EndAll(sessions, SessionNow);
                     }, temporary, null);
                 }
 
@@ -167,13 +167,13 @@ public sealed partial class CommandProcessor
                     }
 
                     // The device that changed it stays signed in; every other session ends (D-467)
-                    var others = await LiveSessionsAsync(db, user.Id, now, ct);
+                    var others = await LiveSessionsAsync(db, user.Id, SessionNow, ct);
                     return ([new AccountPasswordChanged(user.Id)], () =>
                     {
                         user.PasswordHash = passwords.Hash(user, change.NewPassword);
                         user.MustChangePassword = false;
                         user.SecurityStamp = AccountRules.NewStamp();
-                        EndAll(others.Where(s => s.Id != change.KeepSession), now);
+                        EndAll(others.Where(s => s.Id != change.KeepSession), SessionNow);
                     }, null, null);
                 }
 
@@ -204,14 +204,14 @@ public sealed partial class CommandProcessor
                         return Reject(AccountRules.LastAdmin, "The last admin keeps the role.");
                     }
 
-                    var sessions = user.Role != edit.Role ? await LiveSessionsAsync(db, user.Id, now, ct) : [];
+                    var sessions = user.Role != edit.Role ? await LiveSessionsAsync(db, user.Id, SessionNow, ct) : [];
                     return ([new AccountChanged(user.Id, edit.Name.Trim(), AccountRules.ToLog(edit.Role))], () =>
                     {
                         // A new role ends the account's sessions (D-67, D-467)
                         if (user.Role != edit.Role)
                         {
                             user.SecurityStamp = AccountRules.NewStamp();
-                            EndAll(sessions, now);
+                            EndAll(sessions, SessionNow);
                         }
 
                         user.Name = edit.Name.Trim();
@@ -236,12 +236,12 @@ public sealed partial class CommandProcessor
                         return Reject(AccountRules.LastAdmin, "The last admin is not deleted.");
                     }
 
-                    var sessions = await LiveSessionsAsync(db, user.Id, now, ct);
+                    var sessions = await LiveSessionsAsync(db, user.Id, SessionNow, ct);
                     return ([new AccountDeleted(user.Id)], () =>
                     {
                         user.IsDeleted = true;
                         user.SecurityStamp = AccountRules.NewStamp();
-                        EndAll(sessions, now);
+                        EndAll(sessions, SessionNow);
                     }, null, null);
                 }
 

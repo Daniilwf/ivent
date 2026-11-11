@@ -44,7 +44,8 @@ public sealed partial class DeadlineScheduler(
     IClock clock,
     DeadlineSchedulerSettings settings,
     ILogger<DeadlineScheduler> logger,
-    Site.MaintenanceMode? maintenance = null) : BackgroundService
+    Site.MaintenanceMode? maintenance = null,
+    TimeProvider? time = null) : BackgroundService
 {
     /// <summary>
     /// One pass: every active season whose deadline has come gets a <see cref="ReachDeadline"/>. Under maintenance the
@@ -71,7 +72,7 @@ public sealed partial class DeadlineScheduler(
         }
 
         await FireTimersAsync(now, ct);
-        await PurgeSessionsAsync(now, ct);
+        await PurgeSessionsAsync((time ?? TimeProvider.System).GetUtcNow(), ct);
 
         foreach (var (seasonId, deadline) in due)
         {

@@ -121,6 +121,9 @@ public static class AppSetup
         services.AddSingleton<IPasswords>(sp => sp.GetRequiredService<Passwords>());
         services.AddSingleton<LoginThrottle>();
         services.AddSingleton<SessionTouches>();
+
+        // Sessions and their cookie keep the wall clock; the game's IClock may be moved on the test copy (D-469)
+        Microsoft.Extensions.DependencyInjection.Extensions.ServiceCollectionDescriptorExtensions.TryAddSingleton(services, TimeProvider.System);
         services.AddSingleton(sp => new LoginDevices(sp.GetRequiredService<IDataProtectionProvider>(), cookiePrefix + "ge.device", securePolicy));
         services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
             .AddCookie(o =>
