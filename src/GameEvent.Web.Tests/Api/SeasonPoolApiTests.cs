@@ -145,9 +145,10 @@ public sealed class SeasonPoolApiTests : IAsyncLifetime
 
         var row = json.RootElement[0];
         Assert.Equal(
-            ["completedAt", "excludedForMe", "gameId", "marks", "taken", "takenBy"],
+            ["completedAt", "excludedForMe", "gameId", "marks", "offered", "taken", "takenBy"],
             row.EnumerateObject().Select(p => p.Name).Order(StringComparer.Ordinal));
         Assert.Equal("beingPlayed", row.GetProperty("taken").GetString());
+        Assert.True(row.GetProperty("offered").GetBoolean());
     }
 
     [Fact]
