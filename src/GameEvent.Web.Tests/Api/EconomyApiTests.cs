@@ -5,6 +5,7 @@ using System.Text.Json.Nodes;
 using GameEvent.Engine.Rulesets;
 using GameEvent.Infrastructure.EventLog;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace GameEvent.Web.Tests.Api;
 
@@ -143,6 +144,25 @@ public sealed class EconomyApiTests : IAsyncLifetime
             await vasya.PostAsJsonAsync(Url($"items/{Guid.NewGuid()}/use"), new { commandId = Guid.NewGuid() }, Ct), "feature.disabled");
     }
 
+    [Fact]
+    public async Task With_bets_on_and_items_off_the_view_answers_with_the_bets_and_no_inventory()
+    {
+        await FeaturesAsync(items: false, shop: false, bets: true);
+        var vasya = await _site.SignedInAsync("vasya");
+
+        var economy = await EconomyAsync(vasya);
+
+        Assert.Equal(JsonValueKind.Null, economy.GetProperty("items").ValueKind);
+        Assert.Equal(JsonValueKind.Null, economy.GetProperty("shop").ValueKind);
+        Assert.Equal(JsonValueKind.Array, economy.GetProperty("bets").GetProperty("bets").ValueKind);
+        await AssertConflictAsync(
+            await vasya.PostAsJsonAsync(Url($"items/{Guid.NewGuid()}/use"), new { commandId = Guid.NewGuid() }, Ct), "feature.disabled");
+
+        await FeaturesAsync(items: false, shop: false, bets: false);
+
+        await AssertConflictAsync(await vasya.GetAsync(Url("economy"), Ct), "feature.disabled");
+    }
+
     // ---- «Использовать» ----
 
     [Fact]
@@ -189,6 +209,31 @@ public sealed class EconomyApiTests : IAsyncLifetime
         Assert.Contains(
             feed.GetProperty("objects").EnumerateArray(),
             o => o.GetProperty("id").GetString() == "bird-thief" && o.GetProperty("name").GetString() == "Птичкерс");
+    }
+
+    [Fact]
+    public async Task The_feed_reads_the_packs_once_until_a_newer_one_is_published()
+    {
+        var admin = await EconomyOnAsync();
+        await GiveAsync(admin, "vasya", "orange");
+        var names = _site.Services.GetRequiredService<Seasons.FeedObjectNames>();
+        static string? NameOf(JsonElement feed, string id) =>
+            feed.GetProperty("objects").EnumerateArray().Where(o => o.GetProperty("id").GetString() == id).Select(o => o.GetProperty("name").GetString()).SingleOrDefault();
+
+        var first = await ApiCalls.OkAsync(await admin.GetAsync(Url("feed"), Ct));
+        var reads = names.PackReads;
+        var second = await ApiCalls.OkAsync(await admin.GetAsync(Url("feed"), Ct));
+
+        Assert.Equal("Апельсин", NameOf(first, "orange"));
+        Assert.Equal("Апельсин", NameOf(second, "orange"));
+        Assert.Equal(reads, names.PackReads);
+
+        var pack = RepositoryPack();
+        pack["objects"]!.AsArray().Single(o => (string?)o!["id"] == "orange")!["name"] = "Апельсинка";
+        await ApiCalls.PostOkAsync(admin, AdminUrl("content"), new { commandId = Guid.NewGuid(), pack, comment = "Новое имя" });
+
+        Assert.Equal("Апельсинка", NameOf(await ApiCalls.OkAsync(await admin.GetAsync(Url("feed"), Ct)), "orange"));
+        Assert.Equal(reads + 1, names.PackReads);
     }
 
     [Fact]

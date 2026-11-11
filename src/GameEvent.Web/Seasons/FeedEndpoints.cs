@@ -103,7 +103,7 @@ public static class FeedEndpoints
     }
 
     private static async Task<Results<Ok<FeedView>, NotFound, ValidationProblem>> FeedAsync(
-        Guid seasonId, System.Security.Claims.ClaimsPrincipal user, GameEventDbContext db, CancellationToken ct, long? before = null, int limit = 50)
+        Guid seasonId, System.Security.Claims.ClaimsPrincipal user, GameEventDbContext db, FeedObjectNames objectNames, CancellationToken ct, long? before = null, int limit = 50)
     {
         if (limit is < 1 or > MaxFeedPage)
         {
@@ -160,7 +160,7 @@ public static class FeedEndpoints
         }).OfType<FeedEntryView>()];
         var nextBefore = rows.Count == limit && rows[^1].Sequence > 1 ? rows[^1].Sequence : (long?)null;
         var (players, games, runs) = await ReferencesAsync(db, seasonId, entries, admin, ct);
-        return TypedResults.Ok(new FeedView(entries, nextBefore, players, games, runs, await ObjectsAsync(db, seasonId, entries, ct)));
+        return TypedResults.Ok(new FeedView(entries, nextBefore, players, games, runs, await ObjectsAsync(db, objectNames, seasonId, entries, ct)));
     }
 
     private const string DiscardedChoice = "choice-discarded";
@@ -222,9 +222,10 @@ public static class FeedEndpoints
 
     /// <summary>
     /// The names of the objects the page's events name (D-444): from the season's content packs, the latest name of each
-    /// (a deleted definition keeps the name it last had). Read only when the page names an object.
+    /// (a deleted definition keeps the name it last had, <see cref="FeedObjectNames"/>). Read only when the page names an object.
     /// </summary>
-    private static async Task<IReadOnlyList<FeedObjectView>> ObjectsAsync(GameEventDbContext db, Guid seasonId, IReadOnlyList<FeedEntryView> entries, CancellationToken ct)
+    private static async Task<IReadOnlyList<FeedObjectView>> ObjectsAsync(
+        GameEventDbContext db, FeedObjectNames objectNames, Guid seasonId, IReadOnlyList<FeedEntryView> entries, CancellationToken ct)
     {
         var ids = new HashSet<string>(StringComparer.Ordinal);
         foreach (var entry in entries)
@@ -237,23 +238,7 @@ public static class FeedEndpoints
             return [];
         }
 
-        var published = EventCatalog.Describe(typeof(Engine.Content.ContentPublished)).Name;
-        var packs = await db.Events.AsNoTracking()
-            .Where(e => e.SeasonId == seasonId && e.Type == published && e.UndoneByEventId == null)
-            .OrderBy(e => e.Sequence)
-            .ToListAsync(ct);
-        var names = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var row in packs)
-        {
-            if (EventCodec.Decode(new StoredEvent(row.Type, row.Version, row.Data)) is Engine.Content.ContentPublished { Pack: var pack })
-            {
-                foreach (var definition in pack.Objects)
-                {
-                    names[definition.Id] = definition.Name;
-                }
-            }
-        }
-
+        var names = await objectNames.OfAsync(db, seasonId, ct);
         return [.. ids.Order(StringComparer.Ordinal).Where(names.ContainsKey).Select(id => new FeedObjectView(id, names[id]))];
     }
 

@@ -72,6 +72,7 @@ public static class AppSetup
         services.AddSingleton<IIdGenerator, GuidV7Ids>();
         services.AddSingleton<CommandBus>();
         services.AddSingleton<SeasonBroadcaster>();
+        services.AddSingleton<FeedObjectNames>();
         services.AddSingleton<ICommittedEventsListener>(sp => sp.GetRequiredService<SeasonBroadcaster>());
         services.AddSingleton<HubSessions>();
         services.AddSingleton<ICommittedEventsListener>(sp => sp.GetRequiredService<HubSessions>());
