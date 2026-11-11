@@ -120,6 +120,7 @@ public static class AppSetup
         services.AddSingleton<Passwords>();
         services.AddSingleton<IPasswords>(sp => sp.GetRequiredService<Passwords>());
         services.AddSingleton<LoginThrottle>();
+        services.AddSingleton<SessionTouches>();
         services.AddSingleton(sp => new LoginDevices(sp.GetRequiredService<IDataProtectionProvider>(), cookiePrefix + "ge.device", securePolicy));
         services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
             .AddCookie(o =>
@@ -129,7 +130,7 @@ public static class AppSetup
                 o.Cookie.SameSite = SameSiteMode.Strict;
                 o.Cookie.SecurePolicy = securePolicy;
                 o.Cookie.Path = "/";
-                o.ExpireTimeSpan = TimeSpan.FromDays(30);
+                o.ExpireTimeSpan = Infrastructure.Accounts.SessionRules.Lifetime;
                 o.SlidingExpiration = true;
                 o.Events.OnValidatePrincipal = WebSecurity.ValidateSessionAsync;
                 // An API answers with status codes, never redirects to a login page.
@@ -214,6 +215,7 @@ public static class AppSetup
 
         var api = app.MapGroup("/api").AddEndpointFilter<Csrf.Filter>();
         api.MapAccounts();
+        api.MapSessions();
         api.MapSeasons();
         api.MapRules();
         api.MapPoolStats();

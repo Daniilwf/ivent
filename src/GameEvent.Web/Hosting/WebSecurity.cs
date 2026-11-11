@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Sockets;
 using System.Security.Claims;
+using GameEvent.Engine.Kernel;
+using GameEvent.Infrastructure.Accounts;
 using GameEvent.Infrastructure.Database;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -14,25 +16,42 @@ namespace GameEvent.Web.Hosting;
 public static class WebSecurity
 {
     public const string StampClaim = "ge.stamp";
+
+    /// <summary>The session the cookie belongs to (D-466): a cookie without one is signed out (D-467).</summary>
+    public const string SessionClaim = "ge.session";
     public const long ApiBodyLimitBytes = 64 * 1024;
 
+    /// <summary>The cookie's session id, or null for a cookie made before sessions (D-467).</summary>
+    public static Guid? SessionId(this ClaimsPrincipal principal) =>
+        Guid.TryParse(principal?.FindFirstValue(SessionClaim), out var id) ? id : null;
+
     /// <summary>
-    /// Every request re-reads the account (16 users: cheap). A deleted account, a changed role or a rotated
-    /// security stamp ends the session at once, instead of living in the cookie for 30 days.
+    /// Every request re-reads the account and its session (16 users: cheap). A deleted account, a changed role, a rotated
+    /// security stamp or an ended, expired or unknown session ends the sign-in at once, instead of living in the cookie
+    /// for 30 days (D-67, D-466). A live session's visit is written at most every <see cref="SessionRules.TouchInterval"/>.
     /// </summary>
     public static async Task ValidateSessionAsync(CookieValidatePrincipalContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
         var principal = context.Principal;
-        var db = context.HttpContext.RequestServices.GetRequiredService<GameEventDbContext>();
+        var services = context.HttpContext.RequestServices;
+        var db = services.GetRequiredService<GameEventDbContext>();
+        var ct = context.HttpContext.RequestAborted;
         var user = Guid.TryParse(principal?.FindFirstValue(ClaimTypes.NameIdentifier), out var id)
-            ? await db.Users.AsNoTracking().SingleOrDefaultAsync(u => u.Id == id, context.HttpContext.RequestAborted)
+            ? await db.Users.AsNoTracking().SingleOrDefaultAsync(u => u.Id == id, ct)
             : null;
+        var session = principal?.SessionId() is { } sessionId
+            ? await db.Sessions.AsNoTracking().SingleOrDefaultAsync(s => s.Id == sessionId, ct)
+            : null;
+        var now = services.GetRequiredService<IClock>().UtcNow;
 
         var valid = user is { IsDeleted: false }
             && principal is not null
             && principal.FindFirstValue(StampClaim) == user.SecurityStamp
-            && principal.IsInRole(user.Role.ToString());
+            && principal.IsInRole(user.Role.ToString())
+            && session is not null
+            && session.UserId == user.Id
+            && session.IsActive(now);
         if (!valid)
         {
             context.RejectPrincipal();
@@ -41,6 +60,10 @@ public static class WebSecurity
         }
 
         context.HttpContext.Items[MustChangePasswordKey] = user!.MustChangePassword;
+        if (now - session!.LastSeenAt >= SessionRules.TouchInterval)
+        {
+            await services.GetRequiredService<Accounts.SessionTouches>().TouchAsync(session.Id, ct);
+        }
     }
 
     /// <summary>Set for a signed-in request whose account still has a temporary password (D-106).</summary>

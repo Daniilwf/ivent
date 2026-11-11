@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using GameEvent.Engine.Kernel;
 using GameEvent.Infrastructure.Accounts;
 using GameEvent.Infrastructure.Database;
 using GameEvent.Infrastructure.Queue;
@@ -15,8 +16,8 @@ using AccountResult = Microsoft.AspNetCore.Http.HttpResults.Results<
 
 namespace GameEvent.Web.Accounts;
 
-/// <summary>An account as the admin sees it (D-106).</summary>
-public sealed record AccountView(Guid Id, string Login, string Name, Role Role, bool MustChangePassword, bool IsDeleted, DateTimeOffset CreatedAt);
+/// <summary>An account as the admin sees it (D-106); <c>sessions</c> — how many devices it is signed in on (D-466).</summary>
+public sealed record AccountView(Guid Id, string Login, string Name, Role Role, bool MustChangePassword, bool IsDeleted, DateTimeOffset CreatedAt, int Sessions);
 
 /// <summary>The admin creates an account: login, name, role; the answer carries the temporary password once.</summary>
 public sealed record CreateAccountRequest(Guid CommandId, string? Login, string? Name, Role? Role);
@@ -43,39 +44,45 @@ public static class AdminAccountEndpoints
     {
         var accounts = api.MapGroup("/admin/accounts").WithTags("Admin").RequireAuthorization(Policies.Admin);
 
-        accounts.MapGet("", async Task<Ok<IReadOnlyList<AccountView>>> (GameEventDbContext db, CancellationToken ct) =>
+        accounts.MapGet("", async Task<Ok<IReadOnlyList<AccountView>>> (GameEventDbContext db, IClock clock, CancellationToken ct) =>
             {
-                IReadOnlyList<AccountView> list = await db.Users.AsNoTracking()
+                var sessions = await SessionEndpoints.LiveCountsAsync(db, clock.UtcNow, ct);
+                IReadOnlyList<AccountView> list = [.. (await db.Users.AsNoTracking()
                     .OrderBy(u => u.IsDeleted).ThenBy(u => u.Login)
-                    .Select(u => new AccountView(u.Id, u.Login, u.Name, u.Role, u.MustChangePassword, u.IsDeleted, u.CreatedAt))
-                    .ToListAsync(ct);
+                    .ToListAsync(ct))
+                    .Select(u => ViewOf(u, sessions.GetValueOrDefault(u.Id)))];
                 return TypedResults.Ok(list);
             })
             .RequireRateLimiting(AppSetup.AdminReadRateLimit)
             .ProducesProblem(StatusCodes.Status429TooManyRequests);
 
-        accounts.MapPost("", (CreateAccountRequest request, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, CancellationToken ct) =>
+        accounts.MapPost("", (CreateAccountRequest request, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, IClock clock, CancellationToken ct) =>
                 request.Login is null || request.Name is null || request.Role is not { } role || !Enum.IsDefined(role)
                     ? Task.FromResult<AccountResult>(Invalid("login", "A login, a name and a known role are required."))
-                    : SendAsync(request.CommandId, Guid.Empty, _ => new CreateAccount(request.Login.Trim(), request.Name, role), user, db, bus, ct))
+                    : SendAsync(request.CommandId, Guid.Empty, _ => new CreateAccount(request.Login.Trim(), request.Name, role), user, db, bus, clock, ct))
             .WithAccountErrors();
 
-        accounts.MapPost("/{userId:guid}", (Guid userId, ChangeAccountRequest request, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, CancellationToken ct) =>
+        accounts.MapPost("/{userId:guid}", (Guid userId, ChangeAccountRequest request, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, IClock clock, CancellationToken ct) =>
                 request.Name is null || request.Role is not { } role || !Enum.IsDefined(role)
                     ? Task.FromResult<AccountResult>(Invalid("name", "A name and a known role are required."))
-                    : SendAsync(request.CommandId, userId, id => new ChangeAccount(id, request.Name, role), user, db, bus, ct))
+                    : SendAsync(request.CommandId, userId, id => new ChangeAccount(id, request.Name, role), user, db, bus, clock, ct))
             .WithAccountErrors();
 
-        accounts.MapPost("/{userId:guid}/reset-password", (Guid userId, AccountActionRequest request, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, CancellationToken ct) =>
-                SendAsync(request.CommandId, userId, id => new ResetPassword(id), user, db, bus, ct))
+        accounts.MapPost("/{userId:guid}/reset-password", (Guid userId, AccountActionRequest request, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, IClock clock, CancellationToken ct) =>
+                SendAsync(request.CommandId, userId, id => new ResetPassword(id), user, db, bus, clock, ct))
             .WithAccountErrors();
 
-        accounts.MapPost("/{userId:guid}/delete", (Guid userId, AccountActionRequest request, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, CancellationToken ct) =>
-                SendAsync(request.CommandId, userId, id => new DeleteAccount(id), user, db, bus, ct))
+        accounts.MapPost("/{userId:guid}/delete", (Guid userId, AccountActionRequest request, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, IClock clock, CancellationToken ct) =>
+                SendAsync(request.CommandId, userId, id => new DeleteAccount(id), user, db, bus, clock, ct))
             .WithAccountErrors();
 
-        accounts.MapPost("/{userId:guid}/restore", (Guid userId, AccountActionRequest request, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, CancellationToken ct) =>
-                SendAsync(request.CommandId, userId, id => new RestoreAccount(id), user, db, bus, ct))
+        // «Выйти отовсюду» (D-466): every session of the account ends, the password and the role stay
+        accounts.MapPost("/{userId:guid}/end-sessions", (Guid userId, AccountActionRequest request, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, IClock clock, CancellationToken ct) =>
+                SendAsync(request.CommandId, userId, id => new EndSessions(id, Engine.Accounts.SessionEndReason.Admin), user, db, bus, clock, ct))
+            .WithAccountErrors();
+
+        accounts.MapPost("/{userId:guid}/restore", (Guid userId, AccountActionRequest request, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, IClock clock, CancellationToken ct) =>
+                SendAsync(request.CommandId, userId, id => new RestoreAccount(id), user, db, bus, clock, ct))
             .WithAccountErrors();
 
         // Every signed-in user, also one who must change the password first
@@ -96,6 +103,7 @@ public static class AdminAccountEndpoints
         LoginThrottle throttle,
         ILoggerFactory loggers,
         CommandBus bus,
+        IClock clock,
         CancellationToken ct)
     {
         if (request.CommandId == Guid.Empty || request.CurrentPassword is null || request.NewPassword is null
@@ -134,26 +142,27 @@ public static class AdminAccountEndpoints
         }
 
         throttle.Succeeded(user.NormalizedLogin, address);
-        var result = await SendAsync(request.CommandId, userId, id => new ChangeOwnPassword(id, request.NewPassword, user.SecurityStamp), principal, db, bus, ct);
+        var current = principal.SessionId();
+        var result = await SendAsync(request.CommandId, userId, id => new ChangeOwnPassword(id, request.NewPassword, user.SecurityStamp, current), principal, db, bus, clock, ct);
 
-        // The new security stamp ends every session, this one too: sign it in again with the new stamp (D-67)
-        if (result.Result is Ok<AccountActionResponse>)
+        // The new security stamp ends every other session; this one goes on with the new stamp (D-67, D-467)
+        if (result.Result is Ok<AccountActionResponse> && current is { } session)
         {
             var fresh = await db.Users.AsNoTracking().SingleAsync(u => u.Id == userId, ct);
-            await AccountEndpoints.SignInAsync(http, fresh);
+            await AccountEndpoints.SignInAsync(http, fresh, session);
         }
 
         return result;
     }
 
     private static Task<AccountResult> SendAsync(
-        Guid commandId, Guid userId, Func<Guid, IAccountCommand> command, ClaimsPrincipal principal, GameEventDbContext db, CommandBus bus, CancellationToken ct) =>
+        Guid commandId, Guid userId, Func<Guid, IAccountCommand> command, ClaimsPrincipal principal, GameEventDbContext db, CommandBus bus, IClock clock, CancellationToken ct) =>
         commandId == Guid.Empty
             ? Task.FromResult<AccountResult>(Invalid("commandId", "A command id is required."))
-            : SendCheckedAsync(commandId, userId, command, principal, db, bus, ct);
+            : SendCheckedAsync(commandId, userId, command, principal, db, bus, clock, ct);
 
     private static async Task<AccountResult> SendCheckedAsync(
-        Guid commandId, Guid userId, Func<Guid, IAccountCommand> command, ClaimsPrincipal principal, GameEventDbContext db, CommandBus bus, CancellationToken ct)
+        Guid commandId, Guid userId, Func<Guid, IAccountCommand> command, ClaimsPrincipal principal, GameEventDbContext db, CommandBus bus, IClock clock, CancellationToken ct)
     {
         var sent = command(userId);
         var outcome = await bus.SendAsync(new CommandEnvelope(commandId, Guid.Empty, sent, principal.UserId()), ct);
@@ -180,11 +189,12 @@ public static class AdminAccountEndpoints
             ? outcome.Events.Select(e => e.Event).OfType<Engine.Accounts.AccountCreated>().Single().UserId
             : userId;
         var account = await db.Users.AsNoTracking().SingleAsync(u => u.Id == id, ct);
-        return TypedResults.Ok(new AccountActionResponse(
-            outcome.IsDuplicate,
-            new AccountView(account.Id, account.Login, account.Name, account.Role, account.MustChangePassword, account.IsDeleted, account.CreatedAt),
-            outcome.Secret));
+        var sessions = await SessionEndpoints.LiveCountsAsync(db, clock.UtcNow, ct);
+        return TypedResults.Ok(new AccountActionResponse(outcome.IsDuplicate, ViewOf(account, sessions.GetValueOrDefault(account.Id)), outcome.Secret));
     }
+
+    private static AccountView ViewOf(UserRecord u, int sessions) =>
+        new(u.Id, u.Login, u.Name, u.Role, u.MustChangePassword, u.IsDeleted, u.CreatedAt, sessions);
 
     private static ProblemHttpResult Repeat() =>
         TypedResults.Problem(
