@@ -12,8 +12,11 @@ const join = (path: string, key: string) => (path === '' ? key : `${path}.${key}
 export type JsonFault = { offset: number; line: number; column: number };
 
 class Fault extends Error {
-  constructor(readonly offset: number) {
+  readonly offset: number;
+
+  constructor(offset: number) {
     super(`at ${offset}`);
+    this.offset = offset;
   }
 }
 
