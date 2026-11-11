@@ -183,6 +183,9 @@
 | Предупреждение о зоне | в зоне меньше `map.minZoneGames` доступных игр | `ZoneWarnings`, `ZoneGamesWarning` |
 | Проверка публикации | что мешает опубликовать правильную карту сейчас: клетки под игроками, выбор ветки | `MapPublicationChecks`, `MapCheckView`, `POST /api/admin/seasons/{id}/map/check` |
 | Редактор карты | раздел «Карта» админки: холст, панели клетки и зон, проверка, публикация | `MapSection`, `MapCanvas` (React Flow) |
+| Редактор контента | раздел «Контент» админки: объекты и колёса сезона, форма и JSON по схеме, ошибки у полей, шаблоны действий, загрузка и выгрузка пакета, версии | `ContentSection`, `ObjectEditor`, `ObjectForm`; API — `AdminContentEndpoints` |
+| Версия контента | номер публикации пакета контента в сезоне; новая версия собирается из той, что в силе | `ContentCatalog.Version`, `PublishContent.ExpectedVersion`, отказ `content.versionChanged` |
+| Шаблон действия | базовое действие с примером параметров, которое редактор вставляет в эффект | `actionTemplate` (`web/src/admin/content/templates.ts`) |
 | Черновик карты | неопубликованные правки карты в браузере админа | `Draft`, `mapDraft.ts` (`loadDraft`, `saveDraft`) |
 | Последний ход | отрезки последнего перемещения моей фишки для анимации | `MoveView`, `MoveLegView`, `MyTurnView.LastMove` |
 | Ветка (в выборе) | выход развилки, пронумерованный на карте и в кнопках | `BranchOption`, `BranchChoice`, `ChoiceView.Steps` |
@@ -195,6 +198,7 @@
 | Предмет | одноразовый объект, используется вручную | `ObjectKind.Item` |
 | Эффект | объект, который действует сам по триггеру | `ObjectKind.Effect` |
 | Спецролл | объект, задающий, откуда роллить следующую игру | `ObjectKind.SpecialRoll` |
+| Можно несколько сразу | пометка объекта: несколько одинаковых можно применить за раз (поле `stackable`) | `ObjectDefinition.Stackable` |
 | Ивент | карточка из колоды | `ObjectKind.Event` |
 | Вид ивента | хороший, плохой; с этапа 5 — ещё специвент и рискованный; у вытянутого — вид колоды (D-501) | `EventKind` (`Good`, `Bad`; этап 5 — `Special`, `Risky`) |
 | Колода | колесо с ивентами одного вида (D-501) | `WheelDefinition` с полем `Deck` (вид ивентов) |

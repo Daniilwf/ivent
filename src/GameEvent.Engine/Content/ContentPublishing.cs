@@ -17,14 +17,18 @@ public static class ContentPublishing
         var errors = new List<ContentError>();
         void Error(string path, string message) => errors.Add(new ContentError(path, message));
 
-        var ids = pack.Objects.Select(o => o.Id).ToHashSet(StringComparer.Ordinal);
-        var wheels = pack.Wheels.Select(w => w.Id).ToHashSet(StringComparer.Ordinal);
-        foreach (var duplicate in pack.Objects.GroupBy(o => o.Id).Where(g => g.Count() > 1))
+        // The reader lets a null list item through (nullable annotations do not reach list items): named, then skipped
+        Nulls(pack.Objects, "$.objects", Error);
+        Nulls(pack.Wheels, "$.wheels", Error);
+        var objects = pack.Objects.Where(o => o is not null).ToList();
+        var ids = objects.Select(o => o.Id).ToHashSet(StringComparer.Ordinal);
+        var wheels = pack.Wheels.Where(w => w is not null).Select(w => w.Id).ToHashSet(StringComparer.Ordinal);
+        foreach (var duplicate in objects.GroupBy(o => o.Id).Where(g => g.Count() > 1))
         {
             Error("$.objects", $"Object «{duplicate.Key}» is listed twice.");
         }
 
-        foreach (var duplicate in pack.Wheels.GroupBy(w => w.Id).Where(g => g.Count() > 1))
+        foreach (var duplicate in pack.Wheels.Where(w => w is not null).GroupBy(w => w.Id).Where(g => g.Count() > 1))
         {
             Error("$.wheels", $"Wheel «{duplicate.Key}» is listed twice.");
         }
@@ -32,6 +36,11 @@ public static class ContentPublishing
         for (var i = 0; i < pack.Objects.Count; i++)
         {
             var definition = pack.Objects[i];
+            if (definition is null)
+            {
+                continue;
+            }
+
             var at = $"$.objects[{i}]";
             errors.AddRange(ContentValidator.Check(definition).Select(e => new ContentError(at + e.Path[1..], e.Message)));
             Supported(definition, at, Error);
@@ -44,6 +53,11 @@ public static class ContentPublishing
         for (var i = 0; i < pack.Wheels.Count; i++)
         {
             var wheel = pack.Wheels[i];
+            if (wheel is null)
+            {
+                continue;
+            }
+
             var at = $"$.wheels[{i}]";
             if (wheel.Entries.Count == 0 || wheel.Entries.Any(e => e.Weight < 0) || wheel.Entries.Sum(e => e.Weight) <= 0)
             {
@@ -65,6 +79,17 @@ public static class ContentPublishing
         }
 
         return errors;
+    }
+
+    private static void Nulls<T>(IReadOnlyList<T> items, string path, Action<string, string> error)
+    {
+        for (var i = 0; i < items.Count; i++)
+        {
+            if (items[i] is null)
+            {
+                error($"{path}[{i}]", "A list item is an object, not null.");
+            }
+        }
     }
 
     // What stage 4 plays (D-402): the rest waits for its stage and is refused rather than silently ignored.
@@ -193,6 +218,13 @@ public static class ContentPublishing
         if (command.Comment.Length > Limits.MaxCommentLength)
         {
             return Decision.Reject(RejectionCodes.CommentTooLong, $"The comment is limited to {Limits.MaxCommentLength} characters.");
+        }
+
+        if (command.ExpectedVersion is { } expected && expected != state.Catalog.Version)
+        {
+            return Decision.Reject(
+                RejectionCodes.ContentVersionChanged,
+                $"The content changed while it was edited: version {state.Catalog.Version} is in force, the pack was made from {expected}.");
         }
 
         var errors = Check(command.Pack);

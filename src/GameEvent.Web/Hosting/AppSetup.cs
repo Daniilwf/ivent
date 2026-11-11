@@ -9,6 +9,7 @@ using GameEvent.Infrastructure.Queue;
 using GameEvent.Infrastructure.Seasons;
 using GameEvent.Web.Accounts;
 using GameEvent.Web.BugReports;
+using GameEvent.Web.Content;
 using GameEvent.Web.Files;
 using GameEvent.Web.Map;
 using GameEvent.Web.Observability;
@@ -51,6 +52,11 @@ public static class AppSetup
     public const string MapCheckRateLimit = "map-check";
 
     public const int MapChecksPerMinute = 120;
+
+    /// <summary>The content editor's checks (D-490): the admin checks a pack on demand and before each save.</summary>
+    public const string ContentCheckRateLimit = "content-check";
+
+    public const int ContentChecksPerMinute = 60;
 
     public static void AddGameEvent(this WebApplicationBuilder builder)
     {
@@ -164,6 +170,9 @@ public static class AppSetup
             o.AddPolicy(MapCheckRateLimit, ctx => RateLimitPartition.GetFixedWindowLimiter(
                 ctx.User.UserId()?.ToString() ?? WebSecurity.ClientKey(ctx.Connection.RemoteIpAddress),
                 _ => new FixedWindowRateLimiterOptions { PermitLimit = MapChecksPerMinute, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+            o.AddPolicy(ContentCheckRateLimit, ctx => RateLimitPartition.GetFixedWindowLimiter(
+                ctx.User.UserId()?.ToString() ?? WebSecurity.ClientKey(ctx.Connection.RemoteIpAddress),
+                _ => new FixedWindowRateLimiterOptions { PermitLimit = ContentChecksPerMinute, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
             o.AddPolicy(SeasonReadRateLimit, ctx => RateLimitPartition.GetFixedWindowLimiter(
                 ctx.User.UserId()?.ToString() ?? WebSecurity.ClientKey(ctx.Connection.RemoteIpAddress),
                 _ => new FixedWindowRateLimiterOptions { PermitLimit = SeasonReadsPerMinute, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
@@ -223,6 +232,7 @@ public static class AppSetup
         api.MapAdminProofs();
         api.MapAdminSeasons();
         api.MapAdminMap();
+        api.MapAdminContent();
         api.MapSeasonsAndPlayers();
         api.MapFeed();
         api.MapAdminAccounts();
