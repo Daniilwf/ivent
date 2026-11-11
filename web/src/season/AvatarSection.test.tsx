@@ -30,6 +30,17 @@ function serve(answer: (url: string, method: string) => Response, avatar: Link |
       const request = typeof input === 'string' ? null : input;
       const url = request?.url ?? (input as string);
       const method = request?.method ?? init?.method ?? 'GET';
+      // The site names its upload limits (D-617): the defaults of FileLimits
+      if (method === 'GET' && url.endsWith('/api/status')) {
+        const mb = 1024 * 1024;
+        return json(200, {
+          maintenance: false,
+          version: '1',
+          environment: 'test',
+          testTools: false,
+          uploads: { picture: 15 * mb, gif: 8 * mb, bugScreenshot: 3 * mb, mapBackground: 10 * mb },
+        });
+      }
       if (method === 'GET' && url.endsWith('/api/auth/me')) {
         return json(200, {
           id: 'u',

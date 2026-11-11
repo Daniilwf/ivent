@@ -145,7 +145,7 @@
 - **Тест:** `Web.Tests/Api/UndoApiTests.Each_command_names_whom_and_what_it_touched_and_its_comment`; Vitest `LogSection.test.tsx` «says whom and what each command touched…».
 - **Исправление:** D-619 (2).
 
-### K1A-14. Удалённую из пула игру можно было начать, а её страница — 404
+### K1A-14. Удалённую из пула игру можно было начать
 
 - **Найдено:** исследовательское тестирование этапов 1–2, область «админка» (2026-11-11), персона «админ».
 - **Шаги:** игра предложена игроку, админ удаляет её как дубль, игрок жмёт «Начать».
@@ -153,7 +153,7 @@
 - **Получилось:** `run-started` принят.
 - **Важность:** низкая.
 - **Тест:** `Engine.Tests/Rolls/DeletedOfferTests.*`; `Web.Tests/Api/SeasonApiTests.An_offer_the_admin_deleted_from_the_pool_is_not_started_and_rerolls_for_free`.
-- **Исправление:** D-615.
+- **Исправление:** D-615. Страница удалённой игры для игрока — по-прежнему 404, сознательно: мягкое удаление скрывает игру из пула (`PoolApiTests.A_deleted_game_is_the_admins_to_see_by_its_id`), а лента и профиль показывают её название из снапшота без ссылки (`FeedApiTests.A_deleted_game_and_account_keep_their_names_in_the_feed_without_links`).
 
 ### K1A-15. Правила завершённого сезона менялись
 

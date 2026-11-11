@@ -1,4 +1,5 @@
 import { newCommandId } from './commands';
+import { siteEnvironment } from '../app/siteStatus';
 import { antiforgeryHeaders, noteResponse, rejectionCode, type Schemas } from './client';
 
 export type StoredFile = Schemas['StoredFileView'];
@@ -13,16 +14,16 @@ export class UploadError extends Error {
   }
 }
 
-const mb = 1024 * 1024;
+type UploadLimits = Schemas['UploadLimitsView'];
 
 /**
- * The server's own limits (FileLimits, BugReportRules; D-108, D-278): a picture 15 MB, a GIF 8 MB, a bug screenshot
- * 3 MB, a map background 10 MB. The server checks them again; these only spare a doomed upload (D-617).
+ * The largest file the site takes at `path`, as the site says it is configured (`/api/status`, D-617). The server
+ * checks it again; this only spares a doomed upload.
  */
-export function maxUploadBytes(path: string, type: string): number {
-  if (path === '/api/bug-reports/screenshot') return 3 * mb;
-  if (path.endsWith('/map/background')) return 10 * mb;
-  return type === 'image/gif' ? 8 * mb : 15 * mb;
+export function maxUploadBytes(path: string, type: string, limits: UploadLimits): number {
+  if (path === '/api/bug-reports/screenshot') return limits.bugScreenshot;
+  if (path.endsWith('/map/background')) return limits.mapBackground;
+  return type === 'image/gif' ? limits.gif : limits.picture;
 }
 
 /**
@@ -38,8 +39,11 @@ export async function uploadFile(
     | '/api/bug-reports/screenshot'
     | `/api/admin/seasons/${string}/map/background` = '/api/files',
 ): Promise<StoredFile> {
-  // A body over the server's limit is cut off with no answer the page could read (K1A): it is refused here first
-  if (file.size > maxUploadBytes(path, file.type)) throw new UploadError('file.tooLarge');
+  // A body over the server's limit is cut off with no answer the page could read (K1A): it is refused here first. A
+  // site that did not say its limits gets the file and answers for itself.
+  const limits = (await siteEnvironment())?.uploads;
+  if (limits && file.size > maxUploadBytes(path, file.type, limits))
+    throw new UploadError('file.tooLarge');
   const form = new FormData();
   form.append('commandId', newCommandId());
   form.append('file', file, name);

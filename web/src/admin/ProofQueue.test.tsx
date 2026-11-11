@@ -198,6 +198,15 @@ describe('The proof queue', () => {
     expect(within(card).queryByRole('link', { name: /Спросил/ })).toBeNull();
   });
 
+  // D-619 (4): a link only for https; an http address is shown as text
+  it('shows an http source as text, not a link', async () => {
+    open([item({ hours: 12, hoursSource: 'http://howlongtobeat.com/game/57427' })]);
+
+    const card = await screen.findByTestId('proof-r1');
+    expect(card).toHaveTextContent('http://howlongtobeat.com/game/57427');
+    expect(within(card).queryByRole('link', { name: /howlongtobeat/ })).toBeNull();
+  });
+
   it('says nothing about an estimate for hours from the pool', async () => {
     open([item({})]);
 

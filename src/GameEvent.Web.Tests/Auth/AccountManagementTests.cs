@@ -474,12 +474,12 @@ public sealed class AccountManagementTests : IAsyncLifetime
     // ---- Exploratory testing of stages 1 and 2 (K1A) ----
 
     [Theory]
-    [InlineData("​")]
-    [InlineData("‍‍")]
-    [InlineData("‮админ")]
-    [InlineData("Вася⁦")]
-    [InlineData("Вася")]
-    [InlineData("️")]
+    [InlineData("\u200B")]
+    [InlineData("\u200D\u200D")]
+    [InlineData("\u202Eадмин")]
+    [InlineData("Вася\u2066")]
+    [InlineData("Вася\u0007")]
+    [InlineData("\uFE0F")]
     public async Task An_invisible_name_or_one_with_control_characters_is_refused(string name)
     {
         var admin = await _site.SignedInAsync("admin");

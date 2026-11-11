@@ -10822,7 +10822,8 @@
           "maintenance",
           "version",
           "environment",
-          "testTools"
+          "testTools",
+          "uploads"
         ],
         "type": "object",
         "properties": {
@@ -10837,9 +10838,12 @@
           },
           "testTools": {
             "type": "boolean"
+          },
+          "uploads": {
+            "$ref": "#/components/schemas/UploadLimitsView"
           }
         },
-        "description": "What every page asks the site: whether it only reads now (the maintenance banner) and which version it runs — a page\nthat saw another version before shows «Что нового» (J4, D-201). `environment` — which copy of the site this is\n(anything but `production` shows a strip on every page); `testTools` — the test endpoints are there (only\nDevelopment and Test), so the admin gets the page of the test tools (H9, D-220)."
+        "description": "What every page asks the site: whether it only reads now (the maintenance banner) and which version it runs — a page\nthat saw another version before shows «Что нового» (J4, D-201). `environment` — which copy of the site this is\n(anything but `production` shows a strip on every page); `testTools` — the test endpoints are there (only\nDevelopment and Test), so the admin gets the page of the test tools (H9, D-220); `uploads` — the largest file\nof each kind the site takes, so a page refuses a bigger one before sending it (D-617)."
       },
       "SocialRules": {
         "required": [
@@ -11162,6 +11166,34 @@
           "countAsDrop",
           "ignore"
         ]
+      },
+      "UploadLimitsView": {
+        "required": [
+          "picture",
+          "gif",
+          "bugScreenshot",
+          "mapBackground"
+        ],
+        "type": "object",
+        "properties": {
+          "picture": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "gif": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "bugScreenshot": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "mapBackground": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "description": "The largest upload of each kind in bytes, as the site is configured (FileLimits, BugReportRules; D-617)."
       },
       "WeeklyChallengeRules": {
         "required": [

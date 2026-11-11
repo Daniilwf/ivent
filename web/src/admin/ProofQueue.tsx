@@ -236,7 +236,7 @@ export function ProofCard({
           // SPEC «Часы и кубы»: the pool had no hours, the player estimated them with a source the admin may correct
           <p className="text-sm" data-testid="hours-source">
             <span className="font-bold">{t.estimated}</span> <span>{t.estimateSource}: </span>
-            {/^https?:\/\//i.test(item.hoursSource) ? (
+            {/^https:\/\//i.test(item.hoursSource) ? (
               <a
                 href={item.hoursSource}
                 target="_blank"

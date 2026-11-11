@@ -61,9 +61,39 @@ let popped = false;
 globalThis.addEventListener('popstate', () => {
   navigated = true;
   popped = true;
+  restoreEntryScroll();
 });
-// The site puts the scroll back itself once a list is there again: the browser would do it before the list loads
+// The site puts the scroll back itself: the browser would do it before a list loads (the pool and the feed do it again
+// once their list is there, useRestoredScroll). Every page opened by Back or Forward goes where it was left, a page
+// left without a kept place goes to the top, never where the page before it was scrolled (review of K1A-21)
 if ('scrollRestoration' in globalThis.history) globalThis.history.scrollRestoration = 'manual';
+// A reload: the entry keeps where the page was, and the page comes back to it like after Back
+globalThis.addEventListener('pagehide', () => {
+  keepInEntry('scrollY', globalThis.scrollY);
+});
+if (isReload()) {
+  popped = true;
+  restoreEntryScroll();
+}
+
+function isReload(): boolean {
+  // jsdom and old browsers may lack the navigation timing: then it is not known to be a reload
+  try {
+    const first = globalThis.performance.getEntriesByType('navigation')[0] as
+      PerformanceNavigationTiming | undefined;
+    return first?.type === 'reload';
+  } catch {
+    return false;
+  }
+}
+
+/** After the page of the entry rendered, the scroll goes where the entry was left, or to the top */
+function restoreEntryScroll() {
+  const kept = entryState().scrollY;
+  requestAnimationFrame(() => {
+    globalThis.scrollTo(0, typeof kept === 'number' ? kept : 0);
+  });
+}
 
 /** What this history entry keeps: the scroll position and the values of `useEntryState` */
 function entryState(): Record<string, unknown> {
@@ -77,20 +107,21 @@ function keepInEntry(key: string, value: unknown) {
 
 /**
  * A page's value kept in its history entry (a search, the pages of a list shown): Back to the page brings it back,
- * a new visit by a link starts from `initial` (K1A)
+ * a new visit by a link starts from `initial` (K1A). Without a `key` it is a plain state that the entry does not keep.
  */
 export function useEntryState<T>(
-  key: string,
+  key: string | undefined,
   initial: T,
 ): [T, (next: T | ((now: T) => T)) => void] {
   const [value, setValue] = useState<T>(() => {
+    if (key === undefined) return initial;
     const kept = entryState()[key];
     return popped && kept !== undefined ? (kept as T) : initial;
   });
   const set = (next: T | ((now: T) => T)) => {
     setValue((now) => {
       const resolved = typeof next === 'function' ? (next as (now: T) => T)(now) : next;
-      keepInEntry(key, resolved);
+      if (key !== undefined) keepInEntry(key, resolved);
       return resolved;
     });
   };

@@ -7639,13 +7639,15 @@ export interface components {
          * @description What every page asks the site: whether it only reads now (the maintenance banner) and which version it runs — a page
          *     that saw another version before shows «Что нового» (J4, D-201). `environment` — which copy of the site this is
          *     (anything but `production` shows a strip on every page); `testTools` — the test endpoints are there (only
-         *     Development and Test), so the admin gets the page of the test tools (H9, D-220).
+         *     Development and Test), so the admin gets the page of the test tools (H9, D-220); `uploads` — the largest file
+         *     of each kind the site takes, so a page refuses a bigger one before sending it (D-617).
          */
         SiteStatusView: {
             maintenance: boolean;
             version: string;
             environment: components["schemas"]["SiteEnvironment"];
             testTools: boolean;
+            uploads: components["schemas"]["UploadLimitsView"];
         };
         SocialRules: {
             reactions: components["schemas"]["EquatableArrayOfstring"];
@@ -7762,6 +7764,17 @@ export interface components {
         };
         /** @enum {unknown} */
         UnmetConditionPolicy: "noDiceKeepCoins" | "countAsDrop" | "ignore";
+        /** @description The largest upload of each kind in bytes, as the site is configured (FileLimits, BugReportRules; D-617). */
+        UploadLimitsView: {
+            /** Format: int64 */
+            picture: number;
+            /** Format: int64 */
+            gif: number;
+            /** Format: int64 */
+            bugScreenshot: number;
+            /** Format: int64 */
+            mapBackground: number;
+        };
         WeeklyChallengeRules: {
             /** Format: int32 */
             defaultRewardCoins: number;

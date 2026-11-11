@@ -34,6 +34,19 @@ const nextFrame = () =>
       }),
   );
 
+/** The browser's Back: resolves once the entry before is the current one */
+const goBack = () =>
+  new Promise<void>((resolve) => {
+    globalThis.addEventListener(
+      'popstate',
+      () => {
+        resolve();
+      },
+      { once: true },
+    );
+    globalThis.history.back();
+  });
+
 describe('router', () => {
   afterEach(() => {
     globalThis.history.replaceState(null, '', '/');
@@ -123,6 +136,45 @@ describe('router', () => {
     await nextFrame();
 
     expect(screen.getByRole('textbox', { name: 'Поле' })).toHaveFocus();
+  });
+
+  // Review of K1A-21: the site took the scroll restoration from the browser for the pool and the feed, and every other
+  // page opened by Back was left where the page before it had been scrolled
+  it('Back to a page that does not restore its own scroll puts it where the reader left it, not where the last page was', async () => {
+    const scrolled = vi.spyOn(window, 'scrollTo');
+    Object.defineProperty(window, 'scrollY', { configurable: true, value: 400 });
+    navigate(`/users/${id}`);
+    // A page opened by a link starts at the top
+    Object.defineProperty(window, 'scrollY', { configurable: true, value: 0 });
+    navigate('/pool');
+    Object.defineProperty(window, 'scrollY', { configurable: true, value: 15000 });
+    navigate('/rules');
+    scrolled.mockClear();
+
+    await goBack();
+    await nextFrame();
+    expect(scrolled).toHaveBeenLastCalledWith(0, 15000);
+
+    // The profile was opened by a link and left at the top
+    Object.defineProperty(window, 'scrollY', { configurable: true, value: 15000 });
+    await goBack();
+    await nextFrame();
+    expect(scrolled).toHaveBeenLastCalledWith(0, 0);
+
+    // The first page was left 400 px down
+    await goBack();
+    await nextFrame();
+    expect(scrolled).toHaveBeenLastCalledWith(0, 400);
+    scrolled.mockRestore();
+    Object.defineProperty(window, 'scrollY', { configurable: true, value: 0 });
+  });
+
+  it('a reload keeps where the page was scrolled in its entry', () => {
+    Object.defineProperty(window, 'scrollY', { configurable: true, value: 2300 });
+    globalThis.dispatchEvent(new Event('pagehide'));
+
+    expect((globalThis.history.state as { scrollY?: number }).scrollY).toBe(2300);
+    Object.defineProperty(window, 'scrollY', { configurable: true, value: 0 });
   });
 
   it('does not stack the same page twice', () => {
