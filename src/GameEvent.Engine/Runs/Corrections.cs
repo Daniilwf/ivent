@@ -73,8 +73,10 @@ internal static class Corrections
         }
 
         // The count stage only (D-14): missing dice are rolled and appended, extra ones leave from the end.
-        var count = CompletionRoll.Count(command.Hours, run.Snapshot);
-        var sides = run.Mods?.Sides ?? CompletionRoll.DieFor(run.Difficulty!.Value, run.Snapshot.DieByDifficulty).Sides;
+        // An item's single die stays one die whatever the hours (D-481)
+        var count = run.Mods?.SingleDie is not null ? 1 : CompletionRoll.Count(command.Hours, run.Snapshot);
+        var sides = run.Mods?.SingleDie ?? run.Mods?.Sides ?? CompletionRoll.DieFor(run.Difficulty!.Value, run.Snapshot.DieByDifficulty).Sides;
+        // Stryker disable once Equality : equivalent — with as many dice as wanted, rolling zero more adds none
         var added = count > run.Dice.Count ? CompletionRoll.Roll(count - run.Dice.Count, sides, context.Random) : [];
         EquatableArray<Die> removed = [.. run.Dice.Skip(count)];
 
@@ -124,11 +126,12 @@ internal static class Corrections
         var newRule = CompletionRoll.DieFor(difficulty, run.Snapshot.DieByDifficulty);
 
         // Dice whose sides an item set keep them (D-408): only the difficulty's event follows the change
+        // and an item's single die stays that one die of its own kind (D-481); the challenge dice are not the item's
         var sides = run.Mods?.Sides ?? newRule.Sides;
-        EquatableArray<DieChange> Recalculate(EquatableArray<Die> dice) =>
+        static EquatableArray<DieChange> Recalculate(EquatableArray<Die> dice, int sides) =>
             [.. dice.Select(d => new DieChange(d, new Die(sides, (int)Math.Ceiling((decimal)d.Value * sides / d.Sides))))];
-        var dice = Recalculate(run.Dice);
-        var challenge = Recalculate(run.ChallengeDice);
+        var dice = Recalculate(run.Dice, run.Mods?.SingleDie ?? sides);
+        var challenge = Recalculate(run.ChallengeDice, sides);
         var changed = new RunDifficultyChanged(
             run.RunId, run.PlayerId, old, difficulty, dice, challenge, comment, context.Clock.UtcNow);
         var delta = CompletionRoll.Total(SeasonEngine.Apply(state, changed).Runs[run.RunId]) - CompletionRoll.Total(run);
@@ -227,6 +230,7 @@ internal static class Corrections
             if (Finishes.CountsForFinish(player, run))
             {
                 var after = SeasonEngine.Apply(state, new PointsChanged(player.PlayerId, delta, pointsReason, run.RunId));
+                // Stryker disable once Equality : equivalent — Difference never runs with a zero delta
                 var events = delta > 0
                     ? [new FinishSurplusChanged(player.PlayerId, delta)]
                     : Finishes.AfterReduction(
@@ -243,8 +247,10 @@ internal static class Corrections
         // Forward: from where the player stands, extra steps burn at the finish. Back: only what the run really gave
         // beyond its new dice sum — steps that burned at the finish gave no cells to take back (D-47, D-97).
         var newSum = CompletionRoll.Total(run);
+        // Stryker disable once Equality : equivalent — Difference never runs with a zero delta
         var steps = delta > 0 ? delta : -Math.Max(0, run.Moved - newSum);
         // Only a run's own move reaches the finish: a correction is a push and stops a cell before it (RR8, D-322).
+        // Stryker disable once Equality : equivalent — zero steps enter no cell either way
         var path = steps > 0 ? Movement.Push(state.Map, player.CellId, steps) : Movement.Backward(state.Map, player.Path, -steps);
         if (path.Count > 0)
         {

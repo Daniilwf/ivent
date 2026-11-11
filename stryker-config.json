@@ -1,10 +1,8 @@
 {
   "stryker-config": {
-    "solution": "GameEvent.slnx",
     "project": "GameEvent.Engine.csproj",
-    "test-projects": ["src/GameEvent.Engine.Tests/GameEvent.Engine.Tests.csproj"],
-    "test-case-filter": "Category!=Long&FullyQualifiedName!~.Invariants.&FullyQualifiedName!~Chains_stay_within_the_limits&FullyQualifiedName!~An_accepted_undo_equals_the_log_without_the_command",
-    "coverage-analysis": "off",
+    "test-runner": "mtp",
+    "coverage-analysis": "perTest",
     "reporters": ["html", "progress", "json", "markdown"],
     "thresholds": { "high": 90, "low": 80, "break": 80 }
   }

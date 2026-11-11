@@ -231,4 +231,26 @@ public class FinishBonusRecalculationTests
 
         Assert.Equal(s.State, SeasonEngine.Replay(s.Log));
     }
+
+    // ---- Found by mutation testing (D-282) ----
+
+    [Fact]
+    public void Every_finisher_but_the_first_holds_a_bonus_table()
+    {
+        var s = FinishSetup.New();
+        FinishSetup.FinishRun(s, "Вася");
+        FinishSetup.FinishRun(s, "Петя");
+        FinishSetup.FinishRun(s, "Маша");
+
+        Assert.Equal([s.PlayerId("Петя"), s.PlayerId("Маша")], Finishes.Bonused(s.State).Select(p => p.PlayerId));
+    }
+
+    [Fact]
+    public void Nothing_taken_from_a_finishing_run_changes_nothing()
+    {
+        var s = FinishSetup.New();
+        var run = FinishSetup.FinishRun(s, "Вася");
+
+        Assert.Empty(Finishes.AfterReduction(s.State, s.Player("Вася"), s.State.Runs[run], 0, Engine.Map.MoveReason.RunCorrection));
+    }
 }

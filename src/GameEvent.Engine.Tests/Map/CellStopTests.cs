@@ -144,6 +144,24 @@ public class CellStopTests
     }
 
     [Fact]
+    public void Players_stopping_on_one_cell_stand_there_together_and_each_gets_its_bonus()
+    {
+        // SPEC «Несколько игроков на клетке просто стоят вместе»: the second to stop is neither bumped nor refused
+        var s = Pool(BonusMap());
+        Throw(s, "Silent Hill", 2);
+
+        s.RollTitle("Петя", "Fatal Frame").Start("Петя").NextRandom(2).Complete("Петя");
+
+        ScenarioAssert.Accepted(s);
+        Assert.Equal("p", s.Player("Вася").CellId);
+        Assert.Equal("p", s.Player("Петя").CellId);
+        Assert.Equal(5, s.Player("Вася").Points);
+        Assert.Equal(5, s.Player("Петя").Points);
+        // Петя's move moved Петя only
+        Assert.Equal(s.PlayerId("Петя"), Assert.Single(s.LastEvents<PlayerMoved>()).PlayerId);
+    }
+
+    [Fact]
     public void Passing_a_bonus_gives_nothing()
     {
         var s = Pool(BonusMap());
@@ -257,5 +275,19 @@ public class CellStopTests
         s.RollTitle("Вася", "Silent Hill").Start("Вася").NextRandom(4, 4).Act(new DropRun(s.PlayerId("Вася")));
 
         Assert.Equal("k", s.Player("Вася").CellId);
+    }
+
+    [Fact]
+    public void A_paused_move_a_transfer_or_a_non_triggering_move_stops_on_no_cell()
+    {
+        // Found by mutation testing (D-282): the cell's events come only from a stop of a triggering move
+        var s = Pool(BonusMap());
+        var vasya = s.PlayerId("Вася");
+        PlayerMoved Move(int steps, MoveReason reason, bool paused = false) => new(vasya, "a", "p", steps, ["p"], reason, null, paused);
+
+        Assert.Empty(CellStops.After(s.State, Move(1, MoveReason.CompletionRoll, paused: true), s.Context()));
+        Assert.Empty(CellStops.After(s.State, Move(0, MoveReason.CompletionRoll), s.Context()));
+        Assert.Empty(CellStops.After(s.State, Move(1, MoveReason.RunCorrection), s.Context()));
+        Assert.NotEmpty(CellStops.After(s.State, Move(1, MoveReason.CompletionRoll), s.Context()));
     }
 }

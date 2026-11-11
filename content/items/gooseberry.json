@@ -1,0 +1,28 @@
+{
+  "id": "gooseberry",
+  "kind": "item",
+  "name": "Крыжовник",
+  "description": "Брось d6 и получи столько монеток.",
+  "rarity": "common",
+  "price": null,
+  "window": "anytime",
+  "hostile": false,
+  "stackable": true,
+  "tags": ["edible"],
+  "effect": {
+    "target": {
+      "selector": "self"
+    },
+    "actions": [
+      {
+        "type": "roll",
+        "dice": "1d6"
+      },
+      {
+        "type": "changeResource",
+        "resource": "coins",
+        "amount": "$roll"
+      }
+    ]
+  }
+}

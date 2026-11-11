@@ -63,6 +63,13 @@
               null
             ]
           },
+          "tags": true,
+          "unstealable": {
+            "type": "boolean"
+          },
+          "undestroyable": {
+            "type": "boolean"
+          },
           "scope": {
             "enum": [
               "season",
@@ -90,7 +97,9 @@
                       "all",
                       "leader",
                       "higherPoints",
-                      "lowerPoints"
+                      "lowerPoints",
+                      "withinCells",
+                      "nearestBehind"
                     ]
                   },
                   "among": {
@@ -101,6 +110,15 @@
                     ]
                   },
                   "excludeSelf": {
+                    "type": "boolean"
+                  },
+                  "cells": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "includeSameCell": {
                     "type": "boolean"
                   }
                 },
@@ -123,6 +141,7 @@
                   "techReroll",
                   "time",
                   "hostileIncoming",
+                  "runEnded",
                   null
                 ]
               },
@@ -208,6 +227,7 @@
                       "completedStreakWithTag",
                       "allDiceMax",
                       "runHours",
+                      "coins",
                       null
                     ]
                   },
@@ -218,6 +238,12 @@
                     ]
                   },
                   "gte": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "lte": {
                     "type": [
                       "integer",
                       "null"
@@ -259,6 +285,13 @@
                           ],
                           "pattern": "^(-?([1-9][0-9]?)?d[1-9][0-9]{0,2}|-?\\$[a-zA-Z][a-zA-Z0-9]{0,39})$"
                         },
+                        "direction": {
+                          "enum": [
+                            "chosen",
+                            "away",
+                            null
+                          ]
+                        },
                         "target": {
                           "enum": [
                             "self",
@@ -286,6 +319,9 @@
                             "string"
                           ],
                           "pattern": "^(-?([1-9][0-9]?)?d[1-9][0-9]{0,2}|-?\\$[a-zA-Z][a-zA-Z0-9]{0,39})$"
+                        },
+                        "reflect": {
+                          "type": "boolean"
                         },
                         "target": {
                           "enum": [
@@ -363,7 +399,8 @@
                           "enum": [
                             "take",
                             "steal",
-                            "destroy"
+                            "destroy",
+                            "give"
                           ]
                         },
                         "filter": {
@@ -401,7 +438,14 @@
                                 "boolean",
                                 "null"
                               ]
-                            }
+                            },
+                            "hasCounter": {
+                              "type": [
+                                "boolean",
+                                "null"
+                              ]
+                            },
+                            "excludeTags": true
                           },
                           "additionalProperties": false
                         },
@@ -410,6 +454,17 @@
                             "random",
                             "chosen"
                           ]
+                        },
+                        "count": {
+                          "description": "A whole number, dice («1d6», «-1d6») or a reference («$roll», «-$roll», «$choice», «$name»).",
+                          "type": [
+                            "integer",
+                            "string"
+                          ],
+                          "pattern": "^(-?([1-9][0-9]?)?d[1-9][0-9]{0,2}|-?\\$[a-zA-Z][a-zA-Z0-9]{0,39})$"
+                        },
+                        "all": {
+                          "type": "boolean"
                         },
                         "target": {
                           "enum": [
@@ -431,7 +486,9 @@
                         "mode": {
                           "enum": [
                             "transform",
-                            "annotate"
+                            "annotate",
+                            "addCounter",
+                            "resetCounters"
                           ]
                         },
                         "filter": {
@@ -469,7 +526,14 @@
                                 "boolean",
                                 "null"
                               ]
-                            }
+                            },
+                            "hasCounter": {
+                              "type": [
+                                "boolean",
+                                "null"
+                              ]
+                            },
+                            "excludeTags": true
                           },
                           "additionalProperties": false
                         },
@@ -484,6 +548,14 @@
                             "string",
                             "null"
                           ]
+                        },
+                        "value": {
+                          "description": "A whole number, dice («1d6», «-1d6») or a reference («$roll», «-$roll», «$choice», «$name»).",
+                          "type": [
+                            "integer",
+                            "string"
+                          ],
+                          "pattern": "^(-?([1-9][0-9]?)?d[1-9][0-9]{0,2}|-?\\$[a-zA-Z][a-zA-Z0-9]{0,39})$"
                         },
                         "target": {
                           "enum": [
@@ -625,6 +697,7 @@
                                 "completedStreakWithTag",
                                 "allDiceMax",
                                 "runHours",
+                                "coins",
                                 null
                               ]
                             },
@@ -635,6 +708,12 @@
                               ]
                             },
                             "gte": {
+                              "type": [
+                                "integer",
+                                "null"
+                              ]
+                            },
+                            "lte": {
                               "type": [
                                 "integer",
                                 "null"
@@ -677,7 +756,13 @@
                             "multiply",
                             "reroll",
                             "min",
-                            "max"
+                            "max",
+                            "singleDie",
+                            "setOne",
+                            "replaceValue",
+                            "fixAverage",
+                            "bonusPerEven",
+                            "percent"
                           ]
                         },
                         "value": {
@@ -687,6 +772,24 @@
                             "string"
                           ],
                           "pattern": "^(-?([1-9][0-9]?)?d[1-9][0-9]{0,2}|-?\\$[a-zA-Z][a-zA-Z0-9]{0,39})$"
+                        },
+                        "sides": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        },
+                        "from": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        },
+                        "filter": {
+                          "enum": [
+                            "belowAverage",
+                            null
+                          ]
                         },
                         "target": {
                           "enum": [
@@ -775,16 +878,59 @@
                     ],
                     "pattern": "^(-?([1-9][0-9]?)?d[1-9][0-9]{0,2}|-?\\$[a-zA-Z][a-zA-Z0-9]{0,39})$"
                   },
+                  "choice": {
+                    "type": [
+                      "object",
+                      "null"
+                    ],
+                    "properties": {
+                      "prompt": {
+                        "type": "string"
+                      },
+                      "options": {
+                        "type": "object",
+                        "properties": {
+                          "from": {
+                            "enum": [
+                              "categories",
+                              "players",
+                              "games",
+                              null
+                            ]
+                          },
+                          "list": true
+                        },
+                        "additionalProperties": false
+                      }
+                    },
+                    "required": [
+                      "prompt",
+                      "options"
+                    ],
+                    "additionalProperties": false
+                  },
                   "cases": {
                     "type": "array",
                     "items": {
                       "type": "object",
                       "properties": {
                         "from": {
-                          "type": "integer"
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
                         },
                         "to": {
-                          "type": "integer"
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        },
+                        "option": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
                         },
                         "actions": {
                           "type": "array",
@@ -806,6 +952,13 @@
                                       "string"
                                     ],
                                     "pattern": "^(-?([1-9][0-9]?)?d[1-9][0-9]{0,2}|-?\\$[a-zA-Z][a-zA-Z0-9]{0,39})$"
+                                  },
+                                  "direction": {
+                                    "enum": [
+                                      "chosen",
+                                      "away",
+                                      null
+                                    ]
                                   },
                                   "target": {
                                     "enum": [
@@ -834,6 +987,9 @@
                                       "string"
                                     ],
                                     "pattern": "^(-?([1-9][0-9]?)?d[1-9][0-9]{0,2}|-?\\$[a-zA-Z][a-zA-Z0-9]{0,39})$"
+                                  },
+                                  "reflect": {
+                                    "type": "boolean"
                                   },
                                   "target": {
                                     "enum": [
@@ -911,7 +1067,8 @@
                                     "enum": [
                                       "take",
                                       "steal",
-                                      "destroy"
+                                      "destroy",
+                                      "give"
                                     ]
                                   },
                                   "filter": {
@@ -949,7 +1106,14 @@
                                           "boolean",
                                           "null"
                                         ]
-                                      }
+                                      },
+                                      "hasCounter": {
+                                        "type": [
+                                          "boolean",
+                                          "null"
+                                        ]
+                                      },
+                                      "excludeTags": true
                                     },
                                     "additionalProperties": false
                                   },
@@ -958,6 +1122,17 @@
                                       "random",
                                       "chosen"
                                     ]
+                                  },
+                                  "count": {
+                                    "description": "A whole number, dice («1d6», «-1d6») or a reference («$roll», «-$roll», «$choice», «$name»).",
+                                    "type": [
+                                      "integer",
+                                      "string"
+                                    ],
+                                    "pattern": "^(-?([1-9][0-9]?)?d[1-9][0-9]{0,2}|-?\\$[a-zA-Z][a-zA-Z0-9]{0,39})$"
+                                  },
+                                  "all": {
+                                    "type": "boolean"
                                   },
                                   "target": {
                                     "enum": [
@@ -979,7 +1154,9 @@
                                   "mode": {
                                     "enum": [
                                       "transform",
-                                      "annotate"
+                                      "annotate",
+                                      "addCounter",
+                                      "resetCounters"
                                     ]
                                   },
                                   "filter": {
@@ -1017,7 +1194,14 @@
                                           "boolean",
                                           "null"
                                         ]
-                                      }
+                                      },
+                                      "hasCounter": {
+                                        "type": [
+                                          "boolean",
+                                          "null"
+                                        ]
+                                      },
+                                      "excludeTags": true
                                     },
                                     "additionalProperties": false
                                   },
@@ -1032,6 +1216,14 @@
                                       "string",
                                       "null"
                                     ]
+                                  },
+                                  "value": {
+                                    "description": "A whole number, dice («1d6», «-1d6») or a reference («$roll», «-$roll», «$choice», «$name»).",
+                                    "type": [
+                                      "integer",
+                                      "string"
+                                    ],
+                                    "pattern": "^(-?([1-9][0-9]?)?d[1-9][0-9]{0,2}|-?\\$[a-zA-Z][a-zA-Z0-9]{0,39})$"
                                   },
                                   "target": {
                                     "enum": [
@@ -1173,6 +1365,7 @@
                                           "completedStreakWithTag",
                                           "allDiceMax",
                                           "runHours",
+                                          "coins",
                                           null
                                         ]
                                       },
@@ -1183,6 +1376,12 @@
                                         ]
                                       },
                                       "gte": {
+                                        "type": [
+                                          "integer",
+                                          "null"
+                                        ]
+                                      },
+                                      "lte": {
                                         "type": [
                                           "integer",
                                           "null"
@@ -1225,7 +1424,13 @@
                                       "multiply",
                                       "reroll",
                                       "min",
-                                      "max"
+                                      "max",
+                                      "singleDie",
+                                      "setOne",
+                                      "replaceValue",
+                                      "fixAverage",
+                                      "bonusPerEven",
+                                      "percent"
                                     ]
                                   },
                                   "value": {
@@ -1235,6 +1440,24 @@
                                       "string"
                                     ],
                                     "pattern": "^(-?([1-9][0-9]?)?d[1-9][0-9]{0,2}|-?\\$[a-zA-Z][a-zA-Z0-9]{0,39})$"
+                                  },
+                                  "sides": {
+                                    "type": [
+                                      "integer",
+                                      "null"
+                                    ]
+                                  },
+                                  "from": {
+                                    "type": [
+                                      "integer",
+                                      "null"
+                                    ]
+                                  },
+                                  "filter": {
+                                    "enum": [
+                                      "belowAverage",
+                                      null
+                                    ]
                                   },
                                   "target": {
                                     "enum": [
@@ -1310,19 +1533,109 @@
                           }
                         }
                       },
-                      "required": [
-                        "from",
-                        "to"
-                      ],
                       "additionalProperties": false
                     }
                   }
                 },
                 "required": [
-                  "roll",
                   "cases"
                 ],
                 "additionalProperties": false
+              },
+              "counter": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "properties": {
+                  "start": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "start"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": false
+          },
+          "useCondition": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "difficultyAtLeast": {
+                "enum": [
+                  "easy",
+                  "normal",
+                  "hard",
+                  "extreme",
+                  null
+                ]
+              },
+              "game": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "properties": {
+                  "tags": true,
+                  "maxHours": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "minHours": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "releaseYearBefore": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              },
+              "stat": {
+                "enum": [
+                  "hostileReceived",
+                  "completedStreakWithTag",
+                  "allDiceMax",
+                  "runHours",
+                  "coins",
+                  null
+                ]
+              },
+              "tag": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "gte": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "lte": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "minDice": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
               }
             },
             "additionalProperties": false

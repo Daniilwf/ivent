@@ -17,6 +17,28 @@ public static class MapDistances
     }
 
     /// <summary>
+    /// The fewest steps along edges, either way, from <paramref name="from"/> to each cell it is connected with (D-480):
+    /// how far players stand from each other, whatever the branch. Teleports are not edges.
+    /// </summary>
+    public static IReadOnlyDictionary<string, int> Around(MapGraph map, string from)
+    {
+        ArgumentNullException.ThrowIfNull(map);
+        var neighbours = map.Edges.SelectMany(e => new[] { (e.From, e.To), (From: e.To, To: e.From) }).ToLookup(p => p.From, p => p.To);
+        var distances = new Dictionary<string, int> { [from] = 0 };
+        var queue = new Queue<string>([from]);
+        while (queue.TryDequeue(out var cell))
+        {
+            foreach (var next in neighbours[cell].Where(n => !distances.ContainsKey(n)))
+            {
+                distances[next] = distances[cell] + 1;
+                queue.Enqueue(next);
+            }
+        }
+
+        return distances;
+    }
+
+    /// <summary>
     /// How many cells closer to the finish <paramref name="moved"/> brought the player: negative when further (a snake, a
     /// longer branch). A cell that cannot reach the finish counts by the cells walked.
     /// </summary>

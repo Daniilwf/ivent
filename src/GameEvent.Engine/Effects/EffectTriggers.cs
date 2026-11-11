@@ -28,9 +28,9 @@ internal sealed class EffectTriggers : ITriggerHandler
         {
             GameRolled e => Fire(state, context, e.PlayerId, [Trigger.AfterRoll], null, DiceScope.Pending),
             GameChoiceRolled e => Fire(state, context, e.PlayerId, [Trigger.AfterRoll], null, DiceScope.Pending),
-            RunCompleted e => Fire(state, context, e.PlayerId, [Trigger.RunCompleted], e.RunId, DiceScope.Pending),
+            RunCompleted e => Fire(state, context, e.PlayerId, [Trigger.RunCompleted, Trigger.RunEnded], e.RunId, DiceScope.Pending),
             CompletionRolled e => Fire(state, context, e.PlayerId, [Trigger.AfterDice], e.RunId, DiceScope.AfterThrow),
-            RunDropped e => Fire(state, context, e.PlayerId, [Trigger.Drop], e.RunId, DiceScope.Pending),
+            RunDropped e => Fire(state, context, e.PlayerId, [Trigger.Drop, Trigger.RunEnded], e.RunId, DiceScope.Pending),
             RunTechRerolled e => Fire(state, context, e.PlayerId, [Trigger.TechReroll], e.RunId, DiceScope.Pending),
             PlayerMoved e when e.Steps != 0 && CellStops.Triggers(e.Reason) =>
                 Fire(state, context, e.PlayerId, [.. Movement.Visits(e).Select(Of).Distinct()], null, DiceScope.Pending),

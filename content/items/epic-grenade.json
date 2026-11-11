@@ -1,0 +1,30 @@
+{
+  "id": "epic-grenade",
+  "kind": "item",
+  "name": "Эпическая Граната",
+  "description": "Оружие. Выбранный другой игрок идёт на 4 клетки назад и теряет 5 монеток. Если у жертвы монеток не больше порога из правил сезона, урон монетками достаётся тебе, умноженный по тем же правилам.",
+  "rarity": "epic",
+  "price": null,
+  "window": "anytime",
+  "hostile": true,
+  "stackable": false,
+  "tags": ["weapon"],
+  "effect": {
+    "target": {
+      "selector": "chosen",
+      "excludeSelf": true
+    },
+    "actions": [
+      {
+        "type": "move",
+        "steps": -4
+      },
+      {
+        "type": "changeResource",
+        "resource": "coins",
+        "amount": -5,
+        "reflect": true
+      }
+    ]
+  }
+}

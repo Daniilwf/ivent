@@ -1,0 +1,24 @@
+{
+  "id": "gandonopithecus",
+  "kind": "item",
+  "name": "Гандонопитек",
+  "description": "В следующем броске за прохождение на один кубик больше.",
+  "rarity": "epic",
+  "price": 40,
+  "window": "beforeDice",
+  "hostile": false,
+  "stackable": true,
+  "effect": {
+    "target": {
+      "selector": "self"
+    },
+    "actions": [
+      {
+        "type": "modifyDice",
+        "when": "next",
+        "stage": "count",
+        "value": 1
+      }
+    ]
+  }
+}

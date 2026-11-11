@@ -3626,6 +3626,112 @@
         }
       }
     },
+    "/api/admin/seasons/{seasonId}/map/background": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "parameters": [
+          {
+            "name": "seasonId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/FileUploadForm"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoredFileView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RejectionProblem"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Payload Too Large",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RejectionProblem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RejectionProblem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RejectionProblem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RejectionProblem"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported Media Type"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/admin/seasons": {
       "post": {
         "tags": [
@@ -6768,6 +6874,24 @@
         },
         "description": "An answer to the pending choice: its id and the picked option's id."
       },
+      "CoinReflect": {
+        "required": [
+          "coinsAtMost",
+          "multiplier"
+        ],
+        "type": "object",
+        "properties": {
+          "coinsAtMost": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "multiplier": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "Reflection of coin damage (D-474): when the target has at most int CoinReflect.CoinsAtMost coins, the damage goes to the\none who used the effect, times int CoinReflect.Multiplier."
+      },
       "CoinReward": {
         "required": [
           "perHour",
@@ -7138,9 +7262,15 @@
           "multiply",
           "reroll",
           "min",
-          "max"
+          "max",
+          "singleDie",
+          "setOne",
+          "replaceValue",
+          "fixAverage",
+          "bonusPerEven",
+          "percent"
         ],
-        "description": "A stage of the dice pipeline (D-14)."
+        "description": "A stage of the dice pipeline (D-14); the rare ones from DiceStage.SingleDie on came with the import (D-481)."
       },
       "DieByDifficulty": {
         "required": [
@@ -7414,6 +7544,17 @@
           },
           "attacksOnlyOnHigherPoints": {
             "type": "boolean"
+          },
+          "reflect": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "Coin damage marked `reflect` that goes back to the attacker (D-474, the import's weapons). Missing — nothing is\nreflected: a season created before the rule keeps playing as it did (D-50). Not written while missing.",
+                "$ref": "#/components/schemas/CoinReflect"
+              }
+            ]
           }
         }
       },
@@ -8391,6 +8532,35 @@
         },
         "description": "A manual effect the player still has to play out (D-10, D-93); the player resolves it (D-102)."
       },
+      "MapBackgroundView": {
+        "required": [
+          "fileId",
+          "width",
+          "height"
+        ],
+        "type": "object",
+        "properties": {
+          "fileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "width": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "height": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "url": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "The picture under the map (D-277): an uploaded map background (`POST …/map/background`) and its natural size in\npixels — the cells' `x`, `y` are in this picture's space. `url` serves it (the server fills it in; a\nrequest may leave it out)."
+      },
       "MapCheckView": {
         "required": [
           "canPublish",
@@ -8451,9 +8621,19 @@
             "items": {
               "$ref": "#/components/schemas/ZoneView"
             }
+          },
+          "background": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/MapBackgroundView"
+              }
+            ]
           }
         },
-        "description": "A whole map: what the editor loads, checks and publishes."
+        "description": "A whole map: what the editor loads, checks and publishes. `background` — the picture under the cells, or null:\nthe screens then draw the zones' board (D-277)."
       },
       "MapMode": {
         "enum": [
@@ -10536,9 +10716,19 @@
           },
           "mapMode": {
             "$ref": "#/components/schemas/MapMode"
+          },
+          "background": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/MapBackgroundView"
+              }
+            ]
           }
         },
-        "description": "The season screen's data. `status` and `deadline` (UTC; the screen shows it in Moscow time) follow the\nlifecycle (D-101); after the finish `leaderboard` is the recorded result. The map is the one in force (the\nlatest published, D-300): `cells`, `edges` and `zones`; `mapMode` says whether the season plays\non the linear chain of stage 1 or on the graph (D-301)."
+        "description": "The season screen's data. `status` and `deadline` (UTC; the screen shows it in Moscow time) follow the\nlifecycle (D-101); after the finish `leaderboard` is the recorded result. The map is the one in force (the\nlatest published, D-300): `cells`, `edges` and `zones`; `mapMode` says whether the season plays\non the linear chain of stage 1 or on the graph (D-301); `background` — the picture under the cells, null when\nthe map has none or its file is not on this site (D-277)."
       },
       "ShopRules": {
         "required": [

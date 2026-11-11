@@ -10,4 +10,18 @@ public partial class ContentExamplesTests
             .Select(ContentJson.Parse<ObjectDefinition>)
             .GroupBy(o => o.Id)
             .ToDictionary(g => g.Key, g => g.Last(), StringComparer.Ordinal);
+
+    /// <summary>
+    /// The ids of «Примеры расширений формата» (the import of the old pack): content files as they are, kept apart from
+    /// the examples 1–10 the acceptance tests of stage 4 publish.
+    /// </summary>
+    internal static IReadOnlySet<string> ExtensionExampleIds()
+    {
+        var doc = s_docText.Value;
+        var start = doc.IndexOf("## Примеры расширений формата", StringComparison.Ordinal);
+        var end = doc.IndexOf("\n## ", start + 1, StringComparison.Ordinal);
+        return JsonBlock().Matches(doc[start..end])
+            .Select(m => ContentJson.Parse<ObjectDefinition>(m.Groups["json"].Value).Id)
+            .ToHashSet(StringComparer.Ordinal);
+    }
 }

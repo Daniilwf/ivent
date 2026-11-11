@@ -180,6 +180,51 @@ public sealed class MapApiTests : IAsyncLifetime
             players.EnumerateArray().Select(p => (p.GetProperty("name").GetString(), p.GetProperty("choosingBranch").GetBoolean())));
     }
 
+    [Fact]
+    public async Task The_feed_tells_a_discarded_branch_choice_from_a_discarded_game_choice()
+    {
+        // MP-1: the feed said «снимает выбор игры» when the admin discarded a branch choice. The log keeps only the
+        // choice's id, so the feed names its kind
+        var admin = await _site.SignedInAsync("admin");
+        var vasya = await _site.SignedInAsync("vasya");
+        var petya = await _site.SignedInAsync("petya");
+        await SwitchToGraphAsync(admin);
+        await PublishAsync(admin, ForkMap());
+        await CompleteOneAsync(vasya);
+        await DiscardAsync(admin, "vasya");
+        // Петя is offered a choice of games, and the admin discards it too
+        await SetChoiceCountAsync(admin, 2);
+        await ApiCalls.PostOkAsync(petya, $"{Season}/roll");
+        Assert.Equal("game", (await MeAsync(petya)).GetProperty("choice").GetProperty("kind").GetString());
+        await DiscardAsync(admin, "petya");
+
+        var feed = await ApiCalls.OkAsync(await vasya.GetAsync($"{Season}/feed", Ct));
+
+        var discarded = feed.GetProperty("entries").EnumerateArray()
+            .Where(e => e.GetProperty("type").GetString() == "choice-discarded")
+            .Select(e => (e.GetProperty("data").GetProperty("playerId").GetGuid(), e.GetProperty("data").GetProperty("kind").GetString()))
+            .ToList();
+        Assert.Equal([(_site.Players["petya"], "game"), (_site.Players["vasya"], "branch")], discarded);
+    }
+
+    private async Task DiscardAsync(HttpClient admin, string login) =>
+        await ApiCalls.PostOkAsync(
+            admin,
+            $"/api/admin/seasons/{SiteFactory.SeasonId}/players/{_site.Players[login]}/adjust",
+            new { commandId = Guid.NewGuid(), comment = "Публикую карту", discardOffer = true });
+
+    private static async Task SetChoiceCountAsync(HttpClient admin, int count)
+    {
+        using var current = JsonDocument.Parse(await admin.GetStringAsync($"{Season}/rules", Ct));
+        var ruleset = JsonNode.Parse(current.RootElement.GetProperty("ruleset").GetRawText())!;
+        ruleset["roll"]!["choiceCount"] = count;
+        var response = await admin.PutAsJsonAsync(
+            $"/api/admin/seasons/{SiteFactory.SeasonId}/rules",
+            new { commandId = Guid.NewGuid(), expectedVersion = current.RootElement.GetProperty("version").GetInt32(), ruleset },
+            Ct);
+        Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync(Ct));
+    }
+
     // ---- The editor: read ----
 
     [Fact]

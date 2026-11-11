@@ -162,4 +162,21 @@ public class DiffTests
 
         Assert.Equal(forward.Select(c => new RulesetChange(c.Path, c.After, c.Before)), backward);
     }
+
+    [Fact]
+    public void Removed_and_added_objects_of_an_array_unfold_to_their_leaves()
+    {
+        // Found by mutation testing (D-282): an object on one side only is compared field by field, the other side absent
+        var steps = s_base.Bets.PayoutByHoursPerDay;
+        var shorter = s_base with { Bets = s_base.Bets with { PayoutByHoursPerDay = [steps[0]] } };
+
+        var removed = RulesetDiff.Between(s_base, shorter);
+        var added = RulesetDiff.Between(shorter, s_base);
+
+        Assert.NotEmpty(removed);
+        Assert.All(removed, c => Assert.Matches(@"^bets\.payoutByHoursPerDay\[[1-9]\d*\]\.[a-z][A-Za-z]*$", c.Path));
+        Assert.All(removed, c => Assert.Null(c.After));
+        Assert.Equal(removed.Select(c => new RulesetChange(c.Path, c.After, c.Before)), added);
+        Assert.Contains(removed, c => c.Path == "bets.payoutByHoursPerDay[1].multiplier");
+    }
 }

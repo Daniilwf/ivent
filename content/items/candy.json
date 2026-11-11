@@ -1,0 +1,24 @@
+{
+  "id": "candy",
+  "kind": "item",
+  "name": "Конфетка",
+  "description": "Получаешь 1 монетку.",
+  "rarity": "common",
+  "price": 10,
+  "window": "anytime",
+  "hostile": false,
+  "stackable": true,
+  "tags": ["edible"],
+  "effect": {
+    "target": {
+      "selector": "self"
+    },
+    "actions": [
+      {
+        "type": "changeResource",
+        "resource": "coins",
+        "amount": 1
+      }
+    ]
+  }
+}
