@@ -198,9 +198,9 @@
 | Эффект | объект, который действует сам по триггеру | `ObjectKind.Effect` |
 | Спецролл | объект, задающий, откуда роллить следующую игру | `ObjectKind.SpecialRoll` |
 | Ивент | карточка из колоды | `ObjectKind.Event` |
-| Вид ивента | хороший или плохой | `EventKind` (`Good`, `Bad`) |
-| Колода | колесо с ивентами | `Wheel` с видом `Deck` |
-| Общий ивент | ивент на всех, запускается админом | `GlobalEvent` |
+| Вид ивента | хороший, плохой; с этапа 5 — ещё специвент и рискованный; у вытянутого — вид колоды (D-501) | `EventKind` (`Good`, `Bad`; этап 5 — `Special`, `Risky`) |
+| Колода | колесо с ивентами одного вида (D-501) | `WheelDefinition` с полем `Deck` (вид ивентов) |
+| Общий ивент | ивент на всех, запускается админом на срок, с баннером на главной и, может быть, общей целью (D-517) | `GlobalEvent` |
 | Достижение | значок за выполнение условия по статистике | `ObjectKind.Achievement`, `PlayerAchievement` |
 | Определение объекта | шаблон предмета, эффекта, ивента или достижения | `ObjectDefinition`, блок эффекта — `EffectSpec`, разбор — `ContentJson`, проверка — `ContentValidator` |
 | Объект инвентаря | конкретный экземпляр у игрока | `InventoryObject`; события `ObjectGiven`, `ObjectRemoved` (`ObjectRemoval`), `ObjectTransferred`, `ObjectChanged`, `ObjectLost`; откуда — `ObjectSource` |
@@ -238,6 +238,48 @@
 | Выбор из нескольких игр | ролл при `choiceCount` > 1: игрок выбирает одну из выпавших | `GameChoiceRolled`, команда `MakeChoice`, событие `ChoiceMade` |
 | Сброс выбора | админ снимает ожидание выбора тем же флагом, что и сброс предложенной игры; игры снова свободны | `ChoiceDiscarded` (по `AdjustPlayer.DiscardOffer`) |
 | Приглашение | кооп или дуэль, ждущие ответа | `Interaction` |
+
+## Ивенты, голосования и взаимодействия (этап 5)
+
+Заведены при подготовке этапа 5 (2026-11-11, D-500…D-529). Имена в коде — план: при реализации задача сверяет их здесь, расхождение правится в глоссарии той же задачей.
+
+| Термин | Что значит | В коде |
+| --- | --- | --- |
+| Вытянуть ивент | взять ивент из колоды по весу и сразу разыграть его на вытянувшего (D-500) | действие `drawEvent` (`DrawEventAction`), событие `EventDrawn` |
+| Источник ивента | откуда ивент: клетка, дроп, платный реролл, сложность, предмет, общий ивент | `EventSource` |
+| Хороший ивент, плохой ивент | ивент из колоды `good` / `bad` | `EventKind.Good`, `EventKind.Bad`, колоды `good`, `bad` |
+| Специвент | ивент из колоды `special`; применяется первым | `EventKind.Special`, колода `special` |
+| Рискованный ивент | ивент с исходом по броску («кинь d6: 1–3 плохо, 4–6 хорошо»), колода `risky` | `EventKind.Risky`, блок `outcomes` |
+| Колода зоны | колода зоны клетки, где стоит игрок; клетка `deck: zone` | `ZoneDefinition.Deck`, `DeckRef.Zone` |
+| Колода по умолчанию | колода клетки ивента вне зоны с колодой | `events.defaultDeck` |
+| Пустая колода | у колоды нет живых записей: ивент уходит в ручное разрешение | событие `EventDrawMissed` |
+| Накопленные ивенты | ожидающие последствия ивентов, применяемые по порядку «специвент, хороший, плохой» | `RollModifier.EventKind`, `DiceModifier.EventKind`, `events.applyOrder` |
+| Условие прохождения | требование ивента к следующему прохождению («пройди на сложной»), видно на странице прохождения | `modifyNextRoll.runCondition` (`ConditionSpec`), `RunSnapshot.Conditions`, события `RunConditionAttached`, `RunConditionChecked` |
+| Невыполненное условие | прохождение не выполнило условие: по умолчанию без кубов, с монетками | `UnmetConditionPolicy` (`NoDiceKeepCoins`, `CountAsDrop`, `Ignore`), причины `PointsReason.ConditionUnmet`, `MoveReason.ConditionUnmet` |
+| Откуп от плохого ивента | снять ждущие последствия плохого ивента за монетки (выключен, D-508) | `events.badEventBuyout`, команда `BuyOutBadEvent` |
+| IRL-ивент | ивент, выполняемый в жизни (караоке, готовка): ручной эффект с пруфом | `ObjectDefinition.Proof = ContentProof.Media` |
+| IRL-пруф | фото или ссылка на видео к IRL-ивенту; проверяет админ | команды `SubmitIrlProof`, `ReviewIrlProof`, события `IrlProofSubmitted`, `IrlProofReviewed`; `IrlProofStatus` |
+| Ивент ждёт ответа | эффект ивента остановился на вопросе к игроку; ответ — общий выбор (D-511) | `ChoiceKind.Effect`, `SuspendedEffect`, события `EffectSuspended`, `EffectResumed` |
+| Голос | выбор пользователя в голосовании; один на человека, до закрытия можно сменить | команда `CastVote`, событие `VoteCast` |
+| Запуск голосования | админ или ивент открывает голосование со снимком вариантов | команда `StartPoll`, событие `PollStarted`; из ивента — `RequestChoiceAction.Vote` |
+| Итог голосования | вариант с наибольшим числом голосов, ничья — бросок; запускает эффект | событие `PollClosed`, ссылка `$result`; отмена — `PollCancelled` |
+| Голосующие | кто голосует: игроки или все (зрители — по конфигу) | `PollVoters` (`Players`, `Everyone`), `social.spectatorsCanVote` |
+| Анонимное голосование | голоса показываются без имён (D-515) | `PollDefinition.Anonymous` |
+| Запуск общего ивента | админ начинает общий ивент на срок | команды `LaunchGlobalEvent`, `EndGlobalEvent`, события `GlobalEventLaunched`, `GlobalEventEnded` |
+| Общая цель | цель общего ивента с прогресс-баром: часы HLTB или число прохождений | `GlobalEventGoal` (`GoalMetric`: `Hours`, `Runs`), события `GlobalProgressChanged`, `GlobalGoalReached` |
+| Баннер общего ивента | плашка общего ивента на главной | `GlobalEventBanner` |
+| Напарник | второй игрок кооп-прохождения | `RunState.PartnerId`, событие `CoopJoined` |
+| Ролливший | игрок, чей ролл дал кооп-прохождение; бросает кубы и получает долю с округлением вверх | `RunState.PlayerId` |
+| Приглашение в кооп | предложение стать напарником в своём прохождении | `InteractionKind.Coop`, команда `InviteToCoop`, события `InteractionCreated`, `InteractionAnswered`, `InteractionExpired` |
+| Ответ на приглашение | принять или отклонить; без ответа за N часов приглашение сгорает | команда `AnswerInvitation`, `InteractionStatus` (`Pending`, `Accepted`, `Declined`, `Withdrawn`, `Expired`) |
+| Выйти из коопа | напарник покидает кооп-прохождение без штрафа (D-522) | команда `LeaveCoop`, событие `CoopLeft` |
+| Деление кооп-награды | доли очков, шагов и монеток роллившего и напарника | событие `CoopRewardSplit`, `reward.coop` |
+| Дуэль | гонка двух игроков до первого завершения прохождения за награду от системы (D-525) | `InteractionKind.Duel`, команда `ChallengeToDuel`, событие `DuelSettled` |
+| Вызов на дуэль | приглашение на дуэль | `InteractionKind.Duel` |
+| Отклик на запрос напарника | заявка на чужой запрос доски; создаёт приглашение, которое принимает автор | команда `RespondToPartnerRequest`, события `PartnerRequestPosted`, `PartnerRequestClosed` |
+| Выполнить челлендж недели | пройти игру по условию челленджа в его окне; одна награда на игрока | команды `SetWeeklyChallenge`, `MarkWeeklyChallenge`, события `WeeklyChallengeSet`, `WeeklyChallengeCompleted`, `WeeklyChallengeRevoked` |
+| Модерация предложки | админ одобряет или отклоняет предложение | команды `SubmitSuggestion`, `ReviewSuggestion`, `SuggestionStatus` (`Pending`, `Approved`, `Rejected`) |
+| Контракт | особое прохождение по договору с админом за доп. награду (RGG № 16; ждёт решения, D-529) | `features.contracts` |
 
 ## Социальное
 
