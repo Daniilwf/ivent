@@ -550,3 +550,24 @@ API, экраны инвентаря и магазина, редактор эф�
 
 | DP1 | Обрезанный GIF отклоняется `file.broken` и не сохраняется, в том числе обрезанный сразу после байта 0x3B внутри данных; GIF с байтами после завершающего тоже отклоняется (DP-1, D-252) | `src/GameEvent.Web.Tests/Files/FileUploadTests.cs` («A_cut_off_gif_is_refused_and_nothing_is_kept», «A_gif_cut_off_right_after_a_byte_that_looks_like_the_trailer_is_refused», «A_gif_with_bytes_after_its_trailer_is_refused») | ✅ |
 | DP2 | Наклейка игрока в истории игры и в профиле окрашена токеном фишки сезона (D-251) | `web/src/feed/GameScreen.test.tsx`, `web/src/feed/ProfileScreen.test.tsx` | ✅ |
+
+## Исследовательское тестирование этапов 1–2: админка (K1A, `BUGS.md` K1A-1…K1A-28, D-610…D-619)
+
+| ID | Правило | Тесты | Статус |
+| --- | --- | --- | --- |
+| KA1 | Аккаунт в незавершённом сезоне не становится админом (SPEC «Аккаунты», D-610) | `Web.Tests/Auth/AccountManagementTests.An_account_in_a_running_season_is_not_made_an_admin` | ✅ |
+| KA2 | Имя видимое, без управляющих и форматных символов; пароль не из пробелов (D-611) | `AccountManagementTests.An_invisible_name_or_one_with_control_characters_is_refused`, `An_emoji_or_accented_name_is_accepted`, `A_new_password_follows_the_rules`; Vitest `ui/Sticker.test.tsx` | ✅ |
+| KA3 | Имена игроков одного сезона различаются (SPEC «Трудности», D-612) | `Engine.Tests/Players/AddPlayerMidSeasonTests.A_name_another_player_of_the_season_has_is_refused`, `Another_name_joins` | ✅ |
+| KA4 | Сброс пароля удалённого аккаунта — отказ (D-613) | `AccountManagementTests.A_deleted_account_gets_no_temporary_password` | ✅ |
+| KA5 | Правила завершённого сезона зафиксированы (D-614) | `Engine.Tests/Rulesets/MidSeasonChangeTests.Rules_of_a_season_that_is_over_are_fixed`, `Rules_still_change_while_the_season_is_closing` | ✅ |
+| KA6 | Предложенная игра, удалённая из пула, не начинается; её реролл бесплатный (D-615) | `Engine.Tests/Rolls/DeletedOfferTests.*`; `Web.Tests/Api/SeasonApiTests.An_offer_the_admin_deleted_from_the_pool_is_not_started_and_rerolls_for_free` | ✅ |
+| KA7 | Публикация карты по устаревшей версии — отказ; редактор знает о новой карте (D-320, D-616) | `Engine.Tests/Map/GraphSeasonTests.Each_publication_moves_the_map_version_on`, `A_draft_made_from_an_older_map_is_not_published_over_a_newer_one`; `Web.Tests/Api/MapApiTests.A_draft_from_an_older_map_version_is_not_published_over_a_newer_one`; Vitest `MapSection.test.tsx` (версия, устаревший черновик, черновик без правок) | ✅ |
+| KA8 | Проверка карты: телепорт без цели — одна ошибка; ошибки зон по имени и полю; выключенные типы клеток не предлагаются (D-302, D-616, D-619) | `Engine.Tests/Map/MapValidatorTests.A_teleport_without_another_target_is_one_error_not_a_cycle`; `MapApiTests.The_admin_reads_the_map_the_mode_and_who_stands_where`; Vitest `MapSection.test.tsx` (зоны, нечисло, типы клеток) | ✅ |
+| KA9 | Админ видит оценку часов игрока и её источник (SPEC «Часы и кубы»); один комментарий реджекта | `Web.Tests/Api/CompletionRewardApiTests.The_proof_queue_shows_the_admin_the_source_of_a_players_estimate`, `Hours_from_the_pool_have_no_source_in_the_proof_queue`; Vitest `ProofQueue.test.tsx` (оценка, источник, комментарий в окнах) | ✅ |
+| KA10 | Лог и откат называют игрока, игру и комментарий (SPEC «Ошибка админа — откат и открытый лог») | `Web.Tests/Api/UndoApiTests.Each_command_names_whom_and_what_it_touched_and_its_comment`; Vitest `LogSection.test.tsx` | ✅ |
+| KA11 | Выбранный админом сезон сохраняется и назван на разделах сезона | Vitest `AdminScreen.test.tsx` (перезагрузка, исчезнувший сезон) | ✅ |
+| KA12 | Статус предложенной игры в пуле; длина игры на её странице (глоссарий) | `Web.Tests/Api/SeasonPoolApiTests.An_offer_not_started_yet_is_marked_as_offered`; Vitest `PoolScreen.test.tsx`, `GameScreen.test.tsx` | ✅ |
+| KA13 | Понятные отказы: страница гифки, файл больше лимита до отправки, 429 (D-617) | Vitest `AvatarSection.test.tsx`, `useLoaded.test.tsx` | ✅ |
+| KA14 | «Назад» возвращает список пула и ленты и прокрутку; форма пароля закрывается ссылкой на текущий раздел (D-150, D-619) | Vitest `PoolScreen.test.tsx`, `FeedScreen.test.tsx`, `Shell.test.tsx` | ✅ |
+| KA15 | Телефон: нет горизонтальной прокрутки от длинных слов, ссылки 44 px, раскрытая форма в видимой области (DESIGN.md) | Playwright `e2e/tests/k1-long-text.spec.ts`; Vitest `PlayersSection.test.tsx` | ✅ |
+| KA16 | Дедлайн ближе суток — подтверждение (D-101, D-618: продление после дедлайна ждёт решения) | Vitest `SeasonSection.test.tsx` «asks again before a deadline within a day…» | 🟨 |
