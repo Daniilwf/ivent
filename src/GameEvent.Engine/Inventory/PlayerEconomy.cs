@@ -34,9 +34,15 @@ public sealed record RollModifier(string ObjectId, GameFilterSpec? Filter, int? 
 
 /// <summary>
 /// A change of the next throw for a completion (CONTENT.md <c>modifyDice</c> with <c>when: next</c>), waiting for it:
-/// the stage and the value with its references resolved (dice are rolled when the throw happens).
+/// the stage and the value with its references resolved (dice are rolled when the throw happens). <see cref="Sides"/> — the
+/// kind of extra dice of a <c>count</c> stage when it is their own (D-475); written only when set.
 /// </summary>
-public sealed record DiceModifier(string ObjectId, DiceStage Stage, ContentValue Value, bool Hostile = false);
+public sealed record DiceModifier(
+    string ObjectId,
+    DiceStage Stage,
+    ContentValue Value,
+    bool Hostile = false,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? Sides = null);
 
 /// <summary>A lot of the personal shop offer (SPEC «Магазин»): the object, its price in coins, whether it was bought.</summary>
 public sealed record ShopLot(string ObjectId, Rarity Rarity, int Price, bool Sold = false);

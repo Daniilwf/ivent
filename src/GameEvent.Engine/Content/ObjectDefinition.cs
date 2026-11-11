@@ -399,6 +399,12 @@ public sealed record ModifyDiceAction : ActionSpec
     public required DiceStage Stage { get; init; }
 
     public required ContentValue Value { get; init; }
+
+    /// <summary>
+    /// With <c>stage: count</c>: the extra dice are of this kind (a d6 beside a run's d4) rather than the run's (D-475).
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? Sides { get; init; }
 }
 
 /// <summary>Move without walking to a cell id or <c>nearestShortcut</c>.</summary>

@@ -295,6 +295,11 @@ public static partial class ContentValidator
                     break;
                 case ModifyDiceAction modify:
                     CheckDiceValue(modify.Stage, modify.Value, $"{at}.value", error);
+                    if (modify.Sides is { } extraSides && (modify.Stage != DiceStage.Count || extraSides is < 2 or > ContentValue.MaxSides))
+                    {
+                        error($"{at}.sides", $"«sides» gives the extra dice of «count» their kind: 2–{ContentValue.MaxSides}.");
+                    }
+
                     break;
                 case ModifyNextRollAction next when next.Filter is null && next.ChoiceCount is null && next.RunCondition is null:
                     error(at, "«modifyNextRoll» changes a filter, the choice count or the run condition.");

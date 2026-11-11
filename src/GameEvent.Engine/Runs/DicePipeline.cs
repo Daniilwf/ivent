@@ -40,8 +40,16 @@ internal static class DicePipeline
             mods = mods with { Sides = sides };
         }
 
-        var extra = changes.Where(c => c.Stage == DiceStage.Count).Sum(c => c.Value.Number);
-        mods = mods with { ExtraDice = CompletionRoll.Roll(Math.Max(0, extra), sides, random) };
+        // Extra dice of the run's kind first, then those of their own kind in the order they came (D-475)
+        var extra = changes.Where(c => c.Stage == DiceStage.Count && c.Sides is null).Sum(c => c.Value.Number);
+        mods = mods with
+        {
+            ExtraDice =
+            [
+                .. CompletionRoll.Roll(Math.Max(0, extra), sides, random),
+                .. changes.Where(c => c.Stage == DiceStage.Count && c.Sides is not null).SelectMany(c => CompletionRoll.Roll(Math.Max(0, c.Value.Number), c.Sides!.Value, random)),
+            ],
+        };
         var rolled = new List<Die>();
         foreach (var change in changes.Where(c => c.Stage is DiceStage.Add or DiceStage.Multiply or DiceStage.Min or DiceStage.Max)
             .OrderBy(c => c.Stage is DiceStage.Add ? 0 : c.Stage is DiceStage.Multiply ? 1 : 2))
@@ -56,7 +64,7 @@ internal static class DicePipeline
     /// A <c>current</c> change after the throw (the <c>afterDice</c> window or trigger): a reroll replaces the dice, a count
     /// adds dice, the other stages change the mods; points and position follow the difference like a correction (D-408).
     /// </summary>
-    public static void AfterThrow(EffectRun effect, Guid runId, DiceStage stage, ContentValue value)
+    public static void AfterThrow(EffectRun effect, Guid runId, DiceStage stage, ContentValue value, int? extraSides = null)
     {
         var run = effect.State.Runs[runId];
 
@@ -85,7 +93,7 @@ internal static class DicePipeline
                 effect.Emit(rerolled!);
                 break;
             case DiceStage.Count:
-                var added = CompletionRoll.Roll(Math.Max(0, value.Number), sides, random);
+                var added = CompletionRoll.Roll(Math.Max(0, value.Number), extraSides ?? sides, random);
                 var withDice = run.DiceMods with
                 {
                     ExtraDice = [.. run.DiceMods.ExtraDice, .. added],
@@ -133,7 +141,7 @@ internal static class DicePipeline
             return ([], state, []);
         }
 
-        var changes = state.Players[playerId].Wallet.NextDice.Select(m => new ThrowChange(m.ObjectId, m.Stage, m.Value)).ToList();
+        var changes = state.Players[playerId].Wallet.NextDice.Select(m => new ThrowChange(m.ObjectId, m.Stage, m.Value, m.Sides)).ToList();
         var events = new List<IGameEvent>();
         foreach (var item in Firing.Subscribed(state, playerId, Trigger.BeforeDice))
         {

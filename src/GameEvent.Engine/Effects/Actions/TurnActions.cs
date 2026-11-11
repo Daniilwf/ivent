@@ -33,17 +33,17 @@ internal sealed class ModifyDiceHandler : ActionHandler<ModifyDiceAction>
         var ownThrow = run.RunId is { } runId && run.State.Runs[runId].PlayerId == target;
         if (action.When == DiceWhen.Current && ownThrow && run.Dice == DiceScope.Throw)
         {
-            run.ThrowChanges.Add(new ThrowChange(run.ObjectId, action.Stage, value));
+            run.ThrowChanges.Add(new ThrowChange(run.ObjectId, action.Stage, value, action.Sides));
             return;
         }
 
         if (action.When == DiceWhen.Current && ownThrow && run.Dice == DiceScope.AfterThrow)
         {
-            DicePipeline.AfterThrow(run, run.RunId!.Value, action.Stage, value);
+            DicePipeline.AfterThrow(run, run.RunId!.Value, action.Stage, value, action.Sides);
             return;
         }
 
-        run.Emit(new NextDiceModified(target, new DiceModifier(run.ObjectId, action.Stage, value, run.Hostile && target != run.UserId)));
+        run.Emit(new NextDiceModified(target, new DiceModifier(run.ObjectId, action.Stage, value, run.Hostile && target != run.UserId, action.Sides)));
     }
 }
 

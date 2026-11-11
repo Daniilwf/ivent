@@ -1,0 +1,29 @@
+{
+  "id": "rose",
+  "kind": "item",
+  "name": "Роза",
+  "description": "Иди на 1 клетку вперёд, а в следующем броске за прохождение будет дополнительный d4.",
+  "rarity": "common",
+  "price": null,
+  "window": "beforeDice",
+  "hostile": false,
+  "stackable": true,
+  "effect": {
+    "target": {
+      "selector": "self"
+    },
+    "actions": [
+      {
+        "type": "move",
+        "steps": 1
+      },
+      {
+        "type": "modifyDice",
+        "when": "next",
+        "stage": "count",
+        "value": 1,
+        "sides": 4
+      }
+    ]
+  }
+}

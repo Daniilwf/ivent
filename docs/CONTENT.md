@@ -70,7 +70,7 @@
 | `drawEvent` | `deck`: `good`, `bad`, `special`, `risky`, `zone` или id колоды |
 | `spinWheel` | `wheel`: id колеса |
 | `modifyNextRoll` | `filter`, `choiceCount`, `runCondition` |
-| `modifyDice` | `when`: `current` или `next`; `stage`: `count`, `sides`, `add`, `multiply`, `reroll`, `min`, `max`; `value` |
+| `modifyDice` | `when`: `current` или `next`; `stage`: `count`, `sides`, `add`, `multiply`, `reroll`, `min`, `max`; `value`; у `count` — `sides`: дополнительные кубики своего вида (d6 рядом с d4 прохождения, D-475) |
 | `teleport` | `cell`: id клетки или `nearestShortcut` |
 | `requestChoice` | `prompt`, `options`: `{ "from": "categories" }`, `players`, `games` или `{ "list": [...] }`; результат — `$choice` |
 
@@ -298,6 +298,17 @@
       { "type": "changeResource", "resource": "coins", "amount": -2, "reflect": true }
     ]
   }
+}
+```
+
+### 13. Ездовой дракон — дополнительный d6 к следующему броску
+
+```json
+{
+  "id": "riding-dragon", "kind": "item", "name": "Ездовой дракон",
+  "description": "В следующем броске за прохождение есть дополнительный d6.",
+  "rarity": "epic", "price": 45, "window": "beforeDice", "hostile": false, "stackable": true,
+  "effect": { "target": { "selector": "self" }, "actions": [{ "type": "modifyDice", "when": "next", "stage": "count", "value": 1, "sides": 6 }] }
 }
 ```
 
