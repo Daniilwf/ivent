@@ -144,6 +144,10 @@ public sealed record ObjectDefinition
 
     /// <summary>What happens; may be missing on a manual object.</summary>
     public EffectSpec? Effect { get; init; }
+
+    /// <summary>An item is used only while this holds for its user (D-483), e.g. «только если у тебя ноль монеток».</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ConditionSpec? UseCondition { get; init; }
 }
 
 /// <summary>The <c>effect</c> block (CONTENT.md «Блок effect»).</summary>
@@ -223,6 +227,9 @@ public enum ContentStat
 
     /// <summary>The run's hours; needs <c>gte</c>.</summary>
     RunHours,
+
+    /// <summary>The owner's coins; needs <c>gte</c> or <c>lte</c> (D-483).</summary>
+    Coins,
 }
 
 /// <summary>
@@ -241,6 +248,10 @@ public sealed record ConditionSpec
 
     public int? Gte { get; init; }
 
+    /// <summary>At most (D-483); with <see cref="Gte"/> — a range, both equal — exactly.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? Lte { get; init; }
+
     public int? MinDice { get; init; }
 }
 
@@ -256,18 +267,37 @@ public sealed record GameFilterSpec
     public int? ReleaseYearBefore { get; init; }
 }
 
+/// <summary>A branch: by a roll (<see cref="Roll"/>, cases by range) or by the player's answer (<see cref="Choice"/>, cases by option, D-482).</summary>
 public sealed record OutcomesSpec
 {
-    public required ContentValue Roll { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ContentValue? Roll { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public OutcomeChoice? Choice { get; init; }
 
     public required EquatableArray<OutcomeCase> Cases { get; init; }
 }
 
+/// <summary>The question of a branch by choice: what the player is asked and the options, each a case.</summary>
+public sealed record OutcomeChoice
+{
+    public required string Prompt { get; init; }
+
+    public required ChoiceOptionsSpec Options { get; init; }
+}
+
+/// <summary>A case of the branch: a range of the roll or an option of the choice.</summary>
 public sealed record OutcomeCase
 {
-    public required int From { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? From { get; init; }
 
-    public required int To { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? To { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Option { get; init; }
 
     public EquatableArray<ActionSpec> Actions { get; init; } = [];
 }

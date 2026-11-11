@@ -48,6 +48,16 @@ public static partial class ContentValidator
 
         CheckTags(definition.Tags, "$.tags", Error);
 
+        if (definition.UseCondition is { } useCondition)
+        {
+            if (kind != ObjectKind.Item)
+            {
+                Error("$.useCondition", "Only an item is used by hand, so only an item has a condition of use.");
+            }
+
+            CheckCondition(useCondition, "$.useCondition", Error);
+        }
+
         if (kind == ObjectKind.Achievement && definition.Scope is null)
         {
             Error("$.scope", "An achievement is counted per season or over all seasons.");
@@ -501,26 +511,32 @@ public static partial class ContentValidator
 
     private static void CheckOutcomes(OutcomesSpec outcomes, string path, Scope scope, Action<string, string> error)
     {
-        if (outcomes.Roll.Kind != ContentValueKind.Dice || outcomes.Roll.Negative)
+        if (outcomes.Choice is { } choice)
         {
-            error($"{path}.roll", "Outcomes are picked by dice such as «1d6».");
+            CheckChoiceOutcomes(outcomes, choice, path, scope, error);
             return;
         }
 
-        var low = outcomes.Roll.Count;
-        var high = outcomes.Roll.Count * outcomes.Roll.Sides;
+        if (outcomes.Roll is not { Kind: ContentValueKind.Dice, Negative: false } roll)
+        {
+            error($"{path}.roll", "Outcomes are picked by dice such as «1d6» or by a «choice».");
+            return;
+        }
+
+        var low = roll.Count;
+        var high = roll.Count * roll.Sides;
         var covered = new HashSet<int>();
         for (var i = 0; i < outcomes.Cases.Count; i++)
         {
             var @case = outcomes.Cases[i];
             var at = $"{path}.cases[{i}]";
-            if (@case.From > @case.To || @case.From < low || @case.To > high)
+            if (@case is not { From: { } from, To: { } to, Option: null } || from > to || from < low || to > high)
             {
                 error(at, $"A case covers a range within {low}–{high}.");
                 continue;
             }
 
-            if (Enumerable.Range(@case.From, @case.To - @case.From + 1).Any(n => !covered.Add(n)))
+            if (Enumerable.Range(from, to - from + 1).Any(n => !covered.Add(n)))
             {
                 error(at, "Cases do not overlap.");
             }
@@ -534,10 +550,43 @@ public static partial class ContentValidator
         }
     }
 
+    // A branch by the player's answer (D-482): a fixed list, one case per option, no roll.
+    private static void CheckChoiceOutcomes(OutcomesSpec outcomes, OutcomeChoice choice, string path, Scope scope, Action<string, string> error)
+    {
+        if (outcomes.Roll is not null)
+        {
+            error($"{path}.roll", "Outcomes are picked by a roll or by a choice, not both.");
+        }
+
+        CheckText(choice.Prompt, MaxNameLength * 2, $"{path}.choice.prompt", error);
+        CheckOptions(choice.Options, $"{path}.choice.options", error);
+        var options = choice.Options.List ?? [];
+        if (choice.Options.From is not null)
+        {
+            error($"{path}.choice.options", "A branch by choice offers a fixed «list».");
+        }
+
+        for (var i = 0; i < outcomes.Cases.Count; i++)
+        {
+            var @case = outcomes.Cases[i];
+            if (@case.From is not null || @case.To is not null || @case.Option is not { } option || !options.Contains(option, StringComparer.Ordinal))
+            {
+                error($"{path}.cases[{i}].option", "A case of a choice names one of its options.");
+            }
+
+            CheckActions(@case.Actions, $"{path}.cases[{i}].actions", scope with { Chose = true }, error);
+        }
+
+        if (options.Any(o => outcomes.Cases.Count(c => c.Option == o) != 1))
+        {
+            error($"{path}.cases", "Every option has exactly one case.");
+        }
+    }
+
     // A condition tests something: the run, the game or a statistic with the parameters it needs.
     private static void CheckCondition(ConditionSpec condition, string path, Action<string, string> error)
     {
-        if (condition is { DifficultyAtLeast: null, Game: null, Stat: null, Gte: null, Tag: null, MinDice: null })
+        if (condition is { DifficultyAtLeast: null, Game: null, Stat: null, Gte: null, Lte: null, Tag: null, MinDice: null })
         {
             error(path, "A condition tests the run («difficultyAtLeast»), the game («game») or a statistic («stat»).");
             return;
@@ -549,6 +598,7 @@ public static partial class ContentValidator
             ContentStat.CompletedStreakWithTag when string.IsNullOrWhiteSpace(condition.Tag) => "tag",
             ContentStat.CompletedStreakWithTag when condition.Gte is null => "gte",
             ContentStat.AllDiceMax when condition.MinDice is null => "minDice",
+            ContentStat.Coins when condition.Gte is null && condition.Lte is null => "gte",
             _ => null,
         };
         if (missing is not null)
@@ -556,9 +606,14 @@ public static partial class ContentValidator
             error($"{path}.{missing}", $"The «{condition.Stat}» statistic needs «{missing}».");
         }
 
-        if (condition.Stat is null && (condition.Gte is not null || condition.Tag is not null || condition.MinDice is not null))
+        if (condition.Stat is null && (condition.Gte is not null || condition.Lte is not null || condition.Tag is not null || condition.MinDice is not null))
         {
-            error($"{path}.stat", "«gte», «tag» and «minDice» belong to a statistic.");
+            error($"{path}.stat", "«gte», «lte», «tag» and «minDice» belong to a statistic.");
+        }
+
+        if (condition.Lte is not null && condition.Stat != ContentStat.Coins)
+        {
+            error($"{path}.lte", "«lte» bounds the «coins» statistic.");
         }
 
         if (condition.Game is { } game)

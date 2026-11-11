@@ -227,6 +227,7 @@
                       "completedStreakWithTag",
                       "allDiceMax",
                       "runHours",
+                      "coins",
                       null
                     ]
                   },
@@ -237,6 +238,12 @@
                     ]
                   },
                   "gte": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "lte": {
                     "type": [
                       "integer",
                       "null"
@@ -690,6 +697,7 @@
                                 "completedStreakWithTag",
                                 "allDiceMax",
                                 "runHours",
+                                "coins",
                                 null
                               ]
                             },
@@ -700,6 +708,12 @@
                               ]
                             },
                             "gte": {
+                              "type": [
+                                "integer",
+                                "null"
+                              ]
+                            },
+                            "lte": {
                               "type": [
                                 "integer",
                                 "null"
@@ -864,16 +878,59 @@
                     ],
                     "pattern": "^(-?([1-9][0-9]?)?d[1-9][0-9]{0,2}|-?\\$[a-zA-Z][a-zA-Z0-9]{0,39})$"
                   },
+                  "choice": {
+                    "type": [
+                      "object",
+                      "null"
+                    ],
+                    "properties": {
+                      "prompt": {
+                        "type": "string"
+                      },
+                      "options": {
+                        "type": "object",
+                        "properties": {
+                          "from": {
+                            "enum": [
+                              "categories",
+                              "players",
+                              "games",
+                              null
+                            ]
+                          },
+                          "list": true
+                        },
+                        "additionalProperties": false
+                      }
+                    },
+                    "required": [
+                      "prompt",
+                      "options"
+                    ],
+                    "additionalProperties": false
+                  },
                   "cases": {
                     "type": "array",
                     "items": {
                       "type": "object",
                       "properties": {
                         "from": {
-                          "type": "integer"
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
                         },
                         "to": {
-                          "type": "integer"
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        },
+                        "option": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
                         },
                         "actions": {
                           "type": "array",
@@ -1308,6 +1365,7 @@
                                           "completedStreakWithTag",
                                           "allDiceMax",
                                           "runHours",
+                                          "coins",
                                           null
                                         ]
                                       },
@@ -1318,6 +1376,12 @@
                                         ]
                                       },
                                       "gte": {
+                                        "type": [
+                                          "integer",
+                                          "null"
+                                        ]
+                                      },
+                                      "lte": {
                                         "type": [
                                           "integer",
                                           "null"
@@ -1469,16 +1533,11 @@
                           }
                         }
                       },
-                      "required": [
-                        "from",
-                        "to"
-                      ],
                       "additionalProperties": false
                     }
                   }
                 },
                 "required": [
-                  "roll",
                   "cases"
                 ],
                 "additionalProperties": false
@@ -1497,6 +1556,86 @@
                   "start"
                 ],
                 "additionalProperties": false
+              }
+            },
+            "additionalProperties": false
+          },
+          "useCondition": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "difficultyAtLeast": {
+                "enum": [
+                  "easy",
+                  "normal",
+                  "hard",
+                  "extreme",
+                  null
+                ]
+              },
+              "game": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "properties": {
+                  "tags": true,
+                  "maxHours": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "minHours": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "releaseYearBefore": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              },
+              "stat": {
+                "enum": [
+                  "hostileReceived",
+                  "completedStreakWithTag",
+                  "allDiceMax",
+                  "runHours",
+                  "coins",
+                  null
+                ]
+              },
+              "tag": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "gte": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "lte": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "minDice": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
               }
             },
             "additionalProperties": false

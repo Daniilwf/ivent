@@ -229,9 +229,17 @@ internal sealed class EffectRun
                 Emit(new HostileReceived(target, UserId, ObjectId));
             }
 
-            if (effect.Outcomes is { } outcomes)
+            if (effect.Outcomes is { Choice: { } choice } byChoice)
             {
-                LastRoll = Number(outcomes.Roll);
+                // The player's answer picks the case (D-482)
+                if (NextChoice(Actions.RequestChoiceHandler.Options(choice.Options, this)) is { } option)
+                {
+                    RunActions(byChoice.Cases.FirstOrDefault(c => c.Option == option)?.Actions ?? []);
+                }
+            }
+            else if (effect.Outcomes is { Roll: { } dice } outcomes)
+            {
+                LastRoll = Number(dice);
                 var roll = LastRoll.Value;
                 RunActions(outcomes.Cases.FirstOrDefault(c => c.From <= roll && roll <= c.To)?.Actions ?? []);
             }

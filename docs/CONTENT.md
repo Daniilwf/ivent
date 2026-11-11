@@ -32,6 +32,7 @@
 | `stackable` | можно ли применить несколько одинаковых за раз |
 | `manual` | `true` — автоматики нет, эффект уходит в ручное разрешение |
 | `proof` | `media` — для IRL-ивентов нужен фото- или видеопруф |
+| `useCondition` | только у предметов: условие, при котором предмет можно использовать (см. «Условия»), иначе отказ `item.conditionNotMet` (D-483) |
 | `unstealable`, `undestroyable` | эффекты не забирают, не крадут и не передают объект / не уничтожают и не превращают его; правка админа действует (D-478) |
 | `tags` | теги самого объекта: `edible`, `rat`, `gremlin`, `pig`, `weapon`, `potion`…; строчные слова через дефис, каждое один раз. Нужны фильтрам вроде «не крадёт крысиные» (`excludeTags`) и лутбоксам; это не теги игр (D-470) |
 | `effect` | что происходит; у объектов с `manual: true` может отсутствовать |
@@ -53,7 +54,7 @@
 | `intercept` | `hostile` — эффект гасит входящий враждебный эффект (пассивная защита) |
 | `actions` | список базовых действий, выполняются по порядку |
 | `counter` | `{ "start": 3 }` — обратный отсчёт эффекта или спецролла: каждое срабатывание триггера уменьшает счётчик экземпляра на 1 вместо действий, на нуле действия выполняются (D-479) |
-| `outcomes` | случайное ветвление: `{ "roll": "1d6", "cases": [{ "from": 1, "to": 3, "actions": [...] }] }` |
+| `outcomes` | случайное ветвление: `{ "roll": "1d6", "cases": [{ "from": 1, "to": 3, "actions": [...] }] }`; или по выбору игрока (D-482): `{ "choice": { "prompt": "…", "options": { "list": ["а", "б"] } }, "cases": [{ "option": "а", "actions": [...] }] }` — по случаю на каждый вариант, ответ даётся с использованием |
 
 **Значения** в действиях: целое число, строка с кубиками (`"1d6"`, `"2d4"`, `"-1d6"`) или ссылка: `"$roll"` — результат последнего броска в этом эффекте, `"$choice"` — последний выбор игрока, `"$result"` — итог голосования, `"$имя"` — параметр, переданный через `params` в `giveObject`, `"-$roll"` — со знаком минус.
 
@@ -83,7 +84,7 @@
 | Фильтр игры | `{ "tags": ["Horror"], "maxHours": 10, "minHours": 2, "releaseYearBefore": 2005 }` |
 | Фильтр объектов (`takeObject`, `transformObject`) | `{ "kind": "item", "rarity": "epic", "objectId": "orange", "hostile": true, "hasCounter": true, "excludeTags": ["rat"] }`; `excludeTags` пропускает объекты с любым из этих тегов (D-470), `hasCounter` — только объекты со счётчиком или без (D-479) |
 | Условие на прохождение | `{ "difficultyAtLeast": "hard" }` |
-| Статистика игрока | `{ "stat": "hostileReceived", "gte": 5 }`, `{ "stat": "completedStreakWithTag", "tag": "Horror", "gte": 3 }`, `{ "stat": "allDiceMax", "minDice": 3 }`, `{ "stat": "runHours", "gte": 30 }` |
+| Статистика игрока | `{ "stat": "hostileReceived", "gte": 5 }`, `{ "stat": "completedStreakWithTag", "tag": "Horror", "gte": 3 }`, `{ "stat": "allDiceMax", "minDice": 3 }`, `{ "stat": "runHours", "gte": 30 }`, `{ "stat": "coins", "gte": 0, "lte": 0 }` (монетки владельца: `gte` и/или `lte`, D-483) |
 
 Набор статистик расширяется по мере надобности; каждая новая статистика — отдельная задача с тестом.
 
@@ -401,6 +402,38 @@
   "description": "В следующем броске за прохождение каждый кубик показывает своё среднее: d4 — 2, d6 — 3, d8 — 4, d10 — 5, d12 — 6, d20 — 10.",
   "rarity": "epic", "price": 50, "window": "beforeDice", "hostile": false, "stackable": false,
   "effect": { "target": { "selector": "self" }, "actions": [{ "type": "modifyDice", "when": "next", "stage": "fixAverage", "value": 1 }] }
+}
+```
+
+### 20. Кубик сахара — ветвление по выбору игрока
+
+```json
+{
+  "id": "sugar-cube", "kind": "item", "name": "Кубик сахара",
+  "description": "На выбор: дополнительный d6 к следующему броску за прохождение или 3 монетки.",
+  "rarity": "common", "price": null, "window": "beforeDice", "hostile": false, "stackable": false, "tags": ["edible"],
+  "effect": {
+    "target": { "selector": "self" },
+    "outcomes": {
+      "choice": { "prompt": "Что берёшь?", "options": { "list": ["+1d6 к броску", "+3 монетки"] } },
+      "cases": [
+        { "option": "+1d6 к броску", "actions": [{ "type": "modifyDice", "when": "next", "stage": "count", "value": 1, "sides": 6 }] },
+        { "option": "+3 монетки", "actions": [{ "type": "changeResource", "resource": "coins", "amount": 3 }] }
+      ]
+    }
+  }
+}
+```
+
+### 21. Кексик — только при нуле монеток
+
+```json
+{
+  "id": "muffin", "kind": "item", "name": "Кексик",
+  "description": "Можно использовать, только если у тебя ноль монеток. Получаешь 5 монеток.",
+  "rarity": "common", "price": 10, "window": "anytime", "hostile": false, "stackable": true, "tags": ["edible"],
+  "useCondition": { "stat": "coins", "gte": 0, "lte": 0 },
+  "effect": { "target": { "selector": "self" }, "actions": [{ "type": "changeResource", "resource": "coins", "amount": 5 }] }
 }
 ```
 

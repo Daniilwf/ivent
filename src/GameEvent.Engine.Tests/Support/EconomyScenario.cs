@@ -25,12 +25,16 @@ public static class EconomyScenario
     /// <summary>The objects of the items and effects examples of docs/CONTENT.md, by id.</summary>
     public static IReadOnlyDictionary<string, ObjectDefinition> Examples() => Content.ContentExamplesTests.ExampleObjects();
 
-    /// <summary>A pack of the CONTENT.md examples named by <paramref name="ids"/> (all items and effects when none).</summary>
+    /// <summary>
+    /// A pack of the CONTENT.md examples named by <paramref name="ids"/> (when none: all items and effects of the examples
+    /// 1–10 and the events, without «Примеры расширений формата» — those are content files, D-471).
+    /// </summary>
     public static ContentPack ExamplePack(params string[] ids)
     {
         var examples = Examples();
+        var extensions = Content.ContentExamplesTests.ExtensionExampleIds();
         var chosen = ids.Length == 0
-            ? examples.Values.Where(o => o.Kind is ObjectKind.Item or ObjectKind.Effect or ObjectKind.SpecialRoll)
+            ? examples.Values.Where(o => o.Kind is ObjectKind.Item or ObjectKind.Effect or ObjectKind.SpecialRoll && !extensions.Contains(o.Id))
             : ids.Select(id => examples[id]);
         return new ContentPack { Objects = [.. chosen.OrderBy(o => o.Id, StringComparer.Ordinal)] };
     }

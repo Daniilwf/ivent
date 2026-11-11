@@ -59,6 +59,21 @@ public class ImportedItemsCatalog
     }
 
     [Fact]
+    public void Every_extension_example_of_the_doc_is_its_content_file()
+    {
+        // CONTENT.md «Примеры расширений формата»: each example is the file of content/items as it is (D-471)
+        var files = EconomyScenario.RepositoryPack().Objects.ToDictionary(o => o.Id);
+        var examples = Content.ContentExamplesTests.ExampleObjects();
+        var ids = Content.ContentExamplesTests.ExtensionExampleIds();
+
+        Assert.Equal(11, ids.Count);
+        foreach (var id in ids)
+        {
+            Assert.Equal(files[id], examples[id]);
+        }
+    }
+
+    [Fact]
     public void Imported_texts_speak_the_glossary()
     {
         // «Золото = монетки»: the old words do not reach players (README, GLOSSARY)

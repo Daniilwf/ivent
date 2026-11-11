@@ -96,6 +96,9 @@ public static class RejectionCodes
 
     /// <summary>An effect that hands over one of the user's objects, and he has none it may give (D-478).</summary>
     public const string ItemNothingToGive = "item.nothingToGive";
+
+    /// <summary>The item's use condition does not hold for its user (D-483).</summary>
+    public const string ItemConditionNotMet = "item.conditionNotMet";
     public const string ItemHostileCap = "item.hostileCap";
     public const string ItemNotApplicable = "item.notApplicable";
     public const string InventoryFrozen = "inventory.frozen";

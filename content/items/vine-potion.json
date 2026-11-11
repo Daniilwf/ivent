@@ -1,0 +1,38 @@
+{
+  "id": "vine-potion",
+  "kind": "item",
+  "name": "Зелье лозы",
+  "description": "Зелье. Брось d4 и d6: выбранный другой игрок идёт назад на результат d4, а затем вперёд на результат d6.",
+  "rarity": "common",
+  "price": 25,
+  "window": "anytime",
+  "hostile": true,
+  "stackable": false,
+  "tags": [
+    "potion"
+  ],
+  "effect": {
+    "target": {
+      "selector": "chosen",
+      "excludeSelf": true
+    },
+    "actions": [
+      {
+        "type": "roll",
+        "dice": "1d4"
+      },
+      {
+        "type": "move",
+        "steps": "-$roll"
+      },
+      {
+        "type": "roll",
+        "dice": "1d6"
+      },
+      {
+        "type": "move",
+        "steps": "$roll"
+      }
+    ]
+  }
+}

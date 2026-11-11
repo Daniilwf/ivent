@@ -102,7 +102,12 @@ public static class ContentPublishing
             error($"{at}.effect.target", "An effect that acts on its own has nobody to choose its target.");
         }
 
-        var rolled = effect.Outcomes is not null;
+        var rolled = effect.Outcomes is { Roll: not null };
+        if (triggered && effect.Outcomes is { Choice: not null })
+        {
+            error($"{at}.effect.outcomes.choice", "An effect that acts on its own has nobody to ask.");
+        }
+
         var actions = effect.Actions.Concat(effect.Outcomes?.Cases.SelectMany(c => c.Actions) ?? []).ToList();
         for (var i = 0; i < actions.Count; i++)
         {
