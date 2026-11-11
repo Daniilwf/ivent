@@ -440,7 +440,7 @@ public static partial class ContentValidator
         }
 
         if (take is { Pick: Pick.Chosen, Count.Kind: ContentValueKind.Reference }
-            && after.Any(a => a is RequestChoiceAction or TakeObjectAction { Pick: Pick.Chosen }))
+            && after.Any(a => a is RequestChoiceAction or TakeObjectAction { Pick: Pick.Chosen } or MoveAction { Direction: MoveDirection.Chosen }))
         {
             error($"{at}.count", "A chosen count known only at the use takes every answer left: no choice comes after it.");
         }

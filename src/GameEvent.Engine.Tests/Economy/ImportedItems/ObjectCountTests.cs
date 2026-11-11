@@ -173,6 +173,7 @@ public class ObjectCountTests
     [InlineData("allAndCount")]
     [InlineData("allChosen")]
     [InlineData("dynamicThenChoice")]
+    [InlineData("dynamicThenChosenMove")]
     [InlineData("rollWithoutRoll")]
     public void Counts_are_checked(string variant)
     {
@@ -187,6 +188,12 @@ public class ObjectCountTests
                 new RollAction { Dice = ContentValue.TryParse("1d4")! },
                 take with { Count = ContentValue.TryParse("$roll")! },
                 new RequestChoiceAction { Prompt = "?", Options = new ChoiceOptionsSpec { List = ["a", "b"] } },
+            ],
+            "dynamicThenChosenMove" =>
+            [
+                new RollAction { Dice = ContentValue.TryParse("1d4")! },
+                take with { Count = ContentValue.TryParse("$roll")! },
+                new MoveAction { Steps = ContentValue.Of(1), Direction = MoveDirection.Chosen },
             ],
             _ => [take with { Count = ContentValue.TryParse("$roll")! }],
         };
