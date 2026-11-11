@@ -93,6 +93,7 @@
 | Статус прохождения | идёт, завершено, дропнуто, тех-реролл, отклонено (реджект) | `RunStatus` (`Playing`, `Completed`, `Dropped`, `TechRerolled`, `Rejected`) |
 | Снапшот | правила и параметры, зафиксированные в момент ролла | `RunSnapshot` |
 | Сложность | лёгкая, нормальная, сложная, выше сложной | `Difficulty` (`Easy`, `Normal`, `Hard`, `Extreme`) |
+| Сложность при старте | сложность, которую игрок называет, начиная игру; при завершении засчитывается не выше неё (D-633) | `StartRun.DeclaredDifficulty`, `RunStarted.DeclaredDifficulty`, `RunState.DeclaredDifficulty` |
 | Пруф | доказательство прохождения: ссылки, заметка или свидетель | `ProofState` (`ProofStatus`: `Pending`, `Approved`, `Rejected`), команда `SubmitProof`, событие `ProofSubmitted`, таблица `Proof` |
 | Одобрение | подтверждение пруфа админом, в том числе «без скрина» | команда `ApproveProof`, событие `ProofApproved` |
 | Реджект | отклонение пруфа админом: снимается всё, что дал ход прохождения, — очки с бонусом клетки хода, клетки (позиция не улучшается), монетки (в минус), предметы клеток хода, которые игрок ещё держит (D-321, D-327, D-421) | команда `RejectProof`, событие `ProofRejected`, `RunStatus.Rejected`, `RunState.CellPoints`, `RunState.CellObjects`, `ObjectRemoval.ProofRejected` |

@@ -9,6 +9,7 @@
     "setup": "npm install && npm --prefix web install && npm --prefix e2e install && dotnet tool restore && dotnet restore GameEvent.slnx",
     "format:file": "node scripts/format-file.mjs",
     "check:stop": "node scripts/check-stop.mjs",
+    "check:matrix": "node scripts/check-matrix-tests.mjs",
     "lint": "dotnet format GameEvent.slnx --verify-no-changes && npm --prefix web run -s lint && npm --prefix e2e run -s lint && prettier --check .",
     "build": "dotnet build GameEvent.slnx -nologo && npm --prefix web run -s build",
     "test:dotnet:fast": "dotnet test GameEvent.slnx -nologo --filter \"Category!=Long&Category!=Slow\"",
