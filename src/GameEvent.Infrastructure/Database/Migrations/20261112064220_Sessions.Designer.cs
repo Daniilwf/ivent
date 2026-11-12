@@ -11,7 +11,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace GameEvent.Infrastructure.Database.Migrations
 {
     [DbContext(typeof(GameEventDbContext))]
-    [Migration("20261111011449_Sessions")]
+    [Migration("20261112064220_Sessions")]
     partial class Sessions
     {
         /// <inheritdoc />
@@ -497,6 +497,10 @@ namespace GameEvent.Infrastructure.Database.Migrations
 
                     b.Property<long?>("CompletedAt")
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("DeclaredDifficulty")
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("DiceJson")
                         .IsRequired()
