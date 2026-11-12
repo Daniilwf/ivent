@@ -12,8 +12,12 @@ internal static class ObjectFilters
     /// never changes hands (<paramref name="moves"/>), an undestroyable one is never destroyed or transformed.
     /// </summary>
     public static IReadOnlyList<InventoryObject> Matching(EffectRun run, Guid playerId, ObjectFilterSpec? filter, bool moves = false) =>
-        [.. run.State.Players[playerId].Wallet.Inventory
-            .Where(o => run.State.Catalog.Get(o.ObjectId) is var definition
+        Matching(run.State, playerId, filter, moves);
+
+    /// <inheritdoc cref="Matching(EffectRun, Guid, ObjectFilterSpec?, bool)"/>
+    public static IReadOnlyList<InventoryObject> Matching(Seasons.SeasonState state, Guid playerId, ObjectFilterSpec? filter, bool moves = false) =>
+        [.. state.Players[playerId].Wallet.Inventory
+            .Where(o => state.Catalog.Get(o.ObjectId) is var definition
                 && (filter is null || Matches(definition, o, filter))
                 && (moves ? !definition.Unstealable : !definition.Undestroyable))
             .OrderBy(o => o.Acquired)];

@@ -136,6 +136,7 @@ for (const section of [
   'offer',
   'complete',
   'proof',
+  'inventory',
   'feed',
   'profile',
   'sessions',

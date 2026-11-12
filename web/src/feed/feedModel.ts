@@ -36,7 +36,8 @@ export type FeedIcon =
   | 'finish'
   | 'effect'
   | 'admin'
-  | 'undo';
+  | 'undo'
+  | 'item';
 
 export type FeedItem = {
   /** The command's id: one command, one line */
@@ -64,7 +65,7 @@ export type FeedRefs = {
   games: Map<string, FeedGame>;
   /** A run's game */
   runs: Map<string, string>;
-  /** A content object's name (the drawn events, stage 5) */
+  /** A content object's name by its id: items, gifts and drawn events alike (D-444, D-446) */
   objects: Map<string, string>;
 };
 
@@ -147,11 +148,15 @@ type Headline = {
 type Context = {
   /** Whether the command has an event of this type: a choice with a move is a branch, not a game */
   has: (type: string) => boolean;
+  /** The data of the command's first event of this type, if any */
+  find: (type: string) => Data | null;
   player: (d: Data) => FeedPlayer;
   playerRef: (d: Data) => FeedRef;
   gameRef: (d: Data) => FeedRef;
-  /** A content object's name, its id when the page did not name it */
-  objectName: (d: Data) => string;
+  /** A player named by id (a target, the player bet on) */
+  refOf: (id: string) => FeedRef;
+  /** An object's name by its id; the id itself when the page does not know it */
+  object: (id: string | null) => string;
 };
 
 type EventKind = 'good' | 'bad' | 'special' | 'risky';
@@ -380,6 +385,70 @@ const headlines: [string, (d: Data, c: Context) => Headline][] = [
         : { icon: 'roll', actor: c.player(d), line: L.chose(c.playerRef(d)) },
   ],
   [
+    'item-used',
+    (d, c) => ({
+      icon: 'item',
+      actor: c.player(d),
+      line: L.itemUsed(
+        c.playerRef(d),
+        c.object(text(d, 'objectId')),
+        list(d, 'targets')
+          .filter((t): t is string => typeof t === 'string' && t !== text(d, 'playerId'))
+          .map((t) => c.refOf(t)),
+      ),
+    }),
+  ],
+  [
+    'inventory-adjusted',
+    (d, c) => {
+      const given = c.find('object-given');
+      const taken = c.find('object-removed');
+      return {
+        icon: 'admin',
+        actor: c.player(d),
+        line: given
+          ? L.inventoryGiven(c.playerRef(d), c.object(text(record(given['item']), 'objectId')))
+          : taken
+            ? L.inventoryTaken(c.playerRef(d), c.object(text(taken, 'objectId')))
+            : L.inventoryAdjusted(c.playerRef(d)),
+        quote: quoteOf(text(d, 'comment')),
+      };
+    },
+  ],
+  [
+    'content-published',
+    (d) => ({
+      icon: 'season',
+      actor: null,
+      line: L.contentPublished(number(d, 'version') ?? 1),
+      quote: quoteOf(text(d, 'comment')),
+    }),
+  ],
+  [
+    'lot-bought',
+    (d, c) => ({
+      icon: 'item',
+      actor: c.player(d),
+      line: L.lotBought(c.playerRef(d), c.object(text(record(d['item']), 'objectId'))),
+    }),
+  ],
+  [
+    'shop-rolled',
+    (d, c) => ({ icon: 'item', actor: c.player(d), line: L.shopRolled(c.playerRef(d)) }),
+  ],
+  [
+    'bet-placed',
+    (d, c) => {
+      const bet = record(d['bet']);
+      return {
+        icon: 'item',
+        actor: c.player(d),
+        line: L.betPlaced(c.playerRef(d), c.refOf(text(bet, 'onPlayerId') ?? '')),
+        facts: [F.stake(number(bet, 'stake') ?? 0)],
+      };
+    },
+  ],
+  [
     'map-published',
     (d) => ({
       icon: 'season',
@@ -451,7 +520,7 @@ const headlines: [string, (d: Data, c: Context) => Headline][] = [
     (d, c) => ({
       icon: 'effect',
       actor: c.player(d),
-      line: L.eventDrawn(c.playerRef(d), c.objectName(d)),
+      line: L.eventDrawn(c.playerRef(d), c.object(text(d, 'objectId'))),
     }),
   ],
   [
@@ -503,6 +572,7 @@ const effectSource = (value: string | null) =>
 
 /** The facts the rest of a command's events add to its line: dice, points and cells, coins, the finish, events drawn */
 function factsOf(events: Event[], lead: Event, context: Context): string[] {
+  const { object } = context;
   const facts: string[] = [];
   let points = 0;
   let cells = 0;
@@ -552,7 +622,7 @@ function factsOf(events: Event[], lead: Event, context: Context): string[] {
           );
         break;
       case 'event-drawn':
-        facts.push(F.eventDrawn(context.objectName(d)));
+        facts.push(F.eventDrawn(context.object(text(d, 'objectId'))));
         break;
       case 'event-draw-missed':
         facts.push(F.eventDrawMissed);
@@ -562,6 +632,16 @@ function factsOf(events: Event[], lead: Event, context: Context): string[] {
         break;
       case 'effect-chain-cut':
         facts.push(F.chainCut);
+        break;
+      case 'hostile-intercepted':
+        facts.push(F.intercepted(object(text(d, 'objectId'))));
+        break;
+      case 'object-given':
+        if (lead.type === 'item-used')
+          facts.push(F.gotObject(object(text(record(d['item']), 'objectId'))));
+        break;
+      case 'object-lost':
+        facts.push(F.lostObject(object(text(d, 'objectId'))));
         break;
       default:
         break;
@@ -597,20 +677,20 @@ function itemOf(entries: Entry[], refs: FeedRefs): FeedItem | null {
       }
     );
   };
+  const object = (id: string | null) => (id ? (refs.objects.get(id) ?? id) : ru.feed.someItem);
   const context: Context = {
     has: (type) => events.some((e) => e.type === type),
+    find: (type) => events.find((e) => e.type === type)?.data ?? null,
     player,
     playerRef: (d) => ({ kind: 'player', player: player(d) }),
+    refOf: (id) => ({ kind: 'player', player: player({ playerId: id }) }),
+    object,
     gameRef: (d) => {
       const id = text(d, 'gameId') ?? refs.runs.get(text(d, 'runId') ?? '') ?? '';
       return {
         kind: 'game',
         game: refs.games.get(id) ?? { id, title: ru.feed.someGame, hasPage: false },
       };
-    },
-    objectName: (d) => {
-      const id = text(d, 'objectId') ?? '';
-      return refs.objects.get(id) ?? id;
     },
   };
 

@@ -58,6 +58,7 @@ import {
 } from './feedFixtures';
 import { AdminDemos } from './AdminDemos';
 import { ContentDemos } from './ContentDemos';
+import { InventoryDemos } from './InventoryDemos';
 
 // The styleguide's cards act on nothing
 const noop = () => undefined;
@@ -616,6 +617,10 @@ export function Styleguide() {
             </div>
           </div>
         </div>
+      </Section>
+
+      <Section id="inventory" title={t.inventory.title} lead={t.inventory.lead}>
+        <InventoryDemos />
       </Section>
 
       <Section id="pool" title={t.pool.title} lead={t.pool.lead}>
