@@ -59,6 +59,7 @@ import {
 import { AdminDemos } from './AdminDemos';
 import { ContentDemos } from './ContentDemos';
 import { InventoryDemos } from './InventoryDemos';
+import { BetsDemos, ShopDemos } from './EconomyDemos';
 
 // The styleguide's cards act on nothing
 const noop = () => undefined;
@@ -621,6 +622,14 @@ export function Styleguide() {
 
       <Section id="inventory" title={t.inventory.title} lead={t.inventory.lead}>
         <InventoryDemos />
+      </Section>
+
+      <Section id="shop" title={t.shop.title} lead={t.shop.lead}>
+        <ShopDemos />
+      </Section>
+
+      <Section id="bets" title={t.bets.title} lead={t.bets.lead}>
+        <BetsDemos />
       </Section>
 
       <Section id="pool" title={t.pool.title} lead={t.pool.lead}>

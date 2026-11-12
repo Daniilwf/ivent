@@ -7567,6 +7567,23 @@
         },
         "description": "The avatar after the change; `duplicate` — the same request was already handled."
       },
+      "BetOptionView": {
+        "required": [
+          "days",
+          "multiplier"
+        ],
+        "type": "object",
+        "properties": {
+          "days": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "multiplier": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
       "BetRules": {
         "required": [
           "maxStake",
@@ -7597,6 +7614,62 @@
           }
         }
       },
+      "BetRunView": {
+        "required": [
+          "playerId",
+          "name",
+          "token",
+          "runId",
+          "gameId",
+          "gameTitle",
+          "hours",
+          "closesAt",
+          "options"
+        ],
+        "type": "object",
+        "properties": {
+          "playerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "token": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "runId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "gameId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "gameTitle": {
+            "type": "string"
+          },
+          "hours": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "closesAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BetOptionView"
+            }
+          }
+        },
+        "description": "A run I may bet on: whose (name and token colour), the game and its hours of the roll's snapshot, when bets on it close,\nand the multiplier of each deadline."
+      },
       "BetStatus": {
         "enum": [
           "open",
@@ -7609,7 +7682,12 @@
         "required": [
           "bets",
           "deadlineOptionsDays",
-          "maxStake"
+          "maxStake",
+          "refusal",
+          "openBets",
+          "maxOpenBets",
+          "stakeLimit",
+          "runs"
         ],
         "type": "object",
         "properties": {
@@ -7629,9 +7707,33 @@
           "maxStake": {
             "type": "integer",
             "format": "int32"
+          },
+          "refusal": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "openBets": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxOpenBets": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "stakeLimit": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "runs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BetRunView"
+            }
           }
         },
-        "description": "My bets and the rules of a new one: deadlines in days and the largest stake."
+        "description": "My bets and the rules of a new one: deadlines in days and the largest stake of the season (D-414). From the bets plan\n(D-447): `refusal` — the engine's code when no bet is placed now, `openBets` of `maxOpenBets`,\n`stakeLimit` — the largest stake I can place (the season's limit or my coins), `runs` — exactly the runs a\nbet is accepted on now."
       },
       "BetView": {
         "required": [
@@ -7644,7 +7746,8 @@
           "stake",
           "multiplier",
           "status",
-          "payout"
+          "payout",
+          "gameTitle"
         ],
         "type": "object",
         "properties": {
@@ -7685,6 +7788,9 @@
           "payout": {
             "type": "integer",
             "format": "int32"
+          },
+          "gameTitle": {
+            "type": "string"
           }
         }
       },
@@ -12779,7 +12885,8 @@
           "description",
           "rarity",
           "price",
-          "sold"
+          "sold",
+          "refusal"
         ],
         "type": "object",
         "properties": {
@@ -12805,8 +12912,15 @@
           },
           "sold": {
             "type": "boolean"
+          },
+          "refusal": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
-        }
+        },
+        "description": "A lot of my offer; `refusal` — the engine's code when buying it is refused now (sold, too few coins, the inventory full…), D-447."
       },
       "ShopPayment": {
         "enum": [

@@ -69,4 +69,50 @@ public class ShopPlansTests
         Assert.Equal(RejectionCodes.FeatureDisabled, ShopPlans.Of(s.State, s.Clock.UtcNow, s.PlayerId("Вася"))!.Refusal);
         Assert.Null(ShopPlans.Of(s.State, s.Clock.UtcNow, Guid.NewGuid()));
     }
+
+    [Fact]
+    public void Each_lot_says_what_a_purchase_of_it_gets()
+    {
+        var s = Season().WithCoins("Вася", 30);
+        s.RollShop("Вася");
+        var price = s.Player("Вася").Wallet.Shop!.Lots[0].Price;
+        s.Buy("Вася", 0);
+
+        var plan = ShopPlans.Of(s.State, s.Clock.UtcNow, s.PlayerId("Вася"))!;
+        Assert.Equal(plan.Offer!.Lots.Count, plan.LotRefusals.Count);
+        Assert.Equal(RejectionCodes.ShopLotSold, plan.LotRefusals[0]);
+        for (var i = 0; i < plan.LotRefusals.Count; i++)
+        {
+            var refusal = plan.LotRefusals[i];
+            s.Buy("Вася", i);
+            Assert.Equal(refusal, s.Last.Rejection?.Code);
+            if (refusal is null)
+            {
+                break;
+            }
+        }
+
+        Assert.True(price > 0);
+        s.WithCoins("Вася", 0);
+        Assert.All(ShopPlans.Of(s.State, s.Clock.UtcNow, s.PlayerId("Вася"))!.LotRefusals.Where(r => r != RejectionCodes.ShopLotSold), r => Assert.Equal(RejectionCodes.NotEnoughCoins, r));
+    }
+
+    [Fact]
+    public void A_full_inventory_and_the_shop_off_refuse_every_lot()
+    {
+        var s = Season().WithCoins("Вася", 30);
+        s.RollShop("Вася");
+        foreach (var _ in Enumerable.Range(0, 5))
+        {
+            s.Give("Вася", "orange");
+        }
+
+        var full = ShopPlans.Of(s.State, s.Clock.UtcNow, s.PlayerId("Вася"))!;
+        s.Buy("Вася", 0);
+        Assert.All(full.LotRefusals, r => Assert.Equal(RejectionCodes.InventoryFull, r));
+        Assert.Equal(RejectionCodes.InventoryFull, s.Last.Rejection!.Code);
+
+        s.WithRuleset(r => r with { Features = r.Features with { Shop = false } });
+        Assert.All(ShopPlans.Of(s.State, s.Clock.UtcNow, s.PlayerId("Вася"))!.LotRefusals, r => Assert.Equal(RejectionCodes.FeatureDisabled, r));
+    }
 }

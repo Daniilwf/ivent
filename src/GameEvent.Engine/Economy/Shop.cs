@@ -62,23 +62,41 @@ internal static class Shop
         }
 
         var player = state.Players[command.PlayerId];
+        if (LotRefusal(state, player, context.Clock.UtcNow, command.Lot) is { } refusedLot)
+        {
+            return refusedLot;
+        }
+
+        var lot = player.Wallet.Shop!.Lots[command.Lot];
+        var definition = state.Catalog.Live(lot.ObjectId)!;
+        var item = Inventories.New(state, context, player.PlayerId, definition, null, fromPlayerId: null);
+        var bought = new LotBought(player.PlayerId, command.Lot, item, lot.Price);
+        return Decision.Accept(lot.Price == 0 ? [bought] : [bought, new CoinsChanged(player.PlayerId, -lot.Price, CoinsReason.Purchase, RunId: null)]);
+    }
+
+    /// <summary>
+    /// Why lot <paramref name="index"/> of the player's offer is not sold at <paramref name="now"/> — the checks of
+    /// <see cref="BuyLot"/> after the guard, so the shop screen offers exactly what a purchase accepts (D-443); null — sold.
+    /// </summary>
+    public static Decision? LotRefusal(SeasonState state, SeasonPlayer player, DateTimeOffset now, int index)
+    {
         if (player.Wallet.Shop is not { } offer)
         {
             return Decision.Reject(RejectionCodes.ShopNoOffer, "Roll the shop first.");
         }
 
         // The server's clock decides, even before the timer has fired (SPEC «Время считает сервер»).
-        if (context.Clock.UtcNow >= offer.ExpiresAt)
+        if (now >= offer.ExpiresAt)
         {
             return Decision.Reject(RejectionCodes.ShopOfferExpired, "The lots have vanished.");
         }
 
-        if (command.Lot < 0 || command.Lot >= offer.Lots.Count)
+        if (index < 0 || index >= offer.Lots.Count)
         {
             return Decision.Reject(RejectionCodes.ShopUnknownLot, $"The offer has lots 0–{offer.Lots.Count - 1}.");
         }
 
-        var lot = offer.Lots[command.Lot];
+        var lot = offer.Lots[index];
         if (lot.Sold)
         {
             return Decision.Reject(RejectionCodes.ShopLotSold, "This lot is already bought.");
@@ -95,14 +113,9 @@ internal static class Shop
         }
 
         // Content published since the roll may have removed it (D-400): it is not sold any more
-        if (state.Catalog.Live(lot.ObjectId) is not { } definition)
-        {
-            return Decision.Reject(RejectionCodes.ObjectUnknown, $"«{lot.ObjectId}» is no longer in the season's content.");
-        }
-
-        var item = Inventories.New(state, context, player.PlayerId, definition, null, fromPlayerId: null);
-        var bought = new LotBought(player.PlayerId, command.Lot, item, lot.Price);
-        return Decision.Accept(lot.Price == 0 ? [bought] : [bought, new CoinsChanged(player.PlayerId, -lot.Price, CoinsReason.Purchase, RunId: null)]);
+        return state.Catalog.Live(lot.ObjectId) is null
+            ? Decision.Reject(RejectionCodes.ObjectUnknown, $"«{lot.ObjectId}» is no longer in the season's content.")
+            : null;
     }
 
     /// <summary>A purchase needs coins not in debt and enough of them (SPEC «Минус»).</summary>

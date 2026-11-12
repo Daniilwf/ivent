@@ -583,6 +583,11 @@ describe('feed lines of the economy (D-444)', () => {
     ]);
 
     expect(text(item)).toBe(ru.feed.lines.itemUsed<string>('Вася', 'Птичкерс', ['Петя']).join(''));
+    // EA-1: the coins moved are said for each player, not summed to nothing
+    expect(item?.facts).toEqual([
+      ru.feed.facts.coinsOf('Вася', 3),
+      ru.feed.facts.coinsOf('Петя', -3),
+    ]);
     expect(refsOf(item).map((r) => (r.kind === 'player' ? r.player.name : ''))).toEqual([
       'Вася',
       'Петя',
@@ -661,6 +666,36 @@ describe('feed lines of the economy (D-444)', () => {
     ]);
     expect(text(bet)).toBe(ru.feed.lines.betPlaced<string>('Вася', 'Петя').join(''));
     expect(bet?.facts).toContain(ru.feed.facts.stake(5));
+  });
+
+  it('says the coins of a bet paid out on the completion of another apart from the reward (EA-1)', () => {
+    const completed = line([
+      entry('w9', 'coins-changed', {
+        playerId: vasya,
+        delta: 10,
+        reason: 'betPayout',
+        runId: null,
+      }),
+      entry('w9', 'bet-settled', { playerId: vasya, betId: 'b', status: 'won', payout: 10 }),
+      entry('w9', 'coins-changed', {
+        playerId: petya,
+        delta: 4,
+        reason: 'completionReward',
+        runId: 'r',
+      }),
+      entry('w9', 'run-completed', {
+        runId: 'r',
+        playerId: petya,
+        difficulty: 'normal',
+        hours: 6,
+        completedAt: '2026-09-26T12:00:00Z',
+      }),
+    ]);
+
+    expect(completed?.facts).toEqual(
+      expect.arrayContaining([ru.feed.facts.coinsOf('Петя', 4), ru.feed.facts.coinsOf('Вася', 10)]),
+    );
+    expect(completed?.facts).not.toContain(ru.feed.facts.coins(14));
   });
 });
 
