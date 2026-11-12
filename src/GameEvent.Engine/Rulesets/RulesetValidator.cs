@@ -25,6 +25,7 @@ public static class RulesetValidator
     private const int MaxLotLifetimeMinutes = 7 * 24 * 60;
     private const int MaxInventoryLimit = 100;
     private const int MaxBetDeadlineDays = 365;
+    private const int MaxAnswerTimeoutHours = 365 * 24;
     private const int MaxWeight = 1_000_000;
     private const decimal MaxPayoutMultiplier = 100;
     private const int MaxReflectMultiplier = 10;
@@ -154,6 +155,16 @@ public static class RulesetValidator
         if (ruleset.Features.Events && ruleset.Events is null)
         {
             Error("events", "is required when features.events is on");
+        }
+
+        if (ruleset.Events is { AnswerTimeoutHours: { } timeout })
+        {
+            if (timeout < 1)
+            {
+                Error("events.answerTimeoutHours", "must be at least 1, or null for no limit");
+            }
+
+            AtMost("events.answerTimeoutHours", timeout, MaxAnswerTimeoutHours);
         }
 
         // Special and risky events are drawn from decks: without events they could not even be played by hand (D-530)

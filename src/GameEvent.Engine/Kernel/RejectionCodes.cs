@@ -31,6 +31,7 @@ public static class RejectionCodes
     public const string UndoNoHistory = "undo.noHistory";
     public const string CommandUndone = "command.undone";
     public const string EffectNotYours = "effect.notYours";
+    public const string EffectChoicePending = "effect.choicePending";
     public const string EffectUnknownOutcome = "effect.unknownOutcome";
     public const string CommentTooLong = "player.commentTooLong";
     public const string InvalidResource = "player.invalidResource";

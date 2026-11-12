@@ -248,7 +248,7 @@ internal sealed class TransformObjectHandler : ActionHandler<TransformObjectActi
 internal sealed class DrawEventHandler : ActionHandler<DrawEventAction>
 {
     protected override void Execute(DrawEventAction action, EffectRun run) =>
-        run.Emit(Decks.EventDraws.Draw(run.State, run.Context, run.ActionTarget(action), action.Deck, Decks.EventSource.Item));
+        run.Emit(Decks.EventDraws.Draw(run.State, run.Context, run.ActionTarget(action), action.Deck, Decks.EventSource.Item, run.Depth));
 }
 
 /// <summary><c>spinWheel</c>: a loot wheel of the content picks an object by weight (only live ones), and it is given.</summary>
