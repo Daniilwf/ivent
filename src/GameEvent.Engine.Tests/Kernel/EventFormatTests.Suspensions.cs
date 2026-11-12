@@ -28,5 +28,6 @@ public partial class EventFormatTests
             """{"playerId":"10000000-0000-0000-0000-000000000001","choiceId":"00000000-0000-0000-0000-000000000001","objectId":"genre-gift","kind":"good","step":"action","targetId":"10000000-0000-0000-0000-000000000001","nextAction":3,"depth":2,"options":[{"id":"Horror","game":null},{"id":"RPG","game":null}],"roll":3,"choice":null,"dueAt":"2026-10-01T12:30:00+00:00"}"""
         ),
         ("effect-resumed", new EffectResumed(s_player, s_run, "RPG"), """{"playerId":"10000000-0000-0000-0000-000000000001","choiceId":"00000000-0000-0000-0000-000000000001","optionId":"RPG"}"""),
+        ("effect-move-skipped", new EffectMoveSkipped(s_player, "crossroads"), """{"playerId":"10000000-0000-0000-0000-000000000001","objectId":"crossroads"}"""),
     ];
 }

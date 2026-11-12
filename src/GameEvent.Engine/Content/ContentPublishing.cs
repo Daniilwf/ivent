@@ -185,7 +185,6 @@ public static class ContentPublishing
                     error($"{path}.count", "An event asks for one object at a time.");
                 }
 
-                rolled |= actions[i] is RollAction;
                 continue;
             }
 

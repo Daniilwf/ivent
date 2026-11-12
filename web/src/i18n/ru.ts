@@ -140,6 +140,7 @@ const rejection = {
   'player.commentRequired': 'Нужен комментарий.',
   'player.commentTooLong': 'Комментарий слишком длинный: не больше 500 символов.',
   'effect.notYours': 'Это не твой эффект.',
+  'effect.choicePending': 'Ивент ждёт ответа игрока: дождись ответа.',
   'effect.unknownOutcome': 'Неизвестный исход.',
   'item.nothingToGive': 'Отдать нечего: у тебя нет того, что этот предмет передаёт.',
   'item.nothingToTake': 'Забрать нечего: у цели нет того, что этот предмет забирает.',

@@ -68,6 +68,14 @@ public sealed record EffectSuspended(
 public sealed record EffectResumed(Guid PlayerId, Guid ChoiceId, string OptionId) : IGameEvent;
 
 /// <summary>
+/// The record of a <c>move</c> or <c>teleport</c> a continuation skipped after the deadline (Н-13, S5.7-14, D-569): the
+/// answer is accepted, the token of <see cref="PlayerId"/> stays and no dice of the move are rolled. A fact for the log and
+/// the feed; it changes nothing.
+/// </summary>
+[EventType("effect-move-skipped")]
+public sealed record EffectMoveSkipped(Guid PlayerId, string ObjectId) : IGameEvent;
+
+/// <summary>
 /// Effects waiting for an answer (D-511, D-560…D-564): the pending choice of <see cref="ChoiceKind.Effect"/>, the answer
 /// that goes on in its own command with a new chain budget at the level it stopped at, the timer's answer, the discard.
 /// </summary>
@@ -106,12 +114,32 @@ internal static class Suspensions
         return player.Choice == choice ? player : player with { Choice = choice };
     }
 
-    /// <summary>The chain level a command's continuations stopped at: its reactions go on from there (D-511, EV31).</summary>
-    public static int Level(SeasonState state, IEnumerable<IGameEvent> events) =>
-        events.OfType<EffectResumed>()
-            .Select(r => state.Players.GetValueOrDefault(r.PlayerId)?.Suspended.FirstOrDefault(s => s.ChoiceId == r.ChoiceId)?.Depth ?? 0)
-            .DefaultIfEmpty(0)
-            .Max();
+    /// <summary>
+    /// The chain level each of a command's events is at (D-511, EV31): the events of a continuation — its
+    /// <see cref="EffectResumed"/> and the events after it, up to the next one — at the level its effect stopped at, the
+    /// others (the timer's other expiries, the settlements after them) at 0. Each continuation reacts from its own level.
+    /// </summary>
+    public static IReadOnlyList<int>? Levels(SeasonState state, IReadOnlyList<IGameEvent> events)
+    {
+        if (!events.Any(e => e is EffectResumed))
+        {
+            return null;
+        }
+
+        var levels = new int[events.Count];
+        var level = 0;
+        for (var i = 0; i < events.Count; i++)
+        {
+            if (events[i] is EffectResumed r)
+            {
+                level = state.Players.GetValueOrDefault(r.PlayerId)?.Suspended.FirstOrDefault(s => s.ChoiceId == r.ChoiceId)?.Depth ?? 0;
+            }
+
+            levels[i] = level;
+        }
+
+        return levels;
+    }
 
     /// <summary>
     /// The answer of <paramref name="player"/> to the effect asked now (D-511, D-563): the season running or closing (the

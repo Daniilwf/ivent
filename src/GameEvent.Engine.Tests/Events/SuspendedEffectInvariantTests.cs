@@ -21,8 +21,8 @@ namespace GameEvent.Engine.Tests.Events;
 /// commands are undone, the clock runs the answer timeout (D-560) on even seeds, and players roll and complete. After every
 /// command: 1 — the log replays to the state; 12 — the chain limits; 13 — an accepted undo leaves the state the log without
 /// the command replays to; the new invariant of D-562 — a pending choice of <see cref="ChoiceKind.Effect"/> exactly when the
-/// player has a suspended effect not resumed or discarded, and the pending one is among them; 14 — the same seed and commands
-/// give the same log.
+/// player has a suspended effect not resumed or discarded, unless a choice of another kind is asked first (D-567 (10); the
+/// map has a fork), and the pending one is among them; 14 — the same seed and commands give the same log.
 /// </summary>
 public class SuspendedEffectInvariantTests
 {
@@ -39,6 +39,7 @@ public class SuspendedEffectInvariantTests
         var map = MapBuilder.New()
             .EventCell("e1", "ask").EventCell("e2", "ask").EventCell("e3", "ask").EventCell("e4", "ask").EventCell("e5", "ask")
             .Path("start", "e1", "e2", "a", "e3", "b", "e4", "e5", "c", "d", "f", "g", "h", "finish")
+            .Path("b", "x", "e5")
             .Build();
         var s = Scenario.New(rules, seed).WithMap(map)
             .WithCategory("Horror").WithCategory("RPG")
@@ -208,12 +209,14 @@ public class SuspendedEffectInvariantTests
         // 1: the state rebuilt from the log (through its stored form) is the state
         Assert.Equal(s.State, SeasonEngine.Replay(s.Log.Select(e => EventCodec.Decode(EventCodec.Encode(e)))));
 
-        // D-562: a pending choice of an effect exactly when an effect waits, and it is one of those
+        // D-562, D-567 (10): a pending choice of an effect only when an effect waits, and it is one of those; an effect that
+        // waits is asked unless a choice of another kind (a branch, a game) is asked first
         var open = OpenSuspensions(s);
         foreach (var player in s.State.Players.Values)
         {
             var waiting = open.TryGetValue(player.PlayerId, out var set) ? set : [];
-            Assert.Equal(waiting.Count > 0, player.Choice?.Kind == ChoiceKind.Effect);
+            Assert.True(waiting.Count == 0 || player.Choice is not null, $"{player.Name} has an effect waiting and nothing asked.");
+            Assert.True(waiting.Count > 0 || player.Choice?.Kind != ChoiceKind.Effect, $"{player.Name} is asked by an effect that does not wait.");
             if (player.Choice is { Kind: ChoiceKind.Effect } choice)
             {
                 Assert.Contains(choice.ChoiceId, waiting);

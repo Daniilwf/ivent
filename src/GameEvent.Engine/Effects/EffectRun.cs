@@ -364,10 +364,19 @@ internal sealed class EffectRun
         }
 
         TargetId = suspended.TargetId ?? UserId;
+
+        // A player picked at an earlier question is checked again at every later one (Н-10, D-510): one who finished first
+        // or became inactive since is not hit, the answer is not refused
+        if (TargetId != UserId && effect.Target?.Selector == TargetSelector.Chosen && !Targets.Askable(State, definition, UserId).Contains(TargetId))
+        {
+            return;
+        }
+
         LastRoll = suspended.Roll;
         LastChoice = suspended.Choice;
         if (suspended.Step == SuspendedStep.Outcome)
         {
+            // The options of a branch by choice are a fixed list (ContentValidator): the answer of the snapshot is still one
             _choiceIndex = _choices.Count;
             LastChoice = optionId;
             RunActions(effect.Outcomes?.Cases.FirstOrDefault(c => c.Option == optionId)?.Actions ?? []);

@@ -200,7 +200,9 @@ internal static class PlayerAdministration
             .Where(r => r.Delta != 0)
             .Select(r => new ResourceChanged(player.PlayerId, r.Resource, r.Delta, ResourceReason.AdminAdjustment)));
 
-        if (command.DiscardOffer && player is { Phase: TurnPhase.Rolling, Offer: { } offer })
+        // The discard takes what is asked now (D-569): an event's question alone, the rolled game stays for a second discard
+        var asksAnEvent = player.Choice?.Kind == ChoiceKind.Effect;
+        if (command.DiscardOffer && !asksAnEvent && player is { Phase: TurnPhase.Rolling, Offer: { } offer })
         {
             changes.Add(new OfferDiscarded(player.PlayerId, offer.GameId));
         }

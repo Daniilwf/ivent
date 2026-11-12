@@ -68,9 +68,10 @@ internal readonly record struct ChainLimits(int Depth, int Events)
 /// </summary>
 internal static class EffectChain
 {
-    // fromDepth: the level the command's own events are at — 0, or the level a suspended effect stopped at for its continuation (D-511)
+    // levels: the level each of the command's own events is at — 0 when null or past its end, or the level a suspended
+    // effect stopped at for the events of its continuation (D-511): each reacts from its own level
     public static (IReadOnlyList<IGameEvent> Reactions, SeasonState State) Run(
-        SeasonState state, IReadOnlyList<IGameEvent> commandEvents, EngineContext context, int fromDepth = 0)
+        SeasonState state, IReadOnlyList<IGameEvent> commandEvents, EngineContext context, IReadOnlyList<int>? levels = null)
     {
         if (commandEvents.Any(e => e is EffectChainCut))
         {
@@ -83,11 +84,12 @@ internal static class EffectChain
 
         var written = new List<IGameEvent>();
         var total = commandEvents.Count;
-        IReadOnlyList<IGameEvent> level = commandEvents;
-        for (var depth = fromDepth + 1; level.Count > 0; depth++)
+        List<(IGameEvent Trigger, int Depth)> level =
+            [.. commandEvents.Select((e, i) => (e, (levels is not null && i < levels.Count ? levels[i] : 0) + 1))];
+        while (level.Count > 0)
         {
-            var next = new List<IGameEvent>();
-            foreach (var trigger in level)
+            var next = new List<(IGameEvent Trigger, int Depth)>();
+            foreach (var (trigger, depth) in level)
             {
                 foreach (var handler in handlers)
                 {
@@ -109,7 +111,7 @@ internal static class EffectChain
                         }
 
                         written.AddRange(reaction);
-                        next.AddRange(reaction);
+                        next.AddRange(reaction.Select(e => (e, depth + 1)));
                         total += reaction.Count;
 
                         // A countdown inside the firing went past the limits: its cut ends the chain (AU4-1)

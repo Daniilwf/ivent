@@ -32,7 +32,7 @@ namespace GameEvent.Engine.Tests.Events;
 /// the flag D-564.
 /// </para>
 /// </summary>
-public class SuspendedEffectTests
+public partial class SuspendedEffectTests
 {
     // ---- Content: events that ask, the items that bring the player to them ----
 
