@@ -58,7 +58,7 @@ public class SuspendedEffectInvariantTests
         return s;
     }
 
-    private static ICommand CommandFor(Scenario s, byte b)
+    private static ICommand CommandFor(Scenario s, byte b, int setup)
     {
         var name = s_players[(b / 8) % s_players.Length];
         var player = s.Player(name);
@@ -79,9 +79,11 @@ public class SuspendedEffectInvariantTests
                 return new MakeChoice(player.PlayerId, Guid.Parse("00000000-0000-0000-0000-00000000abcd"), "монетки");
             case 3:
                 return new AdjustPlayer(player.PlayerId, "Сброс для теста", DiscardOffer: true);
-            case 4 when s.History.Count > 0:
+            case 4 when s.History.Count > setup:
+                // The game's own commands only: the setup (players, content) stays, as in the other generators (D-566)
                 var history = s.History;
-                return new UndoCommand(history[history.Count - 1 - Math.Min(arg % 3, history.Count - 1)].CommandId, "ошибка админа");
+                var played = history.Count - setup;
+                return new UndoCommand(history[history.Count - 1 - Math.Min(arg % 3, played - 1)].CommandId, "ошибка админа");
             case 5:
                 s.Advance(TimeSpan.FromHours(13));
                 return new FireTimers();
@@ -103,6 +105,7 @@ public class SuspendedEffectInvariantTests
     private static Scenario Play(int seed, byte[] script, bool check)
     {
         var s = NewSeason(seed);
+        var setup = s.History.Count;
         return s.Explained(x =>
         {
             foreach (var b in script ?? [])
@@ -110,7 +113,7 @@ public class SuspendedEffectInvariantTests
                 var before = x.State;
                 var logLength = x.Log.Count;
                 var openBefore = OpenSuspensions(x);
-                var command = CommandFor(x, b);
+                var command = CommandFor(x, b, setup);
                 x.Act(command);
                 if (check)
                 {

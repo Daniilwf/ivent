@@ -66,7 +66,7 @@ public partial class EventFormatTests
             [s_game],
             new Engine.Undo.SeasonFields(SeasonStatus.Active, s_at, "Тестовый сезон", null));
 
-    public static TheoryData<string, IGameEvent, int, string> Samples() => WithEvents(WithEconomy(CoreSamples()));
+    public static TheoryData<string, IGameEvent, int, string> Samples() => WithSuspensions(WithEvents(WithEconomy(CoreSamples())));
 
     private static TheoryData<string, IGameEvent, int, string> CoreSamples() => new()
     {
