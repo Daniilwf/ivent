@@ -9,6 +9,7 @@ using GameEvent.Infrastructure.Queue;
 using GameEvent.Infrastructure.Seasons;
 using GameEvent.Web.Accounts;
 using GameEvent.Web.BugReports;
+using GameEvent.Web.Content;
 using GameEvent.Web.Files;
 using GameEvent.Web.Map;
 using GameEvent.Web.Observability;
@@ -25,6 +26,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace GameEvent.Web.Hosting;
 
@@ -50,6 +52,11 @@ public static class AppSetup
     public const string MapCheckRateLimit = "map-check";
 
     public const int MapChecksPerMinute = 120;
+
+    /// <summary>The content editor's checks (D-490): the admin checks a pack on demand and before each save.</summary>
+    public const string ContentCheckRateLimit = "content-check";
+
+    public const int ContentChecksPerMinute = 60;
 
     public static void AddGameEvent(this WebApplicationBuilder builder)
     {
@@ -122,9 +129,10 @@ public static class AppSetup
         services.AddSingleton<LoginThrottle>();
         services.AddSingleton<SessionTouches>();
 
-        // Sessions and their cookie keep the wall clock; the game's IClock may be moved on the test copy (D-469)
-        Microsoft.Extensions.DependencyInjection.Extensions.ServiceCollectionDescriptorExtensions.TryAddSingleton(services, TimeProvider.System);
-        services.AddSingleton(sp => new LoginDevices(sp.GetRequiredService<IDataProtectionProvider>(), sp.GetRequiredService<IClock>(), cookiePrefix + "ge.device", securePolicy));
+        // Sessions, their cookie and the device cookie keep the wall clock; the game's IClock may be moved on the test
+        // copy (D-469, D-650)
+        services.TryAddSingleton(TimeProvider.System);
+        services.AddSingleton(sp => new LoginDevices(sp.GetRequiredService<IDataProtectionProvider>(), sp.GetRequiredService<TimeProvider>(), cookiePrefix + "ge.device", securePolicy));
         services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
             .AddCookie(o =>
             {
@@ -166,6 +174,9 @@ public static class AppSetup
             o.AddPolicy(MapCheckRateLimit, ctx => RateLimitPartition.GetFixedWindowLimiter(
                 ctx.User.UserId()?.ToString() ?? WebSecurity.ClientKey(ctx.Connection.RemoteIpAddress),
                 _ => new FixedWindowRateLimiterOptions { PermitLimit = MapChecksPerMinute, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+            o.AddPolicy(ContentCheckRateLimit, ctx => RateLimitPartition.GetFixedWindowLimiter(
+                ctx.User.UserId()?.ToString() ?? WebSecurity.ClientKey(ctx.Connection.RemoteIpAddress),
+                _ => new FixedWindowRateLimiterOptions { PermitLimit = ContentChecksPerMinute, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
             o.AddPolicy(SeasonReadRateLimit, ctx => RateLimitPartition.GetFixedWindowLimiter(
                 ctx.User.UserId()?.ToString() ?? WebSecurity.ClientKey(ctx.Connection.RemoteIpAddress),
                 _ => new FixedWindowRateLimiterOptions { PermitLimit = SeasonReadsPerMinute, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
@@ -226,6 +237,7 @@ public static class AppSetup
         api.MapAdminProofs();
         api.MapAdminSeasons();
         api.MapAdminMap();
+        api.MapAdminContent();
         api.MapSeasonsAndPlayers();
         api.MapFeed();
         api.MapAdminAccounts();

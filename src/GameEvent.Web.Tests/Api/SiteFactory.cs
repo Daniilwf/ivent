@@ -80,9 +80,12 @@ internal sealed class SiteFactory : WebApplicationFactory<Program>
 
     public TestClock Clock { get; } = new(new DateTimeOffset(2026, 10, 1, 12, 0, 0, TimeSpan.Zero).AddTicks(7_654_321));
 
-    /// <summary>The wall clock of sessions and their cookie (D-469): the game's <see cref="Clock"/> moves without signing anyone out.</summary>
+    /// <summary>
+    /// The site's wall clock (<see cref="TimeProvider"/>): sessions and the device cookie run by it, not by the game's
+    /// <see cref="Clock"/> (D-469, D-650). It stands still unless a test moves it, so a test can compare stored times.
+    /// </summary>
     /// <remarks>Starts at the real time: the test client's cookie jar drops a cookie whose expiry is in the real past.</remarks>
-    public TestTimeProvider Wall { get; } = new(DateTimeOffset.UtcNow);
+    public TestTimeProvider Time { get; } = new(DateTimeOffset.UtcNow);
 
     public Dictionary<string, Guid> Users { get; } = [];
 
@@ -203,10 +206,10 @@ internal sealed class SiteFactory : WebApplicationFactory<Program>
         {
             services.RemoveAll<IClock>();
             services.AddSingleton<IClock>(Clock);
+            services.RemoveAll<TimeProvider>();
+            services.AddSingleton<TimeProvider>(Time);
             services.RemoveAll<IRandomSource>();
             services.AddSingleton(Random);
-            services.RemoveAll<TimeProvider>();
-            services.AddSingleton<TimeProvider>(Wall);
         });
     }
 

@@ -26,7 +26,7 @@ public static class RulesetSupport
         var f = ruleset.Features;
         foreach (var (name, on) in new[]
         {
-            ("events", f.Events), ("polls", f.Polls),
+            ("polls", f.Polls),
             ("achievements", f.Achievements), ("weeklyChallenge", f.WeeklyChallenge), ("partnerBoard", f.PartnerBoard),
             ("reactions", f.Reactions), ("comments", f.Comments), ("gallery", f.Gallery),
         })
@@ -41,6 +41,12 @@ public static class RulesetSupport
         if (f.Shop && !f.Items)
         {
             errors.Add(new("features.shop", "needs features.items: the shop sells items"));
+        }
+
+        // Events are objects of the season's content, played by the effects of items (D-530).
+        if (f.Events && !f.Items)
+        {
+            errors.Add(new("features.events", "needs features.items: events are objects of the content, played as effects"));
         }
 
         return errors;

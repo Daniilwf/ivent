@@ -10,21 +10,37 @@ namespace GameEvent.Engine.Content;
 /// </summary>
 public static class ContentPublishing
 {
-    /// <summary>The problems of <paramref name="pack"/>, each with its JSON path; empty when it can be published.</summary>
-    public static IReadOnlyList<ContentError> Check(ContentPack pack)
+    // Size limits of one pack (NB-SEC-3, D-653): the same numbers as the admin's content API (D-491), entries per wheel on top.
+    // The imported old season has under 400 objects.
+    public const int MaxObjects = 1000;
+    public const int MaxWheels = 100;
+    public const int MaxWheelEntries = 200;
+
+    /// <summary>
+    /// The problems of <paramref name="pack"/>, each with its JSON path; empty when it can be published. With
+    /// <paramref name="events"/> off (<c>features.events</c>) the pack holds no events and no decks, and draws only
+    /// «good» and «bad» by hand (D-10, D-532); on, it may hold events and their decks (D-501).
+    /// </summary>
+    public static IReadOnlyList<ContentError> Check(ContentPack pack, bool events = false)
     {
         ArgumentNullException.ThrowIfNull(pack);
         var errors = new List<ContentError>();
         void Error(string path, string message) => errors.Add(new ContentError(path, message));
 
-        var ids = pack.Objects.Select(o => o.Id).ToHashSet(StringComparer.Ordinal);
-        var wheels = pack.Wheels.Select(w => w.Id).ToHashSet(StringComparer.Ordinal);
-        foreach (var duplicate in pack.Objects.GroupBy(o => o.Id).Where(g => g.Count() > 1))
+        // The reader lets a null list item through (nullable annotations do not reach list items): named, then skipped
+        Nulls(pack.Objects, "$.objects", Error);
+        Nulls(pack.Wheels, "$.wheels", Error);
+        var objects = pack.Objects.Where(o => o is not null).ToList();
+        var ids = objects.Select(o => o.Id).ToHashSet(StringComparer.Ordinal);
+        var eventIds = objects.Where(o => o.Kind == ObjectKind.Event).Select(o => o.Id).ToHashSet(StringComparer.Ordinal);
+        var wheels = pack.Wheels.Where(w => w is not null && w.Deck is null).Select(w => w.Id).ToHashSet(StringComparer.Ordinal);
+        var decks = pack.Wheels.Where(w => w is not null && w.Deck is not null).Select(w => w.Id).ToHashSet(StringComparer.Ordinal);
+        foreach (var duplicate in objects.GroupBy(o => o.Id).Where(g => g.Count() > 1))
         {
             Error("$.objects", $"Object «{duplicate.Key}» is listed twice.");
         }
 
-        foreach (var duplicate in pack.Wheels.GroupBy(w => w.Id).Where(g => g.Count() > 1))
+        foreach (var duplicate in pack.Wheels.Where(w => w is not null).GroupBy(w => w.Id).Where(g => g.Count() > 1))
         {
             Error("$.wheels", $"Wheel «{duplicate.Key}» is listed twice.");
         }
@@ -32,18 +48,28 @@ public static class ContentPublishing
         for (var i = 0; i < pack.Objects.Count; i++)
         {
             var definition = pack.Objects[i];
+            if (definition is null)
+            {
+                continue;
+            }
+
             var at = $"$.objects[{i}]";
             errors.AddRange(ContentValidator.Check(definition).Select(e => new ContentError(at + e.Path[1..], e.Message)));
-            Supported(definition, at, Error);
+            Supported(definition, at, events, Error);
             if (definition.Effect is { } effect)
             {
-                References(effect, $"{at}.effect", ids, wheels, Error);
+                References(effect, $"{at}.effect", ids, eventIds, wheels, decks, Error);
             }
         }
 
         for (var i = 0; i < pack.Wheels.Count; i++)
         {
             var wheel = pack.Wheels[i];
+            if (wheel is null)
+            {
+                continue;
+            }
+
             var at = $"$.wheels[{i}]";
             if (wheel.Entries.Count == 0 || wheel.Entries.Any(e => e.Weight < 0) || wheel.Entries.Sum(e => e.Weight) <= 0)
             {
@@ -62,18 +88,39 @@ public static class ContentPublishing
             {
                 Error($"{at}.name", $"1–{ContentValidator.MaxNameLength} characters.");
             }
+
+            Deck(wheel, at, events, eventIds, Error);
         }
 
         return errors;
     }
 
-    // What stage 4 plays (D-402): the rest waits for its stage and is refused rather than silently ignored.
-    private static void Supported(ObjectDefinition definition, string at, Action<string, string> error)
+    private static void Nulls<T>(IReadOnlyList<T> items, string path, Action<string, string> error)
     {
-        if (definition.Kind is ObjectKind.Event or ObjectKind.Achievement)
+        for (var i = 0; i < items.Count; i++)
         {
-            error($"{at}.kind", $"{definition.Kind} objects come with their stage (events — 5, achievements — 6).");
+            if (items[i] is null)
+            {
+                error($"{path}[{i}]", "A list item is an object, not null.");
+            }
+        }
+    }
+
+    // What this build plays (D-402): the rest waits for its stage and is refused rather than silently ignored. Events
+    // play once features.events is on (D-532).
+    private static void Supported(ObjectDefinition definition, string at, bool events, Action<string, string> error)
+    {
+        if (definition.Kind == ObjectKind.Achievement || (definition.Kind == ObjectKind.Event && !events))
+        {
+            error($"{at}.kind", definition.Kind == ObjectKind.Event
+                ? "Events are played once features.events is on."
+                : $"{definition.Kind} objects come with their stage (achievements — 6).");
             return;
+        }
+
+        if (definition.Kind == ObjectKind.Event)
+        {
+            Event(definition, at, error);
         }
 
         if (definition.Effect is not { } effect)
@@ -117,8 +164,12 @@ public static class ContentPublishing
                 case ModifyNextRollAction { RunCondition: not null }:
                     error($"{path}.runCondition", "A condition on the run comes with events (stage 5).");
                     break;
-                case DrawEventAction draw when draw.Deck is not ("good" or "bad"):
-                    error($"{path}.deck", "Until events (stage 5) only «good» and «bad» are drawn, by hand.");
+                case DrawEventAction draw when !events && draw.Deck is not ("good" or "bad"):
+                    error($"{path}.deck", "While features.events is off only «good» and «bad» are drawn, by hand.");
+                    break;
+                case DrawEventAction when definition.Kind == ObjectKind.Event:
+                    // Played inside the draw, a draw of a draw would loop past the levels of the chain (D-531)
+                    error(path, "An event does not draw another event.");
                     break;
                 case RequestChoiceAction when triggered:
                 case TakeObjectAction { Pick: Pick.Chosen } when triggered:
@@ -143,8 +194,79 @@ public static class ContentPublishing
         }
     }
 
-    // giveObject, transformObject and spinWheel name objects and wheels of the same pack.
-    private static void References(EffectSpec effect, string at, HashSet<string> ids, HashSet<string> wheels, Action<string, string> error)
+    // What an event plays in 5.1 (D-536): its effect at once on the one who drew it. Text by hand (IRL), a condition and
+    // other targets come with 5.3 and are refused until then rather than ignored.
+    private static void Event(ObjectDefinition definition, string at, Action<string, string> error)
+    {
+        if (definition.Manual)
+        {
+            error($"{at}.manual", "An event played by hand comes with task 5.3.");
+        }
+
+        if (definition.Hostile)
+        {
+            error($"{at}.hostile", "An event is played on the one who drew it: it is not hostile.");
+        }
+
+        if (definition.Effect is { } effect)
+        {
+            if (effect.Condition is not null)
+            {
+                error($"{at}.effect.condition", "An event plays when drawn, without a condition.");
+            }
+
+            if (effect.Target is { Selector: not TargetSelector.Self })
+            {
+                error($"{at}.effect.target", "An event acts on the one who drew it («self»).");
+            }
+        }
+    }
+
+    // A deck holds events only, and a loot wheel none (D-501): a drawn event is played, never kept. The standard decks are
+    // the wheels named like the kinds, and of that kind.
+    private static void Deck(WheelDefinition wheel, string at, bool events, HashSet<string> eventIds, Action<string, string> error)
+    {
+        if (wheel.Deck is { } kind)
+        {
+            if (!events)
+            {
+                error($"{at}.deck", "Decks of events are played once features.events is on.");
+                return;
+            }
+
+            if (!Enum.IsDefined(kind))
+            {
+                error($"{at}.deck", $"Unknown kind of events {kind}.");
+            }
+
+            for (var j = 0; j < wheel.Entries.Count; j++)
+            {
+                if (!eventIds.Contains(wheel.Entries[j].ObjectId))
+                {
+                    error($"{at}.entries[{j}].objectId", $"A deck holds events: «{wheel.Entries[j].ObjectId}» is not an event of the pack.");
+                }
+            }
+        }
+        else
+        {
+            for (var j = 0; j < wheel.Entries.Count; j++)
+            {
+                if (eventIds.Contains(wheel.Entries[j].ObjectId))
+                {
+                    error($"{at}.entries[{j}].objectId", $"«{wheel.Entries[j].ObjectId}» is an event: events are drawn from decks, not won.");
+                }
+            }
+        }
+
+        if (events && Decks.EventDraws.KindOf(wheel.Id) is { } named && wheel.Deck != named)
+        {
+            error($"{at}.deck", $"«{wheel.Id}» is the standard deck of its kind: «deck» is «{wheel.Id}».");
+        }
+    }
+
+    // giveObject, transformObject, spinWheel and drawEvent name objects, wheels and decks of the same pack.
+    private static void References(
+        EffectSpec effect, string at, HashSet<string> ids, HashSet<string> eventIds, HashSet<string> wheels, HashSet<string> decks, Action<string, string> error)
     {
         var actions = effect.Actions.Select((a, i) => (a, $"{at}.actions[{i}]"))
             .Concat(effect.Outcomes?.Cases.SelectMany((c, ci) => c.Actions.Select((a, i) => (a, $"{at}.outcomes.cases[{ci}].actions[{i}]"))) ?? []);
@@ -152,6 +274,12 @@ public static class ContentPublishing
         {
             switch (action)
             {
+                case GiveObjectAction give when eventIds.Contains(give.ObjectId):
+                    error($"{path}.objectId", $"«{give.ObjectId}» is an event: events are drawn from decks, not given.");
+                    break;
+                case TransformObjectAction { Mode: TransformMode.Transform, Into: { } eventInto } when eventIds.Contains(eventInto):
+                    error($"{path}.into", $"«{eventInto}» is an event: events are drawn from decks, not kept.");
+                    break;
                 case GiveObjectAction give when !ids.Contains(give.ObjectId):
                     error($"{path}.objectId", $"«{give.ObjectId}» is not an object of the pack.");
                     break;
@@ -159,7 +287,12 @@ public static class ContentPublishing
                     error($"{path}.into", $"«{into}» is not an object of the pack.");
                     break;
                 case SpinWheelAction spin when !wheels.Contains(spin.Wheel):
-                    error($"{path}.wheel", $"«{spin.Wheel}» is not a wheel of the pack.");
+                    error($"{path}.wheel", decks.Contains(spin.Wheel)
+                        ? $"«{spin.Wheel}» is a deck: its events are drawn with drawEvent."
+                        : $"«{spin.Wheel}» is not a wheel of the pack.");
+                    break;
+                case DrawEventAction draw when Decks.EventDraws.KindOf(draw.Deck) is null && draw.Deck != Decks.DeckRef.Zone && !decks.Contains(draw.Deck):
+                    error($"{path}.deck", $"«{draw.Deck}» is not a deck of the pack.");
                     break;
                 default:
                     break;
@@ -185,6 +318,11 @@ public static class ContentPublishing
             return Decision.Reject(RejectionCodes.SeasonClosed, $"Content is published while the season is a draft or running; it is {state.Status}.");
         }
 
+        if (TooLarge(command.Pack) is { } tooLarge)
+        {
+            return Decision.Reject(RejectionCodes.ContentTooLarge, tooLarge);
+        }
+
         if (string.IsNullOrWhiteSpace(command.Comment))
         {
             return Decision.Reject(RejectionCodes.CommentRequired, "Every admin change explains itself in the public log.");
@@ -195,7 +333,14 @@ public static class ContentPublishing
             return Decision.Reject(RejectionCodes.CommentTooLong, $"The comment is limited to {Limits.MaxCommentLength} characters.");
         }
 
-        var errors = Check(command.Pack);
+        if (command.ExpectedVersion is { } expected && expected != state.Catalog.Version)
+        {
+            return Decision.Reject(
+                RejectionCodes.ContentVersionChanged,
+                $"The content changed while it was edited: version {state.Catalog.Version} is in force, the pack was made from {expected}.");
+        }
+
+        var errors = Check(command.Pack, state.Rules.Features.Events);
         if (errors.Count > 0)
         {
             return Decision.Reject(RejectionCodes.ContentInvalid, string.Join("; ", errors.Select(e => $"{e.Path}: {e.Message}")));
@@ -210,6 +355,14 @@ public static class ContentPublishing
             ? Decision.Reject(RejectionCodes.ContentUnchanged, "The pack equals the content in force.")
             : Decision.Accept(new ContentPublished(catalog.Version + 1, command.Pack, command.Comment.Trim()));
     }
+
+    // Checked before the pack's contents, so a huge pack costs the queue nothing more
+    private static string? TooLarge(ContentPack pack) =>
+        pack.Objects.Count > MaxObjects ? $"At most {MaxObjects} objects in one pack; it has {pack.Objects.Count}."
+        : pack.Wheels.Count > MaxWheels ? $"At most {MaxWheels} wheels in one pack; it has {pack.Wheels.Count}."
+        : pack.Wheels.FirstOrDefault(w => w?.Entries.Count > MaxWheelEntries) is { } wheel
+            ? $"At most {MaxWheelEntries} entries in a wheel; «{wheel.Id}» has {wheel.Entries.Count}."
+            : null;
 
     internal static SeasonState Apply(SeasonState state, ContentPublished e) =>
         state with { Content = state.Catalog.Publish(e.Pack) with { Version = e.Version } };

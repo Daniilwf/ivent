@@ -94,6 +94,17 @@ internal static class Betting
         return rules.PayoutByHoursPerDay.First(s => s.UpTo is not { } upTo || perDay <= upTo).Multiplier;
     }
 
+    /// <summary>
+    /// The coins a won bet pays: the stake times its multiplier, rounded down and clamped to the coins a player can hold
+    /// (NB-SEC-1, D-651) — a multiplier the ruleset once allowed must not throw inside the target's own completion.
+    /// </summary>
+    public static int Payout(Bet bet)
+    {
+        ArgumentNullException.ThrowIfNull(bet);
+        var multiplier = Math.Clamp(bet.Multiplier, 0m, int.MaxValue);
+        return Saturating.Clamp(Math.Floor(bet.Stake * multiplier));
+    }
+
     /// <summary>The bets settled by <paramref name="e"/> (the state already holds it), with their coins.</summary>
     public static IEnumerable<IGameEvent> Settle(SeasonState state, IGameEvent e)
     {
@@ -109,7 +120,7 @@ internal static class Betting
                     }
 
                     // The frozen first gets no coins (the freeze amendment); the bet still counts as won.
-                    var payout = Finishes.IsFrozen(bettor) ? 0 : (int)Math.Floor(bet.Stake * bet.Multiplier);
+                    var payout = Finishes.IsFrozen(bettor) ? 0 : Payout(bet);
                     yield return new BetSettled(bettor.PlayerId, bet.BetId, BetStatus.Won, payout);
                     if (payout != 0)
                     {

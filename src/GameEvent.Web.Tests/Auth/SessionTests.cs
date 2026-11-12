@@ -44,12 +44,12 @@ public sealed class SessionTests : IAsyncLifetime
         var only = Assert.Single(sessions.EnumerateArray());
         Assert.True(only.GetProperty("current").GetBoolean());
         Assert.Equal("Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/130.0", only.GetProperty("userAgent").GetString());
-        Assert.Equal(_site.Wall.GetUtcNow(), only.GetProperty("createdAt").GetDateTimeOffset());
+        Assert.Equal(_site.Time.GetUtcNow(), only.GetProperty("createdAt").GetDateTimeOffset());
 
         await using var db = _site.NewDb();
         var row = await db.Sessions.SingleAsync(Ct);
         Assert.Equal(_site.Users["vasya"], row.UserId);
-        Assert.Equal(_site.Wall.GetUtcNow().AddDays(30), row.ExpiresAt);
+        Assert.Equal(_site.Time.GetUtcNow().AddDays(30), row.ExpiresAt);
         Assert.Null(row.RevokedAt);
     }
 
@@ -91,7 +91,7 @@ public sealed class SessionTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Unauthorized, (await copy.Client.GetAsync("/api/auth/me", Ct)).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await vasya.Client.GetAsync("/api/auth/me", Ct)).StatusCode);
         await using var db = _site.NewDb();
-        Assert.Equal(_site.Wall.GetUtcNow(), (await db.Sessions.SingleAsync(Ct)).RevokedAt);
+        Assert.Equal(_site.Time.GetUtcNow(), (await db.Sessions.SingleAsync(Ct)).RevokedAt);
     }
 
     [Fact]
@@ -123,12 +123,12 @@ public sealed class SessionTests : IAsyncLifetime
         // SES-2: a script signing in without the cookie would pile up live rows for 30 days each
         var first = await DeviceAsync("vasya");
         var firstId = (await SessionsAsync(first))[0].GetProperty("id").GetGuid();
-        _site.Wall.Advance(TimeSpan.FromSeconds(1));
+        _site.Time.Advance(TimeSpan.FromSeconds(1));
         var devices = new List<Device>();
         for (var i = 0; i < 20; i++)
         {
             devices.Add(await DeviceAsync("vasya"));
-            _site.Wall.Advance(TimeSpan.FromSeconds(1));
+            _site.Time.Advance(TimeSpan.FromSeconds(1));
         }
 
         await using var db = _site.NewDb();
@@ -377,7 +377,7 @@ public sealed class SessionTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         await using var db = _site.NewDb();
-        Assert.All(await db.Sessions.Where(s => s.UserId == vasyaId).ToListAsync(Ct), s => Assert.Equal(_site.Wall.GetUtcNow(), s.RevokedAt));
+        Assert.All(await db.Sessions.Where(s => s.UserId == vasyaId).ToListAsync(Ct), s => Assert.Equal(_site.Time.GetUtcNow(), s.RevokedAt));
         Assert.Equal(0, await SessionCountAsync(admin, vasyaId));
     }
 
@@ -388,7 +388,7 @@ public sealed class SessionTests : IAsyncLifetime
     {
         var vasya = await DeviceAsync("vasya");
 
-        _site.Wall.Advance(TimeSpan.FromDays(30).Add(TimeSpan.FromMinutes(1)));
+        _site.Time.Advance(TimeSpan.FromDays(30).Add(TimeSpan.FromMinutes(1)));
 
         Assert.Equal(HttpStatusCode.Unauthorized, (await vasya.Client.GetAsync("/api/auth/me", Ct)).StatusCode);
     }
@@ -400,7 +400,7 @@ public sealed class SessionTests : IAsyncLifetime
         await using (var db = _site.NewDb())
         {
             var row = await db.Sessions.SingleAsync(Ct);
-            row.ExpiresAt = _site.Wall.GetUtcNow().AddSeconds(-1);
+            row.ExpiresAt = _site.Time.GetUtcNow().AddSeconds(-1);
             await db.SaveChangesAsync(Ct);
         }
 
@@ -423,28 +423,28 @@ public sealed class SessionTests : IAsyncLifetime
     {
         var vasya = await DeviceAsync("vasya");
 
-        _site.Wall.Advance(TimeSpan.FromDays(20));
+        _site.Time.Advance(TimeSpan.FromDays(20));
         Assert.Equal(HttpStatusCode.OK, (await vasya.Client.GetAsync("/api/auth/me", Ct)).StatusCode);
-        _site.Wall.Advance(TimeSpan.FromDays(20));
+        _site.Time.Advance(TimeSpan.FromDays(20));
 
         Assert.Equal(HttpStatusCode.OK, (await vasya.Client.GetAsync("/api/auth/me", Ct)).StatusCode);
         await using var db = _site.NewDb();
-        Assert.Equal(_site.Wall.GetUtcNow().AddDays(30), (await db.Sessions.SingleAsync(Ct)).ExpiresAt);
+        Assert.Equal(_site.Time.GetUtcNow().AddDays(30), (await db.Sessions.SingleAsync(Ct)).ExpiresAt);
     }
 
     [Fact]
     public async Task The_last_visit_is_written_at_most_every_five_minutes()
     {
         var vasya = await DeviceAsync("vasya");
-        var signedInAt = _site.Wall.GetUtcNow();
+        var signedInAt = _site.Time.GetUtcNow();
 
-        _site.Wall.Advance(TimeSpan.FromMinutes(4));
+        _site.Time.Advance(TimeSpan.FromMinutes(4));
         await vasya.Client.GetAsync("/api/auth/me", Ct);
         Assert.Equal(signedInAt, await LastSeenAsync());
 
-        _site.Wall.Advance(TimeSpan.FromMinutes(2));
+        _site.Time.Advance(TimeSpan.FromMinutes(2));
         await vasya.Client.GetAsync("/api/auth/me", Ct);
-        Assert.Equal(_site.Wall.GetUtcNow(), await LastSeenAsync());
+        Assert.Equal(_site.Time.GetUtcNow(), await LastSeenAsync());
 
         async Task<DateTimeOffset> LastSeenAsync()
         {
@@ -459,7 +459,7 @@ public sealed class SessionTests : IAsyncLifetime
         var ended = await DeviceAsync("vasya");
         await ended.Client.PostAsync("/api/auth/logout", null, Ct);
         await DeviceAsync("petya");
-        _site.Wall.Advance(TimeSpan.FromDays(31));
+        _site.Time.Advance(TimeSpan.FromDays(31));
         var live = await DeviceAsync("masha");
 
         await _site.Services.GetServices<Microsoft.Extensions.Hosting.IHostedService>().OfType<DeadlineScheduler>().Single().TickAsync(Ct);

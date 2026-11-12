@@ -166,6 +166,8 @@ public sealed partial class EndpointAuthorizationTests : IAsyncLifetime
         {
             "seasonId" => SiteFactory.SeasonId.ToString(),
             _ when m.Groups["constraint"].Value.Contains("guid", StringComparison.Ordinal) => Guid.NewGuid().ToString(),
+            // A value the route accepts, or routing answers 404 before anyone is asked who is calling
+            _ when m.Groups["constraint"].Value.Contains("int", StringComparison.Ordinal) => "1",
             _ => "x",
         });
         using var request = new HttpRequestMessage(new HttpMethod(endpoint.Method), url);

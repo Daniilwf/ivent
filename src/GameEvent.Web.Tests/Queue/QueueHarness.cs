@@ -152,7 +152,7 @@ internal sealed class TestClock : GameEvent.Infrastructure.Kernel.IAdjustableClo
     public void Reset() => UtcNow = _start;
 }
 
-/// <summary>The wall clock of sessions and their cookie (D-469), moved by the tests apart from the game's clock.</summary>
+/// <summary>The site's wall clock (sessions, their cookie and the device cookie; D-469, D-650): stands still until a test moves it, apart from the game's clock.</summary>
 internal sealed class TestTimeProvider(DateTimeOffset start) : TimeProvider
 {
     private readonly Lock _lock = new();

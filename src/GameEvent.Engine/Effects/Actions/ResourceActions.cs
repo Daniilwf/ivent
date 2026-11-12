@@ -1,4 +1,5 @@
 using GameEvent.Engine.Content;
+using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Scoring;
 
 namespace GameEvent.Engine.Effects.Actions;
@@ -28,11 +29,11 @@ internal sealed class ChangeResourceHandler : ActionHandler<ChangeResourceAction
                 {
                     // The damage goes back to the attacker (D-474)
                     target = run.UserId;
-                    amount *= reflect.Multiplier;
+                    amount = Saturating.Multiply(amount, reflect.Multiplier);
                 }
 
                 var coins = run.State.Players[target].Coins;
-                if (!run.State.Rules.Economy.AllowNegativeCoins && amount < 0 && coins + amount < 0)
+                if (!run.State.Rules.Economy.AllowNegativeCoins && amount < 0 && (long)coins + amount < 0)
                 {
                     amount = -Math.Max(0, coins);
                 }

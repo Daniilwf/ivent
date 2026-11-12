@@ -396,6 +396,7 @@ public partial class PlayerAdminInvariantTests
             "items" => features.Items,
             "shop" => features.Shop,
             "bets" => features.Bets,
+            "events" => features.Events,
             _ => throw new ArgumentOutOfRangeException(nameof(mechanic), mechanic, "Unknown mechanic."),
         };
 
@@ -408,6 +409,9 @@ public partial class PlayerAdminInvariantTests
             // The graph map of stage 2 (D-300…D-308): publications, forks, teleports and cell bonuses
             MapPublished or BranchChoiceRequested or PlayerMoved { Paused: true } or PlayerMoved { Reason: MoveReason.Teleport }
                 or PointsChanged { Reason: PointsReason.CellBonus } => "graphMap",
+
+            // Events of stage 5 (D-500…): draws from decks and the events played by hand
+            Engine.Decks.EventDrawn or Engine.Decks.EventDrawMissed or ManualEffectCreated { Source: ManualEffectSource.Event } => "events",
 
             // The economy of stage 4 (D-400…): items and their effects, the shop, bets — each under its flag
             Engine.Content.ContentPublished or Engine.Inventory.ObjectGiven or Engine.Inventory.ObjectRemoved or Engine.Inventory.ObjectTransferred

@@ -100,6 +100,7 @@ public static class AdminAccountEndpoints
         GameEventDbContext db,
         Passwords passwords,
         LoginThrottle throttle,
+        LoginDevices devices,
         ILoggerFactory loggers,
         CommandBus bus,
         TimeProvider time,
@@ -123,9 +124,11 @@ public static class AdminAccountEndpoints
             return Repeat();
         }
 
-        // The current password is guessed like a sign-in: the same limits per login and address, the same log (D-67)
+        // The current password is guessed like a sign-in: the same limit per login and address, the same log (D-67). A live
+        // session is a stronger proof than the device cookie, so a guess spread over other addresses does not hold the change
+        // by the per-login ceiling, the forced one after a reset included (SEC-5, D-650)
         var address = WebSecurity.ClientKey(http.Connection.RemoteIpAddress);
-        if (!throttle.TryBegin(user.NormalizedLogin, address))
+        if (!throttle.TryBegin(user.NormalizedLogin, address, knownDevice: true))
         {
             return TypedResults.Problem(statusCode: StatusCodes.Status429TooManyRequests, title: "Too many attempts.");
         }
@@ -144,11 +147,16 @@ public static class AdminAccountEndpoints
         var current = principal.SessionId();
         var result = await SendAsync(request.CommandId, userId, id => new ChangeOwnPassword(id, request.NewPassword, user.SecurityStamp, current), principal, db, bus, time, ct);
 
-        // The new security stamp ends every other session; this one goes on with the new stamp (D-67, D-467)
-        if (result.Result is Ok<AccountActionResponse> && current is { } session)
+        // The new security stamp ends every other session (SessionsEnded); this one goes on with the new stamp (D-67, D-467),
+        // and this browser stays known with it (SEC-6, D-650)
+        if (result.Result is Ok<AccountActionResponse>)
         {
             var fresh = await db.Users.AsNoTracking().SingleAsync(u => u.Id == userId, ct);
-            await AccountEndpoints.SignInAsync(http, fresh, session);
+            devices.Remember(http, fresh);
+            if (current is { } session)
+            {
+                await AccountEndpoints.SignInAsync(http, fresh, session);
+            }
         }
 
         return result;

@@ -30,7 +30,7 @@ public readonly struct ResourceBag : IEquatable<ResourceBag>, IEnumerable<KeyVal
 
     public ResourceBag Add(string resource, int delta)
     {
-        var amount = this[resource] + delta;
+        var amount = Saturating.Add(this[resource], delta);
         return new(amount == 0 ? Amounts.Remove(resource) : Amounts.SetItem(resource, amount));
     }
 

@@ -1,5 +1,4 @@
 using System.Globalization;
-using GameEvent.Engine.Kernel;
 using GameEvent.Infrastructure.Accounts;
 using Microsoft.AspNetCore.DataProtection;
 
@@ -10,10 +9,11 @@ namespace GameEvent.Web.Accounts;
 /// account it signed in to — its id, its security stamp at that moment and when the note runs out. A browser with a note
 /// that still matches the account is not held by the per-login ceiling of <see cref="LoginThrottle"/>, so a guess spread
 /// over other addresses cannot lock the owner out; its own address limit still holds it. The note opens nothing by itself.
+/// Its lifetime runs by wall time (<see cref="TimeProvider"/>) like the session's, not by the game clock (SEC-7, D-650).
 /// It ends with the password: a password change or reset, a role change or a deletion rotate the stamp, and a login
 /// deleted and given to someone else is another account, so a browser that got in with an old password is a stranger again.
 /// </summary>
-public sealed class LoginDevices(IDataProtectionProvider protection, IClock clock, string cookieName, CookieSecurePolicy securePolicy)
+public sealed class LoginDevices(IDataProtectionProvider protection, TimeProvider time, string cookieName, CookieSecurePolicy securePolicy)
 {
     /// <summary>A year: a phone that signs in a few times a season stays known. Every sign-in renews it.</summary>
     public static readonly TimeSpan Lifetime = TimeSpan.FromDays(365);
@@ -46,7 +46,7 @@ public sealed class LoginDevices(IDataProtectionProvider protection, IClock cloc
         return parts.Length == 3
             && Guid.TryParseExact(parts[0], "N", out var id) && id == user.Id
             && long.TryParse(parts[1], NumberStyles.None, CultureInfo.InvariantCulture, out var expires)
-            && clock.UtcNow.ToUnixTimeSeconds() < expires
+            && time.GetUtcNow().ToUnixTimeSeconds() < expires
             && string.Equals(parts[2], user.SecurityStamp, StringComparison.Ordinal);
     }
 
@@ -55,7 +55,7 @@ public sealed class LoginDevices(IDataProtectionProvider protection, IClock cloc
     {
         ArgumentNullException.ThrowIfNull(http);
         ArgumentNullException.ThrowIfNull(user);
-        var expires = clock.UtcNow.Add(Lifetime).ToUnixTimeSeconds();
+        var expires = time.GetUtcNow().Add(Lifetime).ToUnixTimeSeconds();
         var note = string.Create(CultureInfo.InvariantCulture, $"{user.Id:N}|{expires}|{user.SecurityStamp}");
         http.Response.Cookies.Append(cookieName, _protector.Protect(note), new CookieOptions
         {

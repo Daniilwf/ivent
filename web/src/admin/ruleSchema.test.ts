@@ -105,3 +105,49 @@ describe('The ruleset schema check on the real files', () => {
     ]);
   });
 });
+
+// EE3 (D-494): the content schema's part — a variant per base action by `type`, constants, patterns, `true`
+describe('The content schema check', () => {
+  const action: JsonSchema = {
+    type: 'object',
+    required: ['type'],
+    anyOf: [
+      {
+        properties: {
+          type: { const: 'move' },
+          steps: { type: ['integer', 'string'], pattern: '^-?\\$[a-z]+$' },
+        },
+        required: ['steps'],
+        additionalProperties: false,
+      },
+      {
+        properties: { type: { const: 'roll' }, dice: { type: 'string' }, extra: true },
+        required: ['dice'],
+        additionalProperties: false,
+      },
+    ],
+  };
+
+  it('checks an action against its own variant only', () => {
+    expect(checkSchema({ type: 'move', steps: 2 }, action)).toEqual([]);
+    expect(checkSchema({ type: 'roll', dice: '1d6', extra: { any: 'thing' } }, action)).toEqual([]);
+    expect(checkSchema({ type: 'roll', steps: 2 }, action)).toEqual([
+      { kind: 'required', path: 'dice' },
+      { kind: 'unknown', path: 'steps' },
+    ]);
+  });
+
+  it('names a missing or unknown type with the types there are', () => {
+    expect(checkSchema({ steps: 1 }, action)).toEqual([{ kind: 'required', path: 'type' }]);
+    expect(checkSchema({ type: 'explode' }, action, 'actions[0]')).toEqual([
+      { kind: 'enum', path: 'actions[0].type', values: ['move', 'roll'] },
+    ]);
+  });
+
+  it('says a text that is not of the pattern', () => {
+    expect(checkSchema({ type: 'move', steps: '$roll' }, action)).toEqual([]);
+    expect(checkSchema({ type: 'move', steps: 'сто' }, action)).toEqual([
+      { kind: 'pattern', path: 'steps' },
+    ]);
+  });
+});
