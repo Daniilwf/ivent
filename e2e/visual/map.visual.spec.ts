@@ -139,6 +139,7 @@ for (const section of [
   'inventory',
   'feed',
   'profile',
+  'sessions',
   'game',
   'pool',
   'rules',

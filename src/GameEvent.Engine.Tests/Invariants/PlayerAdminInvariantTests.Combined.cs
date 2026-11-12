@@ -442,6 +442,7 @@ public partial class PlayerAdminInvariantTests
                 // Accounts (D8, D-106) and stored files (D4a, D-108) are the site's, not a season mechanic
                 or Accounts.AccountCreated or Accounts.AccountPasswordReset or Accounts.AccountPasswordChanged
                 or Accounts.AccountChanged or Accounts.AccountDeleted or Accounts.AccountRestored or Accounts.AccountAvatarChanged
+                or Accounts.SessionStarted or Accounts.SessionsEnded
 
                 // The pool lives across seasons (D-119)
                 or GameAdded or GameChanged or GameDeleted or GameRestored or CategorySet or CategoryRemoved

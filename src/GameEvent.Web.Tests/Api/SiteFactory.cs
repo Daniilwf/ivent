@@ -81,10 +81,11 @@ internal sealed class SiteFactory : WebApplicationFactory<Program>
     public TestClock Clock { get; } = new(new DateTimeOffset(2026, 10, 1, 12, 0, 0, TimeSpan.Zero).AddTicks(7_654_321));
 
     /// <summary>
-    /// The site's wall clock (<see cref="TimeProvider"/>): sessions and the device cookie run by it, not by the game clock
-    /// (D-650). Real time plus what a test moved it by, so cookies the test client keeps do not look stale to it.
+    /// The site's wall clock (<see cref="TimeProvider"/>): sessions and the device cookie run by it, not by the game's
+    /// <see cref="Clock"/> (D-469, D-650). It stands still unless a test moves it, so a test can compare stored times.
     /// </summary>
-    public TestTimeProvider Time { get; } = new();
+    /// <remarks>Starts at the real time: the test client's cookie jar drops a cookie whose expiry is in the real past.</remarks>
+    public TestTimeProvider Time { get; } = new(DateTimeOffset.UtcNow);
 
     public Dictionary<string, Guid> Users { get; } = [];
 
@@ -234,18 +235,4 @@ internal sealed class SiteFactory : WebApplicationFactory<Program>
             throw new InvalidOperationException($"Seed {command} rejected: {outcome.Rejection}");
         }
     }
-}
-
-/// <summary>Real time moved forward by <see cref="Advance"/>; tests move it to see sessions and device cookies run out.</summary>
-internal sealed class TestTimeProvider : TimeProvider
-{
-    private long _advanceTicks;
-
-    public TimeSpan Advance
-    {
-        get => TimeSpan.FromTicks(Interlocked.Read(ref _advanceTicks));
-        set => Interlocked.Exchange(ref _advanceTicks, value.Ticks);
-    }
-
-    public override DateTimeOffset GetUtcNow() => System.GetUtcNow() + Advance;
 }

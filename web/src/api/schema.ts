@@ -173,6 +173,146 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auth/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SessionView"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/sessions/{sessionId}/end": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    sessionId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["EndSessionsRequest"];
+                };
+            };
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/sessions/end-others": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["EndSessionsRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["EndedSessions"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/seasons/{seasonId}": {
         parameters: {
             query?: never;
@@ -5438,6 +5578,92 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/accounts/{userId}/end-sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    userId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["AccountActionRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AccountActionResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/accounts/{userId}/restore": {
         parameters: {
             query?: never;
@@ -6973,7 +7199,7 @@ export interface components {
             account: components["schemas"]["AccountView"];
             temporaryPassword: null | string;
         };
-        /** @description An account as the admin sees it (D-106). */
+        /** @description An account as the admin sees it (D-106); `sessions` — how many devices it is signed in on (D-466). */
         AccountView: {
             /** Format: uuid */
             id: string;
@@ -6984,6 +7210,8 @@ export interface components {
             isDeleted: boolean;
             /** Format: date-time */
             createdAt: string;
+            /** Format: int32 */
+            sessions: number;
         };
         /**
          * @description The admin adds an account with the player role to the season (SE4): by default on the start with zero points and
@@ -7651,6 +7879,16 @@ export interface components {
         };
         /** @enum {unknown} */
         EmptyPoolFallback: "dropZoneFilter";
+        /** @description How many sessions a request ended. */
+        EndedSessions: {
+            /** Format: int32 */
+            ended: number;
+        };
+        /** @description Ends one session or the others: the command id makes a repeated click the same request. */
+        EndSessionsRequest: {
+            /** Format: uuid */
+            commandId: string;
+        };
         /**
          * @description Immutable list with value equality, so records holding lists (events, snapshots) compare by content.
          *     Serialized as a plain JSON array.
@@ -8822,6 +9060,20 @@ export interface components {
             mapMode: components["schemas"]["MapMode"];
             background?: null | components["schemas"]["MapBackgroundView"];
             economy?: null | components["schemas"]["EconomyFeaturesView"];
+        };
+        /**
+         * @description A live session of the signed-in user (D-466): `userAgent` — the browser's own description at the sign-in, which
+         *     the page turns into a device's name; `current` — the session of this request.
+         */
+        SessionView: {
+            /** Format: uuid */
+            id: string;
+            userAgent: null | string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            lastSeenAt: string;
+            current: boolean;
         };
         ShopLotView: {
             /** Format: int32 */

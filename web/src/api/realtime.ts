@@ -4,7 +4,7 @@ import {
   LogLevel,
   type HubConnection,
 } from '@microsoft/signalr';
-import type { Schemas } from './client';
+import { api, type Schemas } from './client';
 import { registerConnection } from './connection';
 
 export type SeasonUpdate = Schemas['SeasonUpdate'];
@@ -12,6 +12,16 @@ export type SeasonJoin = Schemas['SeasonJoin'];
 export type PoolUpdate = Schemas['PoolUpdate'];
 
 const retryDelayMs = 5000;
+
+/**
+ * A lost connection may be an ended session (D-466): the server closes its connections and refuses it again. One look
+ * at the account tells: its 401 signs the page out (SIGNED_OUT_EVENT); any other answer leaves the retries to go on.
+ */
+function checkSession() {
+  api.GET('/api/auth/me').catch(() => {
+    // Offline: the retries go on
+  });
+}
 
 function connect(): HubConnection {
   return new HubConnectionBuilder()
@@ -43,6 +53,7 @@ function keepConnected(
         return;
       } catch {
         report('offline');
+        checkSession();
         await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
       }
     }
@@ -50,6 +61,7 @@ function keepConnected(
 
   connection.onreconnecting(() => {
     report('offline');
+    checkSession();
   });
   connection.onreconnected(() => {
     report('online');

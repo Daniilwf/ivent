@@ -140,6 +140,10 @@ public static class AppSetup
         services.AddSingleton<Passwords>();
         services.AddSingleton<IPasswords>(sp => sp.GetRequiredService<Passwords>());
         services.AddSingleton<LoginThrottle>();
+        services.AddSingleton<SessionTouches>();
+
+        // Sessions, their cookie and the device cookie keep the wall clock; the game's IClock may be moved on the test
+        // copy (D-469, D-650)
         services.TryAddSingleton(TimeProvider.System);
         services.AddSingleton(sp => new LoginDevices(sp.GetRequiredService<IDataProtectionProvider>(), sp.GetRequiredService<TimeProvider>(), cookiePrefix + "ge.device", securePolicy));
         services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
@@ -150,7 +154,7 @@ public static class AppSetup
                 o.Cookie.SameSite = SameSiteMode.Strict;
                 o.Cookie.SecurePolicy = securePolicy;
                 o.Cookie.Path = "/";
-                o.ExpireTimeSpan = TimeSpan.FromDays(30);
+                o.ExpireTimeSpan = Infrastructure.Accounts.SessionRules.Lifetime;
                 o.SlidingExpiration = true;
                 o.Events.OnValidatePrincipal = WebSecurity.ValidateSessionAsync;
                 // An API answers with status codes, never redirects to a login page.
@@ -238,6 +242,7 @@ public static class AppSetup
 
         var api = app.MapGroup("/api").AddEndpointFilter<Csrf.Filter>();
         api.MapAccounts();
+        api.MapSessions();
         api.MapSeasons();
         api.MapRules();
         api.MapPoolStats();
