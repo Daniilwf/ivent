@@ -210,6 +210,33 @@ public sealed class RulesApiTests : IAsyncLifetime
         Assert.Equal(1, (await admin.GetFromJsonAsync<RulesView>(Rules, s_json, Ct))!.Version);
     }
 
+    [Theory]
+    [InlineData("economy.shop.rerollCostStep", -5)]
+    [InlineData("economy.shop.lotLifetimeMinutes", 2_000_000_000)]
+    [InlineData("bets.maxStake", 0)]
+    public async Task A_number_out_of_its_safe_range_is_refused_at_its_path(string path, int value)
+    {
+        // NB-SEC-1 (D-651): a negative step made a shop roll pay coins, a huge lifetime threw inside the player's command
+        var admin = await _site.SignedInAsync("admin");
+        var parts = path.Split('.');
+
+        var response = await PutAsync(admin, DefaultWith(r =>
+        {
+            JsonNode node = r;
+            foreach (var part in parts[..^1])
+            {
+                node = node[part]!;
+            }
+
+            node[parts[^1]] = value;
+        }).ToJsonString());
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var problem = await response.Content.ReadFromJsonAsync<RulesetProblem>(s_json, Ct);
+        Assert.Contains(problem!.Errors, e => e.Path == path);
+        Assert.Equal(1, (await admin.GetFromJsonAsync<RulesView>(Rules, s_json, Ct))!.Version);
+    }
+
     [Fact]
     public async Task Same_rules_again_are_a_conflict_not_a_new_version()
     {

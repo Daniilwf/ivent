@@ -1,7 +1,10 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using GameEvent.Engine.Content;
 using GameEvent.Engine.Kernel;
+using GameEvent.Engine.Rulesets;
+using GameEvent.Infrastructure.EventLog;
 using GameEvent.Web.Seasons;
 
 namespace GameEvent.Web.Tests.Api;
@@ -80,6 +83,41 @@ public sealed class FeedVisibilityTests : IAsyncLifetime
         Assert.Equal(["commandId", "comment"], others.EnumerateObject().Select(p => p.Name));
         Assert.Equal((roll, "Сбой колеса"), (others.GetProperty("commandId").GetGuid(), others.GetProperty("comment").GetString()));
         Assert.True(admins.TryGetProperty("players", out _));
+    }
+
+    [Fact]
+    public async Task Others_see_a_content_publications_version_comment_and_size_not_the_pack()
+    {
+        // NB-SEC-3 (D-653): the pack holds every effect and unpublished price; only the admin reads it in the feed
+        await using (var db = _site.NewDb())
+        {
+            var (state, _) = await EventLogReader.ReplaySeasonAsync(db, SiteFactory.SeasonId, Ct);
+            await _site.SendAsync(new ChangeRuleset(state.Rules with { Features = state.Rules.Features with { Items = true } }));
+        }
+
+        var item = new ObjectDefinition
+        {
+            Id = "secret-orange",
+            Kind = ObjectKind.Item,
+            Name = "Тайный апельсин",
+            Description = "Предмет для теста.",
+            Rarity = Rarity.Common,
+            Price = 10,
+            Window = UseWindow.Anytime,
+            Stackable = true,
+            Effect = new EffectSpec { Target = new TargetSpec { Selector = TargetSelector.Self }, Actions = [new MoveAction { Steps = ContentValue.Of(1) }] },
+        };
+        await _site.SendAsync(new PublishContent(new ContentPack { Objects = [item] }, "Новый контент"));
+
+        var admin = Of(await EntriesAsync(await _site.SignedInAsync("admin")), "content-published");
+        foreach (var viewer in new[] { "petya", "zritel" })
+        {
+            var seen = Of(await EntriesAsync(await _site.SignedInAsync(viewer)), "content-published");
+            Assert.Equal(["version", "comment", "objectCount"], seen.EnumerateObject().Select(p => p.Name));
+            Assert.Equal((1, "Новый контент", 1), (seen.GetProperty("version").GetInt32(), seen.GetProperty("comment").GetString(), seen.GetProperty("objectCount").GetInt32()));
+        }
+
+        Assert.Equal("secret-orange", admin.GetProperty("pack").GetProperty("objects")[0].GetProperty("id").GetString());
     }
 
     [Fact]

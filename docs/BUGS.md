@@ -16,6 +16,7 @@
 ## Исправленные
 
 ### AU4-1. Счётчик, сработавший через `addCounter`, срабатывал снова без конца и ронял процесс
+### CE-SEC-1. Пакет контента с null в списке объектов или колёс давал 500
 
 - **Найдено:** аудит правил этапа 4 (2026-11-11).
 - **Шаги:** эффект со счётчиком 1, триггером `runEnded`, `untilTriggered` и действием `transformObject addCounter -1` с `filter.hasCounter` (проходит `ContentValidator`); игрок завершает прохождение.
@@ -123,6 +124,7 @@
 - **Тест:** `src/GameEvent.Engine.Tests/Economy/ContentPackTests.cs` («A_null_in_the_objects_or_the_wheels_is_named_at_its_place_and_the_rest_is_still_checked»), `src/GameEvent.Web.Tests/Api/AdminContentApiTests.cs` («A_null_in_a_list_of_the_pack_is_a_problem_at_its_place_not_a_500»).
 - **Исправление:** `ContentPublishing.Check` первым делом называет каждый null в `$.objects[i]` и `$.wheels[i]` («A list item is an object, not null.») и дальше его пропускает; API ещё до чтения называет null в любом списке пакета (`wheels[0].entries[0]`, `objects[0].effect.actions[0]` — те же 500 глубже). Исправлено.
 ### SEC-2. Ошибки чтения пакета контента показывали имена типов .NET
+### CE-SEC-2. Ошибки чтения пакета контента показывали имена типов .NET
 - **Найдено:** ревью безопасности редактора контента (2026-11-11, ветка `feat/effect-editor`).
 - **Шаги:** админ проверяет пакет с колесом без `name`, с лишним полем `colour` или ценой `"ten"`.
 - **Ожидалось:** сообщение своими словами: нет поля, неизвестное поле, не тот тип.
@@ -140,6 +142,36 @@
 - **Важность:** средняя — защита пассивная и не должна раскрываться отказом.
 - **Тест:** `src/GameEvent.Engine.Tests/Economy/ImportedItems/BaseFormatItemsTests.cs` («An_effect_rat_steals_the_chosen_effect»).
 - **Исправление:** перехват забирает ответы, данные для этой цели (`EffectRun.Run`).
+### NB-SEC-1. Числа магазина и ставок в правилах сезона не имели границ
+
+- **Найдено:** аудит безопасности 2026-11 (чтение `RulesetValidator`: у экономики проверялись только веса редкостей, у ставок — только ступени выплат).
+- **Шаги:** админ сохраняет правила с `economy.shop.rerollCostStep: -5` (или `bets.deadlineOptionsDays: [0]`, огромным `lotLifetimeMinutes`, множителем выплаты `1e20`, весами по 2 000 000 000), игрок крутит магазин или ставит, цель ставки проходит игру.
+- **Ожидалось:** правила с такими числами не сохраняются, ошибка у поля.
+- **Получилось:** правила принимались. Ролл магазина после первого платил игроку монетки (цена `rollCost + step × n` уходила в минус, `CoinsChanged` с плюсом); ставка на 0 дней — `DivideByZeroException`; огромный срок лотов — `ArgumentOutOfRangeException` в `AddMinutes`; огромный множитель — `OverflowException` при выплате внутри `CompleteRun` цели (прохождение чужой игры падало); сумма весов переполнялась.
+- **Важность:** средняя — нужен админ, но одна опечатка ломала чужие команды или раздавала монетки.
+- **Тест:** `src/GameEvent.Engine.Tests/Rulesets/RulesetValidatorTests.cs` (каждое поле: −1, 0, за потолком, на краях), `src/GameEvent.Engine.Tests/Economy/NumberBoundsTests.cs` (цена ролла и выплата зажаты), `src/GameEvent.Web.Tests/Api/RulesApiTests.cs` («A_number_out_of_its_safe_range_is_refused_at_its_path»).
+- **Исправление:** границы полей экономики, ставок, отражения и весов в `RulesetValidator`; цена ролла считается в `long` и зажимается в [0, int.MaxValue], выплата — в `decimal` с зажимом (D-651). **Исправлено.**
+
+### NB-SEC-2. Числа контента могли переполнить очки и монетки
+
+- **Найдено:** аудит безопасности 2026-11 (чтение `ContentValidator` и `PointsLedger`).
+- **Шаги:** опубликовать предмет с `changeResource.amount: -2000000000` и `reflect: true` (или `modifyDice` со `multiply: 1000000`, ценой 2 000 000 000, зоной с `shopPriceMultiplier: 1000`), использовать его.
+- **Ожидалось:** пакет с такими числами не публикуется; счёт не меняет знак ни при каких числах.
+- **Получилось:** пакет принимался; отражение умножало сумму без проверки, `Coins + Delta` в журнале переполнялось — у должника становилось +2 млрд.
+- **Важность:** средняя — нужен админ; переполнение молча меняло счёт.
+- **Тест:** `src/GameEvent.Engine.Tests/Content/ContentValidatorTests.cs` (каждое поле на шаг за потолком), `src/GameEvent.Engine.Tests/Economy/NumberBoundsTests.cs` («A_reflected_hit_at_the_cap_goes_back_whole_and_keeps_its_sign», «The_ledger_stops_at_the_ends_of_a_number_instead_of_changing_sign»).
+- **Исправление:** потолки `modifyDice` (count/reroll ≤ 20 кубов, sides ≤ 100, multiply ≤ 10, add ±1000), `changeResource.amount` ±1 000 000, цена ≤ 1 000 000, множитель цен зоны ≤ 10; журнал очков, монеток и ресурсов и умножение отражения насыщаются на краях `int` (`Saturating`, D-652). **Исправлено.**
+
+### NB-SEC-3. Лента показывала всем пакет контента целиком
+
+- **Найдено:** аудит безопасности 2026-11 (`FeedVisibility`: `content-published` публичный).
+- **Шаги:** админ публикует контент; игрок или зритель открывает ленту.
+- **Ожидалось:** всем видно, что вышла новая версия контента и зачем; сам пакет (все эффекты, цены, предметы не в продаже) — админу.
+- **Получилось:** каждый вошедший получал весь пакет в ленте; пакет не имел предела размера — тысячи объектов раздували каждую страницу ленты.
+- **Важность:** низкая — утечка контента до выхода и лишний трафик.
+- **Тест:** `src/GameEvent.Web.Tests/Api/FeedVisibilityTests.cs` («Others_see_a_content_publications_version_comment_and_size_not_the_pack»), `src/GameEvent.Engine.Tests/Economy/ContentPackTests.cs` («A_pack_over_the_size_limits_is_refused_before_it_is_checked»).
+- **Исправление:** не-админ видит `version`, `comment` и `objectCount`; пакет — не больше 1000 объектов, 100 колёс и 200 записей в колесе, иначе `content.tooLarge` (D-653). **Исправлено.**
+
 ### Q-1. Мутационный счёт движка 100% не проверял ни одного мутанта
 
 - **Найдено:** разбор ночного прогона Stryker 2026-10-04 (поток качества, 2026-11-10).

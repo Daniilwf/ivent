@@ -20,6 +20,12 @@ public enum ManualEffectSource
     /// or its <c>drawEvent</c> while <c>features.events</c> is off (D-10).
     /// </summary>
     Item,
+
+    /// <summary>
+    /// A drawn event played by hand (stage 5): its text without automation (<see cref="PendingManualEffect.ObjectId"/>,
+    /// D-410), or a deck with nothing to draw — «draw an event of this kind» (<c>event-draw-missed</c>, D-501).
+    /// </summary>
+    Event,
 }
 
 /// <summary>

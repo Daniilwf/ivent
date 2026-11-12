@@ -76,8 +76,8 @@ internal static class EffectChain
             return ([], state);
         }
 
-        // The effects of items and cells (D-412) react first, then any handlers of the context (tests, D-24).
-        IReadOnlyList<ITriggerHandler> handlers = [EffectTriggers.Instance, .. context.Triggers ?? []];
+        // Event cells (D-502) and the effects of items and cells (D-412) react first, then any handlers of the context (tests, D-24).
+        IReadOnlyList<ITriggerHandler> handlers = [Decks.EventCells.Instance, EffectTriggers.Instance, .. context.Triggers ?? []];
         var limits = ChainLimits.Of(state);
 
         var written = new List<IGameEvent>();
@@ -92,7 +92,10 @@ internal static class EffectChain
                 {
                     var reactions = handler is IFiringTriggerHandler firings
                         ? firings.ReactInFirings(state, trigger, context, depth, total)
-                        : handler.React(state, trigger, context).Select(e => (IReadOnlyList<IGameEvent>)[e]);
+                        : handler is Decks.EventCells
+                            // A drawn event and what it plays are one firing: cut whole or written whole (D-488)
+                            ? handler.React(state, trigger, context).ToList() is { Count: > 0 } drawn ? [drawn] : []
+                            : handler.React(state, trigger, context).Select(e => (IReadOnlyList<IGameEvent>)[e]);
                     foreach (var reaction in reactions)
                     {
                         if (limits.Cut(depth, total, reaction.Count) is { } cut)

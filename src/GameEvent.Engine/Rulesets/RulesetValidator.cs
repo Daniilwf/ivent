@@ -21,6 +21,13 @@ public static class RulesetValidator
     private const int MaxSides = 1_000;
     private const int MaxChoiceCount = 20;
     private const int MaxCoins = 1_000_000;
+    private const int MaxLotsPerRoll = 10;
+    private const int MaxLotLifetimeMinutes = 7 * 24 * 60;
+    private const int MaxInventoryLimit = 100;
+    private const int MaxBetDeadlineDays = 365;
+    private const int MaxWeight = 1_000_000;
+    private const decimal MaxPayoutMultiplier = 100;
+    private const int MaxReflectMultiplier = 10;
 
     public static IReadOnlyList<RulesetError> Validate(Ruleset ruleset)
     {
@@ -81,10 +88,19 @@ public static class RulesetValidator
 
         NotNegative("finish.bonusAfterList", ruleset.Finish.BonusAfterList);
 
-        var weights = ruleset.Economy.RarityWeights;
-        NotNegative("economy.rarityWeights.common", weights.Common);
-        NotNegative("economy.rarityWeights.epic", weights.Epic);
-        NotNegative("economy.rarityWeights.legendary", weights.Legendary);
+        var economy = ruleset.Economy;
+        var weights = economy.RarityWeights;
+        foreach (var (name, weight) in new[] { ("common", weights.Common), ("epic", weights.Epic), ("legendary", weights.Legendary) })
+        {
+            Within($"economy.rarityWeights.{name}", weight, 0, MaxWeight);
+        }
+
+        // NB-SEC-1: a negative step made a shop roll pay coins, a huge lifetime threw in AddMinutes (D-651)
+        Within("economy.inventoryLimit", economy.InventoryLimit, 0, MaxInventoryLimit);
+        Within("economy.shop.rollCost", economy.Shop.RollCost, 0, MaxCoins);
+        Within("economy.shop.rerollCostStep", economy.Shop.RerollCostStep, 0, MaxCoins);
+        Within("economy.shop.lotsPerRoll", economy.Shop.LotsPerRoll, 1, MaxLotsPerRoll);
+        Within("economy.shop.lotLifetimeMinutes", economy.Shop.LotLifetimeMinutes, 1, MaxLotLifetimeMinutes);
 
         if (ruleset.Roll.ChoiceCount < 1)
         {
@@ -128,6 +144,26 @@ public static class RulesetValidator
         if (ruleset.Effects.Reflect is { Multiplier: < 1 })
         {
             Error("effects.reflect.multiplier", "must be at least 1");
+        }
+
+        if (ruleset.Effects.Reflect is { } reflect)
+        {
+            AtMost("effects.reflect.multiplier", reflect.Multiplier, MaxReflectMultiplier);
+        }
+
+        if (ruleset.Features.Events && ruleset.Events is null)
+        {
+            Error("events", "is required when features.events is on");
+        }
+
+        // Special and risky events are drawn from decks: without events they could not even be played by hand (D-530)
+        var difficulties = ruleset.Reward.DieByDifficulty;
+        foreach (var (name, rule) in new[] { ("easy", difficulties.Easy), ("normal", difficulties.Normal), ("hard", difficulties.Hard), ("extreme", difficulties.Extreme) })
+        {
+            if (!ruleset.Features.Events && rule.GrantEvent is EventKind.Special or EventKind.Risky)
+            {
+                Error($"reward.dieByDifficulty.{name}.grantEvent", "special and risky events need features.events");
+            }
         }
 
         if (ruleset.Effects.MaxEventsPerCommand < 1)
@@ -186,7 +222,29 @@ public static class RulesetValidator
             Error("social.reactions", "must be a non-empty list without repeats");
         }
 
-        PayoutSteps(ruleset.Bets.PayoutByHoursPerDay);
+        var bets = ruleset.Bets;
+        PayoutSteps(bets.PayoutByHoursPerDay);
+        Within("bets.maxStake", bets.MaxStake, 1, MaxCoins);
+        NotNegative("bets.windowHoursAfterRoll", bets.WindowHoursAfterRoll);
+        NotNegative("bets.maxOpenBetsPerPlayer", bets.MaxOpenBetsPerPlayer);
+        var days = bets.DeadlineOptionsDays;
+        if (days.Count == 0 || days.Distinct().Count() != days.Count)
+        {
+            Error("bets.deadlineOptionsDays", "must be a non-empty list without repeats");
+        }
+
+        for (var i = 0; i < days.Count; i++)
+        {
+            Within($"bets.deadlineOptionsDays[{i}]", days[i], 1, MaxBetDeadlineDays);
+        }
+
+        for (var i = 0; i < bets.PayoutByHoursPerDay.Count; i++)
+        {
+            if (bets.PayoutByHoursPerDay[i].Multiplier > MaxPayoutMultiplier)
+            {
+                Error($"bets.payoutByHoursPerDay[{i}].multiplier", $"must be at most {MaxPayoutMultiplier}");
+            }
+        }
 
         var steps = ruleset.Roll.LastDaysLengthFilter.Steps;
         for (var i = 0; i < steps.Count; i++)
@@ -218,6 +276,14 @@ public static class RulesetValidator
             if (value > ceiling)
             {
                 Error(path, $"must be at most {ceiling}");
+            }
+        }
+
+        void Within(string path, int value, int floor, int ceiling)
+        {
+            if (value < floor || value > ceiling)
+            {
+                Error(path, $"must be {floor}–{ceiling}");
             }
         }
 

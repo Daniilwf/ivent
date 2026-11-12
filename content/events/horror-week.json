@@ -1,0 +1,13 @@
+{
+  "id": "horror-week",
+  "kind": "event",
+  "name": "Хоррор-неделя",
+  "description": "Следующая игра будет хоррором.",
+  "rarity": "common",
+  "price": null,
+  "hostile": false,
+  "effect": {
+    "target": { "selector": "self" },
+    "actions": [{ "type": "giveObject", "objectId": "forced-genre", "params": { "tag": "Horror" } }]
+  }
+}
