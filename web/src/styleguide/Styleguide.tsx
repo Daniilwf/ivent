@@ -22,7 +22,7 @@ import { demoBoard } from '../board/demoBoard';
 import { ru } from '../i18n/ru';
 import { Summary } from '../ui/Disclosure';
 import { Button, IconButton, type ButtonVariant } from '../ui/Button';
-import { BottomSheet, ConfirmDanger, FormDialog } from '../ui/Dialogs';
+import { BottomSheet, Confirm, ConfirmDanger, FormDialog } from '../ui/Dialogs';
 import { ChoiceGroup, Field, FilePicker, Select } from '../ui/Field';
 import { Badge, Chip, CountBadge, Tag } from '../ui/Marks';
 import { RouteProgress, Skeleton } from '../ui/Progress';
@@ -660,6 +660,13 @@ export function Styleguide() {
             title={ru.board.dropTitle(run.title)}
             consequences={dropConsequences}
             confirm={ru.board.dropConfirm}
+            onConfirm={() => undefined}
+          />
+          <Confirm
+            trigger={<Button>{ru.turn.alreadyPlayed}</Button>}
+            title={ru.turn.alreadyPlayedTitle(run.title)}
+            consequences={ru.turn.alreadyPlayedConsequences}
+            confirm={ru.turn.alreadyPlayedYes}
             onConfirm={() => undefined}
           />
           <BottomSheet

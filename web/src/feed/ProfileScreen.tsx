@@ -7,7 +7,8 @@ import { moscowDay } from '../app/time';
 import { userToken } from '../design/players';
 import { NotFound } from '../app/NotFound';
 import { ru } from '../i18n/ru';
-import { inlineLink } from '../ui/buttonStyles';
+import { cx } from '../ui/cx';
+import { standaloneLink } from '../ui/buttonStyles';
 import { AsyncState } from '../ui/AsyncState';
 import { Badge, Chip, Tag } from '../ui/Marks';
 import { Skeleton } from '../ui/Progress';
@@ -123,7 +124,7 @@ export function ProfileDetails({
               >
                 <Link
                   to={paths.feed(season.seasonId)}
-                  className={`inline-flex min-h-11 items-center font-medium wrap-anywhere ${inlineLink}`}
+                  className={cx(standaloneLink, 'font-medium wrap-anywhere')}
                 >
                   {season.seasonName}
                 </Link>
@@ -156,7 +157,7 @@ export function ProfileDetails({
                 <div className="flex flex-wrap items-baseline justify-between gap-x-3">
                   <Link
                     to={paths.game(review.gameId)}
-                    className={`inline-flex min-h-11 items-center font-bold wrap-anywhere ${inlineLink}`}
+                    className={cx(standaloneLink, 'font-bold wrap-anywhere')}
                   >
                     {review.gameTitle}
                   </Link>

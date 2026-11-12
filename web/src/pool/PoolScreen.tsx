@@ -273,7 +273,8 @@ export function PoolScreen({
               }}
             />
           ) : null}
-          {filters > 0 || filter.query ? (
+          {/* Пусто говорится один раз: when nothing is found, the empty state carries the reset (DESIGN.md) */}
+          {(filters > 0 || filter.query) && shown.length > 0 ? (
             <Button
               variant="link"
               className="justify-self-start"

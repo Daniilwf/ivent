@@ -642,7 +642,10 @@ export const ru = {
     nameRequired: 'Напиши название.',
     showMore: 'Показать ещё',
     connectionLost: 'Нет связи с сервером, переподключаемся',
-    toFinish: (cells: number) => (cells <= 0 ? 'на финише' : `до финиша ${cells} кл.`),
+    toFinish: (cells: number) =>
+      cells <= 0
+        ? 'на финише'
+        : `до финиша ${cells} ${plural(cells, 'клетка', 'клетки', 'клеток')}`,
     routeProgress: 'Путь от старта до финиша',
   },
   board: {
@@ -660,12 +663,12 @@ export const ru = {
     inactive: 'не в игре',
     noWay: 'нет пути до финиша',
     place: (place: number) => `${place} место`,
-    points: (points: number) => `${points} очк.`,
-    sheet: (place: number, points: number) => `Ты на ${place} месте, ${points} очк.`,
-    sheetPeek: (leader: string, place: number) => `Лидирует ${leader} · ты ${place}-й`,
+    points: (n: number) => points(n),
+    sheet: (place: number, n: number) => `Ты на ${place} месте, ${points(n)}`,
+    sheetPeek: (leader: string, place: number) => `Лидирует ${leader}, ты ${place}-й`,
     sheetLeader: (leader: string) => `Лидирует ${leader}`,
     // K1S-19: several level at the top — nobody leads
-    sheetShared: (points: number) => `Ты делишь 1 место, ${points} очк.`,
+    sheetShared: (n: number) => `Ты делишь 1 место, ${points(n)}`,
     sheetNoLeader: 'Лидера пока нет',
     rule: 'Первый — кто первым дошёл до финиша, дальше по очкам',
     nowPlaying: 'Сейчас проходишь',
@@ -829,7 +832,7 @@ export const ru = {
       h3: 'Заголовок карточки',
       body: 'Основной текст: живой русский на «ты», строки не длиннее 75 символов, цифры 0123456789 не прыгают.',
       small: 'Подпись: 2 ч по HLTB, 12 мин назад',
-      tiny: 'Самая мелкая подпись: до финиша 11 кл.',
+      tiny: 'Самая мелкая подпись: до финиша 11 клеток',
     },
     shape: {
       title: 'Отступы и формы',
@@ -999,7 +1002,7 @@ export const ru = {
     close: 'Скрыть',
     title: 'Что нового',
     release: (version: string, date: string) =>
-      `${version} · ${new Date(`${date}T12:00:00Z`).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}`,
+      `${version}, ${new Date(`${date}T12:00:00Z`).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}`,
     quiet: 'Исправления и улучшения под капотом.',
     empty: 'Пока ни одного выпуска.',
   },
@@ -1125,12 +1128,12 @@ export const ru = {
   leaderboard: {
     title: 'Лидерборд',
     row: (place: number, name: string, points: number, cellsToFinish: number | null) =>
-      `${place}. ${name}: ${points.toLocaleString('ru-RU')} очк.` +
+      `${place}. ${name}: ${points.toLocaleString('ru-RU')} ${plural(points, 'очко', 'очка', 'очков')}` +
       (cellsToFinish === null
         ? ''
         : cellsToFinish === 0
           ? ', на финише'
-          : `, до финиша ${cellsToFinish} кл.`),
+          : `, до финиша ${cellsToFinish} ${plural(cellsToFinish, 'клетка', 'клетки', 'клеток')}`),
     first: '— первое место',
     provisional: '— первое место (предварительно)',
   },
@@ -1478,7 +1481,7 @@ export const ru = {
       bonus: 'Финишировавшие не первыми один раз получают бонус по порядку финиша:',
       // By the order of finishing, not the leaderboard's place: the places after the first go by points
       place: (order: number) => `${order}-й на финише`,
-      points: (n: number) => `+${n} очк.`,
+      points: (n: number) => `+${points(n)}`,
       after: (order: number) => `${order}-й на финише и дальше`,
       noBonus: 'Бонуса за финиш не первым нет.',
       later: 'Финишировавшие не первыми продолжают набирать очки, но их фишка больше не двигается.',
@@ -1722,7 +1725,7 @@ export const ru = {
       history: 'Версии контента',
       historyEmpty: 'Версий пока нет.',
       historyRow: (version: number, at: string, author: string) =>
-        `Версия ${version} · ${at} · ${author}`,
+        `Версия ${version}, ${at}, ${author}`,
       historyChanges: (added: number, changed: number, removed: number) =>
         [
           added ? `новых ${added}` : '',
@@ -2310,7 +2313,7 @@ export const ru = {
         rolling: 'Выбирает игру',
         playing: 'Проходит игру',
       },
-      points: (n: number) => `${n.toLocaleString('ru-RU')} очк.`,
+      points: (n: number) => `${n.toLocaleString('ru-RU')} ${plural(n, 'очко', 'очка', 'очков')}`,
       coins: (n: number) => coins(n),
       cell: (n: number | null) => (n === null ? 'клетка не найдена' : `клетка ${n}`),
       inactive: 'Неактивен',

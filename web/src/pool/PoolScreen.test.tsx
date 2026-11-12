@@ -225,6 +225,8 @@ describe('the pool page', () => {
 
     await userEvent.type(screen.getByLabelText(t.search), 'нет такой игры');
     expect(screen.getByRole('heading', { name: t.nothingTitle })).toBeInTheDocument();
+    // Said once: the empty state carries the reset, the filters do not repeat it, open or folded
+    expect(screen.getAllByText(t.reset)).toHaveLength(1);
 
     await userEvent.click(screen.getByRole('button', { name: t.reset }));
     expect(cards()).toHaveLength(demoPoolGames.length);

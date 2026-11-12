@@ -43,3 +43,26 @@ describe('the season texts follow the glossary', () => {
     }
   });
 });
+
+// Design review of fix/stage12-close («Чего избегать», «Тексты»): no «·» between parts of a line — a comma or a second
+// line; word forms through plural(), never an abbreviation like «очк.» or «кл.»
+describe('the texts of the interface', () => {
+  const sources = import.meta.glob<string>(
+    ['../**/*.{ts,tsx}', '!../**/*.test.{ts,tsx}', '!../api/schema.ts'],
+    {
+      query: '?raw',
+      import: 'default',
+      eager: true,
+    },
+  );
+
+  it('are read from the source', () => {
+    expect(Object.keys(sources)).toContain('./ru.ts');
+  });
+
+  it.each(Object.keys(sources))('%s has no «·» separator and no cut word forms', (path) => {
+    const text = sources[path] ?? '';
+    expect(text).not.toContain('·');
+    expect(text).not.toMatch(/\d\}?\s(очк|кл)\./);
+  });
+});

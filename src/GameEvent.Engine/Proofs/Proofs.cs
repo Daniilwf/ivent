@@ -91,16 +91,20 @@ public static class ProofReviewOrder
 
     /// <summary>
     /// Completed runs not yet approved or rejected: the runs of standing finishers up to their finish first (they decide the
-    /// places, Q-3), then the earliest completed; ties by run id.
+    /// places, Q-3), then the runs of players whose roll the limit of unchecked runs closed (D-134, D-662: a check opens
+    /// it again), then the earliest completed; ties by run id.
     /// </summary>
     public static IReadOnlyList<Guid> Order(SeasonState state)
     {
         ArgumentNullException.ThrowIfNull(state);
 
+        var held = state.Players.Keys.Where(id => Rolls.UncheckedRuns.ClosesRoll(state, id)).ToHashSet();
+
         // A finisher's runs up to the finish decide the first place (Q-3): they go on top, with the run that reached it.
         return [.. state.Runs.Values
             .Where(Rolls.UncheckedRuns.Waits)
             .OrderByDescending(r => DecidesFinish(state, r))
+            .ThenByDescending(r => held.Contains(r.PlayerId))
             .ThenBy(r => r.CompletedAt)
             .ThenBy(r => r.RunId)
             .Select(r => r.RunId)];

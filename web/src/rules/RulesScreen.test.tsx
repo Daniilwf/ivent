@@ -127,7 +127,7 @@ describe('the rules page', () => {
     expect(section(t.sections.drop)).toHaveTextContent('Штраф: −2d4 очков и клеток.');
     expect(
       within(screen.getByTestId('rules-bonuses')).getAllByRole('listitem')[0],
-    ).toHaveTextContent('2-й на финише+10 очк.');
+    ).toHaveTextContent('2-й на финише+10 очков');
     expect(section(t.sections.roll)).toHaveTextContent('ждут 2 прохождения');
   });
 

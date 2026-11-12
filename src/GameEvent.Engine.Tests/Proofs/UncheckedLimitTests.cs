@@ -606,4 +606,27 @@ public class UncheckedLimitTests
         // Then the next roll waits
         RollIsRefused(s);
     }
+
+    // ---- The proof queue puts the runs that hold a roll right after the finishes (D-662) ----
+
+    [Fact]
+    public void The_runs_of_a_player_the_limit_holds_come_before_earlier_runs_of_others()
+    {
+        // Петя completes first, then Вася twice: the limit of 2 closes Вася's roll, not Петя's
+        var s = Season(2);
+        var petya = CompleteRun(s, "Петя", [1, 1]);
+        var vasya = CompleteRuns(s, "Вася", 2);
+
+        Assert.Equal([.. vasya, petya], ProofReviewOrder.Order(s.State));
+    }
+
+    [Fact]
+    public void Without_a_limit_the_queue_keeps_the_completion_order()
+    {
+        var s = Season(null);
+        var petya = CompleteRun(s, "Петя", [1, 1]);
+        var vasya = CompleteRuns(s, "Вася", 2);
+
+        Assert.Equal([petya, .. vasya], ProofReviewOrder.Order(s.State));
+    }
 }

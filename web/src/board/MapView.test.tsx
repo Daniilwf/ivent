@@ -225,7 +225,7 @@ describe('the camera of the map', () => {
 
   it('keeps the board clear of the zoom buttons at the bottom of a desktop frame narrower than 900 px (K1M-6)', () => {
     // At 1440×900 the map stands in the second column of the season screen: a frame of about 730 × 760 px. A board
-    // that reads whole there (a 70-cell one opens closer since the readable scale, D-648) is shown whole
+    // that reads whole there (a 70-cell one opens closer since the readable scale, D-660) is shown whole
     onDesktop();
     frame = { width: 730, height: 760 };
     const board = linearBoard(chain(30)).board;
@@ -432,7 +432,7 @@ describe('the frame of the map (design review)', () => {
   });
 
   it('fits the whole board above the zoom buttons’ band (K2-4)', () => {
-    // A board that reads whole in both frames (a bigger one opens closer, D-648)
+    // A board that reads whole in both frames (a bigger one opens closer, D-660)
     const few = linearBoard(chain(12)).board;
     for (const box of [
       { width: 358, height: 420 },
@@ -447,7 +447,7 @@ describe('the frame of the map (design review)', () => {
     }
   });
 
-  it('opens closer than the whole board where its labels would read under the smallest size (D-648)', () => {
+  it('opens closer than the whole board where its labels would read under the smallest size (D-660)', () => {
     // The linear board of 70 cells on a desktop and on a phone, with my token, without one (a spectator, the admin)
     const board = dev();
     const start = board.cells.find((c) => c.kind === 'start') as Board['cells'][number];

@@ -87,11 +87,11 @@ describe('the rules page from the ruleset', () => {
 
   it('lists the finish bonuses from the second place, then the rest', () => {
     expect(rulesPage(demoRuleset).bonuses).toEqual([
-      { place: '2-й на финише', points: '+10 очк.' },
-      { place: '3-й на финише', points: '+8 очк.' },
-      { place: '4-й на финише', points: '+6 очк.' },
-      { place: '5-й на финише', points: '+4 очк.' },
-      { place: '6-й на финише и дальше', points: '+2 очк.' },
+      { place: '2-й на финише', points: '+10 очков' },
+      { place: '3-й на финише', points: '+8 очков' },
+      { place: '4-й на финише', points: '+6 очков' },
+      { place: '5-й на финише', points: '+4 очка' },
+      { place: '6-й на финише и дальше', points: '+2 очка' },
     ]);
     const none = rulesPage({
       ...demoRuleset,

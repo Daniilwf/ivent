@@ -145,7 +145,7 @@ describe('The season log', () => {
 
     await userEvent.click(within(first).getByTestId('undo'));
     const dialog = await screen.findByRole('alertdialog');
-    expect(dialog).toHaveTextContent(t.about('Волк · «Celeste»'));
+    expect(dialog).toHaveTextContent(t.about('Волк, «Celeste»'));
     await userEvent.type(within(dialog).getByTestId('undo-comment'), 'Ошибка');
     await userEvent.click(within(dialog).getByRole('button', { name: t.undoConfirm }));
     const dependents = await within(dialog).findByTestId('undo-dependents');

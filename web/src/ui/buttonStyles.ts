@@ -40,3 +40,9 @@ export function buttonClass(variant: ButtonVariant = 'quiet', className?: string
 /** A name inside a text that leads to its page (a player, a game): underlined, darker on hover */
 export const inlineLink =
   'rounded-sm underline decoration-2 decoration-muted underline-offset-4 is-hover:decoration-ink is-focus:focus-ring';
+
+/**
+ * A link that stands on its own, outside running text (a game's title, a player's name, «Сменить сезон»): an inline link
+ * with a 44 px tap target on a phone (DESIGN.md «Компоненты и состояния»). Inside a sentence, `inlineLink`
+ */
+export const standaloneLink = `${inlineLink} inline-flex min-h-11 items-center`;

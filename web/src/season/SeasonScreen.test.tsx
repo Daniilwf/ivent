@@ -483,6 +483,11 @@ describe('SeasonScreen', () => {
     await userEvent.click(await screen.findByTestId('already-played'));
     const confirm = await screen.findByTestId('already-played-confirm');
     expect(confirm).toHaveTextContent(ru.turn.alreadyPlayedTitle('Silent Hill'));
+    // It costs nothing: a neutral yes, not the red of a loss (DESIGN.md «Компоненты и состояния»)
+    expect(screen.getByTestId('already-played-confirm-yes')).toHaveAttribute(
+      'data-variant',
+      'main',
+    );
     expect(bodies).toHaveLength(0);
     await userEvent.click(screen.getByTestId('already-played-confirm-yes'));
 
@@ -2020,7 +2025,7 @@ describe('SeasonScreen: runs waiting for the admin (D-134)', () => {
     const fetch = serve((r) => (isSeasonGet(r) ? json(200, waiting(2, 2)) : json(200, {})));
     render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
 
-    // The roll is not offered at all (D-649: no dead main button); the proof that opens it again is the main slot
+    // The roll is not offered at all (D-661: no dead main button); the proof that opens it again is the main slot
     expect(await screen.findByText(ru.turn.uncheckedBlocked(2, 2))).toBeInTheDocument();
     expect(screen.queryByTestId('roll')).toBeNull();
     expect(screen.queryByText(ru.turn.roll)).toBeNull();

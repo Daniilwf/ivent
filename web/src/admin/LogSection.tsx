@@ -23,11 +23,11 @@ const most = 500;
 // Neither the season's creation nor an undo can be undone (undo.notUndoable)
 const final = new Set(['CreateSeason', 'UndoCommand']);
 
-/** Whom and what a command touched: «Волк · «Celeste»», or nothing (K1A) */
+/** Whom and what a command touched: «Волк, «Celeste»», or nothing (K1A) */
 function subjectOf(command: Command): string {
   return [command.playerName, command.gameTitle ? `«${command.gameTitle}»` : null]
     .filter((part) => part != null && part !== '')
-    .join(' · ');
+    .join(', ');
 }
 
 /** The season log, newest first, with undo of a whole command (D-104) */

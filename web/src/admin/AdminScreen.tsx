@@ -28,7 +28,7 @@ import { BottomSheet } from '../ui/Dialogs';
 import { AsyncState } from '../ui/AsyncState';
 import { EmptyState } from '../ui/States';
 import { cx } from '../ui/cx';
-import { inlineLink } from '../ui/buttonStyles';
+import { standaloneLink } from '../ui/buttonStyles';
 import { useDesk } from '../ui/useDesk';
 import { AccountsSection } from './AccountsSection';
 import { BugsSection } from './BugsSection';
@@ -241,10 +241,7 @@ export function AdminScreen({
             data-testid="admin-season-name"
           >
             <span>{t.seasonOf(season.name, ru.seasonStatus[season.status] ?? season.status)}</span>
-            <Link
-              to={href('season')}
-              className={cx(inlineLink, 'inline-flex min-h-11 items-center')}
-            >
+            <Link to={href('season')} className={standaloneLink}>
               {t.changeSeason}
             </Link>
           </p>

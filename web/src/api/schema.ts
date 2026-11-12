@@ -7748,8 +7748,8 @@ export interface components {
             completed: number;
         };
         /**
-         * @description A run to check, in queue order (D-98, Q-3): the runs that decide a finish on top (`decidesFinish`), then by
-         *     completion time; with the claimed difficulty, the counted hours and the dice total, what an approval at a lower
+         * @description A run to check, in queue order (D-98, Q-3, D-662): the runs that decide a finish on top (`decidesFinish`), then
+         *     the runs of players whose roll is closed (`rollClosed`), then by completion time; with the claimed difficulty, the counted hours and the dice total, what an approval at a lower
          *     difficulty or a reject changes. `reachedFinish`: this run's latest move stands on the finish.
          *     `rollClosed`: the player's next roll is closed by the limit of unchecked runs (D-134) until the admin checks one.
          *     `cellBonus`: the points bonus of the cell the run's move stopped on, which a reject takes back too (D-327; always

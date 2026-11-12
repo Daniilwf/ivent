@@ -4,7 +4,7 @@ import { moscowDay } from '../app/time';
 import { Cover } from '../board/GameCards';
 import { ru } from '../i18n/ru';
 import { Button } from '../ui/Button';
-import { ConfirmDanger } from '../ui/Dialogs';
+import { Confirm } from '../ui/Dialogs';
 import { cx } from '../ui/cx';
 import { Tag } from '../ui/Marks';
 import { GameMarks } from './GameMarks';
@@ -71,7 +71,7 @@ function AlreadyPlayed({
 }) {
   const [open, setOpen] = useState(false);
   return (
-    <ConfirmDanger
+    <Confirm
       testId={`${testId}-confirm`}
       open={open}
       onOpenChange={setOpen}

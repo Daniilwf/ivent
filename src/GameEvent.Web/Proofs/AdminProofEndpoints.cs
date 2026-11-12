@@ -19,8 +19,8 @@ using ActionResult = Microsoft.AspNetCore.Http.HttpResults.Results<
 namespace GameEvent.Web.Proofs;
 
 /// <summary>
-/// A run to check, in queue order (D-98, Q-3): the runs that decide a finish on top (<c>decidesFinish</c>), then by
-/// completion time; with the claimed difficulty, the counted hours and the dice total, what an approval at a lower
+/// A run to check, in queue order (D-98, Q-3, D-662): the runs that decide a finish on top (<c>decidesFinish</c>), then
+/// the runs of players whose roll is closed (<c>rollClosed</c>), then by completion time; with the claimed difficulty, the counted hours and the dice total, what an approval at a lower
 /// difficulty or a reject changes. <c>reachedFinish</c>: this run's latest move stands on the finish.
 /// <c>rollClosed</c>: the player's next roll is closed by the limit of unchecked runs (D-134) until the admin checks one.
 /// <c>cellBonus</c>: the points bonus of the cell the run's move stopped on, which a reject takes back too (D-327; always
