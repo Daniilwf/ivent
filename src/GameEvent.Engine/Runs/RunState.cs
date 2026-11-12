@@ -113,7 +113,11 @@ public sealed record RunState(
     [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     EquatableArray<Guid> CellObjects = default,
     [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
-    Difficulty? DeclaredDifficulty = null)
+    Difficulty? DeclaredDifficulty = null,
+
+    // The run drew its difficulty's event (D-557): never a second one, whatever the admin later does to its difficulty
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    bool DifficultyEventDrawn = false)
 {
     /// <summary>What items and effects did to the throw (D-408); none for a run without them.</summary>
     [System.Text.Json.Serialization.JsonIgnore]

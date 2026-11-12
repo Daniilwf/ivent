@@ -178,7 +178,12 @@ internal static class EventDraws
 
         var entry = Weighted.Pick(entries, context.Random);
         var definition = catalog.Live(entry.ObjectId)!;
-        var drawn = new EventDrawn(playerId, deckId, definition.Id, deckKind, source) { FromPlayerId = fromPlayerId, Hostile = hostile };
+        var drawn = new EventDrawn(playerId, deckId, definition.Id, deckKind, source)
+        {
+            FromPlayerId = fromPlayerId,
+            Hostile = hostile,
+            RunId = source == EventSource.Difficulty ? runId : null,
+        };
         var after = SeasonEngine.Apply(state, drawn);
 
         // A bad event by chance meets the Бабл; a price or a penalty never does (D-484 (1), (3))
@@ -193,17 +198,54 @@ internal static class EventDraws
         {
             // Played at once on the drawer; what it gives him comes from the system, not a player (D-544)
             var run = new EffectRun(after, context, playerId, definition.Id, hostile: false, parameters: null);
-            run.Run(effect, Targets.ForTriggered(run.State, context, definition, playerId));
+            var targets = Targets.ForTriggered(run.State, context, definition, playerId);
+
+            // The provisional first no longer affects others (SPEC «Прогресс и победа»): his event reaches him alone (D-557)
+            run.Run(effect, Targets.IsFirst(run.State, playerId) ? [.. targets.Where(t => t == playerId)] : targets);
             events.AddRange(run.Events);
         }
 
-        // A text without automation waits for the player or the admin; the turn goes on (D-410, SPEC «IRL-ивенты»)
+        // A text without automation waits for the player or the admin; the turn goes on (D-410, SPEC «IRL-ивенты»). It
+        // remembers a drop, a reroll or a difficulty it came from, so a buy-out never takes it (panel D-508, D-557)
         if (definition.Manual || definition.Effect is null)
         {
-            events.Add(new ManualEffectCreated(context.Ids.NewId(), playerId, DrawEvent: null, ManualEffectSource.Event, RunId: null) { ObjectId = definition.Id });
+            var from = ManualSource(source, events: true);
+            events.Add(new ManualEffectCreated(context.Ids.NewId(), playerId, DrawEvent: null, from, from == ManualEffectSource.Event ? null : runId)
+            {
+                ObjectId = definition.Id,
+            });
         }
 
         return events;
+    }
+
+    /// <summary>A difficulty's event marks its run, which never draws it again (D-557).</summary>
+    public static SeasonState Apply(SeasonState state, EventDrawn e) =>
+        e is { Source: EventSource.Difficulty, RunId: { } runId } && state.Runs.TryGetValue(runId, out var run)
+            ? state with { Runs = state.Runs.SetItem(runId, run with { DifficultyEventDrawn = true }) }
+            : state;
+
+    /// <summary>
+    /// The difficulty's event of <paramref name="runId"/> once its throw, move, finish and stop are done (D-553 (2)): with
+    /// events on, a difficulty with <c>grantEvent</c>, not drawn yet for this run, and no branch of the run's walk pending.
+    /// </summary>
+    public static List<IGameEvent> ForDifficulty(SeasonState state, EngineContext context, Guid runId)
+    {
+        var run = state.Runs[runId];
+        if (!state.Rules.Features.Events || run.Difficulty is not { } difficulty || run.DifficultyEventDrawn)
+        {
+            return [];
+        }
+
+        // A walk paused at a fork has not stopped yet: the event follows the branch (D-546 (7))
+        if (state.Players[run.PlayerId].Choice is { Kind: Turns.ChoiceKind.Branch, Move.RunId: { } paused } && paused == runId)
+        {
+            return [];
+        }
+
+        return Runs.CompletionRoll.DieFor(difficulty, run.Snapshot.DieByDifficulty).GrantEvent is { } kind
+            ? Draw(state, context, run.PlayerId, NameOf(kind), EventSource.Difficulty, runId)
+            : [];
     }
 
     /// <summary>Whether a bad event of <paramref name="source"/> may be stopped (D-484 (1)): not the price of a reroll, not the penalty of a drop.</summary>
@@ -235,13 +277,14 @@ internal sealed class EventCells : ITriggerHandler
     public IEnumerable<IGameEvent> React(SeasonState state, IGameEvent trigger, EngineContext context) =>
         state.Ruleset is not null && state.Rules.Features.Events
             && trigger is PlayerMoved { Paused: false } move && move.Steps != 0 && CellStops.Triggers(move.Reason)
-            && move.Reason != MoveReason.DropPenalty
+            && move.Reason is not (MoveReason.DropPenalty or MoveReason.CompletionRoll)
             ? Stop(state, context, move)
             : [];
 
     /// <summary>
     /// The draw of the event cell <paramref name="move"/> stopped on, if it is one. The stop of a drop's penalty move draws
-    /// inside the drop, before the drop's own bad event (D-504), so the chain leaves that move alone.
+    /// inside the drop, before the drop's own bad event (D-504), and the stop of a run's own move inside its command, before
+    /// the difficulty's event (D-553 (2), D-557), so the chain leaves those moves alone.
     /// </summary>
     public static List<IGameEvent> Stop(SeasonState state, EngineContext context, PlayerMoved move) =>
         state.Rules.Features.Events && !move.Paused && move.Steps != 0

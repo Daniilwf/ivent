@@ -625,6 +625,33 @@ describe('The content editor', () => {
     expect(t.stackable).toBe('Можно несколько сразу');
   });
 
+  it('shows an interception of several kinds as it is and names a bad event in Russian', async () => {
+    // The Бабл (5.3, D-555): `intercept` is a list; the form's single choice would show it empty
+    const bubble = {
+      id: 'bubble-effect',
+      kind: 'effect',
+      name: 'Бабл',
+      description: 'Гасит следующий плохой ивент или враждебный эффект.',
+      effect: {
+        trigger: 'hostileIncoming',
+        intercept: ['badEvent', 'hostile'],
+        duration: { uses: 1 },
+        actions: [],
+      },
+    };
+    const user = userEvent.setup();
+    open({}, view({ pack: { objects: [orange, curse, bubble], wheels: [lootbox] } }));
+    await user.click(
+      await screen.findByRole('radio', { name: new RegExp(`^${t.kinds.effect ?? ''}`, 'u') }),
+    );
+    await user.click(await screen.findByTestId('content-open-bubble-effect'));
+    await screen.findByTestId('content-editor');
+
+    expect(screen.queryByTestId('content-field-effect.intercept')).toBeNull();
+    expect(screen.getByText('["badEvent","hostile"]')).toBeInTheDocument();
+    expect(t.values.intercept?.badEvent).toBe('плохой ивент');
+  });
+
   it('refuses a file that is not a pack before asking the server', async () => {
     const user = userEvent.setup();
     const server = open();

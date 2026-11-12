@@ -1893,7 +1893,7 @@ export const ru = {
           lowerPoints: 'все ниже по очкам',
         },
         among: { higherPoints: 'выше по очкам', lowerPoints: 'ниже по очкам' },
-        intercept: { hostile: 'враждебный эффект' },
+        intercept: { hostile: 'враждебный эффект', badEvent: 'плохой ивент' },
         target: { self: 'тот, кто использовал' },
         when: { current: 'этот бросок', next: 'следующий бросок' },
         stage: {

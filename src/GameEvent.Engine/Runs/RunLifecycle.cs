@@ -161,16 +161,8 @@ internal static class RunLifecycle
         }
 
         // The finish comes after the run's own rewards, so a first frozen at once is frozen after them (D-99); then the
-        // cell of the stop, or the branch choice of a paused walk (D-303, D-304).
+        // cell of the stop, or the branch choice of a paused walk (D-303, D-304); then the difficulty's event (D-553 (2)).
         events.AddRange(AfterOwnMove(events.Aggregate(state, SeasonEngine.Apply), player, run, moved, walk, context));
-
-        // With events on the difficulty's event is drawn after the throw and the move it made, so what it does waits for
-        // the next throw and never moves the player before his own finish (D-504, D-553)
-        if (die.GrantEvent is { } drawnKind && eventsOn)
-        {
-            events.AddRange(Decks.EventDraws.Draw(
-                events.Aggregate(state, SeasonEngine.Apply), context, player.PlayerId, Decks.EventDraws.NameOf(drawnKind), Decks.EventSource.Difficulty, run.RunId));
-        }
 
         if (command.Review is { } given)
         {
@@ -182,8 +174,11 @@ internal static class RunLifecycle
 
     /// <summary>
     /// After the player's own move of a run (<paramref name="moved"/>, null when no cell was entered) with
-    /// <paramref name="state"/> the state after it: the finish and its settlement, or else the stop on the cell; when the
-    /// walk paused at a fork, the branch choice with the steps left (D-99, D-303, D-304).
+    /// <paramref name="state"/> the state after it: the finish and its settlement, or else the stop on the cell, an event
+    /// cell included; when the walk paused at a fork, the branch choice with the steps left (D-99, D-303, D-304). Once the
+    /// walk is over, the difficulty's event with events on: after the throw, the move, the finish and the stop, so what it
+    /// does waits for the next throw and never moves the player before his own finish or off the cell he stopped on
+    /// (D-504, D-553 (2), D-557).
     /// </summary>
     public static IEnumerable<IGameEvent> AfterOwnMove(
         SeasonState state, SeasonPlayer player, RunState run, PlayerMoved? moved, Walk walk, EngineContext context)
@@ -194,6 +189,10 @@ internal static class RunLifecycle
             var finished = Finishes.AfterCompletionMove(state, player, run, moved, context.Clock.UtcNow).ToList();
             // A move that reached the finish still passed its shops (D-403)
             events.AddRange(finished.Count > 0 ? [.. CellStops.ShopGrants(state, moved, context), .. finished] : CellStops.After(state, moved, context));
+            if (finished.Count == 0)
+            {
+                events.AddRange(Decks.EventCells.Stop(events.Aggregate(state, SeasonEngine.Apply), context, moved));
+            }
         }
 
         if (walk.Paused)
@@ -208,6 +207,10 @@ internal static class RunLifecycle
             events.Add(new BranchChoiceRequested(
                 player.PlayerId, context.Ids.NewId(), fork, [.. state.Map.Exits(fork).Select(e => e.To)], walk.Remaining,
                 MoveReason.CompletionRoll, run.RunId));
+        }
+        else
+        {
+            events.AddRange(Decks.EventDraws.ForDifficulty(events.Aggregate(state, SeasonEngine.Apply), context, run.RunId));
         }
 
         return events;
