@@ -10,6 +10,7 @@ import {
   Trophy,
   Undo2,
   X,
+  Backpack,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { Cover } from '../board/GameCards';
@@ -37,6 +38,7 @@ const icons: Record<FeedIcon, ReactNode> = {
   effect: <Sparkles size={14} aria-hidden />,
   admin: <ShieldCheck size={14} aria-hidden />,
   undo: <Undo2 size={14} aria-hidden />,
+  item: <Backpack size={14} aria-hidden />,
 };
 
 /** A name in a line: a link to the player's profile or the game's page, plain text when there is no page */

@@ -7,7 +7,8 @@ namespace GameEvent.Web.Seasons;
 /// What of each season event the feed shows to whom (D-124, after the security review). Every event type has an entry —
 /// a new type without one fails its test instead of becoming public by default. Public: everyone signed in sees the whole
 /// event. A proof's links, note and files and the admin's comment on it are the player's and the admin's: others see that
-/// a proof was sent and checked. An undo shows others which command it undid and why, not the state it put back.
+/// a proof was sent and checked. An undo shows others which command it undid and why, not the state it put back; a content publication its version,
+/// comment and size, not the pack.
 /// </summary>
 public static class FeedVisibility
 {
@@ -20,6 +21,12 @@ public static class FeedVisibility
 
         /// <summary>Only <c>commandId</c> and <c>comment</c> for everyone but the admin.</summary>
         UndoSummary,
+
+        /// <summary>
+        /// A content publication: the admin sees the whole pack, everyone else its <c>version</c>, <c>comment</c> and
+        /// <c>objectCount</c> (NB-SEC-3, D-653): the pack holds unpublished numbers and every effect of every item.
+        /// </summary>
+        ContentSummary,
 
         /// <summary>The global log's (accounts, files, pool, bug reports): never in a season's feed.</summary>
         NotInFeed,
@@ -74,7 +81,7 @@ public static class FeedVisibility
         ["command-undone"] = Access.UndoSummary,
 
         // The economy (stage 4): every move of coins and objects between players is visible (SPEC «Переводы … всё видно в логе»)
-        ["content-published"] = Access.Public,
+        ["content-published"] = Access.ContentSummary,
         ["object-given"] = Access.Public,
         ["object-removed"] = Access.Public,
         ["object-transferred"] = Access.Public,
@@ -147,6 +154,16 @@ public static class FeedVisibility
 
             case Access.UndoSummary:
                 return admin ? data : new JsonObject { ["commandId"] = data["commandId"]?.DeepClone(), ["comment"] = data["comment"]?.DeepClone() };
+
+            case Access.ContentSummary:
+                return admin
+                    ? data
+                    : new JsonObject
+                    {
+                        ["version"] = data["version"]?.DeepClone(),
+                        ["comment"] = data["comment"]?.DeepClone(),
+                        ["objectCount"] = (data["pack"]?["objects"] as JsonArray)?.Count ?? 0,
+                    };
 
             default:
                 return null;

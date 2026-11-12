@@ -1,9 +1,12 @@
+import { useState } from 'react';
 import type { Schemas } from '../api/client';
+import { difficultyValues } from '../api/schema';
 import { moscowDay } from '../app/time';
 import { Cover } from '../board/GameCards';
 import { ru } from '../i18n/ru';
 import { Button } from '../ui/Button';
 import { cx } from '../ui/cx';
+import { ChoiceGroup } from '../ui/Field';
 import { Tag } from '../ui/Marks';
 import { GameMarks } from './GameMarks';
 import { RerollButton } from './RerollButton';
@@ -12,6 +15,9 @@ type Offered = Schemas['OfferedGameView'];
 type Roll = Schemas['WheelRollView'];
 
 const w = ru.moments.wheel;
+
+type Difficulty = Schemas['Difficulty'];
+const difficulties = difficultyValues.map((d) => ({ value: d, label: ru.difficulty[d] }));
 
 /** The result's heading takes the focus when the wheel stops */
 export const rollResultTitle = 'roll-result-title';
@@ -49,7 +55,10 @@ function optionName(game: Offered) {
   ].join('. ');
 }
 
-/** The rolled game: start it (the one main action), say it was played already, or reroll */
+/**
+ * The rolled game: start it on a difficulty (the one main action; the completion counts no higher, D-633), say it was
+ * played already, or reroll
+ */
 export function OfferCard({
   offer,
   roll,
@@ -63,10 +72,11 @@ export function OfferCard({
   roll: Roll | null;
   price: Schemas['RerollPriceView'] | null;
   pending: boolean;
-  onStart: () => void;
+  onStart: (difficulty: Difficulty) => void;
   onAlreadyPlayed: () => void;
   onReroll: () => void;
 }) {
+  const [difficulty, setDifficulty] = useState<Difficulty>('normal');
   return (
     <div data-testid="offer" className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-3">
       <Cover game={{ title: offer.title, cover: offer.cover?.thumbnailUrl }} />
@@ -91,7 +101,23 @@ export function OfferCard({
         </div>
       ) : null}
       <div className="col-span-2 grid gap-3">
-        <Button variant="main" data-testid="start" loading={pending} onClick={onStart}>
+        <ChoiceGroup
+          data-testid="start-difficulty"
+          label={ru.turn.startDifficulty}
+          hint={ru.turn.startDifficultyHint}
+          options={difficulties}
+          value={difficulty}
+          onChange={setDifficulty}
+          disabled={pending}
+        />
+        <Button
+          variant="main"
+          data-testid="start"
+          loading={pending}
+          onClick={() => {
+            onStart(difficulty);
+          }}
+        >
           {ru.turn.start}
         </Button>
         <div className="flex flex-wrap gap-3">
@@ -120,10 +146,12 @@ export function ChoiceCard({
   roll: Roll | null;
   price: Schemas['RerollPriceView'] | null;
   pending: boolean;
-  onChoose: (optionId: string) => void;
+  /** The picked game starts at once (D-91), on the difficulty chosen above the cards (D-633) */
+  onChoose: (optionId: string, difficulty: Difficulty) => void;
   onAlreadyPlayed: (gameId: string) => void;
   onReroll: () => void;
 }) {
+  const [difficulty, setDifficulty] = useState<Difficulty>('normal');
   const options = choice.options.flatMap(({ id, game }) => (game ? [{ id, game }] : []));
   // Four games and more: a denser card, so the choice fits a phone's screen or two
   const dense = options.length >= 4;
@@ -139,6 +167,15 @@ export function ChoiceCard({
           <Tag>{roll.category}</Tag>
         </div>
       ) : null}
+      <ChoiceGroup
+        data-testid="start-difficulty"
+        label={ru.turn.startDifficulty}
+        hint={ru.turn.startDifficultyHint}
+        options={difficulties}
+        value={difficulty}
+        onChange={setDifficulty}
+        disabled={pending}
+      />
       <ul className="grid gap-4">
         {options.map(({ id, game }) => (
           <li
@@ -154,7 +191,7 @@ export function ChoiceCard({
               aria-label={optionName(game)}
               disabled={pending}
               onClick={() => {
-                onChoose(id);
+                onChoose(id, difficulty);
               }}
               className={cx(
                 'grid w-full cursor-pointer grid-cols-[auto_minmax(0,1fr)] items-center gap-x-4 rounded-md text-left transition duration-(--duration-fast) ease-out is-hover:bg-page focus-visible:outline-none disabled:cursor-default disabled:opacity-50',

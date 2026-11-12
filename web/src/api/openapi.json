@@ -4507,6 +4507,547 @@
         }
       }
     },
+    "/api/seasons/{seasonId}/economy": {
+      "get": {
+        "tags": [
+          "Economy"
+        ],
+        "parameters": [
+          {
+            "name": "seasonId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EconomyView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RejectionProblem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/seasons/{seasonId}/items/{instanceId}/use": {
+      "post": {
+        "tags": [
+          "Economy"
+        ],
+        "parameters": [
+          {
+            "name": "seasonId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "instanceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UseItemRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RejectionProblem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/seasons/{seasonId}/shop/roll": {
+      "post": {
+        "tags": [
+          "Economy"
+        ],
+        "parameters": [
+          {
+            "name": "seasonId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShopRollRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RejectionProblem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/seasons/{seasonId}/shop/buy": {
+      "post": {
+        "tags": [
+          "Economy"
+        ],
+        "parameters": [
+          {
+            "name": "seasonId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BuyLotRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RejectionProblem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/seasons/{seasonId}/bets": {
+      "post": {
+        "tags": [
+          "Economy"
+        ],
+        "parameters": [
+          {
+            "name": "seasonId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlaceBetRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RejectionProblem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/seasons/{seasonId}/players/{playerId}/inventory": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "parameters": [
+          {
+            "name": "seasonId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "playerId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdjustInventoryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RejectionProblem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/admin/accounts": {
       "get": {
         "tags": [
@@ -6407,6 +6948,39 @@
         },
         "description": "The admin adds an account with the player role to the season (SE4): by default on the start with zero points and\ncoins; mid-season the admin sets them."
       },
+      "AdjustInventoryRequest": {
+        "required": [
+          "commandId",
+          "comment"
+        ],
+        "type": "object",
+        "properties": {
+          "commandId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "comment": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "giveObjectId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "removeInstanceId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          }
+        },
+        "description": "The admin gives a player an object by its id or takes one by its instance, with a comment (D-407)."
+      },
       "AdjustPlayerRequest": {
         "required": [
           "commandId",
@@ -6814,6 +7388,97 @@
           }
         }
       },
+      "BetStatus": {
+        "enum": [
+          "open",
+          "won",
+          "lost",
+          "revoked"
+        ]
+      },
+      "BetsView": {
+        "required": [
+          "bets",
+          "deadlineOptionsDays",
+          "maxStake"
+        ],
+        "type": "object",
+        "properties": {
+          "bets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BetView"
+            }
+          },
+          "deadlineOptionsDays": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          "maxStake": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "My bets and the rules of a new one: deadlines in days and the largest stake."
+      },
+      "BetView": {
+        "required": [
+          "betId",
+          "onPlayerId",
+          "onPlayer",
+          "runId",
+          "placedAt",
+          "deadline",
+          "stake",
+          "multiplier",
+          "status",
+          "payout"
+        ],
+        "type": "object",
+        "properties": {
+          "betId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "onPlayerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "onPlayer": {
+            "type": "string"
+          },
+          "runId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "placedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "deadline": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "stake": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "multiplier": {
+            "type": "number",
+            "format": "double"
+          },
+          "status": {
+            "$ref": "#/components/schemas/BetStatus"
+          },
+          "payout": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "BugContextEntryView": {
         "required": [
           "at",
@@ -7032,6 +7697,24 @@
           }
         },
         "description": "A report as the admin reads it and as the export carries it."
+      },
+      "BuyLotRequest": {
+        "required": [
+          "commandId",
+          "lot"
+        ],
+        "type": "object",
+        "properties": {
+          "commandId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "lot": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "Buy lot `lot` (its index in the offer) while the offer lasts."
       },
       "CategoryRequest": {
         "required": [
@@ -7339,9 +8022,19 @@
           },
           "optionId": {
             "type": "string"
+          },
+          "difficulty": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Difficulty"
+              }
+            ]
           }
         },
-        "description": "An answer to the pending choice: its id and the picked option's id."
+        "description": "An answer to the pending choice: its id and the picked option's id; for a game, `difficulty` — the one it starts on\n(D-633)."
       },
       "CoinReflect": {
         "required": [
@@ -8117,6 +8810,26 @@
           }
         }
       },
+      "EconomyFeaturesView": {
+        "required": [
+          "items",
+          "shop",
+          "bets"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "boolean"
+          },
+          "shop": {
+            "type": "boolean"
+          },
+          "bets": {
+            "type": "boolean"
+          }
+        },
+        "description": "Which economy mechanics the season plays (D-441): a mechanic off is not shown at all; always set, optional for older\nclients. The inventory, the shop and the bets come from `GET /api/seasons/{id}/economy`."
+      },
       "EconomyRules": {
         "required": [
           "allowNegativeCoins",
@@ -8140,6 +8853,56 @@
             "$ref": "#/components/schemas/ShopRules"
           }
         }
+      },
+      "EconomyView": {
+        "required": [
+          "coins",
+          "inventoryLimit",
+          "shop",
+          "bets",
+          "items"
+        ],
+        "type": "object",
+        "properties": {
+          "coins": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "inventoryLimit": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "shop": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ShopView"
+              }
+            ]
+          },
+          "bets": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/BetsView"
+              }
+            ]
+          },
+          "items": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/InventoryItemView"
+            }
+          }
+        },
+        "description": "My economy in the season (D-441): coins, the inventory with what each object allows now when `features.items` is\non (null when off: bets play without items), the shop when `features.shop` is on, the bets when\n`features.bets` is on. `inventoryLimit` counts items only (D-406)."
       },
       "EdgeView": {
         "required": [
@@ -8312,8 +9075,7 @@
         "enum": [
           "alreadyPlayed",
           "dropped",
-          "techRerolled",
-          null
+          "techRerolled"
         ]
       },
       "Features": {
@@ -8463,7 +9225,7 @@
             "type": "string"
           }
         },
-        "description": "An object of the content the page's events name (stage 5: the drawn events), by its latest card."
+        "description": "An object of the season's content the page's events name (`objectId`: item uses and gifts, drawn events): its\nname as last published (D-444, D-446)."
       },
       "FeedPlayerView": {
         "required": [
@@ -9072,6 +9834,212 @@
           }
         }
       },
+      "InventoryItemView": {
+        "required": [
+          "instanceId",
+          "objectId",
+          "kind",
+          "name",
+          "description",
+          "rarity",
+          "window",
+          "hostile",
+          "usesLeft",
+          "runsLeft",
+          "expiresAt",
+          "fromPlayer",
+          "usable",
+          "refusal",
+          "choosesTarget",
+          "targets",
+          "steps"
+        ],
+        "type": "object",
+        "properties": {
+          "instanceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "objectId": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ObjectKind"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "rarity": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Rarity"
+              }
+            ]
+          },
+          "window": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/UseWindow"
+              }
+            ]
+          },
+          "hostile": {
+            "type": "boolean"
+          },
+          "usesLeft": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "runsLeft": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "expiresAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "fromPlayer": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "usable": {
+            "type": "boolean"
+          },
+          "refusal": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "choosesTarget": {
+            "type": "boolean"
+          },
+          "targets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ItemTargetView"
+            }
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ItemStepView"
+            }
+          }
+        },
+        "description": "An object I hold: its definition's name and description, what is left of its lifetime, who put it on me. `usable` —\n«Использовать» is open now; `refusal` — the engine's code when it is not (wrong window, deadline, frozen inventory,\nno target; an effect or a special roll acts on its own). `targets` — when `choosesTarget`, exactly the players\nthe engine accepts; `steps` — the answers asked, in order (D-440)."
+      },
+      "ItemOptionView": {
+        "required": [
+          "id",
+          "label"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          }
+        },
+        "description": "One answer: the id the engine checks, the words the screen shows."
+      },
+      "ItemStepKind": {
+        "enum": [
+          "choice",
+          "pickObject",
+          "direction"
+        ],
+        "description": "What the player answers when using an item, in the order the engine asks (D-407)."
+      },
+      "ItemStepView": {
+        "required": [
+          "kind",
+          "prompt",
+          "options",
+          "objectsByTarget",
+          "count",
+          "ranked"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/ItemStepKind"
+          },
+          "prompt": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ItemOptionView"
+            }
+          },
+          "objectsByTarget": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/TargetObjectsView"
+            }
+          },
+          "count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "ranked": {
+            "type": "boolean"
+          }
+        },
+        "description": "An answer to give: a choice (`options`), a direction (`options` `forward` and `back`, the screen\nnames them) or objects of the target (`objectsByTarget`: for each possible target, its objects that fit) —\n`count` different ones (all of them when fewer), or with `ranked` any number in order of preference, the rest\ntaken at random (D-476). `prompt` — the content's question."
+      },
+      "ItemTargetView": {
+        "required": [
+          "playerId",
+          "name",
+          "token"
+        ],
+        "type": "object",
+        "properties": {
+          "playerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "token": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "A player an item may target: the name and the token colour (as on the map)."
+      },
       "JsonElement": { },
       "JsonObject": {
         "type": "object"
@@ -9183,8 +10151,7 @@
       "ManualEffectOutcome": {
         "enum": [
           "applied",
-          "notApplicable",
-          null
+          "notApplicable"
         ]
       },
       "ManualEffectSource": {
@@ -9740,6 +10707,34 @@
             "format": "int32"
           }
         }
+      },
+      "PlaceBetRequest": {
+        "required": [
+          "commandId",
+          "onPlayerId",
+          "days",
+          "stake"
+        ],
+        "type": "object",
+        "properties": {
+          "commandId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "onPlayerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "days": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "stake": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "Bet `stake` coins that `onPlayerId` completes their current run within `days` days (D-414)."
       },
       "PlayerView": {
         "required": [
@@ -10430,6 +11425,13 @@
           }
         }
       },
+      "Rarity": {
+        "enum": [
+          "common",
+          "epic",
+          "legendary"
+        ]
+      },
       "RarityWeights": {
         "required": [
           "common",
@@ -11114,8 +12116,19 @@
           "startedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "declaredDifficulty": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Difficulty"
+              }
+            ]
           }
-        }
+        },
+        "description": "The active run; `declaredDifficulty` — the one named at the start, the cap of the completion's (D-633)."
       },
       "SeasonActionRequest": {
         "required": [
@@ -11475,9 +12488,76 @@
                 "$ref": "#/components/schemas/MapBackgroundView"
               }
             ]
+          },
+          "economy": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/EconomyFeaturesView"
+              }
+            ]
           }
         },
         "description": "The season screen's data. `status` and `deadline` (UTC; the screen shows it in Moscow time) follow the\nlifecycle (D-101); after the finish `leaderboard` is the recorded result. The map is the one in force (the\nlatest published, D-300): `cells`, `edges` and `zones`; `mapMode` says whether the season plays\non the linear chain of stage 1 or on the graph (D-301); `background` — the picture under the cells, null when\nthe map has none or its file is not on this site (D-277)."
+      },
+      "ShopLotView": {
+        "required": [
+          "lot",
+          "objectId",
+          "name",
+          "description",
+          "rarity",
+          "price",
+          "sold"
+        ],
+        "type": "object",
+        "properties": {
+          "lot": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "objectId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "rarity": {
+            "$ref": "#/components/schemas/Rarity"
+          },
+          "price": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "sold": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ShopPayment": {
+        "enum": [
+          "freeRoll",
+          "coins"
+        ],
+        "description": "How a shop roll was paid."
+      },
+      "ShopRollRequest": {
+        "required": [
+          "commandId"
+        ],
+        "type": "object",
+        "properties": {
+          "commandId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "description": "Roll my shop (D-403): a free roll first, then coins."
       },
       "ShopRules": {
         "required": [
@@ -11509,6 +12589,50 @@
             "$ref": "#/components/schemas/EquatableArrayOfShopPriceReset"
           }
         }
+      },
+      "ShopView": {
+        "required": [
+          "payment",
+          "price",
+          "freeRolls",
+          "refusal",
+          "expiresAt",
+          "lots"
+        ],
+        "type": "object",
+        "properties": {
+          "payment": {
+            "$ref": "#/components/schemas/ShopPayment"
+          },
+          "price": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "freeRolls": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "refusal": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "expiresAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "lots": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ShopLotView"
+            }
+          }
+        },
+        "description": "My shop (D-443): the next roll's payment and price, free rolls held, why a roll is refused now (the engine's code), and\nthe lots while the offer lasts (`expiresAt` by the server's clock)."
       },
       "SimilarGameView": {
         "required": [
@@ -11610,8 +12734,19 @@
           "commandId": {
             "type": "string",
             "format": "uuid"
+          },
+          "difficulty": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Difficulty"
+              }
+            ]
           }
-        }
+        },
+        "description": "Start the offered game; `difficulty` — the one the player starts on, the cap of the completion's (D-633)."
       },
       "StoredFileView": {
         "required": [
@@ -11657,6 +12792,25 @@
         },
         "description": "A stored file (D-108): `url` serves the file, `thumbnailUrl` the small one for the map and lists.\n`duplicate` — the same upload was already stored (a retry with the same command id)."
       },
+      "TargetObjectsView": {
+        "required": [
+          "playerId",
+          "objects"
+        ],
+        "type": "object",
+        "properties": {
+          "playerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "objects": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ItemOptionView"
+            }
+          }
+        }
+      },
       "TechRerollReason": {
         "enum": [
           "weakPc",
@@ -11664,8 +12818,7 @@
           "doesNotLaunch",
           "emulatorTooSlow",
           "other",
-          "wish",
-          null
+          "wish"
         ]
       },
       "TechRerollRequest": {
@@ -11933,6 +13086,44 @@
           "ignore"
         ]
       },
+      "UseItemRequest": {
+        "required": [
+          "commandId"
+        ],
+        "type": "object",
+        "properties": {
+          "commandId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "targetPlayerId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "choices": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "description": "Use an item of my inventory (D-407, D-441): `targetPlayerId` — the target of a «chosen» item (one of the item's\n`targets`), `choices` — the answers to its `steps` in order (an option's id, an object's instance id)."
+      },
+      "UseWindow": {
+        "enum": [
+          "beforeRoll",
+          "afterRoll",
+          "beforeDice",
+          "afterDice",
+          "anytime"
+        ]
+      },
       "WeeklyChallengeRules": {
         "required": [
           "defaultRewardCoins"
@@ -12130,6 +13321,9 @@
     },
     {
       "name": "Site"
+    },
+    {
+      "name": "Economy"
     },
     {
       "name": "Files"

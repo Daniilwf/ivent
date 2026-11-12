@@ -10,6 +10,7 @@ using GameEvent.Infrastructure.Seasons;
 using GameEvent.Web.Accounts;
 using GameEvent.Web.BugReports;
 using GameEvent.Web.Content;
+using GameEvent.Web.Economy;
 using GameEvent.Web.Files;
 using GameEvent.Web.Map;
 using GameEvent.Web.Observability;
@@ -26,6 +27,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace GameEvent.Web.Hosting;
 
@@ -77,6 +79,7 @@ public static class AppSetup
         services.AddSingleton<IIdGenerator, GuidV7Ids>();
         services.AddSingleton<CommandBus>();
         services.AddSingleton<SeasonBroadcaster>();
+        services.AddSingleton<ContentCards>();
         services.AddSingleton<ICommittedEventsListener>(sp => sp.GetRequiredService<SeasonBroadcaster>());
         services.AddSingleton<HubSessions>();
         services.AddSingleton<ICommittedEventsListener>(sp => sp.GetRequiredService<HubSessions>());
@@ -107,6 +110,17 @@ public static class AppSetup
             {
                 document.Components.Schemas[type.Name] = await context.GetOrCreateSchemaAsync(type, null, ct);
             }
+
+            // An enum schema is shared: the first nullable use (`Difficulty?`) put null among its values, and the generated
+            // client then lost the list of values and made every use nullable. A nullable use says so itself (oneOf with
+            // null), so the shared schema keeps only the values (D-633).
+            foreach (var schema in document.Components.Schemas.Values.OfType<Microsoft.OpenApi.OpenApiSchema>())
+            {
+                if (schema.Enum is { Count: > 0 } values && values.Any(v => v is null))
+                {
+                    schema.Enum = [.. values.Where(v => v is not null)];
+                }
+            }
         }));
 
         // Local http only in Development and Test; everywhere else (staging too) cookies are Secure and __Host-.
@@ -126,6 +140,8 @@ public static class AppSetup
         services.AddSingleton<Passwords>();
         services.AddSingleton<IPasswords>(sp => sp.GetRequiredService<Passwords>());
         services.AddSingleton<LoginThrottle>();
+        services.TryAddSingleton(TimeProvider.System);
+        services.AddSingleton(sp => new LoginDevices(sp.GetRequiredService<IDataProtectionProvider>(), sp.GetRequiredService<TimeProvider>(), cookiePrefix + "ge.device", securePolicy));
         services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
             .AddCookie(o =>
             {
@@ -232,6 +248,8 @@ public static class AppSetup
         api.MapAdminContent();
         api.MapSeasonsAndPlayers();
         api.MapFeed();
+        api.MapEconomy();
+        api.MapAdminEconomy();
         api.MapAdminAccounts();
         api.MapFiles();
         api.MapAvatars();

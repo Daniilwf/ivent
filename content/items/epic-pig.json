@@ -2,7 +2,7 @@
   "id": "epic-pig",
   "kind": "item",
   "name": "Эпическая Свинья",
-  "description": "Отдай выбранному другому игроку все свои эффекты.",
+  "description": "Отдай выбранному другому игроку все свои враждебные эффекты.",
   "rarity": "epic",
   "price": null,
   "window": "anytime",
@@ -20,7 +20,8 @@
         "mode": "give",
         "all": true,
         "filter": {
-          "kind": "effect"
+          "kind": "effect",
+          "hostile": true
         }
       }
     ]

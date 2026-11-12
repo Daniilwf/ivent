@@ -46,7 +46,9 @@ internal sealed class EffectRun
         ContentParamDictionary? parameters,
         IReadOnlyList<string>? choices = null,
         DiceScope dice = DiceScope.Pending,
-        Guid? runId = null)
+        Guid? runId = null,
+        int depth = 0,
+        int eventsBefore = 0)
     {
         State = state;
         Context = context;
@@ -57,6 +59,8 @@ internal sealed class EffectRun
         _choices = choices ?? [];
         Dice = dice;
         RunId = runId;
+        Depth = depth;
+        EventsBefore = eventsBefore;
     }
 
     public SeasonState State { get; private set; }
@@ -89,6 +93,21 @@ internal sealed class EffectRun
 
     public List<IGameEvent> Events { get; } = [];
 
+    /// <summary>
+    /// How deep this run is nested in its command (invariant 8): 0 for an item used or a trigger inside a command, the level
+    /// of the effect chain for a reaction; a countdown that goes off inside it runs one level deeper.
+    /// </summary>
+    public int Depth { get; }
+
+    /// <summary>The events the command wrote before this run: with <see cref="Events"/>, what counts towards the 50.</summary>
+    public int EventsBefore { get; }
+
+    /// <summary>The events the command has written with this run so far.</summary>
+    public int EventsSoFar => EventsBefore + Events.Count;
+
+    /// <summary>Set when a countdown inside the run went past the chain limits: nothing more runs, the cut is the last event.</summary>
+    public EffectChainCut? Cut { get; private set; }
+
     /// <summary>Changes of the throw being made (<see cref="DiceScope.Throw"/>).</summary>
     public List<ThrowChange> ThrowChanges { get; } = [];
 
@@ -100,6 +119,7 @@ internal sealed class EffectRun
 
     public void Emit(IGameEvent e)
     {
+        Cut ??= e as EffectChainCut;
         Events.Add(e);
         State = SeasonEngine.Apply(State, e);
     }
@@ -248,7 +268,7 @@ internal sealed class EffectRun
                 RunActions(effect.Actions);
             }
 
-            if (Refusal is not null)
+            if (Refusal is not null || Cut is not null)
             {
                 return;
             }
@@ -267,7 +287,7 @@ internal sealed class EffectRun
 
             Actions.BaseActionRegistry.ByType[action.GetType()].Execute(action, this);
             _selfDone |= action.Target == Content.ActionTarget.Self;
-            if (Refusal is not null)
+            if (Refusal is not null || Cut is not null)
             {
                 return;
             }

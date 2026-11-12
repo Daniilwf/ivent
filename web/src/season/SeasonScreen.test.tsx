@@ -340,6 +340,59 @@ describe('SeasonScreen', () => {
     });
   });
 
+  it('starts the offered game on the difficulty the player picks (D-633)', async () => {
+    const bodies: unknown[] = [];
+    serve(async (r) => {
+      if (isSeasonGet(r)) {
+        return json(
+          200,
+          season({
+            me: {
+              playerId: me,
+              phase: 'rolling',
+              offer: {
+                id: 'a1000000-0000-0000-0000-000000000001',
+                title: 'Silent Hill',
+                hours: 12,
+                marks: [],
+              },
+              choice: null,
+              activeRun: null,
+              lastCompleted: null,
+              nextReroll: null,
+              manualEffects: [],
+              dropHintMinutes: null,
+              dropPenalty: null,
+              techRerollOpen: false,
+              challengesEnabled: false,
+              roll: null,
+              unchecked: null,
+              finish: null,
+            },
+          }),
+        );
+      }
+      bodies.push({ url: r.url, body: (await r.json()) as unknown });
+      return json(200, { duplicate: false, events: [] });
+    });
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    await userEvent.click(
+      within(await screen.findByTestId('start-difficulty')).getByRole('radio', {
+        name: ru.difficulty.hard,
+      }),
+    );
+    await userEvent.click(screen.getByTestId('start'));
+
+    await vi.waitFor(() => {
+      expect(bodies).toHaveLength(1);
+    });
+    expect(bodies[0]).toEqual({
+      url: expect.stringMatching(/\/start$/) as unknown,
+      body: { commandId: expect.any(String) as unknown, difficulty: 'hard' },
+    });
+  });
+
   it('explains a choice already made in another tab and refetches the season', async () => {
     const choiceId = 'c0000000-0000-0000-0000-000000000001';
     const picked = {

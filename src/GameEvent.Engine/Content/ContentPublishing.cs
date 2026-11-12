@@ -10,6 +10,12 @@ namespace GameEvent.Engine.Content;
 /// </summary>
 public static class ContentPublishing
 {
+    // Size limits of one pack (NB-SEC-3, D-653): the same numbers as the admin's content API (D-491), entries per wheel on top.
+    // The imported old season has under 400 objects.
+    public const int MaxObjects = 1000;
+    public const int MaxWheels = 100;
+    public const int MaxWheelEntries = 200;
+
     /// <summary>
     /// The problems of <paramref name="pack"/>, each with its JSON path; empty when it can be published. With
     /// <paramref name="events"/> off (<c>features.events</c>) the pack holds no events and no decks, and draws only
@@ -149,10 +155,21 @@ public static class ContentPublishing
             error($"{at}.effect.outcomes.choice", "An effect that acts on its own has nobody to ask.");
         }
 
+        // What the screen asks is known before the use (D-440): not inside a branch whose case a roll or the answer picks,
+        // not the objects of a target the selector picks (a list of preference asks last, ContentValidator).
+        var byRoll = rolled;
+        var byChoice = effect.Outcomes is { Choice: not null };
+        var picksTarget = effect.Target?.Selector is not (null or TargetSelector.Self or TargetSelector.Chosen);
         var actions = effect.Actions.Concat(effect.Outcomes?.Cases.SelectMany(c => c.Actions) ?? []).ToList();
         for (var i = 0; i < actions.Count; i++)
         {
             var path = $"{at}.effect.actions[{i}]";
+            var asks = actions[i] is RequestChoiceAction or TakeObjectAction { Pick: Pick.Chosen, All: false } or MoveAction { Direction: MoveDirection.Chosen };
+            if (!triggered && asks && byChoice)
+            {
+                error(path, "A branch by the player's answer asks nothing more: the questions after it would depend on it.");
+            }
+
             switch (actions[i])
             {
                 case ModifyNextRollAction { RunCondition: not null }:
@@ -172,7 +189,11 @@ public static class ContentPublishing
                     break;
                 case RequestChoiceAction when rolled:
                 case MoveAction { Direction: MoveDirection.Chosen } when rolled:
+                case TakeObjectAction { Pick: Pick.Chosen, All: false } when byRoll:
                     error(path, "A choice is asked before any roll: the player answers when using the item.");
+                    break;
+                case TakeObjectAction { Pick: Pick.Chosen, All: false } take when picksTarget && take.Target != ActionTarget.Self:
+                    error(path, "The selector picks the target only at the use: whose objects, or whom a given one goes to, is not known before.");
                     break;
                 case ModifyDiceAction { Stage: DiceStage.Count, Value: { Kind: ContentValueKind.Number, Number: < 1 } }:
                     error($"{path}.value", "The «count» stage adds dice: 1 or more.");
@@ -312,6 +333,11 @@ public static class ContentPublishing
             return Decision.Reject(RejectionCodes.SeasonClosed, $"Content is published while the season is a draft or running; it is {state.Status}.");
         }
 
+        if (TooLarge(command.Pack) is { } tooLarge)
+        {
+            return Decision.Reject(RejectionCodes.ContentTooLarge, tooLarge);
+        }
+
         if (string.IsNullOrWhiteSpace(command.Comment))
         {
             return Decision.Reject(RejectionCodes.CommentRequired, "Every admin change explains itself in the public log.");
@@ -344,6 +370,14 @@ public static class ContentPublishing
             ? Decision.Reject(RejectionCodes.ContentUnchanged, "The pack equals the content in force.")
             : Decision.Accept(new ContentPublished(catalog.Version + 1, command.Pack, command.Comment.Trim()));
     }
+
+    // Checked before the pack's contents, so a huge pack costs the queue nothing more
+    private static string? TooLarge(ContentPack pack) =>
+        pack.Objects.Count > MaxObjects ? $"At most {MaxObjects} objects in one pack; it has {pack.Objects.Count}."
+        : pack.Wheels.Count > MaxWheels ? $"At most {MaxWheels} wheels in one pack; it has {pack.Wheels.Count}."
+        : pack.Wheels.FirstOrDefault(w => w?.Entries.Count > MaxWheelEntries) is { } wheel
+            ? $"At most {MaxWheelEntries} entries in a wheel; «{wheel.Id}» has {wheel.Entries.Count}."
+            : null;
 
     internal static SeasonState Apply(SeasonState state, ContentPublished e) =>
         state with { Content = state.Catalog.Publish(e.Pack) with { Version = e.Version } };

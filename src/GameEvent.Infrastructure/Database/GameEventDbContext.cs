@@ -165,6 +165,7 @@ public sealed class GameEventDbContext(DbContextOptions<GameEventDbContext> opti
             e.HasIndex(x => new { x.SeasonId, x.GameId });
             e.Property(x => x.Status).HasMaxLength(20);
             e.Property(x => x.Difficulty).HasMaxLength(20);
+            e.Property(x => x.DeclaredDifficulty).HasMaxLength(20);
         });
 
         modelBuilder.Entity<GameRecord>(e =>

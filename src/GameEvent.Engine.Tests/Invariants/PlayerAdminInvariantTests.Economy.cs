@@ -145,11 +145,13 @@ public partial class PlayerAdminInvariantTests
             .WithGame("Silent Hill", 6, "Horror").WithGame("Dead Space", 9, "Horror").WithGame("Amnesia", 3, "Horror")
             .WithGame("Gothic", 30, "RPG").WithGame("Risen", 12, "RPG").WithGame("Tetris", null, "RPG");
         s.WithPlayers(s_economyPlayers);
-        var pack = EconomyScenario.RepositoryPack();
+        // The content files and a chain bomb whose going off lowers every counter of its owner (AU4-1, D-485)
+        var files = EconomyScenario.RepositoryPack();
+        var pack = files with { Objects = [.. files.Objects, Economy.ImportedItems.CounterTests.SelfLoweringBomb()] };
         s.WithContent(pack);
         // Every item of the content files (the imported pack too, D-471) and effects for them to steal, give and count down
         var objects = pack.Objects.Where(o => o.Kind == ObjectKind.Item).Select(o => o.Id)
-            .Concat(["shield-effect", "talisman-effect", "curse-effect", "time-bomb"]).ToArray();
+            .Concat(["shield-effect", "talisman-effect", "curse-effect", "time-bomb", "chain-bomb", "chain-bomb"]).ToArray();
         var setup = s.History.Count;
         return s.Explained(s =>
         {
@@ -328,6 +330,20 @@ public partial class PlayerAdminInvariantTests
         var cut = events.OfType<EffectChainCut>().SingleOrDefault();
         Assert.True(cut is null || cut.Events <= Limits.MaxEventsPerCommand);
 
+        // SPEC «Проверка на дыры», «Очки фармятся»: a use of an item gives points only by an explicit action — a points
+        // change of an object that fired in the command, a bonus cell it stopped on, or the throw it changed (AU4-10)
+        if (command is UseItem)
+        {
+            var fired = events.OfType<ItemUsed>().Select(e => e.ObjectId).Concat(events.OfType<EffectTriggered>().Select(e => e.ObjectId)).ToHashSet();
+            foreach (var change in events.OfType<PointsChanged>())
+            {
+                Assert.Contains(change.Reason, new[] { PointsReason.Item, PointsReason.CellBonus, PointsReason.DiceModified });
+                Assert.True(
+                    change.Reason != PointsReason.Item || fired.Any(id => GivesPoints(s.State.Catalog.Get(id))),
+                    $"Points of an item without a points action: {string.Join(", ", fired)}.");
+            }
+        }
+
         // 16: an item used on another player never changes the roll or the throw they have begun
         if (command is UseItem use)
         {
@@ -416,4 +432,9 @@ public partial class PlayerAdminInvariantTests
             open.Sum(b => b.Stake),
             log2.OfType<BetPlaced>().Where(p => open.Any(o => o.BetId == p.Bet.BetId)).Sum(p => p.Bet.Stake));
     }
+
+    // Whether the object's effect changes points anywhere: its actions or a case of its outcomes
+    private static bool GivesPoints(ObjectDefinition definition) =>
+        definition.Effect is { } effect
+        && effect.Actions.Concat(effect.Outcomes?.Cases.SelectMany(c => c.Actions) ?? []).Any(a => a is ChangeResourceAction { Resource: "points" });
 }

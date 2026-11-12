@@ -16,7 +16,7 @@
 | --- | --- | --- |
 | Сезон | ограниченный по времени ивент со своей картой, правилами и итогами | `Season` |
 | Статус сезона | черновик, идёт, закрытие, завершён, архив | `SeasonStatus` (`Draft`, `Active`, `Closing`, `Finished`, `Archived`) |
-| Дедлайн | момент окончания сезона; после него броски запрещены | `Season.Deadline`, `SetSeasonDeadline`, `SeasonDeadlineSet` |
+| Дедлайн | момент, после которого ходы игроков закрыты; показывается по Москве | `Season.Deadline`, `SetSeasonDeadline`, `SeasonDeadlineSet`, `SeasonSetup.IsPastDeadline` |
 | Смена статуса сезона | переход на следующий статус | `ChangeSeasonStatus`, `SeasonStatusChanged` |
 | Флаг неактивности | отметка админа «выбыл из активной игры» | `SetPlayerInactive`, `PlayerInactivitySet` |
 | Пользователь | аккаунт на сайте | `User` |
@@ -26,7 +26,7 @@
 | Общий лог | лог событий без сезона: аккаунты, позже пул | `GameEvent` с `SeasonId = Guid.Empty` |
 | Метка безопасности | меняется при смене пароля, роли, удалении; обрывает сессии | `UserRecord.SecurityStamp` |
 | Роль | игрок, админ, зритель | `Role` (`Player`, `Admin`, `Spectator`) |
-| Метка безопасности | меняется при смене пароля, роли или удалении аккаунта и завершает старые сессии | `User.SecurityStamp` |
+| Кука устройства | подписанная запись «этот браузер уже входил в этот аккаунт с нынешним паролем» на год; такой браузер не держит потолок неудачных входов по логину, после смены пароля запись чужая (D-460, D-465) | `LoginDevices`, кука `ge.device` |
 | Игрок сезона | участие пользователя в конкретном сезоне | `SeasonPlayer` |
 | Фаза хода | где игрок в цикле хода: ждёт ролла, игра выпала, играет | `TurnPhase` (`Idle`, `Rolling`, `Playing`) |
 | Подсказка о неактивности | отметка в админке: у игрока нет своих действий дольше `inactiveHintDays`, флаг не стоит; рядом — идёт ли прохождение | `AdminPlayerView.InactiveHint`, `Playing`, `LastActionAt` |
@@ -46,7 +46,6 @@
 | Клеток до финиша | наименьшее число шагов вперёд до финиша | `LeaderboardRow.CellsToFinish` |
 | Номер изменения очков | порядковый номер ненулевого изменения очков в сезоне; для тайбрейка «раньше набрал» | `SeasonPlayer.PointsTick`, счётчик — `SeasonState.PointsChanges` |
 | Итоги сезона | снимок мест и очков при завершении сезона (номинации — этап 6) | `SeasonResultRecorded`, `SeasonResultRecord`, `SeasonState.Result` |
-| Дедлайн | момент, после которого ходы игроков закрыты; показывается по Москве | `Season.Deadline`, `SeasonSetup.IsPastDeadline` |
 | Наступление дедлайна | системная команда планировщика: сезон «идёт» переходит в «закрытие» | `ReachDeadline`, `DeadlineScheduler` |
 | Твой сезон | личная страница итогов игрока | `SeasonRecap` |
 | Зал славы | победители, рекорды и статистика за все сезоны | `HallOfFame` |
@@ -83,7 +82,6 @@
 | Навязанный жанр | теги, которыми фильтры ролла (сейчас — зона) ограничили выбор; фиксируются в снапшоте | `RunSnapshot.ImposedTags`, `RollFilter.Tags` |
 | Тех-реролл → дроп | админ превращает тех-реролл в дроп со штрафом | команда `ConvertTechRerollToDrop`, событие `TechRerollConvertedToDrop` |
 | Исключение | игра, которая больше не выпадает конкретному игроку | `PlayerGameExclusion` |
-| Фильтр ролла | предикат по играм от спецролла, зоны или конфига | `RollFilter` |
 
 ## Прохождение и награда
 
@@ -93,6 +91,7 @@
 | Статус прохождения | идёт, завершено, дропнуто, тех-реролл, отклонено (реджект) | `RunStatus` (`Playing`, `Completed`, `Dropped`, `TechRerolled`, `Rejected`) |
 | Снапшот | правила и параметры, зафиксированные в момент ролла | `RunSnapshot` |
 | Сложность | лёгкая, нормальная, сложная, выше сложной | `Difficulty` (`Easy`, `Normal`, `Hard`, `Extreme`) |
+| Сложность при старте | сложность, которую игрок называет, начиная игру; при завершении засчитывается не выше неё (D-633) | `StartRun.DeclaredDifficulty`, `RunStarted.DeclaredDifficulty`, `RunState.DeclaredDifficulty` |
 | Пруф | доказательство прохождения: ссылки, заметка или свидетель | `ProofState` (`ProofStatus`: `Pending`, `Approved`, `Rejected`), команда `SubmitProof`, событие `ProofSubmitted`, таблица `Proof` |
 | Одобрение | подтверждение пруфа админом, в том числе «без скрина» | команда `ApproveProof`, событие `ProofApproved` |
 | Реджект | отклонение пруфа админом: снимается всё, что дал ход прохождения, — очки с бонусом клетки хода, клетки (позиция не улучшается), монетки (в минус), предметы клеток хода, которые игрок ещё держит (D-321, D-327, D-421) | команда `RejectProof`, событие `ProofRejected`, `RunStatus.Rejected`, `RunState.CellPoints`, `RunState.CellObjects`, `ObjectRemoval.ProofRejected` |
@@ -209,24 +208,29 @@
 | Колесо лутбокса | взвешенный список объектов для `spinWheel` | `WheelDefinition`, `WheelEntrySpec`, событие `WheelSpun` |
 | Использовать | применить свой предмет с целью и ответами | команда `UseItem`, событие `ItemUsed` |
 | Правка инвентаря | админ выдаёт или забирает объект с комментарием | команда `AdjustInventory`, событие `InventoryAdjusted` |
+| Инвентарь | всё, что игрок держит: предметы, эффекты, спецроллы; раздел «Инвентарь» на экране сезона | `PlayerEconomy.Inventory`, API `GET /api/seasons/{id}/economy` (`EconomyView`, `InventoryItemView`), экран `season/Inventory.tsx` |
+| План предмета | что экран предлагает для объекта: открыто ли «Использовать», почему нет, на кого можно, какие ответы нужны | `ItemPlan`, `ItemPlans.Of`, шаг ответа — `ItemStep` (`ItemStepKind`: `Choice`, `PickObject`) |
+| Цель предмета («На кого») | игрок, выбранный для предмета с селектором `chosen`; экран предлагает только тех, кого примет движок | `UseItem.TargetPlayerId`, `ItemPlan.Targets`, `Targets.Choosable` |
+| Ответ предмета | выбор для `requestChoice` или объект цели для `takeObject` с `pick: chosen` | `UseItem.Choices`, `ItemStepView` |
+| План магазина | цена и способ оплаты следующего ролла магазина, отказ движка, лоты, пока не истекли | `ShopPlan`, `ShopPlans.Of`, API `ShopView` |
 | Срабатывание эффекта | эффект или спецролл игрока сработал на своём триггере | `EffectTriggered`, `Firing` |
 | Бросок эффекта | кубики из значения эффекта (`$roll`) | `EffectRolled` |
 | Изменение ролла | фильтр или выбор из N для следующего ролла; на ролл фиксируется до старта игры | `RollModifier`, `NextRollModified`, `RollModifiersApplied` (`PlayerEconomy.NextRoll`, `CurrentRoll`) |
 | Изменение броска | этап конвейера для следующего броска за прохождение | `DiceModifier`, `NextDiceModified` |
 | Модификаторы броска | что предметы сделали с броском прохождения: грани, лишние кубики, прибавка, множитель, пределы | `RunDiceMods` (`RunState.Mods`), `RunDiceModified`, переброс — `RunDiceRerolled` |
 | Полученные враждебные | сколько враждебных эффектов дошло до игрока | `HostileReceived`, `PlayerEconomy.HostileReceived` |
-| Редкость | обычный, эпический, легендарный | `Rarity` (`Common`, `Epic`, `Legendary`) |
+| Редкость | обычная, эпическая, легендарная; на экране меткой «Редкость: эпическая» — не согласуется с родом названия предмета | `Rarity` (`Common`, `Epic`, `Legendary`) |
 | Окно использования | момент хода, когда предмет можно применить | `UseWindow` |
 | Базовое действие | элементарная операция, из которых собираются эффекты (не больше 12) | `ActionSpec` (`MoveAction`, `ChangeResourceAction`…) |
 | Триггер | фаза хода, на которую подписан эффект | `Trigger`; реакция на события команды — `ITriggerHandler` |
 | Лимит цепочки | не больше 3 уровней реакций и 50 событий на команду; обрыв пишется в лог | `EffectChain`, `EffectChainCut` |
 | Значение в действии | число, кубики («1d6») или ссылка («$roll») | `ContentValue` |
 | Селектор целей | правило выбора, на кого действует эффект | `TargetSelector` |
-| Враждебный эффект | эффект, наложенный другим игроком во вред | `IsHostile` |
+| Враждебный эффект | эффект, наложенный другим игроком во вред; метка предмета на экране — «Против других» | `IsHostile`, `ObjectDefinition.Hostile` |
 | Перехват | пассивная защита, гасящая враждебный эффект | `Intercept`, событие `HostileIntercepted` |
 | Отражение урона | урон монетками по цели на пороге `effects.reflect.coinsAtMost` и ниже достаётся использующему, умноженный (D-474) | `ChangeResourceAction.Reflect`, `CoinReflect` |
 | Счётчик эффекта | обратный отсчёт эффекта: срабатывания триггера уменьшают его, на нуле эффект действует; зелья меняют и сбрасывают (D-479) | `EffectSpec.Counter`, `InventoryObject.Counter`, `TransformMode.AddCounter`, `ResetCounters`, триггер `RunEnded` |
-| Передача объекта | игрок отдаёт свой объект другому предметом; отданное — его дело на получателе (D-478) | `TakeMode.Give`, `ObjectTransferred.Given`, отказ `item.nothingToGive` |
+| Передача объекта | игрок отдаёт свой объект другому предметом; отданное — его дело на получателе (D-478) | `TakeMode.Give`, `ObjectTransferred.Given`, отказ `item.nothingToGive`; кража «взамен» с `required` — отказ `item.nothingToTake` (D-487) |
 | Неукрадываемый, неуничтожимый | флаги объекта: эффекты не забирают и не передают / не уничтожают и не превращают его (D-478) | `ObjectDefinition.Unstealable`, `Undestroyable` |
 | Условие использования | когда предмет можно использовать, например «при нуле монеток» (D-483) | `ObjectDefinition.UseCondition`, статистика `ContentStat.Coins`, отказ `item.conditionNotMet` |
 | Ветвление по выбору | исходы эффекта по ответу игрока, а не по броску (D-482) | `OutcomesSpec.Choice`, `OutcomeCase.Option` |

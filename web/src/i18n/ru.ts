@@ -1,5 +1,15 @@
 // The single dictionary of interface texts. Terms come from docs/GLOSSARY.md.
 
+// A Russian noun after a number: 1 очко, 2 очка, 5 очков
+const plural = (n: number, one: string, few: string, many: string) => {
+  const tens = Math.abs(n) % 100;
+  const ones = Math.abs(n) % 10;
+  if (tens >= 11 && tens <= 14) return many;
+  if (ones === 1) return one;
+  if (ones >= 2 && ones <= 4) return few;
+  return many;
+};
+
 // игра / игры / игр
 const games = (n: number) => {
   const tens = n % 100;
@@ -10,20 +20,9 @@ const games = (n: number) => {
   return `${n} игр`;
 };
 
-// монетка / монетки / монеток
-const coins = (n: number) => {
-  const tens = n % 100;
-  const ones = n % 10;
-  const word =
-    tens >= 11 && tens <= 14
-      ? 'монеток'
-      : ones === 1
-        ? 'монетка'
-        : ones >= 2 && ones <= 4
-          ? 'монетки'
-          : 'монеток';
-  return `${n.toLocaleString('ru-RU')} ${word}`;
-};
+// монетка / монетки / монеток; a debt with a real minus: −2 монетки
+const coins = (n: number) =>
+  `${n < 0 ? '−' : ''}${Math.abs(n).toLocaleString('ru-RU')} ${plural(n, 'монетка', 'монетки', 'монеток')}`;
 
 // прохождение / прохождения / прохождений
 const runs = (n: number) => {
@@ -84,7 +83,7 @@ const rejection = {
   'turn.noPendingChoice': 'Этот выбор уже сделан или снят. Обнови страницу.',
   'turn.unknownOption': 'Такого варианта нет. Обнови страницу.',
   'roll.noAvailableGames': 'Нет доступных игр для ролла. Сообщи админу.',
-  'roll.notEnoughCoins': 'Не хватает монеток на реролл.',
+  'roll.notEnoughCoins': 'Не хватает монеток.',
   'roll.tooManyUnchecked':
     'Слишком много прохождений ждут проверки админом. Новый ролл откроется, когда их станет меньше лимита сезона.',
   'roll.gameNotOffered': 'Эта игра тебе сейчас не предложена. Обнови страницу.',
@@ -143,6 +142,7 @@ const rejection = {
   'effect.notYours': 'Это не твой эффект.',
   'effect.unknownOutcome': 'Неизвестный исход.',
   'item.nothingToGive': 'Отдать нечего: у тебя нет того, что этот предмет передаёт.',
+  'item.nothingToTake': 'Забрать нечего: у цели нет того, что этот предмет забирает.',
   'item.conditionNotMet':
     'Сейчас этот предмет использовать нельзя: условие из его описания не выполнено.',
   'season.deadlinePassed': 'Дедлайн прошёл: броски закрыты, пруфы принимаются.',
@@ -163,20 +163,52 @@ const rejection = {
   'site.maintenance': 'Идёт обслуживание: сайт на минуту только для чтения. Повтори чуть позже.',
   'bugReport.invalid': 'Опиши, что случилось (до 4000 символов).',
   'bugReport.screenshotUnknown': 'Скриншот не найден. Отправь отчёт ещё раз.',
+  // Stage 4: items, the shop and bets (D-441)
+  'item.unknown': 'Этого предмета у тебя уже нет. Обнови страницу.',
+  'item.notAnItem': 'Это эффект: он действует сам, использовать его не нужно.',
+  'item.wrongWindow': 'Сейчас этот предмет не используется: дождись его момента хода.',
+  'item.notStackable': 'Этот предмет не складывается с собой: прошлый ещё действует.',
+  'item.targetRequired': 'Выбери, на кого использовать предмет.',
+  'item.invalidTarget': 'На этого игрока предмет не действует. Выбери другого.',
+  'item.noTarget': 'Сейчас этот предмет не на кого использовать.',
+  'item.invalidChoice': 'Такого ответа нет. Обнови страницу и выбери снова.',
+  'item.hostileCap': 'На этом игроке уже висит враждебный эффект: больше нельзя.',
+  'item.notApplicable': 'Сейчас этот предмет ничего не изменит.',
+  'map.branchChoicePending':
+    'Кто-то, кого сдвинет предмет, выбирает ветку на развилке: попробуй чуть позже.',
+  'inventory.frozen': 'Ты финишировал первым: инвентарь заморожен.',
+  'inventory.full': 'Инвентарь полон: сначала используй что-нибудь.',
+  'content.unknownObject': 'Такого предмета нет в контенте сезона.',
+  'content.invalid': 'В пакете контента есть ошибки.',
+  'content.unchanged': 'Пакет совпадает с загруженным: обновлять нечего.',
+  'shop.noOffer': 'Сначала ролльни магазин.',
+  'shop.offerExpired': 'Время лотов вышло: ролльни магазин заново.',
+  'shop.unknownLot': 'Такого лота нет. Обнови страницу.',
+  'shop.lotSold': 'Этот лот уже куплен.',
+  'shop.empty': 'В магазине сезона пока ничего не продаётся.',
+  'coins.inDebt': 'Ты в минусе по монеткам: покупать нельзя.',
+  'bet.onSelf': 'На себя ставить нельзя.',
+  'bet.noRun': 'Этот игрок сейчас ничего не проходит.',
+  'bet.windowClosed': 'Ставки на эту игру уже закрыты.',
+  'bet.invalidDays': 'Выбери срок из предложенных.',
+  'bet.invalidStake': 'Ставка больше лимита сезона.',
+  'bet.tooMany': 'У тебя уже максимум открытых ставок.',
+  'bet.onFirst': 'На финишировавшего первым не ставят.',
+  'bet.alreadyPlaced': 'На эту игру ты уже поставил.',
   unknown: 'Действие отклонено. Попробуй ещё раз.',
+} as const;
+
+// What an object of the inventory is (GLOSSARY «Объект»)
+const objectKinds = {
+  item: 'Предмет',
+  effect: 'Эффект',
+  specialRoll: 'Спецролл',
+  event: 'Ивент',
+  achievement: 'Достижение',
 } as const;
 
 // H5: the feed, the profile and the game page
 
-// A Russian noun after a number: 1 очко, 2 очка, 5 очков
-const plural = (n: number, one: string, few: string, many: string) => {
-  const tens = Math.abs(n) % 100;
-  const ones = Math.abs(n) % 10;
-  if (tens >= 11 && tens <= 14) return many;
-  if (ones === 1) return one;
-  if (ones >= 2 && ones <= 4) return few;
-  return many;
-};
 // A change with its sign: +7, −3 (a real minus)
 const signed = (n: number) => (n < 0 ? `−${Math.abs(n)}` : `+${n}`);
 const hoursText = (n: number) => `${n.toLocaleString('ru-RU')} ч`;
@@ -205,6 +237,24 @@ const techReroll = 'Тех-реролл';
 
 const feedLines = {
   seasonCreated: <T>(name: string): Line<T> => [`Сезон «${name}» создан`],
+  // Stage 4 (D-444): items, the shop, bets
+  itemUsed: <T>(p: T, item: string, targets: T[]): Line<T> =>
+    targets.length === 0
+      ? [p, ` использует «${item}»`]
+      : [
+          p,
+          ` использует «${item}». ${targets.length === 1 ? 'Цель' : 'Цели'}: `,
+          ...targets.flatMap((t, i) => (i === 0 ? [t] : [', ', t])),
+        ],
+  inventoryGiven: <T>(p: T, item: string): Line<T> => [p, `: админ выдаёт «${item}»`],
+  inventoryTaken: <T>(p: T, item: string): Line<T> => [p, `: админ забирает «${item}»`],
+  inventoryAdjusted: <T>(p: T): Line<T> => [p, ': админ правит инвентарь'],
+  contentPublished: <T>(version: number): Line<T> => [
+    `Предметы сезона обновлены, версия ${version}`,
+  ],
+  shopRolled: <T>(p: T): Line<T> => [p, ' роллит магазин'],
+  lotBought: <T>(p: T, item: string): Line<T> => [p, ` покупает «${item}»`],
+  betPlaced: <T>(p: T, on: T): Line<T> => [p, ' ставит на ', on],
   seasonStatus: <T>(to: 'draft' | 'active' | 'closing' | 'finished' | 'archived'): Line<T> => [
     {
       draft: 'Сезон снова в подготовке',
@@ -360,6 +410,9 @@ export const ru = {
     },
     roll: 'Крутить колесо',
     start: 'Начать',
+    // SPEC «Награда»: the die follows the difficulty named at the start; lowered on the way — the lower counts (D-633)
+    startDifficulty: 'На какой сложности начинаешь',
+    startDifficultyHint: 'При завершении выше неё не засчитается. Понизишь по ходу — укажешь ниже.',
     alreadyPlayed: 'Уже проходил',
     reroll: 'Реролл',
     rerollFor: (payment: RerollPayment, price: number) =>
@@ -457,6 +510,7 @@ export const ru = {
     completeTitle: 'Игра пройдена? Отметь прохождение',
     difficulty: 'Сложность',
     difficultyHint: 'На какой сложности проходил. Админ сверит её с пруфом',
+    difficultyDeclared: (difficulty: string) => `Начинал на «${difficulty}» — выше не засчитается`,
     // The die of each difficulty and the event it grants, from the run's snapshot
     difficultyDice: (dice: { label: string; sides: number; grant: EventKind | null }[]) =>
       `Кубы: ${dice
@@ -695,6 +749,7 @@ export const ru = {
       ['offer', 'Результат ролла'],
       ['complete', 'Завершение'],
       ['proof', 'Пруф'],
+      ['inventory', 'Инвентарь'],
       ['pool', 'Игры пула'],
       ['rules', 'Правила сезона'],
       ['dialogs', 'Окна'],
@@ -839,6 +894,13 @@ export const ru = {
       title: 'Админка',
       lead: 'Прохождение в очереди пруфов: финиш сверху с золотой меткой, закрытый лимитом ролл — предупреждением. Одобрение — главное действие только у первой карточки, реджект подтверждается.',
     },
+    inventory: {
+      title: 'Инвентарь',
+      lead: 'Предметы, эффекты и спецроллы игрока. «Использовать» — только в окно предмета; лист предлагает только тех, на кого предмет подействует.',
+      buttons:
+        'Кнопка «Использовать»: наведение, фокус, нажатие; вне окна — подсказка вместо кнопки',
+      openSheet: 'Открыть лист «Использовать»',
+    },
     dialogs: {
       title: 'Окна',
       lead: 'Подтверждение опасного действия показывает последствия. Лидерборд на телефоне выезжает снизу.',
@@ -969,6 +1031,53 @@ export const ru = {
     tooOften: 'Слишком много отчётов за час. Попробуй позже.',
     failed: 'Отчёт не отправился. Попробуй ещё раз.',
   },
+  inventory: {
+    title: 'Инвентарь',
+    coins: (n: number) => coins(n),
+    count: (n: number, limit: number) => `Предметов ${n} из ${limit}`,
+    emptyTitle: 'В инвентаре пусто',
+    emptyText: 'Предметы дают клетки, лутбоксы и магазин. Как появятся — будут здесь.',
+    loadError: 'Проверь соединение и попробуй ещё раз.',
+    loadErrorTitle: 'Инвентарь не загрузился',
+    use: 'Использовать',
+    useTitle: (name: string) => `Использовать «${name}»`,
+    target: 'На кого',
+    targetHint: 'Только те, на кого предмет действует сейчас',
+    pickObject: 'Какой предмет',
+    noObjects: 'Подходящих предметов нет',
+    pickObjectNumbered: (n: number) => `Какой предмет, ${n}-й`,
+    preference: (n: number) => `${n}-й по желанию`,
+    preferenceHint:
+      'Сколько предметов — решит бросок. Отметь, какие важнее, остальные выберутся случайно.',
+    direction: 'Куда двигать',
+    forward: 'Вперёд',
+    back: 'Назад',
+    pick: 'Выбери',
+    // Names come in every gender: a text bound to a name never agrees with it
+    used: (name: string) => `Использовано: «${name}»`,
+    kinds: objectKinds,
+    actsAloneChip: (kind: keyof typeof objectKinds) => `${objectKinds[kind]}: действует сам`,
+    rarity: {
+      common: 'Редкость: обычная',
+      epic: 'Редкость: эпическая',
+      legendary: 'Редкость: легендарная',
+    },
+    hostile: 'Против других',
+    from: (name: string) => `От игрока ${name}`,
+    usesLeft: (n: number) =>
+      `Осталось ${n} ${plural(n, 'использование', 'использования', 'использований')}`,
+    runsLeft: (n: number) =>
+      `Ещё на ${n} ${plural(n, 'прохождение', 'прохождения', 'прохождений')}`,
+    until: (time: string) => `До ${time}`,
+    // When an item is used (SPEC «Окна использования»): said when it is not its moment
+    windows: {
+      beforeRoll: 'Используется перед роллом',
+      afterRoll: 'Используется после ролла, до старта игры',
+      beforeDice: 'Используется во время игры, до броска',
+      afterDice: 'Используется сразу после броска за прохождение',
+      anytime: 'Используется в любой момент',
+    },
+  },
   // Events drawn from decks (stage 5, D-500): the card of the one I drew last
   events: {
     kinds: eventKindNames,
@@ -1086,6 +1195,7 @@ export const ru = {
     undoneHint: 'Админ откатил это действие: оно больше не считается',
     someone: 'Игрок',
     someGame: 'игра',
+    someItem: 'предмет',
     fresh: (n: number) =>
       `${n} ${plural(n, 'новая запись', 'новые записи', 'новых записей')} в ленте`,
     emptyTitle: 'В ленте пока пусто',
@@ -1127,6 +1237,10 @@ export const ru = {
       moved: 'Фишка переставлена',
       teleport: 'Телепорт',
       branchWaiting: 'Развилка: ждёт выбора ветки',
+      intercepted: (item: string) => `Перехвачено: «${item}»`,
+      gotObject: (item: string) => `Получено: «${item}»`,
+      lostObject: (item: string) => `Не влезло в инвентарь: «${item}»`,
+      stake: (n: number) => `Ставка: ${coins(n)}`,
     },
     rating: (n: number) => `${n} из 10`,
     ratingLabel: (n: number) => `Оценка: ${n} из 10`,
@@ -1827,6 +1941,10 @@ export const ru = {
         'An object without an effect must be manual.': 'Объект без эффекта должен быть ручным.',
         'A price is 0 or more; null means not for sale.':
           'Цена — 0 или больше; пусто — не продаётся.',
+        'A price is at most 1000000.': 'Цена — не больше 1 000 000.',
+        'An amount is within ±1000000.': 'Количество — не больше ±1 000 000.',
+        '«add» takes a number within ±1000.': 'Прибавка числом — не больше ±1000.',
+        'A multiplier is at most 10.': 'Множитель — не больше 10.',
         'An effect has either actions or outcomes, not both.':
           'У эффекта либо действия, либо исходы по броску — не то и другое.',
         'An effect needs actions, outcomes or an interception.':
@@ -1904,6 +2022,14 @@ export const ru = {
         [
           /^At most (\d+) wheels in one pack\.$/u,
           (n: string) => `В пакете — не больше ${n} колёс.`,
+        ],
+        [
+          /^At most (\d+) entries in a wheel\.$/u,
+          (n: string) => `В колесе — не больше ${n} записей.`,
+        ],
+        [
+          /^The «\w+» stage takes a number of at most (\d+)\.$/u,
+          (n: string) => `Этот шаг кубов — число не больше ${n}.`,
         ],
       ] as readonly (readonly [RegExp, (match: string) => string])[],
       valueHint: 'Число, кубы «1d6» или ссылка «$roll»',
@@ -2094,6 +2220,8 @@ export const ru = {
       'map.unchanged': 'Карта не изменилась: публиковать нечего.',
       'content.invalid': 'В пакете есть ошибки: исправь те, что у полей.',
       'content.unchanged': 'Контент не изменился: сохранять нечего.',
+      'content.tooLarge':
+        'Пакет слишком большой: не больше 1000 объектов, 100 колёс и 200 записей в колесе.',
       'content.versionChanged':
         'Контент изменили, пока ты редактировал: обнови страницу и внеси правки в новую версию.',
       'map.occupiedCellRemoved': 'На удалённой клетке стоят игроки: верни клетку или перенеси их.',

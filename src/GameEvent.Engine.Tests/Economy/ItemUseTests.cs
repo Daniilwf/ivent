@@ -602,6 +602,48 @@ public class ItemUseTests
         Assert.Equal(0, s.Player("Вася").Points);
     }
 
+    private static ObjectDefinition TransferTo(string cell) => new()
+    {
+        Id = $"transfer-to-{cell}",
+        Kind = ObjectKind.Item,
+        Name = "Перенос",
+        Description = "Перенос для теста.",
+        Window = UseWindow.Anytime,
+        Effect = new EffectSpec { Target = new TargetSpec { Selector = TargetSelector.Self }, Actions = [new TeleportAction { Cell = cell }] },
+    };
+
+    [Theory]
+    [InlineData("a", "c")]
+    [InlineData("start", "c")]
+    [InlineData("k", "k")]
+    [InlineData("b", "b")]
+    [InlineData("d", "d")]
+    public void A_transfer_never_lands_behind_the_last_checkpoint(string to, string lands)
+    {
+        // Invariant 7, D-306 (AU4-6): back to the checkpoint, never past it; ahead as before
+        var map = MapBuilder.New().Path("start", "a", "k", "b", "c", "d", "finish").Checkpoint("k").Build();
+        var s = OnMap(map, TransferTo(to));
+        Economy.ImportedItems.ImportedItemsSeason.At(s, "Вася", "c");
+        s.Give("Вася", $"transfer-to-{to}");
+
+        s.Used("Вася", $"transfer-to-{to}");
+
+        Assert.Equal(lands, s.Player("Вася").CellId);
+    }
+
+    [Fact]
+    public void A_transfer_from_before_any_checkpoint_may_go_back()
+    {
+        var map = MapBuilder.New().Path("start", "a", "b", "k", "c", "finish").Checkpoint("k").Build();
+        var s = OnMap(map, TransferTo("a"));
+        Economy.ImportedItems.ImportedItemsSeason.At(s, "Вася", "b");
+        s.Give("Вася", "transfer-to-a");
+
+        s.Used("Вася", "transfer-to-a");
+
+        Assert.Equal("a", s.Player("Вася").CellId);
+    }
+
     [Fact]
     public void A_push_that_stops_on_a_cell_triggers_it()
     {

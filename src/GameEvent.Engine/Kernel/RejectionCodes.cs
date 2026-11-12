@@ -100,6 +100,9 @@ public static class RejectionCodes
     /// <summary>An effect that hands over one of the user's objects, and he has none it may give (D-478).</summary>
     public const string ItemNothingToGive = "item.nothingToGive";
 
+    /// <summary>An effect that must take something from its target (<c>required</c>), and the target has nothing it may take (D-487).</summary>
+    public const string ItemNothingToTake = "item.nothingToTake";
+
     /// <summary>The item's use condition does not hold for its user (D-483).</summary>
     public const string ItemConditionNotMet = "item.conditionNotMet";
     public const string ItemHostileCap = "item.hostileCap";
@@ -122,4 +125,7 @@ public static class RejectionCodes
     public const string BetTooMany = "bet.tooMany";
     public const string BetOnFirst = "bet.onFirst";
     public const string BetAlreadyPlaced = "bet.alreadyPlaced";
+
+    /// <summary>A content pack over the size limits of <c>ContentPublishing</c> (NB-SEC-3, D-653).</summary>
+    public const string ContentTooLarge = "content.tooLarge";
 }
