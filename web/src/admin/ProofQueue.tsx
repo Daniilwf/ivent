@@ -232,6 +232,24 @@ export function ProofCard({
             .filter((part) => part !== null)
             .join(', ')}
         </p>
+        {item.hoursSource ? (
+          // SPEC «Часы и кубы»: the pool had no hours, the player estimated them with a source the admin may correct
+          <p className="text-sm" data-testid="hours-source">
+            <span className="font-bold">{t.estimated}</span> <span>{t.estimateSource}: </span>
+            {/^https:\/\//i.test(item.hoursSource) ? (
+              <a
+                href={item.hoursSource}
+                target="_blank"
+                rel="noreferrer noopener"
+                className={cx(inlineLink, 'break-all')}
+              >
+                {item.hoursSource}
+              </a>
+            ) : (
+              <span className="break-words">{item.hoursSource}</span>
+            )}
+          </p>
+        ) : null}
       </header>
 
       <section className="grid gap-2" aria-label={ru.proof.title}>
@@ -333,6 +351,8 @@ export function ProofCard({
           open={rejecting}
           onOpenChange={(open) => {
             setRejecting(open);
+            // One comment: what the admin already typed in the card goes into the dialog (K1A)
+            if (open && rejectComment.trim() === '') setRejectComment(comment);
             if (!open) {
               setRejectError(undefined);
               setRejectRefusal(undefined);
@@ -371,6 +391,7 @@ export function ProofCard({
           open={penalizing}
           onOpenChange={(open) => {
             setPenalizing(open);
+            if (open && penaltyComment.trim() === '') setPenaltyComment(comment);
             if (!open) {
               setPenaltyError(undefined);
               setPenaltyRefusal(undefined);

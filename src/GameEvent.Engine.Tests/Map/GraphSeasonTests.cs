@@ -114,6 +114,34 @@ public class GraphSeasonTests
     }
 
     [Fact]
+    public void Each_publication_moves_the_map_version_on()
+    {
+        var s = Scenario.New().WithMap(ForkMap()).WithPlayers("Вася");
+        Assert.Equal(0, s.State.MapVersion);
+        var next = MapBuilder.New().Path("start", "a", "f", "b1", "j", "k", "l", "finish").Path("f", "c1", "j").Build();
+
+        s.Act(new PublishMap(next, "Длиннее", ExpectedVersion: 0));
+
+        ScenarioAssert.Accepted(s);
+        Assert.Equal(1, s.State.MapVersion);
+        Assert.Equal(s.State, SeasonEngine.Replay(s.Log));
+    }
+
+    [Fact]
+    public void A_draft_made_from_an_older_map_is_not_published_over_a_newer_one()
+    {
+        // K1A, D-320: another tab published since this draft was made from version 0
+        var s = Scenario.New().WithMap(ForkMap()).WithPlayers("Вася");
+        var theirs = MapBuilder.New().Path("start", "a", "f", "b1", "j", "k", "l", "finish").Path("f", "c1", "j").Build();
+        var mine = MapBuilder.New().Path("start", "a", "f", "b1", "j", "k", "m", "finish").Path("f", "c1", "j").Build();
+        s.Act(new PublishMap(theirs, "Их правка", ExpectedVersion: 0));
+
+        ScenarioAssert.RejectsWithoutChanges(
+            s, x => x.Act(new PublishMap(mine, "Моя правка", ExpectedVersion: 0)), RejectionCodes.MapVersionConflict);
+        Assert.Equal(theirs, s.State.Map);
+    }
+
+    [Fact]
     public void Linear_season_does_not_publish_maps()
     {
         var s = Scenario.New().WithPlayers("Вася");

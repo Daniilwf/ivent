@@ -1,5 +1,5 @@
 import { Moon, UserPlus, Users } from 'lucide-react';
-import { useCallback, useState, type SyntheticEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type SyntheticEvent } from 'react';
 import { api, type Schemas } from '../api/client';
 import { moscowTime } from '../app/time';
 import { ru } from '../i18n/ru';
@@ -230,6 +230,21 @@ function PlayerRow({
   );
 }
 
+/**
+ * A form opened under a player's card: on a phone it would open below the screen with nothing changing in view, so it
+ * scrolls into view and its first field takes the focus (K1A)
+ */
+function useRevealed() {
+  const form = useRef<HTMLFormElement>(null);
+  useEffect(() => {
+    const element = form.current;
+    if (!element) return;
+    element.scrollIntoView({ block: 'nearest' });
+    element.querySelector<HTMLElement>('select, input, textarea')?.focus({ preventScroll: true });
+  }, []);
+  return form;
+}
+
 function AdjustForm({
   seasonId,
   player,
@@ -253,6 +268,7 @@ function AdjustForm({
     form?: string | undefined;
   }>({});
   const [busy, setBusy] = useState(false);
+  const form = useRevealed();
 
   async function submit(e: SyntheticEvent) {
     e.preventDefault();
@@ -290,6 +306,7 @@ function AdjustForm({
 
   return (
     <form
+      ref={form}
       className="grid gap-3 rounded-md border-2 border-muted p-3"
       onSubmit={(e) => void submit(e)}
       aria-label={t.adjustTitle(player.name)}
@@ -385,6 +402,7 @@ function TechRerollForm({
     form?: string | undefined;
   }>({});
   const [busy, setBusy] = useState(false);
+  const form = useRevealed();
 
   async function submit(e: SyntheticEvent) {
     e.preventDefault();
@@ -414,6 +432,7 @@ function TechRerollForm({
 
   return (
     <form
+      ref={form}
       className="grid gap-3 rounded-md border-2 border-muted p-3"
       onSubmit={(e) => void submit(e)}
       aria-label={t.techRerollTitle(player.name)}

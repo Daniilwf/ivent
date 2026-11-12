@@ -30,6 +30,17 @@ function serve(answer: (url: string, method: string) => Response, avatar: Link |
       const request = typeof input === 'string' ? null : input;
       const url = request?.url ?? (input as string);
       const method = request?.method ?? init?.method ?? 'GET';
+      // The site names its upload limits (D-617): the defaults of FileLimits
+      if (method === 'GET' && url.endsWith('/api/status')) {
+        const mb = 1024 * 1024;
+        return json(200, {
+          maintenance: false,
+          version: '1',
+          environment: 'test',
+          testTools: false,
+          uploads: { picture: 15 * mb, gif: 8 * mb, bugScreenshot: 3 * mb, mapBackground: 10 * mb },
+        });
+      }
       if (method === 'GET' && url.endsWith('/api/auth/me')) {
         return json(200, {
           id: 'u',
@@ -112,6 +123,40 @@ describe('My avatar', () => {
       ru.upload.errors['file.hostNotAllowed'],
     );
     expect(onChanged).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    'https://tenor.com/view/cat-gif-123',
+    'https://giphy.com/gifs/cat-abc',
+    'https://www.tenor.com/view/x',
+  ])(
+    'tells which link to paste when given the page of a GIF instead of the GIF itself: %s (K1A)',
+    async (link) => {
+      const sent = serve(() => json(500, {}));
+      render(<AvatarSection onChanged={vi.fn()} />);
+
+      await userEvent.type(screen.getByTestId('avatar-link'), link);
+      await userEvent.click(screen.getByRole('button', { name: ru.avatar.useLink }));
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(ru.avatar.pageLink);
+      expect(sent.filter((x) => x.method !== 'GET')).toHaveLength(0);
+    },
+  );
+
+  it('the refusal of another site says what link works', () => {
+    expect(ru.upload.errors['file.hostNotAllowed']).toMatch(/media\.tenor\.com/);
+  });
+
+  it('refuses a file over the limit before sending it (K1A)', async () => {
+    const sent = serve(() => json(500, {}));
+    render(<AvatarSection onChanged={vi.fn()} />);
+    const huge = picture();
+    Object.defineProperty(huge, 'size', { value: 40 * 1024 * 1024 });
+
+    await userEvent.upload(screen.getByTestId('avatar-file'), huge);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(ru.upload.errors['file.tooLarge']);
+    expect(sent.filter((x) => x.method !== 'GET')).toHaveLength(0);
   });
 
   it('asks for a link before sending an empty one', async () => {

@@ -26,6 +26,11 @@ public enum RerollPayment
 
     /// <summary>The frozen first's reroll in free mode: nothing is spent (D-99).</summary>
     FreeMode,
+
+    /// <summary>
+    /// The offered game was deleted from the pool: nothing is spent and the free rerolls of the roll stay (D-615).
+    /// </summary>
+    GameDeleted,
 }
 
 /// <summary>

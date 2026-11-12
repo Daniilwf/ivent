@@ -100,7 +100,9 @@ describe('GameScreen', () => {
     );
     expect(done).toHaveTextContent(ru.gamePage.status['completed'] ?? '');
     expect(done).toHaveTextContent(ru.difficulty.hard);
-    expect(done).toHaveTextContent('31,5 ч в игре');
+    // Glossary «Часы»: the game's length, not a time played nobody measured (K1A)
+    expect(done).toHaveTextContent('длина 31,5 ч');
+    expect(done).not.toHaveTextContent('в игре');
     expect(done).toHaveTextContent('Лучшая метроидвания');
     expect(
       within(done as HTMLElement).getByRole('img', { name: ru.feed.ratingLabel(9) }),

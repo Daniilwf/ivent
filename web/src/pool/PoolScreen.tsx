@@ -1,7 +1,7 @@
 import { Library, Plus, SearchX, SlidersHorizontal } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import { api, type Schemas } from '../api/client';
-import { usePageHeading } from '../app/router';
+import { useEntryState, usePageHeading, useRestoredScroll } from '../app/router';
 import { answerOf, useLoaded, type Answer } from '../app/useLoaded';
 import { usePoolVersion, useSeasonVersion } from '../app/useSeasonVersion';
 import { ru } from '../i18n/ru';
@@ -59,7 +59,8 @@ export function PoolScreen({
   canAdd: boolean;
   onSignedOut: () => void;
 }) {
-  const [filter, setFilter] = useState<PoolFilter>(noFilter);
+  // The search and the pages shown stay in the history entry: Back from a game comes back to the same list (K1A)
+  const [filter, setFilter] = useEntryState<PoolFilter>('pool.filter', noFilter);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [adding, setAdding] = useState(false);
   const [added, setAdded] = useState<string | null>(null);
@@ -122,7 +123,8 @@ export function PoolScreen({
   const filters = activeFilters(filter);
 
   // A new filter starts from the first page
-  const { page, more } = usePaging(shown, JSON.stringify(filter));
+  const { page, more } = usePaging(shown, JSON.stringify(filter), 'pool.paging');
+  useRestoredScroll(loaded.kind === 'ready');
 
   function change(next: Partial<PoolFilter>) {
     setFilter((now) => ({ ...now, ...next }));

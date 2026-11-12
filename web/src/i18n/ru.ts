@@ -71,7 +71,8 @@ type DropPenalty = {
   badEvent: boolean;
 };
 
-type RerollPayment = 'freeThisRoll' | 'freeRerollResource' | 'coins' | 'badEvent' | 'freeMode';
+type RerollPayment =
+  'freeThisRoll' | 'freeRerollResource' | 'coins' | 'badEvent' | 'freeMode' | 'gameDeleted';
 
 const rejection = {
   'pool.duplicate': 'Такая игра уже есть в пуле.',
@@ -88,6 +89,7 @@ const rejection = {
   'roll.tooManyUnchecked':
     'Слишком много прохождений ждут проверки админом. Новый ролл откроется, когда их станет меньше лимита сезона.',
   'roll.gameNotOffered': 'Эта игра тебе сейчас не предложена. Обнови страницу.',
+  'roll.gameDeleted': 'Админ убрал эту игру из пула. Сделай реролл — он бесплатный.',
   'proof.invalidLink': 'Ссылка должна начинаться с http:// или https://, ссылок не больше пяти.',
   'proof.empty': 'Добавь ссылку на пруф или выбери свидетеля.',
   'proof.witnessInvalid': 'Свидетелем может быть только другой игрок сезона.',
@@ -121,11 +123,17 @@ const rejection = {
     'Этот запрос уже выполнен. Если пароль ещё нужно сменить — отправь форму заново.',
   'account.stale': 'Аккаунт изменился, пока шёл запрос. Войди заново.',
   'account.roleInvalid': 'Неизвестная роль.',
-  'account.passwordInvalid': 'Пароль — от 8 символов, не совпадает с логином и с текущим паролем.',
+  'account.passwordInvalid':
+    'Пароль — от 8 символов, не из одних пробелов, не совпадает с логином и с текущим паролем.',
   'account.loginInvalid':
     'Логин — от 2 до 32 латинских букв, цифр, точек, дефисов и подчёркиваний.',
   'account.loginTaken': 'Такой логин уже занят.',
-  'account.nameInvalid': 'Имя — от 1 до 64 символов.',
+  'account.nameInvalid':
+    'Имя — от 1 до 64 символов, хотя бы один видимый, без невидимых и управляющих символов.',
+  'player.nameTaken':
+    'В сезоне уже есть игрок с таким именем: в лидерборде и ленте их не различить. Переименуй один из аккаунтов.',
+  'account.inSeason':
+    'Этот аккаунт играет в незавершённом сезоне. Админу, который играет, нужен второй аккаунт.',
   'account.lastAdmin': 'Последний админ остаётся админом.',
   'account.deleted': 'Аккаунт уже удалён.',
   'account.notDeleted': 'Аккаунт не удалён.',
@@ -159,6 +167,8 @@ const rejection = {
   'ruleset.invalid': 'В правилах есть ошибки: исправь отмеченные поля.',
   'ruleset.unchanged': 'Правила не изменились: сохранять нечего.',
   'ruleset.versionConflict': 'Правила уже изменил кто-то другой. Обнови страницу и повтори правку.',
+  'map.versionConflict':
+    'Карту уже опубликовали из другой вкладки или другой админ. Верни опубликованную карту и повтори правки.',
   'ruleset.betsInPlay':
     'Ставки нельзя выключить, пока есть открытые ставки или выигрыши по непроверенным прохождениям.',
   'site.maintenance': 'Идёт обслуживание: сайт на минуту только для чтения. Повтори чуть позже.',
@@ -364,7 +374,7 @@ export const ru = {
     alreadyPlayed: 'Уже проходил',
     reroll: 'Реролл',
     rerollFor: (payment: RerollPayment, price: number) =>
-      payment === 'freeThisRoll' || payment === 'freeMode'
+      payment === 'freeThisRoll' || payment === 'freeMode' || payment === 'gameDeleted'
         ? 'Реролл — бесплатно'
         : payment === 'freeRerollResource'
           ? 'Реролл — купон реролла'
@@ -527,6 +537,8 @@ export const ru = {
     link: 'Или ссылка на гифку (Tenor, Giphy, Klipy)',
     useLink: 'Взять по ссылке',
     linkRequired: 'Вставь ссылку.',
+    pageLink:
+      'Это ссылка на страницу, а нужна ссылка на саму гифку. Открой гифку, нажми на неё правой кнопкой или подержи палец и выбери «Копировать адрес картинки» — ссылка начнётся с media.tenor.com или media.giphy.com.',
     remove: 'Убрать аватарку',
   },
   upload: {
@@ -544,7 +556,8 @@ export const ru = {
       'file.busy': 'Сервер занят другими картинками. Попробуй через минуту.',
       'file.downloadsPerHour': 'Лимит скачиваний по ссылке на этот час исчерпан.',
       'file.urlInvalid': 'Нужна ссылка, начинающаяся с https://.',
-      'file.hostNotAllowed': 'Ссылки принимаются только с Tenor, Giphy и Klipy.',
+      'file.hostNotAllowed':
+        'Нужна ссылка на саму гифку с Tenor, Giphy или Klipy — она начинается с media.tenor.com, media.giphy.com или i.giphy.com.',
       'file.addressNotPublic': 'По этой ссылке картинку взять нельзя.',
       'file.downloadFailed': 'Не удалось скачать картинку по ссылке.',
     },
@@ -563,6 +576,7 @@ export const ru = {
     noSeasonText: 'Когда админ заведёт сезон, здесь появятся карта, лидерборд и твой ход.',
     loadErrorTitle: 'Сайт не загрузился',
     loadErrorText: 'Сервер не ответил. Проверь интернет и попробуй ещё раз.',
+    tooOftenText: 'Слишком много запросов подряд. Подожди минуту и попробуй ещё раз.',
     loginLead: 'Настольная игра, где ходы зарабатываются прохождением видеоигр.',
     meeples: 'ИВЕНТ',
   },
@@ -1117,6 +1131,7 @@ export const ru = {
         coins: 'Реролл за монетки',
         badEvent: 'Реролл за плохой ивент',
         freeMode: 'Реролл в свободном режиме',
+        gameDeleted: 'Бесплатный реролл: игру убрали из пула',
       } as Record<string, string>,
       finish: (order: number) => `Финиш: ${order}-е место`,
       frozen: 'Очки заморожены: первый финиш',
@@ -1166,7 +1181,8 @@ export const ru = {
       techRerolled: techReroll,
       rejected: 'Отклонено',
     } as Record<string, string>,
-    played: (hours: number) => `${hoursText(hours)} в игре`,
+    // Glossary «Часы»: the length of the game the run counted (HowLongToBeat or the player's estimate), not time played
+    played: (hours: number) => `длина ${hoursText(hours)}`,
     noRunsTitle: 'Эту игру ещё никто не брал',
     noRunsText: 'Когда она выпадет на колесе, прохождения и отзывы появятся здесь.',
     errorTitle: 'Страница игры не загрузилась',
@@ -1215,6 +1231,8 @@ export const ru = {
     completed: (player: string, day: string | null) =>
       day ? `Уже прошёл ${player}, ${day}` : `Уже прошёл ${player}`,
     playing: (player: string) => `Сейчас играет ${player}`,
+    // Glossary «Предложенная игра»: reserved for the player until «Начать», not played yet
+    offered: (player: string) => `Выпала игроку ${player}, ещё не начата`,
     excluded: {
       alreadyPlayed: 'Тебе не выпадет: ты уже проходил',
       dropped: 'Тебе не выпадет: ты дропнул',
@@ -1520,6 +1538,8 @@ export const ru = {
     noSeasonTitle: 'Сезона пока нет',
     noSeasonText: 'Создай сезон в разделе «Сезон», и здесь появятся игроки и пруфы.',
     toSeason: 'Открыть «Сезон»',
+    seasonOf: (name: string, status: string) => `Сезон: ${name} (${status.toLowerCase()})`,
+    changeSeason: 'Сменить сезон',
     loadErrorTitle: 'Не загрузилось',
     failed: 'Не получилось. Попробуй ещё раз.',
     invalid: 'Сервер не принял значения: проверь поля.',
@@ -1935,6 +1955,8 @@ export const ru = {
       reset: 'Вернуть опубликованную',
       draftStale:
         'Карту опубликовали, пока тебя не было: твой черновик был сделан по прежней версии и отброшен. Перед тобой новая карта.',
+      draftOutdated:
+        'Карту только что опубликовали из другой вкладки или другой админ. Твой черновик сделан по прежней версии: опубликовать его нельзя. Нажми «Вернуть опубликованную» и повтори правки на новой карте.',
       addCell: 'Добавить клетку',
       cellsList: 'Клетка',
       fit: 'Показать всю карту',
@@ -2010,6 +2032,22 @@ export const ru = {
         empty:
           'Зон пока нет. Зона меняет правила ролла, кубы и штраф дропа для тех, кто в ней стоит.',
         newName: (n: number) => `Зона ${n}`,
+        notNumber: 'Нужно число, например 1,5.',
+      },
+      // The field of a zone the check found wrong (MapValidator → ContentValidator paths), by the zone's name (K1A)
+      zoneProblem: (zone: string, path: string) => {
+        const field: Record<string, string> = {
+          '$.id': 'неподходящий id',
+          '$.name': 'название — от 1 до 64 символов',
+          '$.rollFilter': 'фильтр ролла: укажи теги или часы, часы больше нуля',
+          '$.rollFilter.tags': 'теги ролла не пустые',
+          '$.rollFilter.minHours': '«Часов от» больше, чем «Часов до»',
+          '$.rollFilter.maxHours': '«Часов до» больше нуля',
+          '$.diceModifier.value': 'в «Сколько» нужно целое число',
+          '$.dropPenaltyMultiplier': 'множитель штрафа за дроп больше нуля',
+          '$.shopPriceMultiplier': 'множитель цен магазина больше нуля',
+        };
+        return `Зона «${zone}»: ${field[path] ?? 'заполнена с ошибкой'}.`;
       },
       check: {
         title: 'Проверка',
@@ -2146,6 +2184,8 @@ export const ru = {
       completed: (time: string) => `Завершено ${time}`,
       claimed: (difficulty: string) => `Заявлено: ${difficulty}`,
       noHours: 'часы не указаны',
+      estimated: 'Часы — оценка игрока.',
+      estimateSource: 'Источник',
       dice: (total: number) => `кубы +${total}`,
       witness: (name: string) => `Свидетель: ${name}`,
       note: (text: string) => `Заметка: ${text}`,
@@ -2278,6 +2318,8 @@ export const ru = {
       dependents: 'От этого действия зависят более поздние. Сначала откати их:',
       dependentUnknown: 'действие за пределами показанного лога',
       events: (n: number) => `событий: ${n}`,
+      comment: (text: string) => `Комментарий: ${text}`,
+      about: (subject: string) => `Касается: ${subject}`,
       commands: {
         CreateSeason: 'Создание сезона',
         ChangeSeasonStatus: 'Смена статуса сезона',
@@ -2442,6 +2484,14 @@ export const ru = {
       deadlineHint: 'Дата и время по Москве',
       deadlineRequired: 'Выбери дату и время.',
       setDeadline: 'Сохранить дедлайн',
+      // D-101: after the deadline the season closes and does not reopen; a typo of a day is caught here (K1A)
+      deadlineSoonTitle: 'Дедлайн меньше чем через сутки?',
+      deadlineSoonConsequences: (when: string) => [
+        `Дедлайн: ${when}`,
+        'После него броски закроются, а сезон уйдёт в проверку пруфов',
+        'Вернуть сезон в «идёт» или продлить дедлайн потом будет нельзя — проверь дату',
+      ],
+      deadlineSoonConfirm: 'Да, поставить',
       removeDeadline: 'Убрать дедлайн',
       deadlineSaved: 'Дедлайн сохранён.',
       deadlineRemoved: 'Дедлайн убран.',

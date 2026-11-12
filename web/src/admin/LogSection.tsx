@@ -23,6 +23,13 @@ const most = 500;
 // Neither the season's creation nor an undo can be undone (undo.notUndoable)
 const final = new Set(['CreateSeason', 'UndoCommand']);
 
+/** Whom and what a command touched: «Волк · «Celeste»», or nothing (K1A) */
+function subjectOf(command: Command): string {
+  return [command.playerName, command.gameTitle ? `«${command.gameTitle}»` : null]
+    .filter((part) => part != null && part !== '')
+    .join(' · ');
+}
+
 /** The season log, newest first, with undo of a whole command (D-104) */
 export function LogSection({ seasonId, version }: { seasonId: string; version: number }) {
   const [limit, setLimit] = useState(step);
@@ -105,6 +112,7 @@ function LogRow({
   const [dependents, setDependents] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const label = commandLabel(command.commandType);
+  const subject = subjectOf(command);
 
   async function undo() {
     const problem = commentProblem(comment);
@@ -145,6 +153,7 @@ function LogRow({
       <div className="mr-auto grid min-w-0 gap-1">
         <p className="flex flex-wrap items-center gap-2 font-bold">
           {label}
+          {subject ? <span className="font-medium break-words">{subject}</span> : null}
           {command.undone ? (
             <Badge tone="muted" icon={<Undo2 size={12} aria-hidden />}>
               {t.undone}
@@ -158,6 +167,9 @@ function LogRow({
             t.events(command.events.length),
           ].join(', ')}
         </p>
+        {command.comment ? (
+          <p className="text-sm break-words">{t.comment(command.comment)}</p>
+        ) : null}
       </div>
       {command.undone || final.has(command.commandType) ? null : (
         <ConfirmDanger
@@ -176,7 +188,11 @@ function LogRow({
             </Button>
           }
           title={t.undoTitle(label)}
-          consequences={t.undoConsequences(command.events.length)}
+          consequences={[
+            ...(subject ? [t.about(subject)] : []),
+            ...(command.comment ? [t.comment(command.comment)] : []),
+            ...t.undoConsequences(command.events.length),
+          ]}
           confirm={t.undoConfirm}
           busy={busy}
           onConfirm={() => void undo()}
@@ -203,7 +219,14 @@ function LogRow({
                   return (
                     <li key={id}>
                       {later
-                        ? `${commandLabel(later.commandType)}, ${later.authorName ?? ru.admin.system}, ${moscowTime(later.occurredAt)}`
+                        ? [
+                            commandLabel(later.commandType),
+                            subjectOf(later),
+                            later.authorName ?? ru.admin.system,
+                            moscowTime(later.occurredAt),
+                          ]
+                            .filter((part) => part !== '')
+                            .join(', ')
                         : t.dependentUnknown}
                     </li>
                   );

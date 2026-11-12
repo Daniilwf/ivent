@@ -63,6 +63,9 @@ const view = (map: Schemas['MapGraphView'] = published): Schemas['AdminMapView']
   status: 'active',
   map,
   players: [],
+  version: 0,
+  events: false,
+  shop: false,
 });
 
 afterEach(() => {

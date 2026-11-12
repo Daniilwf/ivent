@@ -1,5 +1,6 @@
 import type { Player } from '../board/types';
 import { playerToken } from '../design/players';
+import { initial } from './initial';
 
 /** A player's sticker: the avatar, or the first letter on the token colour in a readable ink */
 export function Sticker({
@@ -31,7 +32,7 @@ export function Sticker({
           className="size-full object-cover"
         />
       ) : (
-        player.name.slice(0, 1)
+        initial(player.name)
       )}
     </span>
   );

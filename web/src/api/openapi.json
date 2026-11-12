@@ -6492,9 +6492,27 @@
             "items": {
               "type": "string"
             }
+          },
+          "playerName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "gameTitle": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "comment": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         },
-        "description": "A command of the season log, newest first (D-104): what the admin picks to undo. `undone` — undone already;\n`events` — the types of its events in order."
+        "description": "A command of the season log, newest first (D-104): what the admin picks to undo. `undone` — undone already;\n`events` — the types of its events in order; `playerName`, `gameTitle`, `comment` — whom and what\nthe command touched, from its first event that names them, so identical rows are told apart before an undo (K1A;\nnull when none does)."
       },
       "AdminContentView": {
         "required": [
@@ -6602,9 +6620,22 @@
             "items": {
               "$ref": "#/components/schemas/MapPlayerView"
             }
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32",
+            "default": 0
+          },
+          "events": {
+            "type": "boolean",
+            "default": false
+          },
+          "shop": {
+            "type": "boolean",
+            "default": false
           }
         },
-        "description": "The season's map in the editor (2.11): the map in force, the players on it, the mode (the editor publishes only in\n`graph`, D-301) and the status (only a draft or a running season takes a new map)."
+        "description": "The season's map in the editor (2.11): the map in force, the players on it, the mode (the editor publishes only in\n`graph`, D-301) and the status (only a draft or a running season takes a new map). `version`: how many times\nthe map was published (0 — the map of the season's creation); the publication names it back (D-616; always set).\n`events`, `shop`: whether the season's mechanics behind the event and shop cells are on — a switched-off\nmechanic is not offered in the editor (D-302, K1A; always set)."
       },
       "AdminPlayerView": {
         "required": [
@@ -10265,9 +10296,15 @@
                 "$ref": "#/components/schemas/DropPenaltyView"
               }
             ]
+          },
+          "hoursSource": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         },
-        "description": "A run to check, in queue order (D-98, Q-3): the runs that decide a finish on top (`decidesFinish`), then by\ncompletion time; with the claimed difficulty, the counted hours and the dice total, what an approval at a lower\ndifficulty or a reject changes. `reachedFinish`: this run's latest move stands on the finish.\n`rollClosed`: the player's next roll is closed by the limit of unchecked runs (D-134) until the admin checks one.\n`cellBonus`: the points bonus of the cell the run's move stopped on, which a reject takes back too (D-327; always\nset, optional for older clients). `dropPenalty`: the drop penalty «Отклонить со штрафом дропа» would throw on top of\nthe reject (D-327, D-262) under the season's rules, with the drops in a row before the run (D-324); null for the frozen\nfirst, who loses nothing (D-99); `affectsPosition` is false for a finisher whose finish this run does not decide\n(his position is fixed); always set, optional for older clients."
+        "description": "A run to check, in queue order (D-98, Q-3): the runs that decide a finish on top (`decidesFinish`), then by\ncompletion time; with the claimed difficulty, the counted hours and the dice total, what an approval at a lower\ndifficulty or a reject changes. `reachedFinish`: this run's latest move stands on the finish.\n`rollClosed`: the player's next roll is closed by the limit of unchecked runs (D-134) until the admin checks one.\n`cellBonus`: the points bonus of the cell the run's move stopped on, which a reject takes back too (D-327; always\nset, optional for older clients). `dropPenalty`: the drop penalty «Отклонить со штрафом дропа» would throw on top of\nthe reject (D-327, D-262) under the season's rules, with the drops in a row before the run (D-324); null for the frozen\nfirst, who loses nothing (D-99); `affectsPosition` is false for a finisher whose finish this run does not decide\n(his position is fixed); always set, optional for older clients. `hoursSource`: where the player's estimate of\nthe hours comes from, when the pool had none (SPEC «Часы и кубы», K1A); null for the pool's hours."
       },
       "ProofRequest": {
         "required": [
@@ -10415,9 +10452,16 @@
               "null",
               "string"
             ]
+          },
+          "expectedVersion": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
           }
         },
-        "description": "Publish a new version of the map (D-300, D-308); `comment` goes to the public log, at most 500 characters."
+        "description": "Publish a new version of the map (D-300, D-308); `comment` goes to the public log, at most 500 characters.\n`expectedVersion`: the map version the draft was made from (`version` of the map read); a newer one\npublished since refuses with `map.versionConflict` (D-616). Without it nothing is checked (scripts)."
       },
       "RankingRules": {
         "required": [
@@ -10531,7 +10575,8 @@
           "freeRerollResource",
           "coins",
           "badEvent",
-          "freeMode"
+          "freeMode",
+          "gameDeleted"
         ],
         "description": "How a reroll was paid for."
       },
@@ -11204,9 +11249,13 @@
                 "$ref": "#/components/schemas/ExclusionReason"
               }
             ]
+          },
+          "offered": {
+            "type": "boolean",
+            "default": false
           }
         },
-        "description": "A game's status in the season as the pool page shows it (SPEC «Статусы игры в сезоне», H6, D-160): `taken` —\ncompleted in the season or being played (an offer and a pending option count), with the player and, for a completed\ngame, when; `marks` — other players who dropped or tech-rerolled it (the game is free again);\n`excludedForMe` — why it never comes to the viewer again. Only games with something to show are listed."
+        "description": "A game's status in the season as the pool page shows it (SPEC «Статусы игры в сезоне», H6, D-160): `taken` —\ncompleted in the season or being played (an offer and a pending option count), with the player and, for a completed\ngame, when; `marks` — other players who dropped or tech-rerolled it (the game is free again);\n`excludedForMe` — why it never comes to the viewer again; `offered` — the game is taken as an offer or an\noption still waiting for «Начать», not played yet (K1A; always set, optional for older clients). Only games with\nsomething to show are listed."
       },
       "SeasonJoin": {
         "required": [
@@ -11557,7 +11606,8 @@
           "maintenance",
           "version",
           "environment",
-          "testTools"
+          "testTools",
+          "uploads"
         ],
         "type": "object",
         "properties": {
@@ -11572,9 +11622,12 @@
           },
           "testTools": {
             "type": "boolean"
+          },
+          "uploads": {
+            "$ref": "#/components/schemas/UploadLimitsView"
           }
         },
-        "description": "What every page asks the site: whether it only reads now (the maintenance banner) and which version it runs — a page\nthat saw another version before shows «Что нового» (J4, D-201). `environment` — which copy of the site this is\n(anything but `production` shows a strip on every page); `testTools` — the test endpoints are there (only\nDevelopment and Test), so the admin gets the page of the test tools (H9, D-220)."
+        "description": "What every page asks the site: whether it only reads now (the maintenance banner) and which version it runs — a page\nthat saw another version before shows «Что нового» (J4, D-201). `environment` — which copy of the site this is\n(anything but `production` shows a strip on every page); `testTools` — the test endpoints are there (only\nDevelopment and Test), so the admin gets the page of the test tools (H9, D-220); `uploads` — the largest file\nof each kind the site takes, so a page refuses a bigger one before sending it (D-617)."
       },
       "SocialRules": {
         "required": [
@@ -11932,6 +11985,34 @@
           "countAsDrop",
           "ignore"
         ]
+      },
+      "UploadLimitsView": {
+        "required": [
+          "picture",
+          "gif",
+          "bugScreenshot",
+          "mapBackground"
+        ],
+        "type": "object",
+        "properties": {
+          "picture": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "gif": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "bugScreenshot": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "mapBackground": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "description": "The largest upload of each kind in bytes, as the site is configured (FileLimits, BugReportRules; D-617)."
       },
       "WeeklyChallengeRules": {
         "required": [

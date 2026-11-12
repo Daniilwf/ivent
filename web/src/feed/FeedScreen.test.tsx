@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import type { Schemas } from '../api/client';
 import { ru } from '../i18n/ru';
 import { FeedScreen } from './FeedScreen';
+import { navigate } from '../app/router';
 import { fakeServer, json } from '../test/fakeServer';
 
 // H5: the season's feed page (SPEC «Лента», D-150) — lines by day, links to players and games, «Показать ещё»,
@@ -160,6 +161,41 @@ describe('FeedScreen', () => {
     expect(asked).toContain('9');
     expect(screen.getByTestId('feed-start')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: '20 сентября' })).toBeInTheDocument();
+  });
+
+  it('brings back the older lines shown and the place in the feed after a profile and Back (K1A)', async () => {
+    serve((before) =>
+      before === null
+        ? json(200, page([started(9, 'new', '2026-09-26T10:00:00Z')], 9))
+        : json(200, page([started(3, 'old', '2026-09-20T10:00:00Z')])),
+    );
+    globalThis.history.pushState(null, '', '/feed');
+    const first = render(<FeedScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+    await userEvent.click(await screen.findByTestId('feed-more'));
+    expect(await screen.findByTestId('feed-item-old')).toBeInTheDocument();
+
+    Object.defineProperty(window, 'scrollY', { configurable: true, value: 5116 });
+    navigate('/users/aaaaaaaa-0000-0000-0000-000000000001');
+    first.unmount();
+    Object.defineProperty(window, 'scrollY', { configurable: true, value: 0 });
+    const scrolled = vi.spyOn(window, 'scrollTo');
+    await new Promise<void>((resolve) => {
+      globalThis.addEventListener(
+        'popstate',
+        () => {
+          resolve();
+        },
+        { once: true },
+      );
+      globalThis.history.back();
+    });
+    render(<FeedScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    expect(await screen.findByTestId('feed-item-old')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(scrolled).toHaveBeenCalledWith(0, 5116);
+    });
+    scrolled.mockRestore();
   });
 
   it('keeps the lines when older ones fail to load and lets try again', async () => {

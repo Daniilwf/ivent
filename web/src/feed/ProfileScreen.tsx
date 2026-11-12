@@ -123,7 +123,7 @@ export function ProfileDetails({
               >
                 <Link
                   to={paths.feed(season.seasonId)}
-                  className={`font-medium wrap-anywhere ${inlineLink}`}
+                  className={`inline-flex min-h-11 items-center font-medium wrap-anywhere ${inlineLink}`}
                 >
                   {season.seasonName}
                 </Link>
@@ -156,7 +156,7 @@ export function ProfileDetails({
                 <div className="flex flex-wrap items-baseline justify-between gap-x-3">
                   <Link
                     to={paths.game(review.gameId)}
-                    className={`font-bold wrap-anywhere ${inlineLink}`}
+                    className={`inline-flex min-h-11 items-center font-bold wrap-anywhere ${inlineLink}`}
                   >
                     {review.gameTitle}
                   </Link>

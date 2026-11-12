@@ -41,12 +41,14 @@ public static class RejectionCodes
     public const string SeasonAlreadyCreated = "season.alreadyCreated";
     public const string PlayerUnknown = "player.unknown";
     public const string PlayerAlreadyAdded = "player.alreadyAdded";
+    public const string PlayerNameTaken = "player.nameTaken";
     public const string WrongPhase = "turn.wrongPhase";
     public const string ChoicePending = "turn.choicePending";
     public const string NoPendingChoice = "turn.noPendingChoice";
     public const string UnknownChoiceOption = "turn.unknownOption";
     public const string NoAvailableGames = "roll.noAvailableGames";
     public const string GameNotOffered = "roll.gameNotOffered";
+    public const string GameDeleted = "roll.gameDeleted";
     public const string NotEnoughCoins = "roll.notEnoughCoins";
     public const string TooManyUncheckedRuns = "roll.tooManyUnchecked";
     public const string HoursRequired = "run.hoursRequired";
@@ -78,6 +80,7 @@ public static class RejectionCodes
     public const string BetsInPlay = "ruleset.betsInPlay";
     public const string MapOccupiedCellRemoved = "map.occupiedCellRemoved";
     public const string MapUnchanged = "map.unchanged";
+    public const string MapVersionConflict = "map.versionConflict";
     public const string MapOccupiedCellRetyped = "map.occupiedCellRetyped";
     public const string BranchChoicePending = "map.branchChoicePending";
     public const string UndoCellNotOnMap = "undo.cellNotOnMap";

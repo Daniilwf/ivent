@@ -13,7 +13,9 @@ namespace GameEvent.Web.Pool;
 /// A game's status in the season as the pool page shows it (SPEC «Статусы игры в сезоне», H6, D-160): <c>taken</c> —
 /// completed in the season or being played (an offer and a pending option count), with the player and, for a completed
 /// game, when; <c>marks</c> — other players who dropped or tech-rerolled it (the game is free again);
-/// <c>excludedForMe</c> — why it never comes to the viewer again. Only games with something to show are listed.
+/// <c>excludedForMe</c> — why it never comes to the viewer again; <c>offered</c> — the game is taken as an offer or an
+/// option still waiting for «Начать», not played yet (K1A; always set, optional for older clients). Only games with
+/// something to show are listed.
 /// </summary>
 public sealed record SeasonGameView(
     Guid GameId,
@@ -21,7 +23,8 @@ public sealed record SeasonGameView(
     string? TakenBy,
     DateTimeOffset? CompletedAt,
     IReadOnlyList<GameMarkView> Marks,
-    ExclusionReason? ExcludedForMe);
+    ExclusionReason? ExcludedForMe,
+    bool Offered = false);
 
 public static class SeasonPoolEndpoints
 {
@@ -80,7 +83,9 @@ public static class SeasonPoolEndpoints
                     miss is null ? null : state.Players[miss.ByPlayerId].Name,
                     completedAt,
                     [.. marks[gameId]],
-                    excluded.TryGetValue(gameId, out var reason) ? reason : null);
+                    excluded.TryGetValue(gameId, out var reason) ? reason : null,
+                    miss?.Reason == RollMissReason.BeingPlayed
+                        && !state.Runs.Values.Any(r => r.GameId == gameId && r.PlayerId == miss.ByPlayerId && r.Status == RunStatus.Playing));
             })];
         return TypedResults.Ok(views);
     }

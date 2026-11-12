@@ -241,6 +241,10 @@ public sealed class MapApiTests : IAsyncLifetime
         Assert.Equal(["petya", "vasya"], players.Select(p => p.GetProperty("name").GetString()));
         Assert.All(players, p => Assert.Equal("start", p.GetProperty("cellId").GetString()));
         Assert.All(players, p => Assert.False(p.GetProperty("choosingBranch").GetBoolean()));
+        // K1A: the mechanics behind the event and shop cells are off by default, so the editor does not offer them
+        Assert.False(view.GetProperty("events").GetBoolean());
+        Assert.False(view.GetProperty("shop").GetBoolean());
+        Assert.Equal(0, view.GetProperty("version").GetInt32());
     }
 
     [Fact]
@@ -259,6 +263,24 @@ public sealed class MapApiTests : IAsyncLifetime
         Assert.True(player.GetProperty("choosingBranch").GetBoolean());
         Assert.Equal("graph", view.GetProperty("mode").GetString());
         Assert.Equal(8, view.GetProperty("map").GetProperty("cells").GetArrayLength());
+    }
+
+    [Fact]
+    public async Task A_draft_from_an_older_map_version_is_not_published_over_a_newer_one()
+    {
+        // K1A, D-616: two tabs read version 0; the second publishes after the first, from the old version
+        var admin = await _site.SignedInAsync("admin");
+        await SwitchToGraphAsync(admin);
+        var read = await ApiCalls.OkAsync(await admin.GetAsync(Admin, Ct));
+        Assert.Equal(0, read.GetProperty("version").GetInt32());
+
+        await ApiCalls.PostOkAsync(admin, $"{Admin}/publish", new { commandId = Guid.NewGuid(), map = ForkMap(), comment = "Первая вкладка", expectedVersion = 0 });
+        var stale = await admin.PostAsJsonAsync($"{Admin}/publish", new { commandId = Guid.NewGuid(), map = LongMap(4), comment = "Вторая вкладка", expectedVersion = 0 }, Ct);
+
+        await AssertRejectedAsync(stale, "map.versionConflict");
+        var now = await ApiCalls.OkAsync(await admin.GetAsync(Admin, Ct));
+        Assert.Equal(1, now.GetProperty("version").GetInt32());
+        Assert.Equal(8, now.GetProperty("map").GetProperty("cells").GetArrayLength());
     }
 
     [Theory]
