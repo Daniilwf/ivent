@@ -29,7 +29,10 @@ public sealed record WeeklyChallengeSet(
 [EventType("weekly-challenge-completed")]
 public sealed record WeeklyChallengeCompleted(Guid ChallengeId, Guid PlayerId, Guid RunId, int Coins) : IGameEvent;
 
-/// <summary>The run's proof was rejected: the completion is gone, the <see cref="Coins"/> it paid are taken back.</summary>
+/// <summary>
+/// The run's proof was rejected: the completion is gone, <see cref="Coins"/> of what it paid are taken back (0 for the frozen
+/// first finisher, whose coins do not change, D-578).
+/// </summary>
 [EventType("weekly-challenge-revoked")]
 public sealed record WeeklyChallengeRevoked(Guid ChallengeId, Guid PlayerId, Guid RunId, int Coins) : IGameEvent;
 
@@ -55,7 +58,7 @@ public sealed record WeeklyChallengeState(
 /// The weekly challenge (D-526): an automatic one is settled by a calculation after the command's events (D-413, not an
 /// effect, so the chain limit never cuts it): a run completed in the window whose game and difficulty meet the condition
 /// gives the player the reward once. A manual one is marked by the admin. A reject takes the completion and its coins
-/// back; the frozen first finisher completes without coins, as with a bet (D-414).
+/// back; the frozen first finisher completes without coins and keeps his coins on a reject, as with a bet (D-414, D-578).
 /// </summary>
 internal static class WeeklyChallenges
 {
@@ -85,7 +88,16 @@ internal static class WeeklyChallenges
 
         var rules = state.Rules.WeeklyChallenge;
         var days = rules.DurationDays ?? throw new InvalidOperationException("The validator requires weeklyChallenge.durationDays.");
-        var reward = command.Definition.Reward.Coins ?? rules.DefaultRewardCoins;
+        // The content format requires reward.coins (ContentValidator), so weeklyChallenge.defaultRewardCoins is not read (D-578)
+        var reward = command.Definition.Reward.Coins ?? throw new InvalidOperationException("The content validator requires reward.coins.");
+
+        // The window's end must be a moment of the calendar: a refusal, not an exception in the queue (D-578)
+        var latest = DateTime.MaxValue.AddDays(-days);
+        if (command.StartsAt.UtcDateTime > latest || command.StartsAt.DateTime > latest)
+        {
+            return Decision.Reject(RejectionCodes.WeeklyChallengeWindowInvalid, "The challenge's window would end past the calendar.");
+        }
+
         return Decision.Accept(new WeeklyChallengeSet(
             context.Ids.NewId(), command.Definition, command.StartsAt, command.StartsAt.AddDays(days), reward));
     }
@@ -179,11 +191,12 @@ internal static class WeeklyChallenges
                 {
                     foreach (var completion in challenge.Completions.Where(c => c.RunId == rejected.RunId))
                     {
-                        // Taken back whole, the frozen first's too: the coins came from a run that is not completed (D-574)
-                        yield return new WeeklyChallengeRevoked(challenge.ChallengeId, completion.PlayerId, completion.RunId, completion.Coins);
-                        if (completion.Coins != 0)
+                        // The frozen first's coins do not change (D-99, Q-3, D-422 (2), D-578): the completion goes, the coins stay
+                        var coins = Finishes.IsFrozen(state.Players[completion.PlayerId]) ? 0 : completion.Coins;
+                        yield return new WeeklyChallengeRevoked(challenge.ChallengeId, completion.PlayerId, completion.RunId, coins);
+                        if (coins != 0)
                         {
-                            yield return new CoinsChanged(completion.PlayerId, -completion.Coins, CoinsReason.WeeklyChallengeRevoked, completion.RunId);
+                            yield return new CoinsChanged(completion.PlayerId, -coins, CoinsReason.WeeklyChallengeRevoked, completion.RunId);
                         }
                     }
                 }
@@ -221,7 +234,14 @@ internal static class WeeklyChallenges
         };
 
     public static SeasonState Apply(SeasonState state, WeeklyChallengeCompleted e) =>
-        Update(state, e.ChallengeId, c => c with { Completions = [.. c.Completions, new WeeklyChallengeCompletion(e.PlayerId, e.RunId, e.Coins)] });
+        Update(state, e.ChallengeId, c => c with { Completions = Ordered([.. c.Completions, new WeeklyChallengeCompletion(e.PlayerId, e.RunId, e.Coins)]) });
+
+    /// <summary>
+    /// Completions in one order whatever came first — by player, then run — so an undo that gives one player's completion
+    /// back leaves the state the log without the undone command gives (D-578).
+    /// </summary>
+    public static EquatableArray<WeeklyChallengeCompletion> Ordered(IEnumerable<WeeklyChallengeCompletion> completions) =>
+        [.. completions.OrderBy(c => c.PlayerId).ThenBy(c => c.RunId)];
 
     public static SeasonState Apply(SeasonState state, WeeklyChallengeRevoked e) =>
         Update(state, e.ChallengeId, c => c with

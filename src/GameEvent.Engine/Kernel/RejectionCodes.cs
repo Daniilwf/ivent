@@ -134,9 +134,21 @@ public static class RejectionCodes
     public const string WeeklyChallengeAlreadyCompleted = "weeklyChallenge.alreadyCompleted";
     public const string WeeklyChallengeOutsideWindow = "weeklyChallenge.outsideWindow";
     public const string WeeklyChallengeNotManual = "weeklyChallenge.notManual";
+
+    /// <summary>The window would end past the last moment of the calendar (D-578).</summary>
+    public const string WeeklyChallengeWindowInvalid = "weeklyChallenge.windowInvalid";
     public const string SuggestionUnknown = "suggestion.unknown";
     public const string SuggestionAlreadyReviewed = "suggestion.alreadyReviewed";
     public const string SuggestionDailyLimit = "suggestion.dailyLimit";
     public const string SuggestionEmpty = "suggestion.empty";
     public const string SuggestionGameRequired = "suggestion.gameRequired";
+
+    /// <summary>The suggestion's text is over <see cref="Limits.MaxSuggestionLength"/> (D-579).</summary>
+    public const string SuggestionTooLong = "suggestion.tooLong";
+
+    /// <summary>The suggested game's card breaks the pool's rules (<see cref="Pool.GameCards"/>, D-579).</summary>
+    public const string SuggestionCardInvalid = "suggestion.cardInvalid";
+
+    /// <summary>The host does not know <c>season.timezone</c>, so no calendar day can be counted (D-579).</summary>
+    public const string SeasonTimezoneUnknown = "season.timezoneUnknown";
 }

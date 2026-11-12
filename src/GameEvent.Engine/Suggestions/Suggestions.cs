@@ -78,19 +78,36 @@ internal static class SuggestionBox
 
         if (text.Length > Limits.MaxSuggestionLength)
         {
-            return Decision.Reject(RejectionCodes.CommentTooLong, $"A suggestion is limited to {Limits.MaxSuggestionLength} characters.");
+            return Decision.Reject(RejectionCodes.SuggestionTooLong, $"A suggestion is limited to {Limits.MaxSuggestionLength} characters.");
         }
 
+        // The card is checked by the pool's rules now (D-579): an approved game must not be refused by the pool later
+        GameCard? game = null;
+        if (command.Kind == SuggestionKind.Game)
+        {
+            var (card, problem) = GameCards.Normalize(command.Game!);
+            if (card is null)
+            {
+                return Decision.Reject(RejectionCodes.SuggestionCardInvalid, problem!);
+            }
+
+            game = card;
+        }
+
+        // The day of the limit is a day of season.timezone, by the host's zones (Н-20, D-579): no silent UTC
         var now = context.Clock.UtcNow;
+        var timezone = state.Rules.Season.Timezone;
+        if (SeasonCalendar.Day(context.TimeZones, timezone, now) is not { } today)
+        {
+            return Decision.Reject(RejectionCodes.SeasonTimezoneUnknown, $"The season's time zone '{timezone}' is not known here.");
+        }
+
         var perDay = state.Rules.Suggestions?.PerDay ?? throw new InvalidOperationException("The validator requires suggestions.");
-        var zone = SeasonTime.Zone(state.Rules.Season.Timezone);
-        var today = SeasonTime.Day(now, zone);
-        if (state.Suggestions.Values.Count(s => s.PlayerId == player.PlayerId && SeasonTime.Day(s.SubmittedAt, zone) == today) >= perDay)
+        if (state.Suggestions.Values.Count(s => s.PlayerId == player.PlayerId && SeasonCalendar.Day(context.TimeZones, timezone, s.SubmittedAt) == today) >= perDay)
         {
             return Decision.Reject(RejectionCodes.SuggestionDailyLimit, $"At most {perDay} suggestions a day.");
         }
 
-        var game = command.Kind == SuggestionKind.Game ? command.Game! with { Title = command.Game!.Title.Trim() } : null;
         return Decision.Accept(new SuggestionSubmitted(context.Ids.NewId(), player.PlayerId, player.UserId, command.Kind, text, game, now));
     }
 
@@ -158,13 +175,4 @@ internal static class SuggestionBox
             Suggestions = state.Suggestions.SetItem(
                 e.SuggestionId, state.Suggestions[e.SuggestionId] with { Status = e.Status, Comment = e.Comment }),
         };
-}
-
-/// <summary>The season's calendar (Н-20): days by <c>season.timezone</c>; an unknown zone counts in UTC (D-575).</summary>
-internal static class SeasonTime
-{
-    public static TimeZoneInfo Zone(string id) =>
-        TimeZoneInfo.TryFindSystemTimeZoneById(id, out var zone) ? zone : TimeZoneInfo.Utc;
-
-    public static DateOnly Day(DateTimeOffset moment, TimeZoneInfo zone) => DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(moment, zone).DateTime);
 }

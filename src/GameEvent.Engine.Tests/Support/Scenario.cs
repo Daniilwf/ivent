@@ -418,7 +418,7 @@ public sealed class Scenario
     public IEnumerable<T> LastEvents<T>() where T : IGameEvent => Last.Events.OfType<T>();
 
     public EngineContext Context() =>
-        new(Clock, Random, Ids, new PoolSnapshot([.. _games], [.. _categories]), _triggers, _history);
+        new(Clock, Random, Ids, new PoolSnapshot([.. _games], [.. _categories]), _triggers, _history, SystemTestTimeZones.Instance);
 
     private IReadOnlyList<Engine.Effects.ITriggerHandler> _triggers = [];
 

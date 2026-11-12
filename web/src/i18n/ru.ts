@@ -195,6 +195,23 @@ const rejection = {
   'bet.tooMany': 'У тебя уже максимум открытых ставок.',
   'bet.onFirst': 'На финишировавшего первым не ставят.',
   'bet.alreadyPlaced': 'На эту игру ты уже поставил.',
+  // Stage 5: the weekly challenge and the suggestion box (D-574, D-575, D-578, D-579)
+  'ruleset.weeklyChallengeInPlay':
+    'Челлендж недели нельзя выключить, пока есть выполнения по прохождениям с непроверенным пруфом.',
+  'weeklyChallenge.unknown': 'Такого челленджа нет в сезоне. Обнови страницу.',
+  'weeklyChallenge.alreadyCompleted': 'Этот игрок уже выполнил челлендж.',
+  'weeklyChallenge.outsideWindow': 'Прохождение завершено не в неделю челленджа.',
+  'weeklyChallenge.notManual': 'Этот челлендж засчитывается сам при завершении прохождения.',
+  'weeklyChallenge.windowInvalid':
+    'Неделя челленджа выходит за пределы календаря: выбери другое начало.',
+  'suggestion.unknown': 'Такого предложения нет. Обнови страницу.',
+  'suggestion.alreadyReviewed': 'Это предложение уже рассмотрено.',
+  'suggestion.dailyLimit': 'На сегодня лимит предложений исчерпан. Приходи завтра.',
+  'suggestion.empty': 'Напиши, что предлагаешь.',
+  'suggestion.gameRequired': 'Укажи название игры.',
+  'suggestion.tooLong': 'Предложение слишком длинное: не больше 2000 символов.',
+  'suggestion.cardInvalid': 'В карточке игры есть ошибка: проверь название, теги, часы и год.',
+  'season.timezoneUnknown': 'Часовой пояс сезона не найден на сервере. Сообщи админу.',
   unknown: 'Действие отклонено. Попробуй ещё раз.',
 } as const;
 

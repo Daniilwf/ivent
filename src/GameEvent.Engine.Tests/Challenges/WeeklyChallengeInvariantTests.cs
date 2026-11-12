@@ -18,7 +18,8 @@ namespace GameEvent.Engine.Tests.Challenges;
 /// <item>a player holds at most one completion of a challenge;</item>
 /// <item>a completion stands on a run of that player that is completed (not rejected) inside the window;</item>
 /// <item>an automatic completion stands on a run whose game meets the condition;</item>
-/// <item>the challenge coins of a player in the effective log equal the coins of the completions they hold;</item>
+/// <item>the challenge coins of a player in the effective log equal the coins of the completions they hold, plus what a
+/// revocation left the frozen first finisher (D-578);</item>
 /// <item>replaying the log gives the same state.</item>
 /// </list>
 /// </summary>
@@ -137,11 +138,38 @@ public class WeeklyChallengeInvariantTests
                 .Where(c => c.PlayerId == player.PlayerId && c.Reason is CoinsReason.WeeklyChallenge or CoinsReason.WeeklyChallengeRevoked)
                 .Sum(c => c.Delta);
             var held = s.State.WeeklyChallenges.Values.SelectMany(w => w.Completions).Where(c => c.PlayerId == player.PlayerId).Sum(c => c.Coins);
-            Assert.Equal(held, paid);
+
+            // A reject leaves the frozen first his coins (D-99, D-578): what a revocation did not take back stays paid
+            var kept = Kept(s, player.PlayerId);
+            Assert.True(kept == 0 || player.Finish?.Frozen == true, $"{s.PlayerName(player.PlayerId)} kept {kept} challenge coins unfrozen");
+            Assert.Equal(held + kept, paid);
         }
 
         Assert.Equal(s.State, SeasonEngine.Replay(s.Log));
         _ = manual;
+    }
+
+    // The coins of each revoked completion it did not take back: the completion's coins less the revocation's
+    private static int Kept(Scenario s, Guid playerId)
+    {
+        var paid = new Dictionary<(Guid, Guid), int>();
+        var kept = 0;
+        foreach (var e in s.EffectiveLog)
+        {
+            switch (e)
+            {
+                case WeeklyChallengeCompleted c when c.PlayerId == playerId:
+                    paid[(c.ChallengeId, c.RunId)] = c.Coins;
+                    break;
+                case WeeklyChallengeRevoked r when r.PlayerId == playerId:
+                    kept += paid[(r.ChallengeId, r.RunId)] - r.Coins;
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        return kept;
     }
 }
 

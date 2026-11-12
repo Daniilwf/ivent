@@ -16,3 +16,4 @@ T:System.IO.File;The engine has no file system access
 T:System.IO.Directory;The engine has no file system access
 T:System.IO.FileStream;The engine has no file system access
 T:System.Net.Http.HttpClient;The engine has no network access
+T:System.TimeZoneInfo;Use ITimeZones: the host gives the time zone database
