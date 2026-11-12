@@ -227,6 +227,8 @@
                   "enum": [
                     "good",
                     "bad",
+                    "special",
+                    "risky",
                     null
                   ]
                 }
@@ -246,6 +248,8 @@
                   "enum": [
                     "good",
                     "bad",
+                    "special",
+                    "risky",
                     null
                   ]
                 }
@@ -265,6 +269,8 @@
                   "enum": [
                     "good",
                     "bad",
+                    "special",
+                    "risky",
                     null
                   ]
                 }
@@ -284,6 +290,8 @@
                   "enum": [
                     "good",
                     "bad",
+                    "special",
+                    "risky",
                     null
                   ]
                 }
@@ -729,6 +737,26 @@
       },
       "required": [
         "defaultRewardCoins"
+      ],
+      "additionalProperties": false
+    },
+    "events": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "properties": {
+        "defaultDeck": {
+          "enum": [
+            "good",
+            "bad",
+            "special",
+            "risky"
+          ]
+        }
+      },
+      "required": [
+        "defaultDeck"
       ],
       "additionalProperties": false
     }

@@ -41,6 +41,23 @@ public sealed record Ruleset
     public required NominationRules Nominations { get; init; }
 
     public required WeeklyChallengeRules WeeklyChallenge { get; init; }
+
+    /// <summary>
+    /// The rules of events (stage 5). Missing — a season created before them reads as it did (D-50); needed once
+    /// <c>features.events</c> is on (<see cref="RulesetValidator"/>). Not written while missing.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public EventRules? Events { get; init; }
+}
+
+/// <summary>The rules of event decks (SPEC «Ивенты», D-500…D-502).</summary>
+public sealed record EventRules
+{
+    /// <summary>
+    /// The deck an event cell draws from when the zone of the player's cell has no deck of the content (D-502): the
+    /// standard deck of this kind.
+    /// </summary>
+    public required EventKind DefaultDeck { get; init; }
 }
 
 public enum MapMode
@@ -173,10 +190,17 @@ public sealed record DiceCountRule
     public required int Max { get; init; }
 }
 
+/// <summary>
+/// The kind of an event (SPEC «Ивенты»): good, bad, special, risky. A drawn event has the kind of its deck (D-501); the
+/// standard decks are the wheels named like the kinds. Special and risky came with stage 5: a build before it cannot read
+/// them, and they are written only once events are on.
+/// </summary>
 public enum EventKind
 {
     Good,
     Bad,
+    Special,
+    Risky,
 }
 
 public sealed record DieRule

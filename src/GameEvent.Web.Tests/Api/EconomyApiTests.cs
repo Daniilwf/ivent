@@ -11,9 +11,10 @@ namespace GameEvent.Web.Tests.Api;
 
 /// <summary>
 /// The economy over HTTP (EC17, D-440…D-443): my inventory with what each object allows now, «Использовать» with a target
-/// and answers through the queue, the shop and the bets; the admin loads a content pack and corrects inventories. Each
-/// endpoint: success, another role or another player's season (403), anonymous (401), invalid input (400), and the
-/// engine's refusals as 409 with their codes. The pack is the repository's <c>content/items</c> and <c>content/wheels</c>.
+/// and answers through the queue, the shop and the bets; the admin corrects inventories. Each endpoint: success, another
+/// role or another player's season (403), anonymous (401), invalid input (400), and the engine's refusals as 409 with
+/// their codes. The pack is the repository's <c>content/items</c> and <c>content/wheels</c>, published through the content
+/// editor's API, the one path for a pack (D-446; its own tests are <see cref="AdminContentApiTests"/>).
 /// </summary>
 public sealed class EconomyApiTests : IAsyncLifetime
 {
@@ -62,9 +63,12 @@ public sealed class EconomyApiTests : IAsyncLifetime
     {
         await FeaturesAsync();
         var admin = await _site.SignedInAsync("admin");
-        await ApiCalls.PostOkAsync(admin, AdminUrl("content"), new { commandId = Guid.NewGuid(), pack = RepositoryPack(), comment = "Первые предметы" });
+        await PublishAsync(admin, RepositoryPack(), 0, "Первые предметы");
         return admin;
     }
+
+    private static async Task PublishAsync(HttpClient admin, JsonObject pack, int expectedVersion, string comment) =>
+        await ApiCalls.PostOkAsync(admin, AdminUrl("content/publish"), new { commandId = Guid.NewGuid(), expectedVersion, pack, comment });
 
     private async Task GiveAsync(HttpClient admin, string login, string objectId) =>
         await ApiCalls.PostOkAsync(
@@ -216,7 +220,7 @@ public sealed class EconomyApiTests : IAsyncLifetime
     {
         var admin = await EconomyOnAsync();
         await GiveAsync(admin, "vasya", "orange");
-        var names = _site.Services.GetRequiredService<Seasons.FeedObjectNames>();
+        var names = _site.Services.GetRequiredService<Seasons.ContentCards>();
         static string? NameOf(JsonElement feed, string id) =>
             feed.GetProperty("objects").EnumerateArray().Where(o => o.GetProperty("id").GetString() == id).Select(o => o.GetProperty("name").GetString()).SingleOrDefault();
 
@@ -230,7 +234,7 @@ public sealed class EconomyApiTests : IAsyncLifetime
 
         var pack = RepositoryPack();
         pack["objects"]!.AsArray().Single(o => (string?)o!["id"] == "orange")!["name"] = "Апельсинка";
-        await ApiCalls.PostOkAsync(admin, AdminUrl("content"), new { commandId = Guid.NewGuid(), pack, comment = "Новое имя" });
+        await PublishAsync(admin, pack, 1, "Новое имя");
 
         Assert.Equal("Апельсинка", NameOf(await ApiCalls.OkAsync(await admin.GetAsync(Url("feed"), Ct)), "orange"));
         Assert.Equal(reads + 1, names.PackReads);
@@ -470,101 +474,31 @@ public sealed class EconomyApiTests : IAsyncLifetime
         var client = await _site.AnonymousAsync();
 
         Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync(Url("economy"), Ct)).StatusCode);
-        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync(AdminUrl("content"), Ct)).StatusCode);
         foreach (var url in new[]
         {
-            Url($"items/{Guid.NewGuid()}/use"), Url("shop/roll"), Url("shop/buy"), Url("bets"), AdminUrl("content"),
-            AdminUrl($"players/{Guid.NewGuid()}/inventory"),
+            Url($"items/{Guid.NewGuid()}/use"), Url("shop/roll"), Url("shop/buy"), Url("bets"), AdminUrl($"players/{Guid.NewGuid()}/inventory"),
         })
         {
             Assert.Equal(HttpStatusCode.Unauthorized, (await client.PostAsJsonAsync(url, new { commandId = Guid.NewGuid() }, Ct)).StatusCode);
         }
     }
 
-    // ---- The admin: content and inventories ----
+    // ---- The admin: inventories (the content pack is the content editor's, D-446) ----
 
     [Fact]
-    public async Task The_admin_loads_the_pack_and_reads_it_back()
-    {
-        var admin = await EconomyOnAsync();
-
-        var content = await ApiCalls.OkAsync(await admin.GetAsync(AdminUrl("content"), Ct));
-
-        Assert.Equal(1, content.GetProperty("version").GetInt32());
-        var objects = content.GetProperty("objects").EnumerateArray().ToList();
-        Assert.Equal(Directory.EnumerateFiles(Path.Combine(RepositoryRoot(), "content", "items"), "*.json").Count(), objects.Count);
-        Assert.Contains(objects, o => o.GetProperty("id").GetString() == "bird-thief" && o.GetProperty("name").GetString() == "Птичкерс");
-        Assert.Equal("lootbox", Assert.Single(content.GetProperty("wheels").EnumerateArray()).GetProperty("id").GetString());
-    }
-
-    [Fact]
-    public async Task A_wrong_pack_is_answered_with_every_problem_at_its_path()
+    public async Task An_inventory_correction_keeps_the_small_body_limit()
     {
         await FeaturesAsync();
         var admin = await _site.SignedInAsync("admin");
-        var pack = RepositoryPack();
-        pack["objects"]![0]!["name"] = "";
-        pack["wheels"]![0]!["entries"]![0]!["objectId"] = "no-such-object";
-
-        var response = await admin.PostAsJsonAsync(AdminUrl("content"), new { commandId = Guid.NewGuid(), pack, comment = "Пакет" }, Ct);
-
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        var errors = JsonDocument.Parse(await response.Content.ReadAsStringAsync(Ct)).RootElement.GetProperty("errors");
-        Assert.True(errors.TryGetProperty("$.objects[0].name", out _), errors.ToString());
-        Assert.True(errors.TryGetProperty("$.wheels[0].entries[0].objectId", out _), errors.ToString());
-    }
-
-    [Theory]
-    [InlineData("{\"commandId\":\"{id}\",\"pack\":[],\"comment\":\"x\"}")]
-    [InlineData("{\"commandId\":\"{id}\",\"pack\":{\"objects\":[{\"id\":\"x\"}]},\"comment\":\"x\"}")]
-    [InlineData("{\"commandId\":\"{id}\",\"pack\":{\"items\":[]},\"comment\":\"x\"}")]
-    [InlineData("{\"commandId\":\"{id}\",\"pack\":{}}")]
-    [InlineData("{\"pack\":{},\"comment\":\"x\"}")]
-    public async Task A_pack_that_does_not_parse_is_a_bad_request(string json)
-    {
-        await FeaturesAsync();
-        var admin = await _site.SignedInAsync("admin");
-
-        var response = await admin.PostAsync(
-            AdminUrl("content"), new StringContent(json.Replace("{id}", Guid.NewGuid().ToString(), StringComparison.Ordinal), System.Text.Encoding.UTF8, "application/json"), Ct);
-
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task A_pack_past_its_limit_is_said_at_pack_and_a_body_past_the_request_limit_is_413()
-    {
-        await FeaturesAsync();
-        var admin = await _site.SignedInAsync("admin");
-        static StringContent Body(int padding) => new(
-            $"{{\"commandId\":\"{Guid.NewGuid()}\",\"comment\":\"x\",\"pack\":{{\"objects\":[],\"wheels\":[],\"pad\":\"{new string('x', padding)}\"}}}}",
+        var body = new StringContent(
+            $"{{\"commandId\":\"{Guid.NewGuid()}\",\"comment\":\"{new string('x', (int)Hosting.WebSecurity.ApiBodyLimitBytes)}\"}}",
             System.Text.Encoding.UTF8,
             "application/json");
 
-        // Past the small API limit but within the pack's own: read and refused at «pack», not cut off
-        var over = await admin.PostAsync(AdminUrl("content"), Body(Economy.AdminEconomyEndpoints.MaxPackLength), Ct);
-        Assert.Equal(HttpStatusCode.BadRequest, over.StatusCode);
-        var errors = JsonDocument.Parse(await over.Content.ReadAsStringAsync(Ct)).RootElement.GetProperty("errors");
-        Assert.True(errors.TryGetProperty("pack", out _), errors.ToString());
-
+        // Only a whole pack is exempt from the small API limit: another admin body is cut off before it is read
         Assert.Equal(
             HttpStatusCode.RequestEntityTooLarge,
-            (await admin.PostAsync(AdminUrl("content"), Body((int)Economy.AdminEconomyEndpoints.MaxContentRequestBytes), Ct)).StatusCode);
-
-        // Only the publication of a pack is exempt: another admin body keeps the small limit
-        Assert.Equal(
-            HttpStatusCode.RequestEntityTooLarge,
-            (await admin.PostAsync(AdminUrl($"players/{_site.Players["vasya"]}/inventory"), Body((int)Hosting.WebSecurity.ApiBodyLimitBytes), Ct)).StatusCode);
-    }
-
-    [Fact]
-    public async Task With_items_off_a_pack_is_refused_by_the_engine()
-    {
-        var admin = await _site.SignedInAsync("admin");
-
-        var response = await admin.PostAsJsonAsync(AdminUrl("content"), new { commandId = Guid.NewGuid(), pack = RepositoryPack(), comment = "Пакет" }, Ct);
-
-        await AssertConflictAsync(response, "feature.disabled");
+            (await admin.PostAsync(AdminUrl($"players/{_site.Players["vasya"]}/inventory"), body, Ct)).StatusCode);
     }
 
     [Fact]
@@ -612,10 +546,6 @@ public sealed class EconomyApiTests : IAsyncLifetime
         await FeaturesAsync();
         var client = await _site.SignedInAsync(login);
 
-        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync(AdminUrl("content"), Ct)).StatusCode);
-        Assert.Equal(
-            HttpStatusCode.Forbidden,
-            (await client.PostAsJsonAsync(AdminUrl("content"), new { commandId = Guid.NewGuid(), pack = RepositoryPack(), comment = "Моё" }, Ct)).StatusCode);
         Assert.Equal(
             HttpStatusCode.Forbidden,
             (await client.PostAsJsonAsync(

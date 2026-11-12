@@ -35,7 +35,8 @@ test('an item on another player: the target is offered, the use is seen live by 
     expectedVersion: rules.version,
     ruleset: { ...rules.ruleset, features: { ...rules.ruleset.features, items: true } },
   });
-  await admin.post(`/api/admin/seasons/${world.seasonId}/content`, {
+  await admin.post(`/api/admin/seasons/${world.seasonId}/content/publish`, {
+    expectedVersion: 0,
     pack: pack(),
     comment: 'Предметы для E2E',
   });

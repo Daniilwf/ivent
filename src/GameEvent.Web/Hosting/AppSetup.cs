@@ -9,6 +9,7 @@ using GameEvent.Infrastructure.Queue;
 using GameEvent.Infrastructure.Seasons;
 using GameEvent.Web.Accounts;
 using GameEvent.Web.BugReports;
+using GameEvent.Web.Content;
 using GameEvent.Web.Economy;
 using GameEvent.Web.Files;
 using GameEvent.Web.Map;
@@ -52,6 +53,11 @@ public static class AppSetup
 
     public const int MapChecksPerMinute = 120;
 
+    /// <summary>The content editor's checks (D-490): the admin checks a pack on demand and before each save.</summary>
+    public const string ContentCheckRateLimit = "content-check";
+
+    public const int ContentChecksPerMinute = 60;
+
     public static void AddGameEvent(this WebApplicationBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
@@ -72,7 +78,7 @@ public static class AppSetup
         services.AddSingleton<IIdGenerator, GuidV7Ids>();
         services.AddSingleton<CommandBus>();
         services.AddSingleton<SeasonBroadcaster>();
-        services.AddSingleton<FeedObjectNames>();
+        services.AddSingleton<ContentCards>();
         services.AddSingleton<ICommittedEventsListener>(sp => sp.GetRequiredService<SeasonBroadcaster>());
         services.AddSingleton<HubSessions>();
         services.AddSingleton<ICommittedEventsListener>(sp => sp.GetRequiredService<HubSessions>());
@@ -163,6 +169,9 @@ public static class AppSetup
             o.AddPolicy(MapCheckRateLimit, ctx => RateLimitPartition.GetFixedWindowLimiter(
                 ctx.User.UserId()?.ToString() ?? WebSecurity.ClientKey(ctx.Connection.RemoteIpAddress),
                 _ => new FixedWindowRateLimiterOptions { PermitLimit = MapChecksPerMinute, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+            o.AddPolicy(ContentCheckRateLimit, ctx => RateLimitPartition.GetFixedWindowLimiter(
+                ctx.User.UserId()?.ToString() ?? WebSecurity.ClientKey(ctx.Connection.RemoteIpAddress),
+                _ => new FixedWindowRateLimiterOptions { PermitLimit = ContentChecksPerMinute, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
             o.AddPolicy(SeasonReadRateLimit, ctx => RateLimitPartition.GetFixedWindowLimiter(
                 ctx.User.UserId()?.ToString() ?? WebSecurity.ClientKey(ctx.Connection.RemoteIpAddress),
                 _ => new FixedWindowRateLimiterOptions { PermitLimit = SeasonReadsPerMinute, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
@@ -222,6 +231,7 @@ public static class AppSetup
         api.MapAdminProofs();
         api.MapAdminSeasons();
         api.MapAdminMap();
+        api.MapAdminContent();
         api.MapSeasonsAndPlayers();
         api.MapFeed();
         api.MapEconomy();

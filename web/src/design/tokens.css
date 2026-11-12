@@ -68,6 +68,8 @@
   --font-*: initial;
   --font-display: 'Unbounded', system-ui, sans-serif; /* headings, numbers that matter, the map */
   --font-text: 'Onest', system-ui, sans-serif; /* everything else */
+  --font-code:
+    ui-monospace, 'Cascadia Mono', Consolas, monospace; /* JSON and codes in the admin's editors: the system's own */
 
   --font-weight-*: initial;
   --font-weight-regular: 400;

@@ -11,6 +11,7 @@ import { ChoiceCard, OfferCard, rollResultTitle } from './RollResult';
 import { CompletionMoment } from './CompletionMoment';
 import { AvatarSection } from './AvatarSection';
 import { ProofSection } from './ProofForm';
+import { DrawnEventCard } from './DrawnEventCard';
 import { ManualEffectItem, type EffectOutcome } from './ManualEffectItem';
 import { InventorySection } from './Inventory';
 import { RunActions } from './RunActions';
@@ -417,7 +418,7 @@ export function SeasonScreen({
   // last run fold under it
   const stepFirst = Boolean(offer ?? choice) || (me?.phase === 'playing' && me.activeRun != null);
   const afterRun =
-    me && (me.manualEffects.length > 0 || me.lastCompleted) ? (
+    me && (me.manualEffects.length > 0 || me.lastCompleted || me.lastEvent) ? (
       <section
         aria-labelledby="after-title"
         data-testid="after"
@@ -433,6 +434,7 @@ export function SeasonScreen({
               ? ru.turn.afterGame(me.lastCompleted.game.title)
               : ru.turn.after}
         </h3>
+        {me.lastEvent ? <DrawnEventCard drawn={me.lastEvent} /> : null}
         {me.manualEffects.length > 0 && (
           <section
             aria-labelledby="effects-title"

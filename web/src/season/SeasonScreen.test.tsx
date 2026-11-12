@@ -182,6 +182,40 @@ describe('SeasonScreen', () => {
     expect(bodies[0]?.commandId).not.toBe(bodies[1]?.commandId);
   });
 
+  it('shows the event I drew last in the tails of the turn, and nothing while I drew none', async () => {
+    const base = season();
+    if (!base.me) throw new Error('No turn');
+    const drawn = season({
+      lastSequence: 9,
+      me: {
+        ...base.me,
+        lastEvent: {
+          sequence: 9,
+          deck: 'good',
+          kind: 'good',
+          objectId: 'tailwind',
+          name: 'Попутный ветер',
+          description: 'В следующем броске за прохождение на один кубик больше.',
+          source: 'cell',
+        },
+      },
+    });
+    let current = base;
+    serve((r) => (isSeasonGet(r) ? json(200, current) : json(404, {})));
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+    await screen.findByTestId('roll');
+    expect(screen.queryByTestId('drawn-event')).toBeNull();
+
+    current = drawn;
+    act(() => {
+      hubChange?.();
+    });
+
+    const card = await screen.findByTestId('drawn-event');
+    expect(card).toHaveTextContent('Попутный ветер');
+    expect(card).toHaveTextContent(ru.events.kinds.good);
+  });
+
   it('refetches when another player acts', async () => {
     let current = season();
     serve((r) => (isSeasonGet(r) ? json(200, current) : json(404, {})));

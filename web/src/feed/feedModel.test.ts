@@ -663,3 +663,78 @@ describe('feed lines of the economy (D-444)', () => {
     expect(bet?.facts).toContain(ru.feed.facts.stake(5));
   });
 });
+
+describe('events drawn from decks (stage 5)', () => {
+  const named = withRefs(refs, {
+    players: [],
+    games: [],
+    runs: [],
+    objects: [{ id: 'tailwind', name: 'Попутный ветер' }],
+  });
+
+  it('tells a draw on the stop of a completion as a fact of its line, by the event’s name', () => {
+    const item = feedDays(
+      [
+        entry('e1', 'event-drawn', {
+          playerId: vasya,
+          deck: 'good',
+          objectId: 'tailwind',
+          kind: 'good',
+          source: 'cell',
+        }),
+        entry('e1', 'run-completed', {
+          runId: run1,
+          playerId: vasya,
+          difficulty: 'normal',
+          hours: 3,
+          completedAt: '2026-09-26T12:00:00Z',
+        }),
+      ],
+      named,
+      now,
+    )[0]?.items[0];
+
+    expect(text(item)).toBe('Вася проходит Hollow Knight');
+    expect(item?.facts).toContain(ru.feed.facts.eventDrawn('Попутный ветер'));
+  });
+
+  it('leads a line of its own when nothing else does, and names the event by its id when the page does not', () => {
+    const drawn = feedDays(
+      [
+        entry('e2', 'event-drawn', {
+          playerId: petya,
+          deck: 'risky',
+          objectId: 'gamble',
+          kind: 'risky',
+          source: 'item',
+        }),
+      ],
+      named,
+      now,
+    )[0]?.items[0];
+
+    expect(text(drawn)).toBe('Петя вытягивает «gamble»');
+    expect(drawn?.icon).toBe('effect');
+  });
+
+  it('says an empty deck once: the manual effect that follows is not a second fact', () => {
+    const missed = one([
+      entry('e3', 'manual-effect-created', {
+        effectId: 'm',
+        playerId: vasya,
+        drawEvent: 'special',
+        source: 'event',
+        runId: null,
+      }),
+      entry('e3', 'event-draw-missed', {
+        playerId: vasya,
+        deck: 'special',
+        kind: 'special',
+        source: 'cell',
+      }),
+    ]);
+
+    expect(text(missed)).toBe('Вася: колода пуста, специвент — вручную');
+    expect(missed?.facts).toEqual([]);
+  });
+});
