@@ -26,6 +26,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace GameEvent.Web.Hosting;
 
@@ -137,6 +138,8 @@ public static class AppSetup
         services.AddSingleton<Passwords>();
         services.AddSingleton<IPasswords>(sp => sp.GetRequiredService<Passwords>());
         services.AddSingleton<LoginThrottle>();
+        services.TryAddSingleton(TimeProvider.System);
+        services.AddSingleton(sp => new LoginDevices(sp.GetRequiredService<IDataProtectionProvider>(), sp.GetRequiredService<TimeProvider>(), cookiePrefix + "ge.device", securePolicy));
         services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
             .AddCookie(o =>
             {

@@ -23,7 +23,7 @@ internal static class Shop
         ArgumentNullException.ThrowIfNull(rules);
         return player.Resources[FreeShopRollsResource] > 0
             ? (ShopPayment.FreeRoll, 0)
-            : (ShopPayment.Coins, rules.RollCost + (rules.RerollCostStep * player.Wallet.ShopRolls));
+            : (ShopPayment.Coins, (int)Math.Clamp(rules.RollCost + ((long)rules.RerollCostStep * player.Wallet.ShopRolls), 0, int.MaxValue));
     }
 
     public static Decision Decide(SeasonState state, RollShop command, EngineContext context)
@@ -140,7 +140,7 @@ internal static class Shop
             var ofRarity = left.Where(d => (d.Rarity ?? Rarity.Common) == rarity).ToList();
             var definition = ofRarity[context.Random.NextInt(0, ofRarity.Count)];
             left.Remove(definition);
-            lots.Add(new ShopLot(definition.Id, rarity, (int)Math.Round(definition.Price!.Value * multiplier, MidpointRounding.AwayFromZero)));
+            lots.Add(new ShopLot(definition.Id, rarity, Saturating.Clamp(Math.Round(definition.Price!.Value * multiplier, MidpointRounding.AwayFromZero))));
         }
 
         return lots;

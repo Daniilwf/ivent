@@ -29,12 +29,21 @@ describe('The content model', () => {
 
   it('tells an unknown server message as it came, marked as the server’s', () => {
     expect(serverText('A brand new rule.')).toBe('Сервер: A brand new rule.');
-    // The reader's messages in the server's own words (SEC-2)
+    // The reader's messages in the server's own words (CE-SEC-2)
     expect(serverText('Field «name» is required.')).toBe('Нужно поле «name».');
     expect(serverText('Field «colour» is unknown.')).toBe('Неизвестное поле «colour».');
     expect(serverText('A list item is an object, not null.')).toBe(
       'Элемент списка — объект, а не null.',
     );
+  });
+
+  it('tells the size and number limits of a pack in Russian (D-652, D-653)', () => {
+    expect(serverText('At most 200 entries in a wheel.')).toBe('В колесе — не больше 200 записей.');
+    expect(serverText('The «Multiply» stage takes a number of at most 10.')).toBe(
+      'Этот шаг кубов — число не больше 10.',
+    );
+    expect(serverText('A price is at most 1000000.')).toBe('Цена — не больше 1 000 000.');
+    expect(serverText('An amount is within ±1000000.')).toBe('Количество — не больше ±1 000 000.');
   });
 
   it('says what is not JSON and what is not an object', () => {

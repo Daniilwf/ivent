@@ -10,6 +10,12 @@ namespace GameEvent.Engine.Content;
 /// </summary>
 public static class ContentPublishing
 {
+    // Size limits of one pack (NB-SEC-3, D-653): the same numbers as the admin's content API (D-491), entries per wheel on top.
+    // The imported old season has under 400 objects.
+    public const int MaxObjects = 1000;
+    public const int MaxWheels = 100;
+    public const int MaxWheelEntries = 200;
+
     /// <summary>
     /// The problems of <paramref name="pack"/>, each with its JSON path; empty when it can be published. With
     /// <paramref name="events"/> off (<c>features.events</c>) the pack holds no events and no decks, and draws only
@@ -312,6 +318,11 @@ public static class ContentPublishing
             return Decision.Reject(RejectionCodes.SeasonClosed, $"Content is published while the season is a draft or running; it is {state.Status}.");
         }
 
+        if (TooLarge(command.Pack) is { } tooLarge)
+        {
+            return Decision.Reject(RejectionCodes.ContentTooLarge, tooLarge);
+        }
+
         if (string.IsNullOrWhiteSpace(command.Comment))
         {
             return Decision.Reject(RejectionCodes.CommentRequired, "Every admin change explains itself in the public log.");
@@ -344,6 +355,14 @@ public static class ContentPublishing
             ? Decision.Reject(RejectionCodes.ContentUnchanged, "The pack equals the content in force.")
             : Decision.Accept(new ContentPublished(catalog.Version + 1, command.Pack, command.Comment.Trim()));
     }
+
+    // Checked before the pack's contents, so a huge pack costs the queue nothing more
+    private static string? TooLarge(ContentPack pack) =>
+        pack.Objects.Count > MaxObjects ? $"At most {MaxObjects} objects in one pack; it has {pack.Objects.Count}."
+        : pack.Wheels.Count > MaxWheels ? $"At most {MaxWheels} wheels in one pack; it has {pack.Wheels.Count}."
+        : pack.Wheels.FirstOrDefault(w => w?.Entries.Count > MaxWheelEntries) is { } wheel
+            ? $"At most {MaxWheelEntries} entries in a wheel; «{wheel.Id}» has {wheel.Entries.Count}."
+            : null;
 
     internal static SeasonState Apply(SeasonState state, ContentPublished e) =>
         state with { Content = state.Catalog.Publish(e.Pack) with { Version = e.Version } };
