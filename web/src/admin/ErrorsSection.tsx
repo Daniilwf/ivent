@@ -6,6 +6,7 @@ import { ru } from '../i18n/ru';
 import { EmptyState } from '../ui/States';
 import { AsyncState } from '../ui/AsyncState';
 import { answerOf, useLoaded } from '../app/useLoaded';
+import { Summary } from '../ui/Disclosure';
 
 const t = ru.admin.errors;
 
@@ -43,9 +44,7 @@ export function ErrorsSection() {
                   {t.user(e.userLogin)}. {t.traceId(e.traceId)}
                 </p>
                 <details>
-                  <summary className="min-h-11 cursor-pointer content-center rounded-sm font-bold is-focus:focus-ring">
-                    {t.trace}
-                  </summary>
+                  <Summary className="font-bold">{t.trace}</Summary>
                   <pre className="overflow-x-auto rounded-md bg-page p-3 text-xs whitespace-pre-wrap break-all">
                     {e.stackTrace}
                   </pre>

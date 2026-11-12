@@ -210,6 +210,22 @@ public class MapValidatorTests
         AssertOnly(Check(MapBuilder.New().Path("start", "t", "finish").Teleport("t", to: "finish")), MapErrorCodes.TeleportTarget, "t");
     }
 
+    [Theory]
+    [InlineData(null)]
+    [InlineData("t")]
+    public void A_teleport_without_another_target_is_one_error_not_a_cycle(string? to)
+    {
+        // K1A: no target (or itself) is «the teleport needs a target», not also «teleports go round»
+        var map = to is null
+            ? MapBuilder.New().Path("start", "t", "finish").Retyped("t", CellType.Teleport)
+            : MapBuilder.New().Path("start", "t", "finish").Teleport("t", to: to);
+
+        var errors = Check(map);
+
+        Assert.Equal([MapErrorCodes.TeleportTarget], errors.Where(e => e.Subject == "t").Select(e => e.Code));
+        Assert.DoesNotContain(errors, e => e.Code == MapErrorCodes.TeleportCycle);
+    }
+
     [Fact]
     public void Teleport_cycles_are_refused()
     {
@@ -367,6 +383,69 @@ public class MapValidatorTests
         Assert.Equal(2, errors.Count);
         Assert.Single(errors, e => e.Code == MapErrorCodes.ZoneInvalid);
         Assert.Single(errors, e => e.Code == MapErrorCodes.ZoneDuplicate);
+    }
+    // ---- Exploratory testing of stages 1 and 2 (K1M) ----
+
+    [Fact]
+    public void A_teleport_past_a_checkpoint_may_not_lead_back_before_it()
+    {
+        // K1M-4: a drop penalty stopping on the snake a3→c1 threw the player behind the checkpoint a1 (SPEC «Чекпоинт»)
+        var map = MapBuilder.New()
+            .Path("start", "c1", "f", "a1", "a2", "a3", "a4", "a5", "j", "e1", "finish")
+            .Path("f", "b1", "b2", "b3", "j")
+            .Checkpoint("a1")
+            .Teleport("a3", to: "c1")
+            .Teleport("b2", to: "a5");
+
+        var errors = Check(map);
+
+        var error = Assert.Single(errors);
+        Assert.Equal((MapErrorCodes.TeleportPastCheckpoint, "a3"), (error.Code, error.Subject));
+    }
+
+    [Fact]
+    public void A_teleport_may_lead_back_to_the_checkpoint_itself_or_from_before_it()
+    {
+        var map = MapBuilder.New()
+            .Path("start", "a", "b", "cp", "c", "d", "finish")
+            .Checkpoint("cp")
+            .Teleport("d", to: "cp")
+            .Teleport("b", to: "a");
+
+        Assert.Empty(Check(map));
+    }
+
+    [Theory]
+    [InlineData(int.MaxValue)]
+    [InlineData(int.MinValue)]
+    [InlineData(-1_000_000)]
+    [InlineData(MapValidator.MaxBonusAmount + 1)]
+    public void A_points_bonus_stays_within_its_ceiling(int amount)
+    {
+        // K1M-5: a bonus of int.MaxValue wrapped the player's points round to −2147483648
+        var map = MapBuilder.New().Path("start", "a", "finish").Bonus("a", amount);
+
+        AssertOnly(Check(map), MapErrorCodes.CellParameter, "a");
+        Assert.Empty(Check(MapBuilder.New().Path("start", "a", "finish").Bonus("a", MapValidator.MaxBonusAmount)));
+        Assert.Empty(Check(MapBuilder.New().Path("start", "a", "finish").Bonus("a", -MapValidator.MaxBonusAmount)));
+    }
+
+    [Theory]
+    [InlineData(1e9, 0)]
+    [InlineData(0, 1e12)]
+    [InlineData(-1e9, 0)]
+    [InlineData(MapValidator.MaxCoordinate + 1, 0)]
+    public void A_cell_stands_within_the_coordinate_ceiling(double x, double y)
+    {
+        // K1M-10: a cell at x = 1e9 passed the check and the player's camera, fitting it, showed no cell at all
+        var placed = MapBuilder.New().Path("start", "a", "finish").Build();
+        MapGraph With(decimal ax, decimal ay) => placed with
+        {
+            Cells = [.. placed.Cells.Select(c => c with { X = c.Id == "a" ? ax : 0, Y = c.Id == "a" ? ay : 0 })],
+        };
+
+        AssertOnly(Validate(With((decimal)x, (decimal)y), s_rules), MapErrorCodes.CellPlace, "a");
+        Assert.Empty(Validate(With(MapValidator.MaxCoordinate, -MapValidator.MaxCoordinate), s_rules));
     }
 }
 

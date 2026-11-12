@@ -37,6 +37,8 @@ public static class MapErrorCodes
     public const string ZoneInvalid = "map.zoneInvalid";
     public const string ZoneUnsupported = "map.zoneUnsupported";
     public const string BackgroundInvalid = "map.backgroundInvalid";
+    public const string TeleportPastCheckpoint = "map.teleportPastCheckpoint";
+    public const string CellPlace = "map.cellPlace";
 }
 
 /// <summary>
@@ -57,6 +59,18 @@ public static class MapValidator
 
     /// <summary>The longest side of a background picture the map may name (D-277); the upload keeps far below it.</summary>
     public const int MaxBackgroundSide = 16_384;
+
+    /// <summary>
+    /// How far from zero a cell may stand on the editor's canvas, either way (K1M-10, D-621): a map at most twice the biggest
+    /// picture across; a typo such as 1e9 would make the player's camera fit a speck.
+    /// </summary>
+    public const int MaxCoordinate = 16_384;
+
+    /// <summary>
+    /// The largest points bonus of a cell, either way (D-621): a safety ceiling, not balance — points are an
+    /// <c>int</c> column and a pasted typo must not wrap them round (K1M-5).
+    /// </summary>
+    public const int MaxBonusAmount = 10_000;
 
     public static IReadOnlyList<MapError> Validate(MapGraph map, Ruleset rules)
     {
@@ -136,6 +150,7 @@ public static class MapValidator
         }
 
         CheckTeleportCycles(cells, Error);
+        CheckTeleportsOverCheckpoints(cells, exits, Error);
         CheckReach(map, cells, exits, Error);
         CheckZones(map, cells, Error);
         if (map.Background is { } background
@@ -209,8 +224,8 @@ public static class MapValidator
                 // D-303: the finish is reached by playing, with places and bonuses
                 error(MapErrorCodes.TeleportTarget, cell.Id, "A teleport leads to another cell of the map, not the finish.");
                 break;
-            case CellType.PointsBonus when cell.Amount is null or 0:
-                error(MapErrorCodes.CellParameter, cell.Id, "A points bonus needs a non-zero «amount».");
+            case CellType.PointsBonus when cell.Amount is null or 0 or > MaxBonusAmount or < -MaxBonusAmount:
+                error(MapErrorCodes.CellParameter, cell.Id, $"A points bonus needs a non-zero «amount» of at most {MaxBonusAmount} either way.");
                 break;
             case CellType.Event when string.IsNullOrWhiteSpace(cell.Deck):
                 error(MapErrorCodes.CellParameter, cell.Id, "An event cell needs «deck».");
@@ -218,6 +233,11 @@ public static class MapValidator
             case CellType.Shop when string.IsNullOrWhiteSpace(cell.Grants):
                 error(MapErrorCodes.CellParameter, cell.Id, "A shop cell needs «grants».");
                 break;
+        }
+
+        if (cell.X is < -MaxCoordinate or > MaxCoordinate || cell.Y is < -MaxCoordinate or > MaxCoordinate)
+        {
+            error(MapErrorCodes.CellPlace, cell.Id, $"A cell stands at most {MaxCoordinate} from zero either way.");
         }
 
         // D-302: a disabled mechanic does not appear on the map
@@ -240,7 +260,8 @@ public static class MapValidator
                 current = cells.GetValueOrDefault(to);
             }
 
-            if (current is not null && current.Id == cell.Id && reported.Add(cell.Id))
+            // A teleport with no other target is a target error alone, not a circle of one (K1A)
+            if (seen.Count > 1 && current is not null && current.Id == cell.Id && reported.Add(cell.Id))
             {
                 foreach (var id in seen)
                 {
@@ -248,6 +269,34 @@ public static class MapValidator
                 }
 
                 error(MapErrorCodes.TeleportCycle, cell.Id, $"Teleports lead in a circle: {string.Join(" → ", seen.Append(cell.Id))}.");
+            }
+        }
+    }
+
+    /// <summary>
+    /// SPEC «Чекпоинт»: nothing throws a player back past a checkpoint (D-620). A teleport on a cell past a checkpoint
+    /// (the checkpoint leads to it along arrows) may not lead to a cell before it (one that leads to the checkpoint):
+    /// a drop penalty or a push stopping there would undo the checkpoint, and so would one's own stop.
+    /// </summary>
+    private static void CheckTeleportsOverCheckpoints(Dictionary<string, Cell> cells, ILookup<string, Edge> exits, Action<string, string, string> error)
+    {
+        IEnumerable<string> Next(string id) => exits[id].Select(e => e.To).Where(cells.ContainsKey);
+
+        var checkpoints = cells.Values.Where(c => c.Type == CellType.Checkpoint).Select(c => c.Id).Order(StringComparer.Ordinal).ToList();
+        if (checkpoints.Count == 0)
+        {
+            return;
+        }
+
+        var ahead = checkpoints.ToDictionary(id => id, id => Closure([id], Next), StringComparer.Ordinal);
+        foreach (var teleport in cells.Values.Where(c => c is { Type: CellType.Teleport, To: { } to } && cells.ContainsKey(to)).OrderBy(c => c.Id, StringComparer.Ordinal))
+        {
+            var target = teleport.To!;
+            var reachFromTarget = Closure([target], Next);
+            var over = checkpoints.FirstOrDefault(cp => cp != target && ahead[cp].Contains(teleport.Id) && reachFromTarget.Contains(cp));
+            if (over is not null)
+            {
+                error(MapErrorCodes.TeleportPastCheckpoint, teleport.Id, $"Teleport '{teleport.Id}' leads back past checkpoint '{over}' to '{target}'.");
             }
         }
     }

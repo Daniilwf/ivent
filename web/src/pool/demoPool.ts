@@ -60,6 +60,7 @@ export const demoStatuses: SeasonGame[] = [
     completedAt: '2026-10-12T15:00:00Z',
     marks: [],
     excludedForMe: null,
+    offered: false,
   },
   {
     gameId: id(3),
@@ -68,6 +69,7 @@ export const demoStatuses: SeasonGame[] = [
     completedAt: null,
     marks: [],
     excludedForMe: null,
+    offered: false,
   },
   {
     gameId: id(5),
@@ -76,6 +78,7 @@ export const demoStatuses: SeasonGame[] = [
     completedAt: null,
     marks: [{ playerName: 'Маша', kind: 'dropped' }],
     excludedForMe: null,
+    offered: false,
   },
   {
     gameId: id(7),
@@ -84,6 +87,7 @@ export const demoStatuses: SeasonGame[] = [
     completedAt: null,
     marks: [],
     excludedForMe: 'techRerolled',
+    offered: false,
   },
 ];
 

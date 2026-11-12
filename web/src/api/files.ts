@@ -1,4 +1,5 @@
 import { newCommandId } from './commands';
+import { siteEnvironment } from '../app/siteStatus';
 import { antiforgeryHeaders, noteResponse, rejectionCode, type Schemas } from './client';
 
 export type StoredFile = Schemas['StoredFileView'];
@@ -11,6 +12,18 @@ export class UploadError extends Error {
     super(code ?? 'upload failed');
     this.code = code;
   }
+}
+
+type UploadLimits = Schemas['UploadLimitsView'];
+
+/**
+ * The largest file the site takes at `path`, as the site says it is configured (`/api/status`, D-617). The server
+ * checks it again; this only spares a doomed upload.
+ */
+export function maxUploadBytes(path: string, type: string, limits: UploadLimits): number {
+  if (path === '/api/bug-reports/screenshot') return limits.bugScreenshot;
+  if (path.endsWith('/map/background')) return limits.mapBackground;
+  return type === 'image/gif' ? limits.gif : limits.picture;
 }
 
 /**
@@ -26,6 +39,11 @@ export async function uploadFile(
     | '/api/bug-reports/screenshot'
     | `/api/admin/seasons/${string}/map/background` = '/api/files',
 ): Promise<StoredFile> {
+  // A body over the server's limit is cut off with no answer the page could read (K1A): it is refused here first. A
+  // site that did not say its limits gets the file and answers for itself.
+  const limits = (await siteEnvironment())?.uploads;
+  if (limits && file.size > maxUploadBytes(path, file.type, limits))
+    throw new UploadError('file.tooLarge');
   const form = new FormData();
   form.append('commandId', newCommandId());
   form.append('file', file, name);

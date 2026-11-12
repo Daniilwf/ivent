@@ -137,6 +137,8 @@ for (const section of [
   'complete',
   'proof',
   'inventory',
+  'shop',
+  'bets',
   'feed',
   'profile',
   'sessions',

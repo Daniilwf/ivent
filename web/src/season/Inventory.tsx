@@ -13,21 +13,15 @@ import { EmptyState, ErrorState, Notice } from '../ui/States';
 import { Sticker } from '../ui/Sticker';
 import { Panel } from '../ui/Surface';
 import { cx } from '../ui/cx';
+import { BetsPanel } from './Bets';
+import { ShopPanel } from './Shop';
+import { refusalText, type Loaded, type PanelState, type UseResult } from './economy';
 
-export type Economy = Schemas['EconomyView'];
+export type { Economy, Loaded, PanelState, UseResult } from './economy';
 export type InventoryItem = Schemas['InventoryItemView'];
 
 /** What the player answers in the sheet: the target (when the item asks for one) and the steps' answers in order */
 export type ItemUse = { targetPlayerId: string | null; choices: string[] };
-
-/** The answer of the server to a use: done, or refused with the engine's code */
-export type UseResult = { ok: true } | { ok: false; message: string };
-
-type Loaded =
-  | { kind: 'loading' }
-  | { kind: 'failed' }
-  | { kind: 'signedOut' }
-  | { kind: 'ready'; economy: Economy };
 
 async function fetchEconomy(seasonId: string): Promise<Loaded> {
   try {
@@ -42,19 +36,27 @@ async function fetchEconomy(seasonId: string): Promise<Loaded> {
 }
 
 /**
- * My inventory on the season screen (4.11a, D-441): loads with the page and again after every command of the season
- * (`version` — the season's last sequence, the hub moves it), so an item another player used on me shows at once.
- * Hidden by the page when items are off.
+ * My economy on the season screen (4.11a, 4.11c, D-441, D-447): one load of `GET …/economy` for the inventory, the shop
+ * (when `shop`) and the bets (when `bets`); again after every command of the season (`version` — the season's last
+ * sequence, the hub moves it), so an item another player used on me or a lot gone by the timer shows at once. Each
+ * panel only when its mechanic is on: the bets (or the shop) may play without items, the inventory is then not shown.
  */
-export function InventorySection({
+export function EconomySection({
   seasonId,
   version,
   onSignedOut,
+  items = true,
+  shop = false,
+  bets = false,
   className,
 }: {
   seasonId: string;
   version: number;
   onSignedOut: () => void;
+  /** Items on: the inventory panel; the shop or the bets may play without items */
+  items?: boolean;
+  shop?: boolean;
+  bets?: boolean;
   className?: string;
 }) {
   const [loaded, setLoaded] = useState<Loaded>({ kind: 'loading' });
@@ -72,24 +74,19 @@ export function InventorySection({
     };
   }, [seasonId, version, retry, onSignedOut]);
 
-  async function use(item: InventoryItem, answer: ItemUse): Promise<UseResult> {
+  // One command of the economy: done (and the economy loads again), or refused in words of the dictionary
+  async function act(
+    send: () => Promise<{ response: Response; error?: unknown }>,
+    own?: Record<string, string>,
+  ): Promise<UseResult> {
     try {
-      const result = await api.POST('/api/seasons/{seasonId}/items/{instanceId}/use', {
-        params: { path: { seasonId, instanceId: item.instanceId } },
-        body: {
-          commandId: newCommandId(),
-          targetPlayerId: answer.targetPlayerId,
-          choices: answer.choices,
-        },
-      });
+      const result = await send();
       if (result.response.status === 401) {
         onSignedOut();
         return { ok: false, message: ru.rejection.unknown };
       }
-      if (result.error) {
-        const code = rejectionCode(result.error);
-        return { ok: false, message: (code && ru.rejection[code]) ?? ru.rejection.unknown };
-      }
+      if (result.error)
+        return { ok: false, message: refusalText(rejectionCode(result.error), own) };
       setRetry((n) => n + 1);
       return { ok: true };
     } catch {
@@ -97,16 +94,79 @@ export function InventorySection({
     }
   }
 
+  const path = { params: { path: { seasonId } } };
+  const state: PanelState = loaded.kind === 'signedOut' ? { kind: 'loading' } : loaded;
+  const onRetry = () => {
+    setLoaded({ kind: 'loading' });
+    setRetry((n) => n + 1);
+  };
+
   return (
-    <InventoryPanel
-      state={loaded.kind === 'signedOut' ? { kind: 'loading' } : loaded}
-      onRetry={() => {
-        setLoaded({ kind: 'loading' });
-        setRetry((n) => n + 1);
-      }}
-      onUse={use}
-      className={className}
-    />
+    <>
+      {items ? (
+        <InventoryPanel
+          state={state}
+          onRetry={onRetry}
+          onUse={(item, answer) =>
+            act(() =>
+              api.POST('/api/seasons/{seasonId}/items/{instanceId}/use', {
+                params: { path: { seasonId, instanceId: item.instanceId } },
+                body: {
+                  commandId: newCommandId(),
+                  targetPlayerId: answer.targetPlayerId,
+                  choices: answer.choices,
+                },
+              }),
+            )
+          }
+          className={className}
+        />
+      ) : null}
+      {shop ? (
+        <ShopPanel
+          state={state}
+          onRetry={onRetry}
+          onRoll={() =>
+            act(
+              () =>
+                api.POST('/api/seasons/{seasonId}/shop/roll', {
+                  ...path,
+                  body: { commandId: newCommandId() },
+                }),
+              ru.shop.refusals,
+            )
+          }
+          onBuy={(lot) =>
+            act(
+              () =>
+                api.POST('/api/seasons/{seasonId}/shop/buy', {
+                  ...path,
+                  body: { commandId: newCommandId(), lot },
+                }),
+              ru.shop.refusals,
+            )
+          }
+          className={className}
+        />
+      ) : null}
+      {bets ? (
+        <BetsPanel
+          state={state}
+          onRetry={onRetry}
+          onBet={(bet) =>
+            act(
+              () =>
+                api.POST('/api/seasons/{seasonId}/bets', {
+                  ...path,
+                  body: { commandId: newCommandId(), ...bet },
+                }),
+              ru.bets.refusals,
+            )
+          }
+          className={className}
+        />
+      ) : null}
+    </>
   );
 }
 
@@ -117,7 +177,7 @@ export function InventoryPanel({
   onUse,
   className,
 }: {
-  state: Exclude<Loaded, { kind: 'signedOut' }>;
+  state: PanelState;
   onRetry: () => void;
   onUse: (item: InventoryItem, answer: ItemUse) => Promise<UseResult>;
   className?: string | undefined;
@@ -280,7 +340,7 @@ export function ItemRow({
           <p className="text-sm text-ink-soft" data-testid={`why-${item.objectId}`}>
             {item.refusal === 'item.wrongWindow' && item.window
               ? ru.inventory.windows[item.window]
-              : ((item.refusal && ru.rejection[item.refusal]) ?? ru.rejection.unknown)}
+              : refusalText(item.refusal)}
           </p>
         )
       ) : null}

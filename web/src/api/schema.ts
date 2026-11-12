@@ -7265,7 +7265,9 @@ export interface components {
         };
         /**
          * @description A command of the season log, newest first (D-104): what the admin picks to undo. `undone` — undone already;
-         *     `events` — the types of its events in order.
+         *     `events` — the types of its events in order; `playerName`, `gameTitle`, `comment` — whom and what
+         *     the command touched, from its first event that names them, so identical rows are told apart before an undo (K1A;
+         *     null when none does).
          */
         AdminCommandView: {
             /** Format: uuid */
@@ -7276,6 +7278,9 @@ export interface components {
             occurredAt: string;
             undone: boolean;
             events: string[];
+            playerName?: null | string;
+            gameTitle?: null | string;
+            comment?: null | string;
         };
         /**
          * @description The season's content in the editor (4.12, D-490): whether items are on (the editor works either way, a pack is
@@ -7306,13 +7311,25 @@ export interface components {
         };
         /**
          * @description The season's map in the editor (2.11): the map in force, the players on it, the mode (the editor publishes only in
-         *     `graph`, D-301) and the status (only a draft or a running season takes a new map).
+         *     `graph`, D-301) and the status (only a draft or a running season takes a new map). `version`: how many times
+         *     the map was published (0 — the map of the season's creation); the publication names it back (D-616; always set).
+         *     `events`, `shop`: whether the season's mechanics behind the event and shop cells are on — a switched-off
+         *     mechanic is not offered in the editor (D-302, K1A; always set).
          */
         AdminMapView: {
             mode: components["schemas"]["MapMode"];
             status: components["schemas"]["SeasonStatus"];
             map: components["schemas"]["MapGraphView"];
             players: components["schemas"]["MapPlayerView"][];
+            /**
+             * Format: int32
+             * @default 0
+             */
+            version: number;
+            /** @default false */
+            events: boolean;
+            /** @default false */
+            shop: boolean;
         };
         /**
          * @description A player as the admin sees them (SE5, D-123): the balance and the place in the turn, the inactivity flag, when they
@@ -7373,6 +7390,12 @@ export interface components {
             duplicate: boolean;
             avatar: null | components["schemas"]["FileLinkView"];
         };
+        BetOptionView: {
+            /** Format: int32 */
+            days: number;
+            /** Format: double */
+            multiplier: number;
+        };
         BetRules: {
             /** Format: int32 */
             maxStake: number;
@@ -7383,14 +7406,48 @@ export interface components {
             deadlineOptionsDays: components["schemas"]["EquatableArrayOfint"];
             payoutByHoursPerDay: components["schemas"]["EquatableArrayOfPayoutStep"];
         };
+        /**
+         * @description A run I may bet on: whose (name and token colour), the game and its hours of the roll's snapshot, when bets on it close,
+         *     and the multiplier of each deadline.
+         */
+        BetRunView: {
+            /** Format: uuid */
+            playerId: string;
+            name: string;
+            /** Format: int32 */
+            token: number;
+            /** Format: uuid */
+            runId: string;
+            /** Format: uuid */
+            gameId: string;
+            gameTitle: string;
+            /** Format: double */
+            hours: null | number;
+            /** Format: date-time */
+            closesAt: string;
+            options: components["schemas"]["BetOptionView"][];
+        };
         /** @enum {unknown} */
         BetStatus: "open" | "won" | "lost" | "revoked";
-        /** @description My bets and the rules of a new one: deadlines in days and the largest stake. */
+        /**
+         * @description My bets and the rules of a new one: deadlines in days and the largest stake of the season (D-414). From the bets plan
+         *     (D-447): `refusal` — the engine's code when no bet is placed now, `openBets` of `maxOpenBets`,
+         *     `stakeLimit` — the largest stake I can place (the season's limit or my coins), `runs` — exactly the runs a
+         *     bet is accepted on now.
+         */
         BetsView: {
             bets: components["schemas"]["BetView"][];
             deadlineOptionsDays: number[];
             /** Format: int32 */
             maxStake: number;
+            refusal: null | string;
+            /** Format: int32 */
+            openBets: number;
+            /** Format: int32 */
+            maxOpenBets: number;
+            /** Format: int32 */
+            stakeLimit: number;
+            runs: components["schemas"]["BetRunView"][];
         };
         BetView: {
             /** Format: uuid */
@@ -7411,6 +7468,7 @@ export interface components {
             status: components["schemas"]["BetStatus"];
             /** Format: int32 */
             payout: number;
+            gameTitle: string;
         };
         /** @description One line of the context a page sends: when (by the browser's clock) and what. */
         BugContextEntryView: {
@@ -7815,10 +7873,12 @@ export interface components {
             affectsPosition: boolean;
             badEvent: boolean;
         };
-        /** @description Drop the active run with the penalty (D-09, D-94). */
+        /** @description Drop the active run with the penalty (D-09, D-94); `runId` — the run the page showed (D-600). */
         DropRequest: {
             /** Format: uuid */
             commandId: string;
+            /** Format: uuid */
+            runId?: null | string;
         };
         DropRules: {
             penaltyDice: components["schemas"]["PenaltyDice"];
@@ -7987,6 +8047,11 @@ export interface components {
              *     optional, so older configs without it still read.
              */
             challenges?: boolean;
+            /**
+             * @description The suggestion box (stage 5, D-527); optional, so older configs without it still read. Not written while off: a season
+             *     logged before it keeps its ruleset's format.
+             */
+            suggestions?: boolean;
         };
         /**
          * @description One event of the season's feed (GLOSSARY «Лента», D-124): its place in the log, the command it came from, when, the
@@ -8435,6 +8500,9 @@ export interface components {
          *     `wishRerollOpen` — whether the player may give the game up by wish now (D-206, D-325; always set, optional for older clients): a tech reroll with the
          *     reason `wish`, within the window, for a game with a listed tag the roll did not impose.
          *     `lastEvent` — the event I drew last (stage 5), while `features.events` is on; null before the first draw.
+         *     `coins` — my balance, what a paid reroll spends (K1S-3). `checks` — my other runs that still take a proof
+         *     (completed, the proof neither approved nor rejected) and the runs rejected since my latest roll, newest first; the
+         *     latest completed run is `lastCompleted` and never here (K1S-1, K1S-9, D-602).
          */
         MyTurnView: {
             /** Format: uuid */
@@ -8460,6 +8528,9 @@ export interface components {
             lastMove?: null | components["schemas"]["MoveView"];
             wishRerollOpen?: null | boolean;
             lastEvent?: null | components["schemas"]["DrawnEventView"];
+            /** Format: int32 */
+            coins?: null | number;
+            checks?: null | components["schemas"]["CompletedRunView"][];
         };
         NominationRules: {
             auto: components["schemas"]["EquatableArrayOfAutoNomination"];
@@ -8621,15 +8692,16 @@ export interface components {
             completed: number;
         };
         /**
-         * @description A run to check, in queue order (D-98, Q-3): the runs that decide a finish on top (`decidesFinish`), then by
-         *     completion time; with the claimed difficulty, the counted hours and the dice total, what an approval at a lower
+         * @description A run to check, in queue order (D-98, Q-3, D-662): the runs that decide a finish on top (`decidesFinish`), then
+         *     the runs of players whose roll is closed (`rollClosed`), then by completion time; with the claimed difficulty, the counted hours and the dice total, what an approval at a lower
          *     difficulty or a reject changes. `reachedFinish`: this run's latest move stands on the finish.
          *     `rollClosed`: the player's next roll is closed by the limit of unchecked runs (D-134) until the admin checks one.
          *     `cellBonus`: the points bonus of the cell the run's move stopped on, which a reject takes back too (D-327; always
          *     set, optional for older clients). `dropPenalty`: the drop penalty «Отклонить со штрафом дропа» would throw on top of
          *     the reject (D-327, D-262) under the season's rules, with the drops in a row before the run (D-324); null for the frozen
          *     first, who loses nothing (D-99); `affectsPosition` is false for a finisher whose finish this run does not decide
-         *     (his position is fixed); always set, optional for older clients.
+         *     (his position is fixed); always set, optional for older clients. `hoursSource`: where the player's estimate of
+         *     the hours comes from, when the pool had none (SPEC «Часы и кубы», K1A); null for the pool's hours.
          */
         ProofQueueItemView: {
             /** Format: uuid */
@@ -8656,6 +8728,7 @@ export interface components {
             /** Format: int32 */
             cellBonus?: null | number;
             dropPenalty?: null | components["schemas"]["DropPenaltyView"];
+            hoursSource?: null | string;
         };
         /**
          * @description The proof of the player's own completed run: links (http/https), screenshots the player uploaded (`files` — ids
@@ -8675,13 +8748,15 @@ export interface components {
          * @enum {unknown}
          */
         ProofStatus: "pending" | "approved" | "rejected";
-        /** @description The proof of a run and how the admin checked it. */
+        /** @description The proof of a run and how the admin checked it; `witnessId` — the player who saw the run, if named. */
         ProofView: {
             status: components["schemas"]["ProofStatus"];
             links: string[];
             note: null | string;
             comment: null | string;
             files: components["schemas"]["FileLinkView"][];
+            /** Format: uuid */
+            witnessId?: null | string;
         };
         /**
          * @description Publish a new version of the season's content (D-400) made from `expectedVersion` (D-491); `comment` goes
@@ -8695,12 +8770,18 @@ export interface components {
             pack: components["schemas"]["JsonElement"];
             comment: string;
         };
-        /** @description Publish a new version of the map (D-300, D-308); `comment` goes to the public log, at most 500 characters. */
+        /**
+         * @description Publish a new version of the map (D-300, D-308); `comment` goes to the public log, at most 500 characters.
+         *     `expectedVersion`: the map version the draft was made from (`version` of the map read); a newer one
+         *     published since refuses with `map.versionConflict` (D-616). Without it nothing is checked (scripts).
+         */
         PublishMapRequest: {
             /** Format: uuid */
             commandId: string;
             map: null | components["schemas"]["MapGraphView"];
             comment?: null | string;
+            /** Format: int32 */
+            expectedVersion?: null | number;
         };
         RankingRules: {
             tiebreakers: components["schemas"]["EquatableArrayOfTiebreaker"];
@@ -8744,17 +8825,21 @@ export interface components {
          * @description How a reroll was paid for.
          * @enum {unknown}
          */
-        RerollPayment: "freeThisRoll" | "freeRerollResource" | "coins" | "badEvent" | "freeMode";
+        RerollPayment: "freeThisRoll" | "freeRerollResource" | "coins" | "badEvent" | "freeMode" | "gameDeleted";
         /** @description What the next reroll costs, computed by the engine's rule (D-93); only while a game is offered. */
         RerollPriceView: {
             payment: components["schemas"]["RerollPayment"];
             /** Format: int32 */
             coins: number;
         };
-        /** @description A reroll of the offered game or the whole pending choice; the price follows D-07. */
+        /**
+         * @description A reroll of the offered game or the whole pending choice; the price follows D-07. `expectedPayment` — the price
+         *     the page showed: a reroll paid otherwise now is refused (409 turn.stale, D-600), so an old tab never spends without asking.
+         */
         RerollRequest: {
             /** Format: uuid */
             commandId: string;
+            expectedPayment?: null | components["schemas"]["RerollPayment"];
         };
         /**
          * @description Resolve a pending manual effect (D-102): `outcome` «applied» or «notApplicable»; `comment` is required for
@@ -8872,6 +8957,7 @@ export interface components {
             nominations: components["schemas"]["NominationRules"];
             weeklyChallenge: components["schemas"]["WeeklyChallengeRules"];
             events?: null | components["schemas"]["EventRules"];
+            suggestions?: null | components["schemas"]["SuggestionRules"];
         };
         /**
          * @description One changed value between two versions of the rules: the JSON path (for example `reward.diceCount.max`)
@@ -8960,7 +9046,9 @@ export interface components {
          * @description A game's status in the season as the pool page shows it (SPEC «Статусы игры в сезоне», H6, D-160): `taken` —
          *     completed in the season or being played (an offer and a pending option count), with the player and, for a completed
          *     game, when; `marks` — other players who dropped or tech-rerolled it (the game is free again);
-         *     `excludedForMe` — why it never comes to the viewer again. Only games with something to show are listed.
+         *     `excludedForMe` — why it never comes to the viewer again; `offered` — the game is taken as an offer or an
+         *     option still waiting for «Начать», not played yet (K1A; always set, optional for older clients). Only games with
+         *     something to show are listed.
          */
         SeasonGameView: {
             /** Format: uuid */
@@ -8971,6 +9059,8 @@ export interface components {
             completedAt: null | string;
             marks: components["schemas"]["GameMarkView"][];
             excludedForMe: null | components["schemas"]["ExclusionReason"];
+            /** @default false */
+            offered: boolean;
         };
         /**
          * @description The answer to joining a season (E3, D-122): the last sequence of its log now, and what was committed after the
@@ -9075,6 +9165,7 @@ export interface components {
             lastSeenAt: string;
             current: boolean;
         };
+        /** @description A lot of my offer; `refusal` — the engine's code when buying it is refused now (sold, too few coins, the inventory full…), D-447. */
         ShopLotView: {
             /** Format: int32 */
             lot: number;
@@ -9085,6 +9176,7 @@ export interface components {
             /** Format: int32 */
             price: number;
             sold: boolean;
+            refusal: null | string;
         };
         /**
          * @description How a shop roll was paid.
@@ -9144,13 +9236,15 @@ export interface components {
          * @description What every page asks the site: whether it only reads now (the maintenance banner) and which version it runs — a page
          *     that saw another version before shows «Что нового» (J4, D-201). `environment` — which copy of the site this is
          *     (anything but `production` shows a strip on every page); `testTools` — the test endpoints are there (only
-         *     Development and Test), so the admin gets the page of the test tools (H9, D-220).
+         *     Development and Test), so the admin gets the page of the test tools (H9, D-220); `uploads` — the largest file
+         *     of each kind the site takes, so a page refuses a bigger one before sending it (D-617).
          */
         SiteStatusView: {
             maintenance: boolean;
             version: string;
             environment: components["schemas"]["SiteEnvironment"];
             testTools: boolean;
+            uploads: components["schemas"]["UploadLimitsView"];
         };
         SocialRules: {
             reactions: components["schemas"]["EquatableArrayOfstring"];
@@ -9160,10 +9254,15 @@ export interface components {
             commentsPerDay: number;
             spectatorsCanVote: boolean;
         };
-        /** @description Start the offered game; `difficulty` — the one the player starts on, the cap of the completion's (D-633). */
+        /**
+         * @description Start the offered game; `gameId` — the game the page showed: another one offered now is refused (409 turn.stale, D-600);
+         *     `difficulty` — the one the player starts on, the cap of the completion's (D-633).
+         */
         StartRequest: {
             /** Format: uuid */
             commandId: string;
+            /** Format: uuid */
+            gameId?: null | string;
             difficulty?: null | components["schemas"]["Difficulty"];
         };
         /**
@@ -9183,6 +9282,14 @@ export interface components {
             url: string;
             thumbnailUrl: string;
             duplicate: boolean;
+        };
+        /** @description The rules of the suggestion box (SPEC «Предложка», D-527). */
+        SuggestionRules: {
+            /**
+             * Format: int32
+             * @description How many suggestions one player may send a calendar day of `season.timezone`.
+             */
+            perDay: number;
         };
         TargetObjectsView: {
             /** Format: uuid */
@@ -9283,6 +9390,17 @@ export interface components {
         };
         /** @enum {unknown} */
         UnmetConditionPolicy: "noDiceKeepCoins" | "countAsDrop" | "ignore";
+        /** @description The largest upload of each kind in bytes, as the site is configured (FileLimits, BugReportRules; D-617). */
+        UploadLimitsView: {
+            /** Format: int64 */
+            picture: number;
+            /** Format: int64 */
+            gif: number;
+            /** Format: int64 */
+            bugScreenshot: number;
+            /** Format: int64 */
+            mapBackground: number;
+        };
         /**
          * @description Use an item of my inventory (D-407, D-441): `targetPlayerId` — the target of a «chosen» item (one of the item's
          *     `targets`), `choices` — the answers to its `steps` in order (an option's id, an object's instance id).
@@ -9299,6 +9417,12 @@ export interface components {
         WeeklyChallengeRules: {
             /** Format: int32 */
             defaultRewardCoins: number;
+            /**
+             * Format: int32
+             * @description How many days a weekly challenge's window lasts from its start (D-526). Missing — a season created before it reads as
+             *     it did (D-50); needed once `features.weeklyChallenge` is on. Not written while missing.
+             */
+            durationDays?: null | number;
         };
         /**
          * @description The wheel of the roll that offered what I see now (D-136), from the log: the categories that were on it, the one it
@@ -9389,7 +9513,7 @@ export const objectKindValues: ReadonlyArray<FlattenedDeepRequired<components>["
 export const proofStatusValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ProofStatus"]> = ["pending", "approved", "rejected"];
 export const rarityValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["Rarity"]> = ["common", "epic", "legendary"];
 export const rerollCostKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["RerollCostKind"]> = ["coins", "badEvent"];
-export const rerollPaymentValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["RerollPayment"]> = ["freeThisRoll", "freeRerollResource", "coins", "badEvent", "freeMode"];
+export const rerollPaymentValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["RerollPayment"]> = ["freeThisRoll", "freeRerollResource", "coins", "badEvent", "freeMode", "gameDeleted"];
 export const roleValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["Role"]> = ["player", "admin", "spectator"];
 export const rollMissReasonValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["RollMissReason"]> = ["completedInSeason", "beingPlayed"];
 export const roundingValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["Rounding"]> = ["nearest", "floor", "ceil"];

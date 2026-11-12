@@ -404,6 +404,49 @@ public sealed class EconomyApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task The_bets_plan_lists_the_runs_open_for_a_bet_and_drops_the_one_bet_on()
+    {
+        await EconomyOnAsync();
+        await SetCoinsAsync("vasya", 7 - await CoinsAsync("vasya"));
+        var petya = await _site.SignedInAsync("petya");
+        await ApiCalls.PostOkAsync(petya, Url("roll"));
+        await ApiCalls.PostOkAsync(petya, Url("start"));
+        var vasya = await _site.SignedInAsync("vasya");
+
+        var bets = (await EconomyAsync(vasya)).GetProperty("bets");
+        var run = Assert.Single(bets.GetProperty("runs").EnumerateArray());
+        Assert.Equal(("petya", _site.Clock.UtcNow.AddHours(24)), (run.GetProperty("name").GetString(), run.GetProperty("closesAt").GetDateTimeOffset()));
+        Assert.False(string.IsNullOrEmpty(run.GetProperty("gameTitle").GetString()));
+        Assert.Equal([1, 3, 7], run.GetProperty("options").EnumerateArray().Select(o => o.GetProperty("days").GetInt32()));
+        Assert.Equal((JsonValueKind.Null, 0, 7), (bets.GetProperty("refusal").ValueKind, bets.GetProperty("openBets").GetInt32(), bets.GetProperty("stakeLimit").GetInt32()));
+        Assert.Empty((await EconomyAsync(petya)).GetProperty("bets").GetProperty("runs").EnumerateArray());
+
+        await ApiCalls.PostOkAsync(vasya, Url("bets"), new { commandId = Guid.NewGuid(), onPlayerId = _site.Players["petya"], days = 1, stake = 2 });
+
+        bets = (await EconomyAsync(vasya)).GetProperty("bets");
+        Assert.Empty(bets.GetProperty("runs").EnumerateArray());
+        Assert.Equal(1, bets.GetProperty("openBets").GetInt32());
+        Assert.Equal(run.GetProperty("gameTitle").GetString(), Assert.Single(bets.GetProperty("bets").EnumerateArray()).GetProperty("gameTitle").GetString());
+    }
+
+    [Fact]
+    public async Task Each_lot_says_why_it_is_not_sold()
+    {
+        await EconomyOnAsync();
+        await SetCoinsAsync("vasya", 100);
+        var vasya = await _site.SignedInAsync("vasya");
+        await ApiCalls.PostOkAsync(vasya, Url("shop/roll"));
+        Assert.All((await EconomyAsync(vasya)).GetProperty("shop").GetProperty("lots").EnumerateArray(), l => Assert.Equal(JsonValueKind.Null, l.GetProperty("refusal").ValueKind));
+
+        await ApiCalls.PostOkAsync(vasya, Url("shop/buy"), new { commandId = Guid.NewGuid(), lot = 0 });
+        await SetCoinsAsync("vasya", -await CoinsAsync("vasya"));
+
+        var lots = (await EconomyAsync(vasya)).GetProperty("shop").GetProperty("lots");
+        Assert.Equal("shop.lotSold", lots[0].GetProperty("refusal").GetString());
+        Assert.Equal("roll.notEnoughCoins", lots[1].GetProperty("refusal").GetString());
+    }
+
+    [Fact]
     public async Task A_bet_on_myself_is_a_conflict()
     {
         await EconomyOnAsync();

@@ -5,7 +5,7 @@ import { ChangePasswordForm } from './app/ChangePasswordForm';
 import { LoginForm, TablePage } from './app/LoginForm';
 import { EnvironmentBanner } from './app/EnvironmentBanner';
 import { MaintenanceBanner } from './app/MaintenanceBanner';
-import { routeOf, usePath } from './app/router';
+import { onReopen, routeOf, usePath } from './app/router';
 import { UpdateBanner } from './app/WhatsNew';
 import { NotFoundPage } from './app/NotFound';
 import { Shell } from './app/Shell';
@@ -97,6 +97,15 @@ export function App() {
       }
     })();
   }, [enter]);
+
+  // A link to the page under the password form opens that page: the form closes (D-150)
+  useEffect(
+    () =>
+      onReopen(() => {
+        setState((s) => (s.kind === 'signedIn' && s.ownPassword ? { ...s, ownPassword: null } : s));
+      }),
+    [],
+  );
 
   async function logout() {
     try {
@@ -245,7 +254,11 @@ export function App() {
         ) : route.kind === 'rules' ? (
           <RulesScreen seasonId={signedIn.seasonId} onSignedOut={signedOut} />
         ) : signedIn.seasonId ? (
-          <SeasonScreen seasonId={signedIn.seasonId} onSignedOut={signedOut} />
+          <SeasonScreen
+            seasonId={signedIn.seasonId}
+            role={signedIn.user.role}
+            onSignedOut={signedOut}
+          />
         ) : (
           <main className="mx-auto grid max-w-110 px-4 py-10" data-testid="no-season">
             <EmptyState

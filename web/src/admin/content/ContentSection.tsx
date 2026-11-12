@@ -219,7 +219,7 @@ function Workspace({
               label={t.kindsLabel}
               options={filters.map((f) => ({
                 value: f,
-                label: `${t.kinds[f] ?? f} · ${
+                label: `${t.kinds[f] ?? f}: ${
                   f === 'wheels'
                     ? pack.wheels.length
                     : f === 'deleted'
@@ -602,7 +602,7 @@ function History({ seasonId, view }: { seasonId: string; view: View }) {
               </p>
               <p>«{v.comment}»</p>
               <p className="text-sm text-ink-soft">
-                {t.historyCounts(v.objects, v.wheels)} ·{' '}
+                {t.historyCounts(v.objects, v.wheels)},{' '}
                 {t.historyChanges(v.added.length, v.changed.length, v.removed.length)}
               </p>
               <div>

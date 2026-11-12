@@ -22,8 +22,10 @@ export const variants: Record<ButtonVariant, string> = {
     'min-h-12 rounded-full border-3 border-ink bg-danger px-5 text-base text-on-color shadow-press is-hover:-translate-y-px is-hover:shadow-press-up is-active:translate-y-1 is-active:shadow-press-down',
   ),
   link: cx('min-h-11 px-1 text-base text-ink underline underline-offset-4 is-hover:decoration-2'),
+  // A dangerous action in a list (undo, reject, reset): ink with a red underline at rest, red under the pointer and in
+  // focus. A column of red words shouted on every row of the log and the players (K2-6); the confirmation stays red.
   dangerLink: cx(
-    'min-h-11 px-1 text-base text-danger underline underline-offset-4 is-hover:decoration-2',
+    'min-h-11 px-1 text-base text-ink underline decoration-danger underline-offset-4 is-hover:text-danger is-hover:decoration-2 is-focus:text-danger',
   ),
 };
 
@@ -38,3 +40,9 @@ export function buttonClass(variant: ButtonVariant = 'quiet', className?: string
 /** A name inside a text that leads to its page (a player, a game): underlined, darker on hover */
 export const inlineLink =
   'rounded-sm underline decoration-2 decoration-muted underline-offset-4 is-hover:decoration-ink is-focus:focus-ring';
+
+/**
+ * A link that stands on its own, outside running text (a game's title, a player's name, «Сменить сезон»): an inline link
+ * with a 44 px tap target on a phone (DESIGN.md «Компоненты и состояния»). Inside a sentence, `inlineLink`
+ */
+export const standaloneLink = `${inlineLink} inline-flex min-h-11 items-center`;

@@ -369,10 +369,13 @@ public partial class PlayerAdminInvariantTests
         Assert.Empty(RulesetSupport.Unsupported(s.State.Rules));
         if (command is ChangeRuleset change && RulesetSupport.Unsupported(change.Ruleset).Count > 0)
         {
-            // Refused as invalid — unless it was already refused for editing an older version
+            // Refused as invalid — unless it was already refused because the season is over (D-614: its rules are fixed)
+            // or for editing an older version
             Assert.False(s.Last.IsAccepted, "A mechanic this build does not have was switched on.");
             Assert.Equal(
-                change.ExpectedVersion is { } edited && edited != before.RulesetVersion ? RejectionCodes.RulesetVersionConflict : RejectionCodes.RulesetInvalid,
+                SeasonSetup.IsOver(before) ? RejectionCodes.SeasonClosed
+                : change.ExpectedVersion is { } edited && edited != before.RulesetVersion ? RejectionCodes.RulesetVersionConflict
+                : RejectionCodes.RulesetInvalid,
                 s.Last.Rejection!.Code);
         }
 

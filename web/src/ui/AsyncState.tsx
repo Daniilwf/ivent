@@ -44,7 +44,11 @@ export function AsyncState<T>({
       <ErrorState
         level={level}
         title={errorTitle}
-        text={ru.shell.loadErrorText}
+        text={
+          loaded.kind === 'failed' && loaded.tooOften
+            ? ru.shell.tooOftenText
+            : ru.shell.loadErrorText
+        }
         onRetry={loaded.reload}
       />
     );

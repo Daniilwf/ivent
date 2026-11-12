@@ -1,0 +1,378 @@
+{
+  "cells": [
+    {
+      "id": "start",
+      "type": "start",
+      "x": 80,
+      "y": 100
+    },
+    {
+      "id": "c1",
+      "type": "empty",
+      "x": 200,
+      "y": 100
+    },
+    {
+      "id": "c2",
+      "type": "empty",
+      "x": 320,
+      "y": 100
+    },
+    {
+      "id": "c3",
+      "type": "event",
+      "x": 440,
+      "y": 100,
+      "deck": "good"
+    },
+    {
+      "id": "c4",
+      "type": "empty",
+      "x": 560,
+      "y": 100
+    },
+    {
+      "id": "c5",
+      "type": "empty",
+      "x": 680,
+      "y": 100
+    },
+    {
+      "id": "c6",
+      "type": "empty",
+      "x": 800,
+      "y": 100
+    },
+    {
+      "id": "c7",
+      "type": "event",
+      "x": 920,
+      "y": 100,
+      "deck": "risky"
+    },
+    {
+      "id": "c8",
+      "type": "empty",
+      "x": 1040,
+      "y": 100
+    },
+    {
+      "id": "c9",
+      "type": "empty",
+      "x": 1160,
+      "y": 100
+    },
+    {
+      "id": "c10",
+      "type": "empty",
+      "x": 1160,
+      "y": 260
+    },
+    {
+      "id": "c11",
+      "type": "event",
+      "x": 1040,
+      "y": 260,
+      "deck": "bad"
+    },
+    {
+      "id": "c12",
+      "type": "empty",
+      "x": 920,
+      "y": 260
+    },
+    {
+      "id": "c13",
+      "type": "empty",
+      "x": 800,
+      "y": 260,
+      "zone": "horror-swamp"
+    },
+    {
+      "id": "c14",
+      "type": "empty",
+      "x": 680,
+      "y": 260,
+      "zone": "horror-swamp"
+    },
+    {
+      "id": "c15",
+      "type": "event",
+      "x": 560,
+      "y": 260,
+      "deck": "zone",
+      "zone": "horror-swamp"
+    },
+    {
+      "id": "c16",
+      "type": "empty",
+      "x": 440,
+      "y": 260,
+      "zone": "horror-swamp"
+    },
+    {
+      "id": "c17",
+      "type": "empty",
+      "x": 320,
+      "y": 260,
+      "zone": "horror-swamp"
+    },
+    {
+      "id": "c18",
+      "type": "empty",
+      "x": 200,
+      "y": 260
+    },
+    {
+      "id": "c19",
+      "type": "empty",
+      "x": 80,
+      "y": 260
+    },
+    {
+      "id": "c20",
+      "type": "event",
+      "x": 80,
+      "y": 420,
+      "deck": "good"
+    },
+    {
+      "id": "c21",
+      "type": "empty",
+      "x": 200,
+      "y": 420
+    },
+    {
+      "id": "c22",
+      "type": "empty",
+      "x": 320,
+      "y": 420
+    },
+    {
+      "id": "c23",
+      "type": "empty",
+      "x": 440,
+      "y": 420
+    },
+    {
+      "id": "c24",
+      "type": "empty",
+      "x": 560,
+      "y": 420
+    },
+    {
+      "id": "c25",
+      "type": "event",
+      "x": 680,
+      "y": 420,
+      "deck": "risky"
+    },
+    {
+      "id": "c26",
+      "type": "empty",
+      "x": 800,
+      "y": 420
+    },
+    {
+      "id": "c27",
+      "type": "empty",
+      "x": 920,
+      "y": 420
+    },
+    {
+      "id": "c28",
+      "type": "empty",
+      "x": 1040,
+      "y": 420
+    },
+    {
+      "id": "finish",
+      "type": "finish",
+      "x": 1160,
+      "y": 420
+    }
+  ],
+  "edges": [
+    {
+      "from": "start",
+      "to": "c1",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "c1",
+      "to": "c2",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "c2",
+      "to": "c3",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "c3",
+      "to": "c4",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "c4",
+      "to": "c5",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "c5",
+      "to": "c6",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "c6",
+      "to": "c7",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "c7",
+      "to": "c8",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "c8",
+      "to": "c9",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "c9",
+      "to": "c10",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "c10",
+      "to": "c11",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "c11",
+      "to": "c12",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "c12",
+      "to": "c13",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "c13",
+      "to": "c14",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "c14",
+      "to": "c15",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "c15",
+      "to": "c16",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "c16",
+      "to": "c17",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "c17",
+      "to": "c18",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "c18",
+      "to": "c19",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "c19",
+      "to": "c20",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "c20",
+      "to": "c21",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "c21",
+      "to": "c22",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "c22",
+      "to": "c23",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "c23",
+      "to": "c24",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "c24",
+      "to": "c25",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "c25",
+      "to": "c26",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "c26",
+      "to": "c27",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "c27",
+      "to": "c28",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    },
+    {
+      "from": "c28",
+      "to": "finish",
+      "isDefaultForward": true,
+      "isPrimaryBackward": true
+    }
+  ],
+  "zones": [
+    {
+      "id": "horror-swamp",
+      "name": "Болото ужаса",
+      "deck": "bad"
+    }
+  ]
+}

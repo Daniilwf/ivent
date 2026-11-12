@@ -8,6 +8,7 @@ import {
   seasonOf,
   setUpSeason,
   signIn,
+  points,
 } from '../../support/world.ts';
 
 // TESTING.md scenario 11 «Зритель» (SPEC «Роль «зритель»»): the spectator sees everything public — the season with its
@@ -41,7 +42,7 @@ test('spectator: sees everything public and cannot make a single game action', a
   await expect(page.getByTestId('turn')).toContainText('Ты смотришь сезон как зритель.');
   await expect(page.getByTestId('cells')).toContainText('Вася');
   await expect(page.getByTestId('cells')).toContainText('Петя');
-  await expect(leaderRow(page, vasya.playerId)).toContainText(`1. Вася: ${String(run.total)} очк.`);
+  await expect(leaderRow(page, vasya.playerId)).toContainText(`1. Вася: ${points(run.total)}`);
   for (const action of ['roll', 'start', 'complete-form', 'drop', 'tech-reroll', 'proof-form'])
     await expect(page.getByTestId(action), action).toHaveCount(0);
 

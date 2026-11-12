@@ -536,7 +536,7 @@ export function ObjectEditor({
                 <li key={v.version}>
                   {t.historyRow(v.version, moscowTime(v.at), v.authorName ?? t.system)} —{' '}
                   {t.objectChange[change]}
-                  {v.comment ? <span className="text-ink-soft">{` · «${v.comment}»`}</span> : null}
+                  {v.comment ? <span className="text-ink-soft">{`, «${v.comment}»`}</span> : null}
                 </li>
               ))}
             </ul>

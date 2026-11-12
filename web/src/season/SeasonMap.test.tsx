@@ -140,10 +140,12 @@ afterEach(() => {
 
 describe('the graph board', () => {
   it('numbers the cells from the start along the arrows, the default branch first', () => {
+    // From 0 at the start, a branch in a row before the next one (K1M-1, K1M-3, D-622)
     const { board, cellNumber } = graphBoard(map);
-    expect(cellNumber.get('start')).toBe(1);
-    expect(cellNumber.get('f')).toBe(2);
-    expect(cellNumber.get('a1')).toBe(3);
+    expect(cellNumber.get('start')).toBe(0);
+    expect(cellNumber.get('f')).toBe(1);
+    expect(cellNumber.get('a1')).toBe(2);
+    expect(cellNumber.get('a2')).toBe(3);
     expect(cellNumber.get('b1')).toBe(4);
     const teleport = board.cells.find((c) => c.kind === 'teleport');
     expect(teleport?.to).toBe(cellNumber.get('a2'));
@@ -155,7 +157,7 @@ describe('the graph board', () => {
     const { cellNumber } = graphBoard(map);
     const options = branchOptions({ ...branchChoice, steps: 1 }, map, cellNumber);
     expect(options.map((o) => o.end)).toEqual([
-      ru.map.branch.endCell(3),
+      ru.map.branch.endCell(2),
       ru.map.branch.endBonus(3, 4),
     ]);
   });
@@ -212,7 +214,7 @@ describe('the season screen on the graph map', () => {
 
     const cells = await screen.findByTestId('cells');
     expect(within(cells).getByTestId('cell-t')).toHaveTextContent(
-      `${ru.map.cellNumber(6)}, ${ru.map.cellKinds['teleport'] ?? ''}, ${ru.map.teleportTo(5)}`,
+      `${ru.map.cellNumber(5)}, ${ru.map.cellKinds['teleport'] ?? ''}, ${ru.map.teleportTo(3)}`,
     );
     expect(within(cells).getByTestId('cell-b1')).toHaveTextContent(ru.map.bonusAmount(3));
     expect(within(cells).getByTestId('cell-a1')).toHaveTextContent(ru.map.inZone('Болото ужаса'));
@@ -238,10 +240,10 @@ describe('the season screen on the graph map', () => {
     const branch = await within(await screen.findByTestId('turn')).findByTestId('branch');
     expect(branch).toHaveTextContent(ru.map.branch.lead(2));
     // Two steps: into a1, then a2; into b1, then the teleport t that leads to a2
-    expect(within(branch).getByTestId('branch-a1')).toHaveTextContent(ru.map.branch.endCell(5));
+    expect(within(branch).getByTestId('branch-a1')).toHaveTextContent(ru.map.branch.endCell(3));
     expect(within(branch).getByTestId('branch-a1')).toHaveTextContent('Болото ужаса');
     expect(within(branch).getByTestId('branch-b1')).toHaveTextContent(
-      ru.map.branch.endTeleport(6, 5),
+      ru.map.branch.endTeleport(5, 3),
     );
     // The teleport lands in the swamp: that zone decides the next roll, not the branch's first cell
     expect(within(branch).getByTestId('branch-b1')).toHaveTextContent('Болото ужаса');
@@ -288,6 +290,16 @@ describe('the season screen on the graph map', () => {
     expect(server.sent('POST', '/choose')[0]?.body).toEqual(
       expect.objectContaining({ optionId: 'a1' }),
     );
+  });
+
+  it('puts who leads before the map legend on a desktop (K2-7)', async () => {
+    onDesktop();
+    fakeServer({ ...common, 'GET /api/seasons/*': season('a1') });
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    const legend = await screen.findByTestId('map-legend');
+    const leaders = screen.getByRole('heading', { name: ru.leaderboard.title });
+    expect(leaders.compareDocumentPosition(legend) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it('asks for the branch on the map on a desktop and points there from the turn card', async () => {
@@ -350,7 +362,7 @@ describe('the season screen on the graph map', () => {
     expect(screen.queryByTestId('roll')).not.toBeInTheDocument();
     await userEvent.click(within(walk).getByRole('button', { name: ru.moments.skip }));
     expect(screen.queryByTestId('walk')).not.toBeInTheDocument();
-    expect(screen.getByTestId('roll-announce')).toHaveTextContent(ru.map.branch.announce(5));
+    expect(screen.getByTestId('roll-announce')).toHaveTextContent(ru.map.branch.announce(3));
     expect(screen.getByTestId('roll')).toBeInTheDocument();
   });
 
@@ -439,6 +451,6 @@ describe('the season screen on the graph map', () => {
 
     await screen.findByTestId('roll');
     expect(screen.queryByTestId('map-legend')).not.toBeInTheDocument();
-    expect(screen.getByTestId('cell-c1')).toHaveTextContent(ru.map.cellNumber(2));
+    expect(screen.getByTestId('cell-c1')).toHaveTextContent(ru.map.cellNumber(1));
   });
 });

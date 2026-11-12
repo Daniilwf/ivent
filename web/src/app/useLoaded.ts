@@ -2,7 +2,11 @@ import { useCallback, useEffect, useEffectEvent, useState } from 'react';
 
 /** A page's data as it comes: loading, failed (retry), not found, or here */
 export type Loaded<T> =
-  { kind: 'loading' } | { kind: 'failed' } | { kind: 'notFound' } | { kind: 'ready'; value: T };
+  | { kind: 'loading' }
+  /** `tooOften`: the server's rate limit answered (429), not a lost connection (K1A) */
+  | { kind: 'failed'; tooOften?: boolean }
+  | { kind: 'notFound' }
+  | { kind: 'ready'; value: T };
 
 /** What one load answered: the data's state, or «the session is over» */
 export type Answer<T> = Loaded<T> | { kind: 'signedOut' };
@@ -12,6 +16,7 @@ export function answerOf<T>({ data, response }: { data?: T; response: Response }
   if (data !== undefined) return { kind: 'ready', value: data };
   if (response.status === 401) return { kind: 'signedOut' };
   if (response.status === 404) return { kind: 'notFound' };
+  if (response.status === 429) return { kind: 'failed', tooOften: true };
   return { kind: 'failed' };
 }
 
@@ -39,18 +44,21 @@ export function useLoaded<T>(
 
   useEffect(() => {
     let active = true;
-    const failed = (now: Loaded<T>): Loaded<T> => (now.kind === 'ready' ? now : { kind: 'failed' });
+    const failed =
+      (answer: Loaded<T> = { kind: 'failed' }) =>
+      (now: Loaded<T>): Loaded<T> =>
+        now.kind === 'ready' ? now : answer;
     load()
       .then((answer) => {
         if (!active) return;
         if (answer.kind === 'signedOut') {
           if (onSignedOutSet) signOut();
-          else setState(failed);
-        } else if (answer.kind === 'failed') setState(failed);
+          else setState(failed());
+        } else if (answer.kind === 'failed') setState(failed(answer));
         else setState(answer);
       })
       .catch(() => {
-        if (active) setState(failed);
+        if (active) setState(failed());
       });
     return () => {
       active = false;

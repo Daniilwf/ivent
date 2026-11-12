@@ -27,8 +27,12 @@ public sealed record SeasonState(
     int FinishesSoFar = 0,
     long PointsChanges = 0,
     EquatableArray<Ranking.LeaderboardRow>? Result = null,
-    GameEvent.Engine.Content.ContentCatalog? Content = null)
+    GameEvent.Engine.Content.ContentCatalog? Content = null,
+    int MapVersion = 0)
 {
+    // MapVersion: how many times the admin published the map (0 — the map the season was created with); a draft names
+    // the version it was made from, so a publication over a newer one is refused (K1A, D-616)
+
     /// <summary>The season's content (D-400): empty until the admin publishes a pack.</summary>
     public GameEvent.Engine.Content.ContentCatalog Catalog => Content ?? GameEvent.Engine.Content.ContentCatalog.Empty;
 
@@ -75,7 +79,8 @@ public sealed record SeasonState(
         && Result == other.Result
         && Catalog == other.Catalog
         && WeeklyChallenges.SequenceEqual(other.WeeklyChallenges)
-        && Suggestions.SequenceEqual(other.Suggestions);
+        && Suggestions.SequenceEqual(other.Suggestions)
+        && MapVersion == other.MapVersion;
 
     // Explicit type arguments: a mutated count still compiles, so mutation testing keeps this method (D-281)
     public override int GetHashCode() => HashCode.Combine<Guid, int, int>(SeasonId, Players.Count, Runs.Count);

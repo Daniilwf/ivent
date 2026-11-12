@@ -16,6 +16,10 @@ const files = (dir: string) =>
     .sort()
     .map((f) => readFileSync(join(content, dir, f), 'utf8'));
 
+/** The design review's screenshots of the screen (DESIGN.md: 390×844 and 1440×900), outside git */
+const designShot = (name: string) =>
+  join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'test-artifacts', 'design', name);
+
 /** start → c1 → c2 → c3 → every cell after it an event cell of the good deck → finish: any throw of 3+ stops on one */
 function eventMap(): Schemas['MapGraphView'] {
   const ids = [
@@ -59,7 +63,7 @@ function eventMap(): Schemas['MapGraphView'] {
 
 test('a stop on an event cell draws the event, its card is in the turn and the feed tells it to another player', async ({
   browser,
-}) => {
+}, testInfo) => {
   const world = await setUpSeason({ players: ['Ветреный', 'Наблюдатель'], start: false });
   const [player, other] = world.players;
   if (!player || !other) throw new Error('No players');
@@ -109,6 +113,10 @@ test('a stop on an event cell draws the event, its card is in the turn and the f
   await expect(card).toBeVisible();
   await expect(card).toContainText('Попутный ветер');
   await expect(card.getByTestId('drawn-event-kind')).toHaveText('Хороший ивент');
+  // Drawn while the page was open: the card comes off the deck, then stands (the design review's screenshots)
+  await expect(card).not.toHaveAttribute('data-drawing');
+  await card.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: designShot(`drawn-event-${testInfo.project.name}.png`) });
 
   // The other player opens the feed from the menu without reloading the season: the completion with its event
   await watcher.getByTestId('nav-feed').first().click();

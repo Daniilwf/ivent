@@ -241,6 +241,10 @@ public sealed class MapApiTests : IAsyncLifetime
         Assert.Equal(["petya", "vasya"], players.Select(p => p.GetProperty("name").GetString()));
         Assert.All(players, p => Assert.Equal("start", p.GetProperty("cellId").GetString()));
         Assert.All(players, p => Assert.False(p.GetProperty("choosingBranch").GetBoolean()));
+        // K1A: the mechanics behind the event and shop cells are off by default, so the editor does not offer them
+        Assert.False(view.GetProperty("events").GetBoolean());
+        Assert.False(view.GetProperty("shop").GetBoolean());
+        Assert.Equal(0, view.GetProperty("version").GetInt32());
     }
 
     [Fact]
@@ -259,6 +263,24 @@ public sealed class MapApiTests : IAsyncLifetime
         Assert.True(player.GetProperty("choosingBranch").GetBoolean());
         Assert.Equal("graph", view.GetProperty("mode").GetString());
         Assert.Equal(8, view.GetProperty("map").GetProperty("cells").GetArrayLength());
+    }
+
+    [Fact]
+    public async Task A_draft_from_an_older_map_version_is_not_published_over_a_newer_one()
+    {
+        // K1A, D-616: two tabs read version 0; the second publishes after the first, from the old version
+        var admin = await _site.SignedInAsync("admin");
+        await SwitchToGraphAsync(admin);
+        var read = await ApiCalls.OkAsync(await admin.GetAsync(Admin, Ct));
+        Assert.Equal(0, read.GetProperty("version").GetInt32());
+
+        await ApiCalls.PostOkAsync(admin, $"{Admin}/publish", new { commandId = Guid.NewGuid(), map = ForkMap(), comment = "Первая вкладка", expectedVersion = 0 });
+        var stale = await admin.PostAsJsonAsync($"{Admin}/publish", new { commandId = Guid.NewGuid(), map = LongMap(4), comment = "Вторая вкладка", expectedVersion = 0 }, Ct);
+
+        await AssertRejectedAsync(stale, "map.versionConflict");
+        var now = await ApiCalls.OkAsync(await admin.GetAsync(Admin, Ct));
+        Assert.Equal(1, now.GetProperty("version").GetInt32());
+        Assert.Equal(8, now.GetProperty("map").GetProperty("cells").GetArrayLength());
     }
 
     [Theory]
@@ -591,14 +613,28 @@ public sealed class MapApiTests : IAsyncLifetime
         for (var i = 1; i < length; i++)
         {
             var id = $"long-cell-number-{i}";
-            cells.Add(Cell(id, "empty", i * 100, (i % 7) * 50));
+            var (x, y) = LongMapPlace(i);
+            cells.Add(Cell(id, "empty", x, y));
             edges.Add(Arrow(previous, id, true, true));
             previous = id;
         }
 
-        cells.Add(Cell("finish", "finish", length * 100, 0));
+        var (fx, fy) = LongMapPlace(length);
+        cells.Add(Cell("finish", "finish", fx, fy - (length % 7) * 50));
         edges.Add(Arrow(previous, "finish", true, true));
         return new JsonObject { ["cells"] = cells, ["edges"] = edges, ["zones"] = new JsonArray() };
+    }
+
+    /// <summary>
+    /// The place of the long map's cell <paramref name="i"/>: 50 to a row, 100 apart, the rows winding back and forth, so
+    /// a long map stays within the map's coordinate ceiling (D-621) and a short one is the straight row it always was.
+    /// </summary>
+    private static (int X, int Y) LongMapPlace(int i)
+    {
+        const int PerRow = 50;
+        var (row, column) = (i / PerRow, i % PerRow);
+        var x = (row % 2 == 0 ? column : PerRow - 1 - column) * 100;
+        return (x, (row * 400) + ((i % 7) * 50));
     }
 
     private static JsonObject Cell(string id, string type, int x, int y, string? zone = null, string? to = null, int? amount = null)

@@ -115,8 +115,13 @@ internal static class Rolling
 
         var player = state.Players[command.PlayerId];
 
-        // D-07, D-93: a free reroll of this roll, then a coupon, then the price.
-        var (payment, price) = RerollPrice.For(player, state.Rules.Roll);
+        // D-07, D-93: a free reroll of this roll, then a coupon, then the price; nothing for a game the admin deleted (D-615)
+        var (payment, price) = RerollPrice.For(player, state.Rules.Roll, player.Offer is { } deleted && IsDeleted(context, deleted.GameId));
+        if (command.ExpectedPayment is { } expected && expected != payment)
+        {
+            return Decision.Reject(RejectionCodes.TurnStale, $"The player saw a reroll paid by {expected}; it is paid by {payment} now.");
+        }
+
         var givenUp = player.Offer is { } offer
             ? new HashSet<Guid> { offer.GameId }
             : player.Choice!.Options.Select(o => o.Game?.GameId).OfType<Guid>().ToHashSet();
@@ -149,9 +154,19 @@ internal static class Rolling
         return state with
         {
             Players = state.Players.SetItem(
-                e.PlayerId, player with { Offer = null, Choice = null, RerollsThisRoll = player.RerollsThisRoll + 1 }),
+                e.PlayerId,
+                player with
+                {
+                    Offer = null,
+                    Choice = null,
+                    RerollsThisRoll = e.Payment == RerollPayment.GameDeleted ? player.RerollsThisRoll : player.RerollsThisRoll + 1,
+                }),
         };
     }
+
+    /// <summary>The game is deleted from the pool (soft deletion: it is still there, marked).</summary>
+    internal static bool IsDeleted(EngineContext context, Guid gameId) =>
+        context.Pool.Games.Any(g => g.Id == gameId && g.IsDeleted);
 
     public static SeasonState Apply(SeasonState state, GameExcluded e)
     {

@@ -62,6 +62,9 @@ internal static class PlayerAdministration
     // Points and coins are fields, not dictionary entries (invariant 9).
     private static readonly HashSet<string> s_reservedResources = new(StringComparer.OrdinalIgnoreCase) { "points", "coins" };
 
+    private static bool SameName(string a, string b) =>
+        string.Equals(a.Trim(), b.Trim(), StringComparison.OrdinalIgnoreCase);
+
     public static Decision Decide(SeasonState state, AddSeasonPlayer command)
     {
         if (!state.IsCreated)
@@ -77,6 +80,12 @@ internal static class PlayerAdministration
         if (state.Players.ContainsKey(command.PlayerId) || state.Players.Values.Any(p => p.UserId == command.UserId))
         {
             return Decision.Reject(RejectionCodes.PlayerAlreadyAdded, $"Player {command.PlayerId} or user {command.UserId} is already in the season.");
+        }
+
+        // D-612: the season's views show names only, so two players of one season never share one
+        if (state.Players.Values.Any(p => SameName(p.Name, command.Name)))
+        {
+            return Decision.Reject(RejectionCodes.PlayerNameTaken, $"Another player of the season is called «{command.Name.Trim()}».");
         }
 
         var start = state.Map.Start.Id;

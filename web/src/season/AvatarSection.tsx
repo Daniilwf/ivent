@@ -7,6 +7,18 @@ import { FilePicker } from '../ui/Field';
 
 const pictureTypes = 'image/png,image/jpeg,image/webp,image/gif';
 
+// The pages of the GIF sites, not their media hosts: the server takes only the GIF itself (SafeDownloader, K1A)
+const gifPages = ['tenor.com', 'giphy.com', 'klipy.com'];
+
+function isGifPage(url: string): boolean {
+  try {
+    const host = new URL(url).hostname.toLowerCase().replace(/^www\./, '');
+    return gifPages.includes(host);
+  } catch {
+    return false;
+  }
+}
+
 /**
  * The signed-in user's own avatar (D-117) — a player's, a spectator's or the admin's: a picture from the device or a GIF
  * by link from Tenor, Giphy or Klipy (the server downloads it), or none. The avatar is on the account, so it stays across
@@ -80,6 +92,10 @@ export function AvatarSection({ onChanged }: { onChanged: () => void }) {
     const url = link.trim();
     if (url === '') {
       setError(ru.avatar.linkRequired);
+      return;
+    }
+    if (isGifPage(url)) {
+      setError(ru.avatar.pageLink);
       return;
     }
     void run(async () => {

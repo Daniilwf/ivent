@@ -9,6 +9,8 @@ import {
   seasonOf,
   setUpSeason,
   signIn,
+  cells,
+  points,
 } from '../support/world.ts';
 
 // TESTING.md scenario 2 «Дроп»: the penalty dice take points and cells alike (SPEC «Реролл, дроп, тех-реролл»), and the
@@ -65,7 +67,7 @@ test('drop: the penalty takes points and cells, and a manual bad event joins the
   // The screen shows the same: the leaderboard's row and the token's cell
   const row = after.leaderboard.find((r) => r.playerId === vasya.playerId);
   await expect(leaderRow(page, vasya.playerId)).toHaveText(
-    `1. Вася: ${String(me.points)} очк., до финиша ${String(row?.cellsToFinish)} кл.`,
+    `1. Вася: ${points(me.points)}, до финиша ${cells(row?.cellsToFinish ?? 0)}`,
   );
   await expect(page.getByTestId(`cell-${me.cellId}`)).toContainText('Вася');
 

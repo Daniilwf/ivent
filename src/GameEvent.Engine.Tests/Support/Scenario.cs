@@ -286,9 +286,10 @@ public sealed class Scenario
     }
 
     /// <summary>
-    /// Like <see cref="MoveStatusTo"/>, but a finish the engine refuses with <c>season.proofsPending</c> is appended as a
-    /// crafted log (the status change and the result). Since C10 (D-101) the engine never finishes with unchecked runs;
-    /// only tests of what a finished season refuses to such a run use this, and say so by calling it.
+    /// Like <see cref="MoveStatusTo"/>, but a finish the engine refuses with <c>season.proofsPending</c> or
+    /// <c>season.effectsPending</c> is appended as a crafted log (the status change and the result). Since C10 (D-101) the
+    /// engine never finishes with unchecked runs, since K1S-15 (D-603) never with a pending manual effect (a season
+    /// finished earlier may still have one); only tests of what a finished season refuses use this, and say so by calling it.
     /// </summary>
     public Scenario MoveStatusToForcingFinish(SeasonStatus status)
     {
@@ -296,7 +297,8 @@ public sealed class Scenario
         {
             var next = State.Status + 1;
             Act(new ChangeSeasonStatus(next));
-            if (!Last.IsAccepted && next == SeasonStatus.Finished && Last.Rejection!.Code == RejectionCodes.SeasonProofsPending)
+            if (!Last.IsAccepted && next == SeasonStatus.Finished
+                && Last.Rejection!.Code is RejectionCodes.SeasonProofsPending or RejectionCodes.SeasonEffectsPending)
             {
                 AppendCraftedEvents(
                     new SeasonStatusChanged(SeasonStatus.Closing, SeasonStatus.Finished),
