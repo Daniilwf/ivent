@@ -11,7 +11,8 @@ public sealed record ObjectCard(string Name, string Description);
 
 /// <summary>
 /// The cards of a season's objects (D-444, D-446): the latest name and text of each id over the season's content packs
-/// that were not undone (a definition dropped from a later pack keeps the card it last had, D-400). One mechanism for
+/// (a definition dropped from a later pack keeps the card it last had, D-400). Content publications are never undone
+/// (Undo rejects them, as it does map publications, D-308); the UndoneByEventId filter below is only a guard and changes nothing today. One mechanism for
 /// every view that names an object — the feed's item uses, gifts and drawn events, the season view's drawn event. Kept
 /// per season and recomputed only when the latest publication changes: a request checks one number instead of decoding
 /// every pack (up to 1 MB each, the memory budget of RUNBOOK).
