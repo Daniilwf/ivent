@@ -155,6 +155,40 @@ public class FinisherEventTests
         NoDrawIn(s);
     }
 
+    [Theory]
+    [InlineData("toll")]
+    [InlineData("pickpocket")]
+    public void The_provisional_first_draws_an_event_of_his_own_run_but_it_reaches_nobody_else(string id)
+    {
+        // SPEC «Прогресс и победа»: «В это время игрок уже не влияет на других» — an event of his own completion that aims at
+        // the leader or a random active player finds nobody (D-557); the frozen-first rule of targets is not enough
+        var s = Season(EventSetup.Pack([id], EventSetup.Deck(EventKind.Good, id)));
+        Finished(s, "Вася");
+        Assert.False(s.Player("Вася").Finish!.Frozen);
+        s.WithCoins("Петя", 10).WithCoins("Маша", 10).WithPoints("Петя", 3);
+        var others = s.State.Players.Values.Where(p => p.PlayerId != s.PlayerId("Вася")).Select(p => (p.PlayerId, p.Points, p.Coins)).ToList();
+
+        Complete(s, "Вася", [2, 2], Difficulty.Extreme);
+
+        Assert.Equal((EventSource.Difficulty, id), (Assert.Single(s.LastEvents<EventDrawn>()).Source, s.LastEvents<EventDrawn>().Single().ObjectId));
+        Assert.Equal(others, s.State.Players.Values.Where(p => p.PlayerId != s.PlayerId("Вася")).Select(p => (p.PlayerId, p.Points, p.Coins)));
+        Assert.DoesNotContain(s.LastEvents<CoinsChanged>(), c => c.PlayerId != s.PlayerId("Вася"));
+    }
+
+    [Fact]
+    public void The_frozen_first_draws_nothing_when_his_run_is_rejected_with_the_drop_penalty()
+    {
+        var s = Season(Decks());
+        FrozenFirst(s, "Вася");
+        var runId = Complete(s, "Вася", [2, 2]);
+
+        s.NextRandom(2, 3, 0).Act(new Engine.Proofs.RejectProofWithDropPenalty(runId, "Обман"));
+
+        ScenarioAssert.Accepted(s);
+        NoDrawIn(s);
+        Assert.Empty(s.State.ManualEffects);
+    }
+
     // ---- A later finisher: points and coins only (EV16, D-510, D-424) ----
 
     [Fact]

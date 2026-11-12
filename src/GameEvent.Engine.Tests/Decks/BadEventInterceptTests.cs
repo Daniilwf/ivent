@@ -5,6 +5,7 @@ using GameEvent.Engine.Inventory;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Rolls;
 using GameEvent.Engine.Rulesets;
+using GameEvent.Engine.Runs;
 using GameEvent.Engine.Seasons;
 using GameEvent.Engine.Tests.Events;
 using GameEvent.Engine.Tests.Support;
@@ -119,6 +120,50 @@ public class BadEventInterceptTests
         Assert.Equal("karaoke", Intercepted(s).EventId);
         Assert.Empty(s.LastEvents<ManualEffectCreated>());
         Assert.Empty(s.State.ManualEffects);
+        Spent(s, "Вася", bubble);
+    }
+
+    [Fact]
+    public void The_bubble_stops_a_bad_event_a_difficulty_grants()
+    {
+        // The default ruleset grants only a good event (D-546 (5)); a ruleset may grant a bad one, which falls on the player
+        // by chance, not as a price or a penalty, so the Бабл stops it (panel D-484 (1), D-557)
+        var s = Season(r => r with
+        {
+            Reward = r.Reward with
+            {
+                DieByDifficulty = r.Reward.DieByDifficulty with { Extreme = r.Reward.DieByDifficulty.Extreme with { GrantEvent = EventKind.Bad } },
+            },
+        });
+        var bubble = s.Bubbled("Вася");
+        s.RollTitle("Вася", "Alan Wake").Start("Вася");
+
+        s.NextRandom(2, 3, 0).Complete("Вася", Difficulty.Extreme);
+
+        ScenarioAssert.Accepted(s);
+        var drawn = Assert.Single(s.LastEvents<EventDrawn>());
+        Assert.Equal((EventKind.Bad, EventSource.Difficulty, "horror-week"), (drawn.Kind, drawn.Source, drawn.ObjectId));
+        var stopped = Intercepted(s);
+        Assert.Equal((bubble, EventSource.Difficulty, "horror-week"), (stopped.InstanceId, stopped.Source, stopped.EventId));
+        Assert.DoesNotContain("forced-genre", s.Inventory("Вася"));
+        Spent(s, "Вася", bubble);
+    }
+
+    [Fact]
+    public void With_events_switched_off_the_bubble_still_stops_a_hostile_effect_as_its_text_says()
+    {
+        // «Гасит следующий плохой ивент или враждебный эффект»: its `hostile` is the interception of stage 4 and works without
+        // events; only `badEvent` waits for them, there being no bad event to stop (D-555, D-557)
+        var s = Season().WithCoins("Вася", 10);
+        var bubble = s.Bubbled("Вася");
+        s.WithRuleset(r => r with { Features = r.Features with { Events = false } });
+        s.Give("Петя", "bird-thief");
+
+        s.Used("Петя", "bird-thief", target: "Вася");
+
+        Assert.Equal(bubble, Assert.Single(s.LastEvents<HostileIntercepted>()).InstanceId);
+        Assert.Empty(s.LastEvents<BadEventIntercepted>());
+        Assert.Equal(10, s.Player("Вася").Coins);
         Spent(s, "Вася", bubble);
     }
 

@@ -56,6 +56,13 @@ public sealed record EventDrawn(Guid PlayerId, string Deck, string ObjectId, Eve
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public bool Hostile { get; init; }
+
+    /// <summary>
+    /// The run whose difficulty granted the event (<see cref="EventSource.Difficulty"/> only): a run draws its difficulty's
+    /// event once, whatever the admin later does to its difficulty (D-557). Written only when set.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Guid? RunId { get; init; }
 }
 
 /// <summary>

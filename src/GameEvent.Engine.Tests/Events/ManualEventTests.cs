@@ -39,7 +39,8 @@ public class ManualEventTests
         var vasya = s.PlayerId("Вася");
         Assert.Equal(new EventDrawn(vasya, "bad", "karaoke", EventKind.Bad, EventSource.DropPenalty), Assert.Single(s.LastEvents<EventDrawn>()));
         var created = Assert.Single(s.LastEvents<ManualEffectCreated>());
-        Assert.Equal((vasya, (EventKind?)null, ManualEffectSource.Event, "karaoke"), (created.PlayerId, created.DrawEvent, created.Source, created.ObjectId));
+        // The pending effect remembers the drop it came from, so a buy-out never takes it (panel D-508, D-557)
+        Assert.Equal((vasya, (EventKind?)null, ManualEffectSource.Drop, "karaoke"), (created.PlayerId, created.DrawEvent, created.Source, created.ObjectId));
         Assert.True(s.IndexOf(e => e is EventDrawn) < s.IndexOf(e => e is ManualEffectCreated));
 
         var pending = s.State.ManualEffects[created.EffectId];

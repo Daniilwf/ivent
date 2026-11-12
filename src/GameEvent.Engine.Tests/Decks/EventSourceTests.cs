@@ -280,7 +280,7 @@ public class EventSourceTests
         s.NextRandom(2, 3, 0).Complete("Вася", Difficulty.Extreme);
 
         var vasya = s.PlayerId("Вася");
-        Assert.Equal(new EventDrawn(vasya, "good", "tailwind", EventKind.Good, EventSource.Difficulty), Assert.Single(s.LastEvents<EventDrawn>()));
+        Assert.Equal(new EventDrawn(vasya, "good", "tailwind", EventKind.Good, EventSource.Difficulty) { RunId = runId }, Assert.Single(s.LastEvents<EventDrawn>()));
         Assert.True(s.IndexOf(e => e is CompletionRolled) < s.IndexOf(e => e is EventDrawn), string.Join(", ", s.LastTypes()));
 
         // The throw of this run is done: two d6 and nothing more; the extra die waits for the next throw
@@ -310,6 +310,232 @@ public class EventSourceTests
         Assert.Empty(s.LastEvents<EventDrawn>());
         Assert.Empty(s.LastEvents<EventDrawMissed>());
         Assert.Empty(s.State.ManualEffects);
+    }
+
+    // ---- The difficulty's event after the stop of the run's own move (D-553 (2), D-557) ----
+
+    [Fact]
+    public void A_completion_above_hard_onto_an_event_cell_draws_the_cell_first_and_then_the_difficulty()
+    {
+        var s = EventSetup.Season(
+            EventSetup.Pack(["coins-minus-3", "tailwind"], EventSetup.Deck(EventKind.Bad, "coins-minus-3"), EventSetup.Deck(EventKind.Good, "tailwind")),
+            EventSetup.Line(("c5", "bad")));
+        s.RollTitle("Вася", "Alan Wake").Start("Вася");
+
+        s.NextRandom(2, 3, 0, 0).Complete("Вася", Difficulty.Extreme);
+
+        Assert.Equal([(EventSource.Cell, "bad"), (EventSource.Difficulty, "good")], s.LastEvents<EventDrawn>().Select(d => (d.Source, d.Deck)));
+        Assert.True(s.IndexOf(e => e is PlayerMoved { To: "c5" }) < s.IndexOf(e => e is EventDrawn), string.Join(", ", s.LastTypes()));
+    }
+
+    [Fact]
+    public void The_push_of_the_difficulty_event_does_not_change_the_cell_the_run_stopped_on()
+    {
+        // c5 draws «the zone's deck» outside any zone: the default deck, bad. c6 and c7 are a swamp whose deck is missing from
+        // the content. The cell draws where the run stopped, before the difficulty's event pushes him on to c7
+        var swamp = new ZoneDefinition { Id = "swamp", Name = "Болото", Deck = "horror-bad" };
+        var map = MapBuilder.New().EventCell("c5", DeckRef.Zone)
+            .Path(["start", .. Enumerable.Range(1, 12).Select(i => $"c{i}"), "finish"]).Zone(swamp, "c6", "c7").Build();
+        var s = EventSetup.Season(
+            EventSetup.Pack(["coins-minus-3", "hop-and-coins"], EventSetup.Deck(EventKind.Bad, "coins-minus-3"), EventSetup.Deck(EventKind.Good, "hop-and-coins")),
+            map,
+            r => r with { Events = new EventRules { DefaultDeck = EventKind.Bad } });
+        s.RollTitle("Вася", "Alan Wake").Start("Вася");
+
+        s.NextRandom(2, 3, 0, 0).Complete("Вася", Difficulty.Extreme);
+
+        ScenarioAssert.Accepted(s);
+        Assert.Equal(
+            [(EventSource.Cell, "bad", "coins-minus-3"), (EventSource.Difficulty, "good", "hop-and-coins")],
+            s.LastEvents<EventDrawn>().Select(d => (d.Source, d.Deck, d.ObjectId)));
+        Assert.Empty(s.LastEvents<EventDrawMissed>());
+        Assert.Empty(s.State.ManualEffects);
+        Assert.Equal("c7", s.Player("Вася").CellId);
+    }
+
+    [Fact]
+    public void The_difficulty_event_of_a_walk_paused_at_a_fork_waits_for_the_branch_and_its_push_is_not_lost()
+    {
+        // start → a → f → b1 → j → k → l → m → finish, f → c1 → j. 1 + 2 from the start: a, f and one step left at the fork.
+        // The difficulty's event follows the stop (D-553 (2)): after the branch, so its push of 2 moves him on (D-546 (7))
+        var map = MapBuilder.New().Path("start", "a", "f", "b1", "j", "k", "l", "m", "finish").Path("f", "c1", "j").Build();
+        var s = EventSetup.Season(EventSetup.Pack(["hop-and-coins"], EventSetup.Deck(EventKind.Good, "hop-and-coins")), map);
+        s.RollTitle("Вася", "Alan Wake").Start("Вася");
+        var runId = s.Player("Вася").ActiveRunId!.Value;
+
+        s.NextRandom(1, 2).Complete("Вася", Difficulty.Extreme);
+
+        ScenarioAssert.Accepted(s);
+        Assert.Single(s.LastEvents<BranchChoiceRequested>());
+        Assert.Empty(s.LastEvents<EventDrawn>());
+        var coins = s.Player("Вася").Coins;
+
+        s.NextRandom(0).ChooseBranch("Вася", "c1");
+
+        ScenarioAssert.Accepted(s);
+        var drawn = Assert.Single(s.LastEvents<EventDrawn>());
+        Assert.Equal((EventSource.Difficulty, "hop-and-coins", (Guid?)runId), (drawn.Source, drawn.ObjectId, drawn.RunId));
+        Assert.True(s.IndexOf(e => e is PlayerMoved { To: "c1" }) < s.IndexOf(e => e is EventDrawn), string.Join(", ", s.LastTypes()));
+        Assert.Equal(("k", coins + 3), (s.Player("Вася").CellId, s.Player("Вася").Coins));
+
+        // Drawn once: the run's difficulty event is not drawn again by a later change of the difficulty
+        s.Act(new ChangeRunDifficulty(runId, Difficulty.Hard, "Ошибся"));
+        ScenarioAssert.Accepted(s);
+        s.NextRandom(0).Act(new ChangeRunDifficulty(runId, Difficulty.Extreme, "Всё-таки выше сложной"));
+        ScenarioAssert.Accepted(s);
+        Assert.Empty(s.LastEvents<EventDrawn>());
+    }
+
+    // ---- The admin changes the difficulty (D-553 (2), D-557) ----
+
+    private static Scenario TailwindSeason() => EventSetup.Season(EventSetup.Pack(["tailwind"], EventSetup.Deck(EventKind.Good, "tailwind")));
+
+    [Fact]
+    public void Raising_the_difficulty_above_hard_draws_its_good_event_once()
+    {
+        var s = TailwindSeason();
+        s.RollTitle("Вася", "Alan Wake").Start("Вася");
+        var runId = s.Player("Вася").ActiveRunId!.Value;
+        s.NextRandom(2, 3).Complete("Вася", Difficulty.Hard);
+        Assert.Empty(s.LastEvents<EventDrawn>());
+
+        s.NextRandom(0).Act(new ChangeRunDifficulty(runId, Difficulty.Extreme, "Это было выше сложной"));
+
+        ScenarioAssert.Accepted(s);
+        var drawn = Assert.Single(s.LastEvents<EventDrawn>());
+        Assert.Equal((EventSource.Difficulty, "tailwind", (Guid?)runId), (drawn.Source, drawn.ObjectId, drawn.RunId));
+        Assert.Single(s.Player("Вася").Wallet.NextDice);
+        Assert.Empty(s.State.ManualEffects);
+    }
+
+    [Fact]
+    public void Lowering_and_raising_the_difficulty_again_draws_no_second_event()
+    {
+        // Н-4 (whether a lowering takes the drawn event back) waits for the owner; a run never draws its difficulty's event twice
+        var s = TailwindSeason();
+        s.RollTitle("Вася", "Alan Wake").Start("Вася");
+        var runId = s.Player("Вася").ActiveRunId!.Value;
+        s.NextRandom(2, 3, 0).Complete("Вася", Difficulty.Extreme);
+        Assert.Single(s.LastEvents<EventDrawn>());
+
+        s.Act(new ChangeRunDifficulty(runId, Difficulty.Hard, "Ошибся"));
+        ScenarioAssert.Accepted(s);
+        Assert.Empty(s.LastEvents<EventDrawn>());
+
+        s.NextRandom(0).Act(new ChangeRunDifficulty(runId, Difficulty.Extreme, "Всё-таки выше сложной"));
+
+        ScenarioAssert.Accepted(s);
+        Assert.Empty(s.LastEvents<EventDrawn>());
+        Assert.Empty(s.LastEvents<EventDrawMissed>());
+        Assert.Empty(s.State.ManualEffects);
+        Assert.Single(s.Player("Вася").Wallet.NextDice);
+    }
+
+    // ---- The other ways to a drop penalty: a tech reroll turned into a drop, a reject with the drop penalty (D-553 (1)) ----
+
+    private static Scenario PenaltySeason() =>
+        EventSetup.Season(
+            EventSetup.Pack(["coins-minus-3", "coins-plus-2", "babl", "bubble-effect"], EventSetup.Deck(EventKind.Bad, "coins-minus-3"), EventSetup.Deck(EventKind.Good, "coins-plus-2")),
+            EventSetup.Line(("c5", "good")));
+
+    [Fact]
+    public void A_tech_reroll_turned_into_a_drop_draws_the_bad_event_of_the_drop_after_the_penalty_move()
+    {
+        var s = PenaltySeason();
+        var bubble = s.Bubbled("Вася");
+        var runId = OnC8Run(s);
+        s.Act(new TechReroll(s.PlayerId("Вася"), TechRerollReason.DoesNotLaunch, null));
+        ScenarioAssert.Accepted(s);
+
+        s.NextRandom(2, 1, 0, 0).Act(new ConvertTechRerollToDrop(runId, "это был дроп"));
+
+        ScenarioAssert.Accepted(s);
+        Assert.Equal([(EventSource.Cell, "good"), (EventSource.DropPenalty, "bad")], s.LastEvents<EventDrawn>().Select(d => (d.Source, d.Deck)));
+        Assert.True(s.IndexOf(e => e is PlayerMoved { Reason: MoveReason.DropPenalty, To: "c5" }) < s.IndexOf(e => e is EventDrawn), string.Join(", ", s.LastTypes()));
+        Assert.Empty(s.LastEvents<BadEventIntercepted>());
+        Assert.Contains(s.Player("Вася").Wallet.Inventory, o => o.InstanceId == bubble);
+        Assert.Equal((7, 10 + 2 - 3, "c5"), (s.Player("Вася").Points, s.Player("Вася").Coins, s.Player("Вася").CellId));
+    }
+
+    [Fact]
+    public void A_reject_with_the_drop_penalty_draws_the_bad_event_of_the_drop_on_what_the_reject_left()
+    {
+        // Вася completes from c8 with a 2 (c10, 12 points); the reject takes the run back (c8, 10 points), the penalty of
+        // 2 + 1 pushes him to c5, an event cell, then the drop's bad event: the Бабл never stops a penalty
+        var s = PenaltySeason();
+        var bubble = s.Bubbled("Вася");
+        var runId = OnC8Run(s);
+        s.NextRandom(2).Complete("Вася");
+        Assert.Equal("c10", s.Player("Вася").CellId);
+
+        s.NextRandom(2, 1, 0, 0).Act(new RejectProofWithDropPenalty(runId, "Обман"));
+
+        ScenarioAssert.Accepted(s);
+        Assert.Equal([(EventSource.Cell, "good"), (EventSource.DropPenalty, "bad")], s.LastEvents<EventDrawn>().Select(d => (d.Source, d.Deck)));
+        Assert.True(s.IndexOf(e => e is ProofRejectPenalized) < s.IndexOf(e => e is EventDrawn), string.Join(", ", s.LastTypes()));
+        Assert.True(s.IndexOf(e => e is PlayerMoved { Reason: MoveReason.DropPenalty, From: "c8", To: "c5" }) < s.IndexOf(e => e is EventDrawn { Source: EventSource.DropPenalty }));
+        Assert.Empty(s.LastEvents<BadEventIntercepted>());
+        Assert.Contains(s.Player("Вася").Wallet.Inventory, o => o.InstanceId == bubble);
+        Assert.Equal((7, "c5"), (s.Player("Вася").Points, s.Player("Вася").CellId));
+    }
+
+    /// <summary>Вася on c8 with 10 points and 10 coins plays Silent Hill past the hour a drop needs; returns the run.</summary>
+    private static Guid OnC8Run(Scenario s)
+    {
+        s.WithPoints("Вася", 10).WithCoins("Вася", 10).At("Вася", "c8");
+        return s.PlayingFor("Вася");
+    }
+
+    // ---- The paid reroll keeps what waited for the next roll (D-556) ----
+
+    [Fact]
+    public void Roll_changes_waiting_for_the_next_roll_keep_waiting_through_a_paid_reroll()
+    {
+        // After his roll Вася draws «Клад» (pick of three for the next roll: it waits, D-405); then he pays a reroll with
+        // «Хоррор-неделя»: the forced genre goes to this roll, «Клад» still waits and reaches the roll after
+        var s = Scenario.New(BadEventReroll(TestRuleset.Create().WithEvents()), 3).WithMap(EventSetup.Line())
+            .WithCategory("Horror").WithCategory("Puzzle")
+            .WithGame("Silent Hill", 3, "Horror").WithGame("Fatal Frame", 3, "Horror").WithGame("Siren", 3, "Horror").WithGame("Kuon", 3, "Horror")
+            .WithGame("Tetris", 3, "Puzzle").WithGame("Portal", 3, "Puzzle").WithGame("Braid", 3, "Puzzle").WithGame("Limbo", 3, "Puzzle")
+            .WithPlayers("Вася", "Петя");
+        s.WithContent(EventSetup.Pack(
+            ["horror-week", "forced-genre", "bounty", "shield", "shield-effect", "sack-good"],
+            EventSetup.Deck(EventKind.Bad, "horror-week"),
+            EventSetup.Deck(EventKind.Good, "bounty")));
+        s.Roll("Вася");
+        s.Act(new Reroll(s.PlayerId("Вася")));
+        ScenarioAssert.Accepted(s);
+        s.Give("Вася", "sack-good");
+        s.Used("Вася", "sack-good");
+        Assert.Single(s.Player("Вася").Wallet.NextRoll, m => m.ObjectId == "bounty");
+
+        s.Act(new Reroll(s.PlayerId("Вася")));
+
+        ScenarioAssert.Accepted(s);
+        var reroll = s.LastCommandId;
+        var applied = Assert.Single(s.LastEvents<RollModifiersApplied>());
+        Assert.Contains(applied.Modifiers, m => m.ObjectId == "forced-genre");
+        Assert.DoesNotContain(applied.Modifiers, m => m.ObjectId == "bounty");
+        Assert.Single(applied.Waiting, m => m.ObjectId == "bounty");
+        Assert.Contains("Horror", s.PoolGame(s.Player("Вася").Offer!.GameId).Tags);
+        Assert.Single(s.Player("Вася").Wallet.NextRoll, m => m.ObjectId == "bounty");
+        Assert.DoesNotContain(s.Player("Вася").Wallet.CurrentRoll, m => m.ObjectId == "bounty");
+
+        // The undo of the reroll gives back the roll before it with «Клад» still waiting
+        var before = s.State;
+        s.Act(new UndoCommand(reroll, "Реролл по ошибке"));
+        ScenarioAssert.Accepted(s);
+        Assert.Equal(SeasonEngine.Replay(s.EffectiveLog).Players, s.State.Players);
+        Assert.Single(s.Player("Вася").Wallet.NextRoll, m => m.ObjectId == "bounty");
+        Assert.NotEqual(before.Players[s.PlayerId("Вася")].Offer, s.Player("Вася").Offer);
+
+        // Rolled again and played: the next roll gets «Клад»
+        s.Act(new Reroll(s.PlayerId("Вася")));
+        ScenarioAssert.Accepted(s);
+        s.Start("Вася").NextRandom(1).Complete("Вася");
+        s.Roll("Вася");
+        Assert.Contains(s.LastEvents<RollModifiersApplied>(), a => a.Modifiers.Any(m => m.ObjectId == "bounty"));
+        Assert.Empty(s.Player("Вася").Wallet.NextRoll);
     }
 
     // ---- drawEvent of an item: the deck of its kind (EV1, EV4) ----
