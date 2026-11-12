@@ -25,6 +25,8 @@ public class ValidationEdgeTests
         { "negative inactive hint", r => r with { Season = r.Season with { InactiveHintDays = -5 } }, "season.inactiveHintDays" },
         { "no chain depth", r => r with { Effects = r.Effects with { MaxChainDepth = 0 } }, "effects.maxChainDepth" },
         { "no events per command", r => r with { Effects = r.Effects with { MaxEventsPerCommand = 0 } }, "effects.maxEventsPerCommand" },
+        { "chain deeper than the ceiling", r => r with { Effects = r.Effects with { MaxChainDepth = Limits.MaxEffectDepth + 1 } }, "effects.maxChainDepth" },
+        { "more events than the ceiling", r => r with { Effects = r.Effects with { MaxEventsPerCommand = Limits.MaxEventsPerCommand + 1 } }, "effects.maxEventsPerCommand" },
         {
             "negative days before deadline",
             r => r with { Roll = r.Roll with { LastDaysLengthFilter = r.Roll.LastDaysLengthFilter with { Steps = [new LengthFilterStep { DaysBeforeDeadline = -1, MaxHours = 5 }] } } },

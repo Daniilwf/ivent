@@ -54,10 +54,75 @@ public class GiveAndFlagsTests
 
         s.Give("Вася", "curse-effect");
         s.Give("Вася", "talisman-effect");
+        s.Give("Вася", "curse-effect");
         s.Give("Вася", "epic-pig");
         s.Used("Вася", "epic-pig", "Петя");
-        Assert.Empty(s.Inventory("Вася"));
-        Assert.Equal(["curse-effect", "talisman-effect"], s.Inventory("Петя"));
+
+        // Every hostile effect; the good talisman stays: a pig is no gift to a friend (D-487)
+        Assert.Equal(["talisman-effect"], s.Inventory("Вася"));
+        Assert.Equal(["curse-effect", "curse-effect"], s.Inventory("Петя"));
+    }
+
+    [Theory]
+    [InlineData("pig")]
+    [InlineData("tough-pig")]
+    [InlineData("cursed-pig")]
+    [InlineData("epic-pig")]
+    public void A_pig_cannot_hand_a_good_effect_to_a_friend(string pigId)
+    {
+        // SPEC «Проверка на дыры»: «Подкармливать друга … прямых переводов нет» (D-487)
+        var s = ImportedItemsSeason.New();
+        var talisman = s.Give("Вася", "talisman-effect");
+        var shield = s.Give("Вася", "shield-effect");
+        var pig = s.Give("Вася", pigId);
+
+        ScenarioAssert.RejectsWithoutChanges(s, x => x.Use("Вася", pig, "Петя"), RejectionCodes.ItemNothingToGive);
+        if (pigId != "epic-pig")
+        {
+            ScenarioAssert.RejectsWithoutChanges(s, x => x.Use("Вася", pig, "Петя", Answer(talisman)), RejectionCodes.ItemNothingToGive);
+            ScenarioAssert.RejectsWithoutChanges(s, x => x.Use("Вася", pig, "Петя", Answer(shield)), RejectionCodes.ItemNothingToGive);
+        }
+    }
+
+    [Fact]
+    public void A_pig_with_a_good_and_a_hostile_effect_may_name_only_the_hostile_one()
+    {
+        var s = ImportedItemsSeason.New();
+        var talisman = s.Give("Вася", "talisman-effect");
+        s.Give("Вася", "curse-effect");
+        var pig = s.Give("Вася", "pig");
+
+        ScenarioAssert.RejectsWithoutChanges(s, x => x.Use("Вася", pig, "Петя", Answer(talisman)), RejectionCodes.ItemInvalidChoice);
+    }
+
+    [Fact]
+    public void A_kyukyushka_rat_on_a_player_with_nothing_to_steal_is_refused()
+    {
+        // It gives first and steals after; a rat item it gives is not stolen back (rat items are not stolen), so on a player
+        // with nothing else it would be a plain gift to a friend (D-487)
+        var s = ImportedItemsSeason.New();
+        var gift = s.Give("Вася", "rat");
+        var rat = s.Give("Вася", "kyukyushka-rat");
+        s.Give("Петя", "rat");
+
+        ScenarioAssert.RejectsWithoutChanges(s, x => x.Use("Вася", rat, "Петя", Answer(gift)), RejectionCodes.ItemNothingToTake);
+        ScenarioAssert.RejectsWithoutChanges(s, x => x.Use("Вася", rat, "Коля", Answer(gift)), RejectionCodes.ItemNothingToTake);
+    }
+
+    [Fact]
+    public void A_kind_rat_on_a_player_with_nothing_to_steal_is_refused()
+    {
+        // The 2 coins and the cell are given «взамен» of a theft: without one they would be a gift to a friend (D-487)
+        var s = ImportedItemsSeason.New();
+        var rat = s.Give("Вася", "kind-rat");
+
+        ScenarioAssert.RejectsWithoutChanges(s, x => x.Use("Вася", rat, "Петя"), RejectionCodes.ItemNothingToTake);
+
+        var pizza = s.Give("Петя", "pizza");
+        s.Use("Вася", rat, "Петя", Answer(pizza));
+        ScenarioAssert.Accepted(s);
+        Assert.Equal(22, s.Player("Петя").Coins);
+        Assert.Equal(["pizza"], s.Inventory("Вася"));
     }
 
     [Fact]
@@ -152,6 +217,43 @@ public class GiveAndFlagsTests
         var pizza = s.Give("Коля", "pizza");
         s.Used("Вася", "schrodinger-rat", "Коля", Answer(pizza));
         Assert.Contains("pizza", s.Inventory("Вася"));
+    }
+
+    [Fact]
+    public void An_undestroyable_object_that_does_not_fit_stays_with_its_owner()
+    {
+        // Given: Петя's inventory is full, Вася hands him the rat of Schrödinger with a kyukyushka rat and steals a pizza
+        var s = ImportedItemsSeason.New();
+        var pizza = s.Give("Петя", "pizza");
+        s.Give("Петя", "pizza");
+        var schrodinger = s.Give("Вася", "schrodinger-rat");
+        s.Give("Вася", "kyukyushka-rat");
+        s.WithRuleset(r => r with { Economy = r.Economy with { InventoryLimit = 2 } });
+
+        s.Used("Вася", "kyukyushka-rat", "Петя", Answer(schrodinger), Answer(pizza));
+
+        // The rat cannot be destroyed, so it is not lost on the way: it stays with Вася, nothing is lost (D-478, AU4-2)
+        Assert.Empty(s.LastEvents<ObjectLost>());
+        Assert.DoesNotContain(s.LastEvents<ObjectRemoved>(), r => r.InstanceId == schrodinger);
+        Assert.Equal(["schrodinger-rat", "pizza"], s.Inventory("Вася"));
+        Assert.Equal(["pizza"], s.Inventory("Петя"));
+    }
+
+    [Fact]
+    public void An_undestroyable_object_stolen_into_a_full_inventory_stays_with_the_target()
+    {
+        var s = ImportedItemsSeason.New();
+        s.Give("Петя", "schrodinger-rat");
+        s.Give("Вася", "pizza");
+        s.Give("Вася", "pizza");
+        s.Give("Вася", "magnet");
+        s.WithRuleset(r => r with { Economy = r.Economy with { InventoryLimit = 2 } });
+
+        s.Used("Вася", "magnet", "Петя");
+
+        Assert.Empty(s.LastEvents<ObjectLost>());
+        Assert.Equal(["schrodinger-rat"], s.Inventory("Петя"));
+        Assert.Equal(["pizza", "pizza"], s.Inventory("Вася"));
     }
 
     [Fact]

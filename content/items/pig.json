@@ -2,7 +2,7 @@
   "id": "pig",
   "kind": "item",
   "name": "Свинья",
-  "description": "Отдай выбранному другому игроку один свой эффект на выбор.",
+  "description": "Отдай выбранному другому игроку один свой враждебный эффект на выбор.",
   "rarity": "common",
   "price": null,
   "window": "anytime",
@@ -20,7 +20,8 @@
         "mode": "give",
         "pick": "chosen",
         "filter": {
-          "kind": "effect"
+          "kind": "effect",
+          "hostile": true
         }
       }
     ]
