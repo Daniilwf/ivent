@@ -29,6 +29,34 @@ describe('CompleteForm', () => {
     expect(screen.queryByTestId('complete-hours')).not.toBeInTheDocument();
   });
 
+  it('offers no difficulty above the one the run started on and says why (D-633)', async () => {
+    const onComplete = vi.fn();
+    render(
+      <CompleteForm needsHours={false} declared="normal" pending={false} onComplete={onComplete} />,
+    );
+
+    const group = screen.getByTestId('complete-difficulty');
+    expect(within(group).getAllByRole('radio')).toHaveLength(2);
+    expect(
+      within(group).queryByRole('radio', { name: ru.difficulty.hard }),
+    ).not.toBeInTheDocument();
+    expect(within(group).getByRole('radio', { name: ru.difficulty.normal })).toBeChecked();
+    expect(group).toHaveAccessibleDescription(
+      `${ru.turn.difficultyHint}. ${ru.turn.difficultyDeclared(ru.difficulty.normal)}.`,
+    );
+
+    await userEvent.click(within(group).getByRole('radio', { name: ru.difficulty.easy }));
+    await userEvent.click(screen.getByTestId('complete-submit'));
+
+    expect(onComplete).toHaveBeenCalledWith({ difficulty: 'easy' });
+  });
+
+  it('offers every difficulty when the start named none', () => {
+    render(<CompleteForm needsHours={false} pending={false} onComplete={vi.fn()} />);
+
+    expect(within(screen.getByTestId('complete-difficulty')).getAllByRole('radio')).toHaveLength(4);
+  });
+
   it('asks for an hours estimate when the game has no hours and accepts a comma', async () => {
     const onComplete = vi.fn();
     render(<CompleteForm needsHours pending={false} onComplete={onComplete} />);

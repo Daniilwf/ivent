@@ -17,6 +17,11 @@ internal static class RunLifecycle
             return rejection;
         }
 
+        if (command.DeclaredDifficulty is { } declared && !Enum.IsDefined(declared))
+        {
+            return Decision.Reject(RejectionCodes.CommandInvalid, $"Unknown difficulty {declared}.");
+        }
+
         var player = state.Players[command.PlayerId];
         var offer = player.Offer ?? throw new InvalidOperationException($"Player {player.PlayerId} is Rolling without an offer.");
 
@@ -32,7 +37,7 @@ internal static class RunLifecycle
         }
 
         return Decision.Accept(new RunStarted(
-            context.Ids.NewId(), player.PlayerId, offer.GameId, offer.Snapshot, offer.RolledAt, context.Clock.UtcNow));
+            context.Ids.NewId(), player.PlayerId, offer.GameId, offer.Snapshot, offer.RolledAt, context.Clock.UtcNow, command.DeclaredDifficulty));
     }
 
     public static Decision Decide(SeasonState state, CompleteRun command, EngineContext context)
@@ -87,9 +92,12 @@ internal static class RunLifecycle
             return badReview;
         }
 
+        // SPEC «Награда»: the difficulty named at the start; lowered on the way — the lower counts (D-633). The event stores
+        // the difficulty that counts, so the proof queue, corrections and replay never recompute the cap.
+        var difficulty = run.DeclaredDifficulty is { } declared && declared < command.Difficulty ? declared : command.Difficulty;
         var now = context.Clock.UtcNow;
         var count = CompletionRoll.Count(hours.Value, run.Snapshot);
-        var die = CompletionRoll.DieFor(command.Difficulty, run.Snapshot.DieByDifficulty);
+        var die = CompletionRoll.DieFor(difficulty, run.Snapshot.DieByDifficulty);
 
         // Items and effects change the throw (D-408): what waits for it, then the beforeDice effects firing now.
         var pending = player.Wallet.NextDice.Count;
@@ -106,7 +114,7 @@ internal static class RunLifecycle
             new RunCompleted(
                 run.RunId,
                 player.PlayerId,
-                command.Difficulty,
+                difficulty,
                 hours.Value,
                 now,
                 source,
@@ -266,7 +274,10 @@ internal static class RunLifecycle
     public static SeasonState Apply(SeasonState state, RunStarted e)
     {
         var run = new RunState(
-            e.RunId, e.PlayerId, e.GameId, RunStatus.Playing, e.Snapshot, e.RolledAt, e.StartedAt, Difficulty: null, Hours: null, Dice: []);
+            e.RunId, e.PlayerId, e.GameId, RunStatus.Playing, e.Snapshot, e.RolledAt, e.StartedAt, Difficulty: null, Hours: null, Dice: [])
+        {
+            DeclaredDifficulty = e.DeclaredDifficulty,
+        };
         var player = state.Players[e.PlayerId] with { Phase = TurnPhase.Playing, Offer = null, RerollsThisRoll = 0, ActiveRunId = e.RunId };
         state = state with { Runs = state.Runs.Add(e.RunId, run), Players = state.Players.SetItem(e.PlayerId, player) };
 

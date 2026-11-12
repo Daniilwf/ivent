@@ -56,7 +56,9 @@ test('two tabs: the same step clicked in both at once happens once, and both tab
   await expect(second.locator('#roll-result-title')).toHaveText(title ?? '');
   expect(await accepted(world, 'RollGame')).toBe(1);
 
-  // The start, in both at once
+  // The start on the hard difficulty (the completion counts no higher, D-633), in both at once
+  for (const tab of tabs)
+    await tab.getByTestId('start-difficulty').getByText('Сложная', { exact: true }).click();
   await clickTogether(tabs, 'start');
   for (const tab of tabs) await expect(tab.getByTestId('active-run')).toContainText(title ?? '');
   expect(await accepted(world, 'StartRun')).toBe(1);

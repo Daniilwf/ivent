@@ -2,9 +2,13 @@ using GameEvent.Engine.Kernel;
 
 namespace GameEvent.Engine.Runs;
 
-/// <summary>Start playing the offered game: Rolling → Playing. Creates the run with the roll-time snapshot.</summary>
+/// <summary>
+/// Start playing the offered game: Rolling → Playing. Creates the run with the roll-time snapshot.
+/// <see cref="DeclaredDifficulty"/> — the difficulty the player starts on (SPEC «Награда»: «указанной при старте»): the
+/// completion counts the lower of it and the one claimed then (D-633). Null — not declared, nothing is capped.
+/// </summary>
 /// <remarks><see cref="GameId"/> — the offered game the player saw (D-600): another one offered now refuses with <c>turn.stale</c>.</remarks>
-public sealed record StartRun(Guid PlayerId, Guid? GameId = null) : ICommand;
+public sealed record StartRun(Guid PlayerId, Difficulty? DeclaredDifficulty = null, Guid? GameId = null) : ICommand;
 
 /// <summary>
 /// Complete the active run: Playing → Idle. Dice are rolled by the server in the same command,
@@ -24,9 +28,21 @@ public sealed record CompleteRun(
 /// <summary>The player reviews their own completed run, or changes the review (D-96).</summary>
 public sealed record ReviewRun(Guid PlayerId, Guid RunId, RunReview Review) : ICommand;
 
-/// <summary>The run started. <see cref="RolledAt"/> is kept: the tech reroll window counts from the roll (D-04).</summary>
+/// <summary>
+/// The run started. <see cref="RolledAt"/> is kept: the tech reroll window counts from the roll (D-04).
+/// <see cref="DeclaredDifficulty"/> — the difficulty named at the start (D-633), written only when named: version 1 stays,
+/// a run-started of before the field reads as not declared (D-50).
+/// </summary>
 [EventType("run-started")]
-public sealed record RunStarted(Guid RunId, Guid PlayerId, Guid GameId, RunSnapshot Snapshot, DateTimeOffset RolledAt, DateTimeOffset StartedAt) : IGameEvent;
+public sealed record RunStarted(
+    Guid RunId,
+    Guid PlayerId,
+    Guid GameId,
+    RunSnapshot Snapshot,
+    DateTimeOffset RolledAt,
+    DateTimeOffset StartedAt,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    Difficulty? DeclaredDifficulty = null) : IGameEvent;
 
 [EventType("run-completed")]
 public sealed record RunCompleted(
