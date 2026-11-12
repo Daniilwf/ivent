@@ -51,14 +51,24 @@ public static class RerollPrice
     /// <summary>The reroll coupon resource (CONTENT.md «Купон реролла»).</summary>
     public const string FreeRerollsResource = "freeRerolls";
 
-    /// <summary>The price of the next reroll for <paramref name="player"/>: free in the first's free mode (D-99).</summary>
-    public static (RerollPayment Payment, int Coins) For(Seasons.SeasonPlayer player, Rulesets.RollRules rules)
+    /// <summary>
+    /// The price of the next reroll for <paramref name="player"/>: nothing for an offered game the admin deleted (D-615),
+    /// free in the first's free mode (D-99).
+    /// </summary>
+    public static (RerollPayment Payment, int Coins) For(Seasons.SeasonPlayer player, Rulesets.RollRules rules, bool offerDeleted = false)
     {
         ArgumentNullException.ThrowIfNull(player);
-        return player.Finish?.Frozen == true
-            ? (RerollPayment.FreeMode, 0)
-            : Next(player.RerollsThisRoll, player.Resources[FreeRerollsResource], rules);
+        return Of(offerDeleted, player.Finish?.Frozen == true, player.RerollsThisRoll, player.Resources[FreeRerollsResource], rules);
     }
+
+    /// <summary>
+    /// The one order of the reroll price, shared by the command and the screen (D-600): a deleted offered game first
+    /// (D-615), then the frozen first's free mode (D-99), then <see cref="Next"/>.
+    /// </summary>
+    public static (RerollPayment Payment, int Coins) Of(bool offerDeleted, bool frozen, int rerollsThisRoll, int coupons, Rulesets.RollRules rules) =>
+        offerDeleted ? (RerollPayment.GameDeleted, 0)
+        : frozen ? (RerollPayment.FreeMode, 0)
+        : Next(rerollsThisRoll, coupons, rules);
 
     /// <summary>
     /// How the next reroll is paid after <paramref name="rerollsThisRoll"/> rerolls of this roll with

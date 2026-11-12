@@ -116,9 +116,7 @@ internal static class Rolling
         var player = state.Players[command.PlayerId];
 
         // D-07, D-93: a free reroll of this roll, then a coupon, then the price; nothing for a game the admin deleted (D-615)
-        var (payment, price) = player.Offer is { } deleted && IsDeleted(context, deleted.GameId)
-            ? (RerollPayment.GameDeleted, 0)
-            : RerollPrice.For(player, state.Rules.Roll);
+        var (payment, price) = RerollPrice.For(player, state.Rules.Roll, player.Offer is { } deleted && IsDeleted(context, deleted.GameId));
         if (command.ExpectedPayment is { } expected && expected != payment)
         {
             return Decision.Reject(RejectionCodes.TurnStale, $"The player saw a reroll paid by {expected}; it is paid by {payment} now.");

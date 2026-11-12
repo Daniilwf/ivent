@@ -444,7 +444,8 @@ public sealed class SeasonApiTests : IAsyncLifetime
         }
 
         AssertNextReroll(await MeJsonAsync(vasya), "gameDeleted", 0);
-        await PostAsync(vasya, "reroll", new { commandId = Guid.NewGuid() });
+        // As the screen sends it: the price it shows (D-600)
+        await PostAsync(vasya, "reroll", new { commandId = Guid.NewGuid(), expectedPayment = "gameDeleted" });
         var me = await MeJsonAsync(vasya);
         Assert.NotEqual(gameId, me.GetProperty("offer").GetProperty("id").GetGuid());
         AssertNextReroll(me, "freeThisRoll", 0);

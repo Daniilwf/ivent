@@ -58,6 +58,27 @@ public class DeletedOfferTests
     }
 
     [Fact]
+    public void A_reroll_sent_with_the_price_the_screen_shows_is_accepted()
+    {
+        var s = Offered().DeleteGame("Silent Hill");
+
+        s.Act(new Reroll(s.PlayerId("Вася"), RerollPayment.GameDeleted));
+
+        Assert.True(s.Last.IsAccepted);
+    }
+
+    [Fact]
+    public void The_price_order_puts_a_deleted_offer_before_the_frozen_first_free_mode()
+    {
+        // D-600: the screen and the command use this one order, so the frozen first (D-99) is never stuck on a deleted offer
+        var rules = Offered().State.Rules.Roll;
+
+        Assert.Equal((RerollPayment.GameDeleted, 0), RerollPrice.Of(offerDeleted: true, frozen: true, 5, 0, rules));
+        Assert.Equal((RerollPayment.FreeMode, 0), RerollPrice.Of(offerDeleted: false, frozen: true, 5, 0, rules));
+        Assert.Equal(RerollPrice.Next(0, 0, rules), RerollPrice.Of(offerDeleted: false, frozen: false, 0, 0, rules));
+    }
+
+    [Fact]
     public void A_run_under_way_keeps_its_deleted_game()
     {
         var s = Offered().Start("Вася").DeleteGame("Silent Hill");
