@@ -26,8 +26,15 @@ public sealed partial class CommandProcessor(
     Accounts.IPasswords passwords,
     IEnumerable<ICommittedEventsListener> listeners,
     ILogger<CommandProcessor> logger,
-    Site.MaintenanceMode? maintenance = null) : BackgroundService
+    Site.MaintenanceMode? maintenance = null,
+    TimeProvider? time = null) : BackgroundService
 {
+    /// <summary>
+    /// The time of sessions (D-469): the wall clock the cookie's own expiry uses, not the game's <see cref="IClock"/>, which
+    /// the test copy moves by months — a moved game clock must not sign the admin out.
+    /// </summary>
+    private DateTimeOffset SessionNow => (time ?? TimeProvider.System).GetUtcNow();
+
     private readonly Dictionary<Guid, (SeasonState State, long LastSequence)> _cache = [];
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -97,7 +104,8 @@ public sealed partial class CommandProcessor(
     private async Task<CommandOutcome> ProcessAsync(CommandEnvelope envelope, CancellationToken ct)
     {
         // While the site only reads (D-121) nothing is written: not a player's action, not the scheduler's, not the admin's
-        if (maintenance?.IsOn == true)
+        // Signing in and out stays open (D-468): the admin signs in to end the mode, and an ended session must end
+        if (maintenance?.IsOn == true && envelope.Command is not Accounts.IOpenInMaintenance)
         {
             return Rejected(Site.MaintenanceMode.Code, "The site is under maintenance and only reads; try again in a minute.");
         }

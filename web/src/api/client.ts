@@ -30,10 +30,24 @@ const antiforgery: Middleware = {
 /** Fired when a write meets maintenance (503): the banner asks the site at once instead of waiting for its next look. */
 export const MAINTENANCE_EVENT = 'site:maintenance';
 
-/** Every answer goes into the bug report's context; a 503 tells the banner the site only reads now (D-121). */
+/**
+ * Fired when the server no longer knows this sign-in (401 on anything but the sign-in itself): the session ended on
+ * another device or by the admin (D-466), and the page goes to the sign-in form at once.
+ */
+export const SIGNED_OUT_EVENT = 'site:signedOut';
+
+/**
+ * Every answer goes into the bug report's context; a 503 tells the banner the site only reads now (D-121), a 401 tells
+ * the page its session is over.
+ */
 export function noteResponse(method: string, url: string, status: number) {
   recordRequest(method, url, status);
   if (status === 503) globalThis.dispatchEvent(new Event(MAINTENANCE_EVENT));
+  if (
+    status === 401 &&
+    !new URL(url, globalThis.location.origin).pathname.startsWith('/api/auth/login')
+  )
+    globalThis.dispatchEvent(new Event(SIGNED_OUT_EVENT));
 }
 
 const observed: Middleware = {

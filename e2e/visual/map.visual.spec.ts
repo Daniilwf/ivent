@@ -141,6 +141,7 @@ for (const section of [
   'bets',
   'feed',
   'profile',
+  'sessions',
   'game',
   'pool',
   'rules',

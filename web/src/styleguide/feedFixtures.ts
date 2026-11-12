@@ -234,3 +234,30 @@ export const demoGameRuns: Schemas['GameRunView'][] = [
   run(1, { status: 'dropped', difficulty: null, hours: null, completedAt: null }),
   run(8, { status: 'rejected', seasonName: 'Весна 2026', completedAt: '2026-04-02T10:00:00Z' }),
 ];
+
+/** «Где я вошёл» (D-466): this phone, a desktop yesterday, a device the browser of which says nothing */
+export const demoSessions: Schemas['SessionView'][] = [
+  {
+    id: id(401),
+    userAgent:
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile Safari/604.1',
+    createdAt: '2026-10-01T07:15:00Z',
+    lastSeenAt: '2026-10-12T17:55:00Z',
+    current: true,
+  },
+  {
+    id: id(402),
+    userAgent:
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/130.0 Safari/537.36 YaBrowser/24.10',
+    createdAt: '2026-09-20T19:00:00Z',
+    lastSeenAt: '2026-10-11T21:40:00Z',
+    current: false,
+  },
+  {
+    id: id(403),
+    userAgent: null,
+    createdAt: '2026-09-14T10:00:00Z',
+    lastSeenAt: '2026-09-30T08:05:00Z',
+    current: false,
+  },
+];

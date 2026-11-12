@@ -70,6 +70,8 @@
 
 ## 5. Ruleset: числа и флаги
 
+Поправки после аудита плана (D-537…D-546): поля кооп и дуэлей — по совету экспертов, поля `reward.coop.partnerMayHaveOwnRun` нет (D-540).
+
 Все числа — в конфиге сезона, движок не держит констант. Поля помечены «есть», если уже в `ruleset.default.json`.
 
 | Поле | По умолчанию | Решение |
@@ -89,7 +91,6 @@
 | `reward.unmetConditionPolicy` | `noDiceKeepCoins` (есть) | движок начинает читать (D-507) |
 | `reward.coop.pointsShare`, `roundUpFor` | 0.5, `roller` (есть) | D-521 |
 | `reward.coop.coinsShare` | 0.5 | новое, D-521 |
-| `reward.coop.partnerMayHaveOwnRun` | false | новое, D-520 |
 | `interactions.inviteTtlHours` | 24 (есть) | приглашения в кооп и дуэль (D-523) |
 | `interactions.maxOpenInvitesPerPlayer` | 3 | D-523 |
 | `partnerBoard.requestTtlHours` | 48 | D-524 |
@@ -97,7 +98,8 @@
 | `polls.allowChangeVote` | true | D-513 |
 | `social.spectatorsCanVote` | false (есть) | D-513 |
 | `globalEvents.maxActive` | 2 | D-517 |
-| `duels.durationDays`, `duels.rewardCoins`, `duels.maxOpenPerPlayer` | 3, 10, 1 | D-525 |
+| `duels.durationDays`, `duels.rewardCoins`, `duels.maxOpenPerPlayer`, `duels.countRunsStartedAfterAccept`, `duels.samePairCooldownDays`, `duels.maxWinsPerSeason`, `duels.dropForfeits` | 7, 10, 1, true, 14, 5, true | D-525 по совету экспертов (D-540) |
+| `polls.showLiveCountsDefault` | false | D-541 |
 | `weeklyChallenge.defaultRewardCoins` | 10 (есть) | D-526 |
 | `weeklyChallenge.durationDays` | 7 | D-526 |
 | `suggestions.perDay` | 5 | D-527 |

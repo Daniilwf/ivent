@@ -295,6 +295,18 @@ public partial class EventFormatTests
             """{"userId":"40000000-0000-0000-0000-000000000001"}"""
         },
         {
+            "session-started",
+            new Engine.Accounts.SessionStarted(s_user, Guid.Parse("60000000-0000-0000-0000-000000000001")),
+            1,
+            """{"userId":"40000000-0000-0000-0000-000000000001","sessionId":"60000000-0000-0000-0000-000000000001"}"""
+        },
+        {
+            "sessions-ended",
+            new Engine.Accounts.SessionsEnded(s_user, [Guid.Parse("60000000-0000-0000-0000-000000000001")], Engine.Accounts.SessionEndReason.OtherDevices),
+            1,
+            """{"userId":"40000000-0000-0000-0000-000000000001","sessionIds":["60000000-0000-0000-0000-000000000001"],"reason":"otherDevices"}"""
+        },
+        {
             "account-restored",
             new Engine.Accounts.AccountRestored(s_user),
             1,

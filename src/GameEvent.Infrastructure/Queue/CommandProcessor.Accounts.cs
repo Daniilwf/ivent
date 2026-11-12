@@ -20,6 +20,7 @@ public sealed partial class CommandProcessor
         var now = clock.UtcNow;
         var (events, apply, secret, rejection) = command switch
         {
+            StartSession or TouchSession or EndSessions or PurgeSessions => await DecideSessionAsync(db, command, SessionNow, ct),
             IAccountCommand account => await DecideAccountAsync(db, account, now, ct),
             Files.RecordFile file => await DecideFileAsync(db, file, now, ct),
             Pool.AddGame or Pool.ChangeGame or Pool.DeleteGame or Pool.RestoreGame or Pool.SetCategory or Pool.RemoveCategory
@@ -137,11 +138,13 @@ public sealed partial class CommandProcessor
                     }
 
                     var temporary = AccountRules.TemporaryPassword();
-                    return ([new AccountPasswordReset(user.Id)], () =>
+                    var sessions = await LiveSessionsAsync(db, user.Id, SessionNow, ct);
+                    return ([new AccountPasswordReset(user.Id), .. Ended(user.Id, sessions, SessionEndReason.AccountChanged)], () =>
                     {
                         user.PasswordHash = passwords.Hash(user, temporary);
                         user.MustChangePassword = true;
                         user.SecurityStamp = AccountRules.NewStamp();
+                        EndAll(sessions, SessionNow);
                     }, temporary, null);
                 }
 
@@ -163,11 +166,14 @@ public sealed partial class CommandProcessor
                         return Reject(AccountRules.PasswordInvalid, $"A new password is {AccountRules.MinPasswordLength}–{AccountRules.MaxPasswordLength} characters, not the login and not the current one.");
                     }
 
-                    return ([new AccountPasswordChanged(user.Id)], () =>
+                    // The device that changed it stays signed in; every other session ends (D-467)
+                    var others = (await LiveSessionsAsync(db, user.Id, SessionNow, ct)).Where(s => s.Id != change.KeepSession).ToList();
+                    return ([new AccountPasswordChanged(user.Id), .. Ended(user.Id, others, SessionEndReason.PasswordChanged)], () =>
                     {
                         user.PasswordHash = passwords.Hash(user, change.NewPassword);
                         user.MustChangePassword = false;
                         user.SecurityStamp = AccountRules.NewStamp();
+                        EndAll(others, SessionNow);
                     }, null, null);
                 }
 
@@ -198,12 +204,14 @@ public sealed partial class CommandProcessor
                         return Reject(AccountRules.LastAdmin, "The last admin keeps the role.");
                     }
 
-                    return ([new AccountChanged(user.Id, edit.Name.Trim(), AccountRules.ToLog(edit.Role))], () =>
+                    var sessions = user.Role != edit.Role ? await LiveSessionsAsync(db, user.Id, SessionNow, ct) : [];
+                    return ([new AccountChanged(user.Id, edit.Name.Trim(), AccountRules.ToLog(edit.Role)), .. Ended(user.Id, sessions, SessionEndReason.AccountChanged)], () =>
                     {
-                        // A new role ends the account's sessions (D-67)
+                        // A new role ends the account's sessions (D-67, D-467)
                         if (user.Role != edit.Role)
                         {
                             user.SecurityStamp = AccountRules.NewStamp();
+                            EndAll(sessions, SessionNow);
                         }
 
                         user.Name = edit.Name.Trim();
@@ -228,10 +236,12 @@ public sealed partial class CommandProcessor
                         return Reject(AccountRules.LastAdmin, "The last admin is not deleted.");
                     }
 
-                    return ([new AccountDeleted(user.Id)], () =>
+                    var sessions = await LiveSessionsAsync(db, user.Id, SessionNow, ct);
+                    return ([new AccountDeleted(user.Id), .. Ended(user.Id, sessions, SessionEndReason.AccountChanged)], () =>
                     {
                         user.IsDeleted = true;
                         user.SecurityStamp = AccountRules.NewStamp();
+                        EndAll(sessions, SessionNow);
                     }, null, null);
                 }
 
@@ -280,6 +290,107 @@ public sealed partial class CommandProcessor
                 throw new InvalidOperationException($"Unknown account command {command.GetType().Name}.");
         }
     }
+
+    /// <summary>
+    /// Sessions (D-466): the sign-in makes one, a live one's visits move its end, the owner or the admin ends them, the
+    /// scheduler drops the rows of the ended. They are the accounts' data, so they go through the same queue (D-469).
+    /// </summary>
+    private static async Task<(IReadOnlyList<IGameEvent> Events, Action? Apply, string? Secret, Rejection? Rejection)> DecideSessionAsync(
+        GameEventDbContext db, IGlobalCommand command, DateTimeOffset now, CancellationToken ct)
+    {
+        switch (command)
+        {
+            case StartSession start:
+                {
+                    if (!await db.Users.AnyAsync(u => u.Id == start.UserId && !u.IsDeleted, ct))
+                    {
+                        return ([], null, null, new Rejection(AccountRules.Unknown, $"Account {start.UserId} does not exist."));
+                    }
+
+                    // Over the limit the least recently seen sessions end in the same command (SES-2)
+                    var live = await LiveSessionsAsync(db, start.UserId, now, ct);
+                    var over = live.OrderBy(s => s.LastSeenAt).ThenBy(s => s.CreatedAt)
+                        .Take(Math.Max(0, live.Count - Math.Max(1, start.MaxLive) + 1))
+                        .ToList();
+                    var session = new SessionRecord
+                    {
+                        Id = SessionRules.NewId(),
+                        UserId = start.UserId,
+                        CreatedAt = now,
+                        LastSeenAt = now,
+                        ExpiresAt = now + SessionRules.Lifetime,
+                        UserAgent = Cut(start.UserAgent, SessionRules.MaxUserAgentLength),
+                        Address = Cut(start.Address, SessionRules.MaxAddressLength),
+                    };
+                    return ([.. Ended(start.UserId, over, SessionEndReason.Limit), new SessionStarted(start.UserId, session.Id)], () =>
+                    {
+                        EndAll(over, now);
+                        db.Sessions.Add(session);
+                    }, null, null);
+                }
+
+            case TouchSession touch:
+                {
+                    // An ended or expired session stays as it was: a touch never brings one back
+                    var session = await db.Sessions.SingleOrDefaultAsync(s => s.Id == touch.SessionId, ct);
+                    return session is not null && session.IsActive(now)
+                        ? ([], () =>
+                        {
+                            session.LastSeenAt = now;
+                            session.ExpiresAt = now + SessionRules.Lifetime;
+                        }, null, null)
+                        : ([], null, null, new Rejection(SessionRules.Unknown, $"Session {touch.SessionId} is not live."));
+                }
+
+            case EndSessions end:
+                {
+                    if (!await db.Users.AnyAsync(u => u.Id == end.UserId, ct))
+                    {
+                        return ([], null, null, new Rejection(AccountRules.Unknown, $"Account {end.UserId} does not exist."));
+                    }
+
+                    var ended = (await LiveSessionsAsync(db, end.UserId, now, ct))
+                        .Where(s => (end.Only is not { } only || s.Id == only) && s.Id != end.Keep)
+                        .ToList();
+                    if (end.Only is not null && ended.Count == 0)
+                    {
+                        return ([], null, null, new Rejection(SessionRules.Unknown, $"Session {end.Only} of account {end.UserId} is not live."));
+                    }
+
+                    return ended.Count == 0
+                        ? ([], () => { }, null, null)
+                        : ([new SessionsEnded(end.UserId, [.. ended.Select(s => s.Id)], end.Reason)], () => EndAll(ended, now), null, null);
+                }
+
+            case PurgeSessions:
+                {
+                    var gone = await db.Sessions.Where(s => s.RevokedAt != null || s.ExpiresAt <= now).ToListAsync(ct);
+                    return ([], () => db.Sessions.RemoveRange(gone), null, null);
+                }
+
+            default:
+                throw new InvalidOperationException($"Unknown session command {command.GetType().Name}.");
+        }
+    }
+
+    // Times compare in SQL: they are stored as UTC ticks (UtcTicksConverter), which sort as the moments do
+    private static Task<List<SessionRecord>> LiveSessionsAsync(GameEventDbContext db, Guid userId, DateTimeOffset now, CancellationToken ct) =>
+        db.Sessions.Where(s => s.UserId == userId && s.RevokedAt == null && s.ExpiresAt > now).ToListAsync(ct);
+
+    /// <summary>The log's record of the sessions a command ends, none when it ends none.</summary>
+    private static IGameEvent[] Ended(Guid userId, List<SessionRecord> sessions, SessionEndReason reason) =>
+        sessions.Count == 0 ? [] : [new SessionsEnded(userId, [.. sessions.Select(s => s.Id)], reason)];
+
+    private static void EndAll(IEnumerable<SessionRecord> sessions, DateTimeOffset now)
+    {
+        foreach (var session in sessions)
+        {
+            session.RevokedAt = now;
+        }
+    }
+
+    private static string? Cut(string? text, int length) =>
+        string.IsNullOrWhiteSpace(text) ? null : text.Length <= length ? text : text[..length];
 
     private static Task<bool> IsLastAdminAsync(GameEventDbContext db, Guid userId, CancellationToken ct) =>
         db.Users.AllAsync(u => u.Id == userId || u.Role != Role.Admin || u.IsDeleted, ct);

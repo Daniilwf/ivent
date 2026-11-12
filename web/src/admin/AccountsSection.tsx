@@ -22,7 +22,10 @@ type Secret = { login: string; password: string } | null;
 
 const roles: Role[] = ['player', 'admin', 'spectator'];
 
-/** Accounts live between seasons (SPEC «Аккаунты»): create, rename, change the role, reset the password, delete */
+/**
+ * Accounts live between seasons (SPEC «Аккаунты»): create, rename, change the role, reset the password, delete; how many
+ * devices each is signed in on and «Выйти отовсюду» (D-466)
+ */
 export function AccountsSection({ me }: { me: string }) {
   const loaded = useLoaded(
     useCallback(async () => answerOf(await api.GET('/api/admin/accounts')), []),
@@ -208,8 +211,10 @@ function AccountRow({
   const [name, setName] = useState(account.name);
   const [role, setRole] = useState<Role>(account.role);
   const [nameError, setNameError] = useState<string>();
-  const [busy, setBusy] = useState<'save' | 'reset' | 'delete' | 'restore' | null>(null);
-  const [confirming, setConfirming] = useState<'reset' | 'delete' | null>(null);
+  const [busy, setBusy] = useState<'save' | 'reset' | 'delete' | 'restore' | 'sessions' | null>(
+    null,
+  );
+  const [confirming, setConfirming] = useState<'reset' | 'delete' | 'sessions' | null>(null);
 
   async function save(e: SyntheticEvent) {
     e.preventDefault();
@@ -235,7 +240,7 @@ function AccountRow({
     }
   }
 
-  async function act(action: 'reset' | 'delete' | 'restore') {
+  async function act(action: 'reset' | 'delete' | 'restore' | 'sessions') {
     setBusy(action);
     try {
       const params = { path: { userId: account.id } };
@@ -245,7 +250,9 @@ function AccountRow({
           ? await api.POST('/api/admin/accounts/{userId}/reset-password', { params, body })
           : action === 'delete'
             ? await api.POST('/api/admin/accounts/{userId}/delete', { params, body })
-            : await api.POST('/api/admin/accounts/{userId}/restore', { params, body });
+            : action === 'sessions'
+              ? await api.POST('/api/admin/accounts/{userId}/end-sessions', { params, body })
+              : await api.POST('/api/admin/accounts/{userId}/restore', { params, body });
       setConfirming(null);
       if (!answer.data) {
         onFailed(refusal(answer));
@@ -256,7 +263,14 @@ function AccountRow({
           login: account.login,
           password: answer.data.temporaryPassword,
         });
-      else onDone(action === 'delete' ? t.deletedOk(account.name) : t.restored(account.name));
+      else
+        onDone(
+          action === 'delete'
+            ? t.deletedOk(account.name)
+            : action === 'sessions'
+              ? t.endSessionsOk(account.name)
+              : t.restored(account.name),
+        );
     } catch {
       setConfirming(null);
       onFailed(ru.admin.failed);
@@ -280,6 +294,11 @@ function AccountRow({
           {account.login}
           {account.mustChangePassword ? `, ${t.mustChange}` : ''}
         </p>
+        {account.isDeleted ? null : (
+          <p className="text-sm text-ink-soft tabular-nums" data-testid="account-sessions">
+            {t.sessions(account.sessions)}
+          </p>
+        )}
       </div>
       {account.isDeleted ? (
         <div>
@@ -319,6 +338,24 @@ function AccountRow({
             busy={busy === 'reset'}
             onConfirm={() => void act('reset')}
           />
+          {account.sessions > 0 ? (
+            <ConfirmDanger
+              open={confirming === 'sessions'}
+              onOpenChange={(open) => {
+                setConfirming(open ? 'sessions' : null);
+              }}
+              trigger={
+                <Button variant="dangerLink" data-testid="account-end-sessions">
+                  {t.endSessions}
+                </Button>
+              }
+              title={t.endSessionsTitle(account.name)}
+              consequences={t.endSessionsConsequences}
+              confirm={t.endSessionsConfirm}
+              busy={busy === 'sessions'}
+              onConfirm={() => void act('sessions')}
+            />
+          ) : null}
           {me ? null : (
             <ConfirmDanger
               open={confirming === 'delete'}

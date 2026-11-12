@@ -991,6 +991,11 @@ export const ru = {
       title: 'Профиль',
       lead: 'Имя, аватарка целиком, число пройденных игр, сезоны с очками и местом, отзывы. Ниже — мой профиль без сезонов и отзывов.',
     },
+    sessions: {
+      title: 'Где я вошёл',
+      lead: 'Мои устройства в профиле: это устройство первым и с отметкой, у остальных — последний заход и «Выйти»; ниже — только одно устройство, загрузка и ошибка.',
+      only: 'Только это устройство',
+    },
     gamePage: {
       title: 'Страница игры',
       lead: 'Карточка из пула и все прохождения во всех сезонах: статус словом и значком, сложность, часы и отзыв. Ниже — игра, которую ещё никто не брал.',
@@ -1163,10 +1168,11 @@ export const ru = {
   },
   // Events drawn from decks (stage 5, D-500): the card of the one I drew last
   events: {
-    lastTitle: 'Вытянутый ивент',
     kinds: eventKindNames,
+    // Said once for a card drawn while the page is open, as the dice are
+    announce: (kind: EventKind, name: string) => `Вытянут ${eventKindWords[kind]}: «${name}»`,
     sources: { cell: 'с клетки ивента', item: 'от предмета' } as Record<'cell' | 'item', string>,
-    played: 'Разыгран сразу, как вытянут. Что он меняет в будущем, сработает само в свой момент.',
+    played: 'Уже разыгран — дальше сработает сам.',
   },
   effects: {
     title: 'Нужно разыграть',
@@ -1350,6 +1356,28 @@ export const ru = {
     notFoundTitle: 'Такого игрока нет',
     notFoundText: 'Возможно, аккаунт удалён или ссылка неверная.',
     toSeason: 'К сезону',
+  },
+  // «Где я вошёл» (D-466): a session is a sign-in on one device; the page calls it «устройство»
+  sessions: {
+    title: 'Где я вошёл',
+    lead: 'Устройства, где открыт твой аккаунт. Не узнаёшь какое-то — выйди на нём и смени пароль.',
+    thisDevice: 'Это устройство',
+    lastSeen: (when: string) => `Последний заход: ${when}`,
+    signedInAt: (when: string) => `Вход: ${when}`,
+    end: 'Выйти',
+    endLabel: (device: string) => `Выйти на устройстве «${device}»`,
+    endOthers: 'Выйти на остальных устройствах',
+    ended: 'Готово: на том устройстве нужно будет войти снова.',
+    endedOthers: (n: number) =>
+      n === 0
+        ? 'Других устройств не было.'
+        : `Готово: вышли на ${n} ${plural(n, 'устройстве', 'устройствах', 'устройствах')}.`,
+    onlyThis: 'Аккаунт открыт только здесь.',
+    failed: 'Не получилось. Проверь связь и попробуй ещё раз.',
+    errorTitle: 'Список устройств не загрузился',
+    device: (browser: string, system: string) => `${browser}, ${system}`,
+    unknownDevice: 'Неизвестное устройство',
+    browsers: { yandex: 'Яндекс Браузер' },
   },
   gamePage: {
     runsTitle: (n: number) => (n === 0 ? 'Прохождения' : `Прохождения: ${n}`),
@@ -2703,6 +2731,16 @@ export const ru = {
       deletedOk: (name: string) => `Аккаунт удалён: ${name}`,
       restore: 'Вернуть',
       restored: (name: string) => `Аккаунт возвращён: ${name}`,
+      sessions: (n: number) => (n === 0 ? 'Нет открытых входов' : `Устройств со входом: ${n}`),
+      endSessions: 'Выйти отовсюду',
+      endSessionsTitle: (name: string) => `Выйти отовсюду у ${name}?`,
+      endSessionsConsequences: [
+        'На всех устройствах аккаунт выйдет сразу',
+        'Пароль и роль останутся',
+        'Войти снова можно тем же паролем',
+      ],
+      endSessionsConfirm: 'Выйти отовсюду',
+      endSessionsOk: (name: string) => `Вышли отовсюду: ${name}`,
     },
     bugs: {
       filter: 'Показать',

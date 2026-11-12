@@ -46,12 +46,15 @@ import { EditorDemo, MapBackgroundDemo, GraphMapDemo } from './GraphDemos';
 import { FeedList, FeedSkeleton } from '../feed/FeedList';
 import { GameDetails } from '../feed/GameScreen';
 import { ProfileDetails } from '../feed/ProfileScreen';
+import { SessionList } from '../feed/SessionsPanel';
 import {
   demoFeedDays,
   demoGameCard,
   demoGameRuns,
   demoProfile,
   demoProfileEmpty,
+  demoNow,
+  demoSessions,
 } from './feedFixtures';
 import { AdminDemos } from './AdminDemos';
 import { ContentDemos } from './ContentDemos';
@@ -759,6 +762,32 @@ export function Styleguide() {
         </div>
         <div className="grid max-w-180 gap-4 border-t-2 border-dashed border-muted pt-4">
           <ProfileDetails profile={demoProfileEmpty} mine />
+        </div>
+      </Section>
+
+      <Section id="sessions" title={t.sessions.title} lead={t.sessions.lead}>
+        <div className="grid max-w-180 gap-4" data-testid="styleguide-sessions">
+          <Panel title={ru.sessions.title}>
+            <SessionList sessions={demoSessions} reload={() => undefined} now={demoNow} />
+          </Panel>
+          <Panel title={t.sessions.only}>
+            <SessionList
+              sessions={demoSessions.slice(0, 1)}
+              reload={() => undefined}
+              now={demoNow}
+            />
+          </Panel>
+          <Panel title={t.states.loading}>
+            <div className="grid gap-3" aria-busy="true">
+              <Skeleton className="h-12 w-full rounded-md" />
+              <Skeleton className="h-12 w-full rounded-md" />
+            </div>
+          </Panel>
+          <ErrorState
+            title={ru.sessions.errorTitle}
+            text={ru.shell.loadErrorText}
+            onRetry={() => undefined}
+          />
         </div>
       </Section>
 

@@ -120,7 +120,7 @@ public sealed class WebSecurityTests : IAsyncLifetime
             b.UseSetting("Security:LoginFailuresPerAddress", "100");
         });
         var owner = await KnownBrowserAsync(site, "petya");
-        _site.Time.Advance = LoginDevices.Lifetime.Add(TimeSpan.FromDays(1)); // wall time, like sessions (D-650)
+        _site.Time.Advance(LoginDevices.Lifetime.Add(TimeSpan.FromDays(1))); // wall time, like sessions (D-650)
 
         await ReachCeilingAsync(site, "petya");
 
