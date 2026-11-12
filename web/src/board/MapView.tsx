@@ -1,3 +1,4 @@
+import { camera, cameraFrame, fanSpot, openingView, type Box, type View } from './camera';
 import { Flag, LocateFixed, Minus, Orbit, Plus, ShoppingBag, Sparkles, X } from 'lucide-react';
 import {
   useEffect,
@@ -15,8 +16,8 @@ import {
 import { playerToken } from '../design/players';
 import { ru } from '../i18n/ru';
 import { IconButton } from '../ui/Button';
-import { cx } from '../ui/cx';
 import { useDesk } from '../ui/useDesk';
+import { cx } from '../ui/cx';
 import { blobPath, cellById, polylinePath, zoneAt } from './geometry';
 import { zoneFill } from './graphBoard';
 import type { Board, BoardBackground, BoardZone, Player, Point, ZoneTheme } from './types';
@@ -192,11 +193,7 @@ export function MapSticker({
   lift?: number;
 }) {
   const r = size / 2;
-  // Several players on one cell fan out above it instead of piling up
-  const angle = count === 1 ? -90 : -150 + (120 / (Math.min(count, 3) - 1)) * index;
-  const reach = count === 1 ? lift : lift + 14;
-  const dx = at.x + Math.cos((angle * Math.PI) / 180) * reach;
-  const dy = at.y + Math.sin((angle * Math.PI) / 180) * reach;
+  const { x: dx, y: dy } = fanSpot(at, index, count, lift);
   // Two maps on one page must not share clip ids
   const clip = `sticker-${useId().replace(/:/g, '')}`;
   const token = playerToken(player.token);
@@ -271,12 +268,14 @@ function FitText({ width, children }: { width: number; children: string }) {
   );
 }
 
-/** «+N» next to a cell with more players than fit */
-function MoreChip({ at, count, radius }: { at: Point; count: number; radius: number }) {
-  // Past the rim of a big cell (the start, the finish), so it never covers the name (K1M-8)
-  const dx = radius > 18 ? radius + 21 : 30;
+/**
+ * «+N» for the players that do not fit: in the fan's last place, never over the cell's own label (K2-2, K1M-8); a tap
+ * on it names everybody on the cell (K1M-7)
+ */
+function MoreChip({ at, count, lift }: { at: Point; count: number; lift: number }) {
+  const spot = fanSpot(at, 2, 3, lift);
   return (
-    <g transform={`translate(${at.x + dx} ${at.y + 4})`} data-more="">
+    <g transform={`translate(${spot.x} ${spot.y})`} data-testid="more-chip" data-more="">
       <rect
         x={-17}
         y={-12}
@@ -389,20 +388,6 @@ function signSpots(board: Board): Map<string, Point> {
 }
 
 // ---- Pan and zoom ----
-/** The view is its centre and its width in world units; the height follows the frame's shape */
-type View = { cx: number; cy: number; w: number };
-type Box = { width: number; height: number };
-
-/**
- * How far past the board's edge the camera may look, in world units: a token fanned out over an edge cell and its «ты»
- * stay whole in the frame (K1M-6)
- */
-const edgeRoom = 48;
-/** The zoom buttons' strip: 44 px buttons 12 px from the frame's edge, and a little air (K1M-6) */
-const toolsRoom = 64;
-/** A pointer that moved less than this between down and up tapped (K1M-7) */
-const tapSlop = 8;
-
 /**
  * `focus`: open around this point, about one world unit to a pixel of the frame; `anchor`: where a tall frame centres;
  * `toolsAt`: the side of the frame the zoom buttons stand on, kept clear of the board in the first view.
@@ -438,53 +423,12 @@ function usePanZoom(
   }, []);
 
   const ratio = box.height / box.width;
-  // The zoom buttons stand at the top of a phone's page and at the bottom of a desktop's (tools="auto"): by the
-  // page's `desk` breakpoint, as the buttons' own classes, not by the frame's width (a desktop's frame is narrower)
+  // The zoom buttons stand at the bottom of the frame on every size (tools="auto", K2-4)
+  const side = toolsAt === 'none' ? null : toolsAt === 'top' ? 'top' : 'bottom';
+  const { area, clamp, wholeWidth } = cameraFrame(board, box, side, anchor);
+  // Around the focus on a phone, the whole board on a desktop while it is readable (K2-3); never past the world's edge
   const desk = useDesk();
-  const side = toolsAt === 'none' ? null : toolsAt === 'auto' ? (desk ? 'bottom' : 'top') : toolsAt;
-  const gap = side ? toolsRoom : 0;
-
-  // The world the camera may show (K1M-2): the board with room round its edge and, on the buttons' side, the strip
-  // they stand on (in world units at the view's zoom)
-  const area = (w: number) => {
-    const strip = (gap * w) / box.width;
-    return {
-      x0: -edgeRoom,
-      x1: board.width + edgeRoom,
-      y0: -edgeRoom - (side === 'top' ? strip : 0),
-      y1: board.height + edgeRoom + (side === 'bottom' ? strip : 0),
-    };
-  };
-  /** A view moved back into the world: never past its edges, and centred on it once it is all in the frame */
-  const clamp = (v: View): View => {
-    const a = area(v.w);
-    const h = v.w * ratio;
-    const along = (at: number, half: number, low: number, high: number) =>
-      half * 2 >= high - low ? (low + high) / 2 : Math.min(Math.max(at, low + half), high - half);
-    return {
-      w: v.w,
-      cx: along(v.cx, v.w / 2, a.x0, a.x1),
-      cy: along(v.cy, h / 2, a.y0, a.y1),
-    };
-  };
-
-  // The width at which the whole board's height, its room and the buttons' strip fill the frame's height
-  const tallWidth =
-    ((board.height + edgeRoom * 2) * box.width) / Math.max(box.height - gap, box.height / 2);
-  // Only a phone's frame crops the board around me; a desktop's always shows the whole board
-  const portrait = ratio > board.height / board.width && box.width < 600;
-  // A wide frame shows the whole board; a tall one (a phone) fills its height and centres on me
-  const wholeWidth = Math.max(board.width + edgeRoom * 2, tallWidth);
-  const fitWidth = portrait ? tallWidth : wholeWidth;
-  const fit = clamp({
-    cx: portrait ? (anchor?.x ?? board.width / 2) : board.width / 2,
-    cy: board.height / 2,
-    w: fitWidth,
-  });
-  const openWidth = Math.min(Math.max(box.width, 320), fit.w);
-  const wide = box.width >= 600;
-  // Around the focus, but never past the world's edge: my token whole, the buttons over the room past the board
-  const opening: View = focus && !wide ? clamp({ w: openWidth, cx: focus.x, cy: focus.y }) : fit;
+  const opening = openingView(board, box, focus, anchor, side, desk);
   const view = clamp(moved ?? opening);
   const current = (v: View | null) => clamp(v ?? opening);
   // The page scrolls under a swipe while the map has nowhere to go up or down (K1M-2: a phone held sideways)
@@ -540,7 +484,10 @@ function usePanZoom(
 
   const movedFar = (e: PointerEvent) => {
     const p = press.current;
-    if (p?.id === e.pointerId && Math.hypot(e.clientX - p.at.x, e.clientY - p.at.y) >= tapSlop)
+    if (
+      p?.id === e.pointerId &&
+      Math.hypot(e.clientX - p.at.x, e.clientY - p.at.y) >= camera.tapSlop
+    )
       p.moved = true;
   };
   const release = (e: PointerEvent, tapped: boolean) => {
@@ -655,7 +602,7 @@ export type MapViewProps = {
   hide?: string[];
   /** The first view: the whole world, or a close look around this cell */
   focus?: number | undefined;
-  /** Where the zoom buttons stand: at the bottom on a desktop, at the top over a phone's bottom sheet */
+  /** Where the zoom buttons stand: at the bottom of the frame (`auto`, K2-4), or at its top */
   tools?: 'top' | 'bottom' | 'auto' | 'none';
   children?: ReactNode;
   /** The camera, for a moment that follows a token */
@@ -951,23 +898,26 @@ export function MapView({
           // Me first, so my sticker is never the one hidden behind «+N»
           const ordered = [...here].sort((a, b) => Number(b.me ?? false) - Number(a.me ?? false));
           const big = c.kind === 'start' || c.kind === 'finish';
+          const lift = big ? 52 : 32;
+          // More than three: two stickers (me first) and «+N» in the third place (K2-2)
+          const shown = here.length > 3 ? 2 : 3;
           // A tap on a token or on «+N» names everybody on the cell (K1M-7)
           return here.length === 0
             ? []
             : [
                 <g key={`players-${c.id}`} data-at={c.id} className="cursor-pointer">
-                  {ordered.slice(0, 3).map((p, i) => (
+                  {ordered.slice(0, shown).map((p, i) => (
                     <MapSticker
                       key={p.id}
                       player={p}
                       at={c}
                       index={i}
                       count={here.length}
-                      lift={big ? 52 : 32}
+                      lift={lift}
                     />
                   ))}
                   {here.length > 3 ? (
-                    <MoreChip at={c} count={here.length - 3} radius={big ? 30 : 18} />
+                    <MoreChip at={c} count={here.length - shown} lift={lift} />
                   ) : null}
                 </g>,
               ];
@@ -983,11 +933,7 @@ export function MapView({
           className={cx(
             'absolute right-3 left-3 flex items-start gap-2 rounded-lg border-2 border-ink bg-card py-2 pr-2 pl-3 text-sm text-ink desk:right-auto desk:max-w-sm',
             // Across the frame from the zoom buttons
-            tools === 'bottom'
-              ? 'top-3'
-              : tools === 'auto'
-                ? 'bottom-3 desk:top-3 desk:bottom-auto'
-                : 'bottom-3',
+            tools === 'top' || tools === 'none' ? 'bottom-3' : 'top-3',
           )}
         >
           <p className="min-w-0">
@@ -1017,11 +963,9 @@ export function MapView({
         <div
           className={cx(
             'absolute right-3 flex gap-2',
-            tools === 'top'
-              ? 'top-3'
-              : tools === 'bottom'
-                ? 'bottom-3'
-                : 'top-3 desk:top-auto desk:bottom-3',
+            // A phone's buttons stand at the bottom too (K2-4): at the top they covered the first row of cells, and
+            // the page leaves room under the frame for the leaderboard's bar
+            tools === 'top' ? 'top-3' : 'bottom-3',
           )}
         >
           <IconButton

@@ -4,11 +4,13 @@ import userEvent from '@testing-library/user-event';
 import { ru } from '../i18n/ru';
 import { graphBoard } from './graphBoard';
 import { linearBoard, type ChainCell } from './linearBoard';
+import { camera, openingView } from './camera';
 import { MapView } from './MapView';
 import type { Board, Player } from './types';
 
 // The map's camera and taps (K1M exploratory testing of stages 1 and 2): pan and zoom keep the board in the frame, a
 // phone's first view shows my token clear of the zoom buttons, a tap names the players on a cell, labels stay readable.
+// Then the map's frame after the design review of stages 1–2 (K2-2…K2-4, D-641).
 
 const chain = (n: number): ChainCell[] =>
   Array.from({ length: n }, (_, i) => ({
@@ -169,8 +171,13 @@ describe('the camera of the map', () => {
     // «ты» stands above my token
     expect(mine.y - 49 * mine.scale).toBeGreaterThanOrEqual(0);
 
-    // The zoom buttons: three of 44 px with 8 px between, 12 px from the top right corner
-    const tools = { left: frame.width - 12 - 148, right: frame.width - 12, top: 12, bottom: 56 };
+    // The zoom buttons: three of 44 px with 8 px between, 12 px from the bottom right corner (K2-4)
+    const tools = {
+      left: frame.width - 12 - 148,
+      right: frame.width - 12,
+      top: frame.height - 56,
+      bottom: frame.height - 12,
+    };
     const covered = (p: { x: number; y: number }, r: number) => {
       const s = onScreen(p);
       return (
@@ -180,8 +187,15 @@ describe('the camera of the map', () => {
         s.y - r * s.scale < tools.bottom
       );
     };
-    for (const c of board.cells) expect(covered(c, 30), `cell ${c.id}`).toBe(false);
-    for (const p of ['p0', 'p1', 'p2']) expect(covered(stickerAt(p), 25), p).toBe(false);
+    // With the buttons at the bottom (K2-4, D-647) the cells under them are the way on, a drag away; my cell, my
+    // stickers and «+N» stand clear of them
+    const start = board.cells.find((c) => c.kind === 'start') as Board['cells'][number];
+    expect(covered(start, 30), 'the start').toBe(false);
+    for (const p of ['p0', 'p1']) expect(covered(stickerAt(p), 25), p).toBe(false);
+    const chip = /translate(([-d.e]+) ([-d.e]+))/.exec(
+      document.querySelector('[data-more]')?.getAttribute('transform') ?? '',
+    );
+    expect(covered({ x: Number(chip?.[1]), y: Number(chip?.[2]) }, 17), '«+N»').toBe(false);
   });
 
   it('keeps the board clear of the zoom buttons at the bottom of a desktop frame narrower than 900 px (K1M-6)', () => {
@@ -333,5 +347,86 @@ describe('the labels of the map', () => {
     expect(
       lastRoad.compareDocumentPosition(sign as Element) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
+  });
+});
+
+const firstChain = Array.from({ length: 30 }, (_, i) => ({
+  id: `c${String(i)}`,
+  type: i === 0 ? ('start' as const) : i === 29 ? ('finish' as const) : ('empty' as const),
+}));
+const { board: small } = linearBoard(firstChain);
+
+const crowdOnFirst = (count: number): Player[] =>
+  Array.from({ length: count }, (_, i) => ({
+    id: `p${String(i)}`,
+    name: `Игрок ${String(i)}`,
+    token: i + 1,
+    // The start: cell 0, as the admin counts it (K1M-1)
+    cell: 0,
+    points: 0,
+    me: i === 0,
+  }));
+
+/** A big world, as a season's map over a picture is (the demo map is 2070 × 1520) */
+const big: Board = { ...small, width: 2070, height: 1520 };
+
+describe('the frame of the map (design review)', () => {
+  it('puts «+N» in the stickers’ fan above a crowded start, not over its label (K2-2)', () => {
+    render(<MapView board={small} players={crowdOnFirst(21)} />);
+
+    const start = small.cells.find((c) => c.kind === 'start');
+    if (!start) throw new Error('No start');
+    const chip = screen.getByTestId('more-chip');
+    const [, y] =
+      /translate\(([-\d.]+) ([-\d.]+)\)/.exec(chip.getAttribute('transform') ?? '')?.slice(1) ?? [];
+    // Above the start's label (a circle of about 30 around its centre), as the stickers are
+    expect(Number(y)).toBeLessThan(start.y - 30);
+    // Two stickers and «+19»: 21 players in all
+    expect(chip).toHaveTextContent('+19');
+    expect(document.querySelectorAll('[data-player]')).toHaveLength(2);
+  });
+
+  it('keeps the zoom buttons at the bottom of the frame on a phone too (K2-4)', () => {
+    render(<MapView board={small} players={crowdOnFirst(1)} tools="auto" />);
+
+    const zoom = screen.getByRole('button', { name: 'Приблизить' }).parentElement;
+    expect(zoom).toHaveClass('bottom-3');
+    expect(zoom).not.toHaveClass('top-3');
+  });
+
+  it('opens a big board around me on a desktop instead of shrinking its cells (K2-3)', () => {
+    const me = { x: 300, y: 400 };
+    const view = openingView(big, { width: 720, height: 760 }, null, me);
+
+    expect(720 / view.w).toBeGreaterThanOrEqual(camera.readable);
+    expect(view.cx).toBeCloseTo(me.x + 0, -3);
+  });
+
+  it('fits the whole board above the zoom buttons’ band (K2-4)', () => {
+    for (const box of [
+      { width: 358, height: 420 },
+      { width: 720, height: 760 },
+    ]) {
+      const view = openingView(small, box, null, null);
+      const perPixel = view.w / box.width;
+      // The board's bottom edge, in frame pixels from the frame's top, stays above the band
+      const bottom = (small.height - (view.cy - (view.w * box.height) / box.width / 2)) / perPixel;
+      expect(bottom).toBeLessThanOrEqual(box.height - camera.tools + 1);
+    }
+  });
+
+  it('still shows a small board whole on a desktop', () => {
+    const view = openingView(small, { width: 720, height: 760 }, null, null);
+
+    expect(view.w).toBeGreaterThanOrEqual(Math.max(small.width, small.height * (720 / 760)));
+  });
+
+  it('lets a phone show the stickers that fan out from a cell at the board’s edge (K2-2)', () => {
+    const start = small.cells.find((c) => c.kind === 'start');
+    if (!start) throw new Error('No start');
+    const view = openingView(small, { width: 358, height: 420 }, start, start);
+
+    // The leftmost sticker stands about 60 world units left of the start: the view reaches it
+    expect(view.cx - view.w / 2).toBeLessThanOrEqual(start.x - 60);
   });
 });

@@ -292,6 +292,16 @@ describe('the season screen on the graph map', () => {
     );
   });
 
+  it('puts who leads before the map legend on a desktop (K2-7)', async () => {
+    onDesktop();
+    fakeServer({ ...common, 'GET /api/seasons/*': season('a1') });
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    const legend = await screen.findByTestId('map-legend');
+    const leaders = screen.getByRole('heading', { name: ru.leaderboard.title });
+    expect(leaders.compareDocumentPosition(legend) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it('asks for the branch on the map on a desktop and points there from the turn card', async () => {
     onDesktop();
     fakeServer({ ...common, 'GET /api/seasons/*': season('f', { choice: branchChoice }) });

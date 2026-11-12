@@ -299,9 +299,11 @@ describe('the turn card (K1S)', () => {
 
   it('K1S-19: tells the admin outside the season apart from a spectator', async () => {
     serve(season(null));
-    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} admin />);
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} role="admin" />);
 
-    expect(await screen.findByRole('heading', { name: ru.turn.adminTitle })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: ru.turn.adminOutsideTitle }),
+    ).toBeInTheDocument();
     expect(screen.queryByText(ru.turn.spectator)).toBeNull();
     expect(screen.getByText(ru.board.sheetNoLeader)).toBeInTheDocument();
   });

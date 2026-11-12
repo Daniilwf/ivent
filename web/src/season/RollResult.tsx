@@ -9,6 +9,7 @@ import { cx } from '../ui/cx';
 import { Tag } from '../ui/Marks';
 import { GameMarks } from './GameMarks';
 import { RerollButton } from './RerollButton';
+import { Summary } from '../ui/Disclosure';
 
 type Offered = Schemas['OfferedGameView'];
 type Roll = Schemas['WheelRollView'];
@@ -26,9 +27,7 @@ function Misses({ roll }: { roll: Roll | null }) {
   if (!roll || roll.misses.length === 0) return null;
   return (
     <details data-testid="roll-misses" className="text-sm text-ink-soft">
-      <summary className="min-h-11 cursor-pointer content-center rounded-md is-focus:focus-ring">
-        {w.missed(roll.misses.length)}
-      </summary>
+      <Summary>{w.missed(roll.misses.length)}</Summary>
       <ul className="grid gap-1 pt-1">
         {roll.misses.map((miss, i) => (
           <li key={i}>

@@ -243,8 +243,8 @@ export function App() {
         ) : signedIn.seasonId ? (
           <SeasonScreen
             seasonId={signedIn.seasonId}
+            role={signedIn.user.role}
             onSignedOut={signedOut}
-            admin={signedIn.user.role === 'admin'}
           />
         ) : (
           <main className="mx-auto grid max-w-110 px-4 py-10" data-testid="no-season">

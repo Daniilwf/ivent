@@ -796,6 +796,20 @@ describe('SeasonScreen', () => {
     expect(screen.queryByTestId('roll')).not.toBeInTheDocument();
   });
 
+  // K2-1: a player or an admin outside the season was told «Ты зритель», which is not what they are
+  it.each<['player' | 'admin' | 'spectator', string, string]>([
+    ['player', ru.turn.outsiderTitle, ru.turn.outsider],
+    ['admin', ru.turn.adminOutsideTitle, ru.turn.adminOutside],
+    ['spectator', ru.turn.spectatorTitle, ru.turn.spectator],
+  ])('names who watches the season without a token: %s (K2-1)', async (role, title, text) => {
+    serve(() => json(200, season({ me: null })));
+    render(<SeasonScreen seasonId={seasonId} role={role} onSignedOut={vi.fn()} />);
+
+    const turn = await screen.findByTestId('turn');
+    expect(within(turn).getByRole('heading', { level: 2 })).toHaveTextContent(title);
+    expect(within(turn).getByText(text)).toBeInTheDocument();
+  });
+
   it.each<[string, Partial<Schemas['SeasonView']>, string]>([
     ['a spectator', { me: null }, ru.turn.spectatorTitle],
     ['a finished season', { status: 'finished' }, ru.turn.finishedTitle],

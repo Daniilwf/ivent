@@ -12,6 +12,7 @@ import { refusal } from './actions';
 import { newCommandId } from '../api/commands';
 import { AsyncState } from '../ui/AsyncState';
 import { answerOf, useLoaded } from '../app/useLoaded';
+import { Summary } from '../ui/Disclosure';
 
 const t = ru.admin.bugs;
 
@@ -163,9 +164,7 @@ function ReportCard({
         </a>
       ) : null}
       <details className="grid gap-2">
-        <summary className="min-h-11 cursor-pointer content-center rounded-sm font-bold is-focus:focus-ring">
-          {t.context}
-        </summary>
+        <Summary className="font-bold">{t.context}</Summary>
         <div className="grid gap-2 pt-2 text-sm">
           {report.context.userAgent ? <p>{t.browser(report.context.userAgent)}</p> : null}
           {report.context.viewport ? <p>{t.viewport(report.context.viewport)}</p> : null}
