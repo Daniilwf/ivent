@@ -92,6 +92,10 @@ public static class AppSetup
         services.Configure<JsonOptions>(o => ConfigureJson(o.SerializerOptions));
         services.AddSignalR().AddJsonProtocol(o => ConfigureJson(o.PayloadSerializerOptions));
         services.AddProblemDetails();
+
+        // Invalid input is a 400 in every environment (D-68, D-630): Development throws on a bad request by default, and
+        // the exception handler would turn that into a 500 and an entry on the «Ошибки» page.
+        services.Configure<RouteHandlerOptions>(o => o.ThrowOnBadRequest = false);
         builder.AddObservability();
         builder.AddFiles();
         builder.AddGameLookup();

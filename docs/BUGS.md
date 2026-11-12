@@ -16,7 +16,6 @@
 ## Исправленные
 
 ### AU4-1. Счётчик, сработавший через `addCounter`, срабатывал снова без конца и ронял процесс
-### CE-SEC-1. Пакет контента с null в списке объектов или колёс давал 500
 
 - **Найдено:** аудит правил этапа 4 (2026-11-11).
 - **Шаги:** эффект со счётчиком 1, триггером `runEnded`, `untilTriggered` и действием `transformObject addCounter -1` с `filter.hasCounter` (проходит `ContentValidator`); игрок завершает прохождение.
@@ -25,6 +24,16 @@
 - **Важность:** высокая — данные контента роняют весь сайт.
 - **Тест:** `src/GameEvent.Engine.Tests/Economy/ImportedItems/CounterTests.cs` (`A_countdown_that_lowers_its_own_counters_goes_off_once`, `A_countdown_at_zero_is_not_lowered_again_and_does_not_go_off_again`, `A_countdown_sees_the_counters_its_own_going_off_changed`, `A_countdown_at_zero_is_not_wound_up_again`, `A_countdown_chain_inside_a_command_is_cut`, `A_countdown_chain_set_off_by_an_item_is_cut_by_the_chain_depth`); бомба в партиях инвариантов экономики.
 - **Исправление:** срабатывает только переход через ноль, срабатывание на нуле идёт уровнем глубже и в счёт 50 событий, за пределом — обрыв (D-485).
+
+### CE-SEC-1. Пакет контента с null в списке объектов или колёс давал 500
+
+- **Найдено:** ревью безопасности редактора контента (2026-11-11, ветка `feat/effect-editor`).
+- **Шаги:** админ, `POST /api/admin/seasons/{id}/content/check` (или `/publish`) с телом `{"objects":[null],"wheels":[]}` или `{"objects":[],"wheels":[null]}`, либо с null глубже — в `entries` колеса или `actions` эффекта.
+- **Ожидалось:** проверка отвечает 200 `valid: false` с ошибкой у `objects[0]` / `wheels[0]`, публикация — 400 с той же ошибкой.
+- **Получилось:** 500: строгое чтение пропускает null внутри списка (аннотации допустимости null не доходят до элементов коллекций), `ContentPublishing.Check` разыменовывал его.
+- **Важность:** низкая — только админ, сайт не падает, но ответ 500 и исключение в журнале ошибок.
+- **Тест:** `src/GameEvent.Engine.Tests/Economy/ContentPackTests.cs` («A_null_in_the_objects_or_the_wheels_is_named_at_its_place_and_the_rest_is_still_checked»), `src/GameEvent.Web.Tests/Api/AdminContentApiTests.cs` («A_null_in_a_list_of_the_pack_is_a_problem_at_its_place_not_a_500»).
+- **Исправление:** `ContentPublishing.Check` первым делом называет каждый null в `$.objects[i]` и `$.wheels[i]` («A list item is an object, not null.») и дальше его пропускает; API ещё до чтения называет null в любом списке пакета (`wheels[0].entries[0]`, `objects[0].effect.actions[0]` — те же 500 глубже). Исправлено.
 
 ### AU4-2. Неуничтожаемый объект пропадал при передаче в полный инвентарь
 
@@ -171,6 +180,26 @@
 - **Важность:** низкая — утечка контента до выхода и лишний трафик.
 - **Тест:** `src/GameEvent.Web.Tests/Api/FeedVisibilityTests.cs` («Others_see_a_content_publications_version_comment_and_size_not_the_pack»), `src/GameEvent.Engine.Tests/Economy/ContentPackTests.cs` («A_pack_over_the_size_limits_is_refused_before_it_is_checked»).
 - **Исправление:** не-админ видит `version`, `comment` и `objectCount`; пакет — не больше 1000 объектов, 100 колёс и 200 записей в колесе, иначе `content.tooLarge` (D-653). **Исправлено.**
+
+### K1O-1. Имена на «Ё» стояли первыми в списке свидетелей и в «Игроках» админки
+
+- **Найдено:** исследовательское тестирование этапов 1–2 (новичок, 2026-11-11).
+- **Шаги:** игрок открывает форму пруфа → список «Свидетель»; админ открывает «Игроки».
+- **Ожидалось:** русский алфавит: Ё после Е (Енот, Ёж, Заяц).
+- **Получилось:** «Ёж, Барсук, Бобр, Вася…»: «Игроки» сортировались `StringComparer.Ordinal`, экран сезона, лента и порядок фишек (`PlayerTokens.InTokenOrder`) — `ORDER BY Name` в SQLite, оба по кодам символов, а у «Ё» код меньше, чем у «А».
+- **Важность:** низкая.
+- **Тест:** `Web.Tests/Api/PlayerNameOrderTests.*` (экран сезона с токенами по порядку, лента, «Игроки», карта в админке).
+- **Исправление:** один порядок имён `PlayerTokens.NameOrder` (D-631): буквы без учёта регистра, «Ё» сразу после «Е», затем культура `ru-RU` и порядковое сравнение; сортировка в памяти после чтения. Цвет фишки игрока на «Ё» в идущем сезоне может смениться один раз. **Исправлено.**
+
+### K1O-2. В Development битый JSON или неизвестное значение перечисления давали 500 и засоряли «Ошибки»
+
+- **Найдено:** исследовательское тестирование этапов 1–2 (хитрый игрок, 2026-11-11).
+- **Шаги:** игрок в Development шлёт `POST /api/seasons/{id}/roll` с телом `{` или `{"commandId":5}`, `POST /complete` со сложностью `nightmare` или тело не в UTF-8.
+- **Ожидалось:** 400 (D-68).
+- **Получилось:** 500, `BadHttpRequestException` с логином игрока на странице «Ошибки»: в Development `RouteHandlerOptions.ThrowOnBadRequest` по умолчанию включён, а обработчик исключений превращал исключение в 500. Тесты в окружении Test этого не видели.
+- **Важность:** низкая — боевой сайт и тестовая копия отвечали 400.
+- **Тест:** `Web.Tests/Api/DevelopmentBadInputTests.*` (сайт в Development: три битых тела и тело в Windows-1251 — 400, журнал ошибок пуст).
+- **Исправление:** `ThrowOnBadRequest = false` во всех окружениях (D-630). **Исправлено.**
 
 ### Q-1. Мутационный счёт движка 100% не проверял ни одного мутанта
 

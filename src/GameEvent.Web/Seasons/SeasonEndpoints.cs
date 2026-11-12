@@ -527,7 +527,7 @@ public static class SeasonEndpoints
         // The log position is read first: the data below is at least that fresh, so a client comparing it with
         // hub updates may refetch once too often but never misses one.
         var lastSequence = await db.Events.Where(e => e.SeasonId == seasonId).MaxAsync(e => e.Sequence, ct);
-        var players = await db.SeasonPlayers.AsNoTracking().Where(p => p.SeasonId == seasonId).InTokenOrder().ToListAsync(ct);
+        var players = (await db.SeasonPlayers.AsNoTracking().Where(p => p.SeasonId == seasonId).ToListAsync(ct)).InTokenOrder();
         var seasonRecord = await db.Seasons.AsNoTracking().SingleAsync(s => s.Id == seasonId, ct);
         var rules = JsonSerializer.Deserialize<Ruleset>(seasonRecord.RulesetJson, EngineJson.Options)!;
         var completedRuns = await db.Runs.AsNoTracking()

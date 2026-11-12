@@ -3,6 +3,7 @@ using GameEvent.Infrastructure.Database;
 using GameEvent.Infrastructure.EventLog;
 using GameEvent.Infrastructure.Pool;
 using GameEvent.Web.Hosting;
+using GameEvent.Web.Seasons;
 using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace GameEvent.Web.Rolls;
@@ -39,6 +40,10 @@ public static class PoolStatsEndpoints
         var pool = await PoolReader.LoadAsync(db, ct);
         return TypedResults.Ok(new PoolStatsView(
             [.. PoolStats.Categories(state, pool).Select(c => new CategoryStatView(c.Category, c.Weight, c.Available))],
-            [.. PoolStats.PlayersWithoutGames(state, pool).Select(id => new PlayerWithoutGamesView(id, state.Players[id].Name))]));
+            // The engine orders ordinally (it knows no culture); the admin reads the list in the Russian alphabet (D-631)
+            [.. PoolStats.PlayersWithoutGames(state, pool)
+                .Select(id => new PlayerWithoutGamesView(id, state.Players[id].Name))
+                .OrderBy(p => p.Name, PlayerTokens.NameOrder)
+                .ThenBy(p => p.Id.ToString("D").ToUpperInvariant(), StringComparer.Ordinal)]));
     }
 }

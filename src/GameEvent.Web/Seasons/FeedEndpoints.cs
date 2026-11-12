@@ -206,7 +206,7 @@ public static class FeedEndpoints
     private static async Task<(IReadOnlyList<FeedPlayerView> Players, IReadOnlyList<FeedGameView> Games, IReadOnlyList<FeedRunView> Runs)> ReferencesAsync(
         GameEventDbContext db, Guid seasonId, IReadOnlyList<FeedEntryView> entries, bool admin, CancellationToken ct)
     {
-        var seasonPlayers = await db.SeasonPlayers.AsNoTracking().Where(p => p.SeasonId == seasonId).InTokenOrder().ToListAsync(ct);
+        var seasonPlayers = (await db.SeasonPlayers.AsNoTracking().Where(p => p.SeasonId == seasonId).ToListAsync(ct)).InTokenOrder();
         var userIds = seasonPlayers.Select(p => p.UserId).Distinct().ToList();
         var users = await db.Users.AsNoTracking().Where(u => userIds.Contains(u.Id)).ToDictionaryAsync(u => u.Id, ct);
         IReadOnlyList<FeedPlayerView> players = [.. seasonPlayers.Select((p, token) =>
