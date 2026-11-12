@@ -103,6 +103,82 @@ public class FreezeTests
     }
 
     [Fact]
+    public void Rejecting_the_last_unchecked_run_before_the_finish_freezes_the_first()
+    {
+        // AU12-1 (Q-3, P4): A 1 + 1, B 4 + 4 (6 burned), B approved first; the reject of A is absorbed by the surplus and
+        // leaves every run up to the finish approved — the first place is final in the same command
+        var s = New();
+        var (runA, _) = Complete(s, "Вася", [1, 1]);
+        var (runB, _) = Complete(s, "Вася", [4, 4]);
+        Approve(s, runB);
+        Assert.False(FinishOf(s, "Вася")!.Frozen);
+
+        Reject(s, runA);
+
+        ScenarioAssert.Accepted(s);
+        Assert.Equal(new FinishSurplusChanged(s.PlayerId("Вася"), -2), s.LastEvents<FinishSurplusChanged>().Single());
+        Assert.Equal(new PlayerFrozen(s.PlayerId("Вася")), s.Last.Events[^1]);
+        Assert.True(FinishOf(s, "Вася")!.Frozen);
+    }
+
+    [Fact]
+    public void Rejecting_the_last_unchecked_run_before_the_finish_with_the_drop_penalty_freezes_after_the_penalty()
+    {
+        // AU12-1: the penalty is part of the reject, so it is paid (points only, the finish holds) and the freeze follows
+        var s = New();
+        var (runA, _) = Complete(s, "Вася", [1, 1]);
+        var (runB, _) = Complete(s, "Вася", [4, 4]);
+        Approve(s, runB);
+        var points = s.Player("Вася").Points;
+
+        s.NextRandom(2, 3).Act(new RejectProofWithDropPenalty(runA, Comment));
+
+        ScenarioAssert.Accepted(s);
+        Assert.Single(s.LastEvents<ProofRejectPenalized>());
+        Assert.Equal(new PlayerFrozen(s.PlayerId("Вася")), s.Last.Events[^1]);
+        Assert.Equal((LinearMap.FinishId, points - 2 - 5), (s.Player("Вася").CellId, s.Player("Вася").Points));
+        Assert.True(FinishOf(s, "Вася")!.Frozen);
+    }
+
+    [Fact]
+    public void Rejecting_the_last_unchecked_snake_run_before_the_finish_freezes_the_first()
+    {
+        // AU12-1: start → a → s → b → finish, s a snake to a; games of 3 hours give one d4. Вася: 1 → a, 1 → s → a (the
+        // snake gained nothing), 3 → finish. With the others approved the reject of the snake run takes no cells and
+        // nothing from the surplus — still the last unchecked run is gone, so the first freezes
+        var s = Scenario.New()
+            .WithMap(MapBuilder.New().Path("start", "a", "s", "b", "finish").Teleport("s", to: "a").Build())
+            .WithCategory("Horror")
+            .WithGame("Silent Hill", 3, "Horror").WithGame("Fatal Frame", 3, "Horror").WithGame("Siren", 3, "Horror")
+            .WithPlayers("Вася", "Петя");
+        Guid Throw(string title, int die)
+        {
+            s.RollTitle("Вася", title).Start("Вася");
+            var runId = s.Player("Вася").ActiveRunId!.Value;
+            s.NextRandom(die).Complete("Вася");
+            ScenarioAssert.Accepted(s);
+            s.Advance(TimeSpan.FromHours(1));
+            return runId;
+        }
+
+        var first = Throw("Silent Hill", 1);
+        var snake = Throw("Fatal Frame", 1);
+        Assert.Equal("a", s.Player("Вася").CellId);
+        var last = Throw("Siren", 3);
+        Assert.NotNull(FinishOf(s, "Вася"));
+        Approve(s, first);
+        Approve(s, last);
+        Assert.False(FinishOf(s, "Вася")!.Frozen);
+
+        Reject(s, snake);
+
+        ScenarioAssert.Accepted(s);
+        Assert.Empty(s.LastEvents<FinishSurplusChanged>());
+        Assert.Equal(new PlayerFrozen(s.PlayerId("Вася")), s.Last.Events[^1]);
+        Assert.Equal("finish", s.Player("Вася").CellId);
+    }
+
+    [Fact]
     public void Approving_a_run_completed_after_the_finish_does_not_freeze()
     {
         var s = New();

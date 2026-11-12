@@ -315,6 +315,11 @@ internal static class ProofReview
             events.AddRange(Drops.Penalty(rejected, rejected.Players[run.PlayerId], dice, run.RunId, context, exclude: false));
         }
 
+        // Q-3, P4 (AU12-1): the reject of the first's last unchecked run up to the finish leaves all of them approved even
+        // when the surplus absorbs it (or the run gained nothing), so the first place is final now — after the penalty,
+        // which is part of the reject. A revoke has already settled the new first; the freeze is never written twice.
+        events.AddRange(Finishes.FreezeIfDue(events.Aggregate(state, SeasonEngine.Apply)));
+
         return Decision.Accept(events);
     }
 

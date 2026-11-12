@@ -77,7 +77,8 @@ public sealed record RunReview(int Rating, string? Text);
 /// move stopped on included (negative — further, a snake): what a reject takes back (D-321). <see cref="CellPoints"/> — the
 /// points bonus of the cell the run's own move stopped on, which a reject takes back with the dice (D-327);
 /// <see cref="CellObjects"/> — the objects the cells of that move granted (a shop's coupon), which a reject takes back
-/// when the player still holds them (D-327 (2), D-421).
+/// when the player still holds them (D-327 (2), D-421). <see cref="DeclaredDifficulty"/> — the difficulty named at the
+/// start, the cap of the one claimed at the completion (D-633); null — none named.
 /// </summary>
 public sealed record RunState(
     Guid RunId,
@@ -110,7 +111,9 @@ public sealed record RunState(
     [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     RunDiceMods? Mods = null,
     [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    EquatableArray<Guid> CellObjects = default)
+    EquatableArray<Guid> CellObjects = default,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    Difficulty? DeclaredDifficulty = null)
 {
     /// <summary>What items and effects did to the throw (D-408); none for a run without them.</summary>
     [System.Text.Json.Serialization.JsonIgnore]
