@@ -8,7 +8,7 @@ import { Cover } from '../board/GameCards';
 import { GameFacts } from '../pool/GameFacts';
 import { NotFound } from '../app/NotFound';
 import { ru } from '../i18n/ru';
-import { inlineLink } from '../ui/buttonStyles';
+import { standaloneLink } from '../ui/buttonStyles';
 import { Badge, Tag } from '../ui/Marks';
 import { AsyncState } from '../ui/AsyncState';
 import { cx } from '../ui/cx';
@@ -101,7 +101,7 @@ export function GameDetails({
         </div>
       </header>
       {game.completionCondition ? (
-        <p className="max-w-prose text-ink-soft">
+        <p className="max-w-prose text-ink-soft wrap-anywhere">
           {ru.gamePage.condition(game.completionCondition)}
         </p>
       ) : null}
@@ -125,7 +125,7 @@ export function GameDetails({
                   <div className="flex flex-wrap items-baseline justify-between gap-x-3">
                     <Link
                       to={paths.profile(run.userId)}
-                      className={cx(inlineLink, 'font-bold wrap-anywhere')}
+                      className={cx(standaloneLink, 'font-bold wrap-anywhere')}
                     >
                       {run.playerName}
                     </Link>

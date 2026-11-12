@@ -187,4 +187,114 @@ describe('The admin pages', () => {
     expect(screen.queryByTestId('admin')).toBeNull();
     expect(server.calls.some((c) => c.path.startsWith('/api/admin'))).toBe(false);
   });
+
+  // K1A: the season the admin opened stays after a reload and in a new tab, and every season page names it
+  const other = '5ea50000-0000-0000-0000-000000000002';
+  const seasons = [
+    {
+      id: seasonId,
+      name: 'Сезон разработки',
+      status: 'active',
+      deadline: null,
+      createdAt: '2026-10-02T00:00:00Z',
+    },
+    {
+      id: other,
+      name: 'Демо-сезон',
+      status: 'active',
+      deadline: null,
+      createdAt: '2026-10-01T00:00:00Z',
+    },
+  ];
+  const seasonView = (id: string, name: string) => ({
+    id,
+    name,
+    status: 'active',
+    deadline: null,
+    cells: [],
+    players: [],
+    leaderboard: [],
+    me: null,
+    lastSequence: 1,
+  });
+
+  it('keep the season the admin opened after a reload and name it on the season pages', async () => {
+    const server = fakeServer({
+      'GET /api/seasons': seasons,
+      [`GET /api/seasons/${seasonId}`]: seasonView(seasonId, 'Сезон разработки'),
+      [`GET /api/seasons/${other}`]: seasonView(other, 'Демо-сезон'),
+      'GET /api/admin/seasons/*/proofs': [],
+    });
+    const first = render(
+      <AdminScreen section="season" currentSeasonId={seasonId} user={adminUser} />,
+    );
+    await userEvent.click(await screen.findByTestId(`season-open-${other}`));
+    first.unmount();
+    const before = server.calls.length;
+
+    // A reload: the page starts again with the newest season as the current one
+    render(<AdminScreen section="proofs" currentSeasonId={seasonId} user={adminUser} />);
+
+    expect(await screen.findByTestId('admin-season-name')).toHaveTextContent('Демо-сезон');
+    await waitFor(() => {
+      expect(server.calls.some((c) => c.path === `/api/admin/seasons/${other}/proofs`)).toBe(true);
+    });
+    expect(
+      server.calls.slice(before).some((c) => c.path === `/api/admin/seasons/${seasonId}/proofs`),
+    ).toBe(false);
+  });
+
+  it('open a season just created, though the list read before did not have it', async () => {
+    // K1A: the kept choice must not fall back to the current season because the list was read before the new one
+    const created: { id: string; name: string }[] = [];
+    fakeServer({
+      'GET /api/seasons': () => ({
+        body: [
+          ...created.map((s) => ({
+            ...s,
+            status: 'preparing',
+            deadline: null,
+            createdAt: '2026-10-03T00:00:00Z',
+          })),
+          ...seasons,
+        ],
+      }),
+      'POST /api/admin/seasons': (call) => {
+        const body = call.body as { seasonId: string; name: string };
+        created.push({ id: body.seasonId, name: body.name });
+        return { body: { events: [] } };
+      },
+      'GET /api/seasons/*': (call) => {
+        const id = call.path.split('/').at(-1) ?? '';
+        const found = created.find((s) => s.id === id);
+        return {
+          body: found
+            ? { ...seasonView(id, found.name), status: 'preparing' }
+            : seasonView(id, id === other ? 'Демо-сезон' : 'Сезон разработки'),
+        };
+      },
+      'GET /api/admin/seasons/*/proofs': [],
+    });
+    render(<AdminScreen section="season" currentSeasonId={seasonId} user={adminUser} />);
+
+    await userEvent.type(await screen.findByTestId('season-name'), 'Зима');
+    await userEvent.click(screen.getByTestId('season-create'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('season-status')).toHaveTextContent('Зима');
+    });
+    expect(globalThis.localStorage.getItem('ge.admin.season')).toBe(created[0]?.id);
+  });
+
+  it('fall back to the current season when the one kept is gone', async () => {
+    fakeServer({
+      'GET /api/seasons': seasons.slice(0, 1),
+      'GET /api/admin/seasons/*/proofs': [],
+    });
+    globalThis.localStorage.setItem('ge.admin.season', '5ea50000-0000-0000-0000-00000000dead');
+
+    render(<AdminScreen section="proofs" currentSeasonId={seasonId} user={adminUser} />);
+
+    expect(await screen.findByTestId('admin-season-name')).toHaveTextContent('Сезон разработки');
+  });
 });

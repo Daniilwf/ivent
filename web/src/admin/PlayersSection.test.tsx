@@ -113,6 +113,66 @@ describe('The players', () => {
     });
   });
 
+  it('numbers the cells of a graph map as the player’s map does (K1M-1)', async () => {
+    // The server lists the cells in its own order; the map numbers them from 0 at the start along the arrows
+    const edge = (from: string, to: string, isDefaultForward = true, isPrimaryBackward = true) => ({
+      from,
+      to,
+      isDefaultForward,
+      isPrimaryBackward,
+    });
+    const graph = {
+      id: seasonId,
+      mapMode: 'graph',
+      cells: [
+        { id: 'start', type: 'start' },
+        { id: 'finish', type: 'finish' },
+        { id: 'b1', type: 'empty' },
+        { id: 'f', type: 'fork' },
+        { id: 'a1', type: 'empty' },
+        { id: 'a2', type: 'empty' },
+      ],
+      edges: [
+        edge('start', 'f'),
+        edge('f', 'a1'),
+        edge('f', 'b1', false),
+        edge('a1', 'a2'),
+        edge('a2', 'finish'),
+        edge('b1', 'finish', true, false),
+      ],
+      zones: [],
+    };
+    const { graphBoard } = await import('../board/graphBoard');
+    const { cellNumber } = graphBoard(graph as Parameters<typeof graphBoard>[0]);
+    fakeServer({
+      'GET /api/admin/seasons/*/players': [player({ cellId: 'b1' })],
+      'GET /api/seasons/*': graph,
+    });
+    render(<PlayersSection seasonId={seasonId} version={0} />);
+
+    const vasya = await screen.findByTestId('player-p1');
+    expect(vasya).toHaveTextContent(t.cell(cellNumber.get('b1') as number));
+    await userEvent.click(within(vasya).getByTestId('adjust-open'));
+    const options = within(screen.getByTestId('adjust-cell')).getAllByRole('option');
+    expect(options.map((o) => o.textContent)).toEqual([
+      t.noMove,
+      t.cellOption(0, String(t.cellKinds.start)),
+      t.cellOption(1, ''),
+      t.cellOption(2, ''),
+      t.cellOption(3, ''),
+      t.cellOption(4, ''),
+      t.cellOption(5, String(t.cellKinds.finish)),
+    ]);
+    expect(options.slice(1).map((o) => (o as HTMLOptionElement).value)).toEqual([
+      'start',
+      'f',
+      'a1',
+      'a2',
+      'b1',
+      'finish',
+    ]);
+  });
+
   it('adjusts a player: a transfer, deltas with a minus sign and the comment', async () => {
     const server = open([player({})], { 'POST /api/admin/seasons/*/players/*/adjust': ok });
 
@@ -147,6 +207,26 @@ describe('The players', () => {
     });
     expect(await screen.findByText(t.adjusted('Вася'))).toBeInTheDocument();
   });
+
+  it.each([
+    ['adjust-open', 'adjust-form', 'adjust-cell', {}],
+    ['tech-reroll-open', 'tech-reroll-form', 'tech-reroll-reason', { phase: 'playing' as const }],
+  ])(
+    'brings the opened form into view and into focus on a phone: %s (K1A)',
+    async (button, formId, firstField, over) => {
+      const scrolled = vi.fn();
+      Element.prototype.scrollIntoView = scrolled;
+      open([player(over)]);
+
+      await userEvent.click(await screen.findByTestId(button));
+
+      const form = screen.getByTestId(formId);
+      await waitFor(() => {
+        expect(within(form).getByTestId(firstField)).toHaveFocus();
+      });
+      expect(scrolled.mock.contexts).toContain(form);
+    },
+  );
 
   it('checks the correction at its fields before sending', async () => {
     const server = open([player({})]);

@@ -29,7 +29,19 @@ export default tseslint.config(
       'react-refresh/only-export-components': ['error', { allowConstantExport: true }],
       '@typescript-eslint/restrict-template-expressions': ['error', { allowNumber: true }],
       'design/tokens-only': 'error',
+      // Every fold opens with the Summary primitive and its chevron: the browser's triangle is hidden (K2-5)
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "JSXOpeningElement[name.name='summary']",
+          message: 'A fold opens with <Summary> from src/ui/Disclosure.tsx (K2-5).',
+        },
+      ],
     },
+  },
+  {
+    files: ['src/ui/Disclosure.tsx'],
+    rules: { 'no-restricted-syntax': 'off' },
   },
   // The tokens themselves live in src/design/: the one place allowed to hold raw values
   {

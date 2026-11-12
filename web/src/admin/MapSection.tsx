@@ -86,11 +86,25 @@ export function MapSection({ seasonId, version }: { seasonId: string; version: n
   );
 }
 
-function problemText(problem: Schemas['MapProblemView']): string {
+/** The zones' codes name a zone: the admin knows it by its name, not its id (K1A) */
+const zoneCodes = new Set(['map.zoneInvalid', 'map.zoneDuplicate', 'map.zoneUnsupported']);
+
+function problemText(problem: Schemas['MapProblemView'], draft?: Draft): string {
+  if (zoneCodes.has(problem.code)) {
+    const name = draft?.zones.find((z) => z.id === problem.subject)?.name || problem.subject;
+    // The server's message starts with the field's path: «$.rollFilter.minHours: …»
+    if (problem.code === 'map.zoneInvalid')
+      return t.zoneProblem(name, problem.message.split(':')[0]?.trim() ?? '');
+    return t.problem[problem.code]?.(name) ?? t.unknownProblem(problem.code, name);
+  }
   return (
     t.problem[problem.code]?.(problem.subject) ?? t.unknownProblem(problem.code, problem.subject)
   );
 }
+
+/** A number typed in a zone's field: empty is «none», anything else must read as a number */
+const notANumber = (text: string) =>
+  text.trim() !== '' && !Number.isFinite(Number(text.replace(',', '.').replace('−', '-')));
 
 function MapEditor({
   seasonId,
@@ -110,6 +124,19 @@ function MapEditor({
   }, [published]);
   const [kept] = useState(() => loadDraft(seasonId, published));
   const [draft, setDraftState] = useState<Draft>(() => kept.draft ?? start);
+  // The map version the draft is made from, named back by the publication (D-616). A map published since (another
+  // tab, another admin) replaces a draft with no edits of its own; an edited one is outdated: the server refuses it
+  const [base, setBase] = useState({ version: view.version, start });
+  const newer = view.version > base.version;
+  // «Вернуть опубликованную» takes the newer map too
+  if (newer && (sameMap(draft, base.start) || sameMap(draft, start))) {
+    setBase({ version: view.version, start });
+    setDraftState(start);
+  }
+  const outdated = newer && !sameMap(draft, base.start);
+  const offeredTypes = types.filter(
+    (type) => (type !== 'event' || view.events) && (type !== 'shop' || view.shop),
+  );
   const [selected, setSelected] = useState<string | null>(null);
   // The answer of the check, for the draft (and attempt) it was asked for; another draft is «checking» until its own
   const [answered, setAnswered] = useState<{ key: string; check: Check } | null>(null);
@@ -172,6 +199,7 @@ function MapEditor({
     <>
       {view.mode === 'linear' ? <Notice tone="info">{t.linear}</Notice> : null}
       {kept.stale ? <Notice tone="warning">{t.draftStale}</Notice> : null}
+      {outdated ? <Notice tone="warning">{t.draftOutdated}</Notice> : null}
       {view.status !== 'draft' && view.status !== 'active' ? (
         <Notice tone="warning">{t.closed}</Notice>
       ) : null}
@@ -256,6 +284,7 @@ function MapEditor({
                 key={cell.id}
                 draft={draft}
                 id={cell.id}
+                offered={offeredTypes}
                 players={onCell.get(cell.id) ?? []}
                 onChange={setDraft}
                 onRemoved={() => {
@@ -293,6 +322,7 @@ function MapEditor({
       <PublishPanel
         seasonId={seasonId}
         draft={draft}
+        version={base.version}
         canPublish={check.kind === 'done' && check.result.canPublish}
         reason={
           check.kind === 'checking'
@@ -312,6 +342,8 @@ function MapEditor({
         outcome={outcome}
         onOutcome={setOutcome}
         onPublished={() => {
+          // The draft is the map now, one version on
+          setBase({ version: base.version + 1, start: draft });
           saveDraft(seasonId, null);
           setOutcome({ tone: 'success', text: t.publish.done });
           onPublished();
@@ -334,10 +366,10 @@ function PhoneView({ view, notices }: { view: AdminMap; notices: React.ReactNode
           id: p.playerId,
           name: p.name,
           token: i,
-          cell: cellNumber.get(p.cellId) ?? 0,
+          // Number 0 is the start: a cell the map does not know draws no token rather than a wrong one there
+          cell: cellNumber.get(p.cellId) ?? -1,
           points: 0,
         }))}
-        tools="top"
         className="h-105 rounded-lg border-3 border-ink"
       />
       <MapLegend zones={map.zones} kinds={new Set(map.cells.map((c) => c.type))} />
@@ -348,12 +380,15 @@ function PhoneView({ view, notices }: { view: AdminMap; notices: React.ReactNode
 function CellPanel({
   draft,
   id,
+  offered,
   players,
   onChange,
   onRemoved,
 }: {
   draft: Draft;
   id: string;
+  /** The types the season takes now: a switched-off mechanic's cell is not offered (D-302) */
+  offered: readonly CellType[];
   players: string[];
   onChange: (draft: Draft) => void;
   onRemoved: () => void;
@@ -385,11 +420,13 @@ function CellPanel({
           onChange(setCellType(draft, id, e.target.value as CellType));
         }}
       >
-        {types.map((type) => (
-          <option key={type} value={type}>
-            {t.types[type] ?? type}
-          </option>
-        ))}
+        {types
+          .filter((type) => offered.includes(type) || type === cell.type)
+          .map((type) => (
+            <option key={type} value={type}>
+              {t.types[type] ?? type}
+            </option>
+          ))}
       </Select>
       <Select
         label={t.cell.zone}
@@ -615,6 +652,7 @@ function ZoneForm({
           label={t.zone.minHours}
           inputMode="decimal"
           value={minHours}
+          error={notANumber(minHours) ? t.zone.notNumber : undefined}
           onChange={(e) => {
             setMinHours(e.target.value);
             onChange(filter({ minHours: numberOrNull(e.target.value) }));
@@ -624,6 +662,7 @@ function ZoneForm({
           label={t.zone.maxHours}
           inputMode="decimal"
           value={maxHours}
+          error={notANumber(maxHours) ? t.zone.notNumber : undefined}
           onChange={(e) => {
             setMaxHours(e.target.value);
             onChange(filter({ maxHours: numberOrNull(e.target.value) }));
@@ -672,6 +711,7 @@ function ZoneForm({
         hint={t.zone.dropHint}
         inputMode="decimal"
         value={drop}
+        error={notANumber(drop) ? t.zone.notNumber : undefined}
         onChange={(e) => {
           setDrop(e.target.value);
           onChange(
@@ -744,12 +784,12 @@ export function CheckPanel({
                             onSelect(cell);
                           }}
                         >
-                          {problemText(p)}
+                          {problemText(p, draft)}
                         </button>
                       ) : p.code === 'map.branchChoicePending' && choosing.length > 0 ? (
-                        `${problemText(p)} ${t.check.choosing(choosing.join(', '))}`
+                        `${problemText(p, draft)} ${t.check.choosing(choosing.join(', '))}`
                       ) : (
-                        problemText(p)
+                        problemText(p, draft)
                       )}
                     </li>
                   );
@@ -781,6 +821,7 @@ export function CheckPanel({
 function PublishPanel({
   seasonId,
   draft,
+  version,
   canPublish,
   reason,
   outcome,
@@ -789,6 +830,8 @@ function PublishPanel({
 }: {
   seasonId: string;
   draft: Draft;
+  /** The map version the draft was made from */
+  version: number;
   canPublish: boolean;
   /** Why the button is disabled, said under it */
   reason: string | null;
@@ -806,7 +849,12 @@ function PublishPanel({
     try {
       const answer = await api.POST('/api/admin/seasons/{seasonId}/map/publish', {
         params: { path: { seasonId } },
-        body: { commandId: newCommandId(), map: normalized(draft), comment: comment.trim() },
+        body: {
+          commandId: newCommandId(),
+          map: normalized(draft),
+          comment: comment.trim(),
+          expectedVersion: version,
+        },
       });
       if (answer.data) {
         setComment('');

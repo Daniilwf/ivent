@@ -62,6 +62,25 @@ public class SeasonResultTests
     }
 
     [Fact]
+    public void Finish_is_refused_while_a_manual_effect_waits_and_accepted_once_it_is_resolved()
+    {
+        // K1S-15 (D-603): Вася dropped and owes a bad event (drop.mandatoryEvent = bad); after the finish nobody could resolve it
+        var s = New();
+        s.Roll("Вася").Start("Вася");
+        s.Act(new DropRun(s.PlayerId("Вася")));
+        ScenarioAssert.Accepted(s);
+        var effect = Assert.Single(s.State.ManualEffects).Key;
+        Close(s);
+
+        Refused(s, new ChangeSeasonStatus(SeasonStatus.Finished), RejectionCodes.SeasonEffectsPending);
+
+        s.Act(new Engine.Effects.ResolveManualEffect(effect, Engine.Effects.ManualEffectOutcome.NotApplicable, "Сезон закончился", PlayerId: null));
+        ScenarioAssert.Accepted(s);
+        Finish(s);
+        Assert.Equal(SeasonStatus.Finished, s.State.Status);
+    }
+
+    [Fact]
     public void Finish_records_the_leaderboard_as_the_result()
     {
         // Вася 4 points (approved), Петя's run rejected, Маша 3 from the admin

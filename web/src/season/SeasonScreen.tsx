@@ -1,4 +1,4 @@
-import { CalendarClock, Flag, Trophy } from 'lucide-react';
+import { CalendarClock, Coins, Flag, Trophy } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { api, rejectionCode, type Schemas } from '../api/client';
 import { newCommandId } from '../api/commands';
@@ -19,7 +19,8 @@ import { MyFinish } from './MyFinish';
 import { seasonPicture } from './seasonView';
 import { linearBoard } from '../board/linearBoard';
 import { Cover, RunCard } from '../board/GameCards';
-import { branchOptions, graphBoard, legsPath } from '../board/graphBoard';
+import { branchOptions, legsPath } from '../board/graphBoard';
+import { seasonBoard } from '../board/seasonBoard';
 import { MapLegend } from '../board/MapLegend';
 import { cellById, cellsToFinish } from '../board/geometry';
 import { TokenMove } from '../board/TokenMove';
@@ -38,13 +39,15 @@ import { Sticker } from '../ui/Sticker';
 import { useDesk } from '../ui/useDesk';
 import { cx } from '../ui/cx';
 import { Panel } from '../ui/Surface';
+import { Summary } from '../ui/Disclosure';
 
 type Season = Schemas['SeasonView'];
 type Command =
   | { kind: 'roll' }
-  | { kind: 'start'; difficulty: Schemas['Difficulty'] }
-  | { kind: 'reroll' }
-  | { kind: 'drop' }
+  // D-600: what the page showed goes with the action; the server refuses it when the turn has changed since
+  | { kind: 'start'; gameId: string; difficulty: Schemas['Difficulty'] }
+  | { kind: 'reroll'; expected: Schemas['RerollPayment'] | null }
+  | { kind: 'drop'; runId: string }
   | {
       kind: 'proof';
       runId: string;
@@ -79,12 +82,18 @@ function send(seasonId: string, command: Command) {
     case 'start':
       return api.POST('/api/seasons/{seasonId}/start', {
         params,
-        body: { commandId, difficulty: command.difficulty },
+        body: { commandId, gameId: command.gameId, difficulty: command.difficulty },
       });
     case 'reroll':
-      return api.POST('/api/seasons/{seasonId}/reroll', { params, body: { commandId } });
+      return api.POST('/api/seasons/{seasonId}/reroll', {
+        params,
+        body: { commandId, expectedPayment: command.expected },
+      });
     case 'drop':
-      return api.POST('/api/seasons/{seasonId}/drop', { params, body: { commandId } });
+      return api.POST('/api/seasons/{seasonId}/drop', {
+        params,
+        body: { commandId, runId: command.runId },
+      });
     case 'proof':
       return api.POST('/api/seasons/{seasonId}/runs/{runId}/proof', {
         params: { path: { seasonId, runId: command.runId } },
@@ -150,9 +159,12 @@ async function fetchSeason(seasonId: string): Promise<Loaded> {
  *  and in a sheet at the bottom of a phone. */
 export function SeasonScreen({
   seasonId,
+  role = 'spectator',
   onSignedOut,
 }: {
   seasonId: string;
+  /** Who looks at the season: without a token of my own the turn card says why (K2-1) */
+  role?: 'player' | 'admin' | 'spectator';
   onSignedOut: () => void;
 }) {
   const [season, setSeason] = useState<Season | null>(null);
@@ -305,15 +317,7 @@ export function SeasonScreen({
       ])
     : '';
   const chain = useMemo(
-    () =>
-      season && graphMode
-        ? graphBoard({
-            cells: season.cells,
-            edges: season.edges,
-            zones: season.zones,
-            background: season.background ?? null,
-          })
-        : linearBoard(season?.cells ?? []),
+    () => (season ? seasonBoard(season) : linearBoard([])),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- the key stands for the map
     [mapKey],
   );
@@ -406,6 +410,13 @@ export function SeasonScreen({
       : null;
   const spin: WheelRoll | null = fresh ? wheelRoll(fresh, offer, choice) : null;
   const uncheckedBlocked = me?.unchecked != null && me.unchecked.count >= me.unchecked.limit;
+  // At the check limit the one thing to do is a proof: of the oldest run waiting without one (checks come newest first)
+  const proofToSend = uncheckedBlocked
+    ? [...(me.checks ?? [])]
+        .reverse()
+        .concat(me.lastCompleted ? [me.lastCompleted] : [])
+        .find((run) => run.status === 'completed' && !run.proof)
+    : undefined;
   const { board, players, rows, cellNumber } = view;
   // A completion that came while the page is open throws its dice first; the rest of the turn waits for it
   const throwing =
@@ -429,12 +440,28 @@ export function SeasonScreen({
     : Math.max(board.cells.length - 1, 1);
   const closing = season.status === 'closing' || (season.status === 'active' && pastDeadline);
   const finished = season.status === 'finished' || season.status === 'archived';
+  // K1S-13: a draft has not started: nothing to do yet, and nobody leads
+  const draft = season.status === 'draft';
+  const checks = me?.checks ?? [];
+  // K1S-19: everyone level at the top (the season's start) — nobody is called the leader
+  const leaderTied =
+    leader !== undefined && !leader.isFirst && shownRows.filter((r) => r.place === 1).length > 1;
 
   // The current step comes first — a roll waiting for my answer (H3) or the game I play (H4) — and the tails of the
   // last run fold under it
   const stepFirst = Boolean(offer ?? choice) || (me?.phase === 'playing' && me.activeRun != null);
+  // The idle turn's main slot: a roll, or at the check limit the proof that opens it again
+  const rollSlot = me?.phase === 'idle' && turnsOpen && !throwing && !branch && !moving;
+  /** Opens the proof form of a run on the card and puts the focus in it */
+  const openProof = (runId: string) => {
+    const fold = document.querySelector<HTMLDetailsElement>(`[data-proof-run="${runId}"]`);
+    if (!fold) return;
+    fold.open = true;
+    const field = fold.querySelector<HTMLElement>('input, textarea, select');
+    (field ?? fold.querySelector('summary'))?.focus();
+  };
   const afterRun =
-    me && (me.manualEffects.length > 0 || me.lastCompleted || me.lastEvent) ? (
+    me && (me.manualEffects.length > 0 || me.lastCompleted || me.lastEvent || checks.length > 0) ? (
       <section
         aria-labelledby="after-title"
         data-testid="after"
@@ -448,7 +475,9 @@ export function SeasonScreen({
             ? ru.turn.todo(me.manualEffects.length)
             : stepFirst && me.lastCompleted
               ? ru.turn.afterGame(me.lastCompleted.game.title)
-              : ru.turn.after}
+              : me.lastCompleted || me.lastEvent
+                ? ru.turn.after
+                : ru.turn.checksTitle}
         </h3>
         {me.manualEffects.length > 0 && (
           <section
@@ -529,11 +558,16 @@ export function SeasonScreen({
               </p>
             )}
             {/* The proof form folds into one line: it is not a to-do that holds the roll (H3 design review) */}
-            <details data-testid="proof-details" className="grid gap-2">
-              <summary className="min-h-11 cursor-pointer content-center rounded-md font-bold is-focus:focus-ring">
+            <details
+              data-testid="proof-details"
+              data-proof-run={me.lastCompleted.id}
+              className="grid gap-2"
+            >
+              <Summary className="font-bold">
                 {me.lastCompleted.proof ? ru.turn.proofSummary : ru.turn.proofToSend}
-              </summary>
+              </Summary>
               <ProofSection
+                key={`${me.lastCompleted.id}:${JSON.stringify(me.lastCompleted.proof ?? null)}`}
                 proof={me.lastCompleted.proof ?? null}
                 pending={pending}
                 witnesses={season.players.filter((p) => p.id !== me.playerId)}
@@ -552,6 +586,60 @@ export function SeasonScreen({
               />
             </details>
           </div>
+        )}
+        {/* K1S-1, K1S-9: the other runs that still take a proof, and a rejection since my last roll */}
+        {checks.length > 0 && (
+          <section aria-labelledby="checks-title" data-testid="checks" className="grid gap-3">
+            {me.lastCompleted ? (
+              <h4 id="checks-title" className="font-bold">
+                {ru.turn.checksTitle}
+              </h4>
+            ) : (
+              <span id="checks-title" className="sr-only">
+                {ru.turn.checksTitle}
+              </span>
+            )}
+            <ul className="grid gap-4">
+              {checks.map((run) => (
+                <li key={run.id} data-testid={`check-${run.id}`} className="grid min-w-0 gap-2">
+                  <p className="min-w-0 font-medium">
+                    {run.status === 'rejected'
+                      ? ru.turn.checkRejected(run.game.title)
+                      : ru.turn.checkWaiting(run.game.title, run.total)}
+                  </p>
+                  {run.status === 'rejected' ? (
+                    <ProofSection
+                      proof={run.proof ?? null}
+                      pending={pending}
+                      witnesses={[]}
+                      onSubmit={() => {}}
+                    />
+                  ) : (
+                    <details
+                      data-testid="check-proof"
+                      data-proof-run={run.id}
+                      className="grid gap-2"
+                    >
+                      <Summary className="font-bold">
+                        {run.proof
+                          ? ru.turn.proofSummaryFor(run.game.title)
+                          : ru.turn.proofToSendFor(run.game.title)}
+                      </Summary>
+                      <ProofSection
+                        key={`${run.id}:${JSON.stringify(run.proof ?? null)}`}
+                        proof={run.proof ?? null}
+                        pending={pending}
+                        witnesses={season.players.filter((p) => p.id !== me.playerId)}
+                        onSubmit={(links, note, witnessId, files) => {
+                          void act({ kind: 'proof', runId: run.id, links, note, witnessId, files });
+                        }}
+                      />
+                    </details>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </section>
         )}
         {/* The event comes after the move that stopped on its cell: the card reads after the throw (design review) */}
         {/* Key moments one after another (DESIGN.md «Движение»): a fresh card waits for the token to stop */}
@@ -753,6 +841,11 @@ export function SeasonScreen({
               </Chip>
             </span>
           ) : null}
+          {me?.coins != null ? (
+            <span data-testid="my-coins">
+              <Chip icon={<Coins size={16} aria-hidden />}>{ru.season.coins(me.coins)}</Chip>
+            </span>
+          ) : null}
           {closing || finished ? (
             <span data-testid="season-status">
               <Chip icon={<Flag size={16} aria-hidden />}>
@@ -775,14 +868,29 @@ export function SeasonScreen({
       >
         <h2 id="turn-title" className="font-display text-lg font-heavy">
           {!me
-            ? ru.turn.spectatorTitle
+            ? role === 'player'
+              ? ru.turn.outsiderTitle
+              : role === 'admin'
+                ? ru.turn.adminOutsideTitle
+                : ru.turn.spectatorTitle
             : finished
               ? ru.turn.finishedTitle
               : closing
                 ? ru.turn.closingTitle
-                : ru.turn.title}
+                : draft
+                  ? ru.turn.draftTitle
+                  : ru.turn.title}
         </h2>
-        {!me && <p className="text-ink-soft">{ru.turn.spectator}</p>}
+        {!me && (
+          <p className="text-ink-soft">
+            {role === 'player'
+              ? ru.turn.outsider
+              : role === 'admin'
+                ? ru.turn.adminOutside
+                : ru.turn.spectator}
+          </p>
+        )}
+        {me && draft && <p className="text-ink-soft">{ru.turn.draftText}</p>}
         {me && finished && <p className="text-ink-soft">{ru.turn.finishedText}</p>}
         {me && closing && <p className="text-ink-soft">{ru.turn.closingText}</p>}
         {/* D-260: a finisher's season goes on; the card says where he stands and what his next runs give */}
@@ -796,6 +904,12 @@ export function SeasonScreen({
         ) : null}
         {/* A refusal is said at the top of the card, where the eye is after the action */}
         {message && <Notice tone="danger">{message}</Notice>}
+        {/* D-134: at the limit of runs waiting for the admin's check the roll is closed: the step's statement */}
+        {rollSlot && uncheckedBlocked ? (
+          <Notice tone="warning">
+            {ru.turn.uncheckedBlocked(me.unchecked?.count ?? 0, me.unchecked?.limit ?? 0)}
+          </Notice>
+        ) : null}
         {/* A phone scrolls the dice into view: the completion button was low on the screen */}
         {!desk && diceStage ? <div ref={showStage}>{diceStage}</div> : null}
         {desk && throwing ? (
@@ -820,24 +934,32 @@ export function SeasonScreen({
             <div ref={showStage}>{branchCard}</div>
           )
         ) : null}
-        {me?.phase === 'idle' && turnsOpen && !throwing && !branch && !moving && (
-          // D-134: at the limit of runs waiting for the admin's check the roll is closed, and the page says why
+        {rollSlot && uncheckedBlocked && proofToSend ? (
+          // The main slot holds the first action that is really there, never a dead main button (DESIGN.md «Карточка
+          // хода»): at the check limit, the proof of the oldest run without one
+          <Button
+            variant="main"
+            data-testid="send-proof"
+            disabled={pending}
+            onClick={() => {
+              openProof(proofToSend.id);
+            }}
+          >
+            {ru.turn.sendProof}
+          </Button>
+        ) : null}
+        {rollSlot && !uncheckedBlocked && (
           <div className="grid gap-2">
-            {uncheckedBlocked ? (
-              <Notice tone="warning">
-                {ru.turn.uncheckedBlocked(me.unchecked?.count ?? 0, me.unchecked?.limit ?? 0)}
-              </Notice>
-            ) : null}
             <Button
               variant="main"
               data-testid="roll"
               loading={pending}
-              disabled={pending || uncheckedBlocked}
+              disabled={pending}
               onClick={() => void act({ kind: 'roll' })}
             >
               {ru.turn.roll}
             </Button>
-            {!uncheckedBlocked && me.unchecked && me.unchecked.count > 0 ? (
+            {me.unchecked && me.unchecked.count > 0 ? (
               <p className="text-sm text-ink-soft" data-testid="unchecked">
                 {ru.turn.uncheckedWaiting(me.unchecked.count, me.unchecked.limit)}
               </p>
@@ -850,12 +972,13 @@ export function SeasonScreen({
             choice={choice}
             roll={me?.roll ?? null}
             price={me?.nextReroll ?? null}
+            coins={me?.coins ?? null}
             pending={pending}
             onChoose={(optionId, difficulty) =>
               void act({ kind: 'choose', choiceId: choice.id, optionId, difficulty })
             }
             onAlreadyPlayed={(gameId) => void act({ kind: 'alreadyPlayed', gameId })}
-            onReroll={() => void act({ kind: 'reroll' })}
+            onReroll={() => void act({ kind: 'reroll', expected: me?.nextReroll?.payment ?? null })}
           />
         )}
         {offer && !spin && (
@@ -863,10 +986,11 @@ export function SeasonScreen({
             offer={offer}
             roll={me?.roll ?? null}
             price={me?.nextReroll ?? null}
+            coins={me?.coins ?? null}
             pending={pending}
-            onStart={(difficulty) => void act({ kind: 'start', difficulty })}
+            onStart={(difficulty) => void act({ kind: 'start', gameId: offer.id, difficulty })}
             onAlreadyPlayed={() => void act({ kind: 'alreadyPlayed', gameId: offer.id })}
-            onReroll={() => void act({ kind: 'reroll' })}
+            onReroll={() => void act({ kind: 'reroll', expected: me?.nextReroll?.payment ?? null })}
           />
         )}
         {/* The result is said once, when the wheel stops, and outlives the wheel */}
@@ -916,7 +1040,9 @@ export function SeasonScreen({
               onWishReroll={() => void act({ kind: 'techReroll', reason: 'wish', comment: null })}
               frozen={me.finish?.frozen === true}
               pending={pending}
-              onDrop={() => void act({ kind: 'drop' })}
+              onDrop={() => {
+                if (me.activeRun) void act({ kind: 'drop', runId: me.activeRun.id });
+              }}
               onTechReroll={(reason, comment) => void act({ kind: 'techReroll', reason, comment })}
             />
           </div>
@@ -936,8 +1062,7 @@ export function SeasonScreen({
             ref={camera}
             board={board}
             players={shownPlayers}
-            focus={shownMine && shownMine.cell > 0 ? shownMine.cell : undefined}
-            tools="auto"
+            focus={shownMine && shownMine.cell >= 0 ? shownMine.cell : undefined}
             options={options?.map((o) => o.cell)}
             className="h-105 rounded-lg border-3 border-ink desk:h-190"
           />
@@ -959,31 +1084,28 @@ export function SeasonScreen({
         </div>
         {/* The map in words: every cell and who stands there (also what the tests and screen readers read) */}
         <ol data-testid="cells" className="sr-only">
-          {(graphMode
-            ? [...season.cells].sort(
-                (a, b) => (cellNumber.get(a.id) ?? 0) - (cellNumber.get(b.id) ?? 0),
-              )
-            : season.cells
-          ).map((cell, i) => {
-            const here = season.players.filter((p) => p.cellId === cell.id);
-            return (
-              <li key={cell.id} data-testid={`cell-${cell.id}`}>
-                {cell.type === 'start'
-                  ? ru.map.start
-                  : cell.type === 'finish'
-                    ? ru.map.finish
-                    : graphMode
-                      ? cellWords(cell, season, cellNumber)
-                      : ru.map.cellNumber(i + 1)}
-                {here.map((p) => (
-                  <span key={p.id} data-testid={`token-${p.id}`}>
-                    {' '}
-                    {p.name}
-                  </span>
-                ))}
-              </li>
-            );
-          })}
+          {[...season.cells]
+            .sort((a, b) => (cellNumber.get(a.id) ?? 0) - (cellNumber.get(b.id) ?? 0))
+            .map((cell) => {
+              const here = season.players.filter((p) => p.cellId === cell.id);
+              return (
+                <li key={cell.id} data-testid={`cell-${cell.id}`}>
+                  {cell.type === 'start'
+                    ? ru.map.start
+                    : cell.type === 'finish'
+                      ? ru.map.finish
+                      : graphMode
+                        ? cellWords(cell, season, cellNumber)
+                        : ru.map.cellNumber(cellNumber.get(cell.id) ?? 0)}
+                  {here.map((p) => (
+                    <span key={p.id} data-testid={`token-${p.id}`}>
+                      {' '}
+                      {p.name}
+                    </span>
+                  ))}
+                </li>
+              );
+            })}
         </ol>
       </section>
 
@@ -1000,18 +1122,6 @@ export function SeasonScreen({
           className="desk:col-start-1 desk:w-96"
         />
       ) : null}
-      {graphMode ? (
-        <MapLegend
-          zones={season.zones}
-          kinds={new Set(season.cells.map((c) => c.type))}
-          myZone={
-            season.cells.find(
-              (c) => c.id === season.players.find((p) => p.id === me?.playerId)?.cellId,
-            )?.zone
-          }
-          className="min-w-0 desk:col-start-1 desk:w-96"
-        />
-      ) : null}
       <Panel title={ru.leaderboard.title} className="hidden desk:col-start-1 desk:grid desk:w-96">
         <p className="text-sm text-ink-soft">{ru.board.rule}</p>
         <Leaderboard rows={shownRows} />
@@ -1025,6 +1135,19 @@ export function SeasonScreen({
         />
       ) : null}
 
+      {/* The map's legend after the leaderboard and the feed (K2-7): on a desktop it pushed «who leads» below the fold */}
+      {graphMode ? (
+        <MapLegend
+          zones={season.zones}
+          kinds={new Set(season.cells.map((c) => c.type))}
+          myZone={
+            season.cells.find(
+              (c) => c.id === season.players.find((p) => p.id === me?.playerId)?.cellId,
+            )?.zone
+          }
+          className="min-w-0 desk:col-start-1 desk:w-96"
+        />
+      ) : null}
       <div className="legacy-screens min-w-0 desk:col-start-1 desk:w-96">
         <AvatarSection
           onChanged={() => {
@@ -1050,13 +1173,15 @@ export function SeasonScreen({
                 <strong className="font-display">{ru.leaderboard.title}</strong>
                 {myRow && leader ? (
                   <span className="text-sm text-ink-soft">
-                    {leader.player.me
-                      ? ru.board.sheet(myRow.place, myRow.points)
-                      : ru.board.sheetPeek(leader.player.name, myRow.place)}
+                    {leaderTied && myRow.place === 1
+                      ? ru.board.sheetShared(myRow.points)
+                      : leader.player.me || leaderTied || myRow.place === 1
+                        ? ru.board.sheet(myRow.place, myRow.points)
+                        : ru.board.sheetPeek(leader.player.name, myRow.place)}
                   </span>
                 ) : leader ? (
                   <span className="text-sm text-ink-soft">
-                    {ru.board.sheetLeader(leader.player.name)}
+                    {leaderTied ? ru.board.sheetNoLeader : ru.board.sheetLeader(leader.player.name)}
                   </span>
                 ) : null}
               </span>

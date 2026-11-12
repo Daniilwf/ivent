@@ -7,6 +7,7 @@ using GameEvent.Engine.Rulesets;
 using GameEvent.Engine.Seasons;
 using GameEvent.Engine.Turns;
 using GameEvent.Web.Seasons;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace GameEvent.Web.Tests.Api;
 
@@ -71,9 +72,12 @@ public sealed class SeasonApiTests : IAsyncLifetime
     [Fact]
     public async Task Current_season_is_the_latest_one_the_player_plays_in_and_the_latest_for_others()
     {
-        // Given a later season without Вася
+        // Given a later running season without Вася (D-601: a running season comes before a draft, so it is started)
         _site.Clock.UtcNow = _site.Clock.UtcNow.AddDays(1);
         var later = await _site.CreateSeasonAsync();
+        var started = await _site.Services.GetRequiredService<Infrastructure.Queue.CommandBus>()
+            .SendAsync(new Infrastructure.Queue.CommandEnvelope(Guid.NewGuid(), later, new ChangeSeasonStatus(SeasonStatus.Active), AuthorId: null), Ct);
+        Assert.True(started.IsAccepted);
 
         // Then Вася keeps his season, a spectator and a player outside both see the latest one
         Assert.Equal(SiteFactory.SeasonId, await CurrentAsync("vasya"));
@@ -450,6 +454,32 @@ public sealed class SeasonApiTests : IAsyncLifetime
         Assert.Equal(JsonValueKind.Object, next.ValueKind);
         Assert.Equal(payment, next.GetProperty("payment").GetString());
         Assert.Equal(coins, next.GetProperty("coins").GetInt32());
+    }
+
+    [Fact]
+    public async Task An_offer_the_admin_deleted_from_the_pool_is_not_started_and_rerolls_for_free()
+    {
+        // K1A, D-615: the admin deletes a duplicate that is Вася's offer
+        var vasya = await _site.SignedInAsync("vasya");
+        await PostAsync(vasya, "roll", new { commandId = Guid.NewGuid() });
+        var gameId = (await MeJsonAsync(vasya)).GetProperty("offer").GetProperty("id").GetGuid();
+        var admin = await _site.SignedInAsync("admin");
+        var deleted = await admin.PostAsJsonAsync($"/api/admin/pool/{gameId}/delete", new { commandId = Guid.NewGuid(), reason = "Дубль" }, Ct);
+        Assert.True(deleted.IsSuccessStatusCode);
+
+        var start = await vasya.PostAsJsonAsync(Url("start"), new { commandId = Guid.NewGuid() }, Ct);
+        Assert.Equal(HttpStatusCode.Conflict, start.StatusCode);
+        using (var problem = JsonDocument.Parse(await start.Content.ReadAsStringAsync(Ct)))
+        {
+            Assert.Equal("roll.gameDeleted", problem.RootElement.GetProperty("code").GetString());
+        }
+
+        AssertNextReroll(await MeJsonAsync(vasya), "gameDeleted", 0);
+        // As the screen sends it: the price it shows (D-600)
+        await PostAsync(vasya, "reroll", new { commandId = Guid.NewGuid(), expectedPayment = "gameDeleted" });
+        var me = await MeJsonAsync(vasya);
+        Assert.NotEqual(gameId, me.GetProperty("offer").GetProperty("id").GetGuid());
+        AssertNextReroll(me, "freeThisRoll", 0);
     }
 
     [Fact]

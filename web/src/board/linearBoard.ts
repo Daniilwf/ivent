@@ -50,10 +50,10 @@ export function linearBoard(
   });
   const cells: BoardCell[] = chain.map((c, i) => ({
     ...(spots[i] as Point),
-    id: i + 1,
+    id: i,
     kind: kindOf(c.type),
   }));
-  const edges = cells.slice(1).map((c, i) => ({ from: i + 1, to: c.id }));
+  const edges = cells.slice(1).map((c, i) => ({ from: i, to: c.id }));
   const roads = spots.length > 1 ? [catmullRom(spots, 8)] : [];
 
   // The rows are shared out among the zones in order: always the meadow at the start and the castle at the finish,
@@ -90,6 +90,6 @@ export function linearBoard(
 
   return {
     board: { width, height, cells, edges, roads, zones },
-    cellNumber: new Map(chain.map((c, i) => [c.id, i + 1])),
+    cellNumber: new Map(chain.map((c, i) => [c.id, i])),
   };
 }

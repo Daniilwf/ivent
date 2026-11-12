@@ -137,6 +137,12 @@ public sealed partial class CommandProcessor
                         return Reject(AccountRules.Unknown, $"Account {reset.UserId} does not exist.");
                     }
 
+                    // Restoring disables whatever password it had (D-106), so a password given now would never work (D-613)
+                    if (user.IsDeleted)
+                    {
+                        return Reject(AccountRules.Deleted, "The account is deleted: restore it, then reset its password.");
+                    }
+
                     var temporary = AccountRules.TemporaryPassword();
                     var sessions = await LiveSessionsAsync(db, user.Id, SessionNow, ct);
                     return ([new AccountPasswordReset(user.Id), .. Ended(user.Id, sessions, SessionEndReason.AccountChanged)], () =>
@@ -202,6 +208,13 @@ public sealed partial class CommandProcessor
                     if (user.Role == Role.Admin && edit.Role != Role.Admin && !user.IsDeleted && await IsLastAdminAsync(db, user.Id, ct))
                     {
                         return Reject(AccountRules.LastAdmin, "The last admin keeps the role.");
+                    }
+
+                    // An admin who plays has two accounts (SPEC «Аккаунты»): a player of a season that is not over does
+                    // not become one, or they would check their own proofs and correct their own points (D-610)
+                    if (edit.Role == Role.Admin && user.Role != Role.Admin && await IsInUnfinishedSeasonAsync(db, user.Id, ct))
+                    {
+                        return Reject(AccountRules.InSeason, "The account plays in a season that is not over: an admin who plays has a second account.");
                     }
 
                     var sessions = user.Role != edit.Role ? await LiveSessionsAsync(db, user.Id, SessionNow, ct) : [];
@@ -289,6 +302,13 @@ public sealed partial class CommandProcessor
             default:
                 throw new InvalidOperationException($"Unknown account command {command.GetType().Name}.");
         }
+    }
+
+    private static async Task<bool> IsInUnfinishedSeasonAsync(GameEventDbContext db, Guid userId, CancellationToken ct)
+    {
+        var seasonIds = await db.SeasonPlayers.AsNoTracking().Where(p => p.UserId == userId).Select(p => p.SeasonId).ToListAsync(ct);
+        return await db.Seasons.AsNoTracking().AnyAsync(
+            s => seasonIds.Contains(s.Id) && s.Status != Engine.Seasons.SeasonStatus.Finished && s.Status != Engine.Seasons.SeasonStatus.Archived, ct);
     }
 
     /// <summary>

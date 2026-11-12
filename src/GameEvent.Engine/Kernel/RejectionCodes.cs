@@ -17,6 +17,9 @@ public static class RejectionCodes
     public const string SeasonDeadlineNotReached = "season.deadlineNotReached";
     public const string SeasonDeadlineInPast = "season.deadlineInPast";
     public const string SeasonProofsPending = "season.proofsPending";
+
+    /// <summary>A manual effect still waits to be resolved: the season does not finish over it (D-603).</summary>
+    public const string SeasonEffectsPending = "season.effectsPending";
     public const string CellUnknown = "map.unknownCell";
     public const string NothingToChange = "player.nothingToChange";
     public const string CommentRequired = "player.commentRequired";
@@ -41,12 +44,17 @@ public static class RejectionCodes
     public const string SeasonAlreadyCreated = "season.alreadyCreated";
     public const string PlayerUnknown = "player.unknown";
     public const string PlayerAlreadyAdded = "player.alreadyAdded";
+    public const string PlayerNameTaken = "player.nameTaken";
     public const string WrongPhase = "turn.wrongPhase";
     public const string ChoicePending = "turn.choicePending";
+
+    /// <summary>The command says what the player saw, and the turn has changed since (D-600).</summary>
+    public const string TurnStale = "turn.stale";
     public const string NoPendingChoice = "turn.noPendingChoice";
     public const string UnknownChoiceOption = "turn.unknownOption";
     public const string NoAvailableGames = "roll.noAvailableGames";
     public const string GameNotOffered = "roll.gameNotOffered";
+    public const string GameDeleted = "roll.gameDeleted";
     public const string NotEnoughCoins = "roll.notEnoughCoins";
     public const string TooManyUncheckedRuns = "roll.tooManyUnchecked";
     public const string HoursRequired = "run.hoursRequired";
@@ -78,6 +86,7 @@ public static class RejectionCodes
     public const string BetsInPlay = "ruleset.betsInPlay";
     public const string MapOccupiedCellRemoved = "map.occupiedCellRemoved";
     public const string MapUnchanged = "map.unchanged";
+    public const string MapVersionConflict = "map.versionConflict";
     public const string MapOccupiedCellRetyped = "map.occupiedCellRetyped";
     public const string BranchChoicePending = "map.branchChoicePending";
     public const string UndoCellNotOnMap = "undo.cellNotOnMap";

@@ -19,15 +19,16 @@ using ActionResult = Microsoft.AspNetCore.Http.HttpResults.Results<
 namespace GameEvent.Web.Proofs;
 
 /// <summary>
-/// A run to check, in queue order (D-98, Q-3): the runs that decide a finish on top (<c>decidesFinish</c>), then by
-/// completion time; with the claimed difficulty, the counted hours and the dice total, what an approval at a lower
+/// A run to check, in queue order (D-98, Q-3, D-662): the runs that decide a finish on top (<c>decidesFinish</c>), then
+/// the runs of players whose roll is closed (<c>rollClosed</c>), then by completion time; with the claimed difficulty, the counted hours and the dice total, what an approval at a lower
 /// difficulty or a reject changes. <c>reachedFinish</c>: this run's latest move stands on the finish.
 /// <c>rollClosed</c>: the player's next roll is closed by the limit of unchecked runs (D-134) until the admin checks one.
 /// <c>cellBonus</c>: the points bonus of the cell the run's move stopped on, which a reject takes back too (D-327; always
 /// set, optional for older clients). <c>dropPenalty</c>: the drop penalty «Отклонить со штрафом дропа» would throw on top of
 /// the reject (D-327, D-262) under the season's rules, with the drops in a row before the run (D-324); null for the frozen
 /// first, who loses nothing (D-99); <c>affectsPosition</c> is false for a finisher whose finish this run does not decide
-/// (his position is fixed); always set, optional for older clients.
+/// (his position is fixed); always set, optional for older clients. <c>hoursSource</c>: where the player's estimate of
+/// the hours comes from, when the pool had none (SPEC «Часы и кубы», K1A); null for the pool's hours.
 /// </summary>
 public sealed record ProofQueueItemView(
     Guid RunId,
@@ -47,7 +48,8 @@ public sealed record ProofQueueItemView(
     IReadOnlyList<Files.FileLinkView> Files,
     bool RollClosed,
     int? CellBonus = null,
-    DropPenaltyView? DropPenalty = null);
+    DropPenaltyView? DropPenalty = null,
+    string? HoursSource = null);
 
 /// <summary>Approve a run: with its proof, or without one («без скрина», a comment then); a lower proven difficulty.</summary>
 public sealed record ApproveProofRequest(Guid CommandId, Difficulty? Difficulty = null, string? Comment = null);
@@ -132,7 +134,8 @@ public static class AdminProofEndpoints
                     run.CellPoints,
                     RejectPenaltyPreview.Of(state, run) is { } penalty
                         ? new DropPenaltyView(penalty.Count, penalty.Sides, penalty.AffectsPoints, penalty.AffectsPosition, penalty.BadEvent)
-                        : null);
+                        : null,
+                    run.HoursSource);
             }),
         ];
         return TypedResults.Ok(items);

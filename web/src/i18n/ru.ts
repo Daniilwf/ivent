@@ -70,7 +70,11 @@ type DropPenalty = {
   badEvent: boolean;
 };
 
-type RerollPayment = 'freeThisRoll' | 'freeRerollResource' | 'coins' | 'badEvent' | 'freeMode';
+type RerollPayment =
+  'freeThisRoll' | 'freeRerollResource' | 'coins' | 'badEvent' | 'freeMode' | 'gameDeleted';
+
+// The admin's section the refusals send to, by its own name
+const effectsSection = 'Ручные эффекты';
 
 const rejection = {
   'pool.duplicate': 'Такая игра уже есть в пуле.',
@@ -80,6 +84,8 @@ const rejection = {
   'pool.removed': 'Эту игру админ убрал из пула.',
   'turn.wrongPhase': 'Это действие сейчас недоступно: обнови страницу.',
   'turn.choicePending': 'Сначала сделай выбор.',
+  'turn.stale':
+    'Ход уже изменился — например, в другой вкладке. Посмотри, что сейчас на экране, и реши ещё раз.',
   'turn.noPendingChoice': 'Этот выбор уже сделан или снят. Обнови страницу.',
   'turn.unknownOption': 'Такого варианта нет. Обнови страницу.',
   'roll.noAvailableGames': 'Нет доступных игр для ролла. Сообщи админу.',
@@ -87,6 +93,7 @@ const rejection = {
   'roll.tooManyUnchecked':
     'Слишком много прохождений ждут проверки админом. Новый ролл откроется, когда их станет меньше лимита сезона.',
   'roll.gameNotOffered': 'Эта игра тебе сейчас не предложена. Обнови страницу.',
+  'roll.gameDeleted': 'Админ убрал эту игру из пула. Сделай реролл — он бесплатный.',
   'proof.invalidLink': 'Ссылка должна начинаться с http:// или https://, ссылок не больше пяти.',
   'proof.empty': 'Добавь ссылку на пруф или выбери свидетеля.',
   'proof.witnessInvalid': 'Свидетелем может быть только другой игрок сезона.',
@@ -120,11 +127,17 @@ const rejection = {
     'Этот запрос уже выполнен. Если пароль ещё нужно сменить — отправь форму заново.',
   'account.stale': 'Аккаунт изменился, пока шёл запрос. Войди заново.',
   'account.roleInvalid': 'Неизвестная роль.',
-  'account.passwordInvalid': 'Пароль — от 8 символов, не совпадает с логином и с текущим паролем.',
+  'account.passwordInvalid':
+    'Пароль — от 8 символов, не из одних пробелов, не совпадает с логином и с текущим паролем.',
   'account.loginInvalid':
     'Логин — от 2 до 32 латинских букв, цифр, точек, дефисов и подчёркиваний.',
   'account.loginTaken': 'Такой логин уже занят.',
-  'account.nameInvalid': 'Имя — от 1 до 64 символов.',
+  'account.nameInvalid':
+    'Имя — от 1 до 64 символов, хотя бы один видимый, без невидимых и управляющих символов.',
+  'player.nameTaken':
+    'В сезоне уже есть игрок с таким именем: в лидерборде и ленте их не различить. Переименуй один из аккаунтов.',
+  'account.inSeason':
+    'Этот аккаунт играет в незавершённом сезоне. Админу, который играет, нужен второй аккаунт.',
   'account.lastAdmin': 'Последний админ остаётся админом.',
   'account.deleted': 'Аккаунт уже удалён.',
   'account.notDeleted': 'Аккаунт не удалён.',
@@ -148,6 +161,7 @@ const rejection = {
   'season.deadlinePassed': 'Дедлайн прошёл: броски закрыты, пруфы принимаются.',
   'season.deadlineNotReached': 'Дедлайн ещё не наступил.',
   'season.proofsPending': 'Сначала проверь все пруфы: итоги — только после проверки.',
+  'season.effectsPending': `Сначала разыграй ручные эффекты: отметь каждый «применено» или «не применимо» в разделе «${effectsSection}».`,
   'season.notActive': 'Сезон сейчас не идёт.',
   'player.finished': 'Позиция финишировавшего меняется только через его прохождения.',
   'player.unknown': 'Ты не участвуешь в этом сезоне.',
@@ -158,6 +172,8 @@ const rejection = {
   'ruleset.invalid': 'В правилах есть ошибки: исправь отмеченные поля.',
   'ruleset.unchanged': 'Правила не изменились: сохранять нечего.',
   'ruleset.versionConflict': 'Правила уже изменил кто-то другой. Обнови страницу и повтори правку.',
+  'map.versionConflict':
+    'Карту уже опубликовали из другой вкладки или другой админ. Верни опубликованную карту и повтори правки.',
   'ruleset.betsInPlay':
     'Ставки нельзя выключить, пока есть открытые ставки или выигрыши по непроверенным прохождениям.',
   'site.maintenance': 'Идёт обслуживание: сайт на минуту только для чтения. Повтори чуть позже.',
@@ -209,6 +225,8 @@ const objectKinds = {
 
 // H5: the feed, the profile and the game page
 
+// 1 очко, 2 очка, 5 очков
+const points = (n: number) => `${n} ${plural(n, 'очко', 'очка', 'очков')}`;
 // A change with its sign: +7, −3 (a real minus)
 const signed = (n: number) => (n < 0 ? `−${Math.abs(n)}` : `+${n}`);
 const hoursText = (n: number) => `${n.toLocaleString('ru-RU')} ч`;
@@ -377,6 +395,11 @@ export const ru = {
     afterGame: (title: string) => `Прошлая игра: ${title}`,
     proofToSend: 'Пруф: ещё не отправлен',
     proofSummary: 'Пруф и проверка',
+    // The fold of another run's proof names its game: two folds never read the same (K2-5)
+    proofToSendFor: (title: string) => `Пруф за ${title}: ещё не отправлен`,
+    proofSummaryFor: (title: string) => `Пруф и проверка за ${title}`,
+    // The roll is closed by the check limit: the main action is the proof of the oldest run that has none
+    sendProof: 'Дослать пруф',
     uncheckedWaiting: (count: number, limit: number) =>
       `На проверке ${count} из ${limit}: на ${limit}-м новый ролл закроется до проверки`,
     uncheckedBlocked: (count: number, limit: number) =>
@@ -384,6 +407,11 @@ export const ru = {
     retrying: 'Пробуем ещё раз…',
     title: 'Твой ход',
     spectatorTitle: 'Ты зритель',
+    // K2-1: a player or an admin who is not in the season has no token in it, but is not a spectator either
+    outsiderTitle: 'Тебя нет в этом сезоне',
+    outsider: 'Сезон идёт без тебя. Попроси админа добавить тебя — и крути колесо.',
+    adminOutsideTitle: 'Ты ведёшь сезон',
+    adminOutside: 'В этом сезоне ты не играешь: пруфы и правки — в админке.',
     finishedTitle: 'Сезон завершён',
     finishedText: 'Ходы закончились, итоги — в лидерборде.',
     closingTitle: 'Ждём проверку пруфов',
@@ -416,7 +444,7 @@ export const ru = {
     alreadyPlayed: 'Уже проходил',
     reroll: 'Реролл',
     rerollFor: (payment: RerollPayment, price: number) =>
-      payment === 'freeThisRoll' || payment === 'freeMode'
+      payment === 'freeThisRoll' || payment === 'freeMode' || payment === 'gameDeleted'
         ? 'Реролл — бесплатно'
         : payment === 'freeRerollResource'
           ? 'Реролл — купон реролла'
@@ -425,10 +453,12 @@ export const ru = {
             : price === 0
               ? 'Реролл — бесплатно'
               : `Реролл — ${coins(price)}`,
-    rerollConfirm: (payment: RerollPayment, price: number) =>
+    rerollConfirm: (payment: RerollPayment, price: number, balance: number | null = null) =>
       payment === 'badEvent'
         ? 'За этот реролл тебе достанется плохой ивент. Продолжить?'
-        : `Реролл стоит ${coins(price)}. Потратить?`,
+        : balance === null
+          ? `Реролл стоит ${coins(price)}. Потратить?`
+          : `Реролл стоит ${coins(price)}, у тебя ${coins(balance)}. Потратить?`,
     rerollConfirmYes: 'Да, реролл',
     rerollConfirmNo: 'Отмена',
     drop: 'Дропнуть',
@@ -499,6 +529,13 @@ export const ru = {
     gameMark: (player: string, kind: 'dropped' | 'techRerolled') =>
       kind === 'dropped' ? `Дропнул ${player}` : `Тех-реролл у ${player}`,
     alreadyPlayedGame: (title: string) => `Уже проходил: ${title}`,
+    // K1S-7: the choice is for the whole season, so it is asked first
+    alreadyPlayedTitle: (title: string) => `«${title}» — уже проходил?`,
+    alreadyPlayedConsequences: [
+      'Игра больше не выпадет тебе в этом сезоне',
+      'Сразу новый ролл — бесплатно, это не реролл',
+    ],
+    alreadyPlayedYes: 'Да, уже проходил',
     choose: 'Выбери одну из выпавших игр',
     pick: 'Выбрать:',
     pickShort: 'Выбрать',
@@ -521,7 +558,7 @@ export const ru = {
         .join(', ')}.`,
     hours: 'Часы (оценка)',
     hoursHint: 'У игры нет данных о длине: укажи оценку.',
-    hoursInvalid: 'Укажи число часов больше нуля.',
+    hoursInvalid: 'Укажи число часов: больше нуля и не больше 1000.',
     hoursSource: 'Источник оценки',
     hoursSourceHint: 'Ссылка, например на HowLongToBeat, или короткая пометка.',
     hoursSourceRequired: 'Укажи источник оценки: ссылку или пометку.',
@@ -531,7 +568,7 @@ export const ru = {
     reviewNoRating: 'Без оценки',
     reviewText: 'Отзыв',
     reviewRatingRequired: 'Чтобы оставить отзыв, поставь оценку от 1 до 10.',
-    lastRejected: (title: string) => `Прохождение отклонено (${title}): очки и клетки сняты.`,
+    lastRejected: (title: string) => `Прохождение отклонено (${title}): снято всё, что дал ход.`,
     lastChallengeDice: (dice: number[]) => `Кубы за челлендж: ${dice.join(' + ')}`,
     lastReview: (rating: number, text: string | null) =>
       text
@@ -540,6 +577,15 @@ export const ru = {
     lastDice: (title: string, dice: number[], total: number, sides: number[] = []) =>
       `Кубы за прохождение (${title}): ${dice.join(' + ')} — итого ${total.toLocaleString('ru-RU')}${sides.length === 0 ? '' : ` (${sides.map((n) => `d${String(n)}`).join(' и ')})`}`,
     spectator: 'Ты смотришь сезон как зритель.',
+    // K1S-13: a season not started yet
+    draftTitle: 'Сезон ещё не начался',
+    draftText:
+      'Ходить можно будет, когда админ запустит сезон. Пока можно посмотреть карту и правила.',
+    // K1S-1, K1S-9: the other runs on the card
+    checksTitle: 'Другие прохождения',
+    checkWaiting: (title: string, total: number) =>
+      `${title}: ждёт проверки, +${points(total)}. Пруф можно дослать.`,
+    checkRejected: (title: string) => `Прохождение отклонено (${title}): снято всё, что дал ход.`,
   },
   difficulty: {
     easy: 'Лёгкая',
@@ -550,6 +596,9 @@ export const ru = {
   proof: {
     title: 'Пруф',
     lead: 'Хватит одного: ссылки, скрины или свидетель.',
+    // K1S-2: a new send replaces the waiting proof, so the form starts with it
+    replaces:
+      'В форме — отправленный пруф. Поправь или добавь: новая отправка заменит его целиком.',
     link: 'Ссылка на скрин или видео',
     linkNumber: (n: number) => `Ссылка ${n}: скрин или видео`,
     addLink: 'Ещё ссылка',
@@ -580,6 +629,8 @@ export const ru = {
     link: 'Или ссылка на гифку (Tenor, Giphy, Klipy)',
     useLink: 'Взять по ссылке',
     linkRequired: 'Вставь ссылку.',
+    pageLink:
+      'Это ссылка на страницу, а нужна ссылка на саму гифку. Открой гифку, нажми на неё правой кнопкой или подержи палец и выбери «Копировать адрес картинки» — ссылка начнётся с media.tenor.com или media.giphy.com.',
     remove: 'Убрать аватарку',
   },
   upload: {
@@ -597,7 +648,8 @@ export const ru = {
       'file.busy': 'Сервер занят другими картинками. Попробуй через минуту.',
       'file.downloadsPerHour': 'Лимит скачиваний по ссылке на этот час исчерпан.',
       'file.urlInvalid': 'Нужна ссылка, начинающаяся с https://.',
-      'file.hostNotAllowed': 'Ссылки принимаются только с Tenor, Giphy и Klipy.',
+      'file.hostNotAllowed':
+        'Нужна ссылка на саму гифку с Tenor, Giphy или Klipy — она начинается с media.tenor.com, media.giphy.com или i.giphy.com.',
       'file.addressNotPublic': 'По этой ссылке картинку взять нельзя.',
       'file.downloadFailed': 'Не удалось скачать картинку по ссылке.',
     },
@@ -616,6 +668,7 @@ export const ru = {
     noSeasonText: 'Когда админ заведёт сезон, здесь появятся карта, лидерборд и твой ход.',
     loadErrorTitle: 'Сайт не загрузился',
     loadErrorText: 'Сервер не ответил. Проверь интернет и попробуй ещё раз.',
+    tooOftenText: 'Слишком много запросов подряд. Подожди минуту и попробуй ещё раз.',
     loginLead: 'Настольная игра, где ходы зарабатываются прохождением видеоигр.',
     meeples: 'ИВЕНТ',
   },
@@ -642,7 +695,10 @@ export const ru = {
     nameRequired: 'Напиши название.',
     showMore: 'Показать ещё',
     connectionLost: 'Нет связи с сервером, переподключаемся',
-    toFinish: (cells: number) => (cells <= 0 ? 'на финише' : `до финиша ${cells} кл.`),
+    toFinish: (cells: number) =>
+      cells <= 0
+        ? 'на финише'
+        : `до финиша ${cells} ${plural(cells, 'клетка', 'клетки', 'клеток')}`,
     routeProgress: 'Путь от старта до финиша',
   },
   board: {
@@ -653,16 +709,20 @@ export const ru = {
     zoomIn: 'Приблизить',
     zoomOut: 'Отдалить',
     toMe: 'К моей фишке',
+    pickedClose: 'Скрыть, кто на клетке',
     leaderboard: 'Лидерборд',
     first: 'Первый',
     firstProvisional: 'Первый, пока предварительно',
     inactive: 'не в игре',
     noWay: 'нет пути до финиша',
     place: (place: number) => `${place} место`,
-    points: (points: number) => `${points} очк.`,
-    sheet: (place: number, points: number) => `Ты на ${place} месте, ${points} очк.`,
-    sheetPeek: (leader: string, place: number) => `Лидирует ${leader} · ты ${place}-й`,
+    points: (n: number) => points(n),
+    sheet: (place: number, n: number) => `Ты на ${place} месте, ${points(n)}`,
+    sheetPeek: (leader: string, place: number) => `Лидирует ${leader}, ты ${place}-й`,
     sheetLeader: (leader: string) => `Лидирует ${leader}`,
+    // K1S-19: several level at the top — nobody leads
+    sheetShared: (n: number) => `Ты делишь 1 место, ${points(n)}`,
+    sheetNoLeader: 'Лидера пока нет',
     rule: 'Первый — кто первым дошёл до финиша, дальше по очкам',
     nowPlaying: 'Сейчас проходишь',
     complete: 'Завершить прохождение',
@@ -674,8 +734,9 @@ export const ru = {
     bonus: (amount: number) => signed(amount),
     mapLabelNobody:
       'Карта сезона: развилки и зоны. Стрелки двигают карту, плюс и минус меняют масштаб',
+    // The start is cell 0 (K1M-1): the map names it, not its number
     mapLabel: (at: number) =>
-      `Карта сезона: развилки и зоны, ты на клетке ${at}. Стрелки двигают карту, плюс и минус меняют масштаб`,
+      `Карта сезона: развилки и зоны, ты ${at === 0 ? 'на старте' : `на клетке ${at}`}. Стрелки двигают карту, плюс и минус меняют масштаб`,
   },
   moments: {
     skip: 'Показать результат',
@@ -700,21 +761,21 @@ export const ru = {
       sides: (n: number) => `d${String(n)}`,
       // «до»: steps past the finish burn, the points do not
       result: (plain: number[], challenge: number[], total: number) =>
-        `${plain.join(' + ')}${challenge.length === 0 ? '' : ` + ${challenge.join(' + ')} за челлендж`}. Итого +${total} очков и до ${total} клеток вперёд`,
+        `${plain.join(' + ')}${challenge.length === 0 ? '' : ` + ${challenge.join(' + ')} за челлендж`}. Итого +${points(total)} и до ${total} ${plural(total, 'клетки', 'клеток', 'клеток')} вперёд`,
       // The frozen first plays in free mode: dice only, no points (Q-3)
       resultFree: (plain: number[], challenge: number[]) =>
         `${plain.join(' + ')}${challenge.length === 0 ? '' : ` + ${challenge.join(' + ')} за челлендж`}. Свободный режим: очки не начисляются`,
       resultStay: (plain: number[], challenge: number[], total: number) =>
-        `${plain.join(' + ')}${challenge.length === 0 ? '' : ` + ${challenge.join(' + ')} за челлендж`}. Итого +${total} очков, фишка стоит на месте`,
+        `${plain.join(' + ')}${challenge.length === 0 ? '' : ` + ${challenge.join(' + ')} за челлендж`}. Итого +${points(total)}, фишка стоит на месте`,
       // The dice's result, shown big once the token stands
-      after: (total: number, at: string) => `+${total} очков. ${at}`,
-      afterStay: (total: number) => `+${total} очков, фишка стоит на месте`,
+      after: (total: number, at: string) => `+${points(total)}. ${at}`,
+      afterStay: (total: number) => `+${points(total)}, фишка стоит на месте`,
       afterFree: 'Свободный режим: очки не начисляются',
       // The completion's moment, said once when the token stands: the game, the dice and where the token is now
       announce: (title: string, dice: string, at: string) =>
         [`Пройдено: ${title}`, dice, at].filter((part) => part !== '').join('. '),
       at: (cell: number, finish: boolean) =>
-        finish ? 'Фишка на финише' : `Фишка на клетке ${cell}`,
+        finish ? 'Фишка на финише' : cell === 0 ? 'Фишка на старте' : `Фишка на клетке ${cell}`,
       // The first finish stands only when the proofs are approved (SPEC: provisional until then)
       atFirst: (provisional: boolean) =>
         provisional
@@ -827,7 +888,7 @@ export const ru = {
       h3: 'Заголовок карточки',
       body: 'Основной текст: живой русский на «ты», строки не длиннее 75 символов, цифры 0123456789 не прыгают.',
       small: 'Подпись: 2 ч по HLTB, 12 мин назад',
-      tiny: 'Самая мелкая подпись: до финиша 11 кл.',
+      tiny: 'Самая мелкая подпись: до финиша 11 клеток',
     },
     shape: {
       title: 'Отступы и формы',
@@ -870,6 +931,8 @@ export const ru = {
       info: 'Сова выкрутила Hollow Knight',
       warning: 'До дедлайна 2 часа: успей закончить ход',
       danger: 'Игра дропнута: −4 очка и клетки',
+      folded:
+        'Свёрнутая часть открывается своей строкой: шеврон поворачивается, когда она открыта.',
     },
     progress: {
       title: 'Прогресс и лидерборд',
@@ -1017,7 +1080,7 @@ export const ru = {
     close: 'Скрыть',
     title: 'Что нового',
     release: (version: string, date: string) =>
-      `${version} · ${new Date(`${date}T12:00:00Z`).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}`,
+      `${version}, ${new Date(`${date}T12:00:00Z`).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}`,
     quiet: 'Исправления и улучшения под капотом.',
     empty: 'Пока ни одного выпуска.',
   },
@@ -1256,16 +1319,18 @@ export const ru = {
     deadline: (text: string) => `Дедлайн: ${text}`,
     closing: 'Дедлайн прошёл: броски закрыты, пруфы принимаются.',
     finished: 'Сезон завершён. Итоги ниже.',
+    // K1S-3: my balance, what a paid reroll spends
+    coins: (n: number) => `У тебя ${coins(n)}`,
   },
   leaderboard: {
     title: 'Лидерборд',
     row: (place: number, name: string, points: number, cellsToFinish: number | null) =>
-      `${place}. ${name}: ${points.toLocaleString('ru-RU')} очк.` +
+      `${place}. ${name}: ${points.toLocaleString('ru-RU')} ${plural(points, 'очко', 'очка', 'очков')}` +
       (cellsToFinish === null
         ? ''
         : cellsToFinish === 0
           ? ', на финише'
-          : `, до финиша ${cellsToFinish} кл.`),
+          : `, до финиша ${cellsToFinish} ${plural(cellsToFinish, 'клетка', 'клетки', 'клеток')}`),
     first: '— первое место',
     provisional: '— первое место (предварительно)',
   },
@@ -1315,6 +1380,7 @@ export const ru = {
         coins: 'Реролл за монетки',
         badEvent: 'Реролл за плохой ивент',
         freeMode: 'Реролл в свободном режиме',
+        gameDeleted: 'Бесплатный реролл: игру убрали из пула',
       } as Record<string, string>,
       finish: (order: number) => `Финиш: ${order}-е место`,
       frozen: 'Очки заморожены: первый финиш',
@@ -1325,6 +1391,9 @@ export const ru = {
       moved: 'Фишка переставлена',
       teleport: 'Телепорт',
       branchWaiting: 'Развилка: ждёт выбора ветки',
+      cellBonus: (n: number) => `${signed(n)} ${plural(n, 'очко', 'очка', 'очков')} — бонус очков`,
+      rolledNext: (title: string) => `Новый ролл: ${title}`,
+      rolledChoice: (n: number) => `Новый ролл: выбор из ${n} ${plural(n, 'игры', 'игр', 'игр')}`,
       intercepted: (item: string) => `Перехвачено: «${item}»`,
       gotObject: (item: string) => `Получено: «${item}»`,
       lostObject: (item: string) => `Не влезло в инвентарь: «${item}»`,
@@ -1393,7 +1462,8 @@ export const ru = {
       techRerolled: techReroll,
       rejected: 'Отклонено',
     } as Record<string, string>,
-    played: (hours: number) => `${hoursText(hours)} в игре`,
+    // Glossary «Часы»: the length of the game the run counted (HowLongToBeat or the player's estimate), not time played
+    played: (hours: number) => `длина ${hoursText(hours)}`,
     noRunsTitle: 'Эту игру ещё никто не брал',
     noRunsText: 'Когда она выпадет на колесе, прохождения и отзывы появятся здесь.',
     errorTitle: 'Страница игры не загрузилась',
@@ -1442,6 +1512,8 @@ export const ru = {
     completed: (player: string, day: string | null) =>
       day ? `Уже прошёл ${player}, ${day}` : `Уже прошёл ${player}`,
     playing: (player: string) => `Сейчас играет ${player}`,
+    // Glossary «Предложенная игра»: reserved for the player until «Начать», not played yet
+    offered: (player: string) => `Выпала игроку ${player}, ещё не начата`,
     excluded: {
       alreadyPlayed: 'Тебе не выпадет: ты уже проходил',
       dropped: 'Тебе не выпадет: ты дропнул',
@@ -1633,10 +1705,11 @@ export const ru = {
         `Тех-реролл — бесплатно, с причиной: слабый ПК, игра платная, не запускается, эмулятор не тянет или другое. Доступен ${hoursText(hours)} после ролла, позже — через админа.`,
     },
     finish: {
-      bonus: 'Финишировавшие не первыми один раз получают бонус:',
-      place: (place: number) => `${place}-е место`,
-      points: (n: number) => `+${n} очк.`,
-      after: (place: number) => `${place}-е и дальше`,
+      bonus: 'Финишировавшие не первыми один раз получают бонус по порядку финиша:',
+      // By the order of finishing, not the leaderboard's place: the places after the first go by points
+      place: (order: number) => `${order}-й на финише`,
+      points: (n: number) => `+${points(n)}`,
+      after: (order: number) => `${order}-й на финише и дальше`,
       noBonus: 'Бонуса за финиш не первым нет.',
       later: 'Финишировавшие не первыми продолжают набирать очки, но их фишка больше не двигается.',
       surplus: 'Лишние шаги после финиша сгорают.',
@@ -1691,7 +1764,7 @@ export const ru = {
       'finish.bonusAfterList': 'Бонус за финиш после списка',
       'map.linearLength': 'Клеток до финиша',
     } as Readonly<Record<string, string>>,
-    bonusField: (place: number) => `Бонус за финиш: ${place}-е место`,
+    bonusField: (order: number) => `Бонус за финиш: ${order}-й на финише`,
     values: {
       coins: 'монетки',
       badEvent: 'плохой ивент',
@@ -1715,7 +1788,7 @@ export const ru = {
       proofs: 'Пруфы',
       players: 'Игроки',
       log: 'Лог',
-      effects: 'Ручные эффекты',
+      effects: effectsSection,
       pool: 'Пул и категории',
       rules: 'Правила',
       season: 'Сезон',
@@ -1747,6 +1820,8 @@ export const ru = {
     noSeasonTitle: 'Сезона пока нет',
     noSeasonText: 'Создай сезон в разделе «Сезон», и здесь появятся игроки и пруфы.',
     toSeason: 'Открыть «Сезон»',
+    seasonOf: (name: string, status: string) => `Сезон: ${name} (${status.toLowerCase()})`,
+    changeSeason: 'Сменить сезон',
     loadErrorTitle: 'Не загрузилось',
     failed: 'Не получилось. Попробуй ещё раз.',
     invalid: 'Сервер не принял значения: проверь поля.',
@@ -1877,7 +1952,7 @@ export const ru = {
       history: 'Версии контента',
       historyEmpty: 'Версий пока нет.',
       historyRow: (version: number, at: string, author: string) =>
-        `Версия ${version} · ${at} · ${author}`,
+        `Версия ${version}, ${at}, ${author}`,
       historyChanges: (added: number, changed: number, removed: number) =>
         [
           added ? `новых ${added}` : '',
@@ -2152,7 +2227,7 @@ export const ru = {
     // 2.11: the map editor
     map: {
       linear:
-        'Сезон идёт по линейной карте. Чтобы рисовать карту, включи в правилах «mapMode»: «graph» — после этого здесь можно опубликовать новую карту.',
+        'Сезон идёт по линейной карте. Чтобы рисовать карту, включи в правилах сезона карту-граф — после этого здесь можно опубликовать новую карту.',
       closed: 'Сезон закрыт: новую карту уже не опубликовать.',
       phone: 'Редактор карты работает на компьютере: на телефоне карту можно только посмотреть.',
       canvas: 'Холст карты',
@@ -2162,6 +2237,8 @@ export const ru = {
       reset: 'Вернуть опубликованную',
       draftStale:
         'Карту опубликовали, пока тебя не было: твой черновик был сделан по прежней версии и отброшен. Перед тобой новая карта.',
+      draftOutdated:
+        'Карту только что опубликовали из другой вкладки или другой админ. Твой черновик сделан по прежней версии: опубликовать его нельзя. Нажми «Вернуть опубликованную» и повтори правки на новой карте.',
       addCell: 'Добавить клетку',
       cellsList: 'Клетка',
       fit: 'Показать всю карту',
@@ -2237,6 +2314,22 @@ export const ru = {
         empty:
           'Зон пока нет. Зона меняет правила ролла, кубы и штраф дропа для тех, кто в ней стоит.',
         newName: (n: number) => `Зона ${n}`,
+        notNumber: 'Нужно число, например 1,5.',
+      },
+      // The field of a zone the check found wrong (MapValidator → ContentValidator paths), by the zone's name (K1A)
+      zoneProblem: (zone: string, path: string) => {
+        const field: Record<string, string> = {
+          '$.id': 'неподходящий id',
+          '$.name': 'название — от 1 до 64 символов',
+          '$.rollFilter': 'фильтр ролла: укажи теги или часы, часы больше нуля',
+          '$.rollFilter.tags': 'теги ролла не пустые',
+          '$.rollFilter.minHours': '«Часов от» больше, чем «Часов до»',
+          '$.rollFilter.maxHours': '«Часов до» больше нуля',
+          '$.diceModifier.value': 'в «Сколько» нужно целое число',
+          '$.dropPenaltyMultiplier': 'множитель штрафа за дроп больше нуля',
+          '$.shopPriceMultiplier': 'множитель цен магазина больше нуля',
+        };
+        return `Зона «${zone}»: ${field[path] ?? 'заполнена с ошибкой'}.`;
       },
       check: {
         title: 'Проверка',
@@ -2280,7 +2373,12 @@ export const ru = {
         'map.teleportTarget': (s: string) =>
           `Телепорт «${s}» должен вести на другую клетку карты, но не на финиш.`,
         'map.teleportCycle': (s: string) => `Телепорты ходят по кругу, начиная с «${s}».`,
-        'map.cellParameter': (s: string) => `У клетки «${s}» не заполнен или лишний параметр.`,
+        'map.teleportPastCheckpoint': (s: string) =>
+          `Телепорт «${s}» стоит за чекпоинтом и ведёт назад, до него: чекпоинт не даёт откинуть игрока ниже себя.`,
+        'map.cellPlace': (s: string) =>
+          `Клетка «${s}» стоит слишком далеко: координаты не дальше 16 384 от нуля.`,
+        'map.cellParameter': (s: string) =>
+          `У клетки «${s}» не заполнен или лишний параметр, или он вне пределов: бонус — от −10 000 до 10 000, но не 0.`,
         'map.featureDisabled': (s: string) =>
           `Клетка «${s}» нужна выключенной механике: ивенты и магазин пока не работают.`,
         'map.zoneUnknown': (s: string) => `У клетки «${s}» зона, которой нет в списке.`,
@@ -2356,6 +2454,7 @@ export const ru = {
       'pool.unknown': 'Игра не найдена. Обнови страницу.',
       'run.notTechRerolled': 'У этого прохождения не было тех-реролла.',
       'season.alreadyCreated': 'Такой сезон уже создан.',
+      'season.nameTaken': 'Сезон с таким названием уже есть: назови новый иначе.',
       'season.invalidName': 'Название сезона — от 1 до 100 символов.',
       'season.invalidTransition': 'Из этого статуса так перевести сезон нельзя.',
       'season.nothingToChange': 'Ничего не изменилось.',
@@ -2373,6 +2472,8 @@ export const ru = {
       completed: (time: string) => `Завершено ${time}`,
       claimed: (difficulty: string) => `Заявлено: ${difficulty}`,
       noHours: 'часы не указаны',
+      estimated: 'Часы — оценка игрока.',
+      estimateSource: 'Источник',
       dice: (total: number) => `кубы +${total}`,
       witness: (name: string) => `Свидетель: ${name}`,
       note: (text: string) => `Заметка: ${text}`,
@@ -2439,7 +2540,7 @@ export const ru = {
         rolling: 'Выбирает игру',
         playing: 'Проходит игру',
       },
-      points: (n: number) => `${n.toLocaleString('ru-RU')} очк.`,
+      points: (n: number) => `${n.toLocaleString('ru-RU')} ${plural(n, 'очко', 'очка', 'очков')}`,
       coins: (n: number) => coins(n),
       cell: (n: number | null) => (n === null ? 'клетка не найдена' : `клетка ${n}`),
       inactive: 'Неактивен',
@@ -2505,6 +2606,8 @@ export const ru = {
       dependents: 'От этого действия зависят более поздние. Сначала откати их:',
       dependentUnknown: 'действие за пределами показанного лога',
       events: (n: number) => `событий: ${n}`,
+      comment: (text: string) => `Комментарий: ${text}`,
+      about: (subject: string) => `Касается: ${subject}`,
       commands: {
         CreateSeason: 'Создание сезона',
         ChangeSeasonStatus: 'Смена статуса сезона',
@@ -2669,6 +2772,14 @@ export const ru = {
       deadlineHint: 'Дата и время по Москве',
       deadlineRequired: 'Выбери дату и время.',
       setDeadline: 'Сохранить дедлайн',
+      // D-101: after the deadline the season closes and does not reopen; a typo of a day is caught here (K1A)
+      deadlineSoonTitle: 'Дедлайн меньше чем через сутки?',
+      deadlineSoonConsequences: (when: string) => [
+        `Дедлайн: ${when}`,
+        'После него броски закроются, а сезон уйдёт в проверку пруфов',
+        'Вернуть сезон в «идёт» или продлить дедлайн потом будет нельзя — проверь дату',
+      ],
+      deadlineSoonConfirm: 'Да, поставить',
       removeDeadline: 'Убрать дедлайн',
       deadlineSaved: 'Дедлайн сохранён.',
       deadlineRemoved: 'Дедлайн убран.',

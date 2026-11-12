@@ -126,6 +126,25 @@ public sealed class FinishApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Frozen_first_rerolls_an_offer_the_admin_deleted_at_the_price_the_screen_shows()
+    {
+        // D-99 + D-615: the frozen first keeps rolling; the admin deletes his offered game. The screen sends the price it
+        // shows (me.nextReroll.payment) as expectedPayment, and the engine must charge the same, or the turn is stuck
+        var vasya = await _site.SignedInAsync("vasya");
+        var runId = await FinishAsync(vasya, "vasya");
+        var admin = await _site.SignedInAsync("admin");
+        await PostOkAsync(admin, $"/api/admin/seasons/{SiteFactory.SeasonId}/runs/{runId}/approve", new { commandId = Guid.NewGuid(), comment = "Видел на стриме" });
+        await PostOkAsync(vasya, Url("roll"), new { commandId = Guid.NewGuid() });
+        var gameId = (await SeasonJsonAsync(vasya)).GetProperty("me").GetProperty("offer").GetProperty("id").GetGuid();
+        await PostOkAsync(admin, $"/api/admin/pool/{gameId}/delete", new { commandId = Guid.NewGuid(), reason = "Дубль" });
+
+        var shown = (await SeasonJsonAsync(vasya)).GetProperty("me").GetProperty("nextReroll").GetProperty("payment").GetString();
+        await PostOkAsync(vasya, Url("reroll"), new { commandId = Guid.NewGuid(), expectedPayment = shown });
+
+        Assert.NotEqual(gameId, (await SeasonJsonAsync(vasya)).GetProperty("me").GetProperty("offer").GetProperty("id").GetGuid());
+    }
+
+    [Fact]
     public async Task Later_finisher_drop_penalty_does_not_affect_the_position()
     {
         var vasya = await _site.SignedInAsync("vasya");

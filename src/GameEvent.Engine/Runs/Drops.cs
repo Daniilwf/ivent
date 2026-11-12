@@ -16,7 +16,8 @@ namespace GameEvent.Engine.Runs;
 /// position (<c>drop.affectsPoints</c>, <c>drop.affectsPosition</c>), never below the start; a mandatory bad event
 /// follows (<c>drop.mandatoryEvent</c>); no coins. The game is excluded for the player and free for everyone else.
 /// </summary>
-public sealed record DropRun(Guid PlayerId) : ICommand;
+/// <remarks><see cref="RunId"/> — the active run the player saw (D-600): another one active now refuses with <c>turn.stale</c>.</remarks>
+public sealed record DropRun(Guid PlayerId, Guid? RunId = null) : ICommand;
 
 /// <summary>Why a game does not start (D-11); <see cref="Other"/> needs a comment.</summary>
 public enum TechRerollReason
@@ -72,6 +73,11 @@ internal static class Drops
 
         var player = state.Players[command.PlayerId];
         var run = ActiveRun(state, player);
+        if (command.RunId is { } seen && seen != run.RunId)
+        {
+            return Decision.Reject(RejectionCodes.TurnStale, "The player saw another active run.");
+        }
+
         var dice = PenaltyRoll(state, run, context);
         return Decision.Accept(
         [

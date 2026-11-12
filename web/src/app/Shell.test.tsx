@@ -109,6 +109,29 @@ describe('the shell', () => {
     expect(seen.some((r) => r.path === '/api/auth/password')).toBe(false);
   });
 
+  it('closes my password form when a link opens the page it was opened over (K1A, D-150)', async () => {
+    serve({ '/api/auth/me': () => json(200, user) });
+    const person = userEvent.setup();
+    render(<App />);
+    await screen.findByTestId('no-season');
+
+    for (const name of [ru.nav.season, ru.app.title]) {
+      await person.click(screen.getByTestId('user-menu'));
+      await person.click(await screen.findByTestId('change-password'));
+      expect(
+        screen.getByRole('heading', { level: 1, name: ru.password.title }),
+      ).toBeInTheDocument();
+
+      const [link] = screen.getAllByRole('link', { name });
+      if (!link) throw new Error(`no link ${name}`);
+      await person.click(link);
+
+      expect(await screen.findByTestId('no-season')).toBeInTheDocument();
+      expect(screen.queryByRole('heading', { level: 1, name: ru.password.title })).toBeNull();
+      expect(globalThis.location.pathname).toBe('/');
+    }
+  });
+
   it('says a too short new password at its field', async () => {
     serve({ '/api/auth/me': () => json(200, user) });
     const person = userEvent.setup();

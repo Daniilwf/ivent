@@ -71,7 +71,7 @@ test('undo: a command with later ones is refused with them listed, the latest is
   // Vasya's page is back where it was before the completion: the game in progress, no points, the start
   await expect(page.getByTestId('active-run')).toBeVisible();
   await expect(page.getByTestId('active-run')).toContainText(game);
-  await expect(leaderRow(page, vasya.playerId)).toContainText('Вася: 0 очк.');
+  await expect(leaderRow(page, vasya.playerId)).toContainText('Вася: 0 очков');
   await expect.poll(() => cellOf(page, 'Вася')).toBe(`cell-${vasyaIn(before)?.cellId ?? ''}`);
   const after = await seasonOf(player, world.seasonId);
   expect(after.players).toEqual(before.players);

@@ -279,3 +279,21 @@ export function confirmButton(page: Page, name: string) {
 }
 
 export { commandId };
+
+/** «1 очко», «2 очка», «5 очков»: as the dictionary says numbers of points and cells (no cut forms) */
+export function points(n: number): string {
+  return `${String(n)} ${plural(n, 'очко', 'очка', 'очков')}`;
+}
+
+export function cells(n: number): string {
+  return `${String(n)} ${plural(n, 'клетка', 'клетки', 'клеток')}`;
+}
+
+function plural(n: number, one: string, few: string, many: string): string {
+  const tens = Math.abs(n) % 100;
+  const last = tens % 10;
+  if (tens > 10 && tens < 20) return many;
+  if (last === 1) return one;
+  if (last > 1 && last < 5) return few;
+  return many;
+}

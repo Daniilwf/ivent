@@ -7,6 +7,7 @@ import { pageSize } from './usePaging';
 import { json } from '../test/fakeServer';
 import { pastTheDelay } from '../test/waits';
 import { similarDelayMs } from './GameForm';
+import { navigate } from '../app/router';
 
 // H6: the pool page — covers, search and filters, the game's status in the season, adding a game with a warning
 // about alike titles (SPEC «Пул игр», «Статусы игры в сезоне», «Дубли»).
@@ -224,6 +225,8 @@ describe('the pool page', () => {
 
     await userEvent.type(screen.getByLabelText(t.search), 'нет такой игры');
     expect(screen.getByRole('heading', { name: t.nothingTitle })).toBeInTheDocument();
+    // Said once: the empty state carries the reset, the filters do not repeat it, open or folded
+    expect(screen.getAllByText(t.reset)).toHaveLength(1);
 
     await userEvent.click(screen.getByRole('button', { name: t.reset }));
     expect(cards()).toHaveLength(demoPoolGames.length);
@@ -253,6 +256,24 @@ describe('the pool page', () => {
     await waitFor(() => {
       expect(cards()).toHaveLength(demoPoolGames.length);
     });
+  });
+
+  it('says an offer nobody started yet is offered, not played (K1A)', async () => {
+    serve({
+      ...base,
+      [`GET /api/seasons/${seasonId}/games`]: () =>
+        json(
+          200,
+          demoStatuses.map((s) => (s.taken === 'beingPlayed' ? { ...s, offered: true } : s)),
+        ),
+    });
+    renderPool();
+    await waitFor(() => {
+      expect(cards()).toHaveLength(demoPoolGames.length);
+    });
+
+    expect(card('Dead Space')).toHaveTextContent(t.offered('Петя'));
+    expect(card('Dead Space')).not.toHaveTextContent('Сейчас играет');
   });
 
   it('keeps the pool when only the statuses fail, and says so', async () => {
@@ -366,6 +387,53 @@ describe('the pool page', () => {
 
     await userEvent.type(screen.getByLabelText(t.search), 'игра');
     expect(cards()).toHaveLength(pageSize);
+  });
+
+  it('brings back the search, the pages shown and the place in the list after a game page and Back (K1A)', async () => {
+    const many = Array.from({ length: 130 }, (_, i) => ({
+      ...demoGame,
+      id: `game-${String(i).padStart(3, '0')}`,
+      title: `Игра ${String(i).padStart(3, '0')}`,
+    }));
+    serve({ ...base, 'GET /api/pool': () => json(200, many) });
+    globalThis.history.pushState(null, '', '/pool');
+    const first = render(<PoolScreen seasonId={seasonId} canAdd onSignedOut={vi.fn()} />);
+    await waitFor(() => {
+      expect(cards()).toHaveLength(pageSize);
+    });
+    await userEvent.type(screen.getByLabelText(t.search), 'Игра');
+    await userEvent.click(screen.getByRole('button', { name: t.more(60, 70) }));
+    expect(cards()).toHaveLength(120);
+
+    // Scrolled down to the 70th game, the reader opens it
+    Object.defineProperty(window, 'scrollY', { configurable: true, value: 15294 });
+    navigate('/games/game-069');
+    first.unmount();
+    Object.defineProperty(window, 'scrollY', { configurable: true, value: 0 });
+    const scrolled = vi.spyOn(window, 'scrollTo');
+
+    // Back: the browser restores the entry, the page mounts again
+    await new Promise<void>((resolve) => {
+      globalThis.addEventListener(
+        'popstate',
+        () => {
+          resolve();
+        },
+        { once: true },
+      );
+      globalThis.history.back();
+    });
+    render(<PoolScreen seasonId={seasonId} canAdd onSignedOut={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(cards()).toHaveLength(120);
+    });
+    expect(screen.getByLabelText(t.search)).toHaveValue('Игра');
+    await waitFor(() => {
+      expect(scrolled).toHaveBeenCalledWith(0, 15294);
+    });
+    scrolled.mockRestore();
+    globalThis.history.replaceState(null, '', '/');
   });
 
   it('a spectator sees no «add a game»', async () => {

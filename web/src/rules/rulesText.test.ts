@@ -87,11 +87,11 @@ describe('the rules page from the ruleset', () => {
 
   it('lists the finish bonuses from the second place, then the rest', () => {
     expect(rulesPage(demoRuleset).bonuses).toEqual([
-      { place: '2-е место', points: '+10 очк.' },
-      { place: '3-е место', points: '+8 очк.' },
-      { place: '4-е место', points: '+6 очк.' },
-      { place: '5-е место', points: '+4 очк.' },
-      { place: '6-е и дальше', points: '+2 очк.' },
+      { place: '2-й на финише', points: '+10 очков' },
+      { place: '3-й на финише', points: '+8 очков' },
+      { place: '4-й на финише', points: '+6 очков' },
+      { place: '5-й на финише', points: '+4 очка' },
+      { place: '6-й на финише и дальше', points: '+2 очка' },
     ]);
     const none = rulesPage({
       ...demoRuleset,
@@ -160,7 +160,7 @@ describe('the dice count', () => {
 describe('the history in words', () => {
   it('names known fields, the finish bonus by place, and an unknown one by its path', () => {
     expect(fieldName('reward.diceCount.max')).toBe('Максимум кубиков');
-    expect(fieldName('finish.bonusByOrder[0]')).toBe('Бонус за финиш: 2-е место');
+    expect(fieldName('finish.bonusByOrder[0]')).toBe('Бонус за финиш: 2-й на финише');
     expect(fieldName('economy.shop.rollCost')).toBe('economy.shop.rollCost');
   });
 

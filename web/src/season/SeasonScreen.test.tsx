@@ -389,7 +389,12 @@ describe('SeasonScreen', () => {
     });
     expect(bodies[0]).toEqual({
       url: expect.stringMatching(/\/start$/) as unknown,
-      body: { commandId: expect.any(String) as unknown, difficulty: 'hard' },
+      // The game the page showed goes along (D-600)
+      body: {
+        commandId: expect.any(String) as unknown,
+        gameId: 'a1000000-0000-0000-0000-000000000001',
+        difficulty: 'hard',
+      },
     });
   });
 
@@ -537,7 +542,17 @@ describe('SeasonScreen', () => {
     });
     render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
 
+    // K1S-7: the game is gone for the whole season, so the click asks first and sends nothing
     await userEvent.click(await screen.findByTestId('already-played'));
+    const confirm = await screen.findByTestId('already-played-confirm');
+    expect(confirm).toHaveTextContent(ru.turn.alreadyPlayedTitle('Silent Hill'));
+    // It costs nothing: a neutral yes, not the red of a loss (DESIGN.md «Компоненты и состояния»)
+    expect(screen.getByTestId('already-played-confirm-yes')).toHaveAttribute(
+      'data-variant',
+      'main',
+    );
+    expect(bodies).toHaveLength(0);
+    await userEvent.click(screen.getByTestId('already-played-confirm-yes'));
 
     await vi.waitFor(() => {
       expect(bodies).toHaveLength(1);
@@ -603,6 +618,7 @@ describe('SeasonScreen', () => {
     render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
 
     await userEvent.click(await screen.findByTestId('already-played-opt-2'));
+    await userEvent.click(await screen.findByTestId('already-played-opt-2-confirm-yes'));
 
     await vi.waitFor(() => {
       expect(bodies).toHaveLength(1);
@@ -846,6 +862,20 @@ describe('SeasonScreen', () => {
 
     expect(await screen.findByText(ru.turn.spectator)).toBeInTheDocument();
     expect(screen.queryByTestId('roll')).not.toBeInTheDocument();
+  });
+
+  // K2-1: a player or an admin outside the season was told «Ты зритель», which is not what they are
+  it.each<['player' | 'admin' | 'spectator', string, string]>([
+    ['player', ru.turn.outsiderTitle, ru.turn.outsider],
+    ['admin', ru.turn.adminOutsideTitle, ru.turn.adminOutside],
+    ['spectator', ru.turn.spectatorTitle, ru.turn.spectator],
+  ])('names who watches the season without a token: %s (K2-1)', async (role, title, text) => {
+    serve(() => json(200, season({ me: null })));
+    render(<SeasonScreen seasonId={seasonId} role={role} onSignedOut={vi.fn()} />);
+
+    const turn = await screen.findByTestId('turn');
+    expect(within(turn).getByRole('heading', { level: 2 })).toHaveTextContent(title);
+    expect(within(turn).getByText(text)).toBeInTheDocument();
   });
 
   it.each<[string, Partial<Schemas['SeasonView']>, string]>([
@@ -2058,10 +2088,10 @@ describe('SeasonScreen: runs waiting for the admin (D-134)', () => {
     const fetch = serve((r) => (isSeasonGet(r) ? json(200, waiting(2, 2)) : json(200, {})));
     render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
 
-    const roll = await screen.findByTestId('roll');
-    expect(roll).toBeDisabled();
-    expect(screen.getByText(ru.turn.uncheckedBlocked(2, 2))).toBeInTheDocument();
-    await userEvent.click(roll);
+    // The roll is not offered at all (D-661: no dead main button); the proof that opens it again is the main slot
+    expect(await screen.findByText(ru.turn.uncheckedBlocked(2, 2))).toBeInTheDocument();
+    expect(screen.queryByTestId('roll')).toBeNull();
+    expect(screen.queryByText(ru.turn.roll)).toBeNull();
     expect(fetch.mock.calls.some(([r]) => r.method === 'POST')).toBe(false);
   });
 
@@ -2187,6 +2217,7 @@ describe('SeasonScreen wheel (H3, D-136)', () => {
     render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
 
     await userEvent.click(await screen.findByTestId('already-played'));
+    await userEvent.click(await screen.findByTestId('already-played-confirm-yes'));
 
     const wheel = await screen.findByTestId('wheel');
     for (const sector of roll.sectors) {
@@ -2278,7 +2309,7 @@ describe('SeasonScreen completion moment (H4)', () => {
   const announce = ru.moments.dice.announce(
     'Silent Hill',
     ru.moments.dice.result([1], [2], 3),
-    ru.moments.dice.at(2, false),
+    ru.moments.dice.at(1, false),
   );
 
   /** Вася plays Silent Hill at the start, or has completed it (standing on c1) */
@@ -2423,7 +2454,7 @@ describe('SeasonScreen completion moment (H4)', () => {
       ru.leaderboard.row(1, 'Вася', 3, 1),
     );
     expect(screen.getByTestId('throw-result')).toHaveTextContent(
-      ru.moments.dice.after(3, ru.moments.dice.at(2, false)),
+      ru.moments.dice.after(3, ru.moments.dice.at(1, false)),
     );
   });
 

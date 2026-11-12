@@ -1,4 +1,6 @@
 using System.Security.Claims;
+using GameEvent.Engine.Files;
+using GameEvent.Infrastructure.Files;
 using GameEvent.Infrastructure.Site;
 using GameEvent.Web.Accounts;
 using GameEvent.Web.Hosting;
@@ -10,9 +12,13 @@ namespace GameEvent.Web.Site;
 /// What every page asks the site: whether it only reads now (the maintenance banner) and which version it runs — a page
 /// that saw another version before shows «Что нового» (J4, D-201). <c>environment</c> — which copy of the site this is
 /// (anything but <c>production</c> shows a strip on every page); <c>testTools</c> — the test endpoints are there (only
-/// Development and Test), so the admin gets the page of the test tools (H9, D-220).
+/// Development and Test), so the admin gets the page of the test tools (H9, D-220); <c>uploads</c> — the largest file
+/// of each kind the site takes, so a page refuses a bigger one before sending it (D-617).
 /// </summary>
-public sealed record SiteStatusView(bool Maintenance, string Version, SiteEnvironment Environment, bool TestTools);
+public sealed record SiteStatusView(bool Maintenance, string Version, SiteEnvironment Environment, bool TestTools, UploadLimitsView Uploads);
+
+/// <summary>The largest upload of each kind in bytes, as the site is configured (FileLimits, BugReportRules; D-617).</summary>
+public sealed record UploadLimitsView(long Picture, long Gif, long BugScreenshot, long MapBackground);
 
 public sealed record MaintenanceRequest(bool On);
 
@@ -68,8 +74,8 @@ public static partial class MaintenanceEndpoints
     public static void MapMaintenance(this RouteGroupBuilder api)
     {
         ArgumentNullException.ThrowIfNull(api);
-        api.MapGet("/status", (MaintenanceMode maintenance, IConfiguration configuration, IWebHostEnvironment environment) =>
-                TypedResults.Ok(StatusOf(maintenance, configuration, environment)))
+        api.MapGet("/status", (MaintenanceMode maintenance, IConfiguration configuration, IWebHostEnvironment environment, FileLimits limits) =>
+                TypedResults.Ok(StatusOf(maintenance, configuration, environment, limits)))
             .WithTags("Site")
             .AllowAnonymous();
 
@@ -84,7 +90,8 @@ public static partial class MaintenanceEndpoints
         ClaimsPrincipal user,
         ILoggerFactory loggers,
         IConfiguration configuration,
-        IWebHostEnvironment environment)
+        IWebHostEnvironment environment,
+        FileLimits limits)
     {
         try
         {
@@ -108,11 +115,17 @@ public static partial class MaintenanceEndpoints
 
         // Not a command (the queue is closed while it is on): the site's log keeps who turned it on and off
         LogChanged(loggers.CreateLogger(typeof(MaintenanceEndpoints)), request.On, user.UserId());
-        return TypedResults.Ok(StatusOf(maintenance, configuration, environment));
+        return TypedResults.Ok(StatusOf(maintenance, configuration, environment, limits));
     }
 
-    private static SiteStatusView StatusOf(MaintenanceMode maintenance, IConfiguration configuration, IWebHostEnvironment environment) =>
-        new(maintenance.IsOn, SiteVersion.Of(configuration), SiteEnvironments.Of(environment), Testing.TestEndpoints.Available(environment));
+    private static SiteStatusView StatusOf(
+        MaintenanceMode maintenance, IConfiguration configuration, IWebHostEnvironment environment, FileLimits limits) =>
+        new(maintenance.IsOn, SiteVersion.Of(configuration), SiteEnvironments.Of(environment), Testing.TestEndpoints.Available(environment),
+            new UploadLimitsView(
+                Files.FileEndpoints.MaxBytes(FileKind.Upload, limits),
+                Math.Min(limits.MaxUploadBytes, limits.MaxGifBytes),
+                Files.FileEndpoints.MaxBytes(FileKind.BugScreenshot, limits),
+                Files.FileEndpoints.MaxBytes(FileKind.MapBackground, limits)));
 
     private static bool IsWrite(HttpRequest request) =>
         !(HttpMethods.IsGet(request.Method) || HttpMethods.IsHead(request.Method) || HttpMethods.IsOptions(request.Method))

@@ -30,6 +30,8 @@ function serve(report: () => Response, screenshot: () => Response = () => json(2
     vi.fn(async (input: Request | string, init?: RequestInit) => {
       const request = typeof input === 'string' ? null : input;
       const url = request?.url ?? (input as string);
+      // The page asks the site its upload limits first (D-617); this site names none, so the server answers for itself
+      if (url.endsWith('/api/status')) return json(404, {});
       const method = request?.method ?? init?.method ?? 'GET';
       const body: unknown = request
         ? await request

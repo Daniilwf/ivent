@@ -7,7 +7,8 @@ namespace GameEvent.Engine.Runs;
 /// <see cref="DeclaredDifficulty"/> — the difficulty the player starts on (SPEC «Награда»: «указанной при старте»): the
 /// completion counts the lower of it and the one claimed then (D-633). Null — not declared, nothing is capped.
 /// </summary>
-public sealed record StartRun(Guid PlayerId, Difficulty? DeclaredDifficulty = null) : ICommand;
+/// <remarks><see cref="GameId"/> — the offered game the player saw (D-600): another one offered now refuses with <c>turn.stale</c>.</remarks>
+public sealed record StartRun(Guid PlayerId, Difficulty? DeclaredDifficulty = null, Guid? GameId = null) : ICommand;
 
 /// <summary>
 /// Complete the active run: Playing → Idle. Dice are rolled by the server in the same command,
