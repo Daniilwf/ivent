@@ -152,6 +152,29 @@ internal sealed class TestClock : GameEvent.Infrastructure.Kernel.IAdjustableClo
     public void Reset() => UtcNow = _start;
 }
 
+/// <summary>The site's wall clock (sessions, their cookie and the device cookie; D-469, D-650): stands still until a test moves it, apart from the game's clock.</summary>
+internal sealed class TestTimeProvider(DateTimeOffset start) : TimeProvider
+{
+    private readonly Lock _lock = new();
+    private DateTimeOffset _now = start;
+
+    public override DateTimeOffset GetUtcNow()
+    {
+        lock (_lock)
+        {
+            return _now;
+        }
+    }
+
+    public void Advance(TimeSpan by)
+    {
+        lock (_lock)
+        {
+            _now += by;
+        }
+    }
+}
+
 internal sealed class SeededRandom(int seed) : GameEvent.Infrastructure.Kernel.IReseedableRandom
 {
 #pragma warning disable CA5394 // deterministic randomness is the point in tests

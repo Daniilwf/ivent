@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { api, refreshCsrf, type Schemas } from './api/client';
+import { api, refreshCsrf, SIGNED_OUT_EVENT, type Schemas } from './api/client';
 import { CalendarClock, LoaderCircle } from 'lucide-react';
 import { ChangePasswordForm } from './app/ChangePasswordForm';
 import { LoginForm, TablePage } from './app/LoginForm';
@@ -53,6 +53,19 @@ export function App() {
 
   const signedOut = useCallback(() => {
     setState({ kind: 'signedOut' });
+  }, []);
+
+  // A session ended elsewhere (another device, the admin, D-466): any 401 brings the sign-in form at once
+  useEffect(() => {
+    const onSignedOut = () => {
+      setState((now) =>
+        now.kind === 'signedIn' || now.kind === 'changePassword' ? { kind: 'signedOut' } : now,
+      );
+    };
+    globalThis.addEventListener(SIGNED_OUT_EVENT, onSignedOut);
+    return () => {
+      globalThis.removeEventListener(SIGNED_OUT_EVENT, onSignedOut);
+    };
   }, []);
 
   const enter = useCallback(async (user: Schemas['CurrentUser'], asked?: CurrentSeason) => {

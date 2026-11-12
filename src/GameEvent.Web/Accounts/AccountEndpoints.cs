@@ -1,7 +1,9 @@
 using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
+using GameEvent.Engine.Kernel;
 using GameEvent.Infrastructure.Accounts;
 using GameEvent.Infrastructure.Database;
+using GameEvent.Infrastructure.Queue;
 using GameEvent.Web.Hosting;
 using GameEvent.Web.Seasons;
 using Microsoft.AspNetCore.Antiforgery;
@@ -41,8 +43,16 @@ public static partial class AccountEndpoints
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status429TooManyRequests);
 
-        auth.MapPost("/logout", async (HttpContext http) =>
+        // Signing out ends this device's session on the server too: a copy of the cookie stops working (D-466)
+        auth.MapPost("/logout", async (HttpContext http, ClaimsPrincipal principal, CommandBus bus, IIdGenerator ids) =>
         {
+            if (principal.UserId() is { } userId && principal.SessionId() is { } sessionId)
+            {
+                await bus.SendAsync(
+                    new CommandEnvelope(ids.NewId(), Guid.Empty, new EndSessions(userId, Engine.Accounts.SessionEndReason.SignedOut, Only: sessionId), userId),
+                    http.RequestAborted);
+            }
+
             await http.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
             return TypedResults.NoContent();
         });
@@ -59,7 +69,8 @@ public static partial class AccountEndpoints
         Guid.TryParse(principal.FindFirstValue(ClaimTypes.NameIdentifier), out var id) ? id : null;
 
     private static async Task<Results<Ok<CurrentUser>, UnauthorizedHttpResult, ValidationProblem, StatusCodeHttpResult>> LoginAsync(
-        LoginRequest request, HttpContext http, GameEventDbContext db, Passwords passwords, LoginThrottle throttle, LoginDevices devices, ILoggerFactory loggers, CancellationToken ct)
+        LoginRequest request, HttpContext http, GameEventDbContext db, Passwords passwords, LoginThrottle throttle, LoginDevices devices,
+        CommandBus bus, IIdGenerator ids, IConfiguration configuration, ILoggerFactory loggers, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(request.Login) || string.IsNullOrEmpty(request.Password)
             || request.Login.Length > 64 || request.Password.Length > 256)
@@ -90,12 +101,30 @@ public static partial class AccountEndpoints
 
         throttle.Succeeded(normalized, address);
         devices.Remember(http, user!);
-        await SignInAsync(http, user!);
-        return TypedResults.Ok(await ToCurrentAsync(user!, db, ct));
+
+        // A browser signing in again leaves its previous session behind: it ends, not lingers unseen (SES-1)
+        if (http.User.UserId() is { } previousUser && http.User.SessionId() is { } previous)
+        {
+            await bus.SendAsync(
+                new CommandEnvelope(ids.NewId(), Guid.Empty, new EndSessions(previousUser, Engine.Accounts.SessionEndReason.SignedOut, Only: previous), previousUser), ct);
+        }
+
+        // Every sign-in is a new session with a new id: a cookie planted before it names none of it (D-466); the
+        // account keeps at most this many live ones (SES-2)
+        var maxSessions = configuration.GetValue("Security:MaxSessionsPerAccount", SessionRules.DefaultMaxLive);
+        var started = await bus.SendAsync(
+            new CommandEnvelope(ids.NewId(), Guid.Empty, new StartSession(user!.Id, http.Request.Headers.UserAgent.ToString(), address, maxSessions), user.Id), ct);
+        if (!started.IsAccepted)
+        {
+            return TypedResults.Unauthorized();
+        }
+
+        await SignInAsync(http, user, started.Events.Select(e => e.Event).OfType<Engine.Accounts.SessionStarted>().Single().SessionId);
+        return TypedResults.Ok(await ToCurrentAsync(user, db, ct));
     }
 
-    /// <summary>The session cookie for <paramref name="user"/> with its current security stamp (D-67).</summary>
-    internal static Task SignInAsync(HttpContext http, UserRecord user)
+    /// <summary>The cookie of session <paramref name="sessionId"/> for <paramref name="user"/> with its current security stamp (D-67, D-466).</summary>
+    internal static Task SignInAsync(HttpContext http, UserRecord user, Guid sessionId)
     {
         var identity = new ClaimsIdentity(
             [
@@ -103,6 +132,7 @@ public static partial class AccountEndpoints
                 new Claim(ClaimTypes.Name, user.Login),
                 new Claim(ClaimTypes.Role, user.Role.ToString()),
                 new Claim(WebSecurity.StampClaim, user.SecurityStamp),
+                new Claim(WebSecurity.SessionClaim, sessionId.ToString()),
             ],
             CookieAuthenticationDefaults.AuthenticationScheme);
         return http.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity));
