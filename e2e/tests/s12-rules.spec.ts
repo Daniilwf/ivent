@@ -23,7 +23,7 @@ test('rules: the page shows the config, then the admin’s new numbers and the c
   await expect(dieOf(page, 'Нормальная')).toContainText('d4');
   await expect(dieOf(page, 'Сложная')).toContainText('d6');
   const second = page.getByTestId('rules-bonuses').getByRole('listitem').first();
-  await expect(second).toHaveText('2-й на финише+10 очк.');
+  await expect(second).toHaveText('2-й на финише+10 очков');
   await expect(page.getByTestId('rules-history')).toContainText(
     'Правила ещё не менялись с начала сезона.',
   );
@@ -46,7 +46,7 @@ test('rules: the page shows the config, then the admin’s new numbers and the c
   // The player's page follows without a reload
   await expect(dieOf(page, 'Сложная')).toContainText('d8', live);
   await expect(dieOf(page, 'Нормальная')).toContainText('d4');
-  await expect(second).toHaveText('2-й на финише+12 очк.');
+  await expect(second).toHaveText('2-й на финише+12 очков');
   const history = page.getByTestId('rules-history');
   await expect(history).toContainText('Версия 2');
   await expect(history).toContainText(`Поменял ${world.admin.name}`);

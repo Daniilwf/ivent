@@ -56,7 +56,7 @@ test('reject: the points and cells of the run are taken back', async ({ browser 
     `Прохождение отклонено (${game}): снято всё, что дал ход.`,
   );
   await expect.poll(() => cellOf(page, 'Вася')).toBe(startCell);
-  await expect(leaderRow(page, vasya.playerId)).toContainText('Вася: 0 очк.');
+  await expect(leaderRow(page, vasya.playerId)).toContainText('Вася: 0 очков');
   await expect(page.getByTestId('proof-status')).toContainText('Пруф отклонён.');
   view = await seasonOf(player, world.seasonId);
   expect(me()?.points).toBe(0);
