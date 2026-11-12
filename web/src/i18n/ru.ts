@@ -1826,6 +1826,10 @@ export const ru = {
         'An object without an effect must be manual.': 'Объект без эффекта должен быть ручным.',
         'A price is 0 or more; null means not for sale.':
           'Цена — 0 или больше; пусто — не продаётся.',
+        'A price is at most 1000000.': 'Цена — не больше 1 000 000.',
+        'An amount is within ±1000000.': 'Количество — не больше ±1 000 000.',
+        '«add» takes a number within ±1000.': 'Прибавка числом — не больше ±1000.',
+        'A multiplier is at most 10.': 'Множитель — не больше 10.',
         'An effect has either actions or outcomes, not both.':
           'У эффекта либо действия, либо исходы по броску — не то и другое.',
         'An effect needs actions, outcomes or an interception.':
@@ -1903,6 +1907,14 @@ export const ru = {
         [
           /^At most (\d+) wheels in one pack\.$/u,
           (n: string) => `В пакете — не больше ${n} колёс.`,
+        ],
+        [
+          /^At most (\d+) entries in a wheel\.$/u,
+          (n: string) => `В колесе — не больше ${n} записей.`,
+        ],
+        [
+          /^The «\w+» stage takes a number of at most (\d+)\.$/u,
+          (n: string) => `Этот шаг кубов — число не больше ${n}.`,
         ],
       ] as readonly (readonly [RegExp, (match: string) => string])[],
       valueHint: 'Число, кубы «1d6» или ссылка «$roll»',
@@ -2093,6 +2105,8 @@ export const ru = {
       'map.unchanged': 'Карта не изменилась: публиковать нечего.',
       'content.invalid': 'В пакете есть ошибки: исправь те, что у полей.',
       'content.unchanged': 'Контент не изменился: сохранять нечего.',
+      'content.tooLarge':
+        'Пакет слишком большой: не больше 1000 объектов, 100 колёс и 200 записей в колесе.',
       'content.versionChanged':
         'Контент изменили, пока ты редактировал: обнови страницу и внеси правки в новую версию.',
       'map.occupiedCellRemoved': 'На удалённой клетке стоят игроки: верни клетку или перенеси их.',

@@ -80,11 +80,14 @@ public static partial class AdminContentEndpoints
     /// </summary>
     public const long MaxContentRequestBytes = 1024 * 1024;
 
-    /// <summary>At most this many object definitions in one pack (the old season had under 400).</summary>
-    public const int MaxObjects = 1000;
+    /// <summary>At most this many object definitions in one pack (the old season had under 400): the engine's limit (D-653).</summary>
+    public const int MaxObjects = ContentPublishing.MaxObjects;
 
-    /// <summary>At most this many wheels in one pack.</summary>
-    public const int MaxWheels = 100;
+    /// <summary>At most this many wheels in one pack: the engine's limit (D-653).</summary>
+    public const int MaxWheels = ContentPublishing.MaxWheels;
+
+    /// <summary>At most this many entries in one wheel: the engine's limit (D-653).</summary>
+    public const int MaxWheelEntries = ContentPublishing.MaxWheelEntries;
 
     private const string Published = "content-published";
 
@@ -287,7 +290,7 @@ public static partial class AdminContentEndpoints
     /// <summary>The problems of a pack: its types (the first one the strict reader meets), then every content rule.</summary>
     private static List<ContentProblemView> Problems(JsonObject json, bool events, out ContentPack? pack)
     {
-        // The reader lets a null list item through at any depth (nullable annotations do not reach list items, SEC-1)
+        // The reader lets a null list item through at any depth (nullable annotations do not reach list items, CE-SEC-1)
         var nulls = NullItems(json, "$").Select(at => new ContentProblemView(Path(at), NullItem)).ToList();
         if (nulls.Count > 0)
         {
@@ -315,6 +318,14 @@ public static partial class AdminContentEndpoints
         if (pack.Wheels.Count > MaxWheels)
         {
             problems.Add(new ContentProblemView("wheels", $"At most {MaxWheels} wheels in one pack."));
+        }
+
+        for (var i = 0; i < pack.Wheels.Count; i++)
+        {
+            if (pack.Wheels[i]?.Entries.Count > MaxWheelEntries)
+            {
+                problems.Add(new ContentProblemView($"wheels[{i}].entries", $"At most {MaxWheelEntries} entries in a wheel."));
+            }
         }
 
         if (problems.Count == 0)
@@ -387,7 +398,7 @@ public static partial class AdminContentEndpoints
 
     /// <summary>
     /// The reader's message in our words: it names .NET types («…for type 'GameEvent.Engine.Content.WheelDefinition'…»),
-    /// which tell the admin nothing and show the inside of the site (SEC-2). Our converters' own messages pass as they are.
+    /// which tell the admin nothing and show the inside of the site (CE-SEC-2). Our converters' own messages pass as they are.
     /// </summary>
     private static string Words(string message)
     {
