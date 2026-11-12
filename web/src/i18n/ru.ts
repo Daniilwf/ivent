@@ -1234,7 +1234,15 @@ export const ru = {
     kinds: eventKindNames,
     // Said once for a card drawn while the page is open, as the dice are
     announce: (kind: EventKind, name: string) => `Вытянут ${eventKindWords[kind]}: «${name}»`,
-    sources: { cell: 'с клетки ивента', item: 'от предмета' } as Record<'cell' | 'item', string>,
+    // Where a drawn event came from (EventSource, D-504)
+    sources: {
+      cell: 'с клетки ивента',
+      item: 'от предмета',
+      difficulty: 'за сложность',
+      incoming: 'от чужого предмета',
+      rerollCost: 'за реролл',
+      dropPenalty: 'за дроп',
+    } as Record<'cell' | 'item' | 'difficulty' | 'incoming' | 'rerollCost' | 'dropPenalty', string>,
     played: 'Уже разыгран — дальше сработает сам.',
   },
   effects: {
