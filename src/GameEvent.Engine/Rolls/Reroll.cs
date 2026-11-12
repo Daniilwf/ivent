@@ -7,7 +7,11 @@ namespace GameEvent.Engine.Rolls;
 /// up and the wheel spins again. Payment in order (D-07): a free reroll of this roll (<c>roll.freeRerollsPerRoll</c>),
 /// then the <c>freeRerolls</c> resource, then <c>roll.rerollCost</c> — coins or a bad event (Q-2).
 /// </summary>
-public sealed record Reroll(Guid PlayerId) : ICommand;
+/// <remarks>
+/// <see cref="ExpectedPayment"/> — the price the player saw (D-600): when set and the reroll would now be paid otherwise
+/// (an older tab showed the free one), the command is refused with <c>turn.stale</c> and nothing is spent.
+/// </remarks>
+public sealed record Reroll(Guid PlayerId, RerollPayment? ExpectedPayment = null) : ICommand;
 
 /// <summary>How a reroll was paid for.</summary>
 public enum RerollPayment

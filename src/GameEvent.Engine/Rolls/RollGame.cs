@@ -119,6 +119,11 @@ internal static class Rolling
         var (payment, price) = player.Offer is { } deleted && IsDeleted(context, deleted.GameId)
             ? (RerollPayment.GameDeleted, 0)
             : RerollPrice.For(player, state.Rules.Roll);
+        if (command.ExpectedPayment is { } expected && expected != payment)
+        {
+            return Decision.Reject(RejectionCodes.TurnStale, $"The player saw a reroll paid by {expected}; it is paid by {payment} now.");
+        }
+
         var givenUp = player.Offer is { } offer
             ? new HashSet<Guid> { offer.GameId }
             : player.Choice!.Options.Select(o => o.Game?.GameId).OfType<Guid>().ToHashSet();

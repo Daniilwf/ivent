@@ -1,3 +1,4 @@
+using GameEvent.Engine.Effects;
 using GameEvent.Engine.Finish;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Map;
@@ -582,6 +583,16 @@ public sealed class SeasonSimulation
             else
             {
                 Execute(sent is null ? new ApproveProof(runId, Comment: "Без скрина: проверено на итогах") : new ApproveProof(runId), bot: null);
+            }
+        }
+
+        // D-603: the season finishes only once every manual effect is resolved; on the final review the admin marks
+        // what is still waiting (the bots play no texts out)
+        if (final)
+        {
+            foreach (var effectId in _state.ManualEffects.Keys.ToList())
+            {
+                Execute(new ResolveManualEffect(effectId, ManualEffectOutcome.NotApplicable, "Итоги сезона", PlayerId: null), bot: null);
             }
         }
     }

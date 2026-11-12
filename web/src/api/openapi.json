@@ -1441,45 +1441,6 @@
         }
       }
     },
-    "/api/admin/content/schema": {
-      "get": {
-        "tags": [
-          "Admin"
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/schema+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/JsonObject"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/seasons": {
       "get": {
         "tags": [
@@ -3771,341 +3732,6 @@
         }
       }
     },
-    "/api/admin/seasons/{seasonId}/content": {
-      "get": {
-        "tags": [
-          "Admin"
-        ],
-        "parameters": [
-          {
-            "name": "seasonId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AdminContentView"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found"
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Too Many Requests",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/admin/seasons/{seasonId}/content/versions/{version}": {
-      "get": {
-        "tags": [
-          "Admin"
-        ],
-        "parameters": [
-          {
-            "name": "seasonId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          {
-            "name": "version",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ContentVersionView"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found"
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Too Many Requests",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/admin/seasons/{seasonId}/content/check": {
-      "post": {
-        "tags": [
-          "Admin"
-        ],
-        "parameters": [
-          {
-            "name": "seasonId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/JsonObject"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ContentCheckView"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "413": {
-            "description": "Payload Too Large",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Too Many Requests",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/admin/seasons/{seasonId}/content/publish": {
-      "post": {
-        "tags": [
-          "Admin"
-        ],
-        "parameters": [
-          {
-            "name": "seasonId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PublishContentRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CommandResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "413": {
-            "description": "Payload Too Large",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RejectionProblem"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/admin/seasons": {
       "post": {
         "tags": [
@@ -6239,62 +5865,6 @@
           }
         }
       }
-    },
-    "/api/test/seasons/{seasonId}/content": {
-      "post": {
-        "tags": [
-          "Test"
-        ],
-        "parameters": [
-          {
-            "name": "seasonId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/TestContentRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "204": {
-            "description": "No Content"
-          },
-          "404": {
-            "description": "Not Found"
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        }
-      }
     }
   },
   "components": {
@@ -6492,66 +6062,9 @@
             "items": {
               "type": "string"
             }
-          },
-          "playerName": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "gameTitle": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "comment": {
-            "type": [
-              "null",
-              "string"
-            ]
           }
         },
-        "description": "A command of the season log, newest first (D-104): what the admin picks to undo. `undone` — undone already;\n`events` — the types of its events in order; `playerName`, `gameTitle`, `comment` — whom and what\nthe command touched, from its first event that names them, so identical rows are told apart before an undo (K1A;\nnull when none does)."
-      },
-      "AdminContentView": {
-        "required": [
-          "itemsEnabled",
-          "status",
-          "version",
-          "pack",
-          "deleted",
-          "history"
-        ],
-        "type": "object",
-        "properties": {
-          "itemsEnabled": {
-            "type": "boolean"
-          },
-          "status": {
-            "$ref": "#/components/schemas/SeasonStatus"
-          },
-          "version": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "pack": {
-            "$ref": "#/components/schemas/JsonElement"
-          },
-          "deleted": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/DeletedObjectView"
-            }
-          },
-          "history": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ContentVersionInfo"
-            }
-          }
-        },
-        "description": "The season's content in the editor (4.12, D-490): whether items are on (the editor works either way, a pack is\npublished only with `features.items`), the season's status, the version in force, the pack in force as content\nJSON (CONTENT.md; null fields left out), the definitions deleted on the way and the versions, newest first."
+        "description": "A command of the season log, newest first (D-104): what the admin picks to undo. `undone` — undone already;\n`events` — the types of its events in order."
       },
       "AdminManualEffectView": {
         "required": [
@@ -6620,22 +6133,9 @@
             "items": {
               "$ref": "#/components/schemas/MapPlayerView"
             }
-          },
-          "version": {
-            "type": "integer",
-            "format": "int32",
-            "default": 0
-          },
-          "events": {
-            "type": "boolean",
-            "default": false
-          },
-          "shop": {
-            "type": "boolean",
-            "default": false
           }
         },
-        "description": "The season's map in the editor (2.11): the map in force, the players on it, the mode (the editor publishes only in\n`graph`, D-301) and the status (only a draft or a running season takes a new map). `version`: how many times\nthe map was published (0 — the map of the season's creation); the publication names it back (D-616; always set).\n`events`, `shop`: whether the season's mechanics behind the event and shop cells are on — a switched-off\nmechanic is not offered in the editor (D-302, K1A; always set)."
+        "description": "The season's map in the editor (2.11): the map in force, the players on it, the mode (the editor publishes only in\n`graph`, D-301) and the status (only a draft or a running season takes a new map)."
       },
       "AdminPlayerView": {
         "required": [
@@ -7374,24 +6874,6 @@
         },
         "description": "An answer to the pending choice: its id and the picked option's id."
       },
-      "CoinReflect": {
-        "required": [
-          "coinsAtMost",
-          "multiplier"
-        ],
-        "type": "object",
-        "properties": {
-          "coinsAtMost": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "multiplier": {
-            "type": "integer",
-            "format": "int32"
-          }
-        },
-        "description": "Reflection of coin damage (D-474): when the target has at most int CoinReflect.CoinsAtMost coins, the damage goes to the\none who used the effect, times int CoinReflect.Multiplier."
-      },
       "CoinReward": {
         "required": [
           "perHour",
@@ -7536,118 +7018,6 @@
           }
         },
         "description": "Completing the active run. `estimatedHours` is needed only when the game has no hours."
-      },
-      "ContentCheckView": {
-        "required": [
-          "valid",
-          "problems"
-        ],
-        "type": "object",
-        "properties": {
-          "valid": {
-            "type": "boolean"
-          },
-          "problems": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ContentProblemView"
-            }
-          }
-        },
-        "description": "The check of a pack: every problem at once, the types' and the content rules'."
-      },
-      "ContentProblemView": {
-        "required": [
-          "path",
-          "message"
-        ],
-        "type": "object",
-        "properties": {
-          "path": {
-            "type": "string"
-          },
-          "message": {
-            "type": "string"
-          }
-        },
-        "description": "A problem of a pack: the JSON path of its field (`objects[2].effect.actions[0].steps`, `pack` for the\nwhole) and the engine's English message, shown as it is next to the field (D-181, D-492)."
-      },
-      "ContentVersionInfo": {
-        "required": [
-          "version",
-          "at",
-          "authorName",
-          "comment",
-          "objects",
-          "wheels",
-          "added",
-          "changed",
-          "removed"
-        ],
-        "type": "object",
-        "properties": {
-          "version": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "at": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "authorName": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "comment": {
-            "type": "string"
-          },
-          "objects": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "wheels": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "added": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "changed": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "removed": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
-        },
-        "description": "One published version of the season's content: who published it, when and why, its size, and which objects and\nwheels it added, changed or removed against the version before it."
-      },
-      "ContentVersionView": {
-        "required": [
-          "version",
-          "pack"
-        ],
-        "type": "object",
-        "properties": {
-          "version": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "pack": {
-            "$ref": "#/components/schemas/JsonElement"
-          }
-        },
-        "description": "One version's pack, for the history and the export of an older version."
       },
       "ConvertToDropRequest": {
         "required": [
@@ -7820,31 +7190,6 @@
         },
         "description": "The signed-in user. `token` — the colour of their token in the latest season they play (Seasons.PlayerTokens), as on\ntheir profile; none outside seasons (D-202)."
       },
-      "DeletedObjectView": {
-        "required": [
-          "id",
-          "kind",
-          "name",
-          "deletedIn"
-        ],
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "kind": {
-            "$ref": "#/components/schemas/ObjectKind"
-          },
-          "name": {
-            "type": "string"
-          },
-          "deletedIn": {
-            "type": "integer",
-            "format": "int32"
-          }
-        },
-        "description": "A definition that an earlier pack had and the one in force does not (soft deletion, invariant 11)."
-      },
       "DeleteGameRequest": {
         "required": [
           "commandId",
@@ -7899,15 +7244,9 @@
           "multiply",
           "reroll",
           "min",
-          "max",
-          "singleDie",
-          "setOne",
-          "replaceValue",
-          "fixAverage",
-          "bonusPerEven",
-          "percent"
+          "max"
         ],
-        "description": "A stage of the dice pipeline (D-14); the rare ones from DiceStage.SingleDie on came with the import (D-481)."
+        "description": "A stage of the dice pipeline (D-14)."
       },
       "DieByDifficulty": {
         "required": [
@@ -8038,43 +7377,6 @@
         },
         "description": "The die a difficulty gives on completion, and the event it grants (`good`, `bad`) or none."
       },
-      "DrawnEventView": {
-        "required": [
-          "sequence",
-          "deck",
-          "kind",
-          "objectId",
-          "name",
-          "description",
-          "source"
-        ],
-        "type": "object",
-        "properties": {
-          "sequence": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "deck": {
-            "type": "string"
-          },
-          "kind": {
-            "$ref": "#/components/schemas/EventKind"
-          },
-          "objectId": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "description": {
-            "type": "string"
-          },
-          "source": {
-            "$ref": "#/components/schemas/EventSource"
-          }
-        },
-        "description": "The event I drew last (D-500, stage 5): `sequence` — its place in the log, so the page shows a new one as new;\n`deck` and `kind` — where it came from; `name` and `description` — its card from the content in\nforce when it was drawn; `source` — a cell or an item."
-      },
       "DropPenaltyView": {
         "required": [
           "count",
@@ -8114,9 +7416,16 @@
           "commandId": {
             "type": "string",
             "format": "uuid"
+          },
+          "runId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           }
         },
-        "description": "Drop the active run with the penalty (D-09, D-94)."
+        "description": "Drop the active run with the penalty (D-09, D-94); `runId` — the run the page showed (D-600)."
       },
       "DropRules": {
         "required": [
@@ -8218,17 +7527,6 @@
           },
           "attacksOnlyOnHigherPoints": {
             "type": "boolean"
-          },
-          "reflect": {
-            "oneOf": [
-              {
-                "type": "null"
-              },
-              {
-                "description": "Coin damage marked `reflect` that goes back to the attacker (D-474, the import's weapons). Missing — nothing is\nreflected: a season created before the rule keeps playing as it did (D-50). Not written while missing.",
-                "$ref": "#/components/schemas/CoinReflect"
-              }
-            ]
           }
         }
       },
@@ -8313,31 +7611,8 @@
       "EventKind": {
         "enum": [
           "good",
-          "bad",
-          "special",
-          "risky"
-        ],
-        "description": "The kind of an event (SPEC «Ивенты»): good, bad, special, risky. A drawn event has the kind of its deck (D-501); the\nstandard decks are the wheels named like the kinds. Special and risky came with stage 5: a build before it cannot read\nthem, and they are written only once events are on."
-      },
-      "EventRules": {
-        "required": [
-          "defaultDeck"
-        ],
-        "type": "object",
-        "properties": {
-          "defaultDeck": {
-            "description": "The deck an event cell draws from when the zone of the player's cell has no deck of the content (D-502): the\nstandard deck of this kind.",
-            "$ref": "#/components/schemas/EventKind"
-          }
-        },
-        "description": "The rules of event decks (SPEC «Ивенты», D-500…D-502)."
-      },
-      "EventSource": {
-        "enum": [
-          "cell",
-          "item"
-        ],
-        "description": "Where a drawn event came from (GLOSSARY «Источник ивента»); stage 5 adds the drop, the paid reroll and the difficulty."
+          "bad"
+        ]
       },
       "ExclusionReason": {
         "enum": [
@@ -8480,22 +7755,6 @@
         },
         "description": "A game an event of the page names; `hasPage` — the viewer may open its page (a deleted game is the admin's);\n`cover` — the pool's cover, as the season screen shows it (D-222)."
       },
-      "FeedObjectView": {
-        "required": [
-          "id",
-          "name"
-        ],
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          }
-        },
-        "description": "An object of the content the page's events name (stage 5: the drawn events), by its latest card."
-      },
       "FeedPlayerView": {
         "required": [
           "id",
@@ -8596,18 +7855,9 @@
             "items": {
               "$ref": "#/components/schemas/FeedRunView"
             }
-          },
-          "objects": {
-            "type": [
-              "null",
-              "array"
-            ],
-            "items": {
-              "$ref": "#/components/schemas/FeedObjectView"
-            }
           }
         },
-        "description": "A page of the feed, newest first; `nextBefore` — the sequence to ask before for the next page, none at the start of\nthe log. `players` — every player of the season; `games` and `runs` — those the page's events name (D-150);\n`objects` — the content objects they name (the drawn events)."
+        "description": "A page of the feed, newest first; `nextBefore` — the sequence to ask before for the next page, none at the start of\nthe log. `players` — every player of the season; `games` and `runs` — those the page's events name (D-150)."
       },
       "FileFromUrlRequest": {
         "required": [
@@ -9223,8 +8473,7 @@
           "paidReroll",
           "drop",
           "difficulty",
-          "item",
-          "event"
+          "item"
         ],
         "description": "What created a manual effect; C11 adds item, cell and event sources."
       },
@@ -9675,18 +8924,24 @@
               "boolean"
             ]
           },
-          "lastEvent": {
-            "oneOf": [
-              {
-                "type": "null"
-              },
-              {
-                "$ref": "#/components/schemas/DrawnEventView"
-              }
-            ]
+          "coins": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "checks": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/CompletedRunView"
+            }
           }
         },
-        "description": "The signed-in player's own turn. While playing: `dropHintMinutes` is `roll.minPlayMinutesBeforeDrop` until\nthat much has been played by the server clock (only a hint: D-09), then null; `dropPenalty` is what a drop costs\nunder the rules in force; `techRerollOpen` says whether the player may still tech-reroll themselves (D-94);\n`challengesEnabled` says whether a challenge may be claimed on completion (`features.challenges`, D-96);\n`techRerollUntil` is when the player's own tech reroll window closes (the roll time plus the run's snapshot of\n`roll.techRerollWindowHours`), null while not playing. The active run's game carries the hours of the roll's\nsnapshot, the ones the completion counts (D-44): the pool may have got hours since (D-138). `difficultyDice` —\nwhile playing, the die each difficulty gives under the run's snapshot and the event it grants, if any.\n`dropPenalty.count` counts the extra dice of the drops in a row before this run (D-205, D-324).\n`wishRerollOpen` — whether the player may give the game up by wish now (D-206, D-325; always set, optional for older clients): a tech reroll with the\nreason `wish`, within the window, for a game with a listed tag the roll did not impose.\n`lastEvent` — the event I drew last (stage 5), while `features.events` is on; null before the first draw."
+        "description": "The signed-in player's own turn. While playing: `dropHintMinutes` is `roll.minPlayMinutesBeforeDrop` until\nthat much has been played by the server clock (only a hint: D-09), then null; `dropPenalty` is what a drop costs\nunder the rules in force; `techRerollOpen` says whether the player may still tech-reroll themselves (D-94);\n`challengesEnabled` says whether a challenge may be claimed on completion (`features.challenges`, D-96);\n`techRerollUntil` is when the player's own tech reroll window closes (the roll time plus the run's snapshot of\n`roll.techRerollWindowHours`), null while not playing. The active run's game carries the hours of the roll's\nsnapshot, the ones the completion counts (D-44): the pool may have got hours since (D-138). `difficultyDice` —\nwhile playing, the die each difficulty gives under the run's snapshot and the event it grants, if any.\n`dropPenalty.count` counts the extra dice of the drops in a row before this run (D-205, D-324).\n`wishRerollOpen` — whether the player may give the game up by wish now (D-206, D-325; always set, optional for older clients): a tech reroll with the\nreason `wish`, within the window, for a game with a listed tag the roll did not impose.\n`coins` — my balance, what a paid reroll spends (K1S-3). `checks` — my other runs that still take a proof\n(completed, the proof neither approved nor rejected) and the runs rejected since my latest roll, newest first; the\nlatest completed run is `lastCompleted` and never here (K1S-1, K1S-9, D-602)."
       },
       "NominationRules": {
         "required": [
@@ -9702,16 +8957,6 @@
             "$ref": "#/components/schemas/EquatableArrayOfVotedNomination"
           }
         }
-      },
-      "ObjectKind": {
-        "enum": [
-          "item",
-          "effect",
-          "specialRoll",
-          "event",
-          "achievement"
-        ],
-        "description": "What an object is (CONTENT.md «Определение объекта», GLOSSARY)."
       },
       "OfferedGameView": {
         "required": [
@@ -10296,15 +9541,9 @@
                 "$ref": "#/components/schemas/DropPenaltyView"
               }
             ]
-          },
-          "hoursSource": {
-            "type": [
-              "null",
-              "string"
-            ]
           }
         },
-        "description": "A run to check, in queue order (D-98, Q-3): the runs that decide a finish on top (`decidesFinish`), then by\ncompletion time; with the claimed difficulty, the counted hours and the dice total, what an approval at a lower\ndifficulty or a reject changes. `reachedFinish`: this run's latest move stands on the finish.\n`rollClosed`: the player's next roll is closed by the limit of unchecked runs (D-134) until the admin checks one.\n`cellBonus`: the points bonus of the cell the run's move stopped on, which a reject takes back too (D-327; always\nset, optional for older clients). `dropPenalty`: the drop penalty «Отклонить со штрафом дропа» would throw on top of\nthe reject (D-327, D-262) under the season's rules, with the drops in a row before the run (D-324); null for the frozen\nfirst, who loses nothing (D-99); `affectsPosition` is false for a finisher whose finish this run does not decide\n(his position is fixed); always set, optional for older clients. `hoursSource`: where the player's estimate of\nthe hours comes from, when the pool had none (SPEC «Часы и кубы», K1A); null for the pool's hours."
+        "description": "A run to check, in queue order (D-98, Q-3): the runs that decide a finish on top (`decidesFinish`), then by\ncompletion time; with the claimed difficulty, the counted hours and the dice total, what an approval at a lower\ndifficulty or a reject changes. `reachedFinish`: this run's latest move stands on the finish.\n`rollClosed`: the player's next roll is closed by the limit of unchecked runs (D-134) until the admin checks one.\n`cellBonus`: the points bonus of the cell the run's move stopped on, which a reject takes back too (D-327; always\nset, optional for older clients). `dropPenalty`: the drop penalty «Отклонить со штрафом дропа» would throw on top of\nthe reject (D-327, D-262) under the season's rules, with the drops in a row before the run (D-324); null for the frozen\nfirst, who loses nothing (D-99); `affectsPosition` is false for a finisher whose finish this run does not decide\n(his position is fixed); always set, optional for older clients."
       },
       "ProofRequest": {
         "required": [
@@ -10396,35 +9635,16 @@
             "items": {
               "$ref": "#/components/schemas/FileLinkView"
             }
-          }
-        },
-        "description": "The proof of a run and how the admin checked it."
-      },
-      "PublishContentRequest": {
-        "required": [
-          "commandId",
-          "expectedVersion",
-          "pack",
-          "comment"
-        ],
-        "type": "object",
-        "properties": {
-          "commandId": {
-            "type": "string",
+          },
+          "witnessId": {
+            "type": [
+              "null",
+              "string"
+            ],
             "format": "uuid"
-          },
-          "expectedVersion": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "pack": {
-            "$ref": "#/components/schemas/JsonElement"
-          },
-          "comment": {
-            "type": "string"
           }
         },
-        "description": "Publish a new version of the season's content (D-400) made from `expectedVersion` (D-491); `comment` goes\nto the public log, at most 500 characters."
+        "description": "The proof of a run and how the admin checked it; `witnessId` — the player who saw the run, if named."
       },
       "PublishMapRequest": {
         "required": [
@@ -10452,16 +9672,9 @@
               "null",
               "string"
             ]
-          },
-          "expectedVersion": {
-            "type": [
-              "null",
-              "integer"
-            ],
-            "format": "int32"
           }
         },
-        "description": "Publish a new version of the map (D-300, D-308); `comment` goes to the public log, at most 500 characters.\n`expectedVersion`: the map version the draft was made from (`version` of the map read); a newer one\npublished since refuses with `map.versionConflict` (D-616). Without it nothing is checked (scripts)."
+        "description": "Publish a new version of the map (D-300, D-308); `comment` goes to the public log, at most 500 characters."
       },
       "RankingRules": {
         "required": [
@@ -10575,8 +9788,7 @@
           "freeRerollResource",
           "coins",
           "badEvent",
-          "freeMode",
-          "gameDeleted"
+          "freeMode"
         ],
         "description": "How a reroll was paid for."
       },
@@ -10606,9 +9818,19 @@
           "commandId": {
             "type": "string",
             "format": "uuid"
+          },
+          "expectedPayment": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/RerollPayment"
+              }
+            ]
           }
         },
-        "description": "A reroll of the offered game or the whole pending choice; the price follows D-07."
+        "description": "A reroll of the offered game or the whole pending choice; the price follows D-07. `expectedPayment` — the price\nthe page showed: a reroll paid otherwise now is refused (409 turn.stale, D-600), so an old tab never spends without asking."
       },
       "ResolveEffectRequest": {
         "required": [
@@ -10947,17 +10169,6 @@
           },
           "weeklyChallenge": {
             "$ref": "#/components/schemas/WeeklyChallengeRules"
-          },
-          "events": {
-            "oneOf": [
-              {
-                "type": "null"
-              },
-              {
-                "description": "The rules of events (stage 5). Missing — a season created before them reads as it did (D-50); needed once\n`features.events` is on (RulesetValidator). Not written while missing.",
-                "$ref": "#/components/schemas/EventRules"
-              }
-            ]
           }
         }
       },
@@ -11249,13 +10460,9 @@
                 "$ref": "#/components/schemas/ExclusionReason"
               }
             ]
-          },
-          "offered": {
-            "type": "boolean",
-            "default": false
           }
         },
-        "description": "A game's status in the season as the pool page shows it (SPEC «Статусы игры в сезоне», H6, D-160): `taken` —\ncompleted in the season or being played (an offer and a pending option count), with the player and, for a completed\ngame, when; `marks` — other players who dropped or tech-rerolled it (the game is free again);\n`excludedForMe` — why it never comes to the viewer again; `offered` — the game is taken as an offer or an\noption still waiting for «Начать», not played yet (K1A; always set, optional for older clients). Only games with\nsomething to show are listed."
+        "description": "A game's status in the season as the pool page shows it (SPEC «Статусы игры в сезоне», H6, D-160): `taken` —\ncompleted in the season or being played (an offer and a pending option count), with the player and, for a completed\ngame, when; `marks` — other players who dropped or tech-rerolled it (the game is free again);\n`excludedForMe` — why it never comes to the viewer again. Only games with something to show are listed."
       },
       "SeasonJoin": {
         "required": [
@@ -11606,8 +10813,7 @@
           "maintenance",
           "version",
           "environment",
-          "testTools",
-          "uploads"
+          "testTools"
         ],
         "type": "object",
         "properties": {
@@ -11622,12 +10828,9 @@
           },
           "testTools": {
             "type": "boolean"
-          },
-          "uploads": {
-            "$ref": "#/components/schemas/UploadLimitsView"
           }
         },
-        "description": "What every page asks the site: whether it only reads now (the maintenance banner) and which version it runs — a page\nthat saw another version before shows «Что нового» (J4, D-201). `environment` — which copy of the site this is\n(anything but `production` shows a strip on every page); `testTools` — the test endpoints are there (only\nDevelopment and Test), so the admin gets the page of the test tools (H9, D-220); `uploads` — the largest file\nof each kind the site takes, so a page refuses a bigger one before sending it (D-617)."
+        "description": "What every page asks the site: whether it only reads now (the maintenance banner) and which version it runs — a page\nthat saw another version before shows «Что нового» (J4, D-201). `environment` — which copy of the site this is\n(anything but `production` shows a strip on every page); `testTools` — the test endpoints are there (only\nDevelopment and Test), so the admin gets the page of the test tools (H9, D-220)."
       },
       "SocialRules": {
         "required": [
@@ -11663,8 +10866,16 @@
           "commandId": {
             "type": "string",
             "format": "uuid"
+          },
+          "gameId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           }
-        }
+        },
+        "description": "Start the offered game; `gameId` — the game the page showed: another one offered now is refused (409 turn.stale, D-600)."
       },
       "StoredFileView": {
         "required": [
@@ -11796,41 +11007,6 @@
           }
         },
         "description": "The site's clock as the test endpoints see it: now, whether it can be moved and how far it is from the real time\n(`shiftMinutes`, negative — in the past; H9, D-221)."
-      },
-      "TestContentRequest": {
-        "required": [
-          "objects",
-          "wheels",
-          "comment"
-        ],
-        "type": "object",
-        "properties": {
-          "objects": {
-            "type": [
-              "null",
-              "array"
-            ],
-            "items": {
-              "type": "string"
-            }
-          },
-          "wheels": {
-            "type": [
-              "null",
-              "array"
-            ],
-            "items": {
-              "type": "string"
-            }
-          },
-          "comment": {
-            "type": [
-              "null",
-              "string"
-            ]
-          }
-        },
-        "description": "A content pack for a season of the tests (stage 5, D-534): `objects` and `wheels` — the JSON texts of content\nfiles, as `content/` holds them; published by the admin's `PublishContent` with `comment`."
       },
       "TestRandomRequest": {
         "required": [
@@ -11985,34 +11161,6 @@
           "countAsDrop",
           "ignore"
         ]
-      },
-      "UploadLimitsView": {
-        "required": [
-          "picture",
-          "gif",
-          "bugScreenshot",
-          "mapBackground"
-        ],
-        "type": "object",
-        "properties": {
-          "picture": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "gif": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "bugScreenshot": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "mapBackground": {
-            "type": "integer",
-            "format": "int64"
-          }
-        },
-        "description": "The largest upload of each kind in bytes, as the site is configured (FileLimits, BugReportRules; D-617)."
       },
       "WeeklyChallengeRules": {
         "required": [

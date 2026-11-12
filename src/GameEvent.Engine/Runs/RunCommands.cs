@@ -3,7 +3,8 @@ using GameEvent.Engine.Kernel;
 namespace GameEvent.Engine.Runs;
 
 /// <summary>Start playing the offered game: Rolling → Playing. Creates the run with the roll-time snapshot.</summary>
-public sealed record StartRun(Guid PlayerId) : ICommand;
+/// <remarks><see cref="GameId"/> — the offered game the player saw (D-600): another one offered now refuses with <c>turn.stale</c>.</remarks>
+public sealed record StartRun(Guid PlayerId, Guid? GameId = null) : ICommand;
 
 /// <summary>
 /// Complete the active run: Playing → Idle. Dice are rolled by the server in the same command,

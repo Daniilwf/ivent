@@ -336,6 +336,15 @@ const headlines: [string, (d: Data, c: Context) => Headline][] = [
       line: L.started(c.playerRef(d), c.gameRef(d)),
     }),
   ],
+  // K1S-8: «Уже проходил» leads its command; the free roll after it is a fact
+  [
+    'game-excluded',
+    (d, c) => ({
+      icon: 'roll',
+      actor: c.player(d),
+      line: L.alreadyPlayed(c.playerRef(d), c.gameRef(d)),
+    }),
+  ],
   [
     'game-rolled',
     (d, c) => ({
@@ -363,14 +372,6 @@ const headlines: [string, (d: Data, c: Context) => Headline][] = [
   [
     'game-rerolled',
     (d, c) => ({ icon: 'roll', actor: c.player(d), line: L.rerolled(c.playerRef(d)) }),
-  ],
-  [
-    'game-excluded',
-    (d, c) => ({
-      icon: 'roll',
-      actor: c.player(d),
-      line: L.alreadyPlayed(c.playerRef(d), c.gameRef(d)),
-    }),
   ],
   [
     'choice-made',
@@ -504,6 +505,7 @@ const effectSource = (value: string | null) =>
 /** The facts the rest of a command's events add to its line: dice, points and cells, coins, the finish, events drawn */
 function factsOf(events: Event[], lead: Event, context: Context): string[] {
   const facts: string[] = [];
+  const bonuses: string[] = [];
   let points = 0;
   let cells = 0;
   let moved = false;
@@ -521,7 +523,9 @@ function factsOf(events: Event[], lead: Event, context: Context): string[] {
         break;
       }
       case 'points-changed':
-        points += number(d, 'delta') ?? 0;
+        // K1S-20: a bonus cell gives its own points, apart from the dice or the penalty that took the token there
+        if (text(d, 'reason') === 'cellBonus') bonuses.push(F.cellBonus(number(d, 'delta') ?? 0));
+        else points += number(d, 'delta') ?? 0;
         break;
       case 'coins-changed':
         coins += number(d, 'delta') ?? 0;
@@ -557,6 +561,14 @@ function factsOf(events: Event[], lead: Event, context: Context): string[] {
       case 'event-draw-missed':
         facts.push(F.eventDrawMissed);
         break;
+      case 'game-rolled': {
+        const game = context.gameRef(d);
+        facts.push(F.rolledNext(game.kind === 'game' ? game.game.title : ''));
+        break;
+      }
+      case 'game-choice-rolled':
+        facts.push(F.rolledChoice(list(d, 'offers').length));
+        break;
       case 'game-rerolled':
         facts.push(F.reroll[text(d, 'payment') ?? ''] ?? F.reroll['freeThisRoll'] ?? '');
         break;
@@ -572,6 +584,7 @@ function factsOf(events: Event[], lead: Event, context: Context): string[] {
     if (points !== 0) facts.push(F.points(points));
     if (cells !== 0) facts.push(F.cells(cells));
   }
+  facts.push(...bonuses);
   if (moved && transferred && cells === 0) facts.push(F.moved);
   if (coins !== 0) facts.push(F.coins(coins));
   return facts;

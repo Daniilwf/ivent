@@ -171,8 +171,9 @@ public class ManualEffectTests
     [Fact]
     public void Nothing_is_resolved_after_the_finish()
     {
+        // A season finished before D-603 may still hold a pending effect: the finish is crafted
         var (s, effectId) = Pending();
-        s.MoveStatusTo(SeasonStatus.Finished);
+        s.MoveStatusToForcingFinish(SeasonStatus.Finished);
 
         ScenarioAssert.RejectsWithoutChanges(
             s,
