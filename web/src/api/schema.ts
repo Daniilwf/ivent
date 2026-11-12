@@ -4556,6 +4556,518 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/seasons/{seasonId}/economy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["EconomyView"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+                /** @description Too Many Requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/seasons/{seasonId}/items/{instanceId}/use": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                    instanceId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["UseItemRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CommandResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/seasons/{seasonId}/shop/roll": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ShopRollRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CommandResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/seasons/{seasonId}/shop/buy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["BuyLotRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CommandResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/seasons/{seasonId}/bets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["PlaceBetRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CommandResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/seasons/{seasonId}/players/{playerId}/inventory": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                    playerId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["AdjustInventoryRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CommandResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/accounts": {
         parameters: {
             query?: never;
@@ -6494,6 +7006,15 @@ export interface components {
              */
             coins: number;
         };
+        /** @description The admin gives a player an object by its id or takes one by its instance, with a comment (D-407). */
+        AdjustInventoryRequest: {
+            /** Format: uuid */
+            commandId: string;
+            comment: null | string;
+            giveObjectId?: null | string;
+            /** Format: uuid */
+            removeInstanceId?: null | string;
+        };
         /** @description The admin corrects a player (D-21): position, points, coins, resources, dropping an offered game; always with a comment. */
         AdjustPlayerRequest: {
             /** Format: uuid */
@@ -6634,6 +7155,35 @@ export interface components {
             deadlineOptionsDays: components["schemas"]["EquatableArrayOfint"];
             payoutByHoursPerDay: components["schemas"]["EquatableArrayOfPayoutStep"];
         };
+        /** @enum {unknown} */
+        BetStatus: "open" | "won" | "lost" | "revoked";
+        /** @description My bets and the rules of a new one: deadlines in days and the largest stake. */
+        BetsView: {
+            bets: components["schemas"]["BetView"][];
+            deadlineOptionsDays: number[];
+            /** Format: int32 */
+            maxStake: number;
+        };
+        BetView: {
+            /** Format: uuid */
+            betId: string;
+            /** Format: uuid */
+            onPlayerId: string;
+            onPlayer: string;
+            /** Format: uuid */
+            runId: string;
+            /** Format: date-time */
+            placedAt: string;
+            /** Format: date-time */
+            deadline: string;
+            /** Format: int32 */
+            stake: number;
+            /** Format: double */
+            multiplier: number;
+            status: components["schemas"]["BetStatus"];
+            /** Format: int32 */
+            payout: number;
+        };
         /** @description One line of the context a page sends: when (by the browser's clock) and what. */
         BugContextEntryView: {
             /** Format: date-time */
@@ -6693,6 +7243,13 @@ export interface components {
             status: components["schemas"]["BugReportStatus"];
             /** Format: date-time */
             createdAt: string;
+        };
+        /** @description Buy lot `lot` (its index in the offer) while the offer lasts. */
+        BuyLotRequest: {
+            /** Format: uuid */
+            commandId: string;
+            /** Format: int32 */
+            lot: number;
         };
         CategoryRequest: {
             /** Format: uuid */
@@ -7043,12 +7600,35 @@ export interface components {
             /** Format: int32 */
             consecutiveExtraDice?: null | number;
         };
+        /**
+         * @description Which economy mechanics the season plays (D-441): a mechanic off is not shown at all; always set, optional for older
+         *     clients. The inventory, the shop and the bets come from `GET /api/seasons/{id}/economy`.
+         */
+        EconomyFeaturesView: {
+            items: boolean;
+            shop: boolean;
+            bets: boolean;
+        };
         EconomyRules: {
             allowNegativeCoins: boolean;
             /** Format: int32 */
             inventoryLimit: number;
             rarityWeights: components["schemas"]["RarityWeights"];
             shop: components["schemas"]["ShopRules"];
+        };
+        /**
+         * @description My economy in the season (D-441): coins, the inventory with what each object allows now when `features.items` is
+         *     on (null when off: bets play without items), the shop when `features.shop` is on, the bets when
+         *     `features.bets` is on. `inventoryLimit` counts items only (D-406).
+         */
+        EconomyView: {
+            /** Format: int32 */
+            coins: number;
+            /** Format: int32 */
+            inventoryLimit: number;
+            shop: null | components["schemas"]["ShopView"];
+            bets: null | components["schemas"]["BetsView"];
+            items: null | components["schemas"]["InventoryItemView"][];
         };
         /**
          * @description An arrow of the map: `isDefaultForward` — the default branch (every exit of a plain cell, one exit of a fork);
@@ -7198,7 +7778,10 @@ export interface components {
             hasPage: boolean;
             cover?: null | components["schemas"]["FileLinkView"];
         };
-        /** @description An object of the content the page's events name (stage 5: the drawn events), by its latest card. */
+        /**
+         * @description An object of the season's content the page's events name (`objectId`: item uses and gifts, drawn events): its
+         *     name as last published (D-444, D-446).
+         */
         FeedObjectView: {
             id: string;
             name: string;
@@ -7395,6 +7978,68 @@ export interface components {
         InteractionRules: {
             /** Format: int32 */
             inviteTtlHours: number;
+        };
+        /**
+         * @description An object I hold: its definition's name and description, what is left of its lifetime, who put it on me. `usable` —
+         *     «Использовать» is open now; `refusal` — the engine's code when it is not (wrong window, deadline, frozen inventory,
+         *     no target; an effect or a special roll acts on its own). `targets` — when `choosesTarget`, exactly the players
+         *     the engine accepts; `steps` — the answers asked, in order (D-440).
+         */
+        InventoryItemView: {
+            /** Format: uuid */
+            instanceId: string;
+            objectId: string;
+            kind: components["schemas"]["ObjectKind"];
+            name: string;
+            description: string;
+            rarity: null | components["schemas"]["Rarity"];
+            window: null | components["schemas"]["UseWindow"];
+            hostile: boolean;
+            /** Format: int32 */
+            usesLeft: null | number;
+            /** Format: int32 */
+            runsLeft: null | number;
+            /** Format: date-time */
+            expiresAt: null | string;
+            fromPlayer: null | string;
+            usable: boolean;
+            refusal: null | string;
+            choosesTarget: boolean;
+            targets: components["schemas"]["ItemTargetView"][];
+            steps: components["schemas"]["ItemStepView"][];
+        };
+        /** @description One answer: the id the engine checks, the words the screen shows. */
+        ItemOptionView: {
+            id: string;
+            label: string;
+        };
+        /**
+         * @description What the player answers when using an item, in the order the engine asks (D-407).
+         * @enum {unknown}
+         */
+        ItemStepKind: "choice" | "pickObject" | "direction";
+        /**
+         * @description An answer to give: a choice (`options`), a direction (`options` `forward` and `back`, the screen
+         *     names them) or objects of the target (`objectsByTarget`: for each possible target, its objects that fit) —
+         *     `count` different ones (all of them when fewer), or with `ranked` any number in order of preference, the rest
+         *     taken at random (D-476). `prompt` — the content's question.
+         */
+        ItemStepView: {
+            kind: components["schemas"]["ItemStepKind"];
+            prompt: null | string;
+            options: components["schemas"]["ItemOptionView"][];
+            objectsByTarget: null | components["schemas"]["TargetObjectsView"][];
+            /** Format: int32 */
+            count: number;
+            ranked: boolean;
+        };
+        /** @description A player an item may target: the name and the token colour (as on the map). */
+        ItemTargetView: {
+            /** Format: uuid */
+            playerId: string;
+            name: string;
+            /** Format: int32 */
+            token: number;
         };
         JsonElement: unknown;
         JsonObject: Record<string, never>;
@@ -7606,6 +8251,17 @@ export interface components {
             /** Format: int32 */
             sides: number;
         };
+        /** @description Bet `stake` coins that `onPlayerId` completes their current run within `days` days (D-414). */
+        PlaceBetRequest: {
+            /** Format: uuid */
+            commandId: string;
+            /** Format: uuid */
+            onPlayerId: string;
+            /** Format: int32 */
+            days: number;
+            /** Format: int32 */
+            stake: number;
+        };
         /**
          * @description A player on the map and the leaderboard; `finishOrder` is their order among the finishers, null before the finish;
          *     `avatar` — the account's picture (D-117), or none; `token` — the colour of their token (PlayerTokens, D-202).
@@ -7811,6 +8467,8 @@ export interface components {
         RankingRules: {
             tiebreakers: components["schemas"]["EquatableArrayOfTiebreaker"];
         };
+        /** @enum {unknown} */
+        Rarity: "common" | "epic" | "legendary";
         RarityWeights: {
             /** Format: int32 */
             common: number;
@@ -8163,6 +8821,28 @@ export interface components {
             zones: components["schemas"]["ZoneView"][];
             mapMode: components["schemas"]["MapMode"];
             background?: null | components["schemas"]["MapBackgroundView"];
+            economy?: null | components["schemas"]["EconomyFeaturesView"];
+        };
+        ShopLotView: {
+            /** Format: int32 */
+            lot: number;
+            objectId: string;
+            name: string;
+            description: string;
+            rarity: components["schemas"]["Rarity"];
+            /** Format: int32 */
+            price: number;
+            sold: boolean;
+        };
+        /**
+         * @description How a shop roll was paid.
+         * @enum {unknown}
+         */
+        ShopPayment: "freeRoll" | "coins";
+        /** @description Roll my shop (D-403): a free roll first, then coins. */
+        ShopRollRequest: {
+            /** Format: uuid */
+            commandId: string;
         };
         ShopRules: {
             /** Format: int32 */
@@ -8174,6 +8854,21 @@ export interface components {
             /** Format: int32 */
             rerollCostStep: number;
             resetOn: components["schemas"]["EquatableArrayOfShopPriceReset"];
+        };
+        /**
+         * @description My shop (D-443): the next roll's payment and price, free rolls held, why a roll is refused now (the engine's code), and
+         *     the lots while the offer lasts (`expiresAt` by the server's clock).
+         */
+        ShopView: {
+            payment: components["schemas"]["ShopPayment"];
+            /** Format: int32 */
+            price: number;
+            /** Format: int32 */
+            freeRolls: number;
+            refusal: null | string;
+            /** Format: date-time */
+            expiresAt: null | string;
+            lots: components["schemas"]["ShopLotView"][];
         };
         /**
          * @description A game whose title is the same or alike (SPEC «Дубли»). `isDeleted` — the admin took it out of the pool: the same
@@ -8236,6 +8931,11 @@ export interface components {
             url: string;
             thumbnailUrl: string;
             duplicate: boolean;
+        };
+        TargetObjectsView: {
+            /** Format: uuid */
+            playerId: string;
+            objects: components["schemas"]["ItemOptionView"][];
         };
         /** @enum {unknown} */
         TechRerollReason: "weakPc" | "paidUnavailable" | "doesNotLaunch" | "emulatorTooSlow" | "other" | "wish";
@@ -8331,6 +9031,19 @@ export interface components {
         };
         /** @enum {unknown} */
         UnmetConditionPolicy: "noDiceKeepCoins" | "countAsDrop" | "ignore";
+        /**
+         * @description Use an item of my inventory (D-407, D-441): `targetPlayerId` — the target of a «chosen» item (one of the item's
+         *     `targets`), `choices` — the answers to its `steps` in order (an option's id, an object's instance id).
+         */
+        UseItemRequest: {
+            /** Format: uuid */
+            commandId: string;
+            /** Format: uuid */
+            targetPlayerId?: null | string;
+            choices?: null | string[];
+        };
+        /** @enum {unknown} */
+        UseWindow: "beforeRoll" | "afterRoll" | "beforeDice" | "afterDice" | "anytime";
         WeeklyChallengeRules: {
             /** Format: int32 */
             defaultRewardCoins: number;
@@ -8402,6 +9115,7 @@ type ReadonlyArray<T> = [
 ] extends [
     unknown[]
 ] ? Readonly<Exclude<T, undefined>> : Readonly<Exclude<T, undefined>[]>;
+export const betStatusValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["BetStatus"]> = ["open", "won", "lost", "revoked"];
 export const bugReportStatusValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["BugReportStatus"]> = ["new", "inWork", "closed"];
 export const cellTypeValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["CellType"]> = ["start", "empty", "finish", "fork", "teleport", "checkpoint", "pointsBonus", "event", "shop"];
 export const choiceKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ChoiceKind"]> = ["game", "branch"];
@@ -8413,6 +9127,7 @@ export const eventKindValues: ReadonlyArray<FlattenedDeepRequired<components>["s
 export const eventSourceValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["EventSource"]> = ["cell", "item"];
 export const exclusionReasonValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ExclusionReason"]> = ["alreadyPlayed", "dropped", "techRerolled"];
 export const gameMarkKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["GameMarkKind"]> = ["dropped", "techRerolled"];
+export const itemStepKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ItemStepKind"]> = ["choice", "pickObject", "direction"];
 export const mandatoryEventValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["MandatoryEvent"]> = ["bad", "none"];
 export const manualEffectOutcomeValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ManualEffectOutcome"]> = ["applied", "notApplicable"];
 export const manualEffectSourceValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ManualEffectSource"]> = ["paidReroll", "drop", "difficulty", "item", "event"];
@@ -8420,6 +9135,7 @@ export const mapModeValues: ReadonlyArray<FlattenedDeepRequired<components>["sch
 export const moveReasonValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["MoveReason"]> = ["completionRoll", "startingCell", "adminAdjustment", "dropPenalty", "runCorrection", "proofRejected", "teleport", "item", "itemTeleport", "diceModified"];
 export const objectKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ObjectKind"]> = ["item", "effect", "specialRoll", "event", "achievement"];
 export const proofStatusValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ProofStatus"]> = ["pending", "approved", "rejected"];
+export const rarityValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["Rarity"]> = ["common", "epic", "legendary"];
 export const rerollCostKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["RerollCostKind"]> = ["coins", "badEvent"];
 export const rerollPaymentValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["RerollPayment"]> = ["freeThisRoll", "freeRerollResource", "coins", "badEvent", "freeMode"];
 export const roleValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["Role"]> = ["player", "admin", "spectator"];
@@ -8427,8 +9143,10 @@ export const rollMissReasonValues: ReadonlyArray<FlattenedDeepRequired<component
 export const roundingValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["Rounding"]> = ["nearest", "floor", "ceil"];
 export const runStatusValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["RunStatus"]> = ["playing", "completed", "dropped", "techRerolled", "rejected"];
 export const seasonStatusValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["SeasonStatus"]> = ["draft", "active", "closing", "finished", "archived"];
+export const shopPaymentValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ShopPayment"]> = ["freeRoll", "coins"];
 export const siteEnvironmentValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["SiteEnvironment"]> = ["production", "staging", "development", "test", "other"];
 export const techRerollReasonValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["TechRerollReason"]> = ["weakPc", "paidUnavailable", "doesNotLaunch", "emulatorTooSlow", "other", "wish"];
 export const turnPhaseValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["TurnPhase"]> = ["idle", "rolling", "playing"];
 export const unmetConditionPolicyValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["UnmetConditionPolicy"]> = ["noDiceKeepCoins", "countAsDrop", "ignore"];
+export const useWindowValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["UseWindow"]> = ["beforeRoll", "afterRoll", "beforeDice", "afterDice", "anytime"];
 export type operations = Record<string, never>;

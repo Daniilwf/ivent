@@ -148,7 +148,11 @@ internal static class ItemUse
     /// A player's own economy action (items, shop, bets): the mechanic is on, the season runs and its deadline has not
     /// passed, the player is known and not the first finisher, whose inventory is frozen (SPEC).
     /// </summary>
-    public static Decision? Guard(SeasonState state, Guid playerId, EngineContext context, Func<Rulesets.Features, bool>? feature = null)
+    public static Decision? Guard(SeasonState state, Guid playerId, EngineContext context, Func<Rulesets.Features, bool>? feature = null) =>
+        Guard(state, playerId, context.Clock.UtcNow, feature);
+
+    /// <inheritdoc cref="Guard(SeasonState, Guid, EngineContext, Func{Rulesets.Features, bool}?)"/>
+    public static Decision? Guard(SeasonState state, Guid playerId, DateTimeOffset now, Func<Rulesets.Features, bool>? feature = null)
     {
         if (SeasonSetup.RequireActive(state) is { } inactive)
         {
@@ -160,7 +164,7 @@ internal static class ItemUse
             return Decision.Reject(RejectionCodes.FeatureDisabled, "This mechanic is off in this season.");
         }
 
-        if (SeasonSetup.IsPastDeadline(state, context.Clock.UtcNow))
+        if (SeasonSetup.IsPastDeadline(state, now))
         {
             return Decision.Reject(RejectionCodes.SeasonDeadlinePassed, "The deadline has passed: no more turns this season.");
         }

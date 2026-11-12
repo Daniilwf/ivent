@@ -10,6 +10,7 @@ using GameEvent.Infrastructure.Seasons;
 using GameEvent.Web.Accounts;
 using GameEvent.Web.BugReports;
 using GameEvent.Web.Content;
+using GameEvent.Web.Economy;
 using GameEvent.Web.Files;
 using GameEvent.Web.Map;
 using GameEvent.Web.Observability;
@@ -78,6 +79,7 @@ public static class AppSetup
         services.AddSingleton<IIdGenerator, GuidV7Ids>();
         services.AddSingleton<CommandBus>();
         services.AddSingleton<SeasonBroadcaster>();
+        services.AddSingleton<ContentCards>();
         services.AddSingleton<ICommittedEventsListener>(sp => sp.GetRequiredService<SeasonBroadcaster>());
         services.AddSingleton<HubSessions>();
         services.AddSingleton<ICommittedEventsListener>(sp => sp.GetRequiredService<HubSessions>());
@@ -246,6 +248,8 @@ public static class AppSetup
         api.MapAdminContent();
         api.MapSeasonsAndPlayers();
         api.MapFeed();
+        api.MapEconomy();
+        api.MapAdminEconomy();
         api.MapAdminAccounts();
         api.MapFiles();
         api.MapAvatars();

@@ -208,20 +208,25 @@
 | Колесо лутбокса | взвешенный список объектов для `spinWheel` | `WheelDefinition`, `WheelEntrySpec`, событие `WheelSpun` |
 | Использовать | применить свой предмет с целью и ответами | команда `UseItem`, событие `ItemUsed` |
 | Правка инвентаря | админ выдаёт или забирает объект с комментарием | команда `AdjustInventory`, событие `InventoryAdjusted` |
+| Инвентарь | всё, что игрок держит: предметы, эффекты, спецроллы; раздел «Инвентарь» на экране сезона | `PlayerEconomy.Inventory`, API `GET /api/seasons/{id}/economy` (`EconomyView`, `InventoryItemView`), экран `season/Inventory.tsx` |
+| План предмета | что экран предлагает для объекта: открыто ли «Использовать», почему нет, на кого можно, какие ответы нужны | `ItemPlan`, `ItemPlans.Of`, шаг ответа — `ItemStep` (`ItemStepKind`: `Choice`, `PickObject`) |
+| Цель предмета («На кого») | игрок, выбранный для предмета с селектором `chosen`; экран предлагает только тех, кого примет движок | `UseItem.TargetPlayerId`, `ItemPlan.Targets`, `Targets.Choosable` |
+| Ответ предмета | выбор для `requestChoice` или объект цели для `takeObject` с `pick: chosen` | `UseItem.Choices`, `ItemStepView` |
+| План магазина | цена и способ оплаты следующего ролла магазина, отказ движка, лоты, пока не истекли | `ShopPlan`, `ShopPlans.Of`, API `ShopView` |
 | Срабатывание эффекта | эффект или спецролл игрока сработал на своём триггере | `EffectTriggered`, `Firing` |
 | Бросок эффекта | кубики из значения эффекта (`$roll`) | `EffectRolled` |
 | Изменение ролла | фильтр или выбор из N для следующего ролла; на ролл фиксируется до старта игры | `RollModifier`, `NextRollModified`, `RollModifiersApplied` (`PlayerEconomy.NextRoll`, `CurrentRoll`) |
 | Изменение броска | этап конвейера для следующего броска за прохождение | `DiceModifier`, `NextDiceModified` |
 | Модификаторы броска | что предметы сделали с броском прохождения: грани, лишние кубики, прибавка, множитель, пределы | `RunDiceMods` (`RunState.Mods`), `RunDiceModified`, переброс — `RunDiceRerolled` |
 | Полученные враждебные | сколько враждебных эффектов дошло до игрока | `HostileReceived`, `PlayerEconomy.HostileReceived` |
-| Редкость | обычный, эпический, легендарный | `Rarity` (`Common`, `Epic`, `Legendary`) |
+| Редкость | обычная, эпическая, легендарная; на экране меткой «Редкость: эпическая» — не согласуется с родом названия предмета | `Rarity` (`Common`, `Epic`, `Legendary`) |
 | Окно использования | момент хода, когда предмет можно применить | `UseWindow` |
 | Базовое действие | элементарная операция, из которых собираются эффекты (не больше 12) | `ActionSpec` (`MoveAction`, `ChangeResourceAction`…) |
 | Триггер | фаза хода, на которую подписан эффект | `Trigger`; реакция на события команды — `ITriggerHandler` |
 | Лимит цепочки | не больше 3 уровней реакций и 50 событий на команду; обрыв пишется в лог | `EffectChain`, `EffectChainCut` |
 | Значение в действии | число, кубики («1d6») или ссылка («$roll») | `ContentValue` |
 | Селектор целей | правило выбора, на кого действует эффект | `TargetSelector` |
-| Враждебный эффект | эффект, наложенный другим игроком во вред | `IsHostile` |
+| Враждебный эффект | эффект, наложенный другим игроком во вред; метка предмета на экране — «Против других» | `IsHostile`, `ObjectDefinition.Hostile` |
 | Перехват | пассивная защита, гасящая враждебный эффект | `Intercept`, событие `HostileIntercepted` |
 | Отражение урона | урон монетками по цели на пороге `effects.reflect.coinsAtMost` и ниже достаётся использующему, умноженный (D-474) | `ChangeResourceAction.Reflect`, `CoinReflect` |
 | Счётчик эффекта | обратный отсчёт эффекта: срабатывания триггера уменьшают его, на нуле эффект действует; зелья меняют и сбрасывают (D-479) | `EffectSpec.Counter`, `InventoryObject.Counter`, `TransformMode.AddCounter`, `ResetCounters`, триггер `RunEnded` |

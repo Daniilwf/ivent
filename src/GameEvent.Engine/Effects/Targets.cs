@@ -49,11 +49,36 @@ internal static class Targets
             : (targets, null);
     }
 
+    /// <summary>
+    /// The players <paramref name="userId"/> may pick as the target of <paramref name="definition"/>'s <c>chosen</c>
+    /// selector, in id order: exactly the ones <see cref="ForUse"/> accepts (the screen offers no other, D-440).
+    /// </summary>
+    public static IReadOnlyList<Guid> Choosable(SeasonState state, ObjectDefinition definition, Guid userId) =>
+        [.. Candidates(state, definition, definition.Effect?.Target, userId).Select(p => p.PlayerId)];
+
+    /// <summary>
+    /// Whether a selector other than <c>chosen</c> finds nobody for <paramref name="userId"/>: decided without a roll,
+    /// exactly when <see cref="ForUse"/> refuses with <c>item.noTarget</c> (D-440) — <c>self</c> for a finisher's move,
+    /// <c>randomActive</c> with nobody active, any other when it picks nobody (<c>nearestBehind</c> with nobody behind…).
+    /// </summary>
+    public static bool HasNobody(SeasonState state, ObjectDefinition definition, Guid userId)
+    {
+        var spec = definition.Effect?.Target;
+        return (spec?.Selector ?? TargetSelector.Self) switch
+        {
+            TargetSelector.Chosen => false,
+            TargetSelector.RandomActive => !Candidates(state, definition, spec, userId).Any(p => !p.IsInactive),
+
+            // The other selectors pick without chance: the same players a use would reach (nearestBehind, withinCells too)
+            _ => Resolve(state, context: null, definition, spec, userId).Count == 0,
+        };
+    }
+
     /// <summary>The targets of an effect that fired for its owner (no one chooses: <c>chosen</c> reaches nobody).</summary>
     public static IReadOnlyList<Guid> ForTriggered(SeasonState state, EngineContext context, ObjectDefinition definition, Guid ownerId) =>
         definition.Effect?.Target?.Selector == TargetSelector.Chosen ? [] : Resolve(state, context, definition, definition.Effect?.Target, ownerId);
 
-    private static List<Guid> Resolve(SeasonState state, EngineContext context, ObjectDefinition definition, TargetSpec? spec, Guid userId)
+    private static List<Guid> Resolve(SeasonState state, EngineContext? context, ObjectDefinition definition, TargetSpec? spec, Guid userId)
     {
         var candidates = Candidates(state, definition, spec, userId);
         switch (spec?.Selector ?? TargetSelector.Self)
@@ -63,7 +88,7 @@ internal static class Targets
                 return candidates.Any(p => p.PlayerId == userId) || !PositionOnly(definition.Effect) ? [userId] : [];
             case TargetSelector.RandomActive:
                 var active = candidates.Where(p => !p.IsInactive).ToList();
-                return active.Count == 0 ? [] : [active[context.Random.NextInt(0, active.Count)].PlayerId];
+                return active.Count == 0 ? [] : [active[context!.Random.NextInt(0, active.Count)].PlayerId];
             case TargetSelector.Leader:
                 return candidates.OrderByDescending(p => p.Points).ThenBy(p => p.PointsTick).ThenBy(p => p.PlayerId).Take(1).Select(p => p.PlayerId).ToList();
             case TargetSelector.WithinCells:
