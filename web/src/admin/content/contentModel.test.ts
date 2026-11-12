@@ -37,6 +37,15 @@ describe('The content model', () => {
     );
   });
 
+  it('tells the size and number limits of a pack in Russian (D-652, D-653)', () => {
+    expect(serverText('At most 200 entries in a wheel.')).toBe('В колесе — не больше 200 записей.');
+    expect(serverText('The «Multiply» stage takes a number of at most 10.')).toBe(
+      'Этот шаг кубов — число не больше 10.',
+    );
+    expect(serverText('A price is at most 1000000.')).toBe('Цена — не больше 1 000 000.');
+    expect(serverText('An amount is within ±1000000.')).toBe('Количество — не больше ±1 000 000.');
+  });
+
   it('says what is not JSON and what is not an object', () => {
     // Where the text breaks, by line and character, never the browser's English message (invariant 13)
     expect(inspect('{', null).parse).toEqual({ offset: 1, line: 1, column: 2 });

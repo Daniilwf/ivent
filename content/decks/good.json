@@ -1,0 +1,6 @@
+{
+  "id": "good",
+  "name": "Хорошие ивенты",
+  "deck": "good",
+  "entries": [{ "objectId": "tailwind", "weight": 1 }]
+}

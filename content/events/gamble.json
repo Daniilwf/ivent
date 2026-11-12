@@ -1,0 +1,19 @@
+{
+  "id": "gamble",
+  "kind": "event",
+  "name": "Рискнёшь?",
+  "description": "Кинь d6: на 1–3 назад на 3 клетки, на 4–6 вперёд на 3.",
+  "rarity": "common",
+  "price": null,
+  "hostile": false,
+  "effect": {
+    "target": { "selector": "self" },
+    "outcomes": {
+      "roll": "1d6",
+      "cases": [
+        { "from": 1, "to": 3, "actions": [{ "type": "move", "steps": -3 }] },
+        { "from": 4, "to": 6, "actions": [{ "type": "move", "steps": 3 }] }
+      ]
+    }
+  }
+}

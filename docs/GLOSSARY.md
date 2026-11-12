@@ -254,13 +254,14 @@
 | Термин | Что значит | В коде |
 | --- | --- | --- |
 | Вытянуть ивент | взять ивент из колоды по весу и сразу разыграть его на вытянувшего (D-500) | действие `drawEvent` (`DrawEventAction`), событие `EventDrawn` |
-| Источник ивента | откуда ивент: клетка, дроп, платный реролл, сложность, предмет, общий ивент | `EventSource` |
+| Источник ивента | откуда ивент: клетка, дроп, платный реролл, сложность, предмет, общий ивент | `EventSource` (5.1: `Cell`, `Item`) |
+| Вытянутый ивент | карточка ивента, который игрок вытянул последним, в его карточке хода | `DrawnEventView`, `me.lastEvent`; экран — `DrawnEventCard` |
 | Хороший ивент, плохой ивент | ивент из колоды `good` / `bad` | `EventKind.Good`, `EventKind.Bad`, колоды `good`, `bad` |
 | Специвент | ивент из колоды `special`; применяется первым | `EventKind.Special`, колода `special` |
 | Рискованный ивент | ивент с исходом по броску («кинь d6: 1–3 плохо, 4–6 хорошо»), колода `risky` | `EventKind.Risky`, блок `outcomes` |
 | Колода зоны | колода зоны клетки, где стоит игрок; клетка `deck: zone` | `ZoneDefinition.Deck`, `DeckRef.Zone` |
 | Колода по умолчанию | колода клетки ивента вне зоны с колодой | `events.defaultDeck` |
-| Пустая колода | у колоды нет живых записей: ивент уходит в ручное разрешение | событие `EventDrawMissed` |
+| Пустая колода | колоды нет в контенте или у неё нет живых записей: ивент уходит в ручное разрешение (D-501, D-535) | событие `EventDrawMissed`, `ManualEffectSource.Event` |
 | Накопленные ивенты | ожидающие последствия ивентов, применяемые по порядку «специвент, хороший, плохой» | `RollModifier.EventKind`, `DiceModifier.EventKind`, `events.applyOrder` |
 | Условие прохождения | требование ивента к следующему прохождению («пройди на сложной»), видно на странице прохождения | `modifyNextRoll.runCondition` (`ConditionSpec`), `RunSnapshot.Conditions`, события `RunConditionAttached`, `RunConditionChecked` |
 | Невыполненное условие | прохождение не выполнило условие: по умолчанию без кубов, с монетками | `UnmetConditionPolicy` (`NoDiceKeepCoins`, `CountAsDrop`, `Ignore`), причины `PointsReason.ConditionUnmet`, `MoveReason.ConditionUnmet` |

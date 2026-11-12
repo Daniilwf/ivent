@@ -19,7 +19,6 @@ using GameEvent.Web.Realtime;
 using GameEvent.Web.Rolls;
 using GameEvent.Web.Rulesets;
 using GameEvent.Web.Runs;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using GameEvent.Web.Seasons;
 using GameEvent.Web.Site;
 using GameEvent.Web.Testing;
@@ -27,6 +26,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace GameEvent.Web.Hosting;
 

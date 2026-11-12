@@ -249,6 +249,24 @@ public sealed class AdminContentApiTests : IAsyncLifetime
         Assert.Equal("objects", Assert.Single(check.GetProperty("problems").EnumerateArray()).GetProperty("path").GetString());
     }
 
+    [Fact]
+    public async Task A_wheel_past_the_entry_limit_is_named_at_its_entries()
+    {
+        // The engine's limit (D-653), shown before publishing
+        var admin = await _site.SignedInAsync("admin");
+        var pack = Pack(Item("orange", "Апельсин", 1));
+        pack["wheels"] = new JsonArray(new JsonObject
+        {
+            ["id"] = "lootbox",
+            ["name"] = "Лутбокс",
+            ["entries"] = new JsonArray([.. Enumerable.Range(0, AdminContentEndpoints.MaxWheelEntries + 1).Select(_ => (JsonNode)new JsonObject { ["objectId"] = "orange", ["weight"] = 1 })]),
+        });
+
+        var check = await ApiCalls.OkAsync(await admin.PostAsJsonAsync($"{Admin}/check", pack, Ct));
+
+        Assert.Equal("wheels[0].entries", Assert.Single(check.GetProperty("problems").EnumerateArray()).GetProperty("path").GetString());
+    }
+
     [Theory]
     [InlineData("not json")]
     [InlineData("[]")]
