@@ -139,6 +139,14 @@ public sealed class Scenario
         return this;
     }
 
+    /// <summary>A game with its release year (a filter on the year reads it: zones, the weekly challenge «Олдскул»).</summary>
+    public Scenario WithReleasedGame(string title, decimal? hours, int releaseYear, params string[] tags)
+    {
+        using var _ = Recording(() => $"s.WithReleasedGame({ScenarioCode.Literal(title)}, {ScenarioCode.Value(hours, _ => null)}, {releaseYear}{string.Concat(tags.Select(t => ", " + ScenarioCode.Literal(t)))});");
+        _games.Add(new Game(SequentialIds.Make(GameIdPrefix, _games.Count + 1), title, [.. tags], hours, ReleaseYear: releaseYear));
+        return this;
+    }
+
     /// <summary>A soft-deleted game: it stays in the pool view but must never be rolled.</summary>
     public Scenario WithDeletedGame(string title, decimal? hours, params string[] tags)
     {
