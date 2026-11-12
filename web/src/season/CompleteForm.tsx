@@ -5,6 +5,7 @@ import { ru } from '../i18n/ru';
 import { CompletionRulesLink } from '../rules/CompletionRulesLink';
 import { Button } from '../ui/Button';
 import { Checkbox, ChoiceGroup, Field, Select, TextArea } from '../ui/Field';
+import { Summary } from '../ui/Disclosure';
 
 export type Completion = {
   difficulty: Schemas['Difficulty'];
@@ -14,6 +15,8 @@ export type Completion = {
   review?: { rating: number; text?: string };
 };
 
+// SeasonEndpoints.MaxHours of the server
+const maxHours = 1000;
 const ratings = Array.from({ length: 10 }, (_, i) => i + 1);
 const difficulties = difficultyValues.map((d) => ({ value: d, label: ru.difficulty[d] }));
 
@@ -70,7 +73,13 @@ export function CompleteForm({
 
     if (needsHours) {
       const estimatedHours = Number(hours.replace(',', '.'));
-      if (hours.trim() === '' || !Number.isFinite(estimatedHours) || estimatedHours <= 0)
+      // The server takes more than 0 and at most SeasonEndpoints.MaxHours (K1S-5)
+      if (
+        hours.trim() === '' ||
+        !Number.isFinite(estimatedHours) ||
+        estimatedHours <= 0 ||
+        estimatedHours > maxHours
+      )
         found.push({ field: 'hours', text: ru.turn.hoursInvalid });
       if (source.trim() === '') found.push({ field: 'source', text: ru.turn.hoursSourceRequired });
       completion.estimatedHours = estimatedHours;
@@ -179,9 +188,7 @@ export function CompleteForm({
         }}
         className="grid gap-3"
       >
-        <summary className="min-h-11 cursor-pointer content-center rounded-md font-bold is-focus:focus-ring">
-          {ru.turn.review}
-        </summary>
+        <Summary className="font-bold">{ru.turn.review}</Summary>
         <div className="grid gap-4 pt-2">
           <Select
             data-testid="complete-review-rating"

@@ -23,7 +23,11 @@ type Sent = { url: string; method: string | undefined; body: FormData };
 
 function serveUploads(answers: Response[]) {
   const requests: Sent[] = [];
-  const fetch = vi.fn((url: string, init?: RequestInit) => {
+  const fetch = vi.fn((input: Request | string, init?: RequestInit) => {
+    // The page asks the site its upload limits first (D-617); this site names none, so the server answers for itself
+    if (typeof input !== 'string' && input.url.endsWith('/api/status'))
+      return Promise.resolve(json(404, {}));
+    const url = typeof input === 'string' ? input : input.url;
     requests.push({ url, method: init?.method, body: init?.body as FormData });
     return Promise.resolve(answers.shift() ?? json(500, {}));
   });
@@ -132,6 +136,8 @@ describe('Screenshots in the proof', () => {
         if (url.endsWith('/api/auth/antiforgery')) {
           return Promise.resolve(json(200, { headerName: 'X-CSRF-TOKEN', token: 'token-1' }));
         }
+        // The upload limits asked first (D-617): this site names none
+        if (url.endsWith('/api/status')) return Promise.resolve(json(404, {}));
         sent.push({ url, headers: (init?.headers ?? {}) as Record<string, string> });
         return Promise.resolve(json(200, shot(1)));
       }),
@@ -180,6 +186,49 @@ describe('Screenshots in the proof', () => {
     const image = within(sent).getByRole('img', { name: ru.proof.shotAlt(1) });
     expect(image).toHaveAttribute('src', shot(1).thumbnailUrl);
     expect(image.closest('a')).toHaveAttribute('href', shot(1).url);
+  });
+
+  // K1S-2: a second send of «ещё ссылка» wiped the screenshot and the note the form never showed
+  it('starts from the waiting proof, so one more link keeps the screenshot and the note', async () => {
+    const onSubmit = renderForm({
+      status: 'pending',
+      links: ['https://example.com/credits.png'],
+      note: 'Титры в конце',
+      comment: null,
+      files: [{ id: shot(1).id, url: shot(1).url, thumbnailUrl: shot(1).thumbnailUrl }],
+    });
+
+    expect(screen.getByText(ru.proof.replaces)).toBeInTheDocument();
+    expect(screen.getByTestId('proof-link')).toHaveValue('https://example.com/credits.png');
+    expect(screen.getByTestId('proof-note')).toHaveValue('Титры в конце');
+    await userEvent.click(screen.getByRole('button', { name: ru.proof.addLink }));
+    const second = screen.getAllByTestId('proof-link')[1];
+    if (!second) throw new Error('no second link field');
+    await userEvent.type(second, 'https://example.com/second.png');
+    await userEvent.click(screen.getByTestId('proof-submit'));
+
+    expect(onSubmit).toHaveBeenCalledWith(
+      ['https://example.com/credits.png', 'https://example.com/second.png'],
+      'Титры в конце',
+      null,
+      [shot(1).id],
+    );
+  });
+
+  it('lets a screenshot of the waiting proof be taken off before the next send', async () => {
+    const onSubmit = renderForm({
+      status: 'pending',
+      links: ['https://example.com/credits.png'],
+      note: null,
+      comment: null,
+      files: [{ id: shot(1).id, url: shot(1).url, thumbnailUrl: shot(1).thumbnailUrl }],
+    });
+
+    await userEvent.click(screen.getByRole('button', { name: ru.proof.removeShot(1) }));
+    await userEvent.click(screen.getByTestId('proof-submit'));
+
+    expect(screen.queryByTestId('proof-files')).toBeNull();
+    expect(onSubmit).toHaveBeenCalledWith(['https://example.com/credits.png'], null, null, []);
   });
 
   it('still asks for a link, a screenshot or a witness when nothing is given', async () => {

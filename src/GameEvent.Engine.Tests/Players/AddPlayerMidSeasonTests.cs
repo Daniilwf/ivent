@@ -217,4 +217,26 @@ public class AddPlayerMidSeasonTests
             x => x.Act(new AddSeasonPlayer(s_newPlayer, SequentialIds.Make(0x40000000, 0x52), "Лёша-3", Coins: 2)),
             RejectionCodes.PlayerAlreadyAdded);
     }
+
+    [Theory]
+    [InlineData("Вася")]
+    [InlineData(" вася ")]
+    [InlineData("ВАСЯ")]
+    public void A_name_another_player_of_the_season_has_is_refused(string name)
+    {
+        // K1A: the leaderboard, the map and the feed show only names; two «Вася» could not be told apart
+        var s = RunningSeason();
+
+        ScenarioAssert.RejectsWithoutChanges(s, x => x.Act(new AddSeasonPlayer(s_newPlayer, s_newUser, name)), RejectionCodes.PlayerNameTaken);
+    }
+
+    [Fact]
+    public void Another_name_joins()
+    {
+        var s = RunningSeason();
+
+        s.Act(new AddSeasonPlayer(s_newPlayer, s_newUser, "Вася 2"));
+
+        ScenarioAssert.Accepted(s);
+    }
 }

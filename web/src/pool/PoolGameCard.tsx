@@ -4,7 +4,7 @@ import { Cover } from '../board/GameCards';
 import { Link } from '../app/Link';
 import { paths } from '../app/router';
 import { ru } from '../i18n/ru';
-import { inlineLink } from '../ui/buttonStyles';
+import { standaloneLink } from '../ui/buttonStyles';
 import { Chip } from '../ui/Marks';
 import { GameMarks } from '../season/GameMarks';
 import { GameFacts } from './GameFacts';
@@ -36,7 +36,7 @@ export function GameStatus({
         </Chip>
       ) : status?.taken === 'beingPlayed' ? (
         <Chip tone="info" icon={<Gamepad2 size={16} aria-hidden className="text-info" />}>
-          {t.playing(status.takenBy ?? '')}
+          {status.offered ? t.offered(status.takenBy ?? '') : t.playing(status.takenBy ?? '')}
         </Chip>
       ) : status?.excludedForMe ? (
         <Chip icon={<Ban size={16} aria-hidden className="text-ink-soft" />}>
@@ -75,7 +75,8 @@ export function PoolGameCard({
       <div className="grid min-w-0 content-start justify-items-start gap-2">
         <h2 className="font-display text-lg font-heavy text-balance wrap-anywhere">
           {/* The game's page: its runs and reviews in every season */}
-          <Link to={paths.game(game.id)} className={inlineLink}>
+          {/* A tap target of 44 px on a phone (DESIGN.md «Компоненты и состояния»), K1A */}
+          <Link to={paths.game(game.id)} className={standaloneLink}>
             {game.title}
           </Link>
         </h2>
@@ -85,7 +86,9 @@ export function PoolGameCard({
       {note || game.author ? (
         <div className="col-span-2 grid gap-1 text-sm">
           {note ? <p className="max-w-prose wrap-anywhere">{note}</p> : null}
-          {game.author ? <p className="text-ink-soft">{t.author(game.author)}</p> : null}
+          {game.author ? (
+            <p className="text-ink-soft wrap-anywhere">{t.author(game.author)}</p>
+          ) : null}
         </div>
       ) : null}
     </li>

@@ -215,7 +215,8 @@
 | План предмета | что экран предлагает для объекта: открыто ли «Использовать», почему нет, на кого можно, какие ответы нужны | `ItemPlan`, `ItemPlans.Of`, шаг ответа — `ItemStep` (`ItemStepKind`: `Choice`, `PickObject`) |
 | Цель предмета («На кого») | игрок, выбранный для предмета с селектором `chosen`; экран предлагает только тех, кого примет движок | `UseItem.TargetPlayerId`, `ItemPlan.Targets`, `Targets.Choosable` |
 | Ответ предмета | выбор для `requestChoice` или объект цели для `takeObject` с `pick: chosen` | `UseItem.Choices`, `ItemStepView` |
-| План магазина | цена и способ оплаты следующего ролла магазина, отказ движка, лоты, пока не истекли | `ShopPlan`, `ShopPlans.Of`, API `ShopView` |
+| План магазина | цена и способ оплаты следующего ролла магазина, отказ движка, лоты, пока не истекли, и почему не продаётся каждый лот; раздел «Магазин» на экране сезона | `ShopPlan`, `ShopPlans.Of`, `Shop.LotRefusal`, API `ShopView`, экран `season/Shop.tsx` |
+| План ставок | на чьи текущие прохождения можно поставить сейчас, коэффициент каждого срока, отказ, предел ставки; раздел «Ставки» на экране сезона | `BetPlan`, `BetPlans.Of` (`BetRun`, `BetOption`), API `BetsView.runs`, экран `season/Bets.tsx` |
 | Срабатывание эффекта | эффект или спецролл игрока сработал на своём триггере | `EffectTriggered`, `Firing` |
 | Бросок эффекта | кубики из значения эффекта (`$roll`) | `EffectRolled` |
 | Изменение ролла | фильтр или выбор из N для следующего ролла; на ролл фиксируется до старта игры | `RollModifier`, `NextRollModified`, `RollModifiersApplied` (`PlayerEconomy.NextRoll`, `CurrentRoll`) |

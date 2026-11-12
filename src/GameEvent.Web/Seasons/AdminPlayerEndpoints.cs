@@ -114,7 +114,7 @@ public static class AdminPlayerEndpoints
         return TypedResults.Ok(views);
     }
 
-    private static async Task<ActionResult> CreateAsync(CreateSeasonRequest request, ClaimsPrincipal user, CommandBus bus, CancellationToken ct)
+    private static async Task<ActionResult> CreateAsync(CreateSeasonRequest request, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, CancellationToken ct)
     {
         if (request.CommandId == Guid.Empty || request.SeasonId == Guid.Empty)
         {
@@ -124,6 +124,15 @@ public static class AdminPlayerEndpoints
         if (string.IsNullOrWhiteSpace(request.Name))
         {
             return Invalid("name", "A season has a name.");
+        }
+
+        // D-604: the seasons are told apart by their names in the list; a retry of the same season is not a clash. Few
+        // seasons ever exist, and Cyrillic case is compared in memory, not by SQLite
+        var name = request.Name.Trim();
+        var names = await db.Seasons.AsNoTracking().Where(s => s.Id != request.SeasonId).Select(s => s.Name).ToListAsync(ct);
+        if (names.Any(n => string.Equals(n.Trim(), name, StringComparison.OrdinalIgnoreCase)))
+        {
+            return Rejected("season.nameTaken", $"A season named «{name}» already exists.");
         }
 
         // The engine checks the name, the rules and the deadline; a season id taken is refused by the log itself
@@ -215,7 +224,7 @@ public static class AdminPlayerEndpoints
         var joined = decoded.Where(e => e.Event is SeasonPlayerAdded).GroupBy(e => ((SeasonPlayerAdded)e.Event).PlayerId).ToDictionary(g => g.Key, g => g.Max(e => e.OccurredAt));
         var now = clock.UtcNow;
         IReadOnlyList<AdminPlayerView> views = [.. players
-            .OrderBy(p => p.Name, StringComparer.Ordinal)
+            .OrderBy(p => p.Name, PlayerTokens.NameOrder)
             .Select(p =>
             {
                 DateTimeOffset? last = lastActions.TryGetValue(p.UserId, out var at) ? at : null;

@@ -72,7 +72,8 @@ describe('CompleteForm', () => {
     });
   });
 
-  it.each(['', '0', '-2', 'abc'])('refuses the estimate "%s"', async (value) => {
+  // K1S-5: above the server's 1000 hours the form said nothing and the server refused with a generic text
+  it.each(['', '0', '-2', 'abc', '5000', '1000,5'])('refuses the estimate "%s"', async (value) => {
     const onComplete = vi.fn();
     render(<CompleteForm needsHours pending={false} onComplete={onComplete} />);
 

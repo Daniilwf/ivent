@@ -2,7 +2,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ru } from '../i18n/ru';
 import { answer, fakeServer, seasonId } from '../test/fakeServer';
-import { InventorySection } from './Inventory';
+import { EconomySection } from './Inventory';
 import { economyFixture, itemFixture } from './inventoryFixtures';
 
 // My inventory on the season screen (4.11a, D-440, D-441): every object with its words, «Использовать» only in its
@@ -15,7 +15,7 @@ const kolya = '10000000-0000-0000-0000-000000000003';
 function renderSection(version = 1) {
   const onSignedOut = vi.fn();
   const view = render(
-    <InventorySection seasonId={seasonId} version={version} onSignedOut={onSignedOut} />,
+    <EconomySection seasonId={seasonId} version={version} onSignedOut={onSignedOut} />,
   );
   return { ...view, onSignedOut };
 }
@@ -94,7 +94,7 @@ describe('the inventory', () => {
     await screen.findByTestId('item-bird-thief');
 
     server.calls.length = 0;
-    rerender(<InventorySection seasonId={seasonId} version={2} onSignedOut={onSignedOut} />);
+    rerender(<EconomySection seasonId={seasonId} version={2} onSignedOut={onSignedOut} />);
 
     await waitFor(() => {
       expect(server.sent('GET', '/economy')).toHaveLength(1);

@@ -78,7 +78,12 @@ test('screen: the main page, the run and the map zoom on this device', async ({
   }
   await expect.poll(() => mapWidth(page)).toBeLessThan(start * 0.9);
 
-  // A drag moves the map
+  // A drag moves the map once the board is wider than the frame: a view wider than the board stays centred (D-623).
+  // A phone opens already closer than the whole board; a desktop's whole board needs more zoom first.
+  if (!phone) {
+    for (let i = 0; i < 3; i++) await page.getByRole('button', { name: 'Приблизить' }).click();
+    await expect.poll(() => mapWidth(page)).toBeLessThan(start * 0.5);
+  }
   const centre = await mapCentre(page);
   if (phone) {
     await fingerDrag(page, { x: cx, y: cy }, { x: -80, y: 0 });

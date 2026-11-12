@@ -109,7 +109,7 @@ export function Shell({
         <div className="mx-auto flex max-w-300 flex-wrap items-center gap-x-2 gap-y-1 px-4 pt-2 pb-1 desk:flex-nowrap desk:gap-3 desk:px-8 desk:py-2">
           <Link
             to={paths.season()}
-            className="mr-auto rounded-md px-1 font-display text-lg font-heavy whitespace-nowrap desk:mr-2"
+            className="mr-auto inline-flex min-h-11 items-center rounded-md px-1 font-display text-lg font-heavy whitespace-nowrap desk:mr-2"
           >
             {ru.app.title}
           </Link>
@@ -147,11 +147,9 @@ export function Shell({
                   ) : null}
                 </span>
                 {/* A phone's header keeps the sticker only; the name is still there for screen readers */}
-                <span
-                  data-testid="current-user"
-                  className="sr-only max-w-40 truncate font-medium desk:not-sr-only"
-                >
-                  {user.name}
+                <span data-testid="current-user" className="sr-only font-medium desk:not-sr-only">
+                  {/* A long name is cut, not pushed past the header (K1A): not-sr-only shows overflow and wraps */}
+                  <span className="inline-block max-w-40 truncate align-middle">{user.name}</span>
                 </span>
               </button>
             }

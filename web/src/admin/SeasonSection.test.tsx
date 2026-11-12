@@ -114,6 +114,38 @@ describe('The season section', () => {
     });
   });
 
+  it('asks again before a deadline within a day: after it the turns close for good (K1A, D-101)', async () => {
+    const server = open('active', { 'POST /api/admin/seasons/*/deadline': ok });
+    // Two hours from now in Moscow time, as the field takes it (a day typed wrong, say)
+    const soon = new Date(Date.now() + 2 * 60 * 60 * 1000 + 60_000);
+    const parts = Object.fromEntries(
+      new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Europe/Moscow',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hourCycle: 'h23',
+      })
+        .formatToParts(soon)
+        .map((p) => [p.type, p.value]),
+    );
+    const typed = `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`;
+
+    const panel = await screen.findByTestId('season-deadline-panel');
+    await userEvent.type(within(panel).getByTestId('deadline-input'), typed);
+    await userEvent.click(within(panel).getByTestId('deadline-save'));
+
+    const dialog = await screen.findByRole('alertdialog');
+    expect(dialog).toHaveTextContent(t.deadlineSoonTitle);
+    expect(server.sent('POST', '/deadline')).toHaveLength(0);
+    await userEvent.click(within(dialog).getByRole('button', { name: t.deadlineSoonConfirm }));
+    await waitFor(() => {
+      expect(server.sent('POST', '/deadline')).toHaveLength(1);
+    });
+  });
+
   it('removes the deadline', async () => {
     const server = open('active', { 'POST /api/admin/seasons/*/deadline': ok });
 

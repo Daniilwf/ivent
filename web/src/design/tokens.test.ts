@@ -2,6 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { camera, mapLabel } from '../board/camera';
 import { contrast, playerToken, tokenColors } from './players';
 
 // Read as a file: the tests do not process CSS
@@ -49,6 +50,11 @@ describe('design tokens', () => {
       const letter = ink === 'var(--color-ink)' ? token('ink') : token('on-color');
       expect(contrast(hex, letter), `token ${i + 1}`).toBeGreaterThanOrEqual(4);
     }
+  });
+
+  it('has the same smallest map label as src/board/camera.ts, and a close-up that keeps it', () => {
+    expect(css).toContain(`--map-label-min: ${String(mapLabel.min)}px;`);
+    expect(camera.closeUp * mapLabel.world).toBeGreaterThanOrEqual(mapLabel.min);
   });
 
   it('gives a player beyond 16 a colour again, from the start of the set', () => {

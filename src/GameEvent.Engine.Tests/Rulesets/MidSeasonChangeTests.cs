@@ -1,5 +1,7 @@
+using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Rulesets;
 using GameEvent.Engine.Runs;
+using GameEvent.Engine.Seasons;
 using GameEvent.Engine.Tests.Support;
 
 namespace GameEvent.Engine.Tests.Rulesets;
@@ -98,5 +100,27 @@ public class MidSeasonChangeTests
         var snapshot = s.Player("Вася").Offer!.Snapshot;
         Assert.Equal(1, snapshot.RulesetVersion);
         Assert.Equal(3, snapshot.DiceCount.HoursPerDie);
+    }
+
+    [Theory]
+    [InlineData(SeasonStatus.Finished)]
+    [InlineData(SeasonStatus.Archived)]
+    public void Rules_of_a_season_that_is_over_are_fixed(SeasonStatus status)
+    {
+        // K1A: every other admin change of a finished season is refused; its rules are part of the results
+        var s = TwoGames().MoveStatusTo(status);
+
+        ScenarioAssert.RejectsWithoutChanges(
+            s,
+            x => x.Act(new ChangeRuleset(HoursPerDie(1)(x.State.Ruleset!), x.State.RulesetVersion)),
+            RejectionCodes.SeasonClosed);
+    }
+
+    [Fact]
+    public void Rules_still_change_while_the_season_is_closing()
+    {
+        var s = TwoGames().MoveStatusTo(SeasonStatus.Closing).WithRuleset(HoursPerDie(1));
+
+        Assert.Equal(2, s.State.RulesetVersion);
     }
 }

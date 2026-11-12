@@ -179,6 +179,76 @@ describe('The proof queue', () => {
     });
   });
 
+  it('marks hours as an estimate of the player and links its source (K1A)', async () => {
+    open([item({ hours: 12, hoursSource: 'https://howlongtobeat.com/game/57427' })]);
+
+    const card = await screen.findByTestId('proof-r1');
+    expect(within(card).getByText(t.estimated)).toBeInTheDocument();
+    expect(
+      within(card).getByRole('link', { name: /howlongtobeat\.com\/game\/57427/ }),
+    ).toHaveAttribute('href', 'https://howlongtobeat.com/game/57427');
+  });
+
+  it('shows a source that is not a link as text', async () => {
+    open([item({ hours: 12, hoursSource: 'Спросил у друга' })]);
+
+    const card = await screen.findByTestId('proof-r1');
+    expect(within(card).getByText(t.estimated)).toBeInTheDocument();
+    expect(card).toHaveTextContent('Спросил у друга');
+    expect(within(card).queryByRole('link', { name: /Спросил/ })).toBeNull();
+  });
+
+  // D-619 (4): a link only for https; an http address is shown as text
+  it('shows an http source as text, not a link', async () => {
+    open([item({ hours: 12, hoursSource: 'http://howlongtobeat.com/game/57427' })]);
+
+    const card = await screen.findByTestId('proof-r1');
+    expect(card).toHaveTextContent('http://howlongtobeat.com/game/57427');
+    expect(within(card).queryByRole('link', { name: /howlongtobeat/ })).toBeNull();
+  });
+
+  it('says nothing about an estimate for hours from the pool', async () => {
+    open([item({})]);
+
+    const card = await screen.findByTestId('proof-r1');
+    expect(within(card).queryByText(t.estimated)).toBeNull();
+  });
+
+  it('takes the comment typed in the card into the reject dialog (K1A)', async () => {
+    const server = open([item({})], { 'POST /api/admin/seasons/*/runs/*/reject': ok });
+
+    await userEvent.type(await screen.findByTestId('approve-comment'), 'На ссылке нет титров');
+    await userEvent.click(screen.getByTestId('reject'));
+    const dialog = await screen.findByRole('alertdialog');
+    expect(within(dialog).getByTestId('reject-comment')).toHaveValue('На ссылке нет титров');
+
+    await userEvent.click(within(dialog).getByRole('button', { name: t.rejectConfirm }));
+    await waitFor(() => {
+      expect(server.sent('POST', '/reject')[0]?.body).toMatchObject({
+        comment: 'На ссылке нет титров',
+      });
+    });
+  });
+
+  it('takes the card comment into the dialog of a reject with the drop penalty too', async () => {
+    open([
+      item({
+        dropPenalty: {
+          count: 1,
+          sides: 6,
+          affectsPoints: true,
+          affectsPosition: true,
+          badEvent: false,
+        },
+      }),
+    ]);
+
+    await userEvent.type(await screen.findByTestId('approve-comment'), 'Скрин чужой');
+    await userEvent.click(screen.getByTestId('reject-penalty'));
+    const dialog = await screen.findByRole('alertdialog');
+    expect(within(dialog).getByTestId('reject-penalty-comment')).toHaveValue('Скрин чужой');
+  });
+
   it('rejects only after a confirmation with the consequences and a comment', async () => {
     const server = open([item({})], { 'POST /api/admin/seasons/*/runs/*/reject': ok });
 

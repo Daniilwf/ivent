@@ -1,4 +1,5 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
+import { standaloneLink } from '../ui/buttonStyles';
 import userEvent from '@testing-library/user-event';
 import type { Schemas } from '../api/client';
 import { ru } from '../i18n/ru';
@@ -94,13 +95,15 @@ describe('GameScreen', () => {
     // The player's sticker has their token colour in that season. The inline declaration is read:
     // jsdom 30.1.3 substitutes var() in computed styles, and the test page defines no tokens (D-251)
     expect(done?.querySelector('span')?.style.background).toBe('var(--color-token-5)');
-    expect(within(done as HTMLElement).getByRole('link', { name: 'Вася' })).toHaveAttribute(
-      'href',
-      `/users/${vasya}`,
-    );
+    const player = within(done as HTMLElement).getByRole('link', { name: 'Вася' });
+    expect(player).toHaveAttribute('href', `/users/${vasya}`);
+    // A link that stands on its own is a 44 px tap target on a phone (DESIGN.md), as every standalone link
+    expect(player.className).toContain(standaloneLink);
     expect(done).toHaveTextContent(ru.gamePage.status['completed'] ?? '');
     expect(done).toHaveTextContent(ru.difficulty.hard);
-    expect(done).toHaveTextContent('31,5 ч в игре');
+    // Glossary «Часы»: the game's length, not a time played nobody measured (K1A)
+    expect(done).toHaveTextContent('длина 31,5 ч');
+    expect(done).not.toHaveTextContent('в игре');
     expect(done).toHaveTextContent('Лучшая метроидвания');
     expect(
       within(done as HTMLElement).getByRole('img', { name: ru.feed.ratingLabel(9) }),

@@ -1,4 +1,5 @@
-import { Flag, LocateFixed, Minus, Orbit, Plus, ShoppingBag, Sparkles } from 'lucide-react';
+import { camera, cameraFrame, fanSpot, openingView, type Box, type View } from './camera';
+import { Flag, LocateFixed, Minus, Orbit, Plus, ShoppingBag, Sparkles, X } from 'lucide-react';
 import {
   useEffect,
   useEffectEvent,
@@ -15,10 +16,12 @@ import {
 import { playerToken } from '../design/players';
 import { ru } from '../i18n/ru';
 import { IconButton } from '../ui/Button';
+import { useDesk } from '../ui/useDesk';
 import { cx } from '../ui/cx';
 import { blobPath, cellById, polylinePath, zoneAt } from './geometry';
 import { zoneFill } from './graphBoard';
 import type { Board, BoardBackground, BoardZone, Player, Point, ZoneTheme } from './types';
+import { initial } from '../ui/initial';
 
 const t = ru.board;
 
@@ -190,11 +193,7 @@ export function MapSticker({
   lift?: number;
 }) {
   const r = size / 2;
-  // Several players on one cell fan out above it instead of piling up
-  const angle = count === 1 ? -90 : -150 + (120 / (Math.min(count, 3) - 1)) * index;
-  const reach = count === 1 ? lift : lift + 14;
-  const dx = at.x + Math.cos((angle * Math.PI) / 180) * reach;
-  const dy = at.y + Math.sin((angle * Math.PI) / 180) * reach;
+  const { x: dx, y: dy } = fanSpot(at, index, count, lift);
   // Two maps on one page must not share clip ids
   const clip = `sticker-${useId().replace(/:/g, '')}`;
   const token = playerToken(player.token);
@@ -224,7 +223,7 @@ export function MapSticker({
           dominantBaseline="central"
           style={{ fill: token.ink, fontSize: size * 0.48 }}
         >
-          {player.name.slice(0, 1)}
+          {initial(player.name)}
         </text>
       )}
       {player.me ? (
@@ -246,10 +245,37 @@ export function MapSticker({
   );
 }
 
-/** «+N» next to a cell with more players than fit */
-function MoreChip({ at, count }: { at: Point; count: number }) {
+/**
+ * A label squeezed to `width` once it is wider (K1M-8: «Финиш» spilled past its circle in the display font). Measured in
+ * the browser after the font loads; until then, and where nothing is measured, it stands as it is.
+ */
+function FitText({ width, children }: { width: number; children: string }) {
+  const ref = useRef<SVGTSpanElement>(null);
+  const [squeeze, setSqueeze] = useState(false);
+  useEffect(() => {
+    const measure = () => {
+      const el = ref.current;
+      if (el && typeof el.getComputedTextLength === 'function')
+        setSqueeze(el.getComputedTextLength() > width);
+    };
+    measure();
+    if ('fonts' in document) void document.fonts.ready.then(measure);
+  }, [width, children]);
   return (
-    <g transform={`translate(${at.x + 30} ${at.y + 4})`}>
+    <tspan ref={ref} {...(squeeze ? { textLength: width, lengthAdjust: 'spacingAndGlyphs' } : {})}>
+      {children}
+    </tspan>
+  );
+}
+
+/**
+ * «+N» for the players that do not fit: in the fan's last place, never over the cell's own label (K2-2, K1M-8); a tap
+ * on it names everybody on the cell (K1M-7)
+ */
+function MoreChip({ at, count, lift }: { at: Point; count: number; lift: number }) {
+  const spot = fanSpot(at, 2, 3, lift);
+  return (
+    <g transform={`translate(${spot.x} ${spot.y})`} data-testid="more-chip" data-more="">
       <rect
         x={-17}
         y={-12}
@@ -362,16 +388,25 @@ function signSpots(board: Board): Map<string, Point> {
 }
 
 // ---- Pan and zoom ----
-/** The view is its centre and its width in world units; the height follows the frame's shape */
-type View = { cx: number; cy: number; w: number };
-type Box = { width: number; height: number };
-
-/** `focus`: open around this point, about one world unit to a pixel of the frame; `anchor`: where a tall frame centres */
-function usePanZoom(board: Board, focus: Point | null, anchor: Point | null) {
+/**
+ * `focus`: open around this point, about one world unit to a pixel of the frame; `anchor`: where a tall frame centres;
+ * `toolsAt`: the side of the frame the zoom buttons stand on, kept clear of the board in the first view.
+ */
+function usePanZoom(
+  board: Board,
+  focus: Point | null,
+  anchor: Point | null,
+  toolsAt: 'bottom' | 'none',
+  onTap: (target: Element | null) => void,
+) {
   // null until the user moves the map: the whole world, fitted to the frame
   const [moved, setView] = useState<View | null>(null);
   const [box, setBox] = useState<Box>({ width: board.width, height: board.height });
   const pointers = useRef(new Map<number, Point>());
+  // The pointer that went down alone: where, on what, and whether it has moved since (a tap or a drag)
+  const press = useRef<{ id: number; at: Point; target: Element | null; moved: boolean } | null>(
+    null,
+  );
   const svg = useRef<SVGSVGElement | null>(null);
 
   useEffect(() => {
@@ -388,34 +423,17 @@ function usePanZoom(board: Board, focus: Point | null, anchor: Point | null) {
   }, []);
 
   const ratio = box.height / box.width;
-  // Only a phone's frame crops the board around me; a desktop's always shows the whole board
-  const portrait = ratio > board.height / board.width && box.width < 600;
-  // A wide frame shows the whole board; a tall one (a phone) fills its height and centres on me
-  const fitWidth = portrait
-    ? (board.height / ratio) * 1.04
-    : Math.max(board.width, board.height / ratio) * 1.04;
-  const fit: View = {
-    cx: portrait
-      ? Math.min(Math.max(anchor?.x ?? board.width / 2, fitWidth / 2), board.width - fitWidth / 2)
-      : board.width / 2,
-    cy: board.height / 2,
-    w: fitWidth,
-  };
-  // Around the focus, but never past the board's edge while the board is bigger than the view
-  const clampTo = (at: number, half: number, size: number) =>
-    half * 2 >= size ? size / 2 : Math.min(Math.max(at, half), size - half);
-  const openWidth = Math.min(Math.max(box.width, 320), fit.w);
-  const wide = box.width >= 600;
-  const opening: View =
-    focus && !wide
-      ? {
-          w: openWidth,
-          cx: clampTo(focus.x, openWidth / 2, board.width),
-          cy: clampTo(focus.y, (openWidth * ratio) / 2, board.height),
-        }
-      : fit;
-  const view = moved ?? opening;
-  const current = (v: View | null) => v ?? opening;
+  // The zoom buttons stand at the bottom of the frame on every size (K2-4)
+  const side = toolsAt === 'none' ? null : 'bottom';
+  const { area, clamp, wholeWidth } = cameraFrame(board, box, side, anchor);
+  // Around the focus on a phone, the whole board on a desktop while it is readable (K2-3); never past the world's edge
+  const desk = useDesk();
+  const opening = openingView(board, box, focus, anchor, side, desk);
+  const view = clamp(moved ?? opening);
+  const current = (v: View | null) => clamp(v ?? opening);
+  // The page scrolls under a swipe while the map has nowhere to go up or down (K1M-2: a phone held sideways)
+  const world = area(view.w);
+  const pansUpDown = view.w * ratio < world.y1 - world.y0 - 1;
 
   const toWorld = (clientX: number, clientY: number, v: View) => {
     const r = svg.current?.getBoundingClientRect();
@@ -430,23 +448,21 @@ function usePanZoom(board: Board, focus: Point | null, anchor: Point | null) {
   const zoomAt = (factor: number, clientX?: number, clientY?: number) => {
     setView((raw) => {
       const v = current(raw);
-      const w = Math.min(
-        Math.max(v.w * factor, 260),
-        Math.max(board.width, board.height / ratio) * 1.25,
-      );
+      // Out as far as the whole world with its room, never farther (K1M-2)
+      const w = Math.min(Math.max(v.w * factor, 260), Math.max(wholeWidth, 260));
       const focus =
         clientX !== undefined && clientY !== undefined
           ? toWorld(clientX, clientY, v)
           : { x: v.cx, y: v.cy };
       const k = w / v.w;
-      return { w, cx: focus.x - (focus.x - v.cx) * k, cy: focus.y - (focus.y - v.cy) * k };
+      return clamp({ w, cx: focus.x - (focus.x - v.cx) * k, cy: focus.y - (focus.y - v.cy) * k });
     });
   };
 
   const panBy = (dx: number, dy: number) => {
     setView((raw) => {
       const v = current(raw);
-      return { ...v, cx: v.cx + dx * v.w, cy: v.cy + dy * v.w };
+      return clamp({ ...v, cx: v.cx + dx * v.w, cy: v.cy + dy * v.w });
     });
   };
 
@@ -466,14 +482,41 @@ function usePanZoom(board: Board, focus: Point | null, anchor: Point | null) {
     };
   }, []);
 
+  const movedFar = (e: PointerEvent) => {
+    const p = press.current;
+    if (
+      p?.id === e.pointerId &&
+      Math.hypot(e.clientX - p.at.x, e.clientY - p.at.y) >= camera.tapSlop
+    )
+      p.moved = true;
+  };
+  const release = (e: PointerEvent, tapped: boolean) => {
+    pointers.current.delete(e.pointerId);
+    const p = press.current;
+    if (p?.id !== e.pointerId) return;
+    press.current = null;
+    if (tapped && !p.moved) onTap(p.target);
+  };
+
   const handlers = {
     onPointerDown: (e: PointerEvent) => {
       e.currentTarget.setPointerCapture(e.pointerId);
       pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      // A second finger makes it a pinch, not a tap
+      press.current =
+        pointers.current.size === 1
+          ? {
+              id: e.pointerId,
+              at: { x: e.clientX, y: e.clientY },
+              target: e.target instanceof Element ? e.target : null,
+              moved: false,
+            }
+          : null;
     },
     onPointerMove: (e: PointerEvent) => {
       const previous = pointers.current.get(e.pointerId);
       if (!previous) return;
+      movedFar(e);
       const r = svg.current?.getBoundingClientRect();
       if (pointers.current.size === 2) {
         const [a, b] = [...pointers.current.values()] as [Point, Point];
@@ -488,15 +531,20 @@ function usePanZoom(board: Board, focus: Point | null, anchor: Point | null) {
       setView((raw) => {
         const v = current(raw);
         const scale = r ? v.w / r.width : 1;
-        return {
+        return clamp({
           ...v,
           cx: v.cx - (e.clientX - previous.x) * scale,
           cy: v.cy - (e.clientY - previous.y) * scale,
-        };
+        });
       });
     },
-    onPointerUp: (e: PointerEvent) => pointers.current.delete(e.pointerId),
-    onPointerCancel: (e: PointerEvent) => pointers.current.delete(e.pointerId),
+    onPointerUp: (e: PointerEvent) => {
+      movedFar(e);
+      release(e, true);
+    },
+    onPointerCancel: (e: PointerEvent) => {
+      release(e, false);
+    },
     // The keyboard: arrows move the map, + and − zoom
     onKeyDown: (e: KeyboardEvent) => {
       const step = 0.1;
@@ -532,7 +580,7 @@ function usePanZoom(board: Board, focus: Point | null, anchor: Point | null) {
   };
 
   const centerOn = (p: Point, w = view.w) => {
-    setView({ w, cx: p.x, cy: p.y });
+    setView(clamp({ w, cx: p.x, cy: p.y }));
   };
 
   // Back to the first view: the whole world, or around me — after a moment moved the camera
@@ -541,7 +589,7 @@ function usePanZoom(board: Board, focus: Point | null, anchor: Point | null) {
   };
 
   const viewBox = `${view.cx - view.w / 2} ${view.cy - (view.w * ratio) / 2} ${view.w} ${view.w * ratio}`;
-  return { viewBox, svg, handlers, zoomAt, centerOn, reset };
+  return { viewBox, svg, handlers, zoomAt, centerOn, reset, pansUpDown };
 }
 
 export type MapApi = { centerOn: (p: Point, w?: number) => void; reset: () => void };
@@ -554,8 +602,8 @@ export type MapViewProps = {
   hide?: string[];
   /** The first view: the whole world, or a close look around this cell */
   focus?: number | undefined;
-  /** Where the zoom buttons stand: at the bottom on a desktop, at the top over a phone's bottom sheet */
-  tools?: 'top' | 'bottom' | 'auto' | 'none';
+  /** The zoom buttons: at the bottom of the frame on every size (K2-4), or none (a moment that moves the camera) */
+  tools?: 'bottom' | 'none';
   children?: ReactNode;
   /** The camera, for a moment that follows a token */
   ref?: Ref<MapApi> | undefined;
@@ -575,12 +623,19 @@ export function MapView({
   ref,
   options = [],
 }: MapViewProps) {
-  const start = focus ? cellById(board, focus) : null;
+  const start = focus !== undefined ? cellById(board, focus) : null;
   const meAt = players.find((p) => p.me);
-  const { viewBox, svg, handlers, zoomAt, centerOn, reset } = usePanZoom(
+  // The cell whose players a tap named (K1M-7): a phone has no hover for the tokens' titles
+  const [picked, setPicked] = useState<number | null>(null);
+  const { viewBox, svg, handlers, zoomAt, centerOn, reset, pansUpDown } = usePanZoom(
     board,
     start,
     meAt ? cellById(board, meAt.cell) : null,
+    tools,
+    (target) => {
+      const at = target?.closest('[data-at]')?.getAttribute('data-at');
+      setPicked(at === undefined || at === null ? null : Number(at));
+    },
   );
   useImperativeHandle(ref, () => ({ centerOn, reset }));
   const props = useMemo(() => scenery(board), [board]);
@@ -591,11 +646,15 @@ export function MapView({
   const myCell = me && !hide.includes(me.id) ? me.cell : null;
   const finish = board.cells.find((c) => c.kind === 'finish');
   const onCell = (id: number) => players.filter((p) => p.cell === id && !hide.includes(p.id));
+  const pickedCell = picked === null ? undefined : board.cells.find((c) => c.id === picked);
+  const pickedPlayers = picked === null ? [] : onCell(picked);
 
   return (
     <div
       className={cx(
-        'table-surface relative touch-none overflow-hidden select-none has-[svg:focus-visible]:outline-3 has-[svg:focus-visible]:outline-offset-3 has-[svg:focus-visible]:outline-ink',
+        'table-surface relative overflow-hidden select-none has-[svg:focus-visible]:outline-3 has-[svg:focus-visible]:outline-offset-3 has-[svg:focus-visible]:outline-ink',
+        // A swipe the map cannot follow up or down scrolls the page (K1M-2)
+        pansUpDown ? 'touch-none' : 'touch-pan-y',
         className,
       )}
     >
@@ -637,35 +696,6 @@ export function MapView({
           <PropShape key={i} prop={p} />
         ))}
 
-        {board.zones.map((z) => {
-          const at = signs.get(z.id);
-          if (!at) return null;
-          const w = signWidth(z.name);
-          return (
-            <g key={`sign-${z.id}`} transform={`translate(${at.x} ${at.y})`}>
-              <rect x={-w / 2} y={-12} width={w} height={30} rx={15} fill={ink} />
-              <rect
-                x={-w / 2}
-                y={-15}
-                width={w}
-                height={30}
-                rx={15}
-                fill="var(--color-card)"
-                stroke={ink}
-                strokeWidth={2.5}
-              />
-              <text
-                className="pointer-events-none font-display text-base font-heavy"
-                textAnchor="middle"
-                dominantBaseline="central"
-                fill={ink}
-              >
-                {z.name}
-              </text>
-            </g>
-          );
-        })}
-
         {finish && !board.background ? <Castle at={finish} /> : null}
 
         {/* The route: a road with an outline, the cells over it */}
@@ -692,6 +722,36 @@ export function MapView({
             data-road={i}
           />
         ))}
+
+        {/* The zone signs over the route, so a road never cuts a name (K1M-9) */}
+        {board.zones.map((z) => {
+          const at = signs.get(z.id);
+          if (!at) return null;
+          const w = signWidth(z.name);
+          return (
+            <g key={`sign-${z.id}`} transform={`translate(${at.x} ${at.y})`} data-zone-sign={z.id}>
+              <rect x={-w / 2} y={-12} width={w} height={30} rx={15} fill={ink} />
+              <rect
+                x={-w / 2}
+                y={-15}
+                width={w}
+                height={30}
+                rx={15}
+                fill="var(--color-card)"
+                stroke={ink}
+                strokeWidth={2.5}
+              />
+              <text
+                className="pointer-events-none font-display text-base font-heavy"
+                textAnchor="middle"
+                dominantBaseline="central"
+                fill={ink}
+              >
+                {z.name}
+              </text>
+            </g>
+          );
+        })}
 
         {board.cells.flatMap((c) =>
           c.kind === 'teleport' && c.to !== undefined
@@ -760,7 +820,7 @@ export function MapView({
                   dominantBaseline="central"
                   fill="var(--color-on-color)"
                 >
-                  {c.kind === 'start' ? t.start : t.finish}
+                  <FitText width={50}>{c.kind === 'start' ? t.start : t.finish}</FitText>
                 </text>
               ) : c.kind === 'event' ? (
                 <Sparkles
@@ -837,38 +897,72 @@ export function MapView({
           const here = onCell(c.id);
           // Me first, so my sticker is never the one hidden behind «+N»
           const ordered = [...here].sort((a, b) => Number(b.me ?? false) - Number(a.me ?? false));
-          return [
-            ...ordered
-              .slice(0, 3)
-              .map((p, i) => (
-                <MapSticker
-                  key={p.id}
-                  player={p}
-                  at={c}
-                  index={i}
-                  count={here.length}
-                  lift={c.kind === 'start' || c.kind === 'finish' ? 52 : 32}
-                />
-              )),
-            here.length > 3 ? (
-              <MoreChip key={`more-${c.id}`} at={c} count={here.length - 3} />
-            ) : null,
-          ];
+          const big = c.kind === 'start' || c.kind === 'finish';
+          const lift = big ? 52 : 32;
+          // More than three: two stickers (me first) and «+N» in the third place (K2-2)
+          const shown = here.length > 3 ? 2 : 3;
+          // A tap on a token or on «+N» names everybody on the cell (K1M-7)
+          return here.length === 0
+            ? []
+            : [
+                <g key={`players-${c.id}`} data-at={c.id} className="cursor-pointer">
+                  {ordered.slice(0, shown).map((p, i) => (
+                    <MapSticker
+                      key={p.id}
+                      player={p}
+                      at={c}
+                      index={i}
+                      count={here.length}
+                      lift={lift}
+                    />
+                  ))}
+                  {here.length > 3 ? (
+                    <MoreChip at={c} count={here.length - shown} lift={lift} />
+                  ) : null}
+                </g>,
+              ];
         })}
 
         {children}
       </svg>
 
+      {pickedCell && pickedPlayers.length > 0 ? (
+        <div
+          data-testid="map-picked"
+          role="status"
+          className={cx(
+            'absolute right-3 left-3 flex items-start gap-2 rounded-lg border-2 border-ink bg-card py-2 pr-2 pl-3 text-sm text-ink desk:right-auto desk:max-w-sm',
+            // Across the frame from the zoom buttons
+            tools === 'none' ? 'bottom-3' : 'top-3',
+          )}
+        >
+          <p className="min-w-0">
+            <span className="font-bold">
+              {pickedCell.kind === 'start'
+                ? t.start
+                : pickedCell.kind === 'finish'
+                  ? t.finish
+                  : ru.map.cellNumber(pickedCell.id)}
+            </span>
+            {': '}
+            {pickedPlayers.map((p) => p.name).join(', ')}
+          </p>
+          <IconButton
+            label={t.pickedClose}
+            onClick={() => {
+              setPicked(null);
+            }}
+          >
+            <X size={16} />
+          </IconButton>
+        </div>
+      ) : null}
+
       {tools === 'none' ? null : (
         <div
-          className={cx(
-            'absolute right-3 flex gap-2',
-            tools === 'top'
-              ? 'top-3'
-              : tools === 'bottom'
-                ? 'bottom-3'
-                : 'top-3 desk:top-auto desk:bottom-3',
-          )}
+          // A phone's buttons stand at the bottom too (K2-4): at the top they covered the first row of cells, and the
+          // page leaves room under the frame for the leaderboard's bar
+          className="absolute right-3 bottom-3 flex gap-2"
         >
           <IconButton
             label={t.zoomIn}

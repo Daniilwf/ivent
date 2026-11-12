@@ -5,9 +5,40 @@ import { ru } from '../i18n/ru';
 import { Button } from './Button';
 import { ConfirmDanger } from './Dialogs';
 import { ChoiceGroup, Field, FilePicker, Select } from './Field';
+import { Summary } from './Disclosure';
 import { CountBadge } from './Marks';
 import { RouteProgress, Skeleton } from './Progress';
 import { ErrorState, Notice } from './States';
+
+describe('the danger link in a list (K2-6)', () => {
+  it('rests in ink with a red underline and turns red only under the pointer or in focus', () => {
+    render(<Button variant="dangerLink">Откатить</Button>);
+    const link = screen.getByRole('button', { name: 'Откатить' });
+    expect(link).toHaveClass(
+      'text-ink',
+      'decoration-danger',
+      'is-hover:text-danger',
+      'is-focus:text-danger',
+    );
+    expect(link).not.toHaveClass('text-danger');
+  });
+});
+
+describe('the folded part’s line (K2-5)', () => {
+  it('opens with a lucide chevron that turns when open, as a 44 px line', async () => {
+    render(
+      <details data-testid="fold">
+        <Summary>Пруф и проверка</Summary>
+        <p>Внутри</p>
+      </details>,
+    );
+    const line = screen.getByText('Пруф и проверка').closest('summary');
+    expect(line).toHaveClass('min-h-11');
+    expect(line?.querySelector('svg')).toHaveClass('in-open:rotate-90');
+    await userEvent.click(screen.getByText('Пруф и проверка'));
+    expect(screen.getByTestId('fold')).toHaveAttribute('open');
+  });
+});
 
 describe('the count badge (D-263)', () => {
   it('shows nothing for zero, the number up to 99, then 99+; hidden from screen readers', () => {

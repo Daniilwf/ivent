@@ -14,6 +14,7 @@ import {
   setUpSeason,
   signIn,
   type World,
+  points,
 } from '../support/world.ts';
 
 // TESTING.md scenario 5 «Финиш» (SPEC «Прогресс и победа», «Первое место»): Vasya finishes first — provisionally, until
@@ -72,7 +73,7 @@ test('finish: provisional first, a second with the bonus, the first rejected, th
   await expect(petyaFinish).toContainText('кубы за прохождения ещё дают очки');
   const petyaPoints = petyaRun.total + secondBonus;
   await expect(leaderRow(petyaPage, petya.playerId)).toContainText(
-    `Петя: ${String(petyaPoints)} очк., на финише`,
+    `Петя: ${points(petyaPoints)}, на финише`,
   );
   // The first stays on top whatever the points (Vasya may have fewer)
   await expect(leaderRow(petyaPage, vasya.playerId)).toContainText('1. Вася');
@@ -89,9 +90,9 @@ test('finish: provisional first, a second with the bonus, the first rejected, th
 
   // The places are recalculated: Petya is the first (provisionally), his bonus is gone; Vasya is off the finish
   await expect(leaderRow(petyaPage, petya.playerId)).toContainText(
-    `1. Петя: ${String(petyaRun.total)} очк., на финише — первое место (предварительно)`,
+    `1. Петя: ${points(petyaRun.total)}, на финише — первое место (предварительно)`,
   );
-  await expect(leaderRow(vasyaPage, vasya.playerId)).toContainText('2. Вася: 0 очк., до финиша');
+  await expect(leaderRow(vasyaPage, vasya.playerId)).toContainText('2. Вася: 0 очков, до финиша');
   view = await seasonOf(vasyaApi, world.seasonId);
   expect(view.me?.finish).toBeNull();
   await expect(vasyaFinish).toHaveCount(0);
@@ -104,7 +105,7 @@ test('finish: provisional first, a second with the bonus, the first rejected, th
   await petyaCard.getByTestId('approve').click();
   await expect(admin.getByTestId('proof-queue')).toContainText('Одобрено');
   await expect(leaderRow(petyaPage, petya.playerId)).toContainText(
-    `1. Петя: ${String(petyaRun.total)} очк., на финише — первое место`,
+    `1. Петя: ${points(petyaRun.total)}, на финише — первое место`,
   );
   await expect(leaderRow(petyaPage, petya.playerId)).not.toContainText('предварительно');
   view = await seasonOf(petyaApi, world.seasonId);
@@ -121,6 +122,6 @@ test('finish: provisional first, a second with the bonus, the first rejected, th
   expect(me?.points).toBe(petyaRun.total);
   expect(after.leaderboard[0]?.playerId).toBe(petya.playerId);
   await expect(leaderRow(petyaPage, petya.playerId)).toContainText(
-    `1. Петя: ${String(petyaRun.total)} очк., на финише`,
+    `1. Петя: ${points(petyaRun.total)}, на финише`,
   );
 });

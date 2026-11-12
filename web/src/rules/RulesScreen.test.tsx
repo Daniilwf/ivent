@@ -127,7 +127,7 @@ describe('the rules page', () => {
     expect(section(t.sections.drop)).toHaveTextContent('Штраф: −2d4 очков и клеток.');
     expect(
       within(screen.getByTestId('rules-bonuses')).getAllByRole('listitem')[0],
-    ).toHaveTextContent('2-е место+10 очк.');
+    ).toHaveTextContent('2-й на финише+10 очков');
     expect(section(t.sections.roll)).toHaveTextContent('ждут 2 прохождения');
   });
 
@@ -165,7 +165,7 @@ describe('the rules page', () => {
         new RegExp(`^Версия 1Сезон начался с этими правилами, 1 октября${year}, 15:00 МСК$`),
       ),
     ]);
-    const bonus = history.getByText('Бонус за финиш: 2-е место').closest('li');
+    const bonus = history.getByText('Бонус за финиш: 2-й на финише').closest('li');
     expect(bonus).toHaveTextContent('Было: 12');
     expect(bonus).toHaveTextContent('Стало: 10');
     const limit = history.getByText('Лимит прохождений на проверке').closest('li');
