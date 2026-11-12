@@ -20,8 +20,9 @@ import { Leaderboard } from '../board/Leaderboard';
 import { cellsToFinish } from '../board/geometry';
 import { demoBoard } from '../board/demoBoard';
 import { ru } from '../i18n/ru';
+import { Summary } from '../ui/Disclosure';
 import { Button, IconButton, type ButtonVariant } from '../ui/Button';
-import { BottomSheet, ConfirmDanger, FormDialog } from '../ui/Dialogs';
+import { BottomSheet, Confirm, ConfirmDanger, FormDialog } from '../ui/Dialogs';
 import { ChoiceGroup, Field, FilePicker, Select } from '../ui/Field';
 import { Badge, Chip, CountBadge, Tag } from '../ui/Marks';
 import { RouteProgress, Skeleton } from '../ui/Progress';
@@ -59,6 +60,7 @@ import {
 import { AdminDemos } from './AdminDemos';
 import { ContentDemos } from './ContentDemos';
 import { InventoryDemos } from './InventoryDemos';
+import { BetsDemos, ShopDemos } from './EconomyDemos';
 
 // The styleguide's cards act on nothing
 const noop = () => undefined;
@@ -445,6 +447,17 @@ export function Styleguide() {
           <Notice tone="warning">{t.feedback.warning}</Notice>
           <Notice tone="danger">{t.feedback.danger}</Notice>
         </div>
+        {/* A folded part, closed and open (K2-5) */}
+        <div className="grid gap-3 desk:grid-cols-2">
+          <details data-testid="sg-fold-closed">
+            <Summary className="font-bold">{ru.turn.proofToSend}</Summary>
+            <p className="pt-1 text-sm text-ink-soft">{t.feedback.folded}</p>
+          </details>
+          <details open data-testid="sg-fold-open">
+            <Summary className="font-bold">{ru.turn.proofSummary}</Summary>
+            <p className="pt-1 text-sm text-ink-soft">{t.feedback.folded}</p>
+          </details>
+        </div>
         <div className="grid gap-4 desk:grid-cols-3">
           <EmptyState
             icon={<Inbox size={28} aria-hidden />}
@@ -623,6 +636,14 @@ export function Styleguide() {
         <InventoryDemos />
       </Section>
 
+      <Section id="shop" title={t.shop.title} lead={t.shop.lead}>
+        <ShopDemos />
+      </Section>
+
+      <Section id="bets" title={t.bets.title} lead={t.bets.lead}>
+        <BetsDemos />
+      </Section>
+
       <Section id="pool" title={t.pool.title} lead={t.pool.lead}>
         <div className="grid items-start gap-4 desk:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
           <ul className="grid gap-3">
@@ -656,6 +677,13 @@ export function Styleguide() {
             title={ru.board.dropTitle(run.title)}
             consequences={dropConsequences}
             confirm={ru.board.dropConfirm}
+            onConfirm={() => undefined}
+          />
+          <Confirm
+            trigger={<Button>{ru.turn.alreadyPlayed}</Button>}
+            title={ru.turn.alreadyPlayedTitle(run.title)}
+            consequences={ru.turn.alreadyPlayedConsequences}
+            confirm={ru.turn.alreadyPlayedYes}
             onConfirm={() => undefined}
           />
           <BottomSheet

@@ -1,7 +1,7 @@
 import { MessagesSquare, SearchX } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Schemas } from '../api/client';
-import { navigate, paths, usePageHeading } from '../app/router';
+import { navigate, paths, useEntryState, usePageHeading, useRestoredScroll } from '../app/router';
 import { useSeasonVersion } from '../app/useSeasonVersion';
 import { ru } from '../i18n/ru';
 import { Button } from '../ui/Button';
@@ -13,7 +13,8 @@ import { fetchFeedPage } from './feedApi';
 
 type Entry = Schemas['FeedEntryView'];
 
-type Feed = { entries: Entry[]; refs: FeedRefs; nextBefore: number | null };
+/** `pages`: how many pages are shown */
+type Feed = { entries: Entry[]; refs: FeedRefs; nextBefore: number | null; pages: number };
 type State =
   { kind: 'loading' } | { kind: 'failed' } | { kind: 'notFound' } | ({ kind: 'ready' } & Feed);
 
@@ -28,6 +29,8 @@ export function FeedScreen({
   const [state, setState] = useState<State>({ kind: 'loading' });
   const heading = usePageHeading();
   const [more, setMore] = useState<'idle' | 'loading' | 'failed'>('idle');
+  // The pages shown stay in the history entry: Back from a profile loads them again and scrolls back (K1A)
+  const [pages, setPages] = useEntryState('feed.pages', 1);
   const [fresh, setFresh] = useState<ReadonlySet<string>>(new Set());
   const [announced, setAnnounced] = useState('');
   // What is shown, for the callbacks that run after an await: they build on the latest, not on their render's
@@ -56,6 +59,7 @@ export function FeedScreen({
         entries: page.entries,
         refs: withRefs(emptyRefs(), page),
         nextBefore: page.nextBefore,
+        pages: 1,
       });
       return;
     }
@@ -104,10 +108,18 @@ export function FeedScreen({
         entries: mergeEntries(latest.entries, result.value.entries),
         refs: withRefs(latest.refs, result.value),
         nextBefore: result.value.nextBefore,
+        pages: latest.pages + 1,
       });
     }
     setMore('idle');
   }
+
+  // Back to the feed: the older pages shown before come again, one after another
+  const restoring = state.kind === 'ready' && state.nextBefore !== null && state.pages < pages;
+  useEffect(() => {
+    if (restoring && more === 'idle') void loadMore();
+  });
+  useRestoredScroll(state.kind === 'ready' && !restoring);
 
   const days = useMemo(
     () => (state.kind === 'ready' ? feedDays(state.entries, state.refs) : []),
@@ -183,7 +195,10 @@ export function FeedScreen({
               <Button
                 data-testid="feed-more"
                 loading={more === 'loading'}
-                onClick={() => void loadMore()}
+                onClick={() => {
+                  setPages(state.pages + 1);
+                  void loadMore();
+                }}
               >
                 {ru.ui.showMore}
               </Button>

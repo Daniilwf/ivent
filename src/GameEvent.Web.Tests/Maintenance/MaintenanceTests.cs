@@ -39,6 +39,41 @@ public sealed class MaintenanceTests : IAsyncLifetime
         Assert.False(Mode.IsOn);
     }
 
+    // Review of K1A-10 (D-617): the page refuses a file over the limit before sending it, by the limits the site is
+    // configured with, not by numbers of its own
+    [Fact]
+    public async Task The_status_names_the_upload_limits_the_site_is_configured_with()
+    {
+        using var configured = _site.WithWebHostBuilder(b => b
+            .UseSetting("Files:MaxUploadBytes", "5000000")
+            .UseSetting("Files:MaxGifBytes", "2000000")
+            .UseSetting("Files:MapBackgroundMaxBytes", "4000000"));
+        var anonymous = configured.CreateClient();
+
+        using var doc = JsonDocument.Parse(await anonymous.GetStringAsync("/api/status", Ct));
+        var uploads = doc.RootElement.GetProperty("uploads");
+
+        Assert.Equal(5_000_000, uploads.GetProperty("picture").GetInt64());
+        Assert.Equal(2_000_000, uploads.GetProperty("gif").GetInt64());
+        Assert.Equal(4_000_000, uploads.GetProperty("mapBackground").GetInt64());
+        Assert.Equal(3 * 1024 * 1024, uploads.GetProperty("bugScreenshot").GetInt64());
+    }
+
+    [Fact]
+    public async Task The_upload_limits_never_pass_the_largest_upload()
+    {
+        using var configured = _site.WithWebHostBuilder(b => b
+            .UseSetting("Files:MaxUploadBytes", "1000000"));
+        var anonymous = configured.CreateClient();
+
+        using var doc = JsonDocument.Parse(await anonymous.GetStringAsync("/api/status", Ct));
+        var uploads = doc.RootElement.GetProperty("uploads");
+
+        Assert.Equal(1_000_000, uploads.GetProperty("gif").GetInt64());
+        Assert.Equal(1_000_000, uploads.GetProperty("mapBackground").GetInt64());
+        Assert.Equal(1_000_000, uploads.GetProperty("bugScreenshot").GetInt64());
+    }
+
     [Fact]
     public async Task The_admin_turns_it_on_and_everyone_sees_the_banner_flag()
     {

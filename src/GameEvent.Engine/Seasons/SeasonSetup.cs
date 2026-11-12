@@ -139,6 +139,13 @@ internal static class SeasonSetup
             return Decision.Reject(RejectionCodes.EffectChoicePending, "An event waits for a player's answer: wait for it or discard it first.");
         }
 
+        // D-603: a manual effect waits until it is marked applied or not applicable (SPEC «Эффекты»); after the finish
+        // nothing changes any more, so it would wait forever
+        if (!state.ManualEffects.IsEmpty)
+        {
+            return Decision.Reject(RejectionCodes.SeasonEffectsPending, "A manual effect waits: resolve every pending effect first.");
+        }
+
         return Decision.Accept(changed, new SeasonResultRecorded(Ranking.Leaderboard.Build(state)));
     }
 

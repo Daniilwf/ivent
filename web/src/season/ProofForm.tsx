@@ -1,5 +1,12 @@
 import { CircleAlert, CircleCheck, Clock, Plus, X } from 'lucide-react';
-import { useRef, useState, type ChangeEvent, type ReactNode, type SyntheticEvent } from 'react';
+import {
+  useId,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type ReactNode,
+  type SyntheticEvent,
+} from 'react';
 import type { Schemas } from '../api/client';
 import { uploadFile, UploadError } from '../api/files';
 import { ru } from '../i18n/ru';
@@ -43,9 +50,11 @@ const statusLook: Record<Schemas['ProofStatus'], { box: string; icon: ReactNode 
 };
 
 /**
- * The proof of the last completed run (D-98, D-116): up to five links, up to five uploaded screenshots and a note, or
- * another player who saw the run. While the proof waits for the admin, a new one replaces it; an approved or rejected
- * proof only shows its status. A mistake is told next to its field.
+ * The proof of a completed run (D-98, D-116): up to five links, up to five uploaded screenshots and a note, or
+ * another player who saw the run. While the proof waits for the admin, a new one replaces it: the form starts with what
+ * was sent — its links, note, witness and screenshots (each can be taken off) — so adding a link keeps the rest (K1S-2).
+ * An approved or rejected proof only shows its status. A mistake is told next to its field. The parent gives the form a
+ * new key when the sent proof changes.
  */
 export function ProofSection({
   proof,
@@ -63,19 +72,25 @@ export function ProofSection({
     files: string[],
   ) => void;
 }) {
-  const [links, setLinks] = useState(['']);
+  const sent = proof?.status === 'pending' ? proof : null;
+  const [links, setLinks] = useState(sent && sent.links.length > 0 ? [...sent.links] : ['']);
+  // The screenshots of the sent proof that stay in the next one
+  const [kept, setKept] = useState<readonly Schemas['FileLinkView'][]>(sent?.files ?? []);
   const [shots, setShots] = useState<Shot[]>([]);
   const [uploading, setUploading] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
-  const [note, setNote] = useState('');
-  const [witness, setWitness] = useState('');
+  const [note, setNote] = useState(sent?.note ?? '');
+  const [witness, setWitness] = useState(
+    sent?.witnessId && witnesses.some((p) => p.id === sent.witnessId) ? sent.witnessId : '',
+  );
   const [problem, setProblem] = useState<Problem | null>(null);
+  const titleId = useId();
 
   function submit(event: SyntheticEvent) {
     event.preventDefault();
     const trimmed = links.map((l) => l.trim());
     const filled = trimmed.filter((l) => l !== '');
-    if (filled.length === 0 && shots.length === 0 && witness === '') {
+    if (filled.length === 0 && shots.length === 0 && kept.length === 0 && witness === '') {
       setProblem({ at: 'form', text: ru.proof.linkRequired });
       return;
     }
@@ -85,12 +100,10 @@ export function ProofSection({
       return;
     }
     setProblem(null);
-    onSubmit(
-      filled,
-      note.trim() === '' ? null : note.trim(),
-      witness === '' ? null : witness,
-      shots.map((s) => s.id),
-    );
+    onSubmit(filled, note.trim() === '' ? null : note.trim(), witness === '' ? null : witness, [
+      ...kept.map((f) => f.id),
+      ...shots.map((s) => s.id),
+    ]);
   }
 
   async function upload(event: ChangeEvent<HTMLInputElement>) {
@@ -122,8 +135,8 @@ export function ProofSection({
 
   const open = proof === null || proof.status === 'pending';
   return (
-    <section aria-labelledby="proof-title" className="grid min-w-0 gap-3">
-      <h4 id="proof-title" className="sr-only">
+    <section aria-labelledby={titleId} className="grid min-w-0 gap-3">
+      <h4 id={titleId} className="sr-only">
         {ru.proof.title}
       </h4>
       {proof && (
@@ -141,10 +154,10 @@ export function ProofSection({
           </p>
         </div>
       )}
-      {proof && proof.files.length > 0 && (
+      {proof && (open ? kept : proof.files).length > 0 && (
         <ul data-testid="proof-files" className="flex flex-wrap gap-2">
-          {proof.files.map((f, i) => (
-            <li key={f.id}>
+          {(open ? kept : proof.files).map((f, i) => (
+            <li key={f.id} className="grid justify-items-center gap-1">
               <a
                 href={f.url}
                 target="_blank"
@@ -159,13 +172,25 @@ export function ProofSection({
                   className="size-18 rounded-sm border-2 border-ink object-cover"
                 />
               </a>
+              {/* A screenshot of the waiting proof stays in the next send unless taken off */}
+              {open ? (
+                <IconButton
+                  label={ru.proof.removeShot(i + 1)}
+                  onClick={() => {
+                    setKept((current) => current.filter((x) => x.id !== f.id));
+                    requestAnimationFrame(() => fileInput.current?.focus());
+                  }}
+                >
+                  <X size={20} aria-hidden />
+                </IconButton>
+              ) : null}
             </li>
           ))}
         </ul>
       )}
       {open && (
         <form onSubmit={submit} noValidate data-testid="proof-form" className="grid min-w-0 gap-4">
-          <p className="text-sm text-ink-soft">{ru.proof.lead}</p>
+          <p className="text-sm text-ink-soft">{sent ? ru.proof.replaces : ru.proof.lead}</p>
           <CompletionRulesLink className="justify-self-start" />
           {links.map((value, i) => (
             <Field
@@ -201,13 +226,13 @@ export function ProofSection({
                 <li key={s.id} className="grid justify-items-center gap-1">
                   <img
                     src={s.thumbnailUrl}
-                    alt={ru.proof.shotAlt(i + 1)}
+                    alt={ru.proof.shotAlt(kept.length + i + 1)}
                     width={72}
                     height={72}
                     className="size-18 rounded-sm border-2 border-ink object-cover"
                   />
                   <IconButton
-                    label={ru.proof.removeShot(i + 1)}
+                    label={ru.proof.removeShot(kept.length + i + 1)}
                     onClick={() => {
                       setShots((current) => current.filter((x) => x.id !== s.id));
                       // The button is gone: the keyboard goes on from the file picker
@@ -220,12 +245,12 @@ export function ProofSection({
               ))}
             </ul>
           )}
-          {shots.length < maxFiles && (
+          {kept.length + shots.length < maxFiles && (
             <FilePicker
               ref={fileInput}
               data-testid="proof-file"
               label={ru.proof.shot}
-              hint={ru.proof.shotHint(maxFiles - shots.length)}
+              hint={ru.proof.shotHint(maxFiles - kept.length - shots.length)}
               accept={pictureTypes}
               busy={uploading}
               onChange={(e) => {

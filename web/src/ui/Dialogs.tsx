@@ -8,19 +8,7 @@ import { cx } from './cx';
 
 const overlay = 'fixed inset-0 z-20 bg-ink/40';
 
-/** Confirms a dangerous action and shows what it costs: «Дроп: −2d4 очков и клеток и плохой ивент» */
-export function ConfirmDanger({
-  trigger,
-  title,
-  consequences,
-  confirm,
-  onConfirm,
-  busy = false,
-  open,
-  onOpenChange,
-  children,
-  testId,
-}: {
+type ConfirmProps = {
   trigger?: ReactNode;
   title: string;
   consequences: readonly string[];
@@ -36,7 +24,34 @@ export function ConfirmDanger({
   children?: ReactNode;
   /** The window's test id; its buttons get `-yes` and `-no` */
   testId?: string;
-}) {
+};
+
+/**
+ * Confirms a dangerous action and shows what it costs: «Дроп: −2d4 очков и клеток и плохой ивент». Only for an action
+ * with a loss (points, cells, an event, a rollback, a rejection): red means a loss (DESIGN.md «Компоненты и состояния»)
+ */
+export function ConfirmDanger(props: ConfirmProps) {
+  return <ConfirmWindow {...props} yes="dangerMain" />;
+}
+
+/** Confirms an answer that costs nothing but is not taken back by a click («Уже проходил»): its yes is the main one */
+export function Confirm(props: ConfirmProps) {
+  return <ConfirmWindow {...props} yes="main" />;
+}
+
+function ConfirmWindow({
+  trigger,
+  title,
+  consequences,
+  confirm,
+  onConfirm,
+  busy = false,
+  open,
+  onOpenChange,
+  children,
+  testId,
+  yes,
+}: ConfirmProps & { yes: 'dangerMain' | 'main' }) {
   return (
     <AlertDialog.Root
       {...(open === undefined ? {} : { open })}
@@ -65,7 +80,7 @@ export function ConfirmDanger({
               <Button data-testid={testId && `${testId}-no`}>{ru.ui.cancel}</Button>
             </AlertDialog.Cancel>
             <Button
-              variant="dangerMain"
+              variant={yes}
               data-testid={testId && `${testId}-yes`}
               loading={busy}
               onClick={onConfirm}

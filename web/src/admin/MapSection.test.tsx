@@ -42,6 +42,9 @@ const view = (overrides: Partial<Schemas['AdminMapView']> = {}): Schemas['AdminM
   status: 'active',
   map: published,
   players: [{ playerId: 'p1', name: 'Вася', cellId: 'c1', finished: false, choosingBranch: false }],
+  version: 0,
+  events: false,
+  shop: false,
   ...overrides,
 });
 
@@ -189,6 +192,24 @@ describe('the map editor', () => {
     expect(screen.getByTestId('map-cell')).toHaveTextContent(t.cell.title('start'));
   });
 
+  it('names the bounds when a bonus is past them, not only a missing parameter (K1M-5)', async () => {
+    onDesktop();
+    fakeServer({
+      'GET /api/admin/seasons/*/map': view(),
+      'POST /api/admin/seasons/*/map/check': {
+        canPublish: false,
+        problems: [{ code: 'map.cellParameter', subject: 'c1', message: '' }],
+        warnings: [],
+      },
+    });
+    render(<MapSection seasonId={seasonId} version={0} />);
+
+    // The engine turns a bonus of 20 000 down with this code: the admin learns the ceiling from the words
+    const problems = await screen.findByTestId('map-problems', {}, afterEdit);
+    expect(problems).toHaveTextContent('c1');
+    expect(problems).toHaveTextContent('10 000');
+  });
+
   it('builds a fork with the keyboard panel and publishes it after the confirmation', async () => {
     onDesktop();
     const server = fakeServer({
@@ -327,6 +348,178 @@ describe('the map editor', () => {
     expect(screen.queryByTestId('map-changed')).not.toBeInTheDocument();
   });
 
+  it('offers no event or shop cell while those mechanics are off (K1A, D-302)', async () => {
+    onDesktop();
+    fakeServer({
+      'GET /api/admin/seasons/*/map': view(),
+      'POST /api/admin/seasons/*/map/check': ok,
+    });
+    render(<MapSection seasonId={seasonId} version={0} />);
+    await screen.findByText(t.check.ok, {}, afterEdit);
+
+    await userEvent.selectOptions(screen.getByTestId('map-cell-pick'), 'c1');
+    const options = within(screen.getByTestId('map-cell-type'))
+      .getAllByRole('option')
+      .map((o) => (o as HTMLOptionElement).value);
+    expect(options).not.toContain('event');
+    expect(options).not.toContain('shop');
+    expect(options).toContain('teleport');
+  });
+
+  it('offers the event and shop cells once their mechanics are on', async () => {
+    onDesktop();
+    fakeServer({
+      'GET /api/admin/seasons/*/map': view({ events: true, shop: true }),
+      'POST /api/admin/seasons/*/map/check': ok,
+    });
+    render(<MapSection seasonId={seasonId} version={0} />);
+    await screen.findByText(t.check.ok, {}, afterEdit);
+
+    await userEvent.selectOptions(screen.getByTestId('map-cell-pick'), 'c1');
+    const options = within(screen.getByTestId('map-cell-type'))
+      .getAllByRole('option')
+      .map((o) => (o as HTMLOptionElement).value);
+    expect(options).toEqual(expect.arrayContaining(['event', 'shop']));
+  });
+
+  it('names the zone and the field of each zone error (K1A)', async () => {
+    onDesktop();
+    fakeServer({
+      'GET /api/admin/seasons/*/map': view({
+        map: { ...published, zones: [{ id: 'zone-1', name: 'Зона 1' }] },
+      }),
+      'POST /api/admin/seasons/*/map/check': {
+        canPublish: false,
+        problems: [
+          {
+            code: 'map.zoneInvalid',
+            subject: 'zone-1',
+            message: '$.rollFilter.minHours: «minHours» is at most «maxHours».',
+          },
+          {
+            code: 'map.zoneInvalid',
+            subject: 'zone-1',
+            message: '$.dropPenaltyMultiplier: A multiplier is above 0.',
+          },
+        ],
+        warnings: [],
+      },
+    });
+    render(<MapSection seasonId={seasonId} version={0} />);
+
+    const problems = await screen.findByTestId('map-problems', {}, afterEdit);
+    expect(problems).toHaveTextContent(t.zoneProblem('Зона 1', '$.rollFilter.minHours'));
+    expect(problems).toHaveTextContent(t.zoneProblem('Зона 1', '$.dropPenaltyMultiplier'));
+    expect(t.zoneProblem('Зона 1', '$.rollFilter.minHours')).not.toBe(
+      t.zoneProblem('Зона 1', '$.dropPenaltyMultiplier'),
+    );
+    expect(problems).not.toHaveTextContent('zone-1');
+  });
+
+  it('says at the field that a zone number is not a number', async () => {
+    onDesktop();
+    fakeServer({
+      'GET /api/admin/seasons/*/map': view({
+        map: { ...published, zones: [{ id: 'zone-1', name: 'Зона 1' }] },
+      }),
+      'POST /api/admin/seasons/*/map/check': ok,
+    });
+    render(<MapSection seasonId={seasonId} version={0} />);
+    const zone = await screen.findByTestId('map-zone-zone-1');
+
+    await userEvent.type(within(zone).getByLabelText(t.zone.drop, { exact: false }), 'abc');
+
+    expect(within(zone).getByText(t.zone.notNumber)).toBeInTheDocument();
+  });
+
+  it('publishes naming the map version the draft was made from (K1A, D-616)', async () => {
+    onDesktop();
+    const server = fakeServer({
+      'GET /api/admin/seasons/*/map': view({ version: 3 }),
+      'POST /api/admin/seasons/*/map/check': (call) => ({
+        body: sameMap(call.body as Draft, published as Draft) ? { ...ok, canPublish: false } : ok,
+      }),
+      'POST /api/admin/seasons/*/map/publish': { duplicate: false, events: [] },
+    });
+    render(<MapSection seasonId={seasonId} version={0} />);
+    await screen.findByText(t.check.unchanged, {}, afterEdit);
+
+    await userEvent.selectOptions(screen.getByTestId('map-cell-pick'), 'c1');
+    await userEvent.selectOptions(screen.getByTestId('map-cell-type'), 'checkpoint');
+    await screen.findByText(t.check.ok, {}, afterEdit);
+    await userEvent.type(screen.getByTestId('map-publish-comment'), 'Чекпоинт');
+    await userEvent.click(screen.getByTestId('map-publish-button'));
+    await userEvent.click(
+      within(await screen.findByTestId('map-publish-confirm')).getByRole('button', {
+        name: t.publish.confirm,
+      }),
+    );
+
+    expect(await screen.findByText(t.publish.done)).toBeInTheDocument();
+    expect(server.sent('POST', '/map/publish')[0]?.body).toMatchObject({ expectedVersion: 3 });
+  });
+
+  it('says a map published since in another tab made the open draft stale', async () => {
+    onDesktop();
+    let current = view({ version: 0 });
+    fakeServer({
+      'GET /api/admin/seasons/*/map': () => ({ body: current }),
+      'POST /api/admin/seasons/*/map/check': ok,
+    });
+    const { rerender } = render(<MapSection seasonId={seasonId} version={0} />);
+    await screen.findByText(t.check.ok, {}, afterEdit);
+    await userEvent.selectOptions(screen.getByTestId('map-cell-pick'), 'c1');
+    await userEvent.selectOptions(screen.getByTestId('map-cell-type'), 'checkpoint');
+
+    // Another tab publishes a bonus on c1: the season's version moves on and the map is read again
+    current = view({
+      version: 1,
+      map: {
+        ...published,
+        cells: (published.cells ?? []).map((c) =>
+          c.id === 'c1' ? { ...c, type: 'pointsBonus', amount: 9 } : c,
+        ),
+      },
+    });
+    rerender(<MapSection seasonId={seasonId} version={1} />);
+
+    expect(await screen.findByText(t.draftOutdated)).toBeInTheDocument();
+
+    // Back to the published map: the newer one, and the warning goes
+    await userEvent.click(screen.getByRole('button', { name: t.reset }));
+    expect(screen.queryByText(t.draftOutdated)).toBeNull();
+    await userEvent.selectOptions(screen.getByTestId('map-cell-pick'), 'c1');
+    expect(screen.getByTestId('map-cell-type')).toHaveValue('pointsBonus');
+  });
+
+  it('takes a map published since when the draft has no edits of its own', async () => {
+    onDesktop();
+    let current = view({ version: 0 });
+    fakeServer({
+      'GET /api/admin/seasons/*/map': () => ({ body: current }),
+      'POST /api/admin/seasons/*/map/check': ok,
+    });
+    const { rerender } = render(<MapSection seasonId={seasonId} version={0} />);
+    await screen.findByText(t.check.ok, {}, afterEdit);
+
+    current = view({
+      version: 1,
+      map: {
+        ...published,
+        cells: (published.cells ?? []).map((c) =>
+          c.id === 'c1' ? { ...c, type: 'checkpoint' } : c,
+        ),
+      },
+    });
+    rerender(<MapSection seasonId={seasonId} version={1} />);
+
+    await userEvent.selectOptions(await screen.findByTestId('map-cell-pick'), 'c1');
+    await vi.waitFor(() => {
+      expect(screen.getByTestId('map-cell-type')).toHaveValue('checkpoint');
+    });
+    expect(screen.queryByText(t.draftOutdated)).toBeNull();
+  });
+
   it('says a linear season needs the graph mode first', async () => {
     onDesktop();
     fakeServer({
@@ -336,6 +529,8 @@ describe('the map editor', () => {
     render(<MapSection seasonId={seasonId} version={0} />);
 
     expect(await screen.findByText(t.linear)).toBeInTheDocument();
+    // The mode is named in words; the config key stays in the JSON editor (design review of fix/stage12-close)
+    expect(t.linear).not.toMatch(/mapMode|graph/);
   });
 
   it('shows the map read-only on a phone', async () => {
@@ -347,6 +542,28 @@ describe('the map editor', () => {
 
     expect(await screen.findByTestId('map-phone')).toHaveTextContent(t.phone);
     expect(screen.queryByTestId('map-editor')).not.toBeInTheDocument();
+    // Its zoom buttons stand at the bottom, as on every map (K2-4)
+    expect(screen.getByRole('button', { name: ru.board.zoomIn }).parentElement).toHaveClass(
+      'bottom-3',
+    );
+  });
+
+  it('draws no token on the start for a player on a cell the map does not know', async () => {
+    fakeServer({
+      'GET /api/admin/seasons/*/map': view({
+        players: [
+          { playerId: 'p1', name: 'Вася', cellId: 'c1', finished: false, choosingBranch: false },
+          { playerId: 'p2', name: 'Лиса', cellId: 'gone', finished: false, choosingBranch: false },
+        ],
+      }),
+      'POST /api/admin/seasons/*/map/check': ok,
+    });
+    render(<MapSection seasonId={seasonId} version={0} />);
+
+    await screen.findByTestId('map-phone');
+    // Cell number 0 is the start since the numbering from 0 (D-622): an unknown cell is not drawn as the start
+    expect(document.querySelector('[data-player="p1"]')).toBeInTheDocument();
+    expect(document.querySelector('[data-player="p2"]')).not.toBeInTheDocument();
   });
 
   it('offers a retry when the page cannot load', async () => {

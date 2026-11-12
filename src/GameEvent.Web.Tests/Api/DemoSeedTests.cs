@@ -145,6 +145,16 @@ public sealed class DemoSeedTests : IAsyncLifetime
         Assert.Equal(50, await db.Games.CountAsync(Ct));
         Assert.True(await db.Games.AnyAsync(g => g.Note != null, Ct));
         Assert.True((await SeasonIntegrity.CheckAsync(db, DevSeed.SeasonId, Ct))!.IsIntact);
+
+        // Stage 5 (5.2): the graph map with event cells, items and events on, the decks published once
+        var season = await db.Seasons.SingleAsync(s => s.Id == DevSeed.SeasonId, Ct);
+        var rules = JsonDocument.Parse(season.RulesetJson).RootElement.GetProperty("features");
+        Assert.Equal(("graph", true, true), (rules.GetProperty("mapMode").GetString(), rules.GetProperty("items").GetBoolean(), rules.GetProperty("events").GetBoolean()));
+        var map = await Web.Map.SeasonMaps.CurrentAsync(db, DevSeed.SeasonId, Ct);
+        Assert.Contains(map!.Cells, c => c.Type == Engine.Map.CellType.Event);
+        var published = await db.Events.Where(e => e.SeasonId == DevSeed.SeasonId && e.Type == "content-published").ToListAsync(Ct);
+        var pack = JsonDocument.Parse(Assert.Single(published).Data).RootElement.GetProperty("pack");
+        Assert.Contains(pack.GetProperty("wheels").EnumerateArray(), w => w.TryGetProperty("deck", out _));
     }
 
     // ---- Helpers ----

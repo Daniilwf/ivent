@@ -10,13 +10,16 @@ const isPaid = (price: Price | null) =>
   price !== null &&
   (price.payment === 'badEvent' || (price.payment === 'coins' && price.coins > 0));
 
-/** «Реролл» with its price (D-93); a paid reroll asks for confirmation first. */
+/** «Реролл» with its price (D-93); a paid reroll asks for confirmation first, with my balance (K1S-3). */
 export function RerollButton({
   price,
+  coins = null,
   pending,
   onReroll,
 }: {
   price: Price | null;
+  /** My coins, when the server says */
+  coins?: number | null;
   pending: boolean;
   onReroll: () => void;
 }) {
@@ -52,7 +55,7 @@ export function RerollButton({
         }}
       >
         <p ref={question} tabIndex={-1} className="focus:outline-none">
-          {ru.turn.rerollConfirm(price.payment, price.coins)}
+          {ru.turn.rerollConfirm(price.payment, price.coins, coins)}
         </p>
         <div className="flex flex-wrap gap-3">
           {/* Not the screen's main blue: «Начать» stays the one main action */}

@@ -268,7 +268,8 @@ public static class FileEndpoints
     private static int DailyLimitOf(FileKind kind, FileLimits limits) =>
         kind == FileKind.BugScreenshot ? BugReportRules.ScreenshotsPerDay : limits.UploadsPerDay;
 
-    private static long MaxBytes(FileKind kind, FileLimits limits) => kind switch
+    /// <summary>The largest upload of a kind; <c>/api/status</c> names it to the pages (D-617).</summary>
+    internal static long MaxBytes(FileKind kind, FileLimits limits) => kind switch
     {
         FileKind.BugScreenshot => Math.Min(limits.MaxUploadBytes, BugReportRules.ScreenshotMaxBytes),
         FileKind.MapBackground => Math.Min(limits.MaxUploadBytes, limits.MapBackgroundMaxBytes),

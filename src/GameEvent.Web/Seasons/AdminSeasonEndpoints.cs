@@ -33,10 +33,20 @@ public sealed record UndoRequest(Guid CommandId, Guid TargetCommandId, string? C
 
 /// <summary>
 /// A command of the season log, newest first (D-104): what the admin picks to undo. <c>undone</c> — undone already;
-/// <c>events</c> — the types of its events in order.
+/// <c>events</c> — the types of its events in order; <c>playerName</c>, <c>gameTitle</c>, <c>comment</c> — whom and what
+/// the command touched, from its first event that names them, so identical rows are told apart before an undo (K1A;
+/// null when none does).
 /// </summary>
 public sealed record AdminCommandView(
-    Guid CommandId, string CommandType, string? AuthorName, DateTimeOffset OccurredAt, bool Undone, IReadOnlyList<string> Events);
+    Guid CommandId,
+    string CommandType,
+    string? AuthorName,
+    DateTimeOffset OccurredAt,
+    bool Undone,
+    IReadOnlyList<string> Events,
+    string? PlayerName = null,
+    string? GameTitle = null,
+    string? Comment = null);
 
 /// <summary>The admin's season actions: the lifecycle (D-101) and resolving manual effects (D-102).</summary>
 public static class AdminSeasonEndpoints
@@ -164,19 +174,32 @@ public static class AdminSeasonEndpoints
             .OrderBy(e => e.Sequence)
             .ToListAsync(ct);
         var authors = await db.NamesAsync(rows.Select(r => r.AuthorId).OfType<Guid>(), ct);
+
+        // Whom and what each command touched: the first player, run or game and comment its events name (K1A)
+        var facts = rows.GroupBy(r => r.CommandId).ToDictionary(g => g.Key, g => CommandFacts.Of(g.Select(r => r.Data)));
+        var players = await db.SeasonPlayers.AsNoTracking().Where(p => p.SeasonId == seasonId).ToDictionaryAsync(p => p.Id, p => p.Name, ct);
+        var runIds = facts.Values.Select(f => f.RunId).OfType<Guid>().Distinct().ToList();
+        var runGames = await db.Runs.AsNoTracking().Where(r => runIds.Contains(r.Id)).ToDictionaryAsync(r => r.Id, r => r.GameId, ct);
+        var gameIds = facts.Values.Select(f => f.GameId).OfType<Guid>().Concat(runGames.Values).Distinct().ToList();
+        var titles = await db.Games.AsNoTracking().Where(g => gameIds.Contains(g.Id)).ToDictionaryAsync(g => g.Id, g => g.Title, ct);
         IReadOnlyList<AdminCommandView> commands = [.. rows
             .GroupBy(r => r.CommandId)
             .OrderByDescending(g => g.Max(r => r.Sequence))
             .Select(g =>
             {
                 var first = g.First();
+                var fact = facts[g.Key];
+                var gameId = fact.GameId ?? (fact.RunId is { } runId && runGames.TryGetValue(runId, out var game) ? game : null);
                 return new AdminCommandView(
                     g.Key,
                     first.CommandType,
                     first.AuthorId is { } author ? authors.GetValueOrDefault(author) : null,
                     first.OccurredAt,
                     g.Any(r => r.UndoneByEventId is not null),
-                    [.. g.Select(r => r.Type)]);
+                    [.. g.Select(r => r.Type)],
+                    fact.PlayerId is { } player ? players.GetValueOrDefault(player) : null,
+                    gameId is { } id ? titles.GetValueOrDefault(id) : null,
+                    fact.Comment);
             })];
         return TypedResults.Ok(commands);
     }
@@ -187,4 +210,38 @@ public static class AdminSeasonEndpoints
         return await SeasonEndpoints.PrecheckAsync(seasonId, commandId, db, ct)
             ?? await SeasonEndpoints.SendAsync(seasonId, commandId, command, user.UserId(), bus, ct);
     }
+}
+
+/// <summary>The first player, run, game and comment the events of one command name, read from their stored JSON.</summary>
+internal sealed record CommandFacts(Guid? PlayerId, Guid? RunId, Guid? GameId, string? Comment)
+{
+    public static CommandFacts Of(IEnumerable<string> events)
+    {
+        Guid? player = null, run = null, game = null;
+        string? comment = null;
+        foreach (var data in events)
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(data);
+            if (doc.RootElement.ValueKind != System.Text.Json.JsonValueKind.Object)
+            {
+                continue;
+            }
+
+            player ??= GuidOf(doc.RootElement, "playerId");
+            run ??= GuidOf(doc.RootElement, "runId");
+            game ??= GuidOf(doc.RootElement, "gameId");
+            if (comment is null && doc.RootElement.TryGetProperty("comment", out var text) && text.ValueKind == System.Text.Json.JsonValueKind.String
+                && !string.IsNullOrWhiteSpace(text.GetString()))
+            {
+                comment = text.GetString();
+            }
+        }
+
+        return new CommandFacts(player, run, game, comment);
+    }
+
+    private static Guid? GuidOf(System.Text.Json.JsonElement root, string name) =>
+        root.TryGetProperty(name, out var value) && value.ValueKind == System.Text.Json.JsonValueKind.String && value.TryGetGuid(out var id)
+            ? id
+            : null;
 }

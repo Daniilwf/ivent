@@ -96,6 +96,8 @@
 
   /* ---- Space: Tailwind's 4 px step; the linter allows whole steps only ---- */
   --spacing: 4px;
+  /* The smallest label on the map, in frame pixels: the camera opens closer rather than show one smaller (camera.ts) */
+  --map-label-min: 9px;
 
   /* ---- Radii by level: a tag, a row, a card, a pill ---- */
   --radius-*: initial;
@@ -239,6 +241,15 @@
        bar at the bottom (WCAG 2.4.11) */
     scroll-padding-top: calc(var(--spacing) * 20);
     scroll-padding-bottom: calc(var(--spacing) * 24);
+  }
+
+  /* A folded part opens by its own line with a lucide chevron (ui/Disclosure.tsx, K2-5): no browser triangle */
+  summary {
+    list-style: none;
+  }
+
+  summary::-webkit-details-marker {
+    display: none;
   }
 
   /* One visible focus everywhere: an ink ring, clear of the element */

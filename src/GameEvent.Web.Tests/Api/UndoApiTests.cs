@@ -130,6 +130,31 @@ public sealed class UndoApiTests : IAsyncLifetime
         Assert.False(string.IsNullOrEmpty(list[1].GetProperty("authorName").GetString()));
     }
 
+    [Fact]
+    public async Task Each_command_names_whom_and_what_it_touched_and_its_comment()
+    {
+        // K1A: identical rows «Игрок добавлен», «Правка игрока» are told apart before an undo
+        var vasya = await _site.SignedInAsync("vasya");
+        var admin = await _site.SignedInAsync("admin");
+        await PostOkAsync(vasya, Url("roll"), new { commandId = Guid.NewGuid() });
+        await PostOkAsync(vasya, Url("start"), new { commandId = Guid.NewGuid() });
+        var adjust = Guid.NewGuid();
+        await PostOkAsync(
+            admin, AdminUrl($"players/{_site.Players["petya"]}/adjust"), new { commandId = adjust, pointsDelta = 3, comment = "За стрим" });
+
+        using var doc = JsonDocument.Parse(await admin.GetStringAsync(AdminUrl("commands"), Ct));
+        var list = doc.RootElement.EnumerateArray().ToList();
+
+        var adjusted = list.Single(c => c.GetProperty("commandId").GetGuid() == adjust);
+        Assert.Equal("petya", adjusted.GetProperty("playerName").GetString());
+        Assert.Equal("За стрим", adjusted.GetProperty("comment").GetString());
+        var started = list.Single(c => c.GetProperty("commandType").GetString() == "StartRun");
+        Assert.Equal("vasya", started.GetProperty("playerName").GetString());
+        Assert.False(string.IsNullOrEmpty(started.GetProperty("gameTitle").GetString()));
+        var added = list.Where(c => c.GetProperty("commandType").GetString() == "AddSeasonPlayer").Select(c => c.GetProperty("playerName").GetString());
+        Assert.Equal(["petya", "vasya"], added.Order());
+    }
+
     // ---- Rule refusals: 409 ----
 
     [Fact]

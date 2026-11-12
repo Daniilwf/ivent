@@ -1,7 +1,7 @@
 import { BookOpen } from 'lucide-react';
 import { paths } from '../app/router';
 import { ru } from '../i18n/ru';
-import { inlineLink } from '../ui/buttonStyles';
+import { standaloneLink } from '../ui/buttonStyles';
 import { cx } from '../ui/cx';
 
 /**
@@ -15,7 +15,7 @@ export function CompletionRulesLink({ className }: { className?: string }) {
       href={`${paths.rules()}#rules-completion`}
       target="_blank"
       rel="noopener"
-      className={cx(inlineLink, 'inline-flex min-h-11 items-center gap-2 text-sm', className)}
+      className={cx(standaloneLink, 'gap-2 text-sm', className)}
     >
       <BookOpen size={16} aria-hidden className="shrink-0" />
       {ru.rules.sections.completion}

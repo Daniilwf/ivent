@@ -10,7 +10,12 @@ namespace GameEvent.Engine.Map;
 /// publication, D-300, D-308). Checked like a new map, and the cells where players stand must stay. Only in the graph
 /// mode, while the season is a draft or running.
 /// </summary>
-public sealed record PublishMap(MapGraph Map, string Comment) : ICommand;
+/// <remarks>
+/// <paramref name="ExpectedVersion"/> is the map version the draft was made from (<see cref="SeasonState.MapVersion"/>):
+/// if the map was published since, the command is refused instead of silently overwriting it (D-616); null skips the
+/// check (scripts, tests).
+/// </remarks>
+public sealed record PublishMap(MapGraph Map, string Comment, int? ExpectedVersion = null) : ICommand;
 
 /// <summary>A new version of the map, stored whole. A player whose last path segment no longer lies on its arrows starts a new segment at their cell.</summary>
 [EventType("map-published")]
@@ -82,6 +87,13 @@ internal static class MapPublishing
             return Decision.Reject(RejectionCodes.CommentTooLong, $"The comment is limited to {Limits.MaxCommentLength} characters.");
         }
 
+        if (command.ExpectedVersion is { } expected && expected != state.MapVersion)
+        {
+            return Decision.Reject(
+                RejectionCodes.MapVersionConflict,
+                $"The draft was made from map version {expected}, but version {state.MapVersion} is published now.");
+        }
+
         if (MapValidator.Check(command.Map, state.Rules) is { } invalid)
         {
             return invalid;
@@ -110,7 +122,7 @@ internal static class MapPublishing
             }
         }
 
-        return state with { Map = e.Map, Players = players };
+        return state with { Map = e.Map, Players = players, MapVersion = state.MapVersion + 1 };
     }
 
     /// <summary>

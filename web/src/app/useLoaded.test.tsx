@@ -1,4 +1,6 @@
-import { act, renderHook, waitFor } from '@testing-library/react';
+import { act, render, renderHook, screen, waitFor } from '@testing-library/react';
+import { ru } from '../i18n/ru';
+import { AsyncState } from '../ui/AsyncState';
 import { answerOf, useLoaded, type Answer } from './useLoaded';
 
 // One loader for every page (D-202): the feed's pages, the rules and the admin's sections.
@@ -132,5 +134,36 @@ describe('answerOf', () => {
     expect(answerOf({ response: response(401) })).toEqual({ kind: 'signedOut' });
     expect(answerOf({ response: response(404) })).toEqual({ kind: 'notFound' });
     expect(answerOf({ response: response(500) })).toEqual({ kind: 'failed' });
+  });
+
+  it('reads the rate limit as «too often», not as a lost connection (K1A)', () => {
+    expect(answerOf({ response: new Response(null, { status: 429 }) })).toEqual({
+      kind: 'failed',
+      tooOften: true,
+    });
+  });
+});
+
+describe('AsyncState', () => {
+  it('says to wait a minute when the server answered «too often»', () => {
+    render(
+      <AsyncState
+        loaded={{ kind: 'failed', tooOften: true, reload: () => {} }}
+        errorTitle="Не загрузилось"
+      >
+        {() => null}
+      </AsyncState>,
+    );
+    expect(screen.getByText(ru.shell.tooOftenText)).toBeInTheDocument();
+    expect(screen.queryByText(ru.shell.loadErrorText)).toBeNull();
+  });
+
+  it('keeps the connection text for any other failure', () => {
+    render(
+      <AsyncState loaded={{ kind: 'failed', reload: () => {} }} errorTitle="Не загрузилось">
+        {() => null}
+      </AsyncState>,
+    );
+    expect(screen.getByText(ru.shell.loadErrorText)).toBeInTheDocument();
   });
 });
