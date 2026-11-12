@@ -48,11 +48,12 @@ public class WeeklyChallengeInvariantTests
         {
             var x = (uint)seed + 7;
             var script = Enumerable.Range(0, 200).Select(_ => (byte)((x = (x * 1103515245) + 12345) >> 16)).ToArray();
-            Play(seed, script, (s, _, _) =>
+            // The manual challenge by its id: a random undo may take back its setting while nobody completed it (D-577)
+            Play(seed, script, (s, _, manual) =>
             {
                 completed += s.Last.Events.OfType<WeeklyChallengeCompleted>().Count();
                 revoked += s.Last.Events.OfType<WeeklyChallengeRevoked>().Count();
-                marked += s.Last.Events.OfType<WeeklyChallengeCompleted>().Count(c => c.ChallengeId == s.State.WeeklyChallenges.Values.Single(w => w.Definition.Check == Engine.Content.ChallengeCheck.Manual).ChallengeId);
+                marked += s.Last.Events.OfType<WeeklyChallengeCompleted>().Count(c => c.ChallengeId == manual);
             });
         }
 

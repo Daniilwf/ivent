@@ -76,6 +76,7 @@ public static class RejectionCodes
 
     /// <summary>Bets are switched off only when none is open and no win waits for its run's proof (D-420).</summary>
     public const string BetsInPlay = "ruleset.betsInPlay";
+    public const string WeeklyChallengeInPlay = "ruleset.weeklyChallengeInPlay";
     public const string MapOccupiedCellRemoved = "map.occupiedCellRemoved";
     public const string MapUnchanged = "map.unchanged";
     public const string MapOccupiedCellRetyped = "map.occupiedCellRetyped";
@@ -128,4 +129,14 @@ public static class RejectionCodes
 
     /// <summary>A content pack over the size limits of <c>ContentPublishing</c> (NB-SEC-3, D-653).</summary>
     public const string ContentTooLarge = "content.tooLarge";
+
+    public const string WeeklyChallengeUnknown = "weeklyChallenge.unknown";
+    public const string WeeklyChallengeAlreadyCompleted = "weeklyChallenge.alreadyCompleted";
+    public const string WeeklyChallengeOutsideWindow = "weeklyChallenge.outsideWindow";
+    public const string WeeklyChallengeNotManual = "weeklyChallenge.notManual";
+    public const string SuggestionUnknown = "suggestion.unknown";
+    public const string SuggestionAlreadyReviewed = "suggestion.alreadyReviewed";
+    public const string SuggestionDailyLimit = "suggestion.dailyLimit";
+    public const string SuggestionEmpty = "suggestion.empty";
+    public const string SuggestionGameRequired = "suggestion.gameRequired";
 }

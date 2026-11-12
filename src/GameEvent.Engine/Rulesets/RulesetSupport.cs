@@ -27,7 +27,7 @@ public static class RulesetSupport
         foreach (var (name, on) in new[]
         {
             ("polls", f.Polls),
-            ("achievements", f.Achievements), ("weeklyChallenge", f.WeeklyChallenge), ("partnerBoard", f.PartnerBoard),
+            ("achievements", f.Achievements), ("partnerBoard", f.PartnerBoard),
             ("reactions", f.Reactions), ("comments", f.Comments), ("gallery", f.Gallery),
         })
         {

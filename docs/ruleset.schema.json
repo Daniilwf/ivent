@@ -48,6 +48,9 @@
         },
         "challenges": {
           "type": "boolean"
+        },
+        "suggestions": {
+          "type": "boolean"
         }
       },
       "required": [
@@ -733,6 +736,12 @@
       "properties": {
         "defaultRewardCoins": {
           "type": "integer"
+        },
+        "durationDays": {
+          "type": [
+            "integer",
+            "null"
+          ]
         }
       },
       "required": [
@@ -757,6 +766,21 @@
       },
       "required": [
         "defaultDeck"
+      ],
+      "additionalProperties": false
+    },
+    "suggestions": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "properties": {
+        "perDay": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "perDay"
       ],
       "additionalProperties": false
     }

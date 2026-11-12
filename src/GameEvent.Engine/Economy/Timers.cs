@@ -71,14 +71,17 @@ public static class Timers
 }
 
 /// <summary>
-/// What follows a command's own events without being an effect (D-413): bets are decided, the shop price starts over,
+/// What follows a command's own events without being an effect (D-413): bets are decided, weekly challenges are completed
+/// or taken back (D-526), the shop price starts over,
 /// objects living for some runs count one down. Not limited by the effect chain: a settlement must never be cut.
 /// Writes nothing while the season has none of it, nor for a mechanic switched off (D-420).
 /// </summary>
 internal static class Settlements
 {
-    public static IReadOnlyList<IGameEvent> After(SeasonState state, IReadOnlyList<IGameEvent> events) =>
-        Each(state, events, (s, e) => (s.Rules.Features.Bets ? Betting.Settle(s, e) : []).Concat(s.Rules.Features.Shop ? ShopReset(s, e) : []));
+    public static IReadOnlyList<IGameEvent> After(SeasonState state, IReadOnlyList<IGameEvent> events, Pool.IPoolView pool) =>
+        Each(state, events, (s, e) => (s.Rules.Features.Bets ? Betting.Settle(s, e) : [])
+            .Concat(s.Rules.Features.WeeklyChallenge ? Challenges.WeeklyChallenges.Settle(s, pool, e) : [])
+            .Concat(s.Rules.Features.Shop ? ShopReset(s, e) : []));
 
     /// <summary>
     /// After the effects fired: an object living for some runs counts one down when a run of its owner ends, so it still
