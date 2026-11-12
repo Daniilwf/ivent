@@ -1,7 +1,7 @@
 using GameEvent.Engine.Content;
 using GameEvent.Engine.Economy;
-using GameEvent.Engine.Inventory;
 using GameEvent.Engine.Effects;
+using GameEvent.Engine.Inventory;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Map;
 using GameEvent.Engine.Players;
