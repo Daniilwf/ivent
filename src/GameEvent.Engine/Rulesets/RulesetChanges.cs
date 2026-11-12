@@ -56,6 +56,14 @@ internal static class RulesetChanges
                 RejectionCodes.BetsInPlay, "A bet is open or won on a run whose proof is not approved yet: switch bets off after they are settled.");
         }
 
+        // D-574: the same for the weekly challenge — a reject must still take back a reward of a run not approved yet
+        if (state.Rules.Features.WeeklyChallenge && !command.Ruleset.Features.WeeklyChallenge && Challenges.WeeklyChallenges.InPlay(state))
+        {
+            return Decision.Reject(
+                RejectionCodes.WeeklyChallengeInPlay,
+                "A weekly challenge is completed with a run whose proof is not approved yet: switch the challenge off after the proofs are checked.");
+        }
+
         return command.Ruleset == state.Ruleset
             ? Decision.Reject(RejectionCodes.RulesetUnchanged, "The new ruleset equals the current one.")
             : Decision.Accept(new RulesetChanged(state.RulesetVersion + 1, command.Ruleset));

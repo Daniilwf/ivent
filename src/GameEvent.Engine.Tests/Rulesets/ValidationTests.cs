@@ -223,7 +223,10 @@ public class ValidationTests
         { "events without items", r => Flags(f => f with { Events = true })(r) with { Events = new EventRules { DefaultDeck = EventKind.Risky } }, "features.events" },
         { "polls", Flags(f => f with { Polls = true }), "features.polls" },
         { "achievements", Flags(f => f with { Achievements = true }), "features.achievements" },
-        { "weekly challenge", Flags(f => f with { WeeklyChallenge = true }), "features.weeklyChallenge" },
+        // The weekly challenge is played since stage 5 (D-526): it needs the length of its window
+        { "weekly challenge without its window", Flags(f => f with { WeeklyChallenge = true }), "weeklyChallenge.durationDays" },
+        // The suggestion box is played since stage 5 (D-527): it needs its daily limit
+        { "suggestions without their limit", Flags(f => f with { Suggestions = true }), "suggestions" },
         { "partner board", Flags(f => f with { PartnerBoard = true }), "features.partnerBoard" },
         { "reactions", Flags(f => f with { Reactions = true }), "features.reactions" },
         { "comments", Flags(f => f with { Comments = true }), "features.comments" },

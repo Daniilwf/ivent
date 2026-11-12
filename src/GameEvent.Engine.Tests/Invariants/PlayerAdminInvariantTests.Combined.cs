@@ -159,6 +159,8 @@ public partial class PlayerAdminInvariantTests
         ("shop", r => r with { Features = r.Features with { Shop = true } }),
         ("items and events", r => r with { Features = r.Features with { Items = true, Events = true } }),
         ("bets", r => r with { Features = r.Features with { Bets = true } }),
+        ("weekly challenge", r => r with { Features = r.Features with { WeeklyChallenge = !r.Features.WeeklyChallenge }, WeeklyChallenge = r.WeeklyChallenge with { DurationDays = 7 } }),
+        ("suggestions", r => r with { Features = r.Features with { Suggestions = !r.Features.Suggestions }, Suggestions = new SuggestionRules { PerDay = 5 } }),
         ("graph map", r => r with { Features = r.Features with { MapMode = MapMode.Graph } }),
         ("unchanged", r => r),
         ("zero hours per die", r => r with { Reward = r.Reward with { DiceCount = r.Reward.DiceCount with { HoursPerDie = 0 } } }),
@@ -400,6 +402,8 @@ public partial class PlayerAdminInvariantTests
             "shop" => features.Shop,
             "bets" => features.Bets,
             "events" => features.Events,
+            "weeklyChallenge" => features.WeeklyChallenge,
+            "suggestions" => features.Suggestions,
             _ => throw new ArgumentOutOfRangeException(nameof(mechanic), mechanic, "Unknown mechanic."),
         };
 
@@ -430,6 +434,11 @@ public partial class PlayerAdminInvariantTests
                 or CoinsChanged { Reason: CoinsReason.ShopRoll or CoinsReason.Purchase } or ResourceChanged { Reason: ResourceReason.ShopRoll } => "shop",
             Engine.Economy.BetPlaced or Engine.Economy.BetSettled
                 or CoinsChanged { Reason: CoinsReason.BetStake or CoinsReason.BetPayout or CoinsReason.BetPayoutRevoked } => "bets",
+
+            // The weekly challenge and the suggestion box of stage 5 (D-526, D-527)
+            Engine.Challenges.WeeklyChallengeSet or Engine.Challenges.WeeklyChallengeCompleted or Engine.Challenges.WeeklyChallengeRevoked
+                or CoinsChanged { Reason: CoinsReason.WeeklyChallenge or CoinsReason.WeeklyChallengeRevoked } => "weeklyChallenge",
+            Engine.Suggestions.SuggestionSubmitted or Engine.Suggestions.SuggestionReviewed => "suggestions",
 
             // The effect dispatcher reacts to content (items, events); stage 1 has no content effects in play (D-24, D-103)
             EffectChainCut => "effects",

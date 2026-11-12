@@ -60,7 +60,28 @@ public class ValidationEdgeTests
             r => r with { Roll = r.Roll with { LastDaysLengthFilter = r.Roll.LastDaysLengthFilter with { Enabled = true } } },
             "roll.lastDaysLengthFilter.enabled"
         },
+        // Review of 5.13 and 5.14 (D-578, D-579): the bounds of the weekly challenge's window and the suggestion box's limit
+        { "a weekly challenge of no days", r => r with { WeeklyChallenge = r.WeeklyChallenge with { DurationDays = 0 } }, "weeklyChallenge.durationDays" },
+        { "a weekly challenge over a year", r => r with { WeeklyChallenge = r.WeeklyChallenge with { DurationDays = 367 } }, "weeklyChallenge.durationDays" },
+        { "no suggestions a day", r => r with { Suggestions = new SuggestionRules { PerDay = 0 } }, "suggestions.perDay" },
+        { "too many suggestions a day", r => r with { Suggestions = new SuggestionRules { PerDay = 101 } }, "suggestions.perDay" },
     };
+
+    [Theory]
+    [InlineData(1, 1)]
+    [InlineData(366, 100)]
+    public void The_weekly_challenge_window_and_the_suggestion_limit_at_their_bounds_are_accepted(int days, int perDay)
+    {
+        var r = TestRuleset.Create();
+        var atBounds = r with
+        {
+            Features = r.Features with { WeeklyChallenge = true, Suggestions = true },
+            WeeklyChallenge = r.WeeklyChallenge with { DurationDays = days },
+            Suggestions = new SuggestionRules { PerDay = perDay },
+        };
+
+        Assert.Empty(RulesetValidator.Validate(atBounds));
+    }
 
     [Theory]
     [MemberData(nameof(Invalid))]

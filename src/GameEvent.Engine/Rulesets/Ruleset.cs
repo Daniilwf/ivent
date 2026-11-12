@@ -48,6 +48,20 @@ public sealed record Ruleset
     /// </summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public EventRules? Events { get; init; }
+
+    /// <summary>
+    /// The rules of the suggestion box (stage 5, D-527). Missing — a season created before them reads as it did (D-50);
+    /// needed once <c>features.suggestions</c> is on. Not written while missing.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public SuggestionRules? Suggestions { get; init; }
+}
+
+/// <summary>The rules of the suggestion box (SPEC «Предложка», D-527).</summary>
+public sealed record SuggestionRules
+{
+    /// <summary>How many suggestions one player may send a calendar day of <c>season.timezone</c>.</summary>
+    public required int PerDay { get; init; }
 }
 
 /// <summary>The rules of event decks (SPEC «Ивенты», D-500…D-502).</summary>
@@ -106,6 +120,13 @@ public sealed record Features
     /// optional, so older configs without it still read.
     /// </summary>
     public bool Challenges { get; init; }
+
+    /// <summary>
+    /// The suggestion box (stage 5, D-527); optional, so older configs without it still read. Not written while off: a season
+    /// logged before it keeps its ruleset's format.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool Suggestions { get; init; }
 }
 
 public sealed record SeasonRules
@@ -474,4 +495,11 @@ public sealed record NominationRules
 public sealed record WeeklyChallengeRules
 {
     public required int DefaultRewardCoins { get; init; }
+
+    /// <summary>
+    /// How many days a weekly challenge's window lasts from its start (D-526). Missing — a season created before it reads as
+    /// it did (D-50); needed once <c>features.weeklyChallenge</c> is on. Not written while missing.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? DurationDays { get; init; }
 }

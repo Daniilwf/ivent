@@ -86,7 +86,7 @@ public sealed record RewardSpec
     public int? Coins { get; init; }
 }
 
-/// <summary>A weekly challenge (CONTENT.md «челлендж недели», stage 6).</summary>
+/// <summary>A weekly challenge (CONTENT.md «челлендж недели», stage 5, D-526).</summary>
 public sealed record WeeklyChallengeDefinition
 {
     public required string Id { get; init; }

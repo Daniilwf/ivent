@@ -13,7 +13,8 @@
     "reactions": false,
     "comments": false,
     "gallery": false,
-    "challenges": false
+    "challenges": false,
+    "suggestions": false
   },
   "season": {
     "timezone": "Europe/Moscow",
@@ -113,9 +114,13 @@
     "voted": ["bestReview", "gameOfSeason", "funniestMoment"]
   },
   "weeklyChallenge": {
-    "defaultRewardCoins": 10
+    "defaultRewardCoins": 10,
+    "durationDays": 7
   },
   "events": {
     "defaultDeck": "risky"
+  },
+  "suggestions": {
+    "perDay": 5
   }
 }

@@ -296,6 +296,9 @@
 | Отклик на запрос напарника | заявка на чужой запрос доски; создаёт приглашение, которое принимает автор | команда `RespondToPartnerRequest`, события `PartnerRequestPosted`, `PartnerRequestClosed` |
 | Выполнить челлендж недели | пройти игру по условию челленджа в его окне; одна награда на игрока | команды `SetWeeklyChallenge`, `MarkWeeklyChallenge`, события `WeeklyChallengeSet`, `WeeklyChallengeCompleted`, `WeeklyChallengeRevoked` |
 | Модерация предложки | админ одобряет или отклоняет предложение | команды `SubmitSuggestion`, `ReviewSuggestion`, `SuggestionStatus` (`Pending`, `Approved`, `Rejected`) |
+| Окно челленджа недели | время, в которое завершение прохождения засчитывается челленджу: от начала на `weeklyChallenge.durationDays` дней (D-526, D-570) | `WeeklyChallengeSet.StartsAt`, `EndsAt` |
+| Выполнение челленджа | действующая награда игрока за челлендж по одному прохождению; реджект снимает | `WeeklyChallengeCompletion`, `WeeklyChallengeState.Completions` |
+| Вид предложения | что предлагается: игра (с карточкой), ивент или предмет; лимит подачи — `suggestions.perDay` в день по часовому поясу сезона (D-527, D-571) | `SuggestionKind` (`Game`, `Event`, `Item`) |
 | Контракт | особое прохождение по договору с админом за доп. награду (RGG № 16; ждёт решения, D-529) | `features.contracts` |
 
 ## Социальное

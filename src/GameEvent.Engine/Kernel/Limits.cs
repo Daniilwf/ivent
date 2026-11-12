@@ -9,6 +9,9 @@ public static class Limits
     /// <summary>The text of a review.</summary>
     public const int MaxReviewLength = 2000;
 
+    /// <summary>The text of a suggestion (D-527).</summary>
+    public const int MaxSuggestionLength = 2000;
+
     /// <summary>Where an hours estimate comes from: a link or a short note.</summary>
     public const int MaxHoursSourceLength = 300;
 

@@ -9522,6 +9522,10 @@
           "challenges": {
             "type": "boolean",
             "description": "Claiming a game's challenge on completion (D-96). Off until games carry a challenge note and the proof checks it;\noptional, so older configs without it still read."
+          },
+          "suggestions": {
+            "type": "boolean",
+            "description": "The suggestion box (stage 5, D-527); optional, so older configs without it still read. Not written while off: a season\nlogged before it keeps its ruleset's format."
           }
         },
         "description": "Feature flags: a disabled mechanic is invisible in the interface and refused by the engine."
@@ -12350,6 +12354,17 @@
                 "$ref": "#/components/schemas/EventRules"
               }
             ]
+          },
+          "suggestions": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The rules of the suggestion box (stage 5, D-527). Missing — a season created before them reads as it did (D-50);\nneeded once `features.suggestions` is on. Not written while missing.",
+                "$ref": "#/components/schemas/SuggestionRules"
+              }
+            ]
           }
         }
       },
@@ -13284,6 +13299,20 @@
         },
         "description": "A stored file (D-108): `url` serves the file, `thumbnailUrl` the small one for the map and lists.\n`duplicate` — the same upload was already stored (a retry with the same command id)."
       },
+      "SuggestionRules": {
+        "required": [
+          "perDay"
+        ],
+        "type": "object",
+        "properties": {
+          "perDay": {
+            "type": "integer",
+            "description": "How many suggestions one player may send a calendar day of `season.timezone`.",
+            "format": "int32"
+          }
+        },
+        "description": "The rules of the suggestion box (SPEC «Предложка», D-527)."
+      },
       "TargetObjectsView": {
         "required": [
           "playerId",
@@ -13652,6 +13681,14 @@
         "properties": {
           "defaultRewardCoins": {
             "type": "integer",
+            "format": "int32"
+          },
+          "durationDays": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "How many days a weekly challenge's window lasts from its start (D-526). Missing — a season created before it reads as\nit did (D-50); needed once `features.weeklyChallenge` is on. Not written while missing.",
             "format": "int32"
           }
         }

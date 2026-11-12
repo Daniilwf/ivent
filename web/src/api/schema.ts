@@ -8054,6 +8054,11 @@ export interface components {
              *     optional, so older configs without it still read.
              */
             challenges?: boolean;
+            /**
+             * @description The suggestion box (stage 5, D-527); optional, so older configs without it still read. Not written while off: a season
+             *     logged before it keeps its ruleset's format.
+             */
+            suggestions?: boolean;
         };
         /**
          * @description One event of the season's feed (GLOSSARY «Лента», D-124): its place in the log, the command it came from, when, the
@@ -8959,6 +8964,7 @@ export interface components {
             nominations: components["schemas"]["NominationRules"];
             weeklyChallenge: components["schemas"]["WeeklyChallengeRules"];
             events?: null | components["schemas"]["EventRules"];
+            suggestions?: null | components["schemas"]["SuggestionRules"];
         };
         /**
          * @description One changed value between two versions of the rules: the JSON path (for example `reward.diceCount.max`)
@@ -9284,6 +9290,14 @@ export interface components {
             thumbnailUrl: string;
             duplicate: boolean;
         };
+        /** @description The rules of the suggestion box (SPEC «Предложка», D-527). */
+        SuggestionRules: {
+            /**
+             * Format: int32
+             * @description How many suggestions one player may send a calendar day of `season.timezone`.
+             */
+            perDay: number;
+        };
         TargetObjectsView: {
             /** Format: uuid */
             playerId: string;
@@ -9410,6 +9424,12 @@ export interface components {
         WeeklyChallengeRules: {
             /** Format: int32 */
             defaultRewardCoins: number;
+            /**
+             * Format: int32
+             * @description How many days a weekly challenge's window lasts from its start (D-526). Missing — a season created before it reads as
+             *     it did (D-50); needed once `features.weeklyChallenge` is on. Not written while missing.
+             */
+            durationDays?: null | number;
         };
         /**
          * @description The wheel of the roll that offered what I see now (D-136), from the log: the categories that were on it, the one it

@@ -11,4 +11,11 @@
     <ProjectReference Include="..\GameEvent.Engine\GameEvent.Engine.csproj" />
   </ItemGroup>
 
+  <!-- D-577: the coop scenarios of the weekly challenge need the coop commands of task 5.10 (InviteToCoop, AnswerInvitation,
+       RunState.PartnerId); they build again with that task, which removes this line. -->
+  <ItemGroup>
+    <Compile Remove="Challenges\WeeklyChallengeCoopTests.cs" />
+    <None Include="Challenges\WeeklyChallengeCoopTests.cs" />
+  </ItemGroup>
+
 </Project>

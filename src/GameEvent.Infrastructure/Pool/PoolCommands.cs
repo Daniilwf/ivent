@@ -27,16 +27,16 @@ public sealed record RemoveCategory(string Name) : Queue.IGlobalCommand;
 /// <summary>The pool's rules (D-119): what a card may hold and which titles are the same or alike.</summary>
 public static class PoolRules
 {
-    public const int MaxTitleLength = 200;
-    public const int MaxTags = 20;
-    public const int MaxTagLength = 50;
-    public const int MaxNoteLength = 1000;
+    public const int MaxTitleLength = GameCards.MaxTitleLength;
+    public const int MaxTags = GameCards.MaxTags;
+    public const int MaxTagLength = GameCards.MaxTagLength;
+    public const int MaxNoteLength = GameCards.MaxNoteLength;
     public const int MaxAuthorNameLength = 64;
     public const int MaxDeletionReasonLength = 500;
-    public const decimal MinHours = 0.5m;
-    public const decimal MaxHours = 1000m;
-    public const int MinYear = 1950;
-    public const int MaxYear = 2100;
+    public const decimal MinHours = GameCards.MinHours;
+    public const decimal MaxHours = GameCards.MaxHours;
+    public const int MinYear = GameCards.MinYear;
+    public const int MaxYear = GameCards.MaxYear;
     public const int MaxCategoryWeight = 1000;
 
     public const string CardInvalid = "pool.cardInvalid";
@@ -54,47 +54,8 @@ public static class PoolRules
     public const string CategoryInvalid = "pool.categoryInvalid";
     public const string CategoryUnknown = "pool.categoryUnknown";
 
-    /// <summary>A card as it is stored: trimmed, tags without repeats (case-insensitively), blanks as none; or why not.</summary>
-    public static (GameCard? Card, string? Problem) Normalize(GameCard card)
-    {
-        ArgumentNullException.ThrowIfNull(card);
-        var title = Tidy(card.Title);
-        if (title.Length is 0 or > MaxTitleLength)
-        {
-            return (null, $"A title is 1–{MaxTitleLength} characters.");
-        }
-
-        var tags = card.Tags.Select(t => t?.Trim() ?? "").Where(t => t.Length > 0).DistinctBy(t => t.ToUpperInvariant()).ToList();
-        if (tags.Count > MaxTags || tags.Any(t => t.Length > MaxTagLength))
-        {
-            return (null, $"Up to {MaxTags} tags of at most {MaxTagLength} characters.");
-        }
-
-        if (card.Hours is { } hours && (hours < MinHours || hours > MaxHours || decimal.Round(hours * 2) != hours * 2))
-        {
-            return (null, $"Hours are {MinHours}–{MaxHours}, in half hours.");
-        }
-
-        if (card.Year is { } year && (year < MinYear || year > MaxYear))
-        {
-            return (null, $"A year is {MinYear}–{MaxYear}.");
-        }
-
-        var steam = string.IsNullOrWhiteSpace(card.SteamAppId) ? null : card.SteamAppId.Trim();
-        if (steam is not null && (steam.Length > 12 || !steam.All(char.IsAsciiDigit)))
-        {
-            return (null, "A Steam app id is up to 12 digits.");
-        }
-
-        var note = string.IsNullOrWhiteSpace(card.Note) ? null : card.Note.Trim();
-        var condition = string.IsNullOrWhiteSpace(card.CompletionCondition) ? null : card.CompletionCondition.Trim();
-        if (note?.Length > MaxNoteLength || condition?.Length > MaxNoteLength)
-        {
-            return (null, $"A note and a condition are at most {MaxNoteLength} characters.");
-        }
-
-        return (new GameCard(title, [.. tags], card.Hours, card.Year, steam, card.CoverFileId, note, card.IsCoop, condition), null);
-    }
+    /// <summary>A card as it is stored, or why not: the engine's card rules, shared with the suggestion box (D-579).</summary>
+    public static (GameCard? Card, string? Problem) Normalize(GameCard card) => GameCards.Normalize(card);
 
     /// <summary>
     /// The same title: equal ignoring case and surrounding spaces — never twice in the pool. Alike: equal once letters and
@@ -103,12 +64,8 @@ public static class PoolRules
     public static bool IsSame(string a, string b) =>
         string.Equals(Tidy(a), Tidy(b), StringComparison.OrdinalIgnoreCase);
 
-    /// <summary>
-    /// A title as stored: one Unicode form (a composed «é» equals a decomposed one) and single spaces — two titles that look
-    /// alike are the same title.
-    /// </summary>
-    public static string Tidy(string? title) =>
-        string.Join(' ', (title ?? "").Normalize(System.Text.NormalizationForm.FormC).Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+    /// <summary>A title as stored (<see cref="GameCards.Tidy"/>).</summary>
+    public static string Tidy(string? title) => GameCards.Tidy(title);
 
     public static bool IsAlike(string a, string b)
     {
