@@ -171,7 +171,8 @@ internal static class PlayerAdministration
             return Decision.Reject(RejectionCodes.DeltaTooLarge, $"One adjustment changes a balance by at most ±{MaxDelta}.");
         }
 
-        if (command.DiscardOffer && player.Phase == TurnPhase.Playing)
+        // A question of an event is discarded whatever the phase (Н-12): it is not the run's
+        if (command.DiscardOffer && player.Phase == TurnPhase.Playing && player.Choice?.Kind != ChoiceKind.Effect)
         {
             return Decision.Reject(RejectionCodes.PlayerBusy, "The player is playing a run: that is a drop or a tech reroll (C6).");
         }
@@ -208,13 +209,16 @@ internal static class PlayerAdministration
             .Where(r => r.Delta != 0)
             .Select(r => new ResourceChanged(player.PlayerId, r.Resource, r.Delta, ResourceReason.AdminAdjustment)));
 
-        if (command.DiscardOffer && player is { Phase: TurnPhase.Rolling, Offer: { } offer })
+        // The discard takes what is asked now (D-569): an event's question alone, the rolled game stays for a second discard
+        var asksAnEvent = player.Choice?.Kind == ChoiceKind.Effect;
+        if (command.DiscardOffer && !asksAnEvent && player is { Phase: TurnPhase.Rolling, Offer: { } offer })
         {
             changes.Add(new OfferDiscarded(player.PlayerId, offer.GameId));
         }
 
         // A branch choice is discarded too: its steps left burn, the points stay (D-305)
-        if (command.DiscardOffer && player.Choice is { } choice && (player.Phase == TurnPhase.Rolling || choice.Kind == ChoiceKind.Branch))
+        if (command.DiscardOffer && player.Choice is { } choice
+            && (player.Phase == TurnPhase.Rolling || choice.Kind is ChoiceKind.Branch or ChoiceKind.Effect))
         {
             changes.Add(new ChoiceDiscarded(player.PlayerId, choice.ChoiceId));
         }

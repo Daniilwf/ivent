@@ -89,9 +89,10 @@ internal static class EventDraws
 
     /// <summary>
     /// The events of <paramref name="playerId"/> drawing from <paramref name="deck"/>: the drawn event and its effect, or a
-    /// miss and a manual effect; nothing for the first finisher, whose effects are frozen (D-510).
+    /// miss and a manual effect; nothing for the first finisher, whose effects are frozen (D-510). An event that asks waits
+    /// for the answer (D-511): <paramref name="level"/> is the chain level its effect runs at, where its continuation goes on.
     /// </summary>
-    public static List<IGameEvent> Draw(SeasonState state, EngineContext context, Guid playerId, string deck, EventSource source)
+    public static List<IGameEvent> Draw(SeasonState state, EngineContext context, Guid playerId, string deck, EventSource source, int level = 0)
     {
         var (deckId, kind) = Resolve(state, playerId, deck);
         if (!state.Rules.Features.Events)
@@ -125,10 +126,13 @@ internal static class EventDraws
         var entry = Weighted.Pick(entries, context.Random);
         var definition = catalog.Live(entry.ObjectId)!;
         var drawn = new EventDrawn(playerId, deckId, definition.Id, deckKind, source);
-        // The pack keeps only events with an effect on the drawer (D-536): they are played at once, never hostile
-        var effect = definition.Effect!;
-        var run = new EffectRun(SeasonEngine.Apply(state, drawn), context, playerId, definition.Id, hostile: false, parameters: null);
-        run.Run(effect, Targets.ForTriggered(run.State, context, definition, playerId));
+        // The pack keeps only events with an effect on the drawer or a target he picks (D-536, D-511): played at once,
+        // never hostile; a question suspends the effect until the answer
+        var run = new EffectRun(SeasonEngine.Apply(state, drawn), context, playerId, definition.Id, hostile: false, parameters: null)
+        {
+            Asks = new Asking(deckKind, level),
+        };
+        run.Play(definition);
         return [drawn, .. run.Events];
     }
 }
@@ -137,14 +141,20 @@ internal static class EventDraws
 /// An event cell draws when a move stops on it (SPEC «Движение»: any stop, a push of another included, never a teleport's
 /// destination; D-502). It reacts in the effect chain, so a loop «event cell → push → event cell» is cut by its levels (D-500).
 /// </summary>
-internal sealed class EventCells : ITriggerHandler
+internal sealed class EventCells : ITriggerHandler, IFiringTriggerHandler
 {
     public static EventCells Instance { get; } = new();
 
-    public IEnumerable<IGameEvent> React(SeasonState state, IGameEvent trigger, EngineContext context) =>
+    public IEnumerable<IGameEvent> React(SeasonState state, IGameEvent trigger, EngineContext context) => Drawn(state, trigger, context, level: 0);
+
+    /// <summary>A drawn event and what it plays are one firing: cut whole or written whole (D-488); it runs at the chain's level.</summary>
+    public IEnumerable<IReadOnlyList<IGameEvent>> ReactInFirings(SeasonState state, IGameEvent trigger, EngineContext context, int depth, int eventsBefore) =>
+        Drawn(state, trigger, context, depth) is { Count: > 0 } drawn ? [drawn] : [];
+
+    private static List<IGameEvent> Drawn(SeasonState state, IGameEvent trigger, EngineContext context, int level) =>
         state.Ruleset is not null && state.Rules.Features.Events
             && trigger is PlayerMoved { Paused: false } move && move.Steps != 0 && CellStops.Triggers(move.Reason)
             && state.Map.CellById(move.To) is { Type: CellType.Event, Deck: { } deck }
-            ? EventDraws.Draw(state, context, move.PlayerId, deck, EventSource.Cell)
+            ? EventDraws.Draw(state, context, move.PlayerId, deck, EventSource.Cell, level)
             : [];
 }

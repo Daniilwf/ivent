@@ -299,7 +299,8 @@ internal static class SeasonProjection
     /// The map, the content (D-400), the count of finishes so far and the count of points changes are not projected; they
     /// are taken from <paramref name="replayed"/>. So is the engine's bookkeeping of a reject (D-321): the run whose move
     /// last placed a player, the cell a run's move began on, what it gained, the bonus of the cell it stopped on and the
-    /// objects its cells granted (D-321, D-327, D-421) — the pages never read them.
+    /// objects its cells granted (D-321, D-327, D-421), and the suspended effects a player's question of an event goes on
+    /// with (D-511; the question itself is the projected pending choice) — the pages never read them.
     /// </summary>
     public static async Task<SeasonState> ReadAsync(GameEventDbContext db, SeasonState replayed, CancellationToken ct)
     {
@@ -340,7 +341,8 @@ internal static class SeasonProjection
                     p.ActiveRunId,
                     p.PointsTick,
                     replayed.Players.TryGetValue(p.Id, out var folded) ? folded.LastMoveRunId : null,
-                    p.EconomyJson is null ? null : JsonSerializer.Deserialize<Engine.Inventory.PlayerEconomy>(p.EconomyJson, EngineJson.Options))),
+                    p.EconomyJson is null ? null : JsonSerializer.Deserialize<Engine.Inventory.PlayerEconomy>(p.EconomyJson, EngineJson.Options),
+                    replayed.Players.TryGetValue(p.Id, out var waiting) ? waiting.Suspended : default)),
             Runs = runs.ToImmutableSortedDictionary(
                 r => r.Id,
                 r => new RunState(

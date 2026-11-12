@@ -14,6 +14,12 @@ internal static class Choosing
             return DecideBranch(state, chooser, branch, command, context);
         }
 
+        // The answer an event waits for (D-511): its own rules, also while closing (Н-13)
+        if (state.IsCreated && state.Players.TryGetValue(command.PlayerId, out var answering) && answering.Choice is { Kind: ChoiceKind.Effect } asked)
+        {
+            return Effects.Suspensions.Answer(state, answering, asked, command, context);
+        }
+
         if (TurnRules.Check(state, command.PlayerId, command, context.Clock.UtcNow) is { } rejection)
         {
             return rejection;
@@ -106,9 +112,13 @@ internal static class Choosing
             };
         });
 
+    // The admin's discard of an effect's question closes the effect without its actions left (Н-12); the turn is not touched
     public static SeasonState Apply(SeasonState state, ChoiceDiscarded e) =>
-        Update(state, e.PlayerId, p => p with { Phase = TurnPhase.Idle, Choice = null, RerollsThisRoll = 0 });
+        Effects.Suspensions.IsSuspended(state, e.PlayerId, e.ChoiceId)
+            ? Effects.Suspensions.Close(state, e.PlayerId, e.ChoiceId)
+            : Update(state, e.PlayerId, p => p with { Phase = TurnPhase.Idle, Choice = null, RerollsThisRoll = 0 });
 
+    // An effect waiting behind a choice of another kind is asked once that choice is gone (D-562)
     private static SeasonState Update(SeasonState state, Guid playerId, Func<SeasonPlayer, SeasonPlayer> change) =>
-        state with { Players = state.Players.SetItem(playerId, change(state.Players[playerId])) };
+        state with { Players = state.Players.SetItem(playerId, Effects.Suspensions.Refresh(change(state.Players[playerId]))) };
 }

@@ -139,6 +139,21 @@ public sealed class SeasonTransferTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_season_with_a_question_of_an_event_waiting_is_exported_and_imported_intact()
+    {
+        // D-511: the import refuses a season that is not intact — a waiting question must not make it so
+        await Queue.EconomyQueueTests.AskAnEventAsync(_site, Ct);
+        var archive = await ExportAsync();
+
+        await using var other = OpenOther();
+        var result = await Infrastructure.Seasons.SeasonTransfer.ImportAsync(other, archive, _site.Clock.UtcNow, ct: Ct);
+
+        Assert.True(result.Integrity.IsIntact, string.Join("; ", result.Integrity.Differences));
+        var (imported, _) = await EventLogReader.ReplaySeasonAsync(other, SiteFactory.SeasonId, Ct);
+        Assert.Single(imported.Players[_site.Players["vasya"]].Suspended);
+    }
+
+    [Fact]
     public async Task Accounts_are_matched_by_login_and_missing_ones_become_deleted_placeholders()
     {
         await PlayAsync();

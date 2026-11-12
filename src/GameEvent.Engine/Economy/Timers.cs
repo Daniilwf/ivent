@@ -27,6 +27,7 @@ public static class Timers
             features.Shop ? wallet.Shop?.ExpiresAt : null,
             .. features.Items && !Finishes.IsFrozen(player) ? wallet.Inventory.Select(o => o.ExpiresAt) : [],
             .. features.Bets ? wallet.Bets.Where(b => b.Status == BetStatus.Open).Select(b => (DateTimeOffset?)b.Deadline) : [],
+            Effects.Suspensions.Due(player, features),
         ];
         return moments.Where(m => m is not null).Min();
     }
@@ -63,6 +64,9 @@ public static class Timers
                 .Where(b => features.Bets && b.Status == BetStatus.Open && b.Deadline <= now)
                 .Select(b => new BetSettled(player.PlayerId, b.BetId, BetStatus.Lost, 0)));
         }
+
+        // An event's question past its answer timeout is answered by the timer (D-560)
+        events.AddRange(Effects.Suspensions.Timeouts(events.Aggregate(state, SeasonEngine.Apply), context));
 
         return events.Count == 0
             ? Decision.Reject(RejectionCodes.TimersNothingDue, "Nothing is due yet.")

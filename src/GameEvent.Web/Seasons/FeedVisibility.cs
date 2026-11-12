@@ -110,6 +110,11 @@ public static class FeedVisibility
         ["event-drawn"] = Access.Public,
         ["event-draw-missed"] = Access.Public,
 
+        // An event's question and its answer (D-511) are public, as a branch choice and its pick
+        ["effect-suspended"] = Access.Public,
+        ["effect-resumed"] = Access.Public,
+        ["effect-move-skipped"] = Access.Public,
+
         // The weekly challenge (stage 5, D-526): what was set, who completed it and what a reject took back are public
         ["weekly-challenge-set"] = Access.Public,
         ["weekly-challenge-completed"] = Access.Public,

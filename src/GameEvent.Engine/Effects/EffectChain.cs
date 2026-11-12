@@ -68,8 +68,10 @@ internal readonly record struct ChainLimits(int Depth, int Events)
 /// </summary>
 internal static class EffectChain
 {
+    // levels: the level each of the command's own events is at — 0 when null or past its end, or the level a suspended
+    // effect stopped at for the events of its continuation (D-511): each reacts from its own level
     public static (IReadOnlyList<IGameEvent> Reactions, SeasonState State) Run(
-        SeasonState state, IReadOnlyList<IGameEvent> commandEvents, EngineContext context)
+        SeasonState state, IReadOnlyList<IGameEvent> commandEvents, EngineContext context, IReadOnlyList<int>? levels = null)
     {
         if (commandEvents.Any(e => e is EffectChainCut))
         {
@@ -82,20 +84,19 @@ internal static class EffectChain
 
         var written = new List<IGameEvent>();
         var total = commandEvents.Count;
-        IReadOnlyList<IGameEvent> level = commandEvents;
-        for (var depth = 1; level.Count > 0; depth++)
+        List<(IGameEvent Trigger, int Depth)> level =
+            [.. commandEvents.Select((e, i) => (e, (levels is not null && i < levels.Count ? levels[i] : 0) + 1))];
+        while (level.Count > 0)
         {
-            var next = new List<IGameEvent>();
-            foreach (var trigger in level)
+            var next = new List<(IGameEvent Trigger, int Depth)>();
+            foreach (var (trigger, depth) in level)
             {
                 foreach (var handler in handlers)
                 {
+                    // A drawn event and what it plays are one firing too (D-488)
                     var reactions = handler is IFiringTriggerHandler firings
                         ? firings.ReactInFirings(state, trigger, context, depth, total)
-                        : handler is Decks.EventCells
-                            // A drawn event and what it plays are one firing: cut whole or written whole (D-488)
-                            ? handler.React(state, trigger, context).ToList() is { Count: > 0 } drawn ? [drawn] : []
-                            : handler.React(state, trigger, context).Select(e => (IReadOnlyList<IGameEvent>)[e]);
+                        : handler.React(state, trigger, context).Select(e => (IReadOnlyList<IGameEvent>)[e]);
                     foreach (var reaction in reactions)
                     {
                         if (limits.Cut(depth, total, reaction.Count) is { } cut)
@@ -110,7 +111,7 @@ internal static class EffectChain
                         }
 
                         written.AddRange(reaction);
-                        next.AddRange(reaction);
+                        next.AddRange(reaction.Select(e => (e, depth + 1)));
                         total += reaction.Count;
 
                         // A countdown inside the firing went past the limits: its cut ends the chain (AU4-1)

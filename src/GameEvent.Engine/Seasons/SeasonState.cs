@@ -136,7 +136,11 @@ public sealed record SeasonPlayer(
     [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     Guid? LastMoveRunId = null,
     [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
-    Inventory.PlayerEconomy? Economy = null)
+    Inventory.PlayerEconomy? Economy = null,
+
+    // Written only when an effect waits: snapshots of players made before stage 5 keep their format (D-511)
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    EquatableArray<Effects.SuspendedEffect> Suspended = default)
 {
     /// <summary>The player's economy (D-401), empty when they have none.</summary>
     [System.Text.Json.Serialization.JsonIgnore]

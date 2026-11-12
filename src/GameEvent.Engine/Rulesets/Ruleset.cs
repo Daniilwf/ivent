@@ -72,6 +72,14 @@ public sealed record EventRules
     /// standard deck of this kind.
     /// </summary>
     public required EventKind DefaultDeck { get; init; }
+
+    /// <summary>
+    /// How long an event that asks waits for its answer, in hours (D-560): past it the timer answers by a random option,
+    /// written in the log. Null — it waits without a limit (the turn waits, the admin may discard it, D-91). Not written
+    /// while null.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? AnswerTimeoutHours { get; init; }
 }
 
 public enum MapMode

@@ -762,6 +762,12 @@
             "special",
             "risky"
           ]
+        },
+        "answerTimeoutHours": {
+          "type": [
+            "integer",
+            "null"
+          ]
         }
       },
       "required": [
