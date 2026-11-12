@@ -57,6 +57,14 @@ internal static class Targets
         [.. Candidates(state, definition, definition.Effect?.Target, userId).Select(p => p.PlayerId)];
 
     /// <summary>
+    /// The players a drawn event asks <paramref name="userId"/> to pick for its target <c>chosen</c> (D-511), in id order:
+    /// the ones the effect may reach and active (an inactive player is not asked about, as for a random target). Counted
+    /// again when the answer comes (Н-10).
+    /// </summary>
+    public static IReadOnlyList<Guid> Askable(SeasonState state, ObjectDefinition definition, Guid userId) =>
+        [.. Candidates(state, definition, definition.Effect?.Target, userId).Where(p => !p.IsInactive).Select(p => p.PlayerId)];
+
+    /// <summary>
     /// Whether a selector other than <c>chosen</c> finds nobody for <paramref name="userId"/>: decided without a roll,
     /// exactly when <see cref="ForUse"/> refuses with <c>item.noTarget</c> (D-440) — <c>self</c> for a finisher's move,
     /// <c>randomActive</c> with nobody active, any other when it picks nobody (<c>nearestBehind</c> with nobody behind…).

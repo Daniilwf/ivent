@@ -7556,10 +7556,10 @@ export interface components {
             ruleset: components["schemas"]["Ruleset"];
         };
         /**
-         * @description What the player is choosing (K-5): a game, a branch at a fork; targets and outcomes come later.
+         * @description What the player is choosing (K-5): a game, a branch at a fork, the answer of an event (D-511).
          * @enum {unknown}
          */
-        ChoiceKind: "game" | "branch";
+        ChoiceKind: "game" | "branch" | "effect";
         ChoiceOptionView: {
             id: string;
             game: null | components["schemas"]["OfferedGameView"];
@@ -7960,6 +7960,13 @@ export interface components {
              *     standard deck of this kind.
              */
             defaultDeck: components["schemas"]["EventKind"];
+            /**
+             * Format: int32
+             * @description How long an event that asks waits for its answer, in hours (D-560): past it the timer answers by a random option,
+             *     written in the log. Null — it waits without a limit (the turn waits, the admin may discard it, D-91). Not written
+             *     while null.
+             */
+            answerTimeoutHours?: null | number;
         };
         /**
          * @description Where a drawn event came from (GLOSSARY «Источник ивента»); stage 5 adds the drop, the paid reroll and the difficulty.
@@ -9370,7 +9377,7 @@ type ReadonlyArray<T> = [
 export const betStatusValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["BetStatus"]> = ["open", "won", "lost", "revoked"];
 export const bugReportStatusValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["BugReportStatus"]> = ["new", "inWork", "closed"];
 export const cellTypeValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["CellType"]> = ["start", "empty", "finish", "fork", "teleport", "checkpoint", "pointsBonus", "event", "shop"];
-export const choiceKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ChoiceKind"]> = ["game", "branch"];
+export const choiceKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ChoiceKind"]> = ["game", "branch", "effect"];
 export const coopRoundUpForValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["CoopRoundUpFor"]> = ["roller"];
 export const diceStageValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["DiceStage"]> = ["count", "sides", "add", "multiply", "reroll", "min", "max", "singleDie", "setOne", "replaceValue", "fixAverage", "bonusPerEven", "percent"];
 export const difficultyValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["Difficulty"]> = ["easy", "normal", "hard", "extreme"];

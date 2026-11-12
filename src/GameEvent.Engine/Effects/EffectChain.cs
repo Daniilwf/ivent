@@ -68,8 +68,9 @@ internal readonly record struct ChainLimits(int Depth, int Events)
 /// </summary>
 internal static class EffectChain
 {
+    // fromDepth: the level the command's own events are at — 0, or the level a suspended effect stopped at for its continuation (D-511)
     public static (IReadOnlyList<IGameEvent> Reactions, SeasonState State) Run(
-        SeasonState state, IReadOnlyList<IGameEvent> commandEvents, EngineContext context)
+        SeasonState state, IReadOnlyList<IGameEvent> commandEvents, EngineContext context, int fromDepth = 0)
     {
         if (commandEvents.Any(e => e is EffectChainCut))
         {
@@ -83,19 +84,17 @@ internal static class EffectChain
         var written = new List<IGameEvent>();
         var total = commandEvents.Count;
         IReadOnlyList<IGameEvent> level = commandEvents;
-        for (var depth = 1; level.Count > 0; depth++)
+        for (var depth = fromDepth + 1; level.Count > 0; depth++)
         {
             var next = new List<IGameEvent>();
             foreach (var trigger in level)
             {
                 foreach (var handler in handlers)
                 {
+                    // A drawn event and what it plays are one firing too (D-488)
                     var reactions = handler is IFiringTriggerHandler firings
                         ? firings.ReactInFirings(state, trigger, context, depth, total)
-                        : handler is Decks.EventCells
-                            // A drawn event and what it plays are one firing: cut whole or written whole (D-488)
-                            ? handler.React(state, trigger, context).ToList() is { Count: > 0 } drawn ? [drawn] : []
-                            : handler.React(state, trigger, context).Select(e => (IReadOnlyList<IGameEvent>)[e]);
+                        : handler.React(state, trigger, context).Select(e => (IReadOnlyList<IGameEvent>)[e]);
                     foreach (var reaction in reactions)
                     {
                         if (limits.Cut(depth, total, reaction.Count) is { } cut)

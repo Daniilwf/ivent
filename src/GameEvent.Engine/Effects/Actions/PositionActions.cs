@@ -27,16 +27,18 @@ internal sealed class MoveHandler : ActionHandler<MoveAction>
 
     protected override void Execute(MoveAction action, EffectRun run)
     {
+        // The way is asked before the steps are rolled: an event that waits for it rolls once, after the answer (D-511)
+        var way = action.Direction == MoveDirection.Chosen ? run.NextChoice([Forward, Back]) : Forward;
+        if (way is null)
+        {
+            return;
+        }
+
         var steps = run.Number(action.Steps);
         var player = run.State.Players[run.ActionTarget(action)];
         switch (action.Direction)
         {
             case MoveDirection.Chosen:
-                if (run.NextChoice([Forward, Back]) is not { } way)
-                {
-                    return;
-                }
-
                 steps = way == Back ? -steps : steps;
                 break;
             case MoveDirection.Away:
@@ -46,7 +48,7 @@ internal sealed class MoveHandler : ActionHandler<MoveAction>
                 break;
         }
 
-        if (steps == 0 || !Positions.Movable(player))
+        if (steps == 0 || !Positions.Movable(player) || run.PositionLocked)
         {
             return;
         }
@@ -88,7 +90,7 @@ internal sealed class TeleportHandler : ActionHandler<TeleportAction>
     {
         var player = run.State.Players[run.ActionTarget(action)];
         var map = run.State.Map;
-        if (!Positions.Movable(player))
+        if (!Positions.Movable(player) || run.PositionLocked)
         {
             return;
         }

@@ -129,6 +129,9 @@ public static class ContentPublishing
         }
 
         var triggered = definition.Kind != ObjectKind.Item;
+
+        // A drawn event asks its player and waits for the answer on the server (D-511): it has somebody to ask
+        var asksLater = definition.Kind == ObjectKind.Event;
         switch (effect.Trigger)
         {
             case Trigger.Time:
@@ -144,13 +147,13 @@ public static class ContentPublishing
                 break;
         }
 
-        if (triggered && effect.Target?.Selector == TargetSelector.Chosen)
+        if (triggered && !asksLater && effect.Target?.Selector == TargetSelector.Chosen)
         {
             error($"{at}.effect.target", "An effect that acts on its own has nobody to choose its target.");
         }
 
         var rolled = effect.Outcomes is { Roll: not null };
-        if (triggered && effect.Outcomes is { Choice: not null })
+        if (triggered && !asksLater && effect.Outcomes is { Choice: not null })
         {
             error($"{at}.effect.outcomes.choice", "An effect that acts on its own has nobody to ask.");
         }
@@ -170,6 +173,22 @@ public static class ContentPublishing
                 error(path, "A branch by the player's answer asks nothing more: the questions after it would depend on it.");
             }
 
+            // An event waits for one answer at a time, at an action of its list (D-511): not inside a case, not a list of preference
+            if (asksLater && asks)
+            {
+                if (i >= effect.Actions.Count)
+                {
+                    error(path, "An event asks in its list of actions, not inside a case of its outcomes.");
+                }
+                else if (actions[i] is TakeObjectAction { Count: not null })
+                {
+                    error($"{path}.count", "An event asks for one object at a time.");
+                }
+
+                rolled |= actions[i] is RollAction;
+                continue;
+            }
+
             switch (actions[i])
             {
                 case ModifyNextRollAction { RunCondition: not null }:
@@ -182,9 +201,9 @@ public static class ContentPublishing
                     // Played inside the draw, a draw of a draw would loop past the levels of the chain (D-531)
                     error(path, "An event does not draw another event.");
                     break;
-                case RequestChoiceAction when triggered:
-                case TakeObjectAction { Pick: Pick.Chosen } when triggered:
-                case MoveAction { Direction: MoveDirection.Chosen } when triggered:
+                case RequestChoiceAction when triggered && !asksLater:
+                case TakeObjectAction { Pick: Pick.Chosen } when triggered && !asksLater:
+                case MoveAction { Direction: MoveDirection.Chosen } when triggered && !asksLater:
                     error(path, "An effect that acts on its own has nobody to ask.");
                     break;
                 case RequestChoiceAction when rolled:
@@ -209,8 +228,8 @@ public static class ContentPublishing
         }
     }
 
-    // What an event plays in 5.1 (D-536): its effect at once on the one who drew it. Text by hand (IRL), a condition and
-    // other targets come with 5.3 and are refused until then rather than ignored.
+    // What an event plays (D-536, D-511): its effect at once on the one who drew it or a player he picks, a question waiting
+    // for his answer. Text by hand (IRL), a condition and other targets come with 5.3 and are refused until then rather than ignored.
     private static void Event(ObjectDefinition definition, string at, Action<string, string> error)
     {
         if (definition.Manual)
@@ -230,9 +249,10 @@ public static class ContentPublishing
                 error($"{at}.effect.condition", "An event plays when drawn, without a condition.");
             }
 
-            if (effect.Target is { Selector: not TargetSelector.Self })
+            // A target the drawer picks is a question that waits for him (D-511); other selectors come with 5.3 and 5.9
+            if (effect.Target is { Selector: not (TargetSelector.Self or TargetSelector.Chosen) })
             {
-                error($"{at}.effect.target", "An event acts on the one who drew it («self»).");
+                error($"{at}.effect.target", "An event acts on the one who drew it («self») or on a player he picks («chosen»).");
             }
         }
     }

@@ -8156,9 +8156,10 @@
       "ChoiceKind": {
         "enum": [
           "game",
-          "branch"
+          "branch",
+          "effect"
         ],
-        "description": "What the player is choosing (K-5): a game, a branch at a fork; targets and outcomes come later."
+        "description": "What the player is choosing (K-5): a game, a branch at a fork, the answer of an event (D-511)."
       },
       "ChoiceOptionView": {
         "required": [
@@ -9295,6 +9296,14 @@
           "defaultDeck": {
             "description": "The deck an event cell draws from when the zone of the player's cell has no deck of the content (D-502): the\nstandard deck of this kind.",
             "$ref": "#/components/schemas/EventKind"
+          },
+          "answerTimeoutHours": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "How long an event that asks waits for its answer, in hours (D-560): past it the timer answers by a random option,\nwritten in the log. Null — it waits without a limit (the turn waits, the admin may discard it, D-91). Not written\nwhile null.",
+            "format": "int32"
           }
         },
         "description": "The rules of event decks (SPEC «Ивенты», D-500…D-502)."

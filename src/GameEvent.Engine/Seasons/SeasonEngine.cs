@@ -96,7 +96,8 @@ public static class SeasonEngine
         var settlements = Settlements.After(after, decision.Events);
         after = settlements.Aggregate(after, Apply);
         IReadOnlyList<IGameEvent> own = [.. decision.Events, .. settlements];
-        var (reactions, reacted) = EffectChain.Run(after, own, context);
+        // A continuation of a suspended effect reacts from the level it stopped at (D-511)
+        var (reactions, reacted) = EffectChain.Run(after, own, context, Suspensions.Level(state, decision.Events));
         var lifetimes = Settlements.Lifetimes(reacted, own);
         var final = lifetimes.Aggregate(reacted, Apply);
         return reactions.Count == 0 && settlements.Count == 0 && lifetimes.Count == 0
@@ -199,6 +200,8 @@ public static class SeasonEngine
             // Facts for the log and the feed that change nothing by themselves: their consequences are their own events.
             ObjectLost or ItemUsed or EffectTriggered or EffectRolled or HostileIntercepted or WheelSpun or InventoryAdjusted => state,
             Decks.EventDrawn or Decks.EventDrawMissed => state,
+            EffectSuspended e => Suspensions.Apply(state, e),
+            EffectResumed e => Suspensions.Apply(state, e),
             _ => throw new ArgumentException($"Unknown event {gameEvent.GetType().Name}.", nameof(gameEvent)),
         };
 

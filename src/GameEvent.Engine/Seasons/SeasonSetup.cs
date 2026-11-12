@@ -133,6 +133,12 @@ internal static class SeasonSetup
             return Decision.Reject(RejectionCodes.BranchChoicePending, "A player is choosing a branch: wait for the choice or discard it first.");
         }
 
+        // D-561: like a branch, the answer of an event belongs to a step made before the deadline
+        if (state.Players.Values.Any(p => p.Suspended.Count > 0))
+        {
+            return Decision.Reject(RejectionCodes.EffectChoicePending, "An event waits for a player's answer: wait for it or discard it first.");
+        }
+
         return Decision.Accept(changed, new SeasonResultRecorded(Ranking.Leaderboard.Build(state)));
     }
 

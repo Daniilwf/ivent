@@ -3,7 +3,7 @@ using GameEvent.Engine.Rolls;
 
 namespace GameEvent.Engine.Turns;
 
-/// <summary>What the player is choosing (K-5): a game, a branch at a fork; targets and outcomes come later.</summary>
+/// <summary>What the player is choosing (K-5): a game, a branch at a fork, the answer of an event (D-511).</summary>
 public enum ChoiceKind
 {
     /// <summary>One of several rolled games (<c>roll.choiceCount</c> &gt; 1, D-06).</summary>
@@ -11,6 +11,13 @@ public enum ChoiceKind
 
     /// <summary>The branch at a fork the player's own move reached (D-304); an option's id is the cell of the branch.</summary>
     Branch,
+
+    /// <summary>
+    /// The answer an event waits for (D-511): its effect is suspended (<see cref="Effects.EffectSuspended"/>) and goes on in
+    /// the command of the answer. An option's id is the text of a list or a category, a player's or an object instance's id
+    /// in the <c>N</c> format.
+    /// </summary>
+    Effect,
 }
 
 /// <summary>

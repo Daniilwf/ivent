@@ -34,6 +34,10 @@ internal sealed class EffectRun
     private readonly IReadOnlyList<string> _choices;
     private int _choiceIndex;
 
+    // What a question would ask now (D-511): the outcome's case or the action being played
+    private SuspendedStep _step = SuspendedStep.Action;
+    private int _actionIndex;
+
     // The actions aimed at the user ran: with several targets they run once per use (D-480)
     private bool _selfDone;
 
@@ -114,6 +118,24 @@ internal sealed class EffectRun
     /// <summary>Set when the command must be refused: the answers do not fit.</summary>
     public Decision? Refusal { get; private set; }
 
+    /// <summary>
+    /// Set for a drawn event (D-511): a question without an answer suspends the effect with <see cref="EffectSuspended"/>
+    /// instead of refusing; null for an item, which answers before its use (D-407).
+    /// </summary>
+    public Asking? Asks { get; init; }
+
+    /// <summary>
+    /// The run goes on after an answer checked against the snapshot of the options (Н-10): an answer that no longer fits what
+    /// the action counts now is skipped, not refused.
+    /// </summary>
+    public bool Resuming { get; init; }
+
+    /// <summary>After the deadline the token does not move (Н-13): <c>move</c> and <c>teleport</c> do nothing.</summary>
+    public bool PositionLocked { get; init; }
+
+    /// <summary>Set when the effect stopped to wait for an answer: nothing more of it runs in this command (D-511).</summary>
+    public bool Suspended { get; private set; }
+
     /// <summary>The answers left unused after the run: a command giving more answers than asked is refused.</summary>
     public int UnusedChoices => _choices.Count - _choiceIndex;
 
@@ -140,6 +162,17 @@ internal sealed class EffectRun
     /// <summary>The next answer of the player, checked against <paramref name="options"/>; null (and a refusal) when it does not fit.</summary>
     public string? NextChoice(IReadOnlyCollection<string> options)
     {
+        if (_choiceIndex >= _choices.Count && Asks is not null)
+        {
+            // An event asks and waits; nothing to choose from is nothing to ask (D-511)
+            if (options.Count > 0)
+            {
+                Suspend(_step, options);
+            }
+
+            return null;
+        }
+
         if (_choiceIndex >= _choices.Count)
         {
             Refuse(RejectionCodes.ItemInvalidChoice, $"The effect of «{ObjectId}» asks for choice number {_choiceIndex + 1}.");
@@ -147,6 +180,12 @@ internal sealed class EffectRun
         }
 
         var answer = _choices[_choiceIndex++];
+        if (!options.Contains(answer, StringComparer.Ordinal) && Resuming)
+        {
+            // Н-10: what was answered is gone since the question: the action is skipped
+            return null;
+        }
+
         if (!options.Contains(answer, StringComparer.Ordinal))
         {
             Refuse(RejectionCodes.ItemInvalidChoice, $"«{answer}» is not one of the options of «{ObjectId}».");
@@ -165,6 +204,12 @@ internal sealed class EffectRun
     {
         var answers = _choices.Skip(_choiceIndex).ToList();
         _choiceIndex = _choices.Count;
+        if (Asks is not null)
+        {
+            // An event never asks for a list of preference (the pack refuses it): what is not answered goes at random
+            answers = [.. answers.Where(a => options.Contains(a, StringComparer.Ordinal)).Distinct(StringComparer.Ordinal)];
+        }
+
         if (answers.FirstOrDefault(a => !options.Contains(a, StringComparer.Ordinal)) is { } wrong)
         {
             Refuse(RejectionCodes.ItemInvalidChoice, $"«{wrong}» is not one of the options of «{ObjectId}».");
@@ -252,6 +297,7 @@ internal sealed class EffectRun
             if (effect.Outcomes is { Choice: { } choice } byChoice)
             {
                 // The player's answer picks the case (D-482)
+                _step = SuspendedStep.Outcome;
                 if (NextChoice(Actions.RequestChoiceHandler.Options(choice.Options, this)) is { } option)
                 {
                     RunActions(byChoice.Cases.FirstOrDefault(c => c.Option == option)?.Actions ?? []);
@@ -268,26 +314,106 @@ internal sealed class EffectRun
                 RunActions(effect.Actions);
             }
 
-            if (Refusal is not null || Cut is not null)
+            if (Refusal is not null || Cut is not null || Suspended)
             {
                 return;
             }
         }
     }
 
-    private void RunActions(EquatableArray<ActionSpec> actions)
+    /// <summary>
+    /// A drawn event (D-511): a target <c>chosen</c> is its first question, asked among the players the server counts;
+    /// otherwise it runs on its targets and may stop at a later question.
+    /// </summary>
+    public void Play(ObjectDefinition definition)
+    {
+        ArgumentNullException.ThrowIfNull(definition);
+        var effect = definition.Effect!;
+        if (effect.Target?.Selector == TargetSelector.Chosen && Asks is not null)
+        {
+            var options = Targets.Askable(State, definition, UserId);
+            if (options.Count > 0)
+            {
+                Suspend(SuspendedStep.Target, [.. options.Select(id => id.ToString("N"))]);
+            }
+
+            return;
+        }
+
+        Run(effect, Targets.ForTriggered(State, Context, definition, UserId));
+    }
+
+    /// <summary>
+    /// The rest of <paramref name="suspended"/> with the answer <paramref name="optionId"/> (D-511): the references computed
+    /// before the question come back; a target asked is checked again and skipped when no longer allowed (Н-10); a case runs
+    /// from its first action; an action that asked is played again with the answer, then the ones after it.
+    /// </summary>
+    public void Resume(ObjectDefinition definition, SuspendedEffect suspended, string optionId)
+    {
+        ArgumentNullException.ThrowIfNull(definition);
+        ArgumentNullException.ThrowIfNull(suspended);
+        var effect = definition.Effect!;
+        if (suspended.Step == SuspendedStep.Target)
+        {
+            if (Guid.TryParseExact(optionId, "N", out var target) && Targets.Askable(State, definition, UserId).Contains(target))
+            {
+                Run(effect, [target]);
+            }
+
+            return;
+        }
+
+        TargetId = suspended.TargetId ?? UserId;
+        LastRoll = suspended.Roll;
+        LastChoice = suspended.Choice;
+        if (suspended.Step == SuspendedStep.Outcome)
+        {
+            _choiceIndex = _choices.Count;
+            LastChoice = optionId;
+            RunActions(effect.Outcomes?.Cases.FirstOrDefault(c => c.Option == optionId)?.Actions ?? []);
+            return;
+        }
+
+        RunActions(effect.Actions, Math.Max(suspended.NextAction - 1, 0));
+    }
+
+    /// <summary>Stops the effect to wait for the answer to <paramref name="options"/> (D-511): written with what it computed so far.</summary>
+    private void Suspend(SuspendedStep step, IReadOnlyCollection<string> options)
+    {
+        var asks = Asks!;
+        var due = State.Rules.Events?.AnswerTimeoutHours is { } hours ? Context.Clock.UtcNow.AddHours(hours) : (DateTimeOffset?)null;
+        Emit(new EffectSuspended(
+            UserId,
+            Context.Ids.NewId(),
+            ObjectId,
+            asks.Kind,
+            step,
+            step == SuspendedStep.Target ? null : TargetId,
+            step == SuspendedStep.Action ? _actionIndex + 1 : 0,
+            asks.Depth,
+            [.. options.Select(o => new Turns.ChoiceOption(o, Game: null))],
+            LastRoll,
+            LastChoice,
+            due));
+        Suspended = true;
+    }
+
+    private void RunActions(EquatableArray<ActionSpec> actions, int from = 0)
     {
         var selfDone = _selfDone;
-        foreach (var action in actions)
+        _step = SuspendedStep.Action;
+        for (var i = from; i < actions.Count; i++)
         {
+            var action = actions[i];
             if (selfDone && action.Target == Content.ActionTarget.Self && TargetId != UserId)
             {
                 continue;
             }
 
+            _actionIndex = i;
             Actions.BaseActionRegistry.ByType[action.GetType()].Execute(action, this);
             _selfDone |= action.Target == Content.ActionTarget.Self;
-            if (Refusal is not null || Cut is not null)
+            if (Refusal is not null || Cut is not null || Suspended)
             {
                 return;
             }
