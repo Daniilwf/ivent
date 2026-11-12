@@ -614,6 +614,7 @@ export const ru = {
     zoomIn: 'Приблизить',
     zoomOut: 'Отдалить',
     toMe: 'К моей фишке',
+    pickedClose: 'Скрыть, кто на клетке',
     leaderboard: 'Лидерборд',
     first: 'Первый',
     firstProvisional: 'Первый, пока предварительно',
@@ -635,8 +636,9 @@ export const ru = {
     bonus: (amount: number) => signed(amount),
     mapLabelNobody:
       'Карта сезона: развилки и зоны. Стрелки двигают карту, плюс и минус меняют масштаб',
+    // The start is cell 0 (K1M-1): the map names it, not its number
     mapLabel: (at: number) =>
-      `Карта сезона: развилки и зоны, ты на клетке ${at}. Стрелки двигают карту, плюс и минус меняют масштаб`,
+      `Карта сезона: развилки и зоны, ты ${at === 0 ? 'на старте' : `на клетке ${at}`}. Стрелки двигают карту, плюс и минус меняют масштаб`,
   },
   moments: {
     skip: 'Показать результат',
@@ -675,7 +677,7 @@ export const ru = {
       announce: (title: string, dice: string, at: string) =>
         [`Пройдено: ${title}`, dice, at].filter((part) => part !== '').join('. '),
       at: (cell: number, finish: boolean) =>
-        finish ? 'Фишка на финише' : `Фишка на клетке ${cell}`,
+        finish ? 'Фишка на финише' : cell === 0 ? 'Фишка на старте' : `Фишка на клетке ${cell}`,
       // The first finish stands only when the proofs are approved (SPEC: provisional until then)
       atFirst: (provisional: boolean) =>
         provisional
@@ -2091,7 +2093,12 @@ export const ru = {
         'map.teleportTarget': (s: string) =>
           `Телепорт «${s}» должен вести на другую клетку карты, но не на финиш.`,
         'map.teleportCycle': (s: string) => `Телепорты ходят по кругу, начиная с «${s}».`,
-        'map.cellParameter': (s: string) => `У клетки «${s}» не заполнен или лишний параметр.`,
+        'map.teleportPastCheckpoint': (s: string) =>
+          `Телепорт «${s}» стоит за чекпоинтом и ведёт назад, до него: чекпоинт не даёт откинуть игрока ниже себя.`,
+        'map.cellPlace': (s: string) =>
+          `Клетка «${s}» стоит слишком далеко: координаты не дальше 16 384 от нуля.`,
+        'map.cellParameter': (s: string) =>
+          `У клетки «${s}» не заполнен или лишний параметр, или он вне пределов: бонус — от −10 000 до 10 000, но не 0.`,
         'map.featureDisabled': (s: string) =>
           `Клетка «${s}» нужна выключенной механике: ивенты и магазин пока не работают.`,
         'map.zoneUnknown': (s: string) => `У клетки «${s}» зона, которой нет в списке.`,

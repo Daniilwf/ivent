@@ -192,6 +192,24 @@ describe('the map editor', () => {
     expect(screen.getByTestId('map-cell')).toHaveTextContent(t.cell.title('start'));
   });
 
+  it('names the bounds when a bonus is past them, not only a missing parameter (K1M-5)', async () => {
+    onDesktop();
+    fakeServer({
+      'GET /api/admin/seasons/*/map': view(),
+      'POST /api/admin/seasons/*/map/check': {
+        canPublish: false,
+        problems: [{ code: 'map.cellParameter', subject: 'c1', message: '' }],
+        warnings: [],
+      },
+    });
+    render(<MapSection seasonId={seasonId} version={0} />);
+
+    // The engine turns a bonus of 20 000 down with this code: the admin learns the ceiling from the words
+    const problems = await screen.findByTestId('map-problems', {}, afterEdit);
+    expect(problems).toHaveTextContent('c1');
+    expect(problems).toHaveTextContent('10 000');
+  });
+
   it('builds a fork with the keyboard panel and publishes it after the confirmation', async () => {
     onDesktop();
     const server = fakeServer({
@@ -522,6 +540,24 @@ describe('the map editor', () => {
 
     expect(await screen.findByTestId('map-phone')).toHaveTextContent(t.phone);
     expect(screen.queryByTestId('map-editor')).not.toBeInTheDocument();
+  });
+
+  it('draws no token on the start for a player on a cell the map does not know', async () => {
+    fakeServer({
+      'GET /api/admin/seasons/*/map': view({
+        players: [
+          { playerId: 'p1', name: 'Вася', cellId: 'c1', finished: false, choosingBranch: false },
+          { playerId: 'p2', name: 'Лиса', cellId: 'gone', finished: false, choosingBranch: false },
+        ],
+      }),
+      'POST /api/admin/seasons/*/map/check': ok,
+    });
+    render(<MapSection seasonId={seasonId} version={0} />);
+
+    await screen.findByTestId('map-phone');
+    // Cell number 0 is the start since the numbering from 0 (D-622): an unknown cell is not drawn as the start
+    expect(document.querySelector('[data-player="p1"]')).toBeInTheDocument();
+    expect(document.querySelector('[data-player="p2"]')).not.toBeInTheDocument();
   });
 
   it('offers a retry when the page cannot load', async () => {

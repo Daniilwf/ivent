@@ -613,14 +613,28 @@ public sealed class MapApiTests : IAsyncLifetime
         for (var i = 1; i < length; i++)
         {
             var id = $"long-cell-number-{i}";
-            cells.Add(Cell(id, "empty", i * 100, (i % 7) * 50));
+            var (x, y) = LongMapPlace(i);
+            cells.Add(Cell(id, "empty", x, y));
             edges.Add(Arrow(previous, id, true, true));
             previous = id;
         }
 
-        cells.Add(Cell("finish", "finish", length * 100, 0));
+        var (fx, fy) = LongMapPlace(length);
+        cells.Add(Cell("finish", "finish", fx, fy - (length % 7) * 50));
         edges.Add(Arrow(previous, "finish", true, true));
         return new JsonObject { ["cells"] = cells, ["edges"] = edges, ["zones"] = new JsonArray() };
+    }
+
+    /// <summary>
+    /// The place of the long map's cell <paramref name="i"/>: 50 to a row, 100 apart, the rows winding back and forth, so
+    /// a long map stays within the map's coordinate ceiling (D-621) and a short one is the straight row it always was.
+    /// </summary>
+    private static (int X, int Y) LongMapPlace(int i)
+    {
+        const int PerRow = 50;
+        var (row, column) = (i / PerRow, i % PerRow);
+        var x = (row % 2 == 0 ? column : PerRow - 1 - column) * 100;
+        return (x, (row * 400) + ((i % 7) * 50));
     }
 
     private static JsonObject Cell(string id, string type, int x, int y, string? zone = null, string? to = null, int? amount = null)

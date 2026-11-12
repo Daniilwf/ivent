@@ -2220,7 +2220,7 @@ describe('SeasonScreen completion moment (H4)', () => {
   const announce = ru.moments.dice.announce(
     'Silent Hill',
     ru.moments.dice.result([1], [2], 3),
-    ru.moments.dice.at(2, false),
+    ru.moments.dice.at(1, false),
   );
 
   /** Вася plays Silent Hill at the start, or has completed it (standing on c1) */
@@ -2365,7 +2365,7 @@ describe('SeasonScreen completion moment (H4)', () => {
       ru.leaderboard.row(1, 'Вася', 3, 1),
     );
     expect(screen.getByTestId('throw-result')).toHaveTextContent(
-      ru.moments.dice.after(3, ru.moments.dice.at(2, false)),
+      ru.moments.dice.after(3, ru.moments.dice.at(1, false)),
     );
   });
 
