@@ -26,6 +26,11 @@ internal static class Choosing
             return Decision.Reject(RejectionCodes.NoPendingChoice, $"Choice {command.ChoiceId} is not pending.");
         }
 
+        if (command.DeclaredDifficulty is { } declared && !Enum.IsDefined(declared))
+        {
+            return Decision.Reject(RejectionCodes.CommandInvalid, $"Unknown difficulty {declared}.");
+        }
+
         if (choice.Options.SingleOrDefault(o => o.Id == command.OptionId) is not { } option)
         {
             return Decision.Reject(RejectionCodes.UnknownChoiceOption, $"The option is not one of choice {command.ChoiceId}.");
@@ -35,7 +40,8 @@ internal static class Choosing
         var game = option.Game ?? throw new InvalidOperationException($"Game choice {choice.ChoiceId} has an option without a game.");
         return Decision.Accept(
             new ChoiceMade(command.PlayerId, command.ChoiceId, command.OptionId),
-            new RunStarted(context.Ids.NewId(), command.PlayerId, game.GameId, game.Snapshot, game.RolledAt, context.Clock.UtcNow));
+            new RunStarted(
+                context.Ids.NewId(), command.PlayerId, game.GameId, game.Snapshot, game.RolledAt, context.Clock.UtcNow, command.DeclaredDifficulty));
     }
 
     /// <summary>

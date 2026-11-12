@@ -48,7 +48,7 @@
 | Поле | Значения |
 | --- | --- |
 | `target` | `selector`: `self`, `chosen`, `randomActive`, `all`, `leader`, `higherPoints`, `lowerPoints`, `withinCells`, `nearestBehind`; `among` — ограничить выбор для `chosen` и `randomActive`: `higherPoints`, `lowerPoints`; `excludeSelf` — исключить себя; у `withinCells` — `cells`: все в пределах стольких клеток по рёбрам карты в обе стороны, стоящие на клетке использующего — при `includeSameCell`; `nearestBehind` — ближайший позади по расстоянию до финиша, при равенстве — все (D-480) |
-| `trigger` | для эффектов: `beforeRoll`, `afterRoll`, `runCompleted`, `beforeDice`, `afterDice`, `moveStep`, `stop`, `pass`, `drop`, `techReroll`, `time`, `hostileIncoming`, `runEnded` (прохождение или дроп, D-479) |
+| `trigger` | для эффектов: `beforeRoll`, `afterRoll`, `runCompleted`, `beforeDice`, `afterDice`, `moveStep` (на каждой вошедшей клетке хода), `stop`, `pass` (на каждой пройденной клетке, D-488), `drop`, `techReroll`, `time`, `hostileIncoming`, `runEnded` (прохождение или дроп, D-479) |
 | `duration` | `{ "uses": N }`, `{ "hours": N }`, `{ "runs": N }` или `{ "untilTriggered": true }` |
 | `condition` | условие срабатывания, см. «Условия» |
 | `intercept` | `hostile` — эффект гасит входящий враждебный эффект (пассивная защита) |
@@ -68,8 +68,8 @@
 | `changeResource` | `resource`: `points`, `coins` или свой ключ; `amount`; `reflect: true` — монетки, снятые с цели, у которой их не больше `effects.reflect.coinsAtMost`, снимаются с использующего, умноженные на `effects.reflect.multiplier` (D-474) |
 | `roll` | `dice`: результат доступен как `$roll` |
 | `giveObject` | `objectId`, `params` для параметризованных объектов |
-| `takeObject` | `mode`: `take`, `steal`, `destroy`, `give` (отдать свой объект цели; нечего отдать — отказ `item.nothingToGive`, D-478); `filter`; `pick`: `random` или `chosen` (ответ — id экземпляра); `count`: сколько объектов — число от 1 или ссылка (`$roll`), `all: true` — все подходящие (D-476). При `chosen` число просит ответ на каждый объект, а ссылка забирает все оставшиеся ответы как список по порядку, недостающие берутся случайно |
-| `transformObject` | `mode`: `transform` (`into`), `annotate` (`note`), `addCounter` (`value`: на сколько меняются счётчики всех подходящих; дошедший до нуля срабатывает сразу) или `resetCounters` (счётчики всех подходящих — к началу), D-479 |
+| `takeObject` | `mode`: `take`, `steal`, `destroy`, `give` (отдать свой объект цели; нечего отдать — отказ `item.nothingToGive`, D-478); `filter`; `required: true` — у цели нечего забрать по фильтру — отказ `item.nothingToTake` (обмен и кража «взамен» не становятся подарком, D-487); `pick`: `random` или `chosen` (ответ — id экземпляра); `count`: сколько объектов — число от 1 или ссылка (`$roll`), `all: true` — все подходящие (D-476). При `chosen` число просит ответ на каждый объект, а ссылка забирает все оставшиеся ответы как список по порядку, недостающие берутся случайно |
+| `transformObject` | `mode`: `transform` (`into`), `annotate` (`note`), `addCounter` (`value`: на сколько меняются счётчики всех подходящих; дошедший до нуля срабатывает сразу — один раз, на уровень цепочки глубже) или `resetCounters` (счётчики всех подходящих — к началу); счётчики, уже дошедшие до нуля, не меняются, D-479, D-485 |
 | `drawEvent` | `deck`: `good`, `bad`, `special`, `risky`, `zone` или id колоды |
 | `spinWheel` | `wheel`: id колеса |
 | `modifyNextRoll` | `filter`, `choiceCount`, `runCondition` |
@@ -354,11 +354,11 @@
 ```json
 {
   "id": "pig", "kind": "item", "name": "Свинья",
-  "description": "Отдай выбранному другому игроку один свой эффект на выбор.",
+  "description": "Отдай выбранному другому игроку один свой враждебный эффект на выбор.",
   "rarity": "common", "price": null, "window": "anytime", "hostile": true, "stackable": false, "tags": ["pig"],
   "effect": {
     "target": { "selector": "chosen", "excludeSelf": true },
-    "actions": [{ "type": "takeObject", "mode": "give", "pick": "chosen", "filter": { "kind": "effect" } }]
+    "actions": [{ "type": "takeObject", "mode": "give", "pick": "chosen", "filter": { "kind": "effect", "hostile": true } }]
   }
 }
 ```

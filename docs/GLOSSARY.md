@@ -26,6 +26,7 @@
 | Общий лог | лог событий без сезона: аккаунты, позже пул | `GameEvent` с `SeasonId = Guid.Empty` |
 | Метка безопасности | меняется при смене пароля, роли, удалении; обрывает сессии | `UserRecord.SecurityStamp` |
 | Роль | игрок, админ, зритель | `Role` (`Player`, `Admin`, `Spectator`) |
+| Кука устройства | подписанная запись «этот браузер уже входил в этот аккаунт с нынешним паролем» на год; такой браузер не держит потолок неудачных входов по логину, после смены пароля запись чужая (D-460, D-465) | `LoginDevices`, кука `ge.device` |
 | Метка безопасности | меняется при смене пароля, роли или удалении аккаунта и завершает старые сессии | `User.SecurityStamp` |
 | Игрок сезона | участие пользователя в конкретном сезоне | `SeasonPlayer` |
 | Фаза хода | где игрок в цикле хода: ждёт ролла, игра выпала, играет | `TurnPhase` (`Idle`, `Rolling`, `Playing`) |
@@ -93,6 +94,7 @@
 | Статус прохождения | идёт, завершено, дропнуто, тех-реролл, отклонено (реджект) | `RunStatus` (`Playing`, `Completed`, `Dropped`, `TechRerolled`, `Rejected`) |
 | Снапшот | правила и параметры, зафиксированные в момент ролла | `RunSnapshot` |
 | Сложность | лёгкая, нормальная, сложная, выше сложной | `Difficulty` (`Easy`, `Normal`, `Hard`, `Extreme`) |
+| Сложность при старте | сложность, которую игрок называет, начиная игру; при завершении засчитывается не выше неё (D-633) | `StartRun.DeclaredDifficulty`, `RunStarted.DeclaredDifficulty`, `RunState.DeclaredDifficulty` |
 | Пруф | доказательство прохождения: ссылки, заметка или свидетель | `ProofState` (`ProofStatus`: `Pending`, `Approved`, `Rejected`), команда `SubmitProof`, событие `ProofSubmitted`, таблица `Proof` |
 | Одобрение | подтверждение пруфа админом, в том числе «без скрина» | команда `ApproveProof`, событие `ProofApproved` |
 | Реджект | отклонение пруфа админом: снимается всё, что дал ход прохождения, — очки с бонусом клетки хода, клетки (позиция не улучшается), монетки (в минус), предметы клеток хода, которые игрок ещё держит (D-321, D-327, D-421) | команда `RejectProof`, событие `ProofRejected`, `RunStatus.Rejected`, `RunState.CellPoints`, `RunState.CellObjects`, `ObjectRemoval.ProofRejected` |
@@ -231,7 +233,7 @@
 | Перехват | пассивная защита, гасящая враждебный эффект | `Intercept`, событие `HostileIntercepted` |
 | Отражение урона | урон монетками по цели на пороге `effects.reflect.coinsAtMost` и ниже достаётся использующему, умноженный (D-474) | `ChangeResourceAction.Reflect`, `CoinReflect` |
 | Счётчик эффекта | обратный отсчёт эффекта: срабатывания триггера уменьшают его, на нуле эффект действует; зелья меняют и сбрасывают (D-479) | `EffectSpec.Counter`, `InventoryObject.Counter`, `TransformMode.AddCounter`, `ResetCounters`, триггер `RunEnded` |
-| Передача объекта | игрок отдаёт свой объект другому предметом; отданное — его дело на получателе (D-478) | `TakeMode.Give`, `ObjectTransferred.Given`, отказ `item.nothingToGive` |
+| Передача объекта | игрок отдаёт свой объект другому предметом; отданное — его дело на получателе (D-478) | `TakeMode.Give`, `ObjectTransferred.Given`, отказ `item.nothingToGive`; кража «взамен» с `required` — отказ `item.nothingToTake` (D-487) |
 | Неукрадываемый, неуничтожимый | флаги объекта: эффекты не забирают и не передают / не уничтожают и не превращают его (D-478) | `ObjectDefinition.Unstealable`, `Undestroyable` |
 | Условие использования | когда предмет можно использовать, например «при нуле монеток» (D-483) | `ObjectDefinition.UseCondition`, статистика `ContentStat.Coins`, отказ `item.conditionNotMet` |
 | Ветвление по выбору | исходы эффекта по ответу игрока, а не по броску (D-482) | `OutcomesSpec.Choice`, `OutcomeCase.Option` |

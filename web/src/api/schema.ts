@@ -7348,13 +7348,17 @@ export interface components {
             /** Format: int32 */
             steps?: null | number;
         };
-        /** @description An answer to the pending choice: its id and the picked option's id. */
+        /**
+         * @description An answer to the pending choice: its id and the picked option's id; for a game, `difficulty` — the one it starts on
+         *     (D-633).
+         */
         ChooseRequest: {
             /** Format: uuid */
             commandId: string;
             /** Format: uuid */
             choiceId: string;
             optionId: string;
+            difficulty?: null | components["schemas"]["Difficulty"];
         };
         /**
          * @description Reflection of coin damage (D-474): when the target has at most int CoinReflect.CoinsAtMost coins, the damage goes to the
@@ -7725,7 +7729,7 @@ export interface components {
          */
         EventSource: "cell" | "item";
         /** @enum {unknown} */
-        ExclusionReason: "alreadyPlayed" | "dropped" | "techRerolled" | null;
+        ExclusionReason: "alreadyPlayed" | "dropped" | "techRerolled";
         /** @description Feature flags: a disabled mechanic is invisible in the interface and refused by the engine. */
         Features: {
             mapMode: components["schemas"]["MapMode"];
@@ -8074,7 +8078,7 @@ export interface components {
         /** @enum {unknown} */
         MandatoryEvent: "bad" | "none";
         /** @enum {unknown} */
-        ManualEffectOutcome: "applied" | "notApplicable" | null;
+        ManualEffectOutcome: "applied" | "notApplicable";
         /**
          * @description What created a manual effect; C11 adds item, cell and event sources.
          * @enum {unknown}
@@ -8693,12 +8697,14 @@ export interface components {
         };
         /** @enum {unknown} */
         RunStatus: "playing" | "completed" | "dropped" | "techRerolled" | "rejected";
+        /** @description The active run; `declaredDifficulty` — the one named at the start, the cap of the completion's (D-633). */
         RunView: {
             /** Format: uuid */
             id: string;
             game: components["schemas"]["RunGameView"];
             /** Format: date-time */
             startedAt: string;
+            declaredDifficulty?: null | components["schemas"]["Difficulty"];
         };
         /** @description An admin action on the season with nothing else to say (D-113: recalculate the finish bonuses). */
         SeasonActionRequest: {
@@ -8902,9 +8908,11 @@ export interface components {
             commentsPerDay: number;
             spectatorsCanVote: boolean;
         };
+        /** @description Start the offered game; `difficulty` — the one the player starts on, the cap of the completion's (D-633). */
         StartRequest: {
             /** Format: uuid */
             commandId: string;
+            difficulty?: null | components["schemas"]["Difficulty"];
         };
         /**
          * @description A stored file (D-108): `url` serves the file, `thumbnailUrl` the small one for the map and lists.
@@ -8930,7 +8938,7 @@ export interface components {
             objects: components["schemas"]["ItemOptionView"][];
         };
         /** @enum {unknown} */
-        TechRerollReason: "weakPc" | "paidUnavailable" | "doesNotLaunch" | "emulatorTooSlow" | "other" | "wish" | null;
+        TechRerollReason: "weakPc" | "paidUnavailable" | "doesNotLaunch" | "emulatorTooSlow" | "other" | "wish";
         /** @description A tech reroll of the active run; `comment` is required for the reason «other» (D-11). */
         TechRerollRequest: {
             /** Format: uuid */
@@ -9035,7 +9043,7 @@ export interface components {
             choices?: null | string[];
         };
         /** @enum {unknown} */
-        UseWindow: "beforeRoll" | "afterRoll" | "beforeDice" | "afterDice" | "anytime" | null;
+        UseWindow: "beforeRoll" | "afterRoll" | "beforeDice" | "afterDice" | "anytime";
         WeeklyChallengeRules: {
             /** Format: int32 */
             defaultRewardCoins: number;
@@ -9117,9 +9125,11 @@ export const difficultyValues: ReadonlyArray<FlattenedDeepRequired<components>["
 export const emptyPoolFallbackValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["EmptyPoolFallback"]> = ["dropZoneFilter"];
 export const eventKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["EventKind"]> = ["good", "bad", "special", "risky"];
 export const eventSourceValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["EventSource"]> = ["cell", "item"];
+export const exclusionReasonValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ExclusionReason"]> = ["alreadyPlayed", "dropped", "techRerolled"];
 export const gameMarkKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["GameMarkKind"]> = ["dropped", "techRerolled"];
 export const itemStepKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ItemStepKind"]> = ["choice", "pickObject", "direction"];
 export const mandatoryEventValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["MandatoryEvent"]> = ["bad", "none"];
+export const manualEffectOutcomeValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ManualEffectOutcome"]> = ["applied", "notApplicable"];
 export const manualEffectSourceValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ManualEffectSource"]> = ["paidReroll", "drop", "difficulty", "item", "event"];
 export const mapModeValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["MapMode"]> = ["linear", "graph"];
 export const moveReasonValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["MoveReason"]> = ["completionRoll", "startingCell", "adminAdjustment", "dropPenalty", "runCorrection", "proofRejected", "teleport", "item", "itemTeleport", "diceModified"];
@@ -9135,6 +9145,8 @@ export const runStatusValues: ReadonlyArray<FlattenedDeepRequired<components>["s
 export const seasonStatusValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["SeasonStatus"]> = ["draft", "active", "closing", "finished", "archived"];
 export const shopPaymentValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ShopPayment"]> = ["freeRoll", "coins"];
 export const siteEnvironmentValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["SiteEnvironment"]> = ["production", "staging", "development", "test", "other"];
+export const techRerollReasonValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["TechRerollReason"]> = ["weakPc", "paidUnavailable", "doesNotLaunch", "emulatorTooSlow", "other", "wish"];
 export const turnPhaseValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["TurnPhase"]> = ["idle", "rolling", "playing"];
 export const unmetConditionPolicyValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["UnmetConditionPolicy"]> = ["noDiceKeepCoins", "countAsDrop", "ignore"];
+export const useWindowValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["UseWindow"]> = ["beforeRoll", "afterRoll", "beforeDice", "afterDice", "anytime"];
 export type operations = Record<string, never>;

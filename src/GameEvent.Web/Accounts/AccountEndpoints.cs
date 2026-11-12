@@ -59,7 +59,7 @@ public static partial class AccountEndpoints
         Guid.TryParse(principal.FindFirstValue(ClaimTypes.NameIdentifier), out var id) ? id : null;
 
     private static async Task<Results<Ok<CurrentUser>, UnauthorizedHttpResult, ValidationProblem, StatusCodeHttpResult>> LoginAsync(
-        LoginRequest request, HttpContext http, GameEventDbContext db, Passwords passwords, LoginThrottle throttle, ILoggerFactory loggers, CancellationToken ct)
+        LoginRequest request, HttpContext http, GameEventDbContext db, Passwords passwords, LoginThrottle throttle, LoginDevices devices, ILoggerFactory loggers, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(request.Login) || string.IsNullOrEmpty(request.Password)
             || request.Login.Length > 64 || request.Password.Length > 256)
@@ -74,13 +74,14 @@ public static partial class AccountEndpoints
         var normalized = UserRecord.Normalize(request.Login);
         var logger = loggers.CreateLogger(typeof(AccountEndpoints));
         var address = WebSecurity.ClientKey(http.Connection.RemoteIpAddress);
-        if (!throttle.TryBegin(normalized, address))
+        // The account is read before the throttle: the device cookie counts only for the account as it is now (SEC-4)
+        var user = await db.Users.AsNoTracking().SingleOrDefaultAsync(u => u.NormalizedLogin == normalized && !u.IsDeleted, ct);
+        if (!throttle.TryBegin(normalized, address, devices.IsKnown(http, user)))
         {
             LogLoginThrottled(logger, TypedLogin(null, normalized), address);
             return TypedResults.StatusCode(StatusCodes.Status429TooManyRequests);
         }
 
-        var user = await db.Users.AsNoTracking().SingleOrDefaultAsync(u => u.NormalizedLogin == normalized && !u.IsDeleted, ct);
         if (!passwords.Verify(user, request.Password))
         {
             LogLoginFailed(logger, TypedLogin(user, normalized), address);
@@ -88,6 +89,7 @@ public static partial class AccountEndpoints
         }
 
         throttle.Succeeded(normalized, address);
+        devices.Remember(http, user!);
         await SignInAsync(http, user!);
         return TypedResults.Ok(await ToCurrentAsync(user!, db, ct));
     }

@@ -86,6 +86,12 @@ internal sealed class TakeObjectHandler : ActionHandler<TakeObjectAction>
             return;
         }
 
+        if (!giving && action.Required && ObjectFilters.Matching(run, from, action.Filter, moves: action.Mode != TakeMode.Destroy).Count == 0)
+        {
+            run.Refuse(RejectionCodes.ItemNothingToTake, $"The target of «{run.ObjectId}» has nothing it may take.");
+            return;
+        }
+
         foreach (var item in Picked(action, run, from))
         {
             Take(action, run, from, to, item);
@@ -152,6 +158,12 @@ internal sealed class TakeObjectHandler : ActionHandler<TakeObjectAction>
 
         if (item.Kind == ObjectKind.Item && run.State.Players[to].Wallet.Items >= run.State.Rules.Economy.InventoryLimit)
         {
+            // An undestroyable object that has no room is not lost: it stays where it is (D-478, AU4-2)
+            if (run.State.Catalog.Get(item.ObjectId).Undestroyable)
+            {
+                return;
+            }
+
             run.Emit(new ObjectRemoved(from, item.InstanceId, item.ObjectId, ObjectRemoval.Destroyed));
             run.Emit(new ObjectLost(to, item.ObjectId));
             return;
@@ -193,12 +205,19 @@ internal sealed class TransformObjectHandler : ActionHandler<TransformObjectActi
         run.Emit(new ObjectChanged(owner, fresh with { InstanceId = item.InstanceId, Acquired = item.Acquired, Notes = item.Notes }));
     }
 
-    // Every matching countdown changes; one brought to zero goes off at once, for its owner (D-479).
+    // Every matching countdown changes; one brought to zero goes off at once, for its owner (D-479). Only a countdown that
+    // crosses zero goes off: one at zero already is left alone, so an effect that lowers its own counter goes off once
+    // (AU4-1). Each is read again before it changes: one going off before it may have changed or taken it.
     private static void Counters(TransformObjectAction action, EffectRun run, Guid owner)
     {
         var by = action.Value is { } value ? run.Number(value) : 0;
-        foreach (var item in ObjectFilters.Matching(run, owner, action.Filter).Where(o => o.Counter is not null))
+        foreach (var matched in ObjectFilters.Matching(run, owner, action.Filter).Where(o => o.Counter is > 0))
         {
+            if (run.State.Players[owner].Wallet.Find(matched.InstanceId) is not { Counter: > 0 } item)
+            {
+                continue;
+            }
+
             var start = run.State.Catalog.Get(item.ObjectId).Effect?.Counter?.Start ?? item.Counter!.Value;
             var counter = action.Mode == TransformMode.ResetCounters ? start : item.Counter!.Value + by;
             if (counter > 0)
@@ -214,6 +233,10 @@ internal sealed class TransformObjectHandler : ActionHandler<TransformObjectActi
             var spent = item with { Counter = 0 };
             run.Emit(new ObjectChanged(owner, spent));
             Effects.Firing.GoOff(run, owner, spent);
+            if (run.Cut is not null)
+            {
+                return;
+            }
         }
     }
 }

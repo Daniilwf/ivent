@@ -2,6 +2,7 @@ using GameEvent.Engine.Content;
 using GameEvent.Engine.Inventory;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Runs;
+using GameEvent.Engine.Seasons;
 using GameEvent.Engine.Tests.Support;
 
 namespace GameEvent.Engine.Tests.Economy.ImportedItems;
@@ -145,6 +146,142 @@ public class CounterTests
 
         Assert.DoesNotContain("counter", EventCodec.Encode(plain).Data, StringComparison.Ordinal);
         Assert.Contains("\"counter\":3", EventCodec.Encode(counted).Data, StringComparison.Ordinal);
+    }
+
+    // An effect built by an admin from data (AU4-1): at zero it lowers the counters of its owner — its own among them
+    private const string ChainBombJson = """
+        {
+          "id": "chain-bomb",
+          "kind": "effect",
+          "name": "Цепная бомба",
+          "description": "x",
+          "rarity": "common",
+          "price": null,
+          "hostile": false,
+          "effect": {
+            "trigger": "runEnded",
+            "duration": { "untilTriggered": true },
+            "counter": { "start": 1 },
+            "actions": [ACTIONS]
+          }
+        }
+        """;
+
+    private const string LowerCounters = """{ "type": "transformObject", "mode": "addCounter", "value": -1, "target": "self", "filter": { "hasCounter": true } }""";
+
+    private const string ResetCounters = """{ "type": "transformObject", "mode": "resetCounters", "target": "self", "filter": { "hasCounter": true } }""";
+
+    internal static ObjectDefinition ChainBomb(params string[] actions) =>
+        ContentFiles.Pack([("chain-bomb.json", ChainBombJson.Replace("ACTIONS", string.Join(", ", actions), StringComparison.Ordinal))], []).Objects.Single();
+
+    /// <summary>The chain bomb that lowers every counter of its owner when it goes off (the random games play it, AU4-1).</summary>
+    internal static ObjectDefinition SelfLoweringBomb() => ChainBomb(LowerCounters);
+
+    private static Scenario WithChainBomb(params string[] actions)
+    {
+        var s = Season();
+        var pack = EconomyScenario.RepositoryPack();
+        var bomb = ChainBomb(actions);
+        Assert.Empty(ContentValidator.Check(bomb));
+        return s.WithContent(pack with { Objects = [.. pack.Objects, bomb] });
+    }
+
+    [Fact]
+    public void A_countdown_that_lowers_its_own_counters_goes_off_once()
+    {
+        var s = WithChainBomb(LowerCounters);
+        s.Give("Вася", "chain-bomb");
+
+        Completes(s, "Вася");
+
+        // It fires at 1: its actions bring its own counter to zero, so it goes off once more inside — and that is all
+        ScenarioAssert.Accepted(s);
+        Assert.Empty(s.LastEvents<Engine.Effects.EffectChainCut>());
+        Assert.Single(s.LastEvents<ObjectChanged>(), c => c.Item.ObjectId == "chain-bomb");
+        Assert.DoesNotContain("chain-bomb", s.Inventory("Вася"));
+        Assert.Equal(s.State, SeasonEngine.Replay(s.Log));
+    }
+
+    [Fact]
+    public void A_countdown_at_zero_is_not_lowered_again_and_does_not_go_off_again()
+    {
+        var s = WithChainBomb(LowerCounters);
+        s.Give("Вася", "time-potion");
+        s.Give("Петя", "chain-bomb");
+
+        // The potion brings Петя's bomb to zero: it goes off once, and its own action finds its counter already at zero
+        s.Used("Вася", "time-potion", "Петя");
+
+        Assert.Single(s.LastEvents<ObjectChanged>(), c => c.Item.ObjectId == "chain-bomb");
+        Assert.DoesNotContain("chain-bomb", s.Inventory("Петя"));
+    }
+
+    [Fact]
+    public void A_countdown_sees_the_counters_its_own_going_off_changed()
+    {
+        // The chain bomb goes off inside the potion and lowers the time bomb; the potion then lowers it once more: 3 → 2 → 1
+        var s = WithChainBomb(LowerCounters);
+        s.Give("Вася", "time-potion");
+        s.Give("Петя", "chain-bomb");
+        s.Give("Петя", "time-bomb");
+
+        s.Used("Вася", "time-potion", "Петя");
+
+        Assert.Equal(1, s.Held("Петя", "time-bomb").Counter);
+    }
+
+    [Fact]
+    public void A_countdown_at_zero_is_not_wound_up_again()
+    {
+        // At zero it would reset its counter to 1 and lower it to 0 again: a countdown that went off is left alone
+        var s = WithChainBomb(ResetCounters, LowerCounters);
+        s.Give("Вася", "chain-bomb");
+
+        Completes(s, "Вася");
+
+        ScenarioAssert.Accepted(s);
+        Assert.Empty(s.LastEvents<Engine.Effects.EffectChainCut>());
+        Assert.DoesNotContain("chain-bomb", s.Inventory("Вася"));
+    }
+
+    [Fact]
+    public void A_countdown_chain_inside_a_command_is_cut()
+    {
+        // Five bombs, each lowering all the others when it goes off: the first fires on the completion (level 1) and sets
+        // off the second (2), the third (3); the fourth would be level 4 — the chain is cut there, the cut written last
+        var s = WithChainBomb(LowerCounters);
+        for (var i = 0; i < 5; i++)
+        {
+            s.Give("Вася", "chain-bomb");
+        }
+
+        Completes(s, "Вася");
+
+        ScenarioAssert.Accepted(s);
+        var cut = Assert.Single(s.LastEvents<Engine.Effects.EffectChainCut>());
+        Assert.Equal((Engine.Effects.EffectChainLimit.Depth, Limits.MaxEffectDepth + 1), (cut.Limit, cut.Depth));
+        Assert.Same(cut, s.Last.Events[^1]);
+        Assert.True(s.Last.Events.Count <= Limits.MaxEventsPerCommand + 1);
+        Assert.Equal(s.State, SeasonEngine.Replay(s.Log));
+    }
+
+    [Fact]
+    public void A_countdown_chain_set_off_by_an_item_is_cut_by_the_chain_depth()
+    {
+        // The potion is the command (level 0): the bombs it sets off go off on levels 1, 2, 3; the next one is cut
+        var s = WithChainBomb(LowerCounters);
+        for (var i = 0; i < 5; i++)
+        {
+            s.Give("Петя", "chain-bomb");
+        }
+
+        s.Give("Вася", "time-potion");
+
+        s.Used("Вася", "time-potion", "Петя");
+
+        var cut = Assert.Single(s.LastEvents<Engine.Effects.EffectChainCut>());
+        Assert.Equal((Engine.Effects.EffectChainLimit.Depth, Limits.MaxEffectDepth + 1), (cut.Limit, cut.Depth));
+        Assert.Equal(s.State, SeasonEngine.Replay(s.Log));
     }
 
     [Theory]

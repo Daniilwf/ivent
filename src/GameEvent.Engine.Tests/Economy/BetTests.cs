@@ -185,6 +185,25 @@ public class BetTests
         Assert.Equal(code, s.Last.Rejection!.Code);
     }
 
+    [Theory]
+    [InlineData(0, true)]
+    [InlineData(1, false)]
+    public void The_bet_window_holds_until_exactly_its_hours_after_the_roll(int minutesOver, bool accepted)
+    {
+        // The window is closed only past its hours: at exactly 24 h a bet is still taken, a minute later it is not (AU4-9)
+        var s = Season();
+        var window = s.State.Rules.Bets.WindowHoursAfterRoll;
+        s.Advance(TimeSpan.FromHours(window) + TimeSpan.FromMinutes(minutesOver));
+
+        s.Bet("Вася", "Петя", 3, 1);
+
+        Assert.Equal(accepted, s.Last.IsAccepted);
+        if (!accepted)
+        {
+            Assert.Equal(RejectionCodes.BetWindowClosed, s.Last.Rejection!.Code);
+        }
+    }
+
     [Fact]
     public void Open_bets_are_limited()
     {

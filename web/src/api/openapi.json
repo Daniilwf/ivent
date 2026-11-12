@@ -8022,9 +8022,19 @@
           },
           "optionId": {
             "type": "string"
+          },
+          "difficulty": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Difficulty"
+              }
+            ]
           }
         },
-        "description": "An answer to the pending choice: its id and the picked option's id."
+        "description": "An answer to the pending choice: its id and the picked option's id; for a game, `difficulty` — the one it starts on\n(D-633)."
       },
       "CoinReflect": {
         "required": [
@@ -9065,8 +9075,7 @@
         "enum": [
           "alreadyPlayed",
           "dropped",
-          "techRerolled",
-          null
+          "techRerolled"
         ]
       },
       "Features": {
@@ -10142,8 +10151,7 @@
       "ManualEffectOutcome": {
         "enum": [
           "applied",
-          "notApplicable",
-          null
+          "notApplicable"
         ]
       },
       "ManualEffectSource": {
@@ -12108,8 +12116,19 @@
           "startedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "declaredDifficulty": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Difficulty"
+              }
+            ]
           }
-        }
+        },
+        "description": "The active run; `declaredDifficulty` — the one named at the start, the cap of the completion's (D-633)."
       },
       "SeasonActionRequest": {
         "required": [
@@ -12715,8 +12734,19 @@
           "commandId": {
             "type": "string",
             "format": "uuid"
+          },
+          "difficulty": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Difficulty"
+              }
+            ]
           }
-        }
+        },
+        "description": "Start the offered game; `difficulty` — the one the player starts on, the cap of the completion's (D-633)."
       },
       "StoredFileView": {
         "required": [
@@ -12788,8 +12818,7 @@
           "doesNotLaunch",
           "emulatorTooSlow",
           "other",
-          "wish",
-          null
+          "wish"
         ]
       },
       "TechRerollRequest": {
@@ -13092,8 +13121,7 @@
           "afterRoll",
           "beforeDice",
           "afterDice",
-          "anytime",
-          null
+          "anytime"
         ]
       },
       "WeeklyChallengeRules": {

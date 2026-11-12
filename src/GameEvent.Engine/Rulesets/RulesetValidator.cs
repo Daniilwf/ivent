@@ -137,6 +137,10 @@ public static class RulesetValidator
             Error("effects.maxChainDepth", "must be at least 1");
         }
 
+        // The protective ceilings of SPEC «Лимит цепочки»: a season may cut its chains earlier, never later (D-418, AU4-7)
+        AtMost("effects.maxChainDepth", ruleset.Effects.MaxChainDepth, Limits.MaxEffectDepth);
+        AtMost("effects.maxEventsPerCommand", ruleset.Effects.MaxEventsPerCommand, Limits.MaxEventsPerCommand);
+
         if (ruleset.Effects.Reflect is { Multiplier: < 1 })
         {
             Error("effects.reflect.multiplier", "must be at least 1");

@@ -45,6 +45,9 @@ test.describe('smoke @smoke', () => {
     expect(page.status()).toBe(200);
     expect(headers['x-content-type-options']).toBe('nosniff');
     expect(headers['x-frame-options']).toBe('DENY');
+    // Only the site's own scripts run (SEC-1, D-462)
+    expect(headers['content-security-policy']).toContain("script-src 'self';");
+    expect(headers['content-security-policy']).toContain("object-src 'none'");
   });
 
   test('a write without a session is refused', async ({ request }) => {

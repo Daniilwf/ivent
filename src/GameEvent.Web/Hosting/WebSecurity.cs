@@ -113,7 +113,22 @@ public static class WebSecurity
         return new IPAddress(bytes) + "/64";
     }
 
-    /// <summary>Headers for every response: no sniffing, no framing, no referrer leaks.</summary>
+    /// <summary>
+    /// The page's policy (SEC-1, D-462; promised by D-72 with the frontend): scripts, fonts, pictures and connections
+    /// only from the site itself — the hub's WebSocket named too, for browsers whose <c>'self'</c> does not cover it.
+    /// Styles may be inline: Radix and Motion put small style elements in the page; a style runs no code. Pictures may
+    /// also be <c>data:</c> and <c>blob:</c> — the preview of an upload and the screenshot of a bug report, whose drawing
+    /// also sets the base address of its own copy of the page to the site's stylesheet (<c>base-uri 'self'</c>). Files
+    /// served by the API replace it with their own, stricter one.
+    /// </summary>
+    internal static string ContentSecurityPolicy(HttpRequest request) =>
+        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; "
+        + (request.Host.Value is { Length: > 0 } host && host.All(c => char.IsAsciiLetterOrDigit(c) || c is '.' or '-' or ':' or '[' or ']')
+            ? $"connect-src 'self' {(request.IsHttps ? "wss" : "ws")}://{host}; "
+            : "connect-src 'self'; ")
+        + "object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'";
+
+    /// <summary>Headers for every response: no sniffing, no framing, no referrer leaks, only the site's own scripts.</summary>
     public static void UseSecurityHeaders(this WebApplication app)
     {
         ArgumentNullException.ThrowIfNull(app);
@@ -122,7 +137,7 @@ public static class WebSecurity
             var headers = context.Response.Headers;
             headers.XContentTypeOptions = "nosniff";
             headers.XFrameOptions = "DENY";
-            headers.ContentSecurityPolicy = "frame-ancestors 'none'";
+            headers.ContentSecurityPolicy = ContentSecurityPolicy(context.Request);
             headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
             await next(context);
         });

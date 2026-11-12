@@ -319,9 +319,35 @@ public class EffectTriggerTests
             }
         }
 
-        var fired = Assert.Single(s.LastEvents<EffectTriggered>());
-        Assert.Equal((trigger, "bonus"), (fired.Trigger, fired.ObjectId));
-        Assert.Contains(s.LastEvents<CoinsChanged>(), c => c.Reason == CoinsReason.Item && c.Delta == 3);
+        // A step of the move fires on every cell entered, a pass on every cell passed (SPEC «шаг движения», D-90, AU4-5);
+        // the rest once
+        var cells = s.LastEvents<Engine.Map.PlayerMoved>().SingleOrDefault()?.Path.Count ?? 0;
+        var times = trigger switch
+        {
+            Trigger.MoveStep => cells,
+            Trigger.Pass => cells - 1,
+            _ => 1,
+        };
+        var fired = s.LastEvents<EffectTriggered>();
+        Assert.Equal(times, fired.Count());
+        Assert.All(fired, f => Assert.Equal((trigger, "bonus"), (f.Trigger, f.ObjectId)));
+        Assert.Equal(times, s.LastEvents<CoinsChanged>().Count(c => c.Reason == CoinsReason.Item && c.Delta == 3));
+        Assert.True(times >= 1);
+    }
+
+    [Fact]
+    public void A_step_of_the_move_fires_on_each_cell_entered()
+    {
+        var s = Season(Effect("bonus", Trigger.MoveStep, null, null, Coins(1)));
+        s.Give("Вася", "bonus");
+
+        s.NextRandom(0, 0).Roll("Вася").Start("Вася");
+        s.NextRandom(2, 2).Complete("Вася");
+
+        var moved = Assert.Single(s.LastEvents<Engine.Map.PlayerMoved>());
+        Assert.True(moved.Path.Count > 1);
+        Assert.Equal(moved.Path.Count, s.LastEvents<EffectTriggered>().Count());
+        Assert.Equal(moved.Path.Count, s.LastEvents<CoinsChanged>().Count(c => c.Reason == CoinsReason.Item && c.Delta == 1));
     }
 
     [Fact]
@@ -425,6 +451,60 @@ public class EffectTriggerTests
         var cut = Assert.Single(s.LastEvents<EffectChainCut>());
         Assert.Equal(EffectChainLimit.Depth, cut.Limit);
         Assert.Equal("c4", s.Player("Вася").CellId);
+        Assert.Equal(s.State, SeasonEngine.Replay(s.Log));
+    }
+
+    // Answers a completion with `count` points changes of +1: they fill the chain before the stop of the move fires
+    private sealed class Filler(int count) : ITriggerHandler
+    {
+        public IEnumerable<IGameEvent> React(SeasonState state, IGameEvent trigger, EngineContext context) =>
+            trigger is RunCompleted completed
+                ? Enumerable.Repeat<IGameEvent>(new PointsChanged(completed.PlayerId, 1, PointsReason.AdminAdjustment, null), count)
+                : [];
+    }
+
+    // A completion of Вася with a once-only effect on the stop of his move (3 events: triggered, +1 coin, used) and `filler`
+    // events written before it fires
+    private static Scenario CompletedWithFiller(int filler)
+    {
+        var s = Season(Effect("once", Trigger.Stop, new DurationSpec { UntilTriggered = true }, null, Coins(1)));
+        s.WithTriggers(new Filler(filler));
+        s.Give("Вася", "once");
+        s.RollTitle("Вася", "Silent Hill").Start("Вася").NextRandom(1, 1).Complete("Вася");
+        return s;
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    public void A_firing_that_does_not_fit_in_the_fifty_is_cut_whole(int over)
+    {
+        // The command's own events and the firing: without filler everything is written, the firing last
+        var probe = CompletedWithFiller(0);
+        Assert.Equal("once", probe.LastEvents<EffectTriggered>().Single().ObjectId);
+        var own = probe.Last.Events.Count - 3;
+
+        // Filler so that the 3 events of the firing would end at 50 + over: 50 fits whole, more is cut whole (AU4-4)
+        var s = CompletedWithFiller(Limits.MaxEventsPerCommand - 3 + over - own);
+
+        if (over == 0)
+        {
+            Assert.Empty(s.LastEvents<EffectChainCut>());
+            Assert.Equal(Limits.MaxEventsPerCommand, s.Last.Events.Count);
+            Assert.Single(s.LastEvents<EffectTriggered>());
+            Assert.Empty(s.Inventory("Вася"));
+        }
+        else
+        {
+            // Neither the trigger, nor the coin, nor the use: the effect is still held, as if it had not fired
+            var cut = Assert.IsType<EffectChainCut>(s.Last.Events[^1]);
+            Assert.Equal((EffectChainLimit.Events, 1, Limits.MaxEventsPerCommand - 3 + over), (cut.Limit, cut.Depth, cut.Events));
+            Assert.Empty(s.LastEvents<EffectTriggered>());
+            Assert.DoesNotContain(s.LastEvents<CoinsChanged>(), c => c.Reason == CoinsReason.Item);
+            Assert.Equal(["once"], s.Inventory("Вася"));
+        }
+
         Assert.Equal(s.State, SeasonEngine.Replay(s.Log));
     }
 
