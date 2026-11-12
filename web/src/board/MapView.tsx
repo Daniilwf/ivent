@@ -396,7 +396,7 @@ function usePanZoom(
   board: Board,
   focus: Point | null,
   anchor: Point | null,
-  toolsAt: 'top' | 'bottom' | 'auto' | 'none',
+  toolsAt: 'bottom' | 'none',
   onTap: (target: Element | null) => void,
 ) {
   // null until the user moves the map: the whole world, fitted to the frame
@@ -423,8 +423,8 @@ function usePanZoom(
   }, []);
 
   const ratio = box.height / box.width;
-  // The zoom buttons stand at the bottom of the frame on every size (tools="auto", K2-4)
-  const side = toolsAt === 'none' ? null : toolsAt === 'top' ? 'top' : 'bottom';
+  // The zoom buttons stand at the bottom of the frame on every size (K2-4)
+  const side = toolsAt === 'none' ? null : 'bottom';
   const { area, clamp, wholeWidth } = cameraFrame(board, box, side, anchor);
   // Around the focus on a phone, the whole board on a desktop while it is readable (K2-3); never past the world's edge
   const desk = useDesk();
@@ -602,8 +602,8 @@ export type MapViewProps = {
   hide?: string[];
   /** The first view: the whole world, or a close look around this cell */
   focus?: number | undefined;
-  /** Where the zoom buttons stand: at the bottom of the frame (`auto`, K2-4), or at its top */
-  tools?: 'top' | 'bottom' | 'auto' | 'none';
+  /** The zoom buttons: at the bottom of the frame on every size (K2-4), or none (a moment that moves the camera) */
+  tools?: 'bottom' | 'none';
   children?: ReactNode;
   /** The camera, for a moment that follows a token */
   ref?: Ref<MapApi> | undefined;
@@ -933,7 +933,7 @@ export function MapView({
           className={cx(
             'absolute right-3 left-3 flex items-start gap-2 rounded-lg border-2 border-ink bg-card py-2 pr-2 pl-3 text-sm text-ink desk:right-auto desk:max-w-sm',
             // Across the frame from the zoom buttons
-            tools === 'top' || tools === 'none' ? 'bottom-3' : 'top-3',
+            tools === 'none' ? 'bottom-3' : 'top-3',
           )}
         >
           <p className="min-w-0">
@@ -949,7 +949,6 @@ export function MapView({
           </p>
           <IconButton
             label={t.pickedClose}
-            className="size-8"
             onClick={() => {
               setPicked(null);
             }}
@@ -961,12 +960,9 @@ export function MapView({
 
       {tools === 'none' ? null : (
         <div
-          className={cx(
-            'absolute right-3 flex gap-2',
-            // A phone's buttons stand at the bottom too (K2-4): at the top they covered the first row of cells, and
-            // the page leaves room under the frame for the leaderboard's bar
-            tools === 'top' ? 'top-3' : 'bottom-3',
-          )}
+          // A phone's buttons stand at the bottom too (K2-4): at the top they covered the first row of cells, and the
+          // page leaves room under the frame for the leaderboard's bar
+          className="absolute right-3 bottom-3 flex gap-2"
         >
           <IconButton
             label={t.zoomIn}

@@ -529,6 +529,8 @@ describe('the map editor', () => {
     render(<MapSection seasonId={seasonId} version={0} />);
 
     expect(await screen.findByText(t.linear)).toBeInTheDocument();
+    // The mode is named in words; the config key stays in the JSON editor (design review of fix/stage12-close)
+    expect(t.linear).not.toMatch(/mapMode|graph/);
   });
 
   it('shows the map read-only on a phone', async () => {
@@ -540,6 +542,10 @@ describe('the map editor', () => {
 
     expect(await screen.findByTestId('map-phone')).toHaveTextContent(t.phone);
     expect(screen.queryByTestId('map-editor')).not.toBeInTheDocument();
+    // Its zoom buttons stand at the bottom, as on every map (K2-4)
+    expect(screen.getByRole('button', { name: ru.board.zoomIn }).parentElement).toHaveClass(
+      'bottom-3',
+    );
   });
 
   it('draws no token on the start for a player on a cell the map does not know', async () => {

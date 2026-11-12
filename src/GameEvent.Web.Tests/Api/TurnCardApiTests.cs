@@ -94,6 +94,35 @@ public sealed class TurnCardApiTests : IAsyncLifetime
         Assert.Equal("pending", sent.GetProperty("proof").GetProperty("status").GetString());
     }
 
+    [Theory]
+    [InlineData("deadline")]
+    [InlineData("closing")]
+    public async Task After_the_deadline_an_older_run_is_still_on_the_card_and_takes_a_proof(string after)
+    {
+        // K1S-1, SPEC «Дедлайн», «Статусы сезона»: after the deadline rolls stop, proofs are still accepted
+        var vasya = await _site.SignedInAsync("vasya");
+        var first = await PlayOneAsync(vasya);
+        await PlayOneAsync(vasya);
+        if (after == "deadline")
+        {
+            await _site.SendAsync(new SetSeasonDeadline(_site.Clock.UtcNow.AddHours(1)));
+            _site.Clock.UtcNow = _site.Clock.UtcNow.AddHours(2);
+        }
+        else
+        {
+            var admin = await _site.SignedInAsync("admin");
+            await PostOkAsync(admin, $"/api/admin/seasons/{SiteFactory.SeasonId}/status", new { commandId = Guid.NewGuid(), to = "closing" });
+        }
+
+        var check = Assert.Single((await MeAsync(vasya)).GetProperty("checks").EnumerateArray());
+        Assert.Equal(first, check.GetProperty("id").GetGuid());
+
+        await PostOkAsync(vasya, $"{Season}/runs/{first}/proof", new { commandId = Guid.NewGuid(), links = new[] { "https://imgur.com/a/credits" } });
+
+        var sent = Assert.Single((await MeAsync(vasya)).GetProperty("checks").EnumerateArray());
+        Assert.Equal("pending", sent.GetProperty("proof").GetProperty("status").GetString());
+    }
+
     [Fact]
     public async Task An_approved_run_leaves_the_card()
     {

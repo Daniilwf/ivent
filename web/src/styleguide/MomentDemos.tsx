@@ -33,7 +33,6 @@ export function MapDemo() {
           board={demoBoard}
           players={demoPlayers}
           focus={me.cell}
-          tools="top"
           className="h-150 w-full max-w-90 rounded-lg border-3 border-ink"
         />
         <span className="text-sm text-ink-soft">{t.map.phone}</span>

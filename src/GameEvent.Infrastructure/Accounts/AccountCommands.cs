@@ -119,7 +119,7 @@ public static partial class AccountRules
         return visible;
     }
 
-    private const char ZeroWidthJoiner = '‍';
+    private const char ZeroWidthJoiner = (char)0x200D;
 
     public static bool IsValidPassword(string? password, string login) =>
         !string.IsNullOrWhiteSpace(password) && password.Length is >= MinPasswordLength and <= MaxPasswordLength

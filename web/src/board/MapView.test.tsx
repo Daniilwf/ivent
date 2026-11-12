@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { ru } from '../i18n/ru';
 import { graphBoard } from './graphBoard';
 import { linearBoard, type ChainCell } from './linearBoard';
-import { camera, openingView } from './camera';
+import { camera, mapLabel, openingView } from './camera';
 import { MapView } from './MapView';
 import type { Board, Player } from './types';
 
@@ -108,7 +108,7 @@ const dev = () => linearBoard(chain(71)).board;
 describe('the camera of the map', () => {
   it('keeps the board in the frame however far the map is dragged (K1M-2)', () => {
     const board = dev();
-    render(<MapView board={board} players={crowd(3, 10)} focus={10} tools="auto" />);
+    render(<MapView board={board} players={crowd(3, 10)} focus={10} />);
 
     drag(2000, 2000, 6);
     let v = viewBox();
@@ -132,7 +132,7 @@ describe('the camera of the map', () => {
 
   it('shows the whole board, centred, when zoomed all the way out (K1M-2)', async () => {
     const board = dev();
-    render(<MapView board={board} players={crowd(3, 10)} focus={10} tools="auto" />);
+    render(<MapView board={board} players={crowd(3, 10)} focus={10} />);
 
     for (let i = 0; i < 8; i++)
       await userEvent.click(screen.getByRole('button', { name: ru.board.zoomOut }));
@@ -148,7 +148,7 @@ describe('the camera of the map', () => {
   it('lets a swipe scroll the page while the whole height of the board is in the frame (K1M-2)', async () => {
     // A phone held sideways: the map shows the whole board, a vertical swipe is the page's
     frame = { width: 844, height: 414 };
-    render(<MapView board={dev()} players={crowd(3, 10)} focus={10} tools="auto" />);
+    render(<MapView board={dev()} players={crowd(3, 10)} focus={10} />);
     const surface = screen.getByRole('application').parentElement as HTMLElement;
     expect(surface).toHaveClass('touch-pan-y');
     expect(surface).not.toHaveClass('touch-none');
@@ -162,7 +162,7 @@ describe('the camera of the map', () => {
   it('opens on a phone with my token whole in the frame and clear of the zoom buttons (K1M-6)', () => {
     // The dev season: 21 players on the start, me among them
     const board = dev();
-    render(<MapView board={board} players={crowd(21, 0)} focus={0} tools="auto" />);
+    render(<MapView board={board} players={crowd(21, 0)} focus={0} />);
 
     const mine = onScreen(stickerAt('p0'));
     const reach = 25 * mine.scale;
@@ -198,12 +198,39 @@ describe('the camera of the map', () => {
     expect(covered({ x: Number(chip?.[1]), y: Number(chip?.[2]) }, 17), '«+N»').toBe(false);
   });
 
+  it('keeps every cell clear of the zoom buttons when a phone shows the whole board (K1M-6)', () => {
+    // A board that reads whole in a phone's frame opens whole, without a token of mine: no cell under the buttons
+    const board = linearBoard(chain(12)).board;
+    render(<MapView board={board} players={crowd(3, 5).map((p) => ({ ...p, me: false }))} />);
+    // A phone's whole view fills the frame's height with the board (K2-3)
+    expect(viewBox().h).toBeGreaterThanOrEqual(board.height);
+
+    const tools = {
+      left: frame.width - 12 - 148,
+      right: frame.width - 12,
+      top: frame.height - 56,
+      bottom: frame.height - 12,
+    };
+    for (const c of board.cells) {
+      const at = onScreen(c);
+      const r = 30 * at.scale;
+      const under =
+        at.x + r > tools.left &&
+        at.x - r < tools.right &&
+        at.y + r > tools.top &&
+        at.y - r < tools.bottom;
+      expect(under, `cell ${String(c.id)}`).toBe(false);
+    }
+  });
+
   it('keeps the board clear of the zoom buttons at the bottom of a desktop frame narrower than 900 px (K1M-6)', () => {
-    // At 1440×900 the map stands in the second column of the season screen: a frame of about 730 × 760 px
+    // At 1440×900 the map stands in the second column of the season screen: a frame of about 730 × 760 px. A board
+    // that reads whole there (a 70-cell one opens closer since the readable scale, D-648) is shown whole
     onDesktop();
     frame = { width: 730, height: 760 };
-    const board = dev();
-    render(<MapView board={board} players={crowd(3, 10)} focus={10} tools="auto" />);
+    const board = linearBoard(chain(30)).board;
+    render(<MapView board={board} players={crowd(3, 10)} focus={10} />);
+    expect(viewBox().w).toBeGreaterThanOrEqual(board.width);
 
     // The world reaches below the board by the buttons' strip, not above it
     const v = viewBox();
@@ -248,8 +275,10 @@ describe('the players on the map', () => {
     expect(picked).toHaveTextContent('Лиса');
     expect(picked).toHaveTextContent('Барсук');
 
-    // Closed by its button
-    fireEvent.click(within(picked).getByRole('button', { name: ru.board.pickedClose }));
+    // Closed by its button, a tap target of 44 px on a phone too (DESIGN.md): no size class but the button's own
+    const close = within(picked).getByRole('button', { name: ru.board.pickedClose });
+    expect(close.className.split(' ').filter((c) => c.startsWith('size-'))).toEqual(['size-11']);
+    fireEvent.click(close);
     expect(screen.queryByTestId('map-picked')).toBeNull();
   });
 
@@ -387,7 +416,7 @@ describe('the frame of the map (design review)', () => {
   });
 
   it('keeps the zoom buttons at the bottom of the frame on a phone too (K2-4)', () => {
-    render(<MapView board={small} players={crowdOnFirst(1)} tools="auto" />);
+    render(<MapView board={small} players={crowdOnFirst(1)} />);
 
     const zoom = screen.getByRole('button', { name: 'Приблизить' }).parentElement;
     expect(zoom).toHaveClass('bottom-3');
@@ -403,15 +432,46 @@ describe('the frame of the map (design review)', () => {
   });
 
   it('fits the whole board above the zoom buttons’ band (K2-4)', () => {
+    // A board that reads whole in both frames (a bigger one opens closer, D-648)
+    const few = linearBoard(chain(12)).board;
     for (const box of [
       { width: 358, height: 420 },
       { width: 720, height: 760 },
     ]) {
-      const view = openingView(small, box, null, null);
+      const view = openingView(few, box, null, null);
+      expect((view.w * box.height) / box.width).toBeGreaterThanOrEqual(few.height);
       const perPixel = view.w / box.width;
       // The board's bottom edge, in frame pixels from the frame's top, stays above the band
-      const bottom = (small.height - (view.cy - (view.w * box.height) / box.width / 2)) / perPixel;
+      const bottom = (few.height - (view.cy - (view.w * box.height) / box.width / 2)) / perPixel;
       expect(bottom).toBeLessThanOrEqual(box.height - camera.tools + 1);
+    }
+  });
+
+  it('opens closer than the whole board where its labels would read under the smallest size (D-648)', () => {
+    // The linear board of 70 cells on a desktop and on a phone, with my token, without one (a spectator, the admin)
+    const board = dev();
+    const start = board.cells.find((c) => c.kind === 'start') as Board['cells'][number];
+    for (const box of [
+      { width: 720, height: 760 },
+      { width: 358, height: 420 },
+    ]) {
+      for (const [focus, anchor] of [
+        [null, null],
+        [null, start],
+        [board.cells[40] ?? null, board.cells[40] ?? null],
+      ] as const) {
+        const view = openingView(board, box, focus, anchor);
+        expect(
+          (box.width / view.w) * mapLabel.world,
+          `${String(box.width)} px`,
+        ).toBeGreaterThanOrEqual(mapLabel.min);
+      }
+      // Without a token of mine the close look is round the start
+      const spectator = openingView(board, box, null, null);
+      expect(Math.abs(spectator.cx - start.x)).toBeLessThanOrEqual(spectator.w / 2);
+      expect(Math.abs(spectator.cy - start.y)).toBeLessThanOrEqual(
+        (spectator.w * box.height) / box.width / 2,
+      );
     }
   });
 

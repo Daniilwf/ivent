@@ -96,6 +96,8 @@
 
   /* ---- Space: Tailwind's 4 px step; the linter allows whole steps only ---- */
   --spacing: 4px;
+  /* The smallest label on the map, in frame pixels: the camera opens closer rather than show one smaller (camera.ts) */
+  --map-label-min: 9px;
 
   /* ---- Radii by level: a tag, a row, a card, a pill ---- */
   --radius-*: initial;

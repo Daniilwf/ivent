@@ -370,7 +370,6 @@ function PhoneView({ view, notices }: { view: AdminMap; notices: React.ReactNode
           cell: cellNumber.get(p.cellId) ?? -1,
           points: 0,
         }))}
-        tools="top"
         className="h-105 rounded-lg border-3 border-ink"
       />
       <MapLegend zones={map.zones} kinds={new Set(map.cells.map((c) => c.type))} />

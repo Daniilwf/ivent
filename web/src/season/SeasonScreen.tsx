@@ -396,6 +396,13 @@ export function SeasonScreen({
       : null;
   const spin: WheelRoll | null = fresh ? wheelRoll(fresh, offer, choice) : null;
   const uncheckedBlocked = me?.unchecked != null && me.unchecked.count >= me.unchecked.limit;
+  // At the check limit the one thing to do is a proof: of the oldest run waiting without one (checks come newest first)
+  const proofToSend = uncheckedBlocked
+    ? [...(me.checks ?? [])]
+        .reverse()
+        .concat(me.lastCompleted ? [me.lastCompleted] : [])
+        .find((run) => run.status === 'completed' && !run.proof)
+    : undefined;
   const { board, players, rows, cellNumber } = view;
   // A completion that came while the page is open throws its dice first; the rest of the turn waits for it
   const throwing =
@@ -429,6 +436,16 @@ export function SeasonScreen({
   // The current step comes first — a roll waiting for my answer (H3) or the game I play (H4) — and the tails of the
   // last run fold under it
   const stepFirst = Boolean(offer ?? choice) || (me?.phase === 'playing' && me.activeRun != null);
+  // The idle turn's main slot: a roll, or at the check limit the proof that opens it again
+  const rollSlot = me?.phase === 'idle' && turnsOpen && !throwing && !branch && !moving;
+  /** Opens the proof form of a run on the card and puts the focus in it */
+  const openProof = (runId: string) => {
+    const fold = document.querySelector<HTMLDetailsElement>(`[data-proof-run="${runId}"]`);
+    if (!fold) return;
+    fold.open = true;
+    const field = fold.querySelector<HTMLElement>('input, textarea, select');
+    (field ?? fold.querySelector('summary'))?.focus();
+  };
   const afterRun =
     me && (me.manualEffects.length > 0 || me.lastCompleted || me.lastEvent || checks.length > 0) ? (
       <section
@@ -528,7 +545,11 @@ export function SeasonScreen({
               </p>
             )}
             {/* The proof form folds into one line: it is not a to-do that holds the roll (H3 design review) */}
-            <details data-testid="proof-details" className="grid gap-2">
+            <details
+              data-testid="proof-details"
+              data-proof-run={me.lastCompleted.id}
+              className="grid gap-2"
+            >
               <Summary className="font-bold">
                 {me.lastCompleted.proof ? ru.turn.proofSummary : ru.turn.proofToSend}
               </Summary>
@@ -581,10 +602,16 @@ export function SeasonScreen({
                       onSubmit={() => {}}
                     />
                   ) : (
-                    <details data-testid="check-proof" className="grid gap-2">
-                      <summary className="min-h-11 cursor-pointer content-center rounded-md font-bold is-focus:focus-ring">
-                        {run.proof ? ru.turn.proofSummary : ru.turn.proofToSend}
-                      </summary>
+                    <details
+                      data-testid="check-proof"
+                      data-proof-run={run.id}
+                      className="grid gap-2"
+                    >
+                      <Summary className="font-bold">
+                        {run.proof
+                          ? ru.turn.proofSummaryFor(run.game.title)
+                          : ru.turn.proofToSendFor(run.game.title)}
+                      </Summary>
                       <ProofSection
                         key={`${run.id}:${JSON.stringify(run.proof ?? null)}`}
                         proof={run.proof ?? null}
@@ -859,6 +886,12 @@ export function SeasonScreen({
         ) : null}
         {/* A refusal is said at the top of the card, where the eye is after the action */}
         {message && <Notice tone="danger">{message}</Notice>}
+        {/* D-134: at the limit of runs waiting for the admin's check the roll is closed: the step's statement */}
+        {rollSlot && uncheckedBlocked ? (
+          <Notice tone="warning">
+            {ru.turn.uncheckedBlocked(me.unchecked?.count ?? 0, me.unchecked?.limit ?? 0)}
+          </Notice>
+        ) : null}
         {/* A phone scrolls the dice into view: the completion button was low on the screen */}
         {!desk && diceStage ? <div ref={showStage}>{diceStage}</div> : null}
         {desk && throwing ? (
@@ -883,24 +916,32 @@ export function SeasonScreen({
             <div ref={showStage}>{branchCard}</div>
           )
         ) : null}
-        {me?.phase === 'idle' && turnsOpen && !throwing && !branch && !moving && (
-          // D-134: at the limit of runs waiting for the admin's check the roll is closed, and the page says why
+        {rollSlot && uncheckedBlocked && proofToSend ? (
+          // The main slot holds the first action that is really there, never a dead main button (DESIGN.md «Карточка
+          // хода»): at the check limit, the proof of the oldest run without one
+          <Button
+            variant="main"
+            data-testid="send-proof"
+            disabled={pending}
+            onClick={() => {
+              openProof(proofToSend.id);
+            }}
+          >
+            {ru.turn.sendProof}
+          </Button>
+        ) : null}
+        {rollSlot && !uncheckedBlocked && (
           <div className="grid gap-2">
-            {uncheckedBlocked ? (
-              <Notice tone="warning">
-                {ru.turn.uncheckedBlocked(me.unchecked?.count ?? 0, me.unchecked?.limit ?? 0)}
-              </Notice>
-            ) : null}
             <Button
               variant="main"
               data-testid="roll"
               loading={pending}
-              disabled={pending || uncheckedBlocked}
+              disabled={pending}
               onClick={() => void act({ kind: 'roll' })}
             >
               {ru.turn.roll}
             </Button>
-            {!uncheckedBlocked && me.unchecked && me.unchecked.count > 0 ? (
+            {me.unchecked && me.unchecked.count > 0 ? (
               <p className="text-sm text-ink-soft" data-testid="unchecked">
                 {ru.turn.uncheckedWaiting(me.unchecked.count, me.unchecked.limit)}
               </p>
@@ -995,7 +1036,6 @@ export function SeasonScreen({
             board={board}
             players={shownPlayers}
             focus={shownMine && shownMine.cell >= 0 ? shownMine.cell : undefined}
-            tools="auto"
             options={options?.map((o) => o.cell)}
             className="h-105 rounded-lg border-3 border-ink desk:h-190"
           />

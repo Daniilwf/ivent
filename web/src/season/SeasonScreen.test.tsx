@@ -2020,10 +2020,10 @@ describe('SeasonScreen: runs waiting for the admin (D-134)', () => {
     const fetch = serve((r) => (isSeasonGet(r) ? json(200, waiting(2, 2)) : json(200, {})));
     render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
 
-    const roll = await screen.findByTestId('roll');
-    expect(roll).toBeDisabled();
-    expect(screen.getByText(ru.turn.uncheckedBlocked(2, 2))).toBeInTheDocument();
-    await userEvent.click(roll);
+    // The roll is not offered at all (D-649: no dead main button); the proof that opens it again is the main slot
+    expect(await screen.findByText(ru.turn.uncheckedBlocked(2, 2))).toBeInTheDocument();
+    expect(screen.queryByTestId('roll')).toBeNull();
+    expect(screen.queryByText(ru.turn.roll)).toBeNull();
     expect(fetch.mock.calls.some(([r]) => r.method === 'POST')).toBe(false);
   });
 

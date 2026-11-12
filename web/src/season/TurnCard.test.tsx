@@ -159,7 +159,7 @@ describe('the turn card (K1S)', () => {
 
     const older = await screen.findByTestId('check-run-1');
     expect(older).toHaveTextContent('Darkwood');
-    await userEvent.click(within(older).getByText(ru.turn.proofToSend));
+    await userEvent.click(within(older).getByText(ru.turn.proofToSendFor('Darkwood')));
     await userEvent.type(
       within(older).getByTestId('proof-link'),
       'https://example.com/darkwood.png',
@@ -171,6 +171,65 @@ describe('the turn card (K1S)', () => {
     });
     expect(sent[0]?.path).toBe(`/api/seasons/${seasonId}/runs/run-1/proof`);
     expect(sent[0]?.body).toMatchObject({ links: ['https://example.com/darkwood.png'] });
+  });
+
+  it('K1S-1: names the game in the fold of an older run, with the chevron the folds share (K2-5)', async () => {
+    serve(
+      season({
+        ...idle,
+        lastCompleted: completed('run-2', 'dropsy'),
+        checks: [completed('run-1', 'Darkwood')],
+      }),
+    );
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    const older = await screen.findByTestId('check-run-1');
+    const fold = within(older).getByText(ru.turn.proofToSendFor('Darkwood')).closest('summary');
+    // The Summary primitive: its chevron, and a line no other fold on the card repeats
+    expect(fold?.querySelector('svg')).not.toBeNull();
+    const summaries = [...document.querySelectorAll('summary')].map((x) => x.textContent);
+    expect(new Set(summaries).size).toBe(summaries.length);
+  });
+
+  it('K1S-1: at the check limit the main slot is the proof of the oldest run, not a dead roll', async () => {
+    serve(
+      season({
+        ...idle,
+        lastCompleted: completed('run-3', 'dropsy'),
+        checks: [
+          completed('run-2', 'Inside'),
+          completed('run-1', 'Darkwood', {
+            proof: {
+              status: 'pending',
+              links: ['https://example.com/a.png'],
+              note: null,
+              comment: null,
+              files: [],
+            },
+          }),
+        ],
+        unchecked: { count: 3, limit: 3 },
+      }),
+    );
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    const turn = await screen.findByTestId('turn');
+    const send = await within(turn).findByTestId('send-proof');
+    // No disabled main button anywhere on the card, and no roll until the limit opens
+    expect(turn.querySelector('[data-variant="main"]:disabled')).toBeNull();
+    expect(within(turn).queryByTestId('roll')).toBeNull();
+    expect(send).toHaveAttribute('data-variant', 'main');
+    expect(send).toHaveTextContent(ru.turn.sendProof);
+    // The limit is the step's statement, right under the heading, before the runs
+    const notice = within(turn).getByText(ru.turn.uncheckedBlocked(3, 3));
+    const after = within(turn).getByTestId('after');
+    expect(notice.compareDocumentPosition(after) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    // Darkwood already has its proof: the oldest without one is Inside, whose form opens with the focus in it
+    await userEvent.click(send);
+    const inside = screen.getByTestId('check-run-2');
+    expect(within(inside).getByTestId('check-proof')).toHaveProperty('open', true);
+    expect(inside).toContainElement(document.activeElement as HTMLElement);
   });
 
   it('K1S-9: tells a rejection of an older run with the admin comment', async () => {

@@ -346,6 +346,11 @@ export const ru = {
     afterGame: (title: string) => `Прошлая игра: ${title}`,
     proofToSend: 'Пруф: ещё не отправлен',
     proofSummary: 'Пруф и проверка',
+    // The fold of another run's proof names its game: two folds never read the same (K2-5)
+    proofToSendFor: (title: string) => `Пруф за ${title}: ещё не отправлен`,
+    proofSummaryFor: (title: string) => `Пруф и проверка за ${title}`,
+    // The roll is closed by the check limit: the main action is the proof of the oldest run that has none
+    sendProof: 'Дослать пруф',
     uncheckedWaiting: (count: number, limit: number) =>
       `На проверке ${count} из ${limit}: на ${limit}-м новый ролл закроется до проверки`,
     uncheckedBlocked: (count: number, limit: number) =>
@@ -1992,7 +1997,7 @@ export const ru = {
     // 2.11: the map editor
     map: {
       linear:
-        'Сезон идёт по линейной карте. Чтобы рисовать карту, включи в правилах «mapMode»: «graph» — после этого здесь можно опубликовать новую карту.',
+        'Сезон идёт по линейной карте. Чтобы рисовать карту, включи в правилах сезона карту-граф — после этого здесь можно опубликовать новую карту.',
       closed: 'Сезон закрыт: новую карту уже не опубликовать.',
       phone: 'Редактор карты работает на компьютере: на телефоне карту можно только посмотреть.',
       canvas: 'Холст карты',
