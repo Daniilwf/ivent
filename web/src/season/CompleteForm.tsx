@@ -25,7 +25,7 @@ const fieldIds: Record<Problem['field'], string> = {
 };
 
 /**
- * Completing the active run (D-96): difficulty as pills in sight; an hours estimate with its source only when the game
+ * Completing the active run (D-96): difficulty as pills in sight, no higher than the one named at the start (D-633); an hours estimate with its source only when the game
  * has no hours; the challenge claim when the season has challenges on (D-96); an optional review, folded. Fields left
  * unset are not sent. Every mistake is told under its field at once, and the focus goes to the first one.
  */
@@ -33,17 +33,27 @@ export function CompleteForm({
   needsHours,
   challengesEnabled = false,
   dice = null,
+  declared = null,
   pending,
   onComplete,
 }: {
   /** The die of each difficulty under the run's snapshot, and its event */
   dice?: readonly Schemas['DifficultyDieView'][] | null;
+  /** The difficulty named at the start: the completion counts no higher (D-633); null — none named */
+  declared?: Schemas['Difficulty'] | null;
   needsHours: boolean;
   challengesEnabled?: boolean;
   pending: boolean;
   onComplete: (completion: Completion) => void;
 }) {
-  const [difficulty, setDifficulty] = useState<Schemas['Difficulty']>('normal');
+  const [difficulty, setDifficulty] = useState<Schemas['Difficulty']>(declared ?? 'normal');
+  // The server counts the lower of the start's and the claimed one: higher pills would promise a die it never throws
+  const offered = declared
+    ? difficulties.slice(0, difficultyValues.indexOf(declared) + 1)
+    : difficulties;
+  const hint = declared
+    ? `${ru.turn.difficultyHint}. ${ru.turn.difficultyDeclared(ru.difficulty[declared])}.`
+    : `${ru.turn.difficultyHint}.`;
   const [hours, setHours] = useState('');
   const [source, setSource] = useState('');
   const [challengeDone, setChallengeDone] = useState(false);
@@ -114,16 +124,16 @@ export function CompleteForm({
         label={ru.turn.difficulty}
         hint={
           dice && dice.length > 0
-            ? `${ru.turn.difficultyHint}. ${ru.turn.difficultyDice(
+            ? `${hint} ${ru.turn.difficultyDice(
                 dice.map((d) => ({
                   label: ru.difficulty[d.difficulty],
                   sides: d.sides,
                   grant: d.grantEvent ?? null,
                 })),
               )}`
-            : `${ru.turn.difficultyHint}.`
+            : hint
         }
-        options={difficulties}
+        options={offered}
         value={difficulty}
         onChange={setDifficulty}
       />

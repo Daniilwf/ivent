@@ -44,6 +44,9 @@ jobs:
           node-version-file: .nvmrc
       - name: gitleaks (full history)
         run: node scripts/gitleaks.mjs git --redact --no-banner --verbose
+      # AU12-3: every push, docs-only included (the matrix is docs), in a second and without npm ci: reads sources only
+      - name: TEST_MATRIX cites only existing tests
+        run: node scripts/check-matrix-tests.mjs
       - id: filter
         uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         with:

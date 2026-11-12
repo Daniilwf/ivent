@@ -495,6 +495,10 @@ namespace GameEvent.Infrastructure.Database.Migrations
                     b.Property<long?>("CompletedAt")
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("DeclaredDifficulty")
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("DiceJson")
                         .IsRequired()
                         .HasColumnType("TEXT");
