@@ -105,6 +105,27 @@ public class ChainLimitTests
     }
 
     [Fact]
+    public void The_seasons_ruleset_may_cut_the_chain_earlier()
+    {
+        // effects.maxChainDepth and effects.maxEventsPerCommand are read (D-418, AU4-7): one level, then ten events
+        var s = Season(new PointsEcho(1));
+        s.WithRuleset(r => r with { Effects = r.Effects with { MaxChainDepth = 1 } });
+
+        s.Act(Bonus(s));
+
+        Assert.Equal(new EffectChainCut(EffectChainLimit.Depth, 2, 3), s.Last.Events[^1]);
+        Assert.Equal(5 + 1, s.Player("Вася").Points);
+
+        // 2 + 3 by level 1; level 2 would add 9: cut when the command has written 10
+        var fan = Season(new PointsEcho(3));
+        fan.WithRuleset(r => r with { Effects = r.Effects with { MaxEventsPerCommand = 10 } });
+        fan.Act(Bonus(fan));
+
+        Assert.Equal(11, fan.Last.Events.Count);
+        Assert.Equal(new EffectChainCut(EffectChainLimit.Events, 2, 10), fan.Last.Events[^1]);
+    }
+
+    [Fact]
     public void Reactions_follow_the_command_in_order_and_see_the_state_so_far()
     {
         var witness = new Witness();

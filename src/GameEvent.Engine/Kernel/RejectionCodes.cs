@@ -100,6 +100,9 @@ public static class RejectionCodes
     /// <summary>An effect that hands over one of the user's objects, and he has none it may give (D-478).</summary>
     public const string ItemNothingToGive = "item.nothingToGive";
 
+    /// <summary>An effect that must take something from its target (<c>required</c>), and the target has nothing it may take (D-487).</summary>
+    public const string ItemNothingToTake = "item.nothingToTake";
+
     /// <summary>The item's use condition does not hold for its user (D-483).</summary>
     public const string ItemConditionNotMet = "item.conditionNotMet";
     public const string ItemHostileCap = "item.hostileCap";
