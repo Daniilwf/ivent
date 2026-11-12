@@ -1,0 +1,24 @@
+{
+  "id": "better-boots",
+  "kind": "item",
+  "name": "Улучшенные Сапоги-скороходы",
+  "description": "+5 к следующему броску за прохождение (к сумме кубиков с модификаторами).",
+  "rarity": "epic",
+  "price": 30,
+  "window": "beforeDice",
+  "hostile": false,
+  "stackable": false,
+  "effect": {
+    "target": {
+      "selector": "self"
+    },
+    "actions": [
+      {
+        "type": "modifyDice",
+        "when": "next",
+        "stage": "add",
+        "value": 5
+      }
+    ]
+  }
+}

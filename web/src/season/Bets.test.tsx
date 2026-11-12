@@ -6,7 +6,7 @@ import { payoutOf } from './economy';
 import { EconomySection } from './Inventory';
 import { betsFixture, economyFixture, petyaId } from './inventoryFixtures';
 
-// Bets on the season screen (4.11c, D-414, D-446): only the runs the server says a bet is accepted on, the sheet with
+// Bets on the season screen (4.11c, D-414, D-447): only the runs the server says a bet is accepted on, the sheet with
 // the deadline and its multiplier, the stake within my limit and the win said before the press; one command; a refusal
 // in Russian in the sheet; my bets with their status in words; empty, refused, error; hidden when bets are off.
 

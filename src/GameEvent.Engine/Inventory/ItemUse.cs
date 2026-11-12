@@ -34,6 +34,11 @@ internal static class ItemUse
             return Decision.Reject(RejectionCodes.ItemWrongWindow, $"«{definition.Id}» is used {definition.Window}; the player is {player.Phase}.");
         }
 
+        if (definition.UseCondition is { } condition && !Conditions.Hold(state, context, player.PlayerId, condition, runId: null))
+        {
+            return Decision.Reject(RejectionCodes.ItemConditionNotMet, $"«{definition.Id}» is used only while its condition holds.");
+        }
+
         var used = new ObjectRemoved(player.PlayerId, item.InstanceId, item.ObjectId, ObjectRemoval.Used);
 
         // A text without automation goes to manual resolution (SPEC «Текстовые эффекты без автоматики», D-410).

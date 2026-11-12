@@ -38,7 +38,8 @@ public sealed record FeedRunView(Guid Id, Guid GameId);
 
 /// <summary>
 /// A page of the feed, newest first; <c>nextBefore</c> — the sequence to ask before for the next page, none at the start of
-/// the log. <c>players</c> — every player of the season; <c>games</c> and <c>runs</c> — those the page's events name (D-150).
+/// the log. <c>players</c> — every player of the season; <c>games</c> and <c>runs</c> — those the page's events name (D-150);
+/// <c>objects</c> — the content objects they name (the drawn events).
 /// </summary>
 public sealed record FeedView(
     IReadOnlyList<FeedEntryView> Entries,
@@ -48,7 +49,10 @@ public sealed record FeedView(
     IReadOnlyList<FeedRunView> Runs,
     IReadOnlyList<FeedObjectView>? Objects = null);
 
-/// <summary>An object of the season's content the page's events name (<c>objectId</c>): its name as last published (D-444).</summary>
+/// <summary>
+/// An object of the season's content the page's events name (<c>objectId</c>: item uses and gifts, drawn events): its
+/// name as last published (D-444, D-446).
+/// </summary>
 public sealed record FeedObjectView(string Id, string Name);
 
 /// <summary>
@@ -103,7 +107,7 @@ public static class FeedEndpoints
     }
 
     private static async Task<Results<Ok<FeedView>, NotFound, ValidationProblem>> FeedAsync(
-        Guid seasonId, System.Security.Claims.ClaimsPrincipal user, GameEventDbContext db, CancellationToken ct, long? before = null, int limit = 50)
+        Guid seasonId, System.Security.Claims.ClaimsPrincipal user, GameEventDbContext db, ContentCards contentCards, CancellationToken ct, long? before = null, int limit = 50)
     {
         if (limit is < 1 or > MaxFeedPage)
         {
@@ -160,7 +164,7 @@ public static class FeedEndpoints
         }).OfType<FeedEntryView>()];
         var nextBefore = rows.Count == limit && rows[^1].Sequence > 1 ? rows[^1].Sequence : (long?)null;
         var (players, games, runs) = await ReferencesAsync(db, seasonId, entries, admin, ct);
-        return TypedResults.Ok(new FeedView(entries, nextBefore, players, games, runs, await ObjectsAsync(db, seasonId, entries, ct)));
+        return TypedResults.Ok(new FeedView(entries, nextBefore, players, games, runs, await ObjectsAsync(db, contentCards, seasonId, entries, ct)));
     }
 
     private const string DiscardedChoice = "choice-discarded";
@@ -221,13 +225,15 @@ public static class FeedEndpoints
     }
 
     /// <summary>
-    /// The names of the objects the page's events name (D-444): from the season's content packs, the latest name of each
-    /// (a deleted definition keeps the name it last had). Read only when the page names an object.
+    /// The names of the objects the page's events name (D-444, D-446): item uses, gifts and drawn events alike, from the
+    /// season's content cards (a deleted definition keeps the name it last had, <see cref="ContentCards"/>). Read only when
+    /// the page names an object; a publication's own pack is not a reference (its wheels' entries name objects too).
     /// </summary>
-    private static async Task<IReadOnlyList<FeedObjectView>> ObjectsAsync(GameEventDbContext db, Guid seasonId, IReadOnlyList<FeedEntryView> entries, CancellationToken ct)
+    private static async Task<IReadOnlyList<FeedObjectView>> ObjectsAsync(
+        GameEventDbContext db, ContentCards contentCards, Guid seasonId, IReadOnlyList<FeedEntryView> entries, CancellationToken ct)
     {
         var ids = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var entry in entries)
+        foreach (var entry in entries.Where(e => e.Type != s_contentPublishedType))
         {
             CollectObjects(entry.Data, ids);
         }
@@ -237,25 +243,11 @@ public static class FeedEndpoints
             return [];
         }
 
-        var published = EventCatalog.Describe(typeof(Engine.Content.ContentPublished)).Name;
-        var packs = await db.Events.AsNoTracking()
-            .Where(e => e.SeasonId == seasonId && e.Type == published && e.UndoneByEventId == null)
-            .OrderBy(e => e.Sequence)
-            .ToListAsync(ct);
-        var names = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var row in packs)
-        {
-            if (EventCodec.Decode(new StoredEvent(row.Type, row.Version, row.Data)) is Engine.Content.ContentPublished { Pack: var pack })
-            {
-                foreach (var definition in pack.Objects)
-                {
-                    names[definition.Id] = definition.Name;
-                }
-            }
-        }
-
-        return [.. ids.Order(StringComparer.Ordinal).Where(names.ContainsKey).Select(id => new FeedObjectView(id, names[id]))];
+        var cards = await contentCards.OfAsync(db, seasonId, ct);
+        return [.. ids.Order(StringComparer.Ordinal).Where(cards.ContainsKey).Select(id => new FeedObjectView(id, cards[id].Name))];
     }
+
+    private static readonly string s_contentPublishedType = EventCatalog.Describe(typeof(Engine.Content.ContentPublished)).Name;
 
     // Every «objectId» at any depth (an object given carries it inside «item»)
     private static void CollectObjects(JsonElement data, HashSet<string> ids)

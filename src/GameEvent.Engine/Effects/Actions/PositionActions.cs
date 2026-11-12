@@ -21,10 +21,31 @@ internal static class Positions
 /// </summary>
 internal sealed class MoveHandler : ActionHandler<MoveAction>
 {
+    /// <summary>The answers of <see cref="MoveDirection.Chosen"/>; the interface names them in its own words.</summary>
+    public const string Forward = "forward";
+    public const string Back = "back";
+
     protected override void Execute(MoveAction action, EffectRun run)
     {
         var steps = run.Number(action.Steps);
         var player = run.State.Players[run.ActionTarget(action)];
+        switch (action.Direction)
+        {
+            case MoveDirection.Chosen:
+                if (run.NextChoice([Forward, Back]) is not { } way)
+                {
+                    return;
+                }
+
+                steps = way == Back ? -steps : steps;
+                break;
+            case MoveDirection.Away:
+                steps *= Away(run.State, run.State.Players[run.UserId].CellId, player.CellId);
+                break;
+            default:
+                break;
+        }
+
         if (steps == 0 || !Positions.Movable(player))
         {
             return;
@@ -43,6 +64,15 @@ internal sealed class MoveHandler : ActionHandler<MoveAction>
         var moved = new PlayerMoved(player.PlayerId, player.CellId, path[^1], steps, [.. path], MoveReason.Item, RunId: null);
         run.Emit(moved);
         run.Emit(CellStops.After(run.State, moved, run.Context));
+    }
+
+    // 1 when the target is closer to the finish than the user (ahead), -1 when farther, 0 when neither (D-477).
+    private static int Away(SeasonState state, string userCell, string targetCell)
+    {
+        var distances = MapDistances.ToFinish(state.Map);
+        return distances.TryGetValue(userCell, out var user) && distances.TryGetValue(targetCell, out var target)
+            ? Math.Sign(user - target)
+            : 0;
     }
 }
 
@@ -64,12 +94,28 @@ internal sealed class TeleportHandler : ActionHandler<TeleportAction>
         }
 
         var destination = action.Cell == NearestShortcut ? Shortcut(map, player.CellId) : action.Cell;
-        if (destination is null || destination == player.CellId || !map.HasCell(destination) || map.CellById(destination).Type == CellType.Finish)
+        if (destination is null || destination == player.CellId || !map.HasCell(destination) || map.CellById(destination).Type == CellType.Finish
+            || BehindCheckpoint(map, player, destination))
         {
             return;
         }
 
         run.Emit(new PlayerMoved(player.PlayerId, player.CellId, destination, Steps: 0, [destination], MoveReason.ItemTeleport, RunId: null));
+    }
+
+    // A transfer never lands behind the checkpoint the player last reached (invariant 7, D-306, AU4-6): the checkpoint a push
+    // back would stop on, and the destination farther from the finish than it.
+    private static bool BehindCheckpoint(MapGraph map, SeasonPlayer player, string destination)
+    {
+        var back = Movement.Backward(map, player.Path, map.Cells.Count, checkpoints: true);
+        var guard = map.CellById(player.CellId).Type == CellType.Checkpoint ? player.CellId : back.Count > 0 ? back[^1] : null;
+        if (guard is null || map.CellById(guard).Type != CellType.Checkpoint)
+        {
+            return false;
+        }
+
+        var distances = MapDistances.ToFinish(map);
+        return distances.TryGetValue(guard, out var fromGuard) && distances.TryGetValue(destination, out var fromDestination) && fromDestination > fromGuard;
     }
 
     // The first teleport cell ahead along the default branches, and where it leads.

@@ -14,20 +14,30 @@ public enum ItemStepKind
     /// <summary>A <c>requestChoice</c>: one of <see cref="ItemStep.Options"/>.</summary>
     Choice,
 
-    /// <summary>A <c>takeObject</c> with <c>pick: chosen</c>: an object of the target (<see cref="ItemStep.ObjectsByTarget"/>, instance ids).</summary>
+    /// <summary>
+    /// A <c>takeObject</c> with <c>pick: chosen</c>: objects of the target (<see cref="ItemStep.ObjectsByTarget"/>, instance
+    /// ids) — <see cref="ItemStep.Count"/> different ones, or with <see cref="ItemStep.Ranked"/> any number in order of preference.
+    /// </summary>
     PickObject,
+
+    /// <summary>A <c>move</c> with <c>direction: chosen</c>: <see cref="MoveHandler.Forward"/> or <see cref="MoveHandler.Back"/> (D-477).</summary>
+    Direction,
 }
 
 /// <summary>
 /// One answer of a use: its kind, the prompt and source of a choice and the answers the engine accepts — for an object,
-/// by target, since whose objects they are depends on the target picked first.
+/// by target, since whose objects they are depends on the target picked first. A pick of objects asks
+/// <see cref="Count"/> different ones (as many as the owner has, when fewer), or with <see cref="Ranked"/> a count known only
+/// at the use (<c>$roll</c>): any number of different ones as a list of preference, the rest taken at random (D-476).
 /// </summary>
 public sealed record ItemStep(
     ItemStepKind Kind,
     string? Prompt,
     ChoiceSource? From,
     EquatableArray<string> Options,
-    ImmutableSortedDictionary<Guid, EquatableArray<string>>? ObjectsByTarget = null);
+    ImmutableSortedDictionary<Guid, EquatableArray<string>>? ObjectsByTarget = null,
+    int Count = 1,
+    bool Ranked = false);
 
 /// <summary>
 /// What the screen needs to offer an object of the inventory (D-440): its definition, whether «Использовать» is open now
@@ -69,7 +79,10 @@ public static class ItemPlans
         var definition = state.Catalog.Get(item.ObjectId);
         var refusal = definition.Kind != ObjectKind.Item
             ? RejectionCodes.ItemNotAnItem
-            : guard ?? (ItemUse.InWindow(state, player, definition.Window ?? UseWindow.Anytime) ? null : RejectionCodes.ItemWrongWindow);
+            : guard
+                ?? (!ItemUse.InWindow(state, player, definition.Window ?? UseWindow.Anytime) ? RejectionCodes.ItemWrongWindow
+                    : definition.UseCondition is { } condition && !Conditions.Hold(state, pool, player.PlayerId, condition, runId: null) ? RejectionCodes.ItemConditionNotMet
+                    : null);
         if (definition.Kind != ObjectKind.Item || definition.Effect is not { } effect)
         {
             return new ItemPlan(item, definition, refusal, false, [], []);
@@ -82,26 +95,48 @@ public static class ItemPlans
             refusal = RejectionCodes.ItemNoTarget;
         }
 
+        // The item being used is spent before its effect runs, so it is never an answer nor a thing to give
+        IReadOnlyList<string> Objects(Guid owner, TakeObjectAction take) =>
+            [.. ObjectFilters.Matching(state, owner, take.Filter, moves: take.Mode != TakeMode.Destroy)
+                .Where(o => o.InstanceId != item.InstanceId)
+                .Select(o => o.InstanceId.ToString("N"))];
+
         var steps = new List<ItemStep>();
-        foreach (var action in effect.Actions)
+
+        // A branch by the player's answer asks it first; its cases ask nothing more (ContentPublishing), and a branch by a
+        // roll asks nothing at all. The effect's own actions run only without a branch.
+        if (effect.Outcomes is { Choice: { } branch })
+        {
+            steps.Add(new ItemStep(ItemStepKind.Choice, branch.Prompt, branch.Options.From, [.. RequestChoiceHandler.Options(branch.Options, state, pool)]));
+        }
+
+        foreach (var action in effect.Outcomes is null ? effect.Actions : [])
         {
             switch (action)
             {
                 case RequestChoiceAction request:
                     steps.Add(new ItemStep(ItemStepKind.Choice, request.Prompt, request.Options.From, [.. RequestChoiceHandler.Options(request.Options, state, pool)]));
                     break;
-                case TakeObjectAction { Pick: Pick.Chosen } take:
-                    // Whose objects: the user's own (target «self»), else each player the target may be; the item being used
-                    // is spent before its effect runs, so it is never an answer. An owner with no object asks no answer.
-                    var owners = take.Target == ActionTarget.Self || !chooses ? [player.PlayerId] : targets;
+                case MoveAction { Direction: MoveDirection.Chosen }:
+                    steps.Add(new ItemStep(ItemStepKind.Direction, null, null, [MoveHandler.Forward, MoveHandler.Back]));
+                    break;
+                case TakeObjectAction { Mode: TakeMode.Give } give when refusal is null && Objects(player.PlayerId, give).Count == 0:
+                    // Nothing it may give is known now; the engine refuses the use (D-478)
+                    refusal = RejectionCodes.ItemNothingToGive;
+                    break;
+                case TakeObjectAction { Pick: Pick.Chosen, All: false } take:
+                    // Whose objects: the user's own (a «give» or target «self»), else each player the target may be (a
+                    // selector that picks the target itself never asks, ContentPublishing). An owner with none asks no answer.
+                    var owners = take.Mode == TakeMode.Give || take.Target == ActionTarget.Self || !chooses ? [player.PlayerId] : targets;
+                    var ranked = take.Count is { Kind: ContentValueKind.Reference };
                     steps.Add(new ItemStep(
                         ItemStepKind.PickObject,
                         null,
                         null,
                         [],
-                        owners.ToImmutableSortedDictionary(
-                            id => id,
-                            id => (EquatableArray<string>)[.. ObjectFilters.Matching(state, id, take.Filter).Where(o => o.InstanceId != item.InstanceId).Select(o => o.InstanceId.ToString("N"))])));
+                        owners.ToImmutableSortedDictionary(id => id, id => (EquatableArray<string>)[.. Objects(id, take)]),
+                        ranked ? 1 : take.Count?.Number ?? 1,
+                        ranked));
                     break;
                 default:
                     break;

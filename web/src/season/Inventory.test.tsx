@@ -2,7 +2,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ru } from '../i18n/ru';
 import { answer, fakeServer, seasonId } from '../test/fakeServer';
-import { InventorySection } from './Inventory';
+import { EconomySection } from './Inventory';
 import { economyFixture, itemFixture } from './inventoryFixtures';
 
 // My inventory on the season screen (4.11a, D-440, D-441): every object with its words, «Использовать» only in its
@@ -15,7 +15,7 @@ const kolya = '10000000-0000-0000-0000-000000000003';
 function renderSection(version = 1) {
   const onSignedOut = vi.fn();
   const view = render(
-    <InventorySection seasonId={seasonId} version={version} onSignedOut={onSignedOut} />,
+    <EconomySection seasonId={seasonId} version={version} onSignedOut={onSignedOut} />,
   );
   return { ...view, onSignedOut };
 }
@@ -94,7 +94,7 @@ describe('the inventory', () => {
     await screen.findByTestId('item-bird-thief');
 
     server.calls.length = 0;
-    rerender(<InventorySection seasonId={seasonId} version={2} onSignedOut={onSignedOut} />);
+    rerender(<EconomySection seasonId={seasonId} version={2} onSignedOut={onSignedOut} />);
 
     await waitFor(() => {
       expect(server.sent('GET', '/economy')).toHaveLength(1);
@@ -145,6 +145,8 @@ describe('«Использовать»', () => {
       steps: [
         {
           kind: 'choice',
+          count: 1,
+          ranked: false,
           prompt: 'Какой жанр подкинуть?',
           options: [
             { id: 'Horror', label: 'Horror' },
@@ -184,6 +186,8 @@ describe('«Использовать»', () => {
       steps: [
         {
           kind: 'pickObject',
+          count: 1,
+          ranked: false,
           prompt: null,
           options: [],
           objectsByTarget: [
@@ -224,6 +228,8 @@ describe('«Использовать»', () => {
       steps: [
         {
           kind: 'pickObject',
+          count: 1,
+          ranked: false,
           prompt: null,
           options: [],
           objectsByTarget: [
@@ -266,6 +272,8 @@ describe('«Использовать»', () => {
       steps: [
         {
           kind: 'pickObject',
+          count: 1,
+          ranked: false,
           prompt: null,
           options: [],
           objectsByTarget: [{ playerId: petya, objects: [] }],
@@ -288,6 +296,139 @@ describe('«Использовать»', () => {
         targetPlayerId: null,
         choices: [],
       });
+    });
+  });
+
+  it('asks the way of a push in words and sends its id', async () => {
+    const pistol = itemFixture({
+      objectId: 'pistol',
+      name: 'Пистолет',
+      targets: [{ playerId: petya, name: 'Петя', token: 1 }],
+      steps: [
+        {
+          kind: 'direction',
+          count: 1,
+          ranked: false,
+          prompt: null,
+          options: [
+            { id: 'forward', label: 'forward' },
+            { id: 'back', label: 'back' },
+          ],
+          objectsByTarget: null,
+        },
+      ],
+    });
+    const server = fakeServer({
+      [economyUrl]: economyFixture({ items: [pistol] }),
+      [useUrl]: { duplicate: false, events: [] },
+    });
+    renderSection();
+    await userEvent.click(await screen.findByTestId('use-pistol'));
+    const sheet = await screen.findByTestId('use-item');
+
+    const way = within(sheet).getByLabelText(ru.inventory.direction);
+    expect(within(way).getByRole('option', { name: ru.inventory.back })).toBeInTheDocument();
+    await userEvent.selectOptions(way, 'back');
+    await userEvent.click(within(sheet).getByTestId('use-item-confirm'));
+
+    await waitFor(() => {
+      expect(server.sent('POST', '/use')[0]?.body).toMatchObject({
+        targetPlayerId: petya,
+        choices: ['back'],
+      });
+    });
+  });
+
+  it('asks as many different objects as the pick takes', async () => {
+    const twice = itemFixture({
+      objectId: 'snatch-two',
+      name: 'Двойная кража',
+      targets: [{ playerId: petya, name: 'Петя', token: 1 }],
+      steps: [
+        {
+          kind: 'pickObject',
+          count: 2,
+          ranked: false,
+          prompt: null,
+          options: [],
+          objectsByTarget: [
+            {
+              playerId: petya,
+              objects: [
+                { id: 'aa', label: 'Апельсин' },
+                { id: 'bb', label: 'Банан' },
+                { id: 'cc', label: 'Кекс' },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+    const server = fakeServer({
+      [economyUrl]: economyFixture({ items: [twice] }),
+      [useUrl]: { duplicate: false, events: [] },
+    });
+    renderSection();
+    await userEvent.click(await screen.findByTestId('use-snatch-two'));
+    const sheet = await screen.findByTestId('use-item');
+    const confirm = within(sheet).getByTestId('use-item-confirm');
+
+    await userEvent.selectOptions(
+      within(sheet).getByLabelText(ru.inventory.pickObjectNumbered(1)),
+      'bb',
+    );
+    expect(confirm).toBeDisabled();
+    const second = within(sheet).getByLabelText(ru.inventory.pickObjectNumbered(2));
+    // The object picked first is not offered again
+    expect(within(second).queryByRole('option', { name: 'Банан' })).toBeNull();
+    await userEvent.selectOptions(second, 'aa');
+    await userEvent.click(confirm);
+
+    await waitFor(() => {
+      expect(server.sent('POST', '/use')[0]?.body).toMatchObject({ choices: ['bb', 'aa'] });
+    });
+  });
+
+  it('takes a list of preference for a count known only at the use, every place optional', async () => {
+    const plasma = itemFixture({
+      objectId: 'plasma-gun',
+      name: 'Плазмаган',
+      targets: [{ playerId: petya, name: 'Петя', token: 1 }],
+      steps: [
+        {
+          kind: 'pickObject',
+          count: 1,
+          ranked: true,
+          prompt: null,
+          options: [],
+          objectsByTarget: [
+            {
+              playerId: petya,
+              objects: [
+                { id: 'aa', label: 'Апельсин' },
+                { id: 'bb', label: 'Банан' },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+    const server = fakeServer({
+      [economyUrl]: economyFixture({ items: [plasma] }),
+      [useUrl]: { duplicate: false, events: [] },
+    });
+    renderSection();
+    await userEvent.click(await screen.findByTestId('use-plasma-gun'));
+    const sheet = await screen.findByTestId('use-item');
+
+    expect(within(sheet).getByText(ru.inventory.preferenceHint)).toBeInTheDocument();
+    const confirm = within(sheet).getByTestId('use-item-confirm');
+    expect(confirm).toBeEnabled();
+    await userEvent.selectOptions(within(sheet).getByLabelText(ru.inventory.preference(2)), 'aa');
+    await userEvent.click(confirm);
+
+    await waitFor(() => {
+      expect(server.sent('POST', '/use')[0]?.body).toMatchObject({ choices: ['aa'] });
     });
   });
 

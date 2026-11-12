@@ -36,7 +36,7 @@ async function fetchEconomy(seasonId: string): Promise<Loaded> {
 }
 
 /**
- * My economy on the season screen (4.11a, 4.11c, D-441, D-446): one load of `GET …/economy` for the inventory, the shop
+ * My economy on the season screen (4.11a, 4.11c, D-441, D-447): one load of `GET …/economy` for the inventory, the shop
  * (when `shop`) and the bets (when `bets`); again after every command of the season (`version` — the season's last
  * sequence, the hub moves it), so an item another player used on me or a lot gone by the timer shows at once. Each
  * panel only when its mechanic is on: the bets (or the shop) may play without items, the inventory is then not shown.
@@ -169,9 +169,6 @@ export function EconomySection({
     </>
   );
 }
-
-/** The inventory alone (the tests of 4.11a): the economy without the shop and the bets */
-export const InventorySection = EconomySection;
 
 /** The panel in each of its states; the styleguide shows them with fixtures */
 export function InventoryPanel({
@@ -371,7 +368,8 @@ export function UseItemDialog({
   const [target, setTarget] = useState<string | null>(
     item.choosesTarget && item.targets.length === 1 ? (item.targets[0]?.playerId ?? null) : null,
   );
-  const [answers, setAnswers] = useState<(string | null)[]>(item.steps.map(() => null));
+  // Each step's answers: one slot, or one per object of a pick of several (D-476)
+  const [answers, setAnswers] = useState<(string | null)[][]>(item.steps.map(() => []));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const targetName = useId();
@@ -386,9 +384,54 @@ export function UseItemDialog({
     step.kind !== 'pickObject' ||
     (item.choosesTarget && target === null) ||
     optionsOf(step).length > 0;
+  // A pick asks `count` different objects (all when fewer); a count known only at the use asks a list of preference,
+  // each place optional: the rest is taken at random
+  const slotsOf = (step: Schemas['ItemStepView']) =>
+    step.kind !== 'pickObject'
+      ? 1
+      : Math.max(
+          1,
+          step.ranked ? optionsOf(step).length : Math.min(step.count, optionsOf(step).length),
+        );
+  // The answers of a step that still fit the target picked, in order, each once
+  const given = (step: Schemas['ItemStepView'], i: number) => {
+    const ids = new Set(optionsOf(step).map((o) => o.id));
+    const picked = (answers[i] ?? []).slice(0, slotsOf(step));
+    return picked.filter((a, j): a is string => a != null && ids.has(a) && picked.indexOf(a) === j);
+  };
   const ready =
     (!item.choosesTarget || target !== null) &&
-    item.steps.every((step, i) => !asked(step) || optionsOf(step).some((o) => o.id === answers[i]));
+    item.steps.every(
+      (step, i) =>
+        !asked(step) ||
+        (step.kind === 'pickObject' && step.ranked) ||
+        given(step, i).length === slotsOf(step),
+    );
+  const answer = (i: number, j: number, value: string | null) => {
+    setAnswers((all) =>
+      all.map((slots, k) => {
+        if (k !== i) return slots;
+        const next = [...slots];
+        next[j] = value;
+        return next;
+      }),
+    );
+    setError(null);
+  };
+  const labelOf = (step: Schemas['ItemStepView'], j: number) => {
+    if (step.kind === 'direction') return ru.inventory.direction;
+    if (step.kind !== 'pickObject') return step.prompt ?? ru.inventory.pick;
+    if (step.ranked) return ru.inventory.preference(j + 1);
+    return slotsOf(step) > 1 ? ru.inventory.pickObjectNumbered(j + 1) : ru.inventory.pickObject;
+  };
+  const optionLabel = (step: Schemas['ItemStepView'], o: Schemas['ItemOptionView']) =>
+    step.kind === 'direction'
+      ? o.id === 'back'
+        ? ru.inventory.back
+        : o.id === 'forward'
+          ? ru.inventory.forward
+          : o.label
+      : o.label;
 
   return (
     <FormDialog
@@ -410,9 +453,7 @@ export function UseItemDialog({
           setError(null);
           void onUse({
             targetPlayerId: item.choosesTarget ? target : null,
-            choices: item.steps
-              .map((step, i) => (asked(step) ? answers[i] : null))
-              .filter((a): a is string => a != null),
+            choices: item.steps.flatMap((step, i) => (asked(step) ? given(step, i) : [])),
           }).then((result) => {
             setBusy(false);
             if (!result.ok) setError(result.message);
@@ -458,33 +499,41 @@ export function UseItemDialog({
         ) : null}
         {item.steps.map((step, i) => {
           const options = optionsOf(step);
-          const label =
-            step.kind === 'pickObject'
-              ? ru.inventory.pickObject
-              : (step.prompt ?? ru.inventory.pick);
+          const slots = Array.from({ length: slotsOf(step) }, (_, j) => j);
           return (
             <div key={i} className="grid gap-1">
-              <Select
-                label={label}
-                data-testid={`use-step-${i}`}
-                value={answers[i] ?? ''}
-                disabled={
-                  options.length === 0 ||
-                  (step.kind === 'pickObject' && item.choosesTarget && !target)
-                }
-                onChange={(e) => {
-                  const value = e.target.value;
-                  setAnswers((all) => all.map((a, j) => (j === i ? value || null : a)));
-                  setError(null);
-                }}
-              >
-                <option value="">{ru.inventory.pick}</option>
-                {options.map((o) => (
-                  <option key={o.id} value={o.id}>
-                    {o.label}
-                  </option>
-                ))}
-              </Select>
+              {step.kind === 'pickObject' && step.ranked && asked(step) ? (
+                <span className="text-sm text-ink-soft">{ru.inventory.preferenceHint}</span>
+              ) : null}
+              {slots.map((j) => {
+                const value = answers[i]?.[j] ?? null;
+                // A pick of several never offers the same object twice
+                const taken = new Set((answers[i] ?? []).filter((a, k) => k !== j && a != null));
+                return (
+                  <Select
+                    key={j}
+                    label={labelOf(step, j)}
+                    data-testid={slots.length > 1 ? `use-step-${i}-${j}` : `use-step-${i}`}
+                    value={value ?? ''}
+                    disabled={
+                      options.length === 0 ||
+                      (step.kind === 'pickObject' && item.choosesTarget && !target)
+                    }
+                    onChange={(e) => {
+                      answer(i, j, e.target.value || null);
+                    }}
+                  >
+                    <option value="">{ru.inventory.pick}</option>
+                    {options
+                      .filter((o) => !taken.has(o.id))
+                      .map((o) => (
+                        <option key={o.id} value={o.id}>
+                          {optionLabel(step, o)}
+                        </option>
+                      ))}
+                  </Select>
+                );
+              })}
               {step.kind === 'pickObject' && !asked(step) ? (
                 <span className="text-sm text-ink-soft">{ru.inventory.noObjects}</span>
               ) : null}

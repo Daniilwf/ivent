@@ -43,7 +43,7 @@ internal static class CompletionRoll
 
     /// <summary>The total through the pipeline (D-14, D-408); without mods — the dice and the zone's addition, never below 0.</summary>
     public static int Total(EquatableArray<Die> dice, EquatableArray<Die> challengeDice, RunSnapshot snapshot, RunDiceMods? mods = null) =>
-        (mods ?? RunDiceMods.None).Total(dice.Sum(d => d.Value) + challengeDice.Sum(d => d.Value), snapshot.Zone?.AddedToSum ?? 0);
+        (mods ?? RunDiceMods.None).Total([.. dice, .. challengeDice], snapshot.Zone?.AddedToSum ?? 0);
 
     public static DieRule DieFor(Difficulty difficulty, DieByDifficulty dice) =>
         difficulty switch

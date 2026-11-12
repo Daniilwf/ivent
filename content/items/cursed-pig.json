@@ -1,0 +1,35 @@
+{
+  "id": "cursed-pig",
+  "kind": "item",
+  "name": "Проклятая Свинья",
+  "description": "Отдай выбранному другому игроку один свой враждебный эффект на выбор и потеряй 5 монеток.",
+  "rarity": "legendary",
+  "price": 60,
+  "window": "anytime",
+  "hostile": true,
+  "stackable": false,
+  "tags": ["pig"],
+  "effect": {
+    "target": {
+      "selector": "chosen",
+      "excludeSelf": true
+    },
+    "actions": [
+      {
+        "type": "takeObject",
+        "mode": "give",
+        "pick": "chosen",
+        "filter": {
+          "kind": "effect",
+          "hostile": true
+        }
+      },
+      {
+        "type": "changeResource",
+        "resource": "coins",
+        "amount": -5,
+        "target": "self"
+      }
+    ]
+  }
+}

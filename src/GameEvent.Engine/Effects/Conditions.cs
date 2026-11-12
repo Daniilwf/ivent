@@ -10,7 +10,11 @@ namespace GameEvent.Engine.Effects;
 /// </summary>
 internal static class Conditions
 {
-    public static bool Hold(SeasonState state, EngineContext context, Guid ownerId, ConditionSpec condition, Guid? runId)
+    public static bool Hold(SeasonState state, EngineContext context, Guid ownerId, ConditionSpec condition, Guid? runId) =>
+        Hold(state, context.Pool, ownerId, condition, runId);
+
+    /// <inheritdoc cref="Hold(SeasonState, EngineContext, Guid, ConditionSpec, Guid?)"/>
+    public static bool Hold(SeasonState state, Pool.IPoolView pool, Guid ownerId, ConditionSpec condition, Guid? runId)
     {
         var run = runId is { } id ? state.Runs.GetValueOrDefault(id) : null;
         if (condition.DifficultyAtLeast is { } difficulty && !(run?.Difficulty >= difficulty))
@@ -19,7 +23,7 @@ internal static class Conditions
         }
 
         if (condition.Game is { } filter
-            && !(run is not null && context.Pool.Games.FirstOrDefault(g => g.Id == run.GameId) is { } game && Rolls.Rolling.Matches(filter, game)))
+            && !(run is not null && pool.Games.FirstOrDefault(g => g.Id == run.GameId) is { } game && Rolls.Rolling.Matches(filter, game)))
         {
             return false;
         }
@@ -30,7 +34,8 @@ internal static class Conditions
             ContentStat.HostileReceived => state.Players[ownerId].Wallet.HostileReceived >= condition.Gte,
             ContentStat.RunHours => run?.Hours >= condition.Gte,
             ContentStat.AllDiceMax => run is not null && AllMax(run, condition.MinDice ?? 1),
-            ContentStat.CompletedStreakWithTag => Streak(state, context, ownerId, condition.Tag!) >= condition.Gte,
+            ContentStat.CompletedStreakWithTag => Streak(state, pool, ownerId, condition.Tag!) >= condition.Gte,
+            ContentStat.Coins => state.Players[ownerId].Coins is var coins && !(coins < condition.Gte) && !(coins > condition.Lte),
             _ => false,
         };
     }
@@ -43,10 +48,10 @@ internal static class Conditions
     }
 
     // The owner's completed runs from the latest back, while their games have the tag.
-    private static int Streak(SeasonState state, EngineContext context, Guid ownerId, string tag) =>
+    private static int Streak(SeasonState state, Pool.IPoolView pool, Guid ownerId, string tag) =>
         state.Runs.Values
             .Where(r => r.PlayerId == ownerId && r.Status == RunStatus.Completed)
             .OrderByDescending(r => r.CompletedAt)
-            .TakeWhile(r => context.Pool.Games.FirstOrDefault(g => g.Id == r.GameId)?.Tags.Contains(tag, StringComparer.OrdinalIgnoreCase) == true)
+            .TakeWhile(r => pool.Games.FirstOrDefault(g => g.Id == r.GameId)?.Tags.Contains(tag, StringComparer.OrdinalIgnoreCase) == true)
             .Count();
 }

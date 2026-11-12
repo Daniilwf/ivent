@@ -16,6 +16,8 @@ const choiceItem = itemFixture({
   steps: [
     {
       kind: 'choice',
+      count: 1,
+      ranked: false,
       prompt: 'Какой жанр подкинуть?',
       options: [
         { id: 'Horror', label: 'Horror' },

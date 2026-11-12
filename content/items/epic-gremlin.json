@@ -1,0 +1,33 @@
+{
+  "id": "epic-gremlin",
+  "kind": "item",
+  "name": "Эпический Гремлин",
+  "description": "Уничтожь все предметы, эффекты и спецроллы у выбранного игрока, хоть у себя. Плата — 15 монеток. Гремлинские предметы гремлину не по зубам.",
+  "rarity": "epic",
+  "price": null,
+  "window": "anytime",
+  "hostile": true,
+  "stackable": false,
+  "tags": ["gremlin"],
+  "effect": {
+    "target": {
+      "selector": "chosen"
+    },
+    "actions": [
+      {
+        "type": "takeObject",
+        "mode": "destroy",
+        "all": true,
+        "filter": {
+          "excludeTags": ["gremlin"]
+        }
+      },
+      {
+        "type": "changeResource",
+        "resource": "coins",
+        "amount": -15,
+        "target": "self"
+      }
+    ]
+  }
+}

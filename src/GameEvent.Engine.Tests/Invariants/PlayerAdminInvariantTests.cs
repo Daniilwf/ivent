@@ -295,6 +295,10 @@ public partial class PlayerAdminInvariantTests
         var runId = (b % 3) switch
         {
             _ when arg == 7 => SequentialIds.Make(0x60000000, b),
+            // AU12-1: the provisional first's finishing run gets other hours — more dice grow the surplus, so a later reject
+            // of an earlier run can be absorbed by it; fewer take from it
+            _ when arg == 6 && FinishLine.First(s.State) is { } first && s.State.Players[first].Finish is { Frozen: false } finish
+                && b % 3 != 1 => finish.RunId,
             1 when runs.Count > 0 => runs[b % runs.Count].RunId,
             _ => runs.LastOrDefault(r => r.PlayerId == player && r.Status == RunStatus.Completed)?.RunId
                 ?? SequentialIds.Make(0x60000000, b),
@@ -314,6 +318,33 @@ public partial class PlayerAdminInvariantTests
 
     private static readonly string[] s_proofLinks =
         ["https://imgur.com/a/credits", "http://example.com/ending.png", "javascript:alert(1)", "ftp://example.com/x.png", "  https://youtu.be/ending	"];
+
+    /// <summary>
+    /// AU12-1: a run of the provisional first up to the finish, unchecked, for the generator's goal «approve the finishing run
+    /// and all but one earlier run, then reject the last one». To approve: the finishing run, else the earliest earlier one
+    /// while more than one is left. To reject: once the finishing run is approved, an earlier one whose reject the surplus
+    /// absorbs (it gained no more than the surplus holds), else the earliest. Null when the goal has nothing to do.
+    /// </summary>
+    private static Guid? FirstsUncheckedRun(SeasonState state, bool approve)
+    {
+        if (FinishLine.First(state) is not { } firstId || state.Players[firstId].Finish is not { Frozen: false } finish)
+        {
+            return null;
+        }
+
+        var pending = state.Runs.Values
+            .Where(r => r.PlayerId == firstId && r.Status == RunStatus.Completed && !r.AfterFinish && r.Proof?.Status != ProofStatus.Approved)
+            .OrderBy(r => r.CompletedAt)
+            .ToList();
+        var finishingUnchecked = pending.Any(r => r.RunId == finish.RunId);
+        var earlier = pending.Where(r => r.RunId != finish.RunId).ToList();
+        if (approve)
+        {
+            return finishingUnchecked ? finish.RunId : earlier.Count > 1 ? earlier[0].RunId : null;
+        }
+
+        return finishingUnchecked ? null : (earlier.FirstOrDefault(r => r.Gain <= finish.Surplus) ?? earlier.FirstOrDefault())?.RunId;
+    }
 
     /// <summary>
     /// With proofs, a coins adjustment with an argument of 3 and up is a proof command instead (bits 5–7): 3 a proof with
@@ -337,6 +368,10 @@ public partial class PlayerAdminInvariantTests
         var variant = s.Log.Count;
         var runId = (variant % 5) switch
         {
+            // AU12-1: the provisional first's finishing run approved out of the queue's order, then his earlier unchecked
+            // runs rejected — so the reject of the last unchecked run up to the finish (absorbed by the surplus or not) comes out
+            _ when arg == 7 && variant % 3 != 2 && FirstsUncheckedRun(s.State, approve: true) is { } approved => approved,
+            _ when arg == 6 && variant % 5 is 1 or 2 or 3 && FirstsUncheckedRun(s.State, approve: false) is { } rejected => rejected,
             _ when arg == 7 && runs.Count > 0 => runs[variant % runs.Count].RunId,
             1 when runs.Count > 0 => runs[b % runs.Count].RunId,
             4 => SequentialIds.Make(0x60000000, b),
@@ -562,12 +597,32 @@ public partial class PlayerAdminInvariantTests
         var seen = new HashSet<Type>();
         var bonus = false;
         var revokedBonus = false;
+        var lastRejected = 0;
         for (var seed = 0; seed < 60; seed++)
         {
             // A fixed pseudo-random script per seed (a linear congruential generator, so the guard is deterministic)
             var x = (uint)seed + 1;
             var script = Enumerable.Range(0, 600).Select(_ => (byte)((x = (x * 1103515245) + 12345) >> 16)).ToArray();
-            var s = Play(seed, script, withDrops: true, withCorrections: true, withProofs: true, finishes: true);
+            var s = Play(seed, script, (s, command, before, _) =>
+            {
+                // AU12-1 (D-632): the provisional first's finishing run approved, the last earlier unchecked one rejected —
+                // he is frozen in the same command (the surplus absorbed it) or his finish is revoked; never left waiting
+                var runId = command switch { RejectProof r => r.RunId, RejectProofWithDropPenalty r => r.RunId, _ => Guid.Empty };
+                if (!s.Last.IsAccepted || runId == Guid.Empty || FinishLine.First(before) is not { } first
+                    || before.Players[first].Finish is not { Frozen: false } finish || finish.RunId == runId)
+                {
+                    return;
+                }
+
+                var waiting = UpToFinishRuns(before, before.Players[first]).Where(r => r.Proof?.Status != ProofStatus.Approved).Select(r => r.RunId).ToList();
+                if (waiting.SequenceEqual([runId]))
+                {
+                    lastRejected++;
+                    Assert.True(
+                        s.Last.Events.Any(e => e is PlayerFrozen f && f.PlayerId == first) || s.Last.Events.Any(e => e is PlayerFinishRevoked),
+                        "The reject of the first's last unchecked run up to the finish left him provisional.");
+                }
+            }, withDrops: true, withCorrections: true, withProofs: true, finishes: true);
             seen.UnionWith(s.Log.Select(e => e.GetType()).Where(t => t == typeof(PlayerFinished) || t == typeof(PlayerFrozen) || t == typeof(PlayerFinishRevoked)));
             bonus |= s.Log.OfType<PointsChanged>().Any(e => e.Reason == PointsReason.FinishBonus);
             revokedBonus |= s.Log.OfType<PointsChanged>().Any(e => e.Reason == PointsReason.FinishBonusRevoked);
@@ -578,6 +633,7 @@ public partial class PlayerAdminInvariantTests
         Assert.Contains(typeof(PlayerFinishRevoked), seen);
         Assert.True(bonus, "No finish bonus in the finish variant.");
         Assert.True(revokedBonus, "No finish bonus taken back in the finish variant.");
+        Assert.True(lastRejected > 0, "The first's last unchecked run up to the finish was never rejected after his finishing run was approved.");
     }
 
     [Fact]
@@ -939,6 +995,12 @@ public partial class PlayerAdminInvariantTests
                     break;
                 case ApproveProof approve when !movedFirst:
                     Assert.Contains(approve.RunId, UpToFinishRuns(s.State, s.State.Players[frozen.PlayerId]).Select(r => r.RunId));
+                    break;
+                // Q-3, P4 (AU12-1, D-632): the reject of the first's last unchecked run up to the finish completes the set of
+                // approved runs as an approval does — the rejected run was up to his finish before the command
+                case RejectProof or RejectProofWithDropPenalty when !movedFirst:
+                    var rejectedRun = command is RejectProof reject ? reject.RunId : ((RejectProofWithDropPenalty)command).RunId;
+                    Assert.Contains(rejectedRun, UpToFinishRuns(before, before.Players[frozen.PlayerId]).Select(r => r.RunId));
                     break;
                 case ApproveProof or RejectProof or RejectProofWithDropPenalty or CorrectRunHours or ChangeRunDifficulty:
                     Assert.True(movedFirst, $"{command} froze a player without moving the first place.");

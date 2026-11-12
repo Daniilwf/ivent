@@ -65,7 +65,7 @@ export type FeedRefs = {
   games: Map<string, FeedGame>;
   /** A run's game */
   runs: Map<string, string>;
-  /** An object's name, by its id (D-444) */
+  /** A content object's name by its id: items, gifts and drawn events alike (D-444, D-446) */
   objects: Map<string, string>;
 };
 
@@ -158,6 +158,10 @@ type Context = {
   /** An object's name by its id; the id itself when the page does not know it */
   object: (id: string | null) => string;
 };
+
+type EventKind = 'good' | 'bad' | 'special' | 'risky';
+const eventKind = (value: string | null): EventKind =>
+  value === 'bad' || value === 'special' || value === 'risky' ? value : 'good';
 
 const L = ru.feed.lines;
 const F = ru.feed.facts;
@@ -512,11 +516,27 @@ const headlines: [string, (d: Data, c: Context) => Headline][] = [
     }),
   ],
   [
+    'event-drawn',
+    (d, c) => ({
+      icon: 'effect',
+      actor: c.player(d),
+      line: L.eventDrawn(c.playerRef(d), c.object(text(d, 'objectId'))),
+    }),
+  ],
+  [
+    'event-draw-missed',
+    (d, c) => ({
+      icon: 'effect',
+      actor: c.player(d),
+      line: L.eventDrawMissed(c.playerRef(d), eventKind(text(d, 'kind'))),
+    }),
+  ],
+  [
     'manual-effect-created',
     (d, c) => ({
       icon: 'effect',
       actor: c.player(d),
-      line: L.effectDrawn(c.playerRef(d), text(d, 'drawEvent') === 'bad' ? 'bad' : 'good'),
+      line: L.effectDrawn(c.playerRef(d), eventKind(text(d, 'drawEvent'))),
     }),
   ],
   [
@@ -542,7 +562,11 @@ const headlines: [string, (d: Data, c: Context) => Headline][] = [
 ];
 
 const effectSource = (value: string | null) =>
-  value === 'paidReroll' || value === 'drop' || value === 'difficulty' || value === 'item'
+  value === 'paidReroll' ||
+  value === 'drop' ||
+  value === 'difficulty' ||
+  value === 'item' ||
+  value === 'event'
     ? value
     : 'drop';
 
@@ -551,12 +575,9 @@ const effectSource = (value: string | null) =>
  * Coins of one player are one fact; coins moved between players (an item that steals, a bet paid out on another's
  * completion) are a fact per player with the name, so −3 and +3 do not add up to nothing (EA-1).
  */
-function factsOf(
-  events: Event[],
-  lead: Event,
-  object: (id: string | null) => string,
-  nameOf: (playerId: string) => string,
-): string[] {
+function factsOf(events: Event[], lead: Event, context: Context): string[] {
+  const { object } = context;
+  const nameOf = (playerId: string) => context.player({ playerId }).name;
   const facts: string[] = [];
   let points = 0;
   let cells = 0;
@@ -601,12 +622,17 @@ function factsOf(
         facts.push(F.frozen);
         break;
       case 'manual-effect-created':
-        facts.push(
-          ru.effects.drawEvent(
-            text(d, 'drawEvent') === 'bad' ? 'bad' : 'good',
-            effectSource(text(d, 'source')),
-          ),
-        );
+        // A drawn event's own manual effect is told by the draw
+        if (text(d, 'source') !== 'event')
+          facts.push(
+            ru.effects.drawEvent(eventKind(text(d, 'drawEvent')), effectSource(text(d, 'source'))),
+          );
+        break;
+      case 'event-drawn':
+        facts.push(F.eventDrawn(context.object(text(d, 'objectId'))));
+        break;
+      case 'event-draw-missed':
+        facts.push(F.eventDrawMissed);
         break;
       case 'game-rerolled':
         facts.push(F.reroll[text(d, 'payment') ?? ''] ?? F.reroll['freeThisRoll'] ?? '');
@@ -704,10 +730,7 @@ function itemOf(entries: Entry[], refs: FeedRefs): FeedItem | null {
     icon: headline.icon,
     actor: headline.actor,
     line: headline.line,
-    facts: [
-      ...(headline.facts ?? []),
-      ...factsOf(events, lead, object, (id) => player({ playerId: id }).name),
-    ],
+    facts: [...(headline.facts ?? []), ...factsOf(events, lead, context)],
     quote: headline.quote ?? null,
     cover:
       headline.showcase?.kind === 'game' && headline.showcase.game.cover

@@ -21,7 +21,7 @@ export type MyBet = Schemas['BetView'];
 export type NewBet = { onPlayerId: string; days: number; stake: number };
 
 /**
- * Bets on the season screen (4.11c, D-414, D-446): the runs of others a bet is accepted on now — whose, which game, until
+ * Bets on the season screen (4.11c, D-414, D-447): the runs of others a bet is accepted on now — whose, which game, until
  * when — each with «Поставить», then my bets with their status in words and an icon. Hidden when the season's bets are
  * off (the economy has no `bets`).
  */

@@ -24,7 +24,10 @@ public class ContentPackTests
         var pack = EconomyScenario.RepositoryPack();
 
         Assert.Empty(ContentPublishing.Check(pack));
-        Assert.InRange(pack.Objects.Count(o => o.Kind == ObjectKind.Item), 20, 30);
+
+        // The first 20–30 items of task 4.1, and beside them the items imported from the old pack (D-471)
+        var imported = ImportedItems.ImportedItemsCatalog.ImportedIds();
+        Assert.InRange(pack.Objects.Count(o => o.Kind == ObjectKind.Item && !imported.Contains(o.Id)), 20, 30);
         Assert.Contains(pack.Wheels, w => w.Id == "lootbox");
     }
 
@@ -52,6 +55,59 @@ public class ContentPackTests
             () => ContentFiles.Pack([("broken.json", """{ "id": "x", "kind": "item", "nme": "?" }""")], []));
 
         Assert.StartsWith("broken.json:", e.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(ContentPublishing.MaxObjects + 1, 0, 0)]
+    [InlineData(1, ContentPublishing.MaxWheels + 1, 1)]
+    [InlineData(1, 1, ContentPublishing.MaxWheelEntries + 1)]
+    public void A_pack_over_the_size_limits_is_refused_before_it_is_checked(int objects, int wheels, int entries)
+    {
+        // NB-SEC-3 (D-653): 1000 objects and 100 wheels, as the admin's content API; 200 entries in a wheel
+        var s = Season();
+        var orange = EconomyScenario.ExamplePack("orange").Objects[0];
+        var pack = new ContentPack
+        {
+            Objects = [.. Enumerable.Range(0, objects).Select(i => orange with { Id = $"orange-{i}" })],
+            Wheels =
+            [
+                .. Enumerable.Range(0, wheels).Select(w => new WheelDefinition
+                {
+                    Id = $"wheel-{w}",
+                    Name = "Колесо",
+                    Entries = [.. Enumerable.Range(0, entries).Select(_ => new WheelEntrySpec { ObjectId = "orange-0", Weight = 1 })],
+                }),
+            ],
+        };
+
+        s.Act(new PublishContent(pack, "Огромный пакет"));
+
+        Assert.Equal(RejectionCodes.ContentTooLarge, s.Last.Rejection!.Code);
+        Assert.Equal(0, s.State.Catalog.Version);
+    }
+
+    [Fact]
+    public void A_pack_at_the_size_limits_is_published()
+    {
+        var s = Season();
+        var orange = EconomyScenario.ExamplePack("orange").Objects[0];
+        var pack = new ContentPack
+        {
+            Objects = [.. Enumerable.Range(0, ContentPublishing.MaxObjects).Select(i => orange with { Id = $"orange-{i}" })],
+            Wheels =
+            [
+                new WheelDefinition
+                {
+                    Id = "wheel",
+                    Name = "Колесо",
+                    Entries = [.. Enumerable.Range(0, ContentPublishing.MaxWheelEntries).Select(_ => new WheelEntrySpec { ObjectId = "orange-0", Weight = 1 })],
+                },
+            ],
+        };
+
+        s.Act(new PublishContent(pack, "Пакет на пределе"));
+
+        Assert.True(s.Last.IsAccepted, s.Last.Rejection?.ToString());
     }
 
     [Fact]
@@ -96,6 +152,26 @@ public class ContentPackTests
         Assert.Contains("$.objects[7].effect.actions[0]", paths);
         Assert.Contains("$.objects[8].effect.actions[0].wheel", paths);
         Assert.Contains("$.wheels[0].entries[0].objectId", paths);
+    }
+
+    [Fact]
+    public void A_null_in_the_objects_or_the_wheels_is_named_at_its_place_and_the_rest_is_still_checked()
+    {
+        var examples = EconomyScenario.Examples();
+        // A list item the strict reader lets through as null (nullable annotations do not reach list items)
+        var pack = new ContentPack
+        {
+            Objects = [null!, examples["orange"]],
+            Wheels = [new WheelDefinition { Id = "w", Name = "Колесо", Entries = [new WheelEntrySpec { ObjectId = "ghost", Weight = 1 }] }, null!],
+        };
+
+        var errors = ContentPublishing.Check(pack);
+
+        var paths = errors.Select(e => e.Path).ToList();
+        Assert.Contains("$.objects[0]", paths);
+        Assert.Contains("$.wheels[1]", paths);
+        Assert.Contains("$.wheels[0].entries[0].objectId", paths);
+        Assert.Equal(3, errors.Count);
     }
 
     [Theory]
@@ -196,6 +272,27 @@ public class ContentPackTests
     }
 
     [Fact]
+    public void A_pack_made_from_an_older_version_is_refused_and_one_from_the_version_in_force_is_published()
+    {
+        // D-491: the editor sends the version it was opened on, so two admins never overwrite each other silently
+        var s = Season().WithContent(EconomyScenario.ExamplePack("orange"));
+        var bigger = EconomyScenario.ExamplePack("orange", "shield", "shield-effect");
+
+        s.Act(new PublishContent(bigger, "Старый редактор", ExpectedVersion: 0));
+        Assert.Equal(RejectionCodes.ContentVersionChanged, s.Last.Rejection!.Code);
+        Assert.Equal(1, s.State.Catalog.Version);
+
+        s.Act(new PublishContent(bigger, "Свежий редактор", ExpectedVersion: 1));
+        Assert.True(s.Last.IsAccepted);
+        Assert.Equal(2, s.State.Catalog.Version);
+
+        // Without a version (a pack loaded by a script or a seed) it is taken as before
+        s.Act(new PublishContent(EconomyScenario.ExamplePack("orange"), "Без версии"));
+        Assert.True(s.Last.IsAccepted);
+        Assert.Equal(3, s.State.Catalog.Version);
+    }
+
+    [Fact]
     public void A_definition_left_out_is_soft_deleted_and_the_objects_held_keep_working()
     {
         var s = Season().WithContent(EconomyScenario.ExamplePack("orange", "reroll-coupon"));
@@ -228,5 +325,88 @@ public class ContentPackTests
         s.Act(new UndoCommand(s.LastCommandId, "Отменить"));
 
         Assert.Equal(RejectionCodes.UndoNotUndoable, s.Last.Rejection!.Code);
+    }
+    // ---- Answers the screen cannot know before the use are refused at publishing (D-440, D-402) ----
+
+    private static readonly TakeObjectAction s_pickOfTarget = new() { Mode = TakeMode.Steal, Pick = Pick.Chosen };
+
+    private static readonly RequestChoiceAction s_ask = new() { Prompt = "Что?", Options = new ChoiceOptionsSpec { List = ["a", "b"] } };
+
+    private static OutcomesSpec ByRoll(params ActionSpec[] actions) =>
+        new() { Roll = ContentValue.TryParse("1d6")!, Cases = [new OutcomeCase { From = 1, To = 6, Actions = [.. actions] }] };
+
+    private static OutcomesSpec ByChoice(params ActionSpec[] actions) =>
+        new()
+        {
+            Choice = new OutcomeChoice { Prompt = "Как?", Options = new ChoiceOptionsSpec { List = ["a", "b"] } },
+            Cases = [new OutcomeCase { Option = "a", Actions = [.. actions] }, new OutcomeCase { Option = "b" }],
+        };
+
+    [Theory]
+    [InlineData("leader", "$.objects[0].effect.actions[0]")]
+    [InlineData("all", "$.objects[0].effect.actions[0]")]
+    [InlineData("allGiven", "$.objects[0].effect.actions[0]")]
+    [InlineData("higherPoints", "$.objects[0].effect.actions[0]")]
+    [InlineData("randomActive", "$.objects[0].effect.actions[0]")]
+    [InlineData("pickAfterRollOutcome", "$.objects[0].effect.actions[0]")]
+    [InlineData("askInChoiceOutcome", "$.objects[0].effect.actions[0]")]
+    [InlineData("pickInChoiceOutcome", "$.objects[0].effect.actions[0]")]
+    [InlineData("directionInChoiceOutcome", "$.objects[0].effect.actions[0]")]
+    [InlineData("askAfterRankedPick", "$.objects[0].effect.actions[1].count")]
+    public void An_answer_unknown_before_the_use_is_refused_with_its_path(string what, string path)
+    {
+        var item = EconomyScenario.Examples()["orange"];
+        EffectSpec On(TargetSelector selector, params ActionSpec[] actions) =>
+            new() { Target = new TargetSpec { Selector = selector, ExcludeSelf = selector != TargetSelector.Self }, Actions = [.. actions] };
+        var self = On(TargetSelector.Self);
+        var effect = what switch
+        {
+            "leader" => On(TargetSelector.Leader, s_pickOfTarget),
+            "all" => On(TargetSelector.All, s_pickOfTarget),
+            "allGiven" => On(TargetSelector.All, new TakeObjectAction { Mode = TakeMode.Give, Pick = Pick.Chosen }),
+            "higherPoints" => On(TargetSelector.HigherPoints, s_pickOfTarget),
+            "randomActive" => On(TargetSelector.RandomActive, s_pickOfTarget),
+            "pickAfterRollOutcome" => self with { Outcomes = ByRoll(new TakeObjectAction { Mode = TakeMode.Destroy, Pick = Pick.Chosen, Target = ActionTarget.Self }) },
+            "askInChoiceOutcome" => self with { Outcomes = ByChoice(s_ask) },
+            "pickInChoiceOutcome" => self with { Outcomes = ByChoice(new TakeObjectAction { Mode = TakeMode.Destroy, Pick = Pick.Chosen }) },
+            "directionInChoiceOutcome" => self with { Outcomes = ByChoice(new MoveAction { Steps = ContentValue.Of(1), Direction = MoveDirection.Chosen }) },
+            _ => self with
+            {
+                Actions =
+                [
+                    new RollAction { Dice = ContentValue.TryParse("1d4")! },
+                    new TakeObjectAction { Mode = TakeMode.Destroy, Pick = Pick.Chosen, Count = ContentValue.TryParse("$roll") },
+                    new TakeObjectAction { Mode = TakeMode.Destroy, Pick = Pick.Chosen },
+                ],
+            },
+        };
+
+        var errors = ContentPublishing.Check(new ContentPack { Objects = [item with { Effect = effect }] });
+
+        Assert.Contains(errors, e => e.Path == path);
+    }
+
+    [Theory]
+    [InlineData("leaderPicksOwn")]
+    [InlineData("leaderRandom")]
+    [InlineData("pickAfterRollAction")]
+    [InlineData("choiceOutcome")]
+    public void An_answer_known_before_the_use_is_published(string what)
+    {
+        var item = EconomyScenario.Examples()["orange"];
+        EffectSpec On(TargetSelector selector, params ActionSpec[] actions) =>
+            new() { Target = new TargetSpec { Selector = selector, ExcludeSelf = selector != TargetSelector.Self }, Actions = [.. actions] };
+        var effect = what switch
+        {
+            "leaderPicksOwn" => On(TargetSelector.Leader, new TakeObjectAction { Mode = TakeMode.Destroy, Pick = Pick.Chosen, Target = ActionTarget.Self }),
+            "leaderRandom" => On(TargetSelector.Leader, new TakeObjectAction { Mode = TakeMode.Steal }),
+            "pickAfterRollAction" => On(
+                TargetSelector.Chosen,
+                new RollAction { Dice = ContentValue.TryParse("1d4")! },
+                new TakeObjectAction { Mode = TakeMode.Destroy, Pick = Pick.Chosen, Count = ContentValue.TryParse("$roll") }),
+            _ => On(TargetSelector.Self) with { Outcomes = ByChoice(new ChangeResourceAction { Resource = "coins", Amount = ContentValue.Of(1) }) },
+        };
+
+        Assert.Empty(ContentPublishing.Check(new ContentPack { Objects = [item with { Effect = effect }] }));
     }
 }

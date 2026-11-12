@@ -13,27 +13,32 @@ namespace GameEvent.Engine.Effects;
 /// through the effect chain, so its limits hold (3 levels, 50 events, D-103). The triggers before a roll and before the
 /// throw fire inside those commands (they change them).
 /// </summary>
-internal sealed class EffectTriggers : ITriggerHandler
+internal sealed class EffectTriggers : ITriggerHandler, IFiringTriggerHandler
 {
     public static EffectTriggers Instance { get; } = new();
 
-    public IEnumerable<IGameEvent> React(SeasonState state, IGameEvent trigger, EngineContext context)
+    public IEnumerable<IGameEvent> React(SeasonState state, IGameEvent trigger, EngineContext context) =>
+        ReactInFirings(state, trigger, context, depth: 1, eventsBefore: 0).SelectMany(f => f);
+
+    public IEnumerable<IReadOnlyList<IGameEvent>> ReactInFirings(
+        SeasonState state, IGameEvent trigger, EngineContext context, int depth, int eventsBefore)
     {
         if (state.Ruleset is null || !state.Rules.Features.Items || state.Catalog.Objects.Count == 0)
         {
             return [];
         }
 
+        var at = new ChainPoint(depth, eventsBefore);
         return trigger switch
         {
-            GameRolled e => Fire(state, context, e.PlayerId, [Trigger.AfterRoll], null, DiceScope.Pending),
-            GameChoiceRolled e => Fire(state, context, e.PlayerId, [Trigger.AfterRoll], null, DiceScope.Pending),
-            RunCompleted e => Fire(state, context, e.PlayerId, [Trigger.RunCompleted], e.RunId, DiceScope.Pending),
-            CompletionRolled e => Fire(state, context, e.PlayerId, [Trigger.AfterDice], e.RunId, DiceScope.AfterThrow),
-            RunDropped e => Fire(state, context, e.PlayerId, [Trigger.Drop], e.RunId, DiceScope.Pending),
-            RunTechRerolled e => Fire(state, context, e.PlayerId, [Trigger.TechReroll], e.RunId, DiceScope.Pending),
+            GameRolled e => Fire(state, context, e.PlayerId, [Trigger.AfterRoll], null, DiceScope.Pending, at),
+            GameChoiceRolled e => Fire(state, context, e.PlayerId, [Trigger.AfterRoll], null, DiceScope.Pending, at),
+            RunCompleted e => Fire(state, context, e.PlayerId, [Trigger.RunCompleted, Trigger.RunEnded], e.RunId, DiceScope.Pending, at),
+            CompletionRolled e => Fire(state, context, e.PlayerId, [Trigger.AfterDice], e.RunId, DiceScope.AfterThrow, at),
+            RunDropped e => Fire(state, context, e.PlayerId, [Trigger.Drop, Trigger.RunEnded], e.RunId, DiceScope.Pending, at),
+            RunTechRerolled e => Fire(state, context, e.PlayerId, [Trigger.TechReroll], e.RunId, DiceScope.Pending, at),
             PlayerMoved e when e.Steps != 0 && CellStops.Triggers(e.Reason) =>
-                Fire(state, context, e.PlayerId, [.. Movement.Visits(e).Select(Of).Distinct()], null, DiceScope.Pending),
+                Fire(state, context, e.PlayerId, [.. Movement.Visits(e).Select(Of)], null, DiceScope.Pending, at),
             _ => [],
         };
     }
@@ -46,17 +51,19 @@ internal sealed class EffectTriggers : ITriggerHandler
             _ => Trigger.Stop,
         };
 
-    private static List<IGameEvent> Fire(
-        SeasonState state, EngineContext context, Guid ownerId, IReadOnlyList<Trigger> triggers, Guid? runId, DiceScope dice)
+    private static List<IReadOnlyList<IGameEvent>> Fire(
+        SeasonState state, EngineContext context, Guid ownerId, IReadOnlyList<Trigger> triggers, Guid? runId, DiceScope dice, ChainPoint at)
     {
-        var events = new List<IGameEvent>();
+        var firings = new List<IReadOnlyList<IGameEvent>>();
+        var eventsBefore = at.EventsBefore;
         foreach (var trigger in triggers)
         {
-            var (fired, after) = Firing.All(state, context, ownerId, trigger, runId, dice);
-            events.AddRange(fired);
+            var (fired, after) = Firing.Each(state, context, ownerId, trigger, runId, dice, at with { EventsBefore = eventsBefore });
+            firings.AddRange(fired);
+            eventsBefore += fired.Sum(f => f.Count);
             state = after;
         }
 
-        return events;
+        return firings;
     }
 }

@@ -12,8 +12,9 @@ public sealed record WheelEntrySpec
 }
 
 /// <summary>
-/// A wheel of objects (a loot box): <c>spinWheel</c> picks one entry by weight and gives its object (D-401). Wheels of
-/// categories and decks of events stay with their own mechanics.
+/// A wheel of objects (SPEC «Колёса и колоды — одна сущность»): a loot box — <c>spinWheel</c> picks one entry by weight
+/// and gives its object (D-401) — or, with <see cref="Deck"/>, a deck of events — <c>drawEvent</c> picks one by weight and
+/// plays it at once (D-500, D-501). Wheels of categories stay with the roll.
 /// </summary>
 public sealed record WheelDefinition
 {
@@ -22,6 +23,13 @@ public sealed record WheelDefinition
     public required string Name { get; init; }
 
     public required EquatableArray<WheelEntrySpec> Entries { get; init; }
+
+    /// <summary>
+    /// The kind of the events of a deck (D-501): its entries are events, and a drawn one is of this kind. Missing — a loot
+    /// wheel, as before stage 5; not written then, so the packs of stage 4 log as they did.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public Rulesets.EventKind? Deck { get; init; }
 }
 
 /// <summary>
@@ -124,9 +132,11 @@ public sealed record ContentCatalog(
 
 /// <summary>
 /// The admin loads a content pack into the season (D-400): checked as a whole, all problems at once. Needs
-/// <c>features.items</c>; allowed while the season is a draft or running.
+/// <c>features.items</c>; allowed while the season is a draft or running. <paramref name="ExpectedVersion"/> — the
+/// content version the admin's editor was opened on (D-491): a pack made from an older one is refused instead of
+/// silently undoing someone else's change; null (a seed, a script) takes the pack whatever the version.
 /// </summary>
-public sealed record PublishContent(ContentPack Pack, string Comment) : ICommand;
+public sealed record PublishContent(ContentPack Pack, string Comment, int? ExpectedVersion = null) : ICommand;
 
 /// <summary>A new version of the season's content, stored whole, like a map (D-300, D-400).</summary>
 [EventType("content-published")]

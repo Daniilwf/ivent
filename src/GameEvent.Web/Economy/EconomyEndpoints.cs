@@ -39,8 +39,9 @@ public sealed record BuyLotRequest(Guid CommandId, int Lot);
 public sealed record PlaceBetRequest(Guid CommandId, Guid OnPlayerId, int Days, int Stake);
 
 /// <summary>
-/// My economy in the season (D-441): coins, the inventory with what each object allows now, the shop when
-/// <c>features.shop</c> is on, the bets when <c>features.bets</c> is on. <c>inventoryLimit</c> counts items only (D-406).
+/// My economy in the season (D-441): coins, the inventory with what each object allows now when <c>features.items</c> is
+/// on (null when off: bets play without items), the shop when <c>features.shop</c> is on, the bets when
+/// <c>features.bets</c> is on. <c>inventoryLimit</c> counts items only (D-406).
 /// </summary>
 public sealed record EconomyView(
     int Coins,
@@ -48,7 +49,7 @@ public sealed record EconomyView(
     // The shop first: the OpenAPI document keeps the first use of a shared enum, and a lot's rarity is never null
     ShopView? Shop,
     BetsView? Bets,
-    IReadOnlyList<InventoryItemView> Items);
+    IReadOnlyList<InventoryItemView>? Items);
 
 /// <summary>
 /// An object I hold: its definition's name and description, what is left of its lifetime, who put it on me. <c>usable</c> —
@@ -79,10 +80,13 @@ public sealed record InventoryItemView(
 public sealed record ItemTargetView(Guid PlayerId, string Name, int Token);
 
 /// <summary>
-/// An answer to give: a choice (<c>options</c>) or an object of the target (<c>objectsByTarget</c>: for each possible
-/// target, its objects that fit). <c>prompt</c> — the content's question.
+/// An answer to give: a choice (<c>options</c>), a direction (<c>options</c> <c>forward</c> and <c>back</c>, the screen
+/// names them) or objects of the target (<c>objectsByTarget</c>: for each possible target, its objects that fit) —
+/// <c>count</c> different ones (all of them when fewer), or with <c>ranked</c> any number in order of preference, the rest
+/// taken at random (D-476). <c>prompt</c> — the content's question.
 /// </summary>
-public sealed record ItemStepView(ItemStepKind Kind, string? Prompt, IReadOnlyList<ItemOptionView> Options, IReadOnlyList<TargetObjectsView>? ObjectsByTarget);
+public sealed record ItemStepView(
+    ItemStepKind Kind, string? Prompt, IReadOnlyList<ItemOptionView> Options, IReadOnlyList<TargetObjectsView>? ObjectsByTarget, int Count, bool Ranked);
 
 /// <summary>One answer: the id the engine checks, the words the screen shows.</summary>
 public sealed record ItemOptionView(string Id, string Label);
@@ -95,12 +99,12 @@ public sealed record TargetObjectsView(Guid PlayerId, IReadOnlyList<ItemOptionVi
 /// </summary>
 public sealed record ShopView(ShopPayment Payment, int Price, int FreeRolls, string? Refusal, DateTimeOffset? ExpiresAt, IReadOnlyList<ShopLotView> Lots);
 
-/// <summary>A lot of my offer; <c>refusal</c> — the engine's code when buying it is refused now (sold, too few coins, the inventory full…), D-446.</summary>
+/// <summary>A lot of my offer; <c>refusal</c> — the engine's code when buying it is refused now (sold, too few coins, the inventory full…), D-447.</summary>
 public sealed record ShopLotView(int Lot, string ObjectId, string Name, string Description, Rarity Rarity, int Price, bool Sold, string? Refusal);
 
 /// <summary>
 /// My bets and the rules of a new one: deadlines in days and the largest stake of the season (D-414). From the bets plan
-/// (D-446): <c>refusal</c> — the engine's code when no bet is placed now, <c>openBets</c> of <c>maxOpenBets</c>,
+/// (D-447): <c>refusal</c> — the engine's code when no bet is placed now, <c>openBets</c> of <c>maxOpenBets</c>,
 /// <c>stakeLimit</c> — the largest stake I can place (the season's limit or my coins), <c>runs</c> — exactly the runs a
 /// bet is accepted on now.
 /// </summary>
@@ -231,14 +235,15 @@ public static class EconomyEndpoints
             return TypedResults.Forbid();
         }
 
-        // The mechanic switched off is not shown at all (CLAUDE.md «Выключенная механика не видна в интерфейсе»)
+        // The mechanic switched off is not shown at all (CLAUDE.md «Выключенная механика не видна в интерфейсе»); bets
+        // play without items (RulesetSupport), so the view is refused only with all three off
         var features = state.Rules.Features;
-        if (!features.Items)
+        if (!features.Items && !features.Shop && !features.Bets)
         {
             return TypedResults.Problem(
                 statusCode: StatusCodes.Status409Conflict,
                 title: "The mechanic is off.",
-                detail: "Items are off in this season.",
+                detail: "Items, the shop and bets are off in this season.",
                 extensions: new Dictionary<string, object?> { ["code"] = RejectionCodes.FeatureDisabled });
         }
 
@@ -248,7 +253,7 @@ public static class EconomyEndpoints
         var names = state.Players.ToDictionary(p => p.Key, p => p.Value.Name);
         ItemTargetView Target(Guid id) => new(id, names[id], tokens.GetValueOrDefault(id));
 
-        var items = ItemPlans.Of(state, pool, now, me.PlayerId).Select(plan => new InventoryItemView(
+        List<InventoryItemView>? items = !features.Items ? null : [.. ItemPlans.Of(state, pool, now, me.PlayerId).Select(plan => new InventoryItemView(
             plan.Item.InstanceId,
             plan.Item.ObjectId,
             plan.Definition.Kind,
@@ -265,7 +270,7 @@ public static class EconomyEndpoints
             plan.Refusal,
             plan.ChoosesTarget,
             [.. plan.Targets.Select(Target)],
-            [.. plan.Steps.Select(step => Step(step, state, pool, names))])).ToList();
+            [.. plan.Steps.Select(step => Step(step, state, pool, names))]))];
 
         ShopView? shop = null;
         if (features.Shop && ShopPlans.Of(state, now, me.PlayerId) is { } plan)
@@ -335,6 +340,8 @@ public static class EconomyEndpoints
                         state.Players[t.Key].Wallet.Inventory.FirstOrDefault(x => x.InstanceId.ToString("N") == o) is { } held
                             ? state.Catalog.Get(held.ObjectId).Name
                             : o))]))]
-                : null);
+                : null,
+            step.Count,
+            step.Ranked);
     }
 }

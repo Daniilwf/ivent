@@ -15,6 +15,14 @@ public static partial class ContentValidator
     public const int MaxNameLength = 100;
     public const int MaxDescriptionLength = 1000;
 
+    // Safety ceilings, not balance (NB-SEC-2, D-652): an item cannot cost, give or take more than a season can hold,
+    // nor multiply dice or prices past what keeps the arithmetic in range.
+    public const int MaxPrice = 1_000_000;
+    public const int MaxResourceAmount = 1_000_000;
+    public const int MaxDiceMultiplier = 10;
+    public const int MaxDiceAddition = 1_000;
+    public const decimal MaxShopPriceMultiplier = 10;
+
     /// <summary>The errors of <paramref name="definition"/>; empty when it is valid.</summary>
     public static IReadOnlyList<ContentError> Check(ObjectDefinition definition)
     {
@@ -32,6 +40,11 @@ public static partial class ContentValidator
             Error("$.price", "A price is 0 or more; null means not for sale.");
         }
 
+        if (definition.Price is > MaxPrice)
+        {
+            Error("$.price", $"A price is at most {MaxPrice}.");
+        }
+
         if (kind != ObjectKind.Item && definition.Price is not null)
         {
             Error("$.price", "Only items are sold in the shop.");
@@ -44,6 +57,18 @@ public static partial class ContentValidator
         if (kind != ObjectKind.Item && definition.Window is not null)
         {
             Error("$.window", "Only items have a window of use.");
+        }
+
+        CheckTags(definition.Tags, "$.tags", Error);
+
+        if (definition.UseCondition is { } useCondition)
+        {
+            if (kind != ObjectKind.Item)
+            {
+                Error("$.useCondition", "Only an item is used by hand, so only an item has a condition of use.");
+            }
+
+            CheckCondition(useCondition, "$.useCondition", Error);
         }
 
         if (kind == ObjectKind.Achievement && definition.Scope is null)
@@ -83,6 +108,19 @@ public static partial class ContentValidator
             Error("$.effect.duration", "Only effects and special rolls last; a duration elsewhere means nothing.");
         }
 
+        if (effect.Counter is { } counter)
+        {
+            if (kind is not (ObjectKind.Effect or ObjectKind.SpecialRoll))
+            {
+                Error("$.effect.counter", "Only effects and special rolls count down.");
+            }
+
+            if (counter.Start < 1)
+            {
+                Error("$.effect.counter.start", "A counter starts at 1 or more.");
+            }
+        }
+
         if (kind != ObjectKind.Effect && effect.Intercept is not null)
         {
             Error("$.effect.intercept", "Only an effect intercepts (an item gives such an effect, as «Щит» does).");
@@ -120,6 +158,19 @@ public static partial class ContentValidator
         if (effect.Target is { } target && target.Among is not null && target.Selector is not (TargetSelector.Chosen or TargetSelector.RandomActive))
         {
             error($"{path}.target.among", "«among» narrows only «chosen» and «randomActive».");
+        }
+
+        if (effect.Target is { } reach)
+        {
+            if (reach.Selector == TargetSelector.WithinCells && reach.Cells is not (>= 1))
+            {
+                error($"{path}.target.cells", "«withinCells» reaches 1 cell or more.");
+            }
+
+            if (reach.Selector != TargetSelector.WithinCells && (reach.Cells is not null || reach.IncludeSameCell))
+            {
+                error($"{path}.target", "«cells» and «includeSameCell» belong to «withinCells».");
+            }
         }
 
         if (effect.Duration is { } duration)
@@ -165,6 +216,11 @@ public static partial class ContentValidator
         if (zone.ShopPriceMultiplier is <= 0)
         {
             Error("$.shopPriceMultiplier", "A multiplier is above 0.");
+        }
+
+        if (zone.ShopPriceMultiplier is > MaxShopPriceMultiplier)
+        {
+            Error("$.shopPriceMultiplier", $"A multiplier is at most {MaxShopPriceMultiplier}.");
         }
 
         return errors;
@@ -265,6 +321,8 @@ public static partial class ContentValidator
                 ChangeResourceAction a => [("amount", a.Amount)],
                 RollAction a => [("dice", a.Dice)],
                 ModifyDiceAction a => [("value", a.Value)],
+                TakeObjectAction { Count: { } count } => [("count", count)],
+                TransformObjectAction { Value: { } by } => [("value", by)],
                 _ => Array.Empty<(string, ContentValue)>(),
             };
             foreach (var (field, value) in values)
@@ -272,16 +330,60 @@ public static partial class ContentValidator
                 CheckReference(value, $"{at}.{field}", scope with { Rolled = rolled, Chose = chose }, error);
             }
 
+            var objectFilter = actions[i] switch
+            {
+                TakeObjectAction a => a.Filter,
+                TransformObjectAction a => a.Filter,
+                _ => null,
+            };
+            CheckTags(objectFilter?.ExcludeTags, $"{at}.filter.excludeTags", error, empty: false);
+            if (actions[i] is MoveAction { Direction: not null } directed && (directed.Steps.Negative || directed.Steps.Number < 0))
+            {
+                error($"{at}.steps", "With a «direction» the steps count cells; the direction says which way.");
+            }
+
+            if (actions[i] is TakeObjectAction take)
+            {
+                CheckCount(take, actions.Skip(i + 1), at, error);
+                if (take is { Mode: TakeMode.Give, Target: ActionTarget.Self })
+                {
+                    error($"{at}.target", "«give» hands the user's object to the effect's target, not to himself.");
+                }
+            }
+
+            if (actions[i] is ChangeResourceAction { Amount: { Kind: ContentValueKind.Number, Number: < -MaxResourceAmount or > MaxResourceAmount } })
+            {
+                error($"{at}.amount", $"An amount is within ±{MaxResourceAmount}.");
+            }
+
             switch (actions[i])
             {
                 case ChangeResourceAction change when string.IsNullOrWhiteSpace(change.Resource):
                     error($"{at}.resource", "A resource is «points», «coins» or another key.");
+                    break;
+                case ChangeResourceAction { Reflect: true } change when change.Resource != "coins" || change.Target == ActionTarget.Self:
+                    error($"{at}.reflect", "Only coins taken from the effect's target are reflected.");
                     break;
                 case RollAction roll when roll.Dice.Kind != ContentValueKind.Dice || roll.Dice.Negative:
                     error($"{at}.dice", "A roll needs dice such as «1d6», without a minus.");
                     break;
                 case ModifyDiceAction modify:
                     CheckDiceValue(modify.Stage, modify.Value, $"{at}.value", error);
+                    if (modify.Sides is { } extraSides && (modify.Stage != DiceStage.Count || extraSides is < 2 or > ContentValue.MaxSides))
+                    {
+                        error($"{at}.sides", $"«sides» gives the extra dice of «count» their kind: 2–{ContentValue.MaxSides}.");
+                    }
+
+                    if ((modify.Stage == DiceStage.ReplaceValue) != (modify.From is not null) || modify.From is < 1)
+                    {
+                        error($"{at}.from", "«replaceValue» names the face («from», 1 or more) that counts as «value»; other stages have none.");
+                    }
+
+                    if (modify.Filter is not null && modify.Stage != DiceStage.Reroll)
+                    {
+                        error($"{at}.filter", "Only «reroll» takes a filter of dice.");
+                    }
+
                     break;
                 case ModifyNextRollAction next when next.Filter is null && next.ChoiceCount is null && next.RunCondition is null:
                     error(at, "«modifyNextRoll» changes a filter, the choice count or the run condition.");
@@ -320,6 +422,12 @@ public static partial class ContentValidator
                 case TransformObjectAction { Mode: TransformMode.Annotate, Note: null or "" }:
                     error($"{at}.note", "«annotate» needs a note.");
                     break;
+                case TransformObjectAction { Mode: TransformMode.AddCounter, Value: null or { Kind: ContentValueKind.Number, Number: 0 } }:
+                    error($"{at}.value", "«addCounter» changes counters by a value other than 0.");
+                    break;
+                case TransformObjectAction { Mode: not TransformMode.AddCounter, Value: not null }:
+                    error($"{at}.value", "Only «addCounter» takes a value.");
+                    break;
                 case DrawEventAction draw when string.IsNullOrWhiteSpace(draw.Deck):
                     error($"{at}.deck", "A deck is «good», «bad», «special», «risky», «zone» or a deck id.");
                     break;
@@ -336,7 +444,28 @@ public static partial class ContentValidator
             }
 
             rolled |= actions[i] is RollAction;
-            chose |= actions[i] is RequestChoiceAction;
+            chose |= actions[i] is RequestChoiceAction or MoveAction { Direction: MoveDirection.Chosen };
+        }
+    }
+
+    // A count is 1 or more, or a reference; «all» takes everything, so it has no count and nothing to pick. A count known
+    // only at the use, chosen, takes every answer left: no choice may come after it (D-476).
+    private static void CheckCount(TakeObjectAction take, IEnumerable<ActionSpec> after, string at, Action<string, string> error)
+    {
+        if (take.Count is { Kind: not ContentValueKind.Reference } count && (count.Kind != ContentValueKind.Number || count.Number < 1))
+        {
+            error($"{at}.count", "A count is a whole number of 1 or more or a reference such as «$roll».");
+        }
+
+        if (take.All && (take.Count is not null || take.Pick == Pick.Chosen))
+        {
+            error($"{at}.all", "«all» takes every matching object: no «count» and no «pick: chosen».");
+        }
+
+        if (take is { Pick: Pick.Chosen, Count.Kind: ContentValueKind.Reference }
+            && after.Any(a => a is RequestChoiceAction or TakeObjectAction { Pick: Pick.Chosen } or MoveAction { Direction: MoveDirection.Chosen }))
+        {
+            error($"{at}.count", "A chosen count known only at the use takes every answer left: no choice comes after it.");
         }
     }
 
@@ -371,11 +500,30 @@ public static partial class ContentValidator
         }
     }
 
-    // Counts, sides, rerolls and bounds are plain numbers; additions may be dice or a reference.
+    // Counts, sides, rerolls and bounds are plain numbers; additions may be dice or a reference, a die set by «setOne» a
+    // reference to the player's answer (D-481).
     private static void CheckDiceValue(DiceStage stage, ContentValue value, string path, Action<string, string> error)
     {
-        if (stage is DiceStage.Add)
+        if (stage is DiceStage.Add && value is { Kind: ContentValueKind.Number } && Math.Abs((long)value.Number) > MaxDiceAddition)
         {
+            error(path, $"«add» takes a number within ±{MaxDiceAddition}.");
+        }
+
+        if (stage is DiceStage.Add || (stage is DiceStage.SetOne && value.Kind == ContentValueKind.Reference && !value.Negative))
+        {
+            return;
+        }
+
+        if (stage is DiceStage.SingleDie && value is { Kind: ContentValueKind.Number, Number: < 2 or > ContentValue.MaxSides })
+        {
+            error(path, $"«singleDie» is a die of 2–{ContentValue.MaxSides} sides.");
+            return;
+        }
+
+        if (stage is DiceStage.SetOne or DiceStage.ReplaceValue or DiceStage.BonusPerEven or DiceStage.Percent or DiceStage.FixAverage
+            && value is { Kind: ContentValueKind.Number, Number: < 1 })
+        {
+            error(path, $"The «{stage}» stage takes a number of 1 or more.");
             return;
         }
 
@@ -387,30 +535,50 @@ public static partial class ContentValidator
         {
             error(path, $"The «{stage}» stage takes a number of 1 or more.");
         }
+        else if (Ceiling(stage) is { } ceiling && Math.Abs((long)value.Number) > ceiling)
+        {
+            error(path, $"The «{stage}» stage takes a number of at most {ceiling}.");
+        }
     }
+
+    // NB-SEC-2 (D-652): how far one stage may move the dice — a count or a reroll within the dice of a value, sides within
+    // a die's, a multiplication within ten times.
+    private static int? Ceiling(DiceStage stage) => stage switch
+    {
+        DiceStage.Count or DiceStage.Reroll => ContentValue.MaxDice,
+        DiceStage.Sides => ContentValue.MaxSides,
+        DiceStage.Multiply => MaxDiceMultiplier,
+        _ => null,
+    };
 
     private static void CheckOutcomes(OutcomesSpec outcomes, string path, Scope scope, Action<string, string> error)
     {
-        if (outcomes.Roll.Kind != ContentValueKind.Dice || outcomes.Roll.Negative)
+        if (outcomes.Choice is { } choice)
         {
-            error($"{path}.roll", "Outcomes are picked by dice such as «1d6».");
+            CheckChoiceOutcomes(outcomes, choice, path, scope, error);
             return;
         }
 
-        var low = outcomes.Roll.Count;
-        var high = outcomes.Roll.Count * outcomes.Roll.Sides;
+        if (outcomes.Roll is not { Kind: ContentValueKind.Dice, Negative: false } roll)
+        {
+            error($"{path}.roll", "Outcomes are picked by dice such as «1d6» or by a «choice».");
+            return;
+        }
+
+        var low = roll.Count;
+        var high = roll.Count * roll.Sides;
         var covered = new HashSet<int>();
         for (var i = 0; i < outcomes.Cases.Count; i++)
         {
             var @case = outcomes.Cases[i];
             var at = $"{path}.cases[{i}]";
-            if (@case.From > @case.To || @case.From < low || @case.To > high)
+            if (@case is not { From: { } from, To: { } to, Option: null } || from > to || from < low || to > high)
             {
                 error(at, $"A case covers a range within {low}–{high}.");
                 continue;
             }
 
-            if (Enumerable.Range(@case.From, @case.To - @case.From + 1).Any(n => !covered.Add(n)))
+            if (Enumerable.Range(from, to - from + 1).Any(n => !covered.Add(n)))
             {
                 error(at, "Cases do not overlap.");
             }
@@ -424,10 +592,43 @@ public static partial class ContentValidator
         }
     }
 
+    // A branch by the player's answer (D-482): a fixed list, one case per option, no roll.
+    private static void CheckChoiceOutcomes(OutcomesSpec outcomes, OutcomeChoice choice, string path, Scope scope, Action<string, string> error)
+    {
+        if (outcomes.Roll is not null)
+        {
+            error($"{path}.roll", "Outcomes are picked by a roll or by a choice, not both.");
+        }
+
+        CheckText(choice.Prompt, MaxNameLength * 2, $"{path}.choice.prompt", error);
+        CheckOptions(choice.Options, $"{path}.choice.options", error);
+        var options = choice.Options.List ?? [];
+        if (choice.Options.From is not null)
+        {
+            error($"{path}.choice.options", "A branch by choice offers a fixed «list».");
+        }
+
+        for (var i = 0; i < outcomes.Cases.Count; i++)
+        {
+            var @case = outcomes.Cases[i];
+            if (@case.From is not null || @case.To is not null || @case.Option is not { } option || !options.Contains(option, StringComparer.Ordinal))
+            {
+                error($"{path}.cases[{i}].option", "A case of a choice names one of its options.");
+            }
+
+            CheckActions(@case.Actions, $"{path}.cases[{i}].actions", scope with { Chose = true }, error);
+        }
+
+        if (options.Any(o => outcomes.Cases.Count(c => c.Option == o) != 1))
+        {
+            error($"{path}.cases", "Every option has exactly one case.");
+        }
+    }
+
     // A condition tests something: the run, the game or a statistic with the parameters it needs.
     private static void CheckCondition(ConditionSpec condition, string path, Action<string, string> error)
     {
-        if (condition is { DifficultyAtLeast: null, Game: null, Stat: null, Gte: null, Tag: null, MinDice: null })
+        if (condition is { DifficultyAtLeast: null, Game: null, Stat: null, Gte: null, Lte: null, Tag: null, MinDice: null })
         {
             error(path, "A condition tests the run («difficultyAtLeast»), the game («game») or a statistic («stat»).");
             return;
@@ -439,6 +640,7 @@ public static partial class ContentValidator
             ContentStat.CompletedStreakWithTag when string.IsNullOrWhiteSpace(condition.Tag) => "tag",
             ContentStat.CompletedStreakWithTag when condition.Gte is null => "gte",
             ContentStat.AllDiceMax when condition.MinDice is null => "minDice",
+            ContentStat.Coins when condition.Gte is null && condition.Lte is null => "gte",
             _ => null,
         };
         if (missing is not null)
@@ -446,9 +648,14 @@ public static partial class ContentValidator
             error($"{path}.{missing}", $"The «{condition.Stat}» statistic needs «{missing}».");
         }
 
-        if (condition.Stat is null && (condition.Gte is not null || condition.Tag is not null || condition.MinDice is not null))
+        if (condition.Stat is null && (condition.Gte is not null || condition.Lte is not null || condition.Tag is not null || condition.MinDice is not null))
         {
-            error($"{path}.stat", "«gte», «tag» and «minDice» belong to a statistic.");
+            error($"{path}.stat", "«gte», «lte», «tag» and «minDice» belong to a statistic.");
+        }
+
+        if (condition.Lte is not null && condition.Stat != ContentStat.Coins)
+        {
+            error($"{path}.lte", "«lte» bounds the «coins» statistic.");
         }
 
         if (condition.Game is { } game)
@@ -506,6 +713,33 @@ public static partial class ContentValidator
         else if (options.List is { } list && (list.Count < 2 || list.Any(string.IsNullOrWhiteSpace)))
         {
             error($"{path}.list", "A list offers at least 2 non-empty options.");
+        }
+    }
+
+    // Object tags are lowercase words like ids («rat», «gremlin»), each once; a filter names at least one.
+    private static void CheckTags(Kernel.EquatableArray<string>? tags, string path, Action<string, string> error, bool empty = true)
+    {
+        if (tags is not { } list)
+        {
+            return;
+        }
+
+        if (!empty && list.Count == 0)
+        {
+            error(path, "List at least one tag.");
+        }
+
+        for (var i = 0; i < list.Count; i++)
+        {
+            if (list[i] is null || list[i].Length > MaxIdLength || !IdPattern().IsMatch(list[i]))
+            {
+                error($"{path}[{i}]", "A tag is lowercase words with hyphens, like an id («rat»).");
+            }
+        }
+
+        if (list.Where(t => t is not null).GroupBy(t => t, StringComparer.Ordinal).FirstOrDefault(g => g.Count() > 1) is { } twice)
+        {
+            error(path, $"«{twice.Key}» is listed twice.");
         }
     }
 

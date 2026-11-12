@@ -57,6 +57,9 @@ public enum Trigger
     TechReroll,
     Time,
     HostileIncoming,
+
+    /// <summary>A run ended: completed or dropped (D-479, the time bomb).</summary>
+    RunEnded,
 }
 
 /// <summary>Whom an effect targets (SPEC «Селекторы»).</summary>
@@ -69,6 +72,12 @@ public enum TargetSelector
     Leader,
     HigherPoints,
     LowerPoints,
+
+    /// <summary>Everyone at most <see cref="TargetSpec.Cells"/> cells away along the map (D-480).</summary>
+    WithinCells,
+
+    /// <summary>The closest player behind the user, all of them on a tie (D-480).</summary>
+    NearestBehind,
 }
 
 /// <summary>Narrows <see cref="TargetSelector.Chosen"/> and <see cref="TargetSelector.RandomActive"/>.</summary>
@@ -114,11 +123,31 @@ public sealed record ObjectDefinition
 
     public ContentProof? Proof { get; init; }
 
+    /// <summary>
+    /// Labels of the object itself (<c>edible</c>, <c>rat</c>, <c>gremlin</c>…), for filters such as «не крадёт крысиные»
+    /// (<see cref="ObjectFilterSpec.ExcludeTags"/>) and for loot boxes (D-470). Not the tags of games. Written only when
+    /// set, like every field the import added, so the logs of packs without it stay as they were.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public EquatableArray<string>? Tags { get; init; }
+
+    /// <summary>Never changes hands by an effect: not taken, stolen or given (D-478). Admin corrections still apply.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool Unstealable { get; init; }
+
+    /// <summary>Never destroyed or transformed by an effect (D-478). Admin corrections still apply.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool Undestroyable { get; init; }
+
     /// <summary>Achievements only: counted per season or over all seasons.</summary>
     public AchievementScope? Scope { get; init; }
 
     /// <summary>What happens; may be missing on a manual object.</summary>
     public EffectSpec? Effect { get; init; }
+
+    /// <summary>An item is used only while this holds for its user (D-483), e.g. «только если у тебя ноль монеток».</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ConditionSpec? UseCondition { get; init; }
 }
 
 /// <summary>The <c>effect</c> block (CONTENT.md «Блок effect»).</summary>
@@ -138,6 +167,19 @@ public sealed record EffectSpec
 
     /// <summary>A random branch: the roll picks the case whose range holds it.</summary>
     public OutcomesSpec? Outcomes { get; init; }
+
+    /// <summary>
+    /// A countdown (D-479): each firing of the trigger lowers the object's counter by one instead of acting; at zero the
+    /// actions run. Only effects and special rolls count.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public CounterSpec? Counter { get; init; }
+}
+
+/// <summary>The counter of an effect: where it starts (and where <c>resetCounters</c> puts it back).</summary>
+public sealed record CounterSpec
+{
+    public required int Start { get; init; }
 }
 
 public sealed record TargetSpec
@@ -147,6 +189,14 @@ public sealed record TargetSpec
     public Among? Among { get; init; }
 
     public bool ExcludeSelf { get; init; }
+
+    /// <summary>The reach of <see cref="TargetSelector.WithinCells"/>: cells along the map's edges either way.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? Cells { get; init; }
+
+    /// <summary><see cref="TargetSelector.WithinCells"/> reaches those on the user's own cell too.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool IncludeSameCell { get; init; }
 }
 
 /// <summary>How long an effect lives: exactly one of the fields.</summary>
@@ -177,6 +227,9 @@ public enum ContentStat
 
     /// <summary>The run's hours; needs <c>gte</c>.</summary>
     RunHours,
+
+    /// <summary>The owner's coins; needs <c>gte</c> or <c>lte</c> (D-483).</summary>
+    Coins,
 }
 
 /// <summary>
@@ -195,6 +248,10 @@ public sealed record ConditionSpec
 
     public int? Gte { get; init; }
 
+    /// <summary>At most (D-483); with <see cref="Gte"/> — a range, both equal — exactly.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? Lte { get; init; }
+
     public int? MinDice { get; init; }
 }
 
@@ -210,18 +267,37 @@ public sealed record GameFilterSpec
     public int? ReleaseYearBefore { get; init; }
 }
 
+/// <summary>A branch: by a roll (<see cref="Roll"/>, cases by range) or by the player's answer (<see cref="Choice"/>, cases by option, D-482).</summary>
 public sealed record OutcomesSpec
 {
-    public required ContentValue Roll { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ContentValue? Roll { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public OutcomeChoice? Choice { get; init; }
 
     public required EquatableArray<OutcomeCase> Cases { get; init; }
 }
 
+/// <summary>The question of a branch by choice: what the player is asked and the options, each a case.</summary>
+public sealed record OutcomeChoice
+{
+    public required string Prompt { get; init; }
+
+    public required ChoiceOptionsSpec Options { get; init; }
+}
+
+/// <summary>A case of the branch: a range of the roll or an option of the choice.</summary>
 public sealed record OutcomeCase
 {
-    public required int From { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? From { get; init; }
 
-    public required int To { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? To { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Option { get; init; }
 
     public EquatableArray<ActionSpec> Actions { get; init; } = [];
 }
@@ -254,10 +330,23 @@ public abstract record ActionSpec
     public ActionTarget? Target { get; init; }
 }
 
-/// <summary>Move by <see cref="Steps"/> cells; a minus goes back.</summary>
+/// <summary>Which way a push goes when its sign does not say it (D-477).</summary>
+public enum MoveDirection
+{
+    /// <summary>The player answers <c>forward</c> or <c>back</c> with the use.</summary>
+    Chosen,
+
+    /// <summary>Away from the one who used it: forward when the target is closer to the finish, back when farther.</summary>
+    Away,
+}
+
+/// <summary>Move by <see cref="Steps"/> cells; a minus goes back, unless <see cref="Direction"/> says the way.</summary>
 public sealed record MoveAction : ActionSpec
 {
     public required ContentValue Steps { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public MoveDirection? Direction { get; init; }
 }
 
 /// <summary>Change <c>points</c>, <c>coins</c> or another resource by <see cref="Amount"/>.</summary>
@@ -266,6 +355,13 @@ public sealed record ChangeResourceAction : ActionSpec
     public required string Resource { get; init; }
 
     public required ContentValue Amount { get; init; }
+
+    /// <summary>
+    /// Coins taken from the effect's target go to the one who used it instead, multiplied, when the target is at or below
+    /// <c>effects.reflect.coinsAtMost</c> (D-474). Only for coins taken from another player.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool Reflect { get; init; }
 }
 
 /// <summary>Roll dice; the result is <c>$roll</c> for the next actions.</summary>
@@ -287,6 +383,9 @@ public enum TakeMode
     Take,
     Steal,
     Destroy,
+
+    /// <summary>The user hands one of his own objects to the target (D-478); refused when he has none to give.</summary>
+    Give,
 }
 
 public enum Pick
@@ -305,6 +404,14 @@ public sealed record ObjectFilterSpec
     public string? ObjectId { get; init; }
 
     public bool? Hostile { get; init; }
+
+    /// <summary>Only objects with a counter (<c>true</c>) or without one (<c>false</c>), D-479.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? HasCounter { get; init; }
+
+    /// <summary>Objects with any of these <see cref="ObjectDefinition.Tags"/> are left alone (D-470).</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public EquatableArray<string>? ExcludeTags { get; init; }
 }
 
 public sealed record TakeObjectAction : ActionSpec
@@ -314,12 +421,33 @@ public sealed record TakeObjectAction : ActionSpec
     public ObjectFilterSpec? Filter { get; init; }
 
     public Pick Pick { get; init; } = Pick.Random;
+
+    /// <summary>How many objects (D-476): a number of 1 or more or a reference such as <c>$roll</c>; missing — one.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ContentValue? Count { get; init; }
+
+    /// <summary>Every matching object (D-476); then there is nothing to pick and no <see cref="Count"/>.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool All { get; init; }
+
+    /// <summary>
+    /// The use is refused (<c>item.nothingToTake</c>) when the target has nothing the filter lets through: an exchange or a
+    /// theft «взамен» that would otherwise be a gift (D-487). <c>give</c> is refused without it (D-478).
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool Required { get; init; }
 }
 
 public enum TransformMode
 {
     Transform,
     Annotate,
+
+    /// <summary>Every matching object's counter changes by <see cref="TransformObjectAction.Value"/>; at zero it goes off (D-479).</summary>
+    AddCounter,
+
+    /// <summary>Every matching object's counter goes back to its start (D-479).</summary>
+    ResetCounters,
 }
 
 /// <summary>Turn an object into another (<see cref="Into"/>) or add a note to it.</summary>
@@ -332,6 +460,10 @@ public sealed record TransformObjectAction : ActionSpec
     public string? Into { get; init; }
 
     public string? Note { get; init; }
+
+    /// <summary>How much <c>addCounter</c> changes the counters by; a minus counts down.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ContentValue? Value { get; init; }
 }
 
 /// <summary>Draw an event from a deck: <c>good</c>, <c>bad</c>, <c>special</c>, <c>risky</c>, <c>zone</c> or a deck id.</summary>
@@ -361,7 +493,7 @@ public enum DiceWhen
     Next,
 }
 
-/// <summary>A stage of the dice pipeline (D-14).</summary>
+/// <summary>A stage of the dice pipeline (D-14); the rare ones from <see cref="SingleDie"/> on came with the import (D-481).</summary>
 public enum DiceStage
 {
     Count,
@@ -371,6 +503,31 @@ public enum DiceStage
     Reroll,
     Min,
     Max,
+
+    /// <summary>The run's dice by hours become one die of <c>value</c> sides.</summary>
+    SingleDie,
+
+    /// <summary>One thrown die (the first) shows <c>value</c>, never above its sides.</summary>
+    SetOne,
+
+    /// <summary>Every die showing <c>from</c> counts as <c>value</c>.</summary>
+    ReplaceValue,
+
+    /// <summary>Every thrown die shows its average: half its sides, rounded down.</summary>
+    FixAverage,
+
+    /// <summary><c>value</c> more for every die showing an even number.</summary>
+    BonusPerEven,
+
+    /// <summary>The total after additions, times <c>value</c> per cent, rounded toward zero.</summary>
+    Percent,
+}
+
+/// <summary>Which dice a <c>reroll</c> after the throw takes (D-481).</summary>
+public enum DieFilter
+{
+    /// <summary>Those below their average (half the sides): d4 — 1, d6 — up to 2, d20 — up to 9.</summary>
+    BelowAverage,
 }
 
 public sealed record ModifyDiceAction : ActionSpec
@@ -380,6 +537,20 @@ public sealed record ModifyDiceAction : ActionSpec
     public required DiceStage Stage { get; init; }
 
     public required ContentValue Value { get; init; }
+
+    /// <summary>
+    /// With <c>stage: count</c>: the extra dice are of this kind (a d6 beside a run's d4) rather than the run's (D-475).
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? Sides { get; init; }
+
+    /// <summary>With <c>stage: replaceValue</c>: the face that counts as <c>value</c> (D-481).</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? From { get; init; }
+
+    /// <summary>With <c>stage: reroll</c>: only the dice the filter takes (D-481).</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public DieFilter? Filter { get; init; }
 }
 
 /// <summary>Move without walking to a cell id or <c>nearestShortcut</c>.</summary>

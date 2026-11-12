@@ -1,0 +1,26 @@
+{
+  "id": "r-key",
+  "kind": "item",
+  "name": "Клавиша «R»",
+  "description": "Сбрасывает счётчики всех твоих эффектов со счётчиком до начальных значений.",
+  "rarity": "common",
+  "price": 26,
+  "window": "anytime",
+  "hostile": false,
+  "stackable": true,
+  "effect": {
+    "target": {
+      "selector": "self"
+    },
+    "actions": [
+      {
+        "type": "transformObject",
+        "mode": "resetCounters",
+        "filter": {
+          "kind": "effect",
+          "hasCounter": true
+        }
+      }
+    ]
+  }
+}

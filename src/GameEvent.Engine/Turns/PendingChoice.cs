@@ -37,8 +37,12 @@ public sealed record PendingChoice(Guid ChoiceId, ChoiceKind Kind, EquatableArra
     public PendingMove? Move { get; init; }
 }
 
-/// <summary>The player picks <see cref="OptionId"/> of the pending choice <see cref="ChoiceId"/>.</summary>
-public sealed record MakeChoice(Guid PlayerId, Guid ChoiceId, string OptionId) : ICommand;
+/// <summary>
+/// The player picks <see cref="OptionId"/> of the pending choice <see cref="ChoiceId"/>. A game choice starts the run at
+/// once: <see cref="DeclaredDifficulty"/> is then the difficulty it starts on, as with <see cref="Runs.StartRun"/> (D-633);
+/// a branch takes none.
+/// </summary>
+public sealed record MakeChoice(Guid PlayerId, Guid ChoiceId, string OptionId, Runs.Difficulty? DeclaredDifficulty = null) : ICommand;
 
 /// <summary>
 /// The player picked an option. For a branch choice the paused move goes on into the picked cell in the same command

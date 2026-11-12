@@ -35,6 +35,7 @@ const areas = {
   scripts: touched(
     /^(scripts\/|package\.json$|lint-staged\.config\.mjs$|commitlint\.config\.mjs$|\.github\/)/,
   ),
+  matrix: touched(/^docs\/TEST_MATRIX\.md$/),
 };
 
 const steps = [];
@@ -73,6 +74,14 @@ if (areas.web) {
 if (areas.e2e) {
   steps.push(['e2e: types', 'npm', ['--prefix', 'e2e', 'run', '-s', 'typecheck']]);
   steps.push(['e2e: ESLint', 'npm', ['--prefix', 'e2e', 'run', '-s', 'lint']]);
+}
+// AU12-3: every test TEST_MATRIX cites exists (a second, reads sources only)
+if (areas.dotnet || areas.web || areas.e2e || areas.scripts || areas.matrix) {
+  steps.push([
+    'TEST_MATRIX: cited tests exist',
+    'node',
+    [quote(`${root}/scripts/check-matrix-tests.mjs`)],
+  ]);
 }
 if (areas.web || areas.e2e || areas.scripts) {
   steps.push([

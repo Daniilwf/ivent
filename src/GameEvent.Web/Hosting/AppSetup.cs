@@ -9,6 +9,7 @@ using GameEvent.Infrastructure.Queue;
 using GameEvent.Infrastructure.Seasons;
 using GameEvent.Web.Accounts;
 using GameEvent.Web.BugReports;
+using GameEvent.Web.Content;
 using GameEvent.Web.Economy;
 using GameEvent.Web.Files;
 using GameEvent.Web.Map;
@@ -26,6 +27,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace GameEvent.Web.Hosting;
 
@@ -52,6 +54,11 @@ public static class AppSetup
 
     public const int MapChecksPerMinute = 120;
 
+    /// <summary>The content editor's checks (D-490): the admin checks a pack on demand and before each save.</summary>
+    public const string ContentCheckRateLimit = "content-check";
+
+    public const int ContentChecksPerMinute = 60;
+
     public static void AddGameEvent(this WebApplicationBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
@@ -72,6 +79,7 @@ public static class AppSetup
         services.AddSingleton<IIdGenerator, GuidV7Ids>();
         services.AddSingleton<CommandBus>();
         services.AddSingleton<SeasonBroadcaster>();
+        services.AddSingleton<ContentCards>();
         services.AddSingleton<ICommittedEventsListener>(sp => sp.GetRequiredService<SeasonBroadcaster>());
         services.AddSingleton<HubSessions>();
         services.AddSingleton<ICommittedEventsListener>(sp => sp.GetRequiredService<HubSessions>());
@@ -102,6 +110,17 @@ public static class AppSetup
             {
                 document.Components.Schemas[type.Name] = await context.GetOrCreateSchemaAsync(type, null, ct);
             }
+
+            // An enum schema is shared: the first nullable use (`Difficulty?`) put null among its values, and the generated
+            // client then lost the list of values and made every use nullable. A nullable use says so itself (oneOf with
+            // null), so the shared schema keeps only the values (D-633).
+            foreach (var schema in document.Components.Schemas.Values.OfType<Microsoft.OpenApi.OpenApiSchema>())
+            {
+                if (schema.Enum is { Count: > 0 } values && values.Any(v => v is null))
+                {
+                    schema.Enum = [.. values.Where(v => v is not null)];
+                }
+            }
         }));
 
         // Local http only in Development and Test; everywhere else (staging too) cookies are Secure and __Host-.
@@ -121,6 +140,8 @@ public static class AppSetup
         services.AddSingleton<Passwords>();
         services.AddSingleton<IPasswords>(sp => sp.GetRequiredService<Passwords>());
         services.AddSingleton<LoginThrottle>();
+        services.TryAddSingleton(TimeProvider.System);
+        services.AddSingleton(sp => new LoginDevices(sp.GetRequiredService<IDataProtectionProvider>(), sp.GetRequiredService<TimeProvider>(), cookiePrefix + "ge.device", securePolicy));
         services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
             .AddCookie(o =>
             {
@@ -162,6 +183,9 @@ public static class AppSetup
             o.AddPolicy(MapCheckRateLimit, ctx => RateLimitPartition.GetFixedWindowLimiter(
                 ctx.User.UserId()?.ToString() ?? WebSecurity.ClientKey(ctx.Connection.RemoteIpAddress),
                 _ => new FixedWindowRateLimiterOptions { PermitLimit = MapChecksPerMinute, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+            o.AddPolicy(ContentCheckRateLimit, ctx => RateLimitPartition.GetFixedWindowLimiter(
+                ctx.User.UserId()?.ToString() ?? WebSecurity.ClientKey(ctx.Connection.RemoteIpAddress),
+                _ => new FixedWindowRateLimiterOptions { PermitLimit = ContentChecksPerMinute, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
             o.AddPolicy(SeasonReadRateLimit, ctx => RateLimitPartition.GetFixedWindowLimiter(
                 ctx.User.UserId()?.ToString() ?? WebSecurity.ClientKey(ctx.Connection.RemoteIpAddress),
                 _ => new FixedWindowRateLimiterOptions { PermitLimit = SeasonReadsPerMinute, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
@@ -221,6 +245,7 @@ public static class AppSetup
         api.MapAdminProofs();
         api.MapAdminSeasons();
         api.MapAdminMap();
+        api.MapAdminContent();
         api.MapSeasonsAndPlayers();
         api.MapFeed();
         api.MapEconomy();

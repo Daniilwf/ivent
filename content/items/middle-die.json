@@ -1,0 +1,24 @@
+{
+  "id": "middle-die",
+  "kind": "item",
+  "name": "Средний кубик",
+  "description": "В следующем броске за прохождение каждый кубик показывает своё среднее: d4 — 2, d6 — 3, d8 — 4, d10 — 5, d12 — 6, d20 — 10.",
+  "rarity": "epic",
+  "price": 50,
+  "window": "beforeDice",
+  "hostile": false,
+  "stackable": false,
+  "effect": {
+    "target": {
+      "selector": "self"
+    },
+    "actions": [
+      {
+        "type": "modifyDice",
+        "when": "next",
+        "stage": "fixAverage",
+        "value": 1
+      }
+    ]
+  }
+}

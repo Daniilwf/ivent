@@ -1,0 +1,30 @@
+{
+  "id": "rare-grenade",
+  "kind": "item",
+  "name": "Редкая Граната",
+  "description": "Оружие. Выбранный другой игрок идёт на 3 клетки назад и теряет 4 монетки. Если у жертвы монеток не больше порога из правил сезона, урон монетками достаётся тебе, умноженный по тем же правилам.",
+  "rarity": "epic",
+  "price": 20,
+  "window": "anytime",
+  "hostile": true,
+  "stackable": false,
+  "tags": ["weapon"],
+  "effect": {
+    "target": {
+      "selector": "chosen",
+      "excludeSelf": true
+    },
+    "actions": [
+      {
+        "type": "move",
+        "steps": -3
+      },
+      {
+        "type": "changeResource",
+        "resource": "coins",
+        "amount": -4,
+        "reflect": true
+      }
+    ]
+  }
+}

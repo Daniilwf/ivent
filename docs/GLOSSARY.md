@@ -16,7 +16,7 @@
 | --- | --- | --- |
 | Сезон | ограниченный по времени ивент со своей картой, правилами и итогами | `Season` |
 | Статус сезона | черновик, идёт, закрытие, завершён, архив | `SeasonStatus` (`Draft`, `Active`, `Closing`, `Finished`, `Archived`) |
-| Дедлайн | момент окончания сезона; после него броски запрещены | `Season.Deadline`, `SetSeasonDeadline`, `SeasonDeadlineSet` |
+| Дедлайн | момент, после которого ходы игроков закрыты; показывается по Москве | `Season.Deadline`, `SetSeasonDeadline`, `SeasonDeadlineSet`, `SeasonSetup.IsPastDeadline` |
 | Смена статуса сезона | переход на следующий статус | `ChangeSeasonStatus`, `SeasonStatusChanged` |
 | Флаг неактивности | отметка админа «выбыл из активной игры» | `SetPlayerInactive`, `PlayerInactivitySet` |
 | Пользователь | аккаунт на сайте | `User` |
@@ -26,7 +26,7 @@
 | Общий лог | лог событий без сезона: аккаунты, позже пул | `GameEvent` с `SeasonId = Guid.Empty` |
 | Метка безопасности | меняется при смене пароля, роли, удалении; обрывает сессии | `UserRecord.SecurityStamp` |
 | Роль | игрок, админ, зритель | `Role` (`Player`, `Admin`, `Spectator`) |
-| Метка безопасности | меняется при смене пароля, роли или удалении аккаунта и завершает старые сессии | `User.SecurityStamp` |
+| Кука устройства | подписанная запись «этот браузер уже входил в этот аккаунт с нынешним паролем» на год; такой браузер не держит потолок неудачных входов по логину, после смены пароля запись чужая (D-460, D-465) | `LoginDevices`, кука `ge.device` |
 | Игрок сезона | участие пользователя в конкретном сезоне | `SeasonPlayer` |
 | Фаза хода | где игрок в цикле хода: ждёт ролла, игра выпала, играет | `TurnPhase` (`Idle`, `Rolling`, `Playing`) |
 | Подсказка о неактивности | отметка в админке: у игрока нет своих действий дольше `inactiveHintDays`, флаг не стоит; рядом — идёт ли прохождение | `AdminPlayerView.InactiveHint`, `Playing`, `LastActionAt` |
@@ -46,7 +46,6 @@
 | Клеток до финиша | наименьшее число шагов вперёд до финиша | `LeaderboardRow.CellsToFinish` |
 | Номер изменения очков | порядковый номер ненулевого изменения очков в сезоне; для тайбрейка «раньше набрал» | `SeasonPlayer.PointsTick`, счётчик — `SeasonState.PointsChanges` |
 | Итоги сезона | снимок мест и очков при завершении сезона (номинации — этап 6) | `SeasonResultRecorded`, `SeasonResultRecord`, `SeasonState.Result` |
-| Дедлайн | момент, после которого ходы игроков закрыты; показывается по Москве | `Season.Deadline`, `SeasonSetup.IsPastDeadline` |
 | Наступление дедлайна | системная команда планировщика: сезон «идёт» переходит в «закрытие» | `ReachDeadline`, `DeadlineScheduler` |
 | Твой сезон | личная страница итогов игрока | `SeasonRecap` |
 | Зал славы | победители, рекорды и статистика за все сезоны | `HallOfFame` |
@@ -61,6 +60,7 @@
 | Причина удаления игры | почему админ убрал игру из пула; обязательна, её видит тот, кто добавляет игру снова (D-208) | `DeleteGame.Reason`, `GameDeleted.Reason`, `GameRecord.DeletionReason`, `PoolGameView.DeletionReason`, `SimilarGameView.DeletionReason` |
 | Убрана из пула | та же игра удалена админом: добавить заново нельзя, только вернуть в пул (D-208, D-241) | отказ `pool.removed`, `SimilarGameView.IsDeleted` |
 | Тег | метка жанра или свойства игры | `Tag` |
+| Тег объекта | метка самого предмета или эффекта: съедобный, крысиный, гремлинский, свиной, оружие, зелье; по ней фильтр действия пропускает объекты (D-470) | `ObjectDefinition.Tags`, `ObjectFilterSpec.ExcludeTags` |
 | Категория | тег с весом на колесе категорий | `Category`, `SetCategory`, `RemoveCategory`, события `CategorySet`, `CategoryRemoved` |
 | Часы | длина игры по HowLongToBeat, основной сюжет | `Game.Hours`, `RunSnapshot.Hours` |
 | Условие прохождения | что считается прохождением для бесконечной или мультиплеерной игры | `GameRecord.CompletionCondition`, `GameCard.CompletionCondition` |
@@ -82,7 +82,6 @@
 | Навязанный жанр | теги, которыми фильтры ролла (сейчас — зона) ограничили выбор; фиксируются в снапшоте | `RunSnapshot.ImposedTags`, `RollFilter.Tags` |
 | Тех-реролл → дроп | админ превращает тех-реролл в дроп со штрафом | команда `ConvertTechRerollToDrop`, событие `TechRerollConvertedToDrop` |
 | Исключение | игра, которая больше не выпадает конкретному игроку | `PlayerGameExclusion` |
-| Фильтр ролла | предикат по играм от спецролла, зоны или конфига | `RollFilter` |
 
 ## Прохождение и награда
 
@@ -92,6 +91,7 @@
 | Статус прохождения | идёт, завершено, дропнуто, тех-реролл, отклонено (реджект) | `RunStatus` (`Playing`, `Completed`, `Dropped`, `TechRerolled`, `Rejected`) |
 | Снапшот | правила и параметры, зафиксированные в момент ролла | `RunSnapshot` |
 | Сложность | лёгкая, нормальная, сложная, выше сложной | `Difficulty` (`Easy`, `Normal`, `Hard`, `Extreme`) |
+| Сложность при старте | сложность, которую игрок называет, начиная игру; при завершении засчитывается не выше неё (D-633) | `StartRun.DeclaredDifficulty`, `RunStarted.DeclaredDifficulty`, `RunState.DeclaredDifficulty` |
 | Пруф | доказательство прохождения: ссылки, заметка или свидетель | `ProofState` (`ProofStatus`: `Pending`, `Approved`, `Rejected`), команда `SubmitProof`, событие `ProofSubmitted`, таблица `Proof` |
 | Одобрение | подтверждение пруфа админом, в том числе «без скрина» | команда `ApproveProof`, событие `ProofApproved` |
 | Реджект | отклонение пруфа админом: снимается всё, что дал ход прохождения, — очки с бонусом клетки хода, клетки (позиция не улучшается), монетки (в минус), предметы клеток хода, которые игрок ещё держит (D-321, D-327, D-421) | команда `RejectProof`, событие `ProofRejected`, `RunStatus.Rejected`, `RunState.CellPoints`, `RunState.CellObjects`, `ObjectRemoval.ProofRejected` |
@@ -181,6 +181,9 @@
 | Предупреждение о зоне | в зоне меньше `map.minZoneGames` доступных игр | `ZoneWarnings`, `ZoneGamesWarning` |
 | Проверка публикации | что мешает опубликовать правильную карту сейчас: клетки под игроками, выбор ветки | `MapPublicationChecks`, `MapCheckView`, `POST /api/admin/seasons/{id}/map/check` |
 | Редактор карты | раздел «Карта» админки: холст, панели клетки и зон, проверка, публикация | `MapSection`, `MapCanvas` (React Flow) |
+| Редактор контента | раздел «Контент» админки: объекты и колёса сезона, форма и JSON по схеме, ошибки у полей, шаблоны действий, загрузка и выгрузка пакета, версии | `ContentSection`, `ObjectEditor`, `ObjectForm`; API — `AdminContentEndpoints` |
+| Версия контента | номер публикации пакета контента в сезоне; новая версия собирается из той, что в силе | `ContentCatalog.Version`, `PublishContent.ExpectedVersion`, отказ `content.versionChanged` |
+| Шаблон действия | базовое действие с примером параметров, которое редактор вставляет в эффект | `actionTemplate` (`web/src/admin/content/templates.ts`) |
 | Черновик карты | неопубликованные правки карты в браузере админа | `Draft`, `mapDraft.ts` (`loadDraft`, `saveDraft`) |
 | Последний ход | отрезки последнего перемещения моей фишки для анимации | `MoveView`, `MoveLegView`, `MyTurnView.LastMove` |
 | Ветка (в выборе) | выход развилки, пронумерованный на карте и в кнопках | `BranchOption`, `BranchChoice`, `ChoiceView.Steps` |
@@ -193,10 +196,11 @@
 | Предмет | одноразовый объект, используется вручную | `ObjectKind.Item` |
 | Эффект | объект, который действует сам по триггеру | `ObjectKind.Effect` |
 | Спецролл | объект, задающий, откуда роллить следующую игру | `ObjectKind.SpecialRoll` |
+| Можно несколько сразу | пометка объекта: несколько одинаковых можно применить за раз (поле `stackable`) | `ObjectDefinition.Stackable` |
 | Ивент | карточка из колоды | `ObjectKind.Event` |
-| Вид ивента | хороший или плохой | `EventKind` (`Good`, `Bad`) |
-| Колода | колесо с ивентами | `Wheel` с видом `Deck` |
-| Общий ивент | ивент на всех, запускается админом | `GlobalEvent` |
+| Вид ивента | хороший, плохой; с этапа 5 — ещё специвент и рискованный; у вытянутого — вид колоды (D-501) | `EventKind` (`Good`, `Bad`; этап 5 — `Special`, `Risky`) |
+| Колода | колесо с ивентами одного вида (D-501) | `WheelDefinition` с полем `Deck` (вид ивентов) |
+| Общий ивент | ивент на всех, запускается админом на срок, с баннером на главной и, может быть, общей целью (D-517) | `GlobalEvent` |
 | Достижение | значок за выполнение условия по статистике | `ObjectKind.Achievement`, `PlayerAchievement` |
 | Определение объекта | шаблон предмета, эффекта, ивента или достижения | `ObjectDefinition`, блок эффекта — `EffectSpec`, разбор — `ContentJson`, проверка — `ContentValidator` |
 | Объект инвентаря | конкретный экземпляр у игрока | `InventoryObject`; события `ObjectGiven`, `ObjectRemoved` (`ObjectRemoval`), `ObjectTransferred`, `ObjectChanged`, `ObjectLost`; откуда — `ObjectSource` |
@@ -225,6 +229,12 @@
 | Селектор целей | правило выбора, на кого действует эффект | `TargetSelector` |
 | Враждебный эффект | эффект, наложенный другим игроком во вред; метка предмета на экране — «Против других» | `IsHostile`, `ObjectDefinition.Hostile` |
 | Перехват | пассивная защита, гасящая враждебный эффект | `Intercept`, событие `HostileIntercepted` |
+| Отражение урона | урон монетками по цели на пороге `effects.reflect.coinsAtMost` и ниже достаётся использующему, умноженный (D-474) | `ChangeResourceAction.Reflect`, `CoinReflect` |
+| Счётчик эффекта | обратный отсчёт эффекта: срабатывания триггера уменьшают его, на нуле эффект действует; зелья меняют и сбрасывают (D-479) | `EffectSpec.Counter`, `InventoryObject.Counter`, `TransformMode.AddCounter`, `ResetCounters`, триггер `RunEnded` |
+| Передача объекта | игрок отдаёт свой объект другому предметом; отданное — его дело на получателе (D-478) | `TakeMode.Give`, `ObjectTransferred.Given`, отказ `item.nothingToGive`; кража «взамен» с `required` — отказ `item.nothingToTake` (D-487) |
+| Неукрадываемый, неуничтожимый | флаги объекта: эффекты не забирают и не передают / не уничтожают и не превращают его (D-478) | `ObjectDefinition.Unstealable`, `Undestroyable` |
+| Условие использования | когда предмет можно использовать, например «при нуле монеток» (D-483) | `ObjectDefinition.UseCondition`, статистика `ContentStat.Coins`, отказ `item.conditionNotMet` |
+| Ветвление по выбору | исходы эффекта по ответу игрока, а не по броску (D-482) | `OutcomesSpec.Choice`, `OutcomeCase.Option` |
 | Ручной эффект | текстовый эффект, ждущий разрешения игроком или админом | `PendingManualEffect`, событие `ManualEffectCreated`, источник `ManualEffectSource`, разрешение `ManualEffectResolved` (`ManualEffectOutcome`: `Applied`, `NotApplicable`), разрешение — `ResolveManualEffect` |
 | Правка часов прохождения | админ меняет часы после броска: кубики докидываются или снимаются с конца | команда `CorrectRunHours`, событие `RunHoursCorrected`, причины `*.RunCorrection` |
 | Смена сложности прохождения | админ меняет сложность по пруфу: каждый кубик пересчитывается | команда `ChangeRunDifficulty`, событие `RunDifficultyChanged`, `DieChange` |
@@ -240,6 +250,49 @@
 | Выбор из нескольких игр | ролл при `choiceCount` > 1: игрок выбирает одну из выпавших | `GameChoiceRolled`, команда `MakeChoice`, событие `ChoiceMade` |
 | Сброс выбора | админ снимает ожидание выбора тем же флагом, что и сброс предложенной игры; игры снова свободны | `ChoiceDiscarded` (по `AdjustPlayer.DiscardOffer`) |
 | Приглашение | кооп или дуэль, ждущие ответа | `Interaction` |
+
+## Ивенты, голосования и взаимодействия (этап 5)
+
+Заведены при подготовке этапа 5 (2026-11-11, D-500…D-529). Имена в коде — план: при реализации задача сверяет их здесь, расхождение правится в глоссарии той же задачей.
+
+| Термин | Что значит | В коде |
+| --- | --- | --- |
+| Вытянуть ивент | взять ивент из колоды по весу и сразу разыграть его на вытянувшего (D-500) | действие `drawEvent` (`DrawEventAction`), событие `EventDrawn` |
+| Источник ивента | откуда ивент: клетка, дроп, платный реролл, сложность, предмет, общий ивент | `EventSource` (5.1: `Cell`, `Item`) |
+| Вытянутый ивент | карточка ивента, который игрок вытянул последним, в его карточке хода | `DrawnEventView`, `me.lastEvent`; экран — `DrawnEventCard` |
+| Хороший ивент, плохой ивент | ивент из колоды `good` / `bad` | `EventKind.Good`, `EventKind.Bad`, колоды `good`, `bad` |
+| Специвент | ивент из колоды `special`; применяется первым | `EventKind.Special`, колода `special` |
+| Рискованный ивент | ивент с исходом по броску («кинь d6: 1–3 плохо, 4–6 хорошо»), колода `risky` | `EventKind.Risky`, блок `outcomes` |
+| Колода зоны | колода зоны клетки, где стоит игрок; клетка `deck: zone` | `ZoneDefinition.Deck`, `DeckRef.Zone` |
+| Колода по умолчанию | колода клетки ивента вне зоны с колодой | `events.defaultDeck` |
+| Пустая колода | колоды нет в контенте или у неё нет живых записей: ивент уходит в ручное разрешение (D-501, D-535) | событие `EventDrawMissed`, `ManualEffectSource.Event` |
+| Накопленные ивенты | ожидающие последствия ивентов, применяемые по порядку «специвент, хороший, плохой» | `RollModifier.EventKind`, `DiceModifier.EventKind`, `events.applyOrder` |
+| Условие прохождения | требование ивента к следующему прохождению («пройди на сложной»), видно на странице прохождения | `modifyNextRoll.runCondition` (`ConditionSpec`), `RunSnapshot.Conditions`, события `RunConditionAttached`, `RunConditionChecked` |
+| Невыполненное условие | прохождение не выполнило условие: по умолчанию без кубов, с монетками | `UnmetConditionPolicy` (`NoDiceKeepCoins`, `CountAsDrop`, `Ignore`), причины `PointsReason.ConditionUnmet`, `MoveReason.ConditionUnmet` |
+| Откуп от плохого ивента | снять ждущие последствия плохого ивента за монетки (выключен, D-508) | `events.badEventBuyout`, команда `BuyOutBadEvent` |
+| IRL-ивент | ивент, выполняемый в жизни (караоке, готовка): ручной эффект с пруфом | `ObjectDefinition.Proof = ContentProof.Media` |
+| IRL-пруф | фото или ссылка на видео к IRL-ивенту; проверяет админ | команды `SubmitIrlProof`, `ReviewIrlProof`, события `IrlProofSubmitted`, `IrlProofReviewed`; `IrlProofStatus` |
+| Ивент ждёт ответа | эффект ивента остановился на вопросе к игроку; ответ — общий выбор (D-511) | `ChoiceKind.Effect`, `SuspendedEffect`, события `EffectSuspended`, `EffectResumed` |
+| Голос | выбор пользователя в голосовании; один на человека, до закрытия можно сменить | команда `CastVote`, событие `VoteCast` |
+| Запуск голосования | админ или ивент открывает голосование со снимком вариантов | команда `StartPoll`, событие `PollStarted`; из ивента — `RequestChoiceAction.Vote` |
+| Итог голосования | вариант с наибольшим числом голосов, ничья — бросок; запускает эффект | событие `PollClosed`, ссылка `$result`; отмена — `PollCancelled` |
+| Голосующие | кто голосует: игроки или все (зрители — по конфигу) | `PollVoters` (`Players`, `Everyone`), `social.spectatorsCanVote` |
+| Анонимное голосование | голоса показываются без имён (D-515) | `PollDefinition.Anonymous` |
+| Запуск общего ивента | админ начинает общий ивент на срок | команды `LaunchGlobalEvent`, `EndGlobalEvent`, события `GlobalEventLaunched`, `GlobalEventEnded` |
+| Общая цель | цель общего ивента с прогресс-баром: часы HLTB или число прохождений | `GlobalEventGoal` (`GoalMetric`: `Hours`, `Runs`), события `GlobalProgressChanged`, `GlobalGoalReached` |
+| Баннер общего ивента | плашка общего ивента на главной | `GlobalEventBanner` |
+| Напарник | второй игрок кооп-прохождения | `RunState.PartnerId`, событие `CoopJoined` |
+| Ролливший | игрок, чей ролл дал кооп-прохождение; бросает кубы и получает долю с округлением вверх | `RunState.PlayerId` |
+| Приглашение в кооп | предложение стать напарником в своём прохождении | `InteractionKind.Coop`, команда `InviteToCoop`, события `InteractionCreated`, `InteractionAnswered`, `InteractionExpired` |
+| Ответ на приглашение | принять или отклонить; без ответа за N часов приглашение сгорает | команда `AnswerInvitation`, `InteractionStatus` (`Pending`, `Accepted`, `Declined`, `Withdrawn`, `Expired`) |
+| Выйти из коопа | напарник покидает кооп-прохождение без штрафа (D-522) | команда `LeaveCoop`, событие `CoopLeft` |
+| Деление кооп-награды | доли очков, шагов и монеток роллившего и напарника | событие `CoopRewardSplit`, `reward.coop` |
+| Дуэль | гонка двух игроков до первого завершения прохождения за награду от системы (D-525) | `InteractionKind.Duel`, команда `ChallengeToDuel`, событие `DuelSettled` |
+| Вызов на дуэль | приглашение на дуэль | `InteractionKind.Duel` |
+| Отклик на запрос напарника | заявка на чужой запрос доски; создаёт приглашение, которое принимает автор | команда `RespondToPartnerRequest`, события `PartnerRequestPosted`, `PartnerRequestClosed` |
+| Выполнить челлендж недели | пройти игру по условию челленджа в его окне; одна награда на игрока | команды `SetWeeklyChallenge`, `MarkWeeklyChallenge`, события `WeeklyChallengeSet`, `WeeklyChallengeCompleted`, `WeeklyChallengeRevoked` |
+| Модерация предложки | админ одобряет или отклоняет предложение | команды `SubmitSuggestion`, `ReviewSuggestion`, `SuggestionStatus` (`Pending`, `Approved`, `Rejected`) |
+| Контракт | особое прохождение по договору с админом за доп. награду (RGG № 16; ждёт решения, D-529) | `features.contracts` |
 
 ## Социальное
 

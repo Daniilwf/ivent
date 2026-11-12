@@ -15,7 +15,7 @@ namespace GameEvent.Infrastructure.Database.Migrations
         protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder.HasAnnotation("ProductVersion", "10.0.13");
+            modelBuilder.HasAnnotation("ProductVersion", "10.0.14");
 
             modelBuilder.Entity("GameEvent.Infrastructure.Accounts.UserRecord", b =>
                 {
@@ -458,6 +458,10 @@ namespace GameEvent.Infrastructure.Database.Migrations
 
                     b.Property<long?>("CompletedAt")
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("DeclaredDifficulty")
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("DiceJson")
                         .IsRequired()

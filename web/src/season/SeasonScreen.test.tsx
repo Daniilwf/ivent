@@ -182,6 +182,40 @@ describe('SeasonScreen', () => {
     expect(bodies[0]?.commandId).not.toBe(bodies[1]?.commandId);
   });
 
+  it('shows the event I drew last in the tails of the turn, and nothing while I drew none', async () => {
+    const base = season();
+    if (!base.me) throw new Error('No turn');
+    const drawn = season({
+      lastSequence: 9,
+      me: {
+        ...base.me,
+        lastEvent: {
+          sequence: 9,
+          deck: 'good',
+          kind: 'good',
+          objectId: 'tailwind',
+          name: 'Попутный ветер',
+          description: 'В следующем броске за прохождение на один кубик больше.',
+          source: 'cell',
+        },
+      },
+    });
+    let current = base;
+    serve((r) => (isSeasonGet(r) ? json(200, current) : json(404, {})));
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+    await screen.findByTestId('roll');
+    expect(screen.queryByTestId('drawn-event')).toBeNull();
+
+    current = drawn;
+    act(() => {
+      hubChange?.();
+    });
+
+    const card = await screen.findByTestId('drawn-event');
+    expect(card).toHaveTextContent('Попутный ветер');
+    expect(card).toHaveTextContent(ru.events.kinds.good);
+  });
+
   it('refetches when another player acts', async () => {
     let current = season();
     serve((r) => (isSeasonGet(r) ? json(200, current) : json(404, {})));
@@ -298,6 +332,59 @@ describe('SeasonScreen', () => {
     expect(bodies[0]).toMatchObject({
       url: expect.stringMatching(/\/choose$/) as unknown,
       body: { choiceId, optionId: 'b2', commandId: expect.any(String) as unknown },
+    });
+  });
+
+  it('starts the offered game on the difficulty the player picks (D-633)', async () => {
+    const bodies: unknown[] = [];
+    serve(async (r) => {
+      if (isSeasonGet(r)) {
+        return json(
+          200,
+          season({
+            me: {
+              playerId: me,
+              phase: 'rolling',
+              offer: {
+                id: 'a1000000-0000-0000-0000-000000000001',
+                title: 'Silent Hill',
+                hours: 12,
+                marks: [],
+              },
+              choice: null,
+              activeRun: null,
+              lastCompleted: null,
+              nextReroll: null,
+              manualEffects: [],
+              dropHintMinutes: null,
+              dropPenalty: null,
+              techRerollOpen: false,
+              challengesEnabled: false,
+              roll: null,
+              unchecked: null,
+              finish: null,
+            },
+          }),
+        );
+      }
+      bodies.push({ url: r.url, body: (await r.json()) as unknown });
+      return json(200, { duplicate: false, events: [] });
+    });
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    await userEvent.click(
+      within(await screen.findByTestId('start-difficulty')).getByRole('radio', {
+        name: ru.difficulty.hard,
+      }),
+    );
+    await userEvent.click(screen.getByTestId('start'));
+
+    await vi.waitFor(() => {
+      expect(bodies).toHaveLength(1);
+    });
+    expect(bodies[0]).toEqual({
+      url: expect.stringMatching(/\/start$/) as unknown,
+      body: { commandId: expect.any(String) as unknown, difficulty: 'hard' },
     });
   });
 

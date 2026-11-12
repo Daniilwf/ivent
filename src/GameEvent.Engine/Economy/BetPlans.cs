@@ -9,12 +9,12 @@ public sealed record BetOption(int Days, decimal Multiplier);
 
 /// <summary>
 /// A run the player may bet on now: another player's current game, rolled within <c>bets.windowHoursAfterRoll</c>
-/// (<c>ClosesAt</c> — when the window ends), with the multiplier of each deadline (D-446).
+/// (<c>ClosesAt</c> — when the window ends), with the multiplier of each deadline (D-447).
 /// </summary>
 public sealed record BetRun(Guid PlayerId, Guid RunId, Guid GameId, decimal? Hours, DateTimeOffset RolledAt, DateTimeOffset ClosesAt, IReadOnlyList<BetOption> Options);
 
 /// <summary>
-/// What the bets screen offers (D-446): why no bet is placed now (the engine's code: the mechanic off, the deadline, the
+/// What the bets screen offers (D-447): why no bet is placed now (the engine's code: the mechanic off, the deadline, the
 /// frozen first, the limit of open bets, debt or no coins), the open bets against their limit, the largest stake the
 /// player can place, and the runs a bet is accepted on.
 /// </summary>

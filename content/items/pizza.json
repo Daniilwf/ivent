@@ -1,0 +1,24 @@
+{
+  "id": "pizza",
+  "kind": "item",
+  "name": "Пицца",
+  "description": "Получаешь 5 монеток.",
+  "rarity": "epic",
+  "price": 30,
+  "window": "anytime",
+  "hostile": false,
+  "stackable": true,
+  "tags": ["edible"],
+  "effect": {
+    "target": {
+      "selector": "self"
+    },
+    "actions": [
+      {
+        "type": "changeResource",
+        "resource": "coins",
+        "amount": 5
+      }
+    ]
+  }
+}

@@ -104,7 +104,7 @@ describe('the inventory on the season screen', () => {
     expect(server.sent('GET', '/economy')).toHaveLength(0);
   });
 
-  it('shows the shop and the bets only when the season plays them (D-446)', async () => {
+  it('shows the shop and the bets only when the season plays them (D-447)', async () => {
     open(season(true, true, { shop: true, bets: true }));
     expect(await screen.findByTestId('shop')).toBeInTheDocument();
     expect(screen.getByTestId('bets')).toBeInTheDocument();

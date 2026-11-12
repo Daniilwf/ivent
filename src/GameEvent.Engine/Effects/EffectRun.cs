@@ -21,7 +21,7 @@ public enum DiceScope
 }
 
 /// <summary>A change of the throw being made, collected while <c>beforeDice</c> effects fire (D-408).</summary>
-internal sealed record ThrowChange(string ObjectId, DiceStage Stage, ContentValue Value);
+internal sealed record ThrowChange(string ObjectId, DiceStage Stage, ContentValue Value, int? Sides = null, int? From = null, DieFilter? Filter = null);
 
 /// <summary>
 /// One run of an effect (SPEC «Архитектура движка правил»: trigger, condition, targets, actions): the actions of an
@@ -34,6 +34,9 @@ internal sealed class EffectRun
     private readonly IReadOnlyList<string> _choices;
     private int _choiceIndex;
 
+    // The actions aimed at the user ran: with several targets they run once per use (D-480)
+    private bool _selfDone;
+
     public EffectRun(
         SeasonState state,
         EngineContext context,
@@ -43,7 +46,9 @@ internal sealed class EffectRun
         ContentParamDictionary? parameters,
         IReadOnlyList<string>? choices = null,
         DiceScope dice = DiceScope.Pending,
-        Guid? runId = null)
+        Guid? runId = null,
+        int depth = 0,
+        int eventsBefore = 0)
     {
         State = state;
         Context = context;
@@ -54,6 +59,8 @@ internal sealed class EffectRun
         _choices = choices ?? [];
         Dice = dice;
         RunId = runId;
+        Depth = depth;
+        EventsBefore = eventsBefore;
     }
 
     public SeasonState State { get; private set; }
@@ -86,6 +93,21 @@ internal sealed class EffectRun
 
     public List<IGameEvent> Events { get; } = [];
 
+    /// <summary>
+    /// How deep this run is nested in its command (invariant 8): 0 for an item used or a trigger inside a command, the level
+    /// of the effect chain for a reaction; a countdown that goes off inside it runs one level deeper.
+    /// </summary>
+    public int Depth { get; }
+
+    /// <summary>The events the command wrote before this run: with <see cref="Events"/>, what counts towards the 50.</summary>
+    public int EventsBefore { get; }
+
+    /// <summary>The events the command has written with this run so far.</summary>
+    public int EventsSoFar => EventsBefore + Events.Count;
+
+    /// <summary>Set when a countdown inside the run went past the chain limits: nothing more runs, the cut is the last event.</summary>
+    public EffectChainCut? Cut { get; private set; }
+
     /// <summary>Changes of the throw being made (<see cref="DiceScope.Throw"/>).</summary>
     public List<ThrowChange> ThrowChanges { get; } = [];
 
@@ -97,6 +119,7 @@ internal sealed class EffectRun
 
     public void Emit(IGameEvent e)
     {
+        Cut ??= e as EffectChainCut;
         Events.Add(e);
         State = SeasonEngine.Apply(State, e);
     }
@@ -132,6 +155,30 @@ internal sealed class EffectRun
 
         LastChoice = answer;
         return answer;
+    }
+
+    /// <summary>
+    /// Every answer not used yet, now used: a list of preference for a count known only at the use (D-476). Each must be one
+    /// of <paramref name="options"/> and given once; otherwise null and a refusal.
+    /// </summary>
+    public IReadOnlyList<string>? RemainingChoices(IReadOnlyCollection<string> options)
+    {
+        var answers = _choices.Skip(_choiceIndex).ToList();
+        _choiceIndex = _choices.Count;
+        if (answers.FirstOrDefault(a => !options.Contains(a, StringComparer.Ordinal)) is { } wrong)
+        {
+            Refuse(RejectionCodes.ItemInvalidChoice, $"«{wrong}» is not one of the options of «{ObjectId}».");
+            return null;
+        }
+
+        if (answers.Distinct(StringComparer.Ordinal).Count() != answers.Count)
+        {
+            Refuse(RejectionCodes.ItemInvalidChoice, $"An answer to «{ObjectId}» is given twice.");
+            return null;
+        }
+
+        LastChoice = answers.LastOrDefault() ?? LastChoice;
+        return answers;
     }
 
     /// <summary>A value as a number (CONTENT.md «Значения»): dice are rolled now and logged, references resolved.</summary>
@@ -193,15 +240,26 @@ internal sealed class EffectRun
                 if (Interception.Find(State, target) is { } shield)
                 {
                     Emit(Interception.Stop(State, target, shield, ObjectId, UserId));
+
+                    // The answers were given for this target: the shield takes them with the effect (IT-1)
+                    _choiceIndex = _choices.Count;
                     continue;
                 }
 
                 Emit(new HostileReceived(target, UserId, ObjectId));
             }
 
-            if (effect.Outcomes is { } outcomes)
+            if (effect.Outcomes is { Choice: { } choice } byChoice)
             {
-                LastRoll = Number(outcomes.Roll);
+                // The player's answer picks the case (D-482)
+                if (NextChoice(Actions.RequestChoiceHandler.Options(choice.Options, this)) is { } option)
+                {
+                    RunActions(byChoice.Cases.FirstOrDefault(c => c.Option == option)?.Actions ?? []);
+                }
+            }
+            else if (effect.Outcomes is { Roll: { } dice } outcomes)
+            {
+                LastRoll = Number(dice);
                 var roll = LastRoll.Value;
                 RunActions(outcomes.Cases.FirstOrDefault(c => c.From <= roll && roll <= c.To)?.Actions ?? []);
             }
@@ -210,7 +268,7 @@ internal sealed class EffectRun
                 RunActions(effect.Actions);
             }
 
-            if (Refusal is not null)
+            if (Refusal is not null || Cut is not null)
             {
                 return;
             }
@@ -219,10 +277,17 @@ internal sealed class EffectRun
 
     private void RunActions(EquatableArray<ActionSpec> actions)
     {
+        var selfDone = _selfDone;
         foreach (var action in actions)
         {
+            if (selfDone && action.Target == Content.ActionTarget.Self && TargetId != UserId)
+            {
+                continue;
+            }
+
             Actions.BaseActionRegistry.ByType[action.GetType()].Execute(action, this);
-            if (Refusal is not null)
+            _selfDone |= action.Target == Content.ActionTarget.Self;
+            if (Refusal is not null || Cut is not null)
             {
                 return;
             }

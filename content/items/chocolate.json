@@ -1,0 +1,24 @@
+{
+  "id": "chocolate",
+  "kind": "item",
+  "name": "Шоколадка",
+  "description": "Получаешь 2 монетки.",
+  "rarity": "common",
+  "price": 15,
+  "window": "anytime",
+  "hostile": false,
+  "stackable": true,
+  "tags": ["edible"],
+  "effect": {
+    "target": {
+      "selector": "self"
+    },
+    "actions": [
+      {
+        "type": "changeResource",
+        "resource": "coins",
+        "amount": 2
+      }
+    ]
+  }
+}

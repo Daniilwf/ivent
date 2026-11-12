@@ -123,6 +123,37 @@ public sealed class SeasonApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Start_on_a_difficulty_caps_the_completion_and_the_view_shows_it()
+    {
+        // AU12-2, D-633: the die follows the difficulty named at the start; claiming higher counts the start's
+        var vasya = await _site.SignedInAsync("vasya");
+        await PostAsync(vasya, "roll", new { commandId = Guid.NewGuid() });
+
+        await PostAsync(vasya, "start", new { commandId = Guid.NewGuid(), difficulty = "easy" });
+
+        var playing = await vasya.GetFromJsonAsync<SeasonView>($"/api/seasons/{SiteFactory.SeasonId}", s_json, Ct);
+        Assert.Equal(Engine.Runs.Difficulty.Easy, playing!.Me!.ActiveRun!.DeclaredDifficulty);
+
+        await PostAsync(vasya, "complete", new { commandId = Guid.NewGuid(), difficulty = "hard" });
+
+        var last = (await vasya.GetFromJsonAsync<SeasonView>($"/api/seasons/{SiteFactory.SeasonId}", s_json, Ct))!.Me!.LastCompleted!;
+        Assert.Equal(Engine.Runs.Difficulty.Easy, last.Difficulty);
+        Assert.All(last.Dice, d => Assert.Equal(2, d.Sides));
+    }
+
+    [Fact]
+    public async Task Start_without_a_difficulty_leaves_it_undeclared()
+    {
+        var vasya = await _site.SignedInAsync("vasya");
+        await PostAsync(vasya, "roll", new { commandId = Guid.NewGuid() });
+
+        await PostAsync(vasya, "start", new { commandId = Guid.NewGuid() });
+
+        var playing = await vasya.GetFromJsonAsync<SeasonView>($"/api/seasons/{SiteFactory.SeasonId}", s_json, Ct);
+        Assert.Null(playing!.Me!.ActiveRun!.DeclaredDifficulty);
+    }
+
+    [Fact]
     public async Task Spectator_and_outsider_can_view_the_season()
     {
         foreach (var login in new[] { "zritel", "masha", "admin" })
@@ -1254,6 +1285,8 @@ public sealed class SeasonApiTests : IAsyncLifetime
     [InlineData("complete", """{"commandId":"5b1e2f0a-0000-0000-0000-000000000004"}""")]
     [InlineData("complete", """{"commandId":"5b1e2f0a-0000-0000-0000-000000000005","difficulty":null}""")]
     [InlineData("start", "not json")]
+    [InlineData("start", """{"commandId":"5b1e2f0a-0000-0000-0000-000000000014","difficulty":"impossible"}""")]
+    [InlineData("choose", """{"commandId":"5b1e2f0a-0000-0000-0000-000000000015","choiceId":"5b1e2f0a-0000-0000-0000-0000000000ff","optionId":"a","difficulty":"impossible"}""")]
     [InlineData("choose", """{"commandId":"5b1e2f0a-0000-0000-0000-00000000000a","choiceId":"5b1e2f0a-0000-0000-0000-0000000000ff","optionId":"a\nb"}""")]
     [InlineData("choose", """{"commandId":"5b1e2f0a-0000-0000-0000-00000000000b","choiceId":"5b1e2f0a-0000-0000-0000-0000000000ff","optionId":"<script>"}""")]
     [InlineData("choose", """{"commandId":"5b1e2f0a-0000-0000-0000-000000000006","choiceId":"00000000-0000-0000-0000-000000000000","optionId":"a"}""")]

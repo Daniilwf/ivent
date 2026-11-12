@@ -5,7 +5,7 @@ using GameEvent.Engine.Tests.Support;
 namespace GameEvent.Engine.Tests.Economy;
 
 /// <summary>
-/// EC23 (D-446): what the bets screen offers is what <c>PlaceBet</c> accepts — the runs of other players rolled within the
+/// EC23 (D-447): what the bets screen offers is what <c>PlaceBet</c> accepts — the runs of other players rolled within the
 /// window, not the first finisher's, not one already bet on; the multiplier of each deadline; the refusal when no bet is
 /// placed at all (the limit of open bets, debt, no coins, the mechanic off).
 /// </summary>

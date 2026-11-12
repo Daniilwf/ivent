@@ -85,24 +85,24 @@ internal static class PointsLedger
         // D-327: the bonus of the cell a run's own move stopped on belongs to that run — a reject takes it back
         if (e.Reason == PointsReason.CellBonus && state.Players[e.PlayerId].LastMoveRunId is { } mover && state.Runs.TryGetValue(mover, out var run))
         {
-            state = state with { Runs = state.Runs.SetItem(mover, run with { CellPoints = run.CellPoints + e.Delta }) };
+            state = state with { Runs = state.Runs.SetItem(mover, run with { CellPoints = Saturating.Add(run.CellPoints, e.Delta) }) };
         }
 
         var tick = e.Delta == 0 ? state.PointsChanges : state.PointsChanges + 1;
         return Update(state with { PointsChanges = tick }, e.PlayerId, p => p with
         {
-            Points = p.Points + e.Delta,
+            Points = Saturating.Add(p.Points, e.Delta),
             PointsTick = e.Delta == 0 ? p.PointsTick : tick,
 
             // The finish bonus a player holds now (Q-4: at most one).
             Finish = e.Reason is PointsReason.FinishBonus or PointsReason.FinishBonusRevoked && p.Finish is { } finish
-                ? finish with { Bonus = finish.Bonus + e.Delta }
+                ? finish with { Bonus = Saturating.Add(finish.Bonus, e.Delta) }
                 : p.Finish,
         });
     }
 
     public static SeasonState Apply(SeasonState state, CoinsChanged e) =>
-        Update(state, e.PlayerId, p => p with { Coins = p.Coins + e.Delta });
+        Update(state, e.PlayerId, p => p with { Coins = Saturating.Add(p.Coins, e.Delta) });
 
     public static SeasonState Apply(SeasonState state, ResourceChanged e) =>
         Update(state, e.PlayerId, p => p with { Resources = p.Resources.Add(e.Resource, e.Delta) });

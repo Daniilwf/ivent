@@ -1,0 +1,29 @@
+{
+  "id": "pig",
+  "kind": "item",
+  "name": "Свинья",
+  "description": "Отдай выбранному другому игроку один свой враждебный эффект на выбор.",
+  "rarity": "common",
+  "price": null,
+  "window": "anytime",
+  "hostile": true,
+  "stackable": false,
+  "tags": ["pig"],
+  "effect": {
+    "target": {
+      "selector": "chosen",
+      "excludeSelf": true
+    },
+    "actions": [
+      {
+        "type": "takeObject",
+        "mode": "give",
+        "pick": "chosen",
+        "filter": {
+          "kind": "effect",
+          "hostile": true
+        }
+      }
+    ]
+  }
+}

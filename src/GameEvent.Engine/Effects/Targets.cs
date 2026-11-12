@@ -1,6 +1,7 @@
 using GameEvent.Engine.Content;
 using GameEvent.Engine.Finish;
 using GameEvent.Engine.Kernel;
+using GameEvent.Engine.Map;
 using GameEvent.Engine.Seasons;
 
 namespace GameEvent.Engine.Effects;
@@ -58,18 +59,18 @@ internal static class Targets
     /// <summary>
     /// Whether a selector other than <c>chosen</c> finds nobody for <paramref name="userId"/>: decided without a roll,
     /// exactly when <see cref="ForUse"/> refuses with <c>item.noTarget</c> (D-440) — <c>self</c> for a finisher's move,
-    /// <c>randomActive</c> with nobody active, any other with no candidate.
+    /// <c>randomActive</c> with nobody active, any other when it picks nobody (<c>nearestBehind</c> with nobody behind…).
     /// </summary>
     public static bool HasNobody(SeasonState state, ObjectDefinition definition, Guid userId)
     {
         var spec = definition.Effect?.Target;
-        var candidates = Candidates(state, definition, spec, userId);
         return (spec?.Selector ?? TargetSelector.Self) switch
         {
             TargetSelector.Chosen => false,
-            TargetSelector.Self => !candidates.Any(p => p.PlayerId == userId) && PositionOnly(definition.Effect),
-            TargetSelector.RandomActive => !candidates.Any(p => !p.IsInactive),
-            _ => candidates.Count == 0,
+            TargetSelector.RandomActive => !Candidates(state, definition, spec, userId).Any(p => !p.IsInactive),
+
+            // The other selectors pick without chance: the same players a use would reach (nearestBehind, withinCells too)
+            _ => Resolve(state, context: null, definition, spec, userId).Count == 0,
         };
     }
 
@@ -77,7 +78,7 @@ internal static class Targets
     public static IReadOnlyList<Guid> ForTriggered(SeasonState state, EngineContext context, ObjectDefinition definition, Guid ownerId) =>
         definition.Effect?.Target?.Selector == TargetSelector.Chosen ? [] : Resolve(state, context, definition, definition.Effect?.Target, ownerId);
 
-    private static List<Guid> Resolve(SeasonState state, EngineContext context, ObjectDefinition definition, TargetSpec? spec, Guid userId)
+    private static List<Guid> Resolve(SeasonState state, EngineContext? context, ObjectDefinition definition, TargetSpec? spec, Guid userId)
     {
         var candidates = Candidates(state, definition, spec, userId);
         switch (spec?.Selector ?? TargetSelector.Self)
@@ -87,9 +88,21 @@ internal static class Targets
                 return candidates.Any(p => p.PlayerId == userId) || !PositionOnly(definition.Effect) ? [userId] : [];
             case TargetSelector.RandomActive:
                 var active = candidates.Where(p => !p.IsInactive).ToList();
-                return active.Count == 0 ? [] : [active[context.Random.NextInt(0, active.Count)].PlayerId];
+                return active.Count == 0 ? [] : [active[context!.Random.NextInt(0, active.Count)].PlayerId];
             case TargetSelector.Leader:
                 return candidates.OrderByDescending(p => p.Points).ThenBy(p => p.PointsTick).ThenBy(p => p.PlayerId).Take(1).Select(p => p.PlayerId).ToList();
+            case TargetSelector.WithinCells:
+                var around = MapDistances.Around(state.Map, state.Players[userId].CellId);
+                return [.. candidates
+                    .Where(p => p.PlayerId != userId && around.TryGetValue(p.CellId, out var away)
+                        && away <= (spec!.Cells ?? 0) && (away > 0 || spec.IncludeSameCell))
+                    .Select(p => p.PlayerId)];
+            case TargetSelector.NearestBehind:
+                var toFinish = MapDistances.ToFinish(state.Map);
+                var mine = toFinish.GetValueOrDefault(state.Players[userId].CellId);
+                var behind = candidates.Where(p => p.PlayerId != userId && toFinish.TryGetValue(p.CellId, out var d) && d > mine).ToList();
+                var nearest = behind.Count == 0 ? 0 : behind.Min(p => toFinish[p.CellId]);
+                return [.. behind.Where(p => toFinish[p.CellId] == nearest).Select(p => p.PlayerId)];
             default:
                 return [.. candidates.Select(p => p.PlayerId)];
         }

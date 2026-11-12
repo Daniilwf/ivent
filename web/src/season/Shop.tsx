@@ -13,7 +13,7 @@ import { refusalText, timeLeft, useNow, type PanelState, type UseResult } from '
 export type ShopLot = Schemas['ShopLotView'];
 
 /**
- * My shop (4.11c, D-443, D-446): the roll — by a coupon first, then for coins, dearer each time within a game — and the
+ * My shop (4.11c, D-443, D-447): the roll — by a coupon first, then for coins, dearer each time within a game — and the
  * personal lots with their timer. «Купить» is open only on a lot the engine sells me now; otherwise its reason in words.
  * Lots past their time vanish by the clock even before the server's timer fires (it refuses them anyway). Hidden when
  * the season's shop is off (the economy has no `shop`).

@@ -103,6 +103,11 @@ public partial class PlayerAdminInvariantTests
                         ShopOfferExpired => "expired",
                         EffectTriggered => "triggered",
                         RunDiceModified => "dice",
+                        ObjectTransferred { Given: true } => "given",
+                        ObjectTransferred => "stolen",
+                        ObjectRemoved { Reason: ObjectRemoval.Destroyed } => "destroyed",
+                        ObjectChanged { Item.Counter: not null } => "counted",
+                        Engine.Map.PlayerMoved { Reason: Engine.Map.MoveReason.Item, Steps: < 0 } => "pushed back",
                         _ => "other",
                     });
                 }
@@ -119,7 +124,7 @@ public partial class PlayerAdminInvariantTests
             });
         }
 
-        foreach (var what in new[] { "used", "hostile", "intercepted", "bought", "won", "lost", "revoked", "expired", "triggered", "dice", "undone", "debt" })
+        foreach (var what in new[] { "used", "hostile", "intercepted", "bought", "won", "lost", "revoked", "expired", "triggered", "dice", "undone", "debt", "given", "stolen", "destroyed", "counted", "pushed back" })
         {
             Assert.True(counts.GetValueOrDefault(what) > 0, $"The economy games never reached «{what}».");
         }
@@ -127,7 +132,9 @@ public partial class PlayerAdminInvariantTests
 
     private static Scenario PlayEconomy(int seed, byte[] script, Action<Scenario, ICommand, SeasonState, int>? afterEach = null, Engine.Map.MapGraph? map = null)
     {
-        var s = EconomyScenario.New(seed);
+        // Reflection of the imported weapons (D-474) at a threshold the random coins reach
+        var s = EconomyScenario.New(seed)
+            .WithRuleset(r => r with { Effects = r.Effects with { Reflect = new CoinReflect { CoinsAtMost = -3, Multiplier = 2 } } });
         if (map is not null)
         {
             s.WithMap(map);
@@ -138,9 +145,13 @@ public partial class PlayerAdminInvariantTests
             .WithGame("Silent Hill", 6, "Horror").WithGame("Dead Space", 9, "Horror").WithGame("Amnesia", 3, "Horror")
             .WithGame("Gothic", 30, "RPG").WithGame("Risen", 12, "RPG").WithGame("Tetris", null, "RPG");
         s.WithPlayers(s_economyPlayers);
-        var pack = EconomyScenario.RepositoryPack();
+        // The content files and a chain bomb whose going off lowers every counter of its owner (AU4-1, D-485)
+        var files = EconomyScenario.RepositoryPack();
+        var pack = files with { Objects = [.. files.Objects, Economy.ImportedItems.CounterTests.SelfLoweringBomb()] };
         s.WithContent(pack);
-        var objects = pack.Objects.Where(o => o.Kind == ObjectKind.Item).Select(o => o.Id).Concat(["shield-effect", "talisman-effect"]).ToArray();
+        // Every item of the content files (the imported pack too, D-471) and effects for them to steal, give and count down
+        var objects = pack.Objects.Where(o => o.Kind == ObjectKind.Item).Select(o => o.Id)
+            .Concat(["shield-effect", "talisman-effect", "curse-effect", "time-bomb", "chain-bomb", "chain-bomb"]).ToArray();
         var setup = s.History.Count;
         return s.Explained(s =>
         {
@@ -184,8 +195,8 @@ public partial class PlayerAdminInvariantTests
 
                 var item = items[variant % items.Count];
                 var definition = s.State.Catalog.Get(item.ObjectId);
-                string[] choices = definition.Effect?.Actions.Any(a => a is RequestChoiceAction) == true ? [variant % 2 == 0 ? "Horror" : "RPG"] : [];
-                return new UseItem(player, item.InstanceId, variant % 7 == 0 ? player : other, [.. choices]);
+                var target = variant % 7 == 0 ? player : other;
+                return new UseItem(player, item.InstanceId, target, [.. Answers(s, definition, item, player, target, variant)]);
             case 8:
                 return new RollShop(player);
             case 9:
@@ -224,6 +235,51 @@ public partial class PlayerAdminInvariantTests
                 };
             default:
                 return new AdjustPlayer(player, "монетки", CoinsDelta: (variant % 21) - 8);
+        }
+    }
+
+    /// <summary>
+    /// Answers a player might give with an item (D-407): a listed option, a direction, the instances of objects a pick
+    /// chooses among (the target's, or his own for a «give»), often enough right to reach the effects and sometimes wrong.
+    /// </summary>
+    private static IEnumerable<string> Answers(Scenario s, ObjectDefinition definition, InventoryObject used, Guid user, Guid target, int variant)
+    {
+        if (definition.Effect is not { } effect)
+        {
+            yield break;
+        }
+
+        if (effect.Outcomes?.Choice is { } choice && choice.Options.List is { } options)
+        {
+            yield return options[variant % options.Count];
+        }
+
+        foreach (var action in effect.Actions)
+        {
+            switch (action)
+            {
+                case RequestChoiceAction { Options.List: { } list }:
+                    yield return list[variant % list.Count];
+                    break;
+                case RequestChoiceAction:
+                    yield return variant % 2 == 0 ? "Horror" : "RPG";
+                    break;
+                case MoveAction { Direction: MoveDirection.Chosen }:
+                    yield return variant % 3 == 0 ? "back" : "forward";
+                    break;
+                case TakeObjectAction { Pick: Pick.Chosen } take:
+                    var from = take.Mode == TakeMode.Give || take.Target == ActionTarget.Self ? user : target;
+                    var held = s.State.Players[from].Wallet.Inventory.Where(o => o.InstanceId != used.InstanceId).ToList();
+                    var count = take.Count is { Kind: ContentValueKind.Number } fixedCount ? fixedCount.Number : take.Count is null ? 1 : 1 + (variant % 3);
+                    foreach (var answer in held.Skip(variant % Math.Max(1, held.Count)).Concat(held).Distinct().Take(count))
+                    {
+                        yield return answer.InstanceId.ToString("N");
+                    }
+
+                    break;
+                default:
+                    break;
+            }
         }
     }
 
@@ -274,6 +330,20 @@ public partial class PlayerAdminInvariantTests
         var cut = events.OfType<EffectChainCut>().SingleOrDefault();
         Assert.True(cut is null || cut.Events <= Limits.MaxEventsPerCommand);
 
+        // SPEC «Проверка на дыры», «Очки фармятся»: a use of an item gives points only by an explicit action — a points
+        // change of an object that fired in the command, a bonus cell it stopped on, or the throw it changed (AU4-10)
+        if (command is UseItem)
+        {
+            var fired = events.OfType<ItemUsed>().Select(e => e.ObjectId).Concat(events.OfType<EffectTriggered>().Select(e => e.ObjectId)).ToHashSet();
+            foreach (var change in events.OfType<PointsChanged>())
+            {
+                Assert.Contains(change.Reason, new[] { PointsReason.Item, PointsReason.CellBonus, PointsReason.DiceModified });
+                Assert.True(
+                    change.Reason != PointsReason.Item || fired.Any(id => GivesPoints(s.State.Catalog.Get(id))),
+                    $"Points of an item without a points action: {string.Join(", ", fired)}.");
+            }
+        }
+
         // 16: an item used on another player never changes the roll or the throw they have begun
         if (command is UseItem use)
         {
@@ -284,6 +354,26 @@ public partial class PlayerAdminInvariantTests
                 if (target.ActiveRunId is { } active)
                 {
                     Assert.Equal(before.Runs[active], s.State.Runs[active]);
+                }
+            }
+        }
+
+        // 8 and 9 for items (SPEC «Цели», D-424): the first finisher is untouched by any use of an item — his points, coins,
+        // position and objects; a later finisher's position and objects are out of reach of others' items (only points and
+        // coins reach him), and his own items never move him
+        if (command is UseItem byItem)
+        {
+            foreach (var finisher in before.Players.Values.Where(p => p.Finish is not null))
+            {
+                var after = s.State.Players[finisher.PlayerId];
+                Assert.Equal(finisher.CellId, after.CellId);
+                if (Engine.Finish.FinishLine.First(before) == finisher.PlayerId)
+                {
+                    Assert.Equal((finisher.Points, finisher.Coins, finisher.Wallet.Inventory), (after.Points, after.Coins, after.Wallet.Inventory));
+                }
+                else if (finisher.PlayerId != byItem.PlayerId)
+                {
+                    Assert.Equal(finisher.Wallet.Inventory.Select(o => o.InstanceId), after.Wallet.Inventory.Select(o => o.InstanceId));
                 }
             }
         }
@@ -342,4 +432,9 @@ public partial class PlayerAdminInvariantTests
             open.Sum(b => b.Stake),
             log2.OfType<BetPlaced>().Where(p => open.Any(o => o.BetId == p.Bet.BetId)).Sum(p => p.Bet.Stake));
     }
+
+    // Whether the object's effect changes points anywhere: its actions or a case of its outcomes
+    private static bool GivesPoints(ObjectDefinition definition) =>
+        definition.Effect is { } effect
+        && effect.Actions.Concat(effect.Outcomes?.Cases.SelectMany(c => c.Actions) ?? []).Any(a => a is ChangeResourceAction { Resource: "points" });
 }

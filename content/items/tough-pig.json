@@ -1,0 +1,31 @@
+{
+  "id": "tough-pig",
+  "kind": "item",
+  "name": "Ебануто живучая свинья",
+  "description": "Отдай выбранному другому игроку один свой враждебный эффект на выбор. Эту свинью невозможно украсть и уничтожить.",
+  "rarity": "legendary",
+  "price": 80,
+  "window": "anytime",
+  "hostile": true,
+  "stackable": false,
+  "tags": ["pig"],
+  "unstealable": true,
+  "undestroyable": true,
+  "effect": {
+    "target": {
+      "selector": "chosen",
+      "excludeSelf": true
+    },
+    "actions": [
+      {
+        "type": "takeObject",
+        "mode": "give",
+        "pick": "chosen",
+        "filter": {
+          "kind": "effect",
+          "hostile": true
+        }
+      }
+    ]
+  }
+}

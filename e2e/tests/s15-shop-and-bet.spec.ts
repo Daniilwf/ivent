@@ -5,7 +5,7 @@ import { expect, test } from '@playwright/test';
 import type { Schemas } from '../support/api.ts';
 import { apiOf, rollAndStart, setUpSeason, signIn } from '../support/world.ts';
 
-// Stage 4 (4.11c, D-446): the shop and a bet on the season screen. The admin turns items, the shop and bets on, loads
+// Stage 4 (4.11c, D-447): the shop and a bet on the season screen. The admin turns items, the shop and bets on, loads
 // the repository's content pack and gives Вася coins; Петя rolls a game and starts it. Вася rolls his shop — the lots
 // come with their timer — and buys one: it lands in his inventory and the coins go. Then he bets on Петя's run: the
 // sheet says the win before the press, the bet is listed as open and the stake leaves his coins.
@@ -46,7 +46,8 @@ test('the shop and a bet: roll, buy a lot, bet on a run', async ({ browser }, te
       features: { ...rules.ruleset.features, items: true, shop: true, bets: true },
     },
   });
-  await admin.post(`/api/admin/seasons/${world.seasonId}/content`, {
+  await admin.post(`/api/admin/seasons/${world.seasonId}/content/publish`, {
+    expectedVersion: 0,
     pack: pack(),
     comment: 'Предметы для E2E',
   });

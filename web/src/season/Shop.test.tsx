@@ -7,7 +7,7 @@ import { ShopPanel } from './Shop';
 import { timeLeft } from './economy';
 import { economyFixture, fixtureNow, shopFixture } from './inventoryFixtures';
 
-// My shop on the season screen (4.11c, D-443, D-446): the roll with its price or a coupon, the lots with their timer,
+// My shop on the season screen (4.11c, D-443, D-447): the roll with its price or a coupon, the lots with their timer,
 // «Купить» only on a lot the engine sells now (otherwise its reason in words), one command per press, a refusal said in
 // Russian; the lots vanish when their time is up; loading, empty and error states; hidden when the shop is off.
 

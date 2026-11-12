@@ -5,8 +5,11 @@ namespace GameEvent.Web.Accounts;
 /// <summary>
 /// Limits failed sign-ins (D-26, D-67). The hard limit is per login and client address: a guesser is stopped,
 /// but cannot lock the owner out from elsewhere. A much higher per-login ceiling slows a guess spread over
-/// many addresses. Windows are temporary; nobody can lock an account for good.
+/// many addresses; a browser that signed in to the login before is not held by it (SEC-2, D-460), so a guess from
+/// elsewhere cannot lock the owner out either. Windows are temporary; nobody can lock an account for good.
 /// An attempt is reserved before the password is checked, so parallel requests cannot slip past the limit.
+/// Attempts past their windows are swept out about once a minute: a stream of made-up logins does not grow the
+/// site's memory (SEC-3).
 /// </summary>
 public sealed class LoginThrottle(IClock clock, IConfiguration configuration)
 {
@@ -17,14 +20,20 @@ public sealed class LoginThrottle(IClock clock, IConfiguration configuration)
     private readonly TimeSpan _addressWindow = TimeSpan.FromMinutes(configuration.GetValue("Security:LoginFailureWindowMinutes", 15));
     private readonly int _perLogin = configuration.GetValue("Security:LoginFailuresPerLogin", 50);
     private readonly TimeSpan _loginWindow = TimeSpan.FromMinutes(60);
+    private static readonly TimeSpan s_sweepInterval = TimeSpan.FromMinutes(1);
+    private DateTimeOffset _lastSweep = DateTimeOffset.MinValue;
 
-    /// <summary>Reserves an attempt; false means the caller is throttled and must not check the password.</summary>
-    public bool TryBegin(string normalizedLogin, string clientKey)
+    /// <summary>
+    /// Reserves an attempt; false means the caller is throttled and must not check the password. <paramref name="knownDevice"/>
+    /// — the browser signed in to this login before (its device cookie, D-460): only its own address limit holds it.
+    /// </summary>
+    public bool TryBegin(string normalizedLogin, string clientKey, bool knownDevice = false)
     {
         lock (_gate)
         {
+            SweepIfDue();
             var pair = Pair(normalizedLogin, clientKey);
-            if (Count(pair, _addressWindow) >= _perAddress || Count(normalizedLogin, _loginWindow) >= _perLogin)
+            if (Count(pair, _addressWindow) >= _perAddress || (!knownDevice && Count(normalizedLogin, _loginWindow) >= _perLogin))
             {
                 return false;
             }
@@ -49,6 +58,34 @@ public sealed class LoginThrottle(IClock clock, IConfiguration configuration)
                     _attempts.Remove(normalizedLogin);
                 }
             }
+        }
+    }
+
+    /// <summary>How many logins and login-address pairs have attempts in memory (for tests).</summary>
+    internal int TrackedKeys
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _attempts.Count;
+            }
+        }
+    }
+
+    private void SweepIfDue()
+    {
+        var now = clock.UtcNow;
+        if (now - _lastSweep < s_sweepInterval)
+        {
+            return;
+        }
+
+        _lastSweep = now;
+        var oldest = now - (_addressWindow > _loginWindow ? _addressWindow : _loginWindow);
+        foreach (var key in _attempts.Where(a => a.Value.Count == 0 || a.Value[^1] <= oldest).Select(a => a.Key).ToList())
+        {
+            _attempts.Remove(key);
         }
     }
 

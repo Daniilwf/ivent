@@ -1,25 +1,37 @@
-// The admin's rules editor checks the typed JSON against the ruleset schema (docs/ruleset.schema.json, served by
-// GET /api/admin/rules/schema) while the admin types. The schema uses a small part of JSON Schema: type, properties,
-// required, additionalProperties, enum and items; this checker knows exactly that part. The server checks everything
-// again on save, including the rules that a schema cannot say (ranges, time zones).
+// The admin's editors check the typed JSON against a schema generated from the server's types while the admin types:
+// the rules (docs/ruleset.schema.json, GET /api/admin/rules/schema) and the content (docs/content.schema.json,
+// GET /api/admin/content/schema). The schemas use a small part of JSON Schema: type, properties, required,
+// additionalProperties, enum, const, pattern, items, `true` for any value and anyOf — the content's base actions, one
+// variant per `type` (D-494); this checker knows exactly that part. The server checks everything again on save,
+// including the rules that a schema cannot say (ranges, time zones, references between objects).
 
 export type JsonSchema = {
   type?: string | string[];
-  properties?: Record<string, JsonSchema>;
+  properties?: Record<string, JsonSchema | boolean>;
   required?: string[];
   additionalProperties?: boolean | JsonSchema;
   enum?: unknown[];
-  items?: JsonSchema;
+  const?: unknown;
+  pattern?: string;
+  items?: JsonSchema | boolean;
+  anyOf?: JsonSchema[];
+  description?: string;
 };
 
 export type SchemaProblem =
-  | { kind: 'required' | 'unknown'; path: string }
+  | { kind: 'required' | 'unknown' | 'pattern'; path: string }
   | { kind: 'type'; path: string; expected: string[] }
   | { kind: 'enum'; path: string; values: unknown[] };
 
 /** Whether an answer looks like a schema this checker can use */
 export function isSchema(value: unknown): value is JsonSchema {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/** The value a variant of anyOf requires in its `type` property: the discriminator of the base actions */
+export function variantType(variant: JsonSchema): unknown {
+  const type = variant.properties?.type;
+  return isSchema(type) ? type.const : undefined;
 }
 
 function typeOf(value: unknown): string {
@@ -44,15 +56,28 @@ function fits(value: unknown, type: string): boolean {
 const join = (path: string, key: string) => (path === '' ? key : `${path}.${key}`);
 
 /** Every place where the value does not fit the schema, with the JSON path of the field */
-export function checkSchema(value: unknown, schema: JsonSchema, path = ''): SchemaProblem[] {
+export function checkSchema(
+  value: unknown,
+  schema: JsonSchema | boolean,
+  path = '',
+): SchemaProblem[] {
+  if (typeof schema === 'boolean') return [];
   const shown = path === '' ? '$' : path;
   if (schema.enum && !schema.enum.some((option) => option === value))
     return [{ kind: 'enum', path: shown, values: schema.enum }];
+  if ('const' in schema && schema.const !== value)
+    return [{ kind: 'enum', path: shown, values: [schema.const] }];
   if (schema.type !== undefined) {
     const types = Array.isArray(schema.type) ? schema.type : [schema.type];
     if (!types.some((type) => fits(value, type)))
       return [{ kind: 'type', path: shown, expected: types }];
   }
+  if (
+    schema.pattern !== undefined &&
+    typeof value === 'string' &&
+    !new RegExp(schema.pattern, 'u').test(value)
+  )
+    return [{ kind: 'pattern', path: shown }];
 
   const problems: SchemaProblem[] = [];
   if (Array.isArray(value)) {
@@ -66,13 +91,32 @@ export function checkSchema(value: unknown, schema: JsonSchema, path = ''): Sche
   }
   if (typeOf(value) !== 'object') return problems;
   const properties = schema.properties ?? {};
-
   const record = value as Record<string, unknown>;
+
+  // A variant per base action, told apart by `type`: the value is checked against its own variant only
+  if (schema.anyOf) {
+    const own = schema.anyOf.find((variant) => variantType(variant) === record.type);
+    if (!own) {
+      const types = schema.anyOf.map(variantType).filter((type) => type !== undefined);
+      return [
+        'type' in record
+          ? { kind: 'enum', path: join(path, 'type'), values: types }
+          : { kind: 'required', path: join(path, 'type') },
+      ];
+    }
+    return [
+      ...(schema.required ?? [])
+        .filter((key) => !(key in record))
+        .map((key) => ({ kind: 'required' as const, path: join(path, key) })),
+      ...checkSchema(value, own, path),
+    ];
+  }
+
   for (const key of schema.required ?? [])
     if (!(key in record)) problems.push({ kind: 'required', path: join(path, key) });
   for (const [key, field] of Object.entries(record)) {
     const known = properties[key];
-    if (known) problems.push(...checkSchema(field, known, join(path, key)));
+    if (known !== undefined) problems.push(...checkSchema(field, known, join(path, key)));
     else if (schema.additionalProperties === false)
       problems.push({ kind: 'unknown', path: join(path, key) });
     else if (isSchema(schema.additionalProperties))
