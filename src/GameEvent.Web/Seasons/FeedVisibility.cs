@@ -109,6 +109,15 @@ public static class FeedVisibility
         // Events (stage 5): what a deck gave is public, as the effects that follow it
         ["event-drawn"] = Access.Public,
         ["event-draw-missed"] = Access.Public,
+
+        // The weekly challenge (stage 5, D-526): what was set, who completed it and what a reject took back are public
+        ["weekly-challenge-set"] = Access.Public,
+        ["weekly-challenge-completed"] = Access.Public,
+        ["weekly-challenge-revoked"] = Access.Public,
+
+        // The suggestion box (D-527) is the admin's moderation queue, not a move of the season: its own screen shows it (5.19)
+        ["suggestion-submitted"] = Access.NotInFeed,
+        ["suggestion-reviewed"] = Access.NotInFeed,
         ["account-created"] = Access.NotInFeed,
         ["account-password-reset"] = Access.NotInFeed,
         ["account-password-changed"] = Access.NotInFeed,
