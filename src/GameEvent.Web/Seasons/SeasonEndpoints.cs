@@ -111,7 +111,14 @@ public sealed record SeasonView(
     IReadOnlyList<EdgeView> Edges,
     IReadOnlyList<ZoneView> Zones,
     MapMode MapMode,
-    MapBackgroundView? Background = null);
+    MapBackgroundView? Background = null,
+    EconomyFeaturesView? Economy = null);
+
+/// <summary>
+/// Which economy mechanics the season plays (D-441): a mechanic off is not shown at all; always set, optional for older
+/// clients. The inventory, the shop and the bets come from <c>GET /api/seasons/{id}/economy</c>.
+/// </summary>
+public sealed record EconomyFeaturesView(bool Items, bool Shop, bool Bets);
 
 /// <summary>
 /// A leaderboard row in place order (D-100): tied players share <c>place</c>; <c>isFirst</c> — the first finisher, on top
@@ -535,7 +542,7 @@ public static class SeasonEndpoints
     }
 
     private static async Task<Results<Ok<SeasonView>, NotFound>> GetSeasonAsync(
-        Guid seasonId, ClaimsPrincipal user, GameEventDbContext db, IClock clock, CancellationToken ct)
+        Guid seasonId, ClaimsPrincipal user, GameEventDbContext db, ContentCards contentCards, IClock clock, CancellationToken ct)
     {
         if (await SeasonMaps.CurrentAsync(db, seasonId, ct) is not { } map)
         {
@@ -698,7 +705,7 @@ public static class SeasonEndpoints
                 // The token walks the real branch and teleport on the graph map; the chain of stage 1 needs no path
                 rules.Features.MapMode == MapMode.Graph ? await SeasonMaps.LastMoveAsync(db, seasonId, mine.Id, ct) : null,
                 wishRerollOpen,
-                rules.Features.Events ? await EventViews.LastDrawnAsync(db, seasonId, mine.Id, ct) : null,
+                rules.Features.Events ? await EventViews.LastDrawnAsync(db, contentCards, seasonId, mine.Id, ct) : null,
                 mine.Coins,
                 checks);
         }
@@ -723,7 +730,8 @@ public static class SeasonEndpoints
             [.. map.Edges.Select(SeasonMaps.ToView)],
             [.. map.Zones.Select(SeasonMaps.ToView)],
             rules.Features.MapMode,
-            await SeasonMaps.BackgroundAsync(db, map, ct)));
+            await SeasonMaps.BackgroundAsync(db, map, ct),
+            new EconomyFeaturesView(rules.Features.Items, rules.Features.Shop, rules.Features.Bets)));
     }
 
     private static readonly string s_rejectedType = EventCatalog.Describe(typeof(ProofRejected)).Name;

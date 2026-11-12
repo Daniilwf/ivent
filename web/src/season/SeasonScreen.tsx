@@ -13,6 +13,7 @@ import { AvatarSection } from './AvatarSection';
 import { ProofSection } from './ProofForm';
 import { DrawnEventCard } from './DrawnEventCard';
 import { ManualEffectItem, type EffectOutcome } from './ManualEffectItem';
+import { EconomySection } from './Inventory';
 import { RunActions } from './RunActions';
 import { MyFinish } from './MyFinish';
 import { seasonPicture } from './seasonView';
@@ -362,6 +363,13 @@ export function SeasonScreen({
       });
     if (season) branchSeen.current = branchId;
   }, [branchId, season]);
+  // An event drawn while the page is open is drawn on screen (a key moment); one drawn before it opened just stands
+  // there. The first loaded view sets the base during render, so the new card mounts already knowing it is fresh.
+  const drawnSequence = season?.me?.lastEvent?.sequence ?? null;
+  const [drawBase, setDrawBase] = useState<{ sequence: number | null } | null>(null);
+  if (season && drawBase === null) setDrawBase({ sequence: drawnSequence });
+  const freshDraw =
+    drawBase !== null && drawnSequence !== null && drawnSequence !== drawBase.sequence;
   const [retrying, setRetrying] = useState(false);
 
   if (loadFailed && !season)
@@ -471,7 +479,6 @@ export function SeasonScreen({
                 ? ru.turn.after
                 : ru.turn.checksTitle}
         </h3>
-        {me.lastEvent ? <DrawnEventCard drawn={me.lastEvent} /> : null}
         {me.manualEffects.length > 0 && (
           <section
             aria-labelledby="effects-title"
@@ -634,6 +641,11 @@ export function SeasonScreen({
             </ul>
           </section>
         )}
+        {/* The event comes after the move that stopped on its cell: the card reads after the throw (design review) */}
+        {/* Key moments one after another (DESIGN.md «Движение»): a fresh card waits for the token to stop */}
+        {me.lastEvent && !(freshDraw && moving) ? (
+          <DrawnEventCard key={me.lastEvent.sequence} drawn={me.lastEvent} fresh={freshDraw} />
+        ) : null}
       </section>
     ) : null;
   // The wheel's stage: on a desktop it takes the map's place and stays with the result until I answer or close it,
@@ -985,6 +997,12 @@ export function SeasonScreen({
         <p className="sr-only" aria-live="polite" data-testid="roll-announce">
           {announced}
         </p>
+        {/* A card drawn while the page is open is said once, when it is drawn on screen */}
+        <p className="sr-only" aria-live="polite" data-testid="draw-announce">
+          {freshDraw && !moving && me?.lastEvent
+            ? ru.events.announce(me.lastEvent.kind, me.lastEvent.name)
+            : ''}
+        </p>
         {me?.phase === 'playing' && me.activeRun && (
           <div data-testid="active-run" className="grid gap-4">
             <p className="sr-only">{ru.turn.playing(me.activeRun.game.title)}</p>
@@ -1091,6 +1109,19 @@ export function SeasonScreen({
         </ol>
       </section>
 
+      {/* Items on (D-441): my inventory under the map on a phone, under my turn on a desktop, then the shop and the bets
+          when they are on (D-447) — bets may play without items; a mechanic off is not shown at all */}
+      {me && (season.economy?.items || season.economy?.shop || season.economy?.bets) ? (
+        <EconomySection
+          seasonId={seasonId}
+          version={season.lastSequence}
+          onSignedOut={onSignedOut}
+          items={season.economy.items}
+          shop={season.economy.shop}
+          bets={season.economy.bets}
+          className="desk:col-start-1 desk:w-96"
+        />
+      ) : null}
       <Panel title={ru.leaderboard.title} className="hidden desk:col-start-1 desk:grid desk:w-96">
         <p className="text-sm text-ink-soft">{ru.board.rule}</p>
         <Leaderboard rows={shownRows} />

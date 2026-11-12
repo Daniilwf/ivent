@@ -1,5 +1,15 @@
 // The single dictionary of interface texts. Terms come from docs/GLOSSARY.md.
 
+// A Russian noun after a number: 1 очко, 2 очка, 5 очков
+const plural = (n: number, one: string, few: string, many: string) => {
+  const tens = Math.abs(n) % 100;
+  const ones = Math.abs(n) % 10;
+  if (tens >= 11 && tens <= 14) return many;
+  if (ones === 1) return one;
+  if (ones >= 2 && ones <= 4) return few;
+  return many;
+};
+
 // игра / игры / игр
 const games = (n: number) => {
   const tens = n % 100;
@@ -10,20 +20,9 @@ const games = (n: number) => {
   return `${n} игр`;
 };
 
-// монетка / монетки / монеток
-const coins = (n: number) => {
-  const tens = n % 100;
-  const ones = n % 10;
-  const word =
-    tens >= 11 && tens <= 14
-      ? 'монеток'
-      : ones === 1
-        ? 'монетка'
-        : ones >= 2 && ones <= 4
-          ? 'монетки'
-          : 'монеток';
-  return `${n.toLocaleString('ru-RU')} ${word}`;
-};
+// монетка / монетки / монеток; a debt with a real minus: −2 монетки
+const coins = (n: number) =>
+  `${n < 0 ? '−' : ''}${Math.abs(n).toLocaleString('ru-RU')} ${plural(n, 'монетка', 'монетки', 'монеток')}`;
 
 // прохождение / прохождения / прохождений
 const runs = (n: number) => {
@@ -90,7 +89,7 @@ const rejection = {
   'turn.noPendingChoice': 'Этот выбор уже сделан или снят. Обнови страницу.',
   'turn.unknownOption': 'Такого варианта нет. Обнови страницу.',
   'roll.noAvailableGames': 'Нет доступных игр для ролла. Сообщи админу.',
-  'roll.notEnoughCoins': 'Не хватает монеток на реролл.',
+  'roll.notEnoughCoins': 'Не хватает монеток.',
   'roll.tooManyUnchecked':
     'Слишком много прохождений ждут проверки админом. Новый ролл откроется, когда их станет меньше лимита сезона.',
   'roll.gameNotOffered': 'Эта игра тебе сейчас не предложена. Обнови страницу.',
@@ -180,20 +179,52 @@ const rejection = {
   'site.maintenance': 'Идёт обслуживание: сайт на минуту только для чтения. Повтори чуть позже.',
   'bugReport.invalid': 'Опиши, что случилось (до 4000 символов).',
   'bugReport.screenshotUnknown': 'Скриншот не найден. Отправь отчёт ещё раз.',
+  // Stage 4: items, the shop and bets (D-441)
+  'item.unknown': 'Этого предмета у тебя уже нет. Обнови страницу.',
+  'item.notAnItem': 'Это эффект: он действует сам, использовать его не нужно.',
+  'item.wrongWindow': 'Сейчас этот предмет не используется: дождись его момента хода.',
+  'item.notStackable': 'Этот предмет не складывается с собой: прошлый ещё действует.',
+  'item.targetRequired': 'Выбери, на кого использовать предмет.',
+  'item.invalidTarget': 'На этого игрока предмет не действует. Выбери другого.',
+  'item.noTarget': 'Сейчас этот предмет не на кого использовать.',
+  'item.invalidChoice': 'Такого ответа нет. Обнови страницу и выбери снова.',
+  'item.hostileCap': 'На этом игроке уже висит враждебный эффект: больше нельзя.',
+  'item.notApplicable': 'Сейчас этот предмет ничего не изменит.',
+  'map.branchChoicePending':
+    'Кто-то, кого сдвинет предмет, выбирает ветку на развилке: попробуй чуть позже.',
+  'inventory.frozen': 'Ты финишировал первым: инвентарь заморожен.',
+  'inventory.full': 'Инвентарь полон: сначала используй что-нибудь.',
+  'content.unknownObject': 'Такого предмета нет в контенте сезона.',
+  'content.invalid': 'В пакете контента есть ошибки.',
+  'content.unchanged': 'Пакет совпадает с загруженным: обновлять нечего.',
+  'shop.noOffer': 'Сначала ролльни магазин.',
+  'shop.offerExpired': 'Время лотов вышло: ролльни магазин заново.',
+  'shop.unknownLot': 'Такого лота нет. Обнови страницу.',
+  'shop.lotSold': 'Этот лот уже куплен.',
+  'shop.empty': 'В магазине сезона пока ничего не продаётся.',
+  'coins.inDebt': 'Ты в минусе по монеткам: покупать нельзя.',
+  'bet.onSelf': 'На себя ставить нельзя.',
+  'bet.noRun': 'Этот игрок сейчас ничего не проходит.',
+  'bet.windowClosed': 'Ставки на эту игру уже закрыты.',
+  'bet.invalidDays': 'Выбери срок из предложенных.',
+  'bet.invalidStake': 'Ставка больше лимита сезона.',
+  'bet.tooMany': 'У тебя уже максимум открытых ставок.',
+  'bet.onFirst': 'На финишировавшего первым не ставят.',
+  'bet.alreadyPlaced': 'На эту игру ты уже поставил.',
   unknown: 'Действие отклонено. Попробуй ещё раз.',
+} as const;
+
+// What an object of the inventory is (GLOSSARY «Объект»)
+const objectKinds = {
+  item: 'Предмет',
+  effect: 'Эффект',
+  specialRoll: 'Спецролл',
+  event: 'Ивент',
+  achievement: 'Достижение',
 } as const;
 
 // H5: the feed, the profile and the game page
 
-// A Russian noun after a number: 1 очко, 2 очка, 5 очков
-const plural = (n: number, one: string, few: string, many: string) => {
-  const tens = Math.abs(n) % 100;
-  const ones = Math.abs(n) % 10;
-  if (tens >= 11 && tens <= 14) return many;
-  if (ones === 1) return one;
-  if (ones >= 2 && ones <= 4) return few;
-  return many;
-};
 // 1 очко, 2 очка, 5 очков
 const points = (n: number) => `${n} ${plural(n, 'очко', 'очка', 'очков')}`;
 // A change with its sign: +7, −3 (a real minus)
@@ -224,6 +255,24 @@ const techReroll = 'Тех-реролл';
 
 const feedLines = {
   seasonCreated: <T>(name: string): Line<T> => [`Сезон «${name}» создан`],
+  // Stage 4 (D-444): items, the shop, bets
+  itemUsed: <T>(p: T, item: string, targets: T[]): Line<T> =>
+    targets.length === 0
+      ? [p, ` использует «${item}»`]
+      : [
+          p,
+          ` использует «${item}». ${targets.length === 1 ? 'Цель' : 'Цели'}: `,
+          ...targets.flatMap((t, i) => (i === 0 ? [t] : [', ', t])),
+        ],
+  inventoryGiven: <T>(p: T, item: string): Line<T> => [p, `: админ выдаёт «${item}»`],
+  inventoryTaken: <T>(p: T, item: string): Line<T> => [p, `: админ забирает «${item}»`],
+  inventoryAdjusted: <T>(p: T): Line<T> => [p, ': админ правит инвентарь'],
+  contentPublished: <T>(version: number): Line<T> => [
+    `Предметы сезона обновлены, версия ${version}`,
+  ],
+  shopRolled: <T>(p: T): Line<T> => [p, ' роллит магазин'],
+  lotBought: <T>(p: T, item: string): Line<T> => [p, ` покупает «${item}»`],
+  betPlaced: <T>(p: T, on: T): Line<T> => [p, ' ставит на ', on],
   seasonStatus: <T>(to: 'draft' | 'active' | 'closing' | 'finished' | 'archived'): Line<T> => [
     {
       draft: 'Сезон снова в подготовке',
@@ -761,6 +810,9 @@ export const ru = {
       ['offer', 'Результат ролла'],
       ['complete', 'Завершение'],
       ['proof', 'Пруф'],
+      ['inventory', 'Инвентарь'],
+      ['shop', 'Магазин'],
+      ['bets', 'Ставки'],
       ['pool', 'Игры пула'],
       ['rules', 'Правила сезона'],
       ['dialogs', 'Окна'],
@@ -907,6 +959,23 @@ export const ru = {
       title: 'Админка',
       lead: 'Прохождение в очереди пруфов: финиш сверху с золотой меткой, закрытый лимитом ролл — предупреждением. Одобрение — главное действие только у первой карточки, реджект подтверждается.',
     },
+    inventory: {
+      title: 'Инвентарь',
+      lead: 'Предметы, эффекты и спецроллы игрока. «Использовать» — только в окно предмета; лист предлагает только тех, на кого предмет подействует.',
+      buttons:
+        'Кнопка «Использовать»: наведение, фокус, нажатие; вне окна — подсказка вместо кнопки',
+      openSheet: 'Открыть лист «Использовать»',
+    },
+    shop: {
+      title: 'Магазин',
+      lead: 'Личные лоты с таймером: ролл за монетки или по купону, «Купить» у каждого лота, куплено — плашка, нельзя — причина словами. Таймер в табличных цифрах; лоты исчезают по времени сервера.',
+      buttons: 'Кнопка «Купить»: наведение, фокус, нажатие',
+    },
+    bets: {
+      title: 'Ставки',
+      lead: 'Чужие игры, на которые можно поставить сейчас, и мои ставки со статусом словом и значком. Лист ставки: срок с коэффициентом, сумма, выигрыш до нажатия.',
+      openSheet: 'Открыть лист ставки',
+    },
     dialogs: {
       title: 'Окна',
       lead: 'Подтверждение опасного действия показывает последствия. Лидерборд на телефоне выезжает снизу.',
@@ -985,6 +1054,11 @@ export const ru = {
       title: 'Профиль',
       lead: 'Имя, аватарка целиком, число пройденных игр, сезоны с очками и местом, отзывы. Ниже — мой профиль без сезонов и отзывов.',
     },
+    sessions: {
+      title: 'Где я вошёл',
+      lead: 'Мои устройства в профиле: это устройство первым и с отметкой, у остальных — последний заход и «Выйти»; ниже — только одно устройство, загрузка и ошибка.',
+      only: 'Только это устройство',
+    },
     gamePage: {
       title: 'Страница игры',
       lead: 'Карточка из пула и все прохождения во всех сезонах: статус словом и значком, сложность, часы и отзыв. Ниже — игра, которую ещё никто не брал.',
@@ -1037,12 +1111,131 @@ export const ru = {
     tooOften: 'Слишком много отчётов за час. Попробуй позже.',
     failed: 'Отчёт не отправился. Попробуй ещё раз.',
   },
+  inventory: {
+    title: 'Инвентарь',
+    coins: (n: number) => coins(n),
+    count: (n: number, limit: number) => `Предметов ${n} из ${limit}`,
+    emptyTitle: 'В инвентаре пусто',
+    emptyText: 'Предметы дают клетки, лутбоксы и магазин. Как появятся — будут здесь.',
+    loadError: 'Проверь соединение и попробуй ещё раз.',
+    loadErrorTitle: 'Инвентарь не загрузился',
+    use: 'Использовать',
+    useTitle: (name: string) => `Использовать «${name}»`,
+    target: 'На кого',
+    targetHint: 'Только те, на кого предмет действует сейчас',
+    pickObject: 'Какой предмет',
+    noObjects: 'Подходящих предметов нет',
+    pickObjectNumbered: (n: number) => `Какой предмет, ${n}-й`,
+    preference: (n: number) => `${n}-й по желанию`,
+    preferenceHint:
+      'Сколько предметов — решит бросок. Отметь, какие важнее, остальные выберутся случайно.',
+    direction: 'Куда двигать',
+    forward: 'Вперёд',
+    back: 'Назад',
+    pick: 'Выбери',
+    // Names come in every gender: a text bound to a name never agrees with it
+    used: (name: string) => `Использовано: «${name}»`,
+    kinds: objectKinds,
+    actsAloneChip: (kind: keyof typeof objectKinds) => `${objectKinds[kind]}: действует сам`,
+    rarity: {
+      common: 'Редкость: обычная',
+      epic: 'Редкость: эпическая',
+      legendary: 'Редкость: легендарная',
+    },
+    hostile: 'Против других',
+    from: (name: string) => `От игрока ${name}`,
+    usesLeft: (n: number) =>
+      `Осталось ${n} ${plural(n, 'использование', 'использования', 'использований')}`,
+    runsLeft: (n: number) =>
+      `Ещё на ${n} ${plural(n, 'прохождение', 'прохождения', 'прохождений')}`,
+    until: (time: string) => `До ${time}`,
+    // When an item is used (SPEC «Окна использования»): said when it is not its moment
+    windows: {
+      beforeRoll: 'Используется перед роллом',
+      afterRoll: 'Используется после ролла, до старта игры',
+      beforeDice: 'Используется во время игры, до броска',
+      afterDice: 'Используется сразу после броска за прохождение',
+      anytime: 'Используется в любой момент',
+    },
+  },
+  // 4.11c (D-447): my shop on the season screen — the roll, the lots with their timer, the purchase
+  shop: {
+    title: 'Магазин',
+    lead: 'Ролл даёт личные лоты на несколько минут. Не купил — лоты исчезнут.',
+    coupons: (n: number) => `${plural(n, 'Купон', 'Купона', 'Купонов')}: ${n}`,
+    roll: (price: number) => `Ролл магазина за ${coins(price)}`,
+    rollAgain: (price: number) => `Новый ролл за ${coins(price)}`,
+    rollFree: 'Ролл по купону',
+    rollAnnounce: 'Новые лоты в магазине.',
+    left: (time: string) => `Лоты исчезнут через ${time}`,
+    gone: 'Время лотов вышло',
+    price: (n: number) => coins(n),
+    buy: 'Купить',
+    buyNamed: (name: string, price: number) => `Купить «${name}» за ${coins(price)}`,
+    sold: 'Куплено',
+    bought: (name: string) => `Куплено: «${name}». Уже в инвентаре.`,
+    emptyTitle: 'Лотов пока нет',
+    emptyText: 'Сделай ролл магазина — появятся личные лоты.',
+    goneTitle: 'Лоты исчезли',
+    goneText: 'Время вышло. Новый ролл даст новые лоты.',
+    loadErrorTitle: 'Магазин не загрузился',
+    // The engine's codes said in the shop's own words where the common ones speak of something else
+    refusals: {
+      'content.unknownObject': 'Этого предмета больше нет в сезоне.',
+    } as Record<string, string>,
+  },
+  // 4.11c (D-447): bets on the runs of others and my bets
+  bets: {
+    title: 'Ставки',
+    lead: 'Ставка — на то, что игрок пройдёт свою игру к сроку. Успел — выигрыш по коэффициенту, нет — монетки сгорают.',
+    open: (n: number, limit: number) => `Открыто ${n} из ${limit}`,
+    runsTitle: 'На кого поставить',
+    until: (time: string) => `Ставки до ${time}`,
+    hours: (h: number) => `${h.toLocaleString('ru-RU')} ч`,
+    noHours: 'Часы не указаны',
+    place: 'Поставить',
+    placeOn: (name: string) => `Поставить на игрока ${name}`,
+    dialogTitle: (name: string) => `Ставка на игрока ${name}`,
+    dialogGame: (game: string) => `Пройдёт «${game}» к сроку?`,
+    deadline: 'Срок',
+    deadlineHint: 'Чем короче срок, тем выше коэффициент',
+    option: (days: number, multiplier: number) =>
+      `${days} ${plural(days, 'день', 'дня', 'дней')}, ×${multiplier.toLocaleString('ru-RU')}`,
+    stake: 'Ставка в монетках',
+    stakeHint: (max: number) => `От 1 до ${coins(max)}`,
+    stakeInvalid: (max: number) => `Ставка — целое число от 1 до ${max}.`,
+    payout: (n: number) => `Выигрыш, если успеет: ${coins(n)}`,
+    confirm: (stake: number) => `Поставить ${coins(stake)}`,
+    placed: (name: string) => `Ставка на игрока ${name} принята.`,
+    emptyTitle: 'Сейчас ставить не на кого',
+    emptyText:
+      'Ставить можно на чужую игру вскоре после её ролла. Загляни, когда кто-нибудь роллит.',
+    mineTitle: 'Мои ставки',
+    mineEmpty: 'Ты ещё не ставил.',
+    on: (name: string, game: string) => `${name}: «${game}»`,
+    deadlineAt: (time: string) => `Срок до ${time}`,
+    stakeOf: (stake: number, multiplier: number) =>
+      `${coins(stake)}, ×${multiplier.toLocaleString('ru-RU')}`,
+    status: {
+      open: 'Ждёт',
+      won: 'Выиграна',
+      lost: 'Проиграна',
+      revoked: 'Отменена',
+    },
+    wonPayout: (n: number) => `+${coins(n)}`,
+    loadErrorTitle: 'Ставки не загрузились',
+    refusals: {
+      'roll.notEnoughCoins': 'Нет монеток на ставку.',
+      'coins.inDebt': 'Ты в минусе по монеткам: ставить нельзя.',
+    } as Record<string, string>,
+  },
   // Events drawn from decks (stage 5, D-500): the card of the one I drew last
   events: {
-    lastTitle: 'Вытянутый ивент',
     kinds: eventKindNames,
+    // Said once for a card drawn while the page is open, as the dice are
+    announce: (kind: EventKind, name: string) => `Вытянут ${eventKindWords[kind]}: «${name}»`,
     sources: { cell: 'с клетки ивента', item: 'от предмета' } as Record<'cell' | 'item', string>,
-    played: 'Разыгран сразу, как вытянут. Что он меняет в будущем, сработает само в свой момент.',
+    played: 'Уже разыгран — дальше сработает сам.',
   },
   effects: {
     title: 'Нужно разыграть',
@@ -1155,6 +1348,7 @@ export const ru = {
     undoneHint: 'Админ откатил это действие: оно больше не считается',
     someone: 'Игрок',
     someGame: 'игра',
+    someItem: 'предмет',
     fresh: (n: number) =>
       `${n} ${plural(n, 'новая запись', 'новые записи', 'новых записей')} в ленте`,
     emptyTitle: 'В ленте пока пусто',
@@ -1200,6 +1394,13 @@ export const ru = {
       cellBonus: (n: number) => `${signed(n)} ${plural(n, 'очко', 'очка', 'очков')} — бонус очков`,
       rolledNext: (title: string) => `Новый ролл: ${title}`,
       rolledChoice: (n: number) => `Новый ролл: выбор из ${n} ${plural(n, 'игры', 'игр', 'игр')}`,
+      intercepted: (item: string) => `Перехвачено: «${item}»`,
+      gotObject: (item: string) => `Получено: «${item}»`,
+      lostObject: (item: string) => `Не влезло в инвентарь: «${item}»`,
+      stake: (n: number) => `Ставка: ${coins(n)}`,
+      // EA-1: coins moved between players by one command, each with its name
+      coinsOf: (name: string, n: number) =>
+        `${name}: ${signed(n)} ${plural(n, 'монетка', 'монетки', 'монеток')}`,
     },
     rating: (n: number) => `${n} из 10`,
     ratingLabel: (n: number) => `Оценка: ${n} из 10`,
@@ -1224,6 +1425,28 @@ export const ru = {
     notFoundTitle: 'Такого игрока нет',
     notFoundText: 'Возможно, аккаунт удалён или ссылка неверная.',
     toSeason: 'К сезону',
+  },
+  // «Где я вошёл» (D-466): a session is a sign-in on one device; the page calls it «устройство»
+  sessions: {
+    title: 'Где я вошёл',
+    lead: 'Устройства, где открыт твой аккаунт. Не узнаёшь какое-то — выйди на нём и смени пароль.',
+    thisDevice: 'Это устройство',
+    lastSeen: (when: string) => `Последний заход: ${when}`,
+    signedInAt: (when: string) => `Вход: ${when}`,
+    end: 'Выйти',
+    endLabel: (device: string) => `Выйти на устройстве «${device}»`,
+    endOthers: 'Выйти на остальных устройствах',
+    ended: 'Готово: на том устройстве нужно будет войти снова.',
+    endedOthers: (n: number) =>
+      n === 0
+        ? 'Других устройств не было.'
+        : `Готово: вышли на ${n} ${plural(n, 'устройстве', 'устройствах', 'устройствах')}.`,
+    onlyThis: 'Аккаунт открыт только здесь.',
+    failed: 'Не получилось. Проверь связь и попробуй ещё раз.',
+    errorTitle: 'Список устройств не загрузился',
+    device: (browser: string, system: string) => `${browser}, ${system}`,
+    unknownDevice: 'Неизвестное устройство',
+    browsers: { yandex: 'Яндекс Браузер' },
   },
   gamePage: {
     runsTitle: (n: number) => (n === 0 ? 'Прохождения' : `Прохождения: ${n}`),
@@ -2619,6 +2842,16 @@ export const ru = {
       deletedOk: (name: string) => `Аккаунт удалён: ${name}`,
       restore: 'Вернуть',
       restored: (name: string) => `Аккаунт возвращён: ${name}`,
+      sessions: (n: number) => (n === 0 ? 'Нет открытых входов' : `Устройств со входом: ${n}`),
+      endSessions: 'Выйти отовсюду',
+      endSessionsTitle: (name: string) => `Выйти отовсюду у ${name}?`,
+      endSessionsConsequences: [
+        'На всех устройствах аккаунт выйдет сразу',
+        'Пароль и роль останутся',
+        'Войти снова можно тем же паролем',
+      ],
+      endSessionsConfirm: 'Выйти отовсюду',
+      endSessionsOk: (name: string) => `Вышли отовсюду: ${name}`,
     },
     bugs: {
       filter: 'Показать',

@@ -33,7 +33,8 @@ public sealed record ResetPassword(Guid UserId) : IAccountCommand;
 /// The owner sets a new password, the current one already checked by the endpoint against the account whose security
 /// stamp is <see cref="ExpectedStamp"/>: a reset or another change in between makes the command stale (D-106).
 /// </summary>
-public sealed record ChangeOwnPassword(Guid UserId, string NewPassword, string ExpectedStamp) : IAccountCommand, ISecretCommand
+/// <remarks><see cref="KeepSession"/> — the device that changed it: it stays signed in, every other session ends (D-467).</remarks>
+public sealed record ChangeOwnPassword(Guid UserId, string NewPassword, string ExpectedStamp, Guid? KeepSession = null) : IAccountCommand, ISecretCommand
 {
     public ICommand WithoutSecret() => this with { NewPassword = "" };
 }

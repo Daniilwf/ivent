@@ -17,6 +17,42 @@ namespace GameEvent.Infrastructure.Database.Migrations
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.14");
 
+            modelBuilder.Entity("GameEvent.Infrastructure.Accounts.SessionRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Address")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("ExpiresAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("LastSeenAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long?>("RevokedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("UserAgent")
+                        .HasMaxLength(256)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("Session", (string)null);
+                });
+
             modelBuilder.Entity("GameEvent.Infrastructure.Accounts.UserRecord", b =>
                 {
                     b.Property<Guid>("Id")
@@ -686,6 +722,15 @@ namespace GameEvent.Infrastructure.Database.Migrations
                     b.HasIndex("PlayerId");
 
                     b.ToTable("SeasonResult", (string)null);
+                });
+
+            modelBuilder.Entity("GameEvent.Infrastructure.Accounts.SessionRecord", b =>
+                {
+                    b.HasOne("GameEvent.Infrastructure.Accounts.UserRecord", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("GameEvent.Infrastructure.Seasons.PendingManualEffectRecord", b =>

@@ -214,6 +214,11 @@ describe('SeasonScreen', () => {
     const card = await screen.findByTestId('drawn-event');
     expect(card).toHaveTextContent('Попутный ветер');
     expect(card).toHaveTextContent(ru.events.kinds.good);
+    // Drawn while the page was open: it comes off the deck (a key moment)
+    expect(card).toHaveAttribute('data-drawing', 'true');
+    expect(screen.getByTestId('draw-announce')).toHaveTextContent(
+      'Вытянут хороший ивент: «Попутный ветер»',
+    );
   });
 
   it('refetches when another player acts', async () => {

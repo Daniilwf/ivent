@@ -16,6 +16,7 @@ import { EmptyState } from '../ui/States';
 import { Sticker } from '../ui/Sticker';
 import { Panel } from '../ui/Surface';
 import { Quote } from './Review';
+import { SessionsPanel } from './SessionsPanel';
 import { answerOf, useLoaded, type Answer } from '../app/useLoaded';
 
 type Profile = Schemas['ProfileView'];
@@ -57,7 +58,10 @@ export function ProfileScreen({
         }
       >
         {(profile) => (
-          <ProfileDetails profile={profile} mine={profile.id === meId} headingRef={heading} />
+          <>
+            <ProfileDetails profile={profile} mine={profile.id === meId} headingRef={heading} />
+            {profile.id === meId ? <SessionsPanel onSignedOut={onSignedOut} /> : null}
+          </>
         )}
       </AsyncState>
     </main>

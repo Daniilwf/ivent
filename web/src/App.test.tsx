@@ -1,4 +1,5 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
+import { SIGNED_OUT_EVENT } from './api/client';
 import { App } from './App';
 import { ru } from './i18n/ru';
 import { fakeServer, json } from './test/fakeServer';
@@ -31,6 +32,19 @@ describe('App', () => {
     render(<App />);
 
     expect(await screen.findByTestId('no-season')).toHaveTextContent(ru.shell.noSeasonTitle);
+  });
+
+  // D-466: the session ended on another device or by the admin; the page shows the sign-in form without a reload
+  it('goes to the sign-in form as soon as a request says the session is over', async () => {
+    serve({ '/api/auth/me': () => json(200, user) });
+    render(<App />);
+    await screen.findByTestId('no-season');
+
+    act(() => {
+      globalThis.dispatchEvent(new Event(SIGNED_OUT_EVENT));
+    });
+
+    expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent(ru.login.title);
   });
 
   // BUGS.md I1-1: on a slow mobile network each request in a row is a round trip before the season can load

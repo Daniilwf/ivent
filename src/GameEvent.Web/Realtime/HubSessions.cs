@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using GameEvent.Engine.Accounts;
 using GameEvent.Infrastructure.Queue;
+using GameEvent.Web.Hosting;
 using Microsoft.AspNetCore.SignalR;
 
 namespace GameEvent.Web.Realtime;
@@ -8,7 +9,7 @@ namespace GameEvent.Web.Realtime;
 /// <summary>
 /// The hub connections of each account (D-67, D-106): a new security stamp — password reset or change, role change,
 /// deletion — closes them, so an ended session stops getting updates at once; the client reconnects with the cookie it
-/// has and is refused if that session ended.
+/// has and is refused if that session ended. Ended sessions (D-466) close only their own connections.
 /// </summary>
 public sealed class HubSessions : ICommittedEventsListener
 {
@@ -25,11 +26,24 @@ public sealed class HubSessions : ICommittedEventsListener
     /// <summary>How many connections an account has open (for tests and diagnostics).</summary>
     public int CountFor(Guid userId) => _connections.Values.Count(c => c.UserIdentifier == userId.ToString());
 
+    /// <summary>How many connections a session has open (for tests and diagnostics).</summary>
+    public int CountForSession(Guid sessionId) => _connections.Values.Count(c => c.User?.SessionId() == sessionId);
+
     public Task OnCommittedAsync(IReadOnlyList<LoggedEvent> events, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(events);
         foreach (var e in events)
         {
+            if (e.Event is SessionsEnded ended)
+            {
+                foreach (var connection in _connections.Values.Where(c => c.User?.SessionId() is { } id && ended.SessionIds.Contains(id)).ToList())
+                {
+                    connection.Abort();
+                }
+
+                continue;
+            }
+
             var userId = e.Event switch
             {
                 AccountPasswordReset x => x.UserId,
