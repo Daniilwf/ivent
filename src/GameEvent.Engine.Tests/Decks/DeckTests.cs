@@ -228,7 +228,6 @@ public class DeckTests
     [Theory]
     [InlineData("given", "$.objects[1].effect.actions[0].objectId")]
     [InlineData("transformedInto", "$.objects[1].effect.actions[0].into")]
-    [InlineData("manual", "$.objects[0].manual")]
     [InlineData("hostile", "$.objects[0].hostile")]
     [InlineData("condition", "$.objects[0].effect.condition")]
     [InlineData("target", "$.objects[0].effect.target")]
@@ -240,10 +239,10 @@ public class DeckTests
         {
             "given" => [tailwind, s_drawGood with { Effect = Acts(new GiveObjectAction { ObjectId = "tailwind" }) }],
             "transformedInto" => [tailwind, s_drawGood with { Effect = Acts(new TransformObjectAction { Mode = TransformMode.Transform, Into = "tailwind" }) }],
-            "manual" => [EconomyScenario.Examples()["karaoke"]],
             "hostile" => [tailwind with { Hostile = true }],
             "condition" => [tailwind with { Effect = tailwind.Effect! with { Condition = new ConditionSpec { DifficultyAtLeast = Engine.Runs.Difficulty.Hard } } }],
-            _ => [tailwind with { Effect = tailwind.Effect! with { Target = new TargetSpec { Selector = TargetSelector.Leader } } }],
+            // Since 5.3 an event reaches the players its selector picks (D-554); nobody is asked to choose one before 5.7
+            _ => [tailwind with { Effect = tailwind.Effect! with { Target = new TargetSpec { Selector = TargetSelector.Chosen } } }],
         };
 
         Assert.Contains(path, ContentPublishing.Check(new ContentPack { Objects = [.. objects] }, events: true).Select(e => e.Path));

@@ -154,7 +154,8 @@ internal static class RunLifecycle
             }
         }
 
-        if (die.GrantEvent is { } granted)
+        var eventsOn = state.Rules.Features.Events;
+        if (die.GrantEvent is { } granted && !eventsOn)
         {
             events.Add(new ManualEffectCreated(context.Ids.NewId(), player.PlayerId, granted, ManualEffectSource.Difficulty, run.RunId));
         }
@@ -162,6 +163,14 @@ internal static class RunLifecycle
         // The finish comes after the run's own rewards, so a first frozen at once is frozen after them (D-99); then the
         // cell of the stop, or the branch choice of a paused walk (D-303, D-304).
         events.AddRange(AfterOwnMove(events.Aggregate(state, SeasonEngine.Apply), player, run, moved, walk, context));
+
+        // With events on the difficulty's event is drawn after the throw and the move it made, so what it does waits for
+        // the next throw and never moves the player before his own finish (D-504, D-553)
+        if (die.GrantEvent is { } drawnKind && eventsOn)
+        {
+            events.AddRange(Decks.EventDraws.Draw(
+                events.Aggregate(state, SeasonEngine.Apply), context, player.PlayerId, Decks.EventDraws.NameOf(drawnKind), Decks.EventSource.Difficulty, run.RunId));
+        }
 
         if (command.Review is { } given)
         {

@@ -259,9 +259,25 @@
                 "additionalProperties": false
               },
               "intercept": {
-                "enum": [
-                  "hostile",
-                  null
+                "anyOf": [
+                  {
+                    "enum": [
+                      "hostile",
+                      "badEvent",
+                      null
+                    ]
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "enum": [
+                        "hostile",
+                        "badEvent"
+                      ]
+                    },
+                    "minItems": 1,
+                    "uniqueItems": true
+                  }
                 ]
               },
               "actions": {

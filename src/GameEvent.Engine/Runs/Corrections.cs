@@ -148,7 +148,9 @@ internal static class Corrections
         // The frozen first gets no new event (the freeze amendment); the old one still does not apply.
         if (!frozen && newRule.GrantEvent is { } granted)
         {
-            events.Add(new ManualEffectCreated(context.Ids.NewId(), run.PlayerId, granted, ManualEffectSource.Difficulty, run.RunId));
+            // With events on it is drawn now, as at the completion (D-504); one already drawn stays (Н-4, D-553)
+            events.AddRange(Decks.EventDraws.Draw(
+                events.Aggregate(state, SeasonEngine.Apply), context, run.PlayerId, Decks.EventDraws.NameOf(granted), Decks.EventSource.Difficulty, run.RunId));
         }
 
         return events;

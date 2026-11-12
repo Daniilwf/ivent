@@ -243,12 +243,24 @@ internal sealed class TransformObjectHandler : ActionHandler<TransformObjectActi
 
 /// <summary>
 /// <c>drawEvent</c>: the target draws an event from the deck and plays it at once (D-500, D-501); while
-/// <c>features.events</c> is off the event is drawn by hand — a manual effect «draw a good/bad event» (D-10, D-410).
+/// <c>features.events</c> is off the event is drawn by hand — a manual effect «draw a good/bad event» (D-10, D-410). Drawn
+/// onto another player it is <c>incoming</c> and remembers who drew it and whether his item was hostile (D-504, D-548).
 /// </summary>
 internal sealed class DrawEventHandler : ActionHandler<DrawEventAction>
 {
-    protected override void Execute(DrawEventAction action, EffectRun run) =>
-        run.Emit(Decks.EventDraws.Draw(run.State, run.Context, run.ActionTarget(action), action.Deck, Decks.EventSource.Item));
+    protected override void Execute(DrawEventAction action, EffectRun run)
+    {
+        var target = run.ActionTarget(action);
+        var incoming = target != run.UserId;
+        run.Emit(Decks.EventDraws.Draw(
+            run.State,
+            run.Context,
+            target,
+            action.Deck,
+            incoming ? Decks.EventSource.Incoming : Decks.EventSource.Item,
+            fromPlayerId: incoming ? run.UserId : null,
+            hostile: incoming && run.Hostile));
+    }
 }
 
 /// <summary><c>spinWheel</c>: a loot wheel of the content picks an object by weight (only live ones), and it is given.</summary>

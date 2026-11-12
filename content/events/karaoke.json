@@ -1,0 +1,11 @@
+{
+  "id": "karaoke",
+  "kind": "event",
+  "name": "Караоке",
+  "description": "Спой песню на выбор остальных и скинь видео в галерею.",
+  "rarity": "common",
+  "price": null,
+  "hostile": false,
+  "manual": true,
+  "proof": "media"
+}

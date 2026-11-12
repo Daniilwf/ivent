@@ -1,7 +1,5 @@
-using GameEvent.Engine.Effects;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Pool;
-using GameEvent.Engine.Rulesets;
 using GameEvent.Engine.Runs;
 using GameEvent.Engine.Scoring;
 using GameEvent.Engine.Seasons;
@@ -122,6 +120,11 @@ internal static class Rolling
             : player.Choice!.Options.Select(o => o.Game?.GameId).OfType<Guid>().ToHashSet();
         var rerolled = new GameRerolled(player.PlayerId, [.. givenUp.Order()], payment);
         var after = Apply(state, rerolled);
+        if (payment == RerollPayment.BadEvent)
+        {
+            return Decks.PaidRerollEvents.Decide(after, rerolled, givenUp, context);
+        }
+
         if (Draw(after, player.PlayerId, context, Filters(after, player.PlayerId), givenUp) is not { } roll)
         {
             return Decision.Reject(RejectionCodes.NoAvailableGames, "No game is left besides the ones given up.");
@@ -137,7 +140,6 @@ internal static class Rolling
         {
             RerollPayment.FreeRerollResource => new ResourceChanged(player.PlayerId, RerollPrice.FreeRerollsResource, -1, ResourceReason.Reroll),
             RerollPayment.Coins when price != 0 => new CoinsChanged(player.PlayerId, -price, CoinsReason.Reroll, RunId: null),
-            RerollPayment.BadEvent => new ManualEffectCreated(context.Ids.NewId(), player.PlayerId, EventKind.Bad, ManualEffectSource.PaidReroll, RunId: null),
             _ => null,
         };
         return Decision.Accept(paid is null ? [rerolled, roll] : [rerolled, paid, roll]);
@@ -176,8 +178,8 @@ internal static class Rolling
         player.Offer?.GameId == gameId || (player.Choice?.Options.Any(o => o.Game?.GameId == gameId) ?? false);
 
     /// <summary>Whether a roll of <paramref name="playerId"/> would find a game: the same test the wheel makes.</summary>
-    internal static bool CanRoll(SeasonState state, Guid playerId, IPoolView pool, IReadOnlyList<RollFilter> filters) =>
-        Wheel(state, playerId, pool, filters).Categories.Count > 0;
+    internal static bool CanRoll(SeasonState state, Guid playerId, IPoolView pool, IReadOnlyList<RollFilter> filters, IReadOnlySet<Guid>? givenUp = null) =>
+        Wheel(state, playerId, pool, filters, givenUp).Categories.Count > 0;
 
     /// <summary>
     /// The wheel and the draw (D-05, D-06, D-46): the roll event for <paramref name="playerId"/>, or null when no

@@ -1,0 +1,18 @@
+{
+  "id": "bubble-effect",
+  "kind": "effect",
+  "name": "Бабл",
+  "description": "Гасит следующий плохой ивент или враждебный эффект.",
+  "rarity": "epic",
+  "price": null,
+  "hostile": false,
+  "tags": [],
+  "effect": {
+    "trigger": "hostileIncoming",
+    "intercept": ["badEvent", "hostile"],
+    "duration": {
+      "uses": 1
+    },
+    "actions": []
+  }
+}

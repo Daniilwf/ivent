@@ -209,31 +209,20 @@ public static class ContentPublishing
         }
     }
 
-    // What an event plays in 5.1 (D-536): its effect at once on the one who drew it. Text by hand (IRL), a condition and
-    // other targets come with 5.3 and are refused until then rather than ignored.
+    // What an event plays (D-536, 5.3): its effect at once, from the one who drew it — on him or on the players its selector
+    // picks without asking (a chosen target waits for 5.7, the triggered check refuses it); a text by hand (manual: true)
+    // waits for resolution (D-410). It is hostile only when another player's hostile item drew it (D-504), never by itself;
+    // a condition comes with 5.5 and is refused until then rather than ignored.
     private static void Event(ObjectDefinition definition, string at, Action<string, string> error)
     {
-        if (definition.Manual)
-        {
-            error($"{at}.manual", "An event played by hand comes with task 5.3.");
-        }
-
         if (definition.Hostile)
         {
             error($"{at}.hostile", "An event is played on the one who drew it: it is not hostile.");
         }
 
-        if (definition.Effect is { } effect)
+        if (definition.Effect is { Condition: not null })
         {
-            if (effect.Condition is not null)
-            {
-                error($"{at}.effect.condition", "An event plays when drawn, without a condition.");
-            }
-
-            if (effect.Target is { Selector: not TargetSelector.Self })
-            {
-                error($"{at}.effect.target", "An event acts on the one who drew it («self»).");
-            }
+            error($"{at}.effect.condition", "An event plays when drawn, without a condition.");
         }
     }
 
