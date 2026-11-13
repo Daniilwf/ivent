@@ -591,6 +591,41 @@ public class SettleForAllTests
         Assert.Equal(Comparable(before), Comparable(s.State));
     }
 
+    [Fact]
+    public void Roll_and_dice_changes_of_a_settlement_carry_its_event_kind()
+    {
+        // A global event or a poll on everyone gives roll and throw changes: they keep their place in events.applyOrder (D-581, D-706)
+        var effect = new EffectSpec
+        {
+            Target = s_all,
+            Actions =
+            [
+                new ModifyNextRollAction { ChoiceCount = 2 },
+                new ModifyDiceAction { Stage = DiceStage.Add, Value = ContentValue.Of(1), When = DiceWhen.Next },
+            ],
+        };
+        var s = Season(effect, ByAdmin, players: 3, economy: true);
+        s.WithTriggers(new KindedGoal(effect, Engine.Rulesets.EventKind.Special));
+        s.Act(new AdjustPlayer(s.PlayerId("Вася"), GoalComment, PointsDelta: 1));
+        var queued = Assert.Single(s.LastEvents<ForAllQueued>());
+        Assert.Equal(Engine.Rulesets.EventKind.Special, queued.Kind);
+
+        var batches = SettleAll(s);
+
+        var rolls = batches.SelectMany(b => b.Events.OfType<NextRollModified>()).ToList();
+        var dice = batches.SelectMany(b => b.Events.OfType<NextDiceModified>()).ToList();
+        Assert.Equal(3, rolls.Count);
+        Assert.Equal(3, dice.Count);
+        Assert.All(rolls, r => Assert.Equal(Engine.Rulesets.EventKind.Special, r.Modifier.EventKind));
+        Assert.All(dice, d => Assert.Equal(Engine.Rulesets.EventKind.Special, d.Modifier.EventKind));
+    }
+
+    private sealed class KindedGoal(EffectSpec effect, Engine.Rulesets.EventKind kind) : ITriggerHandler
+    {
+        public IEnumerable<IGameEvent> React(SeasonState state, IGameEvent trigger, EngineContext context) =>
+            ByAdmin(trigger) ? [ForAllSettlements.Queue(state, context, ForAllSource.GlobalEventLaunch, s_goal, "global-event", effect, kind: kind)] : [];
+    }
+
     // ---- Replay ----
 
     [Fact]
