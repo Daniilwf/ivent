@@ -34,7 +34,8 @@ public static class Timers
 
     /// <summary>
     /// The earliest moment something of <paramref name="player"/> in <paramref name="state"/> is due: his own timers and the
-    /// pending invitations he sent (D-523), his open requests of the partner board (D-524); null when nothing waits.
+    /// pending invitations he sent (D-523), his open requests of the partner board (D-524), the end of the duels he
+    /// challenged to (D-525); null when nothing waits.
     /// </summary>
     public static DateTimeOffset? Next(SeasonState state, SeasonPlayer player)
     {
@@ -51,7 +52,7 @@ public static class Timers
                 .Select(r => (DateTimeOffset?)r.ExpiresAt)
                 .Min()
             : null;
-        return new[] { Next(player, state.Rules.Features), invitations, requests }.Where(m => m is not null).Min();
+        return new[] { Next(player, state.Rules.Features), invitations, requests, Duels.Dueling.Next(state, player.PlayerId) }.Where(m => m is not null).Min();
     }
 
     /// <summary>
@@ -105,6 +106,12 @@ public static class Timers
         // Polls whose time has come close with their results (D-514)
         events.AddRange(Polls.Polling.Due(events.Aggregate(state, SeasonEngine.Apply), context, events.Count));
 
+        // A duel past its race's end is a draw (D-525)
+        if (features.Duels)
+        {
+            events.AddRange(Duels.Dueling.Timeouts(state, now));
+        }
+
         return events.Count == 0
             ? Decision.Reject(RejectionCodes.TimersNothingDue, "Nothing is due yet.")
             : Decision.Accept(events);
@@ -113,7 +120,7 @@ public static class Timers
 
 /// <summary>
 /// What follows a command's own events without being an effect (D-413): bets are decided, weekly challenges are completed
-/// or taken back (D-526), the shop price starts over,
+/// or taken back (D-526), duels are won, drawn or called off (D-525), the shop price starts over,
 /// objects living for some runs count one down. Not limited by the effect chain: a settlement must never be cut.
 /// Writes nothing while the season has none of it, nor for a mechanic switched off (D-420).
 /// </summary>
@@ -124,6 +131,7 @@ internal static class Settlements
             .Concat(s.Rules.Features.WeeklyChallenge ? Challenges.WeeklyChallenges.Settle(s, context.Pool, e) : [])
             .Concat(s.Rules.Features.Coop ? Interactions.Coop.Settle(s, e, context.Clock.UtcNow) : [])
             .Concat(Interactions.PartnerBoard.IsOn(s.Rules.Features) ? Interactions.PartnerBoard.Settle(s, e, context.Clock.UtcNow) : [])
+            .Concat(s.Rules.Features.Duels ? Duels.Dueling.Settle(s, e, context.Clock.UtcNow) : [])
             .Concat(s.Rules.Features.Shop ? ShopReset(s, e) : []));
 
     /// <summary>

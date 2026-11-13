@@ -83,12 +83,17 @@ public static class SeasonEngine
             SubmitIrlProof c => IrlProofs.Decide(state, c, context),
             ReviewIrlProof c => IrlProofs.Decide(state, c, context),
             Interactions.InviteToCoop c => Interactions.Coop.Decide(state, c, context),
+
+            // One invitation for coop and duels (D-718, D-730): a duel's is answered and withdrawn by the duel's rules
+            Interactions.AnswerInvitation c when Duels.Dueling.IsDuel(state, c.InteractionId) => Duels.Dueling.Decide(state, c, context),
+            Interactions.WithdrawInvitation c when Duels.Dueling.IsDuel(state, c.InteractionId) => Duels.Dueling.Decide(state, c, context),
             Interactions.AnswerInvitation c => Interactions.Coop.Decide(state, c, context),
             Interactions.WithdrawInvitation c => Interactions.Coop.Decide(state, c, context),
             Interactions.LeaveCoop c => Interactions.Coop.Decide(state, c, context),
             Interactions.PostPartnerRequest c => Interactions.PartnerBoard.Decide(state, c, context),
             Interactions.RespondToPartnerRequest c => Interactions.PartnerBoard.Decide(state, c, context),
             Interactions.ClosePartnerRequest c => Interactions.PartnerBoard.Decide(state, c, context),
+            Duels.ChallengeToDuel c => Duels.Dueling.Decide(state, c, context),
             FireTimers => Timers.Decide(state, context),
             SettleForAll c => ForAllSettlements.Decide(state, c, context),
             Polls.StartPoll c => Polls.Polling.Decide(state, c, context),
@@ -256,6 +261,9 @@ public static class SeasonEngine
             Interactions.CoopRewardSplit e => Interactions.Coop.Apply(state, e),
             Interactions.PartnerRequestPosted e => Interactions.PartnerBoard.Apply(state, e),
             Interactions.PartnerRequestClosed e => Interactions.PartnerBoard.Apply(state, e),
+            Duels.DuelStarted e => Duels.Dueling.Apply(state, e),
+            Duels.DuelSettled e => Duels.Dueling.Apply(state, e),
+            Duels.DuelWinRevoked e => Duels.Dueling.Apply(state, e),
 
             // Facts for the log and the feed that change nothing by themselves: their consequences are their own events.
             ObjectLost or ItemUsed or EffectTriggered or EffectRolled or HostileIntercepted or WheelSpun or InventoryAdjusted => state,

@@ -26,7 +26,7 @@ public sealed record SeasonFields(SeasonStatus Status, DateTimeOffset? Deadline,
 
 /// <summary>
 /// A command is undone (D-104): what it touched gets back the values it had before — players, runs, pending manual
-/// effects, weekly challenges and suggestions it changed, those it created are removed, the season's fields if it changed
+/// effects, weekly challenges, suggestions and duels it changed, those it created are removed, the season's fields if it changed
 /// them. Nothing later touched them (that is when an undo is allowed), so this equals its events inverted in reverse order.
 /// The counters of finishes and points changes are not wound back: numbers are never reused. Challenges and suggestions are
 /// written only when set: an undo of a command that touched none of them keeps its format (D-576); so are invitations (D-523)
@@ -66,7 +66,11 @@ public sealed record CommandUndone(
     [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     EquatableArray<Polls.Poll>? Polls = null,
     [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
-    EquatableArray<Guid>? RemovedPolls = null) : IGameEvent;
+    EquatableArray<Guid>? RemovedPolls = null,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    EquatableArray<Duels.Duel>? Duels = null,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    EquatableArray<Guid>? RemovedDuels = null) : IGameEvent;
 
 internal static class Undoing
 {
@@ -231,6 +235,7 @@ internal static class Undoing
         var requests = state.PartnerRequests.RemoveRange(e.RemovedPartnerRequests ?? [])
             .SetItems((e.PartnerRequests ?? []).Select(x => KeyValuePair.Create(x.RequestId, x)));
         var polls = state.Polls.RemoveRange(e.RemovedPolls ?? []).SetItems((e.Polls ?? []).Select(x => KeyValuePair.Create(x.PollId, x)));
+        var duels = state.Duels.RemoveRange(e.RemovedDuels ?? []).SetItems((e.Duels ?? []).Select(x => KeyValuePair.Create(x.DuelId, x)));
         var restored = state with
         {
             Polls = polls,
@@ -242,6 +247,7 @@ internal static class Undoing
             ForAll = forAll,
             Interactions = interactions,
             PartnerRequests = requests,
+            Duels = duels,
         };
         if (e.Season is not { } season)
         {
@@ -389,6 +395,59 @@ internal static class Undoing
             }
         }
 
+        // A duel: its challenge, answer and end (D-525 (8), D-730). What a command decides of duels reads the duel standing of
+        // its players — their open duels, their wins, a race still to win — so it holds the players' «duels:» key too: a later
+        // challenge or answer of one of them, and a run of one of them ending within a race of his, wait for it (D-735)
+        foreach (var id in Changed(before.Duels, after.Duels))
+        {
+            keys.Add($"duel:{id}");
+            var duel = after.Duels.GetValueOrDefault(id) ?? before.Duels[id];
+            keys.Add($"{DuelsPrefix}{duel.ChallengerId}");
+            keys.Add($"{DuelsPrefix}{duel.OpponentId}");
+        }
+
+        foreach (var id in Changed(before.Interactions, after.Interactions))
+        {
+            if ((after.Interactions.GetValueOrDefault(id) ?? before.Interactions[id]) is { Kind: Interactions.InteractionKind.Duel } challenge)
+            {
+                keys.Add($"{DuelsPrefix}{challenge.FromPlayerId}");
+                keys.Add($"{DuelsPrefix}{challenge.ToPlayerId}");
+            }
+        }
+
+        foreach (var (playerId, at) in events.Select(RunEnd).OfType<(Guid, DateTimeOffset)>())
+        {
+            if (before.Duels.Values.Concat(after.Duels.Values).Any(d => d.Involves(playerId) && d.AcceptedAt <= at && at < d.ExpiresAt))
+            {
+                keys.Add($"{DuelsPrefix}{playerId}");
+            }
+        }
+
+        // Who may duel is read by every challenge and accept: marking a player inactive or active again, and who is the first
+        // finisher — a finish, a freeze, a revoke — change it, and the first's duels end (D-734)
+        foreach (var e in events)
+        {
+            if (e is Players.PlayerInactivitySet inactivity)
+            {
+                keys.Add($"{DuelsPrefix}{inactivity.PlayerId}");
+            }
+
+            var finisher = e switch
+            {
+                PlayerFinished f => f.PlayerId,
+                PlayerFinishRevoked r => r.PlayerId,
+                PlayerFrozen z => z.PlayerId,
+                _ => (Guid?)null,
+            };
+            if (finisher is not null)
+            {
+                foreach (var id in new[] { finisher, FinishLine.First(before), FinishLine.First(after) }.OfType<Guid>())
+                {
+                    keys.Add($"{DuelsPrefix}{id}");
+                }
+            }
+        }
+
         if (before.Status != after.Status || before.Deadline != after.Deadline || before.Name != after.Name
             || before.Ruleset != after.Ruleset || before.Result != after.Result)
         {
@@ -429,6 +488,18 @@ internal static class Undoing
     }
 
     private const string FinishKey = "finishOrder";
+
+    private const string DuelsPrefix = "duels:";
+
+    // A run's end a duel race may be decided by (D-735)
+    private static (Guid PlayerId, DateTimeOffset At)? RunEnd(IGameEvent e) =>
+        e switch
+        {
+            RunCompleted c => (c.PlayerId, c.CompletedAt),
+            RunDropped d => (d.PlayerId, d.DroppedAt),
+            RunTechRerolled t => (t.PlayerId, t.RerolledAt),
+            _ => null,
+        };
 
     private const string AuthorPrefix = "author:";
 
@@ -473,6 +544,7 @@ internal static class Undoing
         var interactions = Changed(before.Interactions, after.Interactions).ToList();
         var requests = Changed(before.PartnerRequests, after.PartnerRequests).ToList();
         var polls = Changed(before.Polls, after.Polls).ToList();
+        var duels = Changed(before.Duels, after.Duels).ToList();
         var seasonChanged = before.Status != after.Status || before.Deadline != after.Deadline || before.Name != after.Name
             || before.Ruleset != after.Ruleset;
 
@@ -504,7 +576,9 @@ internal static class Undoing
             // A poll as it was, with the votes of the users the command changed as they were and the others' as they are (D-722)
             OrNull([.. polls.Where(before.Polls.ContainsKey)
                 .Select(id => Restored(before.Polls[id], after.Polls.GetValueOrDefault(id), now.Polls.GetValueOrDefault(id)))]),
-            OrNull([.. polls.Where(id => !before.Polls.ContainsKey(id) && now.Polls.ContainsKey(id))]));
+            OrNull([.. polls.Where(id => !before.Polls.ContainsKey(id) && now.Polls.ContainsKey(id))]),
+            OrNull([.. duels.Where(before.Duels.ContainsKey).Select(id => before.Duels[id])]),
+            OrNull([.. duels.Where(id => !before.Duels.ContainsKey(id) && now.Duels.ContainsKey(id))]));
     }
 
     private static Polls.Poll Restored(Polls.Poll was, Polls.Poll? after, Polls.Poll? now)
