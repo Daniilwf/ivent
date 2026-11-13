@@ -260,7 +260,9 @@ internal static class ProofReview
         var events = new List<IGameEvent>();
         if (command.Difficulty is { } lower && lower < claimed)
         {
-            events.AddRange(Corrections.DifficultyChange(state, run, lower, command.Comment!, context));
+            // INV-2: a change that revokes the first's finish settles the next first and may freeze him; here the freeze
+            // waits for the approval, so it is the last event of the command (Q-3) and is decided once, below
+            events.AddRange(Corrections.DifficultyChange(state, run, lower, command.Comment!, context).Where(e => e is not PlayerFrozen));
         }
 
         events.Add(new ProofApproved(run.RunId, run.PlayerId, withoutProof, command.Comment, context.Clock.UtcNow));

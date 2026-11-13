@@ -251,7 +251,7 @@ internal static class Rolling
                 ZoneAtRoll(state, playerId),
                 imposed,
                 state.Rules.Roll.WishRerollTags);
-            offers.Add(new RollOffer(game.Id, snapshot, now));
+            offers.Add(new RollOffer(game.Id, RunConditions.Fix(snapshot, state, playerId), now));
         }
 
         return offers.Count switch

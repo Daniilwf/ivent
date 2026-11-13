@@ -77,7 +77,8 @@ internal static class Corrections
         var count = run.Mods?.SingleDie is not null ? 1 : CompletionRoll.Count(command.Hours, run.Snapshot);
         var sides = run.Mods?.SingleDie ?? run.Mods?.Sides ?? CompletionRoll.DieFor(run.Difficulty!.Value, run.Snapshot.DieByDifficulty).Sides;
         // Stryker disable once Equality : equivalent — with as many dice as wanted, rolling zero more adds none
-        var added = count > run.Dice.Count ? CompletionRoll.Roll(count - run.Dice.Count, sides, context.Random) : [];
+        // A run without dice by its unmet condition throws none (D-592)
+        var added = count > run.Dice.Count && !RunConditions.WithoutDice(run) ? CompletionRoll.Roll(count - run.Dice.Count, sides, context.Random) : [];
         EquatableArray<Die> removed = [.. run.Dice.Skip(count)];
 
         var corrected = new RunHoursCorrected(
@@ -134,9 +135,18 @@ internal static class Corrections
         var challenge = Recalculate(run.ChallengeDice, sides);
         var changed = new RunDifficultyChanged(
             run.RunId, run.PlayerId, old, difficulty, dice, challenge, comment, context.Clock.UtcNow);
-        var delta = CompletionRoll.Total(SeasonEngine.Apply(state, changed).Runs[run.RunId]) - CompletionRoll.Total(run);
         var events = new List<IGameEvent> { changed };
-        events.AddRange(Difference(SeasonEngine.Apply(state, changed), run.RunId, delta));
+
+        // The conditions are checked again at the new difficulty, both ways (D-507, D-546 (2)): one difference for both
+        var afterChange = SeasonEngine.Apply(state, changed);
+        if (RunConditions.Again(afterChange.Runs[run.RunId], context) is { } check)
+        {
+            events.Add(check);
+            afterChange = SeasonEngine.Apply(afterChange, check);
+        }
+
+        var delta = CompletionRoll.Total(afterChange.Runs[run.RunId]) - CompletionRoll.Total(run);
+        events.AddRange(Difference(afterChange, run.RunId, delta));
         var frozen = Finishes.IsFrozen(state.Players[run.PlayerId]);
 
         // The difficulty's own event follows the change: a pending one of the old difficulty is not applicable (one already
@@ -152,7 +162,7 @@ internal static class Corrections
         {
             events.AddRange(Decks.EventDraws.ForDifficulty(events.Aggregate(state, SeasonEngine.Apply), context, run.RunId));
         }
-        else if (!frozen && newRule.GrantEvent is { } granted)
+        else if (!frozen && newRule.GrantEvent is { } granted && !RunConditions.WithoutDice(events.Aggregate(state, SeasonEngine.Apply).Runs[run.RunId]))
         {
             events.Add(new ManualEffectCreated(context.Ids.NewId(), run.PlayerId, granted, ManualEffectSource.Difficulty, run.RunId));
         }
@@ -179,7 +189,7 @@ internal static class Corrections
     }
 
     // Admin corrections of a completed run: a running or closing season, an explained change (D-97).
-    private static Decision? Guard(SeasonState state, Guid runId, string comment)
+    internal static Decision? Guard(SeasonState state, Guid runId, string comment)
     {
         if (!state.IsCreated)
         {

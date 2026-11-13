@@ -193,6 +193,15 @@
                       null
                     ]
                   },
+                  "difficultyAtMost": {
+                    "enum": [
+                      "easy",
+                      "normal",
+                      "hard",
+                      "extreme",
+                      null
+                    ]
+                  },
                   "game": {
                     "type": [
                       "object",
@@ -674,6 +683,15 @@
                           ],
                           "properties": {
                             "difficultyAtLeast": {
+                              "enum": [
+                                "easy",
+                                "normal",
+                                "hard",
+                                "extreme",
+                                null
+                              ]
+                            },
+                            "difficultyAtMost": {
                               "enum": [
                                 "easy",
                                 "normal",
@@ -1353,6 +1371,15 @@
                                           null
                                         ]
                                       },
+                                      "difficultyAtMost": {
+                                        "enum": [
+                                          "easy",
+                                          "normal",
+                                          "hard",
+                                          "extreme",
+                                          null
+                                        ]
+                                      },
                                       "game": {
                                         "type": [
                                           "object",
@@ -1589,6 +1616,15 @@
             ],
             "properties": {
               "difficultyAtLeast": {
+                "enum": [
+                  "easy",
+                  "normal",
+                  "hard",
+                  "extreme",
+                  null
+                ]
+              },
+              "difficultyAtMost": {
                 "enum": [
                   "easy",
                   "normal",

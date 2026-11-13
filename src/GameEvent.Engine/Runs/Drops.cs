@@ -177,7 +177,9 @@ internal static class Drops
 
     public static SeasonState Apply(SeasonState state, RunDropped e) => Finish(state, e.RunId, e.PlayerId, RunStatus.Dropped);
 
-    public static SeasonState Apply(SeasonState state, RunTechRerolled e) => Finish(state, e.RunId, e.PlayerId, RunStatus.TechRerolled);
+    // Not the player's fault: the run's conditions go back to wait for the new roll (Н-7, D-595)
+    public static SeasonState Apply(SeasonState state, RunTechRerolled e) =>
+        RunConditions.Return(Finish(state, e.RunId, e.PlayerId, RunStatus.TechRerolled), state.Runs[e.RunId]);
 
     public static SeasonState Apply(SeasonState state, TechRerollConvertedToDrop e)
     {

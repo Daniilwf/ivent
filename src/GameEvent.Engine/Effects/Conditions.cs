@@ -22,6 +22,11 @@ internal static class Conditions
             return false;
         }
 
+        if (condition.DifficultyAtMost is { } most && !(run?.Difficulty <= most))
+        {
+            return false;
+        }
+
         if (condition.Game is { } filter
             && !(run is not null && pool.Games.FirstOrDefault(g => g.Id == run.GameId) is { } game && Rolls.Rolling.Matches(filter, game)))
         {

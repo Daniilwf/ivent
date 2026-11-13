@@ -190,8 +190,8 @@ public static class ContentPublishing
 
             switch (actions[i])
             {
-                case ModifyNextRollAction { RunCondition: not null }:
-                    error($"{path}.runCondition", "A condition on the run comes with events (stage 5).");
+                case ModifyNextRollAction { RunCondition: not null } when !events:
+                    error($"{path}.runCondition", "A condition on the run comes with events: switch features.events on.");
                     break;
                 case DrawEventAction draw when !events && draw.Deck is not ("good" or "bad"):
                     error($"{path}.deck", "While features.events is off only «good» and «bad» are drawn, by hand.");
