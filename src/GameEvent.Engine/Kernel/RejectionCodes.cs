@@ -37,6 +37,12 @@ public static class RejectionCodes
     /// <summary>An IRL effect (D-509) is resolved by the admin only, through the review of its proof or by hand.</summary>
     public const string EffectAdminOnly = "effect.adminOnly";
 
+    /// <summary>No settlement for everyone with this id waits: unknown, or all its batches are done (D-537).</summary>
+    public const string ForAllUnknown = "forAll.unknown";
+
+    /// <summary>An undo of one of its batches stopped the settlement for everyone: it waits for the undo of its cause (D-701).</summary>
+    public const string ForAllHalted = "forAll.halted";
+
     /// <summary>The effect is not an IRL one: its object has no <c>proof: media</c> (D-509).</summary>
     public const string IrlProofNotIrl = "irlProof.notIrl";
 

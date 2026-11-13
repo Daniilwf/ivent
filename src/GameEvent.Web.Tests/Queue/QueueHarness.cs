@@ -16,11 +16,13 @@ internal sealed class QueueHarness : IAsyncDisposable
 {
     private readonly string _directory;
     private readonly PooledDbContextFactory<GameEventDbContext> _factory;
+    private readonly IReadOnlyList<GameEvent.Engine.Effects.ITriggerHandler>? _triggers;
     private CommandProcessor? _processor;
 
-    private QueueHarness(string directory, IEnumerable<IInterceptor> interceptors)
+    private QueueHarness(string directory, IEnumerable<IInterceptor> interceptors, IReadOnlyList<GameEvent.Engine.Effects.ITriggerHandler>? triggers = null)
     {
         _directory = directory;
+        _triggers = triggers;
         ConnectionString = $"Data Source={Path.Combine(directory, "test.db")};Pooling=False";
         var builder = new DbContextOptionsBuilder<GameEventDbContext>();
         SqliteDatabase.Configure(builder, ConnectionString);
@@ -35,11 +37,18 @@ internal sealed class QueueHarness : IAsyncDisposable
     /// <summary>Starts at a moment with sub-millisecond ticks: storage must keep full precision.</summary>
     public TestClock Clock { get; } = new(new DateTimeOffset(2026, 10, 1, 12, 0, 0, TimeSpan.Zero).AddTicks(1_234_567));
 
-    public static async Task<QueueHarness> StartAsync(params IInterceptor[] interceptors)
+    public static Task<QueueHarness> StartAsync(params IInterceptor[] interceptors) => StartWithTriggersAsync(null, interceptors);
+
+    /// <summary>
+    /// A harness whose processor hands test trigger handlers to every command (D-24): they react to the command's events as
+    /// effects will; a restart keeps them.
+    /// </summary>
+    public static async Task<QueueHarness> StartWithTriggersAsync(
+        IReadOnlyList<GameEvent.Engine.Effects.ITriggerHandler>? triggers, params IInterceptor[] interceptors)
     {
         var directory = Path.Combine(Path.GetTempPath(), "game-event-tests", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
-        var harness = new QueueHarness(directory, interceptors);
+        var harness = new QueueHarness(directory, interceptors, triggers);
         await SqliteDatabase.MigrateAsync(harness.ConnectionString);
         await harness.SeedPoolAsync();
         await harness.StartProcessorAsync();
@@ -81,7 +90,8 @@ internal sealed class QueueHarness : IAsyncDisposable
     private async Task StartProcessorAsync()
     {
         _processor = new CommandProcessor(
-            Bus, _factory, Clock, new SeededRandom(7), new CountingIds(), new Accounts.Passwords(), [], NullLogger<CommandProcessor>.Instance);
+            Bus, _factory, Clock, new SeededRandom(7), new CountingIds(), new Accounts.Passwords(), [], NullLogger<CommandProcessor>.Instance,
+            triggers: _triggers);
         await _processor.StartAsync(CancellationToken.None);
     }
 

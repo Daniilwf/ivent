@@ -429,7 +429,10 @@ public partial class PlayerAdminInvariantTests
             Engine.Decks.EventDrawn or Engine.Decks.EventDrawMissed or Engine.Decks.BadEventIntercepted
                 or ManualEffectCreated { Source: ManualEffectSource.Event }
                 or EffectSuspended or EffectResumed or EffectMoveSkipped or RunConditionChecked
-                or Engine.Proofs.IrlProofSubmitted or Engine.Proofs.IrlProofReviewed => "events",
+                or Engine.Proofs.IrlProofSubmitted or Engine.Proofs.IrlProofReviewed
+
+                // Settlements for everyone (D-537, D-700): their sources — polls, global events — need the events
+                or Engine.Effects.ForAllQueued or Engine.Effects.ForAllSettled => "events",
 
             // The economy of stage 4 (D-400…): items and their effects, the shop, bets — each under its flag
             Engine.Content.ContentPublished or Engine.Inventory.ObjectGiven or Engine.Inventory.ObjectRemoved or Engine.Inventory.ObjectTransferred
