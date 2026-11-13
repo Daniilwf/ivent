@@ -771,5 +771,17 @@ public partial class SuspendedEffectTests
         var leader = s_hex with { Id = "hex-leader", Effect = s_hex.Effect! with { Target = new TargetSpec { Selector = TargetSelector.Leader } } };
 
         Assert.DoesNotContain("$.objects[0].effect.target", ContentPublishing.Check(new ContentPack { Objects = [leader] }, events: true).Select(e => e.Path));
+
+        // Drawn, it hits the leader at once: nothing is asked, nothing waits
+        var s = Season(leader).WithCoins("Петя", 10).WithCoins("Маша", 10).WithPoints("Петя", 5);
+
+        StepOntoTheEventCell(s);
+
+        ScenarioAssert.Accepted(s);
+        Assert.Equal("hex-leader", Assert.Single(s.LastEvents<EventDrawn>()).ObjectId);
+        Assert.Empty(s.LastEvents<EffectSuspended>());
+        Assert.Null(s.Player("Вася").Choice);
+        Assert.Empty(s.Player("Вася").Suspended);
+        Assert.Equal((8, 10), (s.Player("Петя").Coins, s.Player("Маша").Coins));
     }
 }
