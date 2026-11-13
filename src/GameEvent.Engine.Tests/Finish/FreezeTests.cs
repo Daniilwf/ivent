@@ -1,6 +1,7 @@
 using GameEvent.Engine.Finish;
 using GameEvent.Engine.Map;
 using GameEvent.Engine.Proofs;
+using GameEvent.Engine.Rolls;
 using GameEvent.Engine.Runs;
 using GameEvent.Engine.Scoring;
 using GameEvent.Engine.Tests.Support;
@@ -285,6 +286,42 @@ public class FreezeTests
 
         // Then A and B (by completion time) come before Петя's earlier run; L waits in the usual order
         Assert.Equal([runA, runB, petyaRun, later], ProofReviewOrder.Order(s.State));
+    }
+
+    [Fact]
+    public void Runs_up_to_two_finishes_go_by_completion_time_even_when_the_limit_holds_a_finisher()
+    {
+        // EV55-1, D-98, D-662: the limit of 2 unchecked runs; the first is frozen at once. Петя P (1 + 1 → c2), Маша M
+        // (3 + 1 → the finish, frozen), three hours later Петя F (1 + 1 → the finish): two unchecked runs close his roll
+        var s = New(ruleset: r => r with
+        {
+            Finish = r.Finish with { RequireApprovalForFirst = false },
+            Season = r.Season with { MaxUncheckedRuns = 2 },
+        });
+        var (petyaRun, _) = Complete(s, "Петя", [1, 1]);
+        var mashaRun = FinishRun(s, "Маша");
+        s.Advance(TimeSpan.FromHours(2));
+        var (petyaFinish, _) = Complete(s, "Петя", [1, 1]);
+        Assert.True(FinishOf(s, "Маша")!.Frozen);
+        Assert.NotNull(FinishOf(s, "Петя"));
+        Assert.True(UncheckedRuns.ClosesRoll(s.State, s.PlayerId("Петя")));
+
+        // Then the runs up to both finishes stay on top by completion time: the limit orders only the runs below them
+        Assert.Equal([petyaRun, mashaRun, petyaFinish], ProofReviewOrder.Order(s.State));
+    }
+
+    [Fact]
+    public void Runs_up_to_a_finish_go_above_the_earlier_runs_of_a_player_the_limit_holds()
+    {
+        // D-662, D-690: the limit of 1; Вася V (1 + 1 → c2) closes his roll, then Маша M (3 + 1 → the finish)
+        var s = New(ruleset: r => r with { Season = r.Season with { MaxUncheckedRuns = 1 } });
+        var (vasyaRun, _) = Complete(s, "Вася", [1, 1]);
+        var mashaRun = FinishRun(s, "Маша");
+        Assert.True(UncheckedRuns.ClosesRoll(s.State, s.PlayerId("Вася")));
+        Assert.Null(FinishOf(s, "Вася"));
+
+        // Then the finish comes first, the run that holds a roll right after it
+        Assert.Equal([mashaRun, vasyaRun], ProofReviewOrder.Order(s.State));
     }
 
     [Fact]
