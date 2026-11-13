@@ -72,7 +72,8 @@ public static class EventCodec
             throw new JsonException($"Event '{stored.Type}' v{stored.Version} is newer than this build (v{current}).");
         }
 
-        var data = JsonNode.Parse(stored.Data)?.AsObject() ?? throw new JsonException($"Event '{stored.Type}' has no data.");
+        // An event of the current version is read straight from its text; only an upcast needs the JSON tree (D-671)
+        JsonObject? data = null;
         for (var version = stored.Version; version < current; version++)
         {
             if (!upcasters.TryGetValue((stored.Type, version), out var upcast))
@@ -80,12 +81,17 @@ public static class EventCodec
                 throw new JsonException($"No upcaster for event '{stored.Type}' v{version}.");
             }
 
-            data = upcast(data);
+            data = upcast(data ?? Tree(stored));
         }
 
-        return (IGameEvent)(data.Deserialize(type, EngineJson.Options)
-            ?? throw new JsonException($"Event '{stored.Type}' data is null."));
+        var decoded = data is null
+            ? JsonSerializer.Deserialize(stored.Data, type, EngineJson.Options)
+            : data.Deserialize(type, EngineJson.Options);
+        return (IGameEvent)(decoded ?? throw new JsonException($"Event '{stored.Type}' data is null."));
     }
+
+    private static JsonObject Tree(StoredEvent stored) =>
+        JsonNode.Parse(stored.Data)?.AsObject() ?? throw new JsonException($"Event '{stored.Type}' has no data.");
 
     // A method of its own, no local assigned inside try: mutation testing can mutate Decode (D-281)
     private static Type TypeOf(string name)

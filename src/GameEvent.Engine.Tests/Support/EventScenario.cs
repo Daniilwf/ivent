@@ -50,15 +50,17 @@ public static class EventScenario
 
     /// <summary>
     /// The content of a season with events (D-533): /content/items and /content/events as objects, /content/wheels and
-    /// /content/decks as wheels.
+    /// /content/decks as wheels. Read and parsed once per test run, like <see cref="EconomyScenario.RepositoryPack"/> (D-670).
     /// </summary>
-    public static ContentPack RepositoryPack()
+    public static ContentPack RepositoryPack() => s_repositoryPack.Value;
+
+    private static readonly Lazy<ContentPack> s_repositoryPack = new(() =>
     {
         var root = Path.Combine(RepositoryPaths.Root(), "content");
         IEnumerable<(string, string)> Read(params string[] dirs) =>
             dirs.SelectMany(d => Directory.EnumerateFiles(Path.Combine(root, d), "*.json")).Select(f => (Path.GetFileName(f), File.ReadAllText(f)));
         return ContentFiles.Pack(Read("items", "events"), Read("wheels", "decks"));
-    }
+    });
 
     /// <summary>A map cell of type <c>event</c> drawing from <paramref name="deck"/>.</summary>
     public static MapBuilder EventCell(this MapBuilder map, string id, string deck = "zone")

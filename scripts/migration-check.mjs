@@ -10,7 +10,7 @@
 import { spawnSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { fail, quote, root, run } from './lib.mjs';
+import { fail, quote, root, run, runAsync } from './lib.mjs';
 
 const work = join(root, 'var', 'migration-check');
 const baseTree = join(work, 'base');
@@ -55,11 +55,36 @@ function step(title, ok) {
   if (!ok) throw new Failed(title);
 }
 
+/** A chain of commands that runs beside another one (D-672): its output is printed when it ends, then its steps */
+async function chain(commands) {
+  const done = [];
+  for (const [title, command, args, options] of commands) {
+    const started = Date.now();
+    const result = await runAsync(command, args, options);
+    done.push({ title, result, seconds: Math.round((Date.now() - started) / 1000) });
+    if (!result.ok) break;
+  }
+  return done;
+}
+
+function report(done, expected) {
+  for (const { title, result, seconds } of done) {
+    if (!result.ok) console.log(result.output.trim());
+    step(`${title} (${seconds} s)`, result.ok);
+  }
+  step('every step ran', done.length === expected);
+}
+
+// The previous version's checkout is thrown away after the check: its analyzers and code style checked it when it was
+// built for real, so building it here without them gives the same program sooner (D-672)
+const throwaway = ['-p:RunAnalyzers=false', '-p:EnforceCodeStyleInBuild=false'];
+
 /** Rows per table, the seasons, the last migration and the schema of a database (the tool's db-census) */
 function census(file) {
+  // The tool is built beside the previous version (below), so it is not built again for each census
   const result = run(
     'dotnet',
-    ['run', '--project', quote(tool(root)), '--', 'db-census', '--db', quote(file)],
+    ['run', '--no-build', '--project', quote(tool(root)), '--', 'db-census', '--db', quote(file)],
     {
       capture: true,
     },
@@ -102,31 +127,46 @@ try {
     run('git', ['worktree', 'add', '--detach', quote(baseTree), sha]),
   );
 
-  // 1. The previous version's demo season
+  // 1. The previous version's demo season and 2. this version's build, side by side (D-672): they share nothing but
+  // the NuGet cache. The previous version's tool is built too when its season-check will be needed (step 3).
   const demo = join(work, 'demo.db');
   const baseWeb = join(baseTree, 'src', 'GameEvent.Web');
-  step(
-    'build the previous version',
-    run('dotnet', ['build', quote(baseWeb), '-nologo', '-v', 'q']),
-  );
-  step(
-    'seed its demo season',
-    run(
+  const web = join(root, 'src', 'GameEvent.Web');
+  const rollsBack = lastMigration(baseTree) !== lastMigration(root);
+  const base = [
+    [
+      'build the previous version',
+      'dotnet',
+      ['build', quote(baseWeb), '-nologo', '-v', 'q', ...throwaway],
+    ],
+    [
+      'seed its demo season',
       'dotnet',
       ['run', '--no-build', '--no-launch-profile', '--project', quote(baseWeb), '--', 'seed-demo'],
-      {
-        env: { ASPNETCORE_ENVIRONMENT: 'Development', ConnectionStrings__Main: database(demo) },
-      },
-    ),
-  );
+      { env: { ASPNETCORE_ENVIRONMENT: 'Development', ConnectionStrings__Main: database(demo) } },
+    ],
+  ];
+  if (rollsBack)
+    base.push([
+      "build the previous version's tool",
+      'dotnet',
+      ['build', quote(tool(baseTree)), '-nologo', '-v', 'q', ...throwaway],
+    ]);
+  const current = [
+    ['build this version', 'dotnet', ['build', quote(web), '-nologo', '-v', 'q']],
+    ["build this version's tool", 'dotnet', ['build', quote(tool(root)), '-nologo', '-v', 'q']],
+  ];
+  // dotnet ef rolls back (step 3): the tools are restored only when there is a rollback to make
+  if (rollsBack) current.push(['restore the dotnet tools', 'dotnet', ['tool', 'restore']]);
+  const [baseDone, currentDone] = await Promise.all([chain(base), chain(current)]);
+  report(baseDone, base.length);
+  report(currentDone, current.length);
 
   // 2. This version's migrations on a copy: nothing lost, every season replays intact
   const copy = join(work, 'migrated.db');
   for (const suffix of ['', '-wal', '-shm']) {
     if (existsSync(demo + suffix)) cpSync(demo + suffix, copy + suffix);
   }
-  const web = join(root, 'src', 'GameEvent.Web');
-  step('build this version', run('dotnet', ['build', quote(web), '-nologo', '-v', 'q']));
   const seeded = census(demo);
   step(`the demo database has seasons (${seeded.seasons.length})`, seeded.seasons.length > 0);
   step(
@@ -149,6 +189,7 @@ try {
     'every season replays intact with this version',
     run('dotnet', [
       'run',
+      '--no-build',
       '--project',
       quote(tool(root)),
       '--',
@@ -161,7 +202,7 @@ try {
 
   // 3. The rollback to the previous release's schema, checked by the previous release itself
   const previous = lastMigration(baseTree);
-  if (previous === lastMigration(root)) {
+  if (!rollsBack) {
     console.log(`No new migrations since ${ref}: nothing to roll back.`);
   } else {
     step(
@@ -171,6 +212,8 @@ try {
         'database',
         'update',
         previous,
+        // Built with this version above: ef would build it once more
+        '--no-build',
         '--project',
         quote(join('src', 'GameEvent.Infrastructure')),
         '--connection',
@@ -191,6 +234,7 @@ try {
       'dotnet',
       [
         'run',
+        '--no-build',
         '--project',
         quote(tool(baseTree)),
         '--',

@@ -326,7 +326,7 @@ public class GraphInvariantTests
 
         // 1. The log replays to the state, the stored format too
         Assert.Equal(s.State, SeasonEngine.Replay(s.Log));
-        Assert.Equal(s.State, SeasonEngine.Replay(s.Log.Select(e => EventCodec.Decode(EventCodec.Encode(e)))));
+        Assert.Equal(s.State, SeasonEngine.Replay(s.StoredLog));
 
         var log = s.EffectiveLog;
         var map = s.State.Map;
