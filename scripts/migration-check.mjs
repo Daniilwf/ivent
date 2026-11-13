@@ -158,6 +158,13 @@ try {
   ];
   // dotnet ef rolls back (step 3): the tools are restored only when there is a rollback to make
   if (rollsBack) current.push(['restore the dotnet tools', 'dotnet', ['tool', 'restore']]);
+  // The first dotnet command on a fresh machine (the CI runner) sets the SDK up: NuGet's migrations under a named
+  // mutex. Two first commands at once lost that race now and then on Linux («IOException … NuGet-Migrations …
+  // /run/user/…/.dotnet/shm», FL-6, D-761), so one short command sets it up alone; the builds stay side by side.
+  // `--version` and `--info` skip the setup, a command of the CLI does not.
+  const setUp = run('dotnet', ['nuget', 'locals', 'global-packages', '--list'], { capture: true });
+  if (!setUp.ok) console.log(setUp.output.trim());
+  step('set the .NET SDK up', setUp.ok);
   const [baseDone, currentDone] = await Promise.all([chain(base), chain(current)]);
   report(baseDone, base.length);
   report(currentDone, current.length);

@@ -485,6 +485,19 @@ describe('The content editor', () => {
     expect(await screen.findByText(t.removed('Апельсин', 3))).toBeInTheDocument();
   });
 
+  it('takes the focus to the opened editor at once, so what is typed next goes to its field (FL-5)', async () => {
+    // A frame that has not come yet (a loaded machine): the focus must not wait for it, or it would leave the field
+    // while the admin types
+    vi.stubGlobal('requestAnimationFrame', () => 0);
+    const user = userEvent.setup();
+    open();
+    await openOrange(user);
+
+    expect(document.getElementById('content-editor-title')).toHaveFocus();
+    await user.type(screen.getByTestId('content-field-name'), '!');
+    expect(screen.getByTestId('content-field-name')).toHaveValue('Апельсин!');
+  });
+
   it('says that the content changed meanwhile when the server refuses an old version', async () => {
     const user = userEvent.setup();
     open({

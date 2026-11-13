@@ -59,13 +59,20 @@ public static class AppSetup
 
     public const int ContentChecksPerMinute = 60;
 
-    public static void AddGameEvent(this WebApplicationBuilder builder)
+    public static void AddGameEvent(this WebApplicationBuilder builder) => AddGameEvent(builder, IsGeneratingApiDocument);
+
+    /// <param name="builder">The site's builder.</param>
+    /// <param name="generatingApiDocument">
+    /// The build-time OpenAPI generator starts the app only to read its endpoints: no hosted service is registered (D-760).
+    /// </param>
+    internal static void AddGameEvent(WebApplicationBuilder builder, bool generatingApiDocument)
     {
         ArgumentNullException.ThrowIfNull(builder);
         var services = builder.Services;
+        var runsServices = !generatingApiDocument;
 
         // First of the hosted services: the site's lock is held before the queue handles anything (D-127)
-        if (builder.Configuration["Site:OneOff"] != "true" && SitePaths.LockFile(builder.Configuration, builder.Environment.ContentRootPath) is not null)
+        if (runsServices && builder.Configuration["Site:OneOff"] != "true" && SitePaths.LockFile(builder.Configuration, builder.Environment.ContentRootPath) is not null)
         {
             services.AddHostedService<SiteLockService>();
         }
@@ -83,13 +90,16 @@ public static class AppSetup
         services.AddSingleton<ICommittedEventsListener>(sp => sp.GetRequiredService<SeasonBroadcaster>());
         services.AddSingleton<HubSessions>();
         services.AddSingleton<ICommittedEventsListener>(sp => sp.GetRequiredService<HubSessions>());
-        services.AddHostedService<SeasonBroadcastWorker>();
-        services.AddHostedService<CommandProcessor>();
         // Checked at startup: a bad interval stops the site before it serves anything (D-101).
         services.AddSingleton(new DeadlineSchedulerSettings(
             TimeSpan.FromSeconds(builder.Configuration.GetValue("Scheduler:IntervalSeconds", 5)),
-            builder.Configuration.GetValue("Scheduler:Enabled", true) && !IsGeneratingApiDocument));
-        services.AddHostedService<DeadlineScheduler>();
+            builder.Configuration.GetValue("Scheduler:Enabled", true)));
+        if (runsServices)
+        {
+            services.AddHostedService<SeasonBroadcastWorker>();
+            services.AddHostedService<CommandProcessor>();
+            services.AddHostedService<DeadlineScheduler>();
+        }
 
         services.Configure<JsonOptions>(o => ConfigureJson(o.SerializerOptions));
         services.AddSignalR().AddJsonProtocol(o => ConfigureJson(o.PayloadSerializerOptions));
@@ -203,8 +213,11 @@ public static class AppSetup
     }
 
     /// <summary>
-    /// The OpenAPI document is written by starting the app over an empty database (<c>npm run gen:api</c>): the deadline
-    /// scheduler's first pass would log a missing table, and the generator fails on any logged error.
+    /// The OpenAPI document is written at build time by starting the app over an empty, unmigrated database
+    /// (<c>npm run gen:api</c>, the documented check of the generator's entry assembly). A hosted service that reads the
+    /// database there — the queue settling pending settlements at its start (D-702), the deadline scheduler's first pass —
+    /// logs a missing table whenever it runs before the generator stops the host, and the generator fails on any logged
+    /// error: a race the build lost now and then (FL-4, D-760). So none of them is registered there.
     /// </summary>
     private static bool IsGeneratingApiDocument =>
         System.Reflection.Assembly.GetEntryAssembly()?.GetName().Name == "GetDocument.Insider";
