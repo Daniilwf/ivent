@@ -279,6 +279,13 @@ public sealed record GameFilterSpec
     public decimal? MinHours { get; init; }
 
     public int? ReleaseYearBefore { get; init; }
+
+    /// <summary>
+    /// Exactly these games (D-512, D-721): ids in the «N» format or a reference (<c>$choice</c>, <c>$result</c>) — «выберите
+    /// игру лидеру». A game no longer available at the roll drops the filter with a record. Written only when set.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public EquatableArray<string>? Games { get; init; }
 }
 
 /// <summary>A branch: by a roll (<see cref="Roll"/>, cases by range) or by the player's answer (<see cref="Choice"/>, cases by option, D-482).</summary>
@@ -594,4 +601,25 @@ public sealed record RequestChoiceAction : ActionSpec
     public required string Prompt { get; init; }
 
     public required ChoiceOptionsSpec Options { get; init; }
+
+    /// <summary>
+    /// The question goes to the voters, not to the player (D-512): an event's effect waits for the poll and goes on with its
+    /// result as <c>$choice</c>. Only in events, with <c>features.polls</c>. Written only when set.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public PollVoteSpec? Vote { get; init; }
+}
+
+/// <summary>Who votes in an event's poll, whether anonymously, and for how long (D-512).</summary>
+public sealed record PollVoteSpec
+{
+    public required PollVoters Voters { get; init; }
+
+    public bool Anonymous { get; init; }
+
+    public required int ClosesInHours { get; init; }
+
+    /// <summary>Whether the counts are shown before the close (D-541); null — <c>polls.showLiveCountsDefault</c>, never for anonymous.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? ShowLiveCounts { get; init; }
 }

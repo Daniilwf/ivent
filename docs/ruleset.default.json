@@ -124,5 +124,10 @@
   },
   "suggestions": {
     "perDay": 5
+  },
+  "polls": {
+    "gameOptions": 5,
+    "allowChangeVote": true,
+    "showLiveCountsDefault": false
   }
 }

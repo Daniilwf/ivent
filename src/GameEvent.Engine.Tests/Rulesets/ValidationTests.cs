@@ -221,7 +221,8 @@ public class ValidationTests
         { "shop without items", Flags(f => f with { Shop = true }), "features.shop" },
         // Events are played since stage 5 (D-530): they are content, so they need items
         { "events without items", r => Flags(f => f with { Events = true })(r) with { Events = new EventRules { DefaultDeck = EventKind.Risky, IrlProof = new IrlProofRules { MaxFiles = 5 } } }, "features.events" },
-        { "polls", Flags(f => f with { Polls = true }), "features.polls" },
+        // Polls are played since stage 5 (D-512, D-720): they need their rules
+        { "polls without their rules", Flags(f => f with { Polls = true }), "polls" },
         { "achievements", Flags(f => f with { Achievements = true }), "features.achievements" },
         // The weekly challenge is played since stage 5 (D-526): it needs the length of its window
         { "weekly challenge without its window", Flags(f => f with { WeeklyChallenge = true }), "weeklyChallenge.durationDays" },

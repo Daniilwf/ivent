@@ -48,6 +48,10 @@ public sealed record SeasonState(
     public ImmutableSortedDictionary<Guid, ForAllSettlement> ForAll { get; init; } =
         ImmutableSortedDictionary<Guid, ForAllSettlement>.Empty;
 
+    /// <summary>The polls of the season (D-512), by id: open, closed and cancelled.</summary>
+    public ImmutableSortedDictionary<Guid, Polls.Poll> Polls { get; init; } =
+        ImmutableSortedDictionary<Guid, Polls.Poll>.Empty;
+
     public static SeasonState Empty { get; } =
         new(
             Guid.Empty,
@@ -85,6 +89,7 @@ public sealed record SeasonState(
         && WeeklyChallenges.SequenceEqual(other.WeeklyChallenges)
         && Suggestions.SequenceEqual(other.Suggestions)
         && ForAll.SequenceEqual(other.ForAll)
+        && Polls.SequenceEqual(other.Polls)
         && MapVersion == other.MapVersion;
 
     // Explicit type arguments: a mutated count still compiles, so mutation testing keeps this method (D-281)

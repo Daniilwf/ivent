@@ -53,7 +53,11 @@ public sealed record CommandUndone(
     [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     EquatableArray<Effects.ForAllSettlement>? ForAll = null,
     [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
-    EquatableArray<Guid>? RemovedForAll = null) : IGameEvent;
+    EquatableArray<Guid>? RemovedForAll = null,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    EquatableArray<Polls.Poll>? Polls = null,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    EquatableArray<Guid>? RemovedPolls = null) : IGameEvent;
 
 internal static class Undoing
 {
@@ -185,12 +189,23 @@ internal static class Undoing
 
     // A part's key «challenge:{id}:{playerId}» or «author:{playerId}:{suggestionId}» belongs to the whole before its last colon
     private static string? WholeOf(string key) =>
-        new[] { ChallengePrefix, AuthorPrefix }.FirstOrDefault(p => key.StartsWith(p, StringComparison.Ordinal)) is { } prefix
+        new[] { ChallengePrefix, AuthorPrefix, PollPrefix }.FirstOrDefault(p => key.StartsWith(p, StringComparison.Ordinal)) is { } prefix
             && key.LastIndexOf(':') is var last && last > prefix.Length
             ? key[..last]
             : null;
 
     private const string ChallengePrefix = "challenge:";
+
+    private const string PollPrefix = "poll:";
+
+    /// <summary>The users whose votes differ between two versions of a poll.</summary>
+    private static IEnumerable<Guid> VotesChanged(Polls.Poll? was, Polls.Poll? now)
+    {
+        var (a, b) = (was?.Votes ?? [], now?.Votes ?? []);
+        return a.Concat(b).Select(v => v.UserId).Distinct()
+            .Where(u => a.FirstOrDefault(v => v.UserId == u) != b.FirstOrDefault(v => v.UserId == u))
+            .Order();
+    }
 
     public static SeasonState Apply(SeasonState state, CommandUndone e)
     {
@@ -202,8 +217,10 @@ internal static class Undoing
         var suggestions = state.Suggestions.RemoveRange(e.RemovedSuggestions ?? [])
             .SetItems((e.Suggestions ?? []).Select(x => KeyValuePair.Create(x.SuggestionId, x)));
         var forAll = state.ForAll.RemoveRange(e.RemovedForAll ?? []).SetItems((e.ForAll ?? []).Select(x => KeyValuePair.Create(x.SettlementId, x)));
+        var polls = state.Polls.RemoveRange(e.RemovedPolls ?? []).SetItems((e.Polls ?? []).Select(x => KeyValuePair.Create(x.PollId, x)));
         var restored = state with
         {
+            Polls = polls,
             Players = players,
             Runs = runs,
             ManualEffects = effects,
@@ -317,6 +334,22 @@ internal static class Undoing
             keys.Add($"forAll:{id}");
         }
 
+        // A poll as a whole (started, closed, cancelled) and a user's vote in it: the close holds the votes, votes of
+        // different users stay independent (D-722)
+        foreach (var id in Changed(before.Polls, after.Polls))
+        {
+            var (was, now) = (before.Polls.GetValueOrDefault(id), after.Polls.GetValueOrDefault(id));
+            if (was is null || now is null || was with { Votes = [] } != now with { Votes = [] })
+            {
+                keys.Add($"{PollPrefix}{id}");
+            }
+
+            foreach (var user in VotesChanged(was, now))
+            {
+                keys.Add($"{PollPrefix}{id}:{user}");
+            }
+        }
+
         if (before.Status != after.Status || before.Deadline != after.Deadline || before.Name != after.Name
             || before.Ruleset != after.Ruleset || before.Result != after.Result)
         {
@@ -398,6 +431,7 @@ internal static class Undoing
         var challenges = Changed(before.WeeklyChallenges, after.WeeklyChallenges).ToList();
         var suggestions = Changed(before.Suggestions, after.Suggestions).ToList();
         var forAll = Changed(before.ForAll, after.ForAll).ToList();
+        var polls = Changed(before.Polls, after.Polls).ToList();
         var seasonChanged = before.Status != after.Status || before.Deadline != after.Deadline || before.Name != after.Name
             || before.Ruleset != after.Ruleset;
 
@@ -420,7 +454,23 @@ internal static class Undoing
 
             // An undone batch puts its settlement back halted: the queue does not settle it again, its cause is undone next (D-701)
             OrNull([.. forAll.Where(before.ForAll.ContainsKey).Select(id => before.ForAll[id] with { Halted = true })]),
-            OrNull([.. forAll.Where(id => !before.ForAll.ContainsKey(id) && now.ForAll.ContainsKey(id))]));
+            OrNull([.. forAll.Where(id => !before.ForAll.ContainsKey(id) && now.ForAll.ContainsKey(id))]),
+
+            // A poll as it was, with the votes of the users the command changed as they were and the others' as they are (D-722)
+            OrNull([.. polls.Where(before.Polls.ContainsKey)
+                .Select(id => Restored(before.Polls[id], after.Polls.GetValueOrDefault(id), now.Polls.GetValueOrDefault(id)))]),
+            OrNull([.. polls.Where(id => !before.Polls.ContainsKey(id) && now.Polls.ContainsKey(id))]));
+    }
+
+    private static Polls.Poll Restored(Polls.Poll was, Polls.Poll? after, Polls.Poll? now)
+    {
+        if (now is null)
+        {
+            return was;
+        }
+
+        var users = VotesChanged(was, after).ToHashSet();
+        return was with { Votes = GameEvent.Engine.Polls.Polling.Ordered(now.Votes.Where(v => !users.Contains(v.UserId)).Concat(was.Votes.Where(v => users.Contains(v.UserId)))) };
     }
 
     private static EquatableArray<T>? OrNull<T>(EquatableArray<T> items) => items.Count == 0 ? null : items;

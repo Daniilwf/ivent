@@ -58,8 +58,8 @@ internal static class RollPreparation
             // A condition contradicting those before it in this order waits for the next roll (D-506, D-586); an event's
             // filter that fits no game waits too (D-583)
             var (taken, postponed) = Runs.RunConditions.Split(modifiers, state.Rules.Features.Events);
-            var (kept, lifted) = Fit(state, playerId, context, taken);
-            var applied = new RollModifiersApplied(playerId, kept) { Waiting = [.. postponed, .. lifted] };
+            var (kept, lifted, dropped) = Fit(state, playerId, context, taken, m => m, givenUp: null);
+            var applied = new RollModifiersApplied(playerId, [.. kept]) { Waiting = [.. postponed, .. lifted], Dropped = [.. dropped] };
             events.Add(applied);
             state = SeasonEngine.Apply(state, applied);
         }
@@ -90,29 +90,33 @@ internal static class RollPreparation
     /// for one that does (EV7). Item filters stay as in stage 4 (D-92). With events off nothing waits.
     /// <paramref name="givenUp"/> — the games a reroll gives up.
     /// </summary>
-    public static (EquatableArray<RollModifier> Kept, EquatableArray<RollModifier> Lifted) Fit(
-        SeasonState state, Guid playerId, EngineContext context, IReadOnlyList<RollModifier> ordered, IReadOnlySet<Guid>? givenUp = null)
-    {
-        var (kept, lifted) = Fit(state, playerId, context, ordered, m => m, givenUp);
-        return ([.. kept], [.. lifted]);
-    }
-
-    private static (List<T> Kept, List<T> Lifted) Fit<T>(
+    private static (List<T> Kept, List<T> Lifted, List<T> Dropped) Fit<T>(
         SeasonState state, Guid playerId, EngineContext context, IReadOnlyList<T> ordered, Func<T, RollModifier> modifierOf, IReadOnlySet<Guid>? givenUp)
     {
         if (!state.Rules.Features.Events || !ordered.Any(x => modifierOf(x) is { EventKind: not null, Filter: not null }))
         {
-            return ([.. ordered], []);
+            return ([.. ordered], [], []);
         }
 
         var kept = new List<T>();
         var lifted = new List<T>();
+        var dropped = new List<T>();
         var games = Rolling.Fitting(state, playerId, context.Pool, givenUp);
         foreach (var item in ordered)
         {
             if (modifierOf(item) is { EventKind: not null, Filter: { } filter })
             {
                 var narrowed = games.Where(g => Rolling.Matches(filter, g)).ToList();
+
+                // Named games none of which is available any more: the filter goes for good with a record (D-512); the
+                // game a reroll gave up is still available, so the filter only waits
+                if (narrowed.Count == 0 && filter.Games is { } named
+                    && !Rolling.Fitting(state, playerId, context.Pool).Any(g => named.Contains(g.Id.ToString("N"), StringComparer.Ordinal)))
+                {
+                    dropped.Add(item);
+                    continue;
+                }
+
                 if (narrowed.Count == 0)
                 {
                     lifted.Add(item);
@@ -125,7 +129,7 @@ internal static class RollPreparation
             kept.Add(item);
         }
 
-        return (kept, lifted);
+        return (kept, lifted, dropped);
     }
 
     /// <summary>
@@ -144,9 +148,9 @@ internal static class RollPreparation
                 x => x.Modifier.EventKind)
             .ToList();
         var (taken, postponed) = Runs.RunConditions.Split(ordered, x => x.Modifier, state.Rules.Features.Events);
-        var (kept, fitless) = Fit(state, playerId, context, taken, x => x.Modifier, givenUp);
+        var (kept, fitless, dropped) = Fit(state, playerId, context, taken, x => x.Modifier, givenUp);
         List<(RollModifier Modifier, bool Added)> lifted = [.. postponed, .. fitless];
-        if (added.Count == 0 && lifted.Count == 0)
+        if (added.Count == 0 && lifted.Count == 0 && dropped.Count == 0)
         {
             return null;
         }
@@ -154,6 +158,7 @@ internal static class RollPreparation
         return new RollModifiersApplied(playerId, [.. kept.Select(x => x.Modifier)])
         {
             Waiting = [.. lifted.Where(x => !x.Added).Select(x => x.Modifier), .. waiting, .. lifted.Where(x => x.Added).Select(x => x.Modifier)],
+            Dropped = [.. dropped.Select(x => x.Modifier)],
         };
     }
 

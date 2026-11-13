@@ -68,6 +68,9 @@ public static class Timers
         // An event's question past its answer timeout is answered by the timer (D-560)
         events.AddRange(Effects.Suspensions.Timeouts(events.Aggregate(state, SeasonEngine.Apply), context));
 
+        // Polls whose time has come close with their results (D-514)
+        events.AddRange(Polls.Polling.Due(events.Aggregate(state, SeasonEngine.Apply), context, events.Count));
+
         return events.Count == 0
             ? Decision.Reject(RejectionCodes.TimersNothingDue, "Nothing is due yet.")
             : Decision.Accept(events);

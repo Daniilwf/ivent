@@ -116,6 +116,11 @@ internal static class SeasonSetup
         }
 
         var changed = new SeasonStatusChanged(state.Status, command.To);
+        if (command.To == SeasonStatus.Closing)
+        {
+            return Decision.Accept([changed, .. CancelledPolls(state)]);
+        }
+
         if (command.To != SeasonStatus.Finished)
         {
             return Decision.Accept(changed);
@@ -215,9 +220,13 @@ internal static class SeasonSetup
         }
 
         return IsPastDeadline(state, context.Clock.UtcNow)
-            ? Decision.Accept(new SeasonStatusChanged(SeasonStatus.Active, SeasonStatus.Closing))
+            ? Decision.Accept([new SeasonStatusChanged(SeasonStatus.Active, SeasonStatus.Closing), .. CancelledPolls(state)])
             : Decision.Reject(RejectionCodes.SeasonDeadlineNotReached, "The deadline has not come yet.");
     }
+
+    // D-516: the deadline cancels the polls whose result acts; a mechanic switched off writes nothing (D-420)
+    private static IEnumerable<IGameEvent> CancelledPolls(SeasonState state) =>
+        state.Rules.Features.Polls ? Polls.Polling.CancelAtDeadline(state) : [];
 
     public static SeasonState Apply(SeasonState state, SeasonResultRecorded e) => state with { Result = e.Rows };
 

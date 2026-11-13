@@ -31,6 +31,7 @@ public static class RulesetValidator
     private const int MaxReflectMultiplier = 10;
     private const int MaxWeeklyChallengeDays = 366;
     private const int MaxSuggestionsPerDay = 100;
+    private const int MaxPollGameOptions = 20;
 
     public static IReadOnlyList<RulesetError> Validate(Ruleset ruleset)
     {
@@ -210,6 +211,17 @@ public static class RulesetValidator
         if (ruleset.Suggestions is { PerDay: < 1 or > MaxSuggestionsPerDay })
         {
             Error("suggestions.perDay", $"must be 1–{MaxSuggestionsPerDay}");
+        }
+
+        if (ruleset.Features.Polls && ruleset.Polls is null)
+        {
+            Error("polls", "is required when features.polls is on");
+        }
+
+        // A poll over games offers at least two to choose from (D-512)
+        if (ruleset.Polls is { GameOptions: < 2 or > MaxPollGameOptions })
+        {
+            Error("polls.gameOptions", $"must be 2–{MaxPollGameOptions}");
         }
 
         // Special and risky events are drawn from decks: without events they could not even be played by hand (D-530)
