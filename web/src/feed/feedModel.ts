@@ -176,6 +176,11 @@ const headlines: [string, (d: Data, c: Context) => Headline][] = [
     'command-undone',
     (d) => ({ icon: 'undo', actor: null, line: L.undone(), quote: quoteOf(text(d, 'comment')) }),
   ],
+  // A batch of a settlement for everyone (D-537): the system's line, the gains of the players follow as facts
+  [
+    'for-all-settled',
+    (d) => ({ icon: 'effect', actor: null, line: L.forAllSettled(list(d, 'players').length) }),
+  ],
   [
     'season-created',
     (d) => ({ icon: 'season', actor: null, line: L.seasonCreated(text(d, 'name') ?? '') }),

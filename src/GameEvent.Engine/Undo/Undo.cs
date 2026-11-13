@@ -49,7 +49,11 @@ public sealed record CommandUndone(
     [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     EquatableArray<Suggestions.Suggestion>? Suggestions = null,
     [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
-    EquatableArray<Guid>? RemovedSuggestions = null) : IGameEvent;
+    EquatableArray<Guid>? RemovedSuggestions = null,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    EquatableArray<Effects.ForAllSettlement>? ForAll = null,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    EquatableArray<Guid>? RemovedForAll = null) : IGameEvent;
 
 internal static class Undoing
 {
@@ -197,6 +201,7 @@ internal static class Undoing
             .SetItems((e.WeeklyChallenges ?? []).Select(c => KeyValuePair.Create(c.ChallengeId, c)));
         var suggestions = state.Suggestions.RemoveRange(e.RemovedSuggestions ?? [])
             .SetItems((e.Suggestions ?? []).Select(x => KeyValuePair.Create(x.SuggestionId, x)));
+        var forAll = state.ForAll.RemoveRange(e.RemovedForAll ?? []).SetItems((e.ForAll ?? []).Select(x => KeyValuePair.Create(x.SettlementId, x)));
         var restored = state with
         {
             Players = players,
@@ -204,6 +209,7 @@ internal static class Undoing
             ManualEffects = effects,
             WeeklyChallenges = challenges,
             Suggestions = suggestions,
+            ForAll = forAll,
         };
         if (e.Season is not { } season)
         {
@@ -305,6 +311,12 @@ internal static class Undoing
             keys.Add($"suggestion:{id}");
         }
 
+        // A settlement for everyone: its cause queues it, its batches settle it — the cause waits for them (D-537)
+        foreach (var id in Changed(before.ForAll, after.ForAll))
+        {
+            keys.Add($"forAll:{id}");
+        }
+
         if (before.Status != after.Status || before.Deadline != after.Deadline || before.Name != after.Name
             || before.Ruleset != after.Ruleset || before.Result != after.Result)
         {
@@ -385,6 +397,7 @@ internal static class Undoing
         var effects = Changed(before.ManualEffects, after.ManualEffects).ToList();
         var challenges = Changed(before.WeeklyChallenges, after.WeeklyChallenges).ToList();
         var suggestions = Changed(before.Suggestions, after.Suggestions).ToList();
+        var forAll = Changed(before.ForAll, after.ForAll).ToList();
         var seasonChanged = before.Status != after.Status || before.Deadline != after.Deadline || before.Name != after.Name
             || before.Ruleset != after.Ruleset;
 
@@ -403,7 +416,11 @@ internal static class Undoing
                 .Select(id => Restored(before.WeeklyChallenges[id], after.WeeklyChallenges.GetValueOrDefault(id), now.WeeklyChallenges.GetValueOrDefault(id)))]),
             OrNull([.. challenges.Where(id => !before.WeeklyChallenges.ContainsKey(id) && now.WeeklyChallenges.ContainsKey(id))]),
             OrNull([.. suggestions.Where(before.Suggestions.ContainsKey).Select(id => before.Suggestions[id])]),
-            OrNull([.. suggestions.Where(id => !before.Suggestions.ContainsKey(id) && now.Suggestions.ContainsKey(id))]));
+            OrNull([.. suggestions.Where(id => !before.Suggestions.ContainsKey(id) && now.Suggestions.ContainsKey(id))]),
+
+            // An undone batch puts its settlement back halted: the queue does not settle it again, its cause is undone next (D-701)
+            OrNull([.. forAll.Where(before.ForAll.ContainsKey).Select(id => before.ForAll[id] with { Halted = true })]),
+            OrNull([.. forAll.Where(id => !before.ForAll.ContainsKey(id) && now.ForAll.ContainsKey(id))]));
     }
 
     private static EquatableArray<T>? OrNull<T>(EquatableArray<T> items) => items.Count == 0 ? null : items;

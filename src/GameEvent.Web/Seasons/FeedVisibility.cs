@@ -121,6 +121,10 @@ public static class FeedVisibility
         ["effect-resumed"] = Access.Public,
         ["effect-move-skipped"] = Access.Public,
 
+        // A settlement for everyone (D-537): what was queued and who got it in each batch are public, as the effects
+        ["for-all-queued"] = Access.Public,
+        ["for-all-settled"] = Access.Public,
+
         // The weekly challenge (stage 5, D-526): what was set, who completed it and what a reject took back are public
         ["weekly-challenge-set"] = Access.Public,
         ["weekly-challenge-completed"] = Access.Public,

@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text.Json;
+using GameEvent.Engine.Effects;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Seasons;
 using GameEvent.Infrastructure.Database;
@@ -27,8 +28,11 @@ public sealed partial class CommandProcessor(
     IEnumerable<ICommittedEventsListener> listeners,
     ILogger<CommandProcessor> logger,
     Site.MaintenanceMode? maintenance = null,
-    TimeProvider? time = null) : BackgroundService
+    TimeProvider? time = null,
+    IReadOnlyList<Engine.Effects.ITriggerHandler>? triggers = null) : BackgroundService
 {
+    // triggers: test handlers that react to every command's events (D-24); none in the product
+
     /// <summary>
     /// The time of sessions (D-469): the wall clock the cookie's own expiry uses, not the game's <see cref="IClock"/>, which
     /// the test copy moves by months — a moved game clock must not sign the admin out.
@@ -81,7 +85,14 @@ public sealed partial class CommandProcessor(
     {
         try
         {
-            pending.Completion.TrySetResult(await ProcessAsync(pending.Envelope, ct));
+            var outcome = await ProcessAsync(pending.Envelope, ct);
+            pending.Completion.TrySetResult(outcome);
+
+            // What the command queued for everyone is settled right after it, before the next command (D-537)
+            if (outcome.IsAccepted && !outcome.IsDuplicate && pending.Envelope.SeasonId != Guid.Empty)
+            {
+                await SettleForAllAsync(pending.Envelope.SeasonId, ct);
+            }
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -161,11 +172,22 @@ public sealed partial class CommandProcessor(
             cached = await EventLogReader.ReplaySeasonAsync(db, envelope.SeasonId, ct);
         }
 
+        // A settlement for everyone left pending (the server stopped between its cause and its batches) goes first (D-537)
+        if (envelope.Command is not SettleForAll && ForAllSettlements.Next(cached.State) is not null)
+        {
+            _cache[envelope.SeasonId] = cached;
+            await SettleForAllAsync(envelope.SeasonId, ct);
+            if (!_cache.TryGetValue(envelope.SeasonId, out cached))
+            {
+                cached = await EventLogReader.ReplaySeasonAsync(db, envelope.SeasonId, ct);
+            }
+        }
+
         // The rules come from the season's own log (D-82); a new season brings them in CreateSeason.
         // An undo decides on the whole log by command (D-104); other commands need only the state.
         var history = envelope.Command is Engine.Undo.UndoCommand ? await EventLogReader.ReadCommandsAsync(db, envelope.SeasonId, ct) : null;
         var context = new EngineContext(
-            clock, random, ids, await PoolReader.LoadAsync(db, ct), History: history, TimeZones: Kernel.SystemTimeZones.Instance);
+            clock, random, ids, await PoolReader.LoadAsync(db, ct), Triggers: triggers, History: history, TimeZones: Kernel.SystemTimeZones.Instance);
 
         var result = SeasonEngine.Execute(cached.State, envelope.Command, context);
         if (!result.IsAccepted)
@@ -241,6 +263,54 @@ public sealed partial class CommandProcessor(
             }
         }
     }
+
+    /// <summary>
+    /// The batches of the season's pending settlements for everyone (D-537): each a system command of its own (no author)
+    /// through this same consumer, one transaction each, until none waits. The id comes from the settlement and the batch,
+    /// so a batch is never written twice. A refused batch (the site under maintenance, a player choosing a branch) stops
+    /// here; the next command of the season tries again first.
+    /// </summary>
+    private async Task SettleForAllAsync(Guid seasonId, CancellationToken ct)
+    {
+        for (var batches = 0; batches < MaxBatchesInARow; batches++)
+        {
+            if (!_cache.TryGetValue(seasonId, out var cached) || ForAllSettlements.Next(cached.State) is not { } settlementId)
+            {
+                return;
+            }
+
+            var batch = cached.State.ForAll[settlementId].Batches + 1;
+            var envelope = new CommandEnvelope(SettleCommandId(seasonId, settlementId, batch), seasonId, new SettleForAll(settlementId), AuthorId: null);
+            CommandOutcome outcome;
+            try
+            {
+                outcome = await ProcessAsync(envelope, ct);
+            }
+#pragma warning disable CA1031 // a failed batch must not fail its cause, which is committed: the next command tries again
+            catch (Exception e) when (e is not OperationCanceledException)
+#pragma warning restore CA1031
+            {
+                _cache.Remove(seasonId);
+                LogCommandFailed(logger, e, envelope.CommandId, nameof(SettleForAll));
+                return;
+            }
+
+            if (!outcome.IsAccepted || outcome.IsDuplicate)
+            {
+                LogSettlementStopped(logger, seasonId, settlementId, outcome.Rejection?.Code);
+                return;
+            }
+        }
+    }
+
+    // A settlement of the 50 events a batch takes ends in a few batches; this only stops a loop that never ends
+    private const int MaxBatchesInARow = 1000;
+
+    private static Guid SettleCommandId(Guid seasonId, Guid settlementId, int batch) =>
+        new(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes($"settle-for-all:{seasonId:N}:{settlementId:N}:{batch}")).AsSpan(0, 16));
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Settlement {SettlementId} of season {SeasonId} stopped: {Code}")]
+    private static partial void LogSettlementStopped(ILogger logger, Guid seasonId, Guid settlementId, string? code);
 
     private static CommandOutcome Rejected(string code, string detail) => new(false, false, new Rejection(code, detail), []);
 

@@ -69,9 +69,10 @@ internal readonly record struct ChainLimits(int Depth, int Events)
 internal static class EffectChain
 {
     // levels: the level each of the command's own events is at — 0 when null or past its end, or the level a suspended
-    // effect stopped at for the events of its continuation (D-511): each reacts from its own level
+    // effect stopped at for the events of its continuation (D-511): each reacts from its own level. eventsBefore: what the
+    // command wrote before these events — a batch of a settlement for everyone counts the players before (D-537)
     public static (IReadOnlyList<IGameEvent> Reactions, SeasonState State) Run(
-        SeasonState state, IReadOnlyList<IGameEvent> commandEvents, EngineContext context, IReadOnlyList<int>? levels = null)
+        SeasonState state, IReadOnlyList<IGameEvent> commandEvents, EngineContext context, IReadOnlyList<int>? levels = null, int eventsBefore = 0)
     {
         if (commandEvents.Any(e => e is EffectChainCut))
         {
@@ -83,7 +84,7 @@ internal static class EffectChain
         var limits = ChainLimits.Of(state);
 
         var written = new List<IGameEvent>();
-        var total = commandEvents.Count;
+        var total = eventsBefore + commandEvents.Count;
         List<(IGameEvent Trigger, int Depth)> level =
             [.. commandEvents.Select((e, i) => (e, (levels is not null && i < levels.Count ? levels[i] : 0) + 1))];
         while (level.Count > 0)
