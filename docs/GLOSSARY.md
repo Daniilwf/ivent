@@ -302,7 +302,7 @@
 | Итог дуэли | победа, ничья или отмена и почему (D-525, D-733) | `DuelEnd` (`Completed`, `Forfeit`, `TimeOut`, `Deadline`, `WinRejected`, `TechReroll`, `Inactive`, `FirstFinisher`) |
 | Свежее прохождение дуэли | прохождение, которое может выиграть дуэль: выпало не раньше принятия и не игралось в момент принятия (D-731) | `Duel.RunsAtAcceptance`, `duels.countRunsStartedAfterAccept` |
 | Поражение дропом | дроп свежего прохождения отдаёт дуэль сопернику (D-525) | `DuelEnd.Forfeit`, `duels.dropForfeits` |
-| Отклик на запрос напарника | заявка на чужой запрос доски; создаёт приглашение, которое принимает автор | команда `RespondToPartnerRequest`, события `PartnerRequestPosted`, `PartnerRequestClosed` |
+| Отклик на запрос напарника | заявка на чужой запрос доски; создаёт приглашение в кооп от откликнувшегося автору, которое автор принимает или отклоняет (D-524, D-545) | команда `RespondToPartnerRequest`, событие `InteractionCreated` |
 | Выполнить челлендж недели | пройти игру по условию челленджа в его окне; одна награда на игрока | команды `SetWeeklyChallenge`, `MarkWeeklyChallenge`, события `WeeklyChallengeSet`, `WeeklyChallengeCompleted`, `WeeklyChallengeRevoked` |
 | Модерация предложки | админ одобряет или отклоняет предложение | команды `SubmitSuggestion`, `ReviewSuggestion`, `SuggestionStatus` (`Pending`, `Approved`, `Rejected`) |
 | Окно челленджа недели | время, в которое завершение прохождения засчитывается челленджу: от начала на `weeklyChallenge.durationDays` дней (D-526, D-570) | `WeeklyChallengeSet.StartsAt`, `EndsAt` |
@@ -324,7 +324,9 @@
 | Голосование | вопрос с вариантами и сроком | `Poll`, `PollOption`, `Vote`, в контенте — `PollDefinition` |
 | Номинация | награда по итогам сезона: автоматическая или голосованием | `Nomination` |
 | Челлендж недели | условие от админа с наградой на неделю | `WeeklyChallenge`, в контенте — `WeeklyChallengeDefinition` |
-| Запрос напарника | объявление «ищу напарника» для кооп-игры | `PartnerRequest` |
+| Доска «ищу напарника» | запросы игроков, ищущих напарника в своё кооп-прохождение (D-524) | `PartnerBoard`, флаг `features.partnerBoard`, срок `partnerBoard.requestTtlHours` |
+| Запрос напарника | объявление «ищу напарника» для своего идущего кооп-прохождения | `PartnerRequest`, `PartnerRequestStatus` (`Open`, `Closed`), команда `PostPartnerRequest`, событие `PartnerRequestPosted` |
+| Закрытие запроса | запрос закрыт: кооп, конец прохождения, срок, автор или дедлайн | команда `ClosePartnerRequest`, событие `PartnerRequestClosed`, `PartnerRequestCloseReason` (`Coop`, `RunEnded`, `Timeout`, `Author`, `Deadline`) |
 | Предложка | предложение игры, ивента или предмета от игрока | `Suggestion` |
 
 ## Техническое

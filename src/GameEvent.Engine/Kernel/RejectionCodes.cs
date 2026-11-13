@@ -237,6 +237,24 @@ public static class RejectionCodes
     /// <summary>Only the roller completes, drops or tech-rerolls the coop run; the partner may only leave (D-521, D-522).</summary>
     public const string CoopRollerOnly = "coop.rollerOnly";
 
+    /// <summary>No such request on the partner board (D-524).</summary>
+    public const string PartnerRequestUnknown = "partnerRequest.unknown";
+
+    /// <summary>The request is closed: by a coop, the end of its run, its term, its author or the deadline (D-524).</summary>
+    public const string PartnerRequestNotOpen = "partnerRequest.notOpen";
+
+    /// <summary>The run has an open request already: one per run (D-524).</summary>
+    public const string PartnerRequestAlreadyOpen = "partnerRequest.alreadyOpen";
+
+    /// <summary>The author does not respond to his own request (D-524).</summary>
+    public const string PartnerRequestOwn = "partnerRequest.own";
+
+    /// <summary>Only the author closes his request (D-524).</summary>
+    public const string PartnerRequestNotAuthor = "partnerRequest.notAuthor";
+
+    /// <summary>The player has a pending response to this request already (D-545).</summary>
+    public const string PartnerRequestAlreadyResponded = "partnerRequest.alreadyResponded";
+
     // Duels (stage 5, D-525, D-540, D-730)
 
     /// <summary>A duel is with another player.</summary>

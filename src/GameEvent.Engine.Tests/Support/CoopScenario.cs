@@ -21,4 +21,19 @@ public static class CoopScenario
             Interactions = ruleset.Interactions with { InviteTtlHours = inviteTtlHours, MaxOpenInvitesPerPlayer = maxOpenInvites },
         };
     }
+
+    /// <summary>
+    /// The ruleset with <c>features.partnerBoard</c> on (task 5.11, D-524) and coop with it (the board needs coop): a request
+    /// lives <paramref name="requestTtlHours"/> hours.
+    /// </summary>
+    public static Ruleset WithPartnerBoard(this Ruleset ruleset, int requestTtlHours = 48)
+    {
+        ArgumentNullException.ThrowIfNull(ruleset);
+        var coop = ruleset.Features.Coop ? ruleset : ruleset.WithCoop();
+        return coop with
+        {
+            Features = coop.Features with { PartnerBoard = true },
+            PartnerBoard = new PartnerBoardRules { RequestTtlHours = requestTtlHours },
+        };
+    }
 }

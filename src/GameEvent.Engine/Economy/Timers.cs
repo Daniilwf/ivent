@@ -34,7 +34,8 @@ public static class Timers
 
     /// <summary>
     /// The earliest moment something of <paramref name="player"/> in <paramref name="state"/> is due: his own timers and the
-    /// pending invitations he sent (D-523), the end of the duels he challenged to (D-525); null when nothing waits.
+    /// pending invitations he sent (D-523), his open requests of the partner board (D-524), the end of the duels he
+    /// challenged to (D-525); null when nothing waits.
     /// </summary>
     public static DateTimeOffset? Next(SeasonState state, SeasonPlayer player)
     {
@@ -45,7 +46,13 @@ public static class Timers
                 && Interactions.InteractionRules.IsOn(state.Rules.Features, i.Kind))
             .Select(i => (DateTimeOffset?)i.ExpiresAt)
             .Min();
-        return new[] { Next(player, state.Rules.Features), invitations, Duels.Dueling.Next(state, player.PlayerId) }.Where(m => m is not null).Min();
+        var requests = Interactions.PartnerBoard.IsOn(state.Rules.Features)
+            ? state.PartnerRequests.Values
+                .Where(r => r.Status == Interactions.PartnerRequestStatus.Open && r.PlayerId == player.PlayerId)
+                .Select(r => (DateTimeOffset?)r.ExpiresAt)
+                .Min()
+            : null;
+        return new[] { Next(player, state.Rules.Features), invitations, requests, Duels.Dueling.Next(state, player.PlayerId) }.Where(m => m is not null).Min();
     }
 
     internal static Decision Decide(SeasonState state, EngineContext context)
@@ -87,6 +94,9 @@ public static class Timers
         // An invitation past its time burns (D-523)
         events.AddRange(Interactions.Coop.Timeouts(state, now));
 
+        // A request of the partner board past its term closes (D-524)
+        events.AddRange(Interactions.PartnerBoard.Timeouts(state, now));
+
         // A duel past its race's end is a draw (D-525)
         if (features.Duels)
         {
@@ -111,6 +121,7 @@ internal static class Settlements
         Each(state, events, (s, e) => (s.Rules.Features.Bets ? Betting.Settle(s, e) : [])
             .Concat(s.Rules.Features.WeeklyChallenge ? Challenges.WeeklyChallenges.Settle(s, context.Pool, e) : [])
             .Concat(s.Rules.Features.Coop ? Interactions.Coop.Settle(s, e, context.Clock.UtcNow) : [])
+            .Concat(Interactions.PartnerBoard.IsOn(s.Rules.Features) ? Interactions.PartnerBoard.Settle(s, e, context.Clock.UtcNow) : [])
             .Concat(s.Rules.Features.Duels ? Duels.Dueling.Settle(s, e, context.Clock.UtcNow) : [])
             .Concat(s.Rules.Features.Shop ? ShopReset(s, e) : []));
 

@@ -128,6 +128,9 @@
   "suggestions": {
     "perDay": 5
   },
+  "partnerBoard": {
+    "requestTtlHours": 48
+  },
   "duels": {
     "rewardCoins": 10,
     "durationDays": 7,

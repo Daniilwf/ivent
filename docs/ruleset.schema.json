@@ -837,6 +837,21 @@
       ],
       "additionalProperties": false
     },
+    "partnerBoard": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "properties": {
+        "requestTtlHours": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "requestTtlHours"
+      ],
+      "additionalProperties": false
+    },
     "duels": {
       "type": [
         "object",

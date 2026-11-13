@@ -52,6 +52,10 @@ public sealed record SeasonState(
     public ImmutableSortedDictionary<Guid, Interactions.Interaction> Interactions { get; init; } =
         ImmutableSortedDictionary<Guid, Interactions.Interaction>.Empty;
 
+    /// <summary>The requests of the partner board (D-524), by id: open and closed ones.</summary>
+    public ImmutableSortedDictionary<Guid, Interactions.PartnerRequest> PartnerRequests { get; init; } =
+        ImmutableSortedDictionary<Guid, Interactions.PartnerRequest>.Empty;
+
     /// <summary>The accepted duels of the season (D-525, D-730), by the id of the challenge they were accepted from.</summary>
     public ImmutableSortedDictionary<Guid, Duels.Duel> Duels { get; init; } =
         ImmutableSortedDictionary<Guid, Duels.Duel>.Empty;
@@ -94,6 +98,7 @@ public sealed record SeasonState(
         && Suggestions.SequenceEqual(other.Suggestions)
         && ForAll.SequenceEqual(other.ForAll)
         && Interactions.SequenceEqual(other.Interactions)
+        && PartnerRequests.SequenceEqual(other.PartnerRequests)
         && Duels.SequenceEqual(other.Duels)
         && MapVersion == other.MapVersion;
 

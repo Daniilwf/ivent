@@ -57,11 +57,25 @@ public sealed record Ruleset
     public SuggestionRules? Suggestions { get; init; }
 
     /// <summary>
+    /// The rules of the partner board (stage 5, D-524). Missing — a season created before it reads as it did (D-50); needed
+    /// once <c>features.partnerBoard</c> is on. Not written while missing.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public PartnerBoardRules? PartnerBoard { get; init; }
+
+    /// <summary>
     /// The rules of duels (stage 5, D-525, D-540). Missing — a season created before them reads as it did (D-50); needed once
     /// <c>features.duels</c> is on. Not written while missing.
     /// </summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public DuelRules? Duels { get; init; }
+}
+
+/// <summary>The rules of the partner board (SPEC «Взаимодействие игроков», D-524).</summary>
+public sealed record PartnerBoardRules
+{
+    /// <summary>How many hours a request «ищу напарника» stays open unless something closes it earlier.</summary>
+    public required int RequestTtlHours { get; init; }
 }
 
 /// <summary>The rules of duels (D-525, the expert panel, D-540): a race to the next completion for coins from the system.</summary>
@@ -85,7 +99,7 @@ public sealed record DuelRules
     /// <summary>How many duels one player may win in a season; at the limit he neither challenges nor accepts.</summary>
     public required int MaxWinsPerSeason { get; init; }
 
-    /// <summary>A voluntary drop of a run that counts loses the duel: the opponent wins at once.</summary>
+    /// <summary>A voluntary drop (or wish reroll) of a run that counts loses the duel: the opponent wins at once (D-733).</summary>
     public required bool DropForfeits { get; init; }
 }
 

@@ -29,7 +29,8 @@ public sealed record SeasonFields(SeasonStatus Status, DateTimeOffset? Deadline,
 /// effects, weekly challenges, suggestions and duels it changed, those it created are removed, the season's fields if it changed
 /// them. Nothing later touched them (that is when an undo is allowed), so this equals its events inverted in reverse order.
 /// The counters of finishes and points changes are not wound back: numbers are never reused. Challenges and suggestions are
-/// written only when set: an undo of a command that touched none of them keeps its format (D-576); so are invitations (D-523).
+/// written only when set: an undo of a command that touched none of them keeps its format (D-576); so are invitations (D-523)
+/// and requests of the partner board (D-524).
 /// </summary>
 [EventType("command-undone")]
 public sealed record CommandUndone(
@@ -59,6 +60,11 @@ public sealed record CommandUndone(
     [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     EquatableArray<Guid>? RemovedInteractions = null,
     [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    EquatableArray<Interactions.PartnerRequest>? PartnerRequests = null,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    EquatableArray<Guid>? RemovedPartnerRequests = null,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+
     EquatableArray<Duels.Duel>? Duels = null,
     [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     EquatableArray<Guid>? RemovedDuels = null) : IGameEvent;
@@ -212,6 +218,8 @@ internal static class Undoing
         var forAll = state.ForAll.RemoveRange(e.RemovedForAll ?? []).SetItems((e.ForAll ?? []).Select(x => KeyValuePair.Create(x.SettlementId, x)));
         var interactions = state.Interactions.RemoveRange(e.RemovedInteractions ?? [])
             .SetItems((e.Interactions ?? []).Select(x => KeyValuePair.Create(x.InteractionId, x)));
+        var requests = state.PartnerRequests.RemoveRange(e.RemovedPartnerRequests ?? [])
+            .SetItems((e.PartnerRequests ?? []).Select(x => KeyValuePair.Create(x.RequestId, x)));
         var duels = state.Duels.RemoveRange(e.RemovedDuels ?? []).SetItems((e.Duels ?? []).Select(x => KeyValuePair.Create(x.DuelId, x)));
         var restored = state with
         {
@@ -222,6 +230,7 @@ internal static class Undoing
             Suggestions = suggestions,
             ForAll = forAll,
             Interactions = interactions,
+            PartnerRequests = requests,
             Duels = duels,
         };
         if (e.Season is not { } season)
@@ -346,6 +355,14 @@ internal static class Undoing
             }
         }
 
+        // A request names the run it asks a partner to: an undo of that run's start or roll waits for it, and the responses
+        // to it (invitations to the run) hold it (D-524)
+        foreach (var id in Changed(before.PartnerRequests, after.PartnerRequests))
+        {
+            keys.Add($"partnerRequest:{id}");
+            keys.Add($"run:{(after.PartnerRequests.GetValueOrDefault(id) ?? before.PartnerRequests[id]).RunId}");
+        }
+
         // A duel: its challenge, answer and end (D-525 (8), D-730). What a command decides of duels reads the duel standing of
         // its players — their open duels, their wins, a race still to win — so it holds the players' «duels:» key too: a later
         // challenge or answer of one of them, and a run of one of them ending within a race of his, wait for it (D-735)
@@ -371,6 +388,31 @@ internal static class Undoing
             if (before.Duels.Values.Concat(after.Duels.Values).Any(d => d.Involves(playerId) && d.AcceptedAt <= at && at < d.ExpiresAt))
             {
                 keys.Add($"{DuelsPrefix}{playerId}");
+            }
+        }
+
+        // Who may duel is read by every challenge and accept: marking a player inactive or active again, and who is the first
+        // finisher — a finish, a freeze, a revoke — change it, and the first's duels end (D-734)
+        foreach (var e in events)
+        {
+            if (e is Players.PlayerInactivitySet inactivity)
+            {
+                keys.Add($"{DuelsPrefix}{inactivity.PlayerId}");
+            }
+
+            var finisher = e switch
+            {
+                PlayerFinished f => f.PlayerId,
+                PlayerFinishRevoked r => r.PlayerId,
+                PlayerFrozen z => z.PlayerId,
+                _ => (Guid?)null,
+            };
+            if (finisher is not null)
+            {
+                foreach (var id in new[] { finisher, FinishLine.First(before), FinishLine.First(after) }.OfType<Guid>())
+                {
+                    keys.Add($"{DuelsPrefix}{id}");
+                }
             }
         }
 
@@ -468,6 +510,7 @@ internal static class Undoing
         var suggestions = Changed(before.Suggestions, after.Suggestions).ToList();
         var forAll = Changed(before.ForAll, after.ForAll).ToList();
         var interactions = Changed(before.Interactions, after.Interactions).ToList();
+        var requests = Changed(before.PartnerRequests, after.PartnerRequests).ToList();
         var duels = Changed(before.Duels, after.Duels).ToList();
         var seasonChanged = before.Status != after.Status || before.Deadline != after.Deadline || before.Name != after.Name
             || before.Ruleset != after.Ruleset;
@@ -494,6 +537,8 @@ internal static class Undoing
             OrNull([.. forAll.Where(id => !before.ForAll.ContainsKey(id) && now.ForAll.ContainsKey(id))]),
             OrNull([.. interactions.Where(before.Interactions.ContainsKey).Select(id => before.Interactions[id])]),
             OrNull([.. interactions.Where(id => !before.Interactions.ContainsKey(id) && now.Interactions.ContainsKey(id))]),
+            OrNull([.. requests.Where(before.PartnerRequests.ContainsKey).Select(id => before.PartnerRequests[id])]),
+            OrNull([.. requests.Where(id => !before.PartnerRequests.ContainsKey(id) && now.PartnerRequests.ContainsKey(id))]),
             OrNull([.. duels.Where(before.Duels.ContainsKey).Select(id => before.Duels[id])]),
             OrNull([.. duels.Where(id => !before.Duels.ContainsKey(id) && now.Duels.ContainsKey(id))]));
     }

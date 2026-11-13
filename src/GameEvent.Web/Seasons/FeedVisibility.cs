@@ -138,6 +138,8 @@ public static class FeedVisibility
         ["coop-joined"] = Access.Public,
         ["coop-left"] = Access.Public,
         ["coop-reward-split"] = Access.Public,
+        ["partner-request-posted"] = Access.Public,
+        ["partner-request-closed"] = Access.Public,
 
         // Duels (D-525): the race, its end and a win taken back by a reject are public, like a bet's
         ["duel-started"] = Access.Public,
