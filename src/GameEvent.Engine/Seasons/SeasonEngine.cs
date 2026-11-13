@@ -82,6 +82,9 @@ public static class SeasonEngine
             Suggestions.ReviewSuggestion c => Suggestions.SuggestionBox.Decide(state, c, context),
             SubmitIrlProof c => IrlProofs.Decide(state, c, context),
             ReviewIrlProof c => IrlProofs.Decide(state, c, context),
+            Duels.ChallengeToDuel c => Duels.Dueling.Decide(state, c, context),
+            Duels.AnswerDuel c => Duels.Dueling.Decide(state, c, context),
+            Duels.WithdrawDuel c => Duels.Dueling.Decide(state, c, context),
             FireTimers => Timers.Decide(state, context),
             SettleForAll c => ForAllSettlements.Decide(state, c, context),
             _ => throw new ArgumentException($"Unknown command {command.GetType().Name}.", nameof(command)),
@@ -237,6 +240,8 @@ public static class SeasonEngine
             Suggestions.SuggestionReviewed e => Suggestions.SuggestionBox.Apply(state, e),
             IrlProofSubmitted e => IrlProofs.Apply(state, e),
             IrlProofReviewed e => IrlProofs.Apply(state, e),
+            Duels.DuelChallenged or Duels.DuelAnswered or Duels.DuelWithdrawn or Duels.DuelExpired or Duels.DuelSettled
+                or Duels.DuelWinRevoked => Duels.Dueling.Apply(state, gameEvent),
 
             // Facts for the log and the feed that change nothing by themselves: their consequences are their own events.
             ObjectLost or ItemUsed or EffectTriggered or EffectRolled or HostileIntercepted or WheelSpun or InventoryAdjusted => state,

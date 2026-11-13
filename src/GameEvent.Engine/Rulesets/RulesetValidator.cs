@@ -31,6 +31,11 @@ public static class RulesetValidator
     private const int MaxReflectMultiplier = 10;
     private const int MaxWeeklyChallengeDays = 366;
     private const int MaxSuggestionsPerDay = 100;
+    private const int MaxDuelDays = 366;
+    private const int MaxDuelCoins = 1000;
+    private const int MaxOpenDuels = 10;
+    private const int MaxDuelWins = 1000;
+    private const int MaxDuelInviteTtlHours = 24 * 30;
 
     public static IReadOnlyList<RulesetError> Validate(Ruleset ruleset)
     {
@@ -210,6 +215,45 @@ public static class RulesetValidator
         if (ruleset.Suggestions is { PerDay: < 1 or > MaxSuggestionsPerDay })
         {
             Error("suggestions.perDay", $"must be 1–{MaxSuggestionsPerDay}");
+        }
+
+        // Duels (D-525, D-540): the section comes with the flag; the bounds keep every moment of a duel on the calendar
+        if (ruleset.Features.Duels && ruleset.Duels is null)
+        {
+            Error("duels", "is required when features.duels is on");
+        }
+
+        if (ruleset.Duels is { } duels)
+        {
+            if (duels.RewardCoins is < 0 or > MaxDuelCoins)
+            {
+                Error("duels.rewardCoins", $"must be 0–{MaxDuelCoins}");
+            }
+
+            if (duels.DurationDays is < 1 or > MaxDuelDays)
+            {
+                Error("duels.durationDays", $"must be 1–{MaxDuelDays}");
+            }
+
+            if (duels.MaxOpenPerPlayer is < 1 or > MaxOpenDuels)
+            {
+                Error("duels.maxOpenPerPlayer", $"must be 1–{MaxOpenDuels}");
+            }
+
+            if (duels.SamePairCooldownDays is < 0 or > MaxDuelDays)
+            {
+                Error("duels.samePairCooldownDays", $"must be 0–{MaxDuelDays}");
+            }
+
+            if (duels.MaxWinsPerSeason is < 1 or > MaxDuelWins)
+            {
+                Error("duels.maxWinsPerSeason", $"must be 1–{MaxDuelWins}");
+            }
+        }
+
+        if (ruleset.Features.Duels && ruleset.Interactions.InviteTtlHours is < 1 or > MaxDuelInviteTtlHours)
+        {
+            Error("interactions.inviteTtlHours", $"must be 1–{MaxDuelInviteTtlHours}");
         }
 
         // Special and risky events are drawn from decks: without events they could not even be played by hand (D-530)

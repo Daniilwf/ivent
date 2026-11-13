@@ -48,6 +48,10 @@ public sealed record SeasonState(
     public ImmutableSortedDictionary<Guid, ForAllSettlement> ForAll { get; init; } =
         ImmutableSortedDictionary<Guid, ForAllSettlement>.Empty;
 
+    /// <summary>The duels of the season (D-525), challenges among them, by id.</summary>
+    public ImmutableSortedDictionary<Guid, Duels.Duel> Duels { get; init; } =
+        ImmutableSortedDictionary<Guid, Duels.Duel>.Empty;
+
     public static SeasonState Empty { get; } =
         new(
             Guid.Empty,
@@ -85,6 +89,7 @@ public sealed record SeasonState(
         && WeeklyChallenges.SequenceEqual(other.WeeklyChallenges)
         && Suggestions.SequenceEqual(other.Suggestions)
         && ForAll.SequenceEqual(other.ForAll)
+        && Duels.SequenceEqual(other.Duels)
         && MapVersion == other.MapVersion;
 
     // Explicit type arguments: a mutated count still compiles, so mutation testing keeps this method (D-281)

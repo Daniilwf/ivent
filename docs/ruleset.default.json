@@ -14,7 +14,8 @@
     "comments": false,
     "gallery": false,
     "challenges": false,
-    "suggestions": false
+    "suggestions": false,
+    "duels": false
   },
   "season": {
     "timezone": "Europe/Moscow",
@@ -124,5 +125,14 @@
   },
   "suggestions": {
     "perDay": 5
+  },
+  "duels": {
+    "rewardCoins": 10,
+    "durationDays": 7,
+    "maxOpenPerPlayer": 1,
+    "countRunsStartedAfterAccept": true,
+    "samePairCooldownDays": 14,
+    "maxWinsPerSeason": 5,
+    "dropForfeits": true
   }
 }

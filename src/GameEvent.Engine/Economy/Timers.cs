@@ -68,6 +68,12 @@ public static class Timers
         // An event's question past its answer timeout is answered by the timer (D-560)
         events.AddRange(Effects.Suspensions.Timeouts(events.Aggregate(state, SeasonEngine.Apply), context));
 
+        // A challenge past its time burns, a race past its time is a draw (D-523, D-525)
+        if (features.Duels)
+        {
+            events.AddRange(Duels.Dueling.Timeouts(state, now));
+        }
+
         return events.Count == 0
             ? Decision.Reject(RejectionCodes.TimersNothingDue, "Nothing is due yet.")
             : Decision.Accept(events);
@@ -76,7 +82,7 @@ public static class Timers
 
 /// <summary>
 /// What follows a command's own events without being an effect (D-413): bets are decided, weekly challenges are completed
-/// or taken back (D-526), the shop price starts over,
+/// or taken back (D-526), duels are won, drawn or called off (D-525), the shop price starts over,
 /// objects living for some runs count one down. Not limited by the effect chain: a settlement must never be cut.
 /// Writes nothing while the season has none of it, nor for a mechanic switched off (D-420).
 /// </summary>
@@ -85,6 +91,7 @@ internal static class Settlements
     public static IReadOnlyList<IGameEvent> After(SeasonState state, IReadOnlyList<IGameEvent> events, Pool.IPoolView pool) =>
         Each(state, events, (s, e) => (s.Rules.Features.Bets ? Betting.Settle(s, e) : [])
             .Concat(s.Rules.Features.WeeklyChallenge ? Challenges.WeeklyChallenges.Settle(s, pool, e) : [])
+            .Concat(s.Rules.Features.Duels ? Duels.Dueling.Settle(s, e) : [])
             .Concat(s.Rules.Features.Shop ? ShopReset(s, e) : []));
 
     /// <summary>
