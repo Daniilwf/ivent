@@ -84,6 +84,11 @@ internal static class PartnerBoard
             return Decision.Reject(RejectionCodes.CoopRunNotActive, "Only a player playing a run asks for a partner to it.");
         }
 
+        if (author.IsInactive)
+        {
+            return Decision.Reject(RejectionCodes.CoopRunNotActive, "An inactive player asks for no partner.");
+        }
+
         if (run.PlayerId != author.PlayerId)
         {
             return Decision.Reject(RejectionCodes.CoopRollerOnly, "Only the roller of a coop run asks for a partner to it.");
@@ -143,7 +148,8 @@ internal static class PartnerBoard
 
         // A request left open while the board was off may name a run that ended or took a partner meanwhile (D-420)
         var run = state.Runs[request.RunId];
-        if (run.Status != RunStatus.Playing || state.Players[run.PlayerId].ActiveRunId != run.RunId)
+        // The author is checked as an accept would: a response no accept could take is refused now (D-712, D-713)
+        if (run.Status != RunStatus.Playing || state.Players[run.PlayerId].ActiveRunId != run.RunId || state.Players[run.PlayerId].IsInactive)
         {
             return Decision.Reject(RejectionCodes.CoopRunNotActive, "The run of the request is over.");
         }
@@ -151,6 +157,16 @@ internal static class PartnerBoard
         if (run.Coop is not null)
         {
             return Decision.Reject(RejectionCodes.CoopAlreadyJoined, "The run has a partner already.");
+        }
+
+        if (FinishLine.First(state) == request.PlayerId)
+        {
+            return Decision.Reject(RejectionCodes.CoopFirstFinisher, "The first finisher does not play with others (D-510).");
+        }
+
+        if (!Coop.IsCoopGame(context, run.GameId))
+        {
+            return Decision.Reject(RejectionCodes.CoopNotCoopGame, "Only a coop game takes a partner.");
         }
 
         // The response is the invitation the author answers: what an accept would check, checked now too (D-712)
@@ -206,7 +222,8 @@ internal static class PartnerBoard
 
     /// <summary>
     /// What follows <paramref name="e"/> (the state already holds it) with the board on (D-524): a coop on a run or its end
-    /// closes its open request, the season's closing all of them (D-516).
+    /// closes its open request, the season's closing all of them (D-516). One already past its term the timer has not reached
+    /// yet closes as timed out (D-741).
     /// </summary>
     public static IEnumerable<IGameEvent> Settle(SeasonState state, IGameEvent e, DateTimeOffset now)
     {
@@ -223,7 +240,7 @@ internal static class PartnerBoard
             ? []
             : [.. state.PartnerRequests.Values
                 .Where(r => r.Status == PartnerRequestStatus.Open && close.Closes(r))
-                .Select(r => new PartnerRequestClosed(r.RequestId, close.Reason, now))];
+                .Select(r => new PartnerRequestClosed(r.RequestId, r.ExpiresAt <= now ? PartnerRequestCloseReason.Timeout : close.Reason, now))];
     }
 
     /// <summary>The open requests past their term, closed by the timer; none while the board is off (D-420).</summary>

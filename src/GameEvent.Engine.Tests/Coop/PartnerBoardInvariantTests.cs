@@ -135,7 +135,8 @@ public class PartnerBoardInvariantTests
                 var invitation = before.Interactions[joined.InteractionId];
                 Assert.Equal(state.Runs[joined.RunId].PlayerId, joined.RollerId);
                 Assert.Contains(joined.RollerId, new[] { invitation.FromPlayerId, invitation.ToPlayerId });
-                Assert.Equal(invitation.FromPlayerId == joined.RollerId ? invitation.ToPlayerId : invitation.FromPlayerId, joined.PlayerId);
+                Assert.Contains(joined.PlayerId, new[] { invitation.FromPlayerId, invitation.ToPlayerId });
+                Assert.NotEqual(joined.RollerId, joined.PlayerId);
             }
         }
 
