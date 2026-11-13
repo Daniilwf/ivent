@@ -17,7 +17,7 @@ namespace GameEvent.Engine.Tests.Events;
 /// unlisted risky after the listed, the changes of items last; (2) the objects a throw names (<c>run-dice-modified</c>
 /// sources) that waited for it are non-decreasing by the same rank; (3) an event's change of the roll is never lost before it
 /// applies (a roll, a reroll, «Уже проходил» keep it in the roll in progress or waiting); (4) what is left waiting is an
-/// event's filter. At the end the log replays to the state.
+/// event's filter or a contradicting condition. At the end the log replays to the state.
 /// </summary>
 public class AccumulationInvariantTests
 {
@@ -110,10 +110,10 @@ public class AccumulationInvariantTests
             }
         }
 
-        // (4) A change left waiting is an event's filter
+        // (4) A change left waiting is an event's filter (D-583) or a contradicting condition (D-506, D-586)
         foreach (var applied in s.LastEvents<RollModifiersApplied>())
         {
-            Assert.All(applied.Waiting.Where(m => !before.Players[applied.PlayerId].Wallet.NextRoll.Contains(m)), m => Assert.True(m is { EventKind: not null, Filter: not null }, $"{m.ObjectId} waits but is not an event's filter."));
+            Assert.All(applied.Waiting.Where(m => !before.Players[applied.PlayerId].Wallet.NextRoll.Contains(m)), m => Assert.True(m is { EventKind: not null, Filter: not null } || m.RunCondition is not null, $"{m.ObjectId} waits but is neither an event's filter nor a contradicting condition."));
         }
 
         var order = s.Ruleset.Events?.ApplyOrder?.ToList();
