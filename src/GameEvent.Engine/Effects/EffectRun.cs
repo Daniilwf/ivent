@@ -356,9 +356,14 @@ internal sealed class EffectRun
         ArgumentNullException.ThrowIfNull(definition);
         ArgumentNullException.ThrowIfNull(suspended);
         var effect = definition.Effect!;
+
+        // The provisional first goes on with the event of his own run (D-553 (3)), but it reaches him alone, as in Play
+        // (D-557 (4)): a question about another player asked before he became first hits nobody
+        var alone = Targets.IsFirst(State, UserId);
         if (suspended.Step == SuspendedStep.Target)
         {
-            if (Guid.TryParseExact(optionId, "N", out var target) && Targets.Askable(State, definition, UserId).Contains(target))
+            if (Guid.TryParseExact(optionId, "N", out var target) && (!alone || target == UserId)
+                && Targets.Askable(State, definition, UserId).Contains(target))
             {
                 Run(effect, [target]);
             }
@@ -367,6 +372,10 @@ internal sealed class EffectRun
         }
 
         TargetId = suspended.TargetId ?? UserId;
+        if (alone && TargetId != UserId)
+        {
+            return;
+        }
 
         // A player picked at an earlier question is checked again at every later one (Н-10, D-510): one who finished first
         // or became inactive since is not hit, the answer is not refused
