@@ -56,6 +56,14 @@ public partial class PlayerAdminInvariantTests
     }
 
     [Fact]
+    public void An_approval_at_a_lower_difficulty_that_revokes_the_first_freezes_the_next_after_the_approval()
+    {
+        // INV-2, the shrunk game of a long run: Петя finished first, Маша second with her run approved; the approval of
+        // Петя's run at a lower difficulty revokes his finish, and Маша, now first, is frozen — after the approval (Q-3)
+        Invariants_hold_in_the_combined_game_with_rerolls_and_a_choice_of_games(20, [34, 1, 13, 160, 165, 73, 28, 192, 38, 74, 48, 178, 240]);
+    }
+
+    [Fact]
     public void Combined_variant_reaches_undos_rule_changes_and_disabled_mechanics()
     {
         // The generator must exercise what it adds, not only allow it: over fixed scripts undos are accepted (also of a
