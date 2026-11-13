@@ -37,7 +37,32 @@ export default tseslint.config(
           message: 'A fold opens with <Summary> from src/ui/Disclosure.tsx (K2-5).',
         },
       ],
+      // The animation engine stays out of the main page's script (FL-3, DESIGN.md «Производительность»): `m` inside
+      // <Motion>, `animate` from loadMotion(); only src/board/motionFeatures.ts takes the heavy parts
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'motion/react',
+              importNames: ['motion', 'animate', 'domAnimation', 'domMax'],
+              allowTypeImports: true,
+              message: 'Use `m` inside <Motion> and `animate` from loadMotion() (src/board, FL-3).',
+            },
+            { name: 'motion', allowTypeImports: true, message: 'Import from motion/react (FL-3).' },
+            {
+              name: 'framer-motion',
+              allowTypeImports: true,
+              message: 'Import from motion/react (FL-3).',
+            },
+          ],
+        },
+      ],
     },
+  },
+  {
+    files: ['src/board/motionFeatures.ts'],
+    rules: { '@typescript-eslint/no-restricted-imports': 'off' },
   },
   {
     files: ['src/ui/Disclosure.tsx'],

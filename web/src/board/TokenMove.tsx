@@ -1,4 +1,4 @@
-import { animate, useReducedMotion } from 'motion/react';
+import { useReducedMotion, type animate } from 'motion/react';
 import {
   useEffect,
   useEffectEvent,
@@ -9,6 +9,7 @@ import {
   type Ref,
 } from 'react';
 import { cellById } from './geometry';
+import { loadMotion } from './loadMotion';
 import { MapSticker, MapView, type MapApi } from './MapView';
 import { momentBudget, momentHop, type MomentHandle, type MomentPhase } from './moment';
 import type { Board, Player, Point } from './types';
@@ -78,6 +79,11 @@ export function TokenMove({
   };
   const arrive = useEffectEvent(end);
 
+  // The map's token is about to move: the animation engine comes right after the page, not when the move starts
+  useEffect(() => {
+    loadMotion().catch(() => undefined);
+  }, []);
+
   useImperativeHandle(ref, () => ({ skip: end }));
 
   useEffect(() => {
@@ -95,6 +101,14 @@ export function TokenMove({
     const hops = path.length - 1 + jumps.filter((i) => i > 0 && i < path.length).length;
     const hop = Math.min(momentHop, budget / Math.max(hops, 1));
     const run = async () => {
+      // Without the animation engine (its download failed) the token stands on its last cell at once
+      const motion = await loadMotion().catch(() => null);
+      if (halted()) return;
+      if (!motion) {
+        arrive();
+        return;
+      }
+      const { animate } = motion;
       for (let i = 1; i < path.length; i++) {
         const a = cellById(board, path[i - 1] as number);
         const b = cellById(board, path[i] as number);
