@@ -65,6 +65,26 @@ public sealed class Scenario
     /// <summary>All accepted events so far, in order.</summary>
     public IReadOnlyList<IGameEvent> Log => _log;
 
+    /// <summary>
+    /// The log through its stored form: every event encoded as the database keeps it and decoded back. The log only grows
+    /// and an event never changes, so each event goes through the codec once, when it is new — the invariants replay
+    /// this after every command, and re-encoding the whole log each time made the random games quadratic (D-670).
+    /// </summary>
+    public IReadOnlyList<IGameEvent> StoredLog
+    {
+        get
+        {
+            for (var i = _stored.Count; i < _log.Count; i++)
+            {
+                _stored.Add(EventCodec.Decode(EventCodec.Encode(_log[i])));
+            }
+
+            return _stored;
+        }
+    }
+
+    private readonly List<IGameEvent> _stored = [];
+
     /// <summary>Result of the last executed command.</summary>
     public CommandResult Last { get; private set; } = null!;
 
