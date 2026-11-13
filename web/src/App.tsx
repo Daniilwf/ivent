@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { api, refreshCsrf, SIGNED_OUT_EVENT, type Schemas } from './api/client';
 import { CalendarClock, LoaderCircle } from 'lucide-react';
 import { ChangePasswordForm } from './app/ChangePasswordForm';
@@ -9,16 +9,25 @@ import { onReopen, routeOf, usePath } from './app/router';
 import { UpdateBanner } from './app/WhatsNew';
 import { NotFoundPage } from './app/NotFound';
 import { Shell } from './app/Shell';
-import { AdminScreen } from './admin/AdminScreen';
-import { FeedScreen } from './feed/FeedScreen';
-import { GameScreen } from './feed/GameScreen';
-import { ProfileScreen } from './feed/ProfileScreen';
 import { ru } from './i18n/ru';
 import { Button } from './ui/Button';
 import { EmptyState, ErrorState } from './ui/States';
 import { SeasonScreen } from './season/SeasonScreen';
-import { PoolScreen } from './pool/PoolScreen';
-import { RulesScreen } from './rules/RulesScreen';
+
+// The main page (the season's map and turn) is what a player opens first, over a mobile network within 2.5 s (DESIGN.md
+// «Производительность», FL-3): every other screen loads apart, when it is opened, and stays out of the first download
+const AdminScreen = lazy(async () => ({
+  default: (await import('./admin/AdminScreen')).AdminScreen,
+}));
+const FeedScreen = lazy(async () => ({ default: (await import('./feed/FeedScreen')).FeedScreen }));
+const GameScreen = lazy(async () => ({ default: (await import('./feed/GameScreen')).GameScreen }));
+const ProfileScreen = lazy(async () => ({
+  default: (await import('./feed/ProfileScreen')).ProfileScreen,
+}));
+const PoolScreen = lazy(async () => ({ default: (await import('./pool/PoolScreen')).PoolScreen }));
+const RulesScreen = lazy(async () => ({
+  default: (await import('./rules/RulesScreen')).RulesScreen,
+}));
 
 /** The admin's section of an address: none is the proof queue, an unknown one is «Такой страницы нет» */
 const knownAdminSection = (section: string | null) =>
@@ -139,14 +148,7 @@ export function App() {
       return (
         // On the table, like the sign-in that most likely comes next: no grey flash before it
         <main className="table-surface grid min-h-dvh place-items-center" aria-busy="true">
-          <p className="flex items-center gap-2 rounded-full bg-card px-4 py-2 font-medium">
-            <LoaderCircle
-              size={20}
-              className="animate-spin motion-reduce:animate-none"
-              aria-hidden
-            />
-            {ru.ui.loading}
-          </p>
+          <Loading />
         </main>
       );
     if (state.kind === 'failed')
@@ -201,75 +203,96 @@ export function App() {
         }}
         onLogout={() => void logout()}
       >
-        {signedIn.ownPassword === path ? (
-          <main className="mx-auto grid max-w-110 gap-4 px-4 py-6">
-            <ChangePasswordForm
-              temporary={false}
-              onChanged={(user) => {
-                setState({ ...signedIn, user, ownPassword: null });
+        <Suspense
+          fallback={
+            <main className="grid place-items-center px-4 py-10" aria-busy="true">
+              <Loading />
+            </main>
+          }
+        >
+          {page()}
+        </Suspense>
+      </Shell>
+    );
+
+    function page() {
+      return signedIn.ownPassword === path ? (
+        <main className="mx-auto grid max-w-110 gap-4 px-4 py-6">
+          <ChangePasswordForm
+            temporary={false}
+            onChanged={(user) => {
+              setState({ ...signedIn, user, ownPassword: null });
+              focusMenu();
+            }}
+          >
+            <Button
+              variant="link"
+              onClick={() => {
+                setState({ ...signedIn, ownPassword: null });
                 focusMenu();
               }}
             >
-              <Button
-                variant="link"
-                onClick={() => {
-                  setState({ ...signedIn, ownPassword: null });
-                  focusMenu();
-                }}
-              >
-                {ru.password.back}
-              </Button>
-            </ChangePasswordForm>
-          </main>
-        ) : route.kind === 'admin' && admin && knownAdminSection(route.section) ? (
-          <AdminScreen
-            section={route.section}
-            currentSeasonId={signedIn.seasonId}
-            user={signedIn.user}
+              {ru.password.back}
+            </Button>
+          </ChangePasswordForm>
+        </main>
+      ) : route.kind === 'admin' && admin && knownAdminSection(route.section) ? (
+        <AdminScreen
+          section={route.section}
+          currentSeasonId={signedIn.seasonId}
+          user={signedIn.user}
+        />
+      ) : route.kind === 'profile' ? (
+        <ProfileScreen
+          key={route.userId}
+          userId={route.userId}
+          meId={signedIn.user.id}
+          onSignedOut={signedOut}
+        />
+      ) : route.kind === 'game' ? (
+        <GameScreen key={route.gameId} gameId={route.gameId} onSignedOut={signedOut} />
+      ) : route.kind === 'notFound' || (route.kind === 'admin' && admin) ? (
+        // An address the site does not have, the admin's unknown section included
+        <NotFoundPage />
+      ) : route.kind === 'feed' && (route.seasonId ?? signedIn.seasonId) ? (
+        <FeedScreen
+          key={route.seasonId ?? signedIn.seasonId}
+          seasonId={(route.seasonId ?? signedIn.seasonId) as string}
+          onSignedOut={signedOut}
+        />
+      ) : route.kind === 'pool' ? (
+        <PoolScreen
+          seasonId={signedIn.seasonId}
+          canAdd={signedIn.user.role !== 'spectator'}
+          onSignedOut={signedOut}
+        />
+      ) : route.kind === 'rules' ? (
+        <RulesScreen seasonId={signedIn.seasonId} onSignedOut={signedOut} />
+      ) : signedIn.seasonId ? (
+        <SeasonScreen
+          seasonId={signedIn.seasonId}
+          role={signedIn.user.role}
+          onSignedOut={signedOut}
+        />
+      ) : (
+        <main className="mx-auto grid max-w-110 px-4 py-10" data-testid="no-season">
+          <EmptyState
+            level={1}
+            icon={<CalendarClock size={28} aria-hidden />}
+            title={ru.shell.noSeasonTitle}
+            text={ru.shell.noSeasonText}
           />
-        ) : route.kind === 'profile' ? (
-          <ProfileScreen
-            key={route.userId}
-            userId={route.userId}
-            meId={signedIn.user.id}
-            onSignedOut={signedOut}
-          />
-        ) : route.kind === 'game' ? (
-          <GameScreen key={route.gameId} gameId={route.gameId} onSignedOut={signedOut} />
-        ) : route.kind === 'notFound' || (route.kind === 'admin' && admin) ? (
-          // An address the site does not have, the admin's unknown section included
-          <NotFoundPage />
-        ) : route.kind === 'feed' && (route.seasonId ?? signedIn.seasonId) ? (
-          <FeedScreen
-            key={route.seasonId ?? signedIn.seasonId}
-            seasonId={(route.seasonId ?? signedIn.seasonId) as string}
-            onSignedOut={signedOut}
-          />
-        ) : route.kind === 'pool' ? (
-          <PoolScreen
-            seasonId={signedIn.seasonId}
-            canAdd={signedIn.user.role !== 'spectator'}
-            onSignedOut={signedOut}
-          />
-        ) : route.kind === 'rules' ? (
-          <RulesScreen seasonId={signedIn.seasonId} onSignedOut={signedOut} />
-        ) : signedIn.seasonId ? (
-          <SeasonScreen
-            seasonId={signedIn.seasonId}
-            role={signedIn.user.role}
-            onSignedOut={signedOut}
-          />
-        ) : (
-          <main className="mx-auto grid max-w-110 px-4 py-10" data-testid="no-season">
-            <EmptyState
-              level={1}
-              icon={<CalendarClock size={28} aria-hidden />}
-              title={ru.shell.noSeasonTitle}
-              text={ru.shell.noSeasonText}
-            />
-          </main>
-        )}
-      </Shell>
-    );
+        </main>
+      );
+    }
   }
+}
+
+function Loading() {
+  return (
+    <p className="flex items-center gap-2 rounded-full bg-card px-4 py-2 font-medium">
+      <LoaderCircle size={20} className="animate-spin motion-reduce:animate-none" aria-hidden />
+      {ru.ui.loading}
+    </p>
+  );
 }
