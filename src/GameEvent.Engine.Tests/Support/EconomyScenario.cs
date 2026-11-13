@@ -39,14 +39,19 @@ public static class EconomyScenario
         return new ContentPack { Objects = [.. chosen.OrderBy(o => o.Id, StringComparer.Ordinal)] };
     }
 
-    /// <summary>The content files of the repository: /content/items and /content/wheels.</summary>
-    public static ContentPack RepositoryPack()
+    /// <summary>
+    /// The content files of the repository: /content/items and /content/wheels. Read and parsed once per test run: the
+    /// pack is immutable, and the random games would otherwise read every file again for each game (D-670).
+    /// </summary>
+    public static ContentPack RepositoryPack() => s_repositoryPack.Value;
+
+    private static readonly Lazy<ContentPack> s_repositoryPack = new(() =>
     {
         var root = Path.Combine(RepositoryPaths.Root(), "content");
         static IEnumerable<(string, string)> Read(string dir) =>
             Directory.EnumerateFiles(dir, "*.json").Select(f => (Path.GetFileName(f), File.ReadAllText(f)));
         return ContentFiles.Pack(Read(Path.Combine(root, "items")), Read(Path.Combine(root, "wheels")));
-    }
+    });
 
     /// <summary>The admin publishes <paramref name="pack"/>; it must be accepted.</summary>
     public static Scenario WithContent(this Scenario s, ContentPack pack)

@@ -239,7 +239,7 @@ public class SuspendedEffectInvariantTests
         }
 
         // 1: the state rebuilt from the log (through its stored form) is the state
-        Assert.Equal(s.State, SeasonEngine.Replay(s.Log.Select(e => EventCodec.Decode(EventCodec.Encode(e)))));
+        Assert.Equal(s.State, SeasonEngine.Replay(s.StoredLog));
 
         // D-562, D-567 (10): a pending choice of an effect only when an effect waits, and it is one of those; an effect that
         // waits is asked unless a choice of another kind (a branch, a game) is asked first
