@@ -118,7 +118,8 @@
     "durationDays": 7
   },
   "events": {
-    "defaultDeck": "risky"
+    "defaultDeck": "risky",
+    "irlProof": { "maxFiles": 5 }
   },
   "suggestions": {
     "perDay": 5

@@ -80,6 +80,20 @@ public sealed record EventRules
     /// </summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public int? AnswerTimeoutHours { get; init; }
+
+    /// <summary>
+    /// The proofs of IRL events (D-509, D-680). Missing — a season whose event rules came before them reads as it did
+    /// (D-50); needed once <c>features.events</c> is on (<see cref="RulesetValidator"/>). Not written while missing.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IrlProofRules? IrlProof { get; init; }
+}
+
+/// <summary>The proof of an IRL event (D-509): the player's own screenshots and / or one https link to a video.</summary>
+public sealed record IrlProofRules
+{
+    /// <summary>How many uploaded screenshots one submission takes; 0 — a link only.</summary>
+    public required int MaxFiles { get; init; }
 }
 
 public enum MapMode

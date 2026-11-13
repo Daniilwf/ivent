@@ -79,6 +79,8 @@ public static class SeasonEngine
             Challenges.MarkWeeklyChallenge c => Challenges.WeeklyChallenges.Decide(state, c),
             Suggestions.SubmitSuggestion c => Suggestions.SuggestionBox.Decide(state, c, context),
             Suggestions.ReviewSuggestion c => Suggestions.SuggestionBox.Decide(state, c, context),
+            SubmitIrlProof c => IrlProofs.Decide(state, c, context),
+            ReviewIrlProof c => IrlProofs.Decide(state, c, context),
             FireTimers => Timers.Decide(state, context),
             _ => throw new ArgumentException($"Unknown command {command.GetType().Name}.", nameof(command)),
         };
@@ -226,6 +228,8 @@ public static class SeasonEngine
             Challenges.WeeklyChallengeRevoked e => Challenges.WeeklyChallenges.Apply(state, e),
             Suggestions.SuggestionSubmitted e => Suggestions.SuggestionBox.Apply(state, e),
             Suggestions.SuggestionReviewed e => Suggestions.SuggestionBox.Apply(state, e),
+            IrlProofSubmitted e => IrlProofs.Apply(state, e),
+            IrlProofReviewed e => IrlProofs.Apply(state, e),
 
             // Facts for the log and the feed that change nothing by themselves: their consequences are their own events.
             ObjectLost or ItemUsed or EffectTriggered or EffectRolled or HostileIntercepted or WheelSpun or InventoryAdjusted => state,

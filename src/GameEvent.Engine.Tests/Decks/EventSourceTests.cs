@@ -339,7 +339,7 @@ public class EventSourceTests
         var s = EventSetup.Season(
             EventSetup.Pack(["coins-minus-3", "hop-and-coins"], EventSetup.Deck(EventKind.Bad, "coins-minus-3"), EventSetup.Deck(EventKind.Good, "hop-and-coins")),
             map,
-            r => r with { Events = new EventRules { DefaultDeck = EventKind.Bad } });
+            r => r with { Events = new EventRules { DefaultDeck = EventKind.Bad, IrlProof = new IrlProofRules { MaxFiles = 5 } } });
         s.RollTitle("Вася", "Alan Wake").Start("Вася");
 
         s.NextRandom(2, 3, 0, 0).Complete("Вася", Difficulty.Extreme);

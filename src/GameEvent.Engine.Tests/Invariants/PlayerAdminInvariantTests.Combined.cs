@@ -420,7 +420,8 @@ public partial class PlayerAdminInvariantTests
             // Events of stage 5 (D-500…): draws from decks and the events played by hand
             Engine.Decks.EventDrawn or Engine.Decks.EventDrawMissed or Engine.Decks.BadEventIntercepted
                 or ManualEffectCreated { Source: ManualEffectSource.Event }
-                or EffectSuspended or EffectResumed or EffectMoveSkipped => "events",
+                or EffectSuspended or EffectResumed or EffectMoveSkipped
+                or Engine.Proofs.IrlProofSubmitted or Engine.Proofs.IrlProofReviewed => "events",
 
             // The economy of stage 4 (D-400…): items and their effects, the shop, bets — each under its flag
             Engine.Content.ContentPublished or Engine.Inventory.ObjectGiven or Engine.Inventory.ObjectRemoved or Engine.Inventory.ObjectTransferred

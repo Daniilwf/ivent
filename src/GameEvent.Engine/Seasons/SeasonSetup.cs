@@ -127,6 +127,12 @@ internal static class SeasonSetup
             return Decision.Reject(RejectionCodes.SeasonProofsPending, "Every completed run must be approved or rejected first.");
         }
 
+        // D-516, D-546 (1): every submitted IRL proof is checked before the results, like a run's
+        if (Proofs.IrlProofs.Waiting(state) is { Count: > 0 } irl)
+        {
+            return Decision.Reject(RejectionCodes.SeasonProofsPending, "Every submitted IRL proof must be approved or rejected first.", [.. irl]);
+        }
+
         // D-305: the steps waiting at a fork belong to a throw made before the deadline and may still reach the finish
         if (state.Players.Values.Any(p => p.Choice?.Kind == Turns.ChoiceKind.Branch))
         {
@@ -143,7 +149,7 @@ internal static class SeasonSetup
         // nothing changes any more, so it would wait forever
         if (!state.ManualEffects.IsEmpty)
         {
-            return Decision.Reject(RejectionCodes.SeasonEffectsPending, "A manual effect waits: resolve every pending effect first.");
+            return Decision.Reject(RejectionCodes.SeasonEffectsPending, "A manual effect waits: resolve every pending effect first.", [.. state.ManualEffects.Keys]);
         }
 
         return Decision.Accept(changed, new SeasonResultRecorded(Ranking.Leaderboard.Build(state)));

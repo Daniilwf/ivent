@@ -1,5 +1,6 @@
 using GameEvent.Engine.Decks;
 using GameEvent.Engine.Kernel;
+using GameEvent.Engine.Proofs;
 using GameEvent.Engine.Rulesets;
 
 namespace GameEvent.Engine.Tests.Kernel;
@@ -22,7 +23,39 @@ public partial class EventFormatTests
         ("event-drawn", new EventDrawn(s_player, "risky", "gamble", EventKind.Risky, EventSource.Cell), """{"playerId":"10000000-0000-0000-0000-000000000001","deck":"risky","objectId":"gamble","kind":"risky","source":"cell"}"""),
         ("event-draw-missed", new EventDrawMissed(s_player, "horror-bad", EventKind.Bad, EventSource.Item), """{"playerId":"10000000-0000-0000-0000-000000000001","deck":"horror-bad","kind":"bad","source":"item"}"""),
         ("bad-event-intercepted", new BadEventIntercepted(s_player, s_object, "bubble-effect", EventSource.Incoming, "horror-week"), """{"playerId":"10000000-0000-0000-0000-000000000001","instanceId":"60000000-0000-0000-0000-000000000001","objectId":"bubble-effect","source":"incoming","eventId":"horror-week"}"""),
+        ("irl-proof-submitted", new IrlProofSubmitted(s_run, s_player, [s_object], "https://video.example/abc", s_at), """{"effectId":"00000000-0000-0000-0000-000000000001","playerId":"10000000-0000-0000-0000-000000000001","files":["60000000-0000-0000-0000-000000000001"],"link":"https://video.example/abc","submittedAt":"2026-10-01T12:30:00+00:00"}"""),
+        ("irl-proof-reviewed", new IrlProofReviewed(s_run, s_player, false, "Видео закрыто", s_at), """{"effectId":"00000000-0000-0000-0000-000000000001","playerId":"10000000-0000-0000-0000-000000000001","approved":false,"comment":"Видео закрыто","reviewedAt":"2026-10-01T12:30:00+00:00"}"""),
     ];
+
+    [Fact]
+    public void An_irl_proof_without_a_link_or_files_and_an_approval_without_a_comment_write_nulls_and_empties()
+    {
+        Assert.Equal(
+            """{"effectId":"00000000-0000-0000-0000-000000000001","playerId":"10000000-0000-0000-0000-000000000001","files":[],"link":null,"submittedAt":"2026-10-01T12:30:00+00:00"}""",
+            EventCodec.Encode(new IrlProofSubmitted(s_run, s_player, [], null, s_at)).Data);
+        Assert.Equal(
+            """{"effectId":"00000000-0000-0000-0000-000000000001","playerId":"10000000-0000-0000-0000-000000000001","approved":true,"comment":null,"reviewedAt":"2026-10-01T12:30:00+00:00"}""",
+            EventCodec.Encode(new IrlProofReviewed(s_run, s_player, true, null, s_at)).Data);
+    }
+
+    [Fact]
+    public void An_undo_snapshot_keeps_the_irl_proof_of_a_pending_effect()
+    {
+        var effect = new Engine.Effects.PendingManualEffect(s_run, s_player, null, Engine.Effects.ManualEffectSource.Drop, null)
+        {
+            ObjectId = "karaoke",
+            IrlProof = new IrlProofState(IrlProofStatus.Rejected, [s_object], "https://video.example/abc", s_at, "Видео закрыто"),
+        };
+        var undo = new Engine.Undo.CommandUndone(s_run, "Ошибка", [], [], [], [], [effect], [], null);
+
+        var stored = EventCodec.Encode(undo);
+
+        Assert.Contains(
+            "\"irlProof\":" + """{"status":"rejected","files":["60000000-0000-0000-0000-000000000001"],"link":"https://video.example/abc","submittedAt":"2026-10-01T12:30:00+00:00","comment":"Видео закрыто"}""",
+            stored.Data,
+            StringComparison.Ordinal);
+        Assert.Equal(undo, EventCodec.Decode(stored));
+    }
 
     [Theory]
     [InlineData(EventSource.Difficulty, "difficulty")]

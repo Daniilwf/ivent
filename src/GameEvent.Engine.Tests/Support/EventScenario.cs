@@ -16,7 +16,7 @@ public static class EventScenario
         return ruleset with
         {
             Features = ruleset.Features with { Items = true, Events = true },
-            Events = new EventRules { DefaultDeck = defaultDeck },
+            Events = new EventRules { DefaultDeck = defaultDeck, IrlProof = new IrlProofRules { MaxFiles = 5 } },
         };
     }
 

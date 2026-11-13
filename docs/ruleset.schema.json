@@ -768,6 +768,21 @@
             "integer",
             "null"
           ]
+        },
+        "irlProof": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "properties": {
+            "maxFiles": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "maxFiles"
+          ],
+          "additionalProperties": false
         }
       },
       "required": [

@@ -40,6 +40,13 @@ public sealed record PendingManualEffect(Guid EffectId, Guid PlayerId, EventKind
 {
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public string? ObjectId { get; init; }
+
+    /// <summary>
+    /// The proof of an IRL effect (D-509): null until the player submits one. Not written while null, so the undo snapshots
+    /// of effects without one keep their format.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public Proofs.IrlProofState? IrlProof { get; init; }
 }
 
 /// <summary>How a manual effect was resolved (GLOSSARY «Ручной эффект»: применено / не применимо + комментарий).</summary>
@@ -105,6 +112,18 @@ internal static class ManualEffects
         if (command.PlayerId is { } playerId && playerId != effect.PlayerId)
         {
             return Decision.Reject(RejectionCodes.EffectNotYours, "A player resolves only their own manual effects.");
+        }
+
+        // D-509: an IRL effect is the admin's (D-681)
+        if (command.PlayerId is not null && Proofs.IrlProofs.IsIrl(state, effect))
+        {
+            return Decision.Reject(RejectionCodes.EffectAdminOnly, "An IRL effect is resolved by the admin, after its proof.");
+        }
+
+        // Past a proof waiting for the review only the review resolves the effect, whatever its definition says now (D-681)
+        if (effect.IrlProof?.Status == Proofs.IrlProofStatus.Pending)
+        {
+            return Decision.Reject(RejectionCodes.IrlProofPending, "The IRL proof waits for the review: approve or reject it.");
         }
 
         var comment = command.Comment?.Trim() ?? "";
