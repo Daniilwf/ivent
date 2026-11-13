@@ -181,6 +181,26 @@ const headlines: [string, (d: Data, c: Context) => Headline][] = [
     'for-all-settled',
     (d) => ({ icon: 'effect', actor: null, line: L.forAllSettled(list(d, 'players').length) }),
   ],
+  // Polls (D-512…D-516): the start, a vote without its voter's name (D-541), the result and the cancel are the system's lines
+  [
+    'poll-started',
+    (d) => ({ icon: 'effect', actor: null, line: L.pollStarted(text(d, 'question') ?? '') }),
+  ],
+  ['vote-cast', () => ({ icon: 'effect', actor: null, line: L.voteCast() })],
+  ['vote-changed', () => ({ icon: 'effect', actor: null, line: L.voteChanged() })],
+  [
+    'poll-closed',
+    (d) => {
+      // A player or a game won by its id: the poll's page names it (5.22), the feed says only that there is a result
+      const result = text(d, 'result');
+      return {
+        icon: 'effect',
+        actor: null,
+        line: L.pollClosed(result, result !== null && /^[0-9a-f]{32}$/.test(result)),
+      };
+    },
+  ],
+  ['poll-cancelled', () => ({ icon: 'effect', actor: null, line: L.pollCancelled() })],
   [
     'season-created',
     (d) => ({ icon: 'season', actor: null, line: L.seasonCreated(text(d, 'name') ?? '') }),

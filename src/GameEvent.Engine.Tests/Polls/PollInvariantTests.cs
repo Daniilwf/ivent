@@ -254,7 +254,14 @@ public class PollInvariantTests
         // settlement for everyone, whose undo halts the settlement for good (D-701), so it is not the replay without it
         if (command is UndoCommand undo && !s.History.Single(c => c.CommandId == undo.TargetCommandId).Events.Any(e => e is ForAllSettled))
         {
-            Assert.Equal(Comparable(SeasonEngine.Replay(s.EffectiveLog)), Comparable(s.State));
+            // A settlement halted by an earlier undo of its batch stays halted (D-701): no replay without the batch says so (D-728)
+            var replay = SeasonEngine.Replay(s.EffectiveLog);
+            replay = replay with
+            {
+                ForAll = replay.ForAll.SetItems(replay.ForAll.Where(f => s.State.ForAll.TryGetValue(f.Key, out var now) && now.Halted)
+                    .Select(f => KeyValuePair.Create(f.Key, f.Value with { Halted = true }))),
+            };
+            Assert.Equal(Comparable(replay), Comparable(s.State));
         }
 
         Assert.True(s.Last.Events.Count <= Limits.MaxEventsPerCommand + 1, $"{s.Last.Events.Count} events in one command.");

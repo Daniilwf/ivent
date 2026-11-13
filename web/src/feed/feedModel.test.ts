@@ -807,6 +807,26 @@ describe('events drawn from decks (stage 5)', () => {
     expect(item?.facts).toContain(ru.feed.facts.eventDrawn('Попутный ветер'));
   });
 
+  it('shows a poll and its votes without naming the voter (D-541)', () => {
+    const lineOf = (type: string, data: Record<string, unknown>) =>
+      text(feedDays([entry('p1', type, data)], named, now)[0]?.items[0]);
+
+    expect(lineOf('poll-started', { pollId: 'p', question: 'Какой жанр?' })).toBe(
+      'Голосование: Какой жанр?',
+    );
+    expect(lineOf('vote-cast', { pollId: 'p', anonymous: true })).toBe('Голос подан');
+    expect(lineOf('poll-closed', { pollId: 'p', result: 'Horror' })).toBe(
+      'Голосование закрыто, итог: Horror',
+    );
+    expect(lineOf('poll-closed', { pollId: 'p', result: 'a'.repeat(32) })).toBe(
+      'Голосование закрыто, итог подведён',
+    );
+    expect(lineOf('poll-closed', { pollId: 'p', result: null })).toBe(
+      'Голосование закрыто: голосов нет',
+    );
+    expect(lineOf('poll-cancelled', { pollId: 'p' })).toBe('Голосование отменено дедлайном');
+  });
+
   it('shows a batch of a settlement for everyone as a line of the system (D-537)', () => {
     const item = feedDays(
       [

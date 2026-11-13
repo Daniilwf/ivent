@@ -24,6 +24,13 @@ internal static class Polling
     public static Decision Decide(SeasonState state, StartPoll command, EngineContext context)
     {
         ArgumentNullException.ThrowIfNull(command.Definition);
+
+        // In closing the deadline has passed: no new polls (D-516)
+        if (state.IsCreated && state.Status == SeasonStatus.Closing)
+        {
+            return Decision.Reject(RejectionCodes.SeasonDeadlinePassed, "The deadline has passed: no new polls this season.");
+        }
+
         if (SeasonSetup.RequireActive(state) is { } inactive)
         {
             return inactive;

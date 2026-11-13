@@ -412,6 +412,7 @@ public partial class PlayerAdminInvariantTests
             "events" => features.Events,
             "weeklyChallenge" => features.WeeklyChallenge,
             "suggestions" => features.Suggestions,
+            "polls" => features.Polls,
             _ => throw new ArgumentOutOfRangeException(nameof(mechanic), mechanic, "Unknown mechanic."),
         };
 
@@ -452,6 +453,10 @@ public partial class PlayerAdminInvariantTests
             Engine.Challenges.WeeklyChallengeSet or Engine.Challenges.WeeklyChallengeCompleted or Engine.Challenges.WeeklyChallengeRevoked
                 or CoinsChanged { Reason: CoinsReason.WeeklyChallenge or CoinsReason.WeeklyChallengeRevoked } => "weeklyChallenge",
             Engine.Suggestions.SuggestionSubmitted or Engine.Suggestions.SuggestionReviewed => "suggestions",
+
+            // Polls of stage 5 (D-512, D-720)
+            Engine.Polls.PollStarted or Engine.Polls.VoteCast or Engine.Polls.VoteChanged or Engine.Polls.PollClosed
+                or Engine.Polls.PollCancelled => "polls",
 
             // The effect dispatcher reacts to content (items, events); stage 1 has no content effects in play (D-24, D-103)
             EffectChainCut => "effects",

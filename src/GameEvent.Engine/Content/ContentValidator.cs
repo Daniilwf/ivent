@@ -766,9 +766,9 @@ public static partial class ContentValidator
     // A game filter narrows something: tags, hours in a sensible range, a year.
     private static void CheckFilter(GameFilterSpec filter, string path, Action<string, string> error)
     {
-        if (filter is { Tags: null, MaxHours: null, MinHours: null, ReleaseYearBefore: null })
+        if (filter is { Tags: null, MaxHours: null, MinHours: null, ReleaseYearBefore: null, Games: null })
         {
-            error(path, "A filter names tags, hours or a release year.");
+            error(path, "A filter names tags, hours, a release year or games.");
         }
 
         if (filter.Tags is { } tags && (tags.Count == 0 || tags.Any(string.IsNullOrWhiteSpace)))
