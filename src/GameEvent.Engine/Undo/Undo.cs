@@ -51,6 +51,10 @@ public sealed record CommandUndone(
     [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     EquatableArray<Guid>? RemovedSuggestions = null,
     [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    EquatableArray<Effects.ForAllSettlement>? ForAll = null,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    EquatableArray<Guid>? RemovedForAll = null,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     EquatableArray<Interactions.Interaction>? Interactions = null,
     [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     EquatableArray<Guid>? RemovedInteractions = null) : IGameEvent;
@@ -201,6 +205,7 @@ internal static class Undoing
             .SetItems((e.WeeklyChallenges ?? []).Select(c => KeyValuePair.Create(c.ChallengeId, c)));
         var suggestions = state.Suggestions.RemoveRange(e.RemovedSuggestions ?? [])
             .SetItems((e.Suggestions ?? []).Select(x => KeyValuePair.Create(x.SuggestionId, x)));
+        var forAll = state.ForAll.RemoveRange(e.RemovedForAll ?? []).SetItems((e.ForAll ?? []).Select(x => KeyValuePair.Create(x.SettlementId, x)));
         var interactions = state.Interactions.RemoveRange(e.RemovedInteractions ?? [])
             .SetItems((e.Interactions ?? []).Select(x => KeyValuePair.Create(x.InteractionId, x)));
         var restored = state with
@@ -210,6 +215,7 @@ internal static class Undoing
             ManualEffects = effects,
             WeeklyChallenges = challenges,
             Suggestions = suggestions,
+            ForAll = forAll,
             Interactions = interactions,
         };
         if (e.Season is not { } season)
@@ -318,6 +324,12 @@ internal static class Undoing
             keys.Add($"suggestion:{id}");
         }
 
+        // A settlement for everyone: its cause queues it, its batches settle it — the cause waits for them (D-537)
+        foreach (var id in Changed(before.ForAll, after.ForAll))
+        {
+            keys.Add($"forAll:{id}");
+        }
+
         // An invitation names the run it invites to: an undo of that run's start or roll waits for it (D-523)
         foreach (var id in Changed(before.Interactions, after.Interactions))
         {
@@ -408,6 +420,7 @@ internal static class Undoing
         var effects = Changed(before.ManualEffects, after.ManualEffects).ToList();
         var challenges = Changed(before.WeeklyChallenges, after.WeeklyChallenges).ToList();
         var suggestions = Changed(before.Suggestions, after.Suggestions).ToList();
+        var forAll = Changed(before.ForAll, after.ForAll).ToList();
         var interactions = Changed(before.Interactions, after.Interactions).ToList();
         var seasonChanged = before.Status != after.Status || before.Deadline != after.Deadline || before.Name != after.Name
             || before.Ruleset != after.Ruleset;
@@ -428,6 +441,10 @@ internal static class Undoing
             OrNull([.. challenges.Where(id => !before.WeeklyChallenges.ContainsKey(id) && now.WeeklyChallenges.ContainsKey(id))]),
             OrNull([.. suggestions.Where(before.Suggestions.ContainsKey).Select(id => before.Suggestions[id])]),
             OrNull([.. suggestions.Where(id => !before.Suggestions.ContainsKey(id) && now.Suggestions.ContainsKey(id))]),
+
+            // An undone batch puts its settlement back halted: the queue does not settle it again, its cause is undone next (D-701)
+            OrNull([.. forAll.Where(before.ForAll.ContainsKey).Select(id => before.ForAll[id] with { Halted = true })]),
+            OrNull([.. forAll.Where(id => !before.ForAll.ContainsKey(id) && now.ForAll.ContainsKey(id))]),
             OrNull([.. interactions.Where(before.Interactions.ContainsKey).Select(id => before.Interactions[id])]),
             OrNull([.. interactions.Where(id => !before.Interactions.ContainsKey(id) && now.Interactions.ContainsKey(id))]));
     }

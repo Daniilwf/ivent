@@ -87,6 +87,7 @@ public static class SeasonEngine
             Interactions.WithdrawInvitation c => Interactions.Coop.Decide(state, c, context),
             Interactions.LeaveCoop c => Interactions.Coop.Decide(state, c, context),
             FireTimers => Timers.Decide(state, context),
+            SettleForAll c => ForAllSettlements.Decide(state, c, context),
             _ => throw new ArgumentException($"Unknown command {command.GetType().Name}.", nameof(command)),
         };
 
@@ -111,7 +112,10 @@ public static class SeasonEngine
         IReadOnlyList<IGameEvent> own = [.. decision.Events, .. settlements];
         // A continuation of a suspended effect reacts from the level it stopped at, each its own (D-511); the stop of an own
         // move from the level of its draw (D-559 (1))
-        var (reactions, reacted) = EffectChain.Run(after, own, context, Levels(state, decision.Events, context.Levels!));
+        // A batch of a settlement for everyone holds each player's reactions already, counted into its size (D-537)
+        var (reactions, reacted) = command is SettleForAll
+            ? ([], after)
+            : EffectChain.Run(after, own, context, Levels(state, decision.Events, context.Levels!));
         var lifetimes = Settlements.Lifetimes(reacted, own);
         var final = lifetimes.Aggregate(reacted, Apply);
         return reactions.Count == 0 && settlements.Count == 0 && lifetimes.Count == 0
@@ -252,6 +256,8 @@ public static class SeasonEngine
             EffectSuspended e => Suspensions.Apply(state, e),
             EffectResumed e => Suspensions.Apply(state, e),
             EffectMoveSkipped => state,
+            ForAllQueued e => ForAllSettlements.Apply(state, e),
+            ForAllSettled e => ForAllSettlements.Apply(state, e),
             _ => throw new ArgumentException($"Unknown event {gameEvent.GetType().Name}.", nameof(gameEvent)),
         };
 

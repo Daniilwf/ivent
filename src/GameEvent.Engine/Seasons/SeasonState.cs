@@ -44,6 +44,10 @@ public sealed record SeasonState(
     public ImmutableSortedDictionary<Guid, Suggestions.Suggestion> Suggestions { get; init; } =
         ImmutableSortedDictionary<Guid, Suggestions.Suggestion>.Empty;
 
+    /// <summary>The settlements for everyone waiting for their batches (D-537), by id; one leaves when its last batch is done.</summary>
+    public ImmutableSortedDictionary<Guid, ForAllSettlement> ForAll { get; init; } =
+        ImmutableSortedDictionary<Guid, ForAllSettlement>.Empty;
+
     /// <summary>The invitations of the season (D-523), by id: pending ones and answered, withdrawn or expired ones.</summary>
     public ImmutableSortedDictionary<Guid, Interactions.Interaction> Interactions { get; init; } =
         ImmutableSortedDictionary<Guid, Interactions.Interaction>.Empty;
@@ -84,6 +88,7 @@ public sealed record SeasonState(
         && Catalog == other.Catalog
         && WeeklyChallenges.SequenceEqual(other.WeeklyChallenges)
         && Suggestions.SequenceEqual(other.Suggestions)
+        && ForAll.SequenceEqual(other.ForAll)
         && Interactions.SequenceEqual(other.Interactions)
         && MapVersion == other.MapVersion;
 

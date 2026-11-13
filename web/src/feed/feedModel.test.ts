@@ -807,6 +807,27 @@ describe('events drawn from decks (stage 5)', () => {
     expect(item?.facts).toContain(ru.feed.facts.eventDrawn('Попутный ветер'));
   });
 
+  it('shows a batch of a settlement for everyone as a line of the system (D-537)', () => {
+    const item = feedDays(
+      [
+        entry('s1', 'coins-changed', { playerId: petya, delta: 2, reason: 'effect' }),
+        entry('s1', 'coins-changed', { playerId: vasya, delta: 2, reason: 'effect' }),
+        entry('s1', 'for-all-settled', {
+          settlementId: 'a',
+          batch: 1,
+          players: [vasya, petya],
+          skipped: [],
+          done: true,
+        }),
+      ],
+      named,
+      now,
+    )[0]?.items[0];
+
+    expect(text(item)).toBe('Раздача на всех: 2 игрока');
+    expect(item?.actor).toBeNull();
+  });
+
   it('leads a line of its own when nothing else does, and names the event by its id when the page does not', () => {
     const drawn = feedDays(
       [

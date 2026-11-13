@@ -267,11 +267,9 @@ internal static class Coop
 
     /// <summary>The pending invitations past their time, closed by the timer (D-523); none while coop is off (D-420).</summary>
     public static IEnumerable<IGameEvent> Timeouts(SeasonState state, DateTimeOffset now) =>
-        state.Rules.Features.Coop
-            ? state.Interactions.Values
-                .Where(i => i.Status == InteractionStatus.Pending && i.ExpiresAt <= now)
-                .Select(i => new InteractionExpired(i.InteractionId, InteractionExpiry.Timeout, now))
-            : [];
+        state.Interactions.Values
+            .Where(i => i.Status == InteractionStatus.Pending && i.ExpiresAt <= now && InteractionRules.IsOn(state.Rules.Features, i.Kind))
+            .Select(i => new InteractionExpired(i.InteractionId, InteractionExpiry.Timeout, now));
 
     /// <summary>The coop end a player's deactivation brings (the expert panel on D-520): he leaves as if by himself.</summary>
     public static IEnumerable<IGameEvent> OnInactive(SeasonState state, Guid playerId, DateTimeOffset now) =>

@@ -40,12 +40,11 @@ public static class Timers
     {
         ArgumentNullException.ThrowIfNull(state);
         ArgumentNullException.ThrowIfNull(player);
-        var invitations = state.Rules.Features.Coop
-            ? state.Interactions.Values
-                .Where(i => i.Status == Interactions.InteractionStatus.Pending && i.FromPlayerId == player.PlayerId)
-                .Select(i => (DateTimeOffset?)i.ExpiresAt)
-                .Min()
-            : null;
+        var invitations = state.Interactions.Values
+            .Where(i => i.Status == Interactions.InteractionStatus.Pending && i.FromPlayerId == player.PlayerId
+                && Interactions.InteractionRules.IsOn(state.Rules.Features, i.Kind))
+            .Select(i => (DateTimeOffset?)i.ExpiresAt)
+            .Min();
         return new[] { Next(player, state.Rules.Features), invitations }.Where(m => m is not null).Min();
     }
 

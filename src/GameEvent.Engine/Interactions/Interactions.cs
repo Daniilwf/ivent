@@ -143,3 +143,20 @@ public static class CoopShares
         return (roller, total - roller);
     }
 }
+
+/// <summary>
+/// What every kind of invitation shares (D-523): the flag of its mechanic, so the timer and the limits serve a duel
+/// invitation (5.12) as they serve a coop one. What a mechanic switched off left pending waits (D-420).
+/// </summary>
+public static class InteractionRules
+{
+    public static bool IsOn(Rulesets.Features features, InteractionKind kind)
+    {
+        ArgumentNullException.ThrowIfNull(features);
+        return kind switch
+        {
+            InteractionKind.Coop => features.Coop,
+            _ => false,
+        };
+    }
+}

@@ -121,6 +121,8 @@ const rejection = {
   'review.invalidRating': 'Оценка — от 1 до 10.',
   'review.tooLong': 'Отзыв слишком длинный: не больше 2000 символов.',
   'season.closed': 'Сезон закрыт для этого действия.',
+  'forAll.unknown': 'Такой раздачи на всех нет или она уже закончена.',
+  'forAll.halted': 'Раздача на всех остановлена откатом: откатите её причину.',
   'effect.notPending': 'Этот эффект уже разрешён.',
   'account.mustChangePassword': 'Сначала смени временный пароль.',
   'account.currentPasswordWrong': 'Текущий пароль введён неверно.',
@@ -332,6 +334,12 @@ const feedLines = {
   deadlineRemoved: <T>(): Line<T> => ['Дедлайн сезона снят'],
   results: <T>(): Line<T> => ['Итоги сезона подведены'],
   rulesChanged: <T>(version: number): Line<T> => [`Правила сезона обновлены, версия ${version}`],
+  // D-537: a batch of a reward, a poll's result or a global event's effect for everyone
+  forAllSettled: <T>(players: number): Line<T> => [
+    players === 0
+      ? 'Раздача на всех: никому не досталось'
+      : `Раздача на всех: ${players} ${plural(players, 'игрок', 'игрока', 'игроков')}`,
+  ],
   finishBonuses: <T>(): Line<T> => ['Бонусы за финиш пересчитаны по новым правилам'],
   joined: <T>(p: T): Line<T> => [p, ' в игре'],
   paused: <T>(p: T): Line<T> => [p, ' на паузе'],
