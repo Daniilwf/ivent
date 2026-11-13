@@ -47,7 +47,7 @@ public static class SeasonEngine
             SetSeasonDeadline c => SeasonSetup.Decide(state, c, context),
             ReachDeadline c => SeasonSetup.Decide(state, c, context),
             AddSeasonPlayer c => PlayerAdministration.Decide(state, c),
-            SetPlayerInactive c => PlayerAdministration.Decide(state, c),
+            SetPlayerInactive c => PlayerAdministration.Decide(state, c, context),
             AdjustPlayer c => PlayerAdministration.Decide(state, c),
             RollGame c => Rolling.Decide(state, c, context),
             DeclareAlreadyPlayed c => Rolling.Decide(state, c, context),
@@ -82,6 +82,10 @@ public static class SeasonEngine
             Suggestions.ReviewSuggestion c => Suggestions.SuggestionBox.Decide(state, c, context),
             SubmitIrlProof c => IrlProofs.Decide(state, c, context),
             ReviewIrlProof c => IrlProofs.Decide(state, c, context),
+            Interactions.InviteToCoop c => Interactions.Coop.Decide(state, c, context),
+            Interactions.AnswerInvitation c => Interactions.Coop.Decide(state, c, context),
+            Interactions.WithdrawInvitation c => Interactions.Coop.Decide(state, c, context),
+            Interactions.LeaveCoop c => Interactions.Coop.Decide(state, c, context),
             FireTimers => Timers.Decide(state, context),
             SettleForAll c => ForAllSettlements.Decide(state, c, context),
             _ => throw new ArgumentException($"Unknown command {command.GetType().Name}.", nameof(command)),
@@ -103,7 +107,7 @@ public static class SeasonEngine
         // Bets, weekly challenges, the shop price and the lifetimes of objects follow the command's events without limits (D-413); effects
         // react after them, within the chain limits (D-24, D-103).
         var after = decision.Events.Aggregate(state, Apply);
-        var settlements = Settlements.After(after, decision.Events, context.Pool);
+        var settlements = Settlements.After(after, decision.Events, context);
         after = settlements.Aggregate(after, Apply);
         IReadOnlyList<IGameEvent> own = [.. decision.Events, .. settlements];
         // A continuation of a suspended effect reacts from the level it stopped at, each its own (D-511); the stop of an own
@@ -237,6 +241,13 @@ public static class SeasonEngine
             Suggestions.SuggestionReviewed e => Suggestions.SuggestionBox.Apply(state, e),
             IrlProofSubmitted e => IrlProofs.Apply(state, e),
             IrlProofReviewed e => IrlProofs.Apply(state, e),
+            Interactions.InteractionCreated e => Interactions.Coop.Apply(state, e),
+            Interactions.InteractionAnswered e => Interactions.Coop.Apply(state, e),
+            Interactions.InteractionWithdrawn e => Interactions.Coop.Apply(state, e),
+            Interactions.InteractionExpired e => Interactions.Coop.Apply(state, e),
+            Interactions.CoopJoined e => Interactions.Coop.Apply(state, e),
+            Interactions.CoopLeft e => Interactions.Coop.Apply(state, e),
+            Interactions.CoopRewardSplit e => Interactions.Coop.Apply(state, e),
 
             // Facts for the log and the feed that change nothing by themselves: their consequences are their own events.
             ObjectLost or ItemUsed or EffectTriggered or EffectRolled or HostileIntercepted or WheelSpun or InventoryAdjusted => state,

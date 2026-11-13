@@ -80,9 +80,12 @@ internal static class Drops
         var dice = PenaltyRoll(state, run, context);
         var dropped = new RunDropped(run.RunId, player.PlayerId, dice, context.Clock.UtcNow);
 
+        // The coop ends first: the partner is free, the drop and its penalty are the roller's alone (D-522)
+        var left = Interactions.Coop.OnRunGivenUp(state, run, Interactions.CoopLeaveReason.RollerDropped, context.Clock.UtcNow).ToList();
+
         // The penalty and its bad event play on the state after the drop: the run is over, the player idle (D-504)
-        var after = Apply(state, dropped);
-        return Decision.Accept([dropped, .. Penalty(after, after.Players[player.PlayerId], dice, run.RunId, context)]);
+        var after = Apply(left.Aggregate(state, SeasonEngine.Apply), dropped);
+        return Decision.Accept([.. left, dropped, .. Penalty(after, after.Players[player.PlayerId], dice, run.RunId, context)]);
     }
 
     public static Decision Decide(SeasonState state, TechReroll command, EngineContext context)
@@ -126,14 +129,17 @@ internal static class Drops
 
         var rerolled = new RunTechRerolled(run.RunId, player.PlayerId, command.Reason, command.Comment, command.ByAdmin, now);
         var excluded = new GameExcluded(player.PlayerId, run.GameId, ExclusionReason.TechRerolled);
-        var after = Rolling.Apply(Apply(state, rerolled), excluded);
+
+        // The coop ends first: the partner is free without a penalty (D-522)
+        var left = Interactions.Coop.OnRunGivenUp(state, run, Interactions.CoopLeaveReason.RollerTechRerolled, now).ToList();
+        var after = Rolling.Apply(Apply(left.Aggregate(state, SeasonEngine.Apply), rerolled), excluded);
 
         // SPEC: Playing --> Rolling. The new roll is a roll of its own, with its own free rerolls (D-07, D-94) and the
         // special rolls and roll changes waiting for it (D-405).
         var (prepared, ready) = RollPreparation.BeforeRoll(after, player.PlayerId, context);
         return Rolling.Draw(ready, player.PlayerId, context, Rolling.Filters(ready, player.PlayerId)) is { } roll
-            ? Decision.Accept([rerolled, excluded, .. prepared, roll])
-            : Decision.Accept(rerolled, excluded);
+            ? Decision.Accept([.. left, rerolled, excluded, .. prepared, roll])
+            : Decision.Accept([.. left, rerolled, excluded]);
     }
 
     public static Decision Decide(SeasonState state, ConvertTechRerollToDrop command, EngineContext context)
@@ -272,10 +278,14 @@ internal static class Drops
             : sum;
     }
 
-    private static SeasonState Finish(SeasonState state, Guid runId, Guid playerId, RunStatus status) =>
-        state with
+    // A coop partner still on the run (coop switched off, so no coop-left was written, D-420) is free with it
+    private static SeasonState Finish(SeasonState state, Guid runId, Guid playerId, RunStatus status)
+    {
+        state = state with
         {
             Runs = state.Runs.SetItem(runId, state.Runs[runId] with { Status = status }),
             Players = state.Players.SetItem(playerId, state.Players[playerId] with { Phase = TurnPhase.Idle, ActiveRunId = null }),
         };
+        return state.Runs[runId].Coop is { } coop ? Interactions.Coop.Free(state, coop.PlayerId, runId) : state;
+    }
 }

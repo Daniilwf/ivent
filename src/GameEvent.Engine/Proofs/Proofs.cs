@@ -86,7 +86,8 @@ public static class ProofReviewOrder
     {
         ArgumentNullException.ThrowIfNull(state);
         ArgumentNullException.ThrowIfNull(run);
-        return state.Players[run.PlayerId].Finish is not null && !run.AfterFinish;
+        // Either side of a coop run (D-545)
+        return RunShares.Players(run).Any(p => state.Players[p].Finish is not null && !run.Side(p).AfterFinish);
     }
 
     /// <summary>
@@ -339,61 +340,82 @@ internal static class ProofReview
     internal static List<IGameEvent> RejectEvents(SeasonState state, RunState run, string comment, DateTimeOffset now)
     {
         // D-15, D-98: what this run gave is taken back — its dice (after every correction), the cells it moved the
-        // token, its completion coins; its pending difficulty event is not applicable.
+        // token, its completion coins; its pending difficulty event is not applicable. A coop run gave each of its two
+        // players his share: each loses his own (D-522, D-545).
         var player = state.Players[run.PlayerId];
         var events = new List<IGameEvent> { new ProofRejected(run.RunId, run.PlayerId, comment, now) };
 
         // The frozen first loses nothing (Q-3); his runs up to the finish are approved, so only later ones get here.
         // The rejected run's pending difficulty event still does not apply (D-98, D-99).
-        if (Finishes.IsFrozen(player))
+        if (!Finishes.IsFrozen(player))
         {
-            events.AddRange(PendingDifficultyEvents(state, run, comment));
-            return events;
+            events.AddRange(Gains(state, run, player.PlayerId));
         }
 
-        // D-327: the dice and the points bonus of the cell the move stopped on, in one change
-        var points = CompletionRoll.Total(run);
-        if (points + run.CellPoints != 0)
+        events.AddRange(PendingDifficultyEvents(state, run, comment));
+        if (!Finishes.IsFrozen(player))
         {
-            events.Add(new PointsChanged(run.PlayerId, -(points + run.CellPoints), PointsReason.ProofRejected, run.RunId));
+            events.AddRange(FinishBack(events.Aggregate(state, SeasonEngine.Apply), run, player));
         }
 
-        // A reject never improves the position (D-321); a finisher's position changes only through a run up to the
-        // finish, and then by the surplus rule (Q-3).
-        if (player.Finish is null && BackToWhere(state, player, run) is { } back)
+        if (run.Coop is { Shares: not null } coop && state.Players[coop.PlayerId] is var partner && !Finishes.IsFrozen(partner))
+        {
+            events.AddRange(Gains(events.Aggregate(state, SeasonEngine.Apply), run, partner.PlayerId));
+            events.AddRange(FinishBack(events.Aggregate(state, SeasonEngine.Apply), run, partner));
+        }
+
+        return events;
+    }
+
+    // What the run gave the player of its side: his points and the bonus of the cell his move stopped on (D-327), his cells
+    // (never improving the position, D-321; a finisher's position changes only through the finish rule, Q-3), his completion
+    // coins, the objects his move's cells granted that he still holds (D-327 (2), D-421; none while items are off)
+    private static List<IGameEvent> Gains(SeasonState state, RunState run, Guid playerId)
+    {
+        var events = new List<IGameEvent>();
+        var player = state.Players[playerId];
+        var side = run.Side(playerId);
+        var points = RunShares.Points(run, playerId);
+        if (points + side.CellPoints != 0)
+        {
+            events.Add(new PointsChanged(playerId, -(points + side.CellPoints), PointsReason.ProofRejected, run.RunId));
+        }
+
+        if (player.Finish is null && BackToWhere(state, player, side) is { } back)
         {
             events.Add(back);
         }
 
         var coins = run.Snapshot.Coins is { } reward && run.Hours is { } hours
-            ? RunLifecycle.CompletionCoins(reward, run.Snapshot.DiceCount, hours)
+            ? RunShares.Coins(run, playerId, RunLifecycle.CompletionCoins(reward, run.Snapshot.DiceCount, hours))
             : 0;
         if (coins != 0)
         {
-            events.Add(new CoinsChanged(run.PlayerId, -coins, CoinsReason.ProofRejected, run.RunId));
+            events.Add(new CoinsChanged(playerId, -coins, CoinsReason.ProofRejected, run.RunId));
         }
 
-        // D-327 (2), D-421: the objects the move's cells granted, those the player still holds; none while items are off
         if (state.Rules.Features.Items)
         {
-            events.AddRange(run.CellObjects
+            events.AddRange(side.CellObjects
                 .Select(player.Wallet.Find)
                 .OfType<Inventory.InventoryObject>()
-                .Select(o => new Inventory.ObjectRemoved(run.PlayerId, o.InstanceId, o.ObjectId, Inventory.ObjectRemoval.ProofRejected)));
-        }
-
-        events.AddRange(PendingDifficultyEvents(state, run, comment));
-
-        if (Finishes.CountsForFinish(player, run))
-        {
-            var after = events.Aggregate(state, SeasonEngine.Apply);
-            // The finishing run takes back its dice (the surplus holds the steps it burned); an earlier one what it
-            // brought the player closer to the finish, its teleport included (D-321)
-            var taken = player.Finish!.RunId == run.RunId ? points : Math.Max(0, Gain(run));
-            events.AddRange(Finishes.AfterReduction(after, after.Players[player.PlayerId], after.Runs[run.RunId], taken, MoveReason.ProofRejected));
+                .Select(o => new Inventory.ObjectRemoved(playerId, o.InstanceId, o.ObjectId, Inventory.ObjectRemoval.ProofRejected)));
         }
 
         return events;
+    }
+
+    // A finisher's run up to the finish: the finishing run takes back its dice (the surplus holds the steps it burned); an
+    // earlier one what it brought the player closer to the finish, its teleport included (D-321). player — as before the reject.
+    private static IEnumerable<IGameEvent> FinishBack(SeasonState after, RunState run, SeasonPlayer player)
+    {
+        if (!Finishes.CountsForFinish(player, run))
+        {
+            return [];
+        }
+
+        var taken = player.Finish!.RunId == run.RunId ? RunShares.Points(run, player.PlayerId) : Math.Max(0, Gain(run.Side(player.PlayerId)));
+        return Finishes.AfterReduction(after, after.Players[player.PlayerId], after.Runs[run.RunId], taken, MoveReason.ProofRejected);
     }
 
     /// <summary>

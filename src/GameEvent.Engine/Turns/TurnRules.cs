@@ -69,6 +69,9 @@ internal static class TurnRules
             return Decision.Reject(RejectionCodes.WrongPhase, $"Needs phase {required}, player is {player.Phase}.");
         }
 
-        return null;
+        // The coop partner plays the roller's run: only the roller completes, drops or tech-rerolls it (D-521, D-522)
+        return player.ActiveRunId is { } runId && state.Runs[runId].PlayerId != playerId
+            ? Decision.Reject(RejectionCodes.CoopRollerOnly, "Only the roller completes, drops or tech-rerolls a coop run; the partner may leave it.")
+            : null;
     }
 }

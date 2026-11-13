@@ -80,7 +80,8 @@ internal static class Inventories
         // it back (the same sign as the points bonus of the cell, D-327)
         if (e.Source == ObjectSource.Cell && state.Players[e.PlayerId].LastMoveRunId is { } mover && state.Runs.TryGetValue(mover, out var run))
         {
-            state = state with { Runs = state.Runs.SetItem(mover, run with { CellObjects = [.. run.CellObjects, e.Item.InstanceId] }) };
+            var side = run.Side(e.PlayerId);
+            state = state with { Runs = state.Runs.SetItem(mover, run.WithSide(e.PlayerId, side with { CellObjects = [.. side.CellObjects, e.Item.InstanceId] })) };
         }
 
         return Update(state, e.PlayerId, w => w with { Inventory = [.. w.Inventory, e.Item], Acquisitions = Math.Max(w.Acquisitions, e.Item.Acquired) });

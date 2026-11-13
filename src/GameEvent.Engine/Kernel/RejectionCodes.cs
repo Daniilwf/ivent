@@ -192,4 +192,48 @@ public static class RejectionCodes
 
     /// <summary>The host does not know <c>season.timezone</c>, so no calendar day can be counted (D-579).</summary>
     public const string SeasonTimezoneUnknown = "season.timezoneUnknown";
+
+    public const string InteractionUnknown = "interaction.unknown";
+
+    /// <summary>The invitation was answered, withdrawn or expired already (D-523).</summary>
+    public const string InteractionNotPending = "interaction.notPending";
+
+    /// <summary>Only the invited player answers and only the inviter withdraws (D-523).</summary>
+    public const string InteractionNotYours = "interaction.notYours";
+
+    /// <summary>The player has <c>interactions.maxOpenInvitesPerPlayer</c> pending invitations sent (D-523).</summary>
+    public const string InteractionTooMany = "interaction.tooMany";
+
+    /// <summary>The game of the run is not a coop game (D-520).</summary>
+    public const string CoopNotCoopGame = "coop.notCoopGame";
+
+    /// <summary>The inviter has no running run to invite to, or it is over now (D-520, D-523).</summary>
+    public const string CoopRunNotActive = "coop.runNotActive";
+
+    /// <summary>The run has a pending coop invitation already (D-523).</summary>
+    public const string CoopInviteAlreadyOpen = "coop.inviteAlreadyOpen";
+
+    /// <summary>The run has a partner already.</summary>
+    public const string CoopAlreadyJoined = "coop.alreadyJoined";
+
+    /// <summary>The partner may not join: himself, inactive or unknown (D-520).</summary>
+    public const string CoopPartnerInvalid = "coop.partnerInvalid";
+
+    /// <summary>The partner has an active run, an offered game or a pending choice (D-520).</summary>
+    public const string CoopPartnerBusy = "coop.partnerBusy";
+
+    /// <summary>The game is excluded for the partner: his own drop or tech reroll, «уже проходил» (D-546 (8)).</summary>
+    public const string CoopGameExcluded = "coop.gameExcluded";
+
+    /// <summary>The partner has an open bet on the run he would join (D-520).</summary>
+    public const string CoopPartnerHasBet = "coop.partnerHasBet";
+
+    /// <summary>The first finisher neither invites nor joins: he does not affect the others (D-510, Н-18).</summary>
+    public const string CoopFirstFinisher = "coop.firstFinisher";
+
+    /// <summary>The player is not a partner of a running coop run (<see cref="Interactions.LeaveCoop"/>).</summary>
+    public const string CoopNotPartner = "coop.notPartner";
+
+    /// <summary>Only the roller completes, drops or tech-rerolls the coop run; the partner may only leave (D-521, D-522).</summary>
+    public const string CoopRollerOnly = "coop.rollerOnly";
 }

@@ -32,6 +32,22 @@ public static class Timers
         return moments.Where(m => m is not null).Min();
     }
 
+    /// <summary>
+    /// The earliest moment something of <paramref name="player"/> in <paramref name="state"/> is due: his own timers and the
+    /// pending invitations he sent (D-523); null when nothing waits.
+    /// </summary>
+    public static DateTimeOffset? Next(SeasonState state, SeasonPlayer player)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        ArgumentNullException.ThrowIfNull(player);
+        var invitations = state.Interactions.Values
+            .Where(i => i.Status == Interactions.InteractionStatus.Pending && i.FromPlayerId == player.PlayerId
+                && Interactions.InteractionRules.IsOn(state.Rules.Features, i.Kind))
+            .Select(i => (DateTimeOffset?)i.ExpiresAt)
+            .Min();
+        return new[] { Next(player, state.Rules.Features), invitations }.Where(m => m is not null).Min();
+    }
+
     internal static Decision Decide(SeasonState state, EngineContext context)
     {
         if (!state.IsCreated)
@@ -68,6 +84,9 @@ public static class Timers
         // An event's question past its answer timeout is answered by the timer (D-560)
         events.AddRange(Effects.Suspensions.Timeouts(events.Aggregate(state, SeasonEngine.Apply), context));
 
+        // An invitation past its time burns (D-523)
+        events.AddRange(Interactions.Coop.Timeouts(state, now));
+
         return events.Count == 0
             ? Decision.Reject(RejectionCodes.TimersNothingDue, "Nothing is due yet.")
             : Decision.Accept(events);
@@ -82,9 +101,10 @@ public static class Timers
 /// </summary>
 internal static class Settlements
 {
-    public static IReadOnlyList<IGameEvent> After(SeasonState state, IReadOnlyList<IGameEvent> events, Pool.IPoolView pool) =>
+    public static IReadOnlyList<IGameEvent> After(SeasonState state, IReadOnlyList<IGameEvent> events, EngineContext context) =>
         Each(state, events, (s, e) => (s.Rules.Features.Bets ? Betting.Settle(s, e) : [])
-            .Concat(s.Rules.Features.WeeklyChallenge ? Challenges.WeeklyChallenges.Settle(s, pool, e) : [])
+            .Concat(s.Rules.Features.WeeklyChallenge ? Challenges.WeeklyChallenges.Settle(s, context.Pool, e) : [])
+            .Concat(s.Rules.Features.Coop ? Interactions.Coop.Settle(s, e, context.Clock.UtcNow) : [])
             .Concat(s.Rules.Features.Shop ? ShopReset(s, e) : []));
 
     /// <summary>

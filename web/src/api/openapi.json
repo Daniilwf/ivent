@@ -8696,6 +8696,14 @@
           },
           "roundUpFor": {
             "$ref": "#/components/schemas/CoopRoundUpFor"
+          },
+          "coinsShare": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "The roller's share of the run's completion coins (D-521, D-540): ⌈coins × share⌉, the partner the rest. Missing — a\nseason created before coop reads as it did (D-50); needed once `features.coop` is on. Not written while missing.",
+            "format": "double"
           }
         }
       },
@@ -9553,6 +9561,10 @@
           "suggestions": {
             "type": "boolean",
             "description": "The suggestion box (stage 5, D-527); optional, so older configs without it still read. Not written while off: a season\nlogged before it keeps its ruleset's format."
+          },
+          "coop": {
+            "type": "boolean",
+            "description": "Coop runs and invitations (stage 5, D-520…D-523); optional, so older configs without it still read. Not written while\noff: a season logged before it keeps its ruleset's format."
           }
         },
         "description": "Feature flags: a disabled mechanic is invisible in the interface and refused by the engine."
@@ -10249,6 +10261,14 @@
         "properties": {
           "inviteTtlHours": {
             "type": "integer",
+            "format": "int32"
+          },
+          "maxOpenInvitesPerPlayer": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "How many pending invitations one player may have sent (coop and duels together, D-523). Missing — a season created\nbefore invitations reads as it did (D-50); needed once `features.coop` is on. Not written while missing.",
             "format": "int32"
           }
         }

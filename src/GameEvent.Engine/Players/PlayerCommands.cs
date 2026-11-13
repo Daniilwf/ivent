@@ -120,7 +120,7 @@ internal static class PlayerAdministration
         return Decision.Accept(events);
     }
 
-    public static Decision Decide(SeasonState state, SetPlayerInactive command)
+    public static Decision Decide(SeasonState state, SetPlayerInactive command, EngineContext context)
     {
         if (Find(state, command.PlayerId) is not { } player)
         {
@@ -134,7 +134,12 @@ internal static class PlayerAdministration
 
         return player.IsInactive == command.IsInactive
             ? Decision.Reject(RejectionCodes.NothingToChange, $"The player is already {(command.IsInactive ? "inactive" : "active")}.")
-            : Decision.Accept(new PlayerInactivitySet(player.PlayerId, command.IsInactive));
+            : Decision.Accept(
+            [
+                // An inactive partner leaves the coop as if by himself (the expert panel on D-520)
+                .. command.IsInactive ? Interactions.Coop.OnInactive(state, player.PlayerId, context.Clock.UtcNow) : [],
+                new PlayerInactivitySet(player.PlayerId, command.IsInactive),
+            ]);
     }
 
     public static Decision Decide(SeasonState state, AdjustPlayer command)

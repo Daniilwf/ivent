@@ -292,7 +292,11 @@
 | Приглашение в кооп | предложение стать напарником в своём прохождении | `InteractionKind.Coop`, команда `InviteToCoop`, события `InteractionCreated`, `InteractionAnswered`, `InteractionExpired` |
 | Ответ на приглашение | принять или отклонить; без ответа за N часов приглашение сгорает | команда `AnswerInvitation`, `InteractionStatus` (`Pending`, `Accepted`, `Declined`, `Withdrawn`, `Expired`) |
 | Выйти из коопа | напарник покидает кооп-прохождение без штрафа (D-522) | команда `LeaveCoop`, событие `CoopLeft` |
-| Деление кооп-награды | доли очков, шагов и монеток роллившего и напарника | событие `CoopRewardSplit`, `reward.coop` |
+| Отозвать приглашение | приглашающий закрывает своё открытое приглашение (D-523) | команда `WithdrawInvitation`, событие `InteractionWithdrawn` |
+| Сгорание приглашения | приглашение закрыто без ответа: срок, дедлайн, конец прохождения или принято другое (D-523, D-712) | событие `InteractionExpired`, `InteractionExpiry` (`Timeout`, `Deadline`, `RunEnded`, `Superseded`) |
+| Конец коопа | напарник вне кооп-прохождения до завершения: вышел, дроп или тех-реролл роллившего, неактивен, кто-то стал первым (D-522, D-713) | `CoopLeaveReason` (`Left`, `RollerDropped`, `RollerTechRerolled`, `PartnerInactive`, `RollerFirst`, `PartnerFirst`) |
+| Сторона кооп-прохождения | учёт хода каждого из двоих: клетки, финиш, бонус клетки, доля (D-711) | `RunState.Coop` (`CoopPartner`), `RunState.Side` |
+| Деление кооп-награды | доли очков, шагов и монеток роллившего и напарника | событие `CoopRewardSplit`, `reward.coop` (`pointsShare`, `coinsShare`) |
 | Дуэль | гонка двух игроков до первого завершения прохождения за награду от системы (D-525) | `InteractionKind.Duel`, команда `ChallengeToDuel`, событие `DuelSettled` |
 | Вызов на дуэль | приглашение на дуэль | `InteractionKind.Duel` |
 | Отклик на запрос напарника | заявка на чужой запрос доски; создаёт приглашение, которое принимает автор | команда `RespondToPartnerRequest`, события `PartnerRequestPosted`, `PartnerRequestClosed` |
