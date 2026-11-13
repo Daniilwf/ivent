@@ -6,7 +6,7 @@ namespace GameEvent.Web.Seasons;
 /// <summary>
 /// What of each season event the feed shows to whom (D-124, after the security review). Every event type has an entry —
 /// a new type without one fails its test instead of becoming public by default. Public: everyone signed in sees the whole
-/// event. A proof's links, note and files and the admin's comment on it are the player's and the admin's: others see that
+/// event. A proof's links (an IRL proof's link), note and files and the admin's comment on it are the player's and the admin's: others see that
 /// a proof was sent and checked. An undo shows others which command it undid and why, not the state it put back; a content publication its version,
 /// comment and size, not the pack.
 /// </summary>
@@ -32,7 +32,7 @@ public static class FeedVisibility
         NotInFeed,
     }
 
-    private static readonly string[] s_proofDetails = ["links", "note", "files", "comment"];
+    private static readonly string[] s_proofDetails = ["links", "link", "note", "files", "comment"];
 
     public static readonly FrozenDictionary<string, Access> Types = new Dictionary<string, Access>
     {
@@ -64,6 +64,10 @@ public static class FeedVisibility
         ["proof-submitted"] = Access.OwnerFields,
         ["proof-approved"] = Access.OwnerFields,
         ["proof-rejected"] = Access.OwnerFields,
+
+        // An IRL proof (D-509) is shown like a run's: its screenshots, link and the admin's comment are the player's and the admin's
+        ["irl-proof-submitted"] = Access.OwnerFields,
+        ["irl-proof-reviewed"] = Access.OwnerFields,
         ["points-changed"] = Access.Public,
         ["coins-changed"] = Access.Public,
         ["resource-changed"] = Access.Public,
