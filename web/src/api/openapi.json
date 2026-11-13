@@ -9172,6 +9172,54 @@
           }
         }
       },
+      "DuelRules": {
+        "required": [
+          "rewardCoins",
+          "durationDays",
+          "maxOpenPerPlayer",
+          "countRunsStartedAfterAccept",
+          "samePairCooldownDays",
+          "maxWinsPerSeason",
+          "dropForfeits"
+        ],
+        "type": "object",
+        "properties": {
+          "rewardCoins": {
+            "type": "integer",
+            "description": "The coins the system pays the winner; the loser gets nothing, nothing passes between the players.",
+            "format": "int32"
+          },
+          "durationDays": {
+            "type": "integer",
+            "description": "How many days after the acceptance a completion still wins; then the duel is a draw.",
+            "format": "int32"
+          },
+          "maxOpenPerPlayer": {
+            "type": "integer",
+            "description": "How many open duels one player may have: the challenges he sent and waiting, and the accepted ones.",
+            "format": "int32"
+          },
+          "countRunsStartedAfterAccept": {
+            "type": "boolean",
+            "description": "Only a run rolled after the acceptance wins (no sniping with a game nearly done)."
+          },
+          "samePairCooldownDays": {
+            "type": "integer",
+            "description": "How many days after the end of their accepted duel the same two players may not duel again.",
+            "format": "int32"
+          },
+          "maxWinsPerSeason": {
+            "type": "integer",
+            "description": "How many duels one player may win in a season; at the limit he neither challenges nor accepts.",
+            "format": "int32"
+          },
+          "dropForfeits": {
+            "type": "boolean",
+            "description": "A voluntary drop of a run that counts loses the duel: the opponent wins at once."
+          }
+        },
+        "description": "The rules of duels (D-525, the expert panel, D-540): a race to the next completion for coins from the system."
+      },
       "EconomyFeaturesView": {
         "required": [
           "items",
@@ -9565,6 +9613,10 @@
           "coop": {
             "type": "boolean",
             "description": "Coop runs and invitations (stage 5, D-520…D-523); optional, so older configs without it still read. Not written while\noff: a season logged before it keeps its ruleset's format."
+          },
+          "duels": {
+            "type": "boolean",
+            "description": "Duels (stage 5, D-525, D-540); optional, so older configs without it still read. Not written while off: a season\nlogged before it keeps its ruleset's format."
           }
         },
         "description": "Feature flags: a disabled mechanic is invisible in the interface and refused by the engine."
@@ -12424,6 +12476,17 @@
               {
                 "description": "The rules of the suggestion box (stage 5, D-527). Missing — a season created before them reads as it did (D-50);\nneeded once `features.suggestions` is on. Not written while missing.",
                 "$ref": "#/components/schemas/SuggestionRules"
+              }
+            ]
+          },
+          "duels": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The rules of duels (stage 5, D-525, D-540). Missing — a season created before them reads as it did (D-50); needed once\n`features.duels` is on. Not written while missing.",
+                "$ref": "#/components/schemas/DuelRules"
               }
             ]
           }
