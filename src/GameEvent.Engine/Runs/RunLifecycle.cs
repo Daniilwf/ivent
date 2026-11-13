@@ -99,11 +99,19 @@ internal static class RunLifecycle
         var count = CompletionRoll.Count(hours.Value, run.Snapshot);
         var die = CompletionRoll.DieFor(difficulty, run.Snapshot.DieByDifficulty);
 
+        // The conditions of events on the run (D-507): unmet under noDiceKeepCoins of the snapshot — no throw at all, the
+        // changes waiting for it keep waiting and the beforeDice effects do not fire (D-592)
+        var check = RunConditions.AtCompletion(run, player.PlayerId, difficulty);
+        var noThrow = check is { Met: false } && run.Snapshot.ConditionPolicy == Rulesets.UnmetConditionPolicy.NoDiceKeepCoins;
+
         // Items and effects change the throw (D-408): what waits for it, then the beforeDice effects firing now.
-        var pending = player.Wallet.NextDice.Count;
-        var (fired, afterFiring, changes) = DicePipeline.BeforeDice(state, player.PlayerId, run.RunId, context);
+        var pending = noThrow ? 0 : player.Wallet.NextDice.Count;
+        (IReadOnlyList<IGameEvent> Events, SeasonState State, IReadOnlyList<ThrowChange> Changes) none = ([], state, []);
+        var (fired, afterFiring, changes) = noThrow ? none : DicePipeline.BeforeDice(state, player.PlayerId, run.RunId, context);
         player = afterFiring.Players[player.PlayerId];
-        var thrown = DicePipeline.Throw(count, die, command.ChallengeDone ? run.Snapshot.ChallengeExtraDice : 0, changes, context.Random);
+        var thrown = noThrow
+            ? new CompletionThrow([], [], null, [])
+            : DicePipeline.Throw(count, die, command.ChallengeDone ? run.Snapshot.ChallengeExtraDice : 0, changes, context.Random);
         var dice = thrown.Dice;
         var challengeDice = thrown.ChallengeDice;
         var sum = CompletionRoll.Total(dice, challengeDice, run.Snapshot, thrown.Mods);
@@ -121,8 +129,13 @@ internal static class RunLifecycle
                 command.ChallengeDone,
                 AfterFinish: player.Finish is not null,
                 FreeMode: player.Finish is not null && FinishLine.First(state) == player.PlayerId),
-            new CompletionRolled(run.RunId, player.PlayerId, dice, challengeDice),
         };
+        if (check is not null)
+        {
+            events.Add(check);
+        }
+
+        events.Add(new CompletionRolled(run.RunId, player.PlayerId, dice, challengeDice));
         if (thrown.Mods is { } mods)
         {
             events.Add(new RunDiceModified(run.RunId, player.PlayerId, mods, thrown.Rolled, SpentNext: pending));
@@ -309,6 +322,9 @@ internal static class RunLifecycle
             CompletedAt = e.CompletedAt,
             AfterFinish = e.AfterFinish,
             FreeMode = e.FreeMode,
+
+            // Its conditions are checked next (D-507); the claimed challenge is kept for dice thrown later (D-593)
+            Condition = state.Runs[e.RunId].Snapshot.Conditions.Count > 0 ? new RunConditionState(true, ChallengeDone: e.ChallengeDone) : null,
         };
         var player = state.Players[e.PlayerId] with { Phase = TurnPhase.Idle, ActiveRunId = null };
         return state with { Runs = state.Runs.SetItem(e.RunId, run), Players = state.Players.SetItem(e.PlayerId, player) };

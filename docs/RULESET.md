@@ -59,7 +59,7 @@
 | `diceCount` | число кубов: часы / `hoursPerDie`, округление `nearest`, `floor` или `ceil`, пределы `min` и `max` |
 | `dieByDifficulty` | грани кубика по сложности; `grantEvent` — ивент в придачу |
 | `challengeBonus` | награда за выполненный челлендж игры: `extraDice` — сколько кубиков того же типа добавляется после предела `max` (D-13); фиксируется в снапшоте при ролле |
-| `unmetConditionPolicy` | невыполненное условие ивента: `noDiceKeepCoins`, `countAsDrop` или `ignore` |
+| `unmetConditionPolicy` | невыполненное условие ивента: `noDiceKeepCoins` (кубики не бросаются, очков и хода нет, монетки начисляются), `countAsDrop` (пока не поддержан сборкой — отказ `reward.unmetConditionPolicy`, D-596) или `ignore` (как без условия); фиксируется в снапшоте при ролле вместе с условиями (D-507, D-546 (2)) |
 | `coins` | монетки за прохождение: `max(min, ⌊min(часы, diceCount.max × hoursPerDie) × perHour⌋)`; фиксируется в снапшоте при ролле (D-96) |
 | `coop` | доля очков в коопе и кому достаётся округление |
 

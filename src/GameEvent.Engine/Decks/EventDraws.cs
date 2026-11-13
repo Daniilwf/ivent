@@ -237,7 +237,8 @@ internal static class EventDraws
     public static List<IGameEvent> ForDifficulty(SeasonState state, EngineContext context, Guid runId)
     {
         var run = state.Runs[runId];
-        if (!state.Rules.Features.Events || run.Difficulty is not { } difficulty || run.DifficultyEventDrawn)
+        // A run without dice by its unmet condition gets none of the difficulty's reward (D-592)
+        if (!state.Rules.Features.Events || run.Difficulty is not { } difficulty || run.DifficultyEventDrawn || Runs.RunConditions.WithoutDice(run))
         {
             return [];
         }

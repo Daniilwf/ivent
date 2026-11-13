@@ -46,7 +46,9 @@ internal static class RollPreparation
         EquatableArray<RollModifier> modifiers = Targets.IsLaterFinisher(state, playerId) ? [.. pending.Where(m => !m.Hostile)] : pending;
         if (pending.Count > 0 || wallet.CurrentRoll.Count > 0)
         {
-            var applied = new RollModifiersApplied(playerId, modifiers);
+            // A condition contradicting those before it waits for the next roll (D-506)
+            var (taken, postponed) = Runs.RunConditions.Split(modifiers);
+            var applied = new RollModifiersApplied(playerId, taken) { Waiting = postponed };
             events.Add(applied);
             state = SeasonEngine.Apply(state, applied);
         }

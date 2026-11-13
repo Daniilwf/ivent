@@ -46,7 +46,38 @@ public sealed record RunSnapshot(
     [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     EquatableArray<string> ImposedTags = default,
     [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    EquatableArray<string> WishRerollTags = default);
+    EquatableArray<string> WishRerollTags = default)
+{
+    /// <summary>The conditions of events on this run, fixed at the roll (D-507); written only when there are any.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public EquatableArray<RunCondition> Conditions { get; init; }
+
+    /// <summary><c>reward.unmetConditionPolicy</c> at the roll (D-546 (2)); only with conditions.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public UnmetConditionPolicy? ConditionPolicy { get; init; }
+}
+
+/// <summary>
+/// A condition of an event on a run (SPEC «Условия от ивентов», D-507): whose it is, its bounds of difficulty, and whether
+/// another player put it (a hostile change, D-425).
+/// </summary>
+public sealed record RunCondition(
+    string ObjectId,
+    Content.ConditionSpec Condition,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    bool Hostile = false);
+
+/// <summary>
+/// The check of a completed run's conditions (D-507): <see cref="Met"/> at the difficulty that counts, <see cref="Waived"/>
+/// by the admin as not applicable (D-546 (2)), <see cref="ChallengeDone"/> claimed at the completion — so dice thrown later,
+/// when the condition becomes met, include the challenge's.
+/// </summary>
+public sealed record RunConditionState(
+    bool Met,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    bool Waived = false,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    bool ChallengeDone = false);
 
 /// <summary>
 /// The zone the player stood in at the roll, with the rules of it the run plays by (SPEC «Зона фиксируется в момент
@@ -117,7 +148,11 @@ public sealed record RunState(
 
     // The run drew its difficulty's event (D-557): never a second one, whatever the admin later does to its difficulty
     [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    bool DifficultyEventDrawn = false)
+    bool DifficultyEventDrawn = false,
+
+    // The check of its conditions (D-507): null for a run without any, or not completed yet
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    RunConditionState? Condition = null)
 {
     /// <summary>What items and effects did to the throw (D-408); none for a run without them.</summary>
     [System.Text.Json.Serialization.JsonIgnore]

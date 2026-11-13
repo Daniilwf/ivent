@@ -64,7 +64,9 @@ internal static class PaidRerollEvents
         var wallet = state.Players[playerId].Wallet;
         if (wallet.NextRoll.Count > waiting)
         {
-            var applied = new RollModifiersApplied(playerId, [.. wallet.CurrentRoll, .. wallet.NextRoll.Skip(waiting)]) { Waiting = [.. wallet.NextRoll.Take(waiting)] };
+            // A condition contradicting those of the roll waits for the next one (D-506)
+            var (taken, postponed) = Runs.RunConditions.Split([.. wallet.CurrentRoll, .. wallet.NextRoll.Skip(waiting)]);
+            var applied = new RollModifiersApplied(playerId, taken) { Waiting = [.. postponed, .. wallet.NextRoll.Take(waiting)] };
             events.Add(applied);
             state = SeasonEngine.Apply(state, applied);
         }

@@ -21,6 +21,7 @@ public partial class EventFormatTests
     [
         ("event-drawn", new EventDrawn(s_player, "risky", "gamble", EventKind.Risky, EventSource.Cell), """{"playerId":"10000000-0000-0000-0000-000000000001","deck":"risky","objectId":"gamble","kind":"risky","source":"cell"}"""),
         ("event-draw-missed", new EventDrawMissed(s_player, "horror-bad", EventKind.Bad, EventSource.Item), """{"playerId":"10000000-0000-0000-0000-000000000001","deck":"horror-bad","kind":"bad","source":"item"}"""),
+        ("run-condition-checked", new Engine.Runs.RunConditionChecked(s_player, s_player, Engine.Runs.Difficulty.Hard, true, [new Engine.Runs.Die(6, 5)], Waived: true), """{"runId":"10000000-0000-0000-0000-000000000001","playerId":"10000000-0000-0000-0000-000000000001","difficulty":"hard","met":true,"dice":[{"sides":6,"value":5}],"waived":true}"""),
         ("bad-event-intercepted", new BadEventIntercepted(s_player, s_object, "bubble-effect", EventSource.Incoming, "horror-week"), """{"playerId":"10000000-0000-0000-0000-000000000001","instanceId":"60000000-0000-0000-0000-000000000001","objectId":"bubble-effect","source":"incoming","eventId":"horror-week"}"""),
     ];
 
