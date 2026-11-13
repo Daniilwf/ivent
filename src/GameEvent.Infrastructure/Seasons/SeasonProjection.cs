@@ -373,7 +373,12 @@ internal static class SeasonProjection
                     replayed.Runs.GetValueOrDefault(r.Id)?.CellPoints ?? 0,
                     r.DiceModsJson is null ? null : JsonSerializer.Deserialize<RunDiceMods>(r.DiceModsJson, EngineJson.Options),
                     replayed.Runs.GetValueOrDefault(r.Id)?.CellObjects ?? default,
-                    r.DeclaredDifficulty)),
+                    r.DeclaredDifficulty,
+
+                    // The engine's bookkeeping of a run's events: its difficulty's event drawn (D-557) and the check of its
+                    // conditions come from the log, like the cells of its move (columns — 5.16, D-598)
+                    DifficultyEventDrawn: replayed.Runs.GetValueOrDefault(r.Id)?.DifficultyEventDrawn ?? false,
+                    Condition: replayed.Runs.GetValueOrDefault(r.Id)?.Condition)),
             ManualEffects = effects.ToImmutableSortedDictionary(
                 x => x.Id,
                 x => new PendingManualEffect(x.Id, x.PlayerId, x.ObjectId is null ? x.DrawEvent : null, x.Source, x.RunId) { ObjectId = x.ObjectId }),

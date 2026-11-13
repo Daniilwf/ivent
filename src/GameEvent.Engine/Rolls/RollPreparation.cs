@@ -45,9 +45,9 @@ internal static class RollPreparation
         var wallet = state.Players[playerId].Wallet;
 
         // Events' changes by events.applyOrder, then items'; within a kind the special roll's first, then as they came (D-505).
-        // Events' changes of a roll left without a game (an admin's reset, «Уже проходил» with nothing left) never applied to
-        // one: they wait on (D-583); items' are spent as in stage 4.
-        IEnumerable<RollModifier> unused = state.Rules.Features.Events ? wallet.CurrentRoll.Where(m => m.EventKind is not null) : [];
+        // A roll that ended without a game started (an «already played» of the last game, an offer the admin discarded) hands
+        // on its conditions (D-591) and its events' changes (D-583): they never applied to a run; items' are spent as in stage 4.
+        IEnumerable<RollModifier> unused = wallet.CurrentRoll.Where(m => m.RunCondition is not null || (state.Rules.Features.Events && m.EventKind is not null));
         EquatableArray<RollModifier> pending = [.. EventOrder.Sort(state.Rules, [.. wallet.NextRoll.Skip(waiting.Count), .. unused, .. waiting], m => m.EventKind)];
 
         // Others' changes of the game put on him before he finished not first are taken off the roll and recorded by
@@ -55,8 +55,11 @@ internal static class RollPreparation
         EquatableArray<RollModifier> modifiers = Targets.IsLaterFinisher(state, playerId) ? [.. pending.Where(m => !m.Hostile)] : pending;
         if (pending.Count > 0 || wallet.CurrentRoll.Count > 0)
         {
-            var (kept, lifted) = Fit(state, playerId, context, modifiers);
-            var applied = new RollModifiersApplied(playerId, kept) { Waiting = lifted };
+            // A condition contradicting those before it in this order waits for the next roll (D-506, D-586); an event's
+            // filter that fits no game waits too (D-583)
+            var (taken, postponed) = Runs.RunConditions.Split(modifiers, state.Rules.Features.Events);
+            var (kept, lifted) = Fit(state, playerId, context, taken);
+            var applied = new RollModifiersApplied(playerId, kept) { Waiting = [.. postponed, .. lifted] };
             events.Add(applied);
             state = SeasonEngine.Apply(state, applied);
         }
@@ -127,8 +130,8 @@ internal static class RollPreparation
 
     /// <summary>
     /// The roll in progress after a reroll or «Уже проходил» gave up games (D-583): its events' filters are fitted again
-    /// against what is left, with the changes <paramref name="added"/> since (a paid reroll's bad event, D-546 (3)); a filter
-    /// that fits nothing now waits for the next roll — first those of the roll in progress, then <paramref name="waiting"/>,
+    /// against what is left, with the changes <paramref name="added"/> since (a paid reroll's bad event, D-546 (3)), after a
+    /// contradicting condition is set aside (D-506, D-586); a filter that fits nothing now and such a condition wait for the next roll — first those of the roll in progress, then <paramref name="waiting"/>,
     /// then the added ones, as they came. Null when nothing changes (always with events off: the log stays as before).
     /// </summary>
     public static RollModifiersApplied? Refit(
@@ -140,7 +143,9 @@ internal static class RollPreparation
                 [.. current.Select(m => (Modifier: m, Added: false)), .. added.Select(m => (Modifier: m, Added: true))],
                 x => x.Modifier.EventKind)
             .ToList();
-        var (kept, lifted) = Fit(state, playerId, context, ordered, x => x.Modifier, givenUp);
+        var (taken, postponed) = Runs.RunConditions.Split(ordered, x => x.Modifier, state.Rules.Features.Events);
+        var (kept, fitless) = Fit(state, playerId, context, taken, x => x.Modifier, givenUp);
+        List<(RollModifier Modifier, bool Added)> lifted = [.. postponed, .. fitless];
         if (added.Count == 0 && lifted.Count == 0)
         {
             return null;

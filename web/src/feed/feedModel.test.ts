@@ -202,6 +202,25 @@ describe('feed lines', () => {
     expect(item?.quote).toEqual({ rating: 9, text: 'Лучшая метроидвания' });
   });
 
+  it('says the check of a run condition: met, unmet or not applicable (D-507, D-594)', () => {
+    const check = (met: boolean, waived?: boolean) =>
+      text(
+        one([
+          entry('c9', 'run-condition-checked', {
+            runId: run1,
+            playerId: vasya,
+            difficulty: 'hard',
+            met,
+            ...(waived ? { waived } : {}),
+          }),
+        ]),
+      );
+
+    expect(check(true)).toBe('Вася: условие прохождения Hollow Knight выполнено');
+    expect(check(false)).toBe('Вася: условие прохождения Hollow Knight не выполнено');
+    expect(check(true, true)).toBe('Вася: условие прохождения Hollow Knight неприменимо');
+  });
+
   it('shows a proof without its hidden details and a reject with the admin comment when it is there', () => {
     const sent = one([entry('c5', 'proof-submitted', { runId: run1, playerId: vasya })]);
     const rejected = one([

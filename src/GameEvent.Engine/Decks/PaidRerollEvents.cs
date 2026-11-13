@@ -67,7 +67,8 @@ internal static class PaidRerollEvents
         var wallet = state.Players[playerId].Wallet;
         if (wallet.NextRoll.Count > waiting)
         {
-            // In the order of kinds, and a filter that fits no game left waits for the next roll as at any roll (D-583)
+            // In the order of kinds; a contradicting condition and a filter that fits no game left wait for the next roll as at
+            // any roll (D-506, D-583, D-586)
             var applied = RollPreparation.Refit(state, playerId, context, givenUp, [.. wallet.NextRoll.Take(waiting)], [.. wallet.NextRoll.Skip(waiting)])!;
             events.Add(applied);
             state = SeasonEngine.Apply(state, applied);

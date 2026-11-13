@@ -72,7 +72,7 @@
 | `transformObject` | `mode`: `transform` (`into`), `annotate` (`note`), `addCounter` (`value`: на сколько меняются счётчики всех подходящих; дошедший до нуля срабатывает сразу — один раз, на уровень цепочки глубже) или `resetCounters` (счётчики всех подходящих — к началу); счётчики, уже дошедшие до нуля, не меняются, D-479, D-485 |
 | `drawEvent` | `deck`: `good`, `bad`, `special`, `risky`, `zone` или id колоды |
 | `spinWheel` | `wheel`: id колеса |
-| `modifyNextRoll` | `filter`, `choiceCount`, `runCondition` |
+| `modifyNextRoll` | `filter`, `choiceCount`, `runCondition` — условие прохождения: только `difficultyAtLeast` и/или `difficultyAtMost` (фильтр игры — в `filter`), только при `features.events`; фиксируется в снапшоте при ролле, противоречащее предыдущим ждёт следующего ролла (D-506, D-590, D-591) |
 | `modifyDice` | `when`: `current` или `next`; `stage`: `count`, `sides`, `add`, `multiply`, `reroll`, `min`, `max`, `singleDie`, `setOne`, `replaceValue`, `fixAverage`, `bonusPerEven`, `percent`; `value`; у `count` — `sides`: дополнительные кубики своего вида (d6 рядом с d4 прохождения, D-475). Редкие этапы (D-481): `singleDie` — вместо кубиков по часам один кубик на `value` граней; `setOne` — первый кубик показывает `value` (число или `$choice`), не больше своих граней; `replaceValue` — каждый кубик с `from` считается за `value`; `fixAverage` — каждый кубик показывает половину граней; `bonusPerEven` — `value` за каждый чётный кубик; `percent` — сумма с модификаторами × `value`/100 с округлением к нулю; у `reroll` — `filter: belowAverage`: перебросить только кубики ниже половины граней |
 | `teleport` | `cell`: id клетки или `nearestShortcut` |
 | `requestChoice` | `prompt`, `options`: `{ "from": "categories" }`, `players`, `games` или `{ "list": [...] }`; результат — `$choice` |
@@ -83,7 +83,7 @@
 | --- | --- |
 | Фильтр игры | `{ "tags": ["Horror"], "maxHours": 10, "minHours": 2, "releaseYearBefore": 2005 }` |
 | Фильтр объектов (`takeObject`, `transformObject`) | `{ "kind": "item", "rarity": "epic", "objectId": "orange", "hostile": true, "hasCounter": true, "excludeTags": ["rat"] }`; `excludeTags` пропускает объекты с любым из этих тегов (D-470), `hasCounter` — только объекты со счётчиком или без (D-479) |
-| Условие на прохождение | `{ "difficultyAtLeast": "hard" }` |
+| Условие на прохождение | `{ "difficultyAtLeast": "hard" }`, `{ "difficultyAtMost": "easy" }`, обе границы вместе (`difficultyAtLeast` не выше `difficultyAtMost`, D-506) |
 | Статистика игрока | `{ "stat": "hostileReceived", "gte": 5 }`, `{ "stat": "completedStreakWithTag", "tag": "Horror", "gte": 3 }`, `{ "stat": "allDiceMax", "minDice": 3 }`, `{ "stat": "runHours", "gte": 30 }`, `{ "stat": "coins", "gte": 0, "lte": 0 }` (монетки владельца: `gte` и/или `lte`, D-483) |
 
 Набор статистик расширяется по мере надобности; каждая новая статистика — отдельная задача с тестом.

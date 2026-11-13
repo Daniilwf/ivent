@@ -23,6 +23,12 @@ public static class RulesetSupport
             errors.Add(new("roll.lastDaysLengthFilter.enabled", NotYet));
         }
 
+        // A completion turned into a drop by its unmet condition waits for its task (D-596)
+        if (ruleset.Reward.UnmetConditionPolicy == UnmetConditionPolicy.CountAsDrop)
+        {
+            errors.Add(new("reward.unmetConditionPolicy", $"countAsDrop {NotYet}"));
+        }
+
         var f = ruleset.Features;
         foreach (var (name, on) in new[]
         {

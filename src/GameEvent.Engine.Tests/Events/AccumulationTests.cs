@@ -30,7 +30,7 @@ public partial class AccumulationTests
     private static readonly string[] s_deck =
     [
         "horror-filter", "rpg-filter", "short-filter", "classic-filter", "rpg-week", "horror-week",
-        "dice-count", "dice-add", "dice-double", "bad-ask", "special-ask",
+        "dice-count", "dice-add", "dice-double", "bad-ask", "special-ask", "cond-hard", "cond-easy",
     ];
 
     private static readonly Dictionary<string, string> s_json = new(StringComparer.Ordinal)
@@ -43,6 +43,8 @@ public partial class AccumulationTests
         ["dice-count"] = Event("dice-count", "Лишний кубик", """[{ "type": "modifyDice", "when": "next", "stage": "count", "value": 1 }]"""),
         ["dice-add"] = Event("dice-add", "Плюс два", """[{ "type": "modifyDice", "when": "next", "stage": "add", "value": 2 }]"""),
         ["dice-double"] = Event("dice-double", "Вдвойне", """[{ "type": "modifyDice", "when": "next", "stage": "multiply", "value": 2 }]"""),
+        ["cond-hard"] = Event("cond-hard", "Не ниже сложной", """[{ "type": "modifyNextRoll", "runCondition": { "difficultyAtLeast": "hard" } }]"""),
+        ["cond-easy"] = Event("cond-easy", "Не выше лёгкой", """[{ "type": "modifyNextRoll", "runCondition": { "difficultyAtMost": "easy" } }]"""),
         ["bad-ask"] = Asking("bad-ask", "x", "y"),
         ["special-ask"] = Asking("special-ask", "p", "q"),
         ["bad-then-special"] = """

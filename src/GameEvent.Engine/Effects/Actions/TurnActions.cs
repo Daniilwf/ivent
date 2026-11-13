@@ -6,7 +6,7 @@ namespace GameEvent.Engine.Effects.Actions;
 
 /// <summary>
 /// <c>modifyNextRoll</c>: the target's next roll gets a filter (its <c>$parameters</c> resolved) or a choice of several
-/// games. It waits for the next roll from Idle and holds for its rerolls (D-405); the run's condition is stage 5.
+/// games, or a condition on the run (D-507). It waits for the next roll from Idle and holds for its rerolls (D-405).
 /// </summary>
 internal sealed class ModifyNextRollHandler : ActionHandler<ModifyNextRollAction>
 {
@@ -16,7 +16,17 @@ internal sealed class ModifyNextRollHandler : ActionHandler<ModifyNextRollAction
         var filter = action.Filter is { } f
             ? f with { Tags = f.Tags is { } tags ? [.. tags.Select(run.Text)] : null }
             : null;
-        run.Emit(new NextRollModified(target, new RollModifier(run.ObjectId, filter, action.ChoiceCount, run.Hostile && target != run.UserId, run.EventKind)));
+        var hostile = run.Hostile && target != run.UserId;
+        if (filter is not null || action.ChoiceCount is not null)
+        {
+            run.Emit(new NextRollModified(target, new RollModifier(run.ObjectId, filter, action.ChoiceCount, hostile, run.EventKind)));
+        }
+
+        // The condition is a change of its own: a contradicting one waits for a later roll without the filter (D-506, D-591)
+        if (action.RunCondition is { } condition)
+        {
+            run.Emit(new NextRollModified(target, new RollModifier(run.ObjectId, null, null, hostile, run.EventKind) { RunCondition = condition }));
+        }
     }
 }
 

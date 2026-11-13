@@ -392,12 +392,12 @@ public static partial class ContentValidator
                     CheckFilter(filter, $"{at}.filter", error);
                     if (next.RunCondition is { } condition)
                     {
-                        CheckCondition(condition, $"{at}.runCondition", error);
+                        CheckRunCondition(condition, $"{at}.runCondition", error);
                     }
 
                     break;
                 case ModifyNextRollAction { RunCondition: { } runCondition }:
-                    CheckCondition(runCondition, $"{at}.runCondition", error);
+                    CheckRunCondition(runCondition, $"{at}.runCondition", error);
                     break;
                 case ModifyNextRollAction { ChoiceCount: < 2 }:
                     error($"{at}.choiceCount", "A choice is among at least 2 games.");
@@ -626,12 +626,32 @@ public static partial class ContentValidator
     }
 
     // A condition tests something: the run, the game or a statistic with the parameters it needs.
+    // A condition on the run is its difficulty only (D-506, D-590): a game filter goes in «filter» and acts at the roll,
+    // a statistic belongs to triggers.
+    private static void CheckRunCondition(ConditionSpec condition, string path, Action<string, string> error)
+    {
+        if (condition is { DifficultyAtLeast: null, DifficultyAtMost: null }
+            || condition.Game is not null || condition.Stat is not null || condition.Gte is not null || condition.Lte is not null
+            || condition.Tag is not null || condition.MinDice is not null)
+        {
+            error(path, "A condition on the run names its difficulty only: «difficultyAtLeast» and/or «difficultyAtMost»; a game goes in «filter».");
+            return;
+        }
+
+        CheckCondition(condition, path, error);
+    }
+
     private static void CheckCondition(ConditionSpec condition, string path, Action<string, string> error)
     {
-        if (condition is { DifficultyAtLeast: null, Game: null, Stat: null, Gte: null, Lte: null, Tag: null, MinDice: null })
+        if (condition is { DifficultyAtLeast: null, DifficultyAtMost: null, Game: null, Stat: null, Gte: null, Lte: null, Tag: null, MinDice: null })
         {
-            error(path, "A condition tests the run («difficultyAtLeast»), the game («game») or a statistic («stat»).");
+            error(path, "A condition tests the run («difficultyAtLeast», «difficultyAtMost»), the game («game») or a statistic («stat»).");
             return;
+        }
+
+        if (condition is { DifficultyAtLeast: { } least, DifficultyAtMost: { } most } && least > most)
+        {
+            error(path, "«difficultyAtLeast» above «difficultyAtMost» never holds.");
         }
 
         var missing = condition.Stat switch
