@@ -7,6 +7,12 @@
     <OpenApiGenerateDocumentsOptions>--file-name openapi</OpenApiGenerateDocumentsOptions>
   </PropertyGroup>
 
+  <!-- Endpoint request delegates generated at compile time (D-664): without it every start of the site compiles an
+       expression tree per endpoint, the bulk of a start's CPU (and of each API test's). -->
+  <PropertyGroup>
+    <EnableRequestDelegateGenerator>true</EnableRequestDelegateGenerator>
+  </PropertyGroup>
+
   <!-- The development settings (seed password) never ship in a published build. -->
   <ItemGroup>
     <Content Update="appsettings.Development.json" CopyToPublishDirectory="Never" />
