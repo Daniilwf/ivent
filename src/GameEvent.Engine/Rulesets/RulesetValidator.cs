@@ -33,6 +33,7 @@ public static class RulesetValidator
     private const int MaxSuggestionsPerDay = 100;
     private const int MaxOpenInvites = 100;
     private const int MaxInviteTtlHours = 24 * 30;
+    private const int MaxRequestTtlHours = 24 * 30;
 
     public static IReadOnlyList<RulesetError> Validate(Ruleset ruleset)
     {
@@ -292,6 +293,21 @@ public static class RulesetValidator
         if (ruleset.Features.Coop && ruleset.Interactions.InviteTtlHours is < 1 or > MaxInviteTtlHours)
         {
             Error("interactions.inviteTtlHours", $"must be 1–{MaxInviteTtlHours}");
+        }
+
+        // The partner board (D-524): a response is a coop invitation, so the board plays only with coop; its term comes with it
+        if (ruleset.Features.PartnerBoard && !ruleset.Features.Coop)
+        {
+            Error("features.partnerBoard", "needs features.coop: a response to a request is a coop invitation");
+        }
+        else if (ruleset.Features.PartnerBoard && ruleset.PartnerBoard is null)
+        {
+            Error("partnerBoard.requestTtlHours", "is required when features.partnerBoard is on");
+        }
+
+        if (ruleset.PartnerBoard is { RequestTtlHours: < 1 or > MaxRequestTtlHours })
+        {
+            Error("partnerBoard.requestTtlHours", $"must be 1–{MaxRequestTtlHours}");
         }
 
         var tiebreakers = ruleset.Ranking.Tiebreakers;

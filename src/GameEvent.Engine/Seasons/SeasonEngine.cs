@@ -86,6 +86,9 @@ public static class SeasonEngine
             Interactions.AnswerInvitation c => Interactions.Coop.Decide(state, c, context),
             Interactions.WithdrawInvitation c => Interactions.Coop.Decide(state, c, context),
             Interactions.LeaveCoop c => Interactions.Coop.Decide(state, c, context),
+            Interactions.PostPartnerRequest c => Interactions.PartnerBoard.Decide(state, c, context),
+            Interactions.RespondToPartnerRequest c => Interactions.PartnerBoard.Decide(state, c, context),
+            Interactions.ClosePartnerRequest c => Interactions.PartnerBoard.Decide(state, c, context),
             FireTimers => Timers.Decide(state, context),
             SettleForAll c => ForAllSettlements.Decide(state, c, context),
             _ => throw new ArgumentException($"Unknown command {command.GetType().Name}.", nameof(command)),
@@ -248,6 +251,8 @@ public static class SeasonEngine
             Interactions.CoopJoined e => Interactions.Coop.Apply(state, e),
             Interactions.CoopLeft e => Interactions.Coop.Apply(state, e),
             Interactions.CoopRewardSplit e => Interactions.Coop.Apply(state, e),
+            Interactions.PartnerRequestPosted e => Interactions.PartnerBoard.Apply(state, e),
+            Interactions.PartnerRequestClosed e => Interactions.PartnerBoard.Apply(state, e),
 
             // Facts for the log and the feed that change nothing by themselves: their consequences are their own events.
             ObjectLost or ItemUsed or EffectTriggered or EffectRolled or HostileIntercepted or WheelSpun or InventoryAdjusted => state,

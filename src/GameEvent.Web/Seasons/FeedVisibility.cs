@@ -138,6 +138,8 @@ public static class FeedVisibility
         ["coop-joined"] = Access.Public,
         ["coop-left"] = Access.Public,
         ["coop-reward-split"] = Access.Public,
+        ["partner-request-posted"] = Access.Public,
+        ["partner-request-closed"] = Access.Public,
 
         // The suggestion box (D-527) is the admin's moderation queue, not a move of the season: its own screen shows it (5.19)
         ["suggestion-submitted"] = Access.NotInFeed,

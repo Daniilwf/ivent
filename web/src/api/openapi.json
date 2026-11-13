@@ -11160,6 +11160,20 @@
         },
         "description": "A game offered to the player, with the hours fixed at roll time, marks from other players (SPEC «Статусы игры») and\nthe pool's cover, if it has one (D-222)."
       },
+      "PartnerBoardRules": {
+        "required": [
+          "requestTtlHours"
+        ],
+        "type": "object",
+        "properties": {
+          "requestTtlHours": {
+            "type": "integer",
+            "description": "How many hours a request «ищу напарника» stays open unless something closes it earlier.",
+            "format": "int32"
+          }
+        },
+        "description": "The rules of the partner board (SPEC «Взаимодействие игроков», D-524)."
+      },
       "PenaltyDice": {
         "required": [
           "count",
@@ -12424,6 +12438,17 @@
               {
                 "description": "The rules of the suggestion box (stage 5, D-527). Missing — a season created before them reads as it did (D-50);\nneeded once `features.suggestions` is on. Not written while missing.",
                 "$ref": "#/components/schemas/SuggestionRules"
+              }
+            ]
+          },
+          "partnerBoard": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The rules of the partner board (stage 5, D-524). Missing — a season created before it reads as it did (D-50); needed\nonce `features.partnerBoard` is on. Not written while missing.",
+                "$ref": "#/components/schemas/PartnerBoardRules"
               }
             ]
           }

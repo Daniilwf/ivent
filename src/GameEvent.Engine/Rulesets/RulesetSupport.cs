@@ -33,7 +33,7 @@ public static class RulesetSupport
         foreach (var (name, on) in new[]
         {
             ("polls", f.Polls),
-            ("achievements", f.Achievements), ("partnerBoard", f.PartnerBoard),
+            ("achievements", f.Achievements),
             ("reactions", f.Reactions), ("comments", f.Comments), ("gallery", f.Gallery),
         })
         {
