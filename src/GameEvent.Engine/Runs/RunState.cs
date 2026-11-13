@@ -160,9 +160,88 @@ public sealed record RunState(
 
     // The check of its conditions (D-507): null for a run without any, or not completed yet
     [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
-    RunConditionState? Condition = null)
+    RunConditionState? Condition = null,
+
+    // The partner's side of a coop run (D-520): null for a run played alone
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    CoopPartner? Coop = null)
 {
+    /// <summary>The coop partner (D-520); null for a run played alone.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public Guid? PartnerId => Coop?.PlayerId;
+
+    /// <summary>
+    /// The run as <paramref name="playerId"/>'s side of it sees it (D-545): for the coop partner, his own bookkeeping of the
+    /// run's move (<see cref="CoopPartner"/>) in place of the roller's, under his id; for anybody else the run itself. A view
+    /// to read: written back only through <see cref="WithSide"/>.
+    /// </summary>
+    public RunState Side(Guid playerId) =>
+        Coop is { } c && c.PlayerId == playerId && playerId != PlayerId
+            ? this with
+            {
+                PlayerId = playerId,
+                AfterFinish = c.AfterFinish,
+                Moved = c.Moved,
+                ReachedFinish = c.ReachedFinish,
+                MoveFrom = c.MoveFrom,
+                Gain = c.Gain,
+                CellPoints = c.CellPoints,
+                CellObjects = c.CellObjects,
+            }
+            : this;
+
+    /// <summary>The run with <paramref name="playerId"/>'s side of it replaced by <paramref name="side"/> (a changed <see cref="Side"/>).</summary>
+    public RunState WithSide(Guid playerId, RunState side)
+    {
+        ArgumentNullException.ThrowIfNull(side);
+        return Coop is { } c && c.PlayerId == playerId && playerId != PlayerId
+            ? this with
+            {
+                Coop = c with
+                {
+                    AfterFinish = side.AfterFinish,
+                    Moved = side.Moved,
+                    ReachedFinish = side.ReachedFinish,
+                    MoveFrom = side.MoveFrom,
+                    Gain = side.Gain,
+                    CellPoints = side.CellPoints,
+                    CellObjects = side.CellObjects,
+                },
+            }
+            : side with { PlayerId = PlayerId, Coop = Coop };
+    }
+
     /// <summary>What items and effects did to the throw (D-408); none for a run without them.</summary>
     [System.Text.Json.Serialization.JsonIgnore]
     public RunDiceMods DiceMods => Mods ?? RunDiceMods.None;
 }
+
+/// <summary>
+/// The partner's side of a coop run (D-520, D-521, D-545): who and by which invitation; once completed, the shares it was split
+/// by (<see cref="Shares"/>) and the partner's own bookkeeping of his move, as <see cref="RunState"/> keeps the roller's — whether
+/// the run came after his finish, the cells it moved him, whether that move stands on the finish, the cell it began on, what it
+/// brought him closer, the bonus and the objects of the cell he stopped on (D-321, D-327).
+/// </summary>
+public sealed record CoopPartner(
+    Guid PlayerId,
+    Guid InteractionId,
+    DateTimeOffset JoinedAt,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    CoopShareRules? Shares = null,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    bool AfterFinish = false,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    int Moved = 0,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    bool ReachedFinish = false,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    string? MoveFrom = null,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    int Gain = 0,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    int CellPoints = 0,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    EquatableArray<Guid> CellObjects = default);
+
+/// <summary>The shares a completed coop run was split by (<c>reward.coop</c> at the completion, D-521).</summary>
+public sealed record CoopShareRules(decimal PointsShare, decimal CoinsShare);

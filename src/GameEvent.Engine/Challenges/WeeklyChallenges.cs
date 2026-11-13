@@ -173,14 +173,16 @@ internal static class WeeklyChallenges
                 foreach (var challenge in state.WeeklyChallenges.Values.Where(c =>
                     c.Definition.Check == ChallengeCheck.Auto && c.InWindow(completed.CompletedAt)))
                 {
-                    // The coop partner completes it too, each with the whole reward (D-521, D-573): with task 5.10
-                    var player = state.Players[run.PlayerId];
-                    if (!challenge.CompletedBy(player.PlayerId)
-                        && Effects.Conditions.Hold(state, pool, player.PlayerId, challenge.Definition.Condition, run.RunId))
+                    // The coop partner completes it too, each with the whole reward (D-521, D-573)
+                    foreach (var player in RunShares.Players(run).Select(id => state.Players[id]))
                     {
-                        foreach (var next in Complete(challenge, player, run.RunId))
+                        if (!challenge.CompletedBy(player.PlayerId)
+                            && Effects.Conditions.Hold(state, pool, player.PlayerId, challenge.Definition.Condition, run.RunId))
                         {
-                            yield return next;
+                            foreach (var next in Complete(challenge, player, run.RunId))
+                            {
+                                yield return next;
+                            }
                         }
                     }
                 }

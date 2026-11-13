@@ -1,4 +1,5 @@
 using GameEvent.Engine.Duels;
+using GameEvent.Engine.Interactions;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Players;
 using GameEvent.Engine.Proofs;
@@ -11,7 +12,8 @@ using GameEvent.Engine.Tests.Support;
 namespace GameEvent.Engine.Tests.Duels;
 
 /// <summary>
-/// EV30, EV41, EV63 (task 5.12, D-523, D-525, D-540): a challenge waits for its answer, an accept starts a race to the next
+/// EV30, EV41, EV63 (task 5.12, D-523, D-525, D-540, D-718): a challenge is an invitation of kind duel that waits for its
+/// answer (<see cref="AnswerInvitation"/>, <see cref="WithdrawInvitation"/>), an accept starts a race to the next
 /// completion of a run rolled after it, the winner gets <c>duels.rewardCoins</c> from the system and the loser loses
 /// nothing; one open duel a player, a cooldown of the pair, a limit of wins a season; correcting hours later does not
 /// re-decide the duel; the flag off refuses everything.
@@ -31,13 +33,14 @@ public class DuelTests
         s.Challenge("Вася", "Петя");
 
         ScenarioAssert.Accepted(s);
-        var duel = Assert.Single(s.LastEvents<DuelChallenged>()).Duel;
+        var challenge = Assert.Single(s.LastEvents<InteractionCreated>()).Interaction;
         Assert.Equal(
-            (s.PlayerId("Вася"), s.PlayerId("Петя"), DuelStatus.Pending, now, now.AddHours(DuelScenario.InviteTtlHours)),
-            (duel.ChallengerId, duel.OpponentId, duel.Status, duel.CreatedAt, duel.ExpiresAt));
-        Assert.Equal((null, null, null, 0), (duel.AcceptedAt, duel.WinnerId, duel.RunId, duel.Coins));
-        Assert.Equal(duel, s.Duel(duel.DuelId));
+            new Interaction(challenge.InteractionId, InteractionKind.Duel, s.PlayerId("Вася"), s.PlayerId("Петя"), null, now, now.AddHours(DuelScenario.InviteTtlHours)),
+            challenge);
+        Assert.Equal(challenge, s.Invitation(challenge.InteractionId));
+        Assert.Empty(s.State.Duels);
         Assert.Empty(s.LastEvents<CoinsChanged>());
+        Assert.Equal(now.AddHours(DuelScenario.InviteTtlHours), s.NextTimer("Вася"));
         Assert.Equal(s.State, SeasonEngine.Replay(s.Log));
     }
 
@@ -53,12 +56,16 @@ public class DuelTests
         s.Answer("Петя", duel, accept: true);
 
         ScenarioAssert.Accepted(s);
-        var answered = Assert.Single(s.LastEvents<DuelAnswered>());
-        Assert.Equal((duel, true, now, (DateTimeOffset?)now.AddDays(DuelScenario.DurationDays)), (answered.DuelId, answered.Accepted, answered.AnsweredAt, answered.ExpiresAt));
-        Assert.Equal([vasyaRun], answered.RunsAtAcceptance.ToArray());
-        var state = s.Duel(duel);
-        Assert.Equal((DuelStatus.Active, (DateTimeOffset?)now, now.AddDays(DuelScenario.DurationDays)), (state.Status, state.AcceptedAt, state.ExpiresAt));
-        Assert.Equal([vasyaRun], state.RunsAtAcceptance.ToArray());
+        var end = now.AddDays(DuelScenario.DurationDays);
+        Assert.Equal(new InteractionAnswered(duel, s.PlayerId("Петя"), true, now), Assert.Single(s.LastEvents<InteractionAnswered>()));
+        var started = Assert.Single(s.LastEvents<DuelStarted>());
+        Assert.Equal((duel, s.PlayerId("Вася"), s.PlayerId("Петя"), now, end), (started.DuelId, started.ChallengerId, started.OpponentId, started.AcceptedAt, started.ExpiresAt));
+        Assert.Equal([vasyaRun], started.RunsAtAcceptance.ToArray());
+        var events = s.Last.Events.ToList();
+        Assert.True(events.FindIndex(e => e is InteractionAnswered) < events.FindIndex(e => e is DuelStarted), "The answer comes before the duel it starts.");
+        Assert.Equal(InteractionStatus.Accepted, s.Invitation(duel).Status);
+        Assert.Equal(new Duel(duel, s.PlayerId("Вася"), s.PlayerId("Петя"), now, end, [vasyaRun]), s.Duel(duel));
+        Assert.Equal(end, s.NextTimer("Вася"));
         Assert.Equal(s.State, SeasonEngine.Replay(s.Log));
     }
 
@@ -85,11 +92,11 @@ public class DuelTests
         s.Answer("Петя", duel, accept: false);
 
         ScenarioAssert.Accepted(s);
-        var answered = Assert.Single(s.LastEvents<DuelAnswered>());
-        Assert.Equal((duel, false, now, (DateTimeOffset?)null), (answered.DuelId, answered.Accepted, answered.AnsweredAt, answered.ExpiresAt));
-        Assert.Empty(answered.RunsAtAcceptance);
-        Assert.Equal(DuelStatus.Declined, s.Duel(duel).Status);
-        Assert.Null(s.Duel(duel).AcceptedAt);
+        Assert.Equal(new InteractionAnswered(duel, s.PlayerId("Петя"), false, now), Assert.Single(s.LastEvents<InteractionAnswered>()));
+        Assert.Empty(s.LastEvents<DuelStarted>());
+        Assert.Equal(InteractionStatus.Declined, s.Invitation(duel).Status);
+        Assert.Empty(s.State.Duels);
+        Assert.Null(s.NextTimer("Вася"));
     }
 
     [Fact]
@@ -102,8 +109,9 @@ public class DuelTests
         s.Withdraw("Вася", duel);
 
         ScenarioAssert.Accepted(s);
-        Assert.Equal(new DuelWithdrawn(duel, s.Clock.UtcNow), Assert.Single(s.LastEvents<DuelWithdrawn>()));
-        Assert.Equal(DuelStatus.Withdrawn, s.Duel(duel).Status);
+        Assert.Equal(new InteractionWithdrawn(duel, s.PlayerId("Вася"), s.Clock.UtcNow), Assert.Single(s.LastEvents<InteractionWithdrawn>()));
+        Assert.Equal(InteractionStatus.Withdrawn, s.Invitation(duel).Status);
+        Assert.Empty(s.State.Duels);
     }
 
     [Theory]
@@ -151,7 +159,38 @@ public class DuelTests
         s.Challenge("Вася", "Маша");
 
         ScenarioAssert.Accepted(s);
-        Assert.Equal(3, s.State.Duels.Values.Count(d => d.OpponentId == s.PlayerId("Маша") && d.Status == DuelStatus.Pending));
+        Assert.Equal(3, s.State.Interactions.Values.Count(i => i.ToPlayerId == s.PlayerId("Маша") && i.Status == InteractionStatus.Pending));
+    }
+
+    [Fact]
+    public void The_shared_limit_of_invitations_sent_holds_challenges_too()
+    {
+        // interactions.maxOpenInvitesPerPlayer is checked after duel.alreadyOpen and before duel.tooMany (D-523, D-718)
+        var s = DuelScenario.New(d => d with { MaxOpenPerPlayer = 5 }, maxOpenInvites: 1);
+        s.Challenged("Вася", "Петя");
+
+        ScenarioAssert.RejectsWithoutChanges(s, x => x.Challenge("Вася", "Маша"), RejectionCodes.InteractionTooMany);
+        ScenarioAssert.RejectsWithoutChanges(s, x => x.Challenge("Вася", "Петя"), RejectionCodes.DuelAlreadyOpen);
+    }
+
+    [Fact]
+    public void The_shared_limit_comes_before_the_duel_limit()
+    {
+        var s = DuelScenario.New(maxOpenInvites: 1);
+        s.Challenged("Вася", "Петя");
+
+        ScenarioAssert.RejectsWithoutChanges(s, x => x.Challenge("Вася", "Маша"), RejectionCodes.InteractionTooMany);
+    }
+
+    [Fact]
+    public void A_race_going_on_is_not_an_invitation_sent()
+    {
+        var s = DuelScenario.New(d => d with { MaxOpenPerPlayer = 5 }, maxOpenInvites: 1);
+        s.StartDuel("Вася", "Петя");
+
+        s.Challenge("Вася", "Маша");
+
+        ScenarioAssert.Accepted(s);
     }
 
     [Fact]
@@ -186,8 +225,19 @@ public class DuelTests
         var s = Scenario.New().WithMapLength(60).WithCategory("Horror").WithGame("Silent Hill", 6, "Horror").WithPlayers("Вася", "Петя");
 
         ScenarioAssert.RejectsWithoutChanges(s, x => x.Act(new ChallengeToDuel(x.PlayerId("Вася"), x.PlayerId("Петя"))), RejectionCodes.FeatureDisabled);
-        ScenarioAssert.RejectsWithoutChanges(s, x => x.Act(new AnswerDuel(x.PlayerId("Петя"), SequentialIds.Make(0x7D000000, 1), true)), RejectionCodes.FeatureDisabled);
-        ScenarioAssert.RejectsWithoutChanges(s, x => x.Act(new WithdrawDuel(x.PlayerId("Вася"), SequentialIds.Make(0x7D000000, 1))), RejectionCodes.FeatureDisabled);
+    }
+
+    [Fact]
+    public void A_duel_invitation_is_neither_answered_nor_withdrawn_while_the_flag_is_off()
+    {
+        // A challenge left from a log written with the flag on (crafted: the engine does not switch duels off while one waits)
+        var s = Scenario.New().WithMapLength(60).WithCategory("Horror").WithGame("Silent Hill", 6, "Horror").WithPlayers("Вася", "Петя");
+        var id = SequentialIds.Make(0x7D000000, 1);
+        s.AppendCraftedEvents(new InteractionCreated(
+            new Interaction(id, InteractionKind.Duel, s.PlayerId("Вася"), s.PlayerId("Петя"), null, s.Clock.UtcNow, s.Clock.UtcNow.AddHours(24))));
+
+        ScenarioAssert.RejectsWithoutChanges(s, x => x.Act(new AnswerInvitation(x.PlayerId("Петя"), id, true)), RejectionCodes.FeatureDisabled);
+        ScenarioAssert.RejectsWithoutChanges(s, x => x.Act(new WithdrawInvitation(x.PlayerId("Вася"), id)), RejectionCodes.FeatureDisabled);
     }
 
     [Fact]
@@ -201,21 +251,22 @@ public class DuelTests
         s.Act(new Engine.Economy.FireTimers());
         s.Act(new ChangeSeasonStatus(SeasonStatus.Closing));
 
-        Assert.DoesNotContain(s.Log, e => e is DuelChallenged or DuelAnswered or DuelWithdrawn or DuelExpired or DuelSettled or DuelWinRevoked);
+        Assert.DoesNotContain(s.Log, DuelScenario.IsDuelEvent);
         Assert.Empty(s.State.Duels);
-        Assert.Null(DuelTimers.Next(s.State, s.PlayerId("Вася")));
+        Assert.Empty(s.State.Interactions);
+        Assert.Null(s.NextTimer("Вася"));
     }
 
     // ---- The answer and the withdrawal (D-523) ----
 
     [Theory]
-    [InlineData("unknown", RejectionCodes.DuelUnknown)]
-    [InlineData("challenger", RejectionCodes.DuelNotYours)]
-    [InlineData("third", RejectionCodes.DuelNotYours)]
-    [InlineData("answered", RejectionCodes.DuelNotPending)]
-    [InlineData("declined", RejectionCodes.DuelNotPending)]
-    [InlineData("withdrawn", RejectionCodes.DuelNotPending)]
-    [InlineData("expired", RejectionCodes.DuelExpired)]
+    [InlineData("unknown", RejectionCodes.InteractionUnknown)]
+    [InlineData("challenger", RejectionCodes.InteractionNotYours)]
+    [InlineData("third", RejectionCodes.InteractionNotYours)]
+    [InlineData("answered", RejectionCodes.InteractionNotPending)]
+    [InlineData("declined", RejectionCodes.InteractionNotPending)]
+    [InlineData("withdrawn", RejectionCodes.InteractionNotPending)]
+    [InlineData("expired", RejectionCodes.InteractionNotPending)]
     public void An_answer_is_refused_when_it_is_not_the_opponents_or_the_challenge_does_not_wait(string what, string code)
     {
         var s = DuelScenario.New();
@@ -243,9 +294,9 @@ public class DuelTests
         var duel = s.Challenged("Вася", "Петя");
         s.Advance(TimeSpan.FromHours(DuelScenario.InviteTtlHours) + TimeSpan.FromMinutes(5));
 
-        ScenarioAssert.RejectsWithoutChanges(s, x => x.Answer("Петя", duel, accept: false), RejectionCodes.DuelExpired);
+        ScenarioAssert.RejectsWithoutChanges(s, x => x.Answer("Петя", duel, accept: false), RejectionCodes.InteractionNotPending);
 
-        Assert.Equal(DuelStatus.Pending, s.Duel(duel).Status);
+        Assert.Equal(InteractionStatus.Pending, s.Invitation(duel).Status);
     }
 
     [Fact]
@@ -262,11 +313,11 @@ public class DuelTests
     }
 
     [Theory]
-    [InlineData("opponent", RejectionCodes.DuelNotYours)]
-    [InlineData("third", RejectionCodes.DuelNotYours)]
-    [InlineData("accepted", RejectionCodes.DuelNotPending)]
-    [InlineData("twice", RejectionCodes.DuelNotPending)]
-    [InlineData("unknown", RejectionCodes.DuelUnknown)]
+    [InlineData("opponent", RejectionCodes.InteractionNotYours)]
+    [InlineData("third", RejectionCodes.InteractionNotYours)]
+    [InlineData("accepted", RejectionCodes.InteractionNotPending)]
+    [InlineData("twice", RejectionCodes.InteractionNotPending)]
+    [InlineData("unknown", RejectionCodes.InteractionUnknown)]
     public void Only_the_challenger_withdraws_and_only_a_waiting_challenge(string what, string code)
     {
         var s = DuelScenario.New();
@@ -297,7 +348,8 @@ public class DuelTests
 
         Assert.False(s.Last.IsAccepted);
         Assert.Contains(s.Last.Rejection!.Code, new[] { RejectionCodes.DuelTooMany, RejectionCodes.DuelOpponentBusy });
-        Assert.Equal(DuelStatus.Pending, s.Duel(waiting).Status);
+        Assert.Equal(InteractionStatus.Pending, s.Invitation(waiting).Status);
+        Assert.False(s.State.Duels.ContainsKey(waiting));
     }
 
     [Fact]
@@ -320,7 +372,7 @@ public class DuelTests
         var duel = s.Challenged("Вася", "Петя");
         s.Act(new SetPlayerInactive(s.PlayerId("Вася"), true));
 
-        ScenarioAssert.RejectsWithoutChanges(s, x => x.Answer("Петя", duel, accept: true), RejectionCodes.DuelNotPending);
+        ScenarioAssert.RejectsWithoutChanges(s, x => x.Answer("Петя", duel, accept: true), RejectionCodes.InteractionNotPending);
     }
 
     // ---- The race: whoever first completes a run that counts (D-525, EV30) ----
@@ -410,6 +462,7 @@ public class DuelTests
     {
         var s = DuelScenario.New();
         s.RollTitle("Петя", "Doom 3");
+        s.Advance(TimeSpan.FromHours(1)); // a roll at the very moment of the accept counts (at/after it)
         var duel = s.StartDuel("Вася", "Петя");
         s.Advance(TimeSpan.FromHours(1));
         s.Start("Петя");
@@ -652,6 +705,7 @@ public class DuelTests
         Assert.False(s.Last.IsAccepted);
         Assert.Contains(s.Last.Rejection!.Code, new[] { RejectionCodes.SeasonDeadlinePassed, RejectionCodes.SeasonNotActive });
         Assert.Empty(s.State.Duels);
+        Assert.Empty(s.State.Interactions);
     }
 
     // ---- The flag (D-420, D-730) ----
@@ -700,7 +754,7 @@ public class DuelTests
         s.Act(new ChangeRuleset(Off(s)));
 
         ScenarioAssert.Accepted(s);
-        Assert.Null(DuelTimers.Next(s.State, s.PlayerId("Вася")));
+        Assert.Null(s.NextTimer("Вася"));
         ScenarioAssert.RejectsWithoutChanges(s, x => x.Challenge("Вася", "Маша"), RejectionCodes.FeatureDisabled);
     }
 
@@ -716,7 +770,7 @@ public class DuelTests
         Assert.Equal(
             (10, 7, 1, true, 14, 5, true),
             (duels.RewardCoins, duels.DurationDays, duels.MaxOpenPerPlayer, duels.CountRunsStartedAfterAccept, duels.SamePairCooldownDays, duels.MaxWinsPerSeason, duels.DropForfeits));
-        Assert.Equal(24, rules.Interactions.InviteTtlHours);
+        Assert.Equal((24, (int?)3), (rules.Interactions.InviteTtlHours, rules.Interactions.MaxOpenInvitesPerPlayer));
     }
 
     [Fact]
@@ -731,6 +785,15 @@ public class DuelTests
         var rules = TestRuleset.Create() with { Features = TestRuleset.Create().Features with { Duels = true }, Duels = null };
 
         Assert.Contains(RulesetValidator.Validate(rules), e => e.Path == "duels");
+    }
+
+    [Fact]
+    public void The_flag_without_the_limit_of_invitations_is_invalid()
+    {
+        var rules = TestRuleset.Create().WithDuels();
+        rules = rules with { Interactions = rules.Interactions with { MaxOpenInvitesPerPlayer = null } };
+
+        Assert.Contains(RulesetValidator.Validate(rules), e => e.Path.StartsWith("interactions", StringComparison.Ordinal));
     }
 
     public static TheoryData<string, Func<DuelRules, DuelRules>, string> OutOfRange() => new()

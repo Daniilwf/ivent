@@ -51,6 +51,12 @@
         },
         "suggestions": {
           "type": "boolean"
+        },
+        "coop": {
+          "type": "boolean"
+        },
+        "duels": {
+          "type": "boolean"
         }
       },
       "required": [
@@ -358,6 +364,12 @@
               "enum": [
                 "roller"
               ]
+            },
+            "coinsShare": {
+              "type": [
+                "number",
+                "null"
+              ]
             }
           },
           "required": [
@@ -615,6 +627,12 @@
       "properties": {
         "inviteTtlHours": {
           "type": "integer"
+        },
+        "maxOpenInvitesPerPlayer": {
+          "type": [
+            "integer",
+            "null"
+          ]
         }
       },
       "required": [
@@ -816,6 +834,45 @@
       },
       "required": [
         "perDay"
+      ],
+      "additionalProperties": false
+    },
+    "duels": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "properties": {
+        "rewardCoins": {
+          "type": "integer"
+        },
+        "durationDays": {
+          "type": "integer"
+        },
+        "maxOpenPerPlayer": {
+          "type": "integer"
+        },
+        "countRunsStartedAfterAccept": {
+          "type": "boolean"
+        },
+        "samePairCooldownDays": {
+          "type": "integer"
+        },
+        "maxWinsPerSeason": {
+          "type": "integer"
+        },
+        "dropForfeits": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "rewardCoins",
+        "durationDays",
+        "maxOpenPerPlayer",
+        "countRunsStartedAfterAccept",
+        "samePairCooldownDays",
+        "maxWinsPerSeason",
+        "dropForfeits"
       ],
       "additionalProperties": false
     }

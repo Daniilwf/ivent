@@ -292,9 +292,16 @@
 | Приглашение в кооп | предложение стать напарником в своём прохождении | `InteractionKind.Coop`, команда `InviteToCoop`, события `InteractionCreated`, `InteractionAnswered`, `InteractionExpired` |
 | Ответ на приглашение | принять или отклонить; без ответа за N часов приглашение сгорает | команда `AnswerInvitation`, `InteractionStatus` (`Pending`, `Accepted`, `Declined`, `Withdrawn`, `Expired`) |
 | Выйти из коопа | напарник покидает кооп-прохождение без штрафа (D-522) | команда `LeaveCoop`, событие `CoopLeft` |
-| Деление кооп-награды | доли очков, шагов и монеток роллившего и напарника | событие `CoopRewardSplit`, `reward.coop` |
-| Дуэль | гонка двух игроков до первого завершения прохождения за награду от системы (D-525) | `InteractionKind.Duel`, команда `ChallengeToDuel`, событие `DuelSettled` |
-| Вызов на дуэль | приглашение на дуэль | `InteractionKind.Duel` |
+| Отозвать приглашение | приглашающий закрывает своё открытое приглашение (D-523) | команда `WithdrawInvitation`, событие `InteractionWithdrawn` |
+| Сгорание приглашения | приглашение закрыто без ответа: срок, дедлайн, конец прохождения или принято другое (D-523, D-712) | событие `InteractionExpired`, `InteractionExpiry` (`Timeout`, `Deadline`, `RunEnded`, `Superseded`; у вызова на дуэль ещё `Inactive`, `FirstFinisher`, D-734) |
+| Конец коопа | напарник вне кооп-прохождения до завершения: вышел, дроп или тех-реролл роллившего, неактивен, кто-то стал первым (D-522, D-713) | `CoopLeaveReason` (`Left`, `RollerDropped`, `RollerTechRerolled`, `PartnerInactive`, `RollerFirst`, `PartnerFirst`) |
+| Сторона кооп-прохождения | учёт хода каждого из двоих: клетки, финиш, бонус клетки, доля (D-711) | `RunState.Coop` (`CoopPartner`), `RunState.Side` |
+| Деление кооп-награды | доли очков, шагов и монеток роллившего и напарника | событие `CoopRewardSplit`, `reward.coop` (`pointsShare`, `coinsShare`) |
+| Дуэль | гонка двух игроков до первого завершения прохождения за награду от системы (D-525) | `Duel`, `SeasonState.Duels`, `DuelStatus` (`Active`, `Won`, `Drawn`, `Cancelled`), события `DuelStarted`, `DuelSettled`, `DuelWinRevoked` |
+| Вызов на дуэль | приглашение на дуэль: ответ и отзыв — как у любого приглашения (D-718, D-730) | `InteractionKind.Duel`, команда `ChallengeToDuel` |
+| Итог дуэли | победа, ничья или отмена и почему (D-525, D-733) | `DuelEnd` (`Completed`, `Forfeit`, `TimeOut`, `Deadline`, `WinRejected`, `TechReroll`, `Inactive`, `FirstFinisher`) |
+| Свежее прохождение дуэли | прохождение, которое может выиграть дуэль: выпало не раньше принятия и не игралось в момент принятия (D-731) | `Duel.RunsAtAcceptance`, `duels.countRunsStartedAfterAccept` |
+| Поражение дропом | дроп свежего прохождения отдаёт дуэль сопернику (D-525) | `DuelEnd.Forfeit`, `duels.dropForfeits` |
 | Отклик на запрос напарника | заявка на чужой запрос доски; создаёт приглашение, которое принимает автор | команда `RespondToPartnerRequest`, события `PartnerRequestPosted`, `PartnerRequestClosed` |
 | Выполнить челлендж недели | пройти игру по условию челленджа в его окне; одна награда на игрока | команды `SetWeeklyChallenge`, `MarkWeeklyChallenge`, события `WeeklyChallengeSet`, `WeeklyChallengeCompleted`, `WeeklyChallengeRevoked` |
 | Модерация предложки | админ одобряет или отклоняет предложение | команды `SubmitSuggestion`, `ReviewSuggestion`, `SuggestionStatus` (`Pending`, `Approved`, `Rejected`) |

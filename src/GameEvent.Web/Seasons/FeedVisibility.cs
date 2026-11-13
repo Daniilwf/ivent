@@ -130,6 +130,20 @@ public static class FeedVisibility
         ["weekly-challenge-completed"] = Access.Public,
         ["weekly-challenge-revoked"] = Access.Public,
 
+        // Coop and its invitations (D-520…D-523): who plays with whom is part of the race
+        ["interaction-created"] = Access.Public,
+        ["interaction-answered"] = Access.Public,
+        ["interaction-withdrawn"] = Access.Public,
+        ["interaction-expired"] = Access.Public,
+        ["coop-joined"] = Access.Public,
+        ["coop-left"] = Access.Public,
+        ["coop-reward-split"] = Access.Public,
+
+        // Duels (D-525): the race, its end and a win taken back by a reject are public, like a bet's
+        ["duel-started"] = Access.Public,
+        ["duel-settled"] = Access.Public,
+        ["duel-win-revoked"] = Access.Public,
+
         // The suggestion box (D-527) is the admin's moderation queue, not a move of the season: its own screen shows it (5.19)
         ["suggestion-submitted"] = Access.NotInFeed,
         ["suggestion-reviewed"] = Access.NotInFeed,

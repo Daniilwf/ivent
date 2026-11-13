@@ -1,4 +1,5 @@
 using GameEvent.Engine.Duels;
+using GameEvent.Engine.Interactions;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Proofs;
 using GameEvent.Engine.Runs;
@@ -20,6 +21,7 @@ public class DuelUndoTests
         ScenarioAssert.Accepted(s);
         var replayed = SeasonEngine.Replay(s.EffectiveLog);
         Assert.Equal(replayed.Duels, s.State.Duels);
+        Assert.Equal(replayed.Interactions, s.State.Interactions);
         Assert.Equal(replayed.Players.Values.Select(p => p.Coins), s.State.Players.Values.Select(p => p.Coins));
     }
 
@@ -83,13 +85,14 @@ public class DuelUndoTests
     {
         var s = DuelScenario.New();
         var duel = s.Challenged("Вася", "Петя");
-        var waiting = s.Duel(duel);
+        var waiting = s.Invitation(duel);
         s.Accepted("Петя", duel);
 
         s.Act(new UndoCommand(s.LastCommandId, "Нажал не то"));
 
         AssertAsTheLogWithout(s);
-        Assert.Equal(waiting, s.Duel(duel));
+        Assert.Equal(waiting, s.Invitation(duel));
+        Assert.False(s.State.Duels.ContainsKey(duel));
     }
 
     [Fact]
@@ -113,7 +116,8 @@ public class DuelUndoTests
         AssertAsTheLogWithout(s);
         s.Act(new UndoCommand(accepted, "Нажал не то"));
         AssertAsTheLogWithout(s);
-        Assert.Equal(DuelStatus.Pending, s.Duel(duel).Status);
+        Assert.Equal(InteractionStatus.Pending, s.Invitation(duel).Status);
+        Assert.False(s.State.Duels.ContainsKey(duel));
     }
 
     [Fact]
@@ -125,7 +129,8 @@ public class DuelUndoTests
         s.Act(new UndoCommand(s.LastCommandId, "Вызвал не того"));
 
         AssertAsTheLogWithout(s);
-        Assert.False(s.State.Duels.ContainsKey(duel));
+        Assert.False(s.State.Interactions.ContainsKey(duel));
+        Assert.Empty(s.State.Duels);
         s.Challenge("Вася", "Маша");
         ScenarioAssert.Accepted(s);
     }

@@ -29,7 +29,7 @@ public sealed record SeasonFields(SeasonStatus Status, DateTimeOffset? Deadline,
 /// effects, weekly challenges, suggestions and duels it changed, those it created are removed, the season's fields if it changed
 /// them. Nothing later touched them (that is when an undo is allowed), so this equals its events inverted in reverse order.
 /// The counters of finishes and points changes are not wound back: numbers are never reused. Challenges and suggestions are
-/// written only when set: an undo of a command that touched none of them keeps its format (D-576).
+/// written only when set: an undo of a command that touched none of them keeps its format (D-576); so are invitations (D-523).
 /// </summary>
 [EventType("command-undone")]
 public sealed record CommandUndone(
@@ -55,6 +55,11 @@ public sealed record CommandUndone(
     [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     EquatableArray<Guid>? RemovedForAll = null,
     [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    EquatableArray<Interactions.Interaction>? Interactions = null,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    EquatableArray<Guid>? RemovedInteractions = null,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+
     EquatableArray<Duels.Duel>? Duels = null,
     [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     EquatableArray<Guid>? RemovedDuels = null) : IGameEvent;
@@ -206,6 +211,8 @@ internal static class Undoing
         var suggestions = state.Suggestions.RemoveRange(e.RemovedSuggestions ?? [])
             .SetItems((e.Suggestions ?? []).Select(x => KeyValuePair.Create(x.SuggestionId, x)));
         var forAll = state.ForAll.RemoveRange(e.RemovedForAll ?? []).SetItems((e.ForAll ?? []).Select(x => KeyValuePair.Create(x.SettlementId, x)));
+        var interactions = state.Interactions.RemoveRange(e.RemovedInteractions ?? [])
+            .SetItems((e.Interactions ?? []).Select(x => KeyValuePair.Create(x.InteractionId, x)));
         var duels = state.Duels.RemoveRange(e.RemovedDuels ?? []).SetItems((e.Duels ?? []).Select(x => KeyValuePair.Create(x.DuelId, x)));
         var restored = state with
         {
@@ -215,6 +222,7 @@ internal static class Undoing
             WeeklyChallenges = challenges,
             Suggestions = suggestions,
             ForAll = forAll,
+            Interactions = interactions,
             Duels = duels,
         };
         if (e.Season is not { } season)
@@ -285,6 +293,12 @@ internal static class Undoing
             {
                 keys.Add($"game:{run.GameId}");
                 keys.Add($"player:{run.PlayerId}");
+
+                // A coop run is its partner's too (D-520): his later commands hold it
+                if (run.PartnerId is { } partner)
+                {
+                    keys.Add($"player:{partner}");
+                }
                 if (before.Players.GetValueOrDefault(run.PlayerId)?.Finish is not null || after.Players.GetValueOrDefault(run.PlayerId)?.Finish is not null)
                 {
                     keys.Add(FinishKey);
@@ -321,6 +335,16 @@ internal static class Undoing
         foreach (var id in Changed(before.ForAll, after.ForAll))
         {
             keys.Add($"forAll:{id}");
+        }
+
+        // An invitation names the run it invites to: an undo of that run's start or roll waits for it (D-523)
+        foreach (var id in Changed(before.Interactions, after.Interactions))
+        {
+            keys.Add($"interaction:{id}");
+            if ((after.Interactions.GetValueOrDefault(id) ?? before.Interactions.GetValueOrDefault(id))?.RunId is { } invitedTo)
+            {
+                keys.Add($"run:{invitedTo}");
+            }
         }
 
         // A duel: its challenge, answer and end — a completion that won it waits for nothing else of it (D-525 (8), D-730)
@@ -410,6 +434,7 @@ internal static class Undoing
         var challenges = Changed(before.WeeklyChallenges, after.WeeklyChallenges).ToList();
         var suggestions = Changed(before.Suggestions, after.Suggestions).ToList();
         var forAll = Changed(before.ForAll, after.ForAll).ToList();
+        var interactions = Changed(before.Interactions, after.Interactions).ToList();
         var duels = Changed(before.Duels, after.Duels).ToList();
         var seasonChanged = before.Status != after.Status || before.Deadline != after.Deadline || before.Name != after.Name
             || before.Ruleset != after.Ruleset;
@@ -434,6 +459,8 @@ internal static class Undoing
             // An undone batch puts its settlement back halted: the queue does not settle it again, its cause is undone next (D-701)
             OrNull([.. forAll.Where(before.ForAll.ContainsKey).Select(id => before.ForAll[id] with { Halted = true })]),
             OrNull([.. forAll.Where(id => !before.ForAll.ContainsKey(id) && now.ForAll.ContainsKey(id))]),
+            OrNull([.. interactions.Where(before.Interactions.ContainsKey).Select(id => before.Interactions[id])]),
+            OrNull([.. interactions.Where(id => !before.Interactions.ContainsKey(id) && now.Interactions.ContainsKey(id))]),
             OrNull([.. duels.Where(before.Duels.ContainsKey).Select(id => before.Duels[id])]),
             OrNull([.. duels.Where(id => !before.Duels.ContainsKey(id) && now.Duels.ContainsKey(id))]));
     }

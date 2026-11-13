@@ -1,5 +1,6 @@
 using GameEvent.Engine.Duels;
 using GameEvent.Engine.Finish;
+using GameEvent.Engine.Interactions;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Scoring;
 using GameEvent.Engine.Tests.Support;
@@ -42,11 +43,12 @@ public class FirstFinisherDuelTests
         Assert.Equal(s.PlayerId("Вася"), FinishLine.First(s.State));
         var now = s.Clock.UtcNow;
         Assert.Equal(
-            new[] { new DuelExpired(incoming, DuelExpiry.FirstFinisher, now), new DuelExpired(sent, DuelExpiry.FirstFinisher, now) }.OrderBy(e => e.DuelId),
-            s.LastEvents<DuelExpired>().OrderBy(e => e.DuelId));
+            new[] { new InteractionExpired(incoming, InteractionExpiry.FirstFinisher, now), new InteractionExpired(sent, InteractionExpiry.FirstFinisher, now) }.OrderBy(e => e.InteractionId),
+            s.LastEvents<InteractionExpired>().OrderBy(e => e.InteractionId));
         Assert.Equal(new DuelSettled(race, DuelStatus.Cancelled, DuelEnd.FirstFinisher, null, null, 0, now), Assert.Single(s.LastEvents<DuelSettled>()));
         Assert.Empty(s.DuelCoins());
-        Assert.DoesNotContain(s.State.Duels.Values, d => d.IsOpen);
+        Assert.DoesNotContain(s.State.Duels.Values, d => d.Status == DuelStatus.Active);
+        Assert.DoesNotContain(s.State.Interactions.Values, i => i.Status == InteractionStatus.Pending);
         Assert.Equal(s.State, Engine.Seasons.SeasonEngine.Replay(s.Log));
     }
 

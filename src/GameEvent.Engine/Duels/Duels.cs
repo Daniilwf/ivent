@@ -2,25 +2,14 @@ using GameEvent.Engine.Kernel;
 
 namespace GameEvent.Engine.Duels;
 
-// Duels (SPEC «Добровольные взаимодействия», D-523, D-525, the expert panel, D-540, D-730…D-739). A duel's invitation
-// lives here on its own until task 5.10's Interaction lands: D-730 says how the two are joined.
+// Duels (SPEC «Добровольные взаимодействия», D-523, D-525, the expert panel, D-540, D-730…D-739). The challenge is an
+// invitation of kind Duel (Interactions, D-718): sent by ChallengeToDuel, answered by AnswerInvitation, withdrawn by
+// WithdrawInvitation, burned by the invitations' timer. Its accept starts the race, which lives here.
 
-/// <summary>Where a duel stands: a challenge waiting for its answer, closed without a duel, a race going on, or its end.</summary>
+/// <summary>Where an accepted duel stands: the race goes on, or how it ended.</summary>
 public enum DuelStatus
 {
-    /// <summary>The challenge waits for the opponent's answer until <see cref="Duel.ExpiresAt"/>.</summary>
-    Pending,
-
-    /// <summary>The opponent declined the challenge.</summary>
-    Declined,
-
-    /// <summary>The challenger took the challenge back.</summary>
-    Withdrawn,
-
-    /// <summary>The challenge closed without an answer (<see cref="DuelExpiry"/>).</summary>
-    Expired,
-
-    /// <summary>Accepted: the race goes on until <see cref="Duel.ExpiresAt"/>.</summary>
+    /// <summary>The race goes on until <see cref="Duel.ExpiresAt"/>.</summary>
     Active,
 
     /// <summary>Won by <see cref="Duel.WinnerId"/>.</summary>
@@ -31,22 +20,6 @@ public enum DuelStatus
 
     /// <summary>Called off without a payout: nobody's fault (a tech reroll), or a player left the race (inactive, the first finisher).</summary>
     Cancelled,
-}
-
-/// <summary>Why a challenge closed without an answer.</summary>
-public enum DuelExpiry
-{
-    /// <summary><c>interactions.inviteTtlHours</c> passed (the timer).</summary>
-    Timeout,
-
-    /// <summary>The season's deadline came (D-516).</summary>
-    Deadline,
-
-    /// <summary>One of the two was marked inactive.</summary>
-    Inactive,
-
-    /// <summary>One of the two became the first finisher, who plays out of the race (D-510).</summary>
-    FirstFinisher,
 }
 
 /// <summary>How an accepted duel ended.</summary>
@@ -78,21 +51,20 @@ public enum DuelEnd
 }
 
 /// <summary>
-/// A duel between <see cref="ChallengerId"/> and <see cref="OpponentId"/> (D-525). <see cref="ExpiresAt"/> holds the
-/// challenge's time first (<c>interactions.inviteTtlHours</c>), then the race's end (<see cref="AcceptedAt"/> +
-/// <c>duels.durationDays</c>), as the expert panel says. <see cref="RunsAtAcceptance"/> — the runs the two were playing when
-/// the duel was accepted: they never count (D-731). A won duel holds the winner, the winning run (none for a forfeit) and
-/// the coins it paid; <see cref="EndedAt"/> starts the pair's cooldown.
+/// An accepted duel between <see cref="ChallengerId"/> and <see cref="OpponentId"/> (D-525); its id is the id of the
+/// challenge it was accepted from. <see cref="ExpiresAt"/> — the race's end (<see cref="AcceptedAt"/> +
+/// <c>duels.durationDays</c>): the challenge's own time is the invitation's. <see cref="RunsAtAcceptance"/> — the runs the
+/// two were playing when the duel was accepted: they never count (D-731). A won duel holds the winner, the winning run
+/// (none for a forfeit) and the coins it paid; <see cref="EndedAt"/> starts the pair's cooldown.
 /// </summary>
 public sealed record Duel(
     Guid DuelId,
     Guid ChallengerId,
     Guid OpponentId,
-    DateTimeOffset CreatedAt,
+    DateTimeOffset AcceptedAt,
     DateTimeOffset ExpiresAt,
-    DuelStatus Status = DuelStatus.Pending,
-    DateTimeOffset? AcceptedAt = null,
-    EquatableArray<Guid> RunsAtAcceptance = default,
+    EquatableArray<Guid> RunsAtAcceptance,
+    DuelStatus Status = DuelStatus.Active,
     Guid? WinnerId = null,
     Guid? RunId = null,
     int Coins = 0,
@@ -103,43 +75,22 @@ public sealed record Duel(
 
     /// <summary>The other player of the duel.</summary>
     public Guid Other(Guid playerId) => playerId == ChallengerId ? OpponentId : ChallengerId;
-
-    /// <summary>A challenge waiting or a race going on.</summary>
-    [System.Text.Json.Serialization.JsonIgnore]
-    public bool IsOpen => Status is DuelStatus.Pending or DuelStatus.Active;
 }
 
 /// <summary>
-/// <see cref="PlayerId"/> challenges <see cref="OpponentId"/> to a duel (D-525): whoever of the two first completes a run
-/// that counts within <c>duels.durationDays</c> of the acceptance wins <c>duels.rewardCoins</c> from the system.
+/// <see cref="PlayerId"/> challenges <see cref="OpponentId"/> to a duel (D-525): an invitation of kind Duel. Whoever of
+/// the two first completes a run that counts within <c>duels.durationDays</c> of the acceptance wins
+/// <c>duels.rewardCoins</c> from the system.
 /// </summary>
 public sealed record ChallengeToDuel(Guid PlayerId, Guid OpponentId) : ICommand;
 
-/// <summary>The challenged player accepts or declines (D-523); an accept checks everything again now.</summary>
-public sealed record AnswerDuel(Guid PlayerId, Guid DuelId, bool Accept) : ICommand;
-
-/// <summary>The challenger takes back his challenge while it waits (D-523).</summary>
-public sealed record WithdrawDuel(Guid PlayerId, Guid DuelId) : ICommand;
-
-/// <summary>A challenge was sent.</summary>
-[EventType("duel-challenged")]
-public sealed record DuelChallenged(Duel Duel) : IGameEvent;
-
 /// <summary>
-/// The challenged player answered. An accept starts the race: it ends at <see cref="ExpiresAt"/>, and the runs the two
-/// were playing then (<see cref="RunsAtAcceptance"/>) never count (D-731). A decline has neither.
+/// The challenge <see cref="DuelId"/> was accepted (it follows its <c>interaction-answered</c>): the race ends at
+/// <see cref="ExpiresAt"/>, and the runs the two were playing then (<see cref="RunsAtAcceptance"/>) never count (D-731).
 /// </summary>
-[EventType("duel-answered")]
-public sealed record DuelAnswered(
-    Guid DuelId, bool Accepted, DateTimeOffset AnsweredAt, DateTimeOffset? ExpiresAt, EquatableArray<Guid> RunsAtAcceptance) : IGameEvent;
-
-/// <summary>The challenger took his challenge back.</summary>
-[EventType("duel-withdrawn")]
-public sealed record DuelWithdrawn(Guid DuelId, DateTimeOffset WithdrawnAt) : IGameEvent;
-
-/// <summary>A challenge closed without an answer, for <see cref="Reason"/>.</summary>
-[EventType("duel-expired")]
-public sealed record DuelExpired(Guid DuelId, DuelExpiry Reason, DateTimeOffset ExpiredAt) : IGameEvent;
+[EventType("duel-started")]
+public sealed record DuelStarted(
+    Guid DuelId, Guid ChallengerId, Guid OpponentId, DateTimeOffset AcceptedAt, DateTimeOffset ExpiresAt, EquatableArray<Guid> RunsAtAcceptance) : IGameEvent;
 
 /// <summary>
 /// An accepted duel ended (D-525): <see cref="Status"/> won, drawn or cancelled, for <see cref="End"/>. A win names the

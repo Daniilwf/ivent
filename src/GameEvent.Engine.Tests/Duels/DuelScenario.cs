@@ -1,4 +1,5 @@
 using GameEvent.Engine.Duels;
+using GameEvent.Engine.Interactions;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Rulesets;
 using GameEvent.Engine.Runs;
@@ -8,10 +9,12 @@ using GameEvent.Engine.Tests.Support;
 namespace GameEvent.Engine.Tests.Duels;
 
 /// <summary>
-/// Duels in scenarios (task 5.12, D-525, D-540): the flag on with the expert panel's numbers (10 coins, 7 days, one open
-/// duel, only runs rolled after the acceptance, a 14-day cooldown of the pair, 5 wins a season, a drop forfeits), a pool of
-/// 6-hour horror games and Вася, Петя, Маша and Коля. A challenge waits <c>interactions.inviteTtlHours</c> (24 on the test
-/// ruleset). A completion of a 6-hour game throws 2d4: dice 1, 1 move 2 cells.
+/// Duels in scenarios (task 5.12, D-525, D-540, D-718): the flag on with the expert panel's numbers (10 coins, 7 days, one
+/// open duel, only runs rolled after the acceptance, a 14-day cooldown of the pair, 5 wins a season, a drop forfeits), a
+/// pool of 6-hour horror games and Вася, Петя, Маша and Коля. A challenge is an invitation of kind
+/// <see cref="InteractionKind.Duel"/>: it waits <c>interactions.inviteTtlHours</c> (24) and counts in
+/// <c>interactions.maxOpenInvitesPerPlayer</c> (3); its accept starts the duel under the same id. A completion of a 6-hour
+/// game throws 2d4: dice 1, 1 move 2 cells.
 /// </summary>
 internal static class DuelScenario
 {
@@ -19,9 +22,10 @@ internal static class DuelScenario
     public const int DurationDays = 7;
     public const int CooldownDays = 14;
     public const int InviteTtlHours = 24;
+    public const int MaxOpenInvites = 3;
 
     /// <summary>The ruleset with <c>features.duels</c> on and the duel rules of the expert panel (D-540).</summary>
-    public static Ruleset WithDuels(this Ruleset ruleset, Func<DuelRules, DuelRules>? change = null)
+    public static Ruleset WithDuels(this Ruleset ruleset, Func<DuelRules, DuelRules>? change = null, int maxOpenInvites = MaxOpenInvites)
     {
         ArgumentNullException.ThrowIfNull(ruleset);
         var duels = new DuelRules
@@ -38,13 +42,14 @@ internal static class DuelScenario
         {
             Features = ruleset.Features with { Duels = true },
             Duels = change is null ? duels : change(duels),
-            Interactions = ruleset.Interactions with { InviteTtlHours = InviteTtlHours },
+            Interactions = ruleset.Interactions with { InviteTtlHours = InviteTtlHours, MaxOpenInvitesPerPlayer = maxOpenInvites },
         };
     }
 
-    public static Scenario New(Func<DuelRules, DuelRules>? duels = null, Func<Ruleset, Ruleset>? more = null, int mapLength = 60, int seed = 42)
+    public static Scenario New(
+        Func<DuelRules, DuelRules>? duels = null, Func<Ruleset, Ruleset>? more = null, int mapLength = 60, int seed = 42, int maxOpenInvites = MaxOpenInvites)
     {
-        var rules = TestRuleset.Create().WithDuels(duels);
+        var rules = TestRuleset.Create().WithDuels(duels, maxOpenInvites);
         if (more is not null)
         {
             rules = more(rules);
@@ -70,27 +75,27 @@ internal static class DuelScenario
         return s.Act(new ChallengeToDuel(s.PlayerId(player), s.PlayerId(opponent)));
     }
 
-    /// <summary>The player challenges the opponent; the challenge must be accepted. Returns the duel's id.</summary>
+    /// <summary>The player challenges the opponent; the challenge must be accepted. Returns the invitation's id (the duel's id once accepted).</summary>
     public static Guid Challenged(this Scenario s, string player, string opponent)
     {
         ArgumentNullException.ThrowIfNull(s);
         s.Challenge(player, opponent);
         return s.Last.IsAccepted
-            ? Assert.Single(s.LastEvents<DuelChallenged>()).Duel.DuelId
+            ? Assert.Single(s.LastEvents<InteractionCreated>()).Interaction.InteractionId
             : throw new InvalidOperationException($"The challenge {player} → {opponent} was rejected: {s.Last.Rejection}");
     }
 
-    public static Scenario Answer(this Scenario s, string player, Guid duel, bool accept)
+    public static Scenario Answer(this Scenario s, string player, Guid challenge, bool accept)
     {
         ArgumentNullException.ThrowIfNull(s);
-        return s.Act(new AnswerDuel(s.PlayerId(player), duel, accept));
+        return s.Act(new AnswerInvitation(s.PlayerId(player), challenge, accept));
     }
 
-    /// <summary>The opponent accepts the duel; the answer must be accepted by the engine.</summary>
-    public static Scenario Accepted(this Scenario s, string player, Guid duel)
+    /// <summary>The opponent accepts the challenge; the answer must be accepted by the engine.</summary>
+    public static Scenario Accepted(this Scenario s, string player, Guid challenge)
     {
         ArgumentNullException.ThrowIfNull(s);
-        s.Answer(player, duel, accept: true);
+        s.Answer(player, challenge, accept: true);
         return s.Last.IsAccepted
             ? s
             : throw new InvalidOperationException($"{player} accepting the duel was rejected: {s.Last.Rejection}");
@@ -104,16 +109,30 @@ internal static class DuelScenario
         return duel;
     }
 
-    public static Scenario Withdraw(this Scenario s, string player, Guid duel)
+    public static Scenario Withdraw(this Scenario s, string player, Guid challenge)
     {
         ArgumentNullException.ThrowIfNull(s);
-        return s.Act(new WithdrawDuel(s.PlayerId(player), duel));
+        return s.Act(new WithdrawInvitation(s.PlayerId(player), challenge));
     }
 
     public static Duel Duel(this Scenario s, Guid duel)
     {
         ArgumentNullException.ThrowIfNull(s);
         return s.State.Duels[duel];
+    }
+
+    /// <summary>The challenge as an invitation.</summary>
+    public static Interaction Invitation(this Scenario s, Guid challenge)
+    {
+        ArgumentNullException.ThrowIfNull(s);
+        return s.State.Interactions[challenge];
+    }
+
+    /// <summary>The next due moment of the player's timers (his invitations and the duels he challenged to among them).</summary>
+    public static DateTimeOffset? NextTimer(this Scenario s, string player)
+    {
+        ArgumentNullException.ThrowIfNull(s);
+        return Engine.Economy.Timers.Next(s.State, s.Player(player));
     }
 
     /// <summary>The player rolls <paramref name="title"/> and starts it; returns the run.</summary>
@@ -142,17 +161,20 @@ internal static class DuelScenario
         return run;
     }
 
-    /// <summary>The coins the duels paid the player in the last command (their own changes, <see cref="CoinsReason.Duel"/>).</summary>
+    /// <summary>The coins the duels paid or took back in the last command (their own changes).</summary>
     public static IReadOnlyList<CoinsChanged> DuelCoins(this Scenario s)
     {
         ArgumentNullException.ThrowIfNull(s);
         return [.. s.LastEvents<CoinsChanged>().Where(c => c.Reason is CoinsReason.Duel or CoinsReason.DuelRevoked)];
     }
 
-    /// <summary>Every duel event of the last command.</summary>
+    /// <summary>Every duel event of the last command, the invitations' events included.</summary>
     public static IReadOnlyList<IGameEvent> DuelEvents(this Scenario s)
     {
         ArgumentNullException.ThrowIfNull(s);
-        return [.. s.Last.Events.Where(e => e is DuelChallenged or DuelAnswered or DuelWithdrawn or DuelExpired or DuelSettled or DuelWinRevoked)];
+        return [.. s.Last.Events.Where(IsDuelEvent)];
     }
+
+    public static bool IsDuelEvent(IGameEvent e) =>
+        e is DuelStarted or DuelSettled or DuelWinRevoked or InteractionCreated or InteractionAnswered or InteractionWithdrawn or InteractionExpired;
 }

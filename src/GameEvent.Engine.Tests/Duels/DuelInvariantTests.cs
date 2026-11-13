@@ -2,6 +2,7 @@ using FsCheck.Xunit;
 using GameEvent.Engine.Duels;
 using GameEvent.Engine.Economy;
 using GameEvent.Engine.Finish;
+using GameEvent.Engine.Interactions;
 using GameEvent.Engine.Players;
 using GameEvent.Engine.Proofs;
 using GameEvent.Engine.Rolls;
@@ -17,8 +18,10 @@ namespace GameEvent.Engine.Tests.Duels;
 /// Duels in random games (task 5.12): challenges, answers, withdrawals, rolls, starts, completions, drops, tech rerolls,
 /// rejects, approvals, the timer, a player marked inactive and back, the clock and undos. After every accepted command:
 /// <list type="bullet">
-/// <item>two players have at most one open duel;</item>
-/// <item>a player's open duels (challenges he sent and waiting, and races) are within <c>duels.maxOpenPerPlayer</c>;</item>
+/// <item>two players have at most one open duel (a challenge waiting or a race);</item>
+/// <item>a player's open duels (challenges he sent and waiting, and races) are within <c>duels.maxOpenPerPlayer</c>, his
+/// invitations sent and waiting within <c>interactions.maxOpenInvitesPerPlayer</c>;</item>
+/// <item>every duel was started by an accepted invitation of kind duel under its id;</item>
 /// <item>the first finisher and a player marked inactive have no open duel;</item>
 /// <item>a won duel names one of its two players; a win by completion stands on a completed run of the winner, rolled
 /// after the accept, not one of the runs at acceptance, completed before the race's end;</item>
@@ -60,7 +63,7 @@ public class DuelInvariantTests
                 forfeited += s.LastEvents<DuelSettled>().Count(d => d.End == DuelEnd.Forfeit);
                 drawn += s.LastEvents<DuelSettled>().Count(d => d.Status == DuelStatus.Drawn);
                 revoked += s.LastEvents<DuelWinRevoked>().Count();
-                expired += s.LastEvents<DuelExpired>().Count();
+                expired += s.LastEvents<InteractionExpired>().Count();
             });
         }
 
@@ -82,8 +85,8 @@ public class DuelInvariantTests
             var player = s_players[random.Next(s_players.Length)];
             var other = s_players[random.Next(s_players.Length)];
             var id = s.PlayerId(player);
-            var duels = s.State.Duels.Values.ToList();
-            var duel = duels.Count == 0 ? null : duels[random.Next(duels.Count)];
+            var waiting = s.State.Interactions.Values.Where(i => i.Status == InteractionStatus.Pending).ToList();
+            var challenge = waiting.Count == 0 ? null : waiting[random.Next(waiting.Count)];
             var runs = s.State.Runs.Values.Where(r => r.Status is RunStatus.Completed or RunStatus.Rejected).ToList();
             var run = runs.Count == 0 ? null : runs[random.Next(runs.Count)];
             switch (step % 16)
@@ -92,12 +95,12 @@ public class DuelInvariantTests
                 case 1:
                     s.Act(new ChallengeToDuel(id, s.PlayerId(other)));
                     break;
-                case 2 when duel is not null:
-                case 3 when duel is not null:
-                    s.Act(new AnswerDuel(duel.OpponentId, duel.DuelId, step % 5 != 0));
+                case 2 when challenge is not null:
+                case 3 when challenge is not null:
+                    s.Act(new AnswerInvitation(challenge.ToPlayerId, challenge.InteractionId, step % 5 != 0));
                     break;
-                case 4 when duel is not null:
-                    s.Act(new WithdrawDuel(duel.ChallengerId, duel.DuelId));
+                case 4 when challenge is not null:
+                    s.Act(new WithdrawInvitation(challenge.FromPlayerId, challenge.InteractionId));
                     break;
                 case 5:
                     s.Act(new RollGame(id));
@@ -152,16 +155,24 @@ public class DuelInvariantTests
     private static void Check(Scenario s)
     {
         var rules = s.State.Rules.Duels!;
-        var open = s.State.Duels.Values.Where(d => d.IsOpen).ToList();
+        // Open is what still waits or runs by the clock: an invitation past its time is no longer answered (interaction.notPending)
+        // and a race past its end no longer wins, even before the timer writes it down
+        var now = s.Clock.UtcNow;
+        var waiting = s.State.Interactions.Values.Where(i => i.Kind == InteractionKind.Duel && i.Status == InteractionStatus.Pending && now < i.ExpiresAt).ToList();
+        var races = s.State.Duels.Values.Where(d => d.Status == DuelStatus.Active && now < d.ExpiresAt).ToList();
+        List<(Guid From, Guid To)> open = [.. waiting.Select(i => (i.FromPlayerId, i.ToPlayerId)), .. races.Select(d => (d.ChallengerId, d.OpponentId))];
 
         Assert.Equal(open.Count, open.Select(Pair).Distinct().Count());
         foreach (var player in s.State.Players.Values)
         {
-            var own = open.Count(d => d.Status == DuelStatus.Active ? d.Involves(player.PlayerId) : d.ChallengerId == player.PlayerId);
-            Assert.True(own <= rules.MaxOpenPerPlayer, $"{s.PlayerName(player.PlayerId)} has {own} open duels");
-            if (player.IsInactive || FinishLine.First(s.State) == player.PlayerId)
+            var id = player.PlayerId;
+            var own = waiting.Count(i => i.FromPlayerId == id) + races.Count(d => d.Involves(id));
+            Assert.True(own <= rules.MaxOpenPerPlayer, $"{s.PlayerName(id)} has {own} open duels");
+            var sent = s.State.Interactions.Values.Count(i => i.Status == InteractionStatus.Pending && now < i.ExpiresAt && i.FromPlayerId == id);
+            Assert.True(sent <= s.State.Rules.Interactions.MaxOpenInvitesPerPlayer, $"{s.PlayerName(id)} has {sent} invitations sent");
+            if (player.IsInactive || FinishLine.First(s.State) == id)
             {
-                Assert.DoesNotContain(open, d => d.Involves(player.PlayerId));
+                Assert.DoesNotContain(open, o => o.From == id || o.To == id);
             }
 
             var paying = s.State.Duels.Values.Count(d => d.Status == DuelStatus.Won && d.WinnerId == player.PlayerId && d.Coins > 0);
@@ -179,6 +190,18 @@ public class DuelInvariantTests
         foreach (var duel in s.State.Duels.Values)
         {
             Assert.NotEqual(duel.ChallengerId, duel.OpponentId);
+            var invitation = s.State.Interactions[duel.DuelId];
+            Assert.Equal(
+                (InteractionKind.Duel, InteractionStatus.Accepted, duel.ChallengerId, duel.OpponentId),
+                (invitation.Kind, invitation.Status, invitation.FromPlayerId, invitation.ToPlayerId));
+            if (duel.End == DuelEnd.WinRejected)
+            {
+                // A revoked win keeps its winner and run and pays nothing (D-414)
+                Assert.Equal((DuelStatus.Drawn, 0), (duel.Status, duel.Coins));
+                Assert.Equal(RunStatus.Rejected, s.State.Runs[duel.RunId!.Value].Status);
+                continue;
+            }
+
             if (duel.Status != DuelStatus.Won)
             {
                 Assert.Null(duel.WinnerId);
@@ -193,7 +216,7 @@ public class DuelInvariantTests
                 Assert.Equal(duel.WinnerId, run.PlayerId);
                 Assert.Equal(RunStatus.Completed, run.Status);
                 Assert.DoesNotContain(runId, duel.RunsAtAcceptance);
-                Assert.True(run.RolledAt >= duel.AcceptedAt!.Value, "The winning run was rolled before the accept.");
+                Assert.True(run.RolledAt >= duel.AcceptedAt, "The winning run was rolled before the accept.");
                 Assert.True(run.CompletedAt!.Value < duel.ExpiresAt, "The winning run was completed after the race's end.");
             }
         }
@@ -201,8 +224,8 @@ public class DuelInvariantTests
         Assert.Equal(s.State, SeasonEngine.Replay(s.Log));
     }
 
-    private static (Guid, Guid) Pair(Duel duel) =>
-        duel.ChallengerId.CompareTo(duel.OpponentId) < 0 ? (duel.ChallengerId, duel.OpponentId) : (duel.OpponentId, duel.ChallengerId);
+    private static (Guid, Guid) Pair((Guid From, Guid To) duel) =>
+        duel.From.CompareTo(duel.To) < 0 ? (duel.From, duel.To) : (duel.To, duel.From);
 
     // The coins of each revoked win it did not take back: the win's coins less the revocation's
     private static int Kept(Scenario s, Guid playerId)

@@ -44,7 +44,8 @@ internal static class WeeklyChallengeScenario
             .WithReleasedGame("Resident Evil 2", 6, 1998, "Horror")
             .WithReleasedGame("Thief", 6, 1998, "Horror")
             .WithReleasedGame("Dead Space", 6, 2008, "Horror")
-            .WithReleasedGame("Outlast", 6, 2013, "Horror");
+            .WithReleasedGame("Outlast", 6, 2013, "Horror")
+            .MarkCoop("Silent Hill 3");
         return s.WithPlayers("Вася", "Петя", "Маша");
     }
 

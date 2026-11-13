@@ -15,6 +15,7 @@
     "gallery": false,
     "challenges": false,
     "suggestions": false,
+    "coop": false,
     "duels": false
   },
   "season": {
@@ -50,7 +51,7 @@
     "challengeBonus": { "extraDice": 1 },
     "unmetConditionPolicy": "noDiceKeepCoins",
     "coins": { "perHour": 1, "min": 3 },
-    "coop": { "pointsShare": 0.5, "roundUpFor": "roller" }
+    "coop": { "pointsShare": 0.5, "roundUpFor": "roller", "coinsShare": 0.5 }
   },
   "drop": {
     "penaltyDice": { "count": 2, "sides": 4 },
@@ -91,7 +92,8 @@
     "reflect": { "coinsAtMost": -30, "multiplier": 2 }
   },
   "interactions": {
-    "inviteTtlHours": 24
+    "inviteTtlHours": 24,
+    "maxOpenInvitesPerPlayer": 3
   },
   "bets": {
     "maxStake": 10,

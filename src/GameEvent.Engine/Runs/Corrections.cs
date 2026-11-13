@@ -84,15 +84,22 @@ internal static class Corrections
         var corrected = new RunHoursCorrected(
             run.RunId, run.PlayerId, oldHours, command.Hours, added, removed, command.Comment, context.Clock.UtcNow);
 
-        // By the run's total, so a zone's addition counts once and the total never goes below 0 (D-307)
-        var delta = CompletionRoll.Total(SeasonEngine.Apply(state, corrected).Runs[run.RunId]) - CompletionRoll.Total(run);
-        var coins = Finishes.IsFrozen(state.Players[run.PlayerId]) ? 0 : Coins(run.Snapshot, command.Hours) - Coins(run.Snapshot, oldHours);
-        return Decision.Accept(
-        [
-            corrected,
-            .. Difference(SeasonEngine.Apply(state, corrected), run.RunId, delta),
-            .. coins != 0 ? [new CoinsChanged(run.PlayerId, coins, CoinsReason.RunCorrection, run.RunId)] : Array.Empty<IGameEvent>(),
-        ]);
+        // By the run's total, so a zone's addition counts once and the total never goes below 0 (D-307); a coop run's new
+        // total and coins split again by the shares of its completion (D-521)
+        var events = new List<IGameEvent> { corrected };
+        events.AddRange(Differences(SeasonEngine.Apply(state, corrected), run));
+        foreach (var player in RunShares.Players(run))
+        {
+            var coins = Finishes.IsFrozen(state.Players[player])
+                ? 0
+                : RunShares.Coins(run, player, Coins(run.Snapshot, command.Hours)) - RunShares.Coins(run, player, Coins(run.Snapshot, oldHours));
+            if (coins != 0)
+            {
+                events.Add(new CoinsChanged(player, coins, CoinsReason.RunCorrection, run.RunId));
+            }
+        }
+
+        return Decision.Accept(events);
     }
 
     public static Decision Decide(SeasonState state, ChangeRunDifficulty command, EngineContext context)
@@ -145,8 +152,7 @@ internal static class Corrections
             afterChange = SeasonEngine.Apply(afterChange, check);
         }
 
-        var delta = CompletionRoll.Total(afterChange.Runs[run.RunId]) - CompletionRoll.Total(run);
-        events.AddRange(Difference(afterChange, run.RunId, delta));
+        events.AddRange(Differences(afterChange, run));
         var frozen = Finishes.IsFrozen(state.Players[run.PlayerId]);
 
         // The difficulty's own event follows the change: a pending one of the old difficulty is not applicable (one already
@@ -221,18 +227,39 @@ internal static class Corrections
             : null;
     }
 
+    /// <summary>
+    /// The differences of every player the run gave something to (D-97, D-521): <paramref name="state"/> holds the change of
+    /// the run's dice, <paramref name="before"/> is the run before it. Each player's share of the new total against his
+    /// share of the old one, the roller's first.
+    /// </summary>
+    internal static List<IGameEvent> Differences(
+        SeasonState state, RunState before, PointsReason pointsReason = PointsReason.RunCorrection, MoveReason moveReason = MoveReason.RunCorrection)
+    {
+        var events = new List<IGameEvent>();
+        foreach (var player in RunShares.Players(before))
+        {
+            var delta = RunShares.Points(state.Runs[before.RunId], player) - RunShares.Points(before, player);
+            var own = Difference(state, before.RunId, delta, player, pointsReason, moveReason).ToList();
+            events.AddRange(own);
+            state = own.Aggregate(state, SeasonEngine.Apply);
+        }
+
+        return events;
+    }
+
     // Points and position by the difference, from where the player stands now (D-97); also a change of the throw by an
     // item after the fact (D-408). state already holds the correction event, so the run carries its new dice.
-    internal static IEnumerable<IGameEvent> Difference(
-        SeasonState state, Guid runId, int delta, PointsReason pointsReason = PointsReason.RunCorrection, MoveReason moveReason = MoveReason.RunCorrection)
+    private static IEnumerable<IGameEvent> Difference(
+        SeasonState state, Guid runId, int delta, Guid playerId, PointsReason pointsReason, MoveReason moveReason)
     {
         if (delta == 0)
         {
             yield break;
         }
 
-        var run = state.Runs[runId];
-        var player = state.Players[run.PlayerId];
+        // A coop partner's side of the run: his share, his cells (D-545)
+        var run = state.Runs[runId].Side(playerId);
+        var player = state.Players[playerId];
         if (Finishes.IsFrozen(player))
         {
             yield break;
@@ -262,7 +289,7 @@ internal static class Corrections
 
         // Forward: from where the player stands, extra steps burn at the finish. Back: only what the run really gave
         // beyond its new dice sum — steps that burned at the finish gave no cells to take back (D-47, D-97).
-        var newSum = CompletionRoll.Total(run);
+        var newSum = RunShares.Points(state.Runs[runId], playerId);
         // Stryker disable once Equality : equivalent — Difference never runs with a zero delta
         var steps = delta > 0 ? delta : -Math.Max(0, run.Moved - newSum);
         // Only a run's own move reaches the finish: a correction is a push and stops a cell before it (RR8, D-322).

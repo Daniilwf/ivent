@@ -412,6 +412,9 @@ public partial class PlayerAdminInvariantTests
             "events" => features.Events,
             "weeklyChallenge" => features.WeeklyChallenge,
             "suggestions" => features.Suggestions,
+            "coop" => features.Coop,
+            "duels" => features.Duels,
+            "interactions" => features.Coop || features.Duels,
             _ => throw new ArgumentOutOfRangeException(nameof(mechanic), mechanic, "Unknown mechanic."),
         };
 
@@ -452,6 +455,16 @@ public partial class PlayerAdminInvariantTests
             Engine.Challenges.WeeklyChallengeSet or Engine.Challenges.WeeklyChallengeCompleted or Engine.Challenges.WeeklyChallengeRevoked
                 or CoinsChanged { Reason: CoinsReason.WeeklyChallenge or CoinsReason.WeeklyChallengeRevoked } => "weeklyChallenge",
             Engine.Suggestions.SuggestionSubmitted or Engine.Suggestions.SuggestionReviewed => "suggestions",
+
+            // Coop, duels and their invitations (D-520…D-525, D-718): an invitation names its kind only when created, its later
+            // events belong to whichever of the two sent it
+            Engine.Interactions.InteractionCreated { Interaction.Kind: Engine.Interactions.InteractionKind.Coop } => "coop",
+            Engine.Interactions.InteractionCreated { Interaction.Kind: Engine.Interactions.InteractionKind.Duel } => "duels",
+            Engine.Interactions.InteractionCreated or Engine.Interactions.InteractionAnswered or Engine.Interactions.InteractionWithdrawn
+                or Engine.Interactions.InteractionExpired => "interactions",
+            Engine.Interactions.CoopJoined or Engine.Interactions.CoopLeft or Engine.Interactions.CoopRewardSplit => "coop",
+            Engine.Duels.DuelStarted or Engine.Duels.DuelSettled or Engine.Duels.DuelWinRevoked
+                or CoinsChanged { Reason: CoinsReason.Duel or CoinsReason.DuelRevoked } => "duels",
 
             // The effect dispatcher reacts to content (items, events); stage 1 has no content effects in play (D-24, D-103)
             EffectChainCut => "effects",

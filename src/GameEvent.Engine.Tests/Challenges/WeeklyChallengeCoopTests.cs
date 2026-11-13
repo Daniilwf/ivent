@@ -16,7 +16,7 @@ public class WeeklyChallengeCoopTests
 {
     private static (Scenario S, Guid Challenge, Guid Run) CoopRun()
     {
-        var s = WeeklyChallengeScenario.New(r => r with { Features = r.Features with { Coop = true } });
+        var s = WeeklyChallengeScenario.New(r => r.WithCoop());
         var challenge = s.SetChallenge(WeeklyChallengeScenario.OldSchool());
         var run = s.Play("Вася", "Silent Hill 3");
         s.Act(new InviteToCoop(s.PlayerId("Вася"), s.PlayerId("Петя")));
@@ -62,7 +62,7 @@ public class WeeklyChallengeCoopTests
     [Fact]
     public void A_partner_who_already_completed_the_challenge_gets_nothing_more()
     {
-        var s = WeeklyChallengeScenario.New(r => r with { Features = r.Features with { Coop = true } });
+        var s = WeeklyChallengeScenario.New(r => r.WithCoop());
         var challenge = s.SetChallenge(WeeklyChallengeScenario.OldSchool());
         s.CompleteTitle("Петя", "Doom 3");
         var run = s.Play("Вася", "Silent Hill 3");

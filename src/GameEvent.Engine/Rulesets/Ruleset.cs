@@ -184,6 +184,13 @@ public sealed record Features
     public bool Suggestions { get; init; }
 
     /// <summary>
+    /// Coop runs and invitations (stage 5, D-520…D-523); optional, so older configs without it still read. Not written while
+    /// off: a season logged before it keeps its ruleset's format.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool Coop { get; init; }
+
+    /// <summary>
     /// Duels (stage 5, D-525, D-540); optional, so older configs without it still read. Not written while off: a season
     /// logged before it keeps its ruleset's format.
     /// </summary>
@@ -341,6 +348,13 @@ public sealed record CoopRules
     public required decimal PointsShare { get; init; }
 
     public required CoopRoundUpFor RoundUpFor { get; init; }
+
+    /// <summary>
+    /// The roller's share of the run's completion coins (D-521, D-540): ⌈coins × share⌉, the partner the rest. Missing — a
+    /// season created before coop reads as it did (D-50); needed once <c>features.coop</c> is on. Not written while missing.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public decimal? CoinsShare { get; init; }
 }
 
 public sealed record RewardRules
@@ -497,6 +511,13 @@ public sealed record CoinReflect
 public sealed record InteractionRules
 {
     public required int InviteTtlHours { get; init; }
+
+    /// <summary>
+    /// How many pending invitations one player may have sent (coop and duels together, D-523). Missing — a season created
+    /// before invitations reads as it did (D-50); needed once <c>features.coop</c> is on. Not written while missing.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? MaxOpenInvitesPerPlayer { get; init; }
 }
 
 /// <summary>Payout multiplier while the needed hours per day stay up to <see cref="UpTo"/>; null is «no upper bound».</summary>

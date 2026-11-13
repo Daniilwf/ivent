@@ -1,4 +1,5 @@
 using GameEvent.Engine.Duels;
+using GameEvent.Engine.Interactions;
 using GameEvent.Engine.Players;
 using GameEvent.Engine.Proofs;
 using GameEvent.Engine.Runs;
@@ -155,11 +156,12 @@ public class DuelEndTests
         var back = Assert.Single(s.DuelCoins());
         Assert.Equal((s.PlayerId("Вася"), -DuelScenario.RewardCoins, CoinsReason.DuelRevoked), (back.PlayerId, back.Delta, back.Reason));
         var drawn = s.Duel(duel);
-        Assert.Equal((DuelStatus.Drawn, (DuelEnd?)DuelEnd.WinRejected), (drawn.Status, drawn.End));
+        Assert.Equal(
+            (DuelStatus.Drawn, (DuelEnd?)DuelEnd.WinRejected, 0, (Guid?)s.PlayerId("Вася"), (Guid?)run),
+            (drawn.Status, drawn.End, drawn.Coins, drawn.WinnerId, drawn.RunId));
 
         // The win does not pass to the other player
         Assert.Empty(s.LastEvents<DuelSettled>());
-        Assert.NotEqual((Guid?)s.PlayerId("Петя"), drawn.WinnerId);
         Assert.Equal(petyaCoins, s.Player("Петя").Coins);
         Assert.Equal(s.State, SeasonEngine.Replay(s.Log));
     }
@@ -230,21 +232,22 @@ public class DuelEndTests
     {
         var s = DuelScenario.New();
         var duel = s.Challenged("Вася", "Петя");
-        var expiresAt = s.Duel(duel).ExpiresAt;
-        Assert.Equal(expiresAt, DuelTimers.Next(s.State, s.PlayerId("Вася")));
+        var expiresAt = s.Invitation(duel).ExpiresAt;
+        Assert.Equal(expiresAt, s.NextTimer("Вася"));
 
         s.Advance(TimeSpan.FromHours(DuelScenario.InviteTtlHours) - TimeSpan.FromSeconds(1));
         s.FireTimers();
         Assert.Empty(s.DuelEvents());
-        Assert.Equal(DuelStatus.Pending, s.Duel(duel).Status);
+        Assert.Equal(InteractionStatus.Pending, s.Invitation(duel).Status);
 
         s.Advance(TimeSpan.FromSeconds(1));
         s.FireTimers();
 
         ScenarioAssert.Accepted(s);
-        Assert.Equal(new DuelExpired(duel, DuelExpiry.Timeout, s.Clock.UtcNow), Assert.Single(s.LastEvents<DuelExpired>()));
-        Assert.Equal(DuelStatus.Expired, s.Duel(duel).Status);
-        Assert.Null(DuelTimers.Next(s.State, s.PlayerId("Вася")));
+        Assert.Equal(new InteractionExpired(duel, InteractionExpiry.Timeout, s.Clock.UtcNow), Assert.Single(s.LastEvents<InteractionExpired>()));
+        Assert.Equal(InteractionStatus.Expired, s.Invitation(duel).Status);
+        Assert.Empty(s.State.Duels);
+        Assert.Null(s.NextTimer("Вася"));
         Assert.Equal(s.State, SeasonEngine.Replay(s.Log));
     }
 
@@ -254,7 +257,7 @@ public class DuelEndTests
         var s = DuelScenario.New();
         var duel = s.StartDuel("Вася", "Петя");
         var end = s.Clock.UtcNow.AddDays(DuelScenario.DurationDays);
-        Assert.Equal(end, DuelTimers.Next(s.State, s.PlayerId("Вася")));
+        Assert.Equal(end, s.NextTimer("Вася"));
 
         s.Advance(TimeSpan.FromDays(DuelScenario.DurationDays) - TimeSpan.FromSeconds(1));
         s.FireTimers();
@@ -268,20 +271,23 @@ public class DuelEndTests
         Assert.Equal(new DuelSettled(duel, DuelStatus.Drawn, DuelEnd.TimeOut, null, null, 0, s.Clock.UtcNow), Assert.Single(s.LastEvents<DuelSettled>()));
         Assert.Empty(s.DuelCoins());
         Assert.Equal(DuelStatus.Drawn, s.Duel(duel).Status);
-        Assert.Null(DuelTimers.Next(s.State, s.PlayerId("Вася")));
+        Assert.Null(s.NextTimer("Вася"));
     }
 
     [Fact]
     public void The_next_timer_of_a_challenger_is_the_earliest_end_of_his_open_duels()
     {
         var s = DuelScenario.New(d => d with { MaxOpenPerPlayer = 2 });
-        Assert.Null(DuelTimers.Next(s.State, s.PlayerId("Вася")));
+        Assert.Null(s.NextTimer("Вася"));
         var race = s.StartDuel("Вася", "Петя");
         s.Advance(TimeSpan.FromHours(1));
         var waiting = s.Challenged("Вася", "Маша");
 
-        Assert.Equal(s.Duel(waiting).ExpiresAt, DuelTimers.Next(s.State, s.PlayerId("Вася")));
-        Assert.True(s.Duel(waiting).ExpiresAt < s.Duel(race).ExpiresAt);
+        Assert.Equal(s.Invitation(waiting).ExpiresAt, s.NextTimer("Вася"));
+        Assert.True(s.Invitation(waiting).ExpiresAt < s.Duel(race).ExpiresAt);
+
+        // The opponent of a race has no timer of it: the challenger's timer ends it
+        Assert.Null(s.NextTimer("Петя"));
     }
 
     [Fact]
@@ -291,7 +297,7 @@ public class DuelEndTests
         var duel = s.StartDuel("Вася", "Петя");
         s.CompleteTitle("Петя", "Doom 3");
 
-        Assert.Null(DuelTimers.Next(s.State, s.PlayerId("Вася")));
+        Assert.Null(s.NextTimer("Вася"));
         s.Advance(TimeSpan.FromDays(DuelScenario.DurationDays + 1));
         s.FireTimers();
         Assert.Empty(s.DuelEvents());
@@ -311,10 +317,11 @@ public class DuelEndTests
 
         ScenarioAssert.Accepted(s);
         var now = s.Clock.UtcNow;
-        Assert.Equal(new DuelExpired(waiting, DuelExpiry.Deadline, now), Assert.Single(s.LastEvents<DuelExpired>()));
+        Assert.Equal(new InteractionExpired(waiting, InteractionExpiry.Deadline, now), Assert.Single(s.LastEvents<InteractionExpired>()));
         Assert.Equal(new DuelSettled(race, DuelStatus.Drawn, DuelEnd.Deadline, null, null, 0, now), Assert.Single(s.LastEvents<DuelSettled>()));
         Assert.Empty(s.DuelCoins());
-        Assert.DoesNotContain(s.State.Duels.Values, d => d.IsOpen);
+        Assert.DoesNotContain(s.State.Duels.Values, d => d.Status == DuelStatus.Active);
+        Assert.DoesNotContain(s.State.Interactions.Values, i => i.Status == InteractionStatus.Pending);
         Assert.Equal(s.State, SeasonEngine.Replay(s.Log));
     }
 
@@ -330,9 +337,9 @@ public class DuelEndTests
         s.Act(new ReachDeadline());
 
         ScenarioAssert.Accepted(s);
-        Assert.Equal(DuelExpiry.Deadline, Assert.Single(s.LastEvents<DuelExpired>()).Reason);
+        Assert.Equal(InteractionExpiry.Deadline, Assert.Single(s.LastEvents<InteractionExpired>()).Reason);
         Assert.Equal((DuelStatus.Drawn, DuelEnd.Deadline), (Assert.Single(s.LastEvents<DuelSettled>()).Status, s.LastEvents<DuelSettled>().Single().End));
-        Assert.Equal((DuelStatus.Expired, DuelStatus.Drawn), (s.Duel(waiting).Status, s.Duel(race).Status));
+        Assert.Equal((InteractionStatus.Expired, DuelStatus.Drawn), (s.Invitation(waiting).Status, s.Duel(race).Status));
     }
 
     [Fact]
@@ -364,8 +371,9 @@ public class DuelEndTests
         s.Act(new SetPlayerInactive(s.PlayerId(inactive), true));
 
         ScenarioAssert.Accepted(s);
-        Assert.Equal(new DuelExpired(duel, DuelExpiry.Inactive, s.Clock.UtcNow), Assert.Single(s.LastEvents<DuelExpired>()));
-        Assert.Equal(DuelStatus.Expired, s.Duel(duel).Status);
+        Assert.Equal(new InteractionExpired(duel, InteractionExpiry.Inactive, s.Clock.UtcNow), Assert.Single(s.LastEvents<InteractionExpired>()));
+        Assert.Equal(InteractionStatus.Expired, s.Invitation(duel).Status);
+        Assert.Empty(s.State.Duels);
     }
 
     [Theory]

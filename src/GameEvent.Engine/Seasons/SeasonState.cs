@@ -48,6 +48,9 @@ public sealed record SeasonState(
     public ImmutableSortedDictionary<Guid, ForAllSettlement> ForAll { get; init; } =
         ImmutableSortedDictionary<Guid, ForAllSettlement>.Empty;
 
+    /// <summary>The invitations of the season (D-523), by id: pending ones and answered, withdrawn or expired ones.</summary>
+    public ImmutableSortedDictionary<Guid, Interactions.Interaction> Interactions { get; init; } =
+        ImmutableSortedDictionary<Guid, Interactions.Interaction>.Empty;
     /// <summary>The duels of the season (D-525), challenges among them, by id.</summary>
     public ImmutableSortedDictionary<Guid, Duels.Duel> Duels { get; init; } =
         ImmutableSortedDictionary<Guid, Duels.Duel>.Empty;
@@ -89,6 +92,7 @@ public sealed record SeasonState(
         && WeeklyChallenges.SequenceEqual(other.WeeklyChallenges)
         && Suggestions.SequenceEqual(other.Suggestions)
         && ForAll.SequenceEqual(other.ForAll)
+        && Interactions.SequenceEqual(other.Interactions)
         && Duels.SequenceEqual(other.Duels)
         && MapVersion == other.MapVersion;
 
