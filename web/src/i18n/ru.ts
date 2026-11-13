@@ -116,6 +116,7 @@ const rejection = {
   'run.notYours': 'Это не твоё прохождение.',
   'run.notCompleted': 'Это прохождение ещё не завершено.',
   'run.nothingToChange': 'Значение уже такое: менять нечего.',
+  'run.noCondition': 'У этого прохождения нет условия, которое можно отметить неприменимым.',
   'run.unknown': 'Прохождение не найдено. Обнови страницу.',
   'review.invalidRating': 'Оценка — от 1 до 10.',
   'review.tooLong': 'Отзыв слишком длинный: не больше 2000 символов.',
@@ -347,6 +348,12 @@ const feedLines = {
     ': сложность ',
     g,
     ` — ${from} → ${to}`,
+  ],
+  conditionChecked: <T>(p: T, g: T, met: boolean, waived: boolean): Line<T> => [
+    p,
+    ': условие прохождения ',
+    g,
+    waived ? ' неприменимо' : met ? ' выполнено' : ' не выполнено',
   ],
   proofSent: <T>(p: T, g: T): Line<T> => [p, ' отправляет пруф по ', g],
   proofApproved: <T>(p: T, g: T, withoutProof: boolean): Line<T> => [

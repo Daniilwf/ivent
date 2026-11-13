@@ -83,8 +83,9 @@ internal static class DicePipeline
         var (stage, value, extraSides) = (change.Stage, change.Value, change.Sides);
         var run = effect.State.Runs[runId];
 
-        // The throw's move waits at a fork: that step has begun, a change after the throw would move the token off it (D-416)
-        if (effect.State.Players[run.PlayerId].Choice?.Kind == Turns.ChoiceKind.Branch)
+        // The throw's move waits at a fork: that step has begun, a change after the throw would move the token off it (D-416);
+        // a run without dice by its unmet condition had no throw to change (D-592)
+        if (effect.State.Players[run.PlayerId].Choice?.Kind == Turns.ChoiceKind.Branch || RunConditions.WithoutDice(run))
         {
             return;
         }

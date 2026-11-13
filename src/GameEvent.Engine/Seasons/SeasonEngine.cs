@@ -61,6 +61,7 @@ public static class SeasonEngine
             RejectProof c => ProofReview.Decide(state, c, context),
             RejectProofWithDropPenalty c => ProofReview.Decide(state, c, context),
             ChangeRunDifficulty c => Corrections.Decide(state, c, context),
+            WaiveRunCondition c => RunConditions.Decide(state, c, context),
             DropRun c => Drops.Decide(state, c, context),
             TechReroll c => Drops.Decide(state, c, context),
             ConvertTechRerollToDrop c => Drops.Decide(state, c, context),
@@ -149,6 +150,7 @@ public static class SeasonEngine
                 PlayerMoved moved => moved.PlayerId == player.PlayerId,
                 RunHoursCorrected corrected => corrected.RunId == run,
                 RunDifficultyChanged changed => changed.RunId == run,
+                RunConditionChecked conditionChecked => conditionChecked.RunId == run,
                 ProofRejected rejected => rejected.RunId == run,
                 _ => false,
             }))
@@ -196,6 +198,7 @@ public static class SeasonEngine
             ProofApproved e => ProofReview.Apply(state, e),
             ProofRejected e => ProofReview.Apply(state, e),
             RunDifficultyChanged e => Corrections.Apply(state, e),
+            RunConditionChecked e => RunConditions.Apply(state, e),
             ManualEffectResolved e => ManualEffects.Apply(state, e),
             RunDropped e => Drops.Apply(state, e),
             RunTechRerolled e => Drops.Apply(state, e),

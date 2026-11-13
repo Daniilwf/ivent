@@ -96,6 +96,7 @@ public static class RejectionCodes
     public const string NotYourRun = "run.notYours";
     public const string RunNotCompleted = "run.notCompleted";
     public const string RunNothingToChange = "run.nothingToChange";
+    public const string RunNoCondition = "run.noCondition";
     public const string ProofAlreadyReviewed = "proof.alreadyReviewed";
     public const string ProofInvalidLink = "proof.invalidLink";
     public const string ProofEmpty = "proof.empty";

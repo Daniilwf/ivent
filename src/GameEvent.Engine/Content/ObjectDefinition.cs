@@ -250,6 +250,10 @@ public sealed record ConditionSpec
 {
     public Runs.Difficulty? DifficultyAtLeast { get; init; }
 
+    /// <summary>The run's difficulty at most (D-506): «пройди на лёгкой»; written only when set.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Runs.Difficulty? DifficultyAtMost { get; init; }
+
     public GameFilterSpec? Game { get; init; }
 
     public ContentStat? Stat { get; init; }

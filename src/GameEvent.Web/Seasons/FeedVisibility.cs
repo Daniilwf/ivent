@@ -61,6 +61,7 @@ public static class FeedVisibility
         ["proof-reject-penalized"] = Access.Public,
         ["run-hours-corrected"] = Access.Public,
         ["run-difficulty-changed"] = Access.Public,
+        ["run-condition-checked"] = Access.Public,
         ["proof-submitted"] = Access.OwnerFields,
         ["proof-approved"] = Access.OwnerFields,
         ["proof-rejected"] = Access.OwnerFields,
