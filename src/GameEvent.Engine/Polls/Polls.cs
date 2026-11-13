@@ -10,6 +10,9 @@ public enum PollSource
 {
     Admin,
     Event,
+
+    /// <summary>A global event whose effect asks the voters first (EV23, D-753): the result settles it for everyone.</summary>
+    GlobalEvent,
 }
 
 /// <summary>Where a poll is: open for votes, closed with its result, or cancelled by the deadline (D-516).</summary>
@@ -55,7 +58,8 @@ public sealed record ClosePoll(Guid PollId) : ICommand;
 /// A poll started (D-512) with the snapshot of its question and options. <see cref="OnResult"/> — the admin's effect of the
 /// result (<c>$result</c>). An event's poll names its drawer (<see cref="PlayerId"/>), the suspended effect that waits for it
 /// (<see cref="ChoiceId"/>), the event (<see cref="ObjectId"/>, <see cref="Kind"/>) and the player whose games were offered
-/// (<see cref="TargetId"/>). Each of those is written only when set.
+/// (<see cref="TargetId"/>); a global event's poll names the event (<see cref="GlobalEventId"/>, <see cref="ObjectId"/>,
+/// <see cref="Kind"/>). Each of those is written only when set.
 /// </summary>
 [EventType("poll-started")]
 public sealed record PollStarted(
@@ -86,6 +90,10 @@ public sealed record PollStarted(
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Guid? TargetId { get; init; }
+
+    /// <summary>The global event whose effect waits for the result (EV23, D-753); written only when set.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Guid? GlobalEventId { get; init; }
 }
 
 /// <summary>
@@ -147,6 +155,10 @@ public sealed record Poll(
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Guid? TargetId { get; init; }
 
+    /// <summary>The global event whose effect waits for the result (EV23, D-753); written only when set.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Guid? GlobalEventId { get; init; }
+
     /// <summary>The option that won; null while open, without votes or cancelled.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Result { get; init; }
@@ -156,7 +168,7 @@ public sealed record Poll(
     /// does not vote in it, and the deadline cancels it.
     /// </summary>
     [JsonIgnore]
-    public bool HasEffect => OnResult is not null || Source == PollSource.Event;
+    public bool HasEffect => OnResult is not null || Source is PollSource.Event or PollSource.GlobalEvent;
 
     /// <summary>The votes per option in the snapshot's order (0 included).</summary>
     public EquatableArray<PollCount> Counts() =>

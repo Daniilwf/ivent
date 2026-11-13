@@ -36,6 +36,9 @@ public static class RulesetValidator
     private const int MaxRequestTtlHours = 24 * 30;
     private const int MaxPollGameOptions = 20;
 
+    // Global events at once: a banner each on the main screen (D-517)
+    private const int MaxGlobalEventsActive = 10;
+
     public static IReadOnlyList<RulesetError> Validate(Ruleset ruleset)
     {
         ArgumentNullException.ThrowIfNull(ruleset);
@@ -320,6 +323,21 @@ public static class RulesetValidator
         if (ruleset.PartnerBoard is { RequestTtlHours: < 1 or > MaxRequestTtlHours })
         {
             Error("partnerBoard.requestTtlHours", $"must be 1–{MaxRequestTtlHours}");
+        }
+
+        // Global events (D-517): an event of the content played on everyone, so they play only with events
+        if (ruleset.Features.GlobalEvents && !ruleset.Features.Events)
+        {
+            Error("features.globalEvents", "needs features.events: a global event is an event of the content");
+        }
+        else if (ruleset.Features.GlobalEvents && ruleset.GlobalEvents is null)
+        {
+            Error("globalEvents", "is required when features.globalEvents is on");
+        }
+
+        if (ruleset.GlobalEvents is { MaxActive: < 1 or > MaxGlobalEventsActive })
+        {
+            Error("globalEvents.maxActive", $"must be 1–{MaxGlobalEventsActive}");
         }
 
         var tiebreakers = ruleset.Ranking.Tiebreakers;

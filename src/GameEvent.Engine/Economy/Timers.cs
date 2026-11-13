@@ -55,10 +55,12 @@ public static class Timers
     }
 
     /// <summary>
-    /// The earliest moment something of the season itself is due — an open poll's close (D-514); null when nothing waits or
-    /// polls are off (D-420). The scheduler reads it with the season's timer column (task 5.16, D-727).
+    /// The earliest moment something of the season itself is due — an open poll's close (D-514), a global event's end
+    /// (D-517); null when nothing waits or the mechanic is off (D-420). The scheduler reads it with the season's timer column
+    /// (task 5.16, D-727).
     /// </summary>
-    public static DateTimeOffset? NextOfSeason(SeasonState state) => Polls.Polling.NextClose(state);
+    public static DateTimeOffset? NextOfSeason(SeasonState state) =>
+        new[] { Polls.Polling.NextClose(state), GlobalEvents.GlobalEventing.NextEnd(state) }.Where(m => m is not null).Min();
 
     internal static Decision Decide(SeasonState state, EngineContext context)
     {
@@ -105,6 +107,9 @@ public static class Timers
         // Polls whose time has come close with their results (D-514)
         events.AddRange(Polls.Polling.Due(events.Aggregate(state, SeasonEngine.Apply), context, events.Count));
 
+        // Global events whose term is up end (D-517), after the polls that closed in time
+        events.AddRange(GlobalEvents.GlobalEventing.Due(events.Aggregate(state, SeasonEngine.Apply), context));
+
         return events.Count == 0
             ? Decision.Reject(RejectionCodes.TimersNothingDue, "Nothing is due yet.")
             : Decision.Accept(events);
@@ -124,7 +129,8 @@ internal static class Settlements
             .Concat(s.Rules.Features.WeeklyChallenge ? Challenges.WeeklyChallenges.Settle(s, context.Pool, e) : [])
             .Concat(s.Rules.Features.Coop ? Interactions.Coop.Settle(s, e, context.Clock.UtcNow) : [])
             .Concat(Interactions.PartnerBoard.IsOn(s.Rules.Features) ? Interactions.PartnerBoard.Settle(s, e, context.Clock.UtcNow) : [])
-            .Concat(s.Rules.Features.Shop ? ShopReset(s, e) : []));
+            .Concat(s.Rules.Features.Shop ? ShopReset(s, e) : [])
+            .Concat(GlobalEvents.GlobalEventing.IsOn(s) ? GlobalEvents.GlobalEventing.Settle(s, e, context) : []));
 
     /// <summary>
     /// After the effects fired: an object living for some runs counts one down when a run of its owner ends, so it still

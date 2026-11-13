@@ -15,7 +15,8 @@
     "gallery": false,
     "challenges": false,
     "suggestions": false,
-    "coop": false
+    "coop": false,
+    "globalEvents": false
   },
   "season": {
     "timezone": "Europe/Moscow",
@@ -134,5 +135,8 @@
     "gameOptions": 5,
     "allowChangeVote": true,
     "showLiveCountsDefault": false
+  },
+  "globalEvents": {
+    "maxActive": 2
   }
 }

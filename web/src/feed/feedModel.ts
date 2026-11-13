@@ -203,6 +203,25 @@ const headlines: [string, (d: Data, c: Context) => Headline][] = [
     },
   ],
   ['poll-cancelled', () => ({ icon: 'effect', actor: null, line: L.pollCancelled() })],
+  // Global events (D-517, D-518): the launch, the goal's progress and reach, the end are the system's lines
+  [
+    'global-event-launched',
+    (d) => ({
+      icon: 'effect',
+      actor: null,
+      line: L.globalEventLaunched(text(record(d.definition), 'name') ?? text(d, 'objectId') ?? ''),
+    }),
+  ],
+  ['global-event-ended', () => ({ icon: 'effect', actor: null, line: L.globalEventEnded() })],
+  [
+    'global-progress-changed',
+    (d) => ({
+      icon: 'effect',
+      actor: null,
+      line: L.globalProgress(String(number(d, 'total') ?? 0), null),
+    }),
+  ],
+  ['global-goal-reached', () => ({ icon: 'effect', actor: null, line: L.globalGoalReached() })],
   [
     'season-created',
     (d) => ({ icon: 'season', actor: null, line: L.seasonCreated(text(d, 'name') ?? '') }),

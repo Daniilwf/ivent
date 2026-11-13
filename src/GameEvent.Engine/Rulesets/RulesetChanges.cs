@@ -71,6 +71,14 @@ internal static class RulesetChanges
                 RejectionCodes.IrlProofsInPlay, "An IRL proof waits for the review: switch events off after it is checked.", [.. waiting]);
         }
 
+        // D-751: the same for global events — a running one would never end, a reject must still take a contribution back
+        if (GlobalEvents.GlobalEventing.IsOn(state) && !command.Ruleset.Features.GlobalEvents && GlobalEvents.GlobalEventing.InPlay(state))
+        {
+            return Decision.Reject(
+                RejectionCodes.GlobalEventsInPlay,
+                "A global event runs, or counts a run whose proof is not approved yet: switch global events off after they end and the proofs are checked.");
+        }
+
         return command.Ruleset == state.Ruleset
             ? Decision.Reject(RejectionCodes.RulesetUnchanged, "The new ruleset equals the current one.")
             : Decision.Accept(new RulesetChanged(state.RulesetVersion + 1, command.Ruleset));

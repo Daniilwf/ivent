@@ -258,11 +258,11 @@ public static class ContentPublishing
         }
 
         // D-549, as D-519 for the system's effects: pushes of everyone with their cells would not fit the 50 events of the
-        // chain, and the effect would reach only some — until 5.9
+        // chain, and the effect would reach only some. Kept by 5.9 (D-754): a drawn event on everyone stays in its drawer's command
         if (definition.Effect is { Target.Selector: TargetSelector.All } effect
             && effect.Actions.Concat(effect.Outcomes?.Cases.SelectMany(c => c.Actions) ?? []).Any(a => a is MoveAction or TeleportAction))
         {
-            error($"{at}.effect.target", "An event on everyone does not move or teleport (until 5.9).");
+            error($"{at}.effect.target", "An event on everyone does not move or teleport (D-549).");
         }
     }
 

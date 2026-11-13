@@ -254,7 +254,7 @@ public class DeckTests
     [InlineData("coins", false)]
     public void An_event_on_everyone_may_not_move_or_teleport(string what, bool refused)
     {
-        // D-549 (as D-519): 16 pushes with their cells would not fit the 50 events of the chain — until 5.9
+        // D-549 (as D-519): 16 pushes with their cells would not fit the 50 events of the chain — kept by 5.9 (D-754)
         var tailwind = EconomyScenario.Examples()["tailwind"];
         var all = new TargetSpec { Selector = TargetSelector.All };
         var effect = what switch

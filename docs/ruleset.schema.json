@@ -54,6 +54,9 @@
         },
         "coop": {
           "type": "boolean"
+        },
+        "globalEvents": {
+          "type": "boolean"
         }
       },
       "required": [
@@ -869,6 +872,21 @@
         "gameOptions",
         "allowChangeVote",
         "showLiveCountsDefault"
+      ],
+      "additionalProperties": false
+    },
+    "globalEvents": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "properties": {
+        "maxActive": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "maxActive"
       ],
       "additionalProperties": false
     }

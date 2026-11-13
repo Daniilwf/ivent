@@ -36,6 +36,13 @@ public sealed record ForAllQueued(Guid SettlementId, ForAllSource Source, Guid R
     /// </summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Rulesets.EventKind? Kind { get; init; }
+
+    /// <summary>
+    /// The answers the effect's questions get for every player (EV23, D-753): a global event's vote, its result; written only
+    /// when set.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public EquatableArray<string>? Answers { get; init; }
 }
 
 /// <summary>
@@ -69,7 +76,8 @@ public sealed record ForAllSettlement(
     int Batches,
     int Order,
     bool Halted,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] Rulesets.EventKind? Kind = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] Rulesets.EventKind? Kind = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] EquatableArray<string>? Answers = null);
 
 /// <summary>
 /// Settlements for everyone (D-537, invariants 2, 3, 8): a reward of a goal, a poll's result on everyone or a global
@@ -93,7 +101,8 @@ public static class ForAllSettlements
         string objectId,
         EffectSpec effect,
         ContentParamDictionary? parameters = null,
-        Rulesets.EventKind? kind = null)
+        Rulesets.EventKind? kind = null,
+        EquatableArray<string>? answers = null)
     {
         ArgumentNullException.ThrowIfNull(state);
         ArgumentNullException.ThrowIfNull(context);
@@ -104,6 +113,7 @@ public static class ForAllSettlements
         {
             Parameters = parameters,
             Kind = kind,
+            Answers = answers,
         };
     }
 
@@ -170,7 +180,7 @@ public static class ForAllSettlements
                 continue;
             }
 
-            var run = new EffectRun(current, context, playerId, settlement.ObjectId, hostile: false, settlement.Parameters, eventsBefore: count)
+            var run = new EffectRun(current, context, playerId, settlement.ObjectId, hostile: false, settlement.Parameters, settlement.Answers is { } answers ? answers : null, eventsBefore: count)
             {
                 PositionLocked = locked,
                 EventKind = settlement.Kind,
@@ -210,7 +220,7 @@ public static class ForAllSettlements
         {
             ForAll = state.ForAll.SetItem(
                 e.SettlementId,
-                new ForAllSettlement(e.SettlementId, e.Source, e.Reference, e.ObjectId, e.Effect, e.Parameters, e.Players, Batches: 0, order, Halted: false, e.Kind)),
+                new ForAllSettlement(e.SettlementId, e.Source, e.Reference, e.ObjectId, e.Effect, e.Parameters, e.Players, Batches: 0, order, Halted: false, e.Kind, e.Answers)),
         };
     }
 

@@ -276,4 +276,22 @@ public static class RejectionCodes
 
     /// <summary>A poll needs at least two options to choose from when it starts (D-720).</summary>
     public const string PollNoOptions = "poll.noOptions";
+
+    // Global events (stage 5, D-517, D-518, D-750)
+    public const string GlobalEventUnknown = "globalEvent.unknown";
+
+    /// <summary>The global event has ended already: by its term, the admin or the deadline (D-517).</summary>
+    public const string GlobalEventEnded = "globalEvent.ended";
+
+    /// <summary><c>globalEvents.maxActive</c> global events run already (D-517).</summary>
+    public const string GlobalEventTooMany = "globalEvent.tooMany";
+
+    /// <summary>The object launched is not an event of the content (D-517).</summary>
+    public const string GlobalEventNotEvent = "globalEvent.notEvent";
+
+    /// <summary>
+    /// Global events off while one runs or a contribution stands on a run not approved yet: a reject could no longer take it
+    /// back (D-420, D-751).
+    /// </summary>
+    public const string GlobalEventsInPlay = "ruleset.globalEventsInPlay";
 }
