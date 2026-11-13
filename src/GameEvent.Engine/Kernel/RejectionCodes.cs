@@ -294,4 +294,33 @@ public static class RejectionCodes
     /// back (D-420, D-751).
     /// </summary>
     public const string GlobalEventsInPlay = "ruleset.globalEventsInPlay";
+
+    // Duels (stage 5, D-525, D-540, D-730)
+
+    /// <summary>A duel is with another player.</summary>
+    public const string DuelOnSelf = "duel.onSelf";
+
+    /// <summary>The first finisher plays out of the race: he neither challenges nor is challenged (D-510, D-525).</summary>
+    public const string DuelFirstFinisher = "duel.firstFinisher";
+
+    /// <summary>An inactive player neither challenges nor is challenged.</summary>
+    public const string DuelPlayerInactive = "duel.playerInactive";
+
+    /// <summary>The player himself (the challenger, or the one accepting) has <c>duels.maxOpenPerPlayer</c> open duels: challenges waiting and accepted duels.</summary>
+    public const string DuelTooMany = "duel.tooMany";
+
+    /// <summary>The other player has <c>duels.maxOpenPerPlayer</c> open duels.</summary>
+    public const string DuelOpponentBusy = "duel.opponentBusy";
+
+    /// <summary>The two have a challenge waiting or a duel going on already.</summary>
+    public const string DuelAlreadyOpen = "duel.alreadyOpen";
+
+    /// <summary>The two dueled less than <c>duels.samePairCooldownDays</c> ago.</summary>
+    public const string DuelCooldown = "duel.cooldown";
+
+    /// <summary>A player has won <c>duels.maxWinsPerSeason</c> duels this season.</summary>
+    public const string DuelWinLimit = "duel.winLimit";
+
+    /// <summary>Duels are switched off only when none is open and no win waits for its run's proof (D-420, D-730).</summary>
+    public const string DuelsInPlay = "ruleset.duelsInPlay";
 }

@@ -32,6 +32,12 @@ public enum InteractionExpiry
 
     /// <summary>Another invitation to the same run was accepted (D-523).</summary>
     Superseded,
+
+    /// <summary>A player of a duel's challenge was marked inactive (D-525, D-730).</summary>
+    Inactive,
+
+    /// <summary>A player of a duel's challenge became the first finisher, who plays out of the race (D-510, D-730).</summary>
+    FirstFinisher,
 }
 
 /// <summary>
@@ -156,6 +162,7 @@ public static class InteractionRules
         return kind switch
         {
             InteractionKind.Coop => features.Coop,
+            InteractionKind.Duel => features.Duels,
             _ => false,
         };
     }

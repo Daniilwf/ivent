@@ -57,6 +57,9 @@
         },
         "globalEvents": {
           "type": "boolean"
+        },
+        "duels": {
+          "type": "boolean"
         }
       },
       "required": [
@@ -872,6 +875,45 @@
         "gameOptions",
         "allowChangeVote",
         "showLiveCountsDefault"
+      ],
+      "additionalProperties": false
+    },
+    "duels": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "properties": {
+        "rewardCoins": {
+          "type": "integer"
+        },
+        "durationDays": {
+          "type": "integer"
+        },
+        "maxOpenPerPlayer": {
+          "type": "integer"
+        },
+        "countRunsStartedAfterAccept": {
+          "type": "boolean"
+        },
+        "samePairCooldownDays": {
+          "type": "integer"
+        },
+        "maxWinsPerSeason": {
+          "type": "integer"
+        },
+        "dropForfeits": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "rewardCoins",
+        "durationDays",
+        "maxOpenPerPlayer",
+        "countRunsStartedAfterAccept",
+        "samePairCooldownDays",
+        "maxWinsPerSeason",
+        "dropForfeits"
       ],
       "additionalProperties": false
     },

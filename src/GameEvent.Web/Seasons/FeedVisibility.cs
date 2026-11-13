@@ -160,6 +160,11 @@ public static class FeedVisibility
         ["partner-request-posted"] = Access.Public,
         ["partner-request-closed"] = Access.Public,
 
+        // Duels (D-525): the race, its end and a win taken back by a reject are public, like a bet's
+        ["duel-started"] = Access.Public,
+        ["duel-settled"] = Access.Public,
+        ["duel-win-revoked"] = Access.Public,
+
         // The suggestion box (D-527) is the admin's moderation queue, not a move of the season: its own screen shows it (5.19)
         ["suggestion-submitted"] = Access.NotInFeed,
         ["suggestion-reviewed"] = Access.NotInFeed,

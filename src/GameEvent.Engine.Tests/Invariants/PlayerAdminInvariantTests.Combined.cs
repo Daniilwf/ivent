@@ -416,6 +416,8 @@ public partial class PlayerAdminInvariantTests
             "partnerBoard" => features.PartnerBoard && features.Coop,
             "polls" => features.Polls,
             "globalEvents" => features.GlobalEvents && features.Events,
+            "duels" => features.Duels,
+            "interactions" => features.Coop || features.Duels,
             _ => throw new ArgumentOutOfRangeException(nameof(mechanic), mechanic, "Unknown mechanic."),
         };
 
@@ -457,10 +459,15 @@ public partial class PlayerAdminInvariantTests
                 or CoinsChanged { Reason: CoinsReason.WeeklyChallenge or CoinsReason.WeeklyChallengeRevoked } => "weeklyChallenge",
             Engine.Suggestions.SuggestionSubmitted or Engine.Suggestions.SuggestionReviewed => "suggestions",
 
-            // Coop and its invitations (D-520…D-523)
+            // Coop, duels and their invitations (D-520…D-525, D-718): an invitation names its kind only when created, its later
+            // events belong to whichever of the two sent it
+            Engine.Interactions.InteractionCreated { Interaction.Kind: Engine.Interactions.InteractionKind.Coop } => "coop",
+            Engine.Interactions.InteractionCreated { Interaction.Kind: Engine.Interactions.InteractionKind.Duel } => "duels",
             Engine.Interactions.InteractionCreated or Engine.Interactions.InteractionAnswered or Engine.Interactions.InteractionWithdrawn
-                or Engine.Interactions.InteractionExpired or Engine.Interactions.CoopJoined or Engine.Interactions.CoopLeft
-                or Engine.Interactions.CoopRewardSplit => "coop",
+                or Engine.Interactions.InteractionExpired => "interactions",
+            Engine.Interactions.CoopJoined or Engine.Interactions.CoopLeft or Engine.Interactions.CoopRewardSplit => "coop",
+            Engine.Duels.DuelStarted or Engine.Duels.DuelSettled or Engine.Duels.DuelWinRevoked
+                or CoinsChanged { Reason: CoinsReason.Duel or CoinsReason.DuelRevoked } => "duels",
 
             // The partner board (D-524); its responses are coop invitations
             Engine.Interactions.PartnerRequestPosted or Engine.Interactions.PartnerRequestClosed => "partnerBoard",

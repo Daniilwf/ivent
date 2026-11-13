@@ -71,6 +71,13 @@ public sealed record Ruleset
     public PollRules? Polls { get; init; }
 
     /// <summary>
+    /// The rules of duels (stage 5, D-525, D-540). Missing — a season created before them reads as it did (D-50); needed once
+    /// <c>features.duels</c> is on. Not written while missing.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public DuelRules? Duels { get; init; }
+
+    /// <summary>
     /// The rules of global events (stage 5, D-517). Missing — a season created before them reads as it did (D-50); needed
     /// once <c>features.globalEvents</c> is on. Not written while missing.
     /// </summary>
@@ -103,6 +110,31 @@ public sealed record PartnerBoardRules
 {
     /// <summary>How many hours a request «ищу напарника» stays open unless something closes it earlier.</summary>
     public required int RequestTtlHours { get; init; }
+}
+
+/// <summary>The rules of duels (D-525, the expert panel, D-540): a race to the next completion for coins from the system.</summary>
+public sealed record DuelRules
+{
+    /// <summary>The coins the system pays the winner; the loser gets nothing, nothing passes between the players.</summary>
+    public required int RewardCoins { get; init; }
+
+    /// <summary>How many days after the acceptance a completion still wins; then the duel is a draw.</summary>
+    public required int DurationDays { get; init; }
+
+    /// <summary>How many open duels one player may have: the challenges he sent and waiting, and the accepted ones.</summary>
+    public required int MaxOpenPerPlayer { get; init; }
+
+    /// <summary>Only a run rolled after the acceptance wins (no sniping with a game nearly done).</summary>
+    public required bool CountRunsStartedAfterAccept { get; init; }
+
+    /// <summary>How many days after the end of their accepted duel the same two players may not duel again.</summary>
+    public required int SamePairCooldownDays { get; init; }
+
+    /// <summary>How many duels one player may win in a season; at the limit he neither challenges nor accepts.</summary>
+    public required int MaxWinsPerSeason { get; init; }
+
+    /// <summary>A voluntary drop (or wish reroll) of a run that counts loses the duel: the opponent wins at once (D-733).</summary>
+    public required bool DropForfeits { get; init; }
 }
 
 /// <summary>The rules of the suggestion box (SPEC «Предложка», D-527).</summary>
@@ -212,6 +244,13 @@ public sealed record Features
     /// </summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public bool GlobalEvents { get; init; }
+
+    /// <summary>
+    /// Duels (stage 5, D-525, D-540); optional, so older configs without it still read. Not written while off: a season
+    /// logged before it keeps its ruleset's format.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool Duels { get; init; }
 }
 
 public sealed record SeasonRules

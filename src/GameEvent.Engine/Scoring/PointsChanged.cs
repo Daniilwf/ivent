@@ -58,6 +58,12 @@ public enum CoinsReason
 
     /// <summary>A weekly challenge's reward taken back after the run's proof was rejected.</summary>
     WeeklyChallengeRevoked,
+
+    /// <summary>A duel won (D-525): coins from the system.</summary>
+    Duel,
+
+    /// <summary>A duel's reward taken back after the winning run's proof was rejected (D-525, the expert panel (5)).</summary>
+    DuelRevoked,
 }
 
 /// <summary>What changed another resource of a player.</summary>

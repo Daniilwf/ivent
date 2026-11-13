@@ -152,7 +152,7 @@ internal static class SeasonProjection
         }
 
         // The pending invitations a player sent and his open requests of the partner board are due on his timer column too
-        // (D-523, D-524): one changed without a change of its player brings his column up to date
+        // (D-523, D-524), and so is a duel's race on its challenger's (D-730): one changed without a change of its player brings his column up to date
         var requestAuthors = after.PartnerRequests.Keys.Union(before.PartnerRequests.Keys)
             .Where(id => before.PartnerRequests.GetValueOrDefault(id) != after.PartnerRequests.GetValueOrDefault(id))
             .Select(id => (after.PartnerRequests.GetValueOrDefault(id) ?? before.PartnerRequests[id]).PlayerId);
@@ -160,6 +160,9 @@ internal static class SeasonProjection
             .Where(id => before.Interactions.GetValueOrDefault(id) != after.Interactions.GetValueOrDefault(id))
             .Select(id => (after.Interactions.GetValueOrDefault(id) ?? before.Interactions[id]).FromPlayerId)
             .Concat(requestAuthors)
+            .Concat(after.Duels.Keys.Union(before.Duels.Keys)
+                .Where(id => before.Duels.GetValueOrDefault(id) != after.Duels.GetValueOrDefault(id))
+                .Select(id => (after.Duels.GetValueOrDefault(id) ?? before.Duels[id]).ChallengerId))
             .Distinct()
             .Where(id => after.Players.TryGetValue(id, out var now) && before.Players.TryGetValue(id, out var then) && now == then))
         {

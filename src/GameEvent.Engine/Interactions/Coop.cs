@@ -95,7 +95,7 @@ internal static class Coop
         var invitation = state.Interactions[command.InteractionId];
         if (invitation.Kind != InteractionKind.Coop)
         {
-            return Decision.Reject(RejectionCodes.InteractionUnknown, "Only coop invitations are answered in this build.");
+            return Decision.Reject(RejectionCodes.InteractionUnknown, "A duel's challenge is answered by the duel's rules (D-730).");
         }
 
         if (invitation.ToPlayerId != command.PlayerId)
@@ -246,7 +246,7 @@ internal static class Coop
 
     /// <summary>
     /// What follows <paramref name="e"/> (the state already holds it) with coop on (D-523): a run's end closes its pending
-    /// invitations, the season's closing all of them (D-516).
+    /// invitations, the season's closing all coop ones (D-516; a duel's are closed by the duel, D-730).
     /// </summary>
     public static IEnumerable<IGameEvent> Settle(SeasonState state, IGameEvent e, DateTimeOffset now)
     {
@@ -255,7 +255,7 @@ internal static class Coop
             RunCompleted c => i => i.RunId == c.RunId,
             RunDropped d => i => i.RunId == d.RunId,
             RunTechRerolled t => i => i.RunId == t.RunId,
-            SeasonStatusChanged { To: SeasonStatus.Closing } => _ => true,
+            SeasonStatusChanged { To: SeasonStatus.Closing } => i => i.Kind == InteractionKind.Coop,
             _ => null,
         };
         if (closes is null)
@@ -269,7 +269,7 @@ internal static class Coop
             .Select(i => new InteractionExpired(i.InteractionId, reason, now))];
     }
 
-    /// <summary>The pending invitations past their time, closed by the timer (D-523); none while coop is off (D-420).</summary>
+    /// <summary>The pending invitations past their time, closed by the timer (D-523), of every kind whose mechanic is on (D-420, D-718).</summary>
     public static IEnumerable<IGameEvent> Timeouts(SeasonState state, DateTimeOffset now) =>
         state.Interactions.Values
             .Where(i => i.Status == InteractionStatus.Pending && i.ExpiresAt <= now && InteractionRules.IsOn(state.Rules.Features, i.Kind))

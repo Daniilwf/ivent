@@ -16,7 +16,8 @@
     "challenges": false,
     "suggestions": false,
     "coop": false,
-    "globalEvents": false
+    "globalEvents": false,
+    "duels": false
   },
   "season": {
     "timezone": "Europe/Moscow",
@@ -138,5 +139,14 @@
   },
   "globalEvents": {
     "maxActive": 2
+  },
+  "duels": {
+    "rewardCoins": 10,
+    "durationDays": 7,
+    "maxOpenPerPlayer": 1,
+    "countRunsStartedAfterAccept": true,
+    "samePairCooldownDays": 14,
+    "maxWinsPerSeason": 5,
+    "dropForfeits": true
   }
 }
