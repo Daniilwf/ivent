@@ -224,9 +224,9 @@ internal static class SeasonSetup
             : Decision.Reject(RejectionCodes.SeasonDeadlineNotReached, "The deadline has not come yet.");
     }
 
-    // D-516: the deadline cancels the polls whose result acts; a mechanic switched off writes nothing (D-420)
-    private static IEnumerable<IGameEvent> CancelledPolls(SeasonState state) =>
-        state.Rules.Features.Polls ? Polls.Polling.CancelAtDeadline(state) : [];
+    // D-516: the deadline cancels the polls whose result acts — even with polls switched off (D-724): the results must not
+    // change after it, and an event's suspension left to a frozen poll would hold «Подвести итоги» for nothing
+    private static IEnumerable<IGameEvent> CancelledPolls(SeasonState state) => Polls.Polling.CancelAtDeadline(state);
 
     public static SeasonState Apply(SeasonState state, SeasonResultRecorded e) => state with { Result = e.Rows };
 

@@ -287,6 +287,26 @@ public class PollTests
         Assert.Equal(s.GameId("Persona"), s.Player("Петя").Offer!.GameId);
     }
 
+    [Fact]
+    public void An_admin_polls_voted_game_gone_by_the_roll_drops_the_filter_with_a_record_and_the_roll_goes_the_usual_way()
+    {
+        // D-512, D-721: the admin's result has no event kind, the named game is dropped all the same (review of 5.8)
+        var s = Season();
+        var poll = s.Start(EffectPoll(s_gameToLeader, ChoiceSource.Games));
+        var persona = N(s.GameId("Persona"));
+        s.Voted(poll.PollId, "Вася", persona);
+        s.CloseByTimer(poll.PollId);
+        s.DeleteGame("Persona");
+
+        s.Roll("Петя");
+
+        ScenarioAssert.Accepted(s);
+        var applied = Assert.Single(s.LastEvents<Engine.Inventory.RollModifiersApplied>());
+        Assert.Contains(applied.Dropped, m => m.Filter?.Games is { } games && games.Contains(persona));
+        Assert.NotEqual(s.GameId("Persona"), s.Player("Петя").Offer?.GameId ?? Guid.Empty);
+        Assert.Empty(s.Player("Петя").Wallet.NextRoll);
+    }
+
     // ---- S5.8-14 (EV21): players — the active ones, without the first finisher ----
 
     [Theory]
@@ -626,7 +646,7 @@ public class PollTests
         s.Act(new UndoCommand(vote, "Ошибка админа"));
         s.Act(new UndoCommand(start, "Ошибка админа"));
         ScenarioAssert.Accepted(s);
-        Assert.False(s.State.Polls.TryGetValue(poll.PollId, out var left) && left.Status == PollStatus.Open);
+        Assert.False(s.State.Polls.ContainsKey(poll.PollId));
     }
 }
 

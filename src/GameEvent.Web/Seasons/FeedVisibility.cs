@@ -231,12 +231,20 @@ public static class FeedVisibility
         }
     }
 
+    /// <summary>Whether the entry must not name its command's author: a vote of an anonymous poll (D-541, D-726).</summary>
+    public static bool HidesAuthor(string type, JsonObject data)
+    {
+        ArgumentNullException.ThrowIfNull(data);
+        return Types.GetValueOrDefault(type, Access.NotInFeed) == Access.AnonymousVote && data["anonymous"]?.GetValue<bool>() == true;
+    }
+
     // The polls an undo puts back keep their votes, but an anonymous poll's voters are nobody's to see, the admin's either (D-541)
     private static JsonObject WithoutAnonymousVoters(JsonObject data)
     {
         foreach (var poll in (data["polls"] as JsonArray ?? []).OfType<JsonObject>())
         {
-            if (poll["anonymous"]?.GetValue<bool>() == true)
+            // A poll without live counts does not show its votes before the result either (D-726)
+            if (poll["anonymous"]?.GetValue<bool>() == true || poll["showLiveCounts"]?.GetValue<bool>() != true)
             {
                 poll.Remove("votes");
             }

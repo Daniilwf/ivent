@@ -93,7 +93,9 @@ internal static class RollPreparation
     private static (List<T> Kept, List<T> Lifted, List<T> Dropped) Fit<T>(
         SeasonState state, Guid playerId, EngineContext context, IReadOnlyList<T> ordered, Func<T, RollModifier> modifierOf, IReadOnlySet<Guid>? givenUp)
     {
-        if (!state.Rules.Features.Events || !ordered.Any(x => modifierOf(x) is { EventKind: not null, Filter: not null }))
+        // Named games («выберите игру лидеру», D-512) are checked whoever gave them: an admin poll's result has no event kind
+        var events = state.Rules.Features.Events;
+        if (!ordered.Any(x => modifierOf(x) is { Filter.Games: not null } || (events && modifierOf(x) is { EventKind: not null, Filter: not null })))
         {
             return ([.. ordered], [], []);
         }
@@ -104,19 +106,20 @@ internal static class RollPreparation
         var games = Rolling.Fitting(state, playerId, context.Pool, givenUp);
         foreach (var item in ordered)
         {
-            if (modifierOf(item) is { EventKind: not null, Filter: { } filter })
+            var modifier = modifierOf(item);
+
+            // Named games none of which is available any more: the filter goes for good with a record (D-512, D-721); the
+            // game a reroll gave up is still available, so the filter only waits
+            if (modifier.Filter is { Games: { } named }
+                && !Rolling.Fitting(state, playerId, context.Pool).Any(g => named.Contains(g.Id.ToString("N"), StringComparer.Ordinal)))
+            {
+                dropped.Add(item);
+                continue;
+            }
+
+            if (events && modifier is { EventKind: not null, Filter: { } filter })
             {
                 var narrowed = games.Where(g => Rolling.Matches(filter, g)).ToList();
-
-                // Named games none of which is available any more: the filter goes for good with a record (D-512); the
-                // game a reroll gave up is still available, so the filter only waits
-                if (narrowed.Count == 0 && filter.Games is { } named
-                    && !Rolling.Fitting(state, playerId, context.Pool).Any(g => named.Contains(g.Id.ToString("N"), StringComparer.Ordinal)))
-                {
-                    dropped.Add(item);
-                    continue;
-                }
-
                 if (narrowed.Count == 0)
                 {
                     lifted.Add(item);

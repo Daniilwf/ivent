@@ -12,6 +12,13 @@ public sealed record ContentError(string Path, string Message);
 public static partial class ContentValidator
 {
     public const int MaxIdLength = 50;
+
+    /// <summary>The longest a poll stays open, in hours (a season's year, D-720): the close stays a moment of the calendar.</summary>
+    public const int MaxPollHours = 24 * 366;
+
+    /// <summary>The most options a poll's list offers (D-720), as many as <c>polls.gameOptions</c> may.</summary>
+    public const int MaxPollOptions = 20;
+
     public const int MaxNameLength = 100;
     public const int MaxDescriptionLength = 1000;
 
@@ -265,9 +272,10 @@ public static partial class ContentValidator
         void Error(string path, string message) => errors.Add(new ContentError(path, message));
         CheckText(poll.Question, MaxNameLength * 2, "$.question", Error);
         CheckOptions(poll.Options, "$.options", Error);
-        if (poll.ClosesInHours <= 0)
+        CheckPollList(poll.Options, "$.options.list", Error);
+        if (poll.ClosesInHours is <= 0 or > MaxPollHours)
         {
-            Error("$.closesInHours", "A poll closes after a positive number of hours.");
+            Error("$.closesInHours", $"A poll closes after 1–{MaxPollHours} hours.");
         }
 
         // An anonymous poll never shows its counts before the close (D-541)
@@ -299,6 +307,12 @@ public static partial class ContentValidator
         if (effect.Target?.Selector == TargetSelector.Chosen)
         {
             error($"{path}.target", "Nobody answers a poll's result: it has no chosen target.");
+        }
+
+        // There is no user to compare with or leave out (D-725)
+        if (effect.Target is { } reach && (reach.Among is not null || reach.ExcludeSelf))
+        {
+            error($"{path}.target", "A poll's result has no user: no «among» or «excludeSelf».");
         }
 
         if (effect.Outcomes is { Choice: not null })
@@ -482,10 +496,12 @@ public static partial class ContentValidator
                     CheckOptions(request.Options, $"{at}.options", error);
                     if (request.Vote is { } vote)
                     {
-                        if (vote.ClosesInHours <= 0)
+                        if (vote.ClosesInHours is <= 0 or > MaxPollHours)
                         {
-                            error($"{at}.vote.closesInHours", "A poll closes after a positive number of hours.");
+                            error($"{at}.vote.closesInHours", $"A poll closes after 1–{MaxPollHours} hours.");
                         }
+
+                        CheckPollList(request.Options, $"{at}.options.list", error);
 
                         if (vote.Anonymous && vote.ShowLiveCounts == true)
                         {
@@ -498,6 +514,30 @@ public static partial class ContentValidator
 
             rolled |= actions[i] is RollAction;
             chose |= actions[i] is RequestChoiceAction or MoveAction { Direction: MoveDirection.Chosen };
+        }
+    }
+
+    // The options of a poll are what a vote names and the feed shows: a short list of short, distinct texts (D-720)
+    private static void CheckPollList(ChoiceOptionsSpec options, string path, Action<string, string> error)
+    {
+        if (options.List is not { } list)
+        {
+            return;
+        }
+
+        if (list.Count > MaxPollOptions)
+        {
+            error(path, $"A poll offers at most {MaxPollOptions} options.");
+        }
+
+        if (list.Any(o => o is { Length: > MaxNameLength }))
+        {
+            error(path, $"An option is at most {MaxNameLength} characters.");
+        }
+
+        if (list.Where(o => o is not null).GroupBy(o => o, StringComparer.Ordinal).Any(g => g.Count() > 1))
+        {
+            error(path, "Each option is listed once.");
         }
     }
 

@@ -114,6 +114,68 @@ public class PollDeadlineTests
         AssertCancelledAtTheDeadline(s, p);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void A_poll_with_an_effect_closed_past_the_deadline_before_the_scheduler_closes_the_season_is_cancelled(bool withEvent)
+    {
+        // D-724: the deadline has come, ReachDeadline has not run yet; the close cancels instead of giving a result
+        var (s, p) = Season(withEvent);
+        s.Act(new SetSeasonDeadline(s.Clock.UtcNow.AddHours(1)));
+        ScenarioAssert.Accepted(s);
+        s.Advance(TimeSpan.FromHours(1));
+
+        s.Act(new ClosePoll(p.Admin));
+
+        ScenarioAssert.Accepted(s);
+        Assert.Equal(SeasonStatus.Active, s.State.Status);
+        Assert.Equal(p.Admin, Assert.Single(s.LastEvents<PollCancelled>()).PollId);
+        Assert.Empty(s.LastEvents<PollClosed>());
+        Assert.Empty(s.LastEvents<ObjectGiven>());
+        if (p.Event is { } fromEvent)
+        {
+            s.Act(new ClosePoll(fromEvent));
+            ScenarioAssert.Accepted(s);
+            Assert.Equal(fromEvent, Assert.Single(s.LastEvents<PollCancelled>()).PollId);
+            Assert.Empty(s.LastEvents<EffectResumed>());
+            Assert.Empty(s.Player("Вася").Suspended);
+        }
+
+        // A nomination still has its result after the deadline
+        s.Act(new ClosePoll(p.Nomination));
+        Assert.Equal("Финиш", Assert.Single(s.LastEvents<PollClosed>()).Result);
+    }
+
+    [Fact]
+    public void Polls_switched_off_still_have_their_effect_polls_cancelled_at_the_deadline()
+    {
+        // D-724: the results must not change after the deadline, and an event's suspension must not wait for a frozen poll
+        var (s, p) = Season(withEvent: true);
+        s.Act(new Engine.Rulesets.ChangeRuleset(s.Ruleset with { Features = s.Ruleset.Features with { Polls = false } }));
+        ScenarioAssert.Accepted(s);
+
+        s.MoveStatusTo(SeasonStatus.Closing);
+
+        Assert.Equal(new[] { p.Admin, p.Event!.Value }.Order(), s.LastEvents<PollCancelled>().Select(c => c.PollId).Order());
+        Assert.Empty(s.Player("Вася").Suspended);
+    }
+
+    [Fact]
+    public void Undoing_the_deadline_brings_back_the_cancelled_polls_and_the_events_question()
+    {
+        // D-722: the cancel is part of the command that closed the season
+        var (s, p) = Season(withEvent: true);
+        s.MoveStatusTo(SeasonStatus.Closing);
+        var closing = s.LastCommandId;
+
+        s.Act(new Engine.Undo.UndoCommand(closing, "Рано закрыли"));
+
+        ScenarioAssert.Accepted(s);
+        Assert.Equal(SeasonStatus.Active, s.State.Status);
+        Assert.Equal((PollStatus.Open, PollStatus.Open), (s.State.Polls[p.Admin].Status, s.State.Polls[p.Event!.Value].Status));
+        Assert.Contains(s.Player("Вася").Suspended, x => x.PollId == p.Event);
+    }
+
     [Fact]
     public void A_nomination_closed_by_the_admin_after_the_deadline_has_its_result()
     {

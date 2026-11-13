@@ -241,8 +241,9 @@ internal static class Polling
         var after = SeasonEngine.Apply(state, closed);
         if (poll.Source == PollSource.Event)
         {
-            // The event that asked goes on with the result as its answer (D-512)
-            if (poll.PlayerId is { } drawer && poll.ChoiceId is { } choice
+            // The event that asked goes on with the result as its answer (D-512); with events off the answer would be refused
+            // (D-564), so the effect ends without its actions (D-723)
+            if (state.Rules.Features.Events && poll.PlayerId is { } drawer && poll.ChoiceId is { } choice
                 && state.Players.GetValueOrDefault(drawer)?.Suspended.FirstOrDefault(s => s.ChoiceId == choice) is { } suspended)
             {
                 events.AddRange(Suspensions.Continue(after, context, drawer, suspended, result));
@@ -260,7 +261,8 @@ internal static class Polling
         if (effect.Target?.Selector == TargetSelector.All)
         {
             // On everyone in a settlement of its own: the close only queues it (D-537)
-            events.Add(ForAllSettlements.Queue(after, context, ForAllSource.PollResult, poll.PollId, ResultObjectId, effect, parameters, poll.Kind));
+            // An admin's poll has no event kind (D-706)
+            events.Add(ForAllSettlements.Queue(after, context, ForAllSource.PollResult, poll.PollId, ResultObjectId, effect, parameters, kind: null));
             return events;
         }
 
@@ -273,7 +275,6 @@ internal static class Polling
         var run = new EffectRun(after, context, id, ResultObjectId, hostile: false, parameters, eventsBefore: eventsBefore + events.Count)
         {
             PositionLocked = SeasonSetup.IsPastDeadline(after, context.Clock.UtcNow),
-            EventKind = poll.Kind,
         };
         run.Run(effect, [id]);
         if (run.Refusal is null)
@@ -381,11 +382,11 @@ internal static class Polling
     public static EquatableArray<Vote> Ordered(IEnumerable<Vote> votes) => [.. votes.OrderBy(v => v.UserId)];
 
     // The event that waited is closed by the poll's end (D-512, D-516): its continuation, if any, follows as its own events
+    // (the continuation reads the suspension from the state before the close)
     public static SeasonState Apply(SeasonState state, PollClosed e)
     {
         var poll = state.Polls[e.PollId];
-        state = state with { Polls = state.Polls.SetItem(e.PollId, poll with { Status = PollStatus.Closed, Result = e.Result }) };
-        return e.Result is null ? Release(state, poll) : state;
+        return Release(state with { Polls = state.Polls.SetItem(e.PollId, poll with { Status = PollStatus.Closed, Result = e.Result }) }, poll);
     }
 
     public static SeasonState Apply(SeasonState state, PollCancelled e)

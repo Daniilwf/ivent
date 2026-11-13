@@ -389,6 +389,14 @@ internal sealed class EffectRun
             return;
         }
 
+        // The target picked at the draw finished since — a poll waits for a day (D-723): the first finisher is no target,
+        // one who finished not first is reached by points and coins only (SPEC «Цели»)
+        if (TargetId != UserId && State.Players.ContainsKey(TargetId)
+            && (Targets.IsFirst(State, TargetId) || (Targets.IsLaterFinisher(State, TargetId) && !Targets.PointsAndCoinsOnly(effect))))
+        {
+            return;
+        }
+
         // A player picked at an earlier question is checked again at every later one (Н-10, D-510): one who finished first
         // or became inactive since is not hit, the answer is not refused
         if (TargetId != UserId && effect.Target?.Selector == TargetSelector.Chosen && !Targets.Askable(State, definition, UserId).Contains(TargetId))

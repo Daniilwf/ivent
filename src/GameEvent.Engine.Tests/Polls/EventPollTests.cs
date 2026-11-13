@@ -91,6 +91,65 @@ public class EventPollTests
         return s;
     }
 
+    [Fact]
+    public void A_leader_who_finished_first_while_the_poll_was_open_is_not_reached_by_its_result()
+    {
+        // SPEC «Цели», D-723: the target picked at the draw is checked again at the close (review of 5.8)
+        var s = Season();
+        var poll = Draw(s);
+        var persona = N(s.GameId("Persona"));
+        s.Voted(poll.PollId, "Маша", persona);
+        At(s, "Петя", "c20").Finish("Петя");
+        Assert.True(s.Player("Петя").Finish is not null);
+
+        s.CloseByTimer(poll.PollId);
+
+        ScenarioAssert.Accepted(s);
+        Assert.Equal(persona, Assert.Single(s.LastEvents<PollClosed>()).Result);
+        Assert.Single(s.LastEvents<EffectResumed>());
+        Assert.Empty(s.LastEvents<NextRollModified>());
+        Assert.Empty(s.Player("Вася").Suspended);
+    }
+
+    [Fact]
+    public void Undoing_the_close_of_an_events_poll_takes_the_result_back_and_the_poll_waits_again()
+    {
+        // D-722: the close and the continuation are one command
+        var s = Season();
+        var poll = Draw(s);
+        var persona = N(s.GameId("Persona"));
+        s.Voted(poll.PollId, "Маша", persona);
+        s.CloseByTimer(poll.PollId);
+        var close = s.LastCommandId;
+        Assert.Single(s.LastEvents<NextRollModified>());
+
+        s.Act(new Engine.Undo.UndoCommand(close, "Закрыли по ошибке"));
+
+        ScenarioAssert.Accepted(s);
+        Assert.Equal(PollStatus.Open, s.State.Polls[poll.PollId].Status);
+        Assert.Contains(s.Player("Вася").Suspended, x => x.PollId == poll.PollId);
+        Assert.Empty(s.Player("Петя").Wallet.NextRoll);
+        Assert.Null(s.Player("Вася").Choice);
+    }
+
+    [Fact]
+    public void With_events_switched_off_an_events_poll_closes_without_playing_on()
+    {
+        // D-564, D-723: the answer of an event waits while events are off, so the result ends the effect without its actions
+        var s = Season();
+        var poll = Draw(s);
+        s.Voted(poll.PollId, "Маша", N(s.GameId("Persona")));
+        s.Act(new Engine.Rulesets.ChangeRuleset(s.Ruleset with { Features = s.Ruleset.Features with { Events = false } }));
+        ScenarioAssert.Accepted(s);
+
+        s.CloseByTimer(poll.PollId);
+
+        ScenarioAssert.Accepted(s);
+        Assert.NotNull(Assert.Single(s.LastEvents<PollClosed>()).Result);
+        Assert.Empty(s.LastEvents<EffectResumed>());
+        Assert.Empty(s.Player("Вася").Suspended);
+    }
+
     // ---- S5.8-15 (EV23): the event asks the voters and the leader's next roll is the voted game ----
 
     [Fact]

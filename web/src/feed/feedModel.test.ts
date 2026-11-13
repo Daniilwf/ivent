@@ -827,6 +827,16 @@ describe('events drawn from decks (stage 5)', () => {
     expect(lineOf('poll-cancelled', { pollId: 'p' })).toBe('Голосование отменено дедлайном');
   });
 
+  it('names the voter of a named poll and nobody in an anonymous one (D-515, D-541)', () => {
+    const actorOf = (data: Record<string, unknown>) =>
+      feedDays([entry('v1', 'vote-cast', data)], named, now)[0]?.items[0]?.actor ?? null;
+    const user = [...named.players.values()][0]?.userId ?? '';
+    expect(user).not.toBe('');
+
+    expect(actorOf({ pollId: 'p', userId: user, anonymous: false })?.userId).toBe(user);
+    expect(actorOf({ pollId: 'p', anonymous: true })).toBeNull();
+  });
+
   it('shows a batch of a settlement for everyone as a line of the system (D-537)', () => {
     const item = feedDays(
       [
