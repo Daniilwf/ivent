@@ -317,6 +317,14 @@ const headlines: [string, (d: Data, c: Context) => Headline][] = [
     }),
   ],
   [
+    'run-condition-checked',
+    (d, c) => ({
+      icon: 'admin',
+      actor: c.player(d),
+      line: L.conditionChecked(c.playerRef(d), c.gameRef(d), d.met === true, d.waived === true),
+    }),
+  ],
+  [
     'run-reviewed',
     (d, c) => ({
       icon: 'review',

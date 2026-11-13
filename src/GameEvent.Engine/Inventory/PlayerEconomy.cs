@@ -30,9 +30,17 @@ public sealed record InventoryObject(
 
 /// <summary>
 /// A change of the next roll by an item or an effect (CONTENT.md <c>modifyNextRoll</c>): a filter with its parameters
-/// resolved, and the number of games to choose from. <see cref="ObjectId"/> — whose change it is, for «не стакается».
+/// resolved, the number of games to choose from, or a condition on the run. <see cref="ObjectId"/> — whose change it is, for «не стакается».
 /// </summary>
-public sealed record RollModifier(string ObjectId, GameFilterSpec? Filter, int? ChoiceCount, bool Hostile = false);
+public sealed record RollModifier(string ObjectId, GameFilterSpec? Filter, int? ChoiceCount, bool Hostile = false)
+{
+    /// <summary>
+    /// A condition on the run (<c>modifyNextRoll.runCondition</c>, D-507): fixed in the snapshot at the roll; a change
+    /// carries either it or a filter and a choice count. Written only when set, so the changes before it keep their format.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ConditionSpec? RunCondition { get; init; }
+}
 
 /// <summary>
 /// A change of the next throw for a completion (CONTENT.md <c>modifyDice</c> with <c>when: next</c>), waiting for it:

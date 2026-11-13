@@ -39,14 +39,18 @@ internal static class RollPreparation
         state = after;
 
         var wallet = state.Players[playerId].Wallet;
-        EquatableArray<RollModifier> pending = [.. wallet.NextRoll.Skip(waiting.Count), .. waiting];
+        // Conditions of a roll that ended without a game started (an «already played» of the last game, an offer the admin
+        // discarded) go on to this one: a condition belongs to the next run, not to a roll (D-591)
+        EquatableArray<RollModifier> pending = [.. wallet.CurrentRoll.Where(m => m.RunCondition is not null), .. wallet.NextRoll.Skip(waiting.Count), .. waiting];
 
         // Others' changes of the game put on him before he finished not first are taken off the roll and recorded by
         // what the roll applies (D-425); dice changes wait for his throw as before.
         EquatableArray<RollModifier> modifiers = Targets.IsLaterFinisher(state, playerId) ? [.. pending.Where(m => !m.Hostile)] : pending;
         if (pending.Count > 0 || wallet.CurrentRoll.Count > 0)
         {
-            var applied = new RollModifiersApplied(playerId, modifiers);
+            // A condition contradicting those before it waits for the next roll (D-506)
+            var (taken, postponed) = Runs.RunConditions.Split(modifiers, state.Rules.Features.Events);
+            var applied = new RollModifiersApplied(playerId, taken) { Waiting = postponed };
             events.Add(applied);
             state = SeasonEngine.Apply(state, applied);
         }

@@ -201,10 +201,13 @@ internal static class ItemUse
         };
     }
 
-    /// <summary>The player's latest run, when it is a completed one: the throw «after the throw» works on.</summary>
+    /// <summary>
+    /// The player's latest run, when it is a completed one: the throw «after the throw» works on; none when its unmet
+    /// condition left it without a throw (D-592).
+    /// </summary>
     public static RunState? LastCompleted(SeasonState state, SeasonPlayer player) =>
         state.Runs.Values.Where(r => r.PlayerId == player.PlayerId).MaxBy(r => r.StartedAt) is { Status: RunStatus.Completed } run
-        && !run.FreeMode
+        && !run.FreeMode && !Runs.RunConditions.WithoutDice(run)
             ? run
             : null;
 
