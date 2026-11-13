@@ -1,7 +1,7 @@
-using GameEvent.Engine.Kernel;
-using GameEvent.Engine.Polls;
 using GameEvent.Engine.Content;
 using GameEvent.Engine.Economy;
+using GameEvent.Engine.Kernel;
+using GameEvent.Engine.Polls;
 using GameEvent.Engine.Seasons;
 using GameEvent.Engine.Tests.Support;
 using static GameEvent.Engine.Tests.Polls.PollSetup;
