@@ -120,5 +120,5 @@ internal static class Choosing
 
     // An effect waiting behind a choice of another kind is asked once that choice is gone (D-562)
     private static SeasonState Update(SeasonState state, Guid playerId, Func<SeasonPlayer, SeasonPlayer> change) =>
-        state with { Players = state.Players.SetItem(playerId, Effects.Suspensions.Refresh(change(state.Players[playerId]))) };
+        state with { Players = state.Players.SetItem(playerId, Effects.Suspensions.Refresh(change(state.Players[playerId]), state.Rules)) };
 }

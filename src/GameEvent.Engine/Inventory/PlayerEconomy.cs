@@ -10,6 +10,8 @@ namespace GameEvent.Engine.Inventory;
 /// The lifetime (SPEC «Срок жизни эффектов») is what is left of it: <see cref="UsesLeft"/>, <see cref="RunsLeft"/>,
 /// <see cref="ExpiresAt"/>; none of them — until it fires once (<c>untilTriggered</c>) or for the season.
 /// <see cref="FromPlayerId"/> — who put it on the player, when that was another player (a hostile effect).
+/// <see cref="EventKind"/> — the kind of the drawn event that gave this effect or special roll (D-543): its changes and its
+/// firing apply in the order of <c>events.applyOrder</c>; written only when set.
 /// <see cref="Acquired"/> — the number of the player's acquisition, so objects apply in the order they came (SPEC
 /// «Спецролл … по порядку получения»). <see cref="Counter"/> — what is left of an effect's countdown (D-479); written only
 /// when it has one.
@@ -26,13 +28,20 @@ public sealed record InventoryObject(
     int? RunsLeft = null,
     DateTimeOffset? ExpiresAt = null,
     EquatableArray<string> Notes = default,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? Counter = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? Counter = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] Rulesets.EventKind? EventKind = null);
 
 /// <summary>
 /// A change of the next roll by an item or an effect (CONTENT.md <c>modifyNextRoll</c>): a filter with its parameters
 /// resolved, the number of games to choose from, or a condition on the run. <see cref="ObjectId"/> — whose change it is, for «не стакается».
+/// <see cref="EventKind"/> — the kind of the event it came from (D-505): the order it applies in; written only for events.
 /// </summary>
-public sealed record RollModifier(string ObjectId, GameFilterSpec? Filter, int? ChoiceCount, bool Hostile = false)
+public sealed record RollModifier(
+    string ObjectId,
+    GameFilterSpec? Filter,
+    int? ChoiceCount,
+    bool Hostile = false,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] Rulesets.EventKind? EventKind = null)
 {
     /// <summary>
     /// A condition on the run (<c>modifyNextRoll.runCondition</c>, D-507): fixed in the snapshot at the roll; a change
@@ -45,7 +54,8 @@ public sealed record RollModifier(string ObjectId, GameFilterSpec? Filter, int? 
 /// <summary>
 /// A change of the next throw for a completion (CONTENT.md <c>modifyDice</c> with <c>when: next</c>), waiting for it:
 /// the stage and the value with its references resolved (dice are rolled when the throw happens). <see cref="Sides"/> — the
-/// kind of extra dice of a <c>count</c> stage when it is their own (D-475); written only when set.
+/// kind of extra dice of a <c>count</c> stage when it is their own (D-475); written only when set. <see cref="EventKind"/> —
+/// the kind of the event it came from (D-505); written only for events.
 /// </summary>
 public sealed record DiceModifier(
     string ObjectId,
@@ -53,7 +63,8 @@ public sealed record DiceModifier(
     ContentValue Value,
     bool Hostile = false,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? Sides = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? From = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? From = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] Rulesets.EventKind? EventKind = null);
 
 /// <summary>A lot of the personal shop offer (SPEC «Магазин»): the object, its price in coins, whether it was bought.</summary>
 public sealed record ShopLot(string ObjectId, Rarity Rarity, int Price, bool Sold = false);

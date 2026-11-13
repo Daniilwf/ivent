@@ -216,7 +216,8 @@ public class RunConditionTests
         // When he rolls: the condition is fixed in the snapshot with the policy of the rules (seen on the run's page)
         s.RollTitle("Вася", "Alan Wake");
         var offer = s.Player("Вася").Offer!;
-        Assert.Equal([new RunCondition("not-even-sweating", AtLeast(Difficulty.Hard))], offer.Snapshot.Conditions);
+        // The snapshot keeps the kind of its event, so a condition given back keeps its place in the order (D-586)
+        Assert.Equal([new RunCondition("not-even-sweating", AtLeast(Difficulty.Hard), EventKind: EventKind.Bad)], offer.Snapshot.Conditions);
         Assert.Equal(UnmetConditionPolicy.NoDiceKeepCoins, offer.Snapshot.ConditionPolicy);
         Assert.Equal(offer.Snapshot, Assert.Single(s.LastEvents<GameRolled>()).Snapshot);
         Assert.Empty(s.Player("Вася").Wallet.NextRoll);

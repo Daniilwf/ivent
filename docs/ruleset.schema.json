@@ -769,6 +769,20 @@
             "null"
           ]
         },
+        "applyOrder": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "enum": [
+              "good",
+              "bad",
+              "special",
+              "risky"
+            ]
+          }
+        },
         "irlProof": {
           "type": [
             "object",

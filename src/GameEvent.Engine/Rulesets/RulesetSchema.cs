@@ -34,7 +34,9 @@ public static class RulesetSchema
     // EquatableArray<T> has its own converter, which the exporter sees as «any value»: describe it as an array of T.
     private static JsonNode DescribeLists(JsonSchemaExporterContext context, JsonNode schema)
     {
-        var type = context.TypeInfo.Type;
+        // A nullable list (an optional field read as missing, D-50) is an array or null
+        var nullable = Nullable.GetUnderlyingType(context.TypeInfo.Type);
+        var type = nullable ?? context.TypeInfo.Type;
         if (!type.IsGenericType || type.GetGenericTypeDefinition() != typeof(EquatableArray<>))
         {
             return schema;
@@ -42,7 +44,7 @@ public static class RulesetSchema
 
         return new JsonObject
         {
-            ["type"] = "array",
+            ["type"] = nullable is null ? "array" : new JsonArray("array", "null"),
             ["items"] = Node(type.GetGenericArguments()[0]),
         };
     }

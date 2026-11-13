@@ -165,7 +165,9 @@ internal static class DicePipeline
             return ([], state, []);
         }
 
-        var changes = state.Players[playerId].Wallet.NextDice.Select(m => new ThrowChange(m.ObjectId, m.Stage, m.Value, m.Sides, m.From)).ToList();
+        // Events' waiting changes by events.applyOrder, then items', each kind as they came (D-505)
+        var changes = Decks.EventOrder.Sort(state.Rules, state.Players[playerId].Wallet.NextDice, m => m.EventKind)
+            .Select(m => new ThrowChange(m.ObjectId, m.Stage, m.Value, m.Sides, m.From)).ToList();
         var events = new List<IGameEvent>();
         foreach (var item in Firing.Subscribed(state, playerId, Trigger.BeforeDice))
         {

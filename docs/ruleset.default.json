@@ -119,6 +119,7 @@
   },
   "events": {
     "defaultDeck": "risky",
+    "applyOrder": ["special", "good", "bad"],
     "irlProof": { "maxFiles": 5 }
   },
   "suggestions": {
