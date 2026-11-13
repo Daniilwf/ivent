@@ -372,7 +372,9 @@ public class RunConditionTests
         var run = s.State.Runs[runId];
         Assert.Equal(Difficulty.Normal, run.Difficulty);
         Assert.Empty(run.Dice);
-        Assert.Equal(new RunConditionState(Met: false), run.Condition);
+
+        // The dice are held, recalculated to d4 by Q-5, for the condition becoming met again (D-593)
+        Assert.Equal(new RunConditionState(Met: false, Held: new RunHeldDice([new Die(4, 3), new Die(4, 4)], [], null)), run.Condition);
         Assert.Equal((0, "start", coins), (s.Player("Вася").Points, s.Player("Вася").CellId, s.Player("Вася").Coins));
     }
 
@@ -505,14 +507,15 @@ public class RunConditionTests
         s.Act(new ChangeRunDifficulty(runId, Difficulty.Hard, "Всё же сложная"));
         ScenarioAssert.Accepted(s);
         Assert.Empty(s.State.Runs[runId].Dice);
-        s.NextRandom(3, 3).Act(new ChangeRunDifficulty(runId, Difficulty.Extreme, "Всё же выше сложной"));
+        NoThrowExpected(s).Act(new ChangeRunDifficulty(runId, Difficulty.Extreme, "Всё же выше сложной"));
 
-        // Then the dice are back, but the run drew its event already (D-557)
+        // Then the same dice are back, not thrown again (D-593), and the run drew its event already (D-557)
         ScenarioAssert.Accepted(s);
-        Assert.Equal([new Die(6, 3), new Die(6, 3)], s.State.Runs[runId].Dice);
+        Assert.Equal([new Die(6, 5), new Die(6, 2)], s.State.Runs[runId].Dice);
+        Assert.Equal(1, s.Random.ScriptedLeft);
         Assert.Empty(s.LastEvents<EventDrawn>());
         Assert.Empty(s.LastEvents<EventDrawMissed>());
-        Assert.Equal(6, s.Player("Вася").Points);
+        Assert.Equal(7, s.Player("Вася").Points);
     }
 
     // ---- S5.5-06: an hours correction of a run without dice by its condition throws nothing ----

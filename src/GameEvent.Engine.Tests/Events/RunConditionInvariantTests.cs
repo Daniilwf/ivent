@@ -22,6 +22,7 @@ namespace GameEvent.Engine.Tests.Events;
 /// no challenge dice, after any correction (D-507);
 /// (4) a completed run with a condition that is not waived is met exactly when every condition holds at its difficulty;
 /// (5) the last <c>run-condition-checked</c> of a run in a command is what the state holds (the replay does not recompute);
+/// (3b) a met or waived run has dice and holds none aside (D-593);
 /// (6) a command writes at most 50 events. At the end the log replays to the state, and the same seed and script give the
 /// same log (invariant 14). Belongs to the generator of task 5.15; kept here until it lands there.
 /// </summary>
@@ -154,6 +155,13 @@ public class RunConditionInvariantTests
             {
                 Assert.Empty(run.Dice);
                 Assert.Empty(run.ChallengeDice);
+            }
+
+            // And back (review of 5.5): a met or waived run has its dice by the hours again and holds none aside (D-593)
+            if ((condition.Met || condition.Waived) && run.Mods?.SingleDie is null && run.Snapshot.DiceCount.Min > 0)
+            {
+                Assert.NotEmpty(run.Dice);
+                Assert.Null(condition.Held);
             }
         }
 

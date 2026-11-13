@@ -230,6 +230,58 @@ public sealed class EconomyQueueTests : IAsyncLifetime
         Assert.True((await SeasonIntegrity.CheckAsync(check, SiteFactory.SeasonId, Ct))!.IsIntact);
     }
 
+    [Fact]
+    public async Task Conditions_of_runs_checked_changed_and_waived_are_projected_equal_to_the_log()
+    {
+        // D-598: the condition in the snapshot JSON, its check, the held dice and the waived one from the log
+        await using (var db = _site.NewDb())
+        {
+            var (state, _) = await EventLogReader.ReplaySeasonAsync(db, SiteFactory.SeasonId, Ct);
+            await _site.SendAsync(new ChangeRuleset(state.Rules with
+            {
+                Features = state.Rules.Features with { Items = true, Events = true },
+                Events = new EventRules { DefaultDeck = EventKind.Good },
+            }));
+        }
+
+        var vow = Item("vow-hard", 10, new EffectSpec
+        {
+            Target = new TargetSpec { Selector = TargetSelector.Self },
+            Actions = [new ModifyNextRollAction { RunCondition = new ConditionSpec { DifficultyAtLeast = Engine.Runs.Difficulty.Hard } }],
+        });
+        await _site.SendAsync(new PublishContent(new ContentPack { Objects = [vow] }, "Контент"));
+        var vasya = _site.Players["vasya"];
+        await _site.SendAsync(new AdjustInventory(vasya, "vow-hard", null, "Подарок"));
+        Guid runId;
+        await using (var read = _site.NewDb())
+        {
+            var (given, _) = await EventLogReader.ReplaySeasonAsync(read, SiteFactory.SeasonId, Ct);
+            await _site.SendAsync(new UseItem(vasya, given.Players[vasya].Wallet.Inventory.Single(o => o.ObjectId == "vow-hard").InstanceId));
+        }
+
+        await _site.SendAsync(new Engine.Rolls.RollGame(vasya));
+        await _site.SendAsync(new Engine.Runs.StartRun(vasya));
+        _site.Clock.UtcNow = _site.Clock.UtcNow.AddHours(5);
+        await _site.SendAsync(new Engine.Runs.CompleteRun(vasya, Engine.Runs.Difficulty.Hard, 5m, "HLTB"));
+        await using (var read = _site.NewDb())
+        {
+            var (completed, _) = await EventLogReader.ReplaySeasonAsync(read, SiteFactory.SeasonId, Ct);
+            runId = completed.Runs.Values.Single(r => r.PlayerId == vasya).RunId;
+            Assert.True(completed.Runs[runId].Condition!.Met);
+        }
+
+        await _site.SendAsync(new Engine.Proofs.ApproveProof(runId, Engine.Runs.Difficulty.Normal, "Нормальная"));
+        await _site.SendAsync(new Engine.Runs.WaiveRunCondition(runId, "Неприменимо"));
+
+        await using var check = _site.NewDb();
+        var (state2, _) = await EventLogReader.ReplaySeasonAsync(check, SiteFactory.SeasonId, Ct);
+        Assert.Equal(new Engine.Runs.RunConditionState(true, Waived: true), state2.Runs[runId].Condition);
+        Assert.Single(state2.Runs[runId].Snapshot.Conditions);
+        Assert.Equal("vow-hard", Assert.Single(state2.Players[vasya].Wallet.NextRoll).ObjectId);
+        var report = await SeasonIntegrity.CheckAsync(check, SiteFactory.SeasonId, Ct);
+        Assert.True(report!.IsIntact, string.Join("; ", report.Differences));
+    }
+
     private async Task<int> CountAsync(string type)
     {
         await using var db = _site.NewDb();

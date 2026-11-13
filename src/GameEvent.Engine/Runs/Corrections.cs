@@ -162,7 +162,7 @@ internal static class Corrections
         {
             events.AddRange(Decks.EventDraws.ForDifficulty(events.Aggregate(state, SeasonEngine.Apply), context, run.RunId));
         }
-        else if (!frozen && newRule.GrantEvent is { } granted)
+        else if (!frozen && newRule.GrantEvent is { } granted && !RunConditions.WithoutDice(events.Aggregate(state, SeasonEngine.Apply).Runs[run.RunId]))
         {
             events.Add(new ManualEffectCreated(context.Ids.NewId(), run.PlayerId, granted, ManualEffectSource.Difficulty, run.RunId));
         }

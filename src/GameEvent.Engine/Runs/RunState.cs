@@ -70,14 +70,19 @@ public sealed record RunCondition(
 /// <summary>
 /// The check of a completed run's conditions (D-507): <see cref="Met"/> at the difficulty that counts, <see cref="Waived"/>
 /// by the admin as not applicable (D-546 (2)), <see cref="ChallengeDone"/> claimed at the completion — so dice thrown later,
-/// when the condition becomes met, include the challenge's.
+/// when the condition becomes met, include the challenge's; <see cref="Held"/> — the thrown dice an unmet condition took.
 /// </summary>
 public sealed record RunConditionState(
     bool Met,
     [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     bool Waived = false,
     [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    bool ChallengeDone = false);
+    bool ChallengeDone = false,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    RunHeldDice? Held = null);
+
+/// <summary>The thrown dice an unmet condition took off a run (D-593), given back when it is met again.</summary>
+public sealed record RunHeldDice(EquatableArray<Die> Dice, EquatableArray<Die> ChallengeDice, RunDiceMods? Mods);
 
 /// <summary>
 /// The zone the player stood in at the roll, with the rules of it the run plays by (SPEC «Зона фиксируется в момент

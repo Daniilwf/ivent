@@ -375,7 +375,9 @@ internal static class SeasonProjection
                     replayed.Runs.GetValueOrDefault(r.Id)?.CellObjects ?? default,
                     r.DeclaredDifficulty,
 
-                    // The check of its conditions comes from the log, like the cells of its move (columns — 5.16, D-598)
+                    // The engine's bookkeeping of a run's events: its difficulty's event drawn (D-557) and the check of its
+                    // conditions come from the log, like the cells of its move (columns — 5.16, D-598)
+                    DifficultyEventDrawn: replayed.Runs.GetValueOrDefault(r.Id)?.DifficultyEventDrawn ?? false,
                     Condition: replayed.Runs.GetValueOrDefault(r.Id)?.Condition)),
             ManualEffects = effects.ToImmutableSortedDictionary(
                 x => x.Id,

@@ -180,7 +180,7 @@ internal static class RunLifecycle
         }
 
         var eventsOn = state.Rules.Features.Events;
-        if (die.GrantEvent is { } granted && !eventsOn)
+        if (die.GrantEvent is { } granted && !eventsOn && !noThrow)
         {
             events.Add(new ManualEffectCreated(context.Ids.NewId(), player.PlayerId, granted, ManualEffectSource.Difficulty, run.RunId));
         }

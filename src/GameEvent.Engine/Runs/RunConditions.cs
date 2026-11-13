@@ -42,7 +42,8 @@ internal static class RunConditions
     /// The roll's changes split (D-506): the conditions are taken in the order the changes apply; one that contradicts those
     /// taken before it (the highest «at least» above the lowest «at most») is left waiting for a later roll.
     /// </summary>
-    public static (EquatableArray<RollModifier> Taken, EquatableArray<RollModifier> Postponed) Split(IEnumerable<RollModifier> modifiers)
+    /// <remarks>With <paramref name="events"/> off every condition waits: the mechanic is off, not its conditions lost (D-591).</remarks>
+    public static (EquatableArray<RollModifier> Taken, EquatableArray<RollModifier> Postponed) Split(IEnumerable<RollModifier> modifiers, bool events)
     {
         var taken = new List<RollModifier>();
         var postponed = new List<RollModifier>();
@@ -58,7 +59,7 @@ internal static class RunConditions
 
             var newLeast = Max(least, condition.DifficultyAtLeast);
             var newMost = Min(most, condition.DifficultyAtMost);
-            if (newLeast > newMost)
+            if (!events || newLeast > newMost)
             {
                 postponed.Add(modifier);
                 continue;
@@ -119,11 +120,26 @@ internal static class RunConditions
             return new RunConditionChecked(run.RunId, run.PlayerId, difficulty, met, Waived: waive);
         }
 
-        // Dice by its hours at its die, as the completion would have thrown them, without the changes of items (D-593)
-        var sides = CompletionRoll.DieFor(difficulty, run.Snapshot.DieByDifficulty).Sides;
-        var dice = CompletionRoll.Roll(CompletionRoll.Count(run.Hours!.Value, run.Snapshot), sides, context.Random);
+        var rule = CompletionRoll.DieFor(difficulty, run.Snapshot.DieByDifficulty).Sides;
+        var count = CompletionRoll.Count(run.Hours!.Value, run.Snapshot);
+        if (state.Held is { } held)
+        {
+            // The dice the condition took come back, each at the new difficulty by Q-5, items' sides and single die kept
+            // (D-593); by the hours as they are now: missing ones thrown, extra ones off the end (D-14)
+            var sides = held.Mods?.Sides ?? rule;
+            static EquatableArray<Die> Recalculate(EquatableArray<Die> dice, int sides) =>
+                [.. dice.Select(d => new Die(sides, (int)Math.Ceiling((decimal)d.Value * sides / d.Sides)))];
+            var back = held.Mods?.SingleDie is { } single
+                ? Recalculate(held.Dice, single)
+                : (EquatableArray<Die>)[.. Recalculate(held.Dice, sides).Take(count), .. CompletionRoll.Roll(Math.Max(0, count - held.Dice.Count), sides, context.Random)];
+            return new RunConditionChecked(run.RunId, run.PlayerId, difficulty, met, back, held.ChallengeDice.Count > 0 ? Recalculate(held.ChallengeDice, sides) : default, waive);
+        }
+
+        // Never thrown: dice by its hours at its die, as the completion would have thrown them, without the changes of
+        // items that never took part (D-593)
+        var dice = CompletionRoll.Roll(count, rule, context.Random);
         EquatableArray<Die> challenge = state.ChallengeDone && run.Snapshot.ChallengeExtraDice > 0
-            ? CompletionRoll.Roll(run.Snapshot.ChallengeExtraDice, sides, context.Random)
+            ? CompletionRoll.Roll(run.Snapshot.ChallengeExtraDice, rule, context.Random)
             : default;
         return new RunConditionChecked(run.RunId, run.PlayerId, difficulty, met, dice, challenge, waive);
     }
@@ -166,11 +182,16 @@ internal static class RunConditions
         };
         if (!before && WithoutDice(checkedRun))
         {
-            checkedRun = checkedRun with { Dice = [], ChallengeDice = [], Mods = null };
+            // The dice are taken, not lost: held for the condition becoming met again (D-593)
+            var held = run.Dice.Count > 0 || run.ChallengeDice.Count > 0 || run.Mods is not null
+                ? new RunHeldDice(run.Dice, run.ChallengeDice, run.Mods)
+                : null;
+            checkedRun = checkedRun with { Dice = [], ChallengeDice = [], Mods = null, Condition = checkedRun.Condition! with { Held = held } };
         }
-        else if (before && !WithoutDice(checkedRun) && run.Status == RunStatus.Completed && (e.Dice.Count > 0 || e.ChallengeDice.Count > 0))
+        else if (before && !WithoutDice(checkedRun))
         {
-            checkedRun = checkedRun with { Dice = e.Dice, ChallengeDice = e.ChallengeDice };
+            var held = run.Condition?.Held;
+            checkedRun = checkedRun with { Dice = e.Dice, ChallengeDice = e.ChallengeDice, Mods = held?.Mods, Condition = checkedRun.Condition! with { Held = null } };
         }
 
         return state with { Runs = state.Runs.SetItem(e.RunId, checkedRun) };

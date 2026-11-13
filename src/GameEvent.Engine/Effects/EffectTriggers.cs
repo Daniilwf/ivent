@@ -34,6 +34,8 @@ internal sealed class EffectTriggers : ITriggerHandler, IFiringTriggerHandler
             GameRolled e => Fire(state, context, e.PlayerId, [Trigger.AfterRoll], null, DiceScope.Pending, at),
             GameChoiceRolled e => Fire(state, context, e.PlayerId, [Trigger.AfterRoll], null, DiceScope.Pending, at),
             RunCompleted e => Fire(state, context, e.PlayerId, [Trigger.RunCompleted, Trigger.RunEnded], e.RunId, DiceScope.Pending, at),
+            // No throw by an unmet condition, nothing to react to (D-592)
+            CompletionRolled e when Runs.RunConditions.WithoutDice(state.Runs[e.RunId]) => [],
             CompletionRolled e => Fire(state, context, e.PlayerId, [Trigger.AfterDice], e.RunId, DiceScope.AfterThrow, at),
             RunDropped e => Fire(state, context, e.PlayerId, [Trigger.Drop, Trigger.RunEnded], e.RunId, DiceScope.Pending, at),
             RunTechRerolled e => Fire(state, context, e.PlayerId, [Trigger.TechReroll], e.RunId, DiceScope.Pending, at),
