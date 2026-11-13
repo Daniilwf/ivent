@@ -153,7 +153,7 @@ public sealed class EconomyQueueTests : IAsyncLifetime
             await site.SendAsync(new ChangeRuleset(state.Rules with
             {
                 Features = state.Rules.Features with { Items = true, Events = true },
-                Events = new EventRules { DefaultDeck = EventKind.Good, AnswerTimeoutHours = timeoutHours },
+                Events = new EventRules { DefaultDeck = EventKind.Good, AnswerTimeoutHours = timeoutHours, IrlProof = new IrlProofRules { MaxFiles = 5 } },
             }));
         }
 
@@ -240,7 +240,7 @@ public sealed class EconomyQueueTests : IAsyncLifetime
             await _site.SendAsync(new ChangeRuleset(state.Rules with
             {
                 Features = state.Rules.Features with { Items = true, Events = true },
-                Events = new EventRules { DefaultDeck = EventKind.Good },
+                Events = new EventRules { DefaultDeck = EventKind.Good, IrlProof = new IrlProofRules { MaxFiles = 5 } },
             }));
         }
 

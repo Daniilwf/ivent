@@ -8029,6 +8029,7 @@ export interface components {
              */
             answerTimeoutHours?: null | number;
             applyOrder?: null | components["schemas"]["EquatableArrayOfEventKind"];
+            irlProof?: null | components["schemas"]["IrlProofRules"];
         };
         /**
          * @description Where a drawn event came from (GLOSSARY «Источник ивента», panel D-484 (2), D-548). The Бабл stops a bad event of
@@ -8321,6 +8322,14 @@ export interface components {
             choosesTarget: boolean;
             targets: components["schemas"]["ItemTargetView"][];
             steps: components["schemas"]["ItemStepView"][];
+        };
+        /** @description The proof of an IRL event (D-509): the player's own screenshots and / or one https link to a video. */
+        IrlProofRules: {
+            /**
+             * Format: int32
+             * @description How many uploaded screenshots one submission takes; 0 — a link only.
+             */
+            maxFiles: number;
         };
         /** @description One answer: the id the engine checks, the words the screen shows. */
         ItemOptionView: {

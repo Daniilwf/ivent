@@ -115,7 +115,7 @@ public sealed class EventApiTests : IAsyncLifetime
         ruleset["features"]!["mapMode"] = "graph";
         ruleset["features"]!["items"] = true;
         ruleset["features"]!["events"] = events;
-        ruleset["events"] = new JsonObject { ["defaultDeck"] = "risky" };
+        ruleset["events"] = new JsonObject { ["defaultDeck"] = "risky", ["irlProof"] = new JsonObject { ["maxFiles"] = 5 } };
         ruleset["reward"]!["diceCount"]!["min"] = 3;
         ruleset["reward"]!["diceCount"]!["max"] = 3;
         var response = await admin.PutAsJsonAsync(

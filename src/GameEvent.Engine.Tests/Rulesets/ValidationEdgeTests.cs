@@ -65,7 +65,27 @@ public class ValidationEdgeTests
         { "a weekly challenge over a year", r => r with { WeeklyChallenge = r.WeeklyChallenge with { DurationDays = 367 } }, "weeklyChallenge.durationDays" },
         { "no suggestions a day", r => r with { Suggestions = new SuggestionRules { PerDay = 0 } }, "suggestions.perDay" },
         { "too many suggestions a day", r => r with { Suggestions = new SuggestionRules { PerDay = 101 } }, "suggestions.perDay" },
+        // Task 5.6 (EV12): the screenshots of an IRL proof, at most what a proof of a run holds
+        { "events without the irl proof rules", IrlProof(null!), "events.irlProof" },
+        { "negative irl proof files", IrlProof(new IrlProofRules { MaxFiles = -1 }), "events.irlProof.maxFiles" },
+        { "more irl proof files than a proof holds", IrlProof(new IrlProofRules { MaxFiles = Limits.MaxProofFiles + 1 }), "events.irlProof.maxFiles" },
     };
+
+    /// <summary>Events on (with items) and <paramref name="rules"/> as <c>events.irlProof</c>.</summary>
+    private static Func<Ruleset, Ruleset> IrlProof(IrlProofRules rules) =>
+        r =>
+        {
+            var withEvents = r.WithEvents();
+            return withEvents with { Events = withEvents.Events! with { IrlProof = rules } };
+        };
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(Limits.MaxProofFiles)]
+    public void The_irl_proof_files_at_their_bounds_are_accepted(int maxFiles)
+    {
+        Assert.Empty(RulesetValidator.Validate(IrlProof(new IrlProofRules { MaxFiles = maxFiles })(TestRuleset.Create())));
+    }
 
     [Theory]
     [InlineData(1, 1)]

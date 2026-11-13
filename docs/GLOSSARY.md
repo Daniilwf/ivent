@@ -275,7 +275,7 @@
 | Невыполненное условие | прохождение не выполнило условие: по умолчанию без кубов, с монетками; кубики снимает и докидывает правка сложности как поправка (D-592) | `UnmetConditionPolicy` (`NoDiceKeepCoins`, `CountAsDrop` — пока не поддержан, `Ignore`), `RunSnapshot.ConditionPolicy`, `RunConditionChecked.Met` |
 | Откуп от плохого ивента | снять ждущие последствия плохого ивента за монетки (выключен, D-508) | `events.badEventBuyout`, команда `BuyOutBadEvent` |
 | IRL-ивент | ивент, выполняемый в жизни (караоке, готовка): ручной эффект с пруфом | `ObjectDefinition.Proof = ContentProof.Media` |
-| IRL-пруф | фото или ссылка на видео к IRL-ивенту; проверяет админ | команды `SubmitIrlProof`, `ReviewIrlProof`, события `IrlProofSubmitted`, `IrlProofReviewed`; `IrlProofStatus` |
+| IRL-пруф | фото или ссылка на видео к IRL-ивенту; проверяет админ | команды `SubmitIrlProof`, `ReviewIrlProof`, события `IrlProofSubmitted`, `IrlProofReviewed`; `IrlProofStatus`, `IrlProofState` (`PendingManualEffect.IrlProof`), `IrlProofs.IsIrl`; лимит картинок — `events.irlProof.maxFiles` |
 | Ивент ждёт ответа | эффект ивента остановился на вопросе к игроку; ответ — общий выбор (D-511) | `ChoiceKind.Effect`, `SuspendedEffect`, события `EffectSuspended`, `EffectResumed` |
 | Срок ответа ивента | через сколько часов без ответа на приостановленный ивент сервер отвечает случайным вариантом; по умолчанию срока нет (D-560) | `events.answerTimeoutHours` |
 | Голос | выбор пользователя в голосовании; один на человека, до закрытия можно сменить | команда `CastVote`, событие `VoteCast` |
