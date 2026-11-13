@@ -189,14 +189,16 @@ public static class Movement
             MoveReason.Teleport => player.LastMoveRunId,
             _ => null,
         };
-        if (gainRunId is { } gaining && state.Runs.TryGetValue(gaining, out var gainer))
+        // A coop partner's moves of the run are his side of it (D-545)
+        if (gainRunId is { } gaining && state.Runs.TryGetValue(gaining, out var whole))
         {
+            var gainer = whole.Side(e.PlayerId);
             gainer = gainer with
             {
                 Gain = gainer.Gain + MapDistances.Closer(state.Map, e),
                 MoveFrom = gainer.MoveFrom ?? (e.Reason == MoveReason.CompletionRoll ? e.From : null),
             };
-            state = state with { Runs = state.Runs.SetItem(gaining, gainer) };
+            state = state with { Runs = state.Runs.SetItem(gaining, whole.WithSide(e.PlayerId, gainer)) };
         }
 
         if (e.RunId is not { } runId)
@@ -207,8 +209,9 @@ public static class Movement
         // The run keeps the cells it really moved the token (steps past the finish burn, D-47), which a reject or a
         // correction takes back, and whether its latest move stands on the finish (its proof goes on top).
         var run = state.Runs[runId];
-        var moved = run.Moved + (Math.Sign(e.Steps) * e.Path.Count);
+        var side = run.Side(e.PlayerId);
+        var moved = side.Moved + (Math.Sign(e.Steps) * e.Path.Count);
         var reached = state.Map.CellById(e.To).Type == CellType.Finish;
-        return state with { Runs = state.Runs.SetItem(runId, run with { Moved = moved, ReachedFinish = reached }) };
+        return state with { Runs = state.Runs.SetItem(runId, run.WithSide(e.PlayerId, side with { Moved = moved, ReachedFinish = reached })) };
     }
 }

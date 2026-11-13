@@ -125,7 +125,7 @@ internal static class SeasonProjection
             record.FinishApprovalRequired = player.Finish?.ApprovalRequired;
             record.PointsTick = player.PointsTick;
             record.EconomyJson = player.Economy is null ? null : JsonSerializer.Serialize(player.Economy, EngineJson.Options);
-            record.NextTimerAt = Engine.Economy.Timers.Next(player, after.Rules.Features);
+            record.NextTimerAt = Engine.Economy.Timers.Next(after, player);
 
             // Exclusions grow within a season (D-08), a tech reroll turned into a drop changes its reason (D-11), an undo
             // takes back those its command added (D-104).
@@ -151,6 +151,19 @@ internal static class SeasonProjection
             }
         }
 
+        // The pending invitations a player sent are due on his timer column too (D-523): an invitation changed without a
+        // change of its inviter brings his column up to date
+        foreach (var inviter in after.Interactions
+            .Where(i => !before.Interactions.TryGetValue(i.Key, out var was) || was != i.Value)
+            .Select(i => i.Value.FromPlayerId)
+            .Distinct()
+            .Where(id => after.Players.TryGetValue(id, out var now) && before.Players.TryGetValue(id, out var then) && now == then))
+        {
+            var record = await db.SeasonPlayers.FindAsync([inviter], ct)
+                ?? throw new InvalidOperationException($"Player {inviter} has no projection row.");
+            record.NextTimerAt = Engine.Economy.Timers.Next(after, after.Players[inviter]);
+        }
+
         // D-420: what a switched-off mechanic left waiting is not due, so the timer column follows the flags too
         if (before.Ruleset is not null && before.Rules.Features != after.Rules.Features)
         {
@@ -158,7 +171,7 @@ internal static class SeasonProjection
             {
                 var record = await db.SeasonPlayers.FindAsync([id], ct)
                     ?? throw new InvalidOperationException($"Player {id} has no projection row.");
-                record.NextTimerAt = Engine.Economy.Timers.Next(player, after.Rules.Features);
+                record.NextTimerAt = Engine.Economy.Timers.Next(after, player);
             }
         }
 

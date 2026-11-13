@@ -116,7 +116,17 @@ internal static class RunLifecycle
         var challengeDice = thrown.ChallengeDice;
         var sum = CompletionRoll.Total(dice, challengeDice, run.Snapshot, thrown.Mods);
 
-        var events = new List<IGameEvent>(fired)
+        // A coop run (D-521): the roller who became the first finisher plays it alone — the first does not affect others
+        // (D-510, Н-18); otherwise it splits below. With coop switched off it is completed alone, writing nothing of coop (D-420)
+        var coop = run.Coop is { } partnerSide && state.Rules.Features.Coop ? partnerSide : null;
+        var events = new List<IGameEvent>(fired);
+        if (coop is not null && FinishLine.First(state) == player.PlayerId)
+        {
+            events.Add(new Interactions.CoopLeft(run.RunId, coop.PlayerId, Interactions.CoopLeaveReason.RollerFirst, now));
+            coop = null;
+        }
+
+        events.AddRange(new IGameEvent[]
         {
             // Whether the run comes after the finish or in the first's free mode is stored, not recomputed on replay (D-99).
             new RunCompleted(
@@ -129,7 +139,7 @@ internal static class RunLifecycle
                 command.ChallengeDone,
                 AfterFinish: player.Finish is not null,
                 FreeMode: player.Finish is not null && FinishLine.First(state) == player.PlayerId),
-        };
+        });
         if (check is not null)
         {
             events.Add(check);
@@ -152,31 +162,37 @@ internal static class RunLifecycle
             return Decision.Accept(events);
         }
 
-        if (sum != 0)
+        // Coins by the counted hours, from the rules fixed at the roll (Q-2, D-96), up to the hours the dice top out at:
+        // a player's estimate cannot mint coins without limit.
+        var coins = run.Snapshot.Coins is { } reward ? CompletionCoins(reward, run.Snapshot.DiceCount, hours.Value) : 0;
+        Interactions.CoopRewardSplit? split = null;
+        if (coop is not null)
         {
-            events.Add(new PointsChanged(player.PlayerId, sum, PointsReason.CompletionRoll, run.RunId));
+            split = Interactions.Coop.Split(state, run, coop, sum, coins);
+            events.Add(split);
+        }
+
+        var points = split?.RollerPoints ?? sum;
+        if (points != 0)
+        {
+            events.Add(new PointsChanged(player.PlayerId, points, PointsReason.CompletionRoll, run.RunId));
         }
 
         // A finisher's position is fixed (Q-3); otherwise the token moves and may reach the finish (D-99). The player's
         // own walk stops at a fork with steps left and waits for the branch (D-304).
         PlayerMoved? moved = null;
-        var walk = player.Finish is null ? Movement.WalkOwn(state.Map, player.CellId, sum) : new Walk([], 0);
+        var walk = player.Finish is null ? Movement.WalkOwn(state.Map, player.CellId, points) : new Walk([], 0);
         if (walk.Path.Count > 0)
         {
             moved = new PlayerMoved(
-                player.PlayerId, player.CellId, walk.Path[^1], sum, [.. walk.Path], MoveReason.CompletionRoll, run.RunId, walk.Paused);
+                player.PlayerId, player.CellId, walk.Path[^1], points, [.. walk.Path], MoveReason.CompletionRoll, run.RunId, walk.Paused);
             events.Add(moved);
         }
 
-        // Coins by the counted hours, from the rules fixed at the roll (Q-2, D-96), up to the hours the dice top out at:
-        // a player's estimate cannot mint coins without limit.
-        if (run.Snapshot.Coins is { } reward)
+        var ownCoins = split?.RollerCoins ?? coins;
+        if (ownCoins != 0)
         {
-            var coins = CompletionCoins(reward, run.Snapshot.DiceCount, hours.Value);
-            if (coins != 0)
-            {
-                events.Add(new CoinsChanged(player.PlayerId, coins, CoinsReason.CompletionReward, run.RunId));
-            }
+            events.Add(new CoinsChanged(player.PlayerId, ownCoins, CoinsReason.CompletionReward, run.RunId));
         }
 
         var eventsOn = state.Rules.Features.Events;
@@ -188,6 +204,13 @@ internal static class RunLifecycle
         // The finish comes after the run's own rewards, so a first frozen at once is frozen after them (D-99); then the
         // cell of the stop, or the branch choice of a paused walk (D-303, D-304); then the difficulty's event (D-553 (2)).
         events.AddRange(AfterOwnMove(events.Aggregate(state, SeasonEngine.Apply), player, run, moved, walk, context));
+
+        // Then the partner's share by his own move: his stop, his cells, his finish — the roller's finish of the same command
+        // comes first (D-545)
+        if (split is not null)
+        {
+            events.AddRange(Interactions.Coop.PartnerShare(events.Aggregate(state, SeasonEngine.Apply), run.RunId, split, context));
+        }
 
         if (command.Review is { } given)
         {
@@ -234,8 +257,9 @@ internal static class RunLifecycle
                 player.PlayerId, context.Ids.NewId(), fork, [.. state.Map.Exits(fork).Select(e => e.To)], walk.Remaining,
                 MoveReason.CompletionRoll, run.RunId));
         }
-        else
+        else if (player.PlayerId == run.PlayerId)
         {
+            // The run's difficulty event is the roller's, once per run: never the coop partner's (D-557)
             events.AddRange(Decks.EventDraws.ForDifficulty(events.Aggregate(state, SeasonEngine.Apply), context, run.RunId));
         }
 
@@ -327,7 +351,10 @@ internal static class RunLifecycle
             Condition = state.Runs[e.RunId].Snapshot.Conditions.Count > 0 ? new RunConditionState(true, ChallengeDone: e.ChallengeDone) : null,
         };
         var player = state.Players[e.PlayerId] with { Phase = TurnPhase.Idle, ActiveRunId = null };
-        return state with { Runs = state.Runs.SetItem(e.RunId, run), Players = state.Players.SetItem(e.PlayerId, player) };
+        state = state with { Runs = state.Runs.SetItem(e.RunId, run), Players = state.Players.SetItem(e.PlayerId, player) };
+
+        // The run is over for its coop partner too (D-521); his side stays on the run
+        return run.Coop is { } coop ? Interactions.Coop.Free(state, coop.PlayerId, e.RunId) : state;
     }
 
     public static SeasonState Apply(SeasonState state, CompletionRolled e) =>

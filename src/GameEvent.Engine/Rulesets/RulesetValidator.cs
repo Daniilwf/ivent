@@ -31,6 +31,8 @@ public static class RulesetValidator
     private const int MaxReflectMultiplier = 10;
     private const int MaxWeeklyChallengeDays = 366;
     private const int MaxSuggestionsPerDay = 100;
+    private const int MaxOpenInvites = 100;
+    private const int MaxInviteTtlHours = 24 * 30;
 
     public static IReadOnlyList<RulesetError> Validate(Ruleset ruleset)
     {
@@ -257,6 +259,32 @@ public static class RulesetValidator
         if (share is <= 0 or > 1)
         {
             Error("reward.coop.pointsShare", "must be greater than 0 and at most 1");
+        }
+
+        // Coop (D-521, D-523, D-540): the coins share and the limit of invitations come with the flag
+        if (ruleset.Features.Coop && ruleset.Reward.Coop.CoinsShare is null)
+        {
+            Error("reward.coop.coinsShare", "is required when features.coop is on");
+        }
+
+        if (ruleset.Reward.Coop.CoinsShare is <= 0 or > 1)
+        {
+            Error("reward.coop.coinsShare", "must be greater than 0 and at most 1");
+        }
+
+        if (ruleset.Features.Coop && ruleset.Interactions.MaxOpenInvitesPerPlayer is null)
+        {
+            Error("interactions.maxOpenInvitesPerPlayer", "is required when features.coop is on");
+        }
+
+        if (ruleset.Interactions.MaxOpenInvitesPerPlayer is < 1 or > MaxOpenInvites)
+        {
+            Error("interactions.maxOpenInvitesPerPlayer", $"must be 1–{MaxOpenInvites}");
+        }
+
+        if (ruleset.Features.Coop && ruleset.Interactions.InviteTtlHours is < 1 or > MaxInviteTtlHours)
+        {
+            Error("interactions.inviteTtlHours", $"must be 1–{MaxInviteTtlHours}");
         }
 
         var tiebreakers = ruleset.Ranking.Tiebreakers;

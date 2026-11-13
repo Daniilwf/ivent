@@ -29,7 +29,7 @@ public sealed record SeasonFields(SeasonStatus Status, DateTimeOffset? Deadline,
 /// effects, weekly challenges and suggestions it changed, those it created are removed, the season's fields if it changed
 /// them. Nothing later touched them (that is when an undo is allowed), so this equals its events inverted in reverse order.
 /// The counters of finishes and points changes are not wound back: numbers are never reused. Challenges and suggestions are
-/// written only when set: an undo of a command that touched none of them keeps its format (D-576).
+/// written only when set: an undo of a command that touched none of them keeps its format (D-576); so are invitations (D-523).
 /// </summary>
 [EventType("command-undone")]
 public sealed record CommandUndone(
@@ -49,7 +49,11 @@ public sealed record CommandUndone(
     [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     EquatableArray<Suggestions.Suggestion>? Suggestions = null,
     [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
-    EquatableArray<Guid>? RemovedSuggestions = null) : IGameEvent;
+    EquatableArray<Guid>? RemovedSuggestions = null,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    EquatableArray<Interactions.Interaction>? Interactions = null,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    EquatableArray<Guid>? RemovedInteractions = null) : IGameEvent;
 
 internal static class Undoing
 {
@@ -197,6 +201,8 @@ internal static class Undoing
             .SetItems((e.WeeklyChallenges ?? []).Select(c => KeyValuePair.Create(c.ChallengeId, c)));
         var suggestions = state.Suggestions.RemoveRange(e.RemovedSuggestions ?? [])
             .SetItems((e.Suggestions ?? []).Select(x => KeyValuePair.Create(x.SuggestionId, x)));
+        var interactions = state.Interactions.RemoveRange(e.RemovedInteractions ?? [])
+            .SetItems((e.Interactions ?? []).Select(x => KeyValuePair.Create(x.InteractionId, x)));
         var restored = state with
         {
             Players = players,
@@ -204,6 +210,7 @@ internal static class Undoing
             ManualEffects = effects,
             WeeklyChallenges = challenges,
             Suggestions = suggestions,
+            Interactions = interactions,
         };
         if (e.Season is not { } season)
         {
@@ -273,6 +280,12 @@ internal static class Undoing
             {
                 keys.Add($"game:{run.GameId}");
                 keys.Add($"player:{run.PlayerId}");
+
+                // A coop run is its partner's too (D-520): his later commands hold it
+                if (run.PartnerId is { } partner)
+                {
+                    keys.Add($"player:{partner}");
+                }
                 if (before.Players.GetValueOrDefault(run.PlayerId)?.Finish is not null || after.Players.GetValueOrDefault(run.PlayerId)?.Finish is not null)
                 {
                     keys.Add(FinishKey);
@@ -303,6 +316,11 @@ internal static class Undoing
         foreach (var id in Changed(before.Suggestions, after.Suggestions))
         {
             keys.Add($"suggestion:{id}");
+        }
+
+        foreach (var id in Changed(before.Interactions, after.Interactions))
+        {
+            keys.Add($"interaction:{id}");
         }
 
         if (before.Status != after.Status || before.Deadline != after.Deadline || before.Name != after.Name
@@ -385,6 +403,7 @@ internal static class Undoing
         var effects = Changed(before.ManualEffects, after.ManualEffects).ToList();
         var challenges = Changed(before.WeeklyChallenges, after.WeeklyChallenges).ToList();
         var suggestions = Changed(before.Suggestions, after.Suggestions).ToList();
+        var interactions = Changed(before.Interactions, after.Interactions).ToList();
         var seasonChanged = before.Status != after.Status || before.Deadline != after.Deadline || before.Name != after.Name
             || before.Ruleset != after.Ruleset;
 
@@ -403,7 +422,9 @@ internal static class Undoing
                 .Select(id => Restored(before.WeeklyChallenges[id], after.WeeklyChallenges.GetValueOrDefault(id), now.WeeklyChallenges.GetValueOrDefault(id)))]),
             OrNull([.. challenges.Where(id => !before.WeeklyChallenges.ContainsKey(id) && now.WeeklyChallenges.ContainsKey(id))]),
             OrNull([.. suggestions.Where(before.Suggestions.ContainsKey).Select(id => before.Suggestions[id])]),
-            OrNull([.. suggestions.Where(id => !before.Suggestions.ContainsKey(id) && now.Suggestions.ContainsKey(id))]));
+            OrNull([.. suggestions.Where(id => !before.Suggestions.ContainsKey(id) && now.Suggestions.ContainsKey(id))]),
+            OrNull([.. interactions.Where(before.Interactions.ContainsKey).Select(id => before.Interactions[id])]),
+            OrNull([.. interactions.Where(id => !before.Interactions.ContainsKey(id) && now.Interactions.ContainsKey(id))]));
     }
 
     private static EquatableArray<T>? OrNull<T>(EquatableArray<T> items) => items.Count == 0 ? null : items;

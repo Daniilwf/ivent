@@ -159,6 +159,23 @@ public sealed class Scenario
         return this;
     }
 
+    /// <summary>A coop game (<see cref="Game.IsCoop"/>): its roller may invite a partner (D-520).</summary>
+    public Scenario WithCoopGame(string title, decimal? hours, params string[] tags)
+    {
+        using var _ = Recording(() => $"s.WithCoopGame({GameCode(title, hours, tags)});");
+        _games.Add(new Game(SequentialIds.Make(GameIdPrefix, _games.Count + 1), title, [.. tags], hours, IsCoop: true));
+        return this;
+    }
+
+    /// <summary>Makes a game of the pool a coop game (D-520).</summary>
+    public Scenario MarkCoop(string title)
+    {
+        using var _ = Recording(() => $"s.MarkCoop({ScenarioCode.Literal(title)});");
+        var index = _games.FindIndex(g => g.Title == title);
+        _games[index] = _games[index] with { IsCoop = true };
+        return this;
+    }
+
     /// <summary>A game with its release year (a filter on the year reads it: zones, the weekly challenge «Олдскул»).</summary>
     public Scenario WithReleasedGame(string title, decimal? hours, int releaseYear, params string[] tags)
     {

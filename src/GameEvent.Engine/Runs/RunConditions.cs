@@ -160,7 +160,7 @@ internal static class RunConditions
         var check = Again(run, context, waive: true)!;
         var after = SeasonEngine.Apply(state, check);
         var events = new List<IGameEvent> { check };
-        events.AddRange(Corrections.Difference(after, run.RunId, CompletionRoll.Total(after.Runs[run.RunId]) - CompletionRoll.Total(run)));
+        events.AddRange(Corrections.Differences(after, run));
         if (!Finishes.IsFrozen(state.Players[run.PlayerId]))
         {
             events.AddRange(Decks.EventDraws.ForDifficulty(events.Aggregate(state, SeasonEngine.Apply), context, run.RunId));

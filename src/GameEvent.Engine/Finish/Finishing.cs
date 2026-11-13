@@ -92,7 +92,7 @@ internal static class Finishes
     public static bool IsFrozen(SeasonPlayer player) => player.Finish?.Frozen == true;
 
     /// <summary>A run of a finished player that counts for the position: completed before the finish (Q-3).</summary>
-    public static bool CountsForFinish(SeasonPlayer player, RunState run) => player.Finish is not null && !run.AfterFinish;
+    public static bool CountsForFinish(SeasonPlayer player, RunState run) => player.Finish is not null && !run.Side(player.PlayerId).AfterFinish;
 
     /// <summary>A completion move landing on the finish of a player who has not finished: the finish, then Q-4 bonuses and the freeze.</summary>
     public static IEnumerable<IGameEvent> AfterCompletionMove(SeasonState state, SeasonPlayer player, RunState run, PlayerMoved move, DateTimeOffset now)
@@ -118,8 +118,9 @@ internal static class Finishes
             return points;
         }
 
-        var newSum = Runs.CompletionRoll.Total(run);
-        return Math.Max(0, run.Moved - newSum);
+        // A coop run gave each his share (D-545)
+        var newSum = Runs.RunShares.Points(run, player.PlayerId);
+        return Math.Max(0, run.Side(player.PlayerId).Moved - newSum);
     }
 
     /// <summary>
@@ -205,7 +206,7 @@ internal static class Finishes
         // D-115: the rule in force when the first finished, not the one now
         var approved = !(state.Players[firstId].Finish!.ApprovalRequired ?? state.Rules.Finish.RequireApprovalForFirst)
             || state.Runs.Values
-                .Where(r => r.PlayerId == firstId && r.Status == RunStatus.Completed && !r.AfterFinish)
+                .Where(r => r.Status == RunStatus.Completed && Runs.RunShares.Players(r).Contains(firstId) && !r.Side(firstId).AfterFinish)
                 .All(r => r.Proof?.Status == ProofStatus.Approved);
         return approved ? [new PlayerFrozen(firstId)] : [];
     }
@@ -276,9 +277,10 @@ internal static class Finishing
     public static SeasonState Apply(SeasonState state, PlayerFinishRevoked e)
     {
         var runs = state.Runs;
-        foreach (var run in state.Runs.Values.Where(r => r.PlayerId == e.PlayerId && r.AfterFinish))
+        // A coop run completed after the partner's finish is his side of it (D-545)
+        foreach (var run in state.Runs.Values.Where(r => (r.PlayerId == e.PlayerId || r.PartnerId == e.PlayerId) && r.Side(e.PlayerId).AfterFinish))
         {
-            runs = runs.SetItem(run.RunId, run with { AfterFinish = false });
+            runs = runs.SetItem(run.RunId, run.WithSide(e.PlayerId, run.Side(e.PlayerId) with { AfterFinish = false }));
         }
 
         return Update(state with { Runs = runs }, e.PlayerId, p => p with { Finish = null });
