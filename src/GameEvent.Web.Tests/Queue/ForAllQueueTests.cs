@@ -193,7 +193,13 @@ public sealed class ForAllQueueTests
     /// <summary>While <see cref="Armed"/> is set, a <see cref="SettleForAll"/> hangs in SaveChanges until the processor is stopped.</summary>
     private sealed class BlockingSettleInterceptor : SaveChangesInterceptor
     {
-        public bool Armed { get; set; }
+        private volatile bool _armed;
+
+        public bool Armed
+        {
+            get => _armed;
+            set => _armed = value;
+        }
 
         public TaskCompletionSource Blocked { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 

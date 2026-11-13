@@ -254,6 +254,39 @@ public class SettleForAllTests
         Assert.Equal(queued.Players, batches.SelectMany(b => b.Settled.Players));
     }
 
+    /// <summary>
+    /// A reaction of three events in one firing (written whole or cut whole) to each player's +2 coins: a player's settlement
+    /// takes 5 events.
+    /// </summary>
+    private sealed class CoinsEcho : ITriggerHandler, IFiringTriggerHandler
+    {
+        public IEnumerable<IGameEvent> React(SeasonState state, IGameEvent trigger, EngineContext context) => [];
+
+        public IEnumerable<IReadOnlyList<IGameEvent>> ReactInFirings(SeasonState state, IGameEvent trigger, EngineContext context, int depth, int eventsBefore) =>
+            trigger is CoinsChanged { Delta: 2 } coins
+                ? [[.. Enumerable.Repeat<IGameEvent>(new PointsChanged(coins.PlayerId, 1, PointsReason.AdminAdjustment, null), 3)]]
+                : [];
+    }
+
+    [Fact]
+    public void A_player_whose_reactions_do_not_fit_waits_whole_for_the_next_batch()
+    {
+        // Limit 14: the batch event and two players take 11; the third's own 2 events fit, his firing of 3 does not — he
+        // goes whole into the next batch instead of being settled with his chain cut (D-537, D-700)
+        var s = Season(s_pointsAndCoins, ByAdmin, players: 4);
+        s.WithRuleset(r => r with { Effects = r.Effects with { MaxEventsPerCommand = 14 } });
+        s.WithTriggers(new GoalReached(s_pointsAndCoins, ByAdmin), new CoinsEcho());
+        var queued = Cause(s);
+        var before = s.State;
+
+        var batches = SettleAll(s);
+
+        Assert.Equal([2, 2], batches.Select(b => b.Settled.Players.Count));
+        Assert.All(batches, b => Assert.DoesNotContain(b.Events, e => e is EffectChainCut));
+        Assert.All(batches, b => Assert.InRange(b.Events.Count, 1, 14));
+        Assert.All(queued.Players, id => Assert.Equal(before.Players[id].Points + 1 + 3, s.State.Players[id].Points));
+    }
+
     // ---- Targets ----
 
     [Theory]
@@ -285,6 +318,52 @@ public class SettleForAllTests
         Assert.Equal(vasya.Coins, s.Player("Вася").Coins);
         Assert.Equal(petya.Coins + (givesObject ? 0 : 2), s.Player("Петя").Coins);
         Assert.Equal(petya.CellId, s.Player("Петя").CellId);
+    }
+
+    [Fact]
+    public void In_a_settlement_self_is_the_target_so_a_later_finisher_is_not_reached_by_an_object_on_self()
+    {
+        // Points on the target and an object on «self»: in a settlement «self» is the player himself (D-700), so the effect is
+        // not points and coins only and a later finisher is no target (D-518)
+        var effect = new EffectSpec
+        {
+            Target = s_all,
+            Actions = [Resource("points", 1), new GiveObjectAction { ObjectId = "orange", Target = ActionTarget.Self }],
+        };
+        var s = Season(effect, ByAdmin, players: 4, mapLength: 4);
+        Finish(s, "Вася");
+        Finish(s, "Петя");
+
+        var queued = Cause(s);
+
+        Assert.DoesNotContain(s.PlayerId("Петя"), queued.Players);
+        Assert.Contains(s.PlayerId("Маша"), queued.Players);
+    }
+
+    [Fact]
+    public void A_player_whose_run_of_the_effect_is_refused_is_skipped()
+    {
+        // A question in an effect on everyone has nobody to ask: the run is refused, the player gets nothing (D-703 (3))
+        var effect = new EffectSpec
+        {
+            Target = s_all,
+            Actions =
+            [
+                new RequestChoiceAction { Prompt = "Что?", Options = new ChoiceOptionsSpec { List = ["a", "b"] } },
+                Resource("coins", 2),
+            ],
+        };
+        var s = Season(effect, ByAdmin, players: 3);
+        var queued = Cause(s);
+        var before = s.State;
+
+        var batches = SettleAll(s);
+
+        Assert.Equal(queued.Players, batches.SelectMany(b => b.Settled.Skipped));
+        Assert.Empty(batches.SelectMany(b => b.Settled.Players));
+        Assert.True(batches[^1].Settled.Done);
+        Assert.All(queued.Players, id => Assert.Equal(before.Players[id].Coins, s.State.Players[id].Coins));
+        Assert.Empty(s.State.ForAll);
     }
 
     [Fact]

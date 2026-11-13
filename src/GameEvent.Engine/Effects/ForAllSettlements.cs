@@ -75,7 +75,7 @@ public static class ForAllSettlements
 {
     /// <summary>
     /// The event that queues <paramref name="effect"/> for everyone, for a cause to write among its own events. The targets
-    /// are fixed now (D-701): every player but the first finisher, a later finisher only for points and coins (D-518).
+    /// are fixed now (D-700): every player but the first finisher, a later finisher only for points and coins (D-518).
     /// </summary>
     public static ForAllQueued Queue(
         SeasonState state, EngineContext context, ForAllSource source, Guid reference, string objectId, EffectSpec effect, ContentParamDictionary? parameters = null)
@@ -104,7 +104,16 @@ public static class ForAllSettlements
     private static bool Reachable(SeasonState state, Guid playerId, EffectSpec effect) =>
         state.Players.TryGetValue(playerId, out var player)
         && !Targets.IsFirst(state, playerId)
-        && (player.Finish is null || Targets.PointsAndCoinsOnly(effect));
+        && (player.Finish is null || PointsAndCoinsOnly(effect));
+
+    // In a settlement «self» is the target himself (D-700): unlike an item's, its actions on «self» count too
+    private static bool PointsAndCoinsOnly(EffectSpec effect)
+    {
+        var actions = effect.Actions.Concat(effect.Outcomes?.Cases.SelectMany(c => c.Actions) ?? []).ToList();
+        return actions.Any(a => a is ChangeResourceAction)
+            && actions.All(a => a is RollAction or RequestChoiceAction
+                || (a is ChangeResourceAction c && c.Resource is Actions.ChangeResourceHandler.Points or Actions.ChangeResourceHandler.Coins));
+    }
 
     internal static Decision Decide(SeasonState state, SettleForAll command, EngineContext context)
     {
@@ -158,7 +167,10 @@ public static class ForAllSettlements
 
             var (reactions, reacted) = EffectChain.Run(run.State, run.Events, context, eventsBefore: count);
             var size = run.Events.Count + reactions.Count;
-            if (players.Count > 0 && count + size > limit)
+
+            // A player whose chain the batch would cut waits whole for the next batch (D-537): only one alone is cut
+            var cut = run.Cut is not null || reactions.Any(e => e is EffectChainCut { Limit: EffectChainLimit.Events });
+            if (players.Count > 0 && (cut || count + size > limit))
             {
                 break;
             }

@@ -317,7 +317,9 @@ const feedLines = {
   rulesChanged: <T>(version: number): Line<T> => [`Правила сезона обновлены, версия ${version}`],
   // D-537: a batch of a reward, a poll's result or a global event's effect for everyone
   forAllSettled: <T>(players: number): Line<T> => [
-    `Раздача на всех: ${players} ${plural(players, 'игрок', 'игрока', 'игроков')}`,
+    players === 0
+      ? 'Раздача на всех: никому не досталось'
+      : `Раздача на всех: ${players} ${plural(players, 'игрок', 'игрока', 'игроков')}`,
   ],
   finishBonuses: <T>(): Line<T> => ['Бонусы за финиш пересчитаны по новым правилам'],
   joined: <T>(p: T): Line<T> => [p, ' в игре'],

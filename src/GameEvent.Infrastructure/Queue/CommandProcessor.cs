@@ -46,6 +46,7 @@ public sealed partial class CommandProcessor(
         queue.Consuming(true);
         try
         {
+            await SettleLeftPendingAsync(stoppingToken);
             await foreach (var pending in queue.Reader.ReadAllAsync(stoppingToken))
             {
                 queue.Taken();
@@ -302,6 +303,42 @@ public sealed partial class CommandProcessor(
             }
         }
     }
+
+    /// <summary>
+    /// At start, before the first command: the settlements for everyone a stop left between their cause and their batches
+    /// are settled at once (D-702), so a quiet season does not wait for its next command.
+    /// </summary>
+    private async Task SettleLeftPendingAsync(CancellationToken ct)
+    {
+        List<Guid> running;
+        try
+        {
+            await using var db = await dbFactory.CreateDbContextAsync(ct);
+            running = await db.Seasons.AsNoTracking()
+                .Where(s => s.Status == SeasonStatus.Active || s.Status == SeasonStatus.Closing)
+                .Select(s => s.Id)
+                .ToListAsync(ct);
+            foreach (var seasonId in running)
+            {
+                var replayed = await EventLogReader.ReplaySeasonAsync(db, seasonId, ct);
+                if (ForAllSettlements.Next(replayed.State) is not null)
+                {
+                    _cache[seasonId] = replayed;
+                    await SettleForAllAsync(seasonId, ct);
+                }
+            }
+        }
+#pragma warning disable CA1031 // a failed check at start must not stop the queue: the next command of the season settles first
+        catch (Exception e) when (e is not OperationCanceledException)
+#pragma warning restore CA1031
+        {
+            _cache.Clear();
+            LogStartSettlementFailed(logger, e);
+        }
+    }
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Pending settlements for everyone were not settled at start; the next command of each season settles them")]
+    private static partial void LogStartSettlementFailed(ILogger logger, Exception exception);
 
     // A settlement of the 50 events a batch takes ends in a few batches; this only stops a loop that never ends
     private const int MaxBatchesInARow = 1000;
