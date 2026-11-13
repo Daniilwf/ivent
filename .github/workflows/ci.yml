@@ -259,8 +259,7 @@ jobs:
           path: ${{ env.NUGET_PACKAGES }}
           key: nuget-${{ runner.os }}-${{ hashFiles('Directory.Packages.props', '**/*.csproj', 'dotnet-tools.json') }}
           restore-keys: nuget-${{ runner.os }}-
-      - name: Tools
-        run: dotnet tool restore
+      # dotnet ef is restored by the check itself, only when it has a rollback to make (D-672)
       - name: Migrations over the previous release's demo database
         run: npm run -s test:migrations
       - name: The databases (demo data, no secrets)
@@ -291,10 +290,16 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      # No setup-node in the container: npm's own cache is kept here (D-673)
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: /root/.npm
+          key: npm-visual-${{ hashFiles('web/package-lock.json', 'e2e/package-lock.json') }}
+          restore-keys: npm-visual-
       - name: Install
         run: |
-          npm --prefix web ci
-          npm --prefix e2e ci
+          npm --prefix web ci --prefer-offline --no-audit --no-fund
+          npm --prefix e2e ci --prefer-offline --no-audit --no-fund
       - name: Visual tests
         run: node scripts/visual.mjs
       - name: Differences and report
