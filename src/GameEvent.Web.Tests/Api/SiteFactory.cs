@@ -210,6 +210,10 @@ internal sealed class SiteFactory : WebApplicationFactory<Program>
             services.AddSingleton<TimeProvider>(Time);
             services.RemoveAll<IRandomSource>();
             services.AddSingleton(Random);
+
+            // A disposed site must not outlive its test (D-665)
+            services.RemoveAll<Microsoft.AspNetCore.Hosting.Builder.IApplicationBuilderFactory>();
+            services.AddSingleton<Microsoft.AspNetCore.Hosting.Builder.IApplicationBuilderFactory, CollectablePipelineFactory>();
         });
     }
 
