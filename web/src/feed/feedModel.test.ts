@@ -824,7 +824,30 @@ describe('events drawn from decks (stage 5)', () => {
     expect(lineOf('poll-closed', { pollId: 'p', result: null })).toBe(
       'Голосование закрыто: голосов нет',
     );
-    expect(lineOf('poll-cancelled', { pollId: 'p' })).toBe('Голосование отменено дедлайном');
+    expect(lineOf('poll-cancelled', { pollId: 'p' })).toBe('Голосование отменено');
+  });
+
+  it('shows a global event, its goal and its end as lines of the system (D-517, D-518)', () => {
+    const lineOf = (type: string, data: Record<string, unknown>) =>
+      text(feedDays([entry('g1', type, data)], named, now)[0]?.items[0]);
+
+    expect(
+      lineOf('global-event-launched', {
+        globalEventId: 'g',
+        objectId: 'coin-rain',
+        definition: { name: 'Монетный дождь' },
+      }),
+    ).toBe('Общий ивент: Монетный дождь');
+    expect(lineOf('global-event-launched', { globalEventId: 'g', objectId: 'coin-rain' })).toBe(
+      'Общий ивент: coin-rain',
+    );
+    expect(lineOf('global-event-ended', { globalEventId: 'g', reason: 'timer' })).toBe(
+      'Общий ивент закончился',
+    );
+    expect(lineOf('global-progress-changed', { globalEventId: 'g', total: 47.5 })).toBe(
+      'Общая цель: 47,5',
+    );
+    expect(lineOf('global-goal-reached', { globalEventId: 'g' })).toBe('Общая цель достигнута');
   });
 
   it('names the voter of a named poll and nobody in an anonymous one (D-515, D-541)', () => {

@@ -383,13 +383,12 @@ const feedLines = {
         ? 'Голосование закрыто, итог подведён'
         : `Голосование закрыто, итог: ${result}`,
   ],
-  pollCancelled: <T>(): Line<T> => ['Голосование отменено дедлайном'],
+  // Cancelled by the deadline or by the end of its global event (D-516, D-753)
+  pollCancelled: <T>(): Line<T> => ['Голосование отменено'],
   // D-517, D-518: global events and their goals
   globalEventLaunched: <T>(name: string): Line<T> => [`Общий ивент: ${name}`],
   globalEventEnded: <T>(): Line<T> => ['Общий ивент закончился'],
-  globalProgress: <T>(total: string, target: string | null): Line<T> => [
-    target === null ? `Общая цель: ${total}` : `Общая цель: ${total} из ${target}`,
-  ],
+  globalProgress: <T>(total: number): Line<T> => [`Общая цель: ${total.toLocaleString('ru-RU')}`],
   globalGoalReached: <T>(): Line<T> => ['Общая цель достигнута'],
   finishBonuses: <T>(): Line<T> => ['Бонусы за финиш пересчитаны по новым правилам'],
   joined: <T>(p: T): Line<T> => [p, ' в игре'],

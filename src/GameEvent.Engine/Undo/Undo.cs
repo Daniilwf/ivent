@@ -189,6 +189,13 @@ internal static class Undoing
             return Decision.Reject(RejectionCodes.SeasonDeadlinePassed, "The deadline has passed: the season stays closed.");
         }
 
+        // D-750, D-751: an undo never leaves more global events running than globalEvents.maxActive, nor one running or
+        // counting an unchecked run while the mechanic is off — a later launch or switch-off decided by the state it undoes
+        if (GlobalEvents.GlobalEventing.RefuseUndo(state, Apply(state, compensation), context.Clock.UtcNow) is { } refused)
+        {
+            return refused;
+        }
+
         return Decision.Accept(compensation);
     }
 
@@ -216,8 +223,6 @@ internal static class Undoing
     private const string PollPrefix = "poll:";
 
     private const string GlobalEventPrefix = "globalEvent:";
-
-    private const string RunningGlobalEventsKey = "globalEvents:running";
 
     /// <summary>The runs whose contributions differ between two versions of a global event.</summary>
     private static IEnumerable<Guid> ContributionsChanged(GlobalEvents.GlobalEventState? was, GlobalEvents.GlobalEventState? now)
@@ -460,13 +465,6 @@ internal static class Undoing
                 keys.Add($"{GlobalEventPrefix}{id}:end");
             }
 
-            // A launch counts the running events against globalEvents.maxActive: a launch or an end holds the later launches,
-            // so an undo never leaves more running than the limit (D-750)
-            if (was is null || now is null || was.Status != now.Status)
-            {
-                keys.Add(RunningGlobalEventsKey);
-            }
-
             foreach (var run in ContributionsChanged(was, now))
             {
                 keys.Add($"{GlobalEventPrefix}{id}:{run}");
@@ -554,6 +552,16 @@ internal static class Undoing
                 .Where(k => k.Kind != "player" || e is not (Proofs.IrlProofSubmitted or Proofs.IrlProofReviewed))))
             {
                 keys.Add($"{kind}:{id}");
+            }
+
+            // A completion that did not count because the event had ended holds that end: undoing the end would leave it out (D-750)
+            if (e is RunCompleted completed)
+            {
+                foreach (var global in before.GlobalEvents.Values.Where(g => g.Goal is not null && g.Status == GlobalEvents.GlobalEventStatus.Ended
+                    && g.InWindow(completed.CompletedAt)))
+                {
+                    keys.Add($"{GlobalEventPrefix}{global.GlobalEventId}:end");
+                }
             }
 
             if (e is Suggestions.SuggestionSubmitted submitted)

@@ -218,7 +218,7 @@ const headlines: [string, (d: Data, c: Context) => Headline][] = [
     (d) => ({
       icon: 'effect',
       actor: null,
-      line: L.globalProgress(String(number(d, 'total') ?? 0), null),
+      line: L.globalProgress(number(d, 'total') ?? 0),
     }),
   ],
   ['global-goal-reached', () => ({ icon: 'effect', actor: null, line: L.globalGoalReached() })],

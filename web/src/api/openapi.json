@@ -9614,6 +9614,10 @@
             "type": "boolean",
             "description": "Coop runs and invitations (stage 5, D-520…D-523); optional, so older configs without it still read. Not written while\noff: a season logged before it keeps its ruleset's format."
           },
+          "globalEvents": {
+            "type": "boolean",
+            "description": "Global events and their goals (stage 5, D-517, D-518); needs bool Features.Events. Optional, so older configs without\nit still read; not written while off: a season logged before it keeps its ruleset's format."
+          },
           "duels": {
             "type": "boolean",
             "description": "Duels (stage 5, D-525, D-540); optional, so older configs without it still read. Not written while off: a season\nlogged before it keeps its ruleset's format."
@@ -10162,6 +10166,20 @@
           }
         },
         "description": "A run of a game in any season, with its review if there is one (the game page, D-124). `token` — the player's place\nin that season's list of players, their token colour there (D-150)."
+      },
+      "GlobalEventRules": {
+        "required": [
+          "maxActive"
+        ],
+        "type": "object",
+        "properties": {
+          "maxActive": {
+            "type": "integer",
+            "description": "How many global events may run at once (D-517).",
+            "format": "int32"
+          }
+        },
+        "description": "The rules of global events (SPEC «Общие ивенты», D-517)."
       },
       "HostileCap": {
         "required": [
@@ -12547,6 +12565,17 @@
               {
                 "description": "The rules of duels (stage 5, D-525, D-540). Missing — a season created before them reads as it did (D-50); needed once\n`features.duels` is on. Not written while missing.",
                 "$ref": "#/components/schemas/DuelRules"
+              }
+            ]
+          },
+          "globalEvents": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The rules of global events (stage 5, D-517). Missing — a season created before them reads as it did (D-50); needed\nonce `features.globalEvents` is on. Not written while missing.",
+                "$ref": "#/components/schemas/GlobalEventRules"
               }
             ]
           }

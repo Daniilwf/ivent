@@ -171,7 +171,9 @@ public class GlobalEventInvariantTests
                 Assert.Equal(global.Goal!.Metric == GoalMetric.Runs ? 1m : run.Hours!.Value, contribution.Amount);
             }
 
-            Assert.Equal(global.Contributions.Sum(c => c.Amount), global.Progress);
+            // The progress is what the commands in force wrote: the sum of their changes (by review — not of itself)
+            Assert.Equal(
+                s.EffectiveLog.OfType<GlobalProgressChanged>().Where(p => p.GlobalEventId == global.GlobalEventId).Sum(p => p.Delta), global.Progress);
             if (global.Goal is null)
             {
                 Assert.Empty(global.Contributions);

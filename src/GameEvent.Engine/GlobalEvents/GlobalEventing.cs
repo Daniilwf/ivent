@@ -149,11 +149,38 @@ internal static class GlobalEventing
 
         return global.Status != GlobalEventStatus.Active
             ? Decision.Reject(RejectionCodes.GlobalEventEnded, "The global event has ended already.")
-            : Decision.Accept([.. End(state, global, GlobalEventEndReason.Admin)]);
+            : Decision.Accept([.. End(state, global, global.EndsAt <= context.Clock.UtcNow ? GlobalEventEndReason.Timer : GlobalEventEndReason.Admin)]);
     }
 
     /// <summary>Whether the mechanic plays: <c>features.globalEvents</c> with events (D-517, D-420).</summary>
-    public static bool IsOn(SeasonState state) => state.Rules.Features is { GlobalEvents: true, Events: true };
+    public static bool IsOn(SeasonState state) => IsOn(state.Rules.Features);
+
+    private static bool IsOn(Rulesets.Features features) => features is { GlobalEvents: true, Events: true };
+
+    /// <summary>
+    /// Why an undo that leaves <paramref name="after"/> must be refused (D-750, D-751): more global events running than
+    /// <c>globalEvents.maxActive</c> (an end undone after a later launch), or one running or counting an unchecked run while
+    /// the mechanic is off (undone after the switch-off); null when it may go.
+    /// </summary>
+    public static Decision? RefuseUndo(SeasonState before, SeasonState after, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(before);
+        ArgumentNullException.ThrowIfNull(after);
+        if (!after.IsCreated || after.Ruleset is not { } rules)
+        {
+            return null;
+        }
+
+        var running = after.GlobalEvents.Values.Count(g => g.RunsAt(now));
+        if (IsOn(rules.Features) && running > before.GlobalEvents.Values.Count(g => g.RunsAt(now)) && running > (rules.GlobalEvents?.MaxActive ?? 0))
+        {
+            return Decision.Reject(RejectionCodes.GlobalEventTooMany, "The undo would bring back a global event over globalEvents.maxActive: end one first.");
+        }
+
+        return !IsOn(rules.Features) && InPlay(after) && !InPlay(before)
+            ? Decision.Reject(RejectionCodes.GlobalEventsInPlay, "The undo would bring back a global event while global events are off: switch them on first.")
+            : null;
+    }
 
     /// <summary>The vote a global event asks first (EV23): its first action's <c>requestChoice.vote</c>; null when none.</summary>
     public static PollVoteSpec? Vote(ObjectDefinition definition) =>
@@ -196,7 +223,7 @@ internal static class GlobalEventing
     public static DateTimeOffset? NextEnd(SeasonState state)
     {
         ArgumentNullException.ThrowIfNull(state);
-        return state.Ruleset is { Features: { GlobalEvents: true, Events: true } }
+        return state.Ruleset is { } rules && IsOn(rules.Features)
             ? state.GlobalEvents.Values.Where(g => g.Status == GlobalEventStatus.Active).Select(g => (DateTimeOffset?)g.EndsAt).Min()
             : null;
     }
@@ -230,8 +257,8 @@ internal static class GlobalEventing
         var events = new List<IGameEvent>();
         switch (e)
         {
-            // Н-23: a completion after the deadline counts for nothing, the event is over
-            case RunCompleted completed when !SeasonSetup.IsPastDeadline(state, completed.CompletedAt):
+            // Н-23 needs no check here: a completion after the deadline is refused before it is written (D-755)
+            case RunCompleted completed:
                 foreach (var global in Goals(state).Where(g =>
                     g.Status == GlobalEventStatus.Active && g.InWindow(completed.CompletedAt) && g.Contributions.All(c => c.RunId != completed.RunId)))
                 {

@@ -87,6 +87,14 @@ internal static class RulesetChanges
                 "A global event runs, or counts a run whose proof is not approved yet: switch global events off after they end and the proofs are checked.");
         }
 
+        // D-753: a global event's open vote would never close with polls off, and its effect would be lost at the end
+        if (state.Rules.Features.Polls && !command.Ruleset.Features.Polls
+            && state.Polls.Values.Any(p => p.Status == Polls.PollStatus.Open && p.GlobalEventId is not null))
+        {
+            return Decision.Reject(
+                RejectionCodes.GlobalEventsInPlay, "A global event's vote is open: switch polls off after it closes.");
+        }
+
         return command.Ruleset == state.Ruleset
             ? Decision.Reject(RejectionCodes.RulesetUnchanged, "The new ruleset equals the current one.")
             : Decision.Accept(new RulesetChanged(state.RulesetVersion + 1, command.Ruleset));
