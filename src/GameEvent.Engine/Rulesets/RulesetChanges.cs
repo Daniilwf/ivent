@@ -64,6 +64,13 @@ internal static class RulesetChanges
                 "A weekly challenge is completed with a run whose proof is not approved yet: switch the challenge off after the proofs are checked.");
         }
 
+        // D-685: with events off nobody reviews an IRL proof, and the results wait for it — switch events off after the reviews
+        if (state.Rules.Features.Events && !command.Ruleset.Features.Events && Proofs.IrlProofs.Waiting(state) is { Count: > 0 } waiting)
+        {
+            return Decision.Reject(
+                RejectionCodes.IrlProofsInPlay, "An IRL proof waits for the review: switch events off after it is checked.", [.. waiting]);
+        }
+
         return command.Ruleset == state.Ruleset
             ? Decision.Reject(RejectionCodes.RulesetUnchanged, "The new ruleset equals the current one.")
             : Decision.Accept(new RulesetChanged(state.RulesetVersion + 1, command.Ruleset));

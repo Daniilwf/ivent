@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using GameEvent.Engine.Content;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Rulesets;
@@ -34,6 +35,28 @@ public sealed class FeedVisibilityTests : IAsyncLifetime
         var names = EventCatalog.Types.Select(t => EventCatalog.Describe(t).Name).Order(StringComparer.Ordinal).ToList();
 
         Assert.Equal(names, FeedVisibility.Types.Keys.Order(StringComparer.Ordinal));
+    }
+
+    [Fact]
+    public void An_irl_proofs_files_link_and_comment_are_the_players_and_the_admins()
+    {
+        // D-684: others see that an IRL proof was sent and checked, not its screenshots, link or the admin's comment
+        var (effect, owner, file) = (Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+        var at = new DateTimeOffset(2026, 11, 13, 12, 0, 0, TimeSpan.Zero);
+        var submitted = EventCodec.Encode(new Engine.Proofs.IrlProofSubmitted(effect, owner, [file], "https://video.example/abc", at));
+        var reviewed = EventCodec.Encode(new Engine.Proofs.IrlProofReviewed(effect, owner, false, "Видео закрыто", at));
+        JsonObject Data(StoredEvent e) => JsonNode.Parse(e.Data)!.AsObject();
+
+        foreach (var viewer in new Guid?[] { Guid.NewGuid(), null })
+        {
+            var other = FeedVisibility.Shown(submitted.Type, Data(submitted), admin: false, viewer)!;
+            Assert.False(other.ContainsKey("files") || other.ContainsKey("link"));
+            Assert.Equal(effect, other["effectId"]!.GetValue<Guid>());
+            Assert.False(FeedVisibility.Shown(reviewed.Type, Data(reviewed), admin: false, viewer)!.ContainsKey("comment"));
+        }
+
+        Assert.Equal("https://video.example/abc", FeedVisibility.Shown(submitted.Type, Data(submitted), admin: false, owner)!["link"]!.GetValue<string>());
+        Assert.Equal("Видео закрыто", FeedVisibility.Shown(reviewed.Type, Data(reviewed), admin: true, null)!["comment"]!.GetValue<string>());
     }
 
     [Fact]

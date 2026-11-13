@@ -74,7 +74,7 @@ test('a stop on an event cell draws the event, its card is in the turn and the f
   const ruleset = {
     ...rules.ruleset,
     features: { ...rules.ruleset.features, mapMode: 'graph' as const, items: true, events: true },
-    events: { defaultDeck: 'risky' as const },
+    events: { defaultDeck: 'risky' as const, irlProof: { maxFiles: 5 } },
     reward: {
       ...rules.ruleset.reward,
       diceCount: { ...rules.ruleset.reward.diceCount, min: 3, max: 3 },

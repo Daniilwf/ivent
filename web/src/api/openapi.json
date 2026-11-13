@@ -9448,6 +9448,17 @@
             ],
             "description": "How long an event that asks waits for its answer, in hours (D-560): past it the timer answers by a random option,\nwritten in the log. Null — it waits without a limit (the turn waits, the admin may discard it, D-91). Not written\nwhile null.",
             "format": "int32"
+          },
+          "irlProof": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The proofs of IRL events (D-509, D-680). Missing — a season whose event rules came before them reads as it did\n(D-50); needed once `features.events` is on (RulesetValidator). Not written while missing.",
+                "$ref": "#/components/schemas/IrlProofRules"
+              }
+            ]
           }
         },
         "description": "The rules of event decks (SPEC «Ивенты», D-500…D-502)."
@@ -10344,6 +10355,20 @@
           }
         },
         "description": "An object I hold: its definition's name and description, what is left of its lifetime, who put it on me. `usable` —\n«Использовать» is open now; `refusal` — the engine's code when it is not (wrong window, deadline, frozen inventory,\nno target; an effect or a special roll acts on its own). `targets` — when `choosesTarget`, exactly the players\nthe engine accepts; `steps` — the answers asked, in order (D-440)."
+      },
+      "IrlProofRules": {
+        "required": [
+          "maxFiles"
+        ],
+        "type": "object",
+        "properties": {
+          "maxFiles": {
+            "type": "integer",
+            "description": "How many uploaded screenshots one submission takes; 0 — a link only.",
+            "format": "int32"
+          }
+        },
+        "description": "The proof of an IRL event (D-509): the player's own screenshots and / or one https link to a video."
       },
       "ItemOptionView": {
         "required": [
