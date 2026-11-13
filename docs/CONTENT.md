@@ -502,6 +502,28 @@
 }
 ```
 
+### 6. Монетки или шаг — хороший, с вопросом
+
+Ивент не может ответить заранее, как предмет (D-407): его тянут на клетке, на чужом толчке, при штрафе. Вопрос (`outcomes.choice`, `requestChoice`, цель `chosen`, `takeObject` с `pick: chosen`) приостанавливает эффект: `effect-suspended` хранит объект, следующее действие, уже вычисленные `$roll` и `$choice` и варианты, которые посчитал сервер; ход игрока ждёт ответа. Ответ — общая команда выбора, остаток эффекта (`effect-resumed`) выполняется в новой команде (D-511). Спрашивать можно в списке действий ивента, в том числе после броска, но не внутри случая `outcomes`; `takeObject` с выбором — по одному объекту, без `count`.
+
+```json
+{
+  "id": "coin-or-step", "kind": "event", "name": "Монетки или шаг",
+  "description": "Выбери: 3 монетки или шаг вперёд.",
+  "rarity": "common", "price": null, "hostile": false,
+  "effect": {
+    "target": { "selector": "self" },
+    "outcomes": {
+      "choice": { "prompt": "Что берёшь?", "options": { "list": ["монетки", "шаг"] } },
+      "cases": [
+        { "option": "монетки", "actions": [{ "type": "changeResource", "resource": "coins", "amount": 3 }] },
+        { "option": "шаг", "actions": [{ "type": "move", "steps": 1 }] }
+      ]
+    }
+  }
+}
+```
+
 ## Примеры достижений
 
 ```json

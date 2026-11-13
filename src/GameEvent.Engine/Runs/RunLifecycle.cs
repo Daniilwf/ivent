@@ -203,7 +203,8 @@ internal static class RunLifecycle
             events.AddRange(finished.Count > 0 ? [.. CellStops.ShopGrants(state, moved, context), .. finished] : CellStops.After(state, moved, context));
             if (finished.Count == 0)
             {
-                events.AddRange(Decks.EventCells.Stop(events.Aggregate(state, SeasonEngine.Apply), context, moved));
+                // A stop reacts to its move: its question waits at the chain's first level, as in the chain (D-500, D-559 (1))
+                events.AddRange(Decks.EventCells.Stop(events.Aggregate(state, SeasonEngine.Apply), context, moved, level: 1));
             }
         }
 

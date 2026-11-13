@@ -129,6 +129,9 @@ public static class ContentPublishing
         }
 
         var triggered = definition.Kind != ObjectKind.Item;
+
+        // A drawn event asks its player and waits for the answer on the server (D-511): it has somebody to ask
+        var asksLater = definition.Kind == ObjectKind.Event;
         switch (effect.Trigger)
         {
             case Trigger.Time:
@@ -144,13 +147,13 @@ public static class ContentPublishing
                 break;
         }
 
-        if (triggered && effect.Target?.Selector == TargetSelector.Chosen)
+        if (triggered && !asksLater && effect.Target?.Selector == TargetSelector.Chosen)
         {
             error($"{at}.effect.target", "An effect that acts on its own has nobody to choose its target.");
         }
 
         var rolled = effect.Outcomes is { Roll: not null };
-        if (triggered && effect.Outcomes is { Choice: not null })
+        if (triggered && !asksLater && effect.Outcomes is { Choice: not null })
         {
             error($"{at}.effect.outcomes.choice", "An effect that acts on its own has nobody to ask.");
         }
@@ -170,6 +173,21 @@ public static class ContentPublishing
                 error(path, "A branch by the player's answer asks nothing more: the questions after it would depend on it.");
             }
 
+            // An event waits for one answer at a time, at an action of its list (D-511): not inside a case, not a list of preference
+            if (asksLater && asks)
+            {
+                if (i >= effect.Actions.Count)
+                {
+                    error(path, "An event asks in its list of actions, not inside a case of its outcomes.");
+                }
+                else if (actions[i] is TakeObjectAction { Count: not null })
+                {
+                    error($"{path}.count", "An event asks for one object at a time.");
+                }
+
+                continue;
+            }
+
             switch (actions[i])
             {
                 case ModifyNextRollAction { RunCondition: not null }:
@@ -182,9 +200,9 @@ public static class ContentPublishing
                     // Played inside the draw, a draw of a draw would loop past the levels of the chain (D-531)
                     error(path, "An event does not draw another event.");
                     break;
-                case RequestChoiceAction when triggered:
-                case TakeObjectAction { Pick: Pick.Chosen } when triggered:
-                case MoveAction { Direction: MoveDirection.Chosen } when triggered:
+                case RequestChoiceAction when triggered && !asksLater:
+                case TakeObjectAction { Pick: Pick.Chosen } when triggered && !asksLater:
+                case MoveAction { Direction: MoveDirection.Chosen } when triggered && !asksLater:
                     error(path, "An effect that acts on its own has nobody to ask.");
                     break;
                 case RequestChoiceAction when rolled:
@@ -209,10 +227,10 @@ public static class ContentPublishing
         }
     }
 
-    // What an event plays (D-536, 5.3): its effect at once, from the one who drew it — on him or on the players its selector
-    // picks without asking (a chosen target waits for 5.7, the triggered check refuses it); a text by hand (manual: true)
-    // waits for resolution (D-410). It is hostile only when another player's hostile item drew it (D-504), never by itself;
-    // a condition comes with 5.5 and is refused until then rather than ignored.
+    // What an event plays (D-536, D-511, 5.3): its effect at once, from the one who drew it — on him, on the players its
+    // selector picks, or on a player he picks (a chosen target is a question that waits for his answer); a text by hand
+    // (manual: true) waits for resolution (D-410). It is hostile only when another player's hostile item drew it (D-504),
+    // never by itself; a condition comes with 5.5 and is refused until then rather than ignored.
     private static void Event(ObjectDefinition definition, string at, Action<string, string> error)
     {
         if (definition.Hostile)

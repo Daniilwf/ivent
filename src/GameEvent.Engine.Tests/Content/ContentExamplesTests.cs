@@ -44,11 +44,11 @@ public partial class ContentExamplesTests
     [Fact]
     public void The_doc_has_the_examples_the_stages_rely_on()
     {
-        // 10 items with their effects, the examples of the format's extensions (the import of the old pack, D-470), 5 events,
+        // 10 items with their effects, the examples of the format's extensions (the import of the old pack, D-470), 6 events (the 6th asks, D-511),
         // 3 achievements, a zone, the cells, a map, a poll, a weekly challenge — and the «Определение объекта» sample at the top
         var kinds = s_examples.Value.Select(Classify).ToList();
 
-        Assert.Equal(1 + 10 + 3 + ExtensionExamples + 5 + 3, kinds.Count(k => k == "object"));
+        Assert.Equal(1 + 10 + 3 + ExtensionExamples + 6 + 3, kinds.Count(k => k == "object"));
         Assert.Equal(1, kinds.Count(k => k == "zone"));
         Assert.Equal(1, kinds.Count(k => k == "cells"));
         Assert.Equal(1, kinds.Count(k => k == "map"));

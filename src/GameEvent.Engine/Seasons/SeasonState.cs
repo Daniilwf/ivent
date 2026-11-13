@@ -36,6 +36,14 @@ public sealed record SeasonState(
     /// <summary>The season's content (D-400): empty until the admin publishes a pack.</summary>
     public GameEvent.Engine.Content.ContentCatalog Catalog => Content ?? GameEvent.Engine.Content.ContentCatalog.Empty;
 
+    /// <summary>The weekly challenges set in the season (D-526), by id.</summary>
+    public ImmutableSortedDictionary<Guid, Challenges.WeeklyChallengeState> WeeklyChallenges { get; init; } =
+        ImmutableSortedDictionary<Guid, Challenges.WeeklyChallengeState>.Empty;
+
+    /// <summary>The suggestions sent in the season (D-527), by id.</summary>
+    public ImmutableSortedDictionary<Guid, Suggestions.Suggestion> Suggestions { get; init; } =
+        ImmutableSortedDictionary<Guid, Suggestions.Suggestion>.Empty;
+
     public static SeasonState Empty { get; } =
         new(
             Guid.Empty,
@@ -70,6 +78,8 @@ public sealed record SeasonState(
         && PointsChanges == other.PointsChanges
         && Result == other.Result
         && Catalog == other.Catalog
+        && WeeklyChallenges.SequenceEqual(other.WeeklyChallenges)
+        && Suggestions.SequenceEqual(other.Suggestions)
         && MapVersion == other.MapVersion;
 
     // Explicit type arguments: a mutated count still compiles, so mutation testing keeps this method (D-281)
@@ -126,7 +136,11 @@ public sealed record SeasonPlayer(
     [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     Guid? LastMoveRunId = null,
     [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
-    Inventory.PlayerEconomy? Economy = null)
+    Inventory.PlayerEconomy? Economy = null,
+
+    // Written only when an effect waits: snapshots of players made before stage 5 keep their format (D-511)
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    EquatableArray<Effects.SuspendedEffect> Suspended = default)
 {
     /// <summary>The player's economy (D-401), empty when they have none.</summary>
     [System.Text.Json.Serialization.JsonIgnore]

@@ -164,7 +164,8 @@ public sealed partial class CommandProcessor(
         // The rules come from the season's own log (D-82); a new season brings them in CreateSeason.
         // An undo decides on the whole log by command (D-104); other commands need only the state.
         var history = envelope.Command is Engine.Undo.UndoCommand ? await EventLogReader.ReadCommandsAsync(db, envelope.SeasonId, ct) : null;
-        var context = new EngineContext(clock, random, ids, await PoolReader.LoadAsync(db, ct), History: history);
+        var context = new EngineContext(
+            clock, random, ids, await PoolReader.LoadAsync(db, ct), History: history, TimeZones: Kernel.SystemTimeZones.Instance);
 
         var result = SeasonEngine.Execute(cached.State, envelope.Command, context);
         if (!result.IsAccepted)

@@ -259,7 +259,8 @@ internal sealed class DrawEventHandler : ActionHandler<DrawEventAction>
             action.Deck,
             incoming ? Decks.EventSource.Incoming : Decks.EventSource.Item,
             fromPlayerId: incoming ? run.UserId : null,
-            hostile: incoming && run.Hostile));
+            hostile: incoming && run.Hostile,
+            level: run.Depth));
     }
 }
 

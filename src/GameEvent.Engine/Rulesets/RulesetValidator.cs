@@ -25,9 +25,12 @@ public static class RulesetValidator
     private const int MaxLotLifetimeMinutes = 7 * 24 * 60;
     private const int MaxInventoryLimit = 100;
     private const int MaxBetDeadlineDays = 365;
+    private const int MaxAnswerTimeoutHours = 365 * 24;
     private const int MaxWeight = 1_000_000;
     private const decimal MaxPayoutMultiplier = 100;
     private const int MaxReflectMultiplier = 10;
+    private const int MaxWeeklyChallengeDays = 366;
+    private const int MaxSuggestionsPerDay = 100;
 
     public static IReadOnlyList<RulesetError> Validate(Ruleset ruleset)
     {
@@ -154,6 +157,37 @@ public static class RulesetValidator
         if (ruleset.Features.Events && ruleset.Events is null)
         {
             Error("events", "is required when features.events is on");
+        }
+
+        if (ruleset.Events is { AnswerTimeoutHours: { } timeout })
+        {
+            if (timeout < 1)
+            {
+                Error("events.answerTimeoutHours", "must be at least 1, or null for no limit");
+            }
+
+            AtMost("events.answerTimeoutHours", timeout, MaxAnswerTimeoutHours);
+        }
+
+        if (ruleset.Features.WeeklyChallenge && ruleset.WeeklyChallenge.DurationDays is null)
+        {
+            Error("weeklyChallenge.durationDays", "is required when features.weeklyChallenge is on");
+        }
+
+        // A window is a few days; the bound keeps the window's end a valid moment (D-574)
+        if (ruleset.WeeklyChallenge.DurationDays is < 1 or > MaxWeeklyChallengeDays)
+        {
+            Error("weeklyChallenge.durationDays", $"must be 1–{MaxWeeklyChallengeDays}");
+        }
+
+        if (ruleset.Features.Suggestions && ruleset.Suggestions is null)
+        {
+            Error("suggestions", "is required when features.suggestions is on");
+        }
+
+        if (ruleset.Suggestions is { PerDay: < 1 or > MaxSuggestionsPerDay })
+        {
+            Error("suggestions.perDay", $"must be 1–{MaxSuggestionsPerDay}");
         }
 
         // Special and risky events are drawn from decks: without events they could not even be played by hand (D-530)

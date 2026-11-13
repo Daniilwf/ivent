@@ -27,16 +27,25 @@ internal sealed class MoveHandler : ActionHandler<MoveAction>
 
     protected override void Execute(MoveAction action, EffectRun run)
     {
-        var steps = run.Number(action.Steps);
+        // The way is asked before the steps are rolled: an event that waits for it rolls once, after the answer (D-511)
+        var way = action.Direction == MoveDirection.Chosen ? run.NextChoice([Forward, Back]) : Forward;
+        if (way is null)
+        {
+            return;
+        }
+
         var player = run.State.Players[run.ActionTarget(action)];
+        if (run.PositionLocked)
+        {
+            // After the deadline the token stays and the steps are not rolled: the skip is recorded (Н-13, S5.7-14)
+            Skip(run, player);
+            return;
+        }
+
+        var steps = run.Number(action.Steps);
         switch (action.Direction)
         {
             case MoveDirection.Chosen:
-                if (run.NextChoice([Forward, Back]) is not { } way)
-                {
-                    return;
-                }
-
                 steps = way == Back ? -steps : steps;
                 break;
             case MoveDirection.Away:
@@ -74,6 +83,15 @@ internal sealed class MoveHandler : ActionHandler<MoveAction>
             ? Math.Sign(user - target)
             : 0;
     }
+
+    /// <summary>The record of a move a continuation skips after the deadline (Н-13): only for a player it could move.</summary>
+    public static void Skip(EffectRun run, SeasonPlayer player)
+    {
+        if (Positions.Movable(player))
+        {
+            run.Emit(new EffectMoveSkipped(player.PlayerId, run.ObjectId));
+        }
+    }
 }
 
 /// <summary>
@@ -88,6 +106,12 @@ internal sealed class TeleportHandler : ActionHandler<TeleportAction>
     {
         var player = run.State.Players[run.ActionTarget(action)];
         var map = run.State.Map;
+        if (run.PositionLocked)
+        {
+            MoveHandler.Skip(run, player);
+            return;
+        }
+
         if (!Positions.Movable(player))
         {
             return;

@@ -140,6 +140,96 @@ public sealed class EconomyQueueTests : IAsyncLifetime
         Assert.Null(logged.AuthorId);
     }
 
+    /// <summary>
+    /// Events on (D-511): Вася uses a «fortune» that draws from the good deck its one event, which asks «монетки или шаг» and
+    /// waits for his answer on the server. Returns the moment of the question.
+    /// </summary>
+    internal static async Task<DateTimeOffset> AskAnEventAsync(SiteFactory site, CancellationToken ct, int? timeoutHours = null)
+    {
+        ArgumentNullException.ThrowIfNull(site);
+        await using (var db = site.NewDb())
+        {
+            var (state, _) = await EventLogReader.ReplaySeasonAsync(db, SiteFactory.SeasonId, ct);
+            await site.SendAsync(new ChangeRuleset(state.Rules with
+            {
+                Features = state.Rules.Features with { Items = true, Events = true },
+                Events = new EventRules { DefaultDeck = EventKind.Good, AnswerTimeoutHours = timeoutHours },
+            }));
+        }
+
+        var self = new TargetSpec { Selector = TargetSelector.Self };
+        var crossroads = new ObjectDefinition
+        {
+            Id = "crossroads",
+            Kind = ObjectKind.Event,
+            Name = "Перекрёсток",
+            Description = "Монетки или шаг.",
+            Rarity = Rarity.Common,
+            Effect = new EffectSpec
+            {
+                Target = self,
+                Outcomes = new OutcomesSpec
+                {
+                    Choice = new OutcomeChoice { Prompt = "Что берёшь?", Options = new ChoiceOptionsSpec { List = ["монетки", "шаг"] } },
+                    Cases =
+                    [
+                        new OutcomeCase { Option = "монетки", Actions = [new ChangeResourceAction { Resource = "coins", Amount = ContentValue.Of(3) }] },
+                        new OutcomeCase { Option = "шаг", Actions = [new MoveAction { Steps = ContentValue.Of(1) }] },
+                    ],
+                },
+            },
+        };
+        await site.SendAsync(new PublishContent(
+            new ContentPack
+            {
+                Objects = [crossroads, Item("fortune", 10, new EffectSpec { Target = self, Actions = [new DrawEventAction { Deck = "good" }] })],
+                Wheels = [new WheelDefinition { Id = "good", Name = "Хорошие", Deck = EventKind.Good, Entries = [new WheelEntrySpec { ObjectId = "crossroads", Weight = 1 }] }],
+            },
+            "Контент"));
+
+        var vasya = site.Players["vasya"];
+        await site.SendAsync(new AdjustInventory(vasya, "fortune", null, "Подарок"));
+        await using var read = site.NewDb();
+        var (given, _) = await EventLogReader.ReplaySeasonAsync(read, SiteFactory.SeasonId, ct);
+        var asked = site.Clock.UtcNow;
+        await site.SendAsync(new UseItem(vasya, given.Players[vasya].Wallet.Inventory.Single(o => o.ObjectId == "fortune").InstanceId));
+        return asked;
+    }
+
+    [Fact]
+    public async Task A_question_of_an_event_waiting_for_its_answer_is_projected_equal_to_the_log()
+    {
+        // D-511: the suspended effect is the engine's bookkeeping, the pending choice its projected part
+        await AskAnEventAsync(_site, Ct);
+
+        await using var check = _site.NewDb();
+        var (state, _) = await EventLogReader.ReplaySeasonAsync(check, SiteFactory.SeasonId, Ct);
+        Assert.Single(state.Players[_site.Players["vasya"]].Suspended);
+        var report = await SeasonIntegrity.CheckAsync(check, SiteFactory.SeasonId, Ct);
+        Assert.True(report!.IsIntact, string.Join("; ", report.Differences));
+    }
+
+    [Fact]
+    public async Task The_scheduler_answers_a_question_past_its_timeout_through_the_queue()
+    {
+        // D-560: the timer column is the moment of the timeout, the scheduler fires it by the server's clock
+        var asked = await AskAnEventAsync(_site, Ct, timeoutHours: 24);
+        var vasya = _site.Players["vasya"];
+        Assert.Equal(asked.AddHours(24), await NextTimerAsync(vasya));
+
+        await TickAsync();
+        Assert.Equal(0, await CountAsync("effect-resumed"));
+
+        _site.Clock.UtcNow = asked.AddHours(25);
+        await TickAsync();
+        await TickAsync();
+
+        Assert.Equal(1, await CountAsync("effect-resumed"));
+        Assert.Null(await NextTimerAsync(vasya));
+        await using var check = _site.NewDb();
+        Assert.True((await SeasonIntegrity.CheckAsync(check, SiteFactory.SeasonId, Ct))!.IsIntact);
+    }
+
     private async Task<int> CountAsync(string type)
     {
         await using var db = _site.NewDb();

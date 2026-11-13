@@ -59,3 +59,12 @@ public sealed class SequentialIds(uint prefix = 0) : IIdGenerator
     public static Guid Make(uint prefix, long number) =>
         Guid.Parse($"{prefix:x8}-0000-0000-0000-{number:x12}");
 }
+
+/// <summary>The host's time zone database as the site gives it (D-579): the system's IANA zones.</summary>
+public sealed class SystemTestTimeZones : ITimeZones
+{
+    public static readonly SystemTestTimeZones Instance = new();
+
+    public TimeSpan? OffsetAt(string zoneId, DateTimeOffset moment) =>
+        TimeZoneInfo.TryFindSystemTimeZoneById(zoneId, out var zone) ? zone.GetUtcOffset(moment) : null;
+}

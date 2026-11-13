@@ -52,6 +52,12 @@ public enum CoinsReason
 
     /// <summary>A won bet's payout was taken back after the run's proof was rejected.</summary>
     BetPayoutRevoked,
+
+    /// <summary>A weekly challenge completed (D-526).</summary>
+    WeeklyChallenge,
+
+    /// <summary>A weekly challenge's reward taken back after the run's proof was rejected.</summary>
+    WeeklyChallengeRevoked,
 }
 
 /// <summary>What changed another resource of a player.</summary>

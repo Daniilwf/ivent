@@ -73,6 +73,10 @@ public static class SeasonEngine
             RollShop c => Shop.Decide(state, c, context),
             BuyLot c => Shop.Decide(state, c, context),
             PlaceBet c => Betting.Decide(state, c, context),
+            Challenges.SetWeeklyChallenge c => Challenges.WeeklyChallenges.Decide(state, c, context),
+            Challenges.MarkWeeklyChallenge c => Challenges.WeeklyChallenges.Decide(state, c),
+            Suggestions.SubmitSuggestion c => Suggestions.SuggestionBox.Decide(state, c, context),
+            Suggestions.ReviewSuggestion c => Suggestions.SuggestionBox.Decide(state, c, context),
             FireTimers => Timers.Decide(state, context),
             _ => throw new ArgumentException($"Unknown command {command.GetType().Name}.", nameof(command)),
         };
@@ -90,13 +94,14 @@ public static class SeasonEngine
             return new CommandResult(decision, state);
         }
 
-        // Bets, the shop price and the lifetimes of objects follow the command's events without limits (D-413); effects
+        // Bets, weekly challenges, the shop price and the lifetimes of objects follow the command's events without limits (D-413); effects
         // react after them, within the chain limits (D-24, D-103).
         var after = decision.Events.Aggregate(state, Apply);
-        var settlements = Settlements.After(after, decision.Events);
+        var settlements = Settlements.After(after, decision.Events, context.Pool);
         after = settlements.Aggregate(after, Apply);
         IReadOnlyList<IGameEvent> own = [.. decision.Events, .. settlements];
-        var (reactions, reacted) = EffectChain.Run(after, own, context);
+        // A continuation of a suspended effect reacts from the level it stopped at, each its own (D-511)
+        var (reactions, reacted) = EffectChain.Run(after, own, context, Suspensions.Levels(state, decision.Events));
         var lifetimes = Settlements.Lifetimes(reacted, own);
         var final = lifetimes.Aggregate(reacted, Apply);
         return reactions.Count == 0 && settlements.Count == 0 && lifetimes.Count == 0
@@ -195,11 +200,19 @@ public static class SeasonEngine
             ShopPriceRestarted e => Shop.Apply(state, e),
             BetPlaced e => Betting.Apply(state, e),
             BetSettled e => Betting.Apply(state, e),
+            Challenges.WeeklyChallengeSet e => Challenges.WeeklyChallenges.Apply(state, e),
+            Challenges.WeeklyChallengeCompleted e => Challenges.WeeklyChallenges.Apply(state, e),
+            Challenges.WeeklyChallengeRevoked e => Challenges.WeeklyChallenges.Apply(state, e),
+            Suggestions.SuggestionSubmitted e => Suggestions.SuggestionBox.Apply(state, e),
+            Suggestions.SuggestionReviewed e => Suggestions.SuggestionBox.Apply(state, e),
 
             // Facts for the log and the feed that change nothing by themselves: their consequences are their own events.
             ObjectLost or ItemUsed or EffectTriggered or EffectRolled or HostileIntercepted or WheelSpun or InventoryAdjusted => state,
             Decks.EventDrawn e => Decks.EventDraws.Apply(state, e),
             Decks.EventDrawMissed or Decks.BadEventIntercepted => state,
+            EffectSuspended e => Suspensions.Apply(state, e),
+            EffectResumed e => Suspensions.Apply(state, e),
+            EffectMoveSkipped => state,
             _ => throw new ArgumentException($"Unknown event {gameEvent.GetType().Name}.", nameof(gameEvent)),
         };
 

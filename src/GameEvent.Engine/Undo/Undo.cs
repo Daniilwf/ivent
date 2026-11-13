@@ -25,10 +25,11 @@ public sealed record UndoCommand(Guid TargetCommandId, string Comment) : IComman
 public sealed record SeasonFields(SeasonStatus Status, DateTimeOffset? Deadline, string Name, Rulesets.Ruleset? Ruleset);
 
 /// <summary>
-/// A command is undone (D-104): what it touched gets back the values it had before — players, runs and pending manual
-/// effects it changed, those it created are removed, the season's fields if it changed them. Nothing later touched them
-/// (that is when an undo is allowed), so this equals its events inverted in reverse order. The counters of finishes and
-/// points changes are not wound back: numbers are never reused.
+/// A command is undone (D-104): what it touched gets back the values it had before — players, runs, pending manual
+/// effects, weekly challenges and suggestions it changed, those it created are removed, the season's fields if it changed
+/// them. Nothing later touched them (that is when an undo is allowed), so this equals its events inverted in reverse order.
+/// The counters of finishes and points changes are not wound back: numbers are never reused. Challenges and suggestions are
+/// written only when set: an undo of a command that touched none of them keeps its format (D-576).
 /// </summary>
 [EventType("command-undone")]
 public sealed record CommandUndone(
@@ -40,7 +41,15 @@ public sealed record CommandUndone(
     EquatableArray<Guid> RemovedRuns,
     EquatableArray<PendingManualEffect> Effects,
     EquatableArray<Guid> RemovedEffects,
-    SeasonFields? Season) : IGameEvent;
+    SeasonFields? Season,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    EquatableArray<Challenges.WeeklyChallengeState>? WeeklyChallenges = null,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    EquatableArray<Guid>? RemovedWeeklyChallenges = null,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    EquatableArray<Suggestions.Suggestion>? Suggestions = null,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    EquatableArray<Guid>? RemovedSuggestions = null) : IGameEvent;
 
 internal static class Undoing
 {
@@ -111,7 +120,7 @@ internal static class Undoing
             }
             // Stryker disable once Linq : equivalent — an undo's entry is its single CommandUndone, so Any and All agree
             else if (i > index && !undone.Contains(history[i].CommandId) && !history[i].Events.Any(e => e is CommandUndone)
-                && (targetKeys!.Contains(SeasonKey) || Keys(before, after, history[i].Events).Overlaps(targetKeys)))
+                && (targetKeys!.Contains(SeasonKey) || DependsOn(Keys(before, after, history[i].Events), targetKeys)))
             {
                 // Every later command was decided under the season's status, deadline and rules: after a change of
                 // those, all of them depend on it (D-104).
@@ -160,12 +169,42 @@ internal static class Undoing
 
     private const string SeasonKey = "season";
 
+    /// <summary>
+    /// Whether a later command's keys meet the target's (D-104): a shared key, or a whole and a part of it — a challenge and
+    /// a player's completion of it (D-578), a player joining and a suggestion they wrote (D-579). The whole holds every part,
+    /// while parts (completions of different players, suggestions of one author) stay independent of each other.
+    /// </summary>
+    private static bool DependsOn(ISet<string> later, ISet<string> target) =>
+        later.Overlaps(target)
+        || later.Any(k => WholeOf(k) is { } whole && target.Contains(whole))
+        || target.Any(k => WholeOf(k) is { } whole && later.Contains(whole));
+
+    // A part's key «challenge:{id}:{playerId}» or «author:{playerId}:{suggestionId}» belongs to the whole before its last colon
+    private static string? WholeOf(string key) =>
+        new[] { ChallengePrefix, AuthorPrefix }.FirstOrDefault(p => key.StartsWith(p, StringComparison.Ordinal)) is { } prefix
+            && key.LastIndexOf(':') is var last && last > prefix.Length
+            ? key[..last]
+            : null;
+
+    private const string ChallengePrefix = "challenge:";
+
     public static SeasonState Apply(SeasonState state, CommandUndone e)
     {
         var players = state.Players.RemoveRange(e.RemovedPlayers).SetItems(e.Players.Select(p => KeyValuePair.Create(p.PlayerId, p)));
         var runs = state.Runs.RemoveRange(e.RemovedRuns).SetItems(e.Runs.Select(r => KeyValuePair.Create(r.RunId, r)));
         var effects = state.ManualEffects.RemoveRange(e.RemovedEffects).SetItems(e.Effects.Select(x => KeyValuePair.Create(x.EffectId, x)));
-        var restored = state with { Players = players, Runs = runs, ManualEffects = effects };
+        var challenges = state.WeeklyChallenges.RemoveRange(e.RemovedWeeklyChallenges ?? [])
+            .SetItems((e.WeeklyChallenges ?? []).Select(c => KeyValuePair.Create(c.ChallengeId, c)));
+        var suggestions = state.Suggestions.RemoveRange(e.RemovedSuggestions ?? [])
+            .SetItems((e.Suggestions ?? []).Select(x => KeyValuePair.Create(x.SuggestionId, x)));
+        var restored = state with
+        {
+            Players = players,
+            Runs = runs,
+            ManualEffects = effects,
+            WeeklyChallenges = challenges,
+            Suggestions = suggestions,
+        };
         if (e.Season is not { } season)
         {
             return restored;
@@ -196,6 +235,13 @@ internal static class Undoing
         foreach (var id in Changed(before.Players, after.Players))
         {
             keys.Add($"player:{id}");
+
+            // A player joining or leaving the season holds what they authored (D-579)
+            if (!before.Players.ContainsKey(id) || !after.Players.ContainsKey(id))
+            {
+                keys.Add($"{AuthorPrefix}{id}");
+            }
+
             foreach (var player in new[] { before.Players.GetValueOrDefault(id), after.Players.GetValueOrDefault(id) }.OfType<SeasonPlayer>())
             {
                 // A game offered or among the choice's options is taken by this player (D-06, D-91)
@@ -239,6 +285,26 @@ internal static class Undoing
             keys.Add($"effect:{id}");
         }
 
+        // A challenge set or changed as a whole, or a player's completion of it: each player's completions are their own (D-578)
+        foreach (var id in Changed(before.WeeklyChallenges, after.WeeklyChallenges))
+        {
+            var (was, now) = (before.WeeklyChallenges.GetValueOrDefault(id), after.WeeklyChallenges.GetValueOrDefault(id));
+            if (was is null || now is null || was with { Completions = [] } != now with { Completions = [] })
+            {
+                keys.Add($"{ChallengePrefix}{id}");
+            }
+
+            foreach (var player in CompletionsChanged(was, now))
+            {
+                keys.Add($"{ChallengePrefix}{id}:{player}");
+            }
+        }
+
+        foreach (var id in Changed(before.Suggestions, after.Suggestions))
+        {
+            keys.Add($"suggestion:{id}");
+        }
+
         if (before.Status != after.Status || before.Deadline != after.Deadline || before.Name != after.Name
             || before.Ruleset != after.Ruleset || before.Result != after.Result)
         {
@@ -260,9 +326,16 @@ internal static class Undoing
                 keys.Add($"player:{placed.Bet.OnPlayerId}");
             }
 
-            foreach (var (kind, id) in GameIds.Of(e).Concat(GameIds.Own(e)))
+            // A suggestion names its author but changes nothing of the player: it does not hold back undos of their turns
+            // (D-576), only the undo of the author's joining (D-579)
+            foreach (var (kind, id) in GameIds.Of(e).Concat(e is Suggestions.SuggestionSubmitted ? [] : GameIds.Own(e)))
             {
                 keys.Add($"{kind}:{id}");
+            }
+
+            if (e is Suggestions.SuggestionSubmitted submitted)
+            {
+                keys.Add($"{AuthorPrefix}{submitted.PlayerId}:{submitted.SuggestionId}");
             }
         }
 
@@ -271,12 +344,45 @@ internal static class Undoing
 
     private const string FinishKey = "finishOrder";
 
+    private const string AuthorPrefix = "author:";
+
+    /// <summary>The players whose completions of a challenge differ between two versions of it.</summary>
+    private static IEnumerable<Guid> CompletionsChanged(Challenges.WeeklyChallengeState? was, Challenges.WeeklyChallengeState? now)
+    {
+        var (a, b) = (was?.Completions ?? [], now?.Completions ?? []);
+        return a.Concat(b).Select(c => c.PlayerId).Distinct()
+            .Where(p => !a.Where(c => c.PlayerId == p).SequenceEqual(b.Where(c => c.PlayerId == p)))
+            .Order();
+    }
+
+    /// <summary>
+    /// The challenge as the undo leaves it (D-578): as it is now, with the completions of the players the target command
+    /// changed as they were before it. Nothing later touched those players' completions (that is when an undo is allowed).
+    /// </summary>
+    private static Challenges.WeeklyChallengeState Restored(
+        Challenges.WeeklyChallengeState was, Challenges.WeeklyChallengeState? after, Challenges.WeeklyChallengeState? now)
+    {
+        if (now is null)
+        {
+            return was;
+        }
+
+        var players = CompletionsChanged(was, after).ToHashSet();
+        return was with
+        {
+            Completions = Challenges.WeeklyChallenges.Ordered(
+                now.Completions.Where(c => !players.Contains(c.PlayerId)).Concat(was.Completions.Where(c => players.Contains(c.PlayerId)))),
+        };
+    }
+
     private static CommandUndone Compensation(SeasonState before, SeasonState now, LoggedCommand target, string comment)
     {
         var after = target.Events.Aggregate(before, SeasonEngine.Apply);
         var players = Changed(before.Players, after.Players).ToList();
         var runs = Changed(before.Runs, after.Runs).ToList();
         var effects = Changed(before.ManualEffects, after.ManualEffects).ToList();
+        var challenges = Changed(before.WeeklyChallenges, after.WeeklyChallenges).ToList();
+        var suggestions = Changed(before.Suggestions, after.Suggestions).ToList();
         var seasonChanged = before.Status != after.Status || before.Deadline != after.Deadline || before.Name != after.Name
             || before.Ruleset != after.Ruleset;
 
@@ -290,8 +396,15 @@ internal static class Undoing
             [.. runs.Where(id => !before.Runs.ContainsKey(id) && now.Runs.ContainsKey(id))],
             [.. effects.Where(before.ManualEffects.ContainsKey).Select(id => before.ManualEffects[id])],
             [.. effects.Where(id => !before.ManualEffects.ContainsKey(id) && now.ManualEffects.ContainsKey(id))],
-            seasonChanged ? new SeasonFields(before.Status, before.Deadline, before.Name, before.Ruleset == after.Ruleset ? null : before.Rules) : null);
+            seasonChanged ? new SeasonFields(before.Status, before.Deadline, before.Name, before.Ruleset == after.Ruleset ? null : before.Rules) : null,
+            OrNull([.. challenges.Where(before.WeeklyChallenges.ContainsKey)
+                .Select(id => Restored(before.WeeklyChallenges[id], after.WeeklyChallenges.GetValueOrDefault(id), now.WeeklyChallenges.GetValueOrDefault(id)))]),
+            OrNull([.. challenges.Where(id => !before.WeeklyChallenges.ContainsKey(id) && now.WeeklyChallenges.ContainsKey(id))]),
+            OrNull([.. suggestions.Where(before.Suggestions.ContainsKey).Select(id => before.Suggestions[id])]),
+            OrNull([.. suggestions.Where(id => !before.Suggestions.ContainsKey(id) && now.Suggestions.ContainsKey(id))]));
     }
+
+    private static EquatableArray<T>? OrNull<T>(EquatableArray<T> items) => items.Count == 0 ? null : items;
 
     private static IEnumerable<Guid> Changed<T>(
         System.Collections.Immutable.ImmutableSortedDictionary<Guid, T> before, System.Collections.Immutable.ImmutableSortedDictionary<Guid, T> after) =>

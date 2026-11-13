@@ -134,8 +134,10 @@ internal static class EventDraws
     /// The events of <paramref name="playerId"/> drawing from <paramref name="deck"/> (D-500, D-501): the drawn event and its
     /// effect, or its interception by a Бабл (D-484), or its text left to manual resolution (<c>manual: true</c>, D-410); or
     /// a miss and a manual effect «draw an event» that remembers <paramref name="source"/> (D-550). The frozen first draws
-    /// nothing (D-510); the provisional first draws only by his own run: completion, drop, reroll (D-553). With
-    /// <c>features.events</c> off the event is drawn by hand, as before stage 5 (D-10, D-504).
+    /// nothing (D-510); the provisional first draws only by his own run: completion, drop, reroll (D-553). An event that
+    /// asks waits for the answer (D-511), whatever its source: <paramref name="level"/> is the chain level its effect runs
+    /// at, where its continuation goes on. With <c>features.events</c> off the event is drawn by hand, as before stage 5
+    /// (D-10, D-504).
     /// </summary>
     public static List<IGameEvent> Draw(
         SeasonState state,
@@ -145,7 +147,8 @@ internal static class EventDraws
         EventSource source,
         Guid? runId = null,
         Guid? fromPlayerId = null,
-        bool hostile = false)
+        bool hostile = false,
+        int level = 0)
     {
         var (deckId, kind) = Resolve(state, playerId, deck);
         if (!state.Rules.Features.Events)
@@ -194,14 +197,16 @@ internal static class EventDraws
         }
 
         List<IGameEvent> events = [drawn];
-        if (definition.Effect is { } effect)
+        if (definition.Effect is not null)
         {
-            // Played at once on the drawer; what it gives him comes from the system, not a player (D-544)
-            var run = new EffectRun(after, context, playerId, definition.Id, hostile: false, parameters: null);
-            var targets = Targets.ForTriggered(run.State, context, definition, playerId);
-
-            // The provisional first no longer affects others (SPEC «Прогресс и победа»): his event reaches him alone (D-557)
-            run.Run(effect, Targets.IsFirst(run.State, playerId) ? [.. targets.Where(t => t == playerId)] : targets);
+            // Played at once on the drawer; what it gives him comes from the system, not a player (D-544). A question
+            // suspends the effect until the answer, from any source (D-511); the provisional first's event reaches him
+            // alone (D-557 (4)), see EffectRun.Play
+            var run = new EffectRun(after, context, playerId, definition.Id, hostile: false, parameters: null)
+            {
+                Asks = new Asking(deckKind, level) { Source = source },
+            };
+            run.Play(definition);
             events.AddRange(run.Events);
         }
 
@@ -253,8 +258,15 @@ internal static class EventDraws
 
     // D-510, D-553: the frozen first is out; the provisional first draws only by his own run
     private static bool DrawsNothing(SeasonState state, Guid playerId, EventSource source) =>
-        Finish.Finishes.IsFrozen(state.Players[playerId])
-        || (Targets.IsFirst(state, playerId) && source is EventSource.Cell or EventSource.Item or EventSource.Incoming);
+        Targets.IsFirst(state, playerId) ? !PlaysForTheFirst(state.Players[playerId], source) : Finish.Finishes.IsFrozen(state.Players[playerId]);
+
+    /// <summary>
+    /// Whether the first finisher <paramref name="player"/> still plays an event of <paramref name="source"/> (D-553 (3)):
+    /// only while provisional and only by his own run — completion, drop, reroll; a question of it goes on after his
+    /// answer too (D-511). A question with no source written is one of 5.7, closed by the answer only (D-567 (8)).
+    /// </summary>
+    public static bool PlaysForTheFirst(SeasonPlayer player, EventSource? source) =>
+        !Finish.Finishes.IsFrozen(player) && source is EventSource.Difficulty or EventSource.DropPenalty or EventSource.RerollCost;
 
     // D-550: the pending effect remembers where the event came from, so a buy-out never takes the one of a drop or a reroll (panel D-508)
     private static ManualEffectSource ManualSource(EventSource source, bool events) => source switch
@@ -270,15 +282,21 @@ internal static class EventDraws
 /// An event cell draws when a move stops on it (SPEC «Движение»: any stop, a push of another included, never a teleport's
 /// destination; D-502). It reacts in the effect chain, so a loop «event cell → push → event cell» is cut by its levels (D-500).
 /// </summary>
-internal sealed class EventCells : ITriggerHandler
+internal sealed class EventCells : ITriggerHandler, IFiringTriggerHandler
 {
     public static EventCells Instance { get; } = new();
 
-    public IEnumerable<IGameEvent> React(SeasonState state, IGameEvent trigger, EngineContext context) =>
+    public IEnumerable<IGameEvent> React(SeasonState state, IGameEvent trigger, EngineContext context) => Drawn(state, trigger, context, level: 0);
+
+    /// <summary>A drawn event and what it plays are one firing: cut whole or written whole (D-488); it runs at the chain's level.</summary>
+    public IEnumerable<IReadOnlyList<IGameEvent>> ReactInFirings(SeasonState state, IGameEvent trigger, EngineContext context, int depth, int eventsBefore) =>
+        Drawn(state, trigger, context, depth) is { Count: > 0 } drawn ? [drawn] : [];
+
+    private static List<IGameEvent> Drawn(SeasonState state, IGameEvent trigger, EngineContext context, int level) =>
         state.Ruleset is not null && state.Rules.Features.Events
             && trigger is PlayerMoved { Paused: false } move && move.Steps != 0 && CellStops.Triggers(move.Reason)
             && move.Reason is not (MoveReason.DropPenalty or MoveReason.CompletionRoll)
-            ? Stop(state, context, move)
+            ? Stop(state, context, move, level)
             : [];
 
     /// <summary>
@@ -286,9 +304,9 @@ internal sealed class EventCells : ITriggerHandler
     /// inside the drop, before the drop's own bad event (D-504), and the stop of a run's own move inside its command, before
     /// the difficulty's event (D-553 (2), D-557), so the chain leaves those moves alone.
     /// </summary>
-    public static List<IGameEvent> Stop(SeasonState state, EngineContext context, PlayerMoved move) =>
+    public static List<IGameEvent> Stop(SeasonState state, EngineContext context, PlayerMoved move, int level = 0) =>
         state.Rules.Features.Events && !move.Paused && move.Steps != 0
             && state.Map.CellById(move.To) is { Type: CellType.Event, Deck: { } deck }
-            ? EventDraws.Draw(state, context, move.PlayerId, deck, EventSource.Cell)
+            ? EventDraws.Draw(state, context, move.PlayerId, deck, EventSource.Cell, level: level)
             : [];
 }

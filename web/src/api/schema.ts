@@ -7614,10 +7614,10 @@ export interface components {
             ruleset: components["schemas"]["Ruleset"];
         };
         /**
-         * @description What the player is choosing (K-5): a game, a branch at a fork; targets and outcomes come later.
+         * @description What the player is choosing (K-5): a game, a branch at a fork, the answer of an event (D-511).
          * @enum {unknown}
          */
-        ChoiceKind: "game" | "branch";
+        ChoiceKind: "game" | "branch" | "effect";
         ChoiceOptionView: {
             id: string;
             game: null | components["schemas"]["OfferedGameView"];
@@ -8020,6 +8020,13 @@ export interface components {
              *     standard deck of this kind.
              */
             defaultDeck: components["schemas"]["EventKind"];
+            /**
+             * Format: int32
+             * @description How long an event that asks waits for its answer, in hours (D-560): past it the timer answers by a random option,
+             *     written in the log. Null — it waits without a limit (the turn waits, the admin may discard it, D-91). Not written
+             *     while null.
+             */
+            answerTimeoutHours?: null | number;
         };
         /**
          * @description Where a drawn event came from (GLOSSARY «Источник ивента», panel D-484 (2), D-548). The Бабл stops a bad event of
@@ -8049,6 +8056,11 @@ export interface components {
              *     optional, so older configs without it still read.
              */
             challenges?: boolean;
+            /**
+             * @description The suggestion box (stage 5, D-527); optional, so older configs without it still read. Not written while off: a season
+             *     logged before it keeps its ruleset's format.
+             */
+            suggestions?: boolean;
         };
         /**
          * @description One event of the season's feed (GLOSSARY «Лента», D-124): its place in the log, the command it came from, when, the
@@ -8954,6 +8966,7 @@ export interface components {
             nominations: components["schemas"]["NominationRules"];
             weeklyChallenge: components["schemas"]["WeeklyChallengeRules"];
             events?: null | components["schemas"]["EventRules"];
+            suggestions?: null | components["schemas"]["SuggestionRules"];
         };
         /**
          * @description One changed value between two versions of the rules: the JSON path (for example `reward.diceCount.max`)
@@ -9279,6 +9292,14 @@ export interface components {
             thumbnailUrl: string;
             duplicate: boolean;
         };
+        /** @description The rules of the suggestion box (SPEC «Предложка», D-527). */
+        SuggestionRules: {
+            /**
+             * Format: int32
+             * @description How many suggestions one player may send a calendar day of `season.timezone`.
+             */
+            perDay: number;
+        };
         TargetObjectsView: {
             /** Format: uuid */
             playerId: string;
@@ -9405,6 +9426,12 @@ export interface components {
         WeeklyChallengeRules: {
             /** Format: int32 */
             defaultRewardCoins: number;
+            /**
+             * Format: int32
+             * @description How many days a weekly challenge's window lasts from its start (D-526). Missing — a season created before it reads as
+             *     it did (D-50); needed once `features.weeklyChallenge` is on. Not written while missing.
+             */
+            durationDays?: null | number;
         };
         /**
          * @description The wheel of the roll that offered what I see now (D-136), from the log: the categories that were on it, the one it
@@ -9476,7 +9503,7 @@ type ReadonlyArray<T> = [
 export const betStatusValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["BetStatus"]> = ["open", "won", "lost", "revoked"];
 export const bugReportStatusValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["BugReportStatus"]> = ["new", "inWork", "closed"];
 export const cellTypeValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["CellType"]> = ["start", "empty", "finish", "fork", "teleport", "checkpoint", "pointsBonus", "event", "shop"];
-export const choiceKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ChoiceKind"]> = ["game", "branch"];
+export const choiceKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ChoiceKind"]> = ["game", "branch", "effect"];
 export const coopRoundUpForValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["CoopRoundUpFor"]> = ["roller"];
 export const diceStageValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["DiceStage"]> = ["count", "sides", "add", "multiply", "reroll", "min", "max", "singleDie", "setOne", "replaceValue", "fixAverage", "bonusPerEven", "percent"];
 export const difficultyValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["Difficulty"]> = ["easy", "normal", "hard", "extreme"];
