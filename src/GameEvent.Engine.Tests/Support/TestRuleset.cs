@@ -205,5 +205,11 @@ public static class TestRuleset
         }
         """;
 
-    public static Ruleset Create() => RulesetJson.Parse(Json);
+    /// <summary>
+    /// The pinned rules, parsed once per test run: a ruleset is immutable, and every scenario of the random games starts
+    /// from it (D-670).
+    /// </summary>
+    public static Ruleset Create() => s_pinned.Value;
+
+    private static readonly Lazy<Ruleset> s_pinned = new(() => RulesetJson.Parse(Json));
 }

@@ -18,11 +18,17 @@ public readonly struct EquatableArray<T> : IEquatable<EquatableArray<T>>, IReadO
 
     public EquatableArray(IEnumerable<T> items) => _items = [.. items];
 
+    // Takes the array as it is: only the factories below pass one, freshly copied
+    internal EquatableArray(ImmutableArray<T> items) => _items = items;
+
     public int Count => _items.IsDefault ? 0 : _items.Length;
 
     public T this[int index] => _items.IsDefault ? throw new ArgumentOutOfRangeException(nameof(index)) : _items[index];
 
-    public bool Equals(EquatableArray<T> other) => this.SequenceEqual(other);
+    // On the spans: no enumerator boxed per comparison (the state compares by content after every command, D-671)
+    public bool Equals(EquatableArray<T> other) => Span.SequenceEqual(other.Span);
+
+    private ReadOnlySpan<T> Span => _items.IsDefault ? [] : _items.AsSpan();
 
     public override bool Equals(object? obj) => obj is EquatableArray<T> other && Equals(other);
 
@@ -51,7 +57,7 @@ public readonly struct EquatableArray<T> : IEquatable<EquatableArray<T>>, IReadO
 
 public static class EquatableArray
 {
-    public static EquatableArray<T> Create<T>(ReadOnlySpan<T> items) => new(items.ToArray());
+    public static EquatableArray<T> Create<T>(ReadOnlySpan<T> items) => new(ImmutableArray.Create(items));
 
     public static EquatableArray<T> ToEquatableArray<T>(this IEnumerable<T> items) => new(items);
 }
