@@ -145,8 +145,14 @@ internal static class Corrections
             .Where(e => e.RunId == run.RunId && e.Source == ManualEffectSource.Difficulty)
             .Select(e => new ManualEffectResolved(e.EffectId, e.PlayerId, e.RunId, ManualEffectOutcome.NotApplicable, comment)));
 
-        // The frozen first gets no new event (the freeze amendment); the old one still does not apply.
-        if (!frozen && newRule.GrantEvent is { } granted)
+        // The frozen first gets no new event (the freeze amendment); the old one still does not apply. With events on it is
+        // drawn now, as at the completion (D-504), but a run draws its difficulty's event once: one already drawn stays and
+        // is not drawn again (Н-4, D-553, D-557)
+        if (!frozen && state.Rules.Features.Events)
+        {
+            events.AddRange(Decks.EventDraws.ForDifficulty(events.Aggregate(state, SeasonEngine.Apply), context, run.RunId));
+        }
+        else if (!frozen && newRule.GrantEvent is { } granted)
         {
             events.Add(new ManualEffectCreated(context.Ids.NewId(), run.PlayerId, granted, ManualEffectSource.Difficulty, run.RunId));
         }

@@ -124,10 +124,16 @@ public sealed record NextRollModified(Guid PlayerId, RollModifier Modifier) : IG
 
 /// <summary>
 /// A roll from Idle took the pending roll changes (<see cref="Modifiers"/>): they hold for this roll and its rerolls
-/// until the run starts (D-405).
+/// until the run starts (D-405). <see cref="Waiting"/> — the changes that still wait for the next roll: only the bad event of
+/// a paid reroll gives its changes to the roll in progress and leaves the older ones waiting (D-546 (3)); written only
+/// when there are any, so the rolls before it read and write as they were.
 /// </summary>
 [EventType("roll-modifiers-applied")]
-public sealed record RollModifiersApplied(Guid PlayerId, EquatableArray<RollModifier> Modifiers) : IGameEvent;
+public sealed record RollModifiersApplied(Guid PlayerId, EquatableArray<RollModifier> Modifiers) : IGameEvent
+{
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public EquatableArray<RollModifier> Waiting { get; init; }
+}
 
 /// <summary>The player's next throw for a completion is changed (<c>modifyDice</c> with <c>when: next</c>).</summary>
 [EventType("next-dice-modified")]

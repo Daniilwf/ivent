@@ -1,5 +1,6 @@
 using FsCheck.Xunit;
 using GameEvent.Engine.Content;
+using GameEvent.Engine.Decks;
 using GameEvent.Engine.Economy;
 using GameEvent.Engine.Effects;
 using GameEvent.Engine.Inventory;
@@ -18,7 +19,8 @@ namespace GameEvent.Engine.Tests.Events;
 /// <summary>
 /// Random games with events that ask (task 5.7, its done-criterion: invariants 1, 12, 13, 14 in games with suspended
 /// events). Players step and push one another onto event cells, answer (with valid and invalid options), the admin discards,
-/// commands are undone, the clock runs the answer timeout (D-560) on even seeds, and players roll and complete. After every
+/// commands are undone, the clock runs the answer timeout (D-560) on even seeds, and players roll, complete (an extreme
+/// difficulty draws its event), drop (the penalty draws a bad event) and use an item that draws (D-559). After every
 /// command: 1 — the log replays to the state; 12 — the chain limits; 13 — an accepted undo leaves the state the log without
 /// the command replays to; the new invariant of D-562 — a pending choice of <see cref="ChoiceKind.Effect"/> exactly when the
 /// player has a suspended effect not resumed or discarded, unless a choice of another kind is asked first (D-567 (10); the
@@ -27,6 +29,15 @@ namespace GameEvent.Engine.Tests.Events;
 public class SuspendedEffectInvariantTests
 {
     private static readonly string[] s_players = ["Вася", "Петя", "Маша"];
+
+    /// <summary>An item that draws from the deck of the asking events (D-504, D-559).</summary>
+    private static readonly ObjectDefinition s_askSack = ContentJson.Parse<ObjectDefinition>("""
+        {
+          "id": "ask-sack", "kind": "item", "name": "Мешок вопросов", "description": "Вытяни ивент.",
+          "rarity": "common", "price": 10, "window": "anytime", "hostile": false, "stackable": true,
+          "effect": { "target": { "selector": "self" }, "actions": [{ "type": "drawEvent", "deck": "ask" }] }
+        }
+        """);
 
     private static Scenario NewSeason(int seed)
     {
@@ -48,13 +59,19 @@ public class SuspendedEffectInvariantTests
         var asking = SuspendedEffectTests.AskingEvents;
         ObjectDefinition[] objects =
         [
-            .. asking, SuspendedEffectTests.Shove,
+            .. asking, SuspendedEffectTests.Shove, s_askSack,
             EconomyScenario.Examples()["orange"], EconomyScenario.Examples()["forced-genre"], EconomyScenario.Examples()["lucky-die"],
         ];
         s.WithContent(new ContentPack
         {
             Objects = [.. objects.OrderBy(o => o.Id, StringComparer.Ordinal)],
-            Wheels = [EventScenario.Deck(EventKind.Good, "ask", asking.Select(o => o.Id).ToArray())],
+            // The difficulty's good event and the drop's bad one ask too (TestRuleset: extreme grants good, a drop draws bad)
+            Wheels =
+            [
+                EventScenario.Deck(EventKind.Good, "ask", asking.Select(o => o.Id).ToArray()),
+                EventScenario.Deck(EventKind.Bad, "bad", asking.Select(o => o.Id).ToArray()),
+                EventScenario.Deck(EventKind.Good, "good", asking.Select(o => o.Id).ToArray()),
+            ],
         });
         return s;
     }
@@ -67,10 +84,11 @@ public class SuspendedEffectInvariantTests
         switch (b % 8)
         {
             case 0:
-                return new AdjustInventory(player.PlayerId, arg % 3 == 0 ? "lucky-die" : "orange", null, "Выдано для теста");
+                return new AdjustInventory(player.PlayerId, (arg % 3) switch { 0 => "lucky-die", 1 => "ask-sack", _ => "orange" }, null, "Выдано для теста");
             case 1:
-                return player.Wallet.Inventory.FirstOrDefault(o => o.ObjectId == "orange") is { } orange
-                    ? new UseItem(player.PlayerId, orange.InstanceId)
+                // An item that draws an event, else the orange that steps (D-559)
+                return player.Wallet.Inventory.FirstOrDefault(o => o.ObjectId == (arg % 2 == 0 ? "ask-sack" : "orange")) is { } item
+                    ? new UseItem(player.PlayerId, item.InstanceId)
                     : new AdjustInventory(player.PlayerId, "orange", null, "Выдано для теста");
             case 2 when player.Choice is { } choice:
                 // One index past the options is an answer off them
@@ -93,7 +111,13 @@ public class SuspendedEffectInvariantTests
                 {
                     TurnPhase.Idle => new RollGame(player.PlayerId),
                     TurnPhase.Rolling => new StartRun(player.PlayerId),
-                    _ => new CompleteRun(player.PlayerId, Difficulty.Normal),
+                    // A drop draws its penalty, an extreme difficulty its event (D-504, D-559)
+                    _ => (arg % 3) switch
+                    {
+                        0 => new DropRun(player.PlayerId),
+                        1 => new CompleteRun(player.PlayerId, Difficulty.Extreme),
+                        _ => new CompleteRun(player.PlayerId, Difficulty.Normal),
+                    },
                 };
             default:
                 var target = s.PlayerId(s_players[((b / 8) + 1) % s_players.Length]);
@@ -142,9 +166,13 @@ public class SuspendedEffectInvariantTests
     {
         // The generator is worth its invariants only if it gets there: fixed seeds, scripts that step, answer and undo
         var seen = new HashSet<string>();
-        for (var seed = 0; seed < 40; seed++)
+        // Beyond the stepping scripts: Вася rolls, starts, waits 13 hours and completes on extreme (30: case 6, arg 1) or
+        // drops (6: arg 0), so the difficulty's and the drop's events get drawn too (D-559)
+        var scripts = Enumerable.Range(0, 40)
+            .Select(seed => (Seed: seed, Script: Enumerable.Range(0, 60).Select(i => (byte)((seed * 37 + i * 101) % 256)).ToArray()))
+            .Concat(Enumerable.Range(0, 10).Select(seed => (Seed: seed, Script: new byte[] { 6, 6, 5, (byte)(seed % 2 == 0 ? 30 : 6), 2, 2, 6, 6, 5, 30 })));
+        foreach (var (seed, script) in scripts)
         {
-            var script = Enumerable.Range(0, 60).Select(i => (byte)((seed * 37 + i * 101) % 256)).ToArray();
             var s = Play(seed, script, check: true);
             foreach (var command in s.History)
             {
@@ -152,8 +180,9 @@ public class SuspendedEffectInvariantTests
                 {
                     switch (e)
                     {
-                        case EffectSuspended:
+                        case EffectSuspended suspended:
                             seen.Add("suspended");
+                            seen.Add($"suspended:{suspended.Source}");
                             break;
                         case EffectResumed when command.Events.Count > 0 && s.Commands[s.History.ToList().IndexOf(command)] is FireTimers:
                             seen.Add("timeout");
@@ -172,7 +201,10 @@ public class SuspendedEffectInvariantTests
             }
         }
 
-        Assert.Equal(new[] { "discarded", "resumed", "suspended", "timeout", "undone" }, seen.Order());
+        Assert.Equal(new[] { "discarded", "resumed", "suspended", "timeout", "undone" }, seen.Where(k => !k.Contains(':', StringComparison.Ordinal)).Order());
+
+        // The sources of 5.3 ask in these games too (D-559): a cell, an item, a difficulty, a drop
+        Assert.Empty(new[] { "suspended:Cell", "suspended:Item", "suspended:Difficulty", "suspended:DropPenalty" }.Except(seen));
     }
 
     /// <summary>The suspended effects of each player not yet resumed or discarded, by the log as the rules see it.</summary>
@@ -230,8 +262,9 @@ public class SuspendedEffectInvariantTests
             Assert.True(command is FireTimers || (command is MakeChoice answer && answer.PlayerId == resumed.PlayerId), $"{resumed} by {command}.");
         }
 
-        // 12: the chain limits — a suspension keeps its level within them, the cut is the 51st event at most
-        Assert.All(s.Last.Events.OfType<EffectSuspended>(), e => Assert.InRange(e.Depth, 1, Limits.MaxEffectDepth));
+        // 12: the chain limits — a suspension keeps its level within them, the cut is the 51st event at most. The level is
+        // the one the event's actions run at (D-567 (4), D-559 (1); the bound 0…3 owner-approved 2026-11-13)
+        CheckSuspensionLevels(s.Last.Events);
         var cut = s.Last.Events.OfType<EffectChainCut>().SingleOrDefault();
         Assert.True(cut is null || cut.Events <= Limits.MaxEventsPerCommand);
         Assert.True(s.Last.Events.Count <= Limits.MaxEventsPerCommand + 1, $"{s.Last.Events.Count} events in one command.");
@@ -240,6 +273,27 @@ public class SuspendedEffectInvariantTests
         if (command is UndoCommand && s.Last.IsAccepted)
         {
             Assert.Equal(Comparable(SeasonEngine.Replay(s.EffectiveLog)), Comparable(s.State));
+        }
+    }
+
+    /// <summary>
+    /// Invariant 12 for the levels of suspensions, by source (D-567 (4), D-559 (1)): 0…3 at all; a cell's event — a stop
+    /// in the chain or of the command's own move — at its reaction level 1…3; the command's own events (difficulty, drop,
+    /// reroll) and an item used by its holder or on another player (the only items of these games) at 0.
+    /// </summary>
+    private static void CheckSuspensionLevels(IReadOnlyList<IGameEvent> events)
+    {
+        foreach (var suspended in events.OfType<EffectSuspended>())
+        {
+            Assert.InRange(suspended.Depth, 0, Limits.MaxEffectDepth);
+            if (suspended.Source == EventSource.Cell)
+            {
+                Assert.InRange(suspended.Depth, 1, Limits.MaxEffectDepth);
+            }
+            else
+            {
+                Assert.Equal(0, suspended.Depth);
+            }
         }
     }
 

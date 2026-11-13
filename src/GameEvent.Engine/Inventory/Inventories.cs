@@ -114,7 +114,7 @@ internal static class Inventories
         Update(state, e.PlayerId, w => w with { NextRoll = [.. w.NextRoll, e.Modifier] });
 
     public static SeasonState Apply(SeasonState state, RollModifiersApplied e) =>
-        Update(state, e.PlayerId, w => w with { NextRoll = [], CurrentRoll = e.Modifiers });
+        Update(state, e.PlayerId, w => w with { NextRoll = e.Waiting, CurrentRoll = e.Modifiers });
 
     public static SeasonState Apply(SeasonState state, NextDiceModified e) =>
         Update(state, e.PlayerId, w => w with { NextDice = [.. w.NextDice, e.Modifier] });
@@ -147,10 +147,16 @@ internal static class Inventories
 /// <summary>Passive protection (SPEC «Защита только пассивная», CONTENT.md «Щит»): an effect that stops a hostile one.</summary>
 internal static class Interception
 {
-    /// <summary>The player's first interception, in the order it came; null when they have none.</summary>
-    public static InventoryObject? Find(SeasonState state, Guid playerId) =>
+    /// <summary>The player's first interception of a hostile effect, in the order it came; null when they have none.</summary>
+    public static InventoryObject? Find(SeasonState state, Guid playerId) => Find(state, playerId, Intercept.Hostile);
+
+    /// <summary>
+    /// The player's oldest object that stops <paramref name="threat"/> (D-484 (3): several interceptors — the oldest first);
+    /// null when they have none.
+    /// </summary>
+    public static InventoryObject? Find(SeasonState state, Guid playerId, Intercept threat) =>
         state.Players[playerId].Wallet.Inventory
-            .Where(o => state.Catalog.Find(o.ObjectId)?.Effect is { Intercept: Intercept.Hostile, Trigger: Trigger.HostileIncoming })
+            .Where(o => state.Catalog.Find(o.ObjectId)?.Effect is { Intercept: { } stops, Trigger: Trigger.HostileIncoming } && stops.HasFlag(threat))
             .OrderBy(o => o.Acquired)
             .FirstOrDefault();
 

@@ -21,7 +21,47 @@ public partial class EventFormatTests
     [
         ("event-drawn", new EventDrawn(s_player, "risky", "gamble", EventKind.Risky, EventSource.Cell), """{"playerId":"10000000-0000-0000-0000-000000000001","deck":"risky","objectId":"gamble","kind":"risky","source":"cell"}"""),
         ("event-draw-missed", new EventDrawMissed(s_player, "horror-bad", EventKind.Bad, EventSource.Item), """{"playerId":"10000000-0000-0000-0000-000000000001","deck":"horror-bad","kind":"bad","source":"item"}"""),
+        ("bad-event-intercepted", new BadEventIntercepted(s_player, s_object, "bubble-effect", EventSource.Incoming, "horror-week"), """{"playerId":"10000000-0000-0000-0000-000000000001","instanceId":"60000000-0000-0000-0000-000000000001","objectId":"bubble-effect","source":"incoming","eventId":"horror-week"}"""),
     ];
+
+    [Theory]
+    [InlineData(EventSource.Difficulty, "difficulty")]
+    [InlineData(EventSource.Incoming, "incoming")]
+    [InlineData(EventSource.RerollCost, "rerollCost")]
+    [InlineData(EventSource.DropPenalty, "dropPenalty")]
+    public void The_sources_of_task_5_3_are_stored_by_name(EventSource source, string name)
+    {
+        var stored = EventCodec.Encode(new EventDrawMissed(s_player, "bad", EventKind.Bad, source));
+
+        Assert.Contains($"\"source\":\"{name}\"", stored.Data, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void An_event_drawn_onto_a_player_by_another_writes_who_and_whether_hostile()
+    {
+        // D-548: written only when set, so the draws of 5.1 keep their frozen format (the sample above)
+        var drawn = new EventDrawn(s_player, "bad", "horror-week", EventKind.Bad, EventSource.Incoming) { FromPlayerId = s_other, Hostile = true };
+        var stored = new StoredEvent(
+            "event-drawn",
+            1,
+            """{"playerId":"10000000-0000-0000-0000-000000000001","deck":"bad","objectId":"horror-week","kind":"bad","source":"incoming","fromPlayerId":"10000000-0000-0000-0000-000000000002","hostile":true}""");
+
+        Assert.Equal(stored, EventCodec.Encode(drawn));
+        Assert.Equal(drawn, EventCodec.Decode(stored));
+    }
+
+    [Fact]
+    public void Roll_changes_left_waiting_by_a_paid_reroll_are_written_only_when_there_are_some()
+    {
+        // D-556: the event of a paid reroll gives its changes to the roll in progress and leaves the older ones waiting
+        var older = new Engine.Inventory.RollModifier("pick-of-three", null, 3, Hostile: false);
+        var applied = new Engine.Inventory.RollModifiersApplied(s_player, [new Engine.Inventory.RollModifier("forced-genre", null, null, Hostile: false)]) { Waiting = [older] };
+        var stored = EventCodec.Encode(applied);
+
+        Assert.Contains("\"waiting\":[{\"objectId\":\"pick-of-three\"", stored.Data, StringComparison.Ordinal);
+        Assert.Equal(applied, EventCodec.Decode(stored));
+        Assert.DoesNotContain("waiting", EventCodec.Encode(applied with { Waiting = [] }).Data, StringComparison.Ordinal);
+    }
 
     [Fact]
     public void A_manual_effect_of_an_empty_deck_is_stored_in_the_frozen_format_with_the_new_kinds_and_source()

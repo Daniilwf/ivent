@@ -30,4 +30,23 @@ public partial class EventFormatTests
         ("effect-resumed", new EffectResumed(s_player, s_run, "RPG"), """{"playerId":"10000000-0000-0000-0000-000000000001","choiceId":"00000000-0000-0000-0000-000000000001","optionId":"RPG"}"""),
         ("effect-move-skipped", new EffectMoveSkipped(s_player, "crossroads"), """{"playerId":"10000000-0000-0000-0000-000000000001","objectId":"crossroads"}"""),
     ];
+
+    [Fact]
+    public void A_question_of_an_event_writes_its_source_only_when_set()
+    {
+        // D-559: the source of the event (D-548) goes with its question, so the suspensions of 5.7 keep their frozen format (the sample above)
+        var suspended = new EffectSuspended(
+            s_player, s_run, "coin-or-step", EventKind.Good, SuspendedStep.Outcome, s_player, 0, 0,
+            [new ChoiceOption("coins", Game: null), new ChoiceOption("step", Game: null)], null, null, null)
+        {
+            Source = Engine.Decks.EventSource.Difficulty,
+        };
+        var stored = new StoredEvent(
+            "effect-suspended",
+            1,
+            """{"playerId":"10000000-0000-0000-0000-000000000001","choiceId":"00000000-0000-0000-0000-000000000001","objectId":"coin-or-step","kind":"good","step":"outcome","targetId":"10000000-0000-0000-0000-000000000001","nextAction":0,"depth":0,"options":[{"id":"coins","game":null},{"id":"step","game":null}],"roll":null,"choice":null,"dueAt":null,"source":"difficulty"}""");
+
+        Assert.Equal(stored, EventCodec.Encode(suspended));
+        Assert.Equal(suspended, EventCodec.Decode(stored));
+    }
 }

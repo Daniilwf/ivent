@@ -16,4 +16,8 @@ public sealed record EngineContext(
     IPoolView Pool,
     IReadOnlyList<Effects.ITriggerHandler>? Triggers = null,
     IReadOnlyList<Undo.LoggedCommand>? History = null,
-    ITimeZones? TimeZones = null);
+    ITimeZones? TimeZones = null)
+{
+    /// <summary>The levels of the command's own events above 0, set for each command by <see cref="SeasonEngine.Execute"/> (D-559 (1)).</summary>
+    internal Effects.CommandLevels? Levels { get; init; }
+}

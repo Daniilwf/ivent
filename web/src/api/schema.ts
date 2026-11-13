@@ -8029,10 +8029,12 @@ export interface components {
             answerTimeoutHours?: null | number;
         };
         /**
-         * @description Where a drawn event came from (GLOSSARY «Источник ивента»); stage 5 adds the drop, the paid reroll and the difficulty.
+         * @description Where a drawn event came from (GLOSSARY «Источник ивента», panel D-484 (2), D-548). The Бабл stops a bad event of
+         *     EventSource.Cell, EventSource.Item, EventSource.Difficulty and EventSource.Incoming, never the price of a reroll
+         *     (EventSource.RerollCost) or the penalty of a drop (EventSource.DropPenalty).
          * @enum {unknown}
          */
-        EventSource: "cell" | "item";
+        EventSource: "cell" | "item" | "difficulty" | "incoming" | "rerollCost" | "dropPenalty";
         /** @enum {unknown} */
         ExclusionReason: "alreadyPlayed" | "dropped" | "techRerolled";
         /** @description Feature flags: a disabled mechanic is invisible in the interface and refused by the engine. */
@@ -9507,7 +9509,7 @@ export const diceStageValues: ReadonlyArray<FlattenedDeepRequired<components>["s
 export const difficultyValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["Difficulty"]> = ["easy", "normal", "hard", "extreme"];
 export const emptyPoolFallbackValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["EmptyPoolFallback"]> = ["dropZoneFilter"];
 export const eventKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["EventKind"]> = ["good", "bad", "special", "risky"];
-export const eventSourceValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["EventSource"]> = ["cell", "item"];
+export const eventSourceValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["EventSource"]> = ["cell", "item", "difficulty", "incoming", "rerollCost", "dropPenalty"];
 export const exclusionReasonValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ExclusionReason"]> = ["alreadyPlayed", "dropped", "techRerolled"];
 export const gameMarkKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["GameMarkKind"]> = ["dropped", "techRerolled"];
 export const itemStepKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ItemStepKind"]> = ["choice", "pickObject", "direction"];

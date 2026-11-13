@@ -37,6 +37,8 @@ public static class SeasonEngine
         ArgumentNullException.ThrowIfNull(command);
         ArgumentNullException.ThrowIfNull(context);
 
+        // The levels of this command's own events (D-559 (1)), never another command's
+        context = context with { Levels = new CommandLevels() };
         var decision = command switch
         {
             CreateSeason c => SeasonSetup.Decide(state, c),
@@ -100,13 +102,32 @@ public static class SeasonEngine
         var settlements = Settlements.After(after, decision.Events, context.Pool);
         after = settlements.Aggregate(after, Apply);
         IReadOnlyList<IGameEvent> own = [.. decision.Events, .. settlements];
-        // A continuation of a suspended effect reacts from the level it stopped at, each its own (D-511)
-        var (reactions, reacted) = EffectChain.Run(after, own, context, Suspensions.Levels(state, decision.Events));
+        // A continuation of a suspended effect reacts from the level it stopped at, each its own (D-511); the stop of an own
+        // move from the level of its draw (D-559 (1))
+        var (reactions, reacted) = EffectChain.Run(after, own, context, Levels(state, decision.Events, context.Levels!));
         var lifetimes = Settlements.Lifetimes(reacted, own);
         var final = lifetimes.Aggregate(reacted, Apply);
         return reactions.Count == 0 && settlements.Count == 0 && lifetimes.Count == 0
             ? new CommandResult(decision, after)
             : new CommandResult(Decision.Accept([.. own, .. reactions, .. lifetimes]), final);
+    }
+
+    // D-511, D-559 (1): the level each of the command's own events reacts from — a continuation's, a stop's, else 0
+    private static IReadOnlyList<int>? Levels(SeasonState state, IReadOnlyList<IGameEvent> events, CommandLevels marked)
+    {
+        var resumed = Suspensions.Levels(state, events);
+        if (marked.IsEmpty)
+        {
+            return resumed;
+        }
+
+        var levels = new int[events.Count];
+        for (var i = 0; i < events.Count; i++)
+        {
+            levels[i] = Math.Max(resumed?[i] ?? 0, marked.Of(events[i]));
+        }
+
+        return levels;
     }
 
     // D-305: a player choosing a branch is not moved by other commands, and the run whose steps wait is not corrected or
@@ -208,7 +229,8 @@ public static class SeasonEngine
 
             // Facts for the log and the feed that change nothing by themselves: their consequences are their own events.
             ObjectLost or ItemUsed or EffectTriggered or EffectRolled or HostileIntercepted or WheelSpun or InventoryAdjusted => state,
-            Decks.EventDrawn or Decks.EventDrawMissed => state,
+            Decks.EventDrawn e => Decks.EventDraws.Apply(state, e),
+            Decks.EventDrawMissed or Decks.BadEventIntercepted => state,
             EffectSuspended e => Suspensions.Apply(state, e),
             EffectResumed e => Suspensions.Apply(state, e),
             EffectMoveSkipped => state,

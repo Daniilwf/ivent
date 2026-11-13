@@ -9455,9 +9455,13 @@
       "EventSource": {
         "enum": [
           "cell",
-          "item"
+          "item",
+          "difficulty",
+          "incoming",
+          "rerollCost",
+          "dropPenalty"
         ],
-        "description": "Where a drawn event came from (GLOSSARY «Источник ивента»); stage 5 adds the drop, the paid reroll and the difficulty."
+        "description": "Where a drawn event came from (GLOSSARY «Источник ивента», panel D-484 (2), D-548). The Бабл stops a bad event of\nEventSource.Cell, EventSource.Item, EventSource.Difficulty and EventSource.Incoming, never the price of a reroll\n(EventSource.RerollCost) or the penalty of a drop (EventSource.DropPenalty)."
       },
       "ExclusionReason": {
         "enum": [

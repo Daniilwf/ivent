@@ -28,6 +28,21 @@ describe('DrawnEventCard', () => {
     expect(screen.getByText(ru.events.played)).toBeInTheDocument();
   });
 
+  it('names every source of a drawn event', () => {
+    const { rerender } = render(<DrawnEventCard drawn={drawn} />);
+    for (const source of [
+      'cell',
+      'item',
+      'difficulty',
+      'incoming',
+      'rerollCost',
+      'dropPenalty',
+    ] as const) {
+      rerender(<DrawnEventCard drawn={{ ...drawn, source }} />);
+      expect(screen.getByText(ru.events.sources[source])).toBeInTheDocument();
+    }
+  });
+
   it('shows every kind in its words and an event without text without an empty paragraph', () => {
     const { rerender, container } = render(
       <DrawnEventCard drawn={{ ...drawn, kind: 'risky', description: '', source: 'item' }} />,
