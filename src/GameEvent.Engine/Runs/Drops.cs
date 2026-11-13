@@ -239,8 +239,8 @@ internal static class Drops
                 events.AddRange(CellStops.After(state, moved, context));
 
                 // An event cell of the stop draws before the drop's own event (D-504); a stop reacts to its move, so its
-                // question waits at the chain's first level, as in the chain (D-500, D-559 (1))
-                events.AddRange(Decks.EventCells.Stop(events.Aggregate(state, SeasonEngine.Apply), context, moved, level: 1));
+                // event runs at the chain's first level, as in the chain (D-500, D-559 (1))
+                events.AddRange(Decks.EventCells.StopOfOwnMove(events.Aggregate(state, SeasonEngine.Apply), context, moved));
             }
         }
 

@@ -304,9 +304,21 @@ internal sealed class EventCells : ITriggerHandler, IFiringTriggerHandler
     /// inside the drop, before the drop's own bad event (D-504), and the stop of a run's own move inside its command, before
     /// the difficulty's event (D-553 (2), D-557), so the chain leaves those moves alone.
     /// </summary>
-    public static List<IGameEvent> Stop(SeasonState state, EngineContext context, PlayerMoved move, int level = 0) =>
+    public static List<IGameEvent> Stop(SeasonState state, EngineContext context, PlayerMoved move, int level) =>
         state.Rules.Features.Events && !move.Paused && move.Steps != 0
             && state.Map.CellById(move.To) is { Type: CellType.Event, Deck: { } deck }
             ? EventDraws.Draw(state, context, move.PlayerId, deck, EventSource.Cell, level: level)
             : [];
+
+    /// <summary>
+    /// The stop of the command's own move (a run's, a drop's penalty) drawn inside the command: a reaction to the move, so
+    /// its event runs at level 1 and what it writes reacts from level 2, as the same loop started by an item — with or
+    /// without a question (D-500, D-559 (1), D-567 (4)).
+    /// </summary>
+    public static List<IGameEvent> StopOfOwnMove(SeasonState state, EngineContext context, PlayerMoved move)
+    {
+        var drawn = Stop(state, context, move, level: 1);
+        context.Levels?.Mark(drawn, 1);
+        return drawn;
+    }
 }
