@@ -149,7 +149,16 @@ export function ObjectForm({ value, problems, schemas, ids, disabled, onChange }
         <legend className="px-1 font-display text-lg font-heavy">{f.effect}</legend>
         <div className="grid gap-4 desk:grid-cols-2">
           {choice(['effect', 'trigger'], f.trigger ?? '', t.values.trigger ?? {})}
-          {choice(['effect', 'intercept'], f.intercept ?? '', t.values.intercept ?? {})}
+          {/* Several kinds at once (the Бабл, D-555) are a list: shown as it is, edited in the JSON view */}
+          {Array.isArray(getIn(value, ['effect', 'intercept'])) ? (
+            <InJson
+              label={f.intercept ?? ''}
+              value={getIn(value, ['effect', 'intercept'])}
+              error={error(['effect', 'intercept'])}
+            />
+          ) : (
+            choice(['effect', 'intercept'], f.intercept ?? '', t.values.intercept ?? {})
+          )}
           {choice(['effect', 'target', 'selector'], f.target ?? '', t.values.selector ?? {})}
           {choice(['effect', 'target', 'among'], f.among ?? '', t.values.among ?? {})}
           <Select

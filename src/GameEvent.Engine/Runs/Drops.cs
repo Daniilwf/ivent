@@ -1,4 +1,3 @@
-using GameEvent.Engine.Effects;
 using GameEvent.Engine.Finish;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Map;
@@ -79,11 +78,11 @@ internal static class Drops
         }
 
         var dice = PenaltyRoll(state, run, context);
-        return Decision.Accept(
-        [
-            new RunDropped(run.RunId, player.PlayerId, dice, context.Clock.UtcNow),
-            .. Penalty(state, player, dice, run.RunId, context),
-        ]);
+        var dropped = new RunDropped(run.RunId, player.PlayerId, dice, context.Clock.UtcNow);
+
+        // The penalty and its bad event play on the state after the drop: the run is over, the player idle (D-504)
+        var after = Apply(state, dropped);
+        return Decision.Accept([dropped, .. Penalty(after, after.Players[player.PlayerId], dice, run.RunId, context)]);
     }
 
     public static Decision Decide(SeasonState state, TechReroll command, EngineContext context)
@@ -170,13 +169,10 @@ internal static class Drops
         }
 
         // The penalty hits the player's current points and position; their turn is left alone (D-11).
-        var player = state.Players[run.PlayerId];
         var dice = PenaltyRoll(state, run, context);
-        return Decision.Accept(
-        [
-            new TechRerollConvertedToDrop(run.RunId, player.PlayerId, command.Comment, dice, context.Clock.UtcNow),
-            .. Penalty(state, player, dice, run.RunId, context, exclude: false),
-        ]);
+        var converted = new TechRerollConvertedToDrop(run.RunId, run.PlayerId, command.Comment, dice, context.Clock.UtcNow);
+        var after = Apply(state, converted);
+        return Decision.Accept([converted, .. Penalty(after, after.Players[run.PlayerId], dice, run.RunId, context, exclude: false)]);
     }
 
     public static SeasonState Apply(SeasonState state, RunDropped e) => Finish(state, e.RunId, e.PlayerId, RunStatus.Dropped);
@@ -204,29 +200,32 @@ internal static class Drops
         CompletionRoll.Roll(DropStreak.PenaltyDiceCount(state.Rules.Drop, DropStreak.Before(state, run)), state.Rules.Drop.PenaltyDice.Sides, context.Random);
 
     /// <summary>
-    /// The drop penalty (D-09, D-94): points and position by the dice sum, never past the start; the game excluded
-    /// for a drop (a conversion changes the existing exclusion instead); the mandatory bad event.
+    /// The drop penalty (D-09, D-94) on <paramref name="state"/>, which already holds the drop: points and position by the
+    /// dice sum, never past the start; the stop the push ends on, an event cell included; the game excluded for a drop (a
+    /// conversion changes the existing exclusion instead); then the mandatory bad event (D-504) — drawn from the bad deck
+    /// with <c>features.events</c>, else a manual effect.
     /// </summary>
-    internal static IEnumerable<IGameEvent> Penalty(
+    internal static List<IGameEvent> Penalty(
         SeasonState state, SeasonPlayer player, EquatableArray<Die> dice, Guid runId, EngineContext context, bool exclude = true)
     {
         var rules = state.Rules.Drop;
         var sum = PenaltySum(dice, state.Runs[runId].Snapshot);
+        var events = new List<IGameEvent>();
 
         // The frozen first loses nothing and is dealt no event; a finisher's position is fixed (D-09, D-99).
         if (Finishes.IsFrozen(player))
         {
             if (exclude)
             {
-                yield return new GameExcluded(player.PlayerId, state.Runs[runId].GameId, ExclusionReason.Dropped);
+                events.Add(new GameExcluded(player.PlayerId, state.Runs[runId].GameId, ExclusionReason.Dropped));
             }
 
-            yield break;
+            return events;
         }
 
         if (rules.AffectsPoints && sum != 0)
         {
-            yield return new PointsChanged(player.PlayerId, -sum, PointsReason.DropPenalty, runId);
+            events.Add(new PointsChanged(player.PlayerId, -sum, PointsReason.DropPenalty, runId));
         }
 
         if (rules.AffectsPosition && sum != 0 && player.Finish is null)
@@ -236,23 +235,27 @@ internal static class Drops
             if (path.Count > 0)
             {
                 var moved = new PlayerMoved(player.PlayerId, player.CellId, path[^1], -sum, [.. path], MoveReason.DropPenalty, runId);
-                yield return moved;
-                foreach (var e in CellStops.After(state, moved, context))
-                {
-                    yield return e;
-                }
+                events.Add(moved);
+                events.AddRange(CellStops.After(state, moved, context));
+
+                // An event cell of the stop draws before the drop's own event (D-504); a stop reacts to its move, so its
+                // event runs at the chain's first level, as in the chain (D-500, D-559 (1))
+                events.AddRange(Decks.EventCells.StopOfOwnMove(events.Aggregate(state, SeasonEngine.Apply), context, moved));
             }
         }
 
         if (exclude)
         {
-            yield return new GameExcluded(player.PlayerId, state.Runs[runId].GameId, ExclusionReason.Dropped);
+            events.Add(new GameExcluded(player.PlayerId, state.Runs[runId].GameId, ExclusionReason.Dropped));
         }
 
         if (rules.MandatoryEvent == MandatoryEvent.Bad)
         {
-            yield return new ManualEffectCreated(context.Ids.NewId(), player.PlayerId, EventKind.Bad, ManualEffectSource.Drop, runId);
+            events.AddRange(Decks.EventDraws.Draw(
+                events.Aggregate(state, SeasonEngine.Apply), context, player.PlayerId, Decks.EventDraws.NameOf(EventKind.Bad), Decks.EventSource.DropPenalty, runId));
         }
+
+        return events;
     }
 
     /// <summary>

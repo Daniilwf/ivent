@@ -228,10 +228,8 @@ public class DeckTests
     [Theory]
     [InlineData("given", "$.objects[1].effect.actions[0].objectId")]
     [InlineData("transformedInto", "$.objects[1].effect.actions[0].into")]
-    [InlineData("manual", "$.objects[0].manual")]
     [InlineData("hostile", "$.objects[0].hostile")]
     [InlineData("condition", "$.objects[0].effect.condition")]
-    [InlineData("target", "$.objects[0].effect.target")]
     public void An_event_is_played_on_its_drawer_and_never_kept(string what, string path)
     {
         var tailwind = EconomyScenario.Examples()["tailwind"];
@@ -240,13 +238,44 @@ public class DeckTests
         {
             "given" => [tailwind, s_drawGood with { Effect = Acts(new GiveObjectAction { ObjectId = "tailwind" }) }],
             "transformedInto" => [tailwind, s_drawGood with { Effect = Acts(new TransformObjectAction { Mode = TransformMode.Transform, Into = "tailwind" }) }],
-            "manual" => [EconomyScenario.Examples()["karaoke"]],
             "hostile" => [tailwind with { Hostile = true }],
-            "condition" => [tailwind with { Effect = tailwind.Effect! with { Condition = new ConditionSpec { DifficultyAtLeast = Engine.Runs.Difficulty.Hard } } }],
-            _ => [tailwind with { Effect = tailwind.Effect! with { Target = new TargetSpec { Selector = TargetSelector.Leader } } }],
+            // No target row any more: since 5.3 an event reaches the players its selector picks (D-554) and since 5.7 a player its
+            // drawer picks (D-511), so no target is refused (D-559 (3), SuspendedEffectTests.An_event_on_a_selector_that_needs_no_answer_is_published)
+            _ => [tailwind with { Effect = tailwind.Effect! with { Condition = new ConditionSpec { DifficultyAtLeast = Engine.Runs.Difficulty.Hard } } }],
         };
 
         Assert.Contains(path, ContentPublishing.Check(new ContentPack { Objects = [.. objects] }, events: true).Select(e => e.Path));
+    }
+
+    [Theory]
+    [InlineData("move", true)]
+    [InlineData("teleport", true)]
+    [InlineData("caseMove", true)]
+    [InlineData("coins", false)]
+    public void An_event_on_everyone_may_not_move_or_teleport(string what, bool refused)
+    {
+        // D-549 (as D-519): 16 pushes with their cells would not fit the 50 events of the chain — until 5.9
+        var tailwind = EconomyScenario.Examples()["tailwind"];
+        var all = new TargetSpec { Selector = TargetSelector.All };
+        var effect = what switch
+        {
+            "move" => new EffectSpec { Target = all, Actions = [new MoveAction { Steps = ContentValue.Of(1) }] },
+            "teleport" => new EffectSpec { Target = all, Actions = [new TeleportAction { Cell = "start" }] },
+            "caseMove" => new EffectSpec
+            {
+                Target = all,
+                Outcomes = new OutcomesSpec
+                {
+                    Roll = ContentValue.TryParse("1d6"),
+                    Cases = [new OutcomeCase { From = 1, To = 6, Actions = [new MoveAction { Steps = ContentValue.Of(1) }] }],
+                },
+            },
+            _ => new EffectSpec { Target = all, Actions = [new ChangeResourceAction { Resource = "coins", Amount = ContentValue.Of(1) }] },
+        };
+
+        var errors = ContentPublishing.Check(new ContentPack { Objects = [tailwind with { Effect = effect }] }, events: true).Select(e => e.Path);
+
+        Assert.Equal(refused, errors.Contains("$.objects[0].effect.target"));
     }
 
     [Fact]

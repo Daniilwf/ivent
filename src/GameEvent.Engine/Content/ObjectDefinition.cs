@@ -87,9 +87,18 @@ public enum Among
     LowerPoints,
 }
 
+/// <summary>
+/// What an interception stops (D-484, panel D-484 (3)): a set — <c>"intercept": ["badEvent", "hostile"]</c> as the import
+/// writes it; a single value (<c>"hostile"</c>) reads and writes as before, so the logs of packs before stage 5 stay as they were.
+/// </summary>
+[Flags]
 public enum Intercept
 {
-    Hostile,
+    /// <summary>A hostile effect of another player (CONTENT.md «Щит»).</summary>
+    Hostile = 1,
+
+    /// <summary>A bad event that lands on the player by chance: a cell, an item, a difficulty, one drawn onto him by another (D-548).</summary>
+    BadEvent = 2,
 }
 
 /// <summary>
@@ -161,6 +170,7 @@ public sealed record EffectSpec
 
     public ConditionSpec? Condition { get; init; }
 
+    [JsonConverter(typeof(InterceptJsonConverter))]
     public Intercept? Intercept { get; init; }
 
     public EquatableArray<ActionSpec> Actions { get; init; } = [];

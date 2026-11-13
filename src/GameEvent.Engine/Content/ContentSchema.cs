@@ -73,6 +73,18 @@ public static class ContentSchema
     private static JsonNode Describe(JsonSchemaExporterContext context, JsonNode schema)
     {
         var type = context.TypeInfo.Type;
+        if (context.PropertyInfo?.CustomConverter is InterceptJsonConverter)
+        {
+            // A name, or a list of names (D-484)
+            JsonArray Names(bool orNull) => [.. InterceptJsonConverter.Names.Select(n => (JsonNode?)n), .. orNull ? new JsonNode?[] { null } : []];
+            return new JsonObject
+            {
+                ["anyOf"] = new JsonArray(
+                    new JsonObject { ["enum"] = Names(orNull: true) },
+                    new JsonObject { ["type"] = "array", ["items"] = new JsonObject { ["enum"] = Names(orNull: false) }, ["minItems"] = 1, ["uniqueItems"] = true }),
+            };
+        }
+
         if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(EquatableArray<>))
         {
             return new JsonObject { ["type"] = "array", ["items"] = Node(type.GetGenericArguments()[0]) };

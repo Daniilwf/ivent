@@ -323,15 +323,17 @@ internal sealed class EffectRun
 
     /// <summary>
     /// A drawn event (D-511): a target <c>chosen</c> is its first question, asked among the players the server counts;
-    /// otherwise it runs on its targets and may stop at a later question.
+    /// otherwise it runs on its targets and may stop at a later question. The provisional first no longer affects others
+    /// (SPEC «Прогресс и победа», D-557 (4)): the event of his own run reaches him alone, he is asked about nobody.
     /// </summary>
     public void Play(ObjectDefinition definition)
     {
         ArgumentNullException.ThrowIfNull(definition);
         var effect = definition.Effect!;
+        var alone = Targets.IsFirst(State, UserId);
         if (effect.Target?.Selector == TargetSelector.Chosen && Asks is not null)
         {
-            var options = Targets.Askable(State, definition, UserId);
+            var options = alone ? [] : Targets.Askable(State, definition, UserId);
             if (options.Count > 0)
             {
                 Suspend(SuspendedStep.Target, [.. options.Select(id => id.ToString("N"))]);
@@ -340,7 +342,8 @@ internal sealed class EffectRun
             return;
         }
 
-        Run(effect, Targets.ForTriggered(State, Context, definition, UserId));
+        var targets = Targets.ForTriggered(State, Context, definition, UserId);
+        Run(effect, alone ? [.. targets.Where(t => t == UserId)] : targets);
     }
 
     /// <summary>
@@ -353,9 +356,14 @@ internal sealed class EffectRun
         ArgumentNullException.ThrowIfNull(definition);
         ArgumentNullException.ThrowIfNull(suspended);
         var effect = definition.Effect!;
+
+        // The provisional first goes on with the event of his own run (D-553 (3)), but it reaches him alone, as in Play
+        // (D-557 (4)): a question about another player asked before he became first hits nobody
+        var alone = Targets.IsFirst(State, UserId);
         if (suspended.Step == SuspendedStep.Target)
         {
-            if (Guid.TryParseExact(optionId, "N", out var target) && Targets.Askable(State, definition, UserId).Contains(target))
+            if (Guid.TryParseExact(optionId, "N", out var target) && (!alone || target == UserId)
+                && Targets.Askable(State, definition, UserId).Contains(target))
             {
                 Run(effect, [target]);
             }
@@ -364,6 +372,10 @@ internal sealed class EffectRun
         }
 
         TargetId = suspended.TargetId ?? UserId;
+        if (alone && TargetId != UserId)
+        {
+            return;
+        }
 
         // A player picked at an earlier question is checked again at every later one (Н-10, D-510): one who finished first
         // or became inactive since is not hit, the answer is not refused
@@ -403,7 +415,10 @@ internal sealed class EffectRun
             [.. options.Select(o => new Turns.ChoiceOption(o, Game: null))],
             LastRoll,
             LastChoice,
-            due));
+            due)
+        {
+            Source = asks.Source,
+        });
         Suspended = true;
     }
 

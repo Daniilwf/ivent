@@ -227,32 +227,28 @@ public static class ContentPublishing
         }
     }
 
-    // What an event plays (D-536, D-511): its effect at once on the one who drew it or a player he picks, a question waiting
-    // for his answer. Text by hand (IRL), a condition and other targets come with 5.3 and are refused until then rather than ignored.
+    // What an event plays (D-536, D-511, 5.3): its effect at once, from the one who drew it — on him, on the players its
+    // selector picks, or on a player he picks (a chosen target is a question that waits for his answer); a text by hand
+    // (manual: true) waits for resolution (D-410). It is hostile only when another player's hostile item drew it (D-504),
+    // never by itself; a condition comes with 5.5 and is refused until then rather than ignored.
     private static void Event(ObjectDefinition definition, string at, Action<string, string> error)
     {
-        if (definition.Manual)
-        {
-            error($"{at}.manual", "An event played by hand comes with task 5.3.");
-        }
-
         if (definition.Hostile)
         {
             error($"{at}.hostile", "An event is played on the one who drew it: it is not hostile.");
         }
 
-        if (definition.Effect is { } effect)
+        if (definition.Effect is { Condition: not null })
         {
-            if (effect.Condition is not null)
-            {
-                error($"{at}.effect.condition", "An event plays when drawn, without a condition.");
-            }
+            error($"{at}.effect.condition", "An event plays when drawn, without a condition.");
+        }
 
-            // A target the drawer picks is a question that waits for him (D-511); other selectors come with 5.3 and 5.9
-            if (effect.Target is { Selector: not (TargetSelector.Self or TargetSelector.Chosen) })
-            {
-                error($"{at}.effect.target", "An event acts on the one who drew it («self») or on a player he picks («chosen»).");
-            }
+        // D-549, as D-519 for the system's effects: pushes of everyone with their cells would not fit the 50 events of the
+        // chain, and the effect would reach only some — until 5.9
+        if (definition.Effect is { Target.Selector: TargetSelector.All } effect
+            && effect.Actions.Concat(effect.Outcomes?.Cases.SelectMany(c => c.Actions) ?? []).Any(a => a is MoveAction or TeleportAction))
+        {
+            error($"{at}.effect.target", "An event on everyone does not move or teleport (until 5.9).");
         }
     }
 

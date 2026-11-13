@@ -26,7 +26,8 @@ public enum SuspendedStep
 /// the target is the question), the first action to run after the answer (zero-based), the level of the effect chain it
 /// stopped at, the options the server counted, the <c>$roll</c> and <c>$choice</c> computed so far, and when the timer
 /// answers for the player (D-560; null — never). <see cref="Kind"/> is the kind of the deck it came from: several suspended
-/// effects ask one by one, the special first (D-505, D-562).
+/// effects ask one by one, the special first (D-505, D-562). <see cref="Source"/> is where its event came from (D-548):
+/// the provisional first goes on with the event of his own run (D-553 (3)); null in the suspensions written before it.
 /// </summary>
 public sealed record SuspendedEffect(
     Guid ChoiceId,
@@ -39,7 +40,10 @@ public sealed record SuspendedEffect(
     EquatableArray<ChoiceOption> Options,
     int? Roll,
     string? Choice,
-    DateTimeOffset? DueAt);
+    DateTimeOffset? DueAt)
+{
+    public Decks.EventSource? Source { get; init; }
+}
 
 /// <summary>
 /// An event that needs an answer stopped and waits for it on the server (D-511): <see cref="PlayerId"/> answers with the
@@ -58,7 +62,12 @@ public sealed record EffectSuspended(
     EquatableArray<ChoiceOption> Options,
     int? Roll,
     string? Choice,
-    DateTimeOffset? DueAt) : IGameEvent;
+    DateTimeOffset? DueAt) : IGameEvent
+{
+    /// <summary>Where the event came from (D-548, D-553 (3)); written only when set, so the suspensions of 5.7 read as they were.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public Decks.EventSource? Source { get; init; }
+}
 
 /// <summary>
 /// A suspended effect goes on with <see cref="OptionId"/> (D-511): the player's answer, or the timer's random pick past the
@@ -204,13 +213,16 @@ internal static class Suspensions
     /// <summary>
     /// The rest of a suspended effect with <paramref name="optionId"/> (D-511): the computed references come back, a target
     /// asked is checked again (Н-10: one no longer allowed is skipped, the answer is not refused), after the deadline the
-    /// token does not move (Н-13). The first finisher's effects are frozen (D-510): the answer closes the question only.
+    /// token does not move (Н-13). The first finisher's effects are frozen (D-510): the answer closes the question only —
+    /// except the provisional first's event of his own run (completion, drop, reroll), which he still draws and plays on
+    /// himself (D-553 (3), D-557 (4)).
     /// </summary>
     public static List<IGameEvent> Continue(SeasonState state, EngineContext context, Guid playerId, SuspendedEffect suspended, string optionId)
     {
         var resumed = new EffectResumed(playerId, suspended.ChoiceId, optionId);
         var after = SeasonEngine.Apply(state, resumed);
-        if (after.Catalog.Find(suspended.ObjectId) is not { Effect: not null } definition || Targets.IsFirst(after, playerId))
+        if (after.Catalog.Find(suspended.ObjectId) is not { Effect: not null } definition
+            || (Targets.IsFirst(after, playerId) && !Decks.EventDraws.PlaysForTheFirst(after.Players[playerId], suspended.Source)))
         {
             return [resumed];
         }
@@ -219,7 +231,7 @@ internal static class Suspensions
             after, context, playerId, definition.Id, hostile: false, parameters: null,
             choices: suspended.Step == SuspendedStep.Target ? [] : [optionId], eventsBefore: 1)
         {
-            Asks = new Asking(suspended.Kind, suspended.Depth),
+            Asks = new Asking(suspended.Kind, suspended.Depth) { Source = suspended.Source },
             Resuming = true,
             PositionLocked = after.Status != SeasonStatus.Active || SeasonSetup.IsPastDeadline(after, context.Clock.UtcNow),
         };
@@ -233,7 +245,10 @@ internal static class Suspensions
             Suspended =
             [
                 .. p.Suspended,
-                new SuspendedEffect(e.ChoiceId, e.ObjectId, e.Kind, e.Step, e.TargetId, e.NextAction, e.Depth, e.Options, e.Roll, e.Choice, e.DueAt),
+                new SuspendedEffect(e.ChoiceId, e.ObjectId, e.Kind, e.Step, e.TargetId, e.NextAction, e.Depth, e.Options, e.Roll, e.Choice, e.DueAt)
+                {
+                    Source = e.Source,
+                },
             ],
         });
 
@@ -255,5 +270,11 @@ internal static class Suspensions
         state with { Players = state.Players.SetItem(playerId, Refresh(change(state.Players[playerId]))) };
 }
 
-/// <summary>An effect that may ask its player and wait (D-511): the kind of its deck and the chain level it runs at.</summary>
-internal sealed record Asking(EventKind? Kind, int Depth);
+/// <summary>
+/// An effect that may ask its player and wait (D-511): the kind of its deck, the chain level it runs at and where its event
+/// came from (D-548), kept with the question.
+/// </summary>
+internal sealed record Asking(EventKind? Kind, int Depth)
+{
+    public Decks.EventSource? Source { get; init; }
+}

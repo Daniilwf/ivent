@@ -109,6 +109,7 @@ public static class FeedVisibility
         // Events (stage 5): what a deck gave is public, as the effects that follow it
         ["event-drawn"] = Access.Public,
         ["event-draw-missed"] = Access.Public,
+        ["bad-event-intercepted"] = Access.Public,
 
         // An event's question and its answer (D-511) are public, as a branch choice and its pick
         ["effect-suspended"] = Access.Public,

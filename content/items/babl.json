@@ -1,0 +1,23 @@
+{
+  "id": "babl",
+  "kind": "item",
+  "name": "Бабл",
+  "description": "Дает Эффект - Анулирует следующий Плохой Ивент, уничтожается после использования эффекта",
+  "rarity": "epic",
+  "price": 30,
+  "window": "anytime",
+  "hostile": false,
+  "stackable": true,
+  "tags": [],
+  "effect": {
+    "target": {
+      "selector": "self"
+    },
+    "actions": [
+      {
+        "type": "giveObject",
+        "objectId": "bubble-effect"
+      }
+    ]
+  }
+}
