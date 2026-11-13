@@ -67,7 +67,7 @@ public static class PoolReader
         var games = await db.Games.AsNoTracking().ToListAsync(ct);
         var categories = await db.Categories.AsNoTracking().ToListAsync(ct);
         return new PoolSnapshot(
-            [.. games.Select(g => new Game(g.Id, g.Title, Tags(g.TagsJson), g.Hours, g.IsDeleted, g.Year))],
+            [.. games.Select(g => new Game(g.Id, g.Title, Tags(g.TagsJson), g.Hours, g.IsDeleted, g.Year, g.IsCoop))],
             [.. categories.Select(c => new Category(c.Name, c.Weight))]);
     }
 

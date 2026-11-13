@@ -125,7 +125,7 @@ internal static class SeasonProjection
             record.FinishApprovalRequired = player.Finish?.ApprovalRequired;
             record.PointsTick = player.PointsTick;
             record.EconomyJson = player.Economy is null ? null : JsonSerializer.Serialize(player.Economy, EngineJson.Options);
-            record.NextTimerAt = Engine.Economy.Timers.Next(player, after.Rules.Features);
+            record.NextTimerAt = Engine.Economy.Timers.Next(after, player);
 
             // Exclusions grow within a season (D-08), a tech reroll turned into a drop changes its reason (D-11), an undo
             // takes back those its command added (D-104).
@@ -151,6 +151,19 @@ internal static class SeasonProjection
             }
         }
 
+        // The pending invitations a player sent are due on his timer column too (D-523): an invitation changed without a
+        // change of its inviter brings his column up to date
+        foreach (var inviter in after.Interactions.Keys.Union(before.Interactions.Keys)
+            .Where(id => before.Interactions.GetValueOrDefault(id) != after.Interactions.GetValueOrDefault(id))
+            .Select(id => (after.Interactions.GetValueOrDefault(id) ?? before.Interactions[id]).FromPlayerId)
+            .Distinct()
+            .Where(id => after.Players.TryGetValue(id, out var now) && before.Players.TryGetValue(id, out var then) && now == then))
+        {
+            var record = await db.SeasonPlayers.FindAsync([inviter], ct)
+                ?? throw new InvalidOperationException($"Player {inviter} has no projection row.");
+            record.NextTimerAt = Engine.Economy.Timers.Next(after, after.Players[inviter]);
+        }
+
         // D-420: what a switched-off mechanic left waiting is not due, so the timer column follows the flags too
         if (before.Ruleset is not null && before.Rules.Features != after.Rules.Features)
         {
@@ -158,7 +171,7 @@ internal static class SeasonProjection
             {
                 var record = await db.SeasonPlayers.FindAsync([id], ct)
                     ?? throw new InvalidOperationException($"Player {id} has no projection row.");
-                record.NextTimerAt = Engine.Economy.Timers.Next(player, after.Rules.Features);
+                record.NextTimerAt = Engine.Economy.Timers.Next(after, player);
             }
         }
 
@@ -378,7 +391,10 @@ internal static class SeasonProjection
                     // The engine's bookkeeping of a run's events: its difficulty's event drawn (D-557) and the check of its
                     // conditions come from the log, like the cells of its move (columns — 5.16, D-598)
                     DifficultyEventDrawn: replayed.Runs.GetValueOrDefault(r.Id)?.DifficultyEventDrawn ?? false,
-                    Condition: replayed.Runs.GetValueOrDefault(r.Id)?.Condition)),
+                    Condition: replayed.Runs.GetValueOrDefault(r.Id)?.Condition,
+
+                    // The partner's side of a coop run comes from the log too (the column Run.PartnerId — 5.16)
+                    Coop: replayed.Runs.GetValueOrDefault(r.Id)?.Coop)),
             ManualEffects = effects.ToImmutableSortedDictionary(
                 x => x.Id,
                 x => new PendingManualEffect(x.Id, x.PlayerId, x.ObjectId is null ? x.DrawEvent : null, x.Source, x.RunId) { ObjectId = x.ObjectId }),

@@ -39,12 +39,18 @@ internal static class Betting
             return Decision.Reject(RejectionCodes.BetOnFirst, "The first finisher plays out of the race: no bets on them.");
         }
 
-        if (on.ActiveRunId is not { } runId)
+        // A coop partner plays the roller's run: the bet is on the roller (D-520)
+        if (on.ActiveRunId is not { } runId || state.Runs[runId].PlayerId != on.PlayerId)
         {
-            return Decision.Reject(RejectionCodes.BetNoRun, "The player is not playing a game right now.");
+            return Decision.Reject(RejectionCodes.BetNoRun, "The player is not playing a game of his own right now.");
         }
 
         var run = state.Runs[runId];
+        if (run.PartnerId is { } partner && partner == command.PlayerId)
+        {
+            return Decision.Reject(RejectionCodes.BetOnSelf, "No bets on a run you play as its coop partner.");
+        }
+
         var now = context.Clock.UtcNow;
         if (now - run.RolledAt > TimeSpan.FromHours(rules.WindowHoursAfterRoll))
         {

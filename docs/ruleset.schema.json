@@ -51,6 +51,9 @@
         },
         "suggestions": {
           "type": "boolean"
+        },
+        "coop": {
+          "type": "boolean"
         }
       },
       "required": [
@@ -358,6 +361,12 @@
               "enum": [
                 "roller"
               ]
+            },
+            "coinsShare": {
+              "type": [
+                "number",
+                "null"
+              ]
             }
           },
           "required": [
@@ -615,6 +624,12 @@
       "properties": {
         "inviteTtlHours": {
           "type": "integer"
+        },
+        "maxOpenInvitesPerPlayer": {
+          "type": [
+            "integer",
+            "null"
+          ]
         }
       },
       "required": [

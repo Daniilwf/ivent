@@ -7745,6 +7745,12 @@ export interface components {
             /** Format: double */
             pointsShare: number;
             roundUpFor: components["schemas"]["CoopRoundUpFor"];
+            /**
+             * Format: double
+             * @description The roller's share of the run's completion coins (D-521, D-540): ⌈coins × share⌉, the partner the rest. Missing — a
+             *     season created before coop reads as it did (D-50); needed once `features.coop` is on. Not written while missing.
+             */
+            coinsShare?: null | number;
         };
         /** @description The admin creates an account: login, name, role; the answer carries the temporary password once. */
         CreateAccountRequest: {
@@ -8064,6 +8070,11 @@ export interface components {
              *     logged before it keeps its ruleset's format.
              */
             suggestions?: boolean;
+            /**
+             * @description Coop runs and invitations (stage 5, D-520…D-523); optional, so older configs without it still read. Not written while
+             *     off: a season logged before it keeps its ruleset's format.
+             */
+            coop?: boolean;
         };
         /**
          * @description One event of the season's feed (GLOSSARY «Лента», D-124): its place in the log, the command it came from, when, the
@@ -8293,6 +8304,12 @@ export interface components {
         InteractionRules: {
             /** Format: int32 */
             inviteTtlHours: number;
+            /**
+             * Format: int32
+             * @description How many pending invitations one player may have sent (coop and duels together, D-523). Missing — a season created
+             *     before invitations reads as it did (D-50); needed once `features.coop` is on. Not written while missing.
+             */
+            maxOpenInvitesPerPlayer?: null | number;
         };
         /**
          * @description An object I hold: its definition's name and description, what is left of its lifetime, who put it on me. `usable` —

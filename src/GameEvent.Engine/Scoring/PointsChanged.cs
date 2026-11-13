@@ -91,7 +91,8 @@ internal static class PointsLedger
         // D-327: the bonus of the cell a run's own move stopped on belongs to that run — a reject takes it back
         if (e.Reason == PointsReason.CellBonus && state.Players[e.PlayerId].LastMoveRunId is { } mover && state.Runs.TryGetValue(mover, out var run))
         {
-            state = state with { Runs = state.Runs.SetItem(mover, run with { CellPoints = Saturating.Add(run.CellPoints, e.Delta) }) };
+            var side = run.Side(e.PlayerId);
+            state = state with { Runs = state.Runs.SetItem(mover, run.WithSide(e.PlayerId, side with { CellPoints = Saturating.Add(side.CellPoints, e.Delta) })) };
         }
 
         var tick = e.Delta == 0 ? state.PointsChanges : state.PointsChanges + 1;

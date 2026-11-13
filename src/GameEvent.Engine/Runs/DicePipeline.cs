@@ -85,7 +85,8 @@ internal static class DicePipeline
 
         // The throw's move waits at a fork: that step has begun, a change after the throw would move the token off it (D-416);
         // a run without dice by its unmet condition had no throw to change (D-592)
-        if (effect.State.Players[run.PlayerId].Choice?.Kind == Turns.ChoiceKind.Branch || RunConditions.WithoutDice(run))
+        // Either side of a coop run (D-545)
+        if (RunShares.Players(run).Any(p => effect.State.Players[p].Choice?.Kind == Turns.ChoiceKind.Branch) || RunConditions.WithoutDice(run))
         {
             return;
         }
@@ -93,7 +94,6 @@ internal static class DicePipeline
         // The run's kind of die: an item's single die is of its own kind (D-481)
         var sides = run.Mods?.Sides ?? (run.Mods?.SingleDie is null && run.Dice.Count > 0 ? run.Dice[0].Sides : (int?)null) ?? CompletionRoll.DieFor(run.Difficulty!.Value, run.Snapshot.DieByDifficulty).Sides;
         var random = effect.Context.Random;
-        var before = CompletionRoll.Total(run);
         // Every die is thrown again as its own kind: an extra die of its kind (D-475) and an item's single die (D-481) keep it
         EquatableArray<Die> Again(EquatableArray<Die> dice, Func<Die, bool> which) =>
             [.. dice.Select(d => which(d) ? CompletionRoll.Roll(1, d.Sides, random)[0] : d)];
@@ -135,8 +135,7 @@ internal static class DicePipeline
                 break;
         }
 
-        var delta = CompletionRoll.Total(effect.State.Runs[runId]) - before;
-        effect.Emit(Corrections.Difference(effect.State, runId, delta, PointsReason.DiceModified, MoveReason.DiceModified));
+        effect.Emit(Corrections.Differences(effect.State, run, PointsReason.DiceModified, MoveReason.DiceModified));
     }
 
     // A pipeline value as a number: dice are rolled into rolled, a minus before them subtracts.
