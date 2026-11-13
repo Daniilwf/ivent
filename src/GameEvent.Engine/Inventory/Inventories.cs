@@ -20,7 +20,8 @@ internal static class Inventories
         ObjectDefinition definition,
         ContentParamDictionary? parameters,
         ObjectSource source,
-        Guid? fromPlayerId)
+        Guid? fromPlayerId,
+        Rulesets.EventKind? eventKind = null)
     {
         var player = state.Players[playerId];
         if (definition.Kind == ObjectKind.Item && player.Wallet.Items >= state.Rules.Economy.InventoryLimit)
@@ -34,7 +35,9 @@ internal static class Inventories
         }
 
         var from = fromPlayerId == playerId ? null : fromPlayerId;
-        return new ObjectGiven(playerId, New(state, context, playerId, definition, parameters, from), source, from);
+        // An effect or special roll an event gives keeps the event's kind: it applies in the order of events (D-543)
+        var given = New(state, context, playerId, definition, parameters, from);
+        return new ObjectGiven(playerId, definition.Kind == ObjectKind.Item ? given : given with { EventKind = eventKind }, source, from);
     }
 
     /// <summary>A new object of <paramref name="definition"/> for <paramref name="playerId"/>, its lifetime starting now.</summary>

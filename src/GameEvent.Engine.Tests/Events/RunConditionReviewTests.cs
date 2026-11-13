@@ -122,12 +122,13 @@ public class RunConditionReviewTests
         // When the paid reroll draws «Даже не вспотел»: it contradicts «не выше лёгкой» of this roll
         s.Act(new Reroll(s.PlayerId("Вася")));
 
-        // Then the roll keeps «не выше лёгкой»; the drawn one waits behind the older «не ниже выше сложной»
+        // Then the event's condition is the more important one (events before items, D-505, D-586): the roll takes «Даже не
+        // вспотел», and the item's «не выше лёгкой» of this roll waits ahead of the older «не ниже выше сложной»
         ScenarioAssert.Accepted(s);
         Assert.Equal(RerollPayment.BadEvent, Assert.Single(s.LastEvents<GameRerolled>()).Payment);
-        Assert.Equal("vow-easy", Assert.Single(s.Player("Вася").Offer!.Snapshot.Conditions).ObjectId);
-        Assert.Equal(["vow-extreme", "not-even-sweating"], s.Player("Вася").Wallet.NextRoll.Select(m => m.ObjectId));
-        Assert.Equal(["vow-extreme", "not-even-sweating"], Assert.Single(s.LastEvents<RollModifiersApplied>()).Waiting.Select(m => m.ObjectId));
+        Assert.Equal("not-even-sweating", Assert.Single(s.Player("Вася").Offer!.Snapshot.Conditions).ObjectId);
+        Assert.Equal(["vow-easy", "vow-extreme"], s.Player("Вася").Wallet.NextRoll.Select(m => m.ObjectId));
+        Assert.Equal(["vow-easy", "vow-extreme"], Assert.Single(s.LastEvents<RollModifiersApplied>()).Waiting.Select(m => m.ObjectId));
     }
 
     [Fact]

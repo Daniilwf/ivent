@@ -41,6 +41,8 @@ internal sealed class EffectRun
     // The actions aimed at the user ran: with several targets they run once per use (D-480)
     private bool _selfDone;
 
+    private readonly Rulesets.EventKind? _eventKind;
+
     public EffectRun(
         SeasonState state,
         EngineContext context,
@@ -123,6 +125,16 @@ internal sealed class EffectRun
     /// instead of refusing; null for an item, which answers before its use (D-407).
     /// </summary>
     public Asking? Asks { get; init; }
+
+    /// <summary>
+    /// The kind of the event this effect comes from (D-505, D-543): a drawn event's deck, or the kind an event-given effect
+    /// or special roll keeps; null for items. The roll and throw changes it makes and the objects it gives carry it.
+    /// </summary>
+    public Rulesets.EventKind? EventKind
+    {
+        get => _eventKind ?? Asks?.Kind;
+        init => _eventKind = value;
+    }
 
     /// <summary>
     /// The run goes on after an answer checked against the snapshot of the options (Н-10): an answer that no longer fits what
