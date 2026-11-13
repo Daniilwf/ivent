@@ -90,35 +90,22 @@ public sealed record EffectMoveSkipped(Guid PlayerId, string ObjectId) : IGameEv
 /// </summary>
 internal static class Suspensions
 {
-    /// <summary>
-    /// D-505: special, good, bad; risky ones and draws of no kind after them. <c>events.applyOrder</c> of D-505 is not in
-    /// the rules yet (task 5.4): until then the default order (D-565).
-    /// </summary>
-    private static int Rank(EventKind? kind) => kind switch
-    {
-        EventKind.Special => 0,
-        EventKind.Good => 1,
-        EventKind.Bad => 2,
-        EventKind.Risky => 3,
-        _ => 4,
-    };
-
     /// <summary>The suspended effect the player is asked now; null when the pending choice is not one.</summary>
     public static SuspendedEffect? Current(SeasonPlayer player) =>
         player.Choice is { Kind: ChoiceKind.Effect } choice ? player.Suspended.FirstOrDefault(s => s.ChoiceId == choice.ChoiceId) : null;
 
     /// <summary>
     /// The pending choice after a change (D-562): a choice of another kind stays (an effect waits behind a branch); otherwise
-    /// the first open suspension in order, or none.
+    /// the first open suspension in the order of <c>events.applyOrder</c> (D-505, D-565), within a kind as drawn, or none.
     /// </summary>
-    public static SeasonPlayer Refresh(SeasonPlayer player)
+    public static SeasonPlayer Refresh(SeasonPlayer player, Rulesets.Ruleset rules)
     {
         if (player.Choice is { Kind: not ChoiceKind.Effect })
         {
             return player;
         }
 
-        var next = player.Suspended.Select((s, i) => (Effect: s, Index: i)).OrderBy(x => Rank(x.Effect.Kind)).ThenBy(x => x.Index).Select(x => x.Effect).FirstOrDefault();
+        var next = Decks.EventOrder.Sort(rules, player.Suspended, s => s.Kind).FirstOrDefault();
         var choice = next is null ? null : new PendingChoice(next.ChoiceId, ChoiceKind.Effect, next.Options);
         return player.Choice == choice ? player : player with { Choice = choice };
     }
@@ -267,7 +254,7 @@ internal static class Suspensions
         });
 
     private static SeasonState Update(SeasonState state, Guid playerId, Func<SeasonPlayer, SeasonPlayer> change) =>
-        state with { Players = state.Players.SetItem(playerId, Refresh(change(state.Players[playerId]))) };
+        state with { Players = state.Players.SetItem(playerId, Refresh(change(state.Players[playerId]), state.Rules)) };
 }
 
 /// <summary>

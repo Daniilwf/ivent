@@ -19,13 +19,13 @@ internal sealed class ModifyNextRollHandler : ActionHandler<ModifyNextRollAction
         var hostile = run.Hostile && target != run.UserId;
         if (filter is not null || action.ChoiceCount is not null)
         {
-            run.Emit(new NextRollModified(target, new RollModifier(run.ObjectId, filter, action.ChoiceCount, hostile)));
+            run.Emit(new NextRollModified(target, new RollModifier(run.ObjectId, filter, action.ChoiceCount, hostile, run.EventKind)));
         }
 
         // The condition is a change of its own: a contradicting one waits for a later roll without the filter (D-506, D-591)
         if (action.RunCondition is { } condition)
         {
-            run.Emit(new NextRollModified(target, new RollModifier(run.ObjectId, null, null, hostile) { RunCondition = condition }));
+            run.Emit(new NextRollModified(target, new RollModifier(run.ObjectId, null, null, hostile, run.EventKind) { RunCondition = condition }));
         }
     }
 }
@@ -53,7 +53,7 @@ internal sealed class ModifyDiceHandler : ActionHandler<ModifyDiceAction>
             return;
         }
 
-        run.Emit(new NextDiceModified(target, new DiceModifier(run.ObjectId, action.Stage, value, run.Hostile && target != run.UserId, action.Sides, action.From)));
+        run.Emit(new NextDiceModified(target, new DiceModifier(run.ObjectId, action.Stage, value, run.Hostile && target != run.UserId, action.Sides, action.From, run.EventKind)));
     }
 }
 

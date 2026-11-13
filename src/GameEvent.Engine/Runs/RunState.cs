@@ -59,13 +59,16 @@ public sealed record RunSnapshot(
 
 /// <summary>
 /// A condition of an event on a run (SPEC «Условия от ивентов», D-507): whose it is, its bounds of difficulty, and whether
-/// another player put it (a hostile change, D-425).
+/// another player put it (a hostile change, D-425); <see cref="EventKind"/> — the kind of its event, kept when it goes back to
+/// wait (a tech reroll, «не применимо»), so it keeps its place in the order (D-586); written only when set.
 /// </summary>
 public sealed record RunCondition(
     string ObjectId,
     Content.ConditionSpec Condition,
     [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    bool Hostile = false);
+    bool Hostile = false,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    Rulesets.EventKind? EventKind = null);
 
 /// <summary>
 /// The check of a completed run's conditions (D-507): <see cref="Met"/> at the difficulty that counts, <see cref="Waived"/>

@@ -186,6 +186,13 @@ public static class RulesetValidator
             AtMost("events.answerTimeoutHours", timeout, MaxAnswerTimeoutHours);
         }
 
+        if (ruleset.Events is { ApplyOrder: { } order }
+            && (order.Count(k => k == EventKind.Risky) > 1
+                || new[] { EventKind.Special, EventKind.Good, EventKind.Bad }.Any(kind => order.Count(k => k == kind) != 1)))
+        {
+            Error("events.applyOrder", "must list special, good and bad once each, and risky at most once");
+        }
+
         if (ruleset.Features.WeeklyChallenge && ruleset.WeeklyChallenge.DurationDays is null)
         {
             Error("weeklyChallenge.durationDays", "is required when features.weeklyChallenge is on");

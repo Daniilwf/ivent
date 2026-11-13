@@ -40,7 +40,10 @@ internal static class Firing
         }
 
         var run = new EffectRun(
-            state, context, ownerId, item.ObjectId, definition.Hostile, item.Params, dice: dice, runId: runId, depth: point.Depth, eventsBefore: point.EventsBefore);
+            state, context, ownerId, item.ObjectId, definition.Hostile, item.Params, dice: dice, runId: runId, depth: point.Depth, eventsBefore: point.EventsBefore)
+        {
+            EventKind = item.EventKind,
+        };
         run.Emit(new EffectTriggered(ownerId, item.InstanceId, item.ObjectId, trigger));
 
         // A countdown lowers its counter instead of acting, until it reaches zero (D-479)
@@ -78,7 +81,10 @@ internal static class Firing
 
         var definition = parent.State.Catalog.Get(item.ObjectId);
         var run = new EffectRun(
-            parent.State, parent.Context, ownerId, item.ObjectId, definition.Hostile, item.Params, depth: depth, eventsBefore: parent.EventsSoFar);
+            parent.State, parent.Context, ownerId, item.ObjectId, definition.Hostile, item.Params, depth: depth, eventsBefore: parent.EventsSoFar)
+        {
+            EventKind = item.EventKind,
+        };
         run.Run(definition.Effect!, Targets.ForTriggered(run.State, parent.Context, definition, ownerId));
         if (run.Cut is null && run.State.Players[ownerId].Wallet.Find(item.InstanceId) is { } still && Inventories.AfterFiring(run.State, ownerId, still) is { } spent)
         {

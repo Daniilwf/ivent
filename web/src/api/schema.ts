@@ -7960,6 +7960,7 @@ export interface components {
          *     Serialized as a plain JSON array.
          */
         EquatableArrayOfAutoNomination: unknown;
+        EquatableArrayOfEventKind: unknown;
         /**
          * @description Immutable list with value equality, so records holding lists (events, snapshots) compare by content.
          *     Serialized as a plain JSON array.
@@ -8033,6 +8034,7 @@ export interface components {
              *     while null.
              */
             answerTimeoutHours?: null | number;
+            applyOrder?: null | components["schemas"]["EquatableArrayOfEventKind"];
             irlProof?: null | components["schemas"]["IrlProofRules"];
         };
         /**

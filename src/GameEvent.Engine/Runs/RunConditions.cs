@@ -41,17 +41,28 @@ internal static class RunConditions
     /// <summary>
     /// The roll's changes split (D-506): the conditions are taken in the order the changes apply; one that contradicts those
     /// taken before it (the highest «at least» above the lowest «at most») is left waiting for a later roll.
+    /// The changes come in the order of kinds (<c>events.applyOrder</c>, D-586): the more important condition wins, within a
+    /// kind the earlier one.
     /// </summary>
     /// <remarks>With <paramref name="events"/> off every condition waits: the mechanic is off, not its conditions lost (D-591).</remarks>
     public static (EquatableArray<RollModifier> Taken, EquatableArray<RollModifier> Postponed) Split(IEnumerable<RollModifier> modifiers, bool events)
     {
-        var taken = new List<RollModifier>();
-        var postponed = new List<RollModifier>();
+        var (taken, postponed) = Split(modifiers, m => m, events);
+
+        // Nothing postponed stays unwritten: the rolls before conditions keep their format
+        return ([.. taken], postponed.Count == 0 ? default : [.. postponed]);
+    }
+
+    /// <summary>The same split of anything carrying a change (<paramref name="modifierOf"/>), in the given order.</summary>
+    public static (List<T> Taken, List<T> Postponed) Split<T>(IEnumerable<T> items, Func<T, RollModifier> modifierOf, bool events)
+    {
+        var taken = new List<T>();
+        var postponed = new List<T>();
         Difficulty? least = null;
         Difficulty? most = null;
-        foreach (var modifier in modifiers)
+        foreach (var modifier in items)
         {
-            if (modifier.RunCondition is not { } condition)
+            if (modifierOf(modifier).RunCondition is not { } condition)
             {
                 taken.Add(modifier);
                 continue;
@@ -69,8 +80,7 @@ internal static class RunConditions
             taken.Add(modifier);
         }
 
-        // Nothing postponed stays unwritten: the rolls before conditions keep their format
-        return ([.. taken], postponed.Count == 0 ? default : [.. postponed]);
+        return (taken, postponed);
     }
 
     /// <summary>The snapshot with the conditions of the roll in progress and the policy for them (D-507, D-546 (2)).</summary>
@@ -83,7 +93,7 @@ internal static class RunConditions
 
         EquatableArray<RunCondition> conditions = [.. state.Players[playerId].Wallet.CurrentRoll
             .Where(m => m.RunCondition is not null)
-            .Select(m => new RunCondition(m.ObjectId, m.RunCondition!, m.Hostile))];
+            .Select(m => new RunCondition(m.ObjectId, m.RunCondition!, m.Hostile, m.EventKind))];
         return conditions.Count == 0
             ? snapshot
             : snapshot with { Conditions = conditions, ConditionPolicy = state.Rules.Reward.UnmetConditionPolicy };
@@ -168,7 +178,7 @@ internal static class RunConditions
 
         // Not applicable to this game: the conditions wait for the next one (SPEC «ждёт следующей», D-546 (2))
         events.AddRange(run.Snapshot.Conditions.Select(c =>
-            new NextRollModified(run.PlayerId, new RollModifier(c.ObjectId, null, null, c.Hostile) { RunCondition = c.Condition })));
+            new NextRollModified(run.PlayerId, new RollModifier(c.ObjectId, null, null, c.Hostile, c.EventKind) { RunCondition = c.Condition })));
         return Decision.Accept(events);
     }
 
@@ -206,7 +216,7 @@ internal static class RunConditions
         }
 
         EquatableArray<RollModifier> back = [.. run.Snapshot.Conditions.Select(c =>
-            new RollModifier(c.ObjectId, null, null, c.Hostile) { RunCondition = c.Condition })];
+            new RollModifier(c.ObjectId, null, null, c.Hostile, c.EventKind) { RunCondition = c.Condition })];
         return Inventories.Update(state, run.PlayerId, w => w with { NextRoll = [.. back, .. w.NextRoll] });
     }
 
