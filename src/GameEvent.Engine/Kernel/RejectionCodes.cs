@@ -236,14 +236,19 @@ public static class RejectionCodes
 
     /// <summary>Only the roller completes, drops or tech-rerolls the coop run; the partner may only leave (D-521, D-522).</summary>
     public const string CoopRollerOnly = "coop.rollerOnly";
+
     // Duels (stage 5, D-525, D-540, D-730)
+
+    /// <summary>A duel is with another player.</summary>
     public const string DuelOnSelf = "duel.onSelf";
 
     /// <summary>The first finisher plays out of the race: he neither challenges nor is challenged (D-510, D-525).</summary>
     public const string DuelFirstFinisher = "duel.firstFinisher";
+
+    /// <summary>An inactive player neither challenges nor is challenged.</summary>
     public const string DuelPlayerInactive = "duel.playerInactive";
 
-    /// <summary>The challenger has <c>duels.maxOpenPerPlayer</c> open duels: challenges waiting and accepted duels.</summary>
+    /// <summary>The player himself (the challenger, or the one accepting) has <c>duels.maxOpenPerPlayer</c> open duels: challenges waiting and accepted duels.</summary>
     public const string DuelTooMany = "duel.tooMany";
 
     /// <summary>The other player has <c>duels.maxOpenPerPlayer</c> open duels.</summary>

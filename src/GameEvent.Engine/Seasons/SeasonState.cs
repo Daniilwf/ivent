@@ -51,7 +51,8 @@ public sealed record SeasonState(
     /// <summary>The invitations of the season (D-523), by id: pending ones and answered, withdrawn or expired ones.</summary>
     public ImmutableSortedDictionary<Guid, Interactions.Interaction> Interactions { get; init; } =
         ImmutableSortedDictionary<Guid, Interactions.Interaction>.Empty;
-    /// <summary>The duels of the season (D-525), challenges among them, by id.</summary>
+
+    /// <summary>The accepted duels of the season (D-525, D-730), by the id of the challenge they were accepted from.</summary>
     public ImmutableSortedDictionary<Guid, Duels.Duel> Duels { get; init; } =
         ImmutableSortedDictionary<Guid, Duels.Duel>.Empty;
 

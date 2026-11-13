@@ -347,7 +347,7 @@ public class DuelTests
         s.ExpectRejection().Answer("Маша", waiting, accept: true);
 
         Assert.False(s.Last.IsAccepted);
-        Assert.Contains(s.Last.Rejection!.Code, new[] { RejectionCodes.DuelTooMany, RejectionCodes.DuelOpponentBusy });
+        Assert.Equal(RejectionCodes.DuelTooMany, s.Last.Rejection!.Code); // her own limit (D-732)
         Assert.Equal(InteractionStatus.Pending, s.Invitation(waiting).Status);
         Assert.False(s.State.Duels.ContainsKey(waiting));
     }

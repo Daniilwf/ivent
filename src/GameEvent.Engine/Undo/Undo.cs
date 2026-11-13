@@ -59,7 +59,6 @@ public sealed record CommandUndone(
     [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     EquatableArray<Guid>? RemovedInteractions = null,
     [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
-
     EquatableArray<Duels.Duel>? Duels = null,
     [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     EquatableArray<Guid>? RemovedDuels = null) : IGameEvent;
@@ -347,10 +346,32 @@ internal static class Undoing
             }
         }
 
-        // A duel: its challenge, answer and end — a completion that won it waits for nothing else of it (D-525 (8), D-730)
+        // A duel: its challenge, answer and end (D-525 (8), D-730). What a command decides of duels reads the duel standing of
+        // its players — their open duels, their wins, a race still to win — so it holds the players' «duels:» key too: a later
+        // challenge or answer of one of them, and a run of one of them ending within a race of his, wait for it (D-735)
         foreach (var id in Changed(before.Duels, after.Duels))
         {
             keys.Add($"duel:{id}");
+            var duel = after.Duels.GetValueOrDefault(id) ?? before.Duels[id];
+            keys.Add($"{DuelsPrefix}{duel.ChallengerId}");
+            keys.Add($"{DuelsPrefix}{duel.OpponentId}");
+        }
+
+        foreach (var id in Changed(before.Interactions, after.Interactions))
+        {
+            if ((after.Interactions.GetValueOrDefault(id) ?? before.Interactions[id]) is { Kind: Interactions.InteractionKind.Duel } challenge)
+            {
+                keys.Add($"{DuelsPrefix}{challenge.FromPlayerId}");
+                keys.Add($"{DuelsPrefix}{challenge.ToPlayerId}");
+            }
+        }
+
+        foreach (var (playerId, at) in events.Select(RunEnd).OfType<(Guid, DateTimeOffset)>())
+        {
+            if (before.Duels.Values.Concat(after.Duels.Values).Any(d => d.Involves(playerId) && d.AcceptedAt <= at && at < d.ExpiresAt))
+            {
+                keys.Add($"{DuelsPrefix}{playerId}");
+            }
         }
 
         if (before.Status != after.Status || before.Deadline != after.Deadline || before.Name != after.Name
@@ -393,6 +414,18 @@ internal static class Undoing
     }
 
     private const string FinishKey = "finishOrder";
+
+    private const string DuelsPrefix = "duels:";
+
+    // A run's end a duel race may be decided by (D-735)
+    private static (Guid PlayerId, DateTimeOffset At)? RunEnd(IGameEvent e) =>
+        e switch
+        {
+            RunCompleted c => (c.PlayerId, c.CompletedAt),
+            RunDropped d => (d.PlayerId, d.DroppedAt),
+            RunTechRerolled t => (t.PlayerId, t.RerolledAt),
+            _ => null,
+        };
 
     private const string AuthorPrefix = "author:";
 

@@ -93,7 +93,7 @@ internal static class Coop
         var invitation = state.Interactions[command.InteractionId];
         if (invitation.Kind != InteractionKind.Coop)
         {
-            return Decision.Reject(RejectionCodes.InteractionUnknown, "Only coop invitations are answered in this build.");
+            return Decision.Reject(RejectionCodes.InteractionUnknown, "A duel's challenge is answered by the duel's rules (D-730).");
         }
 
         if (invitation.ToPlayerId != command.PlayerId)
@@ -265,7 +265,7 @@ internal static class Coop
             .Select(i => new InteractionExpired(i.InteractionId, reason, now))];
     }
 
-    /// <summary>The pending invitations past their time, closed by the timer (D-523); none while coop is off (D-420).</summary>
+    /// <summary>The pending invitations past their time, closed by the timer (D-523), of every kind whose mechanic is on (D-420, D-718).</summary>
     public static IEnumerable<IGameEvent> Timeouts(SeasonState state, DateTimeOffset now) =>
         state.Interactions.Values
             .Where(i => i.Status == InteractionStatus.Pending && i.ExpiresAt <= now && InteractionRules.IsOn(state.Rules.Features, i.Kind))

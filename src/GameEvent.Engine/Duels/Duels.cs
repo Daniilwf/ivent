@@ -28,7 +28,10 @@ public enum DuelEnd
     /// <summary>A run that counts was completed in time: its player won (<see cref="DuelStatus.Won"/>).</summary>
     Completed,
 
-    /// <summary>The other player dropped a run that counts (<c>duels.dropForfeits</c>): this one won (<see cref="DuelStatus.Won"/>).</summary>
+    /// <summary>
+    /// The other player dropped or wish-rerolled a run that counts (<c>duels.dropForfeits</c>, D-733): this one won
+    /// (<see cref="DuelStatus.Won"/>).
+    /// </summary>
     Forfeit,
 
     /// <summary><c>duels.durationDays</c> passed without a win (<see cref="DuelStatus.Drawn"/>).</summary>
@@ -40,7 +43,7 @@ public enum DuelEnd
     /// <summary>The winning run's proof was rejected: the win is gone and does not pass on (<see cref="DuelStatus.Drawn"/>).</summary>
     WinRejected,
 
-    /// <summary>A run that counts was tech-rerolled: nobody's fault (<see cref="DuelStatus.Cancelled"/>).</summary>
+    /// <summary>A run that counts was tech-rerolled for a technical reason: nobody's fault (<see cref="DuelStatus.Cancelled"/>).</summary>
     TechReroll,
 
     /// <summary>One of the two was marked inactive (<see cref="DuelStatus.Cancelled"/>).</summary>

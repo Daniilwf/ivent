@@ -137,7 +137,8 @@ public class DuelInvariantTests
                     s.Advance(TimeSpan.FromHours(1 + random.Next(48)));
                     continue;
                 case 15 when s.History.Count > setup:
-                    s.Act(new UndoCommand(s.History[^1].CommandId, "Случайный откат"));
+                    // Any command since the setup, not only the last: an undo past later commands must wait for the dependents (D-735)
+                    s.Act(new UndoCommand(s.History[setup + random.Next(s.History.Count - setup)].CommandId, "Случайный откат"));
                     break;
                 default:
                     continue;
@@ -222,6 +223,11 @@ public class DuelInvariantTests
         }
 
         Assert.Equal(s.State, SeasonEngine.Replay(s.Log));
+
+        // An undo leaves what the log without the undone commands gives (invariant 12, D-735)
+        var without = SeasonEngine.Replay(s.EffectiveLog);
+        Assert.Equal(without.Duels, s.State.Duels);
+        Assert.Equal(without.Interactions, s.State.Interactions);
     }
 
     private static (Guid, Guid) Pair((Guid From, Guid To) duel) =>

@@ -109,9 +109,10 @@ internal static class Dueling
             return Decision.Accept(answered);
         }
 
+        // The answering player's own limit is «too many», the challenger's «busy» (D-732)
         var rules = Rules(state);
         if ((Players(state, challenge.FromPlayerId, challenge.ToPlayerId)
-            ?? Limits(state, rules, now, challenge.FromPlayerId, challenge.ToPlayerId, challenge.InteractionId)) is { } changed)
+            ?? Limits(state, rules, now, challenge.ToPlayerId, challenge.FromPlayerId, challenge.InteractionId)) is { } changed)
         {
             return changed;
         }
@@ -186,23 +187,22 @@ internal static class Dueling
                 }
 
             case RunDropped dropped when rules.DropForfeits:
+                // A voluntary drop of a run that counts gives the duel to the other player at once (the expert panel (4))
+                foreach (var next in Forfeit(state, rules, dropped.PlayerId, dropped.RunId, dropped.DroppedAt))
                 {
-                    // A voluntary drop of a run that counts gives the duel to the other player at once (the expert panel (4))
-                    var run = state.Runs[dropped.RunId];
-                    foreach (var duel in Active(state, dropped.PlayerId).Where(d => dropped.DroppedAt < d.ExpiresAt && Counts(rules, d, run)))
-                    {
-                        var winner = duel.Other(dropped.PlayerId);
-                        var coins = Coins(state, rules, winner, Wins(state, winner));
-                        foreach (var next in Win(duel, DuelEnd.Forfeit, winner, runId: null, coins, dropped.DroppedAt))
-                        {
-                            yield return next;
-                        }
-                    }
-
-                    break;
+                    yield return next;
                 }
 
-            case RunTechRerolled rerolled:
+                break;
+            case RunTechRerolled { Reason: TechRerollReason.Wish } wished when rules.DropForfeits:
+                // A wish reroll is the player's own choice, not a technical trouble: it forfeits like a drop (D-733)
+                foreach (var next in Forfeit(state, rules, wished.PlayerId, wished.RunId, wished.RerolledAt))
+                {
+                    yield return next;
+                }
+
+                break;
+            case RunTechRerolled { Reason: not TechRerollReason.Wish } rerolled:
                 {
                     // Not the player's fault: the duel is called off, nobody gets anything
                     var run = state.Runs[rerolled.RunId];
@@ -306,6 +306,19 @@ internal static class Dueling
 
     private static SeasonState Update(SeasonState state, Guid duelId, Func<Duel, Duel> change) =>
         state with { Duels = state.Duels.SetItem(duelId, change(state.Duels[duelId])) };
+
+    private static IEnumerable<IGameEvent> Forfeit(SeasonState state, DuelRules rules, Guid loser, Guid runId, DateTimeOffset at)
+    {
+        var run = state.Runs[runId];
+        foreach (var duel in Active(state, loser).Where(d => at < d.ExpiresAt && Counts(rules, d, run)))
+        {
+            var winner = duel.Other(loser);
+            foreach (var next in Win(duel, DuelEnd.Forfeit, winner, runId: null, Coins(state, rules, winner, Wins(state, winner)), at))
+            {
+                yield return next;
+            }
+        }
+    }
 
     private static IEnumerable<IGameEvent> Win(Duel duel, DuelEnd end, Guid winner, Guid? runId, int coins, DateTimeOffset at)
     {
