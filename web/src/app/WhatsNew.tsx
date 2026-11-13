@@ -1,6 +1,6 @@
 import { Sparkles, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { api } from '../api/client';
+import { siteEnvironment } from './siteStatus';
 import { ru } from '../i18n/ru';
 import { Button, IconButton } from '../ui/Button';
 import { BottomSheet } from '../ui/Dialogs';
@@ -64,7 +64,8 @@ export function UpdateBanner({ releases = changelog }: { releases?: Release[] })
     const page = { alive: true };
     void (async () => {
       try {
-        const { data } = await api.GET('/api/status');
+        // The page's one status request, shared with the other banners (FL-3)
+        const data = await siteEnvironment();
         if (!page.alive || !data) return;
         const before = seen();
         if (before === null) remember(data.version);

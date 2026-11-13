@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { Api } from '../../support/api.ts';
 import { compressingProxy } from '../../support/compressing-proxy.ts';
-import { speedPlayer } from '../../support/global-setup.ts';
+import { demoSeasonId, speedPlayer } from '../../support/global-setup.ts';
 import { baseURL, testPassword } from '../../support/world.ts';
 
 // TESTING.md scenario 13 «Скорость главной на демо-сезоне»: the main page of the demo season (16 players, hundreds of
@@ -9,6 +9,7 @@ import { baseURL, testPassword } from '../../support/world.ts';
 // the turn card and the map with the tokens — within the budget of docs/DESIGN.md «Производительность»: 2.5 s. A first
 // visit: an empty cache, the session already signed in. The network is Lighthouse's «Slow 4G» (150 ms, 1.6 Mbit/s
 // down, 750 kbit/s up, D-233). It runs after the parallel scenarios so the machine's load does not blur the time.
+// The site is warm, as a live one is (FL-3): only the browser comes for the first time.
 
 const budgetMs = 2_500;
 const slow4g = {
@@ -30,6 +31,11 @@ test('speed: the demo season’s main page shows its content within 2.5 s on a m
       );
     },
   );
+  // The first answer about the demo season after the server starts is many times slower than the next ones (0.1 s
+  // instead of 0.01 s, once 0.46 s: nothing has read this season yet), and the first project to run this test would pay
+  // for it alone (FL-3). A live site has answered it long before: the page's requests are asked once, outside the time
+  await player.get('/api/seasons/current');
+  await player.get(`/api/seasons/${demoSeasonId}`);
   const context = await browser.newContext();
   await context.addCookies(await player.cookies());
   await player.dispose();
@@ -55,9 +61,29 @@ test('speed: the demo season’s main page shows its content within 2.5 s on a m
     { polling: 'raf', timeout: 20_000 },
   );
   const elapsed = Math.round(Number(await shown.jsonValue()));
+  // Where the time went, for a slow run: the scripts arrived, the season answered (the same page clock; what loads
+  // after the content is shown, the animation engine, is not counted)
+  const parts = await page.evaluate((shownAt) => {
+    const done = (part: RegExp) =>
+      Math.round(
+        Math.max(
+          0,
+          ...performance
+            .getEntriesByType('resource')
+            .filter(
+              (e) => part.test(new URL(e.name).pathname) && e.startTime + e.duration <= shownAt,
+            )
+            .map((e) => e.startTime + e.duration),
+        ),
+      );
+    return `scripts ${String(done(/\.js$/))} ms, season ${String(done(/^\/api\/seasons\/[0-9a-f-]{36}$/))} ms`;
+  }, elapsed);
   await expect(page.getByTestId('turn')).toBeVisible();
   await context.close();
   await proxy.close();
-  testInfo.annotations.push({ type: 'main content', description: `${String(elapsed)} ms` });
-  expect(elapsed, `main content in ${String(elapsed)} ms`).toBeLessThanOrEqual(budgetMs);
+  testInfo.annotations.push({
+    type: 'main content',
+    description: `${String(elapsed)} ms (${parts})`,
+  });
+  expect(elapsed, `main content in ${String(elapsed)} ms (${parts})`).toBeLessThanOrEqual(budgetMs);
 });
