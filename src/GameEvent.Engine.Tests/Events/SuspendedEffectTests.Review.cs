@@ -6,6 +6,7 @@ using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Map;
 using GameEvent.Engine.Players;
 using GameEvent.Engine.Proofs;
+using GameEvent.Engine.Rolls;
 using GameEvent.Engine.Rulesets;
 using GameEvent.Engine.Scoring;
 using GameEvent.Engine.Seasons;
@@ -244,6 +245,44 @@ public partial class SuspendedEffectTests
         Assert.Null(s.Player("Вася").Choice);
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void A_question_waiting_behind_the_choice_of_a_game_is_asked_after_a_reroll_or_an_already_played(bool reroll)
+    {
+        // D-562, D-567 (10): Вася picks among three games, Петя's curse makes him draw meanwhile; the choice of the game
+        // goes with a reroll or «Уже проходил», and the question that waited behind it is asked
+        var s = Season(s_crossroads, extra: [s_curse, EconomyScenario.Examples()["pick-of-three"]])
+            .WithGame("Alan Wake", 3, "Horror").WithGame("Dead Space", 3, "Horror").WithGame("Soma", 3, "RPG");
+        s.Give("Вася", "pick-of-three");
+        s.Used("Вася", "pick-of-three").Roll("Вася");
+        var games = s.Player("Вася").Choice!;
+        Assert.Equal(ChoiceKind.Game, games.Kind);
+        s.Give("Петя", "curse");
+        s.NextRandom(0).Used("Петя", "curse", "Вася");
+        var suspended = Assert.Single(s.LastEvents<EffectSuspended>());
+        Assert.Equal(games, s.Player("Вася").Choice);
+
+        s.Act(reroll ? new Reroll(s.PlayerId("Вася")) : new DeclareAlreadyPlayed(s.PlayerId("Вася"), games.Options[0].Game!.GameId));
+
+        ScenarioAssert.Accepted(s);
+        Assert.Contains(s.Player("Вася").Suspended, e => e.ChoiceId == suspended.ChoiceId);
+
+        // The reroll keeps the choice of three: the question waits behind the new choice and is asked once a game is picked
+        if (s.Player("Вася").Choice is { Kind: ChoiceKind.Game } again)
+        {
+            Assert.True(reroll);
+            s.Act(new MakeChoice(s.PlayerId("Вася"), again.ChoiceId, again.Options[0].Id));
+            ScenarioAssert.Accepted(s);
+        }
+
+        var next = s.Player("Вася").Choice!;
+        Assert.Equal((ChoiceKind.Effect, suspended.ChoiceId), (next.Kind, next.ChoiceId));
+        Answer(s, "Вася", "монетки");
+        ScenarioAssert.Accepted(s);
+        Assert.Empty(s.Player("Вася").Suspended);
+    }
+
     // ---- D-567 (8): the answer of a player who has since become the first finisher only closes the question ----
 
     [Fact]
@@ -271,6 +310,35 @@ public partial class SuspendedEffectTests
         ScenarioAssert.Accepted(s);
         Assert.IsType<EffectResumed>(Assert.Single(s.Last.Events));
         Assert.Equal(coins, s.Player("Вася").Coins);
+        Assert.Null(s.Player("Вася").Choice);
+    }
+
+    [Fact]
+    public void The_provisional_first_answering_a_question_of_his_runs_event_about_another_player_hits_nobody()
+    {
+        // D-553 (3), D-557 (4): Вася finishes after Маша on extreme, his difficulty's «Сглаз» asks whom to hit; Маша's proof
+        // is rejected and Вася is the provisional first. His answer goes on (his own run's event) but reaches him alone
+        var s = Season(s_hex, decks: [EventScenario.Deck(EventKind.Good, "good", "hex")]).WithCoins("Петя", 10);
+        Finishes(s, "Маша", "Persona", 4, 4, 4);
+        var mashasRun = s.State.Runs.Values.Single(r => r.PlayerId == s.PlayerId("Маша")).RunId;
+        s.Act(new AdjustPlayer(s.PlayerId("Вася"), "Позиция для теста", CellId: "f"));
+        s.RollTitle("Вася", "Silent Hill").Start("Вася").NextRandom(4, 0).Complete("Вася", Engine.Runs.Difficulty.Extreme);
+        ScenarioAssert.Accepted(s);
+        Assert.NotNull(s.Player("Вася").Finish);
+        var suspended = Assert.Single(s.LastEvents<EffectSuspended>());
+        Assert.Equal((Engine.Decks.EventSource.Difficulty, SuspendedStep.Target), (suspended.Source, suspended.Step));
+        Assert.Contains(N(s.PlayerId("Петя")), suspended.Options.Select(o => o.Id));
+
+        s.Act(new RejectProof(mashasRun, "Не то"));
+        ScenarioAssert.Accepted(s);
+        Assert.True(Targets.IsFirst(s.State, s.PlayerId("Вася")));
+        Assert.False(s.Player("Вася").Finish!.Frozen);
+
+        Answer(s, "Вася", N(s.PlayerId("Петя")));
+
+        ScenarioAssert.Accepted(s);
+        Assert.IsType<EffectResumed>(Assert.Single(s.Last.Events));
+        Assert.Equal(10, s.Player("Петя").Coins);
         Assert.Null(s.Player("Вася").Choice);
     }
 

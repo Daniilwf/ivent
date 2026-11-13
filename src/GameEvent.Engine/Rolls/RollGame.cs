@@ -155,14 +155,15 @@ internal static class Rolling
         var player = state.Players[e.PlayerId];
         return state with
         {
+            // A question of an event waiting behind the choice of a game is asked once it is gone (D-562, D-567 (10))
             Players = state.Players.SetItem(
                 e.PlayerId,
-                player with
+                Effects.Suspensions.Refresh(player with
                 {
                     Offer = null,
                     Choice = null,
                     RerollsThisRoll = e.Payment == RerollPayment.GameDeleted ? player.RerollsThisRoll : player.RerollsThisRoll + 1,
-                }),
+                })),
         };
     }
 
@@ -183,7 +184,8 @@ internal static class Rolling
         player = player with { Exclusions = [.. exclusions] };
         if (IsOffered(player, e.GameId))
         {
-            player = player with { Phase = TurnPhase.Idle, Offer = null, Choice = null, RerollsThisRoll = 0 };
+            // A question of an event waiting behind the choice of a game is asked once it is gone (D-562, D-567 (10))
+            player = Effects.Suspensions.Refresh(player with { Phase = TurnPhase.Idle, Offer = null, Choice = null, RerollsThisRoll = 0 });
         }
 
         return state with { Players = state.Players.SetItem(e.PlayerId, player) };
