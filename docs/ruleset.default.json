@@ -126,5 +126,8 @@
   },
   "suggestions": {
     "perDay": 5
+  },
+  "partnerBoard": {
+    "requestTtlHours": 48
   }
 }

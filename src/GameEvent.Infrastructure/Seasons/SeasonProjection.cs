@@ -151,11 +151,15 @@ internal static class SeasonProjection
             }
         }
 
-        // The pending invitations a player sent are due on his timer column too (D-523): an invitation changed without a
-        // change of its inviter brings his column up to date
+        // The pending invitations a player sent and his open requests of the partner board are due on his timer column too
+        // (D-523, D-524): one changed without a change of its player brings his column up to date
+        var requestAuthors = after.PartnerRequests.Keys.Union(before.PartnerRequests.Keys)
+            .Where(id => before.PartnerRequests.GetValueOrDefault(id) != after.PartnerRequests.GetValueOrDefault(id))
+            .Select(id => (after.PartnerRequests.GetValueOrDefault(id) ?? before.PartnerRequests[id]).PlayerId);
         foreach (var inviter in after.Interactions.Keys.Union(before.Interactions.Keys)
             .Where(id => before.Interactions.GetValueOrDefault(id) != after.Interactions.GetValueOrDefault(id))
             .Select(id => (after.Interactions.GetValueOrDefault(id) ?? before.Interactions[id]).FromPlayerId)
+            .Concat(requestAuthors)
             .Distinct()
             .Where(id => after.Players.TryGetValue(id, out var now) && before.Players.TryGetValue(id, out var then) && now == then))
         {

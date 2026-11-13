@@ -56,7 +56,9 @@ internal static class Coop
 
         // Pending by the engine's clock: one past its time is over even before the timer fired (D-523)
         var now = context.Clock.UtcNow;
-        if (state.Interactions.Values.Any(i => IsPending(i, now) && i.Kind == InteractionKind.Coop && i.RunId == run.RunId))
+        // The roller's own: responses of the partner board waiting on the run do not count (D-740)
+        if (state.Interactions.Values.Any(i => IsPending(i, now) && i.Kind == InteractionKind.Coop && i.RunId == run.RunId
+            && i.FromPlayerId == inviter.PlayerId))
         {
             return Decision.Reject(RejectionCodes.CoopInviteAlreadyOpen, "The run has a pending coop invitation already.");
         }
@@ -130,12 +132,14 @@ internal static class Coop
             return Decision.Reject(RejectionCodes.CoopNotCoopGame, "Only a coop game takes a partner.");
         }
 
-        if (Partner(state, command.PlayerId, run.PlayerId, run) is { } partnerRefusal)
+        // The partner is the invited one, or the responder of the partner board inviting the roller (D-524)
+        var partnerId = invitation.FromPlayerId == run.PlayerId ? invitation.ToPlayerId : invitation.FromPlayerId;
+        if (Partner(state, partnerId, run.PlayerId, run) is { } partnerRefusal)
         {
             return partnerRefusal;
         }
 
-        var partner = state.Players[command.PlayerId];
+        var partner = state.Players[partnerId];
         if (partner.Phase != TurnPhase.Idle || partner.ActiveRunId is not null || partner.Offer is not null || partner.Choice is not null)
         {
             return Decision.Reject(RejectionCodes.CoopPartnerBusy, "The partner has a run, an offered game or a choice of his own (D-520).");
@@ -330,7 +334,7 @@ internal static class Coop
         state with { Interactions = state.Interactions.SetItem(id, state.Interactions[id] with { Status = status }) };
 
     // The mechanic, a season running before its deadline, a known player
-    private static Decision? Guard(SeasonState state, Guid playerId, EngineContext context)
+    internal static Decision? Guard(SeasonState state, Guid playerId, EngineContext context)
     {
         if (state.IsCreated && !state.Rules.Features.Coop)
         {
@@ -363,7 +367,7 @@ internal static class Coop
 
     // Who may be the partner (D-520, D-546 (8)): another active player of the season, not the first finisher, for whom the
     // game is not excluded (his own drop, tech reroll, «уже проходил»)
-    private static Decision? Partner(SeasonState state, Guid partnerId, Guid rollerId, RunState run)
+    internal static Decision? Partner(SeasonState state, Guid partnerId, Guid rollerId, RunState run)
     {
         if (partnerId == rollerId || !state.Players.TryGetValue(partnerId, out var partner) || partner.IsInactive)
         {
@@ -380,8 +384,8 @@ internal static class Coop
             : null;
     }
 
-    private static bool IsPending(Interaction invitation, DateTimeOffset now) =>
+    internal static bool IsPending(Interaction invitation, DateTimeOffset now) =>
         invitation.Status == InteractionStatus.Pending && invitation.ExpiresAt > now;
 
-    private static bool IsCoopGame(EngineContext context, Guid gameId) => context.Pool.Games.Any(g => g.Id == gameId && g.IsCoop);
+    internal static bool IsCoopGame(EngineContext context, Guid gameId) => context.Pool.Games.Any(g => g.Id == gameId && g.IsCoop);
 }
