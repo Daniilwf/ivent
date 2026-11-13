@@ -242,6 +242,14 @@ public static class ContentPublishing
         {
             error($"{at}.effect.condition", "An event plays when drawn, without a condition.");
         }
+
+        // D-549, as D-519 for the system's effects: pushes of everyone with their cells would not fit the 50 events of the
+        // chain, and the effect would reach only some — until 5.9
+        if (definition.Effect is { Target.Selector: TargetSelector.All } effect
+            && effect.Actions.Concat(effect.Outcomes?.Cases.SelectMany(c => c.Actions) ?? []).Any(a => a is MoveAction or TeleportAction))
+        {
+            error($"{at}.effect.target", "An event on everyone does not move or teleport (until 5.9).");
+        }
     }
 
     // A deck holds events only, and a loot wheel none (D-501): a drawn event is played, never kept. The standard decks are

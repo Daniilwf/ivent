@@ -247,6 +247,37 @@ public class DeckTests
         Assert.Contains(path, ContentPublishing.Check(new ContentPack { Objects = [.. objects] }, events: true).Select(e => e.Path));
     }
 
+    [Theory]
+    [InlineData("move", true)]
+    [InlineData("teleport", true)]
+    [InlineData("caseMove", true)]
+    [InlineData("coins", false)]
+    public void An_event_on_everyone_may_not_move_or_teleport(string what, bool refused)
+    {
+        // D-549 (as D-519): 16 pushes with their cells would not fit the 50 events of the chain — until 5.9
+        var tailwind = EconomyScenario.Examples()["tailwind"];
+        var all = new TargetSpec { Selector = TargetSelector.All };
+        var effect = what switch
+        {
+            "move" => new EffectSpec { Target = all, Actions = [new MoveAction { Steps = ContentValue.Of(1) }] },
+            "teleport" => new EffectSpec { Target = all, Actions = [new TeleportAction { Cell = "start" }] },
+            "caseMove" => new EffectSpec
+            {
+                Target = all,
+                Outcomes = new OutcomesSpec
+                {
+                    Roll = ContentValue.TryParse("1d6"),
+                    Cases = [new OutcomeCase { From = 1, To = 6, Actions = [new MoveAction { Steps = ContentValue.Of(1) }] }],
+                },
+            },
+            _ => new EffectSpec { Target = all, Actions = [new ChangeResourceAction { Resource = "coins", Amount = ContentValue.Of(1) }] },
+        };
+
+        var errors = ContentPublishing.Check(new ContentPack { Objects = [tailwind with { Effect = effect }] }, events: true).Select(e => e.Path);
+
+        Assert.Equal(refused, errors.Contains("$.objects[0].effect.target"));
+    }
+
     [Fact]
     public void A_loot_wheel_named_like_a_deck_still_publishes_while_events_are_off()
     {
