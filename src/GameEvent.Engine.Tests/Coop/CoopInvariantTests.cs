@@ -110,8 +110,17 @@ public class CoopInvariantTests
             11 => unchecked_.Count == 0 ? new FireTimers() : new ApproveProof(unchecked_[0]),
             12 => unchecked_.Count == 0 ? new FireTimers() : new RejectProof(unchecked_[^1], "Фейк"),
             13 => coopRun is null ? new FireTimers() : new CorrectRunHours(coopRun.RunId, coopRun.Hours == 9 ? 3 : 9, "Правка"),
-            14 => s.History.Count <= setup ? new FireTimers() : new UndoCommand(s.History[^1].CommandId, "ошибка админа"),
-            _ => b % 8 == 0 ? new SetPlayerInactive(player, !me.IsInactive) : new FireTimers(),
+            // The last command most often, else an earlier one, so undos meet their dependents
+            14 => s.History.Count <= setup
+                ? new FireTimers()
+                : new UndoCommand(s.History[b % 3 == 0 ? setup + (b % (s.History.Count - setup)) : s.History.Count - 1].CommandId, "ошибка админа"),
+            // Coop switched off and on again mid-game (D-420, Н-25)
+            _ => (b % 8) switch
+            {
+                0 => new SetPlayerInactive(player, !me.IsInactive),
+                1 => new Engine.Rulesets.ChangeRuleset(s.Ruleset with { Features = s.Ruleset.Features with { Coop = !s.Ruleset.Features.Coop } }),
+                _ => new FireTimers(),
+            },
         };
     }
 

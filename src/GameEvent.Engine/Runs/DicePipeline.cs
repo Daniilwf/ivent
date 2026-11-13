@@ -85,7 +85,8 @@ internal static class DicePipeline
 
         // The throw's move waits at a fork: that step has begun, a change after the throw would move the token off it (D-416);
         // a run without dice by its unmet condition had no throw to change (D-592)
-        if (effect.State.Players[run.PlayerId].Choice?.Kind == Turns.ChoiceKind.Branch || RunConditions.WithoutDice(run))
+        // Either side of a coop run (D-545)
+        if (RunShares.Players(run).Any(p => effect.State.Players[p].Choice?.Kind == Turns.ChoiceKind.Branch) || RunConditions.WithoutDice(run))
         {
             return;
         }

@@ -24,7 +24,7 @@ internal static class Coop
         }
 
         var inviter = state.Players[command.PlayerId];
-        if (inviter.ActiveRunId is not { } runId || state.Runs[runId] is not { Status: RunStatus.Playing } run)
+        if (inviter.ActiveRunId is not { } runId || !state.Runs.TryGetValue(runId, out var run) || run.Status != RunStatus.Playing)
         {
             return Decision.Reject(RejectionCodes.CoopRunNotActive, "Only a player playing a run invites to it.");
         }
@@ -54,19 +54,20 @@ internal static class Coop
             return partnerRefusal;
         }
 
-        if (state.Interactions.Values.Any(i => i.Status == InteractionStatus.Pending && i.Kind == InteractionKind.Coop && i.RunId == run.RunId))
+        // Pending by the engine's clock: one past its time is over even before the timer fired (D-523)
+        var now = context.Clock.UtcNow;
+        if (state.Interactions.Values.Any(i => IsPending(i, now) && i.Kind == InteractionKind.Coop && i.RunId == run.RunId))
         {
             return Decision.Reject(RejectionCodes.CoopInviteAlreadyOpen, "The run has a pending coop invitation already.");
         }
 
         var limit = state.Rules.Interactions.MaxOpenInvitesPerPlayer
             ?? throw new InvalidOperationException("interactions.maxOpenInvitesPerPlayer is required with coop on.");
-        if (state.Interactions.Values.Count(i => i.Status == InteractionStatus.Pending && i.FromPlayerId == inviter.PlayerId) >= limit)
+        if (state.Interactions.Values.Count(i => IsPending(i, now) && i.FromPlayerId == inviter.PlayerId) >= limit)
         {
             return Decision.Reject(RejectionCodes.InteractionTooMany, $"At most {limit} pending invitations sent.");
         }
 
-        var now = context.Clock.UtcNow;
         return Decision.Accept(new InteractionCreated(new Interaction(
             context.Ids.NewId(),
             InteractionKind.Coop,
@@ -90,6 +91,11 @@ internal static class Coop
         }
 
         var invitation = state.Interactions[command.InteractionId];
+        if (invitation.Kind != InteractionKind.Coop)
+        {
+            return Decision.Reject(RejectionCodes.InteractionUnknown, "Only coop invitations are answered in this build.");
+        }
+
         if (invitation.ToPlayerId != command.PlayerId)
         {
             return Decision.Reject(RejectionCodes.InteractionNotYours, "Only the invited player answers.");
@@ -103,8 +109,8 @@ internal static class Coop
         }
 
         // An accept checks everything again now (D-523): the run still running and without a partner, both still allowed
-        if (invitation.RunId is not { } runId || state.Runs[runId] is not { Status: RunStatus.Playing } run
-            || state.Players[run.PlayerId].ActiveRunId != run.RunId)
+        if (invitation.RunId is not { } runId || !state.Runs.TryGetValue(runId, out var run) || run.Status != RunStatus.Playing
+            || state.Players[run.PlayerId].ActiveRunId != run.RunId || state.Players[run.PlayerId].IsInactive)
         {
             return Decision.Reject(RejectionCodes.CoopRunNotActive, "The run of the invitation is over.");
         }
@@ -133,6 +139,12 @@ internal static class Coop
         if (partner.Phase != TurnPhase.Idle || partner.ActiveRunId is not null || partner.Offer is not null || partner.Choice is not null)
         {
             return Decision.Reject(RejectionCodes.CoopPartnerBusy, "The partner has a run, an offered game or a choice of his own (D-520).");
+        }
+
+        // A bet of the partner on the run would pay him for a run he plays (D-520): no joining over it
+        if (partner.Wallet.Bets.Any(b => b.Status == Inventory.BetStatus.Open && b.RunId == run.RunId))
+        {
+            return Decision.Reject(RejectionCodes.CoopPartnerHasBet, "The partner has an open bet on this run.");
         }
 
         // The accepted invitation closes the other pending ones of the run (D-523)
@@ -347,7 +359,7 @@ internal static class Coop
     private static Decision? Pending(SeasonState state, Guid interactionId, EngineContext context) =>
         !state.Interactions.TryGetValue(interactionId, out var invitation)
             ? Decision.Reject(RejectionCodes.InteractionUnknown, $"Invitation {interactionId} is not in the season.")
-            : invitation.Status != InteractionStatus.Pending || invitation.ExpiresAt <= context.Clock.UtcNow
+            : !IsPending(invitation, context.Clock.UtcNow)
                 ? Decision.Reject(RejectionCodes.InteractionNotPending, $"Invitation {interactionId} is {invitation.Status}.")
                 : null;
 
@@ -369,6 +381,9 @@ internal static class Coop
             ? Decision.Reject(RejectionCodes.CoopGameExcluded, "The game is excluded for the partner.")
             : null;
     }
+
+    private static bool IsPending(Interaction invitation, DateTimeOffset now) =>
+        invitation.Status == InteractionStatus.Pending && invitation.ExpiresAt > now;
 
     private static bool IsCoopGame(EngineContext context, Guid gameId) => context.Pool.Games.Any(g => g.Id == gameId && g.IsCoop);
 }

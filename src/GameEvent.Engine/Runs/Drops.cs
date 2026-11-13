@@ -278,10 +278,14 @@ internal static class Drops
             : sum;
     }
 
-    private static SeasonState Finish(SeasonState state, Guid runId, Guid playerId, RunStatus status) =>
-        state with
+    // A coop partner still on the run (coop switched off, so no coop-left was written, D-420) is free with it
+    private static SeasonState Finish(SeasonState state, Guid runId, Guid playerId, RunStatus status)
+    {
+        state = state with
         {
             Runs = state.Runs.SetItem(runId, state.Runs[runId] with { Status = status }),
             Players = state.Players.SetItem(playerId, state.Players[playerId] with { Phase = TurnPhase.Idle, ActiveRunId = null }),
         };
+        return state.Runs[runId].Coop is { } coop ? Interactions.Coop.Free(state, coop.PlayerId, runId) : state;
+    }
 }

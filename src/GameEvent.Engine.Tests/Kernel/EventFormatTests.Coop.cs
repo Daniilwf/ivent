@@ -1,5 +1,6 @@
 using GameEvent.Engine.Interactions;
 using GameEvent.Engine.Kernel;
+using GameEvent.Engine.Runs;
 
 namespace GameEvent.Engine.Tests.Kernel;
 
@@ -34,4 +35,27 @@ public partial class EventFormatTests
             """{"runId":"00000000-0000-0000-0000-000000000001","playerId":"10000000-0000-0000-0000-000000000001","partnerId":"10000000-0000-0000-0000-000000000002","total":7,"rollerPoints":4,"partnerPoints":3,"coins":7,"rollerCoins":4,"partnerCoins":3,"pointsShare":0.5,"coinsShare":0.5}"""
         ),
     ];
+
+    [Fact]
+    public void An_undo_of_a_coop_run_or_an_invitation_writes_them_and_an_undo_of_anything_else_keeps_its_format()
+    {
+        var partner = new CoopPartner(s_other, s_game, s_at, new CoopShareRules(0.5m, 0.5m), AfterFinish: true, Moved: 3, ReachedFinish: true, MoveFrom: "c1", Gain: 3, CellPoints: 2, CellObjects: [s_game]);
+        var filled = FilledUndo();
+        var invitation = new Interaction(s_game, InteractionKind.Coop, s_player, s_other, s_run, s_at, s_at.AddHours(24), InteractionStatus.Expired);
+        var undo = filled with { Runs = [filled.Runs[0] with { Coop = partner }], Interactions = [invitation], RemovedInteractions = [s_run] };
+
+        var stored = EventCodec.Encode(undo);
+
+        Assert.Contains(
+            ""","coop":{"playerId":"10000000-0000-0000-0000-000000000002","interactionId":"20000000-0000-0000-0000-000000000001","joinedAt":"2026-10-01T12:30:00+00:00","shares":{"pointsShare":0.5,"coinsShare":0.5},"afterFinish":true,"moved":3,"reachedFinish":true,"moveFrom":"c1","gain":3,"cellPoints":2,"cellObjects":["20000000-0000-0000-0000-000000000001"]}}""",
+            stored.Data,
+            StringComparison.Ordinal);
+        Assert.EndsWith(
+            ""","interactions":[{"interactionId":"20000000-0000-0000-0000-000000000001","kind":"coop","fromPlayerId":"10000000-0000-0000-0000-000000000001","toPlayerId":"10000000-0000-0000-0000-000000000002","runId":"00000000-0000-0000-0000-000000000001","createdAt":"2026-10-01T12:30:00+00:00","expiresAt":"2026-10-02T12:30:00+00:00","status":"expired"}],"removedInteractions":["00000000-0000-0000-0000-000000000001"]}""",
+            stored.Data,
+            StringComparison.Ordinal);
+        Assert.Equal(undo, EventCodec.Decode(stored));
+        Assert.DoesNotContain("interactions", EventCodec.Encode(filled).Data, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"coop\"", EventCodec.Encode(filled).Data, StringComparison.Ordinal);
+    }
 }

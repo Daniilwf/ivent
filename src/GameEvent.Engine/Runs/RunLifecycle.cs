@@ -126,6 +126,14 @@ internal static class RunLifecycle
             coop = null;
         }
 
+        // A partner who became the first finisher while the coop ran (a revoke of another's finish) is out of it as well:
+        // the first is affected by nobody and the roller plays it alone, with the whole throw (D-99, D-510)
+        if (coop is not null && FinishLine.First(state) == coop.PlayerId)
+        {
+            events.Add(new Interactions.CoopLeft(run.RunId, coop.PlayerId, Interactions.CoopLeaveReason.PartnerFirst, now));
+            coop = null;
+        }
+
         events.AddRange(new IGameEvent[]
         {
             // Whether the run comes after the finish or in the first's free mode is stored, not recomputed on replay (D-99).
@@ -203,13 +211,17 @@ internal static class RunLifecycle
 
         // The finish comes after the run's own rewards, so a first frozen at once is frozen after them (D-99); then the
         // cell of the stop, or the branch choice of a paused walk (D-303, D-304); then the difficulty's event (D-553 (2)).
-        events.AddRange(AfterOwnMove(events.Aggregate(state, SeasonEngine.Apply), player, run, moved, walk, context));
+        events.AddRange(AfterOwnMove(events.Aggregate(state, SeasonEngine.Apply), player, run, moved, walk, context, drawDifficulty: split is null));
 
         // Then the partner's share by his own move: his stop, his cells, his finish — the roller's finish of the same command
-        // comes first (D-545)
+        // comes first (D-545); the difficulty's event after both moves, so it never acts on a step of this throw (D-557)
         if (split is not null)
         {
             events.AddRange(Interactions.Coop.PartnerShare(events.Aggregate(state, SeasonEngine.Apply), run.RunId, split, context));
+            if (!walk.Paused)
+            {
+                events.AddRange(Decks.EventDraws.ForDifficulty(events.Aggregate(state, SeasonEngine.Apply), context, run.RunId));
+            }
         }
 
         if (command.Review is { } given)
@@ -229,7 +241,7 @@ internal static class RunLifecycle
     /// (D-504, D-553 (2), D-557).
     /// </summary>
     public static IEnumerable<IGameEvent> AfterOwnMove(
-        SeasonState state, SeasonPlayer player, RunState run, PlayerMoved? moved, Walk walk, EngineContext context)
+        SeasonState state, SeasonPlayer player, RunState run, PlayerMoved? moved, Walk walk, EngineContext context, bool drawDifficulty = true)
     {
         var events = new List<IGameEvent>();
         if (moved is not null && !walk.Paused)
@@ -257,7 +269,7 @@ internal static class RunLifecycle
                 player.PlayerId, context.Ids.NewId(), fork, [.. state.Map.Exits(fork).Select(e => e.To)], walk.Remaining,
                 MoveReason.CompletionRoll, run.RunId));
         }
-        else if (player.PlayerId == run.PlayerId)
+        else if (player.PlayerId == run.PlayerId && drawDifficulty)
         {
             // The run's difficulty event is the roller's, once per run: never the coop partner's (D-557)
             events.AddRange(Decks.EventDraws.ForDifficulty(events.Aggregate(state, SeasonEngine.Apply), context, run.RunId));

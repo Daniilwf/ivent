@@ -153,9 +153,9 @@ internal static class SeasonProjection
 
         // The pending invitations a player sent are due on his timer column too (D-523): an invitation changed without a
         // change of its inviter brings his column up to date
-        foreach (var inviter in after.Interactions
-            .Where(i => !before.Interactions.TryGetValue(i.Key, out var was) || was != i.Value)
-            .Select(i => i.Value.FromPlayerId)
+        foreach (var inviter in after.Interactions.Keys.Union(before.Interactions.Keys)
+            .Where(id => before.Interactions.GetValueOrDefault(id) != after.Interactions.GetValueOrDefault(id))
+            .Select(id => (after.Interactions.GetValueOrDefault(id) ?? before.Interactions[id]).FromPlayerId)
             .Distinct()
             .Where(id => after.Players.TryGetValue(id, out var now) && before.Players.TryGetValue(id, out var then) && now == then))
         {
@@ -391,7 +391,10 @@ internal static class SeasonProjection
                     // The engine's bookkeeping of a run's events: its difficulty's event drawn (D-557) and the check of its
                     // conditions come from the log, like the cells of its move (columns — 5.16, D-598)
                     DifficultyEventDrawn: replayed.Runs.GetValueOrDefault(r.Id)?.DifficultyEventDrawn ?? false,
-                    Condition: replayed.Runs.GetValueOrDefault(r.Id)?.Condition)),
+                    Condition: replayed.Runs.GetValueOrDefault(r.Id)?.Condition,
+
+                    // The partner's side of a coop run comes from the log too (the column Run.PartnerId — 5.16)
+                    Coop: replayed.Runs.GetValueOrDefault(r.Id)?.Coop)),
             ManualEffects = effects.ToImmutableSortedDictionary(
                 x => x.Id,
                 x => new PendingManualEffect(x.Id, x.PlayerId, x.ObjectId is null ? x.DrawEvent : null, x.Source, x.RunId) { ObjectId = x.ObjectId }),

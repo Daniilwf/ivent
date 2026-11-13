@@ -41,11 +41,10 @@ public static class BetPlans
         var runs = refusal is not null
             ? []
             : state.Players.Values
-                .Where(p => p.PlayerId != playerId && !Targets.IsFirst(state, p.PlayerId) && p.ActiveRunId is not null)
-                .Select(p => state.Runs[p.ActiveRunId!.Value])
                 // A bet is on a run's roller, never on its coop partner or by him (D-520)
-                .Where(run => run.PlayerId != playerId && run.PartnerId != playerId && state.Players[run.PlayerId].ActiveRunId == run.RunId)
-                .Distinct()
+                .Where(p => p.PlayerId != playerId && !Targets.IsFirst(state, p.PlayerId) && p.ActiveRunId is { } active && state.Runs[active].PlayerId == p.PlayerId)
+                .Select(p => state.Runs[p.ActiveRunId!.Value])
+                .Where(run => run.PartnerId != playerId)
                 .Where(run => now - run.RolledAt <= window && open.All(b => b.RunId != run.RunId))
                 .OrderBy(run => run.RolledAt)
                 .ThenBy(run => run.RunId)

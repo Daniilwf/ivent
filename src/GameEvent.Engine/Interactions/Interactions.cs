@@ -102,6 +102,9 @@ public enum CoopLeaveReason
 
     /// <summary>The roller completed the run as the first finisher, who does not affect others (D-510, Н-18).</summary>
     RollerFirst,
+
+    /// <summary>The partner was the first finisher when the run was completed (a revoke of another's finish, D-99).</summary>
+    PartnerFirst,
 }
 
 /// <summary>

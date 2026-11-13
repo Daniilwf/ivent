@@ -210,9 +210,7 @@ public static class RejectionCodes
     /// <summary>The run has a partner already.</summary>
     public const string CoopAlreadyJoined = "coop.alreadyJoined";
 
-    /// <summary>
-    /// The partner may not join: himself, the first finisher, inactive or unknown (D-520, Н-18).
-    /// </summary>
+    /// <summary>The partner may not join: himself, inactive or unknown (D-520).</summary>
     public const string CoopPartnerInvalid = "coop.partnerInvalid";
 
     /// <summary>The partner has an active run, an offered game or a pending choice (D-520).</summary>
@@ -220,6 +218,9 @@ public static class RejectionCodes
 
     /// <summary>The game is excluded for the partner: his own drop or tech reroll, «уже проходил» (D-546 (8)).</summary>
     public const string CoopGameExcluded = "coop.gameExcluded";
+
+    /// <summary>The partner has an open bet on the run he would join (D-520).</summary>
+    public const string CoopPartnerHasBet = "coop.partnerHasBet";
 
     /// <summary>The first finisher neither invites nor joins: he does not affect the others (D-510, Н-18).</summary>
     public const string CoopFirstFinisher = "coop.firstFinisher";

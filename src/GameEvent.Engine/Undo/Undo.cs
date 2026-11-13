@@ -318,9 +318,14 @@ internal static class Undoing
             keys.Add($"suggestion:{id}");
         }
 
+        // An invitation names the run it invites to: an undo of that run's start or roll waits for it (D-523)
         foreach (var id in Changed(before.Interactions, after.Interactions))
         {
             keys.Add($"interaction:{id}");
+            if ((after.Interactions.GetValueOrDefault(id) ?? before.Interactions.GetValueOrDefault(id))?.RunId is { } invitedTo)
+            {
+                keys.Add($"run:{invitedTo}");
+            }
         }
 
         if (before.Status != after.Status || before.Deadline != after.Deadline || before.Name != after.Name
