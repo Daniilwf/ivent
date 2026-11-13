@@ -62,7 +62,7 @@ internal sealed class GiveObjectHandler : ActionHandler<GiveObjectAction>
         var parameters = action.Params is { } given
             ? new ContentParamDictionary(given.Select(p => KeyValuePair.Create(p.Key, run.Text(p.Value))))
             : null;
-        run.Emit(Inventories.Give(run.State, run.Context, run.ActionTarget(action), definition, parameters, ObjectSource.Effect, run.UserId));
+        run.Emit(Inventories.Give(run.State, run.Context, run.ActionTarget(action), definition, parameters, ObjectSource.Effect, run.UserId, run.EventKind));
     }
 }
 

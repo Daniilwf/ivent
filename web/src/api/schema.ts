@@ -7954,6 +7954,7 @@ export interface components {
          *     Serialized as a plain JSON array.
          */
         EquatableArrayOfAutoNomination: unknown;
+        EquatableArrayOfEventKind: unknown;
         /**
          * @description Immutable list with value equality, so records holding lists (events, snapshots) compare by content.
          *     Serialized as a plain JSON array.
@@ -8027,6 +8028,7 @@ export interface components {
              *     while null.
              */
             answerTimeoutHours?: null | number;
+            applyOrder?: null | components["schemas"]["EquatableArrayOfEventKind"];
         };
         /**
          * @description Where a drawn event came from (GLOSSARY «Источник ивента», panel D-484 (2), D-548). The Бабл stops a bad event of

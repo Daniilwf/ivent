@@ -80,6 +80,15 @@ public sealed record EventRules
     /// </summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public int? AnswerTimeoutHours { get; init; }
+
+    /// <summary>
+    /// The order accumulated events apply in (SPEC «Накопление»: специвент, хороший, плохой; D-505): their roll and throw
+    /// changes, the special rolls they gave (D-543) and their questions (D-562), then everything of items. Special, good and
+    /// bad once each; risky at most once, unlisted — after the listed. Null — the default order (a season created before
+    /// the field, D-50). Not written while null.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public EquatableArray<EventKind>? ApplyOrder { get; init; }
 }
 
 public enum MapMode

@@ -16,7 +16,7 @@ internal sealed class ModifyNextRollHandler : ActionHandler<ModifyNextRollAction
         var filter = action.Filter is { } f
             ? f with { Tags = f.Tags is { } tags ? [.. tags.Select(run.Text)] : null }
             : null;
-        run.Emit(new NextRollModified(target, new RollModifier(run.ObjectId, filter, action.ChoiceCount, run.Hostile && target != run.UserId)));
+        run.Emit(new NextRollModified(target, new RollModifier(run.ObjectId, filter, action.ChoiceCount, run.Hostile && target != run.UserId, run.EventKind)));
     }
 }
 
@@ -43,7 +43,7 @@ internal sealed class ModifyDiceHandler : ActionHandler<ModifyDiceAction>
             return;
         }
 
-        run.Emit(new NextDiceModified(target, new DiceModifier(run.ObjectId, action.Stage, value, run.Hostile && target != run.UserId, action.Sides, action.From)));
+        run.Emit(new NextDiceModified(target, new DiceModifier(run.ObjectId, action.Stage, value, run.Hostile && target != run.UserId, action.Sides, action.From, run.EventKind)));
     }
 }
 

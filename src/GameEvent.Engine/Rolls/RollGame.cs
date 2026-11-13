@@ -99,9 +99,15 @@ internal static class Rolling
         // The exclusion drops the offer or the choice; the free roll then spins over what is left (D-07, D-92).
         var excluded = new GameExcluded(player.PlayerId, command.GameId, ExclusionReason.AlreadyPlayed);
         var after = Apply(state, excluded);
+
+        // An event's filter that fits nothing without the game waits for the next roll (D-583)
+        IGameEvent[] head = RollPreparation.Refit(after, player.PlayerId, context, new HashSet<Guid>(), after.Players[player.PlayerId].Wallet.NextRoll, []) is { } refit
+            ? [excluded, refit]
+            : [excluded];
+        after = head.Skip(1).Aggregate(after, SeasonEngine.Apply);
         return Draw(after, player.PlayerId, context, Filters(after, player.PlayerId)) is { } roll
-            ? Decision.Accept(excluded, roll)
-            : Decision.Accept(excluded);
+            ? Decision.Accept([.. head, roll])
+            : Decision.Accept(head);
     }
 
     public static Decision Decide(SeasonState state, Reroll command, EngineContext context)
@@ -125,9 +131,15 @@ internal static class Rolling
             : player.Choice!.Options.Select(o => o.Game?.GameId).OfType<Guid>().ToHashSet();
         var rerolled = new GameRerolled(player.PlayerId, [.. givenUp.Order()], payment);
         var after = Apply(state, rerolled);
+
+        // An event's filter that fits nothing without the games given up waits for the next roll (D-583)
+        IGameEvent[] head = RollPreparation.Refit(after, player.PlayerId, context, givenUp, after.Players[player.PlayerId].Wallet.NextRoll, []) is { } refit
+            ? [rerolled, refit]
+            : [rerolled];
+        after = head.Skip(1).Aggregate(after, SeasonEngine.Apply);
         if (payment == RerollPayment.BadEvent)
         {
-            return Decks.PaidRerollEvents.Decide(after, rerolled, givenUp, context);
+            return Decks.PaidRerollEvents.Decide(after, head, givenUp, context);
         }
 
         if (Draw(after, player.PlayerId, context, Filters(after, player.PlayerId), givenUp) is not { } roll)
@@ -147,7 +159,7 @@ internal static class Rolling
             RerollPayment.Coins when price != 0 => new CoinsChanged(player.PlayerId, -price, CoinsReason.Reroll, RunId: null),
             _ => null,
         };
-        return Decision.Accept(paid is null ? [rerolled, roll] : [rerolled, paid, roll]);
+        return Decision.Accept(paid is null ? [.. head, roll] : [.. head, paid, roll]);
     }
 
     public static SeasonState Apply(SeasonState state, GameRerolled e)
@@ -163,7 +175,8 @@ internal static class Rolling
                     Offer = null,
                     Choice = null,
                     RerollsThisRoll = e.Payment == RerollPayment.GameDeleted ? player.RerollsThisRoll : player.RerollsThisRoll + 1,
-                })),
+                },
+                state.Rules)),
         };
     }
 
@@ -185,7 +198,7 @@ internal static class Rolling
         if (IsOffered(player, e.GameId))
         {
             // A question of an event waiting behind the choice of a game is asked once it is gone (D-562, D-567 (10))
-            player = Effects.Suspensions.Refresh(player with { Phase = TurnPhase.Idle, Offer = null, Choice = null, RerollsThisRoll = 0 });
+            player = Effects.Suspensions.Refresh(player with { Phase = TurnPhase.Idle, Offer = null, Choice = null, RerollsThisRoll = 0 }, state.Rules);
         }
 
         return state with { Players = state.Players.SetItem(e.PlayerId, player) };
@@ -197,6 +210,19 @@ internal static class Rolling
     /// <summary>Whether a roll of <paramref name="playerId"/> would find a game: the same test the wheel makes.</summary>
     internal static bool CanRoll(SeasonState state, Guid playerId, IPoolView pool, IReadOnlyList<RollFilter> filters, IReadOnlySet<Guid>? givenUp = null) =>
         Wheel(state, playerId, pool, filters, givenUp).Categories.Count > 0;
+
+    /// <summary>
+    /// The games a roll of <paramref name="playerId"/> could land on before any filter: available, on the wheel, not given up
+    /// by a reroll. An event's roll filter that leaves none of them with the filters kept before it waits (D-505, EV7).
+    /// </summary>
+    internal static List<Game> Fitting(SeasonState state, Guid playerId, IPoolView pool, IReadOnlySet<Guid>? givenUp = null)
+    {
+        var status = SeasonGameStatus.For(state, playerId);
+        var weighted = pool.Categories.Where(c => c.Weight > 0).ToList();
+        return [.. pool.Games.Where(g => givenUp?.Contains(g.Id) != true
+            && status.Of(g) == GameAvailability.Available
+            && weighted.Any(c => InCategory(g, c)))];
+    }
 
     /// <summary>
     /// The wheel and the draw (D-05, D-06, D-46): the roll event for <paramref name="playerId"/>, or null when no

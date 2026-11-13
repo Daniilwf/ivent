@@ -768,6 +768,20 @@
             "integer",
             "null"
           ]
+        },
+        "applyOrder": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "enum": [
+              "good",
+              "bad",
+              "special",
+              "risky"
+            ]
+          }
         }
       },
       "required": [

@@ -118,7 +118,8 @@
     "durationDays": 7
   },
   "events": {
-    "defaultDeck": "risky"
+    "defaultDeck": "risky",
+    "applyOrder": ["special", "good", "bad"]
   },
   "suggestions": {
     "perDay": 5
