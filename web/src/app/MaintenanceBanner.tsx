@@ -2,6 +2,7 @@ import { Wrench } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { api, MAINTENANCE_EVENT } from '../api/client';
 import { ru } from '../i18n/ru';
+import { siteEnvironment } from './siteStatus';
 
 /** How often the banner asks the site whether it only reads: a deploy's maintenance lasts about a minute. */
 export const STATUS_POLL_MS = 30_000;
@@ -24,7 +25,11 @@ export function MaintenanceBanner() {
       }
     };
     const asked = () => void ask();
-    void ask();
+    // On start, the page's one status request shared with the other banners (FL-3: on a mobile network each request
+    // takes a connection the main page waits for); then a fresh one every time
+    void siteEnvironment().then((status) => {
+      if (alive && status) setOn(status.maintenance);
+    });
     const timer = globalThis.setInterval(asked, STATUS_POLL_MS);
     globalThis.addEventListener(MAINTENANCE_EVENT, asked);
     return () => {

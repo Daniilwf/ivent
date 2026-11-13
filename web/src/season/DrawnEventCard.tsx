@@ -1,7 +1,8 @@
-import { motion, useReducedMotion } from 'motion/react';
+import { m, useReducedMotion } from 'motion/react';
 import { useState } from 'react';
 import type { Schemas } from '../api/client';
 import { ru } from '../i18n/ru';
+import { Motion } from '../board/Motion';
 import { cx } from '../ui/cx';
 
 type Drawn = Schemas['DrawnEventView'];
@@ -28,42 +29,44 @@ export function DrawnEventCard({ drawn, fresh = false }: { drawn: Drawn; fresh?:
   const [skipped, setSkipped] = useState(false);
   const animated = fresh && !reduce && !skipped;
   return (
-    <div className="perspective-distant">
-      <motion.article
-        data-testid="drawn-event"
-        data-drawing={animated ? 'true' : undefined}
-        aria-labelledby={`drawn-event-${String(drawn.sequence)}`}
-        className="grid min-w-0 gap-1 rounded-lg border-2 border-ink bg-card p-4"
-        initial={animated ? { rotateY: -90, y: -24, scale: 0.92, opacity: 0 } : false}
-        animate={{ rotateY: 0, y: 0, scale: 1, opacity: 1 }}
-        transition={
-          animated ? { duration: drawSeconds, ease: [0.2, 0.7, 0.3, 1] } : { duration: 0 }
-        }
-        onClick={() => {
-          if (animated) setSkipped(true);
-        }}
-        onAnimationComplete={() => {
-          if (animated) setSkipped(true);
-        }}
-      >
-        <p className="flex flex-wrap items-center gap-2 text-sm">
-          <span
-            data-testid="drawn-event-kind"
-            className={cx('rounded-full px-2 py-1 font-bold', tones[drawn.kind])}
-          >
-            {t.kinds[drawn.kind]}
-          </span>
-          <span className="text-ink-soft">{t.sources[drawn.source]}</span>
-        </p>
-        <h4
-          id={`drawn-event-${String(drawn.sequence)}`}
-          className="font-display text-lg font-heavy break-words"
+    <Motion>
+      <div className="perspective-distant">
+        <m.article
+          data-testid="drawn-event"
+          data-drawing={animated ? 'true' : undefined}
+          aria-labelledby={`drawn-event-${String(drawn.sequence)}`}
+          className="grid min-w-0 gap-1 rounded-lg border-2 border-ink bg-card p-4"
+          initial={animated ? { rotateY: -90, y: -24, scale: 0.92, opacity: 0 } : false}
+          animate={{ rotateY: 0, y: 0, scale: 1, opacity: 1 }}
+          transition={
+            animated ? { duration: drawSeconds, ease: [0.2, 0.7, 0.3, 1] } : { duration: 0 }
+          }
+          onClick={() => {
+            if (animated) setSkipped(true);
+          }}
+          onAnimationComplete={() => {
+            if (animated) setSkipped(true);
+          }}
         >
-          {drawn.name}
-        </h4>
-        {drawn.description ? <p className="break-words">{drawn.description}</p> : null}
-        <p className="text-sm text-ink-soft">{t.played}</p>
-      </motion.article>
-    </div>
+          <p className="flex flex-wrap items-center gap-2 text-sm">
+            <span
+              data-testid="drawn-event-kind"
+              className={cx('rounded-full px-2 py-1 font-bold', tones[drawn.kind])}
+            >
+              {t.kinds[drawn.kind]}
+            </span>
+            <span className="text-ink-soft">{t.sources[drawn.source]}</span>
+          </p>
+          <h4
+            id={`drawn-event-${String(drawn.sequence)}`}
+            className="font-display text-lg font-heavy break-words"
+          >
+            {drawn.name}
+          </h4>
+          {drawn.description ? <p className="break-words">{drawn.description}</p> : null}
+          <p className="text-sm text-ink-soft">{t.played}</p>
+        </m.article>
+      </div>
+    </Motion>
   );
 }

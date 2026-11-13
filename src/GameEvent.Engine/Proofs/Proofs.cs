@@ -93,7 +93,8 @@ public static class ProofReviewOrder
     /// <summary>
     /// Completed runs not yet approved or rejected: the runs of standing finishers up to their finish first (they decide the
     /// places, Q-3), then the runs of players whose roll the limit of unchecked runs closed (D-134, D-662: a check opens
-    /// it again), then the earliest completed; ties by run id.
+    /// it again), then the earliest completed; ties by run id. The limit does not reorder the finishers' runs among themselves:
+    /// they go by completion time (D-98, D-690).
     /// </summary>
     public static IReadOnlyList<Guid> Order(SeasonState state)
     {
@@ -101,14 +102,16 @@ public static class ProofReviewOrder
 
         var held = state.Players.Keys.Where(id => Rolls.UncheckedRuns.ClosesRoll(state, id)).ToHashSet();
 
-        // A finisher's runs up to the finish decide the first place (Q-3): they go on top, with the run that reached it.
+        // A finisher's runs up to the finish decide the first place (Q-3): they go on top, with the run that reached it,
+        // among themselves by completion time (D-98). The limit lifts only the runs below them (D-662, EV55-1).
         return [.. state.Runs.Values
             .Where(Rolls.UncheckedRuns.Waits)
-            .OrderByDescending(r => DecidesFinish(state, r))
-            .ThenByDescending(r => held.Contains(r.PlayerId))
-            .ThenBy(r => r.CompletedAt)
-            .ThenBy(r => r.RunId)
-            .Select(r => r.RunId)];
+            .Select(r => (Run: r, Finish: DecidesFinish(state, r)))
+            .OrderByDescending(x => x.Finish)
+            .ThenByDescending(x => !x.Finish && held.Contains(x.Run.PlayerId))
+            .ThenBy(x => x.Run.CompletedAt)
+            .ThenBy(x => x.Run.RunId)
+            .Select(x => x.Run.RunId)];
     }
 }
 

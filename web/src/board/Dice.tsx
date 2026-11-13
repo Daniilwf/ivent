@@ -1,9 +1,10 @@
-import { motion, useReducedMotion } from 'motion/react';
+import { m, useReducedMotion } from 'motion/react';
 import { useEffect, useEffectEvent, useImperativeHandle, useRef, useState, type Ref } from 'react';
 import { ru } from '../i18n/ru';
 import './board.css';
 import { cx } from '../ui/cx';
 import { Table } from '../ui/Surface';
+import { Motion } from './Motion';
 import type { MomentHandle, MomentPhase } from './moment';
 
 const t = ru.moments.dice;
@@ -107,45 +108,49 @@ export function Die({
   const [x, y] = numeric ? [0, 0] : (faceTurn[value] ?? [0, 0]);
   const delay = index * 0.09;
   return (
-    <span className="inline-grid justify-items-center gap-2" data-die={value}>
-      <motion.span
-        className="block"
-        initial={thrown ? { x: -260 - index * 30, y: -90, rotate: -200 } : false}
-        animate={{ x: 0, y: 0, rotate: 0 }}
-        transition={
-          thrown
-            ? { type: 'spring', stiffness: 110, damping: 11, mass: 0.9, delay }
-            : { duration: 0 }
-        }
-      >
-        <motion.span
-          className="relative block size-16 transform-3d"
-          initial={thrown ? { rotateX: 0, rotateY: 0 } : false}
-          animate={{ rotateX: x + 720, rotateY: y + 720 }}
-          transition={thrown ? { duration: 1.2, delay, ease: [0.2, 0.7, 0.3, 1] } : { duration: 0 }}
+    <Motion>
+      <span className="inline-grid justify-items-center gap-2" data-die={value}>
+        <m.span
+          className="block"
+          initial={thrown ? { x: -260 - index * 30, y: -90, rotate: -200 } : false}
+          animate={{ x: 0, y: 0, rotate: 0 }}
+          transition={
+            thrown
+              ? { type: 'spring', stiffness: 110, damping: 11, mass: 0.9, delay }
+              : { duration: 0 }
+          }
         >
-          {faces.map((f) => (
-            <Face
-              key={f.value}
-              value={f.value}
-              place={f.place}
-              challenge={challenge}
-              number={numeric ? value : undefined}
-            />
-          ))}
-        </motion.span>
-      </motion.span>
-      {challenge || sides !== 6 ? (
-        <span className="flex gap-1">
-          {sides !== 6 ? (
-            <span className="rounded-full bg-card px-2 text-xs font-bold">{t.sides(sides)}</span>
-          ) : null}
-          {challenge ? (
-            <span className="rounded-full bg-card px-2 text-xs font-bold">{t.challengeDie}</span>
-          ) : null}
-        </span>
-      ) : null}
-    </span>
+          <m.span
+            className="relative block size-16 transform-3d"
+            initial={thrown ? { rotateX: 0, rotateY: 0 } : false}
+            animate={{ rotateX: x + 720, rotateY: y + 720 }}
+            transition={
+              thrown ? { duration: 1.2, delay, ease: [0.2, 0.7, 0.3, 1] } : { duration: 0 }
+            }
+          >
+            {faces.map((f) => (
+              <Face
+                key={f.value}
+                value={f.value}
+                place={f.place}
+                challenge={challenge}
+                number={numeric ? value : undefined}
+              />
+            ))}
+          </m.span>
+        </m.span>
+        {challenge || sides !== 6 ? (
+          <span className="flex gap-1">
+            {sides !== 6 ? (
+              <span className="rounded-full bg-card px-2 text-xs font-bold">{t.sides(sides)}</span>
+            ) : null}
+            {challenge ? (
+              <span className="rounded-full bg-card px-2 text-xs font-bold">{t.challengeDie}</span>
+            ) : null}
+          </span>
+        ) : null}
+      </span>
+    </Motion>
   );
 }
 
@@ -208,7 +213,7 @@ export function DiceMoment({
   const thrown = roll !== null && !skipped && !reduce;
 
   const content = (
-    <>
+    <Motion>
       <div className="flex flex-wrap items-start justify-center gap-3">
         {values.map((v, i) => (
           <Die
@@ -222,16 +227,16 @@ export function DiceMoment({
         ))}
       </div>
       {shown && roll && mode !== 'free' ? (
-        <motion.span
+        <m.span
           className="rounded-full border-3 border-ink bg-card px-6 font-display text-3xl font-heavy"
           initial={reduce ? false : { scale: 0.5, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ type: 'spring', stiffness: 400, damping: 18 }}
         >
           +{total}
-        </motion.span>
+        </m.span>
       ) : null}
-    </>
+    </Motion>
   );
   const words = (
     <p
