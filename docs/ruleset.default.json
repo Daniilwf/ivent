@@ -127,6 +127,9 @@
   "suggestions": {
     "perDay": 5
   },
+  "partnerBoard": {
+    "requestTtlHours": 48
+  },
   "polls": {
     "gameOptions": 5,
     "allowChangeVote": true,

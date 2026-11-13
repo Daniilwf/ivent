@@ -413,6 +413,7 @@ public partial class PlayerAdminInvariantTests
             "weeklyChallenge" => features.WeeklyChallenge,
             "suggestions" => features.Suggestions,
             "coop" => features.Coop,
+            "partnerBoard" => features.PartnerBoard && features.Coop,
             "polls" => features.Polls,
             _ => throw new ArgumentOutOfRangeException(nameof(mechanic), mechanic, "Unknown mechanic."),
         };
@@ -459,6 +460,9 @@ public partial class PlayerAdminInvariantTests
             Engine.Interactions.InteractionCreated or Engine.Interactions.InteractionAnswered or Engine.Interactions.InteractionWithdrawn
                 or Engine.Interactions.InteractionExpired or Engine.Interactions.CoopJoined or Engine.Interactions.CoopLeft
                 or Engine.Interactions.CoopRewardSplit => "coop",
+
+            // The partner board (D-524); its responses are coop invitations
+            Engine.Interactions.PartnerRequestPosted or Engine.Interactions.PartnerRequestClosed => "partnerBoard",
 
             // Polls of stage 5 (D-512, D-720)
             Engine.Polls.PollStarted or Engine.Polls.VoteCast or Engine.Polls.VoteChanged or Engine.Polls.PollClosed

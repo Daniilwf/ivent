@@ -55,6 +55,10 @@ public sealed record SeasonState(
     public ImmutableSortedDictionary<Guid, Polls.Poll> Polls { get; init; } =
         ImmutableSortedDictionary<Guid, Polls.Poll>.Empty;
 
+    /// <summary>The requests of the partner board (D-524), by id: open and closed ones.</summary>
+    public ImmutableSortedDictionary<Guid, Interactions.PartnerRequest> PartnerRequests { get; init; } =
+        ImmutableSortedDictionary<Guid, Interactions.PartnerRequest>.Empty;
+
     public static SeasonState Empty { get; } =
         new(
             Guid.Empty,
@@ -93,6 +97,7 @@ public sealed record SeasonState(
         && Suggestions.SequenceEqual(other.Suggestions)
         && ForAll.SequenceEqual(other.ForAll)
         && Interactions.SequenceEqual(other.Interactions)
+        && PartnerRequests.SequenceEqual(other.PartnerRequests)
         && Polls.SequenceEqual(other.Polls)
         && MapVersion == other.MapVersion;
 

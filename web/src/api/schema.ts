@@ -8591,6 +8591,14 @@ export interface components {
             marks: components["schemas"]["GameMarkView"][];
             cover?: null | components["schemas"]["FileLinkView"];
         };
+        /** @description The rules of the partner board (SPEC «Взаимодействие игроков», D-524). */
+        PartnerBoardRules: {
+            /**
+             * Format: int32
+             * @description How many hours a request «ищу напарника» stays open unless something closes it earlier.
+             */
+            requestTtlHours: number;
+        };
         PenaltyDice: {
             /** Format: int32 */
             count: number;
@@ -8995,6 +9003,7 @@ export interface components {
             weeklyChallenge: components["schemas"]["WeeklyChallengeRules"];
             events?: null | components["schemas"]["EventRules"];
             suggestions?: null | components["schemas"]["SuggestionRules"];
+            partnerBoard?: null | components["schemas"]["PartnerBoardRules"];
         };
         /**
          * @description One changed value between two versions of the rules: the JSON path (for example `reward.diceCount.max`)

@@ -57,6 +57,13 @@ public sealed record Ruleset
     public SuggestionRules? Suggestions { get; init; }
 
     /// <summary>
+    /// The rules of the partner board (stage 5, D-524). Missing — a season created before it reads as it did (D-50); needed
+    /// once <c>features.partnerBoard</c> is on. Not written while missing.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public PartnerBoardRules? PartnerBoard { get; init; }
+
+    /// <summary>
     /// The rules of polls (stage 5, D-512…D-515). Missing — a season created before them reads as it did (D-50); needed once
     /// <c>features.polls</c> is on. Not written while missing.
     /// </summary>
@@ -75,6 +82,13 @@ public sealed record PollRules
 
     /// <summary>Whether a poll shows its counts before the close when it does not say (D-541); never for an anonymous one.</summary>
     public required bool ShowLiveCountsDefault { get; init; }
+}
+
+/// <summary>The rules of the partner board (SPEC «Взаимодействие игроков», D-524).</summary>
+public sealed record PartnerBoardRules
+{
+    /// <summary>How many hours a request «ищу напарника» stays open unless something closes it earlier.</summary>
+    public required int RequestTtlHours { get; init; }
 }
 
 /// <summary>The rules of the suggestion box (SPEC «Предложка», D-527).</summary>

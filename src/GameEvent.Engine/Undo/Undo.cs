@@ -29,7 +29,8 @@ public sealed record SeasonFields(SeasonStatus Status, DateTimeOffset? Deadline,
 /// effects, weekly challenges and suggestions it changed, those it created are removed, the season's fields if it changed
 /// them. Nothing later touched them (that is when an undo is allowed), so this equals its events inverted in reverse order.
 /// The counters of finishes and points changes are not wound back: numbers are never reused. Challenges and suggestions are
-/// written only when set: an undo of a command that touched none of them keeps its format (D-576); so are invitations (D-523).
+/// written only when set: an undo of a command that touched none of them keeps its format (D-576); so are invitations (D-523)
+/// and requests of the partner board (D-524).
 /// </summary>
 [EventType("command-undone")]
 public sealed record CommandUndone(
@@ -58,6 +59,10 @@ public sealed record CommandUndone(
     EquatableArray<Interactions.Interaction>? Interactions = null,
     [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     EquatableArray<Guid>? RemovedInteractions = null,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    EquatableArray<Interactions.PartnerRequest>? PartnerRequests = null,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    EquatableArray<Guid>? RemovedPartnerRequests = null,
     [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     EquatableArray<Polls.Poll>? Polls = null,
     [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
@@ -223,6 +228,8 @@ internal static class Undoing
         var forAll = state.ForAll.RemoveRange(e.RemovedForAll ?? []).SetItems((e.ForAll ?? []).Select(x => KeyValuePair.Create(x.SettlementId, x)));
         var interactions = state.Interactions.RemoveRange(e.RemovedInteractions ?? [])
             .SetItems((e.Interactions ?? []).Select(x => KeyValuePair.Create(x.InteractionId, x)));
+        var requests = state.PartnerRequests.RemoveRange(e.RemovedPartnerRequests ?? [])
+            .SetItems((e.PartnerRequests ?? []).Select(x => KeyValuePair.Create(x.RequestId, x)));
         var polls = state.Polls.RemoveRange(e.RemovedPolls ?? []).SetItems((e.Polls ?? []).Select(x => KeyValuePair.Create(x.PollId, x)));
         var restored = state with
         {
@@ -234,6 +241,7 @@ internal static class Undoing
             Suggestions = suggestions,
             ForAll = forAll,
             Interactions = interactions,
+            PartnerRequests = requests,
         };
         if (e.Season is not { } season)
         {
@@ -357,6 +365,14 @@ internal static class Undoing
             }
         }
 
+        // A request names the run it asks a partner to: an undo of that run's start or roll waits for it, and the responses
+        // to it (invitations to the run) hold it (D-524)
+        foreach (var id in Changed(before.PartnerRequests, after.PartnerRequests))
+        {
+            keys.Add($"partnerRequest:{id}");
+            keys.Add($"run:{(after.PartnerRequests.GetValueOrDefault(id) ?? before.PartnerRequests[id]).RunId}");
+        }
+
         // A poll as a whole (started, closed, cancelled) and a user's vote in it: the close holds the votes, votes of
         // different users stay independent (D-722)
         foreach (var id in Changed(before.Polls, after.Polls))
@@ -455,6 +471,7 @@ internal static class Undoing
         var suggestions = Changed(before.Suggestions, after.Suggestions).ToList();
         var forAll = Changed(before.ForAll, after.ForAll).ToList();
         var interactions = Changed(before.Interactions, after.Interactions).ToList();
+        var requests = Changed(before.PartnerRequests, after.PartnerRequests).ToList();
         var polls = Changed(before.Polls, after.Polls).ToList();
         var seasonChanged = before.Status != after.Status || before.Deadline != after.Deadline || before.Name != after.Name
             || before.Ruleset != after.Ruleset;
@@ -481,6 +498,8 @@ internal static class Undoing
             OrNull([.. forAll.Where(id => !before.ForAll.ContainsKey(id) && now.ForAll.ContainsKey(id))]),
             OrNull([.. interactions.Where(before.Interactions.ContainsKey).Select(id => before.Interactions[id])]),
             OrNull([.. interactions.Where(id => !before.Interactions.ContainsKey(id) && now.Interactions.ContainsKey(id))]),
+            OrNull([.. requests.Where(before.PartnerRequests.ContainsKey).Select(id => before.PartnerRequests[id])]),
+            OrNull([.. requests.Where(id => !before.PartnerRequests.ContainsKey(id) && now.PartnerRequests.ContainsKey(id))]),
 
             // A poll as it was, with the votes of the users the command changed as they were and the others' as they are (D-722)
             OrNull([.. polls.Where(before.Polls.ContainsKey)

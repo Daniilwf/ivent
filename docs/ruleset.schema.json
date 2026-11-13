@@ -834,6 +834,21 @@
       ],
       "additionalProperties": false
     },
+    "partnerBoard": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "properties": {
+        "requestTtlHours": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "requestTtlHours"
+      ],
+      "additionalProperties": false
+    },
     "polls": {
       "type": [
         "object",

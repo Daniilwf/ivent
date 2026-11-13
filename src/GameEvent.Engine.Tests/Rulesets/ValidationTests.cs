@@ -228,7 +228,8 @@ public class ValidationTests
         { "weekly challenge without its window", Flags(f => f with { WeeklyChallenge = true }), "weeklyChallenge.durationDays" },
         // The suggestion box is played since stage 5 (D-527): it needs its daily limit
         { "suggestions without their limit", Flags(f => f with { Suggestions = true }), "suggestions" },
-        { "partner board", Flags(f => f with { PartnerBoard = true }), "features.partnerBoard" },
+        // The partner board is played since stage 5 (D-524): a response is a coop invitation, so it needs coop
+        { "partner board without coop", Flags(f => f with { PartnerBoard = true }), "features.partnerBoard" },
         { "reactions", Flags(f => f with { Reactions = true }), "features.reactions" },
         { "comments", Flags(f => f with { Comments = true }), "features.comments" },
         { "gallery", Flags(f => f with { Gallery = true }), "features.gallery" },
