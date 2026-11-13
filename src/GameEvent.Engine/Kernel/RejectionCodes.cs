@@ -33,6 +33,30 @@ public static class RejectionCodes
     public const string EffectNotYours = "effect.notYours";
     public const string EffectChoicePending = "effect.choicePending";
     public const string EffectUnknownOutcome = "effect.unknownOutcome";
+
+    /// <summary>An IRL effect (D-509) is resolved by the admin only, through the review of its proof or by hand.</summary>
+    public const string EffectAdminOnly = "effect.adminOnly";
+
+    /// <summary>The effect is not an IRL one: its object has no <c>proof: media</c> (D-509).</summary>
+    public const string IrlProofNotIrl = "irlProof.notIrl";
+
+    /// <summary>The IRL proof waits for the admin: no second submission, no resolution past it (D-509, D-681).</summary>
+    public const string IrlProofPending = "irlProof.pending";
+
+    /// <summary>No IRL proof waits for a review (D-509).</summary>
+    public const string IrlProofNotSubmitted = "irlProof.notSubmitted";
+
+    /// <summary>An IRL proof waits for the review: events are not switched off past it (D-685).</summary>
+    public const string IrlProofsInPlay = "irlProof.inPlay";
+
+    /// <summary>An IRL proof's link is not one https address with a host, without user info or hidden characters (D-680).</summary>
+    public const string IrlProofInvalidLink = "irlProof.invalidLink";
+
+    /// <summary>An IRL proof's screenshots: more than <c>events.irlProof.maxFiles</c>, repeated or empty (D-680).</summary>
+    public const string IrlProofInvalidFile = "irlProof.invalidFile";
+
+    /// <summary>An IRL proof without a screenshot and without a link (D-680).</summary>
+    public const string IrlProofEmpty = "irlProof.empty";
     public const string CommentTooLong = "player.commentTooLong";
     public const string InvalidResource = "player.invalidResource";
     public const string DeltaTooLarge = "player.deltaTooLarge";

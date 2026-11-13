@@ -159,6 +159,21 @@ public static class RulesetValidator
             Error("events", "is required when features.events is on");
         }
 
+        if (ruleset.Features.Events && ruleset.Events is { IrlProof: null })
+        {
+            Error("events.irlProof", "is required when features.events is on");
+        }
+
+        if (ruleset.Events?.IrlProof is { } irl)
+        {
+            if (irl.MaxFiles < 0)
+            {
+                Error("events.irlProof.maxFiles", "must not be negative");
+            }
+
+            AtMost("events.irlProof.maxFiles", irl.MaxFiles, Limits.MaxProofFiles);
+        }
+
         if (ruleset.Events is { AnswerTimeoutHours: { } timeout })
         {
             if (timeout < 1)

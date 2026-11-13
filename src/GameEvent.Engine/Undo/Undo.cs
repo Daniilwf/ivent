@@ -328,7 +328,9 @@ internal static class Undoing
 
             // A suggestion names its author but changes nothing of the player: it does not hold back undos of their turns
             // (D-576), only the undo of the author's joining (D-579)
-            foreach (var (kind, id) in GameIds.Of(e).Concat(e is Suggestions.SuggestionSubmitted ? [] : GameIds.Own(e)))
+            // An IRL proof names its player but changes only the effect, which the state's difference already holds (D-682)
+            foreach (var (kind, id) in GameIds.Of(e).Concat(e is Suggestions.SuggestionSubmitted ? [] : GameIds.Own(e)
+                .Where(k => k.Kind != "player" || e is not (Proofs.IrlProofSubmitted or Proofs.IrlProofReviewed))))
             {
                 keys.Add($"{kind}:{id}");
             }

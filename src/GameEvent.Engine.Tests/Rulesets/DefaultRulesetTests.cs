@@ -24,6 +24,13 @@ public class DefaultRulesetTests
     }
 
     [Fact]
+    public void Default_ruleset_takes_up_to_five_irl_proof_files()
+    {
+        // Task 5.6 (EV12): events.irlProof.maxFiles = 5, as many as a proof of a run holds
+        Assert.Equal(5, RulesetJson.Default().Events!.IrlProof!.MaxFiles);
+    }
+
+    [Fact]
     public void Embedded_default_is_the_docs_file()
     {
         var docs = File.ReadAllText(Path.Combine(RepositoryRoot(), "docs", "ruleset.default.json"));
