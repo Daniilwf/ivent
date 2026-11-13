@@ -1,7 +1,9 @@
-import { animate, motion, useMotionValue, useReducedMotion } from 'motion/react';
+import { m, useMotionValue, useReducedMotion, type animate } from 'motion/react';
 import { useEffect, useEffectEvent, useImperativeHandle, useRef, useState, type Ref } from 'react';
 import { ru } from '../i18n/ru';
 import { MomentCard, Table } from '../ui/Surface';
+import { loadMotion } from './loadMotion';
+import { Motion } from './Motion';
 import { momentBudget, type MomentHandle, type MomentPhase } from './moment';
 
 const t = ru.moments.wheel;
@@ -106,6 +108,15 @@ export function WheelMoment({
     // The first stop takes a long spin, each next one a short one; a miss rests on screen for a second
     const stopped = () => cancelled.current;
     const play = async () => {
+      // Without the animation engine (its download failed) the wheel stands on the pick at once
+      const motion = await loadMotion().catch(() => null);
+      if (stopped()) return;
+      if (!motion) {
+        rotation.set(turn(roll.pick.sector, 6));
+        land();
+        return;
+      }
+      const { animate } = motion;
       for (let i = 0; i < stops.length; i++) {
         running.current = animate(rotation, turn(stops[i] as number, 4 + i), {
           duration: i === 0 ? firstSpin : spinOnFor,
@@ -147,136 +158,138 @@ export function WheelMoment({
     pick.game ? t.result(pick.game.title) : t.choice(pick.choices ?? 0);
 
   return (
-    <div className="grid w-full justify-items-center gap-3">
-      <Table
-        className={
-          fill
-            ? 'relative grid h-full w-full cursor-default place-items-center p-4'
-            : 'grid w-full max-w-190 cursor-default place-items-center gap-4 p-4 desk:grid-cols-2'
-        }
-        onClick={() => {
-          if (playing) finish();
-        }}
-      >
-        <div className={fill ? 'aspect-square h-full max-h-full max-w-full' : 'w-75 max-w-full'}>
-          <svg
-            viewBox={`-10 -22 ${size + 20} ${size + 32}`}
-            width="100%"
-            height={fill ? '100%' : undefined}
-            aria-hidden
-          >
-            <motion.g style={{ rotate: rotation, originX: `${r}px`, originY: `${r}px` }}>
-              {sectors.map((name, i) => {
-                const a0 = ((i * sector - 90) * Math.PI) / 180;
-                const a1 = (((i + 1) * sector - 90) * Math.PI) / 180;
-                const midDeg = (i + 0.5) * sector - 90;
-                const mid = (midDeg * Math.PI) / 180;
-                const lx = r + r * 0.6 * Math.cos(mid);
-                const ly = r + r * 0.6 * Math.sin(mid);
-                // Labels run along the radius; on the left half they turn over to stay upright
-                const tilt = Math.cos(mid) < 0 ? midDeg + 180 : midDeg;
-                return (
-                  <g key={name}>
-                    <path
-                      d={`M${r} ${r} L${r + r * Math.cos(a0)} ${r + r * Math.sin(a0)} A${r} ${r} 0 0 1 ${r + r * Math.cos(a1)} ${r + r * Math.sin(a1)} Z`}
-                      fill={sectorFills[i % sectorFills.length]}
-                      stroke="var(--color-ink)"
-                      strokeWidth={3}
-                    />
-                    <text
-                      x={lx}
-                      y={ly}
-                      transform={`rotate(${tilt} ${lx} ${ly})`}
-                      className="font-display text-xs font-bold"
-                      textAnchor="middle"
-                      dominantBaseline="central"
-                      fill="var(--color-ink)"
-                    >
-                      {name}
-                    </text>
-                  </g>
-                );
-              })}
-            </motion.g>
-            <circle
-              cx={r}
-              cy={r}
-              r={26}
-              fill="var(--color-card)"
-              stroke="var(--color-ink)"
-              strokeWidth={4}
-            />
-            <circle cx={r} cy={r} r={r} fill="none" stroke="var(--color-ink)" strokeWidth={6} />
-            <path
-              d={`M${r - 16} -18 L${r + 16} -18 L${r} 16 Z`}
-              fill="var(--color-gold)"
-              stroke="var(--color-ink)"
-              strokeWidth={4}
-              strokeLinejoin="round"
-            />
-          </svg>
-        </div>
-        {stage === 'miss' && miss ? (
-          <motion.div
-            className={over}
-            initial={{ scale: 0.6, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ duration: 0.18 }}
-          >
-            <MomentCard className="w-full max-w-105">
-              {miss.game.cover ? (
-                <img
-                  src={miss.game.cover}
-                  alt=""
-                  width={90}
-                  height={135}
-                  className="rounded-sm border-2 border-ink opacity-70 grayscale"
-                />
-              ) : null}
-              <span className="line-clamp-2 text-sm text-ink-soft">{miss.game.title}</span>
-              <strong>{missSays(miss)}</strong>
-            </MomentCard>
-          </motion.div>
-        ) : null}
-        {stage === 'done' && roll ? (
-          <motion.div
-            className={over}
-            initial={reduce ? false : { rotateY: 90, opacity: 0 }}
-            animate={{ rotateY: 0, opacity: 1 }}
-            transition={{ duration: 0.25 }}
-          >
-            <MomentCard className="w-full max-w-105">
-              {roll.pick.game?.cover ? (
-                <img
-                  src={roll.pick.game.cover}
-                  alt=""
-                  width={110}
-                  height={165}
-                  className="rounded-sm border-2 border-ink"
-                />
-              ) : null}
-              <strong className="font-display text-xl font-heavy text-balance">
-                {roll.pick.game ? roll.pick.game.title : picked(roll.pick)}
-              </strong>
-              <span className="text-sm text-ink-soft">
-                {t.category(sectors[roll.pick.sector] ?? '')}
-              </span>
-              {roll.misses.length > 0 ? (
-                <span className="text-xs text-ink-soft">{t.missed(roll.misses.length)}</span>
-              ) : null}
-            </MomentCard>
-          </motion.div>
-        ) : null}
-      </Table>
-      {/* The card shows the result; the words are for screen readers */}
-      <p className="sr-only" aria-live={announce ? 'polite' : 'off'}>
-        {announce && stage === 'done' && roll
-          ? [
-              ...roll.misses.map((miss) => `${missedLine(miss)}.`),
-              `${t.category(sectors[roll.pick.sector] ?? '')}. ${picked(roll.pick)}`,
-            ].join(' ')
-          : ''}
-      </p>
-    </div>
+    <Motion>
+      <div className="grid w-full justify-items-center gap-3">
+        <Table
+          className={
+            fill
+              ? 'relative grid h-full w-full cursor-default place-items-center p-4'
+              : 'grid w-full max-w-190 cursor-default place-items-center gap-4 p-4 desk:grid-cols-2'
+          }
+          onClick={() => {
+            if (playing) finish();
+          }}
+        >
+          <div className={fill ? 'aspect-square h-full max-h-full max-w-full' : 'w-75 max-w-full'}>
+            <svg
+              viewBox={`-10 -22 ${size + 20} ${size + 32}`}
+              width="100%"
+              height={fill ? '100%' : undefined}
+              aria-hidden
+            >
+              <m.g style={{ rotate: rotation, originX: `${r}px`, originY: `${r}px` }}>
+                {sectors.map((name, i) => {
+                  const a0 = ((i * sector - 90) * Math.PI) / 180;
+                  const a1 = (((i + 1) * sector - 90) * Math.PI) / 180;
+                  const midDeg = (i + 0.5) * sector - 90;
+                  const mid = (midDeg * Math.PI) / 180;
+                  const lx = r + r * 0.6 * Math.cos(mid);
+                  const ly = r + r * 0.6 * Math.sin(mid);
+                  // Labels run along the radius; on the left half they turn over to stay upright
+                  const tilt = Math.cos(mid) < 0 ? midDeg + 180 : midDeg;
+                  return (
+                    <g key={name}>
+                      <path
+                        d={`M${r} ${r} L${r + r * Math.cos(a0)} ${r + r * Math.sin(a0)} A${r} ${r} 0 0 1 ${r + r * Math.cos(a1)} ${r + r * Math.sin(a1)} Z`}
+                        fill={sectorFills[i % sectorFills.length]}
+                        stroke="var(--color-ink)"
+                        strokeWidth={3}
+                      />
+                      <text
+                        x={lx}
+                        y={ly}
+                        transform={`rotate(${tilt} ${lx} ${ly})`}
+                        className="font-display text-xs font-bold"
+                        textAnchor="middle"
+                        dominantBaseline="central"
+                        fill="var(--color-ink)"
+                      >
+                        {name}
+                      </text>
+                    </g>
+                  );
+                })}
+              </m.g>
+              <circle
+                cx={r}
+                cy={r}
+                r={26}
+                fill="var(--color-card)"
+                stroke="var(--color-ink)"
+                strokeWidth={4}
+              />
+              <circle cx={r} cy={r} r={r} fill="none" stroke="var(--color-ink)" strokeWidth={6} />
+              <path
+                d={`M${r - 16} -18 L${r + 16} -18 L${r} 16 Z`}
+                fill="var(--color-gold)"
+                stroke="var(--color-ink)"
+                strokeWidth={4}
+                strokeLinejoin="round"
+              />
+            </svg>
+          </div>
+          {stage === 'miss' && miss ? (
+            <m.div
+              className={over}
+              initial={{ scale: 0.6, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ duration: 0.18 }}
+            >
+              <MomentCard className="w-full max-w-105">
+                {miss.game.cover ? (
+                  <img
+                    src={miss.game.cover}
+                    alt=""
+                    width={90}
+                    height={135}
+                    className="rounded-sm border-2 border-ink opacity-70 grayscale"
+                  />
+                ) : null}
+                <span className="line-clamp-2 text-sm text-ink-soft">{miss.game.title}</span>
+                <strong>{missSays(miss)}</strong>
+              </MomentCard>
+            </m.div>
+          ) : null}
+          {stage === 'done' && roll ? (
+            <m.div
+              className={over}
+              initial={reduce ? false : { rotateY: 90, opacity: 0 }}
+              animate={{ rotateY: 0, opacity: 1 }}
+              transition={{ duration: 0.25 }}
+            >
+              <MomentCard className="w-full max-w-105">
+                {roll.pick.game?.cover ? (
+                  <img
+                    src={roll.pick.game.cover}
+                    alt=""
+                    width={110}
+                    height={165}
+                    className="rounded-sm border-2 border-ink"
+                  />
+                ) : null}
+                <strong className="font-display text-xl font-heavy text-balance">
+                  {roll.pick.game ? roll.pick.game.title : picked(roll.pick)}
+                </strong>
+                <span className="text-sm text-ink-soft">
+                  {t.category(sectors[roll.pick.sector] ?? '')}
+                </span>
+                {roll.misses.length > 0 ? (
+                  <span className="text-xs text-ink-soft">{t.missed(roll.misses.length)}</span>
+                ) : null}
+              </MomentCard>
+            </m.div>
+          ) : null}
+        </Table>
+        {/* The card shows the result; the words are for screen readers */}
+        <p className="sr-only" aria-live={announce ? 'polite' : 'off'}>
+          {announce && stage === 'done' && roll
+            ? [
+                ...roll.misses.map((miss) => `${missedLine(miss)}.`),
+                `${t.category(sectors[roll.pick.sector] ?? '')}. ${picked(roll.pick)}`,
+              ].join(' ')
+            : ''}
+        </p>
+      </div>
+    </Motion>
   );
 }
