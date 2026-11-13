@@ -413,6 +413,7 @@ public partial class PlayerAdminInvariantTests
             "weeklyChallenge" => features.WeeklyChallenge,
             "suggestions" => features.Suggestions,
             "coop" => features.Coop,
+            "partnerBoard" => features.PartnerBoard && features.Coop,
             _ => throw new ArgumentOutOfRangeException(nameof(mechanic), mechanic, "Unknown mechanic."),
         };
 
@@ -458,6 +459,9 @@ public partial class PlayerAdminInvariantTests
             Engine.Interactions.InteractionCreated or Engine.Interactions.InteractionAnswered or Engine.Interactions.InteractionWithdrawn
                 or Engine.Interactions.InteractionExpired or Engine.Interactions.CoopJoined or Engine.Interactions.CoopLeft
                 or Engine.Interactions.CoopRewardSplit => "coop",
+
+            // The partner board (D-524); its responses are coop invitations
+            Engine.Interactions.PartnerRequestPosted or Engine.Interactions.PartnerRequestClosed => "partnerBoard",
 
             // The effect dispatcher reacts to content (items, events); stage 1 has no content effects in play (D-24, D-103)
             EffectChainCut => "effects",
