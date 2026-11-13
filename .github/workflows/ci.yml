@@ -65,14 +65,15 @@ jobs:
               - '{src/**,global.json,Directory.Packages.props,Directory.Build.props,nuget.config,dotnet-tools.json,package.json,scripts/migration-check.mjs,scripts/lib.mjs}'
           predicate-quantifier: every
 
+  # The push checks run as two jobs side by side (D-667): .NET (build, format, tests with coverage, API client) and the
+  # frontend (lint, types, tests, build). Both always run, on the same pushes as before.
   build-test:
-    name: Build and fast tests
+    name: Build and .NET tests
     needs: changes
     if: needs.changes.outputs.code == 'true' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
-    # The fast suite passed 20 minutes with the pool import (#39) and 30 with the stage 4–5 API tests (2026-11-12):
-    # a limit, not the usual time — a run takes what it needs
-    timeout-minutes: 45
+    # The fast suite took 20–30 minutes before D-664/D-665 and takes a few now: a limit, not the usual time
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -84,11 +85,11 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
-          cache-dependency-path: |
-            package-lock.json
-            web/package-lock.json
-            e2e/package-lock.json
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+          cache-dependency-path: package-lock.json
+      # Restored everywhere, saved from main only: a branch's packages are main's plus at most a bump, and each saved
+      # cache counts against the repository's cache quota
+      - id: nuget
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ env.NUGET_PACKAGES }}
           key: nuget-${{ runner.os }}-${{ hashFiles('Directory.Packages.props', '**/*.csproj', 'dotnet-tools.json') }}
@@ -97,30 +98,18 @@ jobs:
       - name: Install
         run: |
           npm ci
-          npm --prefix web ci
-          npm --prefix e2e ci
           dotnet tool restore
           dotnet restore GameEvent.slnx
 
       - name: Build (analyzers, warnings as errors)
         run: dotnet build GameEvent.slnx --no-restore
 
-      - name: Lint (.NET format, ESLint, Prettier)
-        run: npm run -s lint
+      - name: .NET format
+        run: dotnet format GameEvent.slnx --verify-no-changes --no-restore
 
       - name: .NET tests with coverage (architecture, engine, short invariants, API)
         run: npm run -s coverage
 
-      - name: Frontend types, tests and build
-        run: |
-          npm --prefix web run -s typecheck
-          npm --prefix web run -s test
-          npm --prefix web run -s build
-
-      - name: E2E types
-        run: npm --prefix e2e run -s typecheck
-
-      # Active once task B3 adds the generated client.
       - name: API client matches OpenAPI
         if: hashFiles('web/src/api/openapi.json') != ''
         run: |
@@ -137,6 +126,54 @@ jobs:
           path: test-artifacts/coverage/report
           if-no-files-found: ignore
           retention-days: 14
+
+      - name: Save NuGet packages
+        if: github.ref == 'refs/heads/main' && steps.nuget.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ env.NUGET_PACKAGES }}
+          key: ${{ steps.nuget.outputs.cache-primary-key }}
+
+  frontend:
+    name: Frontend lint, tests and build
+    needs: changes
+    if: needs.changes.outputs.code == 'true' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            web/package-lock.json
+            e2e/package-lock.json
+
+      - name: Install
+        run: |
+          npm ci
+          npm --prefix web ci
+          npm --prefix e2e ci
+
+      # npm run lint without its .NET part (that runs in the .NET job)
+      - name: Lint (ESLint, Stylelint, Prettier)
+        run: |
+          npm --prefix web run -s lint
+          npm --prefix e2e run -s lint
+          npx prettier --check .
+
+      - name: Frontend types, tests and build
+        run: |
+          npm --prefix web run -s typecheck
+          npm --prefix web run -s test
+          npm --prefix web run -s build
+
+      - name: E2E types
+        run: npm --prefix e2e run -s typecheck
 
   e2e:
     name: E2E
