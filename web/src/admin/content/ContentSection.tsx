@@ -1,5 +1,5 @@
 import { Download, PackageOpen, Plus, Upload } from 'lucide-react';
-import { useCallback, useMemo, useRef, useState, type RefObject } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { api, type Schemas } from '../../api/client';
 import { newCommandId } from '../../api/commands';
 import { answerOf, useLoaded } from '../../app/useLoaded';
@@ -125,12 +125,17 @@ function Workspace({
   const openItem = (collection: Collection, index: number | null, initial: Json) => {
     counter.current += 1;
     setEditing({ collection, index, initial, key: counter.current });
-    requestAnimationFrame(() => {
-      const heading = document.getElementById('content-editor-title');
-      heading?.focus();
-      heading?.scrollIntoView({ block: 'start' });
-    });
   };
+  // An editor opened here takes the focus to its heading as it mounts, not a frame later: a frame later the admin (or a
+  // test) may already be typing in its fields, and the rest of the text would go to the heading (FL-5). Key 0 is the
+  // object kept open after a save, which keeps the focus where it was.
+  const opened = editing?.key ?? 0;
+  useEffect(() => {
+    if (opened === 0) return;
+    const heading = document.getElementById('content-editor-title');
+    heading?.focus();
+    heading?.scrollIntoView({ block: 'start' });
+  }, [opened]);
 
   // A season that never had content says so once, with the two ways to start (DESIGN.md, «Компоненты и состояния»)
   const nothing =
