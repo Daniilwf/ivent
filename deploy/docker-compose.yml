@@ -33,12 +33,17 @@ x-site: &site
 x-build: &build
   context: ..
   dockerfile: deploy/Dockerfile
+  # The site reports the tag of the image it was built as (J4, D-201, D-771): «local» on a computer, the release tag on a server
+  args:
+    VERSION: ${SITE_VERSION:-local}
 
 services:
   migrate:
     <<: *site
     image: ivent:${SITE_VERSION:-local}
-    build: *build
+    # Built once, by `site`: two services building one tag race each other («image … already exists», D-771); compose
+    # builds every image before it creates any container, so migrate finds it
+    pull_policy: never
     command: ['migrate']
     restart: 'no'
     mem_limit: 384m

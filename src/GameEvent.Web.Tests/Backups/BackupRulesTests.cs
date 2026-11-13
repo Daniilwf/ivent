@@ -140,6 +140,22 @@ public sealed class BackupRulesTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_database_migrated_on_another_system_differs_only_in_line_ends_and_is_sound()
+    {
+        // EF writes its CREATE statements with the system's line end: a database migrated on Windows keeps CRLF in
+        // sqlite_master, one migrated in the Linux container LF (found restoring a demo database seeded on Windows, K3)
+        var other = Environment.NewLine == "\n" ? "char(13) || char(10)" : "char(10)";
+        var archive = (await BackupAsync()).ArchivePath;
+        BackupTests.Rewrite(archive, (name, bytes) => name == SiteBackup.DatabaseEntry
+            ? Edited(bytes, $"PRAGMA writable_schema = ON; UPDATE sqlite_master SET sql = replace(replace(sql, char(13) || char(10), char(10)), char(10), {other}) WHERE sql LIKE '%' || char(10) || '%'; PRAGMA writable_schema = OFF;")
+            : bytes, fixManifest: true);
+
+        var report = await VerifyAsync(archive);
+
+        Assert.True(report.IsSound, string.Join("; ", report.Problems));
+    }
+
+    [Fact]
     public async Task An_archive_from_a_newer_version_is_left_to_that_version()
     {
         var archive = (await BackupAsync()).ArchivePath;
