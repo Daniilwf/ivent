@@ -389,6 +389,14 @@ internal sealed class EffectRun
             return;
         }
 
+        // The target picked at the draw finished since — a poll waits for a day (D-723): the first finisher is no target,
+        // one who finished not first is reached by points and coins only (SPEC «Цели»)
+        if (TargetId != UserId && State.Players.ContainsKey(TargetId)
+            && (Targets.IsFirst(State, TargetId) || (Targets.IsLaterFinisher(State, TargetId) && !Targets.PointsAndCoinsOnly(effect))))
+        {
+            return;
+        }
+
         // A player picked at an earlier question is checked again at every later one (Н-10, D-510): one who finished first
         // or became inactive since is not hit, the answer is not refused
         if (TargetId != UserId && effect.Target?.Selector == TargetSelector.Chosen && !Targets.Askable(State, definition, UserId).Contains(TargetId))
@@ -410,8 +418,57 @@ internal sealed class EffectRun
         RunActions(effect.Actions, Math.Max(suspended.NextAction - 1, 0));
     }
 
+    /// <summary>
+    /// A drawn event's <c>requestChoice.vote</c> (D-512): without an answer yet the voters are asked — the effect stops, written
+    /// with what it computed so far, and a poll starts with the snapshot of the options (games for the effect's target); it
+    /// goes on with the poll's result. With nothing to offer, or polls off (D-420), there is nothing to ask. Answered (the
+    /// continuation), the result is checked as any answer.
+    /// </summary>
+    public void AskVoters(RequestChoiceAction action, PollVoteSpec vote)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        ArgumentNullException.ThrowIfNull(vote);
+        if (_choiceIndex < _choices.Count || Asks is null)
+        {
+            NextChoice(Actions.RequestChoiceHandler.Options(action.Options, this));
+            return;
+        }
+
+        if (!State.Rules.Features.Polls)
+        {
+            return;
+        }
+
+        var options = Polls.Polling.Options(State, Context, action.Options, TargetId);
+        if (options.Count == 0)
+        {
+            return;
+        }
+
+        var pollId = Context.Ids.NewId();
+        var choiceId = Suspend(SuspendedStep.Action, [.. options.Select(o => o.Id)], pollId);
+        var now = Context.Clock.UtcNow;
+        Emit(new Polls.PollStarted(
+            pollId,
+            Polls.PollSource.Event,
+            Text(action.Prompt).Trim(),
+            options,
+            vote.Voters,
+            vote.Anonymous,
+            Polls.Polling.LiveCounts(State, vote.Anonymous, vote.ShowLiveCounts),
+            now,
+            now.AddHours(vote.ClosesInHours))
+        {
+            PlayerId = UserId,
+            ChoiceId = choiceId,
+            ObjectId = ObjectId,
+            Kind = Asks.Kind,
+            TargetId = action.Options.From == ChoiceSource.Games ? TargetId : null,
+        });
+    }
+
     /// <summary>Stops the effect to wait for the answer to <paramref name="options"/> (D-511): written with what it computed so far.</summary>
-    private void Suspend(SuspendedStep step, IReadOnlyCollection<string> options)
+    private Guid Suspend(SuspendedStep step, IReadOnlyCollection<string> options, Guid? pollId = null)
     {
         var asks = Asks!;
         var due = State.Rules.Events?.AnswerTimeoutHours is { } hours ? Context.Clock.UtcNow.AddHours(hours) : (DateTimeOffset?)null;
@@ -427,11 +484,13 @@ internal sealed class EffectRun
             [.. options.Select(o => new Turns.ChoiceOption(o, Game: null))],
             LastRoll,
             LastChoice,
-            due)
+            pollId is null ? due : null)
         {
             Source = asks.Source,
+            PollId = pollId,
         });
         Suspended = true;
+        return ((EffectSuspended)Events[^1]).ChoiceId;
     }
 
     private void RunActions(EquatableArray<ActionSpec> actions, int from = 0)

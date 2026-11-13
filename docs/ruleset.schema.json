@@ -848,6 +848,29 @@
         "requestTtlHours"
       ],
       "additionalProperties": false
+    },
+    "polls": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "properties": {
+        "gameOptions": {
+          "type": "integer"
+        },
+        "allowChangeVote": {
+          "type": "boolean"
+        },
+        "showLiveCountsDefault": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "gameOptions",
+        "allowChangeVote",
+        "showLiveCountsDefault"
+      ],
+      "additionalProperties": false
     }
   },
   "required": [

@@ -51,6 +51,9 @@ public sealed record SeasonState(
     /// <summary>The invitations of the season (D-523), by id: pending ones and answered, withdrawn or expired ones.</summary>
     public ImmutableSortedDictionary<Guid, Interactions.Interaction> Interactions { get; init; } =
         ImmutableSortedDictionary<Guid, Interactions.Interaction>.Empty;
+    /// <summary>The polls of the season (D-512), by id: open, closed and cancelled.</summary>
+    public ImmutableSortedDictionary<Guid, Polls.Poll> Polls { get; init; } =
+        ImmutableSortedDictionary<Guid, Polls.Poll>.Empty;
 
     /// <summary>The requests of the partner board (D-524), by id: open and closed ones.</summary>
     public ImmutableSortedDictionary<Guid, Interactions.PartnerRequest> PartnerRequests { get; init; } =
@@ -95,6 +98,7 @@ public sealed record SeasonState(
         && ForAll.SequenceEqual(other.ForAll)
         && Interactions.SequenceEqual(other.Interactions)
         && PartnerRequests.SequenceEqual(other.PartnerRequests)
+        && Polls.SequenceEqual(other.Polls)
         && MapVersion == other.MapVersion;
 
     // Explicit type arguments: a mutated count still compiles, so mutation testing keeps this method (D-281)

@@ -254,4 +254,26 @@ public static class RejectionCodes
 
     /// <summary>The player has a pending response to this request already (D-545).</summary>
     public const string PartnerRequestAlreadyResponded = "partnerRequest.alreadyResponded";
+
+    // Polls (stage 5, D-512…D-516, D-720)
+    public const string PollUnknown = "poll.unknown";
+
+    /// <summary>The poll is closed or cancelled, or its time is up by the engine's clock (D-513).</summary>
+    public const string PollClosed = "poll.closed";
+
+    /// <summary>The user voted already and <c>polls.allowChangeVote</c> is off (D-513).</summary>
+    public const string PollAlreadyVoted = "poll.alreadyVoted";
+
+    /// <summary>The same vote again, as from a second tab (Н-22): nothing changes.</summary>
+    public const string PollSameVote = "poll.sameVote";
+    public const string PollUnknownOption = "poll.unknownOption";
+
+    /// <summary>Not one of the poll's voters: a spectator without <c>social.spectatorsCanVote</c>, or not a player of a players' poll.</summary>
+    public const string PollNotVoter = "poll.notVoter";
+
+    /// <summary>The first finisher does not vote in a poll whose result acts on others (D-513, EV42).</summary>
+    public const string PollFrozenVoter = "poll.frozenVoter";
+
+    /// <summary>A poll needs at least two options to choose from when it starts (D-720).</summary>
+    public const string PollNoOptions = "poll.noOptions";
 }

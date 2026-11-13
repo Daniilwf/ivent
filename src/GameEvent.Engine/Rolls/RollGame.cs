@@ -331,7 +331,8 @@ internal static class Rolling
         (filter.Tags is not { } tags || tags.Any(t => game.Tags.Contains(t, StringComparer.OrdinalIgnoreCase)))
         && (filter.MinHours is not { } min || game.Hours >= min)
         && (filter.MaxHours is not { } max || game.Hours <= max)
-        && (filter.ReleaseYearBefore is not { } before || game.ReleaseYear < before);
+        && (filter.ReleaseYearBefore is not { } before || game.ReleaseYear < before)
+        && (filter.Games is not { } games || games.Contains(game.Id.ToString("N"), StringComparer.Ordinal));
 
     /// <summary>The zone the player stands in, as the run fixes it at the roll (D-307); null outside any zone.</summary>
     private static RunZone? ZoneAtRoll(SeasonState state, Guid playerId) =>

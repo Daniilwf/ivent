@@ -43,6 +43,13 @@ public sealed record SuspendedEffect(
     DateTimeOffset? DueAt)
 {
     public Decks.EventSource? Source { get; init; }
+
+    /// <summary>
+    /// The poll that answers it (D-512): its voters are asked, not the player, so it is never the player's pending choice; it
+    /// goes on when the poll closes with a result. Written only when set.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public Guid? PollId { get; init; }
 }
 
 /// <summary>
@@ -67,6 +74,10 @@ public sealed record EffectSuspended(
     /// <summary>Where the event came from (D-548, D-553 (3)); written only when set, so the suspensions of 5.7 read as they were.</summary>
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public Decks.EventSource? Source { get; init; }
+
+    /// <summary>The poll its voters answer in (D-512); written only when set.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public Guid? PollId { get; init; }
 }
 
 /// <summary>
@@ -105,7 +116,8 @@ internal static class Suspensions
             return player;
         }
 
-        var next = Decks.EventOrder.Sort(rules, player.Suspended, s => s.Kind).FirstOrDefault();
+        // A question its voters answer is not the player's (D-512)
+        var next = Decks.EventOrder.Sort(rules, [.. player.Suspended.Where(s => s.PollId is null)], s => s.Kind).FirstOrDefault();
         var choice = next is null ? null : new PendingChoice(next.ChoiceId, ChoiceKind.Effect, next.Options);
         return player.Choice == choice ? player : player with { Choice = choice };
     }
@@ -235,6 +247,7 @@ internal static class Suspensions
                 new SuspendedEffect(e.ChoiceId, e.ObjectId, e.Kind, e.Step, e.TargetId, e.NextAction, e.Depth, e.Options, e.Roll, e.Choice, e.DueAt)
                 {
                     Source = e.Source,
+                    PollId = e.PollId,
                 },
             ],
         });

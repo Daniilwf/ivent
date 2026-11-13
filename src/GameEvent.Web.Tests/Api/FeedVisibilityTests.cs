@@ -38,6 +38,61 @@ public sealed class FeedVisibilityTests : IAsyncLifetime
     }
 
     [Fact]
+    public void An_anonymous_vote_names_nobody_and_its_change_is_not_shown_even_to_the_admin()
+    {
+        // D-541, D-726: «голос подан» without the voter or the option; the entry drops the command's author too
+        var (poll, user) = (Guid.NewGuid(), Guid.NewGuid());
+        var cast = EventCodec.Encode(new Engine.Polls.VoteCast(poll, user, "Horror", Anonymous: true, ShowLiveCounts: false));
+        var changed = EventCodec.Encode(new Engine.Polls.VoteChanged(poll, user, "RPG", Anonymous: true, ShowLiveCounts: false));
+        JsonObject Data(StoredEvent e) => JsonNode.Parse(e.Data)!.AsObject();
+
+        foreach (var admin in new[] { true, false })
+        {
+            var shown = FeedVisibility.Shown(cast.Type, Data(cast), admin, viewerPlayerId: null)!;
+            Assert.Equal(["anonymous", "pollId"], shown.Select(x => x.Key).Order(StringComparer.Ordinal));
+            Assert.DoesNotContain(user.ToString(), shown.ToJsonString(), StringComparison.Ordinal);
+            Assert.Null(FeedVisibility.Shown(changed.Type, Data(changed), admin, viewerPlayerId: null));
+        }
+
+        Assert.True(FeedVisibility.HidesAuthor(cast.Type, Data(cast)));
+        Assert.True(FeedVisibility.HidesAuthor(changed.Type, Data(changed)));
+    }
+
+    [Fact]
+    public void A_named_vote_shows_its_voter_and_its_option_only_with_live_counts()
+    {
+        // D-515, D-726: a named poll names the voter; without live counts the option waits for the result
+        var (poll, user) = (Guid.NewGuid(), Guid.NewGuid());
+        var hidden = EventCodec.Encode(new Engine.Polls.VoteCast(poll, user, "Horror", Anonymous: false, ShowLiveCounts: false));
+        var live = EventCodec.Encode(new Engine.Polls.VoteChanged(poll, user, "RPG", Anonymous: false, ShowLiveCounts: true));
+        JsonObject Data(StoredEvent e) => JsonNode.Parse(e.Data)!.AsObject();
+
+        var withoutCounts = FeedVisibility.Shown(hidden.Type, Data(hidden), admin: false, viewerPlayerId: null)!;
+        Assert.False(withoutCounts.ContainsKey("optionId"));
+        Assert.Equal(user, withoutCounts["userId"]!.GetValue<Guid>());
+        Assert.Equal("RPG", FeedVisibility.Shown(live.Type, Data(live), admin: false, viewerPlayerId: null)!["optionId"]!.GetValue<string>());
+        Assert.False(FeedVisibility.HidesAuthor(hidden.Type, Data(hidden)));
+    }
+
+    [Fact]
+    public void An_undo_shows_the_admin_no_votes_of_an_anonymous_poll_or_of_one_without_live_counts()
+    {
+        // D-726: what an undo puts back does not name voters the poll hides
+        JsonObject Poll(bool anonymous, bool live) => new()
+        {
+            ["pollId"] = Guid.NewGuid(),
+            ["anonymous"] = anonymous,
+            ["showLiveCounts"] = live,
+            ["votes"] = new JsonArray(new JsonObject { ["userId"] = Guid.NewGuid(), ["optionId"] = "Horror" }),
+        };
+        var data = new JsonObject { ["commandId"] = Guid.NewGuid(), ["comment"] = "Ошибка", ["polls"] = new JsonArray(Poll(true, false), Poll(false, false), Poll(false, true)) };
+
+        var polls = FeedVisibility.Shown("command-undone", data, admin: true, viewerPlayerId: null)!["polls"]!.AsArray();
+
+        Assert.Equal([false, false, true], polls.Select(p => p!.AsObject().ContainsKey("votes")));
+    }
+
+    [Fact]
     public void An_irl_proofs_files_link_and_comment_are_the_players_and_the_admins()
     {
         // D-684: others see that an IRL proof was sent and checked, not its screenshots, link or the admin's comment

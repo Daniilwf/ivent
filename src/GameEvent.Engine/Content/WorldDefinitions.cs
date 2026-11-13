@@ -58,7 +58,10 @@ public enum PollVoters
     Everyone,
 }
 
-/// <summary>A poll (CONTENT.md «голосование», stage 6): the question, the options, who votes, and the effect of the result.</summary>
+/// <summary>
+/// A poll (CONTENT.md «голосование», stage 5, D-512): the question, the options, who votes, and the effect of the result
+/// (<c>$result</c> is the option that won).
+/// </summary>
 public sealed record PollDefinition
 {
     public required string Question { get; init; }
@@ -72,6 +75,10 @@ public sealed record PollDefinition
     public required int ClosesInHours { get; init; }
 
     public EffectSpec? OnResult { get; init; }
+
+    /// <summary>Whether the counts are shown before the close (D-541); null — <c>polls.showLiveCountsDefault</c>, never for anonymous.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public bool? ShowLiveCounts { get; init; }
 }
 
 public enum ChallengeCheck

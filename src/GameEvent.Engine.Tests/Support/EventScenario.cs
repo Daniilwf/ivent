@@ -20,6 +20,20 @@ public static class EventScenario
         };
     }
 
+    /// <summary>
+    /// The ruleset with polls on (D-512, D-720): <c>polls.gameOptions</c> 5, a vote may change, no live counts by default.
+    /// Items too: a poll whose result acts needs them (D-544).
+    /// </summary>
+    public static Ruleset WithPolls(this Ruleset ruleset, int gameOptions = 5, bool allowChangeVote = true, bool showLiveCountsDefault = false)
+    {
+        ArgumentNullException.ThrowIfNull(ruleset);
+        return ruleset with
+        {
+            Features = ruleset.Features with { Items = true, Polls = true },
+            Polls = new PollRules { GameOptions = gameOptions, AllowChangeVote = allowChangeVote, ShowLiveCountsDefault = showLiveCountsDefault },
+        };
+    }
+
     /// <summary>A scenario on the pinned ruleset with items and events on.</summary>
     public static Scenario New(int seed = 42) => Scenario.New(TestRuleset.Create().WithEvents(), seed);
 

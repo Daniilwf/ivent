@@ -91,6 +91,9 @@ public static class SeasonEngine
             Interactions.ClosePartnerRequest c => Interactions.PartnerBoard.Decide(state, c, context),
             FireTimers => Timers.Decide(state, context),
             SettleForAll c => ForAllSettlements.Decide(state, c, context),
+            Polls.StartPoll c => Polls.Polling.Decide(state, c, context),
+            Polls.CastVote c => Polls.Polling.Decide(state, c, context),
+            Polls.ClosePoll c => Polls.Polling.Decide(state, c, context),
             _ => throw new ArgumentException($"Unknown command {command.GetType().Name}.", nameof(command)),
         };
 
@@ -263,6 +266,11 @@ public static class SeasonEngine
             EffectMoveSkipped => state,
             ForAllQueued e => ForAllSettlements.Apply(state, e),
             ForAllSettled e => ForAllSettlements.Apply(state, e),
+            Polls.PollStarted e => Polls.Polling.Apply(state, e),
+            Polls.VoteCast e => Polls.Polling.Apply(state, e),
+            Polls.VoteChanged e => Polls.Polling.Apply(state, e),
+            Polls.PollClosed e => Polls.Polling.Apply(state, e),
+            Polls.PollCancelled e => Polls.Polling.Apply(state, e),
             _ => throw new ArgumentException($"Unknown event {gameEvent.GetType().Name}.", nameof(gameEvent)),
         };
 

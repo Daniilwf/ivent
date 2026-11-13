@@ -123,6 +123,14 @@ const rejection = {
   'season.closed': 'Сезон закрыт для этого действия.',
   'forAll.unknown': 'Такой раздачи на всех нет или она уже закончена.',
   'forAll.halted': 'Раздача на всех остановлена откатом: откатите её причину.',
+  'poll.unknown': 'Такого голосования нет.',
+  'poll.closed': 'Голосование уже закрыто.',
+  'poll.alreadyVoted': 'Голос уже подан, сменить его в этом сезоне нельзя.',
+  'poll.sameVote': 'Этот голос уже подан.',
+  'poll.unknownOption': 'Такого варианта в голосовании нет.',
+  'poll.notVoter': 'В этом голосовании голосуют только игроки сезона.',
+  'poll.frozenVoter': 'Финишировавший первым не голосует там, где итог действует на игроков.',
+  'poll.noOptions': 'В голосовании должно быть хотя бы два варианта.',
   'effect.notPending': 'Этот эффект уже разрешён.',
   'account.mustChangePassword': 'Сначала смени временный пароль.',
   'account.currentPasswordWrong': 'Текущий пароль введён неверно.',
@@ -347,6 +355,18 @@ const feedLines = {
       ? 'Раздача на всех: никому не досталось'
       : `Раздача на всех: ${players} ${plural(players, 'игрок', 'игрока', 'игроков')}`,
   ],
+  // D-512…D-516, D-541: polls; a vote never names its voter in the feed
+  pollStarted: <T>(question: string): Line<T> => [`Голосование: ${question}`],
+  voteCast: <T>(): Line<T> => ['Голос подан'],
+  voteChanged: <T>(): Line<T> => ['Голос изменён'],
+  pollClosed: <T>(result: string | null, byId: boolean): Line<T> => [
+    result === null
+      ? 'Голосование закрыто: голосов нет'
+      : byId
+        ? 'Голосование закрыто, итог подведён'
+        : `Голосование закрыто, итог: ${result}`,
+  ],
+  pollCancelled: <T>(): Line<T> => ['Голосование отменено дедлайном'],
   finishBonuses: <T>(): Line<T> => ['Бонусы за финиш пересчитаны по новым правилам'],
   joined: <T>(p: T): Line<T> => [p, ' в игре'],
   paused: <T>(p: T): Line<T> => [p, ' на паузе'],

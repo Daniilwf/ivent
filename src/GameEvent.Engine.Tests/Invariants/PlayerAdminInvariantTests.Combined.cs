@@ -414,6 +414,7 @@ public partial class PlayerAdminInvariantTests
             "suggestions" => features.Suggestions,
             "coop" => features.Coop,
             "partnerBoard" => features.PartnerBoard && features.Coop,
+            "polls" => features.Polls,
             _ => throw new ArgumentOutOfRangeException(nameof(mechanic), mechanic, "Unknown mechanic."),
         };
 
@@ -462,6 +463,10 @@ public partial class PlayerAdminInvariantTests
 
             // The partner board (D-524); its responses are coop invitations
             Engine.Interactions.PartnerRequestPosted or Engine.Interactions.PartnerRequestClosed => "partnerBoard",
+
+            // Polls of stage 5 (D-512, D-720)
+            Engine.Polls.PollStarted or Engine.Polls.VoteCast or Engine.Polls.VoteChanged or Engine.Polls.PollClosed
+                or Engine.Polls.PollCancelled => "polls",
 
             // The effect dispatcher reacts to content (items, events); stage 1 has no content effects in play (D-24, D-103)
             EffectChainCut => "effects",

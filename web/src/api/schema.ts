@@ -8640,6 +8640,18 @@ export interface components {
             id: string;
             name: string;
         };
+        /** @description The rules of polls (SPEC «Голосования», D-512, D-513, D-541). */
+        PollRules: {
+            /**
+             * Format: int32
+             * @description How many games a poll over games offers: a random sample of the games available to its target (D-512).
+             */
+            gameOptions: number;
+            /** @description Whether a voter may change the vote before the close; the last one counts (D-513). */
+            allowChangeVote: boolean;
+            /** @description Whether a poll shows its counts before the close when it does not say (D-541); never for an anonymous one. */
+            showLiveCountsDefault: boolean;
+        };
         PoolActionRequest: {
             /** Format: uuid */
             commandId: string;
@@ -9004,6 +9016,7 @@ export interface components {
             events?: null | components["schemas"]["EventRules"];
             suggestions?: null | components["schemas"]["SuggestionRules"];
             partnerBoard?: null | components["schemas"]["PartnerBoardRules"];
+            polls?: null | components["schemas"]["PollRules"];
         };
         /**
          * @description One changed value between two versions of the rules: the JSON path (for example `reward.diceCount.max`)

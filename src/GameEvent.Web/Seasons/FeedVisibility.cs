@@ -28,6 +28,12 @@ public static class FeedVisibility
         /// </summary>
         ContentSummary,
 
+        /// <summary>
+        /// A vote (D-515, D-541): in an anonymous poll nobody, the admin included, sees who voted or for what — «голос подан»
+        /// — and a change of the vote is not shown at all; in a poll without live counts the option waits for the result.
+        /// </summary>
+        AnonymousVote,
+
         /// <summary>The global log's (accounts, files, pool, bug reports): never in a season's feed.</summary>
         NotInFeed,
     }
@@ -126,6 +132,13 @@ public static class FeedVisibility
         ["for-all-settled"] = Access.Public,
 
         // The weekly challenge (stage 5, D-526): what was set, who completed it and what a reject took back are public
+        // Polls (D-512…D-516): the start and the result are public, a vote by the poll's anonymity (D-541)
+        ["poll-started"] = Access.Public,
+        ["vote-cast"] = Access.AnonymousVote,
+        ["vote-changed"] = Access.AnonymousVote,
+        ["poll-closed"] = Access.Public,
+        ["poll-cancelled"] = Access.Public,
+
         ["weekly-challenge-set"] = Access.Public,
         ["weekly-challenge-completed"] = Access.Public,
         ["weekly-challenge-revoked"] = Access.Public,
@@ -190,7 +203,20 @@ public static class FeedVisibility
                 return data;
 
             case Access.UndoSummary:
-                return admin ? data : new JsonObject { ["commandId"] = data["commandId"]?.DeepClone(), ["comment"] = data["comment"]?.DeepClone() };
+                return admin ? WithoutAnonymousVoters(data) : new JsonObject { ["commandId"] = data["commandId"]?.DeepClone(), ["comment"] = data["comment"]?.DeepClone() };
+
+            case Access.AnonymousVote:
+                if (data["anonymous"]?.GetValue<bool>() == true)
+                {
+                    return type == "vote-cast" ? new JsonObject { ["pollId"] = data["pollId"]?.DeepClone(), ["anonymous"] = true } : null;
+                }
+
+                if (data["showLiveCounts"]?.GetValue<bool>() != true)
+                {
+                    data.Remove("optionId");
+                }
+
+                return data;
 
             case Access.ContentSummary:
                 return admin
@@ -205,5 +231,27 @@ public static class FeedVisibility
             default:
                 return null;
         }
+    }
+
+    /// <summary>Whether the entry must not name its command's author: a vote of an anonymous poll (D-541, D-726).</summary>
+    public static bool HidesAuthor(string type, JsonObject data)
+    {
+        ArgumentNullException.ThrowIfNull(data);
+        return Types.GetValueOrDefault(type, Access.NotInFeed) == Access.AnonymousVote && data["anonymous"]?.GetValue<bool>() == true;
+    }
+
+    // The polls an undo puts back keep their votes, but an anonymous poll's voters are nobody's to see, the admin's either (D-541)
+    private static JsonObject WithoutAnonymousVoters(JsonObject data)
+    {
+        foreach (var poll in (data["polls"] as JsonArray ?? []).OfType<JsonObject>())
+        {
+            // A poll without live counts does not show its votes before the result either (D-726)
+            if (poll["anonymous"]?.GetValue<bool>() == true || poll["showLiveCounts"]?.GetValue<bool>() != true)
+            {
+                poll.Remove("votes");
+            }
+        }
+
+        return data;
     }
 }

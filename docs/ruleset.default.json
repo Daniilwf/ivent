@@ -129,5 +129,10 @@
   },
   "partnerBoard": {
     "requestTtlHours": 48
+  },
+  "polls": {
+    "gameOptions": 5,
+    "allowChangeVote": true,
+    "showLiveCountsDefault": false
   }
 }

@@ -14,8 +14,19 @@ internal sealed class ModifyNextRollHandler : ActionHandler<ModifyNextRollAction
     {
         var target = run.ActionTarget(action);
         var filter = action.Filter is { } f
-            ? f with { Tags = f.Tags is { } tags ? [.. tags.Select(run.Text)] : null }
+            ? f with
+            {
+                Tags = f.Tags is { } tags ? [.. tags.Select(run.Text)] : null,
+
+                // «Выберите игру лидеру»: the games named by their references (D-512); none answered — the filter has no games
+                Games = f.Games is { } games ? [.. games.Select(run.Text).Where(g => g.Length > 0)] : null,
+            }
             : null;
+        if (filter is { Games.Count: 0 })
+        {
+            filter = filter with { Games = null };
+            filter = filter == new GameFilterSpec() ? null : filter;
+        }
         var hostile = run.Hostile && target != run.UserId;
         if (filter is not null || action.ChoiceCount is not null)
         {
@@ -63,7 +74,17 @@ internal sealed class ModifyDiceHandler : ActionHandler<ModifyDiceAction>
 /// </summary>
 internal sealed class RequestChoiceHandler : ActionHandler<RequestChoiceAction>
 {
-    protected override void Execute(RequestChoiceAction action, EffectRun run) => run.NextChoice(Options(action.Options, run));
+    protected override void Execute(RequestChoiceAction action, EffectRun run)
+    {
+        if (action.Vote is { } vote)
+        {
+            // The voters answer an event's question (D-512)
+            run.AskVoters(action, vote);
+            return;
+        }
+
+        run.NextChoice(Options(action.Options, run));
+    }
 
     public static IReadOnlyCollection<string> Options(ChoiceOptionsSpec options, EffectRun run) => Options(options, run.State, run.Context.Pool);
 

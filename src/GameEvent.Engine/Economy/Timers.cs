@@ -54,6 +54,12 @@ public static class Timers
         return new[] { Next(player, state.Rules.Features), invitations, requests }.Where(m => m is not null).Min();
     }
 
+    /// <summary>
+    /// The earliest moment something of the season itself is due — an open poll's close (D-514); null when nothing waits or
+    /// polls are off (D-420). The scheduler reads it with the season's timer column (task 5.16, D-727).
+    /// </summary>
+    public static DateTimeOffset? NextOfSeason(SeasonState state) => Polls.Polling.NextClose(state);
+
     internal static Decision Decide(SeasonState state, EngineContext context)
     {
         if (!state.IsCreated)
@@ -95,6 +101,9 @@ public static class Timers
 
         // A request of the partner board past its term closes (D-524)
         events.AddRange(Interactions.PartnerBoard.Timeouts(state, now));
+
+        // Polls whose time has come close with their results (D-514)
+        events.AddRange(Polls.Polling.Due(events.Aggregate(state, SeasonEngine.Apply), context, events.Count));
 
         return events.Count == 0
             ? Decision.Reject(RejectionCodes.TimersNothingDue, "Nothing is due yet.")

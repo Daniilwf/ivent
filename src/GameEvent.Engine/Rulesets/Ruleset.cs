@@ -62,6 +62,26 @@ public sealed record Ruleset
     /// </summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public PartnerBoardRules? PartnerBoard { get; init; }
+
+    /// <summary>
+    /// The rules of polls (stage 5, D-512…D-515). Missing — a season created before them reads as it did (D-50); needed once
+    /// <c>features.polls</c> is on. Not written while missing.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public PollRules? Polls { get; init; }
+}
+
+/// <summary>The rules of polls (SPEC «Голосования», D-512, D-513, D-541).</summary>
+public sealed record PollRules
+{
+    /// <summary>How many games a poll over games offers: a random sample of the games available to its target (D-512).</summary>
+    public required int GameOptions { get; init; }
+
+    /// <summary>Whether a voter may change the vote before the close; the last one counts (D-513).</summary>
+    public required bool AllowChangeVote { get; init; }
+
+    /// <summary>Whether a poll shows its counts before the close when it does not say (D-541); never for an anonymous one.</summary>
+    public required bool ShowLiveCountsDefault { get; init; }
 }
 
 /// <summary>The rules of the partner board (SPEC «Взаимодействие игроков», D-524).</summary>

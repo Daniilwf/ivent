@@ -133,6 +133,13 @@ public sealed record RollModifiersApplied(Guid PlayerId, EquatableArray<RollModi
 {
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     public EquatableArray<RollModifier> Waiting { get; init; }
+
+    /// <summary>
+    /// The miss of «выберите игру лидеру» (D-512): an event's filter of named games none of which is available any more is
+    /// taken off for good and the roll goes the usual way. Written only when there are any.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public EquatableArray<RollModifier> Dropped { get; init; }
 }
 
 /// <summary>The player's next throw for a completion is changed (<c>modifyDice</c> with <c>when: next</c>).</summary>
