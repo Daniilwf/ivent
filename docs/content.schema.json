@@ -226,7 +226,8 @@
                           "integer",
                           "null"
                         ]
-                      }
+                      },
+                      "games": true
                     },
                     "additionalProperties": false
                   },
@@ -666,7 +667,8 @@
                                 "integer",
                                 "null"
                               ]
-                            }
+                            },
+                            "games": true
                           },
                           "additionalProperties": false
                         },
@@ -724,7 +726,8 @@
                                     "integer",
                                     "null"
                                   ]
-                                }
+                                },
+                                "games": true
                               },
                               "additionalProperties": false
                             },
@@ -883,6 +886,37 @@
                             },
                             "list": true
                           },
+                          "additionalProperties": false
+                        },
+                        "vote": {
+                          "type": [
+                            "object",
+                            "null"
+                          ],
+                          "properties": {
+                            "voters": {
+                              "enum": [
+                                "players",
+                                "everyone"
+                              ]
+                            },
+                            "anonymous": {
+                              "type": "boolean"
+                            },
+                            "closesInHours": {
+                              "type": "integer"
+                            },
+                            "showLiveCounts": {
+                              "type": [
+                                "boolean",
+                                "null"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "voters",
+                            "closesInHours"
+                          ],
                           "additionalProperties": false
                         },
                         "target": {
@@ -1346,7 +1380,8 @@
                                           "integer",
                                           "null"
                                         ]
-                                      }
+                                      },
+                                      "games": true
                                     },
                                     "additionalProperties": false
                                   },
@@ -1404,7 +1439,8 @@
                                               "integer",
                                               "null"
                                             ]
-                                          }
+                                          },
+                                          "games": true
                                         },
                                         "additionalProperties": false
                                       },
@@ -1565,6 +1601,37 @@
                                     },
                                     "additionalProperties": false
                                   },
+                                  "vote": {
+                                    "type": [
+                                      "object",
+                                      "null"
+                                    ],
+                                    "properties": {
+                                      "voters": {
+                                        "enum": [
+                                          "players",
+                                          "everyone"
+                                        ]
+                                      },
+                                      "anonymous": {
+                                        "type": "boolean"
+                                      },
+                                      "closesInHours": {
+                                        "type": "integer"
+                                      },
+                                      "showLiveCounts": {
+                                        "type": [
+                                          "boolean",
+                                          "null"
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "voters",
+                                      "closesInHours"
+                                    ],
+                                    "additionalProperties": false
+                                  },
                                   "target": {
                                     "enum": [
                                       "self",
@@ -1657,7 +1724,8 @@
                       "integer",
                       "null"
                     ]
-                  }
+                  },
+                  "games": true
                 },
                 "additionalProperties": false
               },

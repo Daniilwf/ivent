@@ -131,6 +131,11 @@
   "partnerBoard": {
     "requestTtlHours": 48
   },
+  "polls": {
+    "gameOptions": 5,
+    "allowChangeVote": true,
+    "showLiveCountsDefault": false
+  },
   "duels": {
     "rewardCoins": 10,
     "durationDays": 7,

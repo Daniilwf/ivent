@@ -21,7 +21,7 @@ public static class ContentPublishing
     /// <paramref name="events"/> off (<c>features.events</c>) the pack holds no events and no decks, and draws only
     /// «good» and «bad» by hand (D-10, D-532); on, it may hold events and their decks (D-501).
     /// </summary>
-    public static IReadOnlyList<ContentError> Check(ContentPack pack, bool events = false)
+    public static IReadOnlyList<ContentError> Check(ContentPack pack, bool events = false, bool polls = false)
     {
         ArgumentNullException.ThrowIfNull(pack);
         var errors = new List<ContentError>();
@@ -55,7 +55,7 @@ public static class ContentPublishing
 
             var at = $"$.objects[{i}]";
             errors.AddRange(ContentValidator.Check(definition).Select(e => new ContentError(at + e.Path[1..], e.Message)));
-            Supported(definition, at, events, Error);
+            Supported(definition, at, events, polls, Error);
             if (definition.Effect is { } effect)
             {
                 References(effect, $"{at}.effect", ids, eventIds, wheels, decks, Error);
@@ -108,7 +108,7 @@ public static class ContentPublishing
 
     // What this build plays (D-402): the rest waits for its stage and is refused rather than silently ignored. Events
     // play once features.events is on (D-532).
-    private static void Supported(ObjectDefinition definition, string at, bool events, Action<string, string> error)
+    private static void Supported(ObjectDefinition definition, string at, bool events, bool polls, Action<string, string> error)
     {
         if (definition.Kind == ObjectKind.Achievement || (definition.Kind == ObjectKind.Event && !events))
         {
@@ -171,6 +171,20 @@ public static class ContentPublishing
             if (!triggered && asks && byChoice)
             {
                 error(path, "A branch by the player's answer asks nothing more: the questions after it would depend on it.");
+            }
+
+            // The voters answer only a drawn event's question, and only with polls on (D-512); an event with a vote is not
+            // published as one asking its player instead (Н-15)
+            if (actions[i] is RequestChoiceAction { Vote: not null })
+            {
+                if (!asksLater)
+                {
+                    error($"{path}.vote", "Only a drawn event asks the voters.");
+                }
+                else if (!polls)
+                {
+                    error($"{path}.vote", "A vote comes with polls: switch features.polls on.");
+                }
             }
 
             // An event waits for one answer at a time, at an action of its list (D-511): not inside a case, not a list of preference
@@ -370,7 +384,7 @@ public static class ContentPublishing
                 $"The content changed while it was edited: version {state.Catalog.Version} is in force, the pack was made from {expected}.");
         }
 
-        var errors = Check(command.Pack, state.Rules.Features.Events);
+        var errors = Check(command.Pack, state.Rules.Features.Events, state.Rules.Features.Polls);
         if (errors.Count > 0)
         {
             return Decision.Reject(RejectionCodes.ContentInvalid, string.Join("; ", errors.Select(e => $"{e.Path}: {e.Message}")));

@@ -151,6 +151,8 @@ public static class FeedEndpoints
                 data["kind"] = branchChoices.Contains(discarded.ChoiceId) ? "branch" : "game";
             }
 
+            // An anonymous vote names nobody, not even through the command's author (D-541, D-726)
+            var anonymous = FeedVisibility.HidesAuthor(r.Type, data);
             return FeedVisibility.Shown(r.Type, data, admin, viewerPlayerId) is not { } shown
                 ? null
                 : new FeedEntryView(
@@ -159,7 +161,7 @@ public static class FeedEndpoints
                     r.OccurredAt,
                     r.Type,
                     JsonSerializer.SerializeToElement(shown),
-                    r.AuthorId is { } author ? authors.GetValueOrDefault(author) : null,
+                    !anonymous && r.AuthorId is { } author ? authors.GetValueOrDefault(author) : null,
                     r.UndoneByEventId is not null);
         }).OfType<FeedEntryView>()];
         var nextBefore = rows.Count == limit && rows[^1].Sequence > 1 ? rows[^1].Sequence : (long?)null;

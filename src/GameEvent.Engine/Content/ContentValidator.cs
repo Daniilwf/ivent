@@ -12,6 +12,13 @@ public sealed record ContentError(string Path, string Message);
 public static partial class ContentValidator
 {
     public const int MaxIdLength = 50;
+
+    /// <summary>The longest a poll stays open, in hours (a season's year, D-720): the close stays a moment of the calendar.</summary>
+    public const int MaxPollHours = 24 * 366;
+
+    /// <summary>The most options a poll's list offers (D-720), as many as <c>polls.gameOptions</c> may.</summary>
+    public const int MaxPollOptions = 20;
+
     public const int MaxNameLength = 100;
     public const int MaxDescriptionLength = 1000;
 
@@ -265,9 +272,16 @@ public static partial class ContentValidator
         void Error(string path, string message) => errors.Add(new ContentError(path, message));
         CheckText(poll.Question, MaxNameLength * 2, "$.question", Error);
         CheckOptions(poll.Options, "$.options", Error);
-        if (poll.ClosesInHours <= 0)
+        CheckPollList(poll.Options, "$.options.list", Error);
+        if (poll.ClosesInHours is <= 0 or > MaxPollHours)
         {
-            Error("$.closesInHours", "A poll closes after a positive number of hours.");
+            Error("$.closesInHours", $"A poll closes after 1–{MaxPollHours} hours.");
+        }
+
+        // An anonymous poll never shows its counts before the close (D-541)
+        if (poll.Anonymous && poll.ShowLiveCounts == true)
+        {
+            Error("$.showLiveCounts", "An anonymous poll shows its counts only in its result.");
         }
 
         if (poll.OnResult is { } result)
@@ -277,9 +291,48 @@ public static partial class ContentValidator
             {
                 Error("$.onResult", "A poll's result acts at once: no trigger, duration or interception.");
             }
+
+            CheckSystemEffect(result, "$.onResult", Error);
         }
 
         return errors;
+    }
+
+    /// <summary>
+    /// An effect the system plays, with nobody to answer (a poll's result, D-512, D-703 (3)): it asks nothing — no chosen
+    /// target, no branch by choice, no question among its actions; on everyone it does not move (D-519).
+    /// </summary>
+    private static void CheckSystemEffect(EffectSpec effect, string path, Action<string, string> error)
+    {
+        if (effect.Target?.Selector == TargetSelector.Chosen)
+        {
+            error($"{path}.target", "Nobody answers a poll's result: it has no chosen target.");
+        }
+
+        // There is no user to compare with or leave out (D-725)
+        if (effect.Target is { } reach && (reach.Among is not null || reach.ExcludeSelf))
+        {
+            error($"{path}.target", "A poll's result has no user: no «among» or «excludeSelf».");
+        }
+
+        if (effect.Outcomes is { Choice: not null })
+        {
+            error($"{path}.outcomes.choice", "Nobody answers a poll's result: it branches by a roll only.");
+        }
+
+        var actions = effect.Actions.Concat(effect.Outcomes?.Cases.SelectMany(c => c.Actions) ?? []).ToList();
+        for (var i = 0; i < actions.Count; i++)
+        {
+            if (actions[i] is RequestChoiceAction or TakeObjectAction { Pick: Pick.Chosen } or MoveAction { Direction: MoveDirection.Chosen })
+            {
+                error($"{path}.actions[{i}]", "Nobody answers a poll's result: it asks nothing.");
+            }
+        }
+
+        if (effect.Target?.Selector == TargetSelector.All && actions.Any(a => a is MoveAction or TeleportAction))
+        {
+            error($"{path}.target", "A result on everyone does not move or teleport (D-519).");
+        }
     }
 
     public static IReadOnlyList<ContentError> Check(WeeklyChallengeDefinition challenge)
@@ -390,6 +443,7 @@ public static partial class ContentValidator
                     break;
                 case ModifyNextRollAction next when next.Filter is { } filter:
                     CheckFilter(filter, $"{at}.filter", error);
+                    CheckGames(filter.Games, $"{at}.filter.games", scope with { Rolled = rolled, Chose = chose }, error);
                     if (next.RunCondition is { } condition)
                     {
                         CheckRunCondition(condition, $"{at}.runCondition", error);
@@ -440,11 +494,76 @@ public static partial class ContentValidator
                 case RequestChoiceAction request:
                     CheckText(request.Prompt, MaxNameLength * 2, $"{at}.prompt", error);
                     CheckOptions(request.Options, $"{at}.options", error);
+                    if (request.Vote is { } vote)
+                    {
+                        if (vote.ClosesInHours is <= 0 or > MaxPollHours)
+                        {
+                            error($"{at}.vote.closesInHours", $"A poll closes after 1–{MaxPollHours} hours.");
+                        }
+
+                        CheckPollList(request.Options, $"{at}.options.list", error);
+
+                        if (vote.Anonymous && vote.ShowLiveCounts == true)
+                        {
+                            error($"{at}.vote.showLiveCounts", "An anonymous poll shows its counts only in its result.");
+                        }
+                    }
+
                     break;
             }
 
             rolled |= actions[i] is RollAction;
             chose |= actions[i] is RequestChoiceAction or MoveAction { Direction: MoveDirection.Chosen };
+        }
+    }
+
+    // The options of a poll are what a vote names and the feed shows: a short list of short, distinct texts (D-720)
+    private static void CheckPollList(ChoiceOptionsSpec options, string path, Action<string, string> error)
+    {
+        if (options.List is not { } list)
+        {
+            return;
+        }
+
+        if (list.Count > MaxPollOptions)
+        {
+            error(path, $"A poll offers at most {MaxPollOptions} options.");
+        }
+
+        if (list.Any(o => o is { Length: > MaxNameLength }))
+        {
+            error(path, $"An option is at most {MaxNameLength} characters.");
+        }
+
+        if (list.Where(o => o is not null).GroupBy(o => o, StringComparer.Ordinal).Any(g => g.Count() > 1))
+        {
+            error(path, "Each option is listed once.");
+        }
+    }
+
+    // Named games (D-512): ids in the «N» format or references to an answer or a poll's result, at least one
+    private static void CheckGames(Kernel.EquatableArray<string>? games, string path, Scope scope, Action<string, string> error)
+    {
+        if (games is not { } list)
+        {
+            return;
+        }
+
+        if (list.Count == 0)
+        {
+            error(path, "Name at least one game.");
+        }
+
+        for (var i = 0; i < list.Count; i++)
+        {
+            if (list[i] is { } text && text.StartsWith('$'))
+            {
+                CheckReference(ContentValue.TryParse(text), $"{path}[{i}]", scope, error);
+            }
+            else if (!Guid.TryParseExact(list[i] ?? "", "N", out _))
+            {
+                error($"{path}[{i}]", "A game is its id (32 hex digits) or a reference such as «$choice».");
+            }
         }
     }
 
@@ -687,9 +806,9 @@ public static partial class ContentValidator
     // A game filter narrows something: tags, hours in a sensible range, a year.
     private static void CheckFilter(GameFilterSpec filter, string path, Action<string, string> error)
     {
-        if (filter is { Tags: null, MaxHours: null, MinHours: null, ReleaseYearBefore: null })
+        if (filter is { Tags: null, MaxHours: null, MinHours: null, ReleaseYearBefore: null, Games: null })
         {
-            error(path, "A filter names tags, hours or a release year.");
+            error(path, "A filter names tags, hours, a release year or games.");
         }
 
         if (filter.Tags is { } tags && (tags.Count == 0 || tags.Any(string.IsNullOrWhiteSpace)))

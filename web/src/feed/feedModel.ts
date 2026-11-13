@@ -157,6 +157,8 @@ type Context = {
   refOf: (id: string) => FeedRef;
   /** An object's name by its id; the id itself when the page does not know it */
   object: (id: string | null) => string;
+  /** The player of an account named by the event (a voter of a named poll, D-515); null when none is known */
+  voter: (d: Data) => FeedPlayer | null;
 };
 
 type EventKind = 'good' | 'bad' | 'special' | 'risky';
@@ -181,6 +183,26 @@ const headlines: [string, (d: Data, c: Context) => Headline][] = [
     'for-all-settled',
     (d) => ({ icon: 'effect', actor: null, line: L.forAllSettled(list(d, 'players').length) }),
   ],
+  // Polls (D-512…D-516): the start, a vote without its voter's name (D-541), the result and the cancel are the system's lines
+  [
+    'poll-started',
+    (d) => ({ icon: 'effect', actor: null, line: L.pollStarted(text(d, 'question') ?? '') }),
+  ],
+  ['vote-cast', (d, c) => ({ icon: 'effect', actor: c.voter(d), line: L.voteCast() })],
+  ['vote-changed', (d, c) => ({ icon: 'effect', actor: c.voter(d), line: L.voteChanged() })],
+  [
+    'poll-closed',
+    (d) => {
+      // A player or a game won by its id: the poll's page names it (5.22), the feed says only that there is a result
+      const result = text(d, 'result');
+      return {
+        icon: 'effect',
+        actor: null,
+        line: L.pollClosed(result, result !== null && /^[0-9a-f]{32}$/.test(result)),
+      };
+    },
+  ],
+  ['poll-cancelled', () => ({ icon: 'effect', actor: null, line: L.pollCancelled() })],
   [
     'season-created',
     (d) => ({ icon: 'season', actor: null, line: L.seasonCreated(text(d, 'name') ?? '') }),
@@ -721,6 +743,11 @@ function itemOf(entries: Entry[], refs: FeedRefs): FeedItem | null {
   const object = (id: string | null) => (id ? (refs.objects.get(id) ?? id) : ru.feed.someItem);
   const context: Context = {
     has: (type) => events.some((e) => e.type === type),
+    voter: (d) => {
+      // An anonymous vote comes without its user (D-541): nobody is named
+      const user = text(d, 'userId');
+      return user ? ([...refs.players.values()].find((p) => p.userId === user) ?? null) : null;
+    },
     find: (type) => events.find((e) => e.type === type)?.data ?? null,
     player,
     playerRef: (d) => ({ kind: 'player', player: player(d) }),

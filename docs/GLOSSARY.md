@@ -279,9 +279,12 @@
 | IRL-пруф | фото или ссылка на видео к IRL-ивенту; проверяет админ | команды `SubmitIrlProof`, `ReviewIrlProof`, события `IrlProofSubmitted`, `IrlProofReviewed`; `IrlProofStatus`, `IrlProofState` (`PendingManualEffect.IrlProof`), `IrlProofs.IsIrl`; лимит картинок — `events.irlProof.maxFiles` |
 | Ивент ждёт ответа | эффект ивента остановился на вопросе к игроку; ответ — общий выбор (D-511) | `ChoiceKind.Effect`, `SuspendedEffect`, события `EffectSuspended`, `EffectResumed` |
 | Срок ответа ивента | через сколько часов без ответа на приостановленный ивент сервер отвечает случайным вариантом; по умолчанию срока нет (D-560) | `events.answerTimeoutHours` |
-| Голос | выбор пользователя в голосовании; один на человека, до закрытия можно сменить | команда `CastVote`, событие `VoteCast` |
-| Запуск голосования | админ или ивент открывает голосование со снимком вариантов | команда `StartPoll`, событие `PollStarted`; из ивента — `RequestChoiceAction.Vote` |
-| Итог голосования | вариант с наибольшим числом голосов, ничья — бросок; запускает эффект | событие `PollClosed`, ссылка `$result`; отмена — `PollCancelled` |
+| Голос | выбор пользователя в голосовании; один на человека, до закрытия можно сменить (`polls.allowChangeVote`), повтор того же голоса — отказ | команда `CastVote`, события `VoteCast`, `VoteChanged`; в состоянии — `Vote`, `Poll.Votes` |
+| Запуск голосования | админ или ивент открывает голосование со снимком вариантов (игры — выборка `polls.gameOptions`) | команда `StartPoll`, событие `PollStarted`, `PollSource` (`Admin`, `Event`); из ивента — `RequestChoiceAction.Vote` (`PollVoteSpec`), приостановка с `SuspendedEffect.PollId` |
+| Досрочное закрытие голосования | админ закрывает голосование до срока; по сроку закрывает таймер | команда `ClosePoll`, `PollCloseReason` (`Timer`, `Admin`) |
+| Живой счёт | счёт по вариантам до закрытия; у анонимных — никогда (D-541) | `PollDefinition.ShowLiveCounts`, `polls.showLiveCountsDefault` |
+| Выбранная игра | фильтр следующего ролла на конкретные игры («выберите игру лидеру»); недоступная к ролу — снимается с записью | `GameFilterSpec.Games`, `RollModifiersApplied.Dropped` |
+| Итог голосования | вариант с наибольшим числом голосов, ничья — бросок; запускает эффект | событие `PollClosed` (`PollCount`, `Tied`, `TieRoll`), ссылка `$result`; отмена — `PollCancelled`; механика — `Polls/Polling` |
 | Голосующие | кто голосует: игроки или все (зрители — по конфигу) | `PollVoters` (`Players`, `Everyone`), `social.spectatorsCanVote` |
 | Анонимное голосование | голоса показываются без имён (D-515) | `PollDefinition.Anonymous` |
 | Запуск общего ивента | админ начинает общий ивент на срок | команды `LaunchGlobalEvent`, `EndGlobalEvent`, события `GlobalEventLaunched`, `GlobalEventEnded` |

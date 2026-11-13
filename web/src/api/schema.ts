@@ -7894,38 +7894,6 @@ export interface components {
             /** Format: int32 */
             consecutiveExtraDice?: null | number;
         };
-        /** @description The rules of duels (D-525, the expert panel, D-540): a race to the next completion for coins from the system. */
-        DuelRules: {
-            /**
-             * Format: int32
-             * @description The coins the system pays the winner; the loser gets nothing, nothing passes between the players.
-             */
-            rewardCoins: number;
-            /**
-             * Format: int32
-             * @description How many days after the acceptance a completion still wins; then the duel is a draw.
-             */
-            durationDays: number;
-            /**
-             * Format: int32
-             * @description How many open duels one player may have: the challenges he sent and waiting, and the accepted ones.
-             */
-            maxOpenPerPlayer: number;
-            /** @description Only a run rolled after the acceptance wins (no sniping with a game nearly done). */
-            countRunsStartedAfterAccept: boolean;
-            /**
-             * Format: int32
-             * @description How many days after the end of their accepted duel the same two players may not duel again.
-             */
-            samePairCooldownDays: number;
-            /**
-             * Format: int32
-             * @description How many duels one player may win in a season; at the limit he neither challenges nor accepts.
-             */
-            maxWinsPerSeason: number;
-            /** @description A voluntary drop (or wish reroll) of a run that counts loses the duel: the opponent wins at once (D-733). */
-            dropForfeits: boolean;
-        };
         /**
          * @description Which economy mechanics the season plays (D-441): a mechanic off is not shown at all; always set, optional for older
          *     clients. The inventory, the shop and the bets come from `GET /api/seasons/{id}/economy`.
@@ -8107,11 +8075,6 @@ export interface components {
              *     off: a season logged before it keeps its ruleset's format.
              */
             coop?: boolean;
-            /**
-             * @description Duels (stage 5, D-525, D-540); optional, so older configs without it still read. Not written while off: a season
-             *     logged before it keeps its ruleset's format.
-             */
-            duels?: boolean;
         };
         /**
          * @description One event of the season's feed (GLOSSARY «Лента», D-124): its place in the log, the command it came from, when, the
@@ -8677,6 +8640,18 @@ export interface components {
             id: string;
             name: string;
         };
+        /** @description The rules of polls (SPEC «Голосования», D-512, D-513, D-541). */
+        PollRules: {
+            /**
+             * Format: int32
+             * @description How many games a poll over games offers: a random sample of the games available to its target (D-512).
+             */
+            gameOptions: number;
+            /** @description Whether a voter may change the vote before the close; the last one counts (D-513). */
+            allowChangeVote: boolean;
+            /** @description Whether a poll shows its counts before the close when it does not say (D-541); never for an anonymous one. */
+            showLiveCountsDefault: boolean;
+        };
         PoolActionRequest: {
             /** Format: uuid */
             commandId: string;
@@ -9041,7 +9016,7 @@ export interface components {
             events?: null | components["schemas"]["EventRules"];
             suggestions?: null | components["schemas"]["SuggestionRules"];
             partnerBoard?: null | components["schemas"]["PartnerBoardRules"];
-            duels?: null | components["schemas"]["DuelRules"];
+            polls?: null | components["schemas"]["PollRules"];
         };
         /**
          * @description One changed value between two versions of the rules: the JSON path (for example `reward.diceCount.max`)

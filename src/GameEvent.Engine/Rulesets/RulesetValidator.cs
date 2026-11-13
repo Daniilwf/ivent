@@ -34,6 +34,7 @@ public static class RulesetValidator
     private const int MaxOpenInvites = 100;
     private const int MaxInviteTtlHours = 24 * 30;
     private const int MaxRequestTtlHours = 24 * 30;
+    private const int MaxPollGameOptions = 20;
     private const int MaxDuelDays = 366;
     private const int MaxDuelCoins = 1000;
     private const int MaxOpenDuels = 10;
@@ -217,6 +218,17 @@ public static class RulesetValidator
         if (ruleset.Suggestions is { PerDay: < 1 or > MaxSuggestionsPerDay })
         {
             Error("suggestions.perDay", $"must be 1–{MaxSuggestionsPerDay}");
+        }
+
+        if (ruleset.Features.Polls && ruleset.Polls is null)
+        {
+            Error("polls", "is required when features.polls is on");
+        }
+
+        // A poll over games offers at least two to choose from (D-512)
+        if (ruleset.Polls is { GameOptions: < 2 or > MaxPollGameOptions })
+        {
+            Error("polls.gameOptions", $"must be 2–{MaxPollGameOptions}");
         }
 
         // Duels (D-525, D-540): the section comes with the flag; the bounds keep every moment of a duel on the calendar

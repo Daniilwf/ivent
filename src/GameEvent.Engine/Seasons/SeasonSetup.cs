@@ -116,6 +116,11 @@ internal static class SeasonSetup
         }
 
         var changed = new SeasonStatusChanged(state.Status, command.To);
+        if (command.To == SeasonStatus.Closing)
+        {
+            return Decision.Accept([changed, .. CancelledPolls(state)]);
+        }
+
         if (command.To != SeasonStatus.Finished)
         {
             return Decision.Accept(changed);
@@ -215,9 +220,13 @@ internal static class SeasonSetup
         }
 
         return IsPastDeadline(state, context.Clock.UtcNow)
-            ? Decision.Accept(new SeasonStatusChanged(SeasonStatus.Active, SeasonStatus.Closing))
+            ? Decision.Accept([new SeasonStatusChanged(SeasonStatus.Active, SeasonStatus.Closing), .. CancelledPolls(state)])
             : Decision.Reject(RejectionCodes.SeasonDeadlineNotReached, "The deadline has not come yet.");
     }
+
+    // D-516: the deadline cancels the polls whose result acts — even with polls switched off (D-724): the results must not
+    // change after it, and an event's suspension left to a frozen poll would hold «Подвести итоги» for nothing
+    private static IEnumerable<IGameEvent> CancelledPolls(SeasonState state) => Polls.Polling.CancelAtDeadline(state);
 
     public static SeasonState Apply(SeasonState state, SeasonResultRecorded e) => state with { Result = e.Rows };
 

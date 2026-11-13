@@ -32,7 +32,6 @@ public static class RulesetSupport
         var f = ruleset.Features;
         foreach (var (name, on) in new[]
         {
-            ("polls", f.Polls),
             ("achievements", f.Achievements),
             ("reactions", f.Reactions), ("comments", f.Comments), ("gallery", f.Gallery),
         })

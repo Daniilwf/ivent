@@ -225,15 +225,17 @@ public static partial class AdminContentEndpoints
             return TypedResults.NotFound();
         }
 
-        var problems = Problems(body, await EventsOnAsync(db, seasonId, ct), out _);
+        var problems = Problems(body, await FlagsAsync(db, seasonId, ct), out _);
         return TypedResults.Ok(new ContentCheckView(problems.Count == 0, problems));
     }
 
-    // A pack holds events and decks only while the season plays them (D-532): the editor checks as the engine will
-    private static async Task<bool> EventsOnAsync(GameEventDbContext db, Guid seasonId, CancellationToken ct)
+    // A pack holds events and decks only while the season plays them (D-532), an event's vote only with polls (D-512): the
+    // editor checks as the engine will
+    private static async Task<(bool Events, bool Polls)> FlagsAsync(GameEventDbContext db, Guid seasonId, CancellationToken ct)
     {
         var json = await db.Seasons.AsNoTracking().Where(s => s.Id == seasonId).Select(s => s.RulesetJson).SingleOrDefaultAsync(ct);
-        return json is not null && JsonSerializer.Deserialize<Ruleset>(json, EngineJson.Options)!.Features.Events;
+        var features = json is null ? null : JsonSerializer.Deserialize<Ruleset>(json, EngineJson.Options)!.Features;
+        return (features?.Events ?? false, features?.Polls ?? false);
     }
 
     private static async Task<Results<Ok<CommandResponse>, JsonHttpResult<ContentProblem>, ProblemHttpResult, ValidationProblem, NotFound, ForbidHttpResult>> PublishAsync(
@@ -269,7 +271,7 @@ public static partial class AdminContentEndpoints
             };
         }
 
-        var problems = Problems(packJson, await EventsOnAsync(db, seasonId, ct), out var pack);
+        var problems = Problems(packJson, await FlagsAsync(db, seasonId, ct), out var pack);
         if (problems.Count > 0)
         {
             return TypedResults.Json(
@@ -288,7 +290,7 @@ public static partial class AdminContentEndpoints
     }
 
     /// <summary>The problems of a pack: its types (the first one the strict reader meets), then every content rule.</summary>
-    private static List<ContentProblemView> Problems(JsonObject json, bool events, out ContentPack? pack)
+    private static List<ContentProblemView> Problems(JsonObject json, (bool Events, bool Polls) flags, out ContentPack? pack)
     {
         // The reader lets a null list item through at any depth (nullable annotations do not reach list items, CE-SEC-1)
         var nulls = NullItems(json, "$").Select(at => new ContentProblemView(Path(at), NullItem)).ToList();
@@ -330,7 +332,7 @@ public static partial class AdminContentEndpoints
 
         if (problems.Count == 0)
         {
-            problems.AddRange(ContentPublishing.Check(pack, events).Select(e => new ContentProblemView(Path(e.Path), e.Message)));
+            problems.AddRange(ContentPublishing.Check(pack, flags.Events, flags.Polls).Select(e => new ContentProblemView(Path(e.Path), e.Message)));
         }
 
         return problems;
