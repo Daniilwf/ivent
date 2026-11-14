@@ -65,6 +65,46 @@ public sealed partial class CommandProcessor
         return new CommandOutcome(true, false, null, logged, secret);
     }
 
+    /// <summary>
+    /// After an account's deletion (D-734): in each running season it plays, a system command of its own (no author) through
+    /// this same consumer calls off its duels and burns its challenges, one transaction each. The id comes from the season
+    /// and the deletion, so a season is never settled twice for one deletion; a season with nothing open refuses, which is
+    /// fine. A failure in one season is logged and does not stop the others or fail the deletion, which is committed.
+    /// </summary>
+    private async Task CancelDuelsOfDeletedAccountAsync(Guid userId, Guid deletionId, CancellationToken ct)
+    {
+        List<(Guid SeasonId, Guid PlayerId)> plays;
+        await using (var db = await dbFactory.CreateDbContextAsync(ct))
+        {
+            plays = [.. (await db.SeasonPlayers.AsNoTracking()
+                .Where(p => p.UserId == userId)
+                .Join(db.Seasons.Where(s => s.Status == Engine.Seasons.SeasonStatus.Active), p => p.SeasonId, s => s.Id, (p, _) => new { p.SeasonId, p.Id })
+                .ToListAsync(ct))
+                .Select(x => (x.SeasonId, x.Id))];
+        }
+
+        foreach (var (seasonId, playerId) in plays)
+        {
+            var envelope = new CommandEnvelope(
+                AccountDeletedCommandId(seasonId, deletionId), seasonId, new Engine.Duels.CancelDuelsOfDeletedAccount(playerId), AuthorId: null);
+            try
+            {
+                await ProcessAsync(envelope, ct);
+            }
+#pragma warning disable CA1031 // the deletion is committed: a failed season is logged and the others go on
+            catch (Exception e) when (e is not OperationCanceledException)
+#pragma warning restore CA1031
+            {
+                _cache.Remove(seasonId);
+                LogCommandFailed(logger, e, envelope.CommandId, nameof(Engine.Duels.CancelDuelsOfDeletedAccount));
+            }
+        }
+    }
+
+    private static Guid AccountDeletedCommandId(Guid seasonId, Guid deletionId) =>
+        new(System.Security.Cryptography.SHA256.HashData(
+            System.Text.Encoding.UTF8.GetBytes($"account-deleted-duels:{seasonId:N}:{deletionId:N}")).AsSpan(0, 16));
+
     private async Task<(IReadOnlyList<IGameEvent> Events, Action? Apply, string? Secret, Rejection? Rejection)> DecideAccountAsync(
         GameEventDbContext db, IAccountCommand command, DateTimeOffset now, CancellationToken ct)
     {

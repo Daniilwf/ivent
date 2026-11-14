@@ -87,6 +87,13 @@ public sealed partial class CommandProcessor(
         try
         {
             var outcome = await ProcessAsync(pending.Envelope, ct);
+
+            // A deleted account leaves the duels of its running seasons before the deletion is reported done (D-734)
+            if (outcome.IsAccepted && !outcome.IsDuplicate && pending.Envelope.Command is Accounts.DeleteAccount deleted)
+            {
+                await CancelDuelsOfDeletedAccountAsync(deleted.UserId, pending.Envelope.CommandId, ct);
+            }
+
             pending.Completion.TrySetResult(outcome);
 
             // What the command queued for everyone is settled right after it, before the next command (D-537)

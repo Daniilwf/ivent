@@ -83,6 +83,7 @@ public static class SeasonEngine
             SubmitIrlProof c => IrlProofs.Decide(state, c, context),
             ReviewIrlProof c => IrlProofs.Decide(state, c, context),
             Interactions.InviteToCoop c => Interactions.Coop.Decide(state, c, context),
+            Duels.CancelDuelsOfDeletedAccount c => Duels.Dueling.Decide(state, c, context),
 
             // One invitation for coop and duels (D-718, D-730): a duel's is answered and withdrawn by the duel's rules
             Interactions.AnswerInvitation c when Duels.Dueling.IsDuel(state, c.InteractionId) => Duels.Dueling.Decide(state, c, context),

@@ -79,6 +79,25 @@ internal static class Dueling
             now.AddHours(state.Rules.Interactions.InviteTtlHours))));
     }
 
+    /// <summary>The account of the player was deleted: he leaves every race and challenge (D-734).</summary>
+    public static Decision Decide(SeasonState state, CancelDuelsOfDeletedAccount command, EngineContext context)
+    {
+        if (SeasonSetup.RequireActive(state) is { } inactive)
+        {
+            return inactive;
+        }
+
+        if (!state.Players.ContainsKey(command.PlayerId))
+        {
+            return Decision.Reject(RejectionCodes.PlayerUnknown, $"Player {command.PlayerId} is not in the season.");
+        }
+
+        var events = Leave(state, command.PlayerId, InteractionExpiry.AccountDeleted, DuelEnd.AccountDeleted, context.Clock.UtcNow).ToList();
+        return events.Count == 0
+            ? Decision.Reject(RejectionCodes.DuelNothingToCancel, "The player has no duel going on and no challenge waiting.")
+            : Decision.Accept(events);
+    }
+
     /// <summary>The challenged player answers a duel's challenge; an accept checks everything again now (D-523) and starts the race.</summary>
     public static Decision Decide(SeasonState state, AnswerInvitation command, EngineContext context)
     {
