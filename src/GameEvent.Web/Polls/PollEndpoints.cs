@@ -74,12 +74,15 @@ public static class PollEndpoints
             .WithReadErrors();
 
         // Who may vote is the engine's rule (players of the season, spectators when the rules allow): no role policy here
-        seasons.MapPost("/polls/{pollId:guid}/vote", VoteAsync).WithActionErrors();
+        seasons.MapPost("/polls/{pollId:guid}/vote", VoteAsync)
+            .RequireRateLimiting(AppSetup.VoteRateLimit)
+            .WithActionErrors()
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
 
         var admin = api.MapGroup("/admin/seasons/{seasonId:guid}").WithTags("Admin").RequireAuthorization(Policies.Admin);
         admin.MapPost("/polls", StartAsync).WithActionErrors();
         admin.MapPost("/polls/{pollId:guid}/close", (Guid seasonId, Guid pollId, SeasonActionRequest request, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, CancellationToken ct) =>
-                SendAsync(seasonId, request.CommandId, new ClosePoll(pollId), user.UserId(), db, bus, ct))
+                SeasonEndpoints.PrecheckAndSendAsync(seasonId, request.CommandId, new ClosePoll(pollId), user.UserId(), db, bus, ct))
             .WithActionErrors();
     }
 
@@ -168,7 +171,7 @@ public static class PollEndpoints
     {
         if (request.OptionId is not { Length: > 0 and <= MaxOptionLength } option || option.Any(char.IsControl))
         {
-            return Invalid("optionId", $"An option of the poll is 1–{MaxOptionLength} characters.");
+            return SeasonEndpoints.Invalid("optionId", $"An option of the poll is 1–{MaxOptionLength} characters.");
         }
 
         if (await SeasonEndpoints.PrecheckAsync(seasonId, request.CommandId, db, ct) is { } refused)
@@ -193,7 +196,7 @@ public static class PollEndpoints
     {
         if (request.Poll.ValueKind != JsonValueKind.Object)
         {
-            return Invalid("poll", "A poll {question, options, voters, closesInHours} is required.");
+            return SeasonEndpoints.Invalid("poll", "A poll {question, options, voters, closesInHours} is required.");
         }
 
         PollDefinition poll;
@@ -203,16 +206,9 @@ public static class PollEndpoints
         }
         catch (JsonException e)
         {
-            return Invalid("poll", e.Message);
+            return SeasonEndpoints.Invalid("poll", e.Message);
         }
 
-        return await SendAsync(seasonId, request.CommandId, new StartPoll(poll), user.UserId(), db, bus, ct);
+        return await SeasonEndpoints.PrecheckAndSendAsync(seasonId, request.CommandId, new StartPoll(poll), user.UserId(), db, bus, ct);
     }
-
-    private static async Task<ActionResult> SendAsync(Guid seasonId, Guid commandId, ICommand command, Guid? authorId, GameEventDbContext db, CommandBus bus, CancellationToken ct) =>
-        await SeasonEndpoints.PrecheckAsync(seasonId, commandId, db, ct)
-            ?? await SeasonEndpoints.SendAsync(seasonId, commandId, command, authorId, bus, ct);
-
-    private static ValidationProblem Invalid(string field, string message) =>
-        TypedResults.ValidationProblem(new Dictionary<string, string[]> { [field] = [message] });
 }

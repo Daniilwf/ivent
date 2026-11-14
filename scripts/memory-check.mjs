@@ -150,12 +150,25 @@ try {
     '/api/pool',
     '/api/status',
     '/api/seasons/current',
-    // Stage 5 (5.19, D-837): they read the projection's tables; while the season plays a mechanic off they answer 409
+    // Stage 5 (5.19, D-837): they read the projection's tables
     `/api/seasons/${id}/polls`,
     `/api/seasons/${id}/global-events`,
     `/api/seasons/${id}/weekly-challenges`,
   ];
-  const offIsFine = new Set(pages.slice(-3));
+  // A stage 5 read answers 409 only while the season plays its mechanic off: then it is no error, but it reads no table
+  // and loads nothing, so the run says so — a measurement of the stage 5 pages needs a season with them on (D-837)
+  const features =
+    (await (await clients[0](`/api/seasons/${id}/rules`)).json()).ruleset?.features ?? {};
+  const flags = {
+    [`/api/seasons/${id}/polls`]: features.polls,
+    [`/api/seasons/${id}/global-events`]: features.globalEvents,
+    [`/api/seasons/${id}/weekly-challenges`]: features.weeklyChallenge,
+  };
+  const offIsFine = new Set(Object.keys(flags).filter((page) => flags[page] !== true));
+  if (offIsFine.size)
+    console.warn(
+      `Mechanics off in the season, their pages read no table: ${[...offIsFine].map((p) => p.split('/').pop()).join(', ')}.`,
+    );
   const end = Date.now() + seconds * 1000;
   const sampler = setInterval(sample, 2000);
   await Promise.all(

@@ -212,7 +212,7 @@ public static class AdminSeasonEndpoints
                     first.AuthorId is { } author ? authors.GetValueOrDefault(author) : null,
                     first.OccurredAt,
                     g.Any(r => r.UndoneByEventId is not null),
-                    [.. g.Select(r => r.Type)],
+                    [.. g.Select(r => Realtime.AnonymousVotes.Listed(r.Type, r.Data))],
                     fact.PlayerId is { } player ? players.GetValueOrDefault(player) : null,
                     gameId is { } id ? titles.GetValueOrDefault(id) : null,
                     fact.Comment);

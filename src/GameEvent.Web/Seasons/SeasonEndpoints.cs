@@ -502,7 +502,8 @@ public static class SeasonEndpoints
                 ? Invalid("text", $"At most {Limits.MaxReviewLength} characters.")
                 : null;
 
-    private static ValidationProblem Invalid(string field, string message) =>
+    /// <summary>A bad request that names one field.</summary>
+    internal static ValidationProblem Invalid(string field, string message) =>
         TypedResults.ValidationProblem(new Dictionary<string, string[]> { [field] = [message] });
 
     // Option ids are the engine's: a game id in the N format, a cell, or the text of an event's list or category (D-822 (2),
@@ -576,6 +577,11 @@ public static class SeasonEndpoints
 
         return null;
     }
+
+    /// <summary>The precheck of <see cref="PrecheckAsync"/>, then the command through the queue by <see cref="SendAsync"/>.</summary>
+    internal static async Task<ActionResult> PrecheckAndSendAsync(
+        Guid seasonId, Guid commandId, ICommand command, Guid? authorId, GameEventDbContext db, CommandBus bus, CancellationToken ct) =>
+        await PrecheckAsync(seasonId, commandId, db, ct) ?? await SendAsync(seasonId, commandId, command, authorId, bus, ct);
 
     /// <summary>Sends a checked command through the queue: 409 with the engine code on a rejection.</summary>
     internal static async Task<ActionResult> SendAsync(

@@ -97,8 +97,7 @@ public sealed class SeasonHub(HubSessions sessions, IDbContextFactory<GameEventD
         foreach (var command in missed.GroupBy(e => e.CommandId))
         {
             var events = command.ToList();
-            updates.Add(new SeasonUpdate(
-                seasonId, events[0].Sequence, events[^1].Sequence, [.. events.Where(e => !AnonymousVotes.IsHiddenChange(e.Type, e.Data)).Select(e => e.Type)]));
+            updates.Add(new SeasonUpdate(seasonId, events[0].Sequence, events[^1].Sequence, [.. events.Select(e => AnonymousVotes.Listed(e.Type, e.Data))]));
         }
 
         return updates.Count > MaxMissedCommands || updates[^1].ToSequence < last
@@ -134,10 +133,9 @@ public sealed class SeasonBroadcaster : ICommittedEventsListener
             return Task.CompletedTask;
         }
 
-        // D-726, D-831: a changed vote of an anonymous poll is not even listed — the update still comes, so no gap is seen
+        // D-726, D-831, D-835: a changed vote of an anonymous poll reads as a vote cast — the update still comes, so no gap is seen
         IReadOnlyList<string> types = [.. events
-            .Where(e => e.Event is not Engine.Polls.VoteChanged { Anonymous: true })
-            .Select(e => EventCatalog.Describe(e.Event.GetType()).Name)];
+            .Select(e => e.Event is Engine.Polls.VoteChanged { Anonymous: true } ? AnonymousVotes.CastType : EventCatalog.Describe(e.Event.GetType()).Name)];
         if (events[0].SeasonId != Guid.Empty)
         {
             _updates.Writer.TryWrite(new SeasonUpdate(events[0].SeasonId, events[0].Sequence, events[^1].Sequence, types));
@@ -190,12 +188,18 @@ public sealed partial class SeasonBroadcastWorker(
 }
 
 /// <summary>
-/// The hub's side of the anonymous poll (D-726, D-831): watchers never learn that someone changed an anonymous vote. A vote
-/// cast is listed (the feed shows it too, without its voter).
+/// The anonymous poll in the hub and the admin's command journal (D-726, D-831, D-835): nobody learns that someone changed an
+/// anonymous vote, nor when. A changed vote is listed as a vote cast, so its update or row looks like any other vote of the
+/// poll (the feed shows a vote cast too, without its voter).
 /// </summary>
 internal static class AnonymousVotes
 {
     public static readonly string ChangedType = EventCatalog.Describe(typeof(Engine.Polls.VoteChanged)).Name;
+
+    public static readonly string CastType = EventCatalog.Describe(typeof(Engine.Polls.VoteCast)).Name;
+
+    /// <summary>The type a stored event is listed by: a changed vote of an anonymous poll is a vote cast.</summary>
+    public static string Listed(string type, string? data) => IsHiddenChange(type, data) ? CastType : type;
 
     /// <summary>Whether a stored event is a changed vote of an anonymous poll; <paramref name="data"/> is read only for that type.</summary>
     public static bool IsHiddenChange(string type, string? data) =>

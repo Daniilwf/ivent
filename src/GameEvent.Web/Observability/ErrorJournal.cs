@@ -53,7 +53,7 @@ public sealed class ErrorJournal
     /// treated so, whatever the poll: the journal does not read the season.
     /// </summary>
     internal static bool IsVote(PathString path) =>
-        path.Value is { } value && value.EndsWith("/vote", StringComparison.OrdinalIgnoreCase) && value.Contains("/polls/", StringComparison.OrdinalIgnoreCase);
+        path.Value?.TrimEnd('/') is { } value && value.EndsWith("/vote", StringComparison.OrdinalIgnoreCase) && value.Contains("/polls/", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>The path is percent-decoded: control characters are escaped so that it cannot forge a line of the log.</summary>
     internal static string Printable(string text) => text.Any(char.IsControl)

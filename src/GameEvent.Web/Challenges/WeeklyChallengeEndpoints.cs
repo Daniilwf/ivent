@@ -65,10 +65,10 @@ public static class WeeklyChallengeEndpoints
         admin.MapPost("/weekly-challenges", SetAsync).WithActionErrors();
         admin.MapPost("/weekly-challenges/{challengeId:guid}/mark", (Guid seasonId, Guid challengeId, MarkWeeklyChallengeRequest request, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, CancellationToken ct) =>
                 request.PlayerId == Guid.Empty
-                    ? Task.FromResult<ActionResult>(Invalid("playerId", "A player is required."))
+                    ? Task.FromResult<ActionResult>(SeasonEndpoints.Invalid("playerId", "A player is required."))
                     : request.RunId == Guid.Empty
-                        ? Task.FromResult<ActionResult>(Invalid("runId", "A run is required."))
-                        : SendAsync(seasonId, request.CommandId, new MarkWeeklyChallenge(challengeId, request.PlayerId, request.RunId), user, db, bus, ct))
+                        ? Task.FromResult<ActionResult>(SeasonEndpoints.Invalid("runId", "A run is required."))
+                        : SeasonEndpoints.PrecheckAndSendAsync(seasonId, request.CommandId, new MarkWeeklyChallenge(challengeId, request.PlayerId, request.RunId), user.UserId(), db, bus, ct))
             .WithActionErrors();
     }
 
@@ -112,7 +112,7 @@ public static class WeeklyChallengeEndpoints
     {
         if (request.Challenge.ValueKind != JsonValueKind.Object)
         {
-            return Invalid("challenge", "A challenge {id, name, description, condition, reward, check} is required.");
+            return SeasonEndpoints.Invalid("challenge", "A challenge {id, name, description, condition, reward, check} is required.");
         }
 
         WeeklyChallengeDefinition challenge;
@@ -122,16 +122,9 @@ public static class WeeklyChallengeEndpoints
         }
         catch (JsonException e)
         {
-            return Invalid("challenge", e.Message);
+            return SeasonEndpoints.Invalid("challenge", e.Message);
         }
 
-        return await SendAsync(seasonId, request.CommandId, new SetWeeklyChallenge(challenge, request.StartsAt), user, db, bus, ct);
+        return await SeasonEndpoints.PrecheckAndSendAsync(seasonId, request.CommandId, new SetWeeklyChallenge(challenge, request.StartsAt), user.UserId(), db, bus, ct);
     }
-
-    private static async Task<ActionResult> SendAsync(Guid seasonId, Guid commandId, ICommand command, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, CancellationToken ct) =>
-        await SeasonEndpoints.PrecheckAsync(seasonId, commandId, db, ct)
-            ?? await SeasonEndpoints.SendAsync(seasonId, commandId, command, user.UserId(), bus, ct);
-
-    private static ValidationProblem Invalid(string field, string message) =>
-        TypedResults.ValidationProblem(new Dictionary<string, string[]> { [field] = [message] });
 }

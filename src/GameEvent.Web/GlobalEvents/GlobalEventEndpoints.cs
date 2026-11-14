@@ -67,7 +67,7 @@ public static class GlobalEventEndpoints
         var admin = api.MapGroup("/admin/seasons/{seasonId:guid}").WithTags("Admin").RequireAuthorization(Policies.Admin);
         admin.MapPost("/global-events", LaunchAsync).WithActionErrors();
         admin.MapPost("/global-events/{globalEventId:guid}/end", (Guid seasonId, Guid globalEventId, SeasonActionRequest request, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, CancellationToken ct) =>
-                SendAsync(seasonId, request.CommandId, new EndGlobalEvent(globalEventId), user, db, bus, ct))
+                SeasonEndpoints.PrecheckAndSendAsync(seasonId, request.CommandId, new EndGlobalEvent(globalEventId), user.UserId(), db, bus, ct))
             .WithActionErrors();
     }
 
@@ -121,12 +121,12 @@ public static class GlobalEventEndpoints
     {
         if (request.ObjectId is not { Length: > 0 and <= ContentValidator.MaxIdLength } objectId || objectId.Any(char.IsControl))
         {
-            return Invalid("objectId", $"An event's id is 1–{ContentValidator.MaxIdLength} characters.");
+            return SeasonEndpoints.Invalid("objectId", $"An event's id is 1–{ContentValidator.MaxIdLength} characters.");
         }
 
         if (request.DurationHours is < 1 or > MaxDurationHours)
         {
-            return Invalid("durationHours", $"A term is 1–{MaxDurationHours} hours.");
+            return SeasonEndpoints.Invalid("durationHours", $"A term is 1–{MaxDurationHours} hours.");
         }
 
         GlobalEventGoal? goal = null;
@@ -134,12 +134,12 @@ public static class GlobalEventEndpoints
         {
             if (!Enum.IsDefined(asked.Metric))
             {
-                return Invalid("goal.metric", "«hours» or «runs».");
+                return SeasonEndpoints.Invalid("goal.metric", "«hours» or «runs».");
             }
 
             if (asked.Target < 1)
             {
-                return Invalid("goal.target", "A goal's target is at least 1.");
+                return SeasonEndpoints.Invalid("goal.target", "A goal's target is at least 1.");
             }
 
             EffectSpec? reward = null;
@@ -147,7 +147,7 @@ public static class GlobalEventEndpoints
             {
                 if (json.ValueKind != JsonValueKind.Object)
                 {
-                    return Invalid("goal.reward", "A reward is an effect {target, actions}.");
+                    return SeasonEndpoints.Invalid("goal.reward", "A reward is an effect {target, actions}.");
                 }
 
                 try
@@ -156,20 +156,13 @@ public static class GlobalEventEndpoints
                 }
                 catch (JsonException e)
                 {
-                    return Invalid("goal.reward", e.Message);
+                    return SeasonEndpoints.Invalid("goal.reward", e.Message);
                 }
             }
 
             goal = new GlobalEventGoal { Metric = asked.Metric, Target = asked.Target, Reward = reward };
         }
 
-        return await SendAsync(seasonId, request.CommandId, new LaunchGlobalEvent(objectId, request.DurationHours, goal), user, db, bus, ct);
+        return await SeasonEndpoints.PrecheckAndSendAsync(seasonId, request.CommandId, new LaunchGlobalEvent(objectId, request.DurationHours, goal), user.UserId(), db, bus, ct);
     }
-
-    private static async Task<ActionResult> SendAsync(Guid seasonId, Guid commandId, ICommand command, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, CancellationToken ct) =>
-        await SeasonEndpoints.PrecheckAsync(seasonId, commandId, db, ct)
-            ?? await SeasonEndpoints.SendAsync(seasonId, commandId, command, user.UserId(), bus, ct);
-
-    private static ValidationProblem Invalid(string field, string message) =>
-        TypedResults.ValidationProblem(new Dictionary<string, string[]> { [field] = [message] });
 }
