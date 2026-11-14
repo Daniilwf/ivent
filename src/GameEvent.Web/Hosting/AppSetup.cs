@@ -287,6 +287,9 @@ public static class AppSetup
         api.MapFeed();
         api.MapEconomy();
         api.MapAdminEconomy();
+        Polls.PollEndpoints.MapPolls(api);
+        GlobalEvents.GlobalEventEndpoints.MapGlobalEvents(api);
+        Challenges.WeeklyChallengeEndpoints.MapWeeklyChallenges(api);
         api.MapAdminAccounts();
         api.MapFiles();
         api.MapAvatars();

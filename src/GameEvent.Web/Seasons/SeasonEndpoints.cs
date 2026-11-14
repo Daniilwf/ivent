@@ -103,7 +103,8 @@ public sealed record LoggedEventView(long Sequence, string Type);
 /// lifecycle (D-101); after the finish <c>leaderboard</c> is the recorded result. The map is the one in force (the
 /// latest published, D-300): <c>cells</c>, <c>edges</c> and <c>zones</c>; <c>mapMode</c> says whether the season plays
 /// on the linear chain of stage 1 or on the graph (D-301); <c>background</c> — the picture under the cells, null when
-/// the map has none or its file is not on this site (D-277).
+/// the map has none or its file is not on this site (D-277). <c>globalEvents</c> — the banner of the global events running
+/// now (D-832; always set, empty while the mechanic is off, optional for older clients).
 /// </summary>
 public sealed record SeasonView(
     Guid Id,
@@ -119,7 +120,8 @@ public sealed record SeasonView(
     IReadOnlyList<ZoneView> Zones,
     MapMode MapMode,
     MapBackgroundView? Background = null,
-    EconomyFeaturesView? Economy = null);
+    EconomyFeaturesView? Economy = null,
+    IReadOnlyList<GameEvent.Web.GlobalEvents.GlobalEventView>? GlobalEvents = null);
 
 /// <summary>
 /// Which economy mechanics the season plays (D-441): a mechanic off is not shown at all; always set, optional for older
@@ -812,7 +814,8 @@ public static class SeasonEndpoints
             [.. map.Zones.Select(SeasonMaps.ToView)],
             rules.Features.MapMode,
             await SeasonMaps.BackgroundAsync(db, map, ct),
-            new EconomyFeaturesView(rules.Features.Items, rules.Features.Shop, rules.Features.Bets)));
+            new EconomyFeaturesView(rules.Features.Items, rules.Features.Shop, rules.Features.Bets),
+            await GameEvent.Web.GlobalEvents.GlobalEventEndpoints.BannerAsync(db, seasonId, rules.Features.GlobalEvents, clock.UtcNow, ct)));
     }
 
     private static readonly string s_rejectedType = EventCatalog.Describe(typeof(ProofRejected)).Name;

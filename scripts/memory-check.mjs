@@ -3,7 +3,7 @@
 //   1. Seeds the demo season locally (Development) into var/memory-check/game-event.db.
 //   2. Builds the site's image and starts it as the live site does: Production, the container's memory and CPU limits
 //      of deploy/docker-compose.yml, the demo database mounted as /data.
-//   3. Sixteen players sign in and walk the pages (season, feed, pool, rules, status) for the given time, while the
+//   3. Sixteen players sign in and walk the pages (season, feed, pool, rules, status, polls, global events, weekly challenges) for the given time, while the
 //      container's memory is sampled every two seconds.
 //   4. Prints the peak and the average; fails when the peak is over the budget.
 // Usage: npm run test:memory [-- --seconds 120 --budget 400 --image ivent:local]   (needs Docker)
@@ -150,16 +150,22 @@ try {
     '/api/pool',
     '/api/status',
     '/api/seasons/current',
+    // Stage 5 (5.19, D-837): they read the projection's tables; while the season plays a mechanic off they answer 409
+    `/api/seasons/${id}/polls`,
+    `/api/seasons/${id}/global-events`,
+    `/api/seasons/${id}/weekly-challenges`,
   ];
+  const offIsFine = new Set(pages.slice(-3));
   const end = Date.now() + seconds * 1000;
   const sampler = setInterval(sample, 2000);
   await Promise.all(
     clients.map(async (call, n) => {
       let i = n;
       while (Date.now() < end) {
-        const response = await call(pages[i++ % pages.length]).catch(() => null);
+        const page = pages[i++ % pages.length];
+        const response = await call(page).catch(() => null);
         requests++;
-        if (!response?.ok) errors++;
+        if (!response?.ok && !(response?.status === 409 && offIsFine.has(page))) errors++;
         await response?.arrayBuffer().catch(() => undefined);
       }
     }),

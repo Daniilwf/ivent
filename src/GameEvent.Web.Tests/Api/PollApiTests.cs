@@ -128,8 +128,16 @@ public sealed class PollApiTests : IAsyncLifetime
     {
         var admin = await _site.SignedInAsync("admin");
 
+        // The site's pool has one category: a poll over the categories would offer one option (D-836: a list of one is
+        // refused by the content's rule before, as content.invalid)
         await AssertConflictAsync(
-            await admin.PostAsJsonAsync(AdminUrl("polls"), new { commandId = Guid.NewGuid(), poll = NominationJson(options: ["Один"]) }, Ct), "poll.noOptions");
+            await admin.PostAsJsonAsync(
+                AdminUrl("polls"),
+                new { commandId = Guid.NewGuid(), poll = new { question = "Q?", options = new { from = "categories" }, voters = "players", closesInHours = 24 } },
+                Ct),
+            "poll.noOptions");
+        await AssertConflictAsync(
+            await admin.PostAsJsonAsync(AdminUrl("polls"), new { commandId = Guid.NewGuid(), poll = NominationJson(options: ["Один"]) }, Ct), "content.invalid");
         await AssertConflictAsync(
             await admin.PostAsJsonAsync(
                 AdminUrl("polls"),
