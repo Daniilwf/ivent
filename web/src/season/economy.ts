@@ -4,6 +4,10 @@ import { ru } from '../i18n/ru';
 
 // What the panels of my economy share (4.11a, 4.11c): the loaded view, the answer to a command, the refusal in words
 
+/**
+ * The economy view; `serverNow` — the server's clock (its `IClock`, the test clock on Staging) when the view was built
+ * (S4-4); the response's Date header is the fallback.
+ */
 export type Economy = Schemas['EconomyView'];
 
 /** The answer of the server to a command: done, or refused with the engine's code in words */
@@ -13,7 +17,12 @@ export type Loaded =
   | { kind: 'loading' }
   | { kind: 'failed' }
   | { kind: 'signedOut' }
-  | { kind: 'ready'; economy: Economy };
+  | {
+      kind: 'ready';
+      economy: Economy;
+      /** The server's clock minus the device's, in ms, when the view came (S4-4); none — the device's clock */
+      clockOffset?: number;
+    };
 
 /** A panel's state: signed out shows as loading while the page goes to the login */
 export type PanelState = Exclude<Loaded, { kind: 'signedOut' }>;
@@ -22,6 +31,22 @@ export type PanelState = Exclude<Loaded, { kind: 'signedOut' }>;
 export function refusalText(code: string | null | undefined, own?: Record<string, string>): string {
   if (!code) return ru.rejection.unknown;
   return own?.[code] ?? ru.rejection[code] ?? ru.rejection.unknown;
+}
+
+/**
+ * How far the server's clock is ahead of the device's, in ms (S4-4, SPEC «Время считает сервер»): from the server time of
+ * the view, else from the response's Date header, else none
+ */
+export function clockOffset(
+  serverNow: string | null | undefined,
+  dateHeader: string | null | undefined,
+  deviceNow: Date = new Date(),
+): number {
+  for (const said of [serverNow, dateHeader]) {
+    const at = said ? Date.parse(said) : NaN;
+    if (Number.isFinite(at)) return at - deviceNow.getTime();
+  }
+  return 0;
 }
 
 /** Now, again every second while `ticking`: the timer of the lots counts down and they vanish on time */

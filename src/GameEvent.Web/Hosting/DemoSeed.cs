@@ -1,6 +1,8 @@
 using System.Text.Json;
 using GameEvent.Engine.Content;
+using GameEvent.Engine.Economy;
 using GameEvent.Engine.Effects;
+using GameEvent.Engine.Inventory;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Map;
 using GameEvent.Engine.Players;
@@ -31,6 +33,9 @@ namespace GameEvent.Web.Hosting;
 /// the middle of the season, while players stand on it. In the last days the players leave their branch choices
 /// waiting, so the season ends with players standing at a fork. The map is drawn over our own picture (D-279,
 /// content/map.demo.background.png from scripts/map-background.mjs), uploaded as the admin uploads a map background.
+/// Stage 4 (4.13): items, the shop and bets are on with the repository's items and wheels: the bots roll the shop and buy,
+/// use their items on each other, bet on each other's runs; the admin gives items now and then. The season ends with
+/// items held, bets won, lost and open, offers gone and one shop offer still live.
 /// </summary>
 public static class DemoSeed
 {
@@ -106,7 +111,7 @@ public static class DemoSeed
         var (first, published) = DemoMap(contentRoot);
         try
         {
-            await new Bots(factory, bus, clock, ct).PlayAsync((first with { Background = background }, published with { Background = background }));
+            await new Bots(factory, bus, clock, ct).PlayAsync((first with { Background = background }, published with { Background = background }), ItemsPack(contentRoot));
         }
         finally
         {
@@ -142,6 +147,16 @@ public static class DemoSeed
         return new MapBackground(record.Id, record.Width, record.Height);
     }
 
+    /// <summary>The repository's items and wheels (stage 4); the demo season plays without events.</summary>
+    private static ContentPack ItemsPack(string contentRoot)
+    {
+        IEnumerable<(string, string)> Read(string dir) =>
+            Directory.EnumerateFiles(Path.Combine(contentRoot, "content", dir), "*.json")
+                .Order(StringComparer.Ordinal)
+                .Select(f => (Path.GetFileName(f), File.ReadAllText(f)));
+        return ContentFiles.Pack(Read("items"), Read("wheels"));
+    }
+
     /// <summary>
     /// The demo map (content/map.demo.json) as the admin publishes it mid-season, and the first version the season starts
     /// with: the same cells and arrows without the zone <see cref="AddedZone"/> and its teleport (an empty cell there).
@@ -174,13 +189,44 @@ public static class DemoSeed
                 _admin = await db.Users.Where(u => u.Login == "admin").Select(u => u.Id).SingleAsync(ct);
             }
 
+            // One player rolls the shop with the real clock: the screens show a live offer with its timer
+            await using (var db = await factory.CreateDbContextAsync(ct))
+            {
+                var rich = await db.SeasonPlayers.AsNoTracking()
+                    .Where(p => p.SeasonId == SeasonId && p.FinishOrder == null && !p.IsInactive)
+                    .OrderByDescending(p => p.Coins).ThenBy(p => p.Name)
+                    .Select(p => new { p.Id, p.UserId })
+                    .FirstAsync(ct);
+                await TryAsync(new RollShop(rich.Id), rich.UserId);
+
+                // And a bet stays open: an idle player rolls and starts a game now, the first other player who can bets on it
+                var players = await db.SeasonPlayers.AsNoTracking()
+                    .Where(p => p.SeasonId == SeasonId && p.FinishOrder == null && !p.IsInactive)
+                    .OrderBy(p => p.Name).Select(p => new { p.Id, p.UserId, p.Phase }).ToListAsync(ct);
+                foreach (var on in players.Where(p => p.Phase == TurnPhase.Idle))
+                {
+                    if (await TryAsync(new RollGame(on.Id), on.UserId) && await TryAsync(new StartRun(on.Id), on.UserId))
+                    {
+                        foreach (var bettor in players.Where(p => p.Id != on.Id))
+                        {
+                            if (await TryAsync(new PlaceBet(bettor.Id, on.Id, 7, 2), bettor.UserId))
+                            {
+                                break;
+                            }
+                        }
+
+                        break;
+                    }
+                }
+            }
+
             await SendAsync(new SetSeasonDeadline(deadline), _admin);
         }
 
         private (MapGraph First, MapGraph Published) _map;
         private int _day;
 
-        public async Task PlayAsync((MapGraph First, MapGraph Published) map)
+        public async Task PlayAsync((MapGraph First, MapGraph Published) map, ContentPack items)
         {
             _map = map;
             List<Guid> players;
@@ -194,8 +240,9 @@ public static class DemoSeed
             }
 
             var rules = RulesetJson.Default();
-            rules = rules with { Features = rules.Features with { MapMode = MapMode.Graph } };
+            rules = rules with { Features = rules.Features with { MapMode = MapMode.Graph, Items = true, Shop = true, Bets = true } };
             await SendAsync(new CreateSeason(SeasonId, "Демо-сезон", rules, Map: _map.First), _admin);
+            await SendAsync(new PublishContent(items, "Предметы и лутбоксы сезона"), _admin);
             for (var i = 0; i < players.Count; i++)
             {
                 await SendAsync(new AddSeasonPlayer(Guid.CreateVersion7(), players[i], s_names[i]), _admin);
@@ -256,6 +303,8 @@ public static class DemoSeed
                 return;
             }
 
+            await EconomyTurnAsync(player.Id, userId);
+
             switch (player.Phase)
             {
                 case TurnPhase.Idle when _random.NextDouble() < 0.7:
@@ -299,6 +348,46 @@ public static class DemoSeed
                     }
 
                     break;
+            }
+        }
+
+        /// <summary>
+        /// Stage 4: now and then the player rolls the shop and buys a lot, uses an item — on another player when it takes
+        /// a target — or bets a few coins on a run in progress. The engine refuses what does not fit (no coins, the
+        /// window closed, a target it does not accept), so the bots try and move on.
+        /// </summary>
+        private async Task EconomyTurnAsync(Guid playerId, Guid userId)
+        {
+            await using var db = await factory.CreateDbContextAsync(ct);
+            var others = await db.SeasonPlayers.AsNoTracking()
+                .Where(p => p.SeasonId == SeasonId && p.Id != playerId)
+                .OrderBy(p => p.Name)
+                .Select(p => new { p.Id, p.Phase })
+                .ToListAsync(ct);
+            var json = await db.SeasonPlayers.AsNoTracking().Where(p => p.Id == playerId).Select(p => p.EconomyJson).SingleAsync(ct);
+            var wallet = json is null ? PlayerEconomy.Empty : JsonSerializer.Deserialize<PlayerEconomy>(json, EngineJson.Options)!;
+
+            if (_random.NextDouble() < 0.12 && await TryAsync(new RollShop(playerId), userId) && _random.NextDouble() < 0.7)
+            {
+                await TryAsync(new BuyLot(playerId, _random.Next(3)), userId);
+            }
+
+            var items = wallet.Inventory.Where(o => o.Kind == ObjectKind.Item).ToList();
+            if (items.Count > 0 && _random.NextDouble() < 0.25)
+            {
+                var item = items[_random.Next(items.Count)];
+                var target = others[_random.Next(others.Count)].Id;
+                if (!await TryAsync(new UseItem(playerId, item.InstanceId, target), userId))
+                {
+                    await TryAsync(new UseItem(playerId, item.InstanceId), userId);
+                }
+            }
+
+            var playing = others.Where(p => p.Phase == TurnPhase.Playing).ToList();
+            if (playing.Count > 0 && _random.NextDouble() < 0.15)
+            {
+                int[] days = [1, 3, 7];
+                await TryAsync(new PlaceBet(playerId, playing[_random.Next(playing.Count)].Id, days[_random.Next(days.Length)], _random.Next(1, 4)), userId);
             }
         }
 
@@ -354,6 +443,21 @@ public static class DemoSeed
 
         private async Task AdminTurnAsync(int day, Guid quiet)
         {
+            // The scheduler's work while the clock is moved by hand: offers vanish, bets past their term are lost
+            await TryAsync(new FireTimers(), null);
+
+            // Twice the admin gives items as prizes of a contest in the chat: objects that came from the admin
+            if (day is 2 or 16)
+            {
+                await using var given = await factory.CreateDbContextAsync(ct);
+                var players = await given.SeasonPlayers.AsNoTracking().Where(p => p.SeasonId == SeasonId && p.FinishOrder == null)
+                    .OrderBy(p => p.Name).Select(p => p.Id).ToListAsync(ct);
+                foreach (var playerId in players.Where((_, i) => i % 4 == day % 4))
+                {
+                    await TryAsync(new AdjustInventory(playerId, day == 2 ? "bird-thief" : "shield", null, "Приз за конкурс в чате"), _admin);
+                }
+            }
+
             // Mid-season the admin publishes the whole map — the shortcut zone — while players stand on it (D-270)
             if (day == MapPublishedOn)
             {
@@ -408,7 +512,7 @@ public static class DemoSeed
             }
         }
 
-        private async Task<bool> TryAsync(ICommand command, Guid authorId)
+        private async Task<bool> TryAsync(ICommand command, Guid? authorId)
         {
             var commandId = Guid.CreateVersion7();
             var outcome = await bus.SendAsync(new CommandEnvelope(commandId, SeasonId, command, authorId), ct);

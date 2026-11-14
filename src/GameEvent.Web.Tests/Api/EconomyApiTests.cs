@@ -338,6 +338,17 @@ public sealed class EconomyApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task The_view_says_the_servers_time_so_a_timer_counts_on_it()
+    {
+        // S4-4: the shop's timer counts on the server's clock (SPEC «Время считает сервер»), the test clock on Staging too
+        await EconomyOnAsync();
+        _site.Clock.Advance(TimeSpan.FromDays(7));
+        var vasya = await _site.SignedInAsync("vasya");
+
+        Assert.Equal(_site.Clock.UtcNow, (await EconomyAsync(vasya)).GetProperty("serverNow").GetDateTimeOffset());
+    }
+
+    [Fact]
     public async Task In_debt_the_shop_is_refused_and_says_so_before_the_press()
     {
         await EconomyOnAsync();

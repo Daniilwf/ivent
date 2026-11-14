@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import { ru } from '../i18n/ru';
 import type { Schemas } from '../api/client';
 import { fakeServer, seasonId } from '../test/fakeServer';
 import { SeasonScreen } from './SeasonScreen';
@@ -123,5 +124,16 @@ describe('the inventory on the season screen', () => {
     expect(screen.queryByTestId('inventory')).not.toBeInTheDocument();
     expect(screen.queryByTestId('shop')).not.toBeInTheDocument();
     expect(server.sent('GET', '/economy')).toHaveLength(1);
+  });
+});
+
+describe('the season screen order', () => {
+  it('puts nothing between the turn card and the leaderboard (S4D-1)', async () => {
+    open(season(true, true, { shop: true, bets: true }));
+    const shop = await screen.findByTestId('shop');
+    const turn = screen.getByTestId('turn');
+    const leaders = screen.getByRole('heading', { name: ru.leaderboard.title, hidden: true });
+    expect(turn.compareDocumentPosition(leaders) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(leaders.compareDocumentPosition(shop) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });

@@ -55,6 +55,27 @@ public class ContentSchemaTests
         Assert.True(results.IsValid, string.Join("\n", (results.Details ?? []).Where(d => d.Errors is not null).SelectMany(d => d.Errors!.Select(e => $"{d.InstanceLocation}: {e.Value}"))));
     }
 
+    [Theory]
+    [InlineData("\"name\":\"\"")]
+    [InlineData("\"description\":\"\"")]
+    [InlineData("\"price\":-5")]
+    public void An_empty_name_or_description_and_a_negative_price_fail_the_schema(string field)
+    {
+        // S4D-10: the editor checks by the schema while the admin types, so the server's rules for these fields are in it
+        var schema = JsonSchema.FromText(ContentSchema.Generate());
+        var fields = new Dictionary<string, string> { ["name"] = "\"x\"", ["description"] = "\"x\"", ["price"] = "5" };
+        bool Valid()
+        {
+            using var document = JsonDocument.Parse(
+                $$$"""{"objects":[{"id":"x","kind":"item","name":{{{fields["name"]}}},"description":{{{fields["description"]}}},"price":{{{fields["price"]}}},"window":"anytime","effect":{"actions":[{"type":"move","steps":1}]}}],"wheels":[]}""");
+            return schema.Evaluate(document.RootElement).IsValid;
+        }
+
+        Assert.True(Valid());
+        fields[field[1..field.IndexOf('"', 1)]] = field[(field.IndexOf(':') + 1)..];
+        Assert.False(Valid());
+    }
+
     [Fact]
     public void A_typo_in_an_action_fails_the_schema()
     {

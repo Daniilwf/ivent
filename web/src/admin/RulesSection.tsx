@@ -30,6 +30,8 @@ function describe(problem: SchemaProblem): string {
     case 'enum':
       return t.notInList(problem.path, problem.values.map((v) => JSON.stringify(v)).join(', '));
     case 'pattern':
+    case 'length':
+    case 'range':
       return t.badFormat(problem.path);
   }
 }

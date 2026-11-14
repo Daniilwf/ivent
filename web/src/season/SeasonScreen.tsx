@@ -1109,8 +1109,13 @@ export function SeasonScreen({
         </ol>
       </section>
 
-      {/* Items on (D-441): my inventory under the map on a phone, under my turn on a desktop, then the shop and the bets
-          when they are on (D-447) — bets may play without items; a mechanic off is not shown at all */}
+      <Panel title={ru.leaderboard.title} className="hidden desk:col-start-1 desk:grid desk:w-96">
+        <p className="text-sm text-ink-soft">{ru.board.rule}</p>
+        <Leaderboard rows={shownRows} />
+      </Panel>
+      {/* Items on (D-441): my inventory under the map on a phone, under the leaderboard on a desktop (S4D-1: nothing goes
+          between the turn and who leads), then the shop and the bets when they are on (D-447) — bets may play without
+          items; a mechanic off is not shown at all */}
       {me && (season.economy?.items || season.economy?.shop || season.economy?.bets) ? (
         <EconomySection
           seasonId={seasonId}
@@ -1122,10 +1127,6 @@ export function SeasonScreen({
           className="desk:col-start-1 desk:w-96"
         />
       ) : null}
-      <Panel title={ru.leaderboard.title} className="hidden desk:col-start-1 desk:grid desk:w-96">
-        <p className="text-sm text-ink-soft">{ru.board.rule}</p>
-        <Leaderboard rows={shownRows} />
-      </Panel>
       {/* The latest of the feed beside the map on a desktop; a phone opens the feed from the header */}
       {desk ? (
         <FeedPreview

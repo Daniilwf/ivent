@@ -49,12 +49,16 @@ internal static class ObjectFilters
     }
 }
 
-/// <summary><c>giveObject</c>: a new object of the current content, its parameters resolved now (<c>$choice</c> → «Horror»).</summary>
+/// <summary>
+/// <c>giveObject</c>: a new object, its parameters resolved now (<c>$choice</c> → «Horror»). The object named by an effect
+/// is given even when its definition was deleted since: what players hold keeps working, and the effect it gives is part
+/// of it (S4-2, D-780). Never-published ids are refused when the pack is checked.
+/// </summary>
 internal sealed class GiveObjectHandler : ActionHandler<GiveObjectAction>
 {
     protected override void Execute(GiveObjectAction action, EffectRun run)
     {
-        if (run.State.Catalog.Live(action.ObjectId) is not { } definition)
+        if (run.State.Catalog.Find(action.ObjectId) is not { } definition)
         {
             return;
         }

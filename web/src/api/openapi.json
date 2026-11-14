@@ -9699,7 +9699,8 @@
           "inventoryLimit",
           "shop",
           "bets",
-          "items"
+          "items",
+          "serverNow"
         ],
         "type": "object",
         "properties": {
@@ -9739,9 +9740,13 @@
             "items": {
               "$ref": "#/components/schemas/InventoryItemView"
             }
+          },
+          "serverNow": {
+            "type": "string",
+            "format": "date-time"
           }
         },
-        "description": "My economy in the season (D-441): coins, the inventory with what each object allows now when `features.items` is\non (null when off: bets play without items), the shop when `features.shop` is on, the bets when\n`features.bets` is on. `inventoryLimit` counts items only (D-406)."
+        "description": "My economy in the season (D-441): coins, the inventory with what each object allows now when `features.items` is\non (null when off: bets play without items), the shop when `features.shop` is on, the bets when\n`features.bets` is on. `inventoryLimit` counts items only (D-406). `serverNow` — the server's clock when\nthe view was made: the shop's timer counts on it, not on the device's (S4-4)."
       },
       "EdgeView": {
         "required": [
