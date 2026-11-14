@@ -63,9 +63,9 @@ public static class AdminIrlProofEndpoints
 
     // The proofs live on the pending effects of the season folded from the log; the rate limit caps the cost
     private static async Task<Results<Ok<IReadOnlyList<IrlProofQueueItemView>>, NotFound>> GetQueueAsync(
-        Guid seasonId, GameEventDbContext db, CancellationToken ct)
+        Guid seasonId, GameEventDbContext db, SeasonStateReader seasonStates, CancellationToken ct)
     {
-        var (state, _) = await EventLogReader.ReplaySeasonAsync(db, seasonId, ct);
+        var state = await seasonStates.ReadAsync(db, seasonId, ct);
         if (!state.IsCreated)
         {
             return TypedResults.NotFound();

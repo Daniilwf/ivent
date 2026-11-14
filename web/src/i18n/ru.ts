@@ -2276,6 +2276,8 @@ export const ru = {
           'Варианты — либо из источника (from), либо списком (list).',
         'A list offers at least 2 non-empty options.':
           'В списке нужно минимум 2 непустых варианта.',
+        'An option is 1–64 characters, without control characters, «<», «>» or blanks around.':
+          'Вариант — от 1 до 64 символов, без служебных символов, «<», «>» и пробелов по краям.',
         'An effect that acts on its own has nobody to choose its target.':
           'Эффект, который срабатывает сам, не может просить выбрать цель.',
         'An effect that acts on its own has nobody to ask.':
@@ -2562,7 +2564,8 @@ export const ru = {
       'player.deltaTooLarge': 'Слишком большое число: правка — не больше ±1 000 000.',
       'player.invalidResource': 'Такого ресурса нет.',
       'player.nothingToChange': 'Правка ничего не меняет.',
-      'pool.categoryInvalid': 'Вес — целое число от 1 до 1000, тег — до 50 символов.',
+      'pool.categoryInvalid':
+        'Вес — целое число от 1 до 1000, тег — до 50 символов, без служебных символов, «<» и «>».',
       'account.notAPlayer': 'В сезоне играют только аккаунты с ролью «Игрок».',
       'pool.categoryUnknown': 'Такой категории нет на колесе.',
       'pool.deleted': 'Игра удалена: сначала верни её в пул.',

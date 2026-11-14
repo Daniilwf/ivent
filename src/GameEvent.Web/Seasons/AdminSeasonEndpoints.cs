@@ -137,7 +137,8 @@ public static class AdminSeasonEndpoints
 
     private static async Task<Microsoft.AspNetCore.Http.HttpResults.Results<
         Microsoft.AspNetCore.Http.HttpResults.Ok<IReadOnlyList<AdminManualEffectView>>,
-        Microsoft.AspNetCore.Http.HttpResults.NotFound>> GetEffectsAsync(Guid seasonId, GameEventDbContext db, CancellationToken ct)
+        Microsoft.AspNetCore.Http.HttpResults.NotFound>> GetEffectsAsync(
+            Guid seasonId, GameEventDbContext db, Infrastructure.EventLog.SeasonStateReader seasonStates, CancellationToken ct)
     {
         if (!await db.Seasons.AnyAsync(s => s.Id == seasonId, ct))
         {
@@ -155,7 +156,7 @@ public static class AdminSeasonEndpoints
         // An IRL mark comes from the object's definition in the season's catalog (IrlProofs.IsIrl): only an object's text can be one
         if (effects.Any(e => e.ObjectId is not null))
         {
-            var (state, _) = await Infrastructure.EventLog.EventLogReader.ReplaySeasonAsync(db, seasonId, ct);
+            var state = await seasonStates.ReadAsync(db, seasonId, ct);
             effects = [.. effects.Select(e => e with
             {
                 Irl = state.ManualEffects.TryGetValue(e.Id, out var pending) && Engine.Proofs.IrlProofs.IsIrl(state, pending),

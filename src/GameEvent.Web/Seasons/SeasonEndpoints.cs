@@ -250,8 +250,8 @@ public sealed record ChoiceView(Guid Id, ChoiceKind Kind, IReadOnlyList<ChoiceOp
 public sealed record ChoiceOptionView(string Id, OfferedGameView? Game);
 
 /// <summary>
-/// The player's latest completed run: dice by the hours and the challenge dice apart, each die separately; the total
-/// counts both; the review when there is one; <c>status</c> is <c>rejected</c> when the admin took the run back.
+/// The player's latest completed run: <c>dice</c> — the dice by the hours, then the extra dice of items and events (the
+/// count stage, D-825), each die separately; the challenge dice apart; the total counts all of them; the review when there is one; <c>status</c> is <c>rejected</c> when the admin took the run back.
 /// <c>conditions</c> — the conditions of events the roll fixed on it, <c>conditionCheck</c> — how they were checked, null
 /// without conditions (D-821); always set, optional for older clients.
 /// </summary>
@@ -295,7 +295,7 @@ public static class SeasonEndpoints
     /// <summary>The most hours a request may carry: a player's estimate or an admin's correction.</summary>
     public const decimal MaxHours = 1000;
 
-    public const int MaxOptionIdLength = 64;
+    public const int MaxOptionIdLength = OptionIds.MaxLength;
 
     public const int MaxCommentLength = Limits.MaxCommentLength;
 
@@ -308,8 +308,12 @@ public static class SeasonEndpoints
             .RequireAuthorization()
             .ProducesProblem(StatusCodes.Status401Unauthorized);
 
+        // The view folds the season's events when they matter (D-824): a cached fold caught up per read (D-828), and a
+        // limit per user against a loop
         seasons.MapGet("/", GetSeasonAsync)
-            .ProducesProblem(StatusCodes.Status401Unauthorized);
+            .RequireRateLimiting(AppSetup.SeasonViewRateLimit)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
 
         seasons.MapPost("/roll", (Guid seasonId, RollRequest request, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, CancellationToken ct) =>
             ActAsync(seasonId, request.CommandId, user, db, bus, playerId => new RollGame(playerId), ct))
@@ -353,7 +357,7 @@ public static class SeasonEndpoints
                 ? Task.FromResult<ActionResult>(
                     TypedResults.ValidationProblem(new Dictionary<string, string[]>
                     {
-                        ["optionId"] = [$"A choice id and an option id of 1–{MaxOptionIdLength} letters, digits, inner spaces or plain punctuation are required."],
+                        ["optionId"] = [$"A choice id and an option id of 1–{MaxOptionIdLength} characters, without control characters, «<», «>» or blanks around, are required."],
                     }))
                 : ActAsync(seasonId, request.CommandId, user, db, bus, playerId => new MakeChoice(playerId, request.ChoiceId, request.OptionId, request.Difficulty), ct))
             .RequireAuthorization(Policies.Player)
@@ -500,14 +504,9 @@ public static class SeasonEndpoints
         TypedResults.ValidationProblem(new Dictionary<string, string[]> { [field] = [message] });
 
     // Option ids are the engine's: a game id in the N format, a cell, or the text of an event's list or category (D-822 (2),
-    // «монетки», «+1d6 к броску»); the engine checks the id against the options offered (turn.unknownOption). The site lets
-    // through words of any script with inner spaces and plain punctuation only — no markup, no blanks around (D-824).
-    private static bool IsOptionId(string? id) =>
-        id is { Length: > 0 and <= MaxOptionIdLength }
-        && id.Trim().Length == id.Length
-        && id.All(c => char.IsLetterOrDigit(c) || c == ' ' || OptionPunctuation.Contains(c));
-
-    private const string OptionPunctuation = "-_+.,!?:;()'«»—–№%";
+    // «монетки», «+1d6 к броску», «Point & Click»); the engine checks the id against the options offered
+    // (turn.unknownOption), so the site checks only the length and the characters, as the content check does (D-827).
+    private static bool IsOptionId(string? id) => OptionIds.IsValid(id);
 
     /// <summary>The request-level checks of a tech reroll; the reason's rules live in the engine.</summary>
     internal static ValidationProblem? TechRerollInvalid(TechRerollRequest request) =>
@@ -598,7 +597,7 @@ public static class SeasonEndpoints
     }
 
     private static async Task<Results<Ok<SeasonView>, NotFound>> GetSeasonAsync(
-        Guid seasonId, ClaimsPrincipal user, GameEventDbContext db, ContentCards contentCards, IClock clock, CancellationToken ct)
+        Guid seasonId, ClaimsPrincipal user, GameEventDbContext db, ContentCards contentCards, SeasonStateReader seasonStates, IClock clock, CancellationToken ct)
     {
         if (await SeasonMaps.CurrentAsync(db, seasonId, ct) is not { } map)
         {
@@ -653,10 +652,11 @@ public static class SeasonEndpoints
                 .Select(x => new ManualEffectView(x.Id, x.DrawEvent, x.Source, x.ObjectId, false, null))
                 .ToListAsync(ct);
 
-            // Events, conditions, IRL proofs and questions are read from the season folded from the log (D-824): only when
-            // events are on or an object's text waits, so a season without them pays nothing
-            var state = rules.Features.Events || effects.Any(e => e.ObjectId is not null)
-                ? (await EventLogReader.ReplaySeasonAsync(db, seasonId, ct)).State
+            // Events, conditions, IRL proofs and questions are read from the season folded from the log (D-824, D-828): only
+            // when events are on, an object's text waits or an effect asks me (a question outlives events switched off), so
+            // a season without them pays nothing
+            var state = rules.Features.Events || effects.Any(e => e.ObjectId is not null) || choice?.Kind == ChoiceKind.Effect
+                ? await seasonStates.ReadAsync(db, seasonId, ct)
                 : null;
             var events = new EventTurnViews(state, mine.Id);
             effects = [.. effects.Select(e => e with { Irl = events.IsIrl(e.Id), IrlProof = events.ProofOf(e.Id) })];

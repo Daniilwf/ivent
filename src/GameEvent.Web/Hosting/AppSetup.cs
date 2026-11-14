@@ -4,6 +4,7 @@ using System.Threading.RateLimiting;
 using GameEvent.Engine.Kernel;
 using GameEvent.Infrastructure.Accounts;
 using GameEvent.Infrastructure.Database;
+using GameEvent.Infrastructure.EventLog;
 using GameEvent.Infrastructure.Kernel;
 using GameEvent.Infrastructure.Queue;
 using GameEvent.Infrastructure.Seasons;
@@ -95,6 +96,7 @@ public static class AppSetup
         services.AddSingleton<CommandBus>();
         services.AddSingleton<SeasonBroadcaster>();
         services.AddSingleton<ContentCards>();
+        services.AddSingleton<SeasonStateReader>();
         services.AddSingleton<ICommittedEventsListener>(sp => sp.GetRequiredService<SeasonBroadcaster>());
         services.AddSingleton<HubSessions>();
         services.AddSingleton<ICommittedEventsListener>(sp => sp.GetRequiredService<HubSessions>());
@@ -212,6 +214,10 @@ public static class AppSetup
             o.AddPolicy(ContentCheckRateLimit, ctx => RateLimitPartition.GetFixedWindowLimiter(
                 ctx.User.UserId()?.ToString() ?? WebSecurity.ClientKey(ctx.Connection.RemoteIpAddress),
                 _ => new FixedWindowRateLimiterOptions { PermitLimit = ContentChecksPerMinute, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+            var views = builder.Configuration.GetValue("Security:SeasonViewsPerMinute", SeasonViewsPerMinute);
+            o.AddPolicy(SeasonViewRateLimit, ctx => RateLimitPartition.GetFixedWindowLimiter(
+                ctx.User.UserId()?.ToString() ?? WebSecurity.ClientKey(ctx.Connection.RemoteIpAddress),
+                _ => new FixedWindowRateLimiterOptions { PermitLimit = views, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
             o.AddPolicy(SeasonReadRateLimit, ctx => RateLimitPartition.GetFixedWindowLimiter(
                 ctx.User.UserId()?.ToString() ?? WebSecurity.ClientKey(ctx.Connection.RemoteIpAddress),
                 _ => new FixedWindowRateLimiterOptions { PermitLimit = SeasonReadsPerMinute, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));

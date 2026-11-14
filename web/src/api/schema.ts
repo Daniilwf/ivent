@@ -356,6 +356,15 @@ export interface paths {
                     };
                     content?: never;
                 };
+                /** @description Too Many Requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
             };
         };
         put?: never;
@@ -7680,8 +7689,9 @@ export interface components {
          *     last acted themselves and the hint — no action of their own for the rules' `inactiveHintDays` while not marked
          *     inactive. `playing` — a run is going on: a long game is a reason to be quiet, not a sign of leaving.
          *     `choosingBranch` — the player's throw waits at a fork (D-305): the admin may discard the choice, the steps left burn.
-         *     `eventQuestion` — an event waits for the player's answer (D-511, D-569 (8), D-822): the admin takes the question off
-         *     with the correction `discardOffer`; always set, optional for older clients.
+         *     `eventQuestion` — an effect drawn from a deck waits for the player's answer (D-511, D-569 (8), D-822, D-827): an event,
+         *     or an object of another kind a deck holds — only a drawn effect stops on a question, an item used gets its answers with
+         *     the use; the admin takes the question off with the correction `discardOffer`; always set, optional for older clients.
          */
         AdminPlayerView: {
             /** Format: uuid */
@@ -8020,8 +8030,8 @@ export interface components {
             events: components["schemas"]["LoggedEventView"][];
         };
         /**
-         * @description The player's latest completed run: dice by the hours and the challenge dice apart, each die separately; the total
-         *     counts both; the review when there is one; `status` is `rejected` when the admin took the run back.
+         * @description The player's latest completed run: `dice` — the dice by the hours, then the extra dice of items and events (the
+         *     count stage, D-825), each die separately; the challenge dice apart; the total counts all of them; the review when there is one; `status` is `rejected` when the admin took the run back.
          *     `conditions` — the conditions of events the roll fixed on it, `conditionCheck` — how they were checked, null
          *     without conditions (D-821); always set, optional for older clients.
          */
@@ -9223,6 +9233,9 @@ export interface components {
          *     first, who loses nothing (D-99); `affectsPosition` is false for a finisher whose finish this run does not decide
          *     (his position is fixed); always set, optional for older clients. `hoursSource`: where the player's estimate of
          *     the hours comes from, when the pool had none (SPEC «Часы и кубы», K1A); null for the pool's hours.
+         *     `conditions`: the conditions of events the roll fixed on the run; `conditionCheck`: how the completion met
+         *     them, null without conditions — what the «Не применимо» button (`waive-conditions`) acts on (D-546 (2), D-827);
+         *     always set, optional for older clients.
          */
         ProofQueueItemView: {
             /** Format: uuid */
@@ -9250,6 +9263,8 @@ export interface components {
             cellBonus?: null | number;
             dropPenalty?: null | components["schemas"]["DropPenaltyView"];
             hoursSource?: null | string;
+            conditions?: null | components["schemas"]["RunConditionView"][];
+            conditionCheck?: null | components["schemas"]["RunConditionCheckView"];
         };
         /**
          * @description The proof of the player's own completed run: links (http/https), screenshots the player uploaded (`files` — ids

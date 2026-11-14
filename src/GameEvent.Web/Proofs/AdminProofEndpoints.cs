@@ -29,6 +29,9 @@ namespace GameEvent.Web.Proofs;
 /// first, who loses nothing (D-99); <c>affectsPosition</c> is false for a finisher whose finish this run does not decide
 /// (his position is fixed); always set, optional for older clients. <c>hoursSource</c>: where the player's estimate of
 /// the hours comes from, when the pool had none (SPEC «Часы и кубы», K1A); null for the pool's hours.
+/// <c>conditions</c>: the conditions of events the roll fixed on the run; <c>conditionCheck</c>: how the completion met
+/// them, null without conditions — what the «Не применимо» button (<c>waive-conditions</c>) acts on (D-546 (2), D-827);
+/// always set, optional for older clients.
 /// </summary>
 public sealed record ProofQueueItemView(
     Guid RunId,
@@ -49,7 +52,9 @@ public sealed record ProofQueueItemView(
     bool RollClosed,
     int? CellBonus = null,
     DropPenaltyView? DropPenalty = null,
-    string? HoursSource = null);
+    string? HoursSource = null,
+    IReadOnlyList<RunConditionView>? Conditions = null,
+    RunConditionCheckView? ConditionCheck = null);
 
 /// <summary>Approve a run: with its proof, or without one («без скрина», a comment then); a lower proven difficulty.</summary>
 public sealed record ApproveProofRequest(Guid CommandId, Difficulty? Difficulty = null, string? Comment = null);
@@ -97,14 +102,15 @@ public static class AdminProofEndpoints
 
     // The order is the engine's own (ProofReviewOrder) over the season folded from the log; the rate limit caps the cost.
     private static async Task<Results<Ok<IReadOnlyList<ProofQueueItemView>>, NotFound>> GetQueueAsync(
-        Guid seasonId, GameEventDbContext db, CancellationToken ct)
+        Guid seasonId, GameEventDbContext db, SeasonStateReader seasonStates, CancellationToken ct)
     {
-        var (state, _) = await EventLogReader.ReplaySeasonAsync(db, seasonId, ct);
+        var state = await seasonStates.ReadAsync(db, seasonId, ct);
         if (!state.IsCreated)
         {
             return TypedResults.NotFound();
         }
 
+        var conditions = new EventTurnViews(state, Guid.Empty);
         var order = ProofReviewOrder.Order(state);
         var gameIds = order.Select(id => state.Runs[id].GameId).Distinct().ToList();
         var titles = await db.Games.AsNoTracking().Where(g => gameIds.Contains(g.Id)).ToDictionaryAsync(g => g.Id, g => g.Title, ct);
@@ -135,7 +141,9 @@ public static class AdminProofEndpoints
                     RejectPenaltyPreview.Of(state, run) is { } penalty
                         ? new DropPenaltyView(penalty.Count, penalty.Sides, penalty.AffectsPoints, penalty.AffectsPosition, penalty.BadEvent)
                         : null,
-                    run.HoursSource);
+                    run.HoursSource,
+                    conditions.ConditionsOf(run.RunId),
+                    conditions.CheckOf(run.RunId));
             }),
         ];
         return TypedResults.Ok(items);
