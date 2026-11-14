@@ -54,14 +54,37 @@ describe('the rules page', () => {
 
     expect(screen.getByTestId('rules-loading')).toHaveAttribute('aria-busy', 'true');
     expect(await screen.findByText(t.version(3))).toBeInTheDocument();
-    for (const name of Object.values(t.sections)) {
+    // Every section but the economy's, which comes with its mechanics (S4-1)
+    const { economy, ...always } = t.sections;
+    for (const name of Object.values(always)) {
       expect(section(name)).toBeInTheDocument();
     }
+    expect(screen.queryByRole('heading', { name: economy })).not.toBeInTheDocument();
     // The contents lead to each section
     const contents = screen.getByRole('navigation', { name: t.contents });
     expect(within(contents).getByRole('link', { name: t.sections.drop })).toHaveAttribute(
       'href',
       '#rules-drop',
+    );
+  });
+
+  it('with the shop and bets on, gives their numbers in their own section (S4-1)', async () => {
+    const rules = demoRules.ruleset;
+    serve(() =>
+      json(200, {
+        ...demoRules,
+        ruleset: { ...rules, features: { ...rules.features, items: true, shop: true, bets: true } },
+      }),
+    );
+    renderRules();
+
+    const economy = await screen.findByRole('heading', { name: t.sections.economy });
+    expect(economy.closest('section')).toHaveTextContent(t.economy.inventory(5));
+    expect(economy.closest('section')).toHaveTextContent(t.economy.betLost);
+    const contents = screen.getByRole('navigation', { name: t.contents });
+    expect(within(contents).getByRole('link', { name: t.sections.economy })).toHaveAttribute(
+      'href',
+      '#rules-economy',
     );
   });
 

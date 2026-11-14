@@ -1713,6 +1713,7 @@ export const ru = {
       drop: 'Дроп и тех-реролл',
       finish: 'Финиш',
       deadline: 'Сроки',
+      economy: 'Монетки, предметы, магазин и ставки',
       history: 'История изменений',
     },
     // D-207 (RGG 14): the owner's text, word for word; the order is the order of the check
@@ -1845,6 +1846,31 @@ export const ru = {
       later: 'Финишировавшие не первыми продолжают набирать очки, но их фишка больше не двигается.',
       surplus: 'Лишние шаги после финиша сгорают.',
     },
+    // S4-1: the economy in force, shown only with its mechanics on (SPEC «Правила на сайте», «Магазин», «Ставки»)
+    economy: {
+      inventory: (limit: number) =>
+        `В инвентаре — до ${limit} предметов; эффекты и спецроллы места не занимают. Предмет применяют кнопкой «Использовать» в своё окно.`,
+      debt: 'Предметы и ивенты могут увести монетки в минус; в минусе покупать и ставить нельзя.',
+      shop: (cost: number, lots: number, minutes: number) =>
+        `Ролл магазина стоит ${coins(cost, 'accusative')} и даёт ${lots} ${plural(lots, 'личный лот', 'личных лота', 'личных лотов')} на ${minutes} мин; цена лота — по редкости.`,
+      shopStep: (step: number, cost: number, reset: string) =>
+        `Каждый следующий ролл дороже на ${coins(step, 'accusative')}; цена снова ${coins(cost, 'nominative')}${reset ? ` после ${reset}` : ''}.`,
+      resetOn: { runCompleted: 'завершения', runDropped: 'дропа' } as Readonly<
+        Record<string, string>
+      >,
+      resetOf: 'прохождения',
+      coupon: 'Купон магазина даёт бесплатный ролл.',
+      bets: (window: number, days: string) =>
+        `Ставка — на текущее прохождение другого игрока, в первые ${window} ч после его ролла; срок — ${days} дн.`,
+      betLimits: (stake: number, open: number) =>
+        `Не больше ${coins(stake, 'genitive')} за ставку и не больше ${open} ${plural(open, 'открытой ставки', 'открытых ставок', 'открытых ставок')}.`,
+      payout: (steps: string) =>
+        `Если успеет, вернётся ставка × коэффициент по часам игры на день срока: ${steps}.`,
+      step: (upTo: number | null, multiplier: number) =>
+        `${upTo === null ? 'больше' : `до ${upTo.toLocaleString('ru-RU')} ч`} — ×${multiplier.toLocaleString('ru-RU')}`,
+      betLost:
+        'Ставка сгорает при дропе, тех-реролле, по сроку и в дедлайн. Если пруф отклонят после выплаты, выигрыш снимается.',
+    },
     deadline: {
       at: (text: string) => `Дедлайн: ${text}.`,
       none: 'Дедлайн админ ещё не назначил.',
@@ -1894,7 +1920,30 @@ export const ru = {
       'finish.requireApprovalForFirst': 'Первое место — после проверки пруфов',
       'finish.bonusAfterList': 'Бонус за финиш после списка',
       'map.linearLength': 'Клеток до финиша',
+      'features.items': 'Предметы',
+      'features.shop': 'Магазин',
+      'features.bets': 'Ставки',
+      'features.events': 'Ивенты',
+      'features.mapMode': 'Вид карты',
+      'economy.allowNegativeCoins': 'Монетки в минус',
+      'economy.inventoryLimit': 'Предметов в инвентаре',
+      'economy.rarityWeights.common': 'Вес обычных предметов',
+      'economy.rarityWeights.epic': 'Вес эпических предметов',
+      'economy.rarityWeights.legendary': 'Вес легендарных предметов',
+      'economy.shop.lotsPerRoll': 'Лотов за ролл магазина',
+      'economy.shop.lotLifetimeMinutes': 'Минут жизни лотов',
+      'economy.shop.rollCost': 'Цена ролла магазина, монеток',
+      'economy.shop.rerollCostStep': 'Подорожание ролла магазина, монеток',
+      'economy.shop.resetOn': 'Когда цена ролла магазина сбрасывается',
+      'bets.maxStake': 'Наибольшая ставка, монеток',
+      'bets.maxOpenBetsPerPlayer': 'Открытых ставок у игрока',
+      'bets.windowHoursAfterRoll': 'Часов на ставку после ролла',
+      'bets.deadlineOptionsDays': 'Сроки ставок, дней',
     } as Readonly<Record<string, string>>,
+    payoutField: (step: number, part: string) =>
+      part === 'multiplier'
+        ? `Коэффициент ставки, ступень ${step}`
+        : `Часов в день для ступени ${step}`,
     bonusField: (order: number) => `Бонус за финиш: ${order}-й на финише`,
     values: {
       coins: 'монетки',
