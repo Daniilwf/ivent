@@ -1,4 +1,4 @@
-import { Backpack, Clock, Swords, UserRound } from 'lucide-react';
+import { Backpack, Check, Clock, Swords, UserRound } from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
 import { api, rejectionCode, type Schemas } from '../api/client';
 import { newCommandId } from '../api/commands';
@@ -318,7 +318,8 @@ export function ItemRow({
           </Badge>
         ) : null}
       </div>
-      <p className="max-w-prose text-sm wrap-anywhere">{item.description}</p>
+      {/* Two lines in the list (S4D-9): the whole text is in the sheet */}
+      <p className="line-clamp-2 max-w-prose text-sm wrap-anywhere">{item.description}</p>
       {facts.length > 0 || item.expiresAt || item.fromPlayer || !isItem ? (
         <div className="flex flex-wrap gap-2">
           {!isItem ? <Chip tone="info">{ru.inventory.actsAloneChip(item.kind)}</Chip> : null}
@@ -387,6 +388,7 @@ export function UseItemDialog({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const targetName = useId();
+  const formId = useId();
 
   const optionsOf = (step: Schemas['ItemStepView']) =>
     step.kind === 'pickObject'
@@ -438,6 +440,20 @@ export function UseItemDialog({
     if (step.ranked) return ru.inventory.preference(j + 1);
     return slotsOf(step) > 1 ? ru.inventory.pickObjectNumbered(j + 1) : ru.inventory.pickObject;
   };
+  // The first question still open, said next to the closed press: the press is at the bottom, the question may be far up
+  const openStep = item.steps.findIndex(
+    (step, i) =>
+      asked(step) &&
+      !(step.kind === 'pickObject' && step.ranked) &&
+      given(step, i).length < slotsOf(step),
+  );
+  const openStepAt = item.steps[openStep];
+  const missing =
+    item.choosesTarget && target === null
+      ? ru.inventory.target
+      : openStepAt
+        ? labelOf(openStepAt, given(openStepAt, openStep).length)
+        : null;
   const optionLabel = (step: Schemas['ItemStepView'], o: Schemas['ItemOptionView']) =>
     step.kind === 'direction'
       ? o.id === 'back'
@@ -456,9 +472,30 @@ export function UseItemDialog({
       title={ru.inventory.useTitle(item.name)}
       testId="use-item"
       {...(returnFocus ? { returnFocus } : {})}
+      footer={
+        <>
+          {error ? <Notice tone="danger">{error}</Notice> : null}
+          {!ready && missing ? (
+            <p className="text-sm text-ink-soft" data-testid="use-item-missing">
+              {ru.inventory.missing(missing)}
+            </p>
+          ) : null}
+          <Button
+            type="submit"
+            form={formId}
+            variant="main"
+            data-testid="use-item-confirm"
+            disabled={!ready}
+            loading={busy}
+          >
+            {ru.inventory.use}
+          </Button>
+        </>
+      }
     >
       <p className="max-w-prose wrap-anywhere">{item.description}</p>
       <form
+        id={formId}
         className="grid gap-4"
         onSubmit={(e) => {
           e.preventDefault();
@@ -504,7 +541,9 @@ export function UseItemDialog({
                       className="sr-only"
                     />
                     <Sticker player={{ name: t.name, token: t.token }} size={28} />
-                    <span className="min-w-0 wrap-anywhere">{t.name}</span>
+                    <span className="min-w-0 flex-1 wrap-anywhere">{t.name}</span>
+                    {/* The pick is said by a mark too, not by the fill alone (S4D-2) */}
+                    {picked ? <Check size={20} aria-hidden className="shrink-0" /> : null}
                   </label>
                 );
               })}
@@ -554,16 +593,6 @@ export function UseItemDialog({
             </div>
           );
         })}
-        {error ? <Notice tone="danger">{error}</Notice> : null}
-        <Button
-          type="submit"
-          variant="main"
-          data-testid="use-item-confirm"
-          disabled={!ready}
-          loading={busy}
-        >
-          {ru.inventory.use}
-        </Button>
       </form>
     </FormDialog>
   );

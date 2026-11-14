@@ -534,3 +534,80 @@ describe('coins in words', () => {
     expect(ru.rejection['roll.notEnoughCoins']).not.toMatch(/реролл/i);
   });
 });
+
+// S4D-2: with 16 targets the sheet was 1552 px in a 774 px window — the press, the answers and a refusal far below.
+// The title and «Закрыть» stay on top, the press and a refusal at the bottom; only the body scrolls.
+describe('the «Использовать» sheet with many targets', () => {
+  const many = Array.from({ length: 16 }, (_, i) => ({
+    playerId: `10000000-0000-0000-0000-0000000001${String(i).padStart(2, '0')}`,
+    name: `Игрок ${String(i + 1)}`,
+    token: i % 8,
+  }));
+
+  async function openSheet(over?: Record<string, unknown>) {
+    fakeServer({
+      [economyUrl]: economyFixture({
+        items: [itemFixture({ targets: many })],
+      }),
+      [useUrl]: over
+        ? answer(409, over)
+        : { duplicate: false, events: [{ sequence: 9, type: 'item-used' }] },
+    });
+    renderSection();
+    await userEvent.click(await screen.findByTestId('use-bird-thief'));
+    return screen.findByTestId('use-item');
+  }
+
+  it('keeps the title and the press out of the scrolling body', async () => {
+    const sheet = await openSheet();
+    const body = within(sheet).getByTestId('form-dialog-body');
+    const footer = within(sheet).getByTestId('form-dialog-footer');
+    expect(within(body).getByTestId('use-targets')).toBeInTheDocument();
+    expect(within(footer).getByTestId('use-item-confirm')).toBeInTheDocument();
+    expect(body).not.toContainElement(
+      within(sheet).getByRole('heading', { name: ru.inventory.useTitle('Птичкерс') }),
+    );
+    expect(body).not.toContainElement(within(sheet).getByRole('button', { name: ru.ui.close }));
+  });
+
+  it('says a refusal next to the press, and the press still sends the form', async () => {
+    const sheet = await openSheet({
+      title: 'x',
+      status: 409,
+      code: 'item.invalidTarget',
+      detail: 'no',
+    });
+    await userEvent.click(within(sheet).getByText('Игрок 16'));
+    await userEvent.click(within(sheet).getByTestId('use-item-confirm'));
+
+    const alert = await within(sheet).findByRole('alert');
+    expect(within(sheet).getByTestId('form-dialog-footer')).toContainElement(alert);
+  });
+
+  it('says next to the closed press what is still to answer', async () => {
+    const sheet = await openSheet();
+    const footer = within(sheet).getByTestId('form-dialog-footer');
+    expect(footer).toHaveTextContent(ru.inventory.missing(ru.inventory.target));
+    await userEvent.click(within(sheet).getByText('Игрок 1'));
+    expect(footer).not.toHaveTextContent(ru.inventory.missing(ru.inventory.target));
+  });
+
+  it('marks the chosen target with a check besides the fill', async () => {
+    const sheet = await openSheet();
+    await userEvent.click(within(sheet).getByText('Игрок 3'));
+    const picked = within(sheet).getByTestId(`target-${many[2]?.playerId ?? ''}`);
+    const other = within(sheet).getByTestId(`target-${many[3]?.playerId ?? ''}`);
+    expect(picked.querySelector('.lucide-check')).not.toBeNull();
+    expect(other.querySelector('.lucide-check')).toBeNull();
+  });
+});
+
+// S4D-9: five items took ~2000 px — the description is two lines in the list, whole in the sheet
+describe('the item row', () => {
+  it('clamps the description to two lines in the list', async () => {
+    fakeServer({ [economyUrl]: economyFixture() });
+    renderSection();
+    const row = await screen.findByTestId('item-bird-thief');
+    expect(within(row).getByText(itemFixture().description)).toHaveClass('line-clamp-2');
+  });
+});

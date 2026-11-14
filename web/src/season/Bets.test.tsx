@@ -202,6 +202,24 @@ describe('the bets', () => {
   });
 });
 
+describe('the bet sheet', () => {
+  it('marks the chosen deadline with a check besides the fill and keeps the press at the bottom (S4D-2, S4D-17)', async () => {
+    fakeServer({ [economyUrl]: economyFixture({ bets: betsFixture() }) });
+    renderBets();
+    await userEvent.click(await screen.findByTestId(`bet-on-${petyaId}`));
+    const sheet = await screen.findByTestId('bet-sheet');
+
+    await userEvent.click(within(sheet).getByText(ru.bets.option(3, 2)));
+    const chosen = within(sheet).getByText(ru.bets.option(3, 2)).closest('label');
+    const other = within(sheet).getByText(ru.bets.option(1, 3)).closest('label');
+    expect(chosen?.querySelector('.lucide-check')).not.toBeNull();
+    expect(other?.querySelector('.lucide-check')).toBeNull();
+    expect(within(sheet).getByTestId('form-dialog-footer')).toContainElement(
+      within(sheet).getByTestId('bet-confirm'),
+    );
+  });
+});
+
 // S4D-3: with 16 players the panel was ~6000 px on a phone
 describe('the bets with many players', () => {
   const [petya] = betsFixture().runs;

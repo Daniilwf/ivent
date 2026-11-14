@@ -1234,6 +1234,8 @@ export const ru = {
     useTitle: (name: string) => `Использовать «${name}»`,
     target: 'На кого',
     targetHint: 'Только те, на кого предмет действует сейчас',
+    // S4D-2: next to the closed press at the bottom of the sheet, the first question still open
+    missing: (question: string) => `Сначала ответь: «${question}»`,
     pickObject: 'Какой предмет',
     noObjects: 'Подходящих предметов нет',
     pickObjectNumbered: (n: number) => `Какой предмет, ${n}-й`,

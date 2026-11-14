@@ -324,6 +324,7 @@ export function BetDialog({
   const [stake, setStake] = useState('1');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const formId = useId();
   const option = run.options.find((o) => String(o.days) === days) ?? run.options[0];
   const amount = /^\d+$/.test(stake) ? Number(stake) : NaN;
   const valid = Number.isInteger(amount) && amount >= 1 && amount <= stakeLimit;
@@ -337,6 +338,21 @@ export function BetDialog({
       title={ru.bets.dialogTitle(run.name)}
       testId="bet-sheet"
       {...(returnFocus ? { returnFocus } : {})}
+      footer={
+        <>
+          {error ? <Notice tone="danger">{error}</Notice> : null}
+          <Button
+            type="submit"
+            form={formId}
+            variant="main"
+            data-testid="bet-confirm"
+            disabled={!valid}
+            loading={busy}
+          >
+            {valid ? ru.bets.confirm(amount) : ru.bets.place}
+          </Button>
+        </>
+      }
     >
       <p className="max-w-prose wrap-anywhere">{ru.bets.dialogGame(run.gameTitle)}</p>
       <p className="flex items-center gap-2 text-sm text-ink-soft">
@@ -344,6 +360,7 @@ export function BetDialog({
         {run.hours != null ? ru.bets.hours(run.hours) : ru.bets.noHours}
       </p>
       <form
+        id={formId}
         className="grid gap-4"
         onSubmit={(e) => {
           e.preventDefault();
@@ -364,6 +381,7 @@ export function BetDialog({
             ? { hint: ru.bets.deadlineHint }
             : {})}
           data-testid="bet-days"
+          checkMark
           options={run.options.map((o) => ({
             value: String(o.days),
             label: ru.bets.option(o.days, o.multiplier),
@@ -397,16 +415,6 @@ export function BetDialog({
             {ru.bets.payout(payoutOf(amount, option.multiplier), amount)}
           </p>
         ) : null}
-        {error ? <Notice tone="danger">{error}</Notice> : null}
-        <Button
-          type="submit"
-          variant="main"
-          data-testid="bet-confirm"
-          disabled={!valid}
-          loading={busy}
-        >
-          {valid ? ru.bets.confirm(amount) : ru.bets.place}
-        </Button>
       </form>
     </FormDialog>
   );

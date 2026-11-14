@@ -1,4 +1,4 @@
-import { ImagePlus, LoaderCircle } from 'lucide-react';
+import { Check, ImagePlus, LoaderCircle } from 'lucide-react';
 import {
   useId,
   type InputHTMLAttributes,
@@ -215,6 +215,7 @@ export function ChoiceGroup<T extends string>({
   value,
   onChange,
   disabled = false,
+  checkMark = false,
   force,
   className,
   ...rest
@@ -225,6 +226,8 @@ export function ChoiceGroup<T extends string>({
   value: T;
   onChange: (value: T) => void;
   disabled?: boolean;
+  /** The picked pill wears a check besides its fill (S4D-17): an answer of a sheet, not a filter of a list */
+  checkMark?: boolean;
   /** Styleguide only: forces a state on the picked pill */
   force?: string;
   className?: string;
@@ -253,7 +256,7 @@ export function ChoiceGroup<T extends string>({
               key={option.value}
               data-force={picked ? force : undefined}
               className={cx(
-                'inline-flex min-h-11 cursor-pointer items-center rounded-full border-2 border-ink px-4 text-base font-medium whitespace-nowrap transition duration-(--duration-fast) select-none has-[:focus-visible]:focus-ring',
+                'inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-full border-2 border-ink px-4 text-base font-medium whitespace-nowrap transition duration-(--duration-fast) select-none has-[:focus-visible]:focus-ring',
                 'has-[:disabled]:cursor-default has-[:disabled]:opacity-50',
                 picked ? 'bg-ink text-card' : 'bg-card text-ink is-hover:bg-page',
                 force?.includes('focus') && picked ? 'focus-ring' : undefined,
@@ -269,6 +272,7 @@ export function ChoiceGroup<T extends string>({
                 }}
                 className="sr-only"
               />
+              {checkMark && picked ? <Check size={18} aria-hidden className="-ml-1" /> : null}
               {option.label}
             </label>
           );
