@@ -13,9 +13,10 @@ namespace GameEvent.Engine.Tests.Coop;
 
 /// <summary>
 /// <c>features.coop</c> switched off mid-season (Н-25, D-715, decided by the owner 2026-11-14): a coop run already in
-/// progress goes on as coop to its end — the throw is split, each moves his share, its end and its reject are logged as
-/// with the flag on; nobody starts a new coop — an invitation is not sent, a pending one (a direct invitation or a response
-/// of the partner board) is not accepted and burns by its own time. Written before the implementation.
+/// progress goes on as coop to its end — the throw is split, each moves his share, the partner may leave, its end and its
+/// reject are logged as with the flag on; nobody starts a new coop — an invitation is not sent, a pending one (a direct
+/// invitation or a response of the partner board) is not accepted and burns by its own time, but it may be declined or
+/// withdrawn.
 /// </summary>
 public class CoopSwitchedOffTests
 {
@@ -81,7 +82,57 @@ public class CoopSwitchedOffTests
         Assert.Equal(s.PlayerId("Петя"), s.State.Runs[run].PartnerId);
     }
 
+    [Fact]
+    public void With_the_flag_switched_off_a_pending_invitation_may_still_be_declined_or_withdrawn()
+    {
+        // D-715 refuses only what starts a coop: a decline and a withdrawal start nothing
+        var s = New();
+        s.PlayTitle("Вася", CoopGame);
+        var declined = s.Invite("Вася", "Петя");
+        s.WithRuleset(Off);
+
+        s.Answer("Петя", declined, accept: false);
+        ScenarioAssert.Accepted(s);
+        Assert.Equal(InteractionStatus.Declined, s.Invitation(declined).Status);
+
+        s.WithRuleset(r => r with { Features = r.Features with { Coop = true } });
+        var withdrawn = s.Invite("Вася", "Маша");
+        s.WithRuleset(Off);
+
+        s.Act(new WithdrawInvitation(s.PlayerId("Вася"), withdrawn));
+        ScenarioAssert.Accepted(s);
+        Assert.Equal(InteractionStatus.Withdrawn, s.Invitation(withdrawn).Status);
+    }
+
     // ---- A coop in progress goes on as coop ----
+
+    [Fact]
+    public void With_the_flag_switched_off_the_partner_may_still_leave_the_coop()
+    {
+        var s = New();
+        var run = s.CoopRun();
+        var petya = s.PlayerId("Петя");
+        s.WithRuleset(Off);
+        var now = s.Clock.UtcNow;
+
+        s.Act(new LeaveCoop(petya));
+
+        ScenarioAssert.Accepted(s);
+        Assert.Equal(new CoopLeft(run, petya, CoopLeaveReason.Left, now), Assert.Single(s.LastEvents<CoopLeft>()));
+        Assert.Null(s.State.Runs[run].Coop);
+        Assert.Equal((TurnPhase.Idle, (Guid?)null), (s.Player("Петя").Phase, s.Player("Петя").ActiveRunId));
+    }
+
+    [Fact]
+    public void With_the_flag_switched_off_a_player_who_is_no_partner_does_not_leave()
+    {
+        // The boundary: with nothing in progress the flag refuses as before (EV35)
+        var s = New();
+        s.CoopRun();
+        s.WithRuleset(Off);
+
+        s.Rejects(new LeaveCoop(s.PlayerId("Маша")), RejectionCodes.FeatureDisabled);
+    }
 
     [Fact]
     public void With_the_flag_switched_off_a_partner_marked_inactive_leaves_the_coop_as_usual()

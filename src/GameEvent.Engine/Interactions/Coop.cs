@@ -83,7 +83,8 @@ internal static class Coop
 
     public static Decision Decide(SeasonState state, AnswerInvitation command, EngineContext context)
     {
-        if (Guard(state, command.PlayerId, context) is { } rejection)
+        // With the flag off only an accept starts a coop; a decline is still answered (D-715)
+        if (Guard(state, command.PlayerId, context, needsFlag: command.Accept) is { } rejection)
         {
             return rejection;
         }
@@ -165,7 +166,8 @@ internal static class Coop
 
     public static Decision Decide(SeasonState state, WithdrawInvitation command, EngineContext context)
     {
-        if (Guard(state, command.PlayerId, context) is { } rejection)
+        // With the flag off an invitation already sent may still be withdrawn: that starts nothing (D-715)
+        if (Guard(state, command.PlayerId, context, needsFlag: !state.Interactions.ContainsKey(command.InteractionId)) is { } rejection)
         {
             return rejection;
         }
@@ -182,7 +184,10 @@ internal static class Coop
 
     public static Decision Decide(SeasonState state, LeaveCoop command, EngineContext context)
     {
-        if (Guard(state, command.PlayerId, context) is { } rejection)
+        // A coop in progress goes on as usual with the flag off, its partner may leave it (D-715)
+        var partnering = state.Players.TryGetValue(command.PlayerId, out var partnerSide)
+            && partnerSide.ActiveRunId is { } active && state.Runs[active].PartnerId == partnerSide.PlayerId;
+        if (Guard(state, command.PlayerId, context, needsFlag: !partnering) is { } rejection)
         {
             return rejection;
         }
@@ -337,10 +342,11 @@ internal static class Coop
     private static SeasonState Close(SeasonState state, Guid id, InteractionStatus status) =>
         state with { Interactions = state.Interactions.SetItem(id, state.Interactions[id] with { Status = status }) };
 
-    // The mechanic, a season running before its deadline, a known player
-    internal static Decision? Guard(SeasonState state, Guid playerId, EngineContext context)
+    // The mechanic (unless the command only ends what a coop switched off left, D-715), a season running before its deadline,
+    // a known player
+    internal static Decision? Guard(SeasonState state, Guid playerId, EngineContext context, bool needsFlag = true)
     {
-        if (state.IsCreated && !state.Rules.Features.Coop)
+        if (needsFlag && state.IsCreated && !state.Rules.Features.Coop)
         {
             return Decision.Reject(RejectionCodes.FeatureDisabled, "Coop is off in this season.");
         }
