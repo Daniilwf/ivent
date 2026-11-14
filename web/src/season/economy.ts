@@ -5,10 +5,10 @@ import { ru } from '../i18n/ru';
 // What the panels of my economy share (4.11a, 4.11c): the loaded view, the answer to a command, the refusal in words
 
 /**
- * The economy view; `serverNow` — the server's clock (its `IClock`, the test clock on Staging) when the view was built.
- * Not in the API yet (S4-4): until it is, the response's Date header gives the server's real clock.
+ * The economy view; `serverNow` — the server's clock (its `IClock`, the test clock on Staging) when the view was built
+ * (S4-4); the response's Date header is the fallback.
  */
-export type Economy = Schemas['EconomyView'] & { serverNow?: string | null };
+export type Economy = Schemas['EconomyView'];
 
 /** The answer of the server to a command: done, or refused with the engine's code in words */
 export type UseResult = { ok: true } | { ok: false; message: string };

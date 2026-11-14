@@ -7945,7 +7945,8 @@ export interface components {
         /**
          * @description My economy in the season (D-441): coins, the inventory with what each object allows now when `features.items` is
          *     on (null when off: bets play without items), the shop when `features.shop` is on, the bets when
-         *     `features.bets` is on. `inventoryLimit` counts items only (D-406).
+         *     `features.bets` is on. `inventoryLimit` counts items only (D-406). `serverNow` — the server's clock when
+         *     the view was made: the shop's timer counts on it, not on the device's (S4-4).
          */
         EconomyView: {
             /** Format: int32 */
@@ -7955,6 +7956,8 @@ export interface components {
             shop: null | components["schemas"]["ShopView"];
             bets: null | components["schemas"]["BetsView"];
             items: null | components["schemas"]["InventoryItemView"][];
+            /** Format: date-time */
+            serverNow: string;
         };
         /**
          * @description An arrow of the map: `isDefaultForward` — the default branch (every exit of a plain cell, one exit of a fork);
