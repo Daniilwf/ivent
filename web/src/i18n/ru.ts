@@ -443,7 +443,12 @@ const feedLines = {
     g,
     ' отклонено со штрафом дропа',
   ],
-  finished: <T>(p: T, order: number): Line<T> => [p, ` финиширует ${order}-м!`],
+  // The order is the engine's counter, never reused after an undo (S4-5): only order 1 is sure to be the first; later
+  // places go by points, so a later order claims none
+  finished: <T>(p: T, order: number): Line<T> => [
+    p,
+    order === 1 ? ' финиширует первым!' : ' финиширует!',
+  ],
   finishRevoked: <T>(p: T): Line<T> => [p, ': финиш отменён'],
   effectDrawn: <T>(p: T, kind: EventKind): Line<T> => [p, ` тянет ${eventKindWords[kind]}`],
   // A card drawn from a deck and played at once (D-500)
@@ -1506,7 +1511,7 @@ export const ru = {
         freeMode: 'Реролл в свободном режиме',
         gameDeleted: 'Бесплатный реролл: игру убрали из пула',
       } as Record<string, string>,
-      finish: (order: number) => `Финиш: ${order}-е место`,
+      finish: (order: number) => (order === 1 ? 'Финиш: 1-е место' : 'Финиш'),
       frozen: 'Очки заморожены: первый финиш',
       chainCut: 'Цепочка эффектов оборвана',
       eventDrawn: (name: string) => `Ивент «${name}»`,

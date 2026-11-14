@@ -898,3 +898,33 @@ describe('events drawn from decks (stage 5)', () => {
     expect(missed?.facts).toEqual([]);
   });
 });
+
+// S4-5: the engine's finish order is a counter never reused after an undo (Finishes.cs): the only finisher after an undone
+// finish has order 2 and is first. The feed claims a place only for order 1, the one sure to be the first.
+describe('the finish in the feed', () => {
+  const finished = (order: number) =>
+    one([entry('c1', 'player-finished', { playerId: vasya, runId: run1, order, surplus: 0 })]);
+  const completedToFinish = (order: number) =>
+    one([
+      entry('c1', 'player-finished', { playerId: vasya, runId: run1, order, surplus: 0 }),
+      entry('c1', 'run-completed', {
+        runId: run1,
+        playerId: vasya,
+        difficulty: 'hard',
+        hours: 27,
+        completedAt: '2026-09-26T12:00:00Z',
+      }),
+    ]);
+
+  it('says «первым» for the first finish', () => {
+    expect(text(finished(1))).toBe('Вася финиширует первым!');
+    expect(completedToFinish(1)?.facts).toContain('Финиш: 1-е место');
+  });
+
+  it('claims no place from a later order', () => {
+    expect(text(finished(2))).toBe('Вася финиширует!');
+    const facts = completedToFinish(2)?.facts ?? [];
+    expect(facts).toContain('Финиш');
+    expect(facts.join(' ')).not.toMatch(/2-е|место/);
+  });
+});
