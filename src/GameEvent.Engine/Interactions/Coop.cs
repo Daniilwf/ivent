@@ -12,7 +12,8 @@ namespace GameEvent.Engine.Interactions;
 /// coop game invites a free player; the accepted one becomes the partner, playing that one run with him. The roller
 /// completes it with one throw by his own pipeline; points, steps and completion coins are split (D-521), each moves by his
 /// share with his own move. The partner may leave; the roller's drop or tech reroll ends the coop; a reject takes back each
-/// one's share (D-522). Everything is refused while <c>features.coop</c> is off, and what it left waits (D-420).
+/// one's share (D-522). With <c>features.coop</c> switched off nobody starts a coop — every command here is refused — but a
+/// coop in progress goes on as coop to its end, and pending invitations burn by their time (D-715).
 /// </summary>
 internal static class Coop
 {
@@ -275,15 +276,18 @@ internal static class Coop
             .Where(i => i.Status == InteractionStatus.Pending && i.ExpiresAt <= now && InteractionRules.IsOn(state.Rules.Features, i.Kind))
             .Select(i => new InteractionExpired(i.InteractionId, InteractionExpiry.Timeout, now));
 
-    /// <summary>The coop end a player's deactivation brings (the expert panel on D-520): he leaves as if by himself.</summary>
+    /// <summary>
+    /// The coop end a player's deactivation brings (the expert panel on D-520): he leaves as if by himself, whatever the flag —
+    /// a coop in progress goes on as coop with it off (D-715).
+    /// </summary>
     public static IEnumerable<IGameEvent> OnInactive(SeasonState state, Guid playerId, DateTimeOffset now) =>
-        state.Rules.Features.Coop && state.Players[playerId].ActiveRunId is { } runId && state.Runs[runId].PartnerId == playerId
+        state.Players[playerId].ActiveRunId is { } runId && state.Runs[runId].PartnerId == playerId
             ? [new CoopLeft(runId, playerId, CoopLeaveReason.PartnerInactive, now)]
             : [];
 
-    /// <summary>The coop end of the roller's drop or tech reroll of <paramref name="run"/> (D-522); none while coop is off.</summary>
-    public static IEnumerable<IGameEvent> OnRunGivenUp(SeasonState state, RunState run, CoopLeaveReason reason, DateTimeOffset now) =>
-        state.Rules.Features.Coop && run.Coop is { } coop ? [new CoopLeft(run.RunId, coop.PlayerId, reason, now)] : [];
+    /// <summary>The coop end of the roller's drop or tech reroll of <paramref name="run"/> (D-522), whatever the flag (D-715).</summary>
+    public static IEnumerable<IGameEvent> OnRunGivenUp(RunState run, CoopLeaveReason reason, DateTimeOffset now) =>
+        run.Coop is { } coop ? [new CoopLeft(run.RunId, coop.PlayerId, reason, now)] : [];
 
     public static SeasonState Apply(SeasonState state, InteractionCreated e) =>
         state with { Interactions = state.Interactions.SetItem(e.Interaction.InteractionId, e.Interaction) };
@@ -357,13 +361,16 @@ internal static class Coop
             : Decision.Reject(RejectionCodes.PlayerUnknown, $"Player {playerId} is not in the season.");
     }
 
-    // A pending invitation, by the engine's clock: past its time it is over even before the timer fired (D-523)
+    // A pending invitation, by the engine's clock: past its time it is over even before the timer fired (D-523); a response
+    // of the partner board is over with its request, closed or past its term (D-742)
     private static Decision? Pending(SeasonState state, Guid interactionId, EngineContext context) =>
         !state.Interactions.TryGetValue(interactionId, out var invitation)
             ? Decision.Reject(RejectionCodes.InteractionUnknown, $"Invitation {interactionId} is not in the season.")
             : !IsPending(invitation, context.Clock.UtcNow)
                 ? Decision.Reject(RejectionCodes.InteractionNotPending, $"Invitation {interactionId} is {invitation.Status}.")
-                : null;
+                : PartnerBoard.OutlivedItsRequest(state, invitation, context.Clock.UtcNow)
+                    ? Decision.Reject(RejectionCodes.InteractionNotPending, $"Invitation {interactionId} closed with its partner request.")
+                    : null;
 
     // Who may be the partner (D-520, D-546 (8)): another active player of the season, not the first finisher, for whom the
     // game is not excluded (his own drop, tech reroll, «уже проходил»)

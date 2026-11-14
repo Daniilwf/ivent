@@ -38,6 +38,12 @@ public enum InteractionExpiry
 
     /// <summary>A player of a duel's challenge became the first finisher, who plays out of the race (D-510, D-730).</summary>
     FirstFinisher,
+
+    /// <summary>A response of the partner board closed with its request: by its author or its term (D-742).</summary>
+    RequestClosed,
+
+    /// <summary>A player of a duel's challenge deleted his account (D-734).</summary>
+    AccountDeleted,
 }
 
 /// <summary>
@@ -151,8 +157,9 @@ public static class CoopShares
 }
 
 /// <summary>
-/// What every kind of invitation shares (D-523): the flag of its mechanic, so the timer and the limits serve a duel
-/// invitation (5.12) as they serve a coop one. What a mechanic switched off left pending waits (D-420).
+/// What every kind of invitation shares (D-523): whether its timer runs, so the timer serves a duel invitation (5.12) as it
+/// serves a coop one. A duel challenge left pending by duels switched off waits (D-420); a coop invitation burns by its time
+/// whatever the flag, since with coop off it can no longer be accepted (D-715).
 /// </summary>
 public static class InteractionRules
 {
@@ -161,7 +168,7 @@ public static class InteractionRules
         ArgumentNullException.ThrowIfNull(features);
         return kind switch
         {
-            InteractionKind.Coop => features.Coop,
+            InteractionKind.Coop => true,
             InteractionKind.Duel => features.Duels,
             _ => false,
         };

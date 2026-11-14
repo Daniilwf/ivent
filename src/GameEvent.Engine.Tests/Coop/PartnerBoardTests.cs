@@ -42,11 +42,10 @@ internal static class PartnerBoardSteps
     public static PartnerRequest Request(this Scenario s, Guid request) => s.State.PartnerRequests[request];
 
     /// <summary>
-    /// Why a pending response is closed together with its request (D-742, decided by the owner 2026-11-14): a new member
-    /// <c>RequestClosed</c> of <see cref="InteractionExpiry"/>, written as <c>requestClosed</c>. Read by name until the
-    /// implementation adds it, so the tests compile and fail on the missing member, not on the build.
+    /// Why a pending response is closed together with its request (D-742, decided by the owner 2026-11-14), written as
+    /// <c>requestClosed</c>.
     /// </summary>
-    public static InteractionExpiry RequestClosed => Enum.Parse<InteractionExpiry>("RequestClosed");
+    public static InteractionExpiry RequestClosed => InteractionExpiry.RequestClosed;
 
     /// <summary>
     /// What the board keeps true after every command: an open request names a running run of its author with no partner, at
@@ -669,10 +668,8 @@ public class PartnerBoardTests
         Assert.Contains(s.LastEvents<InteractionExpired>(), e => e.InteractionId == response);
         s.Advance(TimeSpan.FromHours(24) + TimeSpan.FromMinutes(1));
 
-        s.Act(new FireTimers());
-
-        ScenarioAssert.Accepted(s);
-        Assert.Empty(s.LastEvents<InteractionExpired>());
+        // Nothing is left for the timer: its own term burns nothing a second time
+        s.Rejects(new FireTimers(), RejectionCodes.TimersNothingDue);
         Assert.Equal(InteractionStatus.Expired, s.Invitation(response).Status);
     }
 

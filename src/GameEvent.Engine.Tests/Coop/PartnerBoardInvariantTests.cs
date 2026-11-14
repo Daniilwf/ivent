@@ -63,7 +63,7 @@ public class PartnerBoardInvariantTests
     private static void Play(int seed, byte[] script, Action<Scenario, ICommand, SeasonState> afterEach)
     {
         // Most games of the pool are coop here, so requests meet runs they can be posted on
-        CoopTestScenario.New(r => r.WithPartnerBoard(requestTtlHours: 12), mapLength: 30, seed: seed)
+        CoopTestScenario.New(r => r.WithPartnerBoard(requestTtlHours: 24), mapLength: 30, seed: seed)
             .MarkCoop(CoopTestScenario.SoloGame).MarkCoop(CoopTestScenario.OtherSoloGame).MarkCoop(CoopTestScenario.ThirdSoloGame)
             .Explained(game =>
         {
