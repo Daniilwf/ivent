@@ -1,10 +1,11 @@
-import { Ban, Check, Clock, HandCoins, Hourglass, Undo2, X } from 'lucide-react';
+import { Check, Clock, HandCoins, Hourglass, Undo2, X } from 'lucide-react';
 import { useId, useRef, useState, type ReactNode } from 'react';
 import type { Schemas } from '../api/client';
 import { moscowTime } from '../app/time';
 import { ru } from '../i18n/ru';
 import { Button } from '../ui/Button';
 import { FormDialog } from '../ui/Dialogs';
+import { Summary } from '../ui/Disclosure';
 import { ChoiceGroup, Field } from '../ui/Field';
 import { Chip } from '../ui/Marks';
 import { Skeleton } from '../ui/Progress';
@@ -72,55 +73,17 @@ export function BetsPanel({
           onRetry={onRetry}
         />
       ) : bets ? (
-        <>
-          <p className="max-w-prose text-sm text-ink-soft">{ru.bets.lead}</p>
-          {done ? <Notice tone="success">{done}</Notice> : null}
-          <section aria-labelledby={`${titleId}-runs`} className="grid gap-2">
-            <h3 id={`${titleId}-runs`} className="font-display font-heavy">
-              {ru.bets.runsTitle}
-            </h3>
-            {bets.refusal ? (
-              <p className="text-sm text-ink-soft" data-testid="bets-refusal">
-                {refusalText(bets.refusal, ru.bets.refusals)}
-              </p>
-            ) : bets.runs.length === 0 ? (
-              <EmptyState
-                icon={<HandCoins size={28} aria-hidden />}
-                title={ru.bets.emptyTitle}
-                text={ru.bets.emptyText}
-              />
-            ) : (
-              <ul className="grid gap-3" data-testid="bet-runs">
-                {bets.runs.map((run) => (
-                  <BetRunRow
-                    key={run.runId}
-                    run={run}
-                    {...(force ? { force } : {})}
-                    onBet={(button) => {
-                      opener.current = button;
-                      setDone(null);
-                      setBetting(run);
-                    }}
-                  />
-                ))}
-              </ul>
-            )}
-          </section>
-          <section aria-labelledby={`${titleId}-mine`} className="grid gap-2">
-            <h3 id={`${titleId}-mine`} className="font-display font-heavy">
-              {ru.bets.mineTitle}
-            </h3>
-            {bets.bets.length === 0 ? (
-              <p className="text-sm text-ink-soft">{ru.bets.mineEmpty}</p>
-            ) : (
-              <ul className="grid gap-2" data-testid="my-bets">
-                {bets.bets.map((bet) => (
-                  <MyBetRow key={bet.betId} bet={bet} />
-                ))}
-              </ul>
-            )}
-          </section>
-        </>
+        <BetsBody
+          bets={bets}
+          done={done}
+          titleId={titleId}
+          {...(force ? { force } : {})}
+          onBet={(run, button) => {
+            opener.current = button;
+            setDone(null);
+            setBetting(run);
+          }}
+        />
       ) : null}
       {betting && bets ? (
         <BetDialog
@@ -144,14 +107,123 @@ export function BetsPanel({
   );
 }
 
-/** A run open for a bet: the player, the game, its hours, when bets on it close */
+/** The rows shown before the rest fold behind «Ещё N игроков» (S4D-3) */
+const shownRuns = 5;
+
+/**
+ * The panel's content: my bets first, then the runs open for a bet (S4D-3). Nothing at all to show is one empty state
+ * with the lead folded in (S4D-4); a sub-heading stands only over its content.
+ */
+function BetsBody({
+  bets,
+  done,
+  titleId,
+  force,
+  onBet,
+}: {
+  bets: NonNullable<Schemas['EconomyView']['bets']>;
+  done: string | null;
+  titleId: string;
+  force?: string;
+  onBet: (run: BetRun, button: HTMLButtonElement) => void;
+}) {
+  const runs = bets.refusal ? [] : bets.runs;
+  if (runs.length === 0 && bets.bets.length === 0) {
+    return (
+      <div className="grid gap-3" data-testid={bets.refusal ? 'bets-refusal' : 'bets-empty'}>
+        {done ? <Notice tone="success">{done}</Notice> : null}
+        <EmptyState
+          icon={<HandCoins size={28} aria-hidden />}
+          title={
+            bets.refusal
+              ? refusalText(bets.refusal, ru.bets.refusals).replace(/\.$/, '')
+              : ru.bets.emptyTitle
+          }
+          text={bets.refusal ? ru.bets.lead : `${ru.bets.lead} ${ru.bets.emptyText}`}
+        />
+      </div>
+    );
+  }
+  // One deadline for every run is said once under the heading, not on each row
+  const shared =
+    runs.length > 1 && new Set(runs.map((r) => r.closesAt)).size === 1
+      ? runs[0]?.closesAt
+      : undefined;
+  const row = (run: BetRun) => (
+    <BetRunRow
+      key={run.runId}
+      run={run}
+      deadline={shared === undefined}
+      {...(force ? { force } : {})}
+      onBet={(button) => {
+        onBet(run, button);
+      }}
+    />
+  );
+  return (
+    <>
+      <p className="max-w-prose text-sm text-ink-soft">{ru.bets.lead}</p>
+      {done ? <Notice tone="success">{done}</Notice> : null}
+      {bets.bets.length > 0 ? (
+        <section aria-labelledby={`${titleId}-mine`} className="grid gap-2">
+          <h3 id={`${titleId}-mine`} className="font-display font-heavy">
+            {ru.bets.mineTitle}
+          </h3>
+          <ul className="grid gap-2" data-testid="my-bets">
+            {bets.bets.map((bet) => (
+              <MyBetRow key={bet.betId} bet={bet} />
+            ))}
+          </ul>
+        </section>
+      ) : null}
+      <section aria-labelledby={`${titleId}-runs`} className="grid gap-2">
+        <h3 id={`${titleId}-runs`} className="font-display font-heavy">
+          {ru.bets.runsTitle}
+        </h3>
+        {bets.refusal ? (
+          <p className="text-sm text-ink-soft" data-testid="bets-refusal">
+            {refusalText(bets.refusal, ru.bets.refusals)}
+          </p>
+        ) : runs.length === 0 ? (
+          <p className="text-sm text-ink-soft">{ru.bets.emptyTitle}</p>
+        ) : (
+          <>
+            {shared ? (
+              <p className="flex items-center gap-2 text-sm text-ink-soft tabular-nums">
+                <Clock size={16} aria-hidden />
+                {ru.bets.until(moscowTime(shared))}
+              </p>
+            ) : null}
+            <ul className="grid gap-2" data-testid="bet-runs">
+              {runs.slice(0, shownRuns).map(row)}
+            </ul>
+            {runs.length > shownRuns ? (
+              <details data-testid="bet-runs-more" className="grid gap-2">
+                <Summary className="font-bold">{ru.bets.more(runs.length - shownRuns)}</Summary>
+                <ul className="grid gap-2">{runs.slice(shownRuns).map(row)}</ul>
+              </details>
+            ) : null}
+          </>
+        )}
+      </section>
+    </>
+  );
+}
+
+/**
+ * A run open for a bet in one compact line (S4D-3): the player, the game, «Поставить»; its hours only when known, its
+ * deadline only when the runs do not share one
+ */
 export function BetRunRow({
   run,
   onBet,
+  deadline = true,
   force,
 }: {
   run: BetRun;
   onBet: (button: HTMLButtonElement) => void;
+  /** Whether the row says when bets on it close (false: the panel says one deadline for all) */
+  deadline?: boolean;
   force?: string;
 }) {
   const nameId = useId();
@@ -159,27 +231,33 @@ export function BetRunRow({
     <li
       aria-labelledby={nameId}
       data-testid={`bet-run-${run.playerId}`}
-      className="grid gap-2 border-t-2 border-muted pt-3 first:border-t-0 first:pt-0"
+      className="flex min-w-0 items-center gap-3 border-t-2 border-muted pt-2 first:border-t-0 first:pt-0"
     >
-      <div className="flex min-w-0 items-center gap-3">
-        <Sticker player={{ name: run.name, token: run.token }} size={36} />
-        <div className="grid min-w-0">
-          <h4 id={nameId} className="font-display font-heavy wrap-anywhere">
-            {run.name}
-          </h4>
-          <span className="wrap-anywhere">{run.gameTitle}</span>
-        </div>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        <Chip icon={<Hourglass size={16} aria-hidden />}>
-          {run.hours != null ? ru.bets.hours(run.hours) : ru.bets.noHours}
-        </Chip>
-        <Chip icon={<Clock size={16} aria-hidden />}>
-          <span className="tabular-nums">{ru.bets.until(moscowTime(run.closesAt))}</span>
-        </Chip>
+      <Sticker player={{ name: run.name, token: run.token }} size={36} />
+      <div className="grid min-w-0 flex-1">
+        <h4 id={nameId} className="font-display font-heavy wrap-anywhere">
+          {run.name}
+        </h4>
+        <span className="text-sm wrap-anywhere">{run.gameTitle}</span>
+        {run.hours != null || deadline ? (
+          <span className="flex flex-wrap gap-x-3 text-sm text-ink-soft tabular-nums">
+            {run.hours != null ? (
+              <span className="inline-flex items-center gap-1">
+                <Hourglass size={16} aria-hidden />
+                {ru.bets.hours(run.hours)}
+              </span>
+            ) : null}
+            {deadline ? (
+              <span className="inline-flex items-center gap-1">
+                <Clock size={16} aria-hidden />
+                {ru.bets.until(moscowTime(run.closesAt))}
+              </span>
+            ) : null}
+          </span>
+        ) : null}
       </div>
       <Button
-        className="justify-self-start"
+        className="shrink-0"
         data-testid={`bet-on-${run.playerId}`}
         aria-label={ru.bets.placeOn(run.name)}
         {...(force ? { force } : {})}
@@ -261,6 +339,10 @@ export function BetDialog({
       {...(returnFocus ? { returnFocus } : {})}
     >
       <p className="max-w-prose wrap-anywhere">{ru.bets.dialogGame(run.gameTitle)}</p>
+      <p className="flex items-center gap-2 text-sm text-ink-soft">
+        <Hourglass size={16} aria-hidden />
+        {run.hours != null ? ru.bets.hours(run.hours) : ru.bets.noHours}
+      </p>
       <form
         className="grid gap-4"
         onSubmit={(e) => {
@@ -295,6 +377,7 @@ export function BetDialog({
         <Field
           label={ru.bets.stake}
           hint={ru.bets.stakeHint(stakeLimit)}
+          errorRestatesHint
           data-testid="bet-stake"
           type="number"
           inputMode="numeric"
@@ -308,16 +391,12 @@ export function BetDialog({
             setError(null);
           }}
         />
-        <p className="font-bold tabular-nums" data-testid="bet-payout">
-          {valid && option ? (
-            ru.bets.payout(payoutOf(amount, option.multiplier))
-          ) : (
-            <span className="inline-flex items-center gap-2 font-normal text-ink-soft">
-              <Ban size={16} aria-hidden />
-              {ru.bets.stakeHint(stakeLimit)}
-            </span>
-          )}
-        </p>
+        {/* What comes back, said before the press; an invalid stake is said at its field only (S4D-7) */}
+        {valid && option ? (
+          <p className="font-bold tabular-nums" data-testid="bet-payout">
+            {ru.bets.payout(payoutOf(amount, option.multiplier), amount)}
+          </p>
+        ) : null}
         {error ? <Notice tone="danger">{error}</Notice> : null}
         <Button
           type="submit"

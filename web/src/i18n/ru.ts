@@ -1299,6 +1299,7 @@ export const ru = {
     until: (time: string) => `Ставки до ${time}`,
     hours: (h: number) => `${h.toLocaleString('ru-RU')} ч`,
     noHours: 'Часы не указаны',
+    more: (n: number) => `Ещё ${n} ${plural(n, 'игрок', 'игрока', 'игроков')}`,
     place: 'Поставить',
     placeOn: (name: string) => `Поставить на игрока ${name}`,
     dialogTitle: (name: string) => `Ставка на игрока ${name}`,
@@ -1310,7 +1311,13 @@ export const ru = {
     stake: 'Ставка в монетках',
     stakeHint: (max: number) => `От 1 до ${coins(max, 'genitive')}`,
     stakeInvalid: (max: number) => `Ставка — целое число от 1 до ${max}.`,
-    payout: (n: number) => `Выигрыш, если успеет: ${coins(n)}`,
+    // The payout is what comes back, the stake included (D-414: ⌊stake × multiplier⌋, the stake left at placing)
+    payout: (total: number, stake: number) =>
+      total > stake
+        ? `Вернётся ${coins(total)}: ставка ${stake.toLocaleString('ru-RU')} и +${(total - stake).toLocaleString('ru-RU')} сверху`
+        : total === stake
+          ? `Вернётся ${coins(total)}: ставка ${stake.toLocaleString('ru-RU')}, без выигрыша сверху`
+          : `Вернётся ${coins(total)} из ставки ${stake.toLocaleString('ru-RU')}`,
     confirm: (stake: number) => `Поставить ${coins(stake, 'accusative')}`,
     placed: (name: string) => `Ставка на игрока ${name} принята.`,
     emptyTitle: 'Сейчас ставить не на кого',
