@@ -257,12 +257,12 @@ public static class ContentPublishing
             error($"{at}.effect.condition", "An event plays when drawn, without a condition.");
         }
 
-        // D-549, as D-519 for the system's effects: pushes of everyone with their cells would not fit the 50 events of the
-        // chain, and the effect would reach only some — until 5.9
-        if (definition.Effect is { Target.Selector: TargetSelector.All } effect
+        // D-757 (the owner's decision of 2026-11-14, lifting D-549): an event on everyone is settled in batches of players, so
+        // it may move them; only one that asks something stays in its drawer's command, and that one may not move everyone
+        if (definition.Effect is { Target.Selector: TargetSelector.All } effect && !Effects.ForAllSettlements.Settles(effect)
             && effect.Actions.Concat(effect.Outcomes?.Cases.SelectMany(c => c.Actions) ?? []).Any(a => a is MoveAction or TeleportAction))
         {
-            error($"{at}.effect.target", "An event on everyone does not move or teleport (until 5.9).");
+            error($"{at}.effect.target", "An event on everyone that asks something does not move or teleport (D-757).");
         }
     }
 

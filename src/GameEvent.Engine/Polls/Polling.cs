@@ -252,6 +252,13 @@ internal static class Polling
             return events;
         }
 
+        // A global event's effect goes to everyone with the result as its answer (EV23, D-753)
+        if (poll.Source == PollSource.GlobalEvent)
+        {
+            events.AddRange(GlobalEvents.GlobalEventing.Voted(after, context, poll, result));
+            return events;
+        }
+
         if (poll.OnResult is not { } effect)
         {
             return events;
@@ -362,6 +369,7 @@ internal static class Polling
                     ObjectId = e.ObjectId,
                     Kind = e.Kind,
                     TargetId = e.TargetId,
+                    GlobalEventId = e.GlobalEventId,
                 }),
         };
 

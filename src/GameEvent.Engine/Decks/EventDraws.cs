@@ -197,7 +197,12 @@ internal static class EventDraws
         }
 
         List<IGameEvent> events = [drawn];
-        if (definition.Effect is not null)
+        if (definition is { Manual: false, Effect: { Target.Selector: TargetSelector.All } shared } && ForAllSettlements.Settles(shared)
+            && !Targets.IsFirst(after, playerId))
+        {
+            events.AddRange(OnEveryone(after, context, playerId, definition, shared, deckKind, source, level));
+        }
+        else if (definition.Effect is not null)
         {
             // Played at once on the drawer; what it gives him comes from the system, not a player (D-544). A question
             // suspends the effect until the answer, from any source (D-511); the provisional first's event reaches him
@@ -219,6 +224,37 @@ internal static class EventDraws
             {
                 ObjectId = definition.Id,
             });
+        }
+
+        return events;
+    }
+
+    /// <summary>
+    /// A drawn event on everyone (D-757, the owner's decision of 2026-11-14, D-703): its actions on «self» play on the drawer
+    /// in his command; the rest goes to its targets — chosen now by the selector, as inside the command — in a settlement for
+    /// everyone of its own, in batches of players with their cells' reactions, so moving everyone fits the 50 events.
+    /// </summary>
+    private static List<IGameEvent> OnEveryone(
+        SeasonState state, EngineContext context, Guid playerId, ObjectDefinition definition, EffectSpec effect, EventKind kind, EventSource source, int level)
+    {
+        var events = new List<IGameEvent>();
+        var own = effect.Actions.Where(a => a.Target == ActionTarget.Self).ToList();
+        if (own.Count > 0)
+        {
+            var run = new EffectRun(state, context, playerId, definition.Id, hostile: false, parameters: null)
+            {
+                Asks = new Asking(kind, level) { Source = source },
+            };
+            run.Run(effect with { Actions = [.. own], Outcomes = null }, [playerId]);
+            events.AddRange(run.Events);
+            state = run.State;
+        }
+
+        var rest = effect with { Actions = [.. effect.Actions.Where(a => a.Target != ActionTarget.Self)] };
+        if (rest.Actions.Count > 0 || rest.Outcomes is not null)
+        {
+            var targets = Targets.ForTriggered(state, context, definition with { Effect = rest }, playerId);
+            events.Add(ForAllSettlements.Queue(state, context, ForAllSource.DrawnEvent, playerId, definition.Id, rest, kind: kind, players: targets));
         }
 
         return events;

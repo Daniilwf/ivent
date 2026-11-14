@@ -55,6 +55,9 @@
         "coop": {
           "type": "boolean"
         },
+        "globalEvents": {
+          "type": "boolean"
+        },
         "duels": {
           "type": "boolean"
         }
@@ -911,6 +914,21 @@
         "samePairCooldownDays",
         "maxWinsPerSeason",
         "dropForfeits"
+      ],
+      "additionalProperties": false
+    },
+    "globalEvents": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "properties": {
+        "maxActive": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "maxActive"
       ],
       "additionalProperties": false
     }

@@ -139,6 +139,12 @@ public static class FeedVisibility
         ["poll-closed"] = Access.Public,
         ["poll-cancelled"] = Access.Public,
 
+        // Global events (D-517, D-518): the launch with its banner, the progress of the goal, its reach and the end are public
+        ["global-event-launched"] = Access.Public,
+        ["global-event-ended"] = Access.Public,
+        ["global-progress-changed"] = Access.Public,
+        ["global-goal-reached"] = Access.Public,
+
         ["weekly-challenge-set"] = Access.Public,
         ["weekly-challenge-completed"] = Access.Public,
         ["weekly-challenge-revoked"] = Access.Public,

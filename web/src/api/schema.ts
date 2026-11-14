@@ -8111,6 +8111,11 @@ export interface components {
              */
             coop?: boolean;
             /**
+             * @description Global events and their goals (stage 5, D-517, D-518); needs bool Features.Events. Optional, so older configs without
+             *     it still read; not written while off: a season logged before it keeps its ruleset's format.
+             */
+            globalEvents?: boolean;
+            /**
              * @description Duels (stage 5, D-525, D-540); optional, so older configs without it still read. Not written while off: a season
              *     logged before it keeps its ruleset's format.
              */
@@ -8294,6 +8299,14 @@ export interface components {
             reviewText: null | string;
             /** Format: int32 */
             token: number;
+        };
+        /** @description The rules of global events (SPEC «Общие ивенты», D-517). */
+        GlobalEventRules: {
+            /**
+             * Format: int32
+             * @description How many global events may run at once (D-517).
+             */
+            maxActive: number;
         };
         HostileCap: {
             enabled: boolean;
@@ -9058,6 +9071,7 @@ export interface components {
             partnerBoard?: null | components["schemas"]["PartnerBoardRules"];
             polls?: null | components["schemas"]["PollRules"];
             duels?: null | components["schemas"]["DuelRules"];
+            globalEvents?: null | components["schemas"]["GlobalEventRules"];
         };
         /**
          * @description One changed value between two versions of the rules: the JSON path (for example `reward.diceCount.max`)
