@@ -226,7 +226,9 @@ internal static class SeasonSetup
 
     // D-516: the deadline cancels the polls whose result acts — even with polls switched off (D-724): the results must not
     // change after it, and an event's suspension left to a frozen poll would hold «Подвести итоги» for nothing
-    private static IEnumerable<IGameEvent> CancelledPolls(SeasonState state) => Polls.Polling.CancelAtDeadline(state);
+    // The deadline ends the global events too (D-516): a goal not reached by then gives nothing; their polls are cancelled above
+    private static IEnumerable<IGameEvent> CancelledPolls(SeasonState state) =>
+        Polls.Polling.CancelAtDeadline(state).Concat(GlobalEvents.GlobalEventing.EndAtDeadline(state));
 
     public static SeasonState Apply(SeasonState state, SeasonResultRecorded e) => state with { Result = e.Rows };
 

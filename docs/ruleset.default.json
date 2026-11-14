@@ -16,6 +16,7 @@
     "challenges": false,
     "suggestions": false,
     "coop": false,
+    "globalEvents": false,
     "duels": false
   },
   "season": {
@@ -135,6 +136,9 @@
     "gameOptions": 5,
     "allowChangeVote": true,
     "showLiveCountsDefault": false
+  },
+  "globalEvents": {
+    "maxActive": 2
   },
   "duels": {
     "rewardCoins": 10,

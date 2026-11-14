@@ -76,6 +76,20 @@ public sealed record Ruleset
     /// </summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public DuelRules? Duels { get; init; }
+
+    /// <summary>
+    /// The rules of global events (stage 5, D-517). Missing — a season created before them reads as it did (D-50); needed
+    /// once <c>features.globalEvents</c> is on. Not written while missing.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public GlobalEventRules? GlobalEvents { get; init; }
+}
+
+/// <summary>The rules of global events (SPEC «Общие ивенты», D-517).</summary>
+public sealed record GlobalEventRules
+{
+    /// <summary>How many global events may run at once (D-517).</summary>
+    public required int MaxActive { get; init; }
 }
 
 /// <summary>The rules of polls (SPEC «Голосования», D-512, D-513, D-541).</summary>
@@ -223,6 +237,13 @@ public sealed record Features
     /// </summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public bool Coop { get; init; }
+
+    /// <summary>
+    /// Global events and their goals (stage 5, D-517, D-518); needs <see cref="Events"/>. Optional, so older configs without
+    /// it still read; not written while off: a season logged before it keeps its ruleset's format.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool GlobalEvents { get; init; }
 
     /// <summary>
     /// Duels (stage 5, D-525, D-540); optional, so older configs without it still read. Not written while off: a season

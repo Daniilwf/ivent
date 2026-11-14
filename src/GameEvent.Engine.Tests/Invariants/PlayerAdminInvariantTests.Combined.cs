@@ -415,6 +415,7 @@ public partial class PlayerAdminInvariantTests
             "coop" => features.Coop,
             "partnerBoard" => features.PartnerBoard && features.Coop,
             "polls" => features.Polls,
+            "globalEvents" => features.GlobalEvents && features.Events,
             "duels" => features.Duels,
             "interactions" => features.Coop || features.Duels,
             _ => throw new ArgumentOutOfRangeException(nameof(mechanic), mechanic, "Unknown mechanic."),
@@ -474,6 +475,10 @@ public partial class PlayerAdminInvariantTests
             // Polls of stage 5 (D-512, D-720)
             Engine.Polls.PollStarted or Engine.Polls.VoteCast or Engine.Polls.VoteChanged or Engine.Polls.PollClosed
                 or Engine.Polls.PollCancelled => "polls",
+
+            // Global events and their goals (D-517, D-518, D-750)
+            Engine.GlobalEvents.GlobalEventLaunched or Engine.GlobalEvents.GlobalEventEnded or Engine.GlobalEvents.GlobalProgressChanged
+                or Engine.GlobalEvents.GlobalGoalReached => "globalEvents",
 
             // The effect dispatcher reacts to content (items, events); stage 1 has no content effects in play (D-24, D-103)
             EffectChainCut => "effects",

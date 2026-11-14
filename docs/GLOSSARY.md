@@ -289,8 +289,10 @@
 | Итог голосования | вариант с наибольшим числом голосов, ничья — бросок; запускает эффект | событие `PollClosed` (`PollCount`, `Tied`, `TieRoll`), ссылка `$result`; отмена — `PollCancelled`; механика — `Polls/Polling` |
 | Голосующие | кто голосует: игроки или все (зрители — по конфигу) | `PollVoters` (`Players`, `Everyone`), `social.spectatorsCanVote` |
 | Анонимное голосование | голоса показываются без имён (D-515) | `PollDefinition.Anonymous` |
-| Запуск общего ивента | админ начинает общий ивент на срок | команды `LaunchGlobalEvent`, `EndGlobalEvent`, события `GlobalEventLaunched`, `GlobalEventEnded` |
-| Общая цель | цель общего ивента с прогресс-баром: часы HLTB или число прохождений | `GlobalEventGoal` (`GoalMetric`: `Hours`, `Runs`), события `GlobalProgressChanged`, `GlobalGoalReached` |
+| Запуск общего ивента | админ начинает общий ивент на срок; конец — по сроку, админом или дедлайном | команды `LaunchGlobalEvent`, `EndGlobalEvent`, события `GlobalEventLaunched`, `GlobalEventEnded` (`GlobalEventEndReason`: `Timer`, `Admin`, `Deadline`); состояние `GlobalEventState` (`GlobalEventStatus`: `Active`, `Ended`); механика — `GlobalEvents/GlobalEventing` |
+| Общая цель | цель общего ивента с прогресс-баром: часы HLTB или число прохождений | `GlobalEventGoal` (`GoalMetric`: `Hours`, `Runs`), события `GlobalProgressChanged` (`GlobalProgressReason`: `Completed`, `Rejected`, `HoursCorrected`), `GlobalGoalReached` |
+| Вклад в общую цель | что одно прохождение внесло в цель: часы HLTB его снапшота или 1; реджект снимает, правка часов меняет разницей | `GlobalContribution` |
+| Голосование общего ивента | вопрос первого действия общего ивента голосующим; итог раздаётся всем ответом на вопрос (EV23) | `PollSource.GlobalEvent`, `PollStarted.GlobalEventId`, `ForAllQueued.Answers` |
 | Баннер общего ивента | плашка общего ивента на главной | `GlobalEventBanner` |
 | Напарник | второй игрок кооп-прохождения | `RunState.PartnerId`, событие `CoopJoined` |
 | Ролливший | игрок, чей ролл дал кооп-прохождение; бросает кубы и получает долю с округлением вверх | `RunState.PlayerId` |
