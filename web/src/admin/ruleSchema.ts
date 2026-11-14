@@ -1,7 +1,8 @@
 // The admin's editors check the typed JSON against a schema generated from the server's types while the admin types:
 // the rules (docs/ruleset.schema.json, GET /api/admin/rules/schema) and the content (docs/content.schema.json,
 // GET /api/admin/content/schema). The schemas use a small part of JSON Schema: type, properties, required,
-// additionalProperties, enum, const, pattern, items, `true` for any value and anyOf — the content's base actions, one
+// additionalProperties, enum, const, pattern, minLength/maxLength, minimum/maximum, items, `true` for any value and
+// anyOf — the content's base actions, one
 // variant per `type` (D-494); this checker knows exactly that part. The server checks everything again on save,
 // including the rules that a schema cannot say (ranges, time zones, references between objects).
 
@@ -13,6 +14,10 @@ export type JsonSchema = {
   enum?: unknown[];
   const?: unknown;
   pattern?: string;
+  minLength?: number;
+  maxLength?: number;
+  minimum?: number;
+  maximum?: number;
   items?: JsonSchema | boolean;
   anyOf?: JsonSchema[];
   description?: string;
@@ -21,7 +26,8 @@ export type JsonSchema = {
 export type SchemaProblem =
   | { kind: 'required' | 'unknown' | 'pattern'; path: string }
   | { kind: 'type'; path: string; expected: string[] }
-  | { kind: 'enum'; path: string; values: unknown[] };
+  | { kind: 'enum'; path: string; values: unknown[] }
+  | { kind: 'length' | 'range'; path: string; min: number | undefined; max: number | undefined };
 
 /** Whether an answer looks like a schema this checker can use */
 export function isSchema(value: unknown): value is JsonSchema {
@@ -78,6 +84,18 @@ export function checkSchema(
     !new RegExp(schema.pattern, 'u').test(value)
   )
     return [{ kind: 'pattern', path: shown }];
+  if (
+    typeof value === 'string' &&
+    ((schema.minLength !== undefined && value.length < schema.minLength) ||
+      (schema.maxLength !== undefined && value.length > schema.maxLength))
+  )
+    return [{ kind: 'length', path: shown, min: schema.minLength, max: schema.maxLength }];
+  if (
+    typeof value === 'number' &&
+    ((schema.minimum !== undefined && value < schema.minimum) ||
+      (schema.maximum !== undefined && value > schema.maximum))
+  )
+    return [{ kind: 'range', path: shown, min: schema.minimum, max: schema.maximum }];
 
   const problems: SchemaProblem[] = [];
   if (Array.isArray(value)) {

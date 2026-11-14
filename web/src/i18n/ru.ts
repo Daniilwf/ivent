@@ -2302,6 +2302,11 @@ export const ru = {
         type: (expected: string) => `Нужно ${expected}`,
         enum: (values: string) => `Одно из: ${values}`,
         pattern: 'Нужно целое число, кубы («1d6», «-1d6») или ссылка («$roll», «$choice»)',
+        // S4D-10: the server's text and price rules, in the schema
+        length: (min: number, max?: number) =>
+          max === undefined ? `Не короче ${min} символов` : `От ${min} до ${max} символов`,
+        range: (min?: number, max?: number) =>
+          `Число${min === undefined ? '' : ` от ${min.toLocaleString('ru-RU')}`}${max === undefined ? '' : ` до ${max.toLocaleString('ru-RU')}`}`,
       },
       // The server's checks speak English for the log (D-492): the common ones are told in Russian by their exact text
       serverMessages: {

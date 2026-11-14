@@ -100,11 +100,37 @@ public static class ContentSchema
             };
         }
 
+        // The text and price rules of ContentValidator, so the editor catches them while the admin types (S4D-10)
+        if (context.PropertyInfo is { } property && schema is JsonObject described
+            && (property.DeclaringType == typeof(ObjectDefinition) || property.DeclaringType == typeof(WheelDefinition)))
+        {
+            switch (property.Name)
+            {
+                case "name":
+                    Text(described, ContentValidator.MaxNameLength);
+                    break;
+                case "description" when property.DeclaringType == typeof(ObjectDefinition):
+                    Text(described, ContentValidator.MaxDescriptionLength);
+                    break;
+                case "price" when property.DeclaringType == typeof(ObjectDefinition):
+                    described["minimum"] = 0;
+                    described["maximum"] = ContentValidator.MaxPrice;
+                    break;
+            }
+        }
+
         if (type == typeof(ContentParamDictionary))
         {
             return new JsonObject { ["type"] = new JsonArray("object", "null"), ["additionalProperties"] = new JsonObject { ["type"] = "string" } };
         }
 
         return schema;
+    }
+
+    /// <summary>1 to <paramref name="max"/> characters (ContentValidator.CheckText; only spaces is the server's to refuse).</summary>
+    private static void Text(JsonObject schema, int max)
+    {
+        schema["minLength"] = 1;
+        schema["maxLength"] = max;
     }
 }
