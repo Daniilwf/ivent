@@ -28,6 +28,9 @@ public sealed class SeasonSimulation
     /// <summary>A bot acts at most this many times per wake: a refused command never makes it loop (D-355).</summary>
     public const int MaxActionsPerWake = 40;
 
+    // The guard of the answers on the final review: each answer moves at most to the finish, so a map's length bounds them
+    private const int MaxFinalAnswers = 1000;
+
     private const double Epsilon = 1e-9;
     private const string ProofLink = "https://example.com/proof";
 
@@ -610,12 +613,29 @@ public sealed class SeasonSimulation
         // what is still waiting (the bots play no texts out)
         if (final)
         {
-            // A bot done for the season still answers what an event asks (D-561), so the results are not held
-            foreach (var bot in _players)
+            // A bot done for the season still answers what an event asks (D-561), so the results are not held. An answer goes on
+            // with its effect: a step may stop on an event cell that asks again, or at a fork (D-805) — answered until nothing waits
+            for (var round = 0; round < MaxFinalAnswers; round++)
             {
-                if (_state.Players[bot.PlayerId].Choice is { Kind: ChoiceKind.Effect } asked)
+                var answered = false;
+                foreach (var bot in _players)
                 {
-                    Answer(bot, asked);
+                    var player = _state.Players[bot.PlayerId];
+                    if (player.Choice is { Kind: ChoiceKind.Branch } branch)
+                    {
+                        ChooseBranch(bot, player, branch);
+                        answered = true;
+                    }
+                    else if (player.Choice is { Kind: ChoiceKind.Effect } asked)
+                    {
+                        Answer(bot, asked);
+                        answered = true;
+                    }
+                }
+
+                if (!answered)
+                {
+                    break;
                 }
             }
 

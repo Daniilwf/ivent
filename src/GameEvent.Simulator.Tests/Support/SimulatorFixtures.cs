@@ -41,13 +41,7 @@ public static class SimulatorFixtures
     /// The content of the repository the site publishes into a season (D-533): /content/items and /content/events as objects,
     /// /content/wheels and /content/decks as wheels.
     /// </summary>
-    public static ContentPack RepositoryContent()
-    {
-        var root = PathOf("content");
-        IEnumerable<(string, string)> Read(params string[] dirs) =>
-            dirs.SelectMany(d => Directory.EnumerateFiles(Path.Combine(root, d), "*.json")).Order(StringComparer.Ordinal).Select(f => (Path.GetFileName(f), File.ReadAllText(f)));
-        return ContentFiles.Pack(Read("items", "events"), Read("wheels", "decks"));
-    }
+    public static ContentPack RepositoryContent() => SimulationInputs.ReadContent(PathOf("content"));
 
     /// <summary>The default ruleset with events on (and items, which events are, D-530): «ивенты вкл» of the simulator (task 5.15).</summary>
     public static Ruleset WithEvents()
