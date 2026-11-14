@@ -1276,12 +1276,15 @@ export const ru = {
     left: (time: string) => `Лоты исчезнут через ${time}`,
     gone: 'Время лотов вышло',
     price: (n: number) => coins(n),
-    buy: 'Купить',
+    buyFor: (price: number) => `Купить за ${coins(price, 'accusative')}`,
     buyNamed: (name: string, price: number) => `Купить «${name}» за ${coins(price, 'accusative')}`,
     sold: 'Куплено',
     bought: (name: string) => `Куплено: «${name}». Уже в инвентаре.`,
     emptyTitle: 'Лотов пока нет',
     emptyText: 'Сделай ролл магазина — появятся личные лоты.',
+    // S4D-5: no «сделай ролл» above a roll the coins do not pay for
+    emptyPoor: (price: number) =>
+      `Монетки дают прохождения — ролл магазина стоит ${coins(price, 'accusative')}.`,
     goneTitle: 'Лоты исчезли',
     goneText: 'Время вышло. Новый ролл даст новые лоты.',
     loadErrorTitle: 'Магазин не загрузился',

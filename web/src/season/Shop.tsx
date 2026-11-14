@@ -14,7 +14,7 @@ export type ShopLot = Schemas['ShopLotView'];
 
 /**
  * My shop (4.11c, D-443, D-447): the roll — by a coupon first, then for coins, dearer each time within a game — and the
- * personal lots with their timer. «Купить» is open only on a lot the engine sells me now; otherwise its reason in words.
+ * personal lots with their timer. «Купить за N» is open only on a lot the engine sells me now; otherwise its reason in words.
  * Lots past their time vanish by the clock even before the server's timer fires (it refuses them anyway). Hidden when
  * the season's shop is off (the economy has no `shop`).
  */
@@ -52,6 +52,19 @@ export function ShopPanel({
   const live = expiresAt !== null && now < expiresAt;
   const lots = live ? (shop?.lots ?? []) : [];
   const rolled = (shop?.lots.length ?? 0) > 0;
+  // A reason every lot still on sale shares (the inventory full) is said once under the heading (S4D-5)
+  const unsold = lots.filter((l) => !l.sold);
+  const sharedWhy =
+    unsold.length > 1 && unsold.every((l) => l.refusal !== null && l.refusal === unsold[0]?.refusal)
+      ? (unsold[0]?.refusal ?? null)
+      : null;
+  // With no lots on screen a refused roll's cause is the empty state's text, not a «сделай ролл» above a closed roll
+  const emptyWhy =
+    lots.length === 0 && shop?.refusal
+      ? shop.refusal === 'roll.notEnoughCoins'
+        ? ru.shop.emptyPoor(shop.price)
+        : refusalText(shop.refusal, ru.shop.refusals)
+      : null;
 
   async function run(what: 'roll' | number, action: () => Promise<UseResult>, success: string) {
     setBusy(what);
@@ -90,6 +103,11 @@ export function ShopPanel({
         />
       ) : shop ? (
         <>
+          {sharedWhy ? (
+            <p className="text-sm text-ink-soft" data-testid="shop-why">
+              {refusalText(sharedWhy, ru.shop.refusals)}
+            </p>
+          ) : null}
           {done ? <Notice tone="success">{done}</Notice> : null}
           {expiresAt !== null && live ? (
             <p className="flex items-center gap-2 font-bold" data-testid="shop-timer">
@@ -105,23 +123,28 @@ export function ShopPanel({
                   lot={lot}
                   busy={busy === lot.lot}
                   disabled={busy !== null}
+                  why={sharedWhy === null}
                   {...(force ? { force } : {})}
                   onBuy={() => void run(lot.lot, () => onBuy(lot.lot), ru.shop.bought(lot.name))}
                 />
               ))}
             </ul>
-          ) : rolled ? (
-            <EmptyState
-              icon={<Clock size={28} aria-hidden />}
-              title={ru.shop.goneTitle}
-              text={ru.shop.goneText}
-            />
           ) : (
-            <EmptyState
-              icon={<Store size={28} aria-hidden />}
-              title={ru.shop.emptyTitle}
-              text={ru.shop.emptyText}
-            />
+            <div data-testid={emptyWhy ? 'shop-refusal' : undefined}>
+              {rolled ? (
+                <EmptyState
+                  icon={<Clock size={28} aria-hidden />}
+                  title={ru.shop.goneTitle}
+                  text={emptyWhy ?? ru.shop.goneText}
+                />
+              ) : (
+                <EmptyState
+                  icon={<Store size={28} aria-hidden />}
+                  title={ru.shop.emptyTitle}
+                  text={emptyWhy ?? ru.shop.emptyText}
+                />
+              )}
+            </div>
           )}
           {error ? <Notice tone="danger">{error}</Notice> : null}
           <div className="grid gap-1">
@@ -140,9 +163,11 @@ export function ShopPanel({
             </Button>
             <p
               className="text-sm text-ink-soft"
-              data-testid={shop.refusal ? 'shop-refusal' : undefined}
+              data-testid={shop.refusal && !emptyWhy ? 'shop-refusal' : undefined}
             >
-              {shop.refusal ? refusalText(shop.refusal, ru.shop.refusals) : ru.shop.lead}
+              {shop.refusal && !emptyWhy
+                ? refusalText(shop.refusal, ru.shop.refusals)
+                : ru.shop.lead}
             </p>
           </div>
         </>
@@ -151,18 +176,21 @@ export function ShopPanel({
   );
 }
 
-/** One lot: what it is, its price, «Купить» while the engine sells it, otherwise why not */
+/** One lot: what it is, its price, «Купить за N» while the engine sells it, otherwise why not */
 export function LotRow({
   lot,
   busy,
   disabled,
   onBuy,
+  why = true,
   force,
 }: {
   lot: ShopLot;
   busy: boolean;
   disabled: boolean;
   onBuy: () => void;
+  /** Whether the lot says its own reason; false — the panel says one reason for all lots (S4D-5) */
+  why?: boolean;
   force?: string;
 }) {
   const titleId = useId();
@@ -200,9 +228,9 @@ export function LotRow({
             {...(force ? { force } : {})}
             onClick={onBuy}
           >
-            {ru.shop.buy}
+            {ru.shop.buyFor(lot.price)}
           </Button>
-        ) : (
+        ) : !why ? null : (
           <span className="text-sm text-ink-soft" data-testid={`lot-why-${lot.lot}`}>
             {refusalText(lot.refusal, ru.shop.refusals)}
           </span>

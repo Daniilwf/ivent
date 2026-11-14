@@ -240,3 +240,55 @@ describe('the clock offset', () => {
     expect(clockOffset('not a date', 'nor this', device)).toBe(0);
   });
 });
+
+// Design review of stage 4 (S4D-5, S4D-14)
+describe('the shop says each thing once', () => {
+  it('does not ask for a roll it cannot pay for: the empty text says what a roll costs', async () => {
+    fakeServer({
+      [economyUrl]: economyFixture({
+        coins: 2,
+        shop: shopFixture({ refusal: 'roll.notEnoughCoins', expiresAt: null, lots: [] }),
+      }),
+    });
+    renderShop();
+
+    expect(await screen.findByText(ru.shop.emptyTitle)).toBeInTheDocument();
+    expect(screen.queryByText(ru.shop.emptyText)).not.toBeInTheDocument();
+    expect(screen.getByText(ru.shop.emptyPoor(6))).toBeInTheDocument();
+    expect(ru.shop.emptyPoor(1)).toBe('Монетки дают прохождения — ролл магазина стоит 1 монетку.');
+    expect(screen.getByTestId('shop-roll')).toBeDisabled();
+    // The cause is said by the empty state, not again under the roll
+    expect(screen.queryByText(ru.rejection['roll.notEnoughCoins'])).not.toBeInTheDocument();
+  });
+
+  it('says a reason all lots share once under the heading, not on each lot', async () => {
+    const full = shopFixture().lots.map((l) => ({ ...l, sold: false, refusal: 'inventory.full' }));
+    fakeServer({ [economyUrl]: economyFixture({ shop: liveShop({ lots: full }) }) });
+    renderShop();
+
+    await screen.findByTestId('shop-lots');
+    expect(screen.getByTestId('shop-why')).toHaveTextContent(ru.rejection['inventory.full']);
+    expect(screen.getAllByText(ru.rejection['inventory.full'])).toHaveLength(1);
+    expect(screen.queryByTestId('lot-why-0')).not.toBeInTheDocument();
+    expect(screen.getByTestId('shop-roll')).toHaveAttribute('data-variant', 'quiet');
+  });
+
+  it('keeps each lot its own reason when the reasons differ', async () => {
+    fakeServer({ [economyUrl]: economyFixture({ shop: liveShop() }) });
+    renderShop();
+
+    await screen.findByTestId('shop-lots');
+    expect(screen.queryByTestId('shop-why')).not.toBeInTheDocument();
+    expect(screen.getByTestId('lot-why-1')).toBeInTheDocument();
+  });
+
+  it('says the price on «Купить», one pattern with the roll (S4D-14)', async () => {
+    fakeServer({ [economyUrl]: economyFixture({ shop: liveShop() }) });
+    renderShop();
+
+    const buy = await screen.findByTestId('buy-0');
+    expect(buy).toHaveTextContent('Купить за 4 монетки');
+    expect(buy).toHaveAccessibleName(ru.shop.buyNamed('Апельсин', 4));
+    expect(ru.shop.buyFor(1)).toBe('Купить за 1 монетку');
+  });
+});
