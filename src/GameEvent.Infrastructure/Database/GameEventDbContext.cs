@@ -32,6 +32,24 @@ public sealed class GameEventDbContext(DbContextOptions<GameEventDbContext> opti
 
     public DbSet<RunRecord> Runs => Set<RunRecord>();
 
+    public DbSet<PollRecord> Polls => Set<PollRecord>();
+
+    public DbSet<PollOptionRecord> PollOptions => Set<PollOptionRecord>();
+
+    public DbSet<VoteRecord> Votes => Set<VoteRecord>();
+
+    public DbSet<GlobalEventRecord> GlobalEvents => Set<GlobalEventRecord>();
+
+    public DbSet<InteractionRecord> Interactions => Set<InteractionRecord>();
+
+    public DbSet<PartnerRequestRecord> PartnerRequests => Set<PartnerRequestRecord>();
+
+    public DbSet<WeeklyChallengeRecord> WeeklyChallenges => Set<WeeklyChallengeRecord>();
+
+    public DbSet<WeeklyChallengeCompletionRecord> WeeklyChallengeCompletions => Set<WeeklyChallengeCompletionRecord>();
+
+    public DbSet<SuggestionRecord> Suggestions => Set<SuggestionRecord>();
+
     public DbSet<GameRecord> Games => Set<GameRecord>();
 
     public DbSet<CategoryRecord> Categories => Set<CategoryRecord>();
@@ -177,6 +195,80 @@ public sealed class GameEventDbContext(DbContextOptions<GameEventDbContext> opti
             e.Property(x => x.Status).HasMaxLength(20);
             e.Property(x => x.Difficulty).HasMaxLength(20);
             e.Property(x => x.DeclaredDifficulty).HasMaxLength(20);
+        });
+
+        // The stage 5 mechanics (migration «Events», D-810, D-811)
+        modelBuilder.Entity<PollRecord>(e =>
+        {
+            e.ToTable("Poll");
+            e.HasOne<SeasonRecord>().WithMany().HasForeignKey(x => x.SeasonId);
+            e.HasIndex(x => new { x.SeasonId, x.Status });
+            e.Property(x => x.Status).HasMaxLength(20);
+        });
+
+        modelBuilder.Entity<PollOptionRecord>(e =>
+        {
+            e.ToTable("PollOption");
+            e.HasKey(x => new { x.PollId, x.Position });
+            e.HasOne<PollRecord>().WithMany().HasForeignKey(x => x.PollId);
+        });
+
+        modelBuilder.Entity<VoteRecord>(e =>
+        {
+            // One vote per user in a poll, whatever reaches the database (D-513, EV40)
+            e.ToTable("Vote");
+            e.HasKey(x => new { x.PollId, x.UserId });
+            e.HasOne<PollRecord>().WithMany().HasForeignKey(x => x.PollId);
+        });
+
+        modelBuilder.Entity<GlobalEventRecord>(e =>
+        {
+            e.ToTable("GlobalEvent");
+            e.HasOne<SeasonRecord>().WithMany().HasForeignKey(x => x.SeasonId);
+            e.HasIndex(x => new { x.SeasonId, x.Status });
+            e.Property(x => x.Status).HasMaxLength(20);
+            e.Property(x => x.ObjectId).HasMaxLength(50);
+        });
+
+        modelBuilder.Entity<InteractionRecord>(e =>
+        {
+            e.ToTable("Interaction");
+            e.HasOne<SeasonRecord>().WithMany().HasForeignKey(x => x.SeasonId);
+            e.HasIndex(x => new { x.SeasonId, x.ToPlayerId });
+            e.HasIndex(x => new { x.SeasonId, x.FromPlayerId });
+            e.Property(x => x.Kind).HasMaxLength(20);
+            e.Property(x => x.Status).HasMaxLength(20);
+        });
+
+        modelBuilder.Entity<PartnerRequestRecord>(e =>
+        {
+            e.ToTable("PartnerRequest");
+            e.HasOne<SeasonRecord>().WithMany().HasForeignKey(x => x.SeasonId);
+            e.HasIndex(x => new { x.SeasonId, x.Status });
+            e.Property(x => x.Status).HasMaxLength(20);
+        });
+
+        modelBuilder.Entity<WeeklyChallengeRecord>(e =>
+        {
+            e.ToTable("WeeklyChallenge");
+            e.HasOne<SeasonRecord>().WithMany().HasForeignKey(x => x.SeasonId);
+            e.HasIndex(x => new { x.SeasonId, x.StartsAt });
+        });
+
+        modelBuilder.Entity<WeeklyChallengeCompletionRecord>(e =>
+        {
+            e.ToTable("WeeklyChallengeCompletion");
+            e.HasKey(x => new { x.ChallengeId, x.PlayerId });
+            e.HasOne<WeeklyChallengeRecord>().WithMany().HasForeignKey(x => x.ChallengeId);
+        });
+
+        modelBuilder.Entity<SuggestionRecord>(e =>
+        {
+            e.ToTable("Suggestion");
+            e.HasOne<SeasonRecord>().WithMany().HasForeignKey(x => x.SeasonId);
+            e.HasIndex(x => new { x.SeasonId, x.Status });
+            e.Property(x => x.Kind).HasMaxLength(20);
+            e.Property(x => x.Status).HasMaxLength(20);
         });
 
         modelBuilder.Entity<GameRecord>(e =>
