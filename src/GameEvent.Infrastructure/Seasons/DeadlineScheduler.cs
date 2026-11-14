@@ -89,8 +89,9 @@ public sealed partial class DeadlineScheduler(
     }
 
     /// <summary>
-    /// The economy's timers (D-404): every season with a player whose earliest timer (shop lots, effects of hours, bets)
-    /// has come gets <see cref="Engine.Economy.FireTimers"/>; the command id comes from the season, that moment and the
+    /// The economy's timers (D-404): every season with a player whose earliest timer (shop lots, effects of hours, bets,
+    /// invitations, requests, duels) or whose own (polls, global events: <c>Season.NextTimerAt</c>, D-727, D-756) has come
+    /// gets <see cref="Engine.Economy.FireTimers"/>; the command id comes from the season, that moment and the
     /// season's last event, so a repeated tick is a duplicate and a refusal (nothing due by the engine's clock) writes nothing.
     /// </summary>
     private async Task FireTimersAsync(DateTimeOffset now, CancellationToken ct)
@@ -99,10 +100,17 @@ public sealed partial class DeadlineScheduler(
         await using (var db = await dbFactory.CreateDbContextAsync(ct))
         {
             var running = db.Seasons.AsNoTracking().Where(s => s.Status == SeasonStatus.Active || s.Status == SeasonStatus.Closing).Select(s => s.Id);
-            due = [.. (await db.SeasonPlayers.AsNoTracking()
-                    .Where(p => p.NextTimerAt != null && running.Contains(p.SeasonId))
-                    .Select(p => new { p.SeasonId, p.NextTimerAt })
-                    .ToListAsync(ct))
+            var players = await db.SeasonPlayers.AsNoTracking()
+                .Where(p => p.NextTimerAt != null && running.Contains(p.SeasonId))
+                .Select(p => new { p.SeasonId, p.NextTimerAt })
+                .ToListAsync(ct);
+
+            // The season's own moments — an open poll's close, a global event's end (D-727, D-756)
+            var seasons = await db.Seasons.AsNoTracking()
+                .Where(s => s.NextTimerAt != null && running.Contains(s.Id))
+                .Select(s => new { SeasonId = s.Id, s.NextTimerAt })
+                .ToListAsync(ct);
+            due = [.. players.Concat(seasons)
                 .Where(p => p.NextTimerAt <= now)
                 .GroupBy(p => p.SeasonId)
                 .Select(g => (g.Key, g.Min(p => p.NextTimerAt!.Value)))];

@@ -3,7 +3,9 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Players;
+using GameEvent.Engine.Polls;
 using GameEvent.Engine.Seasons;
+using GameEvent.Engine.Suggestions;
 using GameEvent.Engine.Undo;
 using GameEvent.Infrastructure.Accounts;
 using GameEvent.Infrastructure.Database;
@@ -284,8 +286,8 @@ public static class SeasonTransfer
         Guid MapAccount(Guid id) =>
             userMap.TryGetValue(id, out var local) ? local : throw new InvalidDataException($"The archive names account {id} but does not list it.");
 
-        // The log is copied as stored (events are not rewritten); the two events naming accounts get this database's
-        // account ids and are written in the current format (D-105).
+        // The log is copied as stored (events are not rewritten); the events naming accounts get this database's account
+        // ids and are written in the current format (D-105, D-816).
         var records = new List<GameEventRecord>();
         var state = SeasonState.Empty;
         foreach (var command in archive.Events.Zip(decoded).GroupBy(x => x.First.CommandId).OrderBy(g => g.Min(x => x.First.Sequence)))
@@ -296,7 +298,19 @@ public static class SeasonTransfer
                 var mapped = original switch
                 {
                     SeasonPlayerAdded added => added with { UserId = MapAccount(added.UserId) },
-                    CommandUndone undone => undone with { Players = [.. undone.Players.Select(p => p with { UserId = MapAccount(p.UserId) })] },
+                    VoteCast cast => cast with { UserId = MapAccount(cast.UserId) },
+                    VoteChanged changed => changed with { UserId = MapAccount(changed.UserId) },
+                    SuggestionSubmitted submitted => submitted with { UserId = MapAccount(submitted.UserId) },
+                    CommandUndone undone => undone with
+                    {
+                        Players = [.. undone.Players.Select(p => p with { UserId = MapAccount(p.UserId) })],
+                        Polls = undone.Polls is { } polls
+                            ? [.. polls.Select(p => p with { Votes = [.. p.Votes.Select(v => v with { UserId = MapAccount(v.UserId) })] })]
+                            : null,
+                        Suggestions = undone.Suggestions is { } suggestions
+                            ? [.. suggestions.Select(s => s with { UserId = MapAccount(s.UserId) })]
+                            : null,
+                    },
                     _ => original,
                 };
                 var stored = ReferenceEquals(mapped, original) ? new StoredEvent(exported.Type, exported.Version, exported.Data) : EventCodec.Encode(mapped);
@@ -429,12 +443,18 @@ public static class SeasonTransfer
         }
     }
 
-    // The events that carry account ids: a player's arrival and the player snapshots an undo keeps (D-104).
+    // The events that carry account ids: a player's arrival, a vote (a spectator's too), a suggestion and the snapshots of
+    // players, polls and suggestions an undo keeps (D-104, D-816).
     private static IEnumerable<Guid> AccountIds(IGameEvent e) =>
         e switch
         {
             SeasonPlayerAdded added => [added.UserId],
-            CommandUndone undone => undone.Players.Select(p => p.UserId),
+            VoteCast cast => [cast.UserId],
+            VoteChanged changed => [changed.UserId],
+            SuggestionSubmitted submitted => [submitted.UserId],
+            CommandUndone undone => undone.Players.Select(p => p.UserId)
+                .Concat((undone.Polls ?? []).SelectMany(p => p.Votes.Select(v => v.UserId)))
+                .Concat((undone.Suggestions ?? []).Select(s => s.UserId)),
             _ => [],
         };
 }
