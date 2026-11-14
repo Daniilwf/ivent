@@ -71,6 +71,17 @@ public sealed record SimulationInputs(
             problems.Add("The pool needs games and categories.");
         }
 
+        // D-802: events on need their decks (without them every draw misses into a manual effect); off, the content is unused
+        if (ruleset.Features.Events && content is null)
+        {
+            problems.Add("The ruleset has events on: give the season's content with --content <folder> (items, events, wheels, decks).");
+        }
+        else if (ruleset.Features.Events && content is not null)
+        {
+            problems.AddRange(
+                ContentPublishing.Check(content, events: true, polls: ruleset.Features.Polls).Select(e => $"content {e.Path}: {e.Message}"));
+        }
+
         if (problems.Count > 0)
         {
             throw new InvalidDataException(string.Join(Environment.NewLine, problems));
@@ -81,14 +92,35 @@ public sealed record SimulationInputs(
     }
 
     /// <summary>Reads the files given on the command line; null paths take the defaults.</summary>
-    public static SimulationInputs Load(string? rulesetPath, string? mapPath, string poolPath, string? settingsPath)
+    public static SimulationInputs Load(string? rulesetPath, string? mapPath, string poolPath, string? settingsPath, string? contentPath = null)
     {
         ArgumentNullException.ThrowIfNull(poolPath);
         var ruleset = rulesetPath is null ? RulesetJson.Default() : RulesetJson.Parse(File.ReadAllText(rulesetPath));
         var map = mapPath is null ? null : ContentJson.Parse<MapGraph>(File.ReadAllText(mapPath));
         var pool = ReadPool(File.ReadAllText(poolPath));
         var settings = settingsPath is null ? new SimulationSettings() : SimulationSettings.Parse(File.ReadAllText(settingsPath));
-        return Create(ruleset, map, pool, settings, rulesetPath ?? "docs/ruleset.default.json", mapPath, poolPath);
+        var content = contentPath is null ? null : ReadContent(contentPath);
+        return Create(ruleset, map, pool, settings, rulesetPath ?? "docs/ruleset.default.json", mapPath, poolPath, content);
+    }
+
+    /// <summary>
+    /// The content of a folder laid out as the repository's <c>/content</c> (D-533, D-802): <c>items</c> and <c>events</c> as
+    /// objects, <c>wheels</c> and <c>decks</c> as wheels; a missing subfolder is empty.
+    /// </summary>
+    public static ContentPack ReadContent(string folder)
+    {
+        ArgumentNullException.ThrowIfNull(folder);
+        if (!Directory.Exists(folder))
+        {
+            throw new DirectoryNotFoundException($"The content folder {folder} does not exist.");
+        }
+
+        IEnumerable<(string, string)> Read(params string[] dirs) =>
+            dirs.Select(d => Path.Combine(folder, d))
+                .Where(Directory.Exists)
+                .SelectMany(d => Directory.EnumerateFiles(d, "*.json"))
+                .Select(f => (Path.GetFileName(f), File.ReadAllText(f)));
+        return ContentFiles.Pack(Read("items", "events"), Read("wheels", "decks"));
     }
 
     private static readonly JsonSerializerOptions s_poolJson = new(JsonSerializerDefaults.Web);
