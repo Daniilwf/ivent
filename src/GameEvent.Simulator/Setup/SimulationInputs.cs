@@ -17,6 +17,8 @@ public sealed record PoolFile(IReadOnlyList<PoolFileCategory> Categories, IReadO
 /// <summary>
 /// Everything one simulation plays with: the ruleset, the map (null — the linear map of the ruleset), the pool with
 /// every game's hours, and the bots' settings. <see cref="GamesWithoutHours"/> — how many games got generated hours.
+/// <see cref="Content"/> — the season's content (items, events and their decks, task 5.15): published into the season when
+/// the ruleset has events on.
 /// </summary>
 public sealed record SimulationInputs(
     Ruleset Ruleset,
@@ -26,14 +28,22 @@ public sealed record SimulationInputs(
     int GamesWithoutHours,
     string RulesetSource,
     string? MapSource,
-    string PoolSource)
+    string PoolSource,
+    ContentPack? Content = null)
 {
     /// <summary>
     /// Builds the inputs: a map switches the ruleset to <c>features.mapMode = graph</c> (D-354). Throws
     /// <see cref="InvalidDataException"/> with every problem when the inputs cannot be played.
     /// </summary>
     public static SimulationInputs Create(
-        Ruleset ruleset, MapGraph? map, PoolFile pool, SimulationSettings settings, string rulesetSource, string? mapSource, string poolSource)
+        Ruleset ruleset,
+        MapGraph? map,
+        PoolFile pool,
+        SimulationSettings settings,
+        string rulesetSource,
+        string? mapSource,
+        string poolSource,
+        ContentPack? content = null)
     {
         ArgumentNullException.ThrowIfNull(ruleset);
         ArgumentNullException.ThrowIfNull(pool);
@@ -67,7 +77,7 @@ public sealed record SimulationInputs(
         }
 
         var (snapshot, generated) = BuildPool(pool, settings.MissingHours);
-        return new SimulationInputs(ruleset, map, snapshot, settings, generated, rulesetSource, mapSource, poolSource);
+        return new SimulationInputs(ruleset, map, snapshot, settings, generated, rulesetSource, mapSource, poolSource, content);
     }
 
     /// <summary>Reads the files given on the command line; null paths take the defaults.</summary>

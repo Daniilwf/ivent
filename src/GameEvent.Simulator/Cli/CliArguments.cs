@@ -15,7 +15,8 @@ public sealed record CliArguments(
     string? Settings,
     ulong Seed,
     string Out,
-    int Threads)
+    int Threads,
+    string? Content = null)
 {
     public const string Usage =
         """
