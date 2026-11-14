@@ -156,7 +156,7 @@ public static class SeasonEngine
 
     // D-305: a player choosing a branch is not moved by other commands, and the run whose steps wait is not corrected or
     // rejected — unless the same command discards the choice.
-    private static Guid? MovesAPlayerChoosingABranch(SeasonState state, IReadOnlyList<IGameEvent> events)
+    internal static Guid? MovesAPlayerChoosingABranch(SeasonState state, IReadOnlyList<IGameEvent> events)
     {
         foreach (var player in state.Players.Values.Where(p => p.Choice?.Kind == ChoiceKind.Branch))
         {

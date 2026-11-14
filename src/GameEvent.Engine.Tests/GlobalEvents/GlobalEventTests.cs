@@ -279,9 +279,22 @@ public class GlobalEventTests
 
     public static TheoryData<string> InvalidEvents() =>
     [
-        "self-move", "self-teleport", "gamble", "coin-or-step",
-        "on-leader", "on-random", "with-question",
+        "coin-or-step", "on-leader", "on-random", "with-question",
     ];
+
+    /// <summary>Events that move or teleport everyone: a global event runs them in batches since D-757 (the owner, 2026-11-14).</summary>
+    public static TheoryData<string> MovingEvents() => ["self-move", "self-teleport", "gamble"];
+
+    [Theory]
+    [MemberData(nameof(MovingEvents))]
+    public void An_event_that_moves_everyone_is_launched_since_the_owners_decision(string objectId)
+    {
+        var s = Season(pack: Pack(Unfit()));
+
+        s.Launch(objectId, 24);
+
+        Assert.Equal(ForAllSource.GlobalEventLaunch, s.Queued().Source);
+    }
 
     /// <summary>
     /// Events valid in a pack (drawn by one player) that a global event may not run (D-519, D-703 (3), D-752). A trigger, a
@@ -308,15 +321,27 @@ public class GlobalEventTests
     [MemberData(nameof(InvalidEvents))]
     public void An_event_a_global_event_may_not_run_is_refused_with_the_path_of_its_effect(string objectId)
     {
-        // D-519: no move or teleport on everyone from the system; D-752: no trigger, term, condition, intercept, other
-        // target, question (but the first-action vote)
+        // D-752: no trigger, term, condition, intercept, other target, question (but the first-action vote); moving
+        // everyone is allowed since D-757
         var s = Season(pack: Pack(Unfit()));
 
         ScenarioAssert.RejectsWithoutChanges(s, x => x.Act(new LaunchGlobalEvent(objectId, 24)), RejectionCodes.ContentInvalid);
         Assert.Contains("effect", s.Last.Rejection!.Detail, StringComparison.Ordinal);
     }
 
-    public static TheoryData<string> InvalidRewards() => ["move", "teleport", "trigger", "duration", "unknown-object", "question", "leader"];
+    public static TheoryData<string> InvalidRewards() => ["trigger", "duration", "unknown-object", "question", "leader"];
+
+    [Theory]
+    [InlineData("move")]
+    [InlineData("teleport")]
+    public void A_goal_reward_that_moves_everyone_is_accepted_since_the_owners_decision(string kind)
+    {
+        var s = Season();
+
+        var launched = s.Launch("coin-rain", 24, RunsGoal(3, Reward(kind)));
+
+        Assert.Equal(Reward(kind), launched.Goal!.Reward);
+    }
 
     private static EffectSpec Reward(string kind) => kind switch
     {

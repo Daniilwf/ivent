@@ -61,8 +61,8 @@ public static partial class ContentValidator
     }
 
     /// <summary>
-    /// An effect the system plays on everyone (D-519, D-703 (3)): at once, on each player as himself, asking nobody — only a
-    /// global event's own first action may ask the voters (EV23, D-753) — and moving nobody.
+    /// An effect the system plays on everyone (D-703 (3), D-757): at once, on each player as himself, asking nobody — only a
+    /// global event's own first action may ask the voters (EV23, D-753). It may move: batches of players carry it (D-757).
     /// </summary>
     private static void CheckForAll(EffectSpec effect, string path, bool allowVote, Action<string, string> error)
     {
@@ -90,11 +90,6 @@ public static partial class ContentValidator
             if (!vote && action is RequestChoiceAction or TakeObjectAction { Pick: Pick.Chosen } or MoveAction { Direction: MoveDirection.Chosen })
             {
                 error(at, "Nobody answers an effect on everyone: only a global event's first action may ask the voters.");
-            }
-
-            if (action is MoveAction or TeleportAction)
-            {
-                error(at, "An effect on everyone does not move or teleport (D-519).");
             }
         }
     }

@@ -300,7 +300,7 @@ public static partial class ContentValidator
 
     /// <summary>
     /// An effect the system plays, with nobody to answer (a poll's result, D-512, D-703 (3)): it asks nothing — no chosen
-    /// target, no branch by choice, no question among its actions; on everyone it does not move (D-519).
+    /// target, no branch by choice, no question among its actions; on everyone it may move (D-757, lifting D-519).
     /// </summary>
     private static void CheckSystemEffect(EffectSpec effect, string path, Action<string, string> error)
     {
@@ -329,10 +329,7 @@ public static partial class ContentValidator
             }
         }
 
-        if (effect.Target?.Selector == TargetSelector.All && actions.Any(a => a is MoveAction or TeleportAction))
-        {
-            error($"{path}.target", "A result on everyone does not move or teleport (D-519).");
-        }
+        // A result on everyone is settled in batches of players, so it may move them (D-757, lifting D-519)
     }
 
     public static IReadOnlyList<ContentError> Check(WeeklyChallengeDefinition challenge)

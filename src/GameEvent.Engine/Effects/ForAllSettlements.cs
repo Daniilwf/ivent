@@ -16,6 +16,9 @@ public enum ForAllSource
 
     /// <summary>The effect of a global event at its launch (D-517; task 5.9).</summary>
     GlobalEventLaunch,
+
+    /// <summary>A drawn event on everyone (D-757, the owner's decision of 2026-11-14): the reference is its drawer.</summary>
+    DrawnEvent,
 }
 
 /// <summary>
@@ -102,14 +105,15 @@ public static class ForAllSettlements
         EffectSpec effect,
         ContentParamDictionary? parameters = null,
         Rulesets.EventKind? kind = null,
-        EquatableArray<string>? answers = null)
+        EquatableArray<string>? answers = null,
+        IReadOnlyList<Guid>? players = null)
     {
         ArgumentNullException.ThrowIfNull(state);
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(objectId);
         ArgumentNullException.ThrowIfNull(effect);
         return new ForAllQueued(
-            context.Ids.NewId(), source, reference, objectId, effect, [.. state.Players.Keys.Where(id => Reachable(state, id, effect))])
+            context.Ids.NewId(), source, reference, objectId, effect, [.. (players ?? [.. state.Players.Keys]).Order().Where(id => Reachable(state, id, effect))])
         {
             Parameters = parameters,
             Kind = kind,
@@ -124,6 +128,19 @@ public static class ForAllSettlements
         return state.Status is SeasonStatus.Active or SeasonStatus.Closing
             ? state.ForAll.Values.Where(s => !s.Halted).OrderBy(s => s.Order).Select(s => (Guid?)s.SettlementId).FirstOrDefault()
             : null;
+    }
+
+    /// <summary>
+    /// Whether <paramref name="effect"/> on everyone may be settled (D-757): it asks nothing — nobody would answer in a
+    /// batch (D-703 (3)) — and no case of its outcomes acts on «self», which in a settlement is each target himself.
+    /// </summary>
+    public static bool Settles(EffectSpec effect)
+    {
+        ArgumentNullException.ThrowIfNull(effect);
+        var cases = effect.Outcomes?.Cases.SelectMany(c => c.Actions).ToList() ?? [];
+        return effect.Target?.Selector != TargetSelector.Chosen && effect.Outcomes?.Choice is null
+            && effect.Actions.Concat(cases).All(a => a is not (RequestChoiceAction or TakeObjectAction { Pick: Pick.Chosen } or MoveAction { Direction: MoveDirection.Chosen }))
+            && cases.All(a => a.Target != ActionTarget.Self);
     }
 
     // The first finisher is out of the game (SPEC); a later finisher is reached by points and coins only (SPEC «Цели», D-518)
@@ -194,6 +211,13 @@ public static class ForAllSettlements
 
             var (reactions, reacted) = EffectChain.Run(run.State, run.Events, context, eventsBefore: count);
             var size = run.Events.Count + reactions.Count;
+
+            // A player at a fork is not moved by another command (D-305): the one this effect would move is skipped, not the batch (D-757)
+            if (SeasonEngine.MovesAPlayerChoosingABranch(current, [.. run.Events, .. reactions]) is not null)
+            {
+                skipped.Add(playerId);
+                continue;
+            }
 
             // A player whose chain the batch would cut waits whole for the next batch (D-537): only one alone is cut
             var cut = run.Cut is not null || reactions.Any(e => e is EffectChainCut { Limit: EffectChainLimit.Events });
