@@ -109,16 +109,24 @@ public class EventsUndoTests
     [Fact]
     public void Undoing_a_waiting_invitation_removes_it_and_frees_its_place_in_the_limit()
     {
-        var s = New();
+        // At most one pending invitation sent: while it waits, another is refused
+        var s = New(r => r.WithCoop(maxOpenInvites: 1));
         s.PlayTitle("Вася", CoopGame);
         var before = s.State;
         var invitation = s.Invite("Вася", "Петя");
+        var invited = s.LastCommandId;
+        s.Act(new InviteToCoop(s.PlayerId("Вася"), s.PlayerId("Маша")));
+        Assert.False(s.Last.IsAccepted, "A second pending invitation was taken.");
 
-        Undone(s, s.LastCommandId);
+        Undone(s, invited);
 
         Assert.Equal(Comparable(before), Comparable(s.State));
         Assert.False(s.State.Interactions.ContainsKey(invitation));
         Assert.DoesNotContain(s.State.Interactions.Values, i => i.FromPlayerId == s.PlayerId("Вася"));
+
+        // Its place in the limit is free again: the next invitation is taken
+        var next = s.Invite("Вася", "Маша");
+        Assert.Equal(s.PlayerId("Маша"), s.State.Interactions[next].ToPlayerId);
     }
 
     [Fact]

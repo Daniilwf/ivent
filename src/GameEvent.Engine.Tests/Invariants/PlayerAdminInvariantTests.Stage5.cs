@@ -117,6 +117,7 @@ public partial class PlayerAdminInvariantTests
                         WeeklyChallengeRevoked => "challenge revoked",
                         SuggestionReviewed => "suggestion reviewed",
                         SeasonStatusChanged { To: SeasonStatus.Closing } => "deadline",
+                        RunConditionChecked { Waived: true } => "condition waived",
                         _ => "other",
                     });
 
@@ -127,16 +128,22 @@ public partial class PlayerAdminInvariantTests
                     }
                 }
 
-                if (command is UndoCommand undone && s.Commands[s.History.ToList().FindIndex(c => c.CommandId == undone.TargetCommandId)] is { } target_)
+                // A difficulty changed on a coop run: the shares are checked after the correction too (D-521)
+                if (command is ChangeRunDifficulty changed && before.Runs[changed.RunId].Coop is not null)
                 {
-                    Count($"undone {target_.GetType().Name}");
+                    Count("coop difficulty changed");
                 }
 
                 if (command is UndoCommand undo)
                 {
+                    var at = s.History.ToList().FindIndex(c => c.CommandId == undo.TargetCommandId);
+                    if (s.Commands[at] is { } targetCommand)
+                    {
+                        Count($"undone {targetCommand.GetType().Name}");
+                    }
+
                     // An undo of a command of stage 5 — one that wrote an event of a stage 5 mechanic
-                    var target = s.History.Single(c => c.CommandId == undo.TargetCommandId);
-                    if (target.Events.Any(e => MechanicOf(e) is not null and not "challenges" and not "graphMap"))
+                    if (s.History[at].Events.Any(e => MechanicOf(e) is not null and not "challenges" and not "graphMap"))
                     {
                         Count("stage 5 undone");
                     }
@@ -148,6 +155,7 @@ public partial class PlayerAdminInvariantTests
         [
             "coop invited", "coop joined", "deadline set", "drawn", "asked", "answered", "irl proof", "coop split", "coop left", "board", "duel settled", "event poll", "event poll closed", "poll closed", "vote changed",
             "goal reached", "progress", "settled", "challenge", "challenge revoked", "suggestion reviewed", "deadline", "stage 5 undone",
+            "condition waived", "coop difficulty changed",
             "undo refused",
         ];
         // EV38: every command of stage 5 is undone as a whole somewhere in the games
@@ -177,7 +185,9 @@ public partial class PlayerAdminInvariantTests
     /// <summary>
     /// The season of the stage 5 games: a line of 24 cells with five event cells drawing from the default deck (risky), the
     /// horror pool with every other game coop, the content of global events (<see cref="GlobalSetup.BaseObjects"/>: «Рискнёшь?»,
-    /// «Монетка или шаг», «Караоке» with its IRL proof, «Хоррор-неделя», «Попутный ветер») in three decks, the good one with
+    /// «Монетка или шаг», «Караоке» with its IRL proof, «Хоррор-неделя», «Попутный ветер») in three decks, the bad one with
+    /// «Даже не вспотел» too — a condition of difficulty on the next run, so the admin's «неприменимо» and difficulty changes meet
+    /// conditions (D-594), coop runs among them; the good one with
     /// «Выберите игру лидеру» too — a vote of the players on the leader's next game (<c>requestChoice.vote</c>, then
     /// <c>modifyNextRoll.filter.games</c>, D-512).
     /// </summary>
@@ -205,10 +215,10 @@ public partial class PlayerAdminInvariantTests
 
         s.WithPlayers(s_stage5Players);
         return s.WithContent(GlobalSetup.Pack(
-            [Polls.EventPollTests.LeaderPick],
+            [Polls.EventPollTests.LeaderPick, EconomyScenario.Examples()["not-even-sweating"]],
             EventScenario.Deck(EventKind.Risky, "risky", "gamble", "coin-or-step"),
             EventScenario.Deck(EventKind.Good, "good", "tailwind", "karaoke", "leader-pick"),
-            EventScenario.Deck(EventKind.Bad, "bad", "horror-week", "karaoke")));
+            EventScenario.Deck(EventKind.Bad, "bad", "horror-week", "karaoke", "not-even-sweating")));
     }
 
     private static Scenario PlayStage5(int seed, byte[] script, Action<Scenario, ICommand, SeasonState, int>? afterEach = null)
@@ -363,10 +373,15 @@ public partial class PlayerAdminInvariantTests
                 };
             case 16 when completed.Count > 0:
                 var run = completed[arg % completed.Count];
-                return (arg % 4) switch
+                // A run with a condition not yet waived, a coop one first, so «неприменимо» meets both (D-594, D-521)
+                var conditioned = completed.Where(r => r.Snapshot.Conditions.Count > 0 && r.Condition is { Waived: false })
+                    .OrderBy(r => r.Coop is null).FirstOrDefault();
+                return (arg % 6) switch
                 {
                     0 => new RejectProof(run.RunId, "Нет титров"),
                     1 => new CorrectRunHours(run.RunId, run.Hours == 9 ? 3 : 9, "Правка часов"),
+                    2 when conditioned is not null => new WaiveRunCondition(conditioned.RunId, "Неприменимо"),
+                    2 or 3 => new ChangeRunDifficulty((conditioned ?? run).RunId, (Difficulty)(b % 4), "По пруфу"),
                     _ => new ApproveProof(run.RunId),
                 };
             case 17 or 18:
@@ -417,11 +432,12 @@ public partial class PlayerAdminInvariantTests
         typeof(LeaveCoop), typeof(PostPartnerRequest), typeof(RespondToPartnerRequest), typeof(ClosePartnerRequest), typeof(ChallengeToDuel),
         typeof(SetWeeklyChallenge), typeof(MarkWeeklyChallenge), typeof(SubmitSuggestion), typeof(ReviewSuggestion), typeof(LaunchGlobalEvent),
         typeof(EndGlobalEvent), typeof(SettleForAll), typeof(SubmitIrlProof), typeof(ReviewIrlProof), typeof(MakeChoice), typeof(ResolveManualEffect),
+        typeof(WaiveRunCondition),
     ];
 
     // Rare in the games: preferred by the undos while among the last commands
     private static readonly HashSet<Type> s_rareStage5Commands =
-        [typeof(LeaveCoop), typeof(WithdrawInvitation), typeof(ClosePartnerRequest), typeof(RespondToPartnerRequest), typeof(MakeChoice)];
+        [typeof(LeaveCoop), typeof(WithdrawInvitation), typeof(ClosePartnerRequest), typeof(RespondToPartnerRequest), typeof(MakeChoice), typeof(WaiveRunCondition)];
 
     /// <summary>
     /// The id of the latest command of stage 5 of the game (after <paramref name="setup"/>) not undone, a rare one among the
@@ -612,8 +628,17 @@ public partial class PlayerAdminInvariantTests
             Assert.True(s.State.ForAll[settle.SettlementId].Halted, "The undo of a batch did not halt its settlement.");
         }
 
-        static SeasonState Unhalted(SeasonState state) =>
-            Comparable(state) with { ForAll = state.ForAll.SetItems(state.ForAll.Select(f => KeyValuePair.Create(f.Key, f.Value with { Halted = false }))) };
+        // Only the settlements whose batches are undone are halted by those undos; every other one compares as it is
+        var halted = s.UndoneCommands()
+            .Select(id => s.Commands[history.FindIndex(c => c.CommandId == id)])
+            .OfType<SettleForAll>()
+            .Select(c => c.SettlementId)
+            .ToHashSet();
+        SeasonState Unhalted(SeasonState state) =>
+            Comparable(state) with
+            {
+                ForAll = state.ForAll.SetItems(state.ForAll.Where(f => halted.Contains(f.Key)).Select(f => KeyValuePair.Create(f.Key, f.Value with { Halted = false }))),
+            };
         Assert.Equal(Unhalted(SeasonEngine.Replay(s.EffectiveLog)), Unhalted(s.State));
     }
 
