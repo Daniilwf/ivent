@@ -12,8 +12,8 @@ using GameEvent.Engine.Tests.GlobalEvents;
 using GameEvent.Engine.Tests.Polls;
 using GameEvent.Engine.Tests.Support;
 using GameEvent.Engine.Undo;
-using DuelScenario = GameEvent.Engine.Tests.Duels.DuelScenario;
 using static GameEvent.Engine.Tests.Coop.CoopTestScenario;
+using DuelScenario = GameEvent.Engine.Tests.Duels.DuelScenario;
 
 namespace GameEvent.Engine.Tests.Undo;
 
