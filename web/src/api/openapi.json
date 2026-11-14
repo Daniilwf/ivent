@@ -267,6 +267,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         }
       }
@@ -1219,6 +1229,105 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/ResolveEffectRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RejectionProblem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/seasons/{seasonId}/effects/{effectId}/irl-proof": {
+      "post": {
+        "tags": [
+          "Seasons"
+        ],
+        "parameters": [
+          {
+            "name": "seasonId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "effectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IrlProofRequest"
               }
             }
           },
@@ -2567,6 +2676,105 @@
         }
       }
     },
+    "/api/admin/seasons/{seasonId}/runs/{runId}/waive-conditions": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "parameters": [
+          {
+            "name": "seasonId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "runId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WaiveConditionsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RejectionProblem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/admin/seasons/{seasonId}/proofs": {
       "get": {
         "tags": [
@@ -2861,6 +3069,178 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/RejectProofRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RejectionProblem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/seasons/{seasonId}/irl-proofs": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "parameters": [
+          {
+            "name": "seasonId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/IrlProofQueueItemView"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/seasons/{seasonId}/effects/{effectId}/irl-proof/review": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "parameters": [
+          {
+            "name": "seasonId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "effectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IrlProofReviewRequest"
               }
             }
           },
@@ -7332,9 +7712,13 @@
             "items": {
               "$ref": "#/components/schemas/ContentVersionInfo"
             }
+          },
+          "eventsEnabled": {
+            "type": "boolean",
+            "default": false
           }
         },
-        "description": "The season's content in the editor (4.12, D-490): whether items are on (the editor works either way, a pack is\npublished only with `features.items`), the season's status, the version in force, the pack in force as content\nJSON (CONTENT.md; null fields left out), the definitions deleted on the way and the versions, newest first."
+        "description": "The season's content in the editor (4.12, D-490): whether items are on (the editor works either way, a pack is\npublished only with `features.items`), the season's status, the version in force, the pack in force as content\nJSON (CONTENT.md; null fields left out), the definitions deleted on the way and the versions, newest first.\n`eventsEnabled` — whether events are on (`features.events`, D-823): the pack's events and decks play only then;\nalways set, optional for older clients."
       },
       "AdminManualEffectView": {
         "required": [
@@ -7376,9 +7760,13 @@
               "null",
               "string"
             ]
+          },
+          "irl": {
+            "type": "boolean",
+            "default": false
           }
         },
-        "description": "A pending manual effect of any player, oldest first, for the admin to resolve (D-102)."
+        "description": "A pending manual effect of any player, oldest first, for the admin to resolve (D-102); `irl` — an IRL one (D-509,\nD-820): its proof is checked in the IRL proof queue, or the admin closes it «не применимо» here; always set, optional\nfor older clients."
       },
       "AdminMapView": {
         "required": [
@@ -7488,9 +7876,13 @@
           "choosingBranch": {
             "type": "boolean",
             "default": false
+          },
+          "eventQuestion": {
+            "type": "boolean",
+            "default": false
           }
         },
-        "description": "A player as the admin sees them (SE5, D-123): the balance and the place in the turn, the inactivity flag, when they\nlast acted themselves and the hint — no action of their own for the rules' `inactiveHintDays` while not marked\ninactive. `playing` — a run is going on: a long game is a reason to be quiet, not a sign of leaving.\n`choosingBranch` — the player's throw waits at a fork (D-305): the admin may discard the choice, the steps left burn."
+        "description": "A player as the admin sees them (SE5, D-123): the balance and the place in the turn, the inactivity flag, when they\nlast acted themselves and the hint — no action of their own for the rules' `inactiveHintDays` while not marked\ninactive. `playing` — a run is going on: a long game is a reason to be quiet, not a sign of leaving.\n`choosingBranch` — the player's throw waits at a fork (D-305): the admin may discard the choice, the steps left burn.\n`eventQuestion` — an effect drawn from a deck waits for the player's answer (D-511, D-569 (8), D-822, D-827): an event,\nor an object of another kind a deck holds — only a drawn effect stops on a question, an item used gets its answers with\nthe use; the admin takes the question off with the correction `discardOffer`; always set, optional for older clients."
       },
       "AlreadyPlayedRequest": {
         "required": [
@@ -8347,9 +8739,27 @@
               "integer"
             ],
             "format": "int32"
+          },
+          "prompt": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "objectId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         },
-        "description": "The pending choice, kept on the server: a reloaded page shows the same options (T2). A branch choice (D-304): each\noption's id is the cell the branch leads to, `steps` — the steps of the throw still to walk from the fork."
+        "description": "The pending choice, kept on the server: a reloaded page shows the same options (T2). A branch choice (D-304): each\noption's id is the cell the branch leads to, `steps` — the steps of the throw still to walk from the fork. The question\nof a suspended event (`effect`, D-511, D-822): `prompt` — its text, `objectId` and `name` — the event;\nan option's id is the answer sent back to `/choose` as it is (a list's text, a player's id)."
       },
       "ChooseRequest": {
         "required": [
@@ -8498,9 +8908,28 @@
           },
           "status": {
             "$ref": "#/components/schemas/RunStatus"
+          },
+          "conditions": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/RunConditionView"
+            }
+          },
+          "conditionCheck": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/RunConditionCheckView"
+              }
+            ]
           }
         },
-        "description": "The player's latest completed run: dice by the hours and the challenge dice apart, each die separately; the total\ncounts both; the review when there is one; `status` is `rejected` when the admin took the run back."
+        "description": "The player's latest completed run: `dice` — the dice by the hours, then the extra dice of items and events (the\ncount stage, D-825), each die separately; the challenge dice apart; the total counts all of them; the review when there is one; `status` is `rejected` when the admin took the run back.\n`conditions` — the conditions of events the roll fixed on it, `conditionCheck` — how they were checked, null\nwithout conditions (D-821); always set, optional for older clients."
       },
       "CompleteRequest": {
         "required": [
@@ -9490,8 +9919,7 @@
           "bad",
           "special",
           "risky"
-        ],
-        "description": "The kind of an event (SPEC «Ивенты»): good, bad, special, risky. A drawn event has the kind of its deck (D-501); the\nstandard decks are the wheels named like the kinds. Special and risky came with stage 5: a build before it cannot read\nthem, and they are written only once events are on."
+        ]
       },
       "EventRules": {
         "required": [
@@ -10463,6 +10891,114 @@
         },
         "description": "An object I hold: its definition's name and description, what is left of its lifetime, who put it on me. `usable` —\n«Использовать» is open now; `refusal` — the engine's code when it is not (wrong window, deadline, frozen inventory,\nno target; an effect or a special roll acts on its own). `targets` — when `choosesTarget`, exactly the players\nthe engine accepts; `steps` — the answers asked, in order (D-440)."
       },
+      "IrlProofQueueItemView": {
+        "required": [
+          "effectId",
+          "playerId",
+          "playerName",
+          "objectId",
+          "name",
+          "description",
+          "files",
+          "link",
+          "submittedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "effectId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "playerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "playerName": {
+            "type": "string"
+          },
+          "objectId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FileLinkView"
+            }
+          },
+          "link": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "submittedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "description": "An IRL proof waiting for the admin (D-509, D-820), oldest first: whose, the event (its card from the content in force),\nthe player's own pictures and the https link — shown, never opened by the server — and when it was sent."
+      },
+      "IrlProofRequest": {
+        "required": [
+          "commandId"
+        ],
+        "type": "object",
+        "properties": {
+          "commandId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "files": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "link": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "The proof of my IRL effect (D-509, D-686, D-820): pictures I uploaded (`files` — ids from `POST /api/files`, up\nto `events.irlProof.maxFiles`) and / or one https `link` to a video, which the server never opens."
+      },
+      "IrlProofReviewRequest": {
+        "required": [
+          "commandId",
+          "approved"
+        ],
+        "type": "object",
+        "properties": {
+          "commandId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "approved": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "comment": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "The admin's check of an IRL proof (D-509): `approved` resolves the effect «применено» and gives nothing; a reject\nexplains itself in `comment` (required then, at most 500 characters) and the player sends a new proof."
+      },
       "IrlProofRules": {
         "required": [
           "maxFiles"
@@ -10476,6 +11012,52 @@
           }
         },
         "description": "The proof of an IRL event (D-509): the player's own screenshots and / or one https link to a video."
+      },
+      "IrlProofStatus": {
+        "enum": [
+          "pending",
+          "approved",
+          "rejected"
+        ],
+        "description": "Where the proof of an IRL event stands (D-509)."
+      },
+      "IrlProofView": {
+        "required": [
+          "status",
+          "files",
+          "link",
+          "comment",
+          "submittedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/IrlProofStatus"
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FileLinkView"
+            }
+          },
+          "link": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "comment": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "submittedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "description": "The proof of an IRL effect (D-509, D-820), for its owner only: `status`, the own uploaded pictures, the https link\n(never opened by the server), the admin's comment after a reject and when it was sent."
       },
       "ItemOptionView": {
         "required": [
@@ -10714,6 +11296,20 @@
             "type": [
               "null",
               "string"
+            ]
+          },
+          "irl": {
+            "type": "boolean",
+            "default": false
+          },
+          "irlProof": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/IrlProofView"
+              }
             ]
           }
         },
@@ -11164,9 +11760,27 @@
             "items": {
               "$ref": "#/components/schemas/CompletedRunView"
             }
+          },
+          "waitingEvents": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/WaitingEventView"
+            }
+          },
+          "waitingConditions": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/RunConditionView"
+            }
           }
         },
-        "description": "The signed-in player's own turn. While playing: `dropHintMinutes` is `roll.minPlayMinutesBeforeDrop` until\nthat much has been played by the server clock (only a hint: D-09), then null; `dropPenalty` is what a drop costs\nunder the rules in force; `techRerollOpen` says whether the player may still tech-reroll themselves (D-94);\n`challengesEnabled` says whether a challenge may be claimed on completion (`features.challenges`, D-96);\n`techRerollUntil` is when the player's own tech reroll window closes (the roll time plus the run's snapshot of\n`roll.techRerollWindowHours`), null while not playing. The active run's game carries the hours of the roll's\nsnapshot, the ones the completion counts (D-44): the pool may have got hours since (D-138). `difficultyDice` —\nwhile playing, the die each difficulty gives under the run's snapshot and the event it grants, if any.\n`dropPenalty.count` counts the extra dice of the drops in a row before this run (D-205, D-324).\n`wishRerollOpen` — whether the player may give the game up by wish now (D-206, D-325; always set, optional for older clients): a tech reroll with the\nreason `wish`, within the window, for a game with a listed tag the roll did not impose.\n`lastEvent` — the event I drew last (stage 5), while `features.events` is on; null before the first draw.\n`coins` — my balance, what a paid reroll spends (K1S-3). `checks` — my other runs that still take a proof\n(completed, the proof neither approved nor rejected) and the runs rejected since my latest roll, newest first; the\nlatest completed run is `lastCompleted` and never here (K1S-1, K1S-9, D-602)."
+        "description": "The signed-in player's own turn. While playing: `dropHintMinutes` is `roll.minPlayMinutesBeforeDrop` until\nthat much has been played by the server clock (only a hint: D-09), then null; `dropPenalty` is what a drop costs\nunder the rules in force; `techRerollOpen` says whether the player may still tech-reroll themselves (D-94);\n`challengesEnabled` says whether a challenge may be claimed on completion (`features.challenges`, D-96);\n`techRerollUntil` is when the player's own tech reroll window closes (the roll time plus the run's snapshot of\n`roll.techRerollWindowHours`), null while not playing. The active run's game carries the hours of the roll's\nsnapshot, the ones the completion counts (D-44): the pool may have got hours since (D-138). `difficultyDice` —\nwhile playing, the die each difficulty gives under the run's snapshot and the event it grants, if any.\n`dropPenalty.count` counts the extra dice of the drops in a row before this run (D-205, D-324).\n`wishRerollOpen` — whether the player may give the game up by wish now (D-206, D-325; always set, optional for older clients): a tech reroll with the\nreason `wish`, within the window, for a game with a listed tag the roll did not impose.\n`lastEvent` — the event I drew last (stage 5), while `features.events` is on; null before the first draw.\n`coins` — my balance, what a paid reroll spends (K1S-3). `checks` — my other runs that still take a proof\n(completed, the proof neither approved nor rejected) and the runs rejected since my latest roll, newest first; the\nlatest completed run is `lastCompleted` and never here (K1S-1, K1S-9, D-602). `waitingEvents` — my drawn events\nwaiting for my future steps; `waitingConditions` — the conditions of events waiting for my next roll (D-821, D-823);\nboth always set (empty with events off), optional for older clients."
       },
       "NominationRules": {
         "required": [
@@ -11848,9 +12462,28 @@
               "null",
               "string"
             ]
+          },
+          "conditions": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/RunConditionView"
+            }
+          },
+          "conditionCheck": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/RunConditionCheckView"
+              }
+            ]
           }
         },
-        "description": "A run to check, in queue order (D-98, Q-3, D-662): the runs that decide a finish on top (`decidesFinish`), then\nthe runs of players whose roll is closed (`rollClosed`), then by completion time; with the claimed difficulty, the counted hours and the dice total, what an approval at a lower\ndifficulty or a reject changes. `reachedFinish`: this run's latest move stands on the finish.\n`rollClosed`: the player's next roll is closed by the limit of unchecked runs (D-134) until the admin checks one.\n`cellBonus`: the points bonus of the cell the run's move stopped on, which a reject takes back too (D-327; always\nset, optional for older clients). `dropPenalty`: the drop penalty «Отклонить со штрафом дропа» would throw on top of\nthe reject (D-327, D-262) under the season's rules, with the drops in a row before the run (D-324); null for the frozen\nfirst, who loses nothing (D-99); `affectsPosition` is false for a finisher whose finish this run does not decide\n(his position is fixed); always set, optional for older clients. `hoursSource`: where the player's estimate of\nthe hours comes from, when the pool had none (SPEC «Часы и кубы», K1A); null for the pool's hours."
+        "description": "A run to check, in queue order (D-98, Q-3, D-662): the runs that decide a finish on top (`decidesFinish`), then\nthe runs of players whose roll is closed (`rollClosed`), then by completion time; with the claimed difficulty, the counted hours and the dice total, what an approval at a lower\ndifficulty or a reject changes. `reachedFinish`: this run's latest move stands on the finish.\n`rollClosed`: the player's next roll is closed by the limit of unchecked runs (D-134) until the admin checks one.\n`cellBonus`: the points bonus of the cell the run's move stopped on, which a reject takes back too (D-327; always\nset, optional for older clients). `dropPenalty`: the drop penalty «Отклонить со штрафом дропа» would throw on top of\nthe reject (D-327, D-262) under the season's rules, with the drops in a row before the run (D-324); null for the frozen\nfirst, who loses nothing (D-99); `affectsPosition` is false for a finisher whose finish this run does not decide\n(his position is fixed); always set, optional for older clients. `hoursSource`: where the player's estimate of\nthe hours comes from, when the pool had none (SPEC «Часы и кубы», K1A); null for the pool's hours.\n`conditions`: the conditions of events the roll fixed on the run; `conditionCheck`: how the completion met\nthem, null without conditions — what the «Не применимо» button (`waive-conditions`) acts on (D-546 (2), D-827);\nalways set, optional for older clients."
       },
       "ProofRequest": {
         "required": [
@@ -12722,6 +13355,75 @@
         },
         "description": "The rules in force and their history: who changed what and when (C3). Numbers on the rules page are real.\n`deadline` — the season's deadline, set apart from the rules by the admin (H7, D-170); null while not set."
       },
+      "RunConditionCheckView": {
+        "required": [
+          "met",
+          "waived"
+        ],
+        "type": "object",
+        "properties": {
+          "met": {
+            "type": "boolean"
+          },
+          "waived": {
+            "type": "boolean"
+          }
+        },
+        "description": "The check of a completed run's conditions (D-507, D-821): met at the difficulty that counts, waived by the admin."
+      },
+      "RunConditionView": {
+        "required": [
+          "objectId",
+          "name",
+          "kind",
+          "hostile",
+          "difficultyAtLeast",
+          "difficultyAtMost"
+        ],
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/EventKind"
+              }
+            ]
+          },
+          "hostile": {
+            "type": "boolean"
+          },
+          "difficultyAtLeast": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Difficulty"
+              }
+            ]
+          },
+          "difficultyAtMost": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Difficulty"
+              }
+            ]
+          }
+        },
+        "description": "A condition of an event on a run (SPEC «Условия от ивентов», D-507, D-821): whose it is, the kind of the deck it came\nfrom (null for an item's), whether another player put it, and its bounds of difficulty (null when not set)."
+      },
       "RunGameView": {
         "required": [
           "id",
@@ -12794,9 +13496,18 @@
                 "$ref": "#/components/schemas/Difficulty"
               }
             ]
+          },
+          "conditions": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/RunConditionView"
+            }
           }
         },
-        "description": "The active run; `declaredDifficulty` — the one named at the start, the cap of the completion's (D-633)."
+        "description": "The active run; `declaredDifficulty` — the one named at the start, the cap of the completion's (D-633);\n`conditions` — the conditions of events its roll fixed (D-507, D-821), always set, optional for older clients."
       },
       "SeasonActionRequest": {
         "required": [
@@ -13890,6 +14601,50 @@
           "afterDice",
           "anytime"
         ]
+      },
+      "WaitingEventView": {
+        "required": [
+          "objectId",
+          "name",
+          "description",
+          "kind"
+        ],
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/EventKind"
+          }
+        },
+        "description": "An event I drew whose effect waits for my future steps (SPEC «Ивенты копятся», D-505, D-823): a change of my next roll\nor of my next throw; `kind` — the kind of the deck it came from."
+      },
+      "WaiveConditionsRequest": {
+        "required": [
+          "commandId",
+          "comment"
+        ],
+        "type": "object",
+        "properties": {
+          "commandId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "comment": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "The admin marks the conditions of a completed run «не применимо» (D-546 (2), D-821): the run counts as if they were met\nand they wait for the player's next roll; the comment is required."
       },
       "WeeklyChallengeRules": {
         "required": [

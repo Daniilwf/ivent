@@ -17,7 +17,7 @@ export function ManualEffectItem({
 }: {
   effect: Effect;
   pending: boolean;
-  /** False once the season is finished: the effect is shown, nothing can be resolved (D-102). */
+  /** False once the season is finished: the effect is shown, nothing can be resolved (D-102). An IRL effect never is. */
   resolvable: boolean;
   onResolve: (outcome: EffectOutcome, comment: string | null) => void;
 }) {
@@ -26,7 +26,8 @@ export function ManualEffectItem({
   const commentId = `effect-comment-${effect.id}`;
   const hintId = `effect-hint-${effect.id}`;
 
-  if (!resolvable) {
+  // Only the admin resolves an IRL effect, after its proof or «не применимо» (D-509, D-820): the player is shown the text
+  if (!resolvable || effect.irl) {
     return (
       <li data-testid={`manual-effect-${effect.id}`}>
         <p>{ru.effects.drawEvent(effect.drawEvent, effect.source)}</p>

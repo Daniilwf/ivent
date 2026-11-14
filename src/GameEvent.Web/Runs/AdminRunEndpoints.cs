@@ -24,6 +24,12 @@ public sealed record DifficultyChangeRequest(Guid CommandId, Engine.Runs.Difficu
 /// <summary>An admin comment on a change to a player's runs; required, the log shows it.</summary>
 public sealed record ConvertToDropRequest(Guid CommandId, string? Comment);
 
+/// <summary>
+/// The admin marks the conditions of a completed run «не применимо» (D-546 (2), D-821): the run counts as if they were met
+/// and they wait for the player's next roll; the comment is required.
+/// </summary>
+public sealed record WaiveConditionsRequest(Guid CommandId, string? Comment);
+
 /// <summary>Admin actions on runs (D-11, D-94): tech reroll after the window, turning a tech reroll into a drop.</summary>
 public static class AdminRunEndpoints
 {
@@ -62,6 +68,12 @@ public static class AdminRunEndpoints
                         ["comment"] = [$"A comment of at most {SeasonEndpoints.MaxCommentLength} characters is required."],
                     }))
                 : SendAsync(seasonId, request.CommandId, new ConvertTechRerollToDrop(runId, request.Comment), user, db, bus, ct))
+            .WithActionErrors();
+
+        season.MapPost("/runs/{runId:guid}/waive-conditions", (Guid seasonId, Guid runId, WaiveConditionsRequest request, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, CancellationToken ct) =>
+            CommentInvalid(request.Comment) is { } badComment
+                ? Task.FromResult<ActionResult>(badComment)
+                : SendAsync(seasonId, request.CommandId, new WaiveRunCondition(runId, request.Comment!), user, db, bus, ct))
             .WithActionErrors();
     }
 

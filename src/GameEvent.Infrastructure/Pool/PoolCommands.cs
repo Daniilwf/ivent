@@ -100,6 +100,9 @@ public static class PoolRules
     public static Rejection? CheckCategory(string name, int weight) =>
         string.IsNullOrWhiteSpace(name) || name.Trim().Length > MaxTagLength
             ? new Rejection(CategoryInvalid, $"A category is 1–{MaxTagLength} characters.")
+            // A category is an option an event's question offers (D-827): its name must be an answer /choose takes
+            : !Engine.Turns.OptionIds.IsValid(name.Trim())
+                ? new Rejection(CategoryInvalid, "A category has no control characters, «<» or «>».")
             : weight is < 1 or > MaxCategoryWeight
                 ? new Rejection(CategoryInvalid, $"A weight is 1–{MaxCategoryWeight}.")
                 : null;

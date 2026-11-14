@@ -16,7 +16,15 @@ const seasonId = '5ea50000-0000-0000-0000-000000000001';
 const me = '10000000-0000-0000-0000-000000000001';
 const effectId = 'e1000000-0000-0000-0000-000000000001';
 
-function season(status: Schemas['SeasonView']['status'] = 'active'): Schemas['SeasonView'] {
+function season(
+  status: Schemas['SeasonView']['status'] = 'active',
+  effect: Schemas['ManualEffectView'] = {
+    id: effectId,
+    drawEvent: 'bad',
+    source: 'drop',
+    irl: false,
+  },
+): Schemas['SeasonView'] {
   return {
     id: seasonId,
     status,
@@ -48,7 +56,7 @@ function season(status: Schemas['SeasonView']['status'] = 'active'): Schemas['Se
       activeRun: null,
       lastCompleted: null,
       nextReroll: null,
-      manualEffects: [{ id: effectId, drawEvent: 'bad', source: 'drop' }],
+      manualEffects: [effect],
       dropHintMinutes: null,
       dropPenalty: null,
       techRerollOpen: false,
@@ -71,12 +79,13 @@ const resolveUrl = `/api/seasons/${seasonId}/effects/${effectId}/resolve`;
 function serve(
   answer: () => Response = () => json(200, { duplicate: false, events: [] }),
   status: Schemas['SeasonView']['status'] = 'active',
+  effect?: Schemas['ManualEffectView'],
 ) {
   const sent: unknown[] = [];
   vi.stubGlobal(
     'fetch',
     vi.fn(async (request: Request) => {
-      if (request.method === 'GET') return json(200, season(status));
+      if (request.method === 'GET') return json(200, season(status, effect));
       if (request.url.endsWith(resolveUrl)) {
         sent.push(await request.json());
         return answer();
@@ -90,6 +99,24 @@ function serve(
 describe('Manual effects', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it('offers no resolution of an IRL effect: only the admin resolves it (D-820)', async () => {
+    serve(undefined, 'active', {
+      id: effectId,
+      drawEvent: 'bad',
+      source: 'event',
+      objectId: 'karaoke',
+      irl: true,
+      irlProof: null,
+    });
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    expect(await screen.findByTestId(`manual-effect-${effectId}`)).toBeInTheDocument();
+    expect(screen.queryByTestId(`manual-effect-applied-${effectId}`)).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId(`manual-effect-not-applicable-${effectId}`),
+    ).not.toBeInTheDocument();
   });
 
   it('applies an effect without a comment', async () => {
