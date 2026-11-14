@@ -67,8 +67,8 @@ public sealed record PartnerRequestClosed(Guid RequestId, PartnerRequestCloseRea
 /// response is a coop invitation from the responder to the author (an exception from «приглашает ролливший», D-520), so both
 /// agree and the author stays the roller. Several responses may wait on one request; accepting one supersedes the others
 /// (D-712). A request closes by a coop on its run, the run's end, its term, its author or the deadline, and its still pending
-/// responses close with it (D-742). With <c>features.partnerBoard</c> or <c>features.coop</c> off nobody posts, responds or
-/// closes, and an open request does not time out; the end of its run and a coop on it still close it (D-743).
+/// responses close with it (D-742). With <c>features.partnerBoard</c> or <c>features.coop</c> off nobody posts or responds;
+/// a request already open still closes by its author, its term, the end of its run and a coop on it (D-743).
 /// </summary>
 internal static class PartnerBoard
 {
@@ -141,7 +141,7 @@ internal static class PartnerBoard
         }
 
         var now = context.Clock.UtcNow;
-        if (state.Interactions.Values.Any(i => Coop.IsPending(i, now) && i.Kind == InteractionKind.Coop
+        if (state.Interactions.Values.Any(i => Coop.IsWaiting(state, i, now) && i.Kind == InteractionKind.Coop
             && i.FromPlayerId == command.PlayerId && i.RunId == request.RunId))
         {
             return Decision.Reject(RejectionCodes.PartnerRequestAlreadyResponded, "The player has a pending response to this request.");
@@ -189,7 +189,7 @@ internal static class PartnerBoard
 
         var limit = state.Rules.Interactions.MaxOpenInvitesPerPlayer
             ?? throw new InvalidOperationException("interactions.maxOpenInvitesPerPlayer is required with coop on.");
-        if (state.Interactions.Values.Count(i => Coop.IsPending(i, now) && i.FromPlayerId == responder.PlayerId) >= limit)
+        if (state.Interactions.Values.Count(i => Coop.IsWaiting(state, i, now) && i.FromPlayerId == responder.PlayerId) >= limit)
         {
             return Decision.Reject(RejectionCodes.InteractionTooMany, $"At most {limit} pending invitations sent.");
         }
@@ -206,7 +206,8 @@ internal static class PartnerBoard
 
     public static Decision Decide(SeasonState state, ClosePartnerRequest command, EngineContext context)
     {
-        if (Guard(state, command.PlayerId, context) is { } rejection)
+        // With the board off a request already open may still be closed by its author: that starts nothing (D-743)
+        if (Coop.Guard(state, command.PlayerId, context, needsFlag: false) is { } rejection)
         {
             return rejection;
         }
@@ -251,13 +252,11 @@ internal static class PartnerBoard
                 .Select(r => new PartnerRequestClosed(r.RequestId, r.ExpiresAt <= now ? PartnerRequestCloseReason.Timeout : close.Reason, now))];
     }
 
-    /// <summary>The open requests past their term, closed by the timer; none while the board is off (D-420).</summary>
+    /// <summary>The open requests past their term, closed by the timer, whatever the flags (D-743).</summary>
     public static IEnumerable<IGameEvent> Timeouts(SeasonState state, DateTimeOffset now) =>
-        IsOn(state.Rules.Features)
-            ? state.PartnerRequests.Values
-                .Where(r => r.Status == PartnerRequestStatus.Open && r.ExpiresAt <= now)
-                .Select(r => new PartnerRequestClosed(r.RequestId, PartnerRequestCloseReason.Timeout, now))
-            : [];
+        state.PartnerRequests.Values
+            .Where(r => r.Status == PartnerRequestStatus.Open && r.ExpiresAt <= now)
+            .Select(r => new PartnerRequestClosed(r.RequestId, PartnerRequestCloseReason.Timeout, now));
 
     /// <summary>
     /// The still pending responses of <paramref name="request"/>: coop invitations to its author on its run from another

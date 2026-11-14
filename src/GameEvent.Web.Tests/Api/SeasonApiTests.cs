@@ -7,6 +7,7 @@ using GameEvent.Engine.Rulesets;
 using GameEvent.Engine.Seasons;
 using GameEvent.Engine.Turns;
 using GameEvent.Web.Seasons;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace GameEvent.Web.Tests.Api;
@@ -784,6 +785,46 @@ public sealed class SeasonApiTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Conflict, late.StatusCode);
         using var problem = JsonDocument.Parse(await late.Content.ReadAsStringAsync(Ct));
         Assert.Equal("run.techRerollWindowClosed", problem.RootElement.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task Drop_penalty_is_back_to_the_base_after_a_coop_completion_the_player_partnered()
+    {
+        // D-716 (decided by the owner 2026-11-14): a split coop run is the partner's own run and ends his drop streak, as in
+        // the engine (DropStreak.Before) — standing where he joined it, after his drop (without it the next drop throws 3d4).
+        // Вася starts first, so Петя's roll never meets Вася's game (it is taken) and the game is not excluded for him; the
+        // pool of three leaves Петя its last game
+        await using (var db = _site.NewDb())
+        {
+            await db.Games.ExecuteUpdateAsync(g => g.SetProperty(x => x.IsCoop, true), Ct);
+        }
+
+        var rules = RulesetJson.Default();
+        await _site.SendAsync(new ChangeRuleset(rules with { Features = rules.Features with { Coop = true } }, ExpectedVersion: null));
+        var (vasya, petya) = (await _site.SignedInAsync("vasya"), await _site.SignedInAsync("petya"));
+        await PostAsync(vasya, "roll", new { commandId = Guid.NewGuid() });
+        await PostAsync(vasya, "start", new { commandId = Guid.NewGuid() });
+        await PostAsync(petya, "roll", new { commandId = Guid.NewGuid() });
+        await PostAsync(petya, "start", new { commandId = Guid.NewGuid() });
+        await PostAsync(petya, "drop", new { commandId = Guid.NewGuid() });
+
+        // The runs stand in time (the test clock stands still otherwise): the drop, then the join, then Петя's next roll
+        _site.Clock.UtcNow = _site.Clock.UtcNow.AddHours(1);
+        await _site.SendAsync(new Engine.Interactions.InviteToCoop(_site.Players["vasya"], _site.Players["petya"]));
+        Guid invitation;
+        await using (var db = _site.NewDb())
+        {
+            var (state, _) = await Infrastructure.EventLog.EventLogReader.ReplaySeasonAsync(db, SiteFactory.SeasonId, Ct);
+            invitation = Assert.Single(state.Interactions.Values).InteractionId;
+        }
+
+        await _site.SendAsync(new Engine.Interactions.AnswerInvitation(_site.Players["petya"], invitation, Accept: true));
+        await PostAsync(vasya, "complete", new { commandId = Guid.NewGuid(), difficulty = "normal" });
+        _site.Clock.UtcNow = _site.Clock.UtcNow.AddHours(1);
+        await PostAsync(petya, "roll", new { commandId = Guid.NewGuid() });
+        await PostAsync(petya, "start", new { commandId = Guid.NewGuid() });
+
+        AssertDropPenalty(await MeJsonAsync(petya), 2, 4, points: true, position: true, badEvent: true);
     }
 
     [Fact]

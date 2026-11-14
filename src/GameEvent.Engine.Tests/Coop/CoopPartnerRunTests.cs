@@ -26,8 +26,9 @@ public class CoopPartnerRunTests
     private const string OnCompleted = "partner-on-completed";
     private const string OnEnded = "partner-on-ended";
     private const string ForTwoGames = "partner-for-two-games";
+    private const string OnStreak = "partner-on-streak";
 
-    private static ObjectDefinition Effect(string id, Trigger trigger, DurationSpec? duration, int coins) =>
+    private static ObjectDefinition Effect(string id, Trigger trigger, DurationSpec? duration, int coins, ConditionSpec? condition = null) =>
         new()
         {
             Id = id,
@@ -39,6 +40,7 @@ public class CoopPartnerRunTests
             {
                 Trigger = trigger,
                 Duration = duration,
+                Condition = condition,
                 Actions = [new ChangeResourceAction { Resource = "coins", Amount = ContentValue.Of(coins) }],
             },
         };
@@ -56,6 +58,8 @@ public class CoopPartnerRunTests
                 Effect(OnCompleted, Trigger.RunCompleted, null, 3),
                 Effect(OnEnded, Trigger.RunEnded, null, 3),
                 Effect(ForTwoGames, Trigger.RunCompleted, new DurationSpec { Runs = 2 }, 1),
+                // Every game of the coop scenario has the tag of its category «Games»
+                Effect(OnStreak, Trigger.RunCompleted, null, 3, new ConditionSpec { Stat = ContentStat.CompletedStreakWithTag, Tag = "Games", Gte = 2 }),
             ],
         });
     }
@@ -116,6 +120,42 @@ public class CoopPartnerRunTests
         ScenarioAssert.Accepted(s);
         Assert.DoesNotContain(s.LastEvents<EffectTriggered>(), e => e.PlayerId == s.PlayerId("Петя"));
         Assert.Equal(0, ItemCoins(s, "Петя"));
+    }
+
+    // ---- The streak of a tag (D-793 (6), an extension of D-716 to confirm) ----
+
+    [Fact]
+    public void The_coop_completion_counts_in_the_partners_streak_of_a_tag()
+    {
+        // Петя completes one game of his own: a streak of 1, the condition «≥ 2» does not hold yet
+        var s = Season();
+        s.Give("Петя", OnStreak);
+        s.CompleteTitle("Петя", SoloGame, 1, 1);
+        Assert.DoesNotContain(s.LastEvents<EffectTriggered>(), e => e.PlayerId == s.PlayerId("Петя"));
+        s.Advance(TimeSpan.FromHours(1));
+        s.CoopRun();
+
+        s.NextRandom(3, 4).Complete("Вася");
+
+        ScenarioAssert.Accepted(s);
+        Assert.Contains(s.LastEvents<EffectTriggered>(), e => e.PlayerId == s.PlayerId("Петя") && e.ObjectId == OnStreak);
+    }
+
+    [Fact]
+    public void A_partner_who_left_before_the_completion_does_not_count_it_in_his_streak()
+    {
+        var s = Season();
+        s.Give("Петя", OnStreak);
+        s.CompleteTitle("Петя", SoloGame, 1, 1);
+        s.Advance(TimeSpan.FromHours(1));
+        s.CoopRun();
+        s.Act(new LeaveCoop(s.PlayerId("Петя")));
+        ScenarioAssert.Accepted(s);
+
+        s.NextRandom(3, 4).Complete("Вася");
+
+        ScenarioAssert.Accepted(s);
+        Assert.DoesNotContain(s.LastEvents<EffectTriggered>(), e => e.PlayerId == s.PlayerId("Петя"));
     }
 
     // ---- Objects «на N игр» ----

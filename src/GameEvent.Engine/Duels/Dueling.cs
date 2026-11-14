@@ -52,7 +52,7 @@ internal static class Dueling
         // The invitations' own limit counts the pending ones of every kind (D-523, D-718)
         var invites = state.Rules.Interactions.MaxOpenInvitesPerPlayer
             ?? throw new InvalidOperationException("interactions.maxOpenInvitesPerPlayer is required with duels on.");
-        if (state.Interactions.Values.Count(i => IsPending(i, now) && i.FromPlayerId == command.PlayerId) >= invites)
+        if (state.Interactions.Values.Count(i => Coop.IsWaiting(state, i, now) && i.FromPlayerId == command.PlayerId) >= invites)
         {
             return Decision.Reject(RejectionCodes.InteractionTooMany, $"At most {invites} pending invitations sent.");
         }

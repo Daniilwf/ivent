@@ -12,8 +12,9 @@ namespace GameEvent.Engine.Interactions;
 /// coop game invites a free player; the accepted one becomes the partner, playing that one run with him. The roller
 /// completes it with one throw by his own pipeline; points, steps and completion coins are split (D-521), each moves by his
 /// share with his own move. The partner may leave; the roller's drop or tech reroll ends the coop; a reject takes back each
-/// one's share (D-522). With <c>features.coop</c> switched off nobody starts a coop — every command here is refused — but a
-/// coop in progress goes on as coop to its end, and pending invitations burn by their time (D-715).
+/// one's share (D-522). With <c>features.coop</c> switched off only what starts a coop is refused (invite, accept, respond);
+/// decline, withdraw and leave still work, a coop in progress goes on as coop to its end, and pending invitations burn by
+/// their time (D-715, D-790).
 /// </summary>
 internal static class Coop
 {
@@ -58,7 +59,7 @@ internal static class Coop
         // Pending by the engine's clock: one past its time is over even before the timer fired (D-523)
         var now = context.Clock.UtcNow;
         // The roller's own: responses of the partner board waiting on the run do not count (D-740)
-        if (state.Interactions.Values.Any(i => IsPending(i, now) && i.Kind == InteractionKind.Coop && i.RunId == run.RunId
+        if (state.Interactions.Values.Any(i => IsWaiting(state, i, now) && i.Kind == InteractionKind.Coop && i.RunId == run.RunId
             && i.FromPlayerId == inviter.PlayerId))
         {
             return Decision.Reject(RejectionCodes.CoopInviteAlreadyOpen, "The run has a pending coop invitation already.");
@@ -66,7 +67,7 @@ internal static class Coop
 
         var limit = state.Rules.Interactions.MaxOpenInvitesPerPlayer
             ?? throw new InvalidOperationException("interactions.maxOpenInvitesPerPlayer is required with coop on.");
-        if (state.Interactions.Values.Count(i => IsPending(i, now) && i.FromPlayerId == inviter.PlayerId) >= limit)
+        if (state.Interactions.Values.Count(i => IsWaiting(state, i, now) && i.FromPlayerId == inviter.PlayerId) >= limit)
         {
             return Decision.Reject(RejectionCodes.InteractionTooMany, $"At most {limit} pending invitations sent.");
         }
@@ -374,7 +375,7 @@ internal static class Coop
             ? Decision.Reject(RejectionCodes.InteractionUnknown, $"Invitation {interactionId} is not in the season.")
             : !IsPending(invitation, context.Clock.UtcNow)
                 ? Decision.Reject(RejectionCodes.InteractionNotPending, $"Invitation {interactionId} is {invitation.Status}.")
-                : PartnerBoard.OutlivedItsRequest(state, invitation, context.Clock.UtcNow)
+                : !IsWaiting(state, invitation, context.Clock.UtcNow)
                     ? Decision.Reject(RejectionCodes.InteractionNotPending, $"Invitation {interactionId} closed with its partner request.")
                     : null;
 
@@ -399,6 +400,14 @@ internal static class Coop
 
     internal static bool IsPending(Interaction invitation, DateTimeOffset now) =>
         invitation.Status == InteractionStatus.Pending && invitation.ExpiresAt > now;
+
+    /// <summary>
+    /// The one meaning of «still waits» for answers, withdrawals and every limit of invitations (D-523, D-742): pending by the
+    /// engine's clock, and not a response of the partner board whose request is over (closed or past its term), even before
+    /// the timers fired.
+    /// </summary>
+    internal static bool IsWaiting(SeasonState state, Interaction invitation, DateTimeOffset now) =>
+        IsPending(invitation, now) && !PartnerBoard.OutlivedItsRequest(state, invitation, now);
 
     internal static bool IsCoopGame(EngineContext context, Guid gameId) => context.Pool.Games.Any(g => g.Id == gameId && g.IsCoop);
 }

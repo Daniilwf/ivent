@@ -46,12 +46,11 @@ public static class Timers
                 && Interactions.InteractionRules.IsOn(state.Rules.Features, i.Kind))
             .Select(i => (DateTimeOffset?)i.ExpiresAt)
             .Min();
-        var requests = Interactions.PartnerBoard.IsOn(state.Rules.Features)
-            ? state.PartnerRequests.Values
-                .Where(r => r.Status == Interactions.PartnerRequestStatus.Open && r.PlayerId == player.PlayerId)
-                .Select(r => (DateTimeOffset?)r.ExpiresAt)
-                .Min()
-            : null;
+        // A request's term runs whatever the flags (D-743)
+        var requests = state.PartnerRequests.Values
+            .Where(r => r.Status == Interactions.PartnerRequestStatus.Open && r.PlayerId == player.PlayerId)
+            .Select(r => (DateTimeOffset?)r.ExpiresAt)
+            .Min();
         return new[] { Next(player, state.Rules.Features), invitations, requests, Duels.Dueling.Next(state, player.PlayerId) }.Where(m => m is not null).Min();
     }
 

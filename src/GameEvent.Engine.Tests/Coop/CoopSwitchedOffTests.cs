@@ -188,6 +188,48 @@ public class CoopSwitchedOffTests
         }
     }
 
+    // ---- The coins share of a coop in progress (D-715) ----
+
+    private static Ruleset NoCoinsShare(Ruleset r) => r with { Reward = r.Reward with { Coop = r.Reward.Coop with { CoinsShare = null } } };
+
+    [Fact]
+    public void While_a_coop_runs_its_coins_share_is_not_removed_together_with_the_flag()
+    {
+        // The validator needs the share only with the flag on, but the coop in progress is still split by it (D-715)
+        var s = New();
+        s.CoopRun();
+
+        ScenarioAssert.RejectsWithoutChanges(s, x => x.Act(new ChangeRuleset(NoCoinsShare(Off(x.Ruleset)))), RejectionCodes.CoopInPlay);
+    }
+
+    [Fact]
+    public void While_a_coop_runs_its_coins_share_is_not_removed_after_the_flag_and_the_run_still_splits()
+    {
+        var s = New();
+        var run = s.CoopRun();
+        s.WithRuleset(Off);
+
+        ScenarioAssert.RejectsWithoutChanges(s, x => x.Act(new ChangeRuleset(NoCoinsShare(x.Ruleset))), RejectionCodes.CoopInPlay);
+
+        s.NextRandom(3, 4).Complete("Вася");
+        ScenarioAssert.Accepted(s);
+        Assert.Equal(run, Assert.Single(s.LastEvents<CoopRewardSplit>()).RunId);
+    }
+
+    [Fact]
+    public void Once_the_coop_ended_its_coins_share_may_go_with_the_flag()
+    {
+        // The boundary: nothing is split by it any more — a reject splits by the shares written at the completion
+        var s = New();
+        s.CoopRun();
+        s.CompleteWith("Вася", 3, 4);
+
+        s.Act(new ChangeRuleset(NoCoinsShare(Off(s.Ruleset))));
+
+        ScenarioAssert.Accepted(s);
+        Assert.Null(s.State.Rules.Reward.Coop.CoinsShare);
+    }
+
     [Fact]
     public void A_solo_run_completed_with_the_flag_off_is_not_split()
     {

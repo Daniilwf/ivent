@@ -649,10 +649,44 @@ public class PartnerBoardTests
         var response = s.Respond("Петя", request);
         s.Advance(TimeSpan.FromHours(1));
 
-        s.Act(new AnswerInvitation(s.PlayerId("Вася"), response, Accept: true));
+        s.Rejects(new AnswerInvitation(s.PlayerId("Вася"), response, Accept: true), RejectionCodes.InteractionNotPending);
 
-        Assert.False(s.Last.IsAccepted, "A response to a request past its term was accepted.");
         Assert.Null(s.State.Runs[run].Coop);
+    }
+
+    [Fact]
+    public void A_response_whose_request_is_over_by_the_clock_holds_no_slot_of_the_invitations()
+    {
+        // D-742 with the limit (D-523): the response is no longer pending once its request's term ran out, even before the
+        // timer fired — so it does not keep the responder's only slot until its own term
+        var s = PartnerBoardSteps.Board(r => r.WithCoop(maxOpenInvites: 1), requestTtlHours: 6);
+        s.PlayTitle("Вася", CoopGame);
+        var vasyas = s.Post("Вася");
+        var outlived = s.Respond("Петя", vasyas);
+        s.PlayTitle("Маша", SecondCoopGame);
+        var mashas = s.Post("Маша");
+        s.Advance(TimeSpan.FromHours(4));
+        Assert.Equal(InteractionStatus.Pending, s.Invitation(outlived).Status);
+
+        s.Act(new RespondToPartnerRequest(s.PlayerId("Петя"), mashas));
+
+        ScenarioAssert.Accepted(s);
+        Assert.Single(s.LastEvents<InteractionCreated>());
+    }
+
+    [Fact]
+    public void A_response_whose_request_is_still_open_holds_its_slot()
+    {
+        // The boundary of the test above: one minute before the request's term the response still waits
+        var s = PartnerBoardSteps.Board(r => r.WithCoop(maxOpenInvites: 1), requestTtlHours: 6);
+        s.PlayTitle("Вася", CoopGame);
+        var vasyas = s.Post("Вася");
+        s.Respond("Петя", vasyas);
+        s.PlayTitle("Маша", SecondCoopGame);
+        var mashas = s.Post("Маша");
+        s.Advance(TimeSpan.FromHours(4) - TimeSpan.FromMinutes(1));
+
+        s.Rejects(new RespondToPartnerRequest(s.PlayerId("Петя"), mashas), RejectionCodes.InteractionTooMany);
     }
 
     [Fact]

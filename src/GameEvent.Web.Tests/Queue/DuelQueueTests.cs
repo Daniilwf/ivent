@@ -1,5 +1,6 @@
 using GameEvent.Engine.Duels;
 using GameEvent.Engine.Interactions;
+using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Players;
 using GameEvent.Engine.Rulesets;
 using GameEvent.Engine.Seasons;
@@ -20,7 +21,7 @@ namespace GameEvent.Web.Tests.Queue;
 /// </summary>
 public sealed class DuelQueueTests : IAsyncLifetime
 {
-    private readonly SiteFactory _site = new();
+    private SiteFactory _site = new();
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
@@ -94,9 +95,75 @@ public sealed class DuelQueueTests : IAsyncLifetime
         await DeleteAccountAsync("vasya");
 
         var state = await StateAsync();
-        Assert.Contains(state.Interactions[sent].Status, new[] { InteractionStatus.Expired, InteractionStatus.Withdrawn });
-        Assert.Contains(state.Interactions[received].Status, new[] { InteractionStatus.Expired, InteractionStatus.Withdrawn });
+        Assert.Equal((InteractionStatus.Expired, InteractionStatus.Expired), (state.Interactions[sent].Status, state.Interactions[received].Status));
+        Assert.Equal(
+            new[] { sent, received }.Order(),
+            (await ExpiredAsync()).Where(e => e.Reason == InteractionExpiry.AccountDeleted).Select(e => e.InteractionId).Order());
         Assert.Empty(state.Duels);
+        await AssertIntactAsync();
+    }
+
+    // ---- What a deletion missed is caught up (D-792) ----
+
+    [Fact]
+    public async Task A_repeat_of_the_deletion_closes_what_its_first_run_missed()
+    {
+        // Вася has nothing open when deleted, then is challenged: the repeat of the same deletion (a client's retry after a
+        // stop) is a duplicate, and still closes the challenge
+        await DuelsOnAsync();
+        var (vasya, petya) = (_site.Players["vasya"], _site.Players["petya"]);
+        var deletion = Guid.NewGuid();
+        await DeleteAccountAsync("vasya", deletion);
+        await _site.SendAsync(new ChallengeToDuel(petya, vasya));
+        var challenge = await SingleChallengeAsync(petya);
+
+        await DeleteAccountAsync("vasya", deletion);
+
+        Assert.Equal(InteractionStatus.Expired, (await StateAsync()).Interactions[challenge].Status);
+        Assert.Equal(InteractionExpiry.AccountDeleted, Assert.Single(await ExpiredAsync()).Reason);
+        await AssertIntactAsync();
+    }
+
+    [Fact]
+    public async Task The_timers_pass_closes_the_duels_a_deleted_account_left()
+    {
+        await DuelsOnAsync();
+        var (vasya, petya) = (_site.Players["vasya"], _site.Players["petya"]);
+        await DeleteAccountAsync("vasya");
+        await _site.SendAsync(new ChallengeToDuel(petya, vasya));
+        var challenge = await SingleChallengeAsync(petya);
+
+        // Nothing is due by the engine's clock: the pass itself is refused, the sweep after it still runs
+        await _site.Services.GetRequiredService<CommandBus>()
+            .SendAsync(new CommandEnvelope(Guid.NewGuid(), SiteFactory.SeasonId, new Engine.Economy.FireTimers(), AuthorId: null), Ct);
+
+        Assert.Equal(InteractionStatus.Expired, (await StateAsync()).Interactions[challenge].Status);
+        Assert.Equal(InteractionExpiry.AccountDeleted, Assert.Single(await ExpiredAsync()).Reason);
+        await AssertIntactAsync();
+    }
+
+    [Fact]
+    public async Task The_start_of_the_site_closes_the_duels_a_deleted_account_left()
+    {
+        await DuelsOnAsync();
+        var (vasya, petya) = (_site.Players["vasya"], _site.Players["petya"]);
+        await _site.SendAsync(new ChallengeToDuel(petya, vasya));
+        var challenge = await SingleChallengeAsync(petya);
+        await _site.SendAsync(new AnswerInvitation(vasya, challenge, Accept: true));
+
+        // The deletion committed, the server stopped before its season command: the account is marked as the deletion left it
+        await using (var db = _site.NewDb())
+        {
+            await db.Users.Where(u => u.Id == _site.Users["vasya"]).ExecuteUpdateAsync(u => u.SetProperty(x => x.IsDeleted, true), Ct);
+        }
+
+        var next = _site.Restarted();
+        await _site.DisposeAsync();
+        _site = next;
+        _ = _site.Services; // starts the new host: its queue sweeps before the first command
+
+        var duel = await WaitForAsync(async () => (await StateAsync()).Duels[challenge], d => d.Status != DuelStatus.Active);
+        Assert.Equal((DuelStatus.Cancelled, DuelEnd.AccountDeleted), (duel.Status, duel.End));
         await AssertIntactAsync();
     }
 
@@ -120,11 +187,36 @@ public sealed class DuelQueueTests : IAsyncLifetime
     }
 
     /// <summary>The admin deletes the account (a global command: no season in the envelope); must be accepted.</summary>
-    private async Task DeleteAccountAsync(string login)
+    private async Task DeleteAccountAsync(string login, Guid? commandId = null)
     {
         var outcome = await _site.Services.GetRequiredService<CommandBus>()
-            .SendAsync(new CommandEnvelope(Guid.NewGuid(), Guid.Empty, new DeleteAccount(_site.Users[login]), AuthorId: null), Ct);
+            .SendAsync(new CommandEnvelope(commandId ?? Guid.NewGuid(), Guid.Empty, new DeleteAccount(_site.Users[login]), AuthorId: null), Ct);
         Assert.True(outcome.IsAccepted, $"Deleting the account was rejected: {outcome.Rejection}");
+    }
+
+    /// <summary>The season's logged <see cref="InteractionExpired"/> events, not undone.</summary>
+    private async Task<List<InteractionExpired>> ExpiredAsync()
+    {
+        await using var db = _site.NewDb();
+        return [.. (await db.Events.AsNoTracking()
+                .Where(e => e.SeasonId == SiteFactory.SeasonId && e.Type == "interaction-expired" && e.UndoneByEventId == null)
+                .ToListAsync(Ct))
+            .Select(e => EventCodec.Decode(new StoredEvent(e.Type, e.Version, e.Data)))
+            .OfType<InteractionExpired>()];
+    }
+
+    private static async Task<T> WaitForAsync<T>(Func<Task<T>> read, Func<T, bool> done)
+    {
+        for (var tries = 0; ; tries++)
+        {
+            var value = await read();
+            if (done(value) || tries >= 100)
+            {
+                return value;
+            }
+
+            await Task.Delay(50, Ct);
+        }
     }
 
     private async Task DuelsOnAsync(int maxOpenPerPlayer = 1)

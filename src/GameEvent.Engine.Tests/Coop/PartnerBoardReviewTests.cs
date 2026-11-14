@@ -18,8 +18,9 @@ namespace GameEvent.Engine.Tests.Coop;
 public class PartnerBoardReviewTests
 {
     [Fact]
-    public void The_term_of_an_open_request_is_due_on_its_authors_timer_and_only_while_the_board_is_on()
+    public void The_term_of_an_open_request_is_due_on_its_authors_timer_whatever_the_flag()
     {
+        // D-743, decided by the owner 2026-11-14: the term runs with the board off too (was: not due while it was off)
         var s = PartnerBoardSteps.Board(r => r.WithCoop(inviteTtlHours: 100), requestTtlHours: 6);
         s.PlayTitle("Вася", CoopGame);
         Assert.Null(Timers.Next(s.State, s.Player("Вася")));
@@ -28,7 +29,7 @@ public class PartnerBoardReviewTests
         Assert.Equal(s.Request(request).ExpiresAt, Timers.Next(s.State, s.Player("Вася")));
 
         s.WithRuleset(r => r with { Features = r.Features with { PartnerBoard = false } });
-        Assert.Null(Timers.Next(s.State, s.Player("Вася")));
+        Assert.Equal(s.Request(request).ExpiresAt, Timers.Next(s.State, s.Player("Вася")));
         s.WithRuleset(r => r with { Features = r.Features with { PartnerBoard = true } });
 
         s.Act(new ClosePartnerRequest(s.PlayerId("Вася"), request));

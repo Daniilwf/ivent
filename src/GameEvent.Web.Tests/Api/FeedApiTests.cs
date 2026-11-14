@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
 using static GameEvent.Web.Tests.Api.ApiCalls;
 
 namespace GameEvent.Web.Tests.Api;
@@ -159,6 +160,37 @@ public sealed class FeedApiTests : IAsyncLifetime
         var review = Assert.Single(profile.GetProperty("reviews").EnumerateArray());
         Assert.Equal((runId, gameId, 8, "Отличная игра"), (review.GetProperty("runId").GetGuid(), review.GetProperty("gameId").GetGuid(), review.GetProperty("rating").GetInt32(), review.GetProperty("text").GetString()));
         Assert.False(string.IsNullOrEmpty(review.GetProperty("gameTitle").GetString()));
+    }
+
+    [Fact]
+    public async Task A_coop_completion_counts_in_the_partners_completed_games()
+    {
+        // D-716 (decided by the owner 2026-11-14): the split coop run is the partner's completed game too, as the engine and
+        // the season screen count it
+        await using (var db = _site.NewDb())
+        {
+            await db.Games.ExecuteUpdateAsync(g => g.SetProperty(x => x.IsCoop, true), Ct);
+        }
+
+        var rules = Engine.Rulesets.RulesetJson.Default();
+        await _site.SendAsync(new Engine.Rulesets.ChangeRuleset(rules with { Features = rules.Features with { Coop = true } }, ExpectedVersion: null));
+        var vasya = await _site.SignedInAsync("vasya");
+        await PostOkAsync(vasya, Url("roll"), new { commandId = Guid.NewGuid() });
+        await PostOkAsync(vasya, Url("start"), new { commandId = Guid.NewGuid() });
+        await _site.SendAsync(new Engine.Interactions.InviteToCoop(_site.Players["vasya"], _site.Players["petya"]));
+        Guid invitation;
+        await using (var db = _site.NewDb())
+        {
+            var (state, _) = await Infrastructure.EventLog.EventLogReader.ReplaySeasonAsync(db, SiteFactory.SeasonId, Ct);
+            invitation = Assert.Single(state.Interactions.Values).InteractionId;
+        }
+
+        await _site.SendAsync(new Engine.Interactions.AnswerInvitation(_site.Players["petya"], invitation, Accept: true));
+        await PostOkAsync(vasya, Url("complete"), new { commandId = Guid.NewGuid(), difficulty = "normal" });
+
+        var viewer = await _site.SignedInAsync("zritel");
+        Assert.Equal(1, (await OkAsync(await viewer.GetAsync($"/api/users/{_site.Users["petya"]}", Ct))).GetProperty("completed").GetInt32());
+        Assert.Equal(1, (await OkAsync(await viewer.GetAsync($"/api/users/{_site.Users["vasya"]}", Ct))).GetProperty("completed").GetInt32());
     }
 
     [Fact]

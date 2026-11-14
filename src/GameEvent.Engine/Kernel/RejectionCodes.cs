@@ -306,6 +306,12 @@ public static class RejectionCodes
     /// <summary>The player of a deleted account has no duel going on and no challenge waiting to close (D-734).</summary>
     public const string DuelNothingToCancel = "duel.nothingToCancel";
 
+    /// <summary>
+    /// <c>reward.coop.coinsShare</c> is removed only while no coop run is in progress: it is split by it even with coop off
+    /// (D-715).
+    /// </summary>
+    public const string CoopInPlay = "ruleset.coopInPlay";
+
     /// <summary>Duels are switched off only when none is open and no win waits for its run's proof (D-420, D-730).</summary>
     public const string DuelsInPlay = "ruleset.duelsInPlay";
 }

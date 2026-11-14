@@ -47,6 +47,7 @@ public sealed partial class CommandProcessor(
         try
         {
             await SettleLeftPendingAsync(stoppingToken);
+            await CancelDuelsLeftByDeletedAccountsAsync(seasonId: null, stoppingToken);
             await foreach (var pending in queue.Reader.ReadAllAsync(stoppingToken))
             {
                 queue.Taken();
@@ -88,10 +89,17 @@ public sealed partial class CommandProcessor(
         {
             var outcome = await ProcessAsync(pending.Envelope, ct);
 
-            // A deleted account leaves the duels of its running seasons before the deletion is reported done (D-734)
-            if (outcome.IsAccepted && !outcome.IsDuplicate && pending.Envelope.Command is Accounts.DeleteAccount deleted)
+            // A deleted account leaves the duels of its running seasons before the deletion is reported done (D-734); a repeat
+            // of the deletion tries again what a stop in between missed — the ids are the same, so nothing is written twice
+            if (outcome.IsAccepted && pending.Envelope.Command is Accounts.DeleteAccount deleted)
             {
                 await CancelDuelsOfDeletedAccountAsync(deleted.UserId, pending.Envelope.CommandId, ct);
+            }
+
+            // The timers' pass of a season also closes what a deleted account left open there (D-734, D-792)
+            if (pending.Envelope.Command is Engine.Economy.FireTimers)
+            {
+                await CancelDuelsLeftByDeletedAccountsAsync(pending.Envelope.SeasonId, ct);
             }
 
             pending.Completion.TrySetResult(outcome);

@@ -63,20 +63,18 @@ public class PartnerBoardInvariantTests
     private static void Play(int seed, byte[] script, Action<Scenario, ICommand, SeasonState> afterEach)
     {
         // Most games of the pool are coop here, so requests meet runs they can be posted on
-        CoopTestScenario.New(r => r.WithPartnerBoard(requestTtlHours: 24), mapLength: 30, seed: seed)
+        CoopTestScenario.New(r => r.WithPartnerBoard(requestTtlHours: 12), mapLength: 30, seed: seed)
             .MarkCoop(CoopTestScenario.SoloGame).MarkCoop(CoopTestScenario.OtherSoloGame).MarkCoop(CoopTestScenario.ThirdSoloGame)
             .Explained(game =>
         {
             var setup = game.History.Count;
-            var boardWasOff = false;
             foreach (var b in script)
             {
                 game.Advance(TimeSpan.FromHours(1 + (b % 3)));
                 var before = game.State;
                 var command = CommandFor(game, b, setup);
                 game.Act(command);
-                boardWasOff |= !game.State.Rules.Features.PartnerBoard;
-                Check(game, before, boardWasOff);
+                Check(game, before);
                 afterEach(game, command, before);
             }
         });
@@ -93,6 +91,9 @@ public class PartnerBoardInvariantTests
         var open = state.PartnerRequests.Values.Where(r => r.Status == PartnerRequestStatus.Open).ToList();
         var mine = open.FirstOrDefault(r => r.PlayerId == player);
         var others = open.FirstOrDefault(r => r.PlayerId != player);
+        var response = mine is null
+            ? null
+            : state.Interactions.Values.FirstOrDefault(i => i.ToPlayerId == player && i.RunId == mine.RunId && Interactions.Coop.IsWaiting(state, i, s.Clock.UtcNow));
         return ((b / 4) % 16) switch
         {
             0 or 1 or 2 => me.Phase switch
@@ -101,7 +102,9 @@ public class PartnerBoardInvariantTests
                 TurnPhase.Rolling => new StartRun(player),
                 _ => new CompleteRun(player, Difficulty.Normal),
             },
-            3 or 4 => new PostPartnerRequest(player),
+            // An author whose request is open has nothing to post: he takes a response that still waits instead, so the board's
+            // coops keep up with the closings of D-742 (a closed request cancels its responses)
+            3 or 4 => response is null ? new PostPartnerRequest(player) : new AnswerInvitation(player, response.InteractionId, Accept: true),
             5 or 6 => others is null ? new PostPartnerRequest(player) : new RespondToPartnerRequest(player, others.RequestId),
             7 or 8 => pendingTo is null
                 ? new RespondToPartnerRequest(player, open.FirstOrDefault()?.RequestId ?? Guid.Empty)
@@ -121,7 +124,7 @@ public class PartnerBoardInvariantTests
         };
     }
 
-    private static void Check(Scenario s, SeasonState before, bool boardWasOff)
+    private static void Check(Scenario s, SeasonState before)
     {
         var state = s.State;
 
@@ -143,7 +146,6 @@ public class PartnerBoardInvariantTests
 
         // D-743 (decided by the owner 2026-11-14): the board switched off no longer lets a request outlive its run or its
         // coop, so the requests are checked whether the board was ever off or not (was: skipped once it had been off)
-        _ = boardWasOff;
         var now = s.Clock.UtcNow;
         var open = state.PartnerRequests.Values.Where(r => r.Status == PartnerRequestStatus.Open && r.ExpiresAt > now).ToList();
         foreach (var request in open)
