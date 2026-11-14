@@ -39,7 +39,10 @@ export function ShopPanel({
 }) {
   const shop = state.kind === 'ready' ? state.economy.shop : null;
   const expiresAt = shop?.expiresAt ? new Date(shop.expiresAt) : null;
-  const now = useNow(expiresAt !== null, fixedNow);
+  // The lots' time is the server's (S4-4): the device's clock moved by how far the server's was ahead when the view came
+  const offset = state.kind === 'ready' && !fixedNow ? (state.clockOffset ?? 0) : 0;
+  const deviceNow = useNow(expiresAt !== null, fixedNow);
+  const now = offset === 0 ? deviceNow : new Date(deviceNow.getTime() + offset);
   const [busy, setBusy] = useState<'roll' | number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);

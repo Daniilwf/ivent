@@ -15,7 +15,14 @@ import { Panel } from '../ui/Surface';
 import { cx } from '../ui/cx';
 import { BetsPanel } from './Bets';
 import { ShopPanel } from './Shop';
-import { refusalText, type Loaded, type PanelState, type UseResult } from './economy';
+import {
+  clockOffset,
+  refusalText,
+  type Economy,
+  type Loaded,
+  type PanelState,
+  type UseResult,
+} from './economy';
 
 export type { Economy, Loaded, PanelState, UseResult } from './economy';
 export type InventoryItem = Schemas['InventoryItemView'];
@@ -28,7 +35,14 @@ async function fetchEconomy(seasonId: string): Promise<Loaded> {
     const { data, response } = await api.GET('/api/seasons/{seasonId}/economy', {
       params: { path: { seasonId } },
     });
-    if (data) return { kind: 'ready', economy: data };
+    if (data) {
+      const economy: Economy = data;
+      return {
+        kind: 'ready',
+        economy,
+        clockOffset: clockOffset(economy.serverNow, response.headers.get('date')),
+      };
+    }
     return response.status === 401 ? { kind: 'signedOut' } : { kind: 'failed' };
   } catch {
     return { kind: 'failed' };
