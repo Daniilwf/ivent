@@ -44,6 +44,7 @@ public class LongInvariantTests
         var names = PropertyMethods().Select(Name).ToList();
 
         Assert.Contains("PlayerAdminInvariantTests.Invariants_hold_in_the_combined_game", names);
+        Assert.Contains("PlayerAdminInvariantTests.Invariants_hold_in_the_games_of_stage_5", names);
         Assert.Contains("SliceInvariantTests.Invariants_hold_after_every_command", names);
         Assert.Contains("UndoTests.An_accepted_undo_equals_the_log_without_the_command", names);
         Assert.Contains("ChainLimitTests.Chains_stay_within_the_limits", names);

@@ -4,7 +4,7 @@ namespace GameEvent.Simulator.Cli;
 
 /// <summary>
 /// The command line: <c>--runs N --days N [--ruleset path] [--map path] [--pool path] [--settings path] [--seed n]
-/// [--out folder] [--threads n]</c>.
+/// [--out folder] [--threads n] [--content folder]</c>.
 /// </summary>
 public sealed record CliArguments(
     int Runs,
@@ -15,7 +15,8 @@ public sealed record CliArguments(
     string? Settings,
     ulong Seed,
     string Out,
-    int Threads)
+    int Threads,
+    string? Content = null)
 {
     public const string Usage =
         """
@@ -29,6 +30,8 @@ public sealed record CliArguments(
           --seed n          base seed (default 1): the same seed gives the same report
           --out folder      where report.md and report.json go (default var/simulation)
           --threads n       parallel seasons (default: all cores)
+          --content folder  the season's content laid out as /content (items, events, wheels, decks);
+                            needed when the ruleset has features.events on
         """;
 
     /// <summary>Parses <paramref name="args"/>; the error names the bad option.</summary>
@@ -78,6 +81,9 @@ public sealed record CliArguments(
                     break;
                 case "--out":
                     result = result with { Out = value };
+                    break;
+                case "--content":
+                    result = result with { Content = value };
                     break;
                 default:
                     return (null, $"bad option {name} {value}");
