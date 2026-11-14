@@ -107,6 +107,7 @@ public partial class PlayerAdminInvariantTests
                         CoopLeft => "coop left",
                         PartnerRequestPosted => "board",
                         DuelSettled => "duel settled",
+                        PollStarted { Source: PollSource.Event } => "event poll",
                         PollClosed => "poll closed",
                         VoteChanged => "vote changed",
                         GlobalGoalReached => "goal reached",
@@ -118,6 +119,12 @@ public partial class PlayerAdminInvariantTests
                         SeasonStatusChanged { To: SeasonStatus.Closing } => "deadline",
                         _ => "other",
                     });
+
+                    // The vote of an event closes and its effect goes on with the voted game (D-512)
+                    if (e is PollClosed pc && before.Polls.TryGetValue(pc.PollId, out var asking) && asking.Source == PollSource.Event)
+                    {
+                        Count("event poll closed");
+                    }
                 }
 
                 if (command is UndoCommand undone && s.Commands[s.History.ToList().FindIndex(c => c.CommandId == undone.TargetCommandId)] is { } target_)
@@ -139,7 +146,7 @@ public partial class PlayerAdminInvariantTests
 
         string[] expected =
         [
-            "coop invited", "coop joined", "deadline set", "drawn", "asked", "answered", "irl proof", "coop split", "coop left", "board", "duel settled", "poll closed", "vote changed",
+            "coop invited", "coop joined", "deadline set", "drawn", "asked", "answered", "irl proof", "coop split", "coop left", "board", "duel settled", "event poll", "event poll closed", "poll closed", "vote changed",
             "goal reached", "progress", "settled", "challenge", "challenge revoked", "suggestion reviewed", "deadline", "stage 5 undone",
             "undo refused",
         ];
@@ -170,7 +177,9 @@ public partial class PlayerAdminInvariantTests
     /// <summary>
     /// The season of the stage 5 games: a line of 24 cells with five event cells drawing from the default deck (risky), the
     /// horror pool with every other game coop, the content of global events (<see cref="GlobalSetup.BaseObjects"/>: «Рискнёшь?»,
-    /// «Монетка или шаг», «Караоке» with its IRL proof, «Хоррор-неделя», «Попутный ветер») in three decks.
+    /// «Монетка или шаг», «Караоке» with its IRL proof, «Хоррор-неделя», «Попутный ветер») in three decks, the good one with
+    /// «Выберите игру лидеру» too — a vote of the players on the leader's next game (<c>requestChoice.vote</c>, then
+    /// <c>modifyNextRoll.filter.games</c>, D-512).
     /// </summary>
     private static Scenario NewStage5Season(int seed)
     {
@@ -196,9 +205,9 @@ public partial class PlayerAdminInvariantTests
 
         s.WithPlayers(s_stage5Players);
         return s.WithContent(GlobalSetup.Pack(
-            null,
+            [Polls.EventPollTests.LeaderPick],
             EventScenario.Deck(EventKind.Risky, "risky", "gamble", "coin-or-step"),
-            EventScenario.Deck(EventKind.Good, "good", "tailwind", "karaoke"),
+            EventScenario.Deck(EventKind.Good, "good", "tailwind", "karaoke", "leader-pick"),
             EventScenario.Deck(EventKind.Bad, "bad", "horror-week", "karaoke")));
     }
 
