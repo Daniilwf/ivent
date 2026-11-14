@@ -162,6 +162,8 @@ internal static class Settlements
         e switch
         {
             Runs.RunCompleted c => (c.PlayerId, Rulesets.ShopPriceReset.RunCompleted),
+            // A coop completion is the partner's own run too: his price starts over, his objects count the game (D-716)
+            Interactions.CoopRewardSplit split => (split.PartnerId, Rulesets.ShopPriceReset.RunCompleted),
             Runs.RunDropped d => (d.PlayerId, Rulesets.ShopPriceReset.RunDropped),
             _ => null,
         };
