@@ -66,10 +66,9 @@ export function ContentSection({ seasonId, version }: { seasonId: string; versio
   return (
     <AsyncState loaded={loaded} errorTitle={ru.admin.loadErrorTitle}>
       {(view, reload) => (
-        <Workspace
-          key={`${seasonId}-${view.version}`}
+        <Pinned
+          latest={view}
           seasonId={seasonId}
-          view={view}
           schemas={contentSchemas(schema.kind === 'ready' ? schema.value : null)}
           schemaFailed={schema.kind === 'failed'}
           saved={saved}
@@ -83,6 +82,56 @@ export function ContentSection({ seasonId, version }: { seasonId: string; versio
   );
 }
 
+/**
+ * The version the editor works on (S4-3, D-491): a newer one, published by another admin, replaces it at once only when
+ * nothing is open; an open editor keeps its draft, the newer version is announced and taken on the admin's word. A save
+ * is made from the version shown, so the server refuses it over a newer one instead of overwriting it.
+ */
+function Pinned({
+  latest,
+  onSaved,
+  ...rest
+}: Omit<Parameters<typeof Workspace>[0], 'view' | 'onEditing'> & { latest: View }) {
+  const [shown, setShown] = useState(latest);
+  const [editing, setEditing] = useState(false);
+  // My own save brings the next version: it is taken, the saved object stays open in it
+  const [own, setOwn] = useState(false);
+  const newer = latest.version === shown.version ? null : latest;
+  // Adjusted while rendering, not in an effect: the newer version shows in the same render (react.dev, «You might not need an effect»)
+  if (newer && (!editing || own)) {
+    setOwn(false);
+    setShown(newer);
+  }
+
+  return (
+    <>
+      {newer && editing && !own ? (
+        <div className="grid justify-items-start gap-2" data-testid="content-newer">
+          <Notice tone="warning">{t.newer(newer.version)}</Notice>
+          <Button
+            data-testid="content-take-newer"
+            onClick={() => {
+              setShown(newer);
+            }}
+          >
+            {t.takeNewer}
+          </Button>
+        </div>
+      ) : null}
+      <Workspace
+        key={`${rest.seasonId}-${shown.version}`}
+        {...rest}
+        view={shown}
+        onEditing={setEditing}
+        onSaved={(next) => {
+          setOwn(true);
+          onSaved(next);
+        }}
+      />
+    </>
+  );
+}
+
 function Workspace({
   seasonId,
   view,
@@ -90,6 +139,7 @@ function Workspace({
   schemaFailed,
   saved,
   onSaved,
+  onEditing,
 }: {
   seasonId: string;
   view: View;
@@ -97,6 +147,7 @@ function Workspace({
   schemaFailed: boolean;
   saved: { text: string; open: string | null } | null;
   onSaved: (next: { text: string; open: string | null }) => void;
+  onEditing: (editing: boolean) => void;
 }) {
   const desk = useDesk();
   const pack = useMemo(() => packOf(view.pack), [view.pack]);
@@ -117,6 +168,10 @@ function Workspace({
       ? { collection: 'wheels', index: wheel, initial: pack.wheels[wheel] ?? {}, key: 0 }
       : null;
   });
+  const isEditing = editing !== null;
+  useEffect(() => {
+    onEditing(isEditing);
+  }, [isEditing, onEditing]);
   const ids = {
     objects: pack.objects.map((o) => String(o.id)),
     wheels: pack.wheels.map((w) => String(w.id)),

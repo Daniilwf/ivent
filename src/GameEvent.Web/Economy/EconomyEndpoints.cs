@@ -41,7 +41,8 @@ public sealed record PlaceBetRequest(Guid CommandId, Guid OnPlayerId, int Days, 
 /// <summary>
 /// My economy in the season (D-441): coins, the inventory with what each object allows now when <c>features.items</c> is
 /// on (null when off: bets play without items), the shop when <c>features.shop</c> is on, the bets when
-/// <c>features.bets</c> is on. <c>inventoryLimit</c> counts items only (D-406).
+/// <c>features.bets</c> is on. <c>inventoryLimit</c> counts items only (D-406). <c>serverNow</c> — the server's clock when
+/// the view was made: the shop's timer counts on it, not on the device's (S4-4).
 /// </summary>
 public sealed record EconomyView(
     int Coins,
@@ -49,7 +50,8 @@ public sealed record EconomyView(
     // The shop first: the OpenAPI document keeps the first use of a shared enum, and a lot's rarity is never null
     ShopView? Shop,
     BetsView? Bets,
-    IReadOnlyList<InventoryItemView>? Items);
+    IReadOnlyList<InventoryItemView>? Items,
+    DateTimeOffset ServerNow);
 
 /// <summary>
 /// An object I hold: its definition's name and description, what is left of its lifetime, who put it on me. <c>usable</c> —
@@ -314,7 +316,7 @@ public static class EconomyEndpoints
                     [.. r.Options.Select(o => new BetOptionView(o.Days, o.Multiplier))]))]);
         }
 
-        return TypedResults.Ok(new EconomyView(me.Coins, state.Rules.Economy.InventoryLimit, shop, bets, items));
+        return TypedResults.Ok(new EconomyView(me.Coins, state.Rules.Economy.InventoryLimit, shop, bets, items, now));
     }
 
     // An answer in words: a category is its own name; a player, a game and an object are named by their id

@@ -79,6 +79,26 @@ describe('The ruleset schema check', () => {
     ]);
   });
 
+  it('checks the length of a text and the range of a number (S4D-10)', () => {
+    const text: JsonSchema = { type: 'string', minLength: 1, maxLength: 3 };
+    const price: JsonSchema = { type: ['integer', 'null'], minimum: 0, maximum: 9 };
+    expect(checkSchema('ab', text)).toEqual([]);
+    expect(checkSchema('', text, 'name')).toEqual([
+      { kind: 'length', path: 'name', min: 1, max: 3 },
+    ]);
+    expect(checkSchema('abcd', text, 'name')).toEqual([
+      { kind: 'length', path: 'name', min: 1, max: 3 },
+    ]);
+    expect(checkSchema(null, price)).toEqual([]);
+    expect(checkSchema(5, price)).toEqual([]);
+    expect(checkSchema(-5, price, 'price')).toEqual([
+      { kind: 'range', path: 'price', min: 0, max: 9 },
+    ]);
+    expect(checkSchema(10, price, 'price')).toEqual([
+      { kind: 'range', path: 'price', min: 0, max: 9 },
+    ]);
+  });
+
   it('knows a schema-like answer', () => {
     expect(isSchema({ type: 'object' })).toBe(true);
     expect(isSchema(null)).toBe(false);

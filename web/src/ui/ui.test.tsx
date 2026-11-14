@@ -143,6 +143,21 @@ describe('the design system components', () => {
     expect(input).toHaveAccessibleDescription('Нужна ссылка целиком');
   });
 
+  it('a field whose error restates its hint says the error instead (S4D-7)', () => {
+    render(
+      <Field
+        label="Ставка"
+        errorRestatesHint
+        hint="От 1 до 7 монеток"
+        error="Ставка — целое число от 1 до 7."
+      />,
+    );
+    expect(screen.queryByText('От 1 до 7 монеток')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Ставка')).toHaveAccessibleDescription(
+      'Ставка — целое число от 1 до 7.',
+    );
+  });
+
   it('the route bar counts the cells done out of the whole way', () => {
     render(<RouteProgress left={12} total={40} />);
     const bar = screen.getByRole('progressbar', { name: ru.ui.routeProgress });

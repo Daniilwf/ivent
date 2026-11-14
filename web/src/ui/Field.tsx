@@ -1,4 +1,4 @@
-import { ImagePlus, LoaderCircle } from 'lucide-react';
+import { Check, ImagePlus, LoaderCircle } from 'lucide-react';
 import {
   useId,
   type InputHTMLAttributes,
@@ -14,6 +14,7 @@ export function Field({
   label,
   hint,
   error,
+  errorRestatesHint = false,
   announce = true,
   force,
   className,
@@ -22,6 +23,11 @@ export function Field({
   label: string;
   hint?: string;
   error?: string | undefined;
+  /**
+   * The error says the hint's own rule over again («от 1 до 7» and «целое число от 1 до 7»): it takes the hint's place,
+   * so the rule is said once (S4D-7). A hint that says something else (why the field is asked) stays with the error.
+   */
+  errorRestatesHint?: boolean;
   /** false: the error follows the typing (a live check) — it is linked to the field, not announced by itself;
    * the form says the count of errors politely (DESIGN.md, «Формы») */
   announce?: boolean;
@@ -31,21 +37,22 @@ export function Field({
   const id = useId();
   const hintId = `${id}-hint`;
   const errorId = `${id}-error`;
+  const shownHint = error && errorRestatesHint ? undefined : hint;
   return (
     <div className={cx('grid gap-1', className)}>
       <label htmlFor={id} className="text-sm font-bold">
         {label}
       </label>
-      {hint ? (
+      {shownHint ? (
         <span id={hintId} className="text-sm text-ink-soft">
-          {hint}
+          {shownHint}
         </span>
       ) : null}
       <input
         id={id}
         data-force={force}
         aria-invalid={error ? true : undefined}
-        aria-describedby={cx(hint && hintId, error && errorId) || undefined}
+        aria-describedby={cx(shownHint && hintId, error && errorId) || undefined}
         className={cx(
           'min-h-12 w-full min-w-0 rounded-md border-2 bg-card px-3 text-base text-ink transition duration-(--duration-fast) placeholder:text-ink-soft disabled:bg-page disabled:opacity-60',
           'is-focus:outline-3 is-focus:outline-offset-2 is-focus:outline-ink',
@@ -208,6 +215,7 @@ export function ChoiceGroup<T extends string>({
   value,
   onChange,
   disabled = false,
+  checkMark = false,
   force,
   className,
   ...rest
@@ -218,6 +226,8 @@ export function ChoiceGroup<T extends string>({
   value: T;
   onChange: (value: T) => void;
   disabled?: boolean;
+  /** The picked pill wears a check besides its fill (S4D-17): an answer of a sheet, not a filter of a list */
+  checkMark?: boolean;
   /** Styleguide only: forces a state on the picked pill */
   force?: string;
   className?: string;
@@ -246,7 +256,7 @@ export function ChoiceGroup<T extends string>({
               key={option.value}
               data-force={picked ? force : undefined}
               className={cx(
-                'inline-flex min-h-11 cursor-pointer items-center rounded-full border-2 border-ink px-4 text-base font-medium whitespace-nowrap transition duration-(--duration-fast) select-none has-[:focus-visible]:focus-ring',
+                'inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-full border-2 border-ink px-4 text-base font-medium whitespace-nowrap transition duration-(--duration-fast) select-none has-[:focus-visible]:focus-ring',
                 'has-[:disabled]:cursor-default has-[:disabled]:opacity-50',
                 picked ? 'bg-ink text-card' : 'bg-card text-ink is-hover:bg-page',
                 force?.includes('focus') && picked ? 'focus-ring' : undefined,
@@ -262,6 +272,7 @@ export function ChoiceGroup<T extends string>({
                 }}
                 className="sr-only"
               />
+              {checkMark && picked ? <Check size={18} aria-hidden className="-ml-1" /> : null}
               {option.label}
             </label>
           );

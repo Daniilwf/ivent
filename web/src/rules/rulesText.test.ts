@@ -157,11 +157,60 @@ describe('the dice count', () => {
   });
 });
 
+describe('the economy on the rules page (S4-1)', () => {
+  const on = (features: Partial<typeof demoRuleset.features>) =>
+    rulesPage({ ...demoRuleset, features: { ...demoRuleset.features, ...features } });
+
+  it('is not there while the economy mechanics are off', () => {
+    expect(rulesPage(demoRuleset).economy).toEqual([]);
+  });
+
+  it('says the inventory limit and that a debt closes buying, with items on', () => {
+    const page = on({ items: true });
+    expect(page.economy).toContain(t.economy.inventory(5));
+    expect(page.economy).toContain(t.economy.debt);
+    expect(page.economy.join(' ')).not.toMatch(/магазин|Ставк/u);
+  });
+
+  it('gives the shop with its real numbers', () => {
+    const page = on({ items: true, shop: true });
+    expect(page.economy).toContain(
+      'Ролл магазина стоит 5 монеток и даёт 3 личных лота на 15 мин; цена лота — по редкости.',
+    );
+    expect(page.economy).toContain(
+      'Каждый следующий ролл дороже на 5 монеток; цена снова 5 монеток после завершения или дропа прохождения.',
+    );
+  });
+
+  it('gives the bets with the window, the terms, the limits and the coefficients', () => {
+    const page = on({ bets: true });
+    expect(page.economy).toContain(
+      'Ставка — на текущее прохождение другого игрока, в первые 24 ч после его ролла; срок — 1, 3 или 7 дн.',
+    );
+    expect(page.economy).toContain('Не больше 10 монеток за ставку и не больше 3 открытых ставок.');
+    expect(page.economy).toContain(
+      'Если успеет, вернётся ставка × коэффициент по часам игры на день срока: до 1 ч — ×1,2, до 3 ч — ×2, больше — ×3.',
+    );
+    expect(page.economy).toContain(t.economy.betLost);
+  });
+});
+
 describe('the history in words', () => {
   it('names known fields, the finish bonus by place, and an unknown one by its path', () => {
     expect(fieldName('reward.diceCount.max')).toBe('Максимум кубиков');
     expect(fieldName('finish.bonusByOrder[0]')).toBe('Бонус за финиш: 2-й на финише');
-    expect(fieldName('economy.shop.rollCost')).toBe('economy.shop.rollCost');
+    expect(fieldName('effects.maxChainDepth')).toBe('effects.maxChainDepth');
+  });
+
+  it('names the mechanics switched on and the numbers of the economy (S4-1)', () => {
+    expect(fieldName('features.shop')).toBe('Магазин');
+    expect(fieldName('features.bets')).toBe('Ставки');
+    expect(fieldName('features.items')).toBe('Предметы');
+    expect(fieldName('economy.shop.rollCost')).toBe('Цена ролла магазина, монеток');
+    expect(fieldName('bets.maxStake')).toBe('Наибольшая ставка, монеток');
+    expect(fieldName('bets.payoutByHoursPerDay[1].multiplier')).toBe(
+      'Коэффициент ставки, ступень 2',
+    );
   });
 
   it('gives values as numbers, yes and no, known words, and «нет» for none', () => {

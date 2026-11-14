@@ -30,6 +30,7 @@ const order: SectionId[] = [
   'reward',
   'drop',
   'finish',
+  'economy',
   'deadline',
   'history',
 ];
@@ -143,16 +144,18 @@ export function RulesContent({ rules }: { rules: Schemas['RulesView'] }) {
       >
         <h2 className="mb-2 text-sm font-bold">{t.contents}</h2>
         <ul className="grid gap-1">
-          {order.map((id) => (
-            <li key={id}>
-              <a
-                href={`#rules-${id}`}
-                className="inline-flex min-h-11 items-center rounded-md px-2 underline-offset-4 is-hover:underline is-focus:focus-ring"
-              >
-                {t.sections[id]}
-              </a>
-            </li>
-          ))}
+          {order
+            .filter((id) => id !== 'economy' || page.economy.length > 0)
+            .map((id) => (
+              <li key={id}>
+                <a
+                  href={`#rules-${id}`}
+                  className="inline-flex min-h-11 items-center rounded-md px-2 underline-offset-4 is-hover:underline is-focus:focus-ring"
+                >
+                  {t.sections[id]}
+                </a>
+              </li>
+            ))}
         </ul>
       </nav>
 
@@ -215,6 +218,11 @@ export function RulesContent({ rules }: { rules: Schemas['RulesView'] }) {
           ) : null}
           <Lines lines={page.finish} />
         </RulesSection>
+        {page.economy.length > 0 ? (
+          <RulesSection id="economy">
+            <Lines lines={page.economy} />
+          </RulesSection>
+        ) : null}
         <RulesSection id="deadline">
           <p className="flex items-center gap-2 font-bold" data-testid="rules-deadline">
             <CalendarClock size={20} aria-hidden className="shrink-0" />
