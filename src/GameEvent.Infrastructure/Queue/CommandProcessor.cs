@@ -87,6 +87,13 @@ public sealed partial class CommandProcessor(
         try
         {
             var outcome = await ProcessAsync(pending.Envelope, ct);
+
+            // An approved game suggestion is in the pool by the time the admin's approval answers (D-572)
+            if (outcome.IsAccepted && !outcome.IsDuplicate && pending.Envelope.SeasonId != Guid.Empty)
+            {
+                await AddApprovedGamesAsync(pending.Envelope.SeasonId, outcome, ct);
+            }
+
             pending.Completion.TrySetResult(outcome);
 
             // What the command queued for everyone is settled right after it, before the next command (D-537)

@@ -63,6 +63,14 @@ public static class SeasonIntegrity
         Compare("player", fromLog.Players, stored.Players, differences);
         Compare("run", fromLog.Runs, stored.Runs, differences);
         Compare("manualEffect", fromLog.ManualEffects, stored.ManualEffects, differences);
+
+        // The stage 5 mechanics (D-810); duels have no table of their own (D-730)
+        Compare("poll", fromLog.Polls, stored.Polls, differences);
+        Compare("globalEvent", fromLog.GlobalEvents, stored.GlobalEvents, differences);
+        Compare("interaction", fromLog.Interactions, stored.Interactions, differences);
+        Compare("partnerRequest", fromLog.PartnerRequests, stored.PartnerRequests, differences);
+        Compare("weeklyChallenge", fromLog.WeeklyChallenges, stored.WeeklyChallenges, differences);
+        Compare("suggestion", fromLog.Suggestions, stored.Suggestions, differences);
         return differences;
     }
 

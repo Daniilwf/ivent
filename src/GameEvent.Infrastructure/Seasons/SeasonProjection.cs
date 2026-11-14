@@ -17,7 +17,7 @@ namespace GameEvent.Infrastructure.Seasons;
 /// Writes the difference between season states into the projection tables, inside the command's transaction.
 /// Only changed players and runs are touched.
 /// </summary>
-internal static class SeasonProjection
+internal static partial class SeasonProjection
 {
     public static async Task WriteAsync(
         GameEventDbContext db, SeasonState before, SeasonState after, DateTimeOffset now, Guid? authorId, CancellationToken ct)
@@ -45,16 +45,18 @@ internal static class SeasonProjection
                 RulesetVersion = after.RulesetVersion,
                 RulesetJson = JsonSerializer.Serialize(after.Rules, EngineJson.Options),
                 CreatedAt = now,
+                NextTimerAt = NextOfSeason(after),
             });
         }
         else if (before.RulesetVersion != after.RulesetVersion || before.Status != after.Status
-            || before.Deadline != after.Deadline || before.Name != after.Name)
+            || before.Deadline != after.Deadline || before.Name != after.Name || NextOfSeason(before) != NextOfSeason(after))
         {
             var season = await db.Seasons.FindAsync([after.SeasonId], ct)
                 ?? throw new InvalidOperationException($"Season {after.SeasonId} has no projection row.");
             season.Name = after.Name;
             season.Status = after.Status;
             season.Deadline = after.Deadline;
+            season.NextTimerAt = NextOfSeason(after);
             if (season.RulesetVersion != after.RulesetVersion)
             {
                 season.RulesetVersion = after.RulesetVersion;
@@ -216,6 +218,10 @@ internal static class SeasonProjection
             record.Moved = run.Moved;
             record.AfterFinish = run.AfterFinish;
             record.FreeMode = run.FreeMode;
+            record.PartnerId = run.PartnerId;
+            record.CoopJson = run.Coop is null ? null : JsonSerializer.Serialize(run.Coop, EngineJson.Options);
+            record.ConditionsJson = run.Condition is null ? null : JsonSerializer.Serialize(run.Condition, EngineJson.Options);
+            record.ConditionMet = run.Condition?.Met;
 
             if (run.Proof is null && before.Runs.GetValueOrDefault(id)?.Proof is not null && await db.Proofs.FindAsync([id], ct) is { } undoneProof)
             {
@@ -295,7 +301,21 @@ internal static class SeasonProjection
                 Source = effect.Source,
                 RunId = effect.RunId,
                 ObjectId = effect.ObjectId,
+                IrlProofJson = effect.IrlProof is null ? null : JsonSerializer.Serialize(effect.IrlProof, EngineJson.Options),
             });
+        }
+
+        // A pending effect changes by its IRL proof (D-509): submitted, reviewed, taken back by an undo
+        foreach (var (id, effect) in after.ManualEffects.Where(x => before.ManualEffects.TryGetValue(x.Key, out var old) && old != x.Value))
+        {
+            var row = await db.ManualEffects.FindAsync([id], ct)
+                ?? throw new InvalidOperationException($"Manual effect {id} has no projection row.");
+            row.PlayerId = effect.PlayerId;
+            row.DrawEvent = effect.DrawEvent ?? Engine.Rulesets.EventKind.Good;
+            row.Source = effect.Source;
+            row.RunId = effect.RunId;
+            row.ObjectId = effect.ObjectId;
+            row.IrlProofJson = effect.IrlProof is null ? null : JsonSerializer.Serialize(effect.IrlProof, EngineJson.Options);
         }
 
         foreach (var id in before.ManualEffects.Keys.Where(id => !after.ManualEffects.ContainsKey(id)))
@@ -303,7 +323,13 @@ internal static class SeasonProjection
             db.ManualEffects.Remove(await db.ManualEffects.FindAsync([id], ct)
                 ?? throw new InvalidOperationException($"Manual effect {id} has no projection row."));
         }
+
+        await WriteEventsAsync(db, before, after, ct);
     }
+
+    // The season's own timer column (D-727, D-756): what a switched-off mechanic left waiting is not due (D-420)
+    private static DateTimeOffset? NextOfSeason(SeasonState state) =>
+        state.Ruleset is null ? null : Engine.Economy.Timers.NextOfSeason(state);
 
     // Player ids are participation ids (one per season), never user ids: a clash means a bug upstream.
     private static void EnsureSameSeason(Guid stored, Guid current, string what, Guid id)
@@ -335,7 +361,7 @@ internal static class SeasonProjection
         var exclusions = (await db.Exclusions.AsNoTracking().Where(x => playerIds.Contains(x.PlayerId)).ToListAsync(ct))
             .ToLookup(x => x.PlayerId);
 
-        return replayed with
+        var stored = replayed with
         {
             Name = season.Name,
             Status = season.Status,
@@ -395,19 +421,24 @@ internal static class SeasonProjection
                     replayed.Runs.GetValueOrDefault(r.Id)?.CellObjects ?? default,
                     r.DeclaredDifficulty,
 
-                    // The engine's bookkeeping of a run's events: its difficulty's event drawn (D-557) and the check of its
-                    // conditions come from the log, like the cells of its move (columns — 5.16, D-598)
+                    // The engine's bookkeeping of a run's events: its difficulty's event drawn (D-557) comes from the log, like
+                    // the cells of its move; the check of its conditions and the partner are columns (D-598, D-811)
                     DifficultyEventDrawn: replayed.Runs.GetValueOrDefault(r.Id)?.DifficultyEventDrawn ?? false,
-                    Condition: replayed.Runs.GetValueOrDefault(r.Id)?.Condition,
-
-                    // The partner's side of a coop run comes from the log too (the column Run.PartnerId — 5.16)
-                    Coop: replayed.Runs.GetValueOrDefault(r.Id)?.Coop)),
+                    Condition: r.ConditionsJson is null
+                        ? null
+                        : JsonSerializer.Deserialize<RunConditionState>(r.ConditionsJson, EngineJson.Options)! with { Met = r.ConditionMet == true },
+                    Coop: CoopOf(r))),
             ManualEffects = effects.ToImmutableSortedDictionary(
                 x => x.Id,
-                x => new PendingManualEffect(x.Id, x.PlayerId, x.ObjectId is null ? x.DrawEvent : null, x.Source, x.RunId) { ObjectId = x.ObjectId }),
+                x => new PendingManualEffect(x.Id, x.PlayerId, x.ObjectId is null ? x.DrawEvent : null, x.Source, x.RunId)
+                {
+                    ObjectId = x.ObjectId,
+                    IrlProof = x.IrlProofJson is null ? null : JsonSerializer.Deserialize<Engine.Proofs.IrlProofState>(x.IrlProofJson, EngineJson.Options),
+                }),
             Result = result.Count == 0
                 ? null
                 : [.. result.Select(x => new Engine.Ranking.LeaderboardRow(x.PlayerId, x.Place, x.Points, x.CellsToFinish, x.IsFirst, x.Provisional))],
         };
+        return await ReadEventsAsync(db, stored, ct);
     }
 }
