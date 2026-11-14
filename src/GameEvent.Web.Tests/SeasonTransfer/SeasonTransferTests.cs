@@ -5,11 +5,14 @@ using GameEvent.Engine.Seasons;
 using GameEvent.Infrastructure.Accounts;
 using GameEvent.Infrastructure.Database;
 using GameEvent.Infrastructure.EventLog;
+using GameEvent.Infrastructure.Kernel;
+using GameEvent.Infrastructure.Pool;
 using GameEvent.Infrastructure.Queue;
 using GameEvent.Infrastructure.Seasons;
 using GameEvent.Web.Tests.Api;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using static GameEvent.Web.Tests.Queue.EventsTestSupport;
 
 namespace GameEvent.Web.Tests.SeasonTransfer;
 
@@ -258,6 +261,66 @@ public sealed class SeasonTransferTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Votes_and_suggestions_name_this_databases_accounts_and_a_second_vote_stays_one()
+    {
+        // EV40, L4: the vote's and the suggestion's account follow the login into the other database; a spectator who
+        // voted travels with the archive
+        await RulesAsync(_site, r => r with
+        {
+            Features = r.Features with { Items = true, Polls = true, Suggestions = true },
+            Social = r.Social with { SpectatorsCanVote = true },
+        });
+        await _site.SendAsync(new Engine.Polls.StartPoll(Nomination() with { Voters = Engine.Content.PollVoters.Everyone }));
+        var poll = Assert.Single((await StateAsync(_site)).Polls.Values);
+        await _site.SendAsync(new Engine.Polls.CastVote(poll.PollId, _site.Users["vasya"], "Финиш"));
+        await _site.SendAsync(new Engine.Polls.CastVote(poll.PollId, _site.Users["zritel"], "Дроп"));
+        await _site.SendAsync(new Engine.Suggestions.SubmitSuggestion(_site.Players["vasya"], Engine.Suggestions.SuggestionKind.Event, "Ночь хоррора", null));
+
+        // Петя's vote is undone: the undo's snapshot of the poll names Вася's account too
+        var petyasVote = Guid.NewGuid();
+        var bus = _site.Services.GetRequiredService<CommandBus>();
+        Assert.True((await bus.SendAsync(new CommandEnvelope(petyasVote, SiteFactory.SeasonId, new Engine.Polls.CastVote(poll.PollId, _site.Users["petya"], "Реролл"), AuthorId: null), Ct)).IsAccepted);
+        Assert.True((await bus.SendAsync(new CommandEnvelope(Guid.NewGuid(), SiteFactory.SeasonId, new Engine.Undo.UndoCommand(petyasVote, "Ошибка"), AuthorId: null), Ct)).IsAccepted);
+        var archive = await ExportAsync();
+        Assert.Contains(archive.Users, u => u.Id == _site.Users["zritel"]);
+
+        await using var other = OpenOther();
+        var localVasya = new UserRecord
+        {
+            Id = Guid.NewGuid(),
+            Login = "vasya",
+            NormalizedLogin = "vasya",
+            Name = "Вася здесь",
+            PasswordHash = "x",
+            SecurityStamp = "x",
+            Role = Role.Player,
+            CreatedAt = _site.Clock.UtcNow,
+        };
+        other.Users.Add(localVasya);
+        await other.SaveChangesAsync(Ct);
+
+        var result = await Infrastructure.Seasons.SeasonTransfer.ImportAsync(other, archive, _site.Clock.UtcNow, ct: Ct);
+
+        Assert.True(result.Integrity.IsIntact, string.Join("; ", result.Integrity.Differences));
+        var local = (await other.Users.Select(u => u.Id).ToListAsync(Ct)).ToHashSet();
+        var (imported, _) = await EventLogReader.ReplaySeasonAsync(other, SiteFactory.SeasonId, Ct);
+        var votes = imported.Polls[poll.PollId].Votes;
+        Assert.Equal(2, votes.Count);
+        Assert.All(votes, v => Assert.Contains(v.UserId, local));
+        Assert.Contains(votes, v => v.UserId == localVasya.Id);
+        Assert.Equal(localVasya.Id, Assert.Single(imported.Suggestions.Values).UserId);
+        var voteUsers = (await RowsAsync(other, "SELECT upper(UserId) FROM Vote")).Select(r => (string)r[0]!).ToList();
+        Assert.Contains(localVasya.Id.ToString().ToUpperInvariant(), voteUsers);
+        Assert.Equal(localVasya.Id.ToString().ToUpperInvariant(), await ScalarAsync(other, "SELECT upper(UserId) FROM Suggestion"));
+
+        // The same user votes again in the open poll: the vote in force changes, a second one is not cast
+        var context = new EngineContext(_site.Clock, new CryptoRandomSource(), new GuidV7Ids(), await PoolReader.LoadAsync(other, Ct));
+        var again = SeasonEngine.Execute(imported, new Engine.Polls.CastVote(poll.PollId, localVasya.Id, "Реролл"), context);
+        Assert.DoesNotContain(again.Events, e => e is Engine.Polls.VoteCast);
+        Assert.Equal(2, again.State.Polls[poll.PollId].Votes.Count);
+    }
+
+    [Fact]
     public async Task The_log_is_copied_as_stored_except_the_events_naming_accounts()
     {
         await PlayAsync();
@@ -270,7 +333,7 @@ public sealed class SeasonTransferTests : IAsyncLifetime
         foreach (var (original, copy) in archive.Events.Zip(copied))
         {
             Assert.Equal((original.Sequence, original.CommandId, original.CommandType, original.Type, original.OccurredAt), (copy.Sequence, copy.CommandId, copy.CommandType, copy.Type, copy.OccurredAt));
-            if (original.Type is not ("season-player-added" or "command-undone"))
+            if (original.Type is not ("season-player-added" or "command-undone" or "vote-cast" or "vote-changed" or "suggestion-submitted"))
             {
                 Assert.Equal((original.Version, original.Data), (copy.Version, copy.Data));
             }

@@ -66,6 +66,64 @@ public sealed class EventsQueueTests : IAsyncLifetime
         await AssertIntactAsync(_site);
     }
 
+    [Fact]
+    public async Task A_switched_off_mechanic_leaves_nothing_due_and_switched_on_again_its_term_comes_back()
+    {
+        // D-420, D-812: polls off mid-season — the open poll's close is not due; on again — it is, and closes once
+        await PollsOnAsync(_site);
+        await _site.SendAsync(new StartPoll(Nomination(hours: 24)));
+        var poll = Assert.Single((await StateAsync(_site)).Polls.Values);
+
+        await RulesAsync(_site, Flags(f => f with { Polls = false }));
+        Assert.Null(await SeasonTimerAsync());
+        _site.Clock.UtcNow = poll.ClosesAt.AddMinutes(1);
+        await TickAsync(_site);
+        Assert.Equal(0, await CountAsync(_site, "poll-closed"));
+        await AssertIntactAsync(_site);
+
+        await RulesAsync(_site, Flags(f => f with { Polls = true }));
+        Assert.Equal(poll.ClosesAt, await SeasonTimerAsync());
+        await TickAsync(_site);
+        await TickAsync(_site);
+
+        Assert.Equal(1, await CountAsync(_site, "poll-closed"));
+        Assert.Null(await SeasonTimerAsync());
+        await AssertIntactAsync(_site);
+    }
+
+    [Fact]
+    public async Task A_seasons_timer_column_changed_behind_the_queue_is_a_difference()
+    {
+        // EV36, L4: a stale column would leave the poll open past its term, so the integrity check compares it
+        await PollsOnAsync(_site);
+        await _site.SendAsync(new StartPoll(Nomination(hours: 24)));
+        await AssertIntactAsync(_site);
+
+        await using (var db = _site.NewDb())
+        {
+            Assert.Equal(1, await ExecuteAsync(db, "UPDATE Season SET NextTimerAt = NULL"));
+        }
+
+        Assert.Contains("season.nextTimerAt", (await IntegrityAsync(_site)).Differences);
+    }
+
+    [Fact]
+    public async Task A_players_timer_column_changed_behind_the_queue_is_a_difference()
+    {
+        await CoopOnAsync(_site);
+        var (vasya, petya) = (_site.Players["vasya"], _site.Players["petya"]);
+        await PlayingAsync(_site, vasya);
+        await _site.SendAsync(new InviteToCoop(vasya, petya));
+        await AssertIntactAsync(_site);
+
+        await using (var db = _site.NewDb())
+        {
+            Assert.Equal(1, await ExecuteAsync(db, "UPDATE SeasonPlayer SET NextTimerAt = NULL WHERE upper(Id) = upper($p0)", vasya.ToString()));
+        }
+
+        Assert.Contains($"player {vasya}: nextTimerAt", (await IntegrityAsync(_site)).Differences);
+    }
+
     // ---- The scheduler: polls by their term (D-727) ----
 
     [Fact]

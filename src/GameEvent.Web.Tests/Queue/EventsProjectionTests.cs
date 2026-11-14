@@ -29,7 +29,7 @@ namespace GameEvent.Web.Tests.Queue;
 /// </summary>
 public sealed class EventsProjectionTests : IAsyncLifetime
 {
-    private readonly SiteFactory _site = new();
+    private SiteFactory _site = new();
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
@@ -366,6 +366,197 @@ public sealed class EventsProjectionTests : IAsyncLifetime
         Assert.Equal(SuggestionStatus.Approved, (await StateAsync(_site)).Suggestions[suggestion.SuggestionId].Status);
     }
 
+    [Fact]
+    public async Task A_repeated_approval_brings_a_lost_game_into_the_pool_once()
+    {
+        // D-572, D-817: the approval was committed but its game did not reach the pool (the service stopped in between);
+        // the client repeats the same command id and the pool's command, whose id comes from the suggestion, runs now
+        var approval = await ApprovedSignalisAsync();
+        await LoseSignalisAsync();
+
+        await SendWithIdAsync(approval.Command, approval.Id, duplicate: true);
+        await SendWithIdAsync(approval.Command, approval.Id, duplicate: true);
+
+        await using var db = _site.NewDb();
+        Assert.Equal(1, await db.Games.CountAsync(g => g.Title == "Signalis", Ct));
+        Assert.Equal(1, await db.Events.CountAsync(e => e.Type == "game-added" && e.Data.Contains("Signalis"), Ct));
+    }
+
+    [Fact]
+    public async Task A_repeated_approval_after_a_restart_brings_a_lost_game_into_the_pool_once()
+    {
+        // D-817: the queue's cache of the season is gone; the state comes from the log, the game is not skipped silently
+        var approval = await ApprovedSignalisAsync();
+        await LoseSignalisAsync();
+        var next = _site.Restarted();
+        await _site.DisposeAsync();
+        _site = next;
+
+        await SendWithIdAsync(approval.Command, approval.Id, duplicate: true);
+
+        await using var db = _site.NewDb();
+        Assert.Equal(1, await db.Games.CountAsync(g => g.Title == "Signalis", Ct));
+    }
+
+    // ---- Undo reaches the new tables (D-104, L4) ----
+
+    [Fact]
+    public async Task Undoing_a_polls_close_votes_and_start_returns_and_removes_its_rows()
+    {
+        await PollsOnAsync(_site);
+        var start = await SendWithIdAsync(new StartPoll(Nomination()));
+        var poll = Assert.Single((await StateAsync(_site)).Polls.Values);
+        var first = await SendWithIdAsync(new CastVote(poll.PollId, _site.Users["vasya"], "Финиш"));
+        var second = await SendWithIdAsync(new CastVote(poll.PollId, _site.Users["petya"], "Дроп"));
+        var close = await SendWithIdAsync(new ClosePoll(poll.PollId));
+
+        await UndoAsync(close);
+        await using (var db = _site.NewDb())
+        {
+            Assert.Equal("Open", await ScalarAsync(db, "SELECT Status FROM Poll"));
+        }
+
+        await AssertIntactAsync(_site);
+        await UndoAsync(second);
+        await using (var db = _site.NewDb())
+        {
+            Assert.Equal("Финиш", await ScalarAsync(db, "SELECT OptionId FROM Vote"));
+            Assert.Equal(1L, await ScalarAsync(db, "SELECT count(*) FROM Vote"));
+        }
+
+        await AssertIntactAsync(_site);
+        await UndoAsync(first);
+        await UndoAsync(start);
+        await using (var db = _site.NewDb())
+        {
+            Assert.Equal(0L, await ScalarAsync(db, "SELECT count(*) FROM Vote"));
+            Assert.Equal(0L, await ScalarAsync(db, "SELECT count(*) FROM PollOption"));
+            Assert.Equal(0L, await ScalarAsync(db, "SELECT count(*) FROM Poll"));
+        }
+
+        await AssertIntactAsync(_site);
+    }
+
+    [Fact]
+    public async Task Undoing_a_global_events_launch_removes_its_row()
+    {
+        await GlobalEventsOnAsync(_site);
+        var launch = await SendWithIdAsync(new LaunchGlobalEvent(CoinRain.Id, DurationHours: 24));
+
+        // The coins it rained for everyone are a later command of their own (D-537), settled after the launch answered: the
+        // undo names it, it goes first
+        var bus = _site.Services.GetRequiredService<CommandBus>();
+        var refused = await bus.SendAsync(new CommandEnvelope(Guid.NewGuid(), SiteFactory.SeasonId, new Engine.Undo.UndoCommand(launch, "Ошибка"), AuthorId: null), Ct);
+        Assert.Equal(Engine.Kernel.RejectionCodes.UndoDependents, refused.Rejection?.Code);
+        foreach (var later in refused.Rejection!.Related.AsEnumerable().Reverse())
+        {
+            await UndoAsync(later);
+        }
+
+        await UndoAsync(launch);
+
+        await using (var db = _site.NewDb())
+        {
+            Assert.Equal(0L, await ScalarAsync(db, "SELECT count(*) FROM GlobalEvent"));
+        }
+
+        await AssertIntactAsync(_site);
+    }
+
+    [Fact]
+    public async Task Undoing_an_accepted_coop_clears_the_runs_partner_and_undoing_the_invitation_removes_it()
+    {
+        await CoopOnAsync(_site);
+        var (vasya, petya) = (_site.Players["vasya"], _site.Players["petya"]);
+        await PlayingAsync(_site, vasya);
+        var invite = await SendWithIdAsync(new InviteToCoop(vasya, petya));
+        var invitation = Assert.Single((await StateAsync(_site)).Interactions.Values);
+        var accept = await SendWithIdAsync(new AnswerInvitation(petya, invitation.InteractionId, Accept: true));
+
+        await UndoAsync(accept);
+        await using (var db = _site.NewDb())
+        {
+            Assert.Equal(0L, await ScalarAsync(db, "SELECT count(*) FROM Run WHERE PartnerId IS NOT NULL"));
+            Assert.Equal("Pending", await ScalarAsync(db, "SELECT Status FROM Interaction"));
+        }
+
+        await AssertIntactAsync(_site);
+        await UndoAsync(invite);
+        await using (var db = _site.NewDb())
+        {
+            Assert.Equal(0L, await ScalarAsync(db, "SELECT count(*) FROM Interaction"));
+        }
+
+        await AssertIntactAsync(_site);
+    }
+
+    [Fact]
+    public async Task Undoing_a_partner_request_removes_its_row()
+    {
+        await CoopOnAsync(_site, partnerBoard: true);
+        var vasya = _site.Players["vasya"];
+        await PlayingAsync(_site, vasya);
+        var post = await SendWithIdAsync(new PostPartnerRequest(vasya));
+
+        await UndoAsync(post);
+
+        await using (var db = _site.NewDb())
+        {
+            Assert.Equal(0L, await ScalarAsync(db, "SELECT count(*) FROM PartnerRequest"));
+        }
+
+        await AssertIntactAsync(_site);
+    }
+
+    [Fact]
+    public async Task Undoing_a_weekly_challenge_without_completions_removes_its_row()
+    {
+        await RulesAsync(_site, Flags(f => f with { WeeklyChallenge = true }));
+        var week = new WeeklyChallengeDefinition
+        {
+            Id = "hard-week",
+            Name = "Неделя харда",
+            Description = "Пройди на сложной.",
+            Condition = new ConditionSpec { DifficultyAtLeast = Engine.Runs.Difficulty.Hard },
+            Reward = new RewardSpec { Coins = 5 },
+            Check = Engine.Content.ChallengeCheck.Auto,
+        };
+        var set = await SendWithIdAsync(new SetWeeklyChallenge(week, _site.Clock.UtcNow));
+
+        await UndoAsync(set);
+
+        await using (var db = _site.NewDb())
+        {
+            Assert.Equal(0L, await ScalarAsync(db, "SELECT count(*) FROM WeeklyChallenge"));
+        }
+
+        await AssertIntactAsync(_site);
+    }
+
+    [Fact]
+    public async Task Undoing_a_suggestions_review_returns_it_pending_and_undoing_the_submission_removes_it()
+    {
+        await RulesAsync(_site, Flags(f => f with { Suggestions = true }));
+        var submit = await SendWithIdAsync(new SubmitSuggestion(_site.Players["vasya"], SuggestionKind.Event, "Ивент «Ночь хоррора»", null));
+        var suggestion = Assert.Single((await StateAsync(_site)).Suggestions.Values);
+        var review = await SendWithIdAsync(new ReviewSuggestion(suggestion.SuggestionId, Approve: false, "Уже есть"));
+
+        await UndoAsync(review);
+        await using (var db = _site.NewDb())
+        {
+            Assert.Equal("Pending", await ScalarAsync(db, "SELECT Status FROM Suggestion"));
+        }
+
+        await AssertIntactAsync(_site);
+        await UndoAsync(submit);
+        await using (var db = _site.NewDb())
+        {
+            Assert.Equal(0L, await ScalarAsync(db, "SELECT count(*) FROM Suggestion"));
+        }
+
+        await AssertIntactAsync(_site);
+    }
+
     // ---- The run's conditions ----
 
     [Fact]
@@ -495,6 +686,40 @@ public sealed class EventsProjectionTests : IAsyncLifetime
     }
 
     // ---- Helpers ----
+
+    private async Task<Guid> SendWithIdAsync(Engine.Kernel.ICommand command, Guid? id = null, bool duplicate = false)
+    {
+        var commandId = id ?? Guid.NewGuid();
+        var outcome = await _site.Services.GetRequiredService<CommandBus>().SendAsync(new CommandEnvelope(commandId, SiteFactory.SeasonId, command, AuthorId: null), Ct);
+        Assert.True(outcome.IsAccepted, outcome.Rejection?.ToString());
+        Assert.Equal(duplicate, outcome.IsDuplicate);
+        return commandId;
+    }
+
+    private Task<Guid> UndoAsync(Guid commandId) => SendWithIdAsync(new Engine.Undo.UndoCommand(commandId, "Ошибка"));
+
+    /// <summary>Вася suggests «Signalis» and the admin approves it by a known command id: the game is in the pool.</summary>
+    private async Task<(Guid Id, ReviewSuggestion Command)> ApprovedSignalisAsync()
+    {
+        await RulesAsync(_site, Flags(f => f with { Suggestions = true }));
+        var card = new GameCard("Signalis", ["Horror"], 9m, 2022, null, null, null, IsCoop: false);
+        await _site.SendAsync(new SubmitSuggestion(_site.Players["vasya"], SuggestionKind.Game, "Классный сурвайвал", card));
+        var suggestion = Assert.Single((await StateAsync(_site)).Suggestions.Values);
+        var command = new ReviewSuggestion(suggestion.SuggestionId, Approve: true, null);
+        var id = await SendWithIdAsync(command);
+        await using var db = _site.NewDb();
+        Assert.Equal(1, await db.Games.CountAsync(g => g.Title == "Signalis", Ct));
+        return (id, command);
+    }
+
+    /// <summary>The state of a stop between the approval's commit and the pool's command: neither its event nor its row.</summary>
+    private async Task LoseSignalisAsync()
+    {
+        await using var db = _site.NewDb();
+        Assert.Equal(1, await db.Events.Where(e => e.Type == "game-added" && e.Data.Contains("Signalis")).ExecuteDeleteAsync(Ct));
+        Assert.Equal(1, await db.Games.Where(g => g.Title == "Signalis").ExecuteDeleteAsync(Ct));
+    }
+
 
     /// <summary>
     /// Events on with an IRL event (<c>manual</c>, <c>proof: media</c>) as the only one of the good deck; Вася uses a «fortune»
