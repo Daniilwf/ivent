@@ -11,8 +11,9 @@ namespace GameEvent.Engine.Tests.Coop;
 
 /// <summary>
 /// Findings of the review of task 5.11 (D-741): the term of a request is due on its author's timer; a response no accept
-/// could take is refused at once — the run ended or took a partner while the board was off, the author is inactive or became
-/// the first finisher; a request past its term closes as timed out whatever closes it first.
+/// could take is refused at once — the author is inactive or became the first finisher; a request whose run ended or took a
+/// partner while the board was off is closed all the same (D-743); a request past its term closes as timed out whatever
+/// closes it first.
 /// </summary>
 public class PartnerBoardReviewTests
 {
@@ -38,9 +39,10 @@ public class PartnerBoardReviewTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public void A_response_to_a_request_whose_run_ended_or_took_a_partner_while_the_board_was_off_is_refused(bool ended)
+    public void A_request_whose_run_ended_or_took_a_partner_while_the_board_was_off_is_closed_and_takes_no_response(bool ended)
     {
-        // D-420: with the board off nothing closes the request; switched back on, a response checks the run again
+        // D-743, decided by the owner 2026-11-14: the board off only refuses new posts and responses — the end of the run and
+        // a coop still close the request (was: nothing closed it while the board was off, D-420)
         var s = PartnerBoardSteps.Board();
         s.PlayTitle("Вася", CoopGame);
         var request = s.Post("Вася");
@@ -55,10 +57,10 @@ public class PartnerBoardReviewTests
             s.Accept("Вася", response);
         }
 
-        Assert.Equal(PartnerRequestStatus.Open, s.Request(request).Status);
+        Assert.Equal(PartnerRequestStatus.Closed, s.Request(request).Status);
         s.WithRuleset(r => r with { Features = r.Features with { PartnerBoard = true } });
 
-        s.Rejects(new RespondToPartnerRequest(s.PlayerId("Петя"), request), ended ? RejectionCodes.CoopRunNotActive : RejectionCodes.CoopAlreadyJoined);
+        s.Rejects(new RespondToPartnerRequest(s.PlayerId("Петя"), request), RejectionCodes.PartnerRequestNotOpen);
     }
 
     [Fact]

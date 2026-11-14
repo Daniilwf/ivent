@@ -157,6 +157,33 @@ public class DuelReviewTests
         ScenarioAssert.RejectsWithoutChanges(s, x => x.Answer("Петя", waiting, accept: true), RejectionCodes.FeatureDisabled);
     }
 
+    [Fact]
+    public void A_coop_completion_wins_a_duel_for_the_roller_only()
+    {
+        // D-731, confirmed by the owner 2026-11-14 as the exception to D-716: the coop completion is the partner's own run
+        // everywhere else, but a duel is won only by the roller's completion. Вася races Маша, Петя races Коля; then Вася
+        // plays the coop «Silent Hill» with Петя and completes it
+        var s = Both().MarkCoop("Silent Hill");
+        var vasyasDuel = s.StartDuel("Вася", "Маша");
+        var petyasDuel = s.StartDuel("Петя", "Коля");
+        s.Advance(TimeSpan.FromMinutes(1));
+        var run = s.Play("Вася", "Silent Hill");
+        s.Act(new InviteToCoop(s.PlayerId("Вася"), s.PlayerId("Петя")));
+        ScenarioAssert.Accepted(s);
+        var invitation = Assert.Single(s.LastEvents<InteractionCreated>()).Interaction.InteractionId;
+        s.Act(new AnswerInvitation(s.PlayerId("Петя"), invitation, Accept: true));
+        ScenarioAssert.Accepted(s);
+        s.Advance(TimeSpan.FromHours(2));
+
+        s.CompleteActive("Вася");
+
+        ScenarioAssert.Accepted(s);
+        var settled = Assert.Single(s.LastEvents<DuelSettled>());
+        Assert.Equal((vasyasDuel, DuelStatus.Won, s.PlayerId("Вася"), run), (settled.DuelId, settled.Status, settled.WinnerId, settled.RunId));
+        Assert.Equal(DuelStatus.Active, s.Duel(petyasDuel).Status);
+        Assert.DoesNotContain(s.DuelCoins(), c => c.PlayerId == s.PlayerId("Петя"));
+    }
+
     // ---- The first finisher after a revoke of the first finish (D-734, EV42) ----
 
     [Fact]

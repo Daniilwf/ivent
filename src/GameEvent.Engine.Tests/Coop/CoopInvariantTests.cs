@@ -18,7 +18,8 @@ namespace GameEvent.Engine.Tests.Coop;
 /// hours corrections, undos, timers and the inactive flag among four players on a short map with coop games. After every
 /// command: the log replays to the state (1), points and coins are the sum of their changes (2), one run per game and the
 /// partner without a run of his own (4), and the coop shares add up to the throw and its coins (D-521) — at the split and
-/// after every correction, per player.
+/// after every correction, per player. With the flag switched off nobody starts a coop and a coop in progress is still
+/// split (D-715); a split coop completion counts in the completed runs of both (D-716).
 /// </summary>
 public class CoopInvariantTests
 {
@@ -127,7 +128,6 @@ public class CoopInvariantTests
     private static void Check(Scenario s, ICommand command, SeasonState before)
     {
         _ = command;
-        _ = before;
         var state = s.State;
 
         // 1: the log replays to the state
@@ -156,6 +156,36 @@ public class CoopInvariantTests
         {
             Assert.NotEqual(run.PlayerId, run.PartnerId);
             Assert.True(s.PoolGame(run.GameId).IsCoop, "A partner joined a run of a game that is not coop.");
+        }
+
+        if (s.Last.IsAccepted)
+        {
+            // D-715 (decided by the owner 2026-11-14): with the flag off nobody starts a new coop — no invitation is sent and
+            // none is accepted…
+            if (!before.Rules.Features.Coop)
+            {
+                Assert.Empty(s.LastEvents<CoopJoined>());
+                Assert.DoesNotContain(s.LastEvents<InteractionCreated>(), c => c.Interaction.Kind == InteractionKind.Coop);
+            }
+
+            // …and a coop in progress goes on as coop to its end whatever the flag: its completion is split, or ends the coop
+            // for a first finisher (D-713)
+            foreach (var completed in s.LastEvents<RunCompleted>().Where(c => before.Runs[c.RunId].Coop is not null))
+            {
+                Assert.True(
+                    s.LastEvents<CoopRewardSplit>().Any(x => x.RunId == completed.RunId) || s.LastEvents<CoopLeft>().Any(x => x.RunId == completed.RunId),
+                    $"The coop run {completed.RunId} was completed without a split (coop {(before.Rules.Features.Coop ? "on" : "off")}).");
+            }
+        }
+
+        // D-716 (decided by the owner 2026-11-14): a split coop completion is the partner's own run too — it counts in the
+        // completed runs of both (the «прохождения» tiebreaker); a reject takes it from both
+        var entries = Engine.Ranking.Leaderboard.Entries(state).ToDictionary(e => e.PlayerId);
+        foreach (var player in state.Players.Values)
+        {
+            var expected = state.Runs.Values.Count(r => r.Status == RunStatus.Completed
+                && (r.PlayerId == player.PlayerId || (r.Coop is { Shares: not null } coop && coop.PlayerId == player.PlayerId)));
+            Assert.Equal(expected, entries[player.PlayerId].CompletedRuns);
         }
 
         // The shares add up to the throw and its coins (D-521, EV46): at the split…

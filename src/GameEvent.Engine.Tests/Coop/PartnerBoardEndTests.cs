@@ -14,8 +14,9 @@ namespace GameEvent.Engine.Tests.Coop;
 /// with it (EV32, EV35, EV37, EV38; D-420, D-516, D-524, D-712, D-740): the end of its run (completion, drop, tech reroll)
 /// closes it with <see cref="PartnerRequestCloseReason.RunEnded"/> together with the run's pending responses; the season
 /// going to «Подведение итогов» closes it with <see cref="PartnerRequestCloseReason.Deadline"/>; past the deadline nobody
-/// posts or responds; with <c>features.partnerBoard</c> off every board command is refused and an open request waits
-/// without timing out; an accepted response holds the undo of the response. Scenarios S5.11-05 (run end), -06, -07, -09.
+/// posts or responds; with <c>features.partnerBoard</c> off every board command is refused and an open request does not
+/// time out, but the end of its run and a coop still close it (D-743); an accepted response holds the undo of the
+/// response, the undo of the author's close brings back the responses it cancelled (D-742). Scenarios S5.11-05 (run end), -06, -07, -09.
 /// </summary>
 public class PartnerBoardEndTests
 {
@@ -174,6 +175,77 @@ public class PartnerBoardEndTests
         Assert.Equal(PartnerRequestStatus.Open, s.Request(request).Status);
     }
 
+    [Theory]
+    [InlineData("complete")]
+    [InlineData("drop")]
+    [InlineData("techReroll")]
+    public void With_the_board_switched_off_the_end_of_the_run_still_closes_its_request_and_burns_its_responses(string end)
+    {
+        // D-743, decided by the owner 2026-11-14: the flag off refuses only new posts and responses
+        var s = PartnerBoardSteps.Board();
+        s.PlayTitle("Вася", CoopGame);
+        var request = s.Post("Вася");
+        var response = s.Respond("Петя", request);
+        s.WithRuleset(r => r with { Features = r.Features with { PartnerBoard = false } });
+        var now = s.Clock.UtcNow;
+
+        switch (end)
+        {
+            case "complete":
+                s.NextRandom(1, 1).Complete("Вася");
+                break;
+            case "drop":
+                s.NextRandom(1, 1).Act(new DropRun(s.PlayerId("Вася")));
+                break;
+            default:
+                s.Act(new TechReroll(s.PlayerId("Вася"), TechRerollReason.DoesNotLaunch, null));
+                break;
+        }
+
+        ScenarioAssert.Accepted(s);
+        Assert.Equal(
+            new PartnerRequestClosed(request, PartnerRequestCloseReason.RunEnded, now),
+            Assert.Single(s.LastEvents<PartnerRequestClosed>()));
+        Assert.Equal(InteractionExpiry.RunEnded, Assert.Single(s.LastEvents<InteractionExpired>(), e => e.InteractionId == response).Reason);
+        Assert.Equal(PartnerRequestStatus.Closed, s.Request(request).Status);
+    }
+
+    [Fact]
+    public void With_the_board_switched_off_a_coop_still_closes_the_request_and_supersedes_the_other_responses()
+    {
+        // D-743: accepting a response is a coop answer (coop is on), and the coop closes the request as with the board on
+        var s = PartnerBoardSteps.Board();
+        var run = s.PlayTitle("Вася", CoopGame);
+        var request = s.Post("Вася");
+        var fromPetya = s.Respond("Петя", request);
+        var fromMasha = s.Respond("Маша", request);
+        s.WithRuleset(r => r with { Features = r.Features with { PartnerBoard = false } });
+        var now = s.Clock.UtcNow;
+
+        s.Accept("Вася", fromMasha);
+
+        Assert.Equal(s.PlayerId("Маша"), s.State.Runs[run].PartnerId);
+        Assert.Equal(new PartnerRequestClosed(request, PartnerRequestCloseReason.Coop, now), Assert.Single(s.LastEvents<PartnerRequestClosed>()));
+        Assert.Equal(InteractionExpiry.Superseded, Assert.Single(s.LastEvents<InteractionExpired>(), e => e.InteractionId == fromPetya).Reason);
+        Assert.Equal(PartnerRequestStatus.Closed, s.Request(request).Status);
+    }
+
+    [Fact]
+    public void With_the_board_switched_off_a_direct_invitation_accepted_closes_the_request_too()
+    {
+        var s = PartnerBoardSteps.Board();
+        s.PlayTitle("Вася", CoopGame);
+        var request = s.Post("Вася");
+        var response = s.Respond("Петя", request);
+        var direct = s.Invite("Вася", "Маша");
+        s.WithRuleset(r => r with { Features = r.Features with { PartnerBoard = false } });
+
+        s.Accept("Маша", direct);
+
+        Assert.Equal(PartnerRequestCloseReason.Coop, Assert.Single(s.LastEvents<PartnerRequestClosed>()).Reason);
+        Assert.Equal(InteractionStatus.Expired, s.Invitation(response).Status);
+    }
+
     [Fact]
     public void Switched_back_on_a_request_past_its_term_closes_by_the_first_timer()
     {
@@ -305,5 +377,27 @@ public class PartnerBoardEndTests
         Assert.Equal(Comparable(before), Comparable(s.State));
         Assert.Equal(PartnerRequestStatus.Open, s.Request(request).Status);
         s.Respond("Петя", request);
+    }
+
+    [Fact]
+    public void The_undo_of_the_authors_close_brings_back_the_responses_it_cancelled()
+    {
+        // D-742 with invariant 12: the close cancelled the pending responses, its undo returns them to pending
+        var s = PartnerBoardSteps.Board();
+        s.PlayTitle("Вася", CoopGame);
+        var request = s.Post("Вася");
+        var response = s.Respond("Петя", request);
+        var before = s.State;
+        s.Act(new ClosePartnerRequest(s.PlayerId("Вася"), request));
+        ScenarioAssert.Accepted(s);
+        Assert.Equal(InteractionStatus.Expired, s.Invitation(response).Status);
+        var close = s.LastCommandId;
+
+        s.Act(new UndoCommand(close, "Ошибка админа"));
+
+        ScenarioAssert.Accepted(s);
+        Assert.Equal(Comparable(before), Comparable(s.State));
+        Assert.Equal(InteractionStatus.Pending, s.Invitation(response).Status);
+        s.Accept("Вася", response);
     }
 }

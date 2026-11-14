@@ -779,9 +779,14 @@ public partial class PlayerAdminInvariantTests
     {
         CheckInvariants(s, command, before, logLengthBefore);
 
+        // D-691 (approved by the owner 2026-11-14): below the finishes, the runs of a player whose roll the limit of unchecked
+        // runs holds (D-662, the reference count UncheckedRuns) come before the others' runs; inside the finishes only time
+        // decides (D-690)
+        var limit = s.State.Rules.Season.MaxUncheckedRuns;
         var expected = s.State.Runs.Values
             .Where(r => r.Status == RunStatus.Completed && r.Proof?.Status is null or ProofStatus.Pending)
             .OrderByDescending(r => IsUpToFinish(s.State, r)) // Q-3: every run up to a standing finish goes on top
+            .ThenByDescending(r => !IsUpToFinish(s.State, r) && limit is { } max && UncheckedRuns(s.State, r.PlayerId) >= max)
             .ThenBy(r => r.CompletedAt)
             .ThenBy(r => r.RunId)
             .Select(r => r.RunId);
