@@ -32,6 +32,9 @@ internal sealed class SiteFactory : WebApplicationFactory<Program>
     private readonly int _loginAttemptsPerMinute;
     private readonly string _environment;
 
+    /// <summary>Set once a <see cref="Restarted"/> site took this one's folder: the last one deletes it.</summary>
+    private bool _handedOver;
+
     public SiteFactory() : this(loginAttemptsPerMinute: 1000)
     {
     }
@@ -47,6 +50,38 @@ internal sealed class SiteFactory : WebApplicationFactory<Program>
 
         // Migrating costs about as much as a whole test: the schema is migrated once per test run and copied
         File.Copy(s_template.Value, file);
+    }
+
+    /// <summary>
+    /// The same site after a restart (D3): a new host — its own queue, caches and scheduler — over this site's database
+    /// and files, by the same clocks (they stand for the server's time, which goes on while the site is down). Dispose
+    /// this site first: the queue has one consumer at a time.
+    /// </summary>
+    public SiteFactory Restarted()
+    {
+        _handedOver = true;
+        return new SiteFactory(this);
+    }
+
+    private SiteFactory(SiteFactory before)
+    {
+        _directory = before._directory;
+        _loginAttemptsPerMinute = before._loginAttemptsPerMinute;
+        _environment = before._environment;
+        FrontendPath = before.FrontendPath;
+        ConnectionString = before.ConnectionString;
+        Random = before.Random;
+        Clock = before.Clock;
+        Time = before.Time;
+        foreach (var (login, id) in before.Users)
+        {
+            Users[login] = id;
+        }
+
+        foreach (var (login, id) in before.Players)
+        {
+            Players[login] = id;
+        }
     }
 
     /// <summary>A database migrated once for the whole test run; every site starts from a copy of it.</summary>
@@ -221,6 +256,11 @@ internal sealed class SiteFactory : WebApplicationFactory<Program>
     {
         base.Dispose(disposing);
         Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+        if (_handedOver)
+        {
+            return;
+        }
+
         try
         {
             Directory.Delete(_directory, recursive: true);

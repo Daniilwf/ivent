@@ -28,8 +28,9 @@ RUN dotnet publish src/GameEvent.Web/GameEvent.Web.csproj -c Release --no-restor
 
 # ---- Runtime ----
 FROM mcr.microsoft.com/dotnet/aspnet:10.0@sha256:bfd912c83295ce66d4b706ebb8541b9f14259b0e76fbb88b2751f58ce2399d2e AS runtime
-# The release tag (J4, D-201): the site reports it, a page that saw another one offers «Что нового»
-ARG VERSION=dev
+# The release tag (J4, D-201): the site reports it, a page that saw another one offers «Что нового». Without
+# --build-arg VERSION=<tag> it stays empty and the site reports its assembly's version (D-771)
+ARG VERSION=
 WORKDIR /app
 COPY --from=build /app ./
 COPY --from=web /src/web/dist ./frontend
@@ -44,6 +45,7 @@ ENV Logging__File__Path=/data/logs/game-event-.log
 ENV DataProtection__KeysPath=/data/keys
 ENV Site__LockFile=/data/site.lock
 ENV Backup__Path=/backups
+ENV Site__Version=${VERSION}
 # A 1-core, 1 GB server (CLAUDE.md «Эксплуатация», D-209): the workstation GC (one heap, no GC thread per core) and
 # the GC's conserve-memory mode keep the live process within its 400 MB budget; `npm run test:memory` measures it
 ENV DOTNET_gcServer=0

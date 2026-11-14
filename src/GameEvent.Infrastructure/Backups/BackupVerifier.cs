@@ -319,7 +319,10 @@ public static class BackupVerifier
     {
         await using var connection = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = database, Mode = SqliteOpenMode.ReadOnly, Pooling = false }.ToString());
         await connection.OpenAsync(ct);
-        return await ListAsync(connection, "SELECT type, name, tbl_name, sql FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' ORDER BY type, name", ct);
+        // EF writes its statements with the system's line end: a database migrated on Windows keeps CRLF, one migrated in
+        // the Linux container LF — the same schema either way (D-772)
+        var lines = await ListAsync(connection, "SELECT type, name, tbl_name, sql FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' ORDER BY type, name", ct);
+        return [.. lines.Select(line => line.ReplaceLineEndings("\n"))];
     }
 
     /// <summary>A name a backup writes: the database, or a relative path under files/ or keys/ that stays there.</summary>

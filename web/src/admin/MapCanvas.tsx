@@ -102,6 +102,16 @@ const spread = 1.4;
 /** About half of a cell's card on the canvas: from its corner (its place) to its number's centre */
 const cardHalf = { x: 26, y: 26 };
 
+/**
+ * How far «Показать всю карту» and «Отдалить» may shrink the canvas (MP-2, D-770): far enough for the largest map a
+ * background allows (3200 px, spread on the canvas) to fit the frame. The canvas opens at a readable zoom; an overview
+ * the admin asked for may be small.
+ */
+export const overviewMinZoom = 0.1;
+
+/** The zoom the canvas opens at: its text never shrinks below the small text size of the site */
+export const readableMinZoom = 0.5;
+
 /** The zoom buttons of the player's map, on the canvas */
 function CanvasTools() {
   const flow = useReactFlow();
@@ -113,7 +123,10 @@ function CanvasTools() {
       <IconButton label={ru.board.zoomOut} onClick={() => void flow.zoomOut()}>
         <Minus size={20} />
       </IconButton>
-      <IconButton label={t.fit} onClick={() => void flow.fitView({ padding: 0.08 })}>
+      <IconButton
+        label={t.fit}
+        onClick={() => void flow.fitView({ padding: 0.08, minZoom: overviewMinZoom })}
+      >
         <Maximize size={20} />
       </IconButton>
     </FlowPanel>
@@ -230,9 +243,9 @@ export function MapCanvas({
         edges={edges}
         nodeTypes={nodeTypes}
         fitView
-        // Text on the canvas never shrinks below the small text size of the site
-        fitViewOptions={{ padding: 0.15, minZoom: 0.5, maxZoom: 1.2 }}
-        minZoom={0.5}
+        // The canvas opens readable; the zoom buttons may go down to an overview of the whole map (MP-2)
+        fitViewOptions={{ padding: 0.15, minZoom: readableMinZoom, maxZoom: 1.2 }}
+        minZoom={overviewMinZoom}
         deleteKeyCode={null}
         onNodeClick={(_, node) => {
           onSelect(node.id);
