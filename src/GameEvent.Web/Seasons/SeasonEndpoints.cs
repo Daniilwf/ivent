@@ -389,6 +389,29 @@ public static class SeasonEndpoints
             .WithActionErrors();
     }
 
+    /// <summary>
+    /// The partner of each split coop run still completed, once per run: a coop completion is his run too, so it counts in
+    /// his completed runs for the tiebreaker as the engine counts it (D-716). The run table names only the roller; the
+    /// split's event, not undone, names the partner, and a reject leaves the run no longer completed.
+    /// </summary>
+    private static async Task<List<Guid>> CoopPartnersOfCompletedRunsAsync(GameEventDbContext db, Guid seasonId, CancellationToken ct)
+    {
+        var splits = await db.Events.AsNoTracking()
+            .Where(e => e.SeasonId == seasonId && e.Type == "coop-reward-split" && e.UndoneByEventId == null)
+            .Select(e => new { e.Type, e.Version, e.Data })
+            .ToListAsync(ct);
+        var partners = splits
+            .Select(e => EventCodec.Decode(new StoredEvent(e.Type, e.Version, e.Data)))
+            .OfType<Engine.Interactions.CoopRewardSplit>()
+            .ToList();
+        var runIds = partners.Select(p => p.RunId).ToList();
+        var completed = await db.Runs.AsNoTracking()
+            .Where(r => r.SeasonId == seasonId && runIds.Contains(r.Id) && r.Status == RunStatus.Completed)
+            .Select(r => r.Id)
+            .ToListAsync(ct);
+        return [.. partners.Where(p => completed.Contains(p.RunId)).DistinctBy(p => p.RunId).Select(p => p.PartnerId)];
+    }
+
     /// <summary>A known outcome and a comment within the limit; whether a comment is needed is the engine's rule (409).</summary>
     internal static ValidationProblem? ResolveInvalid(ResolveEffectRequest request) =>
         request.Outcome is not { } outcome || !Enum.IsDefined(outcome)
@@ -560,6 +583,10 @@ public static class SeasonEndpoints
             .GroupBy(r => r.PlayerId)
             .Select(g => new { g.Key, Count = g.Count() })
             .ToDictionaryAsync(x => x.Key, x => x.Count, ct);
+        foreach (var partner in await CoopPartnersOfCompletedRunsAsync(db, seasonId, ct))
+        {
+            completedRuns[partner] = completedRuns.GetValueOrDefault(partner) + 1;
+        }
         var result = await db.SeasonResults.AsNoTracking().Where(x => x.SeasonId == seasonId).OrderBy(x => x.Row).ToListAsync(ct);
         var leaderboard = result.Count > 0
             ? [.. result.Select(x => new LeaderboardRow(x.PlayerId, x.Place, x.Points, x.CellsToFinish, x.IsFirst, x.Provisional))]

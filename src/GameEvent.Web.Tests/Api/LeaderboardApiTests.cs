@@ -1,10 +1,12 @@
 using System.Net.Http.Json;
 using System.Text.Json;
+using GameEvent.Engine.Interactions;
 using GameEvent.Engine.Players;
 using GameEvent.Engine.Proofs;
 using GameEvent.Engine.Ranking;
 using GameEvent.Engine.Rulesets;
 using GameEvent.Infrastructure.EventLog;
+using Microsoft.EntityFrameworkCore;
 
 namespace GameEvent.Web.Tests.Api;
 
@@ -12,7 +14,7 @@ namespace GameEvent.Web.Tests.Api;
 /// The leaderboard in the season view (C9b, P5, P7, P11; D-100): <c>leaderboard</c> — the rows in place order,
 /// [{playerId, place, points, cellsToFinish, isFirst, provisional}], exactly the engine's <see cref="Leaderboard.Build"/>
 /// of the season folded from the log. The first finisher is on top whatever his points. Anyone who may see the season
-/// sees it, spectators too. Responses are read as raw JSON, so the tests compile before the DTOs exist.
+/// sees it, spectators too; a split coop completion counts in the partner's runs too (D-716). Responses are read as raw JSON, so the tests compile before the DTOs exist.
 /// </summary>
 public sealed class LeaderboardApiTests : IAsyncLifetime
 {
@@ -139,6 +141,38 @@ public sealed class LeaderboardApiTests : IAsyncLifetime
         Assert.Equal([1, 2], rows.Select(r => r.Place));
     }
 
+    [Fact]
+    public async Task A_coop_completion_counts_in_the_partners_runs_as_in_the_engine()
+    {
+        // D-716 (decided by the owner 2026-11-14): Петя partners Вася's coop run, Маша joins without runs. The admin evens
+        // Маша and Петя, Маша first — were the coop completion not Петя's run, her earlier score would put her above
+        await using (var db = _site.NewDb())
+        {
+            await db.Games.ExecuteUpdateAsync(g => g.SetProperty(x => x.IsCoop, true), Ct);
+        }
+
+        var state = await StateAsync();
+        await _site.SendAsync(new ChangeRuleset(state.Rules with { Features = state.Rules.Features with { Coop = true } }));
+        var vasya = await _site.SignedInAsync("vasya");
+        var (vasyaId, petyaId) = (_site.Players["vasya"], _site.Players["petya"]);
+        await PostOkAsync(vasya, Url("roll"), new { commandId = Guid.NewGuid() });
+        await PostOkAsync(vasya, Url("start"), new { commandId = Guid.NewGuid() });
+        await _site.SendAsync(new InviteToCoop(vasyaId, petyaId));
+        var invitation = Assert.Single((await StateAsync()).Interactions.Values).InteractionId;
+        await _site.SendAsync(new AnswerInvitation(petyaId, invitation, Accept: true));
+        await PostOkAsync(vasya, Url("complete"), new { commandId = Guid.NewGuid(), difficulty = "normal" });
+        _site.Clock.UtcNow = _site.Clock.UtcNow.AddHours(1);
+        _site.Players["masha"] = Guid.NewGuid();
+        await _site.SendAsync(new AddSeasonPlayer(_site.Players["masha"], _site.Users["masha"], "masha"));
+        await EvenPointsAsync(vasya, "masha", "petya");
+
+        var rows = Rows(await SeasonJsonAsync(vasya));
+
+        Assert.Equal(await ExpectedAsync(), rows);
+        var places = rows.ToDictionary(r => r.PlayerId, r => r.Place);
+        Assert.True(places[petyaId] < places[_site.Players["masha"]], "The partner's coop completion did not break the tie.");
+    }
+
     // ---- A revoked finish ----
 
     [Fact]
@@ -183,6 +217,12 @@ public sealed class LeaderboardApiTests : IAsyncLifetime
             var id = _site.Players[login];
             await _site.SendAsync(new AdjustPlayer(id, "Выравнивание", PointsDelta: target - players[id]));
         }
+    }
+
+    private async Task<Engine.Seasons.SeasonState> StateAsync()
+    {
+        await using var db = _site.NewDb();
+        return (await EventLogReader.ReplaySeasonAsync(db, SiteFactory.SeasonId, Ct)).State;
     }
 
     private async Task<List<LeaderboardRow>> ExpectedAsync()
