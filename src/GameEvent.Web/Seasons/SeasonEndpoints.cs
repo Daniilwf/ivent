@@ -353,7 +353,7 @@ public static class SeasonEndpoints
                 ? Task.FromResult<ActionResult>(
                     TypedResults.ValidationProblem(new Dictionary<string, string[]>
                     {
-                        ["optionId"] = [$"A choice id and an option id of 1–{MaxOptionIdLength} characters without control characters are required."],
+                        ["optionId"] = [$"A choice id and an option id of 1–{MaxOptionIdLength} letters, digits, inner spaces or plain punctuation are required."],
                     }))
                 : ActAsync(seasonId, request.CommandId, user, db, bus, playerId => new MakeChoice(playerId, request.ChoiceId, request.OptionId, request.Difficulty), ct))
             .RequireAuthorization(Policies.Player)
@@ -500,9 +500,14 @@ public static class SeasonEndpoints
         TypedResults.ValidationProblem(new Dictionary<string, string[]> { [field] = [message] });
 
     // Option ids are the engine's: a game id in the N format, a cell, or the text of an event's list or category (D-822 (2),
-    // «монетки»); the engine checks the id against the options offered (turn.unknownOption), the site only its size.
+    // «монетки», «+1d6 к броску»); the engine checks the id against the options offered (turn.unknownOption). The site lets
+    // through words of any script with inner spaces and plain punctuation only — no markup, no blanks around (D-824).
     private static bool IsOptionId(string? id) =>
-        id is { Length: > 0 and <= MaxOptionIdLength } && !id.Any(c => char.IsControl(c) || char.GetUnicodeCategory(c) == System.Globalization.UnicodeCategory.Format);
+        id is { Length: > 0 and <= MaxOptionIdLength }
+        && id.Trim().Length == id.Length
+        && id.All(c => char.IsLetterOrDigit(c) || c == ' ' || OptionPunctuation.Contains(c));
+
+    private const string OptionPunctuation = "-_+.,!?:;()'«»—–№%";
 
     /// <summary>The request-level checks of a tech reroll; the reason's rules live in the engine.</summary>
     internal static ValidationProblem? TechRerollInvalid(TechRerollRequest request) =>

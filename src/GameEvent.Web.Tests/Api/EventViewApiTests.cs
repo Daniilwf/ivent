@@ -46,6 +46,28 @@ public sealed class EventViewApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task The_extra_die_of_an_event_counts_in_the_turn_card_and_the_proof_queue_as_in_the_points()
+    {
+        // D-825: the count stage's die is a die of the throw — the totals the screens show are the points the run gave
+        var admin = await _site.SignedInAsync("admin");
+        var vasya = await _site.SignedInAsync("vasya");
+        await SetUpAsync(admin, Tailwind);
+        await DropAsync(vasya);
+        var pointsBefore = await PointsAsync(vasya);
+
+        await CompleteAsync(vasya);
+
+        var completed = (await MeAsync(vasya)).GetProperty("lastCompleted");
+        var total = completed.GetProperty("total").GetInt32();
+        Assert.Equal(completed.GetProperty("dice").EnumerateArray().Sum(d => d.GetProperty("value").GetInt32()), total);
+        Assert.Equal(pointsBefore + total, await PointsAsync(vasya));
+        var queued = Assert.Single(
+            (await ApiCalls.OkAsync(await admin.GetAsync($"{Admin}/proofs", Ct))).EnumerateArray(),
+            p => p.GetProperty("runId").GetGuid() == completed.GetProperty("id").GetGuid());
+        Assert.Equal(total, queued.GetProperty("diceTotal").GetInt32());
+    }
+
+    [Fact]
     public async Task My_waiting_events_are_mine_alone_and_empty_before_any_draw()
     {
         var admin = await _site.SignedInAsync("admin");
@@ -150,5 +172,12 @@ public sealed class EventViewApiTests : IAsyncLifetime
             var client = await _site.SignedInAsync(login);
             Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync(Editor, Ct)).StatusCode);
         }
+    }
+
+    private static async Task<int> PointsAsync(HttpClient player)
+    {
+        var season = await ApiCalls.OkAsync(await player.GetAsync(Season, Ct));
+        var me = season.GetProperty("me").GetProperty("playerId").GetGuid();
+        return season.GetProperty("players").EnumerateArray().Single(p => p.GetProperty("id").GetGuid() == me).GetProperty("points").GetInt32();
     }
 }

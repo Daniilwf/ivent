@@ -127,7 +127,7 @@ public static class AdminProofEndpoints
                     proof?.WitnessId is { } witness ? state.Players[witness].Name : null,
                     run.Difficulty,
                     run.Hours,
-                    RunTotal.Of(run.Dice, run.ChallengeDice, run.Snapshot),
+                    RunTotal.Of(run.Dice, run.ChallengeDice, run.Snapshot, run.Mods),
                     ProofReviewOrder.DecidesFinish(state, run),
                     proof is null ? [] : [.. proof.Files.Select(Files.FileLinkView.Of)],
                     Engine.Rolls.UncheckedRuns.ClosesRoll(state, run.PlayerId),
