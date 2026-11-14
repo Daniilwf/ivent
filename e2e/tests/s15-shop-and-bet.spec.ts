@@ -98,7 +98,7 @@ test('the shop and a bet: roll, buy a lot, bet on a run', async ({ browser }, te
   await sheet.getByText(/^3 дня, ×/).click();
   const stake = sheet.getByLabel('Ставка в монетках');
   await stake.fill('2');
-  await expect(sheet.getByTestId('bet-payout')).toContainText('Выигрыш, если успеет:');
+  await expect(sheet.getByTestId('bet-payout')).toContainText('Вернётся');
   await page.screenshot({ path: shot('bet-sheet') });
   await sheet.getByTestId('bet-confirm').click();
 

@@ -102,6 +102,13 @@ public sealed partial class CommandProcessor(
                 await CancelDuelsLeftByDeletedAccountsAsync(pending.Envelope.SeasonId, ct);
             }
 
+            // An approved game suggestion is in the pool by the time the admin's approval answers (D-572); a repeat of the
+            // approval tries again, since the stop that lost its answer may have lost the game too (D-817)
+            if (outcome.IsAccepted && pending.Envelope.SeasonId != Guid.Empty)
+            {
+                await AddApprovedGamesAsync(pending.Envelope.SeasonId, outcome, ct);
+            }
+
             pending.Completion.TrySetResult(outcome);
 
             // What the command queued for everyone is settled right after it, before the next command (D-537)

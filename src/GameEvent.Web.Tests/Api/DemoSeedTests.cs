@@ -86,6 +86,26 @@ public sealed class DemoSeedTests : IAsyncLifetime
         Assert.All(inForce.Cells, c => Assert.True(c.X > 0 && c.X < background.Width && c.Y > 0 && c.Y < background.Height, $"cell {c.Id} is off the picture"));
         Assert.NotNull(await Web.Map.SeasonMaps.BackgroundAsync(db, inForce, Ct));
 
+        // Stage 4 (4.13): the economy in every state — items, the shop and bets on, the pack published; lots rolled,
+        // bought and gone; items given by the admin and used on others; bets won, lost and open; a shop offer still live
+        var features = JsonDocument.Parse(season.RulesetJson).RootElement.GetProperty("features");
+        Assert.Equal((true, true, true), (features.GetProperty("items").GetBoolean(), features.GetProperty("shop").GetBoolean(), features.GetProperty("bets").GetBoolean()));
+        string[] economy =
+        [
+            "content-published", "shop-rolled", "lot-bought", "shop-offer-expired", "inventory-adjusted", "object-given",
+            "item-used", "bet-placed", "bet-settled",
+        ];
+        Assert.Empty(economy.Except(types));
+        var settled = events.Where(e => e.Type == "bet-settled").Select(e => JsonDocument.Parse(e.Data).RootElement.GetProperty("status").GetString()).ToHashSet();
+        Assert.Superset(new HashSet<string?> { "won", "lost" }, settled);
+        Assert.Contains(events, e => e.Type == "item-used" && JsonDocument.Parse(e.Data).RootElement is var used
+            && used.GetProperty("targets").EnumerateArray().Any(t => t.GetString() != used.GetProperty("playerId").GetString()));
+        var wallets = await db.SeasonPlayers.Where(p => p.SeasonId == DemoSeed.SeasonId && p.EconomyJson != null).Select(p => p.EconomyJson!).ToListAsync(Ct);
+        var parsed = wallets.Select(w => JsonDocument.Parse(w).RootElement).ToList();
+        Assert.Contains(parsed, w => w.TryGetProperty("inventory", out var inventory) && inventory.GetArrayLength() > 0);
+        Assert.Contains(parsed, w => w.TryGetProperty("bets", out var bets) && bets.EnumerateArray().Any(b => b.GetProperty("status").GetString() == "open"));
+        Assert.Contains(parsed, w => w.TryGetProperty("shop", out var shop) && shop.GetProperty("expiresAt").GetDateTimeOffset() > start);
+
         var integrity = await SeasonIntegrity.CheckAsync(db, DemoSeed.SeasonId, Ct);
         Assert.True(integrity!.IsIntact, string.Join("; ", integrity.Differences));
 

@@ -28,6 +28,9 @@ public sealed class PendingManualEffectRecord
 
     /// <summary>The object whose text waits for resolution (D-410); null for «draw an event».</summary>
     public string? ObjectId { get; set; }
+
+    /// <summary>The proof of an IRL effect (D-509, D-680: <c>IrlProofState</c>) as JSON; null until the player submits one.</summary>
+    public string? IrlProofJson { get; set; }
 }
 
 /// <summary>A game excluded for one player of the season (SPEC «Модель данных»: PlayerGameExclusion).</summary>
@@ -56,6 +59,12 @@ public sealed class SeasonRecord
     public required string RulesetJson { get; set; }
 
     public DateTimeOffset CreatedAt { get; set; }
+
+    /// <summary>
+    /// The earliest moment something of the season itself is due — an open poll's close, a global event's end
+    /// (<c>Timers.NextOfSeason</c>, D-727, D-756): the scheduler sends the timers command when it has come.
+    /// </summary>
+    public DateTimeOffset? NextTimerAt { get; set; }
 }
 
 /// <summary>
@@ -217,6 +226,21 @@ public sealed class RunRecord
 
     /// <summary>Completed while its player was first: it does not complete the game in the season (D-16).</summary>
     public bool FreeMode { get; set; }
+
+    /// <summary>The coop partner (D-520, <c>RunState.PartnerId</c>); null for a run played alone.</summary>
+    public Guid? PartnerId { get; set; }
+
+    /// <summary>The partner's side of a coop run (<c>CoopPartner</c>) as JSON; null for a run played alone (D-811).</summary>
+    public string? CoopJson { get; set; }
+
+    /// <summary>
+    /// The check of the run's conditions (D-507, <c>RunState.Condition</c>) as JSON; null without one. The conditions themselves
+    /// are in <see cref="SnapshotJson"/> (D-598).
+    /// </summary>
+    public string? ConditionsJson { get; set; }
+
+    /// <summary>Whether the run's conditions are met (<c>Condition.Met</c>); null without a check.</summary>
+    public bool? ConditionMet { get; set; }
 }
 
 /// <summary>The proof of a run (SPEC «Модель данных»: Proof), one per run; the admin's queue reads pending rows.</summary>
