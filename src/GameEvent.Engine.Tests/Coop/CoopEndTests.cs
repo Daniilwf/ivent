@@ -18,7 +18,8 @@ namespace GameEvent.Engine.Tests.Coop;
 /// How a coop ends before or after its completion (EV29, EV38; D-522, invariant 13): the partner leaves without a penalty
 /// and without an exclusion; the roller's drop or tech reroll is his alone and frees the partner; the admin marking the
 /// partner inactive frees him too; a reject takes from each his share of points, cells and coins (D-321 per player); an
-/// undo of the completion waits for the later commands of either player. Scenarios S5.10-17…-20, -24, -25, -27.
+/// undo of the completion waits for the later commands of either player; with the flag switched off mid-coop the run goes
+/// on as coop to its end (D-715). Scenarios S5.10-17…-20, -24, -25, -27.
 /// </summary>
 public class CoopEndTests
 {
@@ -251,23 +252,28 @@ public class CoopEndTests
         Assert.Equal(InteractionStatus.Pending, s.Invitation(id).Status);
     }
 
-    // ---- The flag switched off mid-coop (S5.10-27, Н-25) ----
+    // ---- The flag switched off mid-coop (S5.10-27, Н-25, D-715) ----
 
     [Fact]
-    public void With_the_flag_switched_off_mid_coop_the_completion_is_solo_and_frees_the_partner()
+    public void With_the_flag_switched_off_mid_coop_the_run_completes_as_coop_and_is_split()
     {
-        // Н-25, нужно решение: our default — the coop freezes; the completion is not split, the partner is freed
+        // D-715, decided by the owner 2026-11-14: a coop run in progress goes on as coop to its end — the throw is split
+        // and each moves his share, as with the flag on (was: the completion was solo and only freed the partner)
         var s = New();
         var run = s.CoopRun();
+        var (vasya, petya) = (s.PlayerId("Вася"), s.PlayerId("Петя"));
         s.WithRuleset(r => r with { Features = r.Features with { Coop = false } });
 
         s.NextRandom(3, 4).Complete("Вася");
 
         ScenarioAssert.Accepted(s);
-        Assert.Empty(s.LastEvents<CoopRewardSplit>());
-        Assert.Equal(7, s.Player("Вася").Points);
-        Assert.Equal((0, 0, LinearMap.StartId), (s.Player("Петя").Points, s.Player("Петя").Coins, s.Player("Петя").CellId));
+        Assert.Equal(
+            new CoopRewardSplit(run, vasya, petya, Total: 7, RollerPoints: 4, PartnerPoints: 3, Coins: 6, RollerCoins: 3, PartnerCoins: 3, PointsShare: 0.5m, CoinsShare: 0.5m),
+            Assert.Single(s.LastEvents<CoopRewardSplit>()));
+        Assert.Equal((4, 3, "c4"), (s.Player("Вася").Points, s.Player("Вася").Coins, s.Player("Вася").CellId));
+        Assert.Equal((3, 3, "c3"), (s.Player("Петя").Points, s.Player("Петя").Coins, s.Player("Петя").CellId));
         Assert.Equal((TurnPhase.Idle, (Guid?)null), (s.Player("Петя").Phase, s.Player("Петя").ActiveRunId));
         Assert.Equal(RunStatus.Completed, s.State.Runs[run].Status);
+        Assert.NotNull(s.State.Runs[run].Coop!.Shares);
     }
 }

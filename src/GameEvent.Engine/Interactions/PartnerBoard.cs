@@ -66,8 +66,9 @@ public sealed record PartnerRequestClosed(Guid RequestId, PartnerRequestCloseRea
 /// The partner board (SPEC «Взаимодействие игроков», D-524, D-545): the roller of a running coop run posts a request; a
 /// response is a coop invitation from the responder to the author (an exception from «приглашает ролливший», D-520), so both
 /// agree and the author stays the roller. Several responses may wait on one request; accepting one supersedes the others
-/// (D-712). A request closes by a coop on its run, the run's end, its term, its author or the deadline. Everything is refused
-/// while <c>features.partnerBoard</c> or <c>features.coop</c> is off, and what it left waits (D-420).
+/// (D-712). A request closes by a coop on its run, the run's end, its term, its author or the deadline, and its still pending
+/// responses close with it (D-742). With <c>features.partnerBoard</c> or <c>features.coop</c> off nobody posts or responds;
+/// a request already open still closes by its author, its term, the end of its run and a coop on it (D-743).
 /// </summary>
 internal static class PartnerBoard
 {
@@ -140,7 +141,7 @@ internal static class PartnerBoard
         }
 
         var now = context.Clock.UtcNow;
-        if (state.Interactions.Values.Any(i => Coop.IsPending(i, now) && i.Kind == InteractionKind.Coop
+        if (state.Interactions.Values.Any(i => Coop.IsWaiting(state, i, now) && i.Kind == InteractionKind.Coop
             && i.FromPlayerId == command.PlayerId && i.RunId == request.RunId))
         {
             return Decision.Reject(RejectionCodes.PartnerRequestAlreadyResponded, "The player has a pending response to this request.");
@@ -188,7 +189,7 @@ internal static class PartnerBoard
 
         var limit = state.Rules.Interactions.MaxOpenInvitesPerPlayer
             ?? throw new InvalidOperationException("interactions.maxOpenInvitesPerPlayer is required with coop on.");
-        if (state.Interactions.Values.Count(i => Coop.IsPending(i, now) && i.FromPlayerId == responder.PlayerId) >= limit)
+        if (state.Interactions.Values.Count(i => Coop.IsWaiting(state, i, now) && i.FromPlayerId == responder.PlayerId) >= limit)
         {
             return Decision.Reject(RejectionCodes.InteractionTooMany, $"At most {limit} pending invitations sent.");
         }
@@ -205,7 +206,8 @@ internal static class PartnerBoard
 
     public static Decision Decide(SeasonState state, ClosePartnerRequest command, EngineContext context)
     {
-        if (Guard(state, command.PlayerId, context) is { } rejection)
+        // With the board off a request already open may still be closed by its author: that starts nothing (D-743)
+        if (Coop.Guard(state, command.PlayerId, context, needsFlag: false) is { } rejection)
         {
             return rejection;
         }
@@ -221,12 +223,19 @@ internal static class PartnerBoard
     }
 
     /// <summary>
-    /// What follows <paramref name="e"/> (the state already holds it) with the board on (D-524): a coop on a run or its end
-    /// closes its open request, the season's closing all of them (D-516). One already past its term the timer has not reached
-    /// yet closes as timed out (D-741).
+    /// What follows <paramref name="e"/> (the state already holds it), whatever the flags (D-524, D-743): a coop on a run or
+    /// its end closes its open request, the season's closing all of them (D-516). One already past its term the timer has not
+    /// reached yet closes as timed out (D-741). A request closed by its author or its term cancels its still pending
+    /// responses (D-742); the other closings close them by their own cause (superseded, the run's end, the deadline).
     /// </summary>
     public static IEnumerable<IGameEvent> Settle(SeasonState state, IGameEvent e, DateTimeOffset now)
     {
+        if (e is PartnerRequestClosed closed)
+        {
+            return [.. Responses(state, state.PartnerRequests[closed.RequestId])
+                .Select(i => new InteractionExpired(i.InteractionId, InteractionExpiry.RequestClosed, now))];
+        }
+
         (Func<PartnerRequest, bool> Closes, PartnerRequestCloseReason Reason)? closing = e switch
         {
             CoopJoined j => (r => r.RunId == j.RunId, PartnerRequestCloseReason.Coop),
@@ -243,13 +252,31 @@ internal static class PartnerBoard
                 .Select(r => new PartnerRequestClosed(r.RequestId, r.ExpiresAt <= now ? PartnerRequestCloseReason.Timeout : close.Reason, now))];
     }
 
-    /// <summary>The open requests past their term, closed by the timer; none while the board is off (D-420).</summary>
+    /// <summary>The open requests past their term, closed by the timer, whatever the flags (D-743).</summary>
     public static IEnumerable<IGameEvent> Timeouts(SeasonState state, DateTimeOffset now) =>
-        IsOn(state.Rules.Features)
-            ? state.PartnerRequests.Values
-                .Where(r => r.Status == PartnerRequestStatus.Open && r.ExpiresAt <= now)
-                .Select(r => new PartnerRequestClosed(r.RequestId, PartnerRequestCloseReason.Timeout, now))
-            : [];
+        state.PartnerRequests.Values
+            .Where(r => r.Status == PartnerRequestStatus.Open && r.ExpiresAt <= now)
+            .Select(r => new PartnerRequestClosed(r.RequestId, PartnerRequestCloseReason.Timeout, now));
+
+    /// <summary>
+    /// The still pending responses of <paramref name="request"/>: coop invitations to its author on its run from another
+    /// player, made while it was open — a run has one open request at a time (D-524, D-742).
+    /// </summary>
+    public static IEnumerable<Interaction> Responses(SeasonState state, PartnerRequest request) =>
+        state.Interactions.Values.Where(i => i.Status == InteractionStatus.Pending && IsResponse(i, request));
+
+    /// <summary>
+    /// Whether <paramref name="invitation"/> is a response whose request is over by the clock (D-742, D-741 (2)): closed, or
+    /// past its term even before the timer fired. Such a response is closed with it, so it is no longer pending.
+    /// </summary>
+    public static bool OutlivedItsRequest(SeasonState state, Interaction invitation, DateTimeOffset now) =>
+        invitation.Kind == InteractionKind.Coop
+        && state.PartnerRequests.Values.Where(r => IsResponse(invitation, r)).MaxBy(r => r.CreatedAt) is { } request
+        && !IsOpen(request, now);
+
+    private static bool IsResponse(Interaction invitation, PartnerRequest request) =>
+        invitation.Kind == InteractionKind.Coop && invitation.RunId == request.RunId && invitation.ToPlayerId == request.PlayerId
+        && invitation.FromPlayerId != request.PlayerId && invitation.CreatedAt >= request.CreatedAt;
 
     /// <summary>The board plays with both flags on (D-524).</summary>
     public static bool IsOn(Rulesets.Features features) => features.PartnerBoard && features.Coop;

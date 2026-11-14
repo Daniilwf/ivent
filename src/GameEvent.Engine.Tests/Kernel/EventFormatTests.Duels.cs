@@ -75,6 +75,10 @@ public partial class EventFormatTests
         { "interaction-created", new InteractionCreated(DuelInvitation()), "{\"interaction\":" + DuelInvitationJson + "}" },
         { "interaction-expired", new InteractionExpired(s_duel, InteractionExpiry.Inactive, s_at), "\"reason\":\"inactive\"" },
         { "interaction-expired", new InteractionExpired(s_duel, InteractionExpiry.FirstFinisher, s_at), "\"reason\":\"firstFinisher\"" },
+        // The owner's decisions of 2026-11-14: a deleted account (D-734, D-792) and a closed partner request (D-742, D-791)
+        { "duel-settled", new DuelSettled(s_duel, DuelStatus.Cancelled, DuelEnd.AccountDeleted, null, null, 0, s_at), "\"end\":\"accountDeleted\"," },
+        { "interaction-expired", new InteractionExpired(s_duel, InteractionExpiry.AccountDeleted, s_at), "\"reason\":\"accountDeleted\"" },
+        { "interaction-expired", new InteractionExpired(s_duel, InteractionExpiry.RequestClosed, s_at), "\"reason\":\"requestClosed\"" },
         { "coins-changed", new CoinsChanged(s_player, 10, CoinsReason.Duel, s_run), """{"playerId":"10000000-0000-0000-0000-000000000001","delta":10,"reason":"duel","runId":"00000000-0000-0000-0000-000000000001"}""" },
         { "coins-changed", new CoinsChanged(s_player, -10, CoinsReason.DuelRevoked, s_run), """{"playerId":"10000000-0000-0000-0000-000000000001","delta":-10,"reason":"duelRevoked","runId":"00000000-0000-0000-0000-000000000001"}""" },
     };

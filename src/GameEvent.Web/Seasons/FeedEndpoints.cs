@@ -369,8 +369,10 @@ public static class FeedEndpoints
                 completedAt.GetValueOrDefault(r.RunId)))
             .OrderByDescending(r => r.CompletedAt)];
         var avatar = user.AvatarFileId is { } file ? FileLinkView.Of(file) : null;
+        // A split coop run still completed is the partner's completed game too, as the engine counts it (D-716)
+        var partnered = (await CoopPartnerRuns.LoadAsync(db, seasonIds, playerIds, ct)).Count(r => r.Status == RunStatus.Completed);
         return TypedResults.Ok(new ProfileView(
-            user.Id, user.Name, avatar, seasonViews, reviewViews, runs.Count(r => r.Status == RunStatus.Completed)));
+            user.Id, user.Name, avatar, seasonViews, reviewViews, runs.Count(r => r.Status == RunStatus.Completed) + partnered));
     }
 
     private static async Task<Results<Ok<IReadOnlyList<GameRunView>>, NotFound>> GameRunsAsync(

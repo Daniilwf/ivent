@@ -51,6 +51,9 @@ public enum DuelEnd
 
     /// <summary>One of the two became the first finisher (<see cref="DuelStatus.Cancelled"/>, D-510).</summary>
     FirstFinisher,
+
+    /// <summary>The account of one of the two was deleted (<see cref="DuelStatus.Cancelled"/>, D-734).</summary>
+    AccountDeleted,
 }
 
 /// <summary>
@@ -79,6 +82,13 @@ public sealed record Duel(
     /// <summary>The other player of the duel.</summary>
     public Guid Other(Guid playerId) => playerId == ChallengerId ? OpponentId : ChallengerId;
 }
+
+/// <summary>
+/// The account of <see cref="PlayerId"/> was deleted (D-734): his races are called off without a winner or a payout and his
+/// waiting challenges, sent or received, burn. A system command the queue sends to each running season of the account right
+/// after its deletion; it works whatever the flag and the deadline, so nothing of a deleted account stays open.
+/// </summary>
+public sealed record CancelDuelsOfDeletedAccount(Guid PlayerId) : ICommand;
 
 /// <summary>
 /// <see cref="PlayerId"/> challenges <see cref="OpponentId"/> to a duel (D-525): an invitation of kind Duel. Whoever of

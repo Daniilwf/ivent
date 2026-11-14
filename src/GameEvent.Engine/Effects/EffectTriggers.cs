@@ -8,8 +8,9 @@ using GameEvent.Engine.Seasons;
 namespace GameEvent.Engine.Effects;
 
 /// <summary>
-/// The triggers that react to what happened (SPEC «Триггеры по фазам хода», D-412): after a roll, the completion, after
-/// the throw, a drop, a tech reroll, and every step, pass and stop of a move that triggers cells. The owner's effects fire
+/// The triggers that react to what happened (SPEC «Триггеры по фазам хода», D-412): after a roll, the completion (for a coop
+/// run the partner's too, D-716), after the throw, a drop, a tech reroll, and every step, pass and stop of a move that
+/// triggers cells. The owner's effects fire
 /// through the effect chain, so its limits hold (3 levels, 50 events, D-103). The triggers before a roll and before the
 /// throw fire inside those commands (they change them).
 /// </summary>
@@ -34,6 +35,8 @@ internal sealed class EffectTriggers : ITriggerHandler, IFiringTriggerHandler
             GameRolled e => Fire(state, context, e.PlayerId, [Trigger.AfterRoll], null, DiceScope.Pending, at),
             GameChoiceRolled e => Fire(state, context, e.PlayerId, [Trigger.AfterRoll], null, DiceScope.Pending, at),
             RunCompleted e => Fire(state, context, e.PlayerId, [Trigger.RunCompleted, Trigger.RunEnded], e.RunId, DiceScope.Pending, at),
+            // A coop completion is the partner's own run too: his run-end effects fire on its split (D-716)
+            Interactions.CoopRewardSplit e => Fire(state, context, e.PartnerId, [Trigger.RunCompleted, Trigger.RunEnded], e.RunId, DiceScope.Pending, at),
             // No throw by an unmet condition, nothing to react to (D-592)
             CompletionRolled e when Runs.RunConditions.WithoutDice(state.Runs[e.RunId]) => [],
             CompletionRolled e => Fire(state, context, e.PlayerId, [Trigger.AfterDice], e.RunId, DiceScope.AfterThrow, at),

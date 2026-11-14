@@ -117,8 +117,8 @@ internal static class RunLifecycle
         var sum = CompletionRoll.Total(dice, challengeDice, run.Snapshot, thrown.Mods);
 
         // A coop run (D-521): the roller who became the first finisher plays it alone — the first does not affect others
-        // (D-510, Н-18); otherwise it splits below. With coop switched off it is completed alone, writing nothing of coop (D-420)
-        var coop = run.Coop is { } partnerSide && state.Rules.Features.Coop ? partnerSide : null;
+        // (D-510, Н-18); otherwise it splits below. A coop in progress goes on as coop with the flag switched off (D-715)
+        var coop = run.Coop;
         var events = new List<IGameEvent>(fired);
         if (coop is not null && FinishLine.First(state) == player.PlayerId)
         {

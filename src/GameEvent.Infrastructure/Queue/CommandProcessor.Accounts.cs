@@ -4,6 +4,7 @@ using GameEvent.Infrastructure.Accounts;
 using GameEvent.Infrastructure.Database;
 using GameEvent.Infrastructure.EventLog;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace GameEvent.Infrastructure.Queue;
 
@@ -64,6 +65,131 @@ public sealed partial class CommandProcessor
         await NotifyAsync(envelope, logged, ct);
         return new CommandOutcome(true, false, null, logged, secret);
     }
+
+    /// <summary>
+    /// After an account's deletion (D-734): in each running season it plays, a system command of its own (no author) through
+    /// this same consumer calls off its duels and burns its challenges, one transaction each. The id comes from the season
+    /// and the deletion, so a season is never settled twice for one deletion (a repeat of the deletion runs it again safely);
+    /// a season with nothing open refuses, which is fine. A failure in one season is logged and does not stop the others or
+    /// fail the deletion, which is committed; the sweep at start and after the timers catches it up.
+    /// </summary>
+    private async Task CancelDuelsOfDeletedAccountAsync(Guid userId, Guid deletionId, CancellationToken ct)
+    {
+        List<(Guid SeasonId, Guid PlayerId)> plays;
+        await using (var db = await dbFactory.CreateDbContextAsync(ct))
+        {
+            plays = [.. (await db.SeasonPlayers.AsNoTracking()
+                .Where(p => p.UserId == userId)
+                .Join(db.Seasons.Where(s => s.Status == Engine.Seasons.SeasonStatus.Active), p => p.SeasonId, s => s.Id, (p, _) => new { p.SeasonId, p.Id })
+                .ToListAsync(ct))
+                .Select(x => (x.SeasonId, x.Id))];
+        }
+
+        foreach (var (seasonId, playerId) in plays)
+        {
+            var envelope = new CommandEnvelope(
+                AccountDeletedCommandId(seasonId, deletionId), seasonId, new Engine.Duels.CancelDuelsOfDeletedAccount(playerId), AuthorId: null);
+            try
+            {
+                await ProcessAsync(envelope, ct);
+            }
+#pragma warning disable CA1031 // the deletion is committed: a failed season is logged and the others go on
+            catch (Exception e) when (e is not OperationCanceledException)
+#pragma warning restore CA1031
+            {
+                _cache.Remove(seasonId);
+                LogCommandFailed(logger, e, envelope.CommandId, nameof(Engine.Duels.CancelDuelsOfDeletedAccount));
+            }
+        }
+    }
+
+    /// <summary>
+    /// The sweep behind <see cref="CancelDuelsOfDeletedAccountAsync"/> (D-734, D-792): at start and after each timers' pass of
+    /// a season, a player of a running season whose account is deleted and who still has a duel going on or a challenge
+    /// waiting gets the same system command — a stop between the deletion and its command, or a season that failed it, is
+    /// caught up. The id comes from the season, the player and what is open, so a repeated sweep is a duplicate and what
+    /// opens later gets a command of its own. Failures are logged; the next sweep tries again.
+    /// </summary>
+    private async Task CancelDuelsLeftByDeletedAccountsAsync(Guid? seasonId, CancellationToken ct)
+    {
+        try
+        {
+            List<(Guid SeasonId, Guid PlayerId)> deleted;
+            await using (var db = await dbFactory.CreateDbContextAsync(ct))
+            {
+                var running = db.Seasons.Where(s => s.Status == Engine.Seasons.SeasonStatus.Active && (seasonId == null || s.Id == seasonId)).Select(s => s.Id);
+                deleted = [.. (await db.SeasonPlayers.AsNoTracking()
+                    .Where(p => running.Contains(p.SeasonId))
+                    .Join(db.Users.Where(u => u.IsDeleted), p => p.UserId, u => u.Id, (p, _) => new { p.SeasonId, p.Id })
+                    .ToListAsync(ct))
+                    .Select(x => (x.SeasonId, x.Id))];
+            }
+
+            foreach (var season in deleted.GroupBy(d => d.SeasonId))
+            {
+                Engine.Seasons.SeasonState state;
+                if (_cache.TryGetValue(season.Key, out var cached))
+                {
+                    state = cached.State;
+                }
+                else
+                {
+                    await using var db = await dbFactory.CreateDbContextAsync(ct);
+                    state = (await EventLogReader.ReplaySeasonAsync(db, season.Key, ct)).State;
+                }
+
+                foreach (var (_, playerId) in season)
+                {
+                    var open = OpenDuelsOf(state, playerId);
+                    if (open.Count == 0)
+                    {
+                        continue;
+                    }
+
+                    var envelope = new CommandEnvelope(
+                        SweepCommandId(season.Key, playerId, open), season.Key, new Engine.Duels.CancelDuelsOfDeletedAccount(playerId), AuthorId: null);
+                    try
+                    {
+                        await ProcessAsync(envelope, ct);
+                    }
+#pragma warning disable CA1031 // a failed season is logged and the others go on; the next sweep tries again
+                    catch (Exception e) when (e is not OperationCanceledException)
+#pragma warning restore CA1031
+                    {
+                        _cache.Remove(season.Key);
+                        LogCommandFailed(logger, e, envelope.CommandId, nameof(Engine.Duels.CancelDuelsOfDeletedAccount));
+                    }
+                }
+            }
+        }
+#pragma warning disable CA1031 // a failed sweep must not stop the queue: the next one tries again
+        catch (Exception e) when (e is not OperationCanceledException)
+#pragma warning restore CA1031
+        {
+            LogSweepFailed(logger, e);
+        }
+    }
+
+    // What the player still has open in duels: the races he is in and the challenges waiting either way (D-734)
+    private static List<Guid> OpenDuelsOf(Engine.Seasons.SeasonState state, Guid playerId) =>
+    [
+        .. state.Duels.Values.Where(d => d.Status == Engine.Duels.DuelStatus.Active && d.Involves(playerId)).Select(d => d.DuelId),
+        .. state.Interactions.Values
+            .Where(i => i is { Kind: Engine.Interactions.InteractionKind.Duel, Status: Engine.Interactions.InteractionStatus.Pending }
+                && (i.FromPlayerId == playerId || i.ToPlayerId == playerId))
+            .Select(i => i.InteractionId),
+    ];
+
+    private static Guid SweepCommandId(Guid seasonId, Guid playerId, IEnumerable<Guid> open) =>
+        new(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(
+            $"account-deleted-duels-sweep:{seasonId:N}:{playerId:N}:{string.Join(",", open.Order().Select(id => id.ToString("N")))}")).AsSpan(0, 16));
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "The sweep of duels left by deleted accounts failed; the next one tries again")]
+    private static partial void LogSweepFailed(ILogger logger, Exception exception);
+
+    private static Guid AccountDeletedCommandId(Guid seasonId, Guid deletionId) =>
+        new(System.Security.Cryptography.SHA256.HashData(
+            System.Text.Encoding.UTF8.GetBytes($"account-deleted-duels:{seasonId:N}:{deletionId:N}")).AsSpan(0, 16));
 
     private async Task<(IReadOnlyList<IGameEvent> Events, Action? Apply, string? Secret, Rejection? Rejection)> DecideAccountAsync(
         GameEventDbContext db, IAccountCommand command, DateTimeOffset now, CancellationToken ct)

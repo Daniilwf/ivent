@@ -12,7 +12,9 @@ namespace GameEvent.Engine.Interactions;
 /// coop game invites a free player; the accepted one becomes the partner, playing that one run with him. The roller
 /// completes it with one throw by his own pipeline; points, steps and completion coins are split (D-521), each moves by his
 /// share with his own move. The partner may leave; the roller's drop or tech reroll ends the coop; a reject takes back each
-/// one's share (D-522). Everything is refused while <c>features.coop</c> is off, and what it left waits (D-420).
+/// one's share (D-522). With <c>features.coop</c> switched off only what starts a coop is refused (invite, accept, respond);
+/// decline, withdraw and leave still work, a coop in progress goes on as coop to its end, and pending invitations burn by
+/// their time (D-715, D-790).
 /// </summary>
 internal static class Coop
 {
@@ -57,7 +59,7 @@ internal static class Coop
         // Pending by the engine's clock: one past its time is over even before the timer fired (D-523)
         var now = context.Clock.UtcNow;
         // The roller's own: responses of the partner board waiting on the run do not count (D-740)
-        if (state.Interactions.Values.Any(i => IsPending(i, now) && i.Kind == InteractionKind.Coop && i.RunId == run.RunId
+        if (state.Interactions.Values.Any(i => IsWaiting(state, i, now) && i.Kind == InteractionKind.Coop && i.RunId == run.RunId
             && i.FromPlayerId == inviter.PlayerId))
         {
             return Decision.Reject(RejectionCodes.CoopInviteAlreadyOpen, "The run has a pending coop invitation already.");
@@ -65,7 +67,7 @@ internal static class Coop
 
         var limit = state.Rules.Interactions.MaxOpenInvitesPerPlayer
             ?? throw new InvalidOperationException("interactions.maxOpenInvitesPerPlayer is required with coop on.");
-        if (state.Interactions.Values.Count(i => IsPending(i, now) && i.FromPlayerId == inviter.PlayerId) >= limit)
+        if (state.Interactions.Values.Count(i => IsWaiting(state, i, now) && i.FromPlayerId == inviter.PlayerId) >= limit)
         {
             return Decision.Reject(RejectionCodes.InteractionTooMany, $"At most {limit} pending invitations sent.");
         }
@@ -82,7 +84,8 @@ internal static class Coop
 
     public static Decision Decide(SeasonState state, AnswerInvitation command, EngineContext context)
     {
-        if (Guard(state, command.PlayerId, context) is { } rejection)
+        // With the flag off only an accept starts a coop; a decline is still answered (D-715)
+        if (Guard(state, command.PlayerId, context, needsFlag: command.Accept) is { } rejection)
         {
             return rejection;
         }
@@ -164,7 +167,8 @@ internal static class Coop
 
     public static Decision Decide(SeasonState state, WithdrawInvitation command, EngineContext context)
     {
-        if (Guard(state, command.PlayerId, context) is { } rejection)
+        // With the flag off an invitation already sent may still be withdrawn: that starts nothing (D-715)
+        if (Guard(state, command.PlayerId, context, needsFlag: !state.Interactions.ContainsKey(command.InteractionId)) is { } rejection)
         {
             return rejection;
         }
@@ -181,7 +185,10 @@ internal static class Coop
 
     public static Decision Decide(SeasonState state, LeaveCoop command, EngineContext context)
     {
-        if (Guard(state, command.PlayerId, context) is { } rejection)
+        // A coop in progress goes on as usual with the flag off, its partner may leave it (D-715)
+        var partnering = state.Players.TryGetValue(command.PlayerId, out var partnerSide)
+            && partnerSide.ActiveRunId is { } active && state.Runs[active].PartnerId == partnerSide.PlayerId;
+        if (Guard(state, command.PlayerId, context, needsFlag: !partnering) is { } rejection)
         {
             return rejection;
         }
@@ -275,15 +282,18 @@ internal static class Coop
             .Where(i => i.Status == InteractionStatus.Pending && i.ExpiresAt <= now && InteractionRules.IsOn(state.Rules.Features, i.Kind))
             .Select(i => new InteractionExpired(i.InteractionId, InteractionExpiry.Timeout, now));
 
-    /// <summary>The coop end a player's deactivation brings (the expert panel on D-520): he leaves as if by himself.</summary>
+    /// <summary>
+    /// The coop end a player's deactivation brings (the expert panel on D-520): he leaves as if by himself, whatever the flag —
+    /// a coop in progress goes on as coop with it off (D-715).
+    /// </summary>
     public static IEnumerable<IGameEvent> OnInactive(SeasonState state, Guid playerId, DateTimeOffset now) =>
-        state.Rules.Features.Coop && state.Players[playerId].ActiveRunId is { } runId && state.Runs[runId].PartnerId == playerId
+        state.Players[playerId].ActiveRunId is { } runId && state.Runs[runId].PartnerId == playerId
             ? [new CoopLeft(runId, playerId, CoopLeaveReason.PartnerInactive, now)]
             : [];
 
-    /// <summary>The coop end of the roller's drop or tech reroll of <paramref name="run"/> (D-522); none while coop is off.</summary>
-    public static IEnumerable<IGameEvent> OnRunGivenUp(SeasonState state, RunState run, CoopLeaveReason reason, DateTimeOffset now) =>
-        state.Rules.Features.Coop && run.Coop is { } coop ? [new CoopLeft(run.RunId, coop.PlayerId, reason, now)] : [];
+    /// <summary>The coop end of the roller's drop or tech reroll of <paramref name="run"/> (D-522), whatever the flag (D-715).</summary>
+    public static IEnumerable<IGameEvent> OnRunGivenUp(RunState run, CoopLeaveReason reason, DateTimeOffset now) =>
+        run.Coop is { } coop ? [new CoopLeft(run.RunId, coop.PlayerId, reason, now)] : [];
 
     public static SeasonState Apply(SeasonState state, InteractionCreated e) =>
         state with { Interactions = state.Interactions.SetItem(e.Interaction.InteractionId, e.Interaction) };
@@ -333,10 +343,11 @@ internal static class Coop
     private static SeasonState Close(SeasonState state, Guid id, InteractionStatus status) =>
         state with { Interactions = state.Interactions.SetItem(id, state.Interactions[id] with { Status = status }) };
 
-    // The mechanic, a season running before its deadline, a known player
-    internal static Decision? Guard(SeasonState state, Guid playerId, EngineContext context)
+    // The mechanic (unless the command only ends what a coop switched off left, D-715), a season running before its deadline,
+    // a known player
+    internal static Decision? Guard(SeasonState state, Guid playerId, EngineContext context, bool needsFlag = true)
     {
-        if (state.IsCreated && !state.Rules.Features.Coop)
+        if (needsFlag && state.IsCreated && !state.Rules.Features.Coop)
         {
             return Decision.Reject(RejectionCodes.FeatureDisabled, "Coop is off in this season.");
         }
@@ -357,13 +368,16 @@ internal static class Coop
             : Decision.Reject(RejectionCodes.PlayerUnknown, $"Player {playerId} is not in the season.");
     }
 
-    // A pending invitation, by the engine's clock: past its time it is over even before the timer fired (D-523)
+    // A pending invitation, by the engine's clock: past its time it is over even before the timer fired (D-523); a response
+    // of the partner board is over with its request, closed or past its term (D-742)
     private static Decision? Pending(SeasonState state, Guid interactionId, EngineContext context) =>
         !state.Interactions.TryGetValue(interactionId, out var invitation)
             ? Decision.Reject(RejectionCodes.InteractionUnknown, $"Invitation {interactionId} is not in the season.")
             : !IsPending(invitation, context.Clock.UtcNow)
                 ? Decision.Reject(RejectionCodes.InteractionNotPending, $"Invitation {interactionId} is {invitation.Status}.")
-                : null;
+                : !IsWaiting(state, invitation, context.Clock.UtcNow)
+                    ? Decision.Reject(RejectionCodes.InteractionNotPending, $"Invitation {interactionId} closed with its partner request.")
+                    : null;
 
     // Who may be the partner (D-520, D-546 (8)): another active player of the season, not the first finisher, for whom the
     // game is not excluded (his own drop, tech reroll, «уже проходил»)
@@ -386,6 +400,14 @@ internal static class Coop
 
     internal static bool IsPending(Interaction invitation, DateTimeOffset now) =>
         invitation.Status == InteractionStatus.Pending && invitation.ExpiresAt > now;
+
+    /// <summary>
+    /// The one meaning of «still waits» for answers, withdrawals and every limit of invitations (D-523, D-742): pending by the
+    /// engine's clock, and not a response of the partner board whose request is over (closed or past its term), even before
+    /// the timers fired.
+    /// </summary>
+    internal static bool IsWaiting(SeasonState state, Interaction invitation, DateTimeOffset now) =>
+        IsPending(invitation, now) && !PartnerBoard.OutlivedItsRequest(state, invitation, now);
 
     internal static bool IsCoopGame(EngineContext context, Guid gameId) => context.Pool.Games.Any(g => g.Id == gameId && g.IsCoop);
 }

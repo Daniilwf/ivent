@@ -14,8 +14,9 @@ namespace GameEvent.Engine.Tests.Coop;
 /// Random games with the partner board (task 5.11, D-524, D-545): rolls, requests, responses, answers, direct invitations,
 /// leaving, completions, drops, tech rerolls, undos, timers and the board switched off and on among four players. After
 /// every command: the log replays to the state (1); a coop joins the roller of the run and the other side of its invitation,
-/// so a response makes the responder the partner and keeps the author the roller; while the board stayed on, an open
-/// request (by the clock) names a running run of its author without a partner, one per run.
+/// so a response makes the responder the partner and keeps the author the roller; an open request (by the clock) names a
+/// running run of its author without a partner, one per run, whether the board was switched off meanwhile or not (D-743);
+/// a pending response has an open request of its run (D-742).
 /// </summary>
 public class PartnerBoardInvariantTests
 {
@@ -67,15 +68,13 @@ public class PartnerBoardInvariantTests
             .Explained(game =>
         {
             var setup = game.History.Count;
-            var boardWasOff = false;
             foreach (var b in script)
             {
                 game.Advance(TimeSpan.FromHours(1 + (b % 3)));
                 var before = game.State;
                 var command = CommandFor(game, b, setup);
                 game.Act(command);
-                boardWasOff |= !game.State.Rules.Features.PartnerBoard;
-                Check(game, before, boardWasOff);
+                Check(game, before);
                 afterEach(game, command, before);
             }
         });
@@ -92,6 +91,9 @@ public class PartnerBoardInvariantTests
         var open = state.PartnerRequests.Values.Where(r => r.Status == PartnerRequestStatus.Open).ToList();
         var mine = open.FirstOrDefault(r => r.PlayerId == player);
         var others = open.FirstOrDefault(r => r.PlayerId != player);
+        var response = mine is null
+            ? null
+            : state.Interactions.Values.FirstOrDefault(i => i.ToPlayerId == player && i.RunId == mine.RunId && Interactions.Coop.IsWaiting(state, i, s.Clock.UtcNow));
         return ((b / 4) % 16) switch
         {
             0 or 1 or 2 => me.Phase switch
@@ -100,7 +102,9 @@ public class PartnerBoardInvariantTests
                 TurnPhase.Rolling => new StartRun(player),
                 _ => new CompleteRun(player, Difficulty.Normal),
             },
-            3 or 4 => new PostPartnerRequest(player),
+            // An author whose request is open has nothing to post: he takes a response that still waits instead, so the board's
+            // coops keep up with the closings of D-742 (a closed request cancels its responses)
+            3 or 4 => response is null ? new PostPartnerRequest(player) : new AnswerInvitation(player, response.InteractionId, Accept: true),
             5 or 6 => others is null ? new PostPartnerRequest(player) : new RespondToPartnerRequest(player, others.RequestId),
             7 or 8 => pendingTo is null
                 ? new RespondToPartnerRequest(player, open.FirstOrDefault()?.RequestId ?? Guid.Empty)
@@ -120,7 +124,7 @@ public class PartnerBoardInvariantTests
         };
     }
 
-    private static void Check(Scenario s, SeasonState before, bool boardWasOff)
+    private static void Check(Scenario s, SeasonState before)
     {
         var state = s.State;
 
@@ -140,12 +144,8 @@ public class PartnerBoardInvariantTests
             }
         }
 
-        // What a board switched off left open may outlive its run (D-420): the rest is checked while it stayed on
-        if (boardWasOff)
-        {
-            return;
-        }
-
+        // D-743 (decided by the owner 2026-11-14): the board switched off no longer lets a request outlive its run or its
+        // coop, so the requests are checked whether the board was ever off or not (was: skipped once it had been off)
         var now = s.Clock.UtcNow;
         var open = state.PartnerRequests.Values.Where(r => r.Status == PartnerRequestStatus.Open && r.ExpiresAt > now).ToList();
         foreach (var request in open)
@@ -157,5 +157,15 @@ public class PartnerBoardInvariantTests
         }
 
         Assert.Equal(open.Count, open.Select(r => r.RunId).Distinct().Count());
+
+        // D-742 (decided by the owner 2026-11-14): a pending response — a coop invitation to the roller of its run — lives
+        // only while a request of that roller on that run is open; closing the request in any way cancels it
+        foreach (var response in state.Interactions.Values.Where(i =>
+            i.Kind == InteractionKind.Coop && i.Status == InteractionStatus.Pending && i.RunId is { } runId && state.Runs[runId].PlayerId == i.ToPlayerId))
+        {
+            Assert.True(
+                state.PartnerRequests.Values.Any(r => r.RunId == response.RunId && r.PlayerId == response.ToPlayerId && r.Status == PartnerRequestStatus.Open),
+                $"The response {response.InteractionId} is pending while no request of its run is open.");
+        }
     }
 }

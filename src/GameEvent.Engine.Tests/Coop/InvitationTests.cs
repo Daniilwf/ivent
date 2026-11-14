@@ -485,18 +485,21 @@ public class InvitationTests
     }
 
     [Fact]
-    public void With_the_flag_switched_off_pending_invitations_do_not_burn_by_the_timer()
+    public void With_the_flag_switched_off_pending_invitations_burn_by_their_timer()
     {
-        // Н-25, нужно решение: the coop freezes when the flag goes off mid-season — our default, not the spec's
+        // D-715, decided by the owner 2026-11-14: with the flag off nobody starts a new coop, so a pending invitation cannot be
+        // accepted and burns at its own time (was: it froze, Н-25)
         var s = New();
         s.PlayTitle("Вася", CoopGame);
         var id = s.Invite("Вася", "Петя");
         s.WithRuleset(r => r with { Features = r.Features with { Coop = false } });
-        s.Advance(TimeSpan.FromHours(25));
+        s.Advance(TimeSpan.FromHours(24) + TimeSpan.FromMinutes(1));
 
         s.Act(new FireTimers());
 
-        Assert.Empty(s.LastEvents<InteractionExpired>());
-        Assert.Equal(InteractionStatus.Pending, s.Invitation(id).Status);
+        ScenarioAssert.Accepted(s);
+        var expired = Assert.Single(s.LastEvents<InteractionExpired>());
+        Assert.Equal((id, InteractionExpiry.Timeout), (expired.InteractionId, expired.Reason));
+        Assert.Equal(InteractionStatus.Expired, s.Invitation(id).Status);
     }
 }

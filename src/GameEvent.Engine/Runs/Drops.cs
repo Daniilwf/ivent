@@ -81,7 +81,7 @@ internal static class Drops
         var dropped = new RunDropped(run.RunId, player.PlayerId, dice, context.Clock.UtcNow);
 
         // The coop ends first: the partner is free, the drop and its penalty are the roller's alone (D-522)
-        var left = Interactions.Coop.OnRunGivenUp(state, run, Interactions.CoopLeaveReason.RollerDropped, context.Clock.UtcNow).ToList();
+        var left = Interactions.Coop.OnRunGivenUp(run, Interactions.CoopLeaveReason.RollerDropped, context.Clock.UtcNow).ToList();
 
         // The penalty and its bad event play on the state after the drop: the run is over, the player idle (D-504)
         var after = Apply(left.Aggregate(state, SeasonEngine.Apply), dropped);
@@ -131,7 +131,7 @@ internal static class Drops
         var excluded = new GameExcluded(player.PlayerId, run.GameId, ExclusionReason.TechRerolled);
 
         // The coop ends first: the partner is free without a penalty (D-522)
-        var left = Interactions.Coop.OnRunGivenUp(state, run, Interactions.CoopLeaveReason.RollerTechRerolled, now).ToList();
+        var left = Interactions.Coop.OnRunGivenUp(run, Interactions.CoopLeaveReason.RollerTechRerolled, now).ToList();
         var after = Rolling.Apply(Apply(left.Aggregate(state, SeasonEngine.Apply), rerolled), excluded);
 
         // SPEC: Playing --> Rolling. The new roll is a roll of its own, with its own free rerolls (D-07, D-94) and the
@@ -278,7 +278,7 @@ internal static class Drops
             : sum;
     }
 
-    // A coop partner still on the run (coop switched off, so no coop-left was written, D-420) is free with it
+    // A coop partner still on the run (a log from before D-715: coop switched off wrote no coop-left, D-420) is free with it
     private static SeasonState Finish(SeasonState state, Guid runId, Guid playerId, RunStatus status)
     {
         state = state with

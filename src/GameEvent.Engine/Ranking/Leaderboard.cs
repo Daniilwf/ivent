@@ -7,7 +7,7 @@ namespace GameEvent.Engine.Ranking;
 
 /// <summary>
 /// What ranking needs to know of a player (D-100): points, the cell, the finish order (null — no standing finish),
-/// whether frozen, the completed runs that count (completed and not rejected) and <see cref="PointsTick"/> — the
+/// whether frozen, the completed runs that count (completed and not rejected; a split coop run for both, D-716) and <see cref="PointsTick"/> — the
 /// number of the season's points change that set the current points (0 — never changed).
 /// </summary>
 public sealed record RankingEntry(
@@ -102,9 +102,11 @@ public static class Leaderboard
     public static IEnumerable<RankingEntry> Entries(SeasonState state)
     {
         ArgumentNullException.ThrowIfNull(state);
+        // A split coop completion counts for both its players (D-716)
         var completed = state.Runs.Values
             .Where(r => r.Status == RunStatus.Completed)
-            .CountBy(r => r.PlayerId)
+            .SelectMany(RunShares.Players)
+            .CountBy(id => id)
             .ToDictionary(x => x.Key, x => x.Value);
         return state.Players.Values.Select(p => new RankingEntry(
             p.PlayerId,

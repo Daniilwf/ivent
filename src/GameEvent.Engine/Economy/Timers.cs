@@ -46,12 +46,11 @@ public static class Timers
                 && Interactions.InteractionRules.IsOn(state.Rules.Features, i.Kind))
             .Select(i => (DateTimeOffset?)i.ExpiresAt)
             .Min();
-        var requests = Interactions.PartnerBoard.IsOn(state.Rules.Features)
-            ? state.PartnerRequests.Values
-                .Where(r => r.Status == Interactions.PartnerRequestStatus.Open && r.PlayerId == player.PlayerId)
-                .Select(r => (DateTimeOffset?)r.ExpiresAt)
-                .Min()
-            : null;
+        // A request's term runs whatever the flags (D-743)
+        var requests = state.PartnerRequests.Values
+            .Where(r => r.Status == Interactions.PartnerRequestStatus.Open && r.PlayerId == player.PlayerId)
+            .Select(r => (DateTimeOffset?)r.ExpiresAt)
+            .Min();
         return new[] { Next(player, state.Rules.Features), invitations, requests, Duels.Dueling.Next(state, player.PlayerId) }.Where(m => m is not null).Min();
     }
 
@@ -127,15 +126,17 @@ public static class Timers
 /// What follows a command's own events without being an effect (D-413): bets are decided, weekly challenges are completed
 /// or taken back (D-526), duels are won, drawn or called off (D-525), the shop price starts over,
 /// objects living for some runs count one down. Not limited by the effect chain: a settlement must never be cut.
-/// Writes nothing while the season has none of it, nor for a mechanic switched off (D-420).
+/// Writes nothing while the season has none of it, nor for a mechanic switched off (D-420) — except coop and the partner
+/// board: what they left open closes with its run, its coop or its request whatever the flags, which only refuse new coops,
+/// posts and responses (D-715, D-742, D-743).
 /// </summary>
 internal static class Settlements
 {
     public static IReadOnlyList<IGameEvent> After(SeasonState state, IReadOnlyList<IGameEvent> events, EngineContext context) =>
         Each(state, events, (s, e) => (s.Rules.Features.Bets ? Betting.Settle(s, e) : [])
             .Concat(s.Rules.Features.WeeklyChallenge ? Challenges.WeeklyChallenges.Settle(s, context.Pool, e) : [])
-            .Concat(s.Rules.Features.Coop ? Interactions.Coop.Settle(s, e, context.Clock.UtcNow) : [])
-            .Concat(Interactions.PartnerBoard.IsOn(s.Rules.Features) ? Interactions.PartnerBoard.Settle(s, e, context.Clock.UtcNow) : [])
+            .Concat(Interactions.Coop.Settle(s, e, context.Clock.UtcNow))
+            .Concat(Interactions.PartnerBoard.Settle(s, e, context.Clock.UtcNow))
             .Concat(s.Rules.Features.Duels ? Duels.Dueling.Settle(s, e, context.Clock.UtcNow) : [])
             .Concat(s.Rules.Features.Shop ? ShopReset(s, e) : [])
             .Concat(GlobalEvents.GlobalEventing.IsOn(s) ? GlobalEvents.GlobalEventing.Settle(s, e, context) : []));
@@ -166,6 +167,8 @@ internal static class Settlements
         e switch
         {
             Runs.RunCompleted c => (c.PlayerId, Rulesets.ShopPriceReset.RunCompleted),
+            // A coop completion is the partner's own run too: his price starts over, his objects count the game (D-716)
+            Interactions.CoopRewardSplit split => (split.PartnerId, Rulesets.ShopPriceReset.RunCompleted),
             Runs.RunDropped d => (d.PlayerId, Rulesets.ShopPriceReset.RunDropped),
             _ => null,
         };

@@ -13,7 +13,7 @@ namespace GameEvent.Engine.Tests.Coop;
 
 /// <summary>
 /// Findings of the review of task 5.10 (D-711): an undo of the run an invitation names waits for it, a drop or tech reroll
-/// with coop switched off frees the partner, a partner who became the first finisher is out at the completion, a bet on the
+/// with coop switched off ends the coop as usual (D-715), a partner who became the first finisher is out at the completion, a bet on the
 /// run or an inactive roller stops an accept, and an invitation past its time does not count against the limits.
 /// </summary>
 public class CoopReviewTests
@@ -34,17 +34,21 @@ public class CoopReviewTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public void With_coop_switched_off_the_rollers_drop_or_tech_reroll_frees_the_partner(bool drop)
+    public void With_coop_switched_off_the_rollers_drop_or_tech_reroll_ends_the_coop_as_usual(bool drop)
     {
-        // Н-25, нужно решение: with the flag off nothing of coop is written, the partner is freed with the run
+        // D-715, decided by the owner 2026-11-14: a coop in progress goes on as coop with the flag off, so its end is logged
+        // as with the flag on (was: nothing of coop was written, the partner was freed silently)
         var s = New();
-        s.CoopRun();
+        var run = s.CoopRun();
         s.WithRuleset(r => r with { Features = r.Features with { Coop = false } });
 
         s.Act(drop ? new DropRun(s.PlayerId("Вася")) : new TechReroll(s.PlayerId("Вася"), TechRerollReason.WeakPc, Comment: null));
 
         ScenarioAssert.Accepted(s);
-        Assert.Empty(s.LastEvents<CoopLeft>());
+        var left = Assert.Single(s.LastEvents<CoopLeft>());
+        Assert.Equal(
+            (run, s.PlayerId("Петя"), drop ? CoopLeaveReason.RollerDropped : CoopLeaveReason.RollerTechRerolled),
+            (left.RunId, left.PlayerId, left.Reason));
         Assert.Equal((TurnPhase.Idle, (Guid?)null), (s.Player("Петя").Phase, s.Player("Петя").ActiveRunId));
     }
 

@@ -72,6 +72,14 @@ internal static class RulesetChanges
                 "A duel is open or won with a run whose proof is not approved yet: switch duels off after they are settled.");
         }
 
+        // D-715: a coop in progress is still split at its completion with coop off, so its coins share stays until it ends
+        if (command.Ruleset.Reward.Coop.CoinsShare is null
+            && state.Runs.Values.Any(r => r.Status == Runs.RunStatus.Playing && r.Coop is not null))
+        {
+            return Decision.Reject(
+                RejectionCodes.CoopInPlay, "A coop run is in progress: reward.coop.coinsShare stays until it ends, it is split by it.");
+        }
+
         // D-685: with events off nobody reviews an IRL proof, and the results wait for it — switch events off after the reviews
         if (state.Rules.Features.Events && !command.Ruleset.Features.Events && Proofs.IrlProofs.Waiting(state) is { Count: > 0 } waiting)
         {

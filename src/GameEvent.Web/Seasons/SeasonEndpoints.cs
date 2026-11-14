@@ -615,6 +615,14 @@ public static class SeasonEndpoints
             .GroupBy(r => r.PlayerId)
             .Select(g => new { g.Key, Count = g.Count() })
             .ToDictionaryAsync(x => x.Key, x => x.Count, ct);
+        // A split coop run still completed is the partner's completed run too, for the tiebreaker as the engine counts it (D-716)
+        foreach (var partnered in await CoopPartnerRuns.LoadAsync(db, [seasonId], null, ct))
+        {
+            if (partnered.Status == RunStatus.Completed)
+            {
+                completedRuns[partnered.PartnerId] = completedRuns.GetValueOrDefault(partnered.PartnerId) + 1;
+            }
+        }
         var result = await db.SeasonResults.AsNoTracking().Where(x => x.SeasonId == seasonId).OrderBy(x => x.Row).ToListAsync(ct);
         var leaderboard = result.Count > 0
             ? [.. result.Select(x => new LeaderboardRow(x.PlayerId, x.Place, x.Points, x.CellsToFinish, x.IsFirst, x.Provisional))]
@@ -709,11 +717,13 @@ public static class SeasonEndpoints
             var drop = rules.Drop;
             var techRerollOpen = playing && now - run!.RolledAt <= TimeSpan.FromHours(snapshot!.TechRerollWindowHours);
 
-            // D-205: the drops in a row before this run add their dice; D-206: a wish reroll of a listed genre
+            // D-205: the drops in a row before this run add their dice, a split coop run he partnered ends them as his own
+            // (D-716, standing where he joined it, as DropStreak.Before); D-206: a wish reroll of a listed genre
             var streak = playing
                 ? DropStreak.Count(
                     (await db.Runs.AsNoTracking().Where(r => r.PlayerId == mine.Id).Select(r => new { r.Id, r.RolledAt, r.Status }).ToListAsync(ct))
-                        .Select(r => (r.Id, r.RolledAt, r.Status)),
+                        .Select(r => (r.Id, r.RolledAt, r.Status))
+                        .Concat((await CoopPartnerRuns.LoadAsync(db, [seasonId], [mine.Id], ct)).Select(r => (r.RunId, r.JoinedAt, r.Status))),
                     run!.Id,
                     run.RolledAt)
                 : 0;

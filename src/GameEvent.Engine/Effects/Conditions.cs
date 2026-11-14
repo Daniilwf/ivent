@@ -52,10 +52,10 @@ internal static class Conditions
         return dice.Count >= minDice && dice.All(d => d.Value == d.Sides);
     }
 
-    // The owner's completed runs from the latest back, while their games have the tag.
+    // The owner's completed runs from the latest back, while their games have the tag; a split coop run is his too (D-716).
     private static int Streak(SeasonState state, Pool.IPoolView pool, Guid ownerId, string tag) =>
         state.Runs.Values
-            .Where(r => r.PlayerId == ownerId && r.Status == RunStatus.Completed)
+            .Where(r => r.Status == RunStatus.Completed && RunShares.Players(r).Contains(ownerId))
             .OrderByDescending(r => r.CompletedAt)
             .TakeWhile(r => pool.Games.FirstOrDefault(g => g.Id == r.GameId)?.Tags.Contains(tag, StringComparer.OrdinalIgnoreCase) == true)
             .Count();

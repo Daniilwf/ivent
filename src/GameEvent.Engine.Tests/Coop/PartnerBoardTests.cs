@@ -42,6 +42,12 @@ internal static class PartnerBoardSteps
     public static PartnerRequest Request(this Scenario s, Guid request) => s.State.PartnerRequests[request];
 
     /// <summary>
+    /// Why a pending response is closed together with its request (D-742, decided by the owner 2026-11-14), written as
+    /// <c>requestClosed</c>.
+    /// </summary>
+    public static InteractionExpiry RequestClosed => InteractionExpiry.RequestClosed;
+
+    /// <summary>
     /// What the board keeps true after every command: an open request names a running run of its author with no partner, at
     /// most one open request per run, and the log replays to the state.
     /// </summary>
@@ -67,7 +73,7 @@ internal static class PartnerBoardSteps
 /// The partner board (EV32, EV42; D-524, D-545, D-712, D-713, D-740, Н-26): the roller of a running coop game without a
 /// partner posts a request; another player's response is a coop invitation from him to the author, so the author keeps the
 /// roll and both sides agree; several responses may wait on one request, accepting one supersedes the others and closes the
-/// request. A request closes by a coop, by its term, by its author. Scenarios S5.11-01 (posting), -02 (refused requests),
+/// request. A request closes by a coop, by its term, by its author, and takes its pending responses along (D-742). Scenarios S5.11-01 (posting), -02 (refused requests),
 /// -03 (response and accept), -04 (refused responses), -05 (closing by the term and by the author, Н-26), -08 (the first
 /// finisher) of the stage 5 plan; the run's end, the deadline, the flags and undo are in <see cref="PartnerBoardEndTests"/>.
 /// </summary>
@@ -580,34 +586,39 @@ public class PartnerBoardTests
         s.Rejects(new ClosePartnerRequest(s.PlayerId("Маша"), request), RejectionCodes.PartnerRequestNotAuthor);
     }
 
-    // ---- Responses outlive their request (Н-26, our default) ----
+    // ---- Responses are cancelled with their request (Н-26, D-742) ----
 
     [Fact]
-    public void A_response_to_a_request_the_author_closed_stays_pending_and_the_author_may_still_accept_it()
+    public void Closing_the_request_by_its_author_cancels_its_pending_responses()
     {
-        // Н-26, нужно решение: our default — the response is an invitation like any, it lives to its own term
+        // D-742, decided by the owner 2026-11-14 (was: the response lived to its own term and could still be accepted)
         var s = PartnerBoardSteps.Board();
         var run = s.PlayTitle("Вася", CoopGame);
         var request = s.Post("Вася");
-        var response = s.Respond("Петя", request);
+        var fromPetya = s.Respond("Петя", request);
+        var fromMasha = s.Respond("Маша", request);
+        var now = s.Clock.UtcNow;
 
         s.Act(new ClosePartnerRequest(s.PlayerId("Вася"), request));
+
         ScenarioAssert.Accepted(s);
-        Assert.Empty(s.LastEvents<InteractionExpired>());
-        Assert.Equal(InteractionStatus.Pending, s.Invitation(response).Status);
+        Assert.Equal(new PartnerRequestClosed(request, PartnerRequestCloseReason.Author, now), Assert.Single(s.LastEvents<PartnerRequestClosed>()));
+        Assert.Equal(
+            new[] { new InteractionExpired(fromPetya, PartnerBoardSteps.RequestClosed, now), new InteractionExpired(fromMasha, PartnerBoardSteps.RequestClosed, now) }
+                .OrderBy(e => e.InteractionId),
+            s.LastEvents<InteractionExpired>().OrderBy(e => e.InteractionId));
+        Assert.Equal(InteractionStatus.Expired, s.Invitation(fromPetya).Status);
+        Assert.Equal(InteractionStatus.Expired, s.Invitation(fromMasha).Status);
 
-        s.Accept("Вася", response);
-
-        Assert.Equal(s.PlayerId("Петя"), s.State.Runs[run].PartnerId);
-        Assert.Equal(s.PlayerId("Вася"), s.State.Runs[run].PlayerId);
-        Assert.Empty(s.LastEvents<PartnerRequestClosed>());
+        s.Rejects(new AnswerInvitation(s.PlayerId("Вася"), fromPetya, Accept: true), RejectionCodes.InteractionNotPending);
+        Assert.Null(s.State.Runs[run].Coop);
         PartnerBoardSteps.AssertBoardHolds(s);
     }
 
     [Fact]
-    public void A_response_to_a_request_that_timed_out_stays_pending_to_its_own_term()
+    public void A_request_timing_out_cancels_its_pending_responses()
     {
-        // Н-26: the response made at hour 47 lives 24 hours, the request ends at hour 48
+        // D-742: the response made at hour 47 would live 24 hours; the request ends at hour 48 and takes it along
         var s = PartnerBoardSteps.Board();
         var run = s.PlayTitle("Вася", CoopGame);
         var request = s.Post("Вася");
@@ -616,42 +627,122 @@ public class PartnerBoardTests
         s.Advance(TimeSpan.FromHours(1));
 
         s.Act(new FireTimers());
+
         ScenarioAssert.Accepted(s);
         Assert.Equal(PartnerRequestCloseReason.Timeout, Assert.Single(s.LastEvents<PartnerRequestClosed>()).Reason);
-        Assert.DoesNotContain(s.LastEvents<InteractionExpired>(), e => e.InteractionId == response);
-        Assert.Equal(InteractionStatus.Pending, s.Invitation(response).Status);
+        var expired = Assert.Single(s.LastEvents<InteractionExpired>(), e => e.InteractionId == response);
+        Assert.Equal(PartnerBoardSteps.RequestClosed, expired.Reason);
+        Assert.Equal(InteractionStatus.Expired, s.Invitation(response).Status);
 
-        s.Accept("Вася", response);
-        Assert.Equal(s.PlayerId("Петя"), s.State.Runs[run].PartnerId);
+        s.Rejects(new AnswerInvitation(s.PlayerId("Вася"), response, Accept: true), RejectionCodes.InteractionNotPending);
+        Assert.Null(s.State.Runs[run].Coop);
     }
 
     [Fact]
-    public void A_response_outliving_its_request_burns_by_its_own_term()
+    public void Past_the_requests_term_its_response_is_not_accepted_even_before_the_timer_fired()
     {
+        // D-741 (2): a request past its term is closed by the clock already; D-742: its responses close with it
+        var s = PartnerBoardSteps.Board();
+        var run = s.PlayTitle("Вася", CoopGame);
+        var request = s.Post("Вася");
+        s.Advance(TimeSpan.FromHours(47));
+        var response = s.Respond("Петя", request);
+        s.Advance(TimeSpan.FromHours(1));
+
+        s.Rejects(new AnswerInvitation(s.PlayerId("Вася"), response, Accept: true), RejectionCodes.InteractionNotPending);
+
+        Assert.Null(s.State.Runs[run].Coop);
+    }
+
+    [Fact]
+    public void A_response_whose_request_is_over_by_the_clock_holds_no_slot_of_the_invitations()
+    {
+        // D-742 with the limit (D-523): the response is no longer pending once its request's term ran out, even before the
+        // timer fired — so it does not keep the responder's only slot until its own term
+        var s = PartnerBoardSteps.Board(r => r.WithCoop(maxOpenInvites: 1), requestTtlHours: 6);
+        s.PlayTitle("Вася", CoopGame);
+        var vasyas = s.Post("Вася");
+        var outlived = s.Respond("Петя", vasyas);
+        s.PlayTitle("Маша", SecondCoopGame);
+        var mashas = s.Post("Маша");
+        s.Advance(TimeSpan.FromHours(4));
+        Assert.Equal(InteractionStatus.Pending, s.Invitation(outlived).Status);
+
+        s.Act(new RespondToPartnerRequest(s.PlayerId("Петя"), mashas));
+
+        ScenarioAssert.Accepted(s);
+        Assert.Single(s.LastEvents<InteractionCreated>());
+    }
+
+    [Fact]
+    public void A_response_whose_request_is_still_open_holds_its_slot()
+    {
+        // The boundary of the test above: one minute before the request's term the response still waits
+        var s = PartnerBoardSteps.Board(r => r.WithCoop(maxOpenInvites: 1), requestTtlHours: 6);
+        s.PlayTitle("Вася", CoopGame);
+        var vasyas = s.Post("Вася");
+        s.Respond("Петя", vasyas);
+        s.PlayTitle("Маша", SecondCoopGame);
+        var mashas = s.Post("Маша");
+        s.Advance(TimeSpan.FromHours(4) - TimeSpan.FromMinutes(1));
+
+        s.Rejects(new RespondToPartnerRequest(s.PlayerId("Петя"), mashas), RejectionCodes.InteractionTooMany);
+    }
+
+    [Fact]
+    public void A_response_cancelled_with_its_request_does_not_burn_again_at_its_own_term()
+    {
+        // Was «a response outliving its request burns by its own term»: under D-742 no response outlives its request
         var s = PartnerBoardSteps.Board();
         s.PlayTitle("Вася", CoopGame);
         var request = s.Post("Вася");
         var response = s.Respond("Петя", request);
         s.Act(new ClosePartnerRequest(s.PlayerId("Вася"), request));
+        ScenarioAssert.Accepted(s);
+        Assert.Contains(s.LastEvents<InteractionExpired>(), e => e.InteractionId == response);
         s.Advance(TimeSpan.FromHours(24) + TimeSpan.FromMinutes(1));
 
-        s.Act(new FireTimers());
+        // Nothing is left for the timer: its own term burns nothing a second time
+        s.Rejects(new FireTimers(), RejectionCodes.TimersNothingDue);
+        Assert.Equal(InteractionStatus.Expired, s.Invitation(response).Status);
+    }
+
+    [Fact]
+    public void Closing_a_request_leaves_answered_responses_direct_invitations_and_other_requests_alone()
+    {
+        // The boundary of D-742: only the still pending responses of that request are cancelled
+        var s = PartnerBoardSteps.Board();
+        s.PlayTitle("Вася", CoopGame);
+        var request = s.Post("Вася");
+        var declined = s.Respond("Петя", request);
+        s.Answer("Вася", declined, accept: false);
+        ScenarioAssert.Accepted(s);
+        var pending = s.Respond("Маша", request);
+        var direct = s.Invite("Вася", "Коля");
+        s.PlayTitle("Петя", SecondCoopGame);
+        var other = s.Post("Петя");
+        var toOther = s.Respond("Коля", other);
+        var now = s.Clock.UtcNow;
+
+        s.Act(new ClosePartnerRequest(s.PlayerId("Вася"), request));
 
         ScenarioAssert.Accepted(s);
-        var expired = Assert.Single(s.LastEvents<InteractionExpired>());
-        Assert.Equal((response, InteractionExpiry.Timeout), (expired.InteractionId, expired.Reason));
+        Assert.Equal(new InteractionExpired(pending, PartnerBoardSteps.RequestClosed, now), Assert.Single(s.LastEvents<InteractionExpired>()));
+        Assert.Equal(InteractionStatus.Declined, s.Invitation(declined).Status);
+        Assert.Equal(InteractionStatus.Pending, s.Invitation(direct).Status);
+        Assert.Equal(InteractionStatus.Pending, s.Invitation(toOther).Status);
+        Assert.Equal(PartnerRequestStatus.Open, s.Request(other).Status);
     }
 
     [Fact]
     public void Accepting_a_response_checks_the_responder_again()
     {
-        // D-712 holds for responses: Петя rolled a game of his own after responding — the accept is refused
+        // D-712 holds for responses: Петя rolled a game of his own after responding — the accept is refused (the request
+        // stays open here: closing it would cancel the response first, D-742)
         var s = PartnerBoardSteps.Board();
         s.PlayTitle("Вася", CoopGame);
         var request = s.Post("Вася");
         var response = s.Respond("Петя", request);
-        s.Act(new ClosePartnerRequest(s.PlayerId("Вася"), request));
-        ScenarioAssert.Accepted(s);
         s.RollTitle("Петя", SoloGame);
 
         s.Rejects(new AnswerInvitation(s.PlayerId("Вася"), response, Accept: true), RejectionCodes.CoopPartnerBusy);
