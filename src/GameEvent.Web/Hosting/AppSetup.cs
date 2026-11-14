@@ -49,6 +49,14 @@ public static class AppSetup
 
     public const int SeasonReadsPerMinute = 60;
 
+    /// <summary>
+    /// The season view (the main screen, D-828): it folds the season's events, so per user — enough for a page that refetches
+    /// after every command of a busy season, not for a loop.
+    /// </summary>
+    public const string SeasonViewRateLimit = "season-view";
+
+    public const int SeasonViewsPerMinute = 240;
+
     /// <summary>The map editor's checks (D-315): one after each edit settles, so more than the admin's other reads.</summary>
     public const string MapCheckRateLimit = "map-check";
 

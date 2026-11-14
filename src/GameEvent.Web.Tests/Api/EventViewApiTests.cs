@@ -23,6 +23,46 @@ public sealed class EventViewApiTests : IAsyncLifetime
 
     public async ValueTask DisposeAsync() => await _site.DisposeAsync();
 
+    // ---- The cost of the season view ----
+
+    [Fact]
+    public async Task Many_season_views_in_a_row_are_limited_per_user()
+    {
+        // The view folds the season's events (D-824, D-828): a player looping it gets 429, the others are not held up
+        var admin = await _site.SignedInAsync("admin");
+        var vasya = await _site.SignedInAsync("vasya");
+        var petya = await _site.SignedInAsync("petya");
+        await SetUpAsync(admin, Tailwind);
+        var codes = new List<HttpStatusCode>();
+        for (var i = 0; i < Hosting.AppSetup.SeasonViewsPerMinute + 10; i++)
+        {
+            codes.Add((await vasya.GetAsync(Season, Ct)).StatusCode);
+        }
+
+        Assert.Equal(HttpStatusCode.OK, codes[0]);
+        Assert.Contains(HttpStatusCode.TooManyRequests, codes);
+        Assert.All(codes, c => Assert.True(c is HttpStatusCode.OK or HttpStatusCode.TooManyRequests, $"Unexpected {c}."));
+        var firstLimited = codes.IndexOf(HttpStatusCode.TooManyRequests);
+        Assert.All(codes.Skip(firstLimited), c => Assert.Equal(HttpStatusCode.TooManyRequests, c));
+        Assert.Equal(HttpStatusCode.OK, (await petya.GetAsync(Season, Ct)).StatusCode);
+    }
+
+    [Fact]
+    public async Task The_view_follows_every_new_event_of_the_season()
+    {
+        // The folded season is kept between reads and caught up with the new events only (D-828): each read sees the latest
+        var admin = await _site.SignedInAsync("admin");
+        var vasya = await _site.SignedInAsync("vasya");
+        await SetUpAsync(admin, Tailwind);
+        Assert.Empty((await MeAsync(vasya)).GetProperty("waitingEvents").EnumerateArray());
+
+        await DropAsync(vasya);
+        Assert.Single((await MeAsync(vasya)).GetProperty("waitingEvents").EnumerateArray());
+
+        await CompleteAsync(vasya);
+        Assert.Empty((await MeAsync(vasya)).GetProperty("waitingEvents").EnumerateArray());
+    }
+
     // ---- Accumulated events in my view ----
 
     [Fact]

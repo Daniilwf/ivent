@@ -113,6 +113,39 @@ public sealed class RunConditionApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task The_admin_sees_the_unmet_condition_in_the_proof_queue_waives_it_and_sees_it_waived()
+    {
+        // D-546 (2), D-827: the «не применимо» button needs to know which run fails which condition
+        var (admin, vasya) = await ConditionAsync();
+        var runId = await CompleteAsync(vasya, "normal");
+
+        var item = await QueueItemAsync(admin, runId);
+        AssertNotEvenSweating(Assert.Single(item.GetProperty("conditions").EnumerateArray()));
+        Assert.False(item.GetProperty("conditionCheck").GetProperty("met").GetBoolean());
+        Assert.False(item.GetProperty("conditionCheck").GetProperty("waived").GetBoolean());
+
+        await PostOkAsync(admin, WaiveUrl(runId), new { commandId = Guid.NewGuid(), comment = "Сложности в игре нет" });
+
+        var waived = (await QueueItemAsync(admin, runId)).GetProperty("conditionCheck");
+        Assert.True(waived.GetProperty("met").GetBoolean());
+        Assert.True(waived.GetProperty("waived").GetBoolean());
+    }
+
+    [Fact]
+    public async Task A_run_without_conditions_has_none_in_the_proof_queue()
+    {
+        var admin = await _site.SignedInAsync("admin");
+        var vasya = await _site.SignedInAsync("vasya");
+        await SetUpAsync(admin, Tailwind);
+        var runId = await CompleteAsync(vasya);
+
+        var item = await QueueItemAsync(admin, runId);
+
+        Assert.Empty(item.GetProperty("conditions").EnumerateArray());
+        Assert.Equal(JsonValueKind.Null, item.GetProperty("conditionCheck").ValueKind);
+    }
+
+    [Fact]
     public async Task The_same_command_id_twice_waives_once()
     {
         var (admin, vasya) = await ConditionAsync();
@@ -224,6 +257,9 @@ public sealed class RunConditionApiTests : IAsyncLifetime
         await DropAsync(vasya);
         return (admin, vasya);
     }
+
+    private static async Task<JsonElement> QueueItemAsync(HttpClient admin, Guid runId) =>
+        (await ApiCalls.OkAsync(await admin.GetAsync($"{Admin}/proofs", Ct))).EnumerateArray().Single(i => i.GetProperty("runId").GetGuid() == runId);
 
     private static void AssertNotEvenSweating(JsonElement condition)
     {

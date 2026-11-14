@@ -72,19 +72,23 @@ internal static class EventSeason
 
     public static string Admin => $"/api/admin/seasons/{SiteFactory.SeasonId}";
 
-    /// <summary>The rules on, the long map, and a pack whose bad deck holds <paramref name="badEvent"/>.</summary>
-    public static async Task SetUpAsync(HttpClient admin, string badEvent, int maxFiles = 5)
+    /// <summary>
+    /// The rules on, the long map, and a pack whose bad deck holds <paramref name="badEvent"/>; <paramref name="extra"/> —
+    /// more objects it needs (an object it gives), outside the decks.
+    /// </summary>
+    public static async Task SetUpAsync(HttpClient admin, string badEvent, int maxFiles = 5, params string[] extra)
     {
         await SwitchEventsAsync(admin, on: true, maxFiles);
         await ApiCalls.PostOkAsync(admin, $"{Admin}/map/publish", new { commandId = Guid.NewGuid(), map = LongMap(), comment = "Длинная карта" });
-        await ApiCalls.PostOkAsync(admin, $"/api/test/seasons/{SiteFactory.SeasonId}/content", Pack(badEvent));
+        await ApiCalls.PostOkAsync(admin, $"/api/test/seasons/{SiteFactory.SeasonId}/content", Pack(badEvent, extra));
     }
 
     /// <summary>The objects and decks of <see cref="SetUpAsync"/> as the test endpoint takes them.</summary>
-    public static object Pack(string badEvent)
+    public static object Pack(string badEvent, params string[] extra)
     {
         var badId = JsonNode.Parse(badEvent)!["id"]!.GetValue<string>();
         var objects = new List<string> { badEvent, Gamble };
+        objects.AddRange(extra);
         if (badId != "tailwind")
         {
             objects.Add(Tailwind);
