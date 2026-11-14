@@ -68,6 +68,10 @@ public sealed record CommandUndone(
     [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     EquatableArray<Guid>? RemovedPolls = null,
     [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    EquatableArray<GlobalEvents.GlobalEventState>? GlobalEvents = null,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    EquatableArray<Guid>? RemovedGlobalEvents = null,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     EquatableArray<Duels.Duel>? Duels = null,
     [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     EquatableArray<Guid>? RemovedDuels = null) : IGameEvent;
@@ -185,6 +189,13 @@ internal static class Undoing
             return Decision.Reject(RejectionCodes.SeasonDeadlinePassed, "The deadline has passed: the season stays closed.");
         }
 
+        // D-750, D-751: an undo never leaves more global events running than globalEvents.maxActive, nor one running or
+        // counting an unchecked run while the mechanic is off — a later launch or switch-off decided by the state it undoes
+        if (GlobalEvents.GlobalEventing.RefuseUndo(state, Apply(state, compensation), context.Clock.UtcNow) is { } refused)
+        {
+            return refused;
+        }
+
         return Decision.Accept(compensation);
     }
 
@@ -202,7 +213,7 @@ internal static class Undoing
 
     // A part's key «challenge:{id}:{playerId}» or «author:{playerId}:{suggestionId}» belongs to the whole before its last colon
     private static string? WholeOf(string key) =>
-        new[] { ChallengePrefix, AuthorPrefix, PollPrefix }.FirstOrDefault(p => key.StartsWith(p, StringComparison.Ordinal)) is { } prefix
+        new[] { ChallengePrefix, AuthorPrefix, PollPrefix, GlobalEventPrefix }.FirstOrDefault(p => key.StartsWith(p, StringComparison.Ordinal)) is { } prefix
             && key.LastIndexOf(':') is var last && last > prefix.Length
             ? key[..last]
             : null;
@@ -210,6 +221,42 @@ internal static class Undoing
     private const string ChallengePrefix = "challenge:";
 
     private const string PollPrefix = "poll:";
+
+    private const string GlobalEventPrefix = "globalEvent:";
+
+    /// <summary>The runs whose contributions differ between two versions of a global event.</summary>
+    private static IEnumerable<Guid> ContributionsChanged(GlobalEvents.GlobalEventState? was, GlobalEvents.GlobalEventState? now)
+    {
+        var (a, b) = (was?.Contributions ?? [], now?.Contributions ?? []);
+        return a.Concat(b).Select(c => c.RunId).Distinct()
+            .Where(r => a.FirstOrDefault(c => c.RunId == r) != b.FirstOrDefault(c => c.RunId == r))
+            .Order();
+    }
+
+    /// <summary>
+    /// The global event as the undo leaves it (D-750): as it is now, with what the target command changed of it as it was —
+    /// the contributions of its runs, its end, or the event itself (the goal reached). Nothing later touched those parts
+    /// (that is when an undo is allowed).
+    /// </summary>
+    private static GlobalEvents.GlobalEventState Restored(
+        GlobalEvents.GlobalEventState was, GlobalEvents.GlobalEventState? after, GlobalEvents.GlobalEventState? now)
+    {
+        if (now is null || after is null)
+        {
+            return was;
+        }
+
+        var runs = ContributionsChanged(was, after).ToHashSet();
+        var ended = (was.Status, was.EndReason) != (after.Status, after.EndReason);
+        var basis = Whole(was) != Whole(after) ? was : now;
+        return basis with
+        {
+            Status = ended ? was.Status : now.Status,
+            EndReason = ended ? was.EndReason : now.EndReason,
+            Contributions = GlobalEvents.GlobalEventing.Ordered(
+                now.Contributions.Where(c => !runs.Contains(c.RunId)).Concat(was.Contributions.Where(c => runs.Contains(c.RunId)))),
+        };
+    }
 
     /// <summary>The users whose votes differ between two versions of a poll.</summary>
     private static IEnumerable<Guid> VotesChanged(Polls.Poll? was, Polls.Poll? now)
@@ -219,6 +266,10 @@ internal static class Undoing
             .Where(u => a.FirstOrDefault(v => v.UserId == u) != b.FirstOrDefault(v => v.UserId == u))
             .Order();
     }
+
+    // A global event without its parts: the contributions and the end, each its own key (D-750)
+    private static GlobalEvents.GlobalEventState Whole(GlobalEvents.GlobalEventState global) =>
+        global with { Contributions = [], Status = GlobalEvents.GlobalEventStatus.Active, EndReason = null };
 
     public static SeasonState Apply(SeasonState state, CommandUndone e)
     {
@@ -235,9 +286,12 @@ internal static class Undoing
         var requests = state.PartnerRequests.RemoveRange(e.RemovedPartnerRequests ?? [])
             .SetItems((e.PartnerRequests ?? []).Select(x => KeyValuePair.Create(x.RequestId, x)));
         var polls = state.Polls.RemoveRange(e.RemovedPolls ?? []).SetItems((e.Polls ?? []).Select(x => KeyValuePair.Create(x.PollId, x)));
+        var globals = state.GlobalEvents.RemoveRange(e.RemovedGlobalEvents ?? [])
+            .SetItems((e.GlobalEvents ?? []).Select(x => KeyValuePair.Create(x.GlobalEventId, x)));
         var duels = state.Duels.RemoveRange(e.RemovedDuels ?? []).SetItems((e.Duels ?? []).Select(x => KeyValuePair.Create(x.DuelId, x)));
         var restored = state with
         {
+            GlobalEvents = globals,
             Polls = polls,
             Players = players,
             Runs = runs,
@@ -395,6 +449,28 @@ internal static class Undoing
             }
         }
 
+        // A global event as a whole (launched, its goal reached) and its parts — a run's contribution, the end: the whole holds
+        // the parts, the parts stay independent of each other (D-750)
+        foreach (var id in Changed(before.GlobalEvents, after.GlobalEvents))
+        {
+            var (was, now) = (before.GlobalEvents.GetValueOrDefault(id), after.GlobalEvents.GetValueOrDefault(id));
+            if (was is null || now is null || Whole(was) != Whole(now))
+            {
+                keys.Add($"{GlobalEventPrefix}{id}");
+            }
+
+            // Its end is a part too: completions before it stay undoable after it (D-750)
+            if (was is not null && now is not null && (was.Status, was.EndReason) != (now.Status, now.EndReason))
+            {
+                keys.Add($"{GlobalEventPrefix}{id}:end");
+            }
+
+            foreach (var run in ContributionsChanged(was, now))
+            {
+                keys.Add($"{GlobalEventPrefix}{id}:{run}");
+            }
+        }
+
         // A duel: its challenge, answer and end (D-525 (8), D-730). What a command decides of duels reads the duel standing of
         // its players — their open duels, their wins, a race still to win — so it holds the players' «duels:» key too: a later
         // challenge or answer of one of them, and a run of one of them ending within a race of his, wait for it (D-735)
@@ -478,6 +554,16 @@ internal static class Undoing
                 keys.Add($"{kind}:{id}");
             }
 
+            // A completion that did not count because the event had ended holds that end: undoing the end would leave it out (D-750)
+            if (e is RunCompleted completed)
+            {
+                foreach (var global in before.GlobalEvents.Values.Where(g => g.Goal is not null && g.Status == GlobalEvents.GlobalEventStatus.Ended
+                    && g.InWindow(completed.CompletedAt)))
+                {
+                    keys.Add($"{GlobalEventPrefix}{global.GlobalEventId}:end");
+                }
+            }
+
             if (e is Suggestions.SuggestionSubmitted submitted)
             {
                 keys.Add($"{AuthorPrefix}{submitted.PlayerId}:{submitted.SuggestionId}");
@@ -544,6 +630,7 @@ internal static class Undoing
         var interactions = Changed(before.Interactions, after.Interactions).ToList();
         var requests = Changed(before.PartnerRequests, after.PartnerRequests).ToList();
         var polls = Changed(before.Polls, after.Polls).ToList();
+        var globals = Changed(before.GlobalEvents, after.GlobalEvents).ToList();
         var duels = Changed(before.Duels, after.Duels).ToList();
         var seasonChanged = before.Status != after.Status || before.Deadline != after.Deadline || before.Name != after.Name
             || before.Ruleset != after.Ruleset;
@@ -577,6 +664,11 @@ internal static class Undoing
             OrNull([.. polls.Where(before.Polls.ContainsKey)
                 .Select(id => Restored(before.Polls[id], after.Polls.GetValueOrDefault(id), now.Polls.GetValueOrDefault(id)))]),
             OrNull([.. polls.Where(id => !before.Polls.ContainsKey(id) && now.Polls.ContainsKey(id))]),
+
+            // A global event as it was, with the contributions of the runs the command changed as they were (D-750)
+            OrNull([.. globals.Where(before.GlobalEvents.ContainsKey)
+                .Select(id => Restored(before.GlobalEvents[id], after.GlobalEvents.GetValueOrDefault(id), now.GlobalEvents.GetValueOrDefault(id)))]),
+            OrNull([.. globals.Where(id => !before.GlobalEvents.ContainsKey(id) && now.GlobalEvents.ContainsKey(id))]),
             OrNull([.. duels.Where(before.Duels.ContainsKey).Select(id => before.Duels[id])]),
             OrNull([.. duels.Where(id => !before.Duels.ContainsKey(id) && now.Duels.ContainsKey(id))]));
     }

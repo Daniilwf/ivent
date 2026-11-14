@@ -450,9 +450,9 @@ public class PollTests
     [InlineData("move")]
     [InlineData("teleport")]
     [InlineData("caseMove")]
-    public void A_result_on_everyone_may_not_move_or_teleport(string what)
+    public void A_result_on_everyone_may_move_or_teleport_since_the_owners_decision(string what)
     {
-        // S5.8-21, D-519: 16 pushes with their cells do not fit the chain
+        // S5.8-21 changed by D-757 (the owner, 2026-11-14, lifting D-519): the result on everyone is settled in batches of players
         var all = new TargetSpec { Selector = TargetSelector.All };
         var effect = what switch
         {
@@ -470,7 +470,9 @@ public class PollTests
         };
         var s = Season();
 
-        ScenarioAssert.RejectsWithoutChanges(s, x => x.Act(new StartPoll(ListEffectPoll(effect))), RejectionCodes.ContentInvalid);
+        s.Act(new StartPoll(ListEffectPoll(effect)));
+
+        ScenarioAssert.Accepted(s);
     }
 
     [Fact]

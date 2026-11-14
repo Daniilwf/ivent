@@ -248,19 +248,30 @@ public class DeckTests
     }
 
     [Theory]
-    [InlineData("move", true)]
-    [InlineData("teleport", true)]
-    [InlineData("caseMove", true)]
+    [InlineData("move", false)]
+    [InlineData("teleport", false)]
+    [InlineData("caseMove", false)]
     [InlineData("coins", false)]
-    public void An_event_on_everyone_may_not_move_or_teleport(string what, bool refused)
+    [InlineData("askingMove", true)]
+    public void An_event_on_everyone_may_move_unless_it_asks(string what, bool refused)
     {
-        // D-549 (as D-519): 16 pushes with their cells would not fit the 50 events of the chain — until 5.9
+        // D-757 (the owner's decision of 2026-11-14, lifting D-549): an event on everyone is settled in batches of players, so
+        // it may move them; one that asks stays in its drawer's command and may not
         var tailwind = EconomyScenario.Examples()["tailwind"];
         var all = new TargetSpec { Selector = TargetSelector.All };
         var effect = what switch
         {
             "move" => new EffectSpec { Target = all, Actions = [new MoveAction { Steps = ContentValue.Of(1) }] },
             "teleport" => new EffectSpec { Target = all, Actions = [new TeleportAction { Cell = "start" }] },
+            "askingMove" => new EffectSpec
+            {
+                Target = all,
+                Actions =
+                [
+                    new RequestChoiceAction { Prompt = "Сколько?", Options = new ChoiceOptionsSpec { List = ["1", "2"] } },
+                    new MoveAction { Steps = ContentValue.Of(1) },
+                ],
+            },
             "caseMove" => new EffectSpec
             {
                 Target = all,

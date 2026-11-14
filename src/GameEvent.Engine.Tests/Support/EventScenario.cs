@@ -34,6 +34,21 @@ public static class EventScenario
         };
     }
 
+    /// <summary>
+    /// The ruleset with global events on (D-517, D-750): events and items too, <c>globalEvents.maxActive</c>
+    /// <paramref name="maxActive"/>.
+    /// </summary>
+    public static Ruleset WithGlobalEvents(this Ruleset ruleset, int maxActive = 2)
+    {
+        ArgumentNullException.ThrowIfNull(ruleset);
+        var events = ruleset.Features.Events ? ruleset : ruleset.WithEvents();
+        return events with
+        {
+            Features = events.Features with { GlobalEvents = true },
+            GlobalEvents = new GlobalEventRules { MaxActive = maxActive },
+        };
+    }
+
     /// <summary>A scenario on the pinned ruleset with items and events on.</summary>
     public static Scenario New(int seed = 42) => Scenario.New(TestRuleset.Create().WithEvents(), seed);
 

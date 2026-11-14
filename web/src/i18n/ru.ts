@@ -131,6 +131,12 @@ const rejection = {
   'poll.notVoter': 'В этом голосовании голосуют только игроки сезона.',
   'poll.frozenVoter': 'Финишировавший первым не голосует там, где итог действует на игроков.',
   'poll.noOptions': 'В голосовании должно быть хотя бы два варианта.',
+  'globalEvent.unknown': 'Такого общего ивента нет.',
+  'globalEvent.ended': 'Общий ивент уже закончился.',
+  'globalEvent.tooMany': 'Одновременно идёт максимум общих ивентов: сначала закончи один.',
+  'globalEvent.notEvent': 'Общим ивентом запускается только ивент.',
+  'ruleset.globalEventsInPlay':
+    'Общий ивент идёт или считает прохождение с непроверенным пруфом: выключи общие ивенты после их конца и проверки пруфов.',
   'effect.notPending': 'Этот эффект уже разрешён.',
   'account.mustChangePassword': 'Сначала смени временный пароль.',
   'account.currentPasswordWrong': 'Текущий пароль введён неверно.',
@@ -377,7 +383,13 @@ const feedLines = {
         ? 'Голосование закрыто, итог подведён'
         : `Голосование закрыто, итог: ${result}`,
   ],
-  pollCancelled: <T>(): Line<T> => ['Голосование отменено дедлайном'],
+  // Cancelled by the deadline or by the end of its global event (D-516, D-753)
+  pollCancelled: <T>(): Line<T> => ['Голосование отменено'],
+  // D-517, D-518: global events and their goals
+  globalEventLaunched: <T>(name: string): Line<T> => [`Общий ивент: ${name}`],
+  globalEventEnded: <T>(): Line<T> => ['Общий ивент закончился'],
+  globalProgress: <T>(total: number): Line<T> => [`Общая цель: ${total.toLocaleString('ru-RU')}`],
+  globalGoalReached: <T>(): Line<T> => ['Общая цель достигнута'],
   finishBonuses: <T>(): Line<T> => ['Бонусы за финиш пересчитаны по новым правилам'],
   joined: <T>(p: T): Line<T> => [p, ' в игре'],
   paused: <T>(p: T): Line<T> => [p, ' на паузе'],
