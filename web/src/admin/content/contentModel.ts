@@ -75,6 +75,10 @@ export function schemaProblem(problem: SchemaProblem): Problem {
       return { path, text: t.problem.unknown, source: 'schema' };
     case 'pattern':
       return { path, text: t.problem.pattern, source: 'schema' };
+    case 'length':
+      return { path, text: t.problem.length(problem.min ?? 0, problem.max), source: 'schema' };
+    case 'range':
+      return { path, text: t.problem.range(problem.min, problem.max), source: 'schema' };
     case 'type':
       return { path, text: t.problem.type(typeWords(problem.expected)), source: 'schema' };
     case 'enum':

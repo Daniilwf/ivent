@@ -4,7 +4,7 @@ import { ru } from '../i18n/ru';
 import { answer, fakeServer, seasonId } from '../test/fakeServer';
 import { EconomySection } from './Inventory';
 import { ShopPanel } from './Shop';
-import { timeLeft } from './economy';
+import { clockOffset, timeLeft } from './economy';
 import { economyFixture, fixtureNow, shopFixture } from './inventoryFixtures';
 
 // My shop on the season screen (4.11c, D-443, D-447): the roll with its price or a coupon, the lots with their timer,
@@ -174,5 +174,121 @@ describe('the timer', () => {
     expect(timeLeft(new Date(now.getTime() + 754_000), now)).toBe('12:34');
     expect(timeLeft(new Date(now.getTime() + 3_725_000), now)).toBe('1:02:05');
     expect(timeLeft(new Date(now.getTime() - 5_000), now)).toBe('0:00');
+  });
+});
+
+// S4-4: the countdown took the device clock — after the test clock moved 7 days it showed «168:24:49», and a phone whose
+// clock is ahead took live lots for gone. The time is the server's (SPEC «Время считает сервер»).
+describe('the shop timer on the server clock', () => {
+  const week = 7 * 24 * 3600_000;
+
+  function shopAt(deviceNow: Date, offset: number) {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'Date'] });
+    vi.setSystemTime(deviceNow);
+    render(
+      <ShopPanel
+        state={{
+          kind: 'ready',
+          economy: economyFixture({ shop: shopFixture() }),
+          clockOffset: offset,
+        }}
+        onRetry={vi.fn()}
+        onRoll={vi.fn()}
+        onBuy={vi.fn()}
+      />,
+    );
+  }
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('keeps the lots live on a device whose clock is a week ahead', () => {
+    shopAt(new Date(fixtureNow.getTime() + week), -week);
+    expect(screen.getByTestId('shop-lots')).toBeInTheDocument();
+    expect(screen.getByTestId('shop-timer')).toHaveTextContent('12:34');
+  });
+
+  it('counts from the server time on a device whose clock is a week behind', () => {
+    shopAt(new Date(fixtureNow.getTime() - week), week);
+    expect(screen.getByTestId('shop-timer')).toHaveTextContent(/через 12:34$/);
+  });
+
+  it('takes the offset from the server time of the economy', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(fixtureNow.getTime() + week));
+    fakeServer({
+      [economyUrl]: {
+        ...economyFixture({ shop: shopFixture() }),
+        serverNow: fixtureNow.toISOString(),
+      },
+    });
+    renderShop();
+    expect(await screen.findByTestId('shop-timer')).toHaveTextContent('12:34');
+  });
+});
+
+describe('the clock offset', () => {
+  const device = new Date('2026-11-11T12:00:00Z');
+
+  it('prefers the server time of the view, then the Date header, then none', () => {
+    expect(clockOffset('2026-11-11T12:00:10Z', 'Wed, 11 Nov 2026 12:00:05 GMT', device)).toBe(
+      10_000,
+    );
+    expect(clockOffset(null, 'Wed, 11 Nov 2026 12:00:05 GMT', device)).toBe(5_000);
+    expect(clockOffset(undefined, null, device)).toBe(0);
+    expect(clockOffset('not a date', 'nor this', device)).toBe(0);
+  });
+});
+
+// Design review of stage 4 (S4D-5, S4D-14)
+describe('the shop says each thing once', () => {
+  it('does not ask for a roll it cannot pay for: the empty text says what a roll costs', async () => {
+    fakeServer({
+      [economyUrl]: economyFixture({
+        coins: 2,
+        shop: shopFixture({ refusal: 'roll.notEnoughCoins', expiresAt: null, lots: [] }),
+      }),
+    });
+    renderShop();
+
+    expect(await screen.findByText(ru.shop.emptyTitle)).toBeInTheDocument();
+    expect(screen.queryByText(ru.shop.emptyText)).not.toBeInTheDocument();
+    expect(screen.getByText(ru.shop.emptyPoor(6))).toBeInTheDocument();
+    expect(ru.shop.emptyPoor(1)).toBe('Монетки дают прохождения — ролл магазина стоит 1 монетку.');
+    expect(screen.getByTestId('shop-roll')).toBeDisabled();
+    // The cause is said by the empty state, not again under the roll
+    expect(screen.queryByText(ru.rejection['roll.notEnoughCoins'])).not.toBeInTheDocument();
+  });
+
+  it('says a reason all lots share once under the heading, not on each lot', async () => {
+    const full = shopFixture().lots.map((l) => ({ ...l, sold: false, refusal: 'inventory.full' }));
+    fakeServer({ [economyUrl]: economyFixture({ shop: liveShop({ lots: full }) }) });
+    renderShop();
+
+    await screen.findByTestId('shop-lots');
+    expect(screen.getByTestId('shop-why')).toHaveTextContent(ru.rejection['inventory.full']);
+    expect(screen.getAllByText(ru.rejection['inventory.full'])).toHaveLength(1);
+    expect(screen.queryByTestId('lot-why-0')).not.toBeInTheDocument();
+    expect(screen.getByTestId('shop-roll')).toHaveAttribute('data-variant', 'quiet');
+  });
+
+  it('keeps each lot its own reason when the reasons differ', async () => {
+    fakeServer({ [economyUrl]: economyFixture({ shop: liveShop() }) });
+    renderShop();
+
+    await screen.findByTestId('shop-lots');
+    expect(screen.queryByTestId('shop-why')).not.toBeInTheDocument();
+    expect(screen.getByTestId('lot-why-1')).toBeInTheDocument();
+  });
+
+  it('says the price on «Купить», one pattern with the roll (S4D-14)', async () => {
+    fakeServer({ [economyUrl]: economyFixture({ shop: liveShop() }) });
+    renderShop();
+
+    const buy = await screen.findByTestId('buy-0');
+    expect(buy).toHaveTextContent('Купить за 4 монетки');
+    expect(buy).toHaveAccessibleName(ru.shop.buyNamed('Апельсин', 4));
+    expect(ru.shop.buyFor(1)).toBe('Купить за 1 монетку');
   });
 });

@@ -318,6 +318,26 @@ public class ContentPackTests
     }
 
     [Fact]
+    public void A_held_item_still_gives_its_effect_after_both_are_deleted()
+    {
+        // S4-2, D-780: the admin's delete dialog promises that objects held keep working; an item whose effect is its
+        // giveObject keeps giving it, though neither is in the current pack any more
+        var s = Season().WithContent(EconomyScenario.ExamplePack("shield", "shield-effect", "orange"));
+        var shield = s.Give("Вася", "shield");
+
+        s.WithContent(EconomyScenario.ExamplePack("orange"));
+        Assert.Null(s.State.Catalog.Live("shield-effect"));
+        s.Use("Вася", shield);
+
+        Assert.True(s.Last.IsAccepted);
+        Assert.Contains("shield-effect", s.Inventory("Вася"));
+
+        // Not given anew by the admin, though
+        s.Act(new AdjustInventory(s.PlayerId("Петя"), "shield-effect", null, "Выдать"));
+        Assert.Equal(RejectionCodes.ObjectUnknown, s.Last.Rejection!.Code);
+    }
+
+    [Fact]
     public void A_publication_is_not_undone()
     {
         var s = Season().WithContent(EconomyScenario.ExamplePack("orange"));

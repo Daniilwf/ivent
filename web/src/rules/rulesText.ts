@@ -48,11 +48,13 @@ export type RulesPage = {
   drop: string[];
   bonuses: BonusRow[];
   finish: string[];
+  /** Coins, items, the shop and bets — empty while all their mechanics are off (S4-1) */
+  economy: string[];
 };
 
 /** The page's sentences for a ruleset; the deadline comes apart (it is the season's, not the ruleset's) */
 export function rulesPage(rules: Ruleset): RulesPage {
-  const { season, roll, reward, drop, finish, ranking, map, features } = rules;
+  const { season, roll, reward, drop, finish, ranking, map, features, economy, bets } = rules;
 
   const tiebreakers = list(ranking.tiebreakers, isString)
     .map((x) => t.win.tiebreaker[x])
@@ -140,7 +142,39 @@ export function rulesPage(rules: Ruleset): RulesPage {
   const noBonus = byOrder.every((x) => x === 0) && finish.bonusAfterList === 0;
   const finishLines = [...(noBonus ? [t.finish.noBonus] : []), t.finish.later, t.finish.surplus];
 
+  const e = t.economy;
+  const resets = list(economy.shop.resetOn, isString)
+    .map((x) => e.resetOn[x])
+    .filter(isString);
+  const economyLines = [
+    ...(features.items ? [e.inventory(economy.inventoryLimit)] : []),
+    ...(features.items || features.bets ? [e.debt] : []),
+    ...(features.shop
+      ? [
+          e.shop(economy.shop.rollCost, economy.shop.lotsPerRoll, economy.shop.lotLifetimeMinutes),
+          ...(economy.shop.rerollCostStep > 0
+            ? [
+                e.shopStep(
+                  economy.shop.rerollCostStep,
+                  economy.shop.rollCost,
+                  resets.length > 0 ? `${resets.join(' или ')} ${e.resetOf}` : '',
+                ),
+              ]
+            : []),
+        ]
+      : []),
+    ...(features.bets
+      ? [
+          e.bets(bets.windowHoursAfterRoll, orList(list(bets.deadlineOptionsDays, isNumber))),
+          e.betLimits(bets.maxStake, bets.maxOpenBetsPerPlayer),
+          e.payout(payoutSteps(bets.payoutByHoursPerDay).join(', ')),
+          e.betLost,
+        ]
+      : []),
+  ];
+
   return {
+    economy: economyLines,
     win,
     roll: rollLines,
     reward: rewardLines,
@@ -152,10 +186,32 @@ export function rulesPage(rules: Ruleset): RulesPage {
   };
 }
 
+type PayoutStep = { upTo: number | null; multiplier: number };
+const isStep = (x: unknown): x is PayoutStep =>
+  typeof x === 'object' &&
+  x !== null &&
+  typeof (x as PayoutStep).multiplier === 'number' &&
+  ((x as PayoutStep).upTo === null || typeof (x as PayoutStep).upTo === 'number');
+
+/** The bet coefficients by the hours per day: «до 1 ч — ×1,2» */
+function payoutSteps(value: unknown): string[] {
+  return list(value, isStep).map((s) => t.economy.step(s.upTo, s.multiplier));
+}
+
+/** «1, 3 или 7» */
+function orList(values: number[]): string {
+  const words = values.map((v) => v.toLocaleString('ru-RU'));
+  return words.length < 2
+    ? words.join('')
+    : `${words.slice(0, -1).join(', ')} или ${words.at(-1) ?? ''}`;
+}
+
 /** A changed field in words: «Максимум кубиков», «Бонус за финиш: 3-е место»; an unknown one by its path */
 export function fieldName(path: string): string {
   const bonus = /^finish\.bonusByOrder\[(\d+)\]$/.exec(path);
   if (bonus) return t.bonusField(Number(bonus[1]) + 2);
+  const payout = /^bets\.payoutByHoursPerDay\[(\d+)\]\.(\w+)$/.exec(path);
+  if (payout) return t.payoutField(Number(payout[1]) + 1, payout[2] ?? '');
   return t.fields[path] ?? path;
 }
 

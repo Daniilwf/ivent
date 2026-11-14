@@ -22,7 +22,14 @@ export class Api {
   static async signIn(baseURL: string, login: string, password: string): Promise<Api> {
     const context = await request.newContext({ baseURL });
     const api = new Api(context, await antiforgery(context));
-    const answer = await api.send('POST', '/api/auth/login', { login, password });
+    // Workers that start together sign in the seed admin at once: each attempt is reserved until its password is
+    // checked, and more than the per-address limit in flight answers 429 (FL-7). A reservation is not a failure, so
+    // the sign-in waits a moment and tries again.
+    let answer = await api.send('POST', '/api/auth/login', { login, password });
+    for (let attempt = 1; answer.status() === 429 && attempt <= 10; attempt++) {
+      await new Promise((resolve) => setTimeout(resolve, 200 * attempt));
+      answer = await api.send('POST', '/api/auth/login', { login, password });
+    }
     expect(answer.status(), `sign-in of ${login}: ${await answer.text()}`).toBe(200);
     api.csrf = await antiforgery(context);
     return api;
