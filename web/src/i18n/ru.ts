@@ -20,9 +20,17 @@ const games = (n: number) => {
   return `${n} игр`;
 };
 
-// монетка / монетки / монеток; a debt with a real minus: −2 монетки
-const coins = (n: number) =>
-  `${n < 0 ? '−' : ''}${Math.abs(n).toLocaleString('ru-RU')} ${plural(n, 'монетка', 'монетки', 'монеток')}`;
+// The case a number of coins stands in (S4D-6): «у тебя 1 монетка», «поставить 1 монетку», «до 21 монетки»
+export type GrammaticalCase = 'nominative' | 'accusative' | 'genitive';
+const coinWords: Record<GrammaticalCase, readonly [string, string, string]> = {
+  nominative: ['монетка', 'монетки', 'монеток'],
+  accusative: ['монетку', 'монетки', 'монеток'],
+  genitive: ['монетки', 'монеток', 'монеток'],
+};
+
+// монетка / монетки / монеток in the case asked; a debt with a real minus: −2 монетки
+export const coins = (n: number, grammaticalCase: GrammaticalCase = 'nominative') =>
+  `${n < 0 ? '−' : ''}${Math.abs(n).toLocaleString('ru-RU')} ${plural(n, ...coinWords[grammaticalCase])}`;
 
 // прохождение / прохождения / прохождений
 const runs = (n: number) => {
@@ -447,7 +455,12 @@ const feedLines = {
     g,
     ' отклонено со штрафом дропа',
   ],
-  finished: <T>(p: T, order: number): Line<T> => [p, ` финиширует ${order}-м!`],
+  // The order is the engine's counter, never reused after an undo (S4-5): only order 1 is sure to be the first; later
+  // places go by points, so a later order claims none
+  finished: <T>(p: T, order: number): Line<T> => [
+    p,
+    order === 1 ? ' финиширует первым!' : ' финиширует!',
+  ],
   finishRevoked: <T>(p: T): Line<T> => [p, ': финиш отменён'],
   effectDrawn: <T>(p: T, kind: EventKind): Line<T> => [p, ` тянет ${eventKindWords[kind]}`],
   // A card drawn from a deck and played at once (D-500)
@@ -567,8 +580,8 @@ export const ru = {
       payment === 'badEvent'
         ? 'За этот реролл тебе достанется плохой ивент. Продолжить?'
         : balance === null
-          ? `Реролл стоит ${coins(price)}. Потратить?`
-          : `Реролл стоит ${coins(price)}, у тебя ${coins(balance)}. Потратить?`,
+          ? `Реролл стоит ${coins(price, 'accusative')}. Потратить?`
+          : `Реролл стоит ${coins(price, 'accusative')}, у тебя ${coins(balance)}. Потратить?`,
     rerollConfirmYes: 'Да, реролл',
     rerollConfirmNo: 'Отмена',
     drop: 'Дропнуть',
@@ -1233,6 +1246,8 @@ export const ru = {
     useTitle: (name: string) => `Использовать «${name}»`,
     target: 'На кого',
     targetHint: 'Только те, на кого предмет действует сейчас',
+    // S4D-2: next to the closed press at the bottom of the sheet, the first question still open
+    missing: (question: string) => `Сначала ответь: «${question}»`,
     pickObject: 'Какой предмет',
     noObjects: 'Подходящих предметов нет',
     pickObjectNumbered: (n: number) => `Какой предмет, ${n}-й`,
@@ -1273,19 +1288,22 @@ export const ru = {
     title: 'Магазин',
     lead: 'Ролл даёт личные лоты на несколько минут. Не купил — лоты исчезнут.',
     coupons: (n: number) => `${plural(n, 'Купон', 'Купона', 'Купонов')}: ${n}`,
-    roll: (price: number) => `Ролл магазина за ${coins(price)}`,
-    rollAgain: (price: number) => `Новый ролл за ${coins(price)}`,
+    roll: (price: number) => `Ролл магазина за ${coins(price, 'accusative')}`,
+    rollAgain: (price: number) => `Новый ролл за ${coins(price, 'accusative')}`,
     rollFree: 'Ролл по купону',
     rollAnnounce: 'Новые лоты в магазине.',
     left: (time: string) => `Лоты исчезнут через ${time}`,
     gone: 'Время лотов вышло',
     price: (n: number) => coins(n),
-    buy: 'Купить',
-    buyNamed: (name: string, price: number) => `Купить «${name}» за ${coins(price)}`,
+    buyFor: (price: number) => `Купить за ${coins(price, 'accusative')}`,
+    buyNamed: (name: string, price: number) => `Купить «${name}» за ${coins(price, 'accusative')}`,
     sold: 'Куплено',
     bought: (name: string) => `Куплено: «${name}». Уже в инвентаре.`,
     emptyTitle: 'Лотов пока нет',
     emptyText: 'Сделай ролл магазина — появятся личные лоты.',
+    // S4D-5: no «сделай ролл» above a roll the coins do not pay for
+    emptyPoor: (price: number) =>
+      `Монетки дают прохождения — ролл магазина стоит ${coins(price, 'accusative')}.`,
     goneTitle: 'Лоты исчезли',
     goneText: 'Время вышло. Новый ролл даст новые лоты.',
     loadErrorTitle: 'Магазин не загрузился',
@@ -1303,6 +1321,7 @@ export const ru = {
     until: (time: string) => `Ставки до ${time}`,
     hours: (h: number) => `${h.toLocaleString('ru-RU')} ч`,
     noHours: 'Часы не указаны',
+    more: (n: number) => `Ещё ${n} ${plural(n, 'игрок', 'игрока', 'игроков')}`,
     place: 'Поставить',
     placeOn: (name: string) => `Поставить на игрока ${name}`,
     dialogTitle: (name: string) => `Ставка на игрока ${name}`,
@@ -1312,10 +1331,16 @@ export const ru = {
     option: (days: number, multiplier: number) =>
       `${days} ${plural(days, 'день', 'дня', 'дней')}, ×${multiplier.toLocaleString('ru-RU')}`,
     stake: 'Ставка в монетках',
-    stakeHint: (max: number) => `От 1 до ${coins(max)}`,
+    stakeHint: (max: number) => `От 1 до ${coins(max, 'genitive')}`,
     stakeInvalid: (max: number) => `Ставка — целое число от 1 до ${max}.`,
-    payout: (n: number) => `Выигрыш, если успеет: ${coins(n)}`,
-    confirm: (stake: number) => `Поставить ${coins(stake)}`,
+    // The payout is what comes back, the stake included (D-414: ⌊stake × multiplier⌋, the stake left at placing)
+    payout: (total: number, stake: number) =>
+      total > stake
+        ? `Вернётся ${coins(total)}: ставка ${stake.toLocaleString('ru-RU')} и +${(total - stake).toLocaleString('ru-RU')} сверху`
+        : total === stake
+          ? `Вернётся ${coins(total)}: ставка ${stake.toLocaleString('ru-RU')}, без выигрыша сверху`
+          : `Вернётся ${coins(total)} из ставки ${stake.toLocaleString('ru-RU')}`,
+    confirm: (stake: number) => `Поставить ${coins(stake, 'accusative')}`,
     placed: (name: string) => `Ставка на игрока ${name} принята.`,
     emptyTitle: 'Сейчас ставить не на кого',
     emptyText:
@@ -1500,7 +1525,7 @@ export const ru = {
         freeMode: 'Реролл в свободном режиме',
         gameDeleted: 'Бесплатный реролл: игру убрали из пула',
       } as Record<string, string>,
-      finish: (order: number) => `Финиш: ${order}-е место`,
+      finish: (order: number) => (order === 1 ? 'Финиш: 1-е место' : 'Финиш'),
       frozen: 'Очки заморожены: первый финиш',
       chainCut: 'Цепочка эффектов оборвана',
       eventDrawn: (name: string) => `Ивент «${name}»`,
@@ -1700,6 +1725,7 @@ export const ru = {
       drop: 'Дроп и тех-реролл',
       finish: 'Финиш',
       deadline: 'Сроки',
+      economy: 'Монетки, предметы, магазин и ставки',
       history: 'История изменений',
     },
     // D-207 (RGG 14): the owner's text, word for word; the order is the order of the check
@@ -1762,7 +1788,7 @@ export const ru = {
           ? 'Первый реролл после каждого ролла — бесплатно.'
           : `Бесплатных рероллов после каждого ролла: ${n}.`,
       noFree: 'Бесплатных рероллов нет.',
-      costCoins: (n: number) => `Дальше реролл стоит ${coins(n)}.`,
+      costCoins: (n: number) => `Дальше реролл стоит ${coins(n, 'accusative')}.`,
       costBadEvent: 'Дальше реролл — за плохой ивент.',
       alreadyPlayed:
         'Проходил игру до ивента — жми «Уже проходил»: новый ролл бесплатный, игра тебе больше не выпадет.',
@@ -1832,6 +1858,31 @@ export const ru = {
       later: 'Финишировавшие не первыми продолжают набирать очки, но их фишка больше не двигается.',
       surplus: 'Лишние шаги после финиша сгорают.',
     },
+    // S4-1: the economy in force, shown only with its mechanics on (SPEC «Правила на сайте», «Магазин», «Ставки»)
+    economy: {
+      inventory: (limit: number) =>
+        `В инвентаре — до ${limit} предметов; эффекты и спецроллы места не занимают. Предмет применяют кнопкой «Использовать» в своё окно.`,
+      debt: 'Предметы и ивенты могут увести монетки в минус; в минусе покупать и ставить нельзя.',
+      shop: (cost: number, lots: number, minutes: number) =>
+        `Ролл магазина стоит ${coins(cost, 'accusative')} и даёт ${lots} ${plural(lots, 'личный лот', 'личных лота', 'личных лотов')} на ${minutes} мин; цена лота — по редкости.`,
+      shopStep: (step: number, cost: number, reset: string) =>
+        `Каждый следующий ролл дороже на ${coins(step, 'accusative')}; цена снова ${coins(cost, 'nominative')}${reset ? ` после ${reset}` : ''}.`,
+      resetOn: { runCompleted: 'завершения', runDropped: 'дропа' } as Readonly<
+        Record<string, string>
+      >,
+      resetOf: 'прохождения',
+      coupon: 'Купон магазина даёт бесплатный ролл.',
+      bets: (window: number, days: string) =>
+        `Ставка — на текущее прохождение другого игрока, в первые ${window} ч после его ролла; срок — ${days} дн.`,
+      betLimits: (stake: number, open: number) =>
+        `Не больше ${coins(stake, 'genitive')} за ставку и не больше ${open} ${plural(open, 'открытой ставки', 'открытых ставок', 'открытых ставок')}.`,
+      payout: (steps: string) =>
+        `Если успеет, вернётся ставка × коэффициент по часам игры на день срока: ${steps}.`,
+      step: (upTo: number | null, multiplier: number) =>
+        `${upTo === null ? 'больше' : `до ${upTo.toLocaleString('ru-RU')} ч`} — ×${multiplier.toLocaleString('ru-RU')}`,
+      betLost:
+        'Ставка сгорает при дропе, тех-реролле, по сроку и в дедлайн. Если пруф отклонят после выплаты, выигрыш снимается.',
+    },
     deadline: {
       at: (text: string) => `Дедлайн: ${text}.`,
       none: 'Дедлайн админ ещё не назначил.',
@@ -1881,7 +1932,30 @@ export const ru = {
       'finish.requireApprovalForFirst': 'Первое место — после проверки пруфов',
       'finish.bonusAfterList': 'Бонус за финиш после списка',
       'map.linearLength': 'Клеток до финиша',
+      'features.items': 'Предметы',
+      'features.shop': 'Магазин',
+      'features.bets': 'Ставки',
+      'features.events': 'Ивенты',
+      'features.mapMode': 'Вид карты',
+      'economy.allowNegativeCoins': 'Монетки в минус',
+      'economy.inventoryLimit': 'Предметов в инвентаре',
+      'economy.rarityWeights.common': 'Вес обычных предметов',
+      'economy.rarityWeights.epic': 'Вес эпических предметов',
+      'economy.rarityWeights.legendary': 'Вес легендарных предметов',
+      'economy.shop.lotsPerRoll': 'Лотов за ролл магазина',
+      'economy.shop.lotLifetimeMinutes': 'Минут жизни лотов',
+      'economy.shop.rollCost': 'Цена ролла магазина, монеток',
+      'economy.shop.rerollCostStep': 'Подорожание ролла магазина, монеток',
+      'economy.shop.resetOn': 'Когда цена ролла магазина сбрасывается',
+      'bets.maxStake': 'Наибольшая ставка, монеток',
+      'bets.maxOpenBetsPerPlayer': 'Открытых ставок у игрока',
+      'bets.windowHoursAfterRoll': 'Часов на ставку после ролла',
+      'bets.deadlineOptionsDays': 'Сроки ставок, дней',
     } as Readonly<Record<string, string>>,
+    payoutField: (step: number, part: string) =>
+      part === 'multiplier'
+        ? `Коэффициент ставки, ступень ${step}`
+        : `Часов в день для ступени ${step}`,
     bonusField: (order: number) => `Бонус за финиш: ${order}-й на финише`,
     values: {
       coins: 'монетки',
@@ -2039,6 +2113,9 @@ export const ru = {
       checkFailed: 'Проверка не удалась. Попробуй ещё раз.',
       save: 'Сохранить новую версию',
       saved: (version: number) => `Сохранено: версия контента ${version}.`,
+      newer: (version: number) =>
+        `Пока ты правишь, другой админ сохранил версию контента ${version}. Твоя правка цела, но поверх новой версии её не сохранить: перенеси нужное и открой новую версию.`,
+      takeNewer: 'Открыть новую версию',
       fixFirst: 'Сначала исправь ошибки.',
       nothingNew: 'Правок нет.',
       remove: 'Удалить объект',
@@ -2237,6 +2314,11 @@ export const ru = {
         type: (expected: string) => `Нужно ${expected}`,
         enum: (values: string) => `Одно из: ${values}`,
         pattern: 'Нужно целое число, кубы («1d6», «-1d6») или ссылка («$roll», «$choice»)',
+        // S4D-10: the server's text and price rules, in the schema
+        length: (min: number, max?: number) =>
+          max === undefined ? `Не короче ${min} символов` : `От ${min} до ${max} символов`,
+        range: (min?: number, max?: number) =>
+          `Число${min === undefined ? '' : ` от ${min.toLocaleString('ru-RU')}`}${max === undefined ? '' : ` до ${max.toLocaleString('ru-RU')}`}`,
       },
       // The server's checks speak English for the log (D-492): the common ones are told in Russian by their exact text
       serverMessages: {

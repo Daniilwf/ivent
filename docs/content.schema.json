@@ -19,10 +19,14 @@
             ]
           },
           "name": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
           },
           "description": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
           },
           "rarity": {
             "enum": [
@@ -36,7 +40,9 @@
             "type": [
               "integer",
               "null"
-            ]
+            ],
+            "minimum": 0,
+            "maximum": 1000000
           },
           "window": {
             "enum": [
@@ -1785,7 +1791,9 @@
             "type": "string"
           },
           "name": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
           },
           "entries": {
             "type": "array",

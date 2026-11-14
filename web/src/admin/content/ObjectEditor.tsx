@@ -397,7 +397,8 @@ export function ObjectEditor({
         <TextArea
           ref={editor}
           label={wheel ? t.wheelJson : t.json}
-          hint={t.jsonHint}
+          // Read-only on a phone: nothing is typed, so no word of a check while typing (S4D-16)
+          {...(readOnly ? {} : { hint: t.jsonHint })}
           value={text}
           rows={18}
           readOnly={readOnly}

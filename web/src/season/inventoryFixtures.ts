@@ -37,6 +37,8 @@ export function economyFixture(over: Partial<Schemas['EconomyView']> = {}): Sche
     inventoryLimit: 5,
     shop: null,
     bets: null,
+    // The server's clock is the device's in a fixture: no offset unless a test sets one (S4-4)
+    serverNow: new Date().toISOString(),
     items: [
       itemFixture(),
       itemFixture({
