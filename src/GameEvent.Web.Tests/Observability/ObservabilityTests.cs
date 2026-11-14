@@ -206,6 +206,20 @@ public sealed class ObservabilityTests : IAsyncLifetime
         Assert.Equal("/api/seasons/1", ErrorJournal.Printable("/api/seasons/1"));
     }
 
+    [Theory]
+    [InlineData("/api/seasons/1/polls/2/vote", true)]
+    [InlineData("/api/seasons/1/polls/2/vote/", true)]
+    [InlineData("/API/Seasons/1/POLLS/2/VOTE", true)]
+    [InlineData("/api/admin/seasons/1/polls/2/close", false)]
+    [InlineData("/api/seasons/1/polls/2", false)]
+    [InlineData("/api/seasons/1/vote", false)]
+    [InlineData("/api/seasons/1/feed", false)]
+    public void Only_a_votes_request_is_kept_without_its_user(string path, bool vote)
+    {
+        // D-835 (3): the «Ошибки» page names no voter; every other request keeps its login
+        Assert.Equal(vote, ErrorJournal.IsVote(new Microsoft.AspNetCore.Http.PathString(path)));
+    }
+
     [Fact]
     public void A_failed_sign_in_logs_an_unknown_login_only_as_a_hash()
     {

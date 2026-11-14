@@ -236,6 +236,21 @@ public sealed class GlobalEventApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task An_event_past_its_term_leaves_the_banner_before_its_timer_and_stays_active_in_the_list()
+    {
+        // D-838: the banner follows the site's clock, the list the state — the timer may not have ended it yet
+        var admin = await _site.SignedInAsync("admin");
+        await ApiCalls.PostOkAsync(admin, AdminUrl("global-events"), Launch(durationHours: 1));
+        var vasya = await _site.SignedInAsync("vasya");
+        Assert.Equal(1, (await BannerAsync(vasya)).GetArrayLength());
+
+        _site.Clock.UtcNow = _site.Clock.UtcNow.AddHours(1);
+
+        Assert.Equal(0, (await BannerAsync(vasya)).GetArrayLength());
+        Assert.Equal("active", Assert.Single((await ListAsync(vasya)).EnumerateArray()).GetProperty("status").GetString());
+    }
+
+    [Fact]
     public async Task Ending_an_ended_or_unknown_event_is_a_conflict_and_without_a_command_id_a_bad_request()
     {
         var admin = await _site.SignedInAsync("admin");

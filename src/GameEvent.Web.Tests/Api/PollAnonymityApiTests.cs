@@ -128,14 +128,22 @@ public sealed class PollAnonymityApiTests : IAsyncLifetime
         await ApiCalls.PostOkAsync(await _site.SignedInAsync("admin"), AdminUrl($"polls/{pollId}/close"));
 
         await WaitForAsync(updates, "poll-closed");
+        long beforeThePoll;
         lock (updates)
         {
+            beforeThePoll = updates.Single(u => u.Types.Contains("poll-started")).FromSequence - 1;
             Assert.DoesNotContain(updates, u => u.Types.Contains("vote-changed"));
-            Assert.Contains(updates, u => u.Types.Contains("vote-cast"));
+
+            // Not even an update without types: the change looks like the vote cast before it (D-835)
+            Assert.DoesNotContain(updates, u => u.Types.Count == 0);
+            Assert.Equal(2, updates.Count(u => u.Types.SequenceEqual(["vote-cast"])));
         }
 
-        var resumed = await connection.InvokeAsync<Realtime.SeasonJoin>(nameof(Realtime.SeasonHub.Resume), SiteFactory.SeasonId, 0L, Ct);
+        var resumed = await connection.InvokeAsync<Realtime.SeasonJoin>(nameof(Realtime.SeasonHub.Resume), SiteFactory.SeasonId, beforeThePoll, Ct);
+        Assert.False(resumed.Reload);
         Assert.DoesNotContain(resumed.Missed, u => u.Types.Contains("vote-changed"));
+        Assert.DoesNotContain(resumed.Missed, u => u.Types.Count == 0);
+        Assert.Equal(2, resumed.Missed.Count(u => u.Types.SequenceEqual(["vote-cast"])));
     }
 
     [Fact]
@@ -153,7 +161,12 @@ public sealed class PollAnonymityApiTests : IAsyncLifetime
             Assert.Equal(JsonValueKind.Null, row.GetProperty("authorName").ValueKind);
             Assert.Equal(JsonValueKind.Null, row.GetProperty("playerName").ValueKind);
             AssertNamesNobody(row.GetRawText(), "the journal row");
+
+            // Nor that the vote was changed, nor when: both rows read as a vote cast (D-541, D-726)
+            Assert.Equal(["vote-cast"], row.GetProperty("events").EnumerateArray().Select(e => e.GetString()));
         }
+
+        Assert.DoesNotContain(rows, r => r.GetProperty("events").EnumerateArray().Any(e => e.GetString() == "vote-changed"));
     }
 
     [Fact]

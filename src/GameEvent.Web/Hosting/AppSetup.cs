@@ -58,6 +58,14 @@ public static class AppSetup
 
     public const int SeasonViewsPerMinute = 240;
 
+    /// <summary>
+    /// The votes of a user (D-839): each is a command of the one queue, and a changed vote is accepted again and again, so
+    /// per user — more than anyone clicks, not a loop.
+    /// </summary>
+    public const string VoteRateLimit = "vote";
+
+    public const int VotesPerMinute = 20;
+
     /// <summary>The map editor's checks (D-315): one after each edit settles, so more than the admin's other reads.</summary>
     public const string MapCheckRateLimit = "map-check";
 

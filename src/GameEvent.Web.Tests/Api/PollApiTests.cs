@@ -156,6 +156,33 @@ public sealed class PollApiTests : IAsyncLifetime
         await AssertConflictAsync(await vasya.GetAsync(Url("polls"), Ct), "feature.disabled");
         await AssertConflictAsync(await admin.PostAsJsonAsync(AdminUrl("polls"), new { commandId = Guid.NewGuid(), poll = NominationJson() }, Ct), "feature.disabled");
         await AssertConflictAsync(await VoteAsync(vasya, Guid.NewGuid(), "Финиш"), "feature.disabled");
+        await AssertConflictAsync(await vasya.GetAsync(Url($"polls/{Guid.NewGuid()}"), Ct), "feature.disabled");
+    }
+
+    [Fact]
+    public async Task A_poll_whose_result_acts_cancelled_by_the_deadline_has_no_counts_and_no_result()
+    {
+        // D-516, D-838: the deadline cancels it, and a cancelled poll shows neither how it stood nor what would have won
+        var admin = await _site.SignedInAsync("admin");
+        var pollId = await StartPollAsync(_site, admin, new
+        {
+            question = "Кому монетку?",
+            options = new { list = new[] { "Финиш", "Дроп" } },
+            voters = "players",
+            closesInHours = 24,
+            showLiveCounts = true,
+            onResult = new { target = new { selector = "all" }, actions = new object[] { new { type = "changeResource", resource = "coins", amount = 1 } } },
+        });
+        await VoteOkAsync(await _site.SignedInAsync("vasya"), pollId, "Дроп");
+        await _site.SendAsync(new Engine.Seasons.SetSeasonDeadline(_site.Clock.UtcNow.AddHours(1)));
+        _site.Clock.UtcNow = _site.Clock.UtcNow.AddHours(2);
+
+        await TickAsync(_site);
+
+        var card = await CardAsync(await _site.SignedInAsync("petya"), pollId);
+        Assert.Equal("cancelled", card.GetProperty("status").GetString());
+        Assert.Equal(JsonValueKind.Null, card.GetProperty("counts").ValueKind);
+        Assert.Equal(JsonValueKind.Null, card.GetProperty("result").ValueKind);
     }
 
     // ---- The admin closes a poll early ----
@@ -292,6 +319,26 @@ public sealed class PollApiTests : IAsyncLifetime
 
         // Петя has not voted: his own vote is a first one
         Assert.Equal(["vote-cast"], await TypesAsync(await VoteAsync(await _site.SignedInAsync("petya"), pollId, "Дроп")));
+    }
+
+    [Fact]
+    public async Task Many_votes_in_a_row_are_limited_per_user_and_do_not_hold_up_the_others()
+    {
+        // D-839: every vote is a command of the one queue, and a changed vote is accepted again and again — a loop of
+        // A, B, A, B is stopped by the site before the queue
+        var admin = await _site.SignedInAsync("admin");
+        var pollId = await StartPollAsync(_site, admin, NominationJson());
+        var vasya = await _site.SignedInAsync("vasya");
+        var codes = new List<HttpStatusCode>();
+        for (var i = 0; i < Hosting.AppSetup.VotesPerMinute + 5; i++)
+        {
+            codes.Add((await VoteAsync(vasya, pollId, i % 2 == 0 ? "Финиш" : "Дроп")).StatusCode);
+        }
+
+        Assert.All(codes.Take(Hosting.AppSetup.VotesPerMinute), c => Assert.Equal(HttpStatusCode.OK, c));
+        Assert.All(codes.Skip(Hosting.AppSetup.VotesPerMinute), c => Assert.Equal(HttpStatusCode.TooManyRequests, c));
+        Assert.Equal(Hosting.AppSetup.VotesPerMinute, await CountAsync(_site, "vote-cast") + await CountAsync(_site, "vote-changed"));
+        await VoteOkAsync(await _site.SignedInAsync("petya"), pollId, "Реролл");
     }
 
     [Fact]
