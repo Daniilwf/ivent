@@ -282,19 +282,19 @@
 | Очередь IRL-пруфов | поданные IRL-пруфы, ждущие проверки админом, старые первыми (D-820) | `GET /api/admin/seasons/{id}/irl-proofs`, `IrlProofQueueItemView` |
 | Ивент ждёт ответа | эффект, вытянутый из колоды (ивент или другой объект колоды), остановился на вопросе к игроку; ответ — общий выбор (D-511). Предмет, который игрок использует, на вопросе не останавливается: ответы приходят вместе с использованием (D-827) | `ChoiceKind.Effect`, `SuspendedEffect`, события `EffectSuspended`, `EffectResumed`; в API — `ChoiceView.prompt`, `objectId`, `name`, ответ — общий `POST /api/seasons/{id}/choose`, у админа — `AdminPlayerView.eventQuestion` (D-822) |
 | Срок ответа ивента | через сколько часов без ответа на приостановленный ивент сервер отвечает случайным вариантом; по умолчанию срока нет (D-560) | `events.answerTimeoutHours` |
-| Голос | выбор пользователя в голосовании; один на человека, до закрытия можно сменить (`polls.allowChangeVote`), повтор того же голоса — отказ | команда `CastVote`, события `VoteCast`, `VoteChanged`; в состоянии — `Vote`, `Poll.Votes` |
+| Голос | выбор пользователя в голосовании; один на человека, до закрытия можно сменить (`polls.allowChangeVote`), повтор того же голоса — отказ | команда `CastVote`, события `VoteCast`, `VoteChanged`; в состоянии — `Vote`, `Poll.Votes`; API — `VoteRequest`, свой голос — `PollView.MyVote` |
 | Запуск голосования | админ или ивент открывает голосование со снимком вариантов (игры — выборка `polls.gameOptions`) | команда `StartPoll`, событие `PollStarted`, `PollSource` (`Admin`, `Event`); из ивента — `RequestChoiceAction.Vote` (`PollVoteSpec`), приостановка с `SuspendedEffect.PollId` |
 | Досрочное закрытие голосования | админ закрывает голосование до срока; по сроку закрывает таймер | команда `ClosePoll`, `PollCloseReason` (`Timer`, `Admin`) |
 | Живой счёт | счёт по вариантам до закрытия; у анонимных — никогда (D-541) | `PollDefinition.ShowLiveCounts`, `polls.showLiveCountsDefault` |
 | Выбранная игра | фильтр следующего ролла на конкретные игры («выберите игру лидеру»); недоступная к ролу — снимается с записью | `GameFilterSpec.Games`, `RollModifiersApplied.Dropped` |
 | Итог голосования | вариант с наибольшим числом голосов, ничья — бросок; запускает эффект | событие `PollClosed` (`PollCount`, `Tied`, `TieRoll`), ссылка `$result`; отмена — `PollCancelled`; механика — `Polls/Polling` |
 | Голосующие | кто голосует: игроки или все (зрители — по конфигу) | `PollVoters` (`Players`, `Everyone`), `social.spectatorsCanVote` |
-| Анонимное голосование | голоса показываются без имён (D-515) | `PollDefinition.Anonymous` |
+| Анонимное голосование | голоса показываются без имён никому, включая админа; голос — команда без автора (D-515, D-541, D-835) | `PollDefinition.Anonymous`, `Poll.Anonymous`; API — `PollView.Anonymous` |
 | Запуск общего ивента | админ начинает общий ивент на срок; конец — по сроку, админом или дедлайном | команды `LaunchGlobalEvent`, `EndGlobalEvent`, события `GlobalEventLaunched`, `GlobalEventEnded` (`GlobalEventEndReason`: `Timer`, `Admin`, `Deadline`); состояние `GlobalEventState` (`GlobalEventStatus`: `Active`, `Ended`); механика — `GlobalEvents/GlobalEventing` |
 | Общая цель | цель общего ивента с прогресс-баром: часы HLTB или число прохождений | `GlobalEventGoal` (`GoalMetric`: `Hours`, `Runs`), события `GlobalProgressChanged` (`GlobalProgressReason`: `Completed`, `Rejected`, `HoursCorrected`), `GlobalGoalReached` |
 | Вклад в общую цель | что одно прохождение внесло в цель: часы HLTB его снапшота или 1; реджект снимает, правка часов меняет разницей | `GlobalContribution` |
 | Голосование общего ивента | вопрос первого действия общего ивента голосующим; итог раздаётся всем ответом на вопрос (EV23) | `PollSource.GlobalEvent`, `PollStarted.GlobalEventId`, `ForAllQueued.Answers` |
-| Баннер общего ивента | плашка общего ивента на главной; экран запланирован в 5.22 | компонент `GlobalEventBanner` — план, пока не реализован |
+| Баннер общего ивента | плашка общего ивента на главной: идущие ивенты с прогрессом цели | поле вида сезона `SeasonView.GlobalEvents` (`GlobalEventView`, `GlobalGoalView`), экран — 5.22 |
 | Напарник | второй игрок кооп-прохождения | `RunState.PartnerId`, событие `CoopJoined` |
 | Ролливший | игрок, чей ролл дал кооп-прохождение; бросает кубы и получает долю с округлением вверх | `RunState.PlayerId` |
 | Приглашение в кооп | предложение стать напарником в своём прохождении | `InteractionKind.Coop`, команда `InviteToCoop`, события `InteractionCreated`, `InteractionAnswered`, `InteractionExpired` |
@@ -314,7 +314,7 @@
 | Выполнить челлендж недели | пройти игру по условию челленджа в его окне; одна награда на игрока | команды `SetWeeklyChallenge`, `MarkWeeklyChallenge`, события `WeeklyChallengeSet`, `WeeklyChallengeCompleted`, `WeeklyChallengeRevoked` |
 | Модерация предложки | админ одобряет или отклоняет предложение | команды `SubmitSuggestion`, `ReviewSuggestion`, `SuggestionStatus` (`Pending`, `Approved`, `Rejected`) |
 | Окно челленджа недели | время, в которое завершение прохождения засчитывается челленджу: от начала на `weeklyChallenge.durationDays` дней (D-526, D-570) | `WeeklyChallengeSet.StartsAt`, `EndsAt` |
-| Выполнение челленджа | действующая награда игрока за челлендж по одному прохождению; реджект снимает | `WeeklyChallengeCompletion`, `WeeklyChallengeState.Completions` |
+| Выполнение челленджа | действующая награда игрока за челлендж по одному прохождению; реджект снимает | `WeeklyChallengeCompletion`, `WeeklyChallengeState.Completions`; API — `WeeklyChallengeView.CompletedBy` |
 | Вид предложения | что предлагается: игра (с карточкой), ивент или предмет; лимит подачи — `suggestions.perDay` в день по часовому поясу сезона (D-527, D-571) | `SuggestionKind` (`Game`, `Event`, `Item`) |
 | Контракт | особое прохождение по договору с админом за доп. награду; снят с этапа 5 (RGG № 16, D-540), вариант на будущее | флага и команды в движке нет |
 
