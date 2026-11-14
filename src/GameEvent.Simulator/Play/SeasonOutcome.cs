@@ -92,6 +92,7 @@ public sealed record BotOutcome(
 /// One simulated season. <see cref="FirstFinishDay"/> — when the player who ended up first reached the finish;
 /// <see cref="FirstFrozenDay"/> — when he was frozen (his finish approved). <see cref="Rejections"/> — refused commands by
 /// code; <see cref="GuardTrips"/> — times a bot hit the action limit of one wake (0 unless a bot loops).
+/// <see cref="EventsDrawn"/> — events drawn from the decks (task 5.15: the bots draw events when the ruleset has them on).
 /// </summary>
 public sealed record SeasonOutcome(
     int Index,
@@ -105,4 +106,5 @@ public sealed record SeasonOutcome(
     int Commands,
     int Events,
     int Misses,
-    int GuardTrips);
+    int GuardTrips,
+    int EventsDrawn = 0);

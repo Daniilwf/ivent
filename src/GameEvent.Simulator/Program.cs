@@ -14,7 +14,7 @@ if (arguments is null)
 SimulationInputs inputs;
 try
 {
-    inputs = SimulationInputs.Load(arguments.Ruleset, arguments.Map, arguments.Pool, arguments.Settings);
+    inputs = SimulationInputs.Load(arguments.Ruleset, arguments.Map, arguments.Pool, arguments.Settings, arguments.Content);
 }
 catch (Exception e) when (e is IOException or JsonException or InvalidDataException or UnauthorizedAccessException)
 {
