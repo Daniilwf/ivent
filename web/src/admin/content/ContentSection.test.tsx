@@ -755,3 +755,15 @@ describe('The content editor on a phone', () => {
     expect(screen.getByTestId('content-preview')).toBeInTheDocument();
   });
 });
+
+// S4D-16: the phone shows the JSON to look at; «проверяются, пока печатаешь» speaks of typing nobody can do there
+describe('The content editor on a phone, the JSON hint', () => {
+  it('does not promise a check while typing in the read-only JSON', async () => {
+    const user = userEvent.setup();
+    open();
+    await openOrange(user);
+
+    expect(screen.getByTestId('content-json')).toHaveAttribute('readonly');
+    expect(screen.queryByText(t.jsonHint)).not.toBeInTheDocument();
+  });
+});
