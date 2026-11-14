@@ -514,6 +514,54 @@ describe('The content editor', () => {
     ).toBeInTheDocument();
   });
 
+  it('keeps an unsaved edit when another admin publishes meanwhile, and says so (S4-3)', async () => {
+    // D-491: two admins never overwrite each other silently — and an admin's draft is not thrown away silently either
+    const user = userEvent.setup();
+    let current = view();
+    const server = fakeServer({
+      'GET /api/admin/seasons/*/content': () => ({ body: current }),
+      'GET /api/admin/content/schema': schema,
+      'POST /api/admin/seasons/*/content/publish': answer(409, { code: 'content.versionChanged' }),
+    });
+    const { rerender } = render(<ContentSection seasonId={seasonId} version={0} />);
+    await openOrange(user);
+    await user.type(screen.getByTestId('content-field-name'), '!');
+
+    // The other tab publishes version 3: the season's version moves, the content is read again
+    current = view({ version: 3 });
+    rerender(<ContentSection seasonId={seasonId} version={1} />);
+    expect(await screen.findByTestId('content-newer')).toHaveTextContent(t.newer(3));
+    expect(screen.getByTestId('content-field-name')).toHaveValue('Апельсин!');
+
+    // Saving the draft is made from the version it was opened in: the server refuses it with words
+    await user.type(screen.getByTestId('content-comment'), 'Правка');
+    await user.click(screen.getByTestId('content-save'));
+    expect(
+      await screen.findByText(ru.admin.rejection['content.versionChanged'] ?? ''),
+    ).toBeInTheDocument();
+    expect(server.sent('POST', '/content/publish')[0]?.body).toMatchObject({ expectedVersion: 2 });
+
+    // «Открыть новую версию» drops the draft and shows version 3
+    await user.click(screen.getByTestId('content-take-newer'));
+    expect(await screen.findByText(t.version(3))).toBeInTheDocument();
+    expect(screen.queryByTestId('content-newer')).not.toBeInTheDocument();
+  });
+
+  it('takes a newer version at once when nothing is open', async () => {
+    let current = view();
+    fakeServer({
+      'GET /api/admin/seasons/*/content': () => ({ body: current }),
+      'GET /api/admin/content/schema': schema,
+    });
+    const { rerender } = render(<ContentSection seasonId={seasonId} version={0} />);
+    expect(await screen.findByText(t.version(2))).toBeInTheDocument();
+
+    current = view({ version: 3 });
+    rerender(<ContentSection seasonId={seasonId} version={1} />);
+    expect(await screen.findByText(t.version(3))).toBeInTheDocument();
+    expect(screen.queryByTestId('content-newer')).not.toBeInTheDocument();
+  });
+
   it('creates a new object from its template and adds it to the pack', async () => {
     const user = userEvent.setup();
     const server = open({ 'POST /api/admin/seasons/*/content/publish': published });
