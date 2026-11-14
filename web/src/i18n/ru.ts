@@ -20,9 +20,17 @@ const games = (n: number) => {
   return `${n} игр`;
 };
 
-// монетка / монетки / монеток; a debt with a real minus: −2 монетки
-const coins = (n: number) =>
-  `${n < 0 ? '−' : ''}${Math.abs(n).toLocaleString('ru-RU')} ${plural(n, 'монетка', 'монетки', 'монеток')}`;
+// The case a number of coins stands in (S4D-6): «у тебя 1 монетка», «поставить 1 монетку», «до 21 монетки»
+export type GrammaticalCase = 'nominative' | 'accusative' | 'genitive';
+const coinWords: Record<GrammaticalCase, readonly [string, string, string]> = {
+  nominative: ['монетка', 'монетки', 'монеток'],
+  accusative: ['монетку', 'монетки', 'монеток'],
+  genitive: ['монетки', 'монеток', 'монеток'],
+};
+
+// монетка / монетки / монеток in the case asked; a debt with a real minus: −2 монетки
+export const coins = (n: number, grammaticalCase: GrammaticalCase = 'nominative') =>
+  `${n < 0 ? '−' : ''}${Math.abs(n).toLocaleString('ru-RU')} ${plural(n, ...coinWords[grammaticalCase])}`;
 
 // прохождение / прохождения / прохождений
 const runs = (n: number) => {
@@ -555,8 +563,8 @@ export const ru = {
       payment === 'badEvent'
         ? 'За этот реролл тебе достанется плохой ивент. Продолжить?'
         : balance === null
-          ? `Реролл стоит ${coins(price)}. Потратить?`
-          : `Реролл стоит ${coins(price)}, у тебя ${coins(balance)}. Потратить?`,
+          ? `Реролл стоит ${coins(price, 'accusative')}. Потратить?`
+          : `Реролл стоит ${coins(price, 'accusative')}, у тебя ${coins(balance)}. Потратить?`,
     rerollConfirmYes: 'Да, реролл',
     rerollConfirmNo: 'Отмена',
     drop: 'Дропнуть',
@@ -1261,15 +1269,15 @@ export const ru = {
     title: 'Магазин',
     lead: 'Ролл даёт личные лоты на несколько минут. Не купил — лоты исчезнут.',
     coupons: (n: number) => `${plural(n, 'Купон', 'Купона', 'Купонов')}: ${n}`,
-    roll: (price: number) => `Ролл магазина за ${coins(price)}`,
-    rollAgain: (price: number) => `Новый ролл за ${coins(price)}`,
+    roll: (price: number) => `Ролл магазина за ${coins(price, 'accusative')}`,
+    rollAgain: (price: number) => `Новый ролл за ${coins(price, 'accusative')}`,
     rollFree: 'Ролл по купону',
     rollAnnounce: 'Новые лоты в магазине.',
     left: (time: string) => `Лоты исчезнут через ${time}`,
     gone: 'Время лотов вышло',
     price: (n: number) => coins(n),
     buy: 'Купить',
-    buyNamed: (name: string, price: number) => `Купить «${name}» за ${coins(price)}`,
+    buyNamed: (name: string, price: number) => `Купить «${name}» за ${coins(price, 'accusative')}`,
     sold: 'Куплено',
     bought: (name: string) => `Куплено: «${name}». Уже в инвентаре.`,
     emptyTitle: 'Лотов пока нет',
@@ -1300,10 +1308,10 @@ export const ru = {
     option: (days: number, multiplier: number) =>
       `${days} ${plural(days, 'день', 'дня', 'дней')}, ×${multiplier.toLocaleString('ru-RU')}`,
     stake: 'Ставка в монетках',
-    stakeHint: (max: number) => `От 1 до ${coins(max)}`,
+    stakeHint: (max: number) => `От 1 до ${coins(max, 'genitive')}`,
     stakeInvalid: (max: number) => `Ставка — целое число от 1 до ${max}.`,
     payout: (n: number) => `Выигрыш, если успеет: ${coins(n)}`,
-    confirm: (stake: number) => `Поставить ${coins(stake)}`,
+    confirm: (stake: number) => `Поставить ${coins(stake, 'accusative')}`,
     placed: (name: string) => `Ставка на игрока ${name} принята.`,
     emptyTitle: 'Сейчас ставить не на кого',
     emptyText:
@@ -1750,7 +1758,7 @@ export const ru = {
           ? 'Первый реролл после каждого ролла — бесплатно.'
           : `Бесплатных рероллов после каждого ролла: ${n}.`,
       noFree: 'Бесплатных рероллов нет.',
-      costCoins: (n: number) => `Дальше реролл стоит ${coins(n)}.`,
+      costCoins: (n: number) => `Дальше реролл стоит ${coins(n, 'accusative')}.`,
       costBadEvent: 'Дальше реролл — за плохой ивент.',
       alreadyPlayed:
         'Проходил игру до ивента — жми «Уже проходил»: новый ролл бесплатный, игра тебе больше не выпадет.',
