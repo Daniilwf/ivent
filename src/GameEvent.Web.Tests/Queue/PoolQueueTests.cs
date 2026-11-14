@@ -271,6 +271,11 @@ public sealed class PoolQueueTests
         Assert.True((await SendAsync(h, new SetCategory("Racing", 5))).IsAccepted);
         Assert.Equal(PoolRules.CategoryInvalid, (await SendAsync(h, new SetCategory("Racing", 0))).Rejection!.Code);
         Assert.Equal(PoolRules.CategoryInvalid, (await SendAsync(h, new SetCategory(" ", 3))).Rejection!.Code);
+
+        // A category is an option of an event's question (D-827): one /choose takes back
+        Assert.Equal(PoolRules.CategoryInvalid, (await SendAsync(h, new SetCategory("<b>Racing</b>", 3))).Rejection!.Code);
+        Assert.Equal(PoolRules.CategoryInvalid, (await SendAsync(h, new SetCategory("Rac\u0007ing", 3))).Rejection!.Code);
+        Assert.True((await SendAsync(h, new SetCategory("Point & Click", 1))).IsAccepted);
         Assert.True((await SendAsync(h, new RemoveCategory("Racing"))).IsAccepted);
         Assert.Equal(PoolRules.CategoryUnknown, (await SendAsync(h, new RemoveCategory("Racing"))).Rejection!.Code);
         await using var db = h.NewDb();

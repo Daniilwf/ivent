@@ -495,6 +495,50 @@ public class ContentValidatorTests
             path);
     }
 
+    [Theory]
+    [InlineData("\" a\"")]
+    [InlineData("\"a \"")]
+    [InlineData("\"a\\u0007b\"")]
+    [InlineData("\"a\\u200Bb\"")]
+    [InlineData("\"<b>\"")]
+    [InlineData("\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"")]
+    public void A_list_option_is_one_the_site_takes_as_an_answer(string option)
+    {
+        // D-827: the same rule as the check of /choose, so a published question can always be answered
+        AssertError(
+            Orange.Replace(
+                "{\"type\":\"move\",\"steps\":1}",
+                $"{{\"type\":\"requestChoice\",\"prompt\":\"?\",\"options\":{{\"list\":[\"ok\",{option}]}}}}",
+                StringComparison.Ordinal),
+            "$.effect.actions[0].options.list");
+    }
+
+    [Theory]
+    [InlineData("+1d6 к броску")]
+    [InlineData("Point & Click")]
+    [InlineData("Action/Adventure")]
+    [InlineData("«Да» или \"нет\"")]
+    public void An_option_of_any_other_punctuation_is_a_valid_answer(string option) =>
+        Assert.True(Engine.Turns.OptionIds.IsValid(option));
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData(" a")]
+    [InlineData("a\t")]
+    [InlineData("a\nb")]
+    [InlineData("a\u200Bb")]
+    [InlineData("<script>")]
+    public void An_option_with_blanks_around_control_characters_or_markup_is_not_an_answer(string? option) =>
+        Assert.False(Engine.Turns.OptionIds.IsValid(option));
+
+    [Fact]
+    public void An_option_is_at_most_the_limit_long()
+    {
+        Assert.True(Engine.Turns.OptionIds.IsValid(new string('я', Engine.Turns.OptionIds.MaxLength)));
+        Assert.False(Engine.Turns.OptionIds.IsValid(new string('я', Engine.Turns.OptionIds.MaxLength + 1)));
+    }
+
     [Fact]
     public void Result_reference_belongs_to_a_poll()
     {

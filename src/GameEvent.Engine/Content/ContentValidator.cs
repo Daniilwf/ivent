@@ -850,6 +850,11 @@ public static partial class ContentValidator
         {
             error($"{path}.list", "A list offers at least 2 non-empty options.");
         }
+        else if (options.List is { } offered && !offered.All(Turns.OptionIds.IsValid))
+        {
+            // The answer comes back through the site's check of an option (D-827): a list a player cannot answer is not published
+            error($"{path}.list", $"An option is 1–{Turns.OptionIds.MaxLength} characters, without control characters, «<», «>» or blanks around.");
+        }
     }
 
     // Object tags are lowercase words like ids («rat», «gremlin»), each once; a filter names at least one.

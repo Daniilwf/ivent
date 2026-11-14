@@ -21,9 +21,13 @@ public sealed record SeasonStatusRequest(Guid CommandId, SeasonStatus? To);
 /// <summary>The admin sets or removes (null) the deadline; only in draft or active (D-101).</summary>
 public sealed record SeasonDeadlineRequest(Guid CommandId, DateTimeOffset? Deadline);
 
-/// <summary>A pending manual effect of any player, oldest first, for the admin to resolve (D-102).</summary>
+/// <summary>
+/// A pending manual effect of any player, oldest first, for the admin to resolve (D-102); <c>irl</c> — an IRL one (D-509,
+/// D-820): its proof is checked in the IRL proof queue, or the admin closes it «не применимо» here; always set, optional
+/// for older clients.
+/// </summary>
 public sealed record AdminManualEffectView(
-    Guid Id, Guid PlayerId, string PlayerName, Engine.Rulesets.EventKind DrawEvent, Engine.Effects.ManualEffectSource Source, Guid? RunId, string? ObjectId = null);
+    Guid Id, Guid PlayerId, string PlayerName, Engine.Rulesets.EventKind DrawEvent, Engine.Effects.ManualEffectSource Source, Guid? RunId, string? ObjectId = null, bool Irl = false);
 
 /// <summary>An admin action on the season with nothing else to say (D-113: recalculate the finish bonuses).</summary>
 public sealed record SeasonActionRequest(Guid CommandId);
@@ -133,7 +137,8 @@ public static class AdminSeasonEndpoints
 
     private static async Task<Microsoft.AspNetCore.Http.HttpResults.Results<
         Microsoft.AspNetCore.Http.HttpResults.Ok<IReadOnlyList<AdminManualEffectView>>,
-        Microsoft.AspNetCore.Http.HttpResults.NotFound>> GetEffectsAsync(Guid seasonId, GameEventDbContext db, CancellationToken ct)
+        Microsoft.AspNetCore.Http.HttpResults.NotFound>> GetEffectsAsync(
+            Guid seasonId, GameEventDbContext db, Infrastructure.EventLog.SeasonStateReader seasonStates, CancellationToken ct)
     {
         if (!await db.Seasons.AnyAsync(s => s.Id == seasonId, ct))
         {
@@ -145,8 +150,19 @@ public static class AdminSeasonEndpoints
             .Where(x => x.SeasonId == seasonId)
             .Join(db.SeasonPlayers, x => x.PlayerId, p => p.Id, (x, p) => new { x, p.Name })
             .OrderBy(r => r.x.Id)
-            .Select(r => new AdminManualEffectView(r.x.Id, r.x.PlayerId, r.Name, r.x.DrawEvent, r.x.Source, r.x.RunId, r.x.ObjectId))
+            .Select(r => new AdminManualEffectView(r.x.Id, r.x.PlayerId, r.Name, r.x.DrawEvent, r.x.Source, r.x.RunId, r.x.ObjectId, false))
             .ToListAsync(ct);
+
+        // An IRL mark comes from the object's definition in the season's catalog (IrlProofs.IsIrl): only an object's text can be one
+        if (effects.Any(e => e.ObjectId is not null))
+        {
+            var state = await seasonStates.ReadAsync(db, seasonId, ct);
+            effects = [.. effects.Select(e => e with
+            {
+                Irl = state.ManualEffects.TryGetValue(e.Id, out var pending) && Engine.Proofs.IrlProofs.IsIrl(state, pending),
+            })];
+        }
+
         return TypedResults.Ok(effects);
     }
 

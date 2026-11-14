@@ -38,6 +38,8 @@ public sealed record ContentVersionInfo(
 /// The season's content in the editor (4.12, D-490): whether items are on (the editor works either way, a pack is
 /// published only with <c>features.items</c>), the season's status, the version in force, the pack in force as content
 /// JSON (CONTENT.md; null fields left out), the definitions deleted on the way and the versions, newest first.
+/// <c>eventsEnabled</c> — whether events are on (<c>features.events</c>, D-823): the pack's events and decks play only then;
+/// always set, optional for older clients.
 /// </summary>
 public sealed record AdminContentView(
     bool ItemsEnabled,
@@ -45,7 +47,8 @@ public sealed record AdminContentView(
     int Version,
     JsonElement Pack,
     IReadOnlyList<DeletedObjectView> Deleted,
-    IReadOnlyList<ContentVersionInfo> History);
+    IReadOnlyList<ContentVersionInfo> History,
+    bool EventsEnabled = false);
 
 /// <summary>One version's pack, for the history and the export of an older version.</summary>
 public sealed record ContentVersionView(int Version, JsonElement Pack);
@@ -202,7 +205,8 @@ public static partial class AdminContentEndpoints
             versions.Count == 0 ? 0 : versions[^1].Published.Version,
             Compact(previous),
             [.. deleted.Values.OrderBy(d => d.Id, StringComparer.Ordinal)],
-            history));
+            history,
+            rules.Features.Events));
     }
 
     private static async Task<Results<Ok<ContentVersionView>, NotFound>> GetVersionAsync(
