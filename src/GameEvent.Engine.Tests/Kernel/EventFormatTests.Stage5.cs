@@ -40,7 +40,101 @@ public partial class EventFormatTests
     public static TheoryData<string, IGameEvent, string> Stage5ValueSamples() => new()
     {
         { "duel-settled", new Engine.Duels.DuelSettled(s_run, Engine.Duels.DuelStatus.Won, Engine.Duels.DuelEnd.Completed, s_player, s_game, 10, s_at), "\"status\":\"won\",\"end\":\"completed\"" },
+
+        // Coop: every way a partner leaves (D-521, D-522, D-731)
+        { "coop-left", new Engine.Interactions.CoopLeft(s_run, s_other, Engine.Interactions.CoopLeaveReason.Left, s_at), "\"reason\":\"left\"" },
+        { "coop-left", new Engine.Interactions.CoopLeft(s_run, s_other, Engine.Interactions.CoopLeaveReason.RollerTechRerolled, s_at), "\"reason\":\"rollerTechRerolled\"" },
+        { "coop-left", new Engine.Interactions.CoopLeft(s_run, s_other, Engine.Interactions.CoopLeaveReason.PartnerInactive, s_at), "\"reason\":\"partnerInactive\"" },
+        { "coop-left", new Engine.Interactions.CoopLeft(s_run, s_other, Engine.Interactions.CoopLeaveReason.RollerFirst, s_at), "\"reason\":\"rollerFirst\"" },
+        { "coop-left", new Engine.Interactions.CoopLeft(s_run, s_other, Engine.Interactions.CoopLeaveReason.PartnerFirst, s_at), "\"reason\":\"partnerFirst\"" },
+
+        // Invitations: why one expires, and the answers only the state keeps (an undo snapshot)
+        { "interaction-expired", new Engine.Interactions.InteractionExpired(s_game, Engine.Interactions.InteractionExpiry.Timeout, s_at), "\"reason\":\"timeout\"" },
+        { "interaction-expired", new Engine.Interactions.InteractionExpired(s_game, Engine.Interactions.InteractionExpiry.Deadline, s_at), "\"reason\":\"deadline\"" },
+        { "interaction-expired", new Engine.Interactions.InteractionExpired(s_game, Engine.Interactions.InteractionExpiry.Superseded, s_at), "\"reason\":\"superseded\"" },
+        { "command-undone", InvitationUndo(Engine.Interactions.InteractionStatus.Declined), "\"status\":\"declined\"}]" },
+        { "command-undone", InvitationUndo(Engine.Interactions.InteractionStatus.Withdrawn), "\"status\":\"withdrawn\"}]" },
+        { "command-undone", InvitationUndo(Engine.Interactions.InteractionStatus.Expired), "\"status\":\"expired\"}]" },
+
+        // The partner board
+        { "partner-request-closed", new Engine.Interactions.PartnerRequestClosed(s_game, Engine.Interactions.PartnerRequestCloseReason.Coop, s_at), "\"reason\":\"coop\"" },
+        { "partner-request-closed", new Engine.Interactions.PartnerRequestClosed(s_game, Engine.Interactions.PartnerRequestCloseReason.Timeout, s_at), "\"reason\":\"timeout\"" },
+        { "partner-request-closed", new Engine.Interactions.PartnerRequestClosed(s_game, Engine.Interactions.PartnerRequestCloseReason.Author, s_at), "\"reason\":\"author\"" },
+        { "partner-request-closed", new Engine.Interactions.PartnerRequestClosed(s_game, Engine.Interactions.PartnerRequestCloseReason.Deadline, s_at), "\"reason\":\"deadline\"" },
+        {
+            "command-undone",
+            new Engine.Undo.CommandUndone(s_run, "Ошибка", [], [], [], [], [], [], null)
+            {
+                PartnerRequests = [new Engine.Interactions.PartnerRequest(s_game, s_player, s_run, s_at, s_at.AddHours(48), Engine.Interactions.PartnerRequestStatus.Closed)],
+                RemovedPartnerRequests = [],
+            },
+            "\"status\":\"closed\"}]"
+        },
+
+        // A duel still running, as an undo stores it
+        {
+            "command-undone",
+            new Engine.Undo.CommandUndone(s_run, "Ошибка", [], [], [], [], [], [], null, Duels: [new Engine.Duels.Duel(s_duel, s_player, s_other, s_at, s_at.AddDays(7), [s_game])], RemovedDuels: []),
+            "\"status\":\"active\",\"winnerId\":null"
+        },
+
+        // Draws: the price of a reroll, the penalty of a drop and the event of a difficulty (D-504, D-557)
+        { "event-drawn", new Engine.Decks.EventDrawn(s_player, "bad", "horror-week", EventKind.Bad, Engine.Decks.EventSource.RerollCost), "\"source\":\"rerollCost\"" },
+        { "event-drawn", new Engine.Decks.EventDrawn(s_player, "bad", "horror-week", EventKind.Bad, Engine.Decks.EventSource.DropPenalty), "\"source\":\"dropPenalty\"" },
+        { "event-drawn", new Engine.Decks.EventDrawn(s_player, "good", "tailwind", EventKind.Good, Engine.Decks.EventSource.Difficulty) { RunId = s_run }, "\"source\":\"difficulty\",\"runId\":\"00000000-0000-0000-0000-000000000001\"" },
+
+        // The questions of an event: a target and an outcome (D-511)
+        { "effect-suspended", Suspended(SuspendedStep.Target), "\"step\":\"target\"" },
+        { "effect-suspended", Suspended(SuspendedStep.Outcome), "\"step\":\"outcome\"" },
+
+        // Settlements for everyone: of a poll's result, a global event's launch and a drawn event (D-700)
+        { "for-all-queued", ForAll(ForAllSource.PollResult), "\"source\":\"pollResult\"" },
+        { "for-all-queued", ForAll(ForAllSource.GlobalEventLaunch), "\"source\":\"globalEventLaunch\"" },
+        { "for-all-queued", ForAll(ForAllSource.DrawnEvent), "\"source\":\"drawnEvent\"" },
+
+        // Global events: how one ends, how its progress changes, a goal of runs
+        { "global-event-ended", new GlobalEventEnded(s_run, GlobalEventEndReason.Admin), "\"reason\":\"admin\"" },
+        { "global-event-ended", new GlobalEventEnded(s_run, GlobalEventEndReason.Deadline), "\"reason\":\"deadline\"" },
+        { "global-progress-changed", new GlobalProgressChanged(s_run, s_game, GlobalProgressReason.Completed, 1, 3), "\"reason\":\"completed\",\"delta\":1,\"total\":3" },
+        { "global-progress-changed", new GlobalProgressChanged(s_run, s_game, GlobalProgressReason.Rejected, -1, 2), "\"reason\":\"rejected\",\"delta\":-1,\"total\":2" },
+        {
+            "global-event-launched",
+            new GlobalEventLaunched(s_run, "coin-rain", s_globalDefinition, s_at, s_at.AddHours(72)) { Goal = new GlobalEventGoal { Metric = GoalMetric.Runs, Target = 3 }, Kind = EventKind.Good },
+            "\"goal\":{\"metric\":\"runs\",\"target\":3}"
+        },
+
+        // Polls: started by the admin and by a global event, closed early by the admin
+        { "poll-started", Poll(PollSource.Admin), "\"source\":\"admin\"" },
+        { "poll-started", Poll(PollSource.GlobalEvent), "\"source\":\"globalEvent\"" },
+        { "poll-closed", new PollClosed(s_run, PollCloseReason.Admin, "Horror", [new PollCount("Horror", 1)], [], 0), "\"reason\":\"admin\"" },
+
+        // Suggestions: of an event and of an item, approved, and waiting as an undo stores it
+        { "suggestion-submitted", new Engine.Suggestions.SuggestionSubmitted(s_challenge, s_player, s_user, Engine.Suggestions.SuggestionKind.Event, "Ивент «Тишина»", null, s_at), "\"kind\":\"event\",\"text\":\"Ивент «Тишина»\",\"game\":null" },
+        { "suggestion-submitted", new Engine.Suggestions.SuggestionSubmitted(s_challenge, s_player, s_user, Engine.Suggestions.SuggestionKind.Item, "Предмет «Зонтик»", null, s_at), "\"kind\":\"item\"" },
+        { "suggestion-reviewed", new Engine.Suggestions.SuggestionReviewed(s_challenge, Engine.Suggestions.SuggestionStatus.Approved, null, s_at), "\"status\":\"approved\",\"comment\":null" },
+        {
+            "command-undone",
+            new Engine.Undo.CommandUndone(
+                s_run, "Ошибка", [], [], [], [], [], [], null, null, null,
+                [new Engine.Suggestions.Suggestion(s_challenge, s_player, s_user, Engine.Suggestions.SuggestionKind.Event, "Ивент «Тишина»", null, s_at, Engine.Suggestions.SuggestionStatus.Pending, null)],
+                []),
+            "\"status\":\"pending\""
+        },
     };
+
+    private static Engine.Undo.CommandUndone InvitationUndo(Engine.Interactions.InteractionStatus status) =>
+        new(
+            s_run, "Ошибка", [], [], [], [], [], [], null,
+            Interactions: [new Engine.Interactions.Interaction(s_game, Engine.Interactions.InteractionKind.Coop, s_player, s_other, s_run, s_at, s_at.AddHours(24), status)],
+            RemovedInteractions: []);
+
+    private static EffectSuspended Suspended(SuspendedStep step) =>
+        new(s_player, s_run, "coin-or-step", EventKind.Good, step, s_player, 0, 0, [new Engine.Turns.ChoiceOption("coins", Game: null)], null, null, null);
+
+    private static ForAllQueued ForAll(ForAllSource source) => new(s_run, source, s_object, "poll-result", s_coinsOnAll, [s_player]);
+
+    private static PollStarted Poll(PollSource source) =>
+        new(s_run, source, "Какой жанр?", [new PollOption("Horror", "Horror")], PollVoters.Everyone, true, false, s_at, s_at.AddHours(24));
 
 
     [Theory]
