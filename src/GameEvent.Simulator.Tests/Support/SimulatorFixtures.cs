@@ -37,6 +37,24 @@ public static class SimulatorFixtures
             map is null ? null : "map",
             "content/pool.demo.json");
 
+    /// <summary>
+    /// The content of the repository the site publishes into a season (D-533): /content/items and /content/events as objects,
+    /// /content/wheels and /content/decks as wheels.
+    /// </summary>
+    public static ContentPack RepositoryContent() => SimulationInputs.ReadContent(PathOf("content"));
+
+    /// <summary>The default ruleset with events on (and items, which events are, D-530): «ивенты вкл» of the simulator (task 5.15).</summary>
+    public static Ruleset WithEvents()
+    {
+        var rules = RulesetJson.Default();
+        return rules with { Features = rules.Features with { Items = true, Events = true } };
+    }
+
+    /// <summary>The inputs with <paramref name="content"/> for the season.</summary>
+    public static SimulationInputs InputsWithContent(Ruleset ruleset, ContentPack? content, SimulationSettings? settings = null) =>
+        SimulationInputs.Create(
+            ruleset, null, DemoPool(), settings ?? new SimulationSettings(), "docs/ruleset.default.json", null, "content/pool.demo.json", content);
+
     public static Ruleset WithUncheckedLimit(int? limit)
     {
         var rules = RulesetJson.Default();

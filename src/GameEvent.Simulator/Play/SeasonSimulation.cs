@@ -1,3 +1,5 @@
+using GameEvent.Engine.Content;
+using GameEvent.Engine.Decks;
 using GameEvent.Engine.Effects;
 using GameEvent.Engine.Finish;
 using GameEvent.Engine.Kernel;
@@ -25,6 +27,9 @@ public sealed class SeasonSimulation
 {
     /// <summary>A bot acts at most this many times per wake: a refused command never makes it loop (D-355).</summary>
     public const int MaxActionsPerWake = 40;
+
+    // The guard of the answers on the final review: each answer moves at most to the finish, so a map's length bounds them
+    private const int MaxFinalAnswers = 1000;
 
     private const double Epsilon = 1e-9;
     private const string ProofLink = "https://example.com/proof";
@@ -60,6 +65,7 @@ public sealed class SeasonSimulation
     private int _events;
     private int _misses;
     private int _guardTrips;
+    private int _eventsDrawn;
 
     public SeasonSimulation(SimulationInputs inputs, int days, int index, ulong seed)
     {
@@ -122,6 +128,12 @@ public sealed class SeasonSimulation
         var map = _inputs.Map;
         Require(Execute(new CreateSeason(s_seasonId, "Симуляция", _inputs.Ruleset, _deadline, map), bot: null), "create the season");
         _cellsToFinish = Leaderboard.CellsToFinish(_state.Map);
+
+        // D-802: with events on the season gets its content as on the site, by the admin's command; off, it is not published
+        if (_inputs.Ruleset.Features.Events && _inputs.Content is { } content)
+        {
+            Require(Execute(new PublishContent(content, "Контент симуляции"), bot: null), "publish the content");
+        }
 
         var sessions = new SimRandom(SimRandom.Mix(_seed, 3));
         var behaviour = _inputs.Settings.Behaviour;
@@ -241,6 +253,13 @@ public sealed class SeasonSimulation
             if (player.Choice is { Kind: ChoiceKind.Branch } branch)
             {
                 ChooseBranch(bot, player, branch);
+                continue;
+            }
+
+            // The answer an event asks for belongs to the step before it, after the deadline too (D-561): the bot answers
+            if (player.Choice is { Kind: ChoiceKind.Effect } asked)
+            {
+                Answer(bot, asked);
                 continue;
             }
 
@@ -515,6 +534,10 @@ public sealed class SeasonSimulation
         Require(Execute(new MakeChoice(bot.PlayerId, choice.ChoiceId, pick), bot), "choose a branch");
     }
 
+    // An event's question (D-511): the bot takes the first option; the draws are what the simulation measures, not the answers
+    private void Answer(Bot bot, PendingChoice choice) =>
+        Require(Execute(new MakeChoice(bot.PlayerId, choice.ChoiceId, choice.Options[0].Id), bot), "answer an event");
+
     // The unchecked-runs limit holds the roll: the bot waits for the admin's next check, within its session.
     private void WaitForAdmin(Bot bot)
     {
@@ -590,6 +613,32 @@ public sealed class SeasonSimulation
         // what is still waiting (the bots play no texts out)
         if (final)
         {
+            // A bot done for the season still answers what an event asks (D-561), so the results are not held. An answer goes on
+            // with its effect: a step may stop on an event cell that asks again, or at a fork (D-805) — answered until nothing waits
+            for (var round = 0; round < MaxFinalAnswers; round++)
+            {
+                var answered = false;
+                foreach (var bot in _players)
+                {
+                    var player = _state.Players[bot.PlayerId];
+                    if (player.Choice is { Kind: ChoiceKind.Branch } branch)
+                    {
+                        ChooseBranch(bot, player, branch);
+                        answered = true;
+                    }
+                    else if (player.Choice is { Kind: ChoiceKind.Effect } asked)
+                    {
+                        Answer(bot, asked);
+                        answered = true;
+                    }
+                }
+
+                if (!answered)
+                {
+                    break;
+                }
+            }
+
             foreach (var effectId in _state.ManualEffects.Keys.ToList())
             {
                 Execute(new ResolveManualEffect(effectId, ManualEffectOutcome.NotApplicable, "Итоги сезона", PlayerId: null), bot: null);
@@ -694,6 +743,9 @@ public sealed class SeasonSimulation
             case PlayerMoved { Reason: MoveReason.Teleport } moved:
                 _byPlayer[moved.PlayerId].Teleports++;
                 break;
+            case EventDrawn:
+                _eventsDrawn++;
+                break;
             case GameRolled rolled:
                 _misses += rolled.Misses.Count;
                 break;
@@ -787,7 +839,8 @@ public sealed class SeasonSimulation
             _commands,
             _events,
             _misses,
-            _guardTrips);
+            _guardTrips,
+            _eventsDrawn);
     }
 
     private static void Require(CommandResult result, string what)
