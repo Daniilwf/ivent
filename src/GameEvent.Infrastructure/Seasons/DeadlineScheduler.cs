@@ -107,7 +107,7 @@ public sealed partial class DeadlineScheduler(
 
             // The season's own moments — an open poll's close, a global event's end (D-727, D-756)
             var seasons = await db.Seasons.AsNoTracking()
-                .Where(s => s.NextTimerAt != null && (s.Status == SeasonStatus.Active || s.Status == SeasonStatus.Closing))
+                .Where(s => s.NextTimerAt != null && running.Contains(s.Id))
                 .Select(s => new { SeasonId = s.Id, s.NextTimerAt })
                 .ToListAsync(ct);
             due = [.. players.Concat(seasons)

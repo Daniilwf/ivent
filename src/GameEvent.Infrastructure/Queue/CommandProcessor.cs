@@ -88,8 +88,9 @@ public sealed partial class CommandProcessor(
         {
             var outcome = await ProcessAsync(pending.Envelope, ct);
 
-            // An approved game suggestion is in the pool by the time the admin's approval answers (D-572)
-            if (outcome.IsAccepted && !outcome.IsDuplicate && pending.Envelope.SeasonId != Guid.Empty)
+            // An approved game suggestion is in the pool by the time the admin's approval answers (D-572); a repeat of the
+            // approval tries again, since the stop that lost its answer may have lost the game too (D-817)
+            if (outcome.IsAccepted && pending.Envelope.SeasonId != Guid.Empty)
             {
                 await AddApprovedGamesAsync(pending.Envelope.SeasonId, outcome, ct);
             }

@@ -45,18 +45,18 @@ internal static partial class SeasonProjection
                 RulesetVersion = after.RulesetVersion,
                 RulesetJson = JsonSerializer.Serialize(after.Rules, EngineJson.Options),
                 CreatedAt = now,
-                NextTimerAt = NextOfSeason(after),
+                NextTimerAt = Engine.Economy.Timers.NextOfSeason(after),
             });
         }
         else if (before.RulesetVersion != after.RulesetVersion || before.Status != after.Status
-            || before.Deadline != after.Deadline || before.Name != after.Name || NextOfSeason(before) != NextOfSeason(after))
+            || before.Deadline != after.Deadline || before.Name != after.Name || Engine.Economy.Timers.NextOfSeason(before) != Engine.Economy.Timers.NextOfSeason(after))
         {
             var season = await db.Seasons.FindAsync([after.SeasonId], ct)
                 ?? throw new InvalidOperationException($"Season {after.SeasonId} has no projection row.");
             season.Name = after.Name;
             season.Status = after.Status;
             season.Deadline = after.Deadline;
-            season.NextTimerAt = NextOfSeason(after);
+            season.NextTimerAt = Engine.Economy.Timers.NextOfSeason(after);
             if (season.RulesetVersion != after.RulesetVersion)
             {
                 season.RulesetVersion = after.RulesetVersion;
@@ -326,10 +326,6 @@ internal static partial class SeasonProjection
 
         await WriteEventsAsync(db, before, after, ct);
     }
-
-    // The season's own timer column (D-727, D-756): what a switched-off mechanic left waiting is not due (D-420)
-    private static DateTimeOffset? NextOfSeason(SeasonState state) =>
-        state.Ruleset is null ? null : Engine.Economy.Timers.NextOfSeason(state);
 
     // Player ids are participation ids (one per season), never user ids: a clash means a bug upstream.
     private static void EnsureSameSeason(Guid stored, Guid current, string what, Guid id)

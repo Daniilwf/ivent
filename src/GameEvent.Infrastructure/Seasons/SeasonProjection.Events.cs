@@ -295,13 +295,11 @@ internal static partial class SeasonProjection
         };
     }
 
-    // The partner's column wins over the JSON of his side: a partner changed behind the queue is a difference (L4)
-    private static CoopPartner? CoopOf(RunRecord run) => run.PartnerId switch
-    {
-        null => null,
-        { } partner when run.CoopJson is null => new CoopPartner(partner, Guid.Empty, default),
-        { } partner => Json<CoopPartner>(run.CoopJson) with { PlayerId = partner },
-    };
+    // The partner's column wins over the JSON of his side, so a partner changed behind the queue is a difference (L4): a
+    // side without its column reads as nobody's (PlayerId empty), a column without its side as a bare side of that partner
+    private static CoopPartner? CoopOf(RunRecord run) => run.CoopJson is { } json
+        ? Json<CoopPartner>(json) with { PlayerId = run.PartnerId ?? Guid.Empty }
+        : run.PartnerId is { } partner ? new CoopPartner(partner, Guid.Empty, default) : null;
 
     private static T Json<T>(string json) =>
         JsonSerializer.Deserialize<T>(json, EngineJson.Options) ?? throw new InvalidOperationException($"A stored {typeof(T).Name} is null.");

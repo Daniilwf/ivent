@@ -37,7 +37,10 @@ public static class SeasonIntegrity
             }
 
             var stored = await SeasonProjection.ReadAsync(db, replayed, ct);
-            var differences = Differences(replayed, stored).Concat(await RulesetHistoryDifferencesAsync(db, seasonId, ct)).ToList();
+            var differences = Differences(replayed, stored)
+                .Concat(await TimerDifferencesAsync(db, replayed, ct))
+                .Concat(await RulesetHistoryDifferencesAsync(db, seasonId, ct))
+                .ToList();
             var lastAfter = await db.Events.AsNoTracking().Where(e => e.SeasonId == seasonId).MaxAsync(e => e.Sequence, ct);
             if (lastAfter == last || attempt == Attempts)
             {
@@ -71,6 +74,29 @@ public static class SeasonIntegrity
         Compare("partnerRequest", fromLog.PartnerRequests, stored.PartnerRequests, differences);
         Compare("weeklyChallenge", fromLog.WeeklyChallenges, stored.WeeklyChallenges, differences);
         Compare("suggestion", fromLog.Suggestions, stored.Suggestions, differences);
+        return differences;
+    }
+
+    // The timer columns the scheduler reads (D-404, D-812): the season's own moments and each player's are those of the
+    // log's state, so a stale column cannot leave a poll or a global event open past its term unnoticed (EV36).
+    private static async Task<IEnumerable<string>> TimerDifferencesAsync(GameEventDbContext db, SeasonState replayed, CancellationToken ct)
+    {
+        var differences = new List<string>();
+        var season = await db.Seasons.AsNoTracking().Where(s => s.Id == replayed.SeasonId).Select(s => new { s.NextTimerAt }).SingleOrDefaultAsync(ct);
+        if (season is not null && season.NextTimerAt != Engine.Economy.Timers.NextOfSeason(replayed))
+        {
+            differences.Add("season.nextTimerAt");
+        }
+
+        var players = await db.SeasonPlayers.AsNoTracking().Where(p => p.SeasonId == replayed.SeasonId).Select(p => new { p.Id, p.NextTimerAt }).ToListAsync(ct);
+        foreach (var row in players.OrderBy(p => p.Id))
+        {
+            if (replayed.Players.TryGetValue(row.Id, out var player) && row.NextTimerAt != Engine.Economy.Timers.Next(replayed, player))
+            {
+                differences.Add($"player {row.Id}: nextTimerAt");
+            }
+        }
+
         return differences;
     }
 
