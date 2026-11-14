@@ -1315,6 +1315,93 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/seasons/{seasonId}/effects/{effectId}/irl-proof": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                    effectId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["IrlProofRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CommandResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/seasons/current": {
         parameters: {
             query?: never;
@@ -2698,6 +2785,93 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/seasons/{seasonId}/runs/{runId}/waive-conditions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                    runId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["WaiveConditionsRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CommandResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/seasons/{seasonId}/proofs": {
         parameters: {
             query?: never;
@@ -2965,6 +3139,166 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": components["schemas"]["RejectProofRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CommandResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/seasons/{seasonId}/irl-proofs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["IrlProofQueueItemView"][];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Too Many Requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/seasons/{seasonId}/effects/{effectId}/irl-proof/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                    effectId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["IrlProofReviewRequest"];
                 };
             };
             responses: {
@@ -7286,6 +7620,8 @@ export interface components {
          * @description The season's content in the editor (4.12, D-490): whether items are on (the editor works either way, a pack is
          *     published only with `features.items`), the season's status, the version in force, the pack in force as content
          *     JSON (CONTENT.md; null fields left out), the definitions deleted on the way and the versions, newest first.
+         *     `eventsEnabled` — whether events are on (`features.events`, D-823): the pack's events and decks play only then;
+         *     always set, optional for older clients.
          */
         AdminContentView: {
             itemsEnabled: boolean;
@@ -7295,8 +7631,14 @@ export interface components {
             pack: components["schemas"]["JsonElement"];
             deleted: components["schemas"]["DeletedObjectView"][];
             history: components["schemas"]["ContentVersionInfo"][];
+            /** @default false */
+            eventsEnabled: boolean;
         };
-        /** @description A pending manual effect of any player, oldest first, for the admin to resolve (D-102). */
+        /**
+         * @description A pending manual effect of any player, oldest first, for the admin to resolve (D-102); `irl` — an IRL one (D-509,
+         *     D-820): its proof is checked in the IRL proof queue, or the admin closes it «не применимо» here; always set, optional
+         *     for older clients.
+         */
         AdminManualEffectView: {
             /** Format: uuid */
             id: string;
@@ -7308,6 +7650,8 @@ export interface components {
             /** Format: uuid */
             runId: null | string;
             objectId?: null | string;
+            /** @default false */
+            irl: boolean;
         };
         /**
          * @description The season's map in the editor (2.11): the map in force, the players on it, the mode (the editor publishes only in
@@ -7336,6 +7680,8 @@ export interface components {
          *     last acted themselves and the hint — no action of their own for the rules' `inactiveHintDays` while not marked
          *     inactive. `playing` — a run is going on: a long game is a reason to be quiet, not a sign of leaving.
          *     `choosingBranch` — the player's throw waits at a fork (D-305): the admin may discard the choice, the steps left burn.
+         *     `eventQuestion` — an event waits for the player's answer (D-511, D-569 (8), D-822): the admin takes the question off
+         *     with the correction `discardOffer`; always set, optional for older clients.
          */
         AdminPlayerView: {
             /** Format: uuid */
@@ -7359,6 +7705,8 @@ export interface components {
             inactiveHint: boolean;
             /** @default false */
             choosingBranch: boolean;
+            /** @default false */
+            eventQuestion: boolean;
         };
         /** @description «Уже проходил» on the offered game or an option of the pending choice (D-92). */
         AlreadyPlayedRequest: {
@@ -7624,7 +7972,9 @@ export interface components {
         };
         /**
          * @description The pending choice, kept on the server: a reloaded page shows the same options (T2). A branch choice (D-304): each
-         *     option's id is the cell the branch leads to, `steps` — the steps of the throw still to walk from the fork.
+         *     option's id is the cell the branch leads to, `steps` — the steps of the throw still to walk from the fork. The question
+         *     of a suspended event (`effect`, D-511, D-822): `prompt` — its text, `objectId` and `name` — the event;
+         *     an option's id is the answer sent back to `/choose` as it is (a list's text, a player's id).
          */
         ChoiceView: {
             /** Format: uuid */
@@ -7633,6 +7983,9 @@ export interface components {
             options: components["schemas"]["ChoiceOptionView"][];
             /** Format: int32 */
             steps?: null | number;
+            prompt?: null | string;
+            objectId?: null | string;
+            name?: null | string;
         };
         /**
          * @description An answer to the pending choice: its id and the picked option's id; for a game, `difficulty` — the one it starts on
@@ -7669,6 +8022,8 @@ export interface components {
         /**
          * @description The player's latest completed run: dice by the hours and the challenge dice apart, each die separately; the total
          *     counts both; the review when there is one; `status` is `rejected` when the admin took the run back.
+         *     `conditions` — the conditions of events the roll fixed on it, `conditionCheck` — how they were checked, null
+         *     without conditions (D-821); always set, optional for older clients.
          */
         CompletedRunView: {
             /** Format: uuid */
@@ -7682,6 +8037,8 @@ export interface components {
             review: null | components["schemas"]["ReviewView"];
             proof: null | components["schemas"]["ProofView"];
             status: components["schemas"]["RunStatus"];
+            conditions?: null | components["schemas"]["RunConditionView"][];
+            conditionCheck?: null | components["schemas"]["RunConditionCheckView"];
         };
         /** @description Completing the active run. `estimatedHours` is needed only when the game has no hours. */
         CompleteRequest: {
@@ -8045,12 +8402,7 @@ export interface components {
             stackTrace: string;
             traceId: string;
         };
-        /**
-         * @description The kind of an event (SPEC «Ивенты»): good, bad, special, risky. A drawn event has the kind of its deck (D-501); the
-         *     standard decks are the wheels named like the kinds. Special and risky came with stage 5: a build before it cannot read
-         *     them, and they are written only once events are on.
-         * @enum {unknown}
-         */
+        /** @enum {unknown} */
         EventKind: "good" | "bad" | "special" | "risky";
         /** @description The rules of event decks (SPEC «Ивенты», D-500…D-502). */
         EventRules: {
@@ -8390,6 +8742,44 @@ export interface components {
             targets: components["schemas"]["ItemTargetView"][];
             steps: components["schemas"]["ItemStepView"][];
         };
+        /**
+         * @description An IRL proof waiting for the admin (D-509, D-820), oldest first: whose, the event (its card from the content in force),
+         *     the player's own pictures and the https link — shown, never opened by the server — and when it was sent.
+         */
+        IrlProofQueueItemView: {
+            /** Format: uuid */
+            effectId: string;
+            /** Format: uuid */
+            playerId: string;
+            playerName: string;
+            objectId: string;
+            name: string;
+            description: string;
+            files: components["schemas"]["FileLinkView"][];
+            link: null | string;
+            /** Format: date-time */
+            submittedAt: string;
+        };
+        /**
+         * @description The proof of my IRL effect (D-509, D-686, D-820): pictures I uploaded (`files` — ids from `POST /api/files`, up
+         *     to `events.irlProof.maxFiles`) and / or one https `link` to a video, which the server never opens.
+         */
+        IrlProofRequest: {
+            /** Format: uuid */
+            commandId: string;
+            files?: null | string[];
+            link?: null | string;
+        };
+        /**
+         * @description The admin's check of an IRL proof (D-509): `approved` resolves the effect «применено» and gives nothing; a reject
+         *     explains itself in `comment` (required then, at most 500 characters) and the player sends a new proof.
+         */
+        IrlProofReviewRequest: {
+            /** Format: uuid */
+            commandId: string;
+            approved: null | boolean;
+            comment?: null | string;
+        };
         /** @description The proof of an IRL event (D-509): the player's own screenshots and / or one https link to a video. */
         IrlProofRules: {
             /**
@@ -8397,6 +8787,23 @@ export interface components {
              * @description How many uploaded screenshots one submission takes; 0 — a link only.
              */
             maxFiles: number;
+        };
+        /**
+         * @description Where the proof of an IRL event stands (D-509).
+         * @enum {unknown}
+         */
+        IrlProofStatus: "pending" | "approved" | "rejected";
+        /**
+         * @description The proof of an IRL effect (D-509, D-820), for its owner only: `status`, the own uploaded pictures, the https link
+         *     (never opened by the server), the admin's comment after a reject and when it was sent.
+         */
+        IrlProofView: {
+            status: components["schemas"]["IrlProofStatus"];
+            files: components["schemas"]["FileLinkView"][];
+            link: null | string;
+            comment: null | string;
+            /** Format: date-time */
+            submittedAt: string;
         };
         /** @description One answer: the id the engine checks, the words the screen shows. */
         ItemOptionView: {
@@ -8481,6 +8888,9 @@ export interface components {
             drawEvent: components["schemas"]["EventKind"];
             source: components["schemas"]["ManualEffectSource"];
             objectId?: null | string;
+            /** @default false */
+            irl: boolean;
+            irlProof?: null | components["schemas"]["IrlProofView"];
         };
         /**
          * @description The picture under the map (D-277): an uploaded map background (`POST …/map/background`) and its natural size in
@@ -8589,7 +8999,9 @@ export interface components {
          *     `lastEvent` — the event I drew last (stage 5), while `features.events` is on; null before the first draw.
          *     `coins` — my balance, what a paid reroll spends (K1S-3). `checks` — my other runs that still take a proof
          *     (completed, the proof neither approved nor rejected) and the runs rejected since my latest roll, newest first; the
-         *     latest completed run is `lastCompleted` and never here (K1S-1, K1S-9, D-602).
+         *     latest completed run is `lastCompleted` and never here (K1S-1, K1S-9, D-602). `waitingEvents` — my drawn events
+         *     waiting for my future steps; `waitingConditions` — the conditions of events waiting for my next roll (D-821, D-823);
+         *     both always set (empty with events off), optional for older clients.
          */
         MyTurnView: {
             /** Format: uuid */
@@ -8618,6 +9030,8 @@ export interface components {
             /** Format: int32 */
             coins?: null | number;
             checks?: null | components["schemas"]["CompletedRunView"][];
+            waitingEvents?: null | components["schemas"]["WaitingEventView"][];
+            waitingConditions?: null | components["schemas"]["RunConditionView"][];
         };
         NominationRules: {
             auto: components["schemas"]["EquatableArrayOfAutoNomination"];
@@ -9118,6 +9532,23 @@ export interface components {
             /** Format: date-time */
             deadline?: null | string;
         };
+        /** @description The check of a completed run's conditions (D-507, D-821): met at the difficulty that counts, waived by the admin. */
+        RunConditionCheckView: {
+            met: boolean;
+            waived: boolean;
+        };
+        /**
+         * @description A condition of an event on a run (SPEC «Условия от ивентов», D-507, D-821): whose it is, the kind of the deck it came
+         *     from (null for an item's), whether another player put it, and its bounds of difficulty (null when not set).
+         */
+        RunConditionView: {
+            objectId: string;
+            name: string;
+            kind: null | components["schemas"]["EventKind"];
+            hostile: boolean;
+            difficultyAtLeast: null | components["schemas"]["Difficulty"];
+            difficultyAtMost: null | components["schemas"]["Difficulty"];
+        };
         /**
          * @description The game of a run: its title, hours and the pool's cover (none when the game has none, D-222). Named apart from the pool's PoolGameView: the OpenAPI document
          *     keys schemas by type name, so two records called GameView became one schema and the pool lost its fields (D-161).
@@ -9132,7 +9563,10 @@ export interface components {
         };
         /** @enum {unknown} */
         RunStatus: "playing" | "completed" | "dropped" | "techRerolled" | "rejected";
-        /** @description The active run; `declaredDifficulty` — the one named at the start, the cap of the completion's (D-633). */
+        /**
+         * @description The active run; `declaredDifficulty` — the one named at the start, the cap of the completion's (D-633);
+         *     `conditions` — the conditions of events its roll fixed (D-507, D-821), always set, optional for older clients.
+         */
         RunView: {
             /** Format: uuid */
             id: string;
@@ -9140,6 +9574,7 @@ export interface components {
             /** Format: date-time */
             startedAt: string;
             declaredDifficulty?: null | components["schemas"]["Difficulty"];
+            conditions?: null | components["schemas"]["RunConditionView"][];
         };
         /** @description An admin action on the season with nothing else to say (D-113: recalculate the finish bonuses). */
         SeasonActionRequest: {
@@ -9525,6 +9960,25 @@ export interface components {
         };
         /** @enum {unknown} */
         UseWindow: "beforeRoll" | "afterRoll" | "beforeDice" | "afterDice" | "anytime";
+        /**
+         * @description An event I drew whose effect waits for my future steps (SPEC «Ивенты копятся», D-505, D-823): a change of my next roll
+         *     or of my next throw; `kind` — the kind of the deck it came from.
+         */
+        WaitingEventView: {
+            objectId: string;
+            name: string;
+            description: string;
+            kind: components["schemas"]["EventKind"];
+        };
+        /**
+         * @description The admin marks the conditions of a completed run «не применимо» (D-546 (2), D-821): the run counts as if they were met
+         *     and they wait for the player's next roll; the comment is required.
+         */
+        WaiveConditionsRequest: {
+            /** Format: uuid */
+            commandId: string;
+            comment: null | string;
+        };
         WeeklyChallengeRules: {
             /** Format: int32 */
             defaultRewardCoins: number;
@@ -9614,6 +10068,7 @@ export const eventKindValues: ReadonlyArray<FlattenedDeepRequired<components>["s
 export const eventSourceValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["EventSource"]> = ["cell", "item", "difficulty", "incoming", "rerollCost", "dropPenalty"];
 export const exclusionReasonValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ExclusionReason"]> = ["alreadyPlayed", "dropped", "techRerolled"];
 export const gameMarkKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["GameMarkKind"]> = ["dropped", "techRerolled"];
+export const irlProofStatusValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["IrlProofStatus"]> = ["pending", "approved", "rejected"];
 export const itemStepKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ItemStepKind"]> = ["choice", "pickObject", "direction"];
 export const mandatoryEventValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["MandatoryEvent"]> = ["bad", "none"];
 export const manualEffectOutcomeValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ManualEffectOutcome"]> = ["applied", "notApplicable"];

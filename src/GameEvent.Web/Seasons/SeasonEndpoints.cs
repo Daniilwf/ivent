@@ -10,6 +10,7 @@ using GameEvent.Engine.Runs;
 using GameEvent.Engine.Seasons;
 using GameEvent.Engine.Turns;
 using GameEvent.Infrastructure.Database;
+using GameEvent.Infrastructure.EventLog;
 using GameEvent.Infrastructure.Pool;
 using GameEvent.Infrastructure.Queue;
 using GameEvent.Web.Accounts;
@@ -53,6 +54,12 @@ public sealed record RerollRequest(Guid CommandId, RerollPayment? ExpectedPaymen
 /// «notApplicable» and for the admin, at most 500 characters.
 /// </summary>
 public sealed record ResolveEffectRequest(Guid CommandId, ManualEffectOutcome? Outcome, string? Comment = null);
+
+/// <summary>
+/// The proof of my IRL effect (D-509, D-686, D-820): pictures I uploaded (<c>files</c> — ids from <c>POST /api/files</c>, up
+/// to <c>events.irlProof.maxFiles</c>) and / or one https <c>link</c> to a video, which the server never opens.
+/// </summary>
+public sealed record IrlProofRequest(Guid CommandId, IReadOnlyList<Guid>? Files = null, string? Link = null);
 
 /// <summary>«Уже проходил» on the offered game or an option of the pending choice (D-92).</summary>
 public sealed record AlreadyPlayedRequest(Guid CommandId, Guid GameId);
@@ -147,7 +154,9 @@ public sealed record PlayerView(Guid Id, string Name, string CellId, int Points,
 /// <c>lastEvent</c> — the event I drew last (stage 5), while <c>features.events</c> is on; null before the first draw.
 /// <c>coins</c> — my balance, what a paid reroll spends (K1S-3). <c>checks</c> — my other runs that still take a proof
 /// (completed, the proof neither approved nor rejected) and the runs rejected since my latest roll, newest first; the
-/// latest completed run is <c>lastCompleted</c> and never here (K1S-1, K1S-9, D-602).
+/// latest completed run is <c>lastCompleted</c> and never here (K1S-1, K1S-9, D-602). <c>waitingEvents</c> — my drawn events
+/// waiting for my future steps; <c>waitingConditions</c> — the conditions of events waiting for my next roll (D-821, D-823);
+/// both always set (empty with events off), optional for older clients.
 /// </summary>
 public sealed record MyTurnView(
     Guid PlayerId,
@@ -171,7 +180,9 @@ public sealed record MyTurnView(
     bool? WishRerollOpen = null,
     DrawnEventView? LastEvent = null,
     int? Coins = null,
-    IReadOnlyList<CompletedRunView>? Checks = null);
+    IReadOnlyList<CompletedRunView>? Checks = null,
+    IReadOnlyList<WaitingEventView>? WaitingEvents = null,
+    IReadOnlyList<RunConditionView>? WaitingConditions = null);
 
 /// <summary>The die a difficulty gives on completion, and the event it grants (<c>good</c>, <c>bad</c>) or none.</summary>
 public sealed record DifficultyDieView(Difficulty Difficulty, int Sides, EventKind? GrantEvent);
@@ -223,20 +234,26 @@ public sealed record RerollPriceView(RerollPayment Payment, int Coins);
 /// <remarks>
 /// <c>objectId</c> — the object whose text waits for resolution (D-410): the page shows its description, and
 /// <c>drawEvent</c> means nothing then.
+/// <c>irl</c> — the object asks for a media proof (D-509): only the admin resolves it, after the proof (<c>irlProof</c>, the
+/// owner's only; null before one is sent) or «не применимо» (D-820). Both always set, optional for older clients.
 /// </remarks>
-public sealed record ManualEffectView(Guid Id, EventKind DrawEvent, ManualEffectSource Source, string? ObjectId = null);
+public sealed record ManualEffectView(Guid Id, EventKind DrawEvent, ManualEffectSource Source, string? ObjectId = null, bool Irl = false, IrlProofView? IrlProof = null);
 
 /// <summary>
 /// The pending choice, kept on the server: a reloaded page shows the same options (T2). A branch choice (D-304): each
-/// option's id is the cell the branch leads to, <c>steps</c> — the steps of the throw still to walk from the fork.
+/// option's id is the cell the branch leads to, <c>steps</c> — the steps of the throw still to walk from the fork. The question
+/// of a suspended event (<c>effect</c>, D-511, D-822): <c>prompt</c> — its text, <c>objectId</c> and <c>name</c> — the event;
+/// an option's id is the answer sent back to <c>/choose</c> as it is (a list's text, a player's id).
 /// </summary>
-public sealed record ChoiceView(Guid Id, ChoiceKind Kind, IReadOnlyList<ChoiceOptionView> Options, int? Steps = null);
+public sealed record ChoiceView(Guid Id, ChoiceKind Kind, IReadOnlyList<ChoiceOptionView> Options, int? Steps = null, string? Prompt = null, string? ObjectId = null, string? Name = null);
 
 public sealed record ChoiceOptionView(string Id, OfferedGameView? Game);
 
 /// <summary>
 /// The player's latest completed run: dice by the hours and the challenge dice apart, each die separately; the total
 /// counts both; the review when there is one; <c>status</c> is <c>rejected</c> when the admin took the run back.
+/// <c>conditions</c> — the conditions of events the roll fixed on it, <c>conditionCheck</c> — how they were checked, null
+/// without conditions (D-821); always set, optional for older clients.
 /// </summary>
 public sealed record CompletedRunView(
     Guid Id,
@@ -247,7 +264,9 @@ public sealed record CompletedRunView(
     int Total,
     ReviewView? Review,
     ProofView? Proof,
-    RunStatus Status);
+    RunStatus Status,
+    IReadOnlyList<RunConditionView>? Conditions = null,
+    RunConditionCheckView? ConditionCheck = null);
 
 /// <summary>The proof of a run and how the admin checked it; <c>witnessId</c> — the player who saw the run, if named.</summary>
 public sealed record ProofView(ProofStatus Status, IReadOnlyList<string> Links, string? Note, string? Comment, IReadOnlyList<Files.FileLinkView> Files, Guid? WitnessId = null);
@@ -265,8 +284,11 @@ public sealed record CurrentSeasonView(Guid Id);
 /// </summary>
 public sealed record RunGameView(Guid Id, string Title, decimal? Hours, Files.FileLinkView? Cover = null);
 
-/// <summary>The active run; <c>declaredDifficulty</c> — the one named at the start, the cap of the completion's (D-633).</summary>
-public sealed record RunView(Guid Id, RunGameView Game, DateTimeOffset StartedAt, Difficulty? DeclaredDifficulty = null);
+/// <summary>
+/// The active run; <c>declaredDifficulty</c> — the one named at the start, the cap of the completion's (D-633);
+/// <c>conditions</c> — the conditions of events its roll fixed (D-507, D-821), always set, optional for older clients.
+/// </summary>
+public sealed record RunView(Guid Id, RunGameView Game, DateTimeOffset StartedAt, Difficulty? DeclaredDifficulty = null, IReadOnlyList<RunConditionView>? Conditions = null);
 
 public static class SeasonEndpoints
 {
@@ -331,7 +353,7 @@ public static class SeasonEndpoints
                 ? Task.FromResult<ActionResult>(
                     TypedResults.ValidationProblem(new Dictionary<string, string[]>
                     {
-                        ["optionId"] = [$"A choice id and an option id of 1–{MaxOptionIdLength} letters, digits, '-' or '_' are required."],
+                        ["optionId"] = [$"A choice id and an option id of 1–{MaxOptionIdLength} characters without control characters are required."],
                     }))
                 : ActAsync(seasonId, request.CommandId, user, db, bus, playerId => new MakeChoice(playerId, request.ChoiceId, request.OptionId, request.Difficulty), ct))
             .RequireAuthorization(Policies.Player)
@@ -387,7 +409,35 @@ public static class SeasonEndpoints
                 : ActAsync(seasonId, request.CommandId, user, db, bus, playerId => new ResolveManualEffect(effectId, request.Outcome!.Value, request.Comment, playerId), ct))
             .RequireAuthorization(Policies.Player)
             .WithActionErrors();
+
+        // D-686: the player from the session, the pictures checked as his own uploads before the command, the link only shown
+        seasons.MapPost("/effects/{effectId:guid}/irl-proof", (Guid seasonId, Guid effectId, IrlProofRequest request, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, CancellationToken ct) =>
+            IrlProofInvalid(request) is { } invalid
+                ? Task.FromResult<ActionResult>(invalid)
+                : ActAsync(
+                    seasonId,
+                    request.CommandId,
+                    user,
+                    db,
+                    bus,
+                    playerId => new SubmitIrlProof(playerId, effectId, [.. request.Files ?? []], string.IsNullOrWhiteSpace(request.Link) ? null : request.Link.Trim()),
+                    ct,
+                    () => ForeignFilesAsync(request.Files ?? [], user, db, ct)))
+            .RequireAuthorization(Policies.Player)
+            .WithActionErrors();
     }
+
+    /// <summary>
+    /// The request-level checks of an IRL proof (D-686): a link is one https address by <see cref="IrlProofs.IsValidLink"/>
+    /// (not <see cref="ProofLinks.IsValid"/>, which lets http through); no more pictures than a run's proof takes. How many the
+    /// season allows, repeats and an empty proof are the engine's rules (409).
+    /// </summary>
+    internal static ValidationProblem? IrlProofInvalid(IrlProofRequest request) =>
+        !string.IsNullOrWhiteSpace(request.Link) && !IrlProofs.IsValidLink(request.Link.Trim())
+            ? Invalid("link", $"One https link without a login, of at most {Limits.MaxProofLinkLength} characters.")
+            : request.Files?.Count > Limits.MaxProofFiles
+                ? Invalid("files", $"Up to {Limits.MaxProofFiles} pictures.")
+                : null;
 
     /// <summary>A known outcome and a comment within the limit; whether a comment is needed is the engine's rule (409).</summary>
     internal static ValidationProblem? ResolveInvalid(ResolveEffectRequest request) =>
@@ -449,9 +499,10 @@ public static class SeasonEndpoints
     private static ValidationProblem Invalid(string field, string message) =>
         TypedResults.ValidationProblem(new Dictionary<string, string[]> { [field] = [message] });
 
-    // Option ids are engine-made (a game id in the N format); anything else never reaches the engine.
+    // Option ids are the engine's: a game id in the N format, a cell, or the text of an event's list or category (D-822 (2),
+    // «монетки»); the engine checks the id against the options offered (turn.unknownOption), the site only its size.
     private static bool IsOptionId(string? id) =>
-        id is { Length: > 0 and <= MaxOptionIdLength } && id.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_');
+        id is { Length: > 0 and <= MaxOptionIdLength } && !id.Any(c => char.IsControl(c) || char.GetUnicodeCategory(c) == System.Globalization.UnicodeCategory.Format);
 
     /// <summary>The request-level checks of a tech reroll; the reason's rules live in the engine.</summary>
     internal static ValidationProblem? TechRerollInvalid(TechRerollRequest request) =>
@@ -594,8 +645,17 @@ public static class SeasonEndpoints
             var effects = await db.ManualEffects.AsNoTracking()
                 .Where(x => x.SeasonId == seasonId && x.PlayerId == mine.Id)
                 .OrderBy(x => x.Id)
-                .Select(x => new ManualEffectView(x.Id, x.DrawEvent, x.Source, x.ObjectId))
+                .Select(x => new ManualEffectView(x.Id, x.DrawEvent, x.Source, x.ObjectId, false, null))
                 .ToListAsync(ct);
+
+            // Events, conditions, IRL proofs and questions are read from the season folded from the log (D-824): only when
+            // events are on or an object's text waits, so a season without them pays nothing
+            var state = rules.Features.Events || effects.Any(e => e.ObjectId is not null)
+                ? (await EventLogReader.ReplaySeasonAsync(db, seasonId, ct)).State
+                : null;
+            var events = new EventTurnViews(state, mine.Id);
+            effects = [.. effects.Select(e => e with { Irl = events.IsIrl(e.Id), IrlProof = events.ProofOf(e.Id) })];
+            var question = events.QuestionOf(choice);
             // D-134: the same count the engine checks (UncheckedRuns) — completed, the proof neither approved nor rejected;
             // the frozen first is never held
             UncheckedRunsView? waitingCheck = null;
@@ -611,7 +671,7 @@ public static class SeasonEndpoints
                 waitingCheck = new UncheckedRunsView(waiting, limit);
             }
 
-            var checks = await ChecksOf(db, seasonId, mine.Id, last?.Id, ct);
+            IReadOnlyList<CompletedRunView> checks = [.. (await ChecksOf(db, seasonId, mine.Id, last?.Id, ct)).Select(c => WithConditions(c, events))];
 
             // Only while turns are open: after the deadline the page offers nothing to spin for (D-101)
             var turnsOpen = seasonRecord.Status == SeasonStatus.Active && (seasonRecord.Deadline is not { } end || clock.UtcNow < end);
@@ -663,7 +723,10 @@ public static class SeasonEndpoints
                     choice.ChoiceId,
                     choice.Kind,
                     [.. choice.Options.Select(o => new ChoiceOptionView(o.Id, o.Game is null ? null : Offered(o.Game)))],
-                    choice.Move?.Steps),
+                    choice.Move?.Steps,
+                    question?.Prompt,
+                    question?.ObjectId,
+                    question?.Name),
                 mine.Phase == TurnPhase.Rolling ? new RerollPriceView(price.Payment, price.Coins) : null,
                 run is null
                     ? null
@@ -674,8 +737,9 @@ public static class SeasonEndpoints
                             ? Game(run, games[run.GameId])
                             : new RunGameView(run.GameId, games[run.GameId].Title, snapshot.Hours is > 0 ? snapshot.Hours : null, CoverOf(games[run.GameId])),
                         run.StartedAt,
-                        run.DeclaredDifficulty),
-                last is null ? null : Completed(last, games[last.GameId], lastReview, lastProof),
+                        run.DeclaredDifficulty,
+                        events.ConditionsOf(run.Id)),
+                last is null ? null : WithConditions(Completed(last, games[last.GameId], lastReview, lastProof), events),
                 effects,
                 playing && played < TimeSpan.FromMinutes(rules.Roll.MinPlayMinutesBeforeDrop) ? rules.Roll.MinPlayMinutesBeforeDrop : null,
                 // The frozen first drops with no penalty; a finisher's position is fixed (D-99).
@@ -707,7 +771,9 @@ public static class SeasonEndpoints
                 wishRerollOpen,
                 rules.Features.Events ? await EventViews.LastDrawnAsync(db, contentCards, seasonId, mine.Id, ct) : null,
                 mine.Coins,
-                checks);
+                checks,
+                events.WaitingEvents(),
+                events.WaitingConditions());
         }
 
         // Avatars live on the accounts, across seasons (SPEC «Сезоны»)
@@ -882,6 +948,9 @@ public static class SeasonEndpoints
     private static Files.FileLinkView? CoverOf(Infrastructure.Pool.GameRecord game) =>
         game.CoverFileId is { } cover ? Files.FileLinkView.Of(cover) : null;
 
+    private static CompletedRunView WithConditions(CompletedRunView run, EventTurnViews events) =>
+        run with { Conditions = events.ConditionsOf(run.Id), ConditionCheck = events.CheckOf(run.Id) };
+
     private static CompletedRunView Completed(
         Infrastructure.Seasons.RunRecord run,
         Infrastructure.Pool.GameRecord game,
@@ -890,13 +959,16 @@ public static class SeasonEndpoints
     {
         var dice = JsonSerializer.Deserialize<EquatableArray<Die>>(run.DiceJson, EngineJson.Options);
         var challenge = JsonSerializer.Deserialize<EquatableArray<Die>>(run.ChallengeDiceJson, EngineJson.Options);
+        // D-825: the extra dice of items and events (the count stage) are dice of the throw too — shown after the dice by
+        // the hours, and the total goes through the whole pipeline as the engine counts it (D-408)
+        var mods = run.DiceModsJson is null ? null : JsonSerializer.Deserialize<RunDiceMods>(run.DiceModsJson, EngineJson.Options);
         return new CompletedRunView(
             run.Id,
             Game(run, game),
             run.Difficulty ?? throw new InvalidOperationException($"Completed run {run.Id} has no difficulty."),
-            [.. dice.Select(d => new DieView(d.Sides, d.Value))],
+            [.. dice.Concat(mods?.ExtraDice ?? []).Select(d => new DieView(d.Sides, d.Value))],
             [.. challenge.Select(d => new DieView(d.Sides, d.Value))],
-            RunTotal.Of(dice, challenge, JsonSerializer.Deserialize<RunSnapshot>(run.SnapshotJson, EngineJson.Options)!),
+            RunTotal.Of(dice, challenge, JsonSerializer.Deserialize<RunSnapshot>(run.SnapshotJson, EngineJson.Options)!, mods),
             review is null ? null : new ReviewView(review.Rating, review.Text),
             proof is null
                 ? null

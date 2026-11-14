@@ -25,6 +25,7 @@ function player(overrides: Partial<Schemas['AdminPlayerView']>): Schemas['AdminP
     lastActionAt: '2026-09-20T09:00:00+00:00',
     inactiveHint: false,
     choosingBranch: false,
+    eventQuestion: false,
     ...overrides,
   };
 }

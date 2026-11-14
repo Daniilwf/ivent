@@ -265,6 +265,7 @@ public static class AppSetup
         api.MapPoolStats();
         api.MapAdminRuns();
         api.MapAdminProofs();
+        api.MapAdminIrlProofs();
         api.MapAdminSeasons();
         api.MapAdminMap();
         api.MapAdminContent();

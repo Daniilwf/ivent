@@ -1062,8 +1062,18 @@ describe('SeasonScreen reroll price and manual effects (D-93)', () => {
 
   it('lists pending manual effects of the player', async () => {
     const effects: Schemas['ManualEffectView'][] = [
-      { id: 'e1000000-0000-0000-0000-000000000001', drawEvent: 'bad', source: 'paidReroll' },
-      { id: 'e1000000-0000-0000-0000-000000000002', drawEvent: 'bad', source: 'paidReroll' },
+      {
+        id: 'e1000000-0000-0000-0000-000000000001',
+        drawEvent: 'bad',
+        source: 'paidReroll',
+        irl: false,
+      },
+      {
+        id: 'e1000000-0000-0000-0000-000000000002',
+        drawEvent: 'bad',
+        source: 'paidReroll',
+        irl: false,
+      },
     ];
     serveRolling(rolling({ payment: 'badEvent', coins: 0 }, effects));
     render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
@@ -1079,7 +1089,7 @@ describe('SeasonScreen reroll price and manual effects (D-93)', () => {
 
   it('puts pending effects in the turn card above the roll button, with their count (H2)', async () => {
     const effects: Schemas['ManualEffectView'][] = [
-      { id: 'e1000000-0000-0000-0000-000000000001', drawEvent: 'bad', source: 'drop' },
+      { id: 'e1000000-0000-0000-0000-000000000001', drawEvent: 'bad', source: 'drop', irl: false },
     ];
     const idle = season();
     if (!idle.me) throw new Error('the fixture has a player');
@@ -1101,7 +1111,12 @@ describe('SeasonScreen reroll price and manual effects (D-93)', () => {
 
   it('puts the rolled game above the pending effects while the roll waits for an answer (H3, D-137)', async () => {
     const effects: Schemas['ManualEffectView'][] = [
-      { id: 'e1000000-0000-0000-0000-000000000001', drawEvent: 'bad', source: 'paidReroll' },
+      {
+        id: 'e1000000-0000-0000-0000-000000000001',
+        drawEvent: 'bad',
+        source: 'paidReroll',
+        irl: false,
+      },
     ];
     serveRolling(rolling({ payment: 'badEvent', coins: 0 }, effects));
     render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
@@ -1581,6 +1596,7 @@ describe('SeasonScreen drop and tech reroll (RR2, RR4, RR5, D-94)', () => {
   it('lists the bad event of a drop among manual effects', async () => {
     const effect: Schemas['ManualEffectView'] = {
       id: 'e1000000-0000-0000-0000-000000000003',
+      irl: false,
       drawEvent: 'bad',
       source: 'drop',
     };
@@ -1955,6 +1971,7 @@ describe('SeasonScreen completion reward (C7a, D-96)', () => {
   it('lists the good event of «выше сложной» among manual effects with its own words', async () => {
     const effect: Schemas['ManualEffectView'] = {
       id: 'e1000000-0000-0000-0000-000000000009',
+      irl: false,
       drawEvent: 'good',
       source: 'difficulty',
     };

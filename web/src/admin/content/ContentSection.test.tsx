@@ -41,6 +41,7 @@ const view = (
   overrides: Partial<Schemas['AdminContentView']> = {},
 ): Schemas['AdminContentView'] => ({
   itemsEnabled: true,
+  eventsEnabled: false,
   status: 'active',
   version: 2,
   pack: { objects: [orange, curse], wheels: [lootbox] },
