@@ -122,6 +122,12 @@ internal sealed class SiteFactory : WebApplicationFactory<Program>
     /// <remarks>Starts at the real time: the test client's cookie jar drops a cookie whose expiry is in the real past.</remarks>
     public TestTimeProvider Time { get; } = new(DateTimeOffset.UtcNow);
 
+    /// <summary>
+    /// Services a test puts over the site's own, applied last (for example a clock that fails on purpose to reach the
+    /// «Ошибки» page). Kept by <see cref="Restarted"/> only when set again.
+    /// </summary>
+    public Action<IServiceCollection>? ExtraServices { get; init; }
+
     public Dictionary<string, Guid> Users { get; } = [];
 
     public Dictionary<string, Guid> Players { get; } = [];
@@ -249,6 +255,7 @@ internal sealed class SiteFactory : WebApplicationFactory<Program>
             // A disposed site must not outlive its test (D-665)
             services.RemoveAll<Microsoft.AspNetCore.Hosting.Builder.IApplicationBuilderFactory>();
             services.AddSingleton<Microsoft.AspNetCore.Hosting.Builder.IApplicationBuilderFactory, CollectablePipelineFactory>();
+            ExtraServices?.Invoke(services);
         });
     }
 
