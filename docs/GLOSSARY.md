@@ -209,7 +209,7 @@
 | Достижение | значок за выполнение условия по статистике | `ObjectKind.Achievement`, `PlayerAchievement` |
 | Определение объекта | шаблон предмета, эффекта, ивента или достижения | `ObjectDefinition`, блок эффекта — `EffectSpec`, разбор — `ContentJson`, проверка — `ContentValidator` |
 | Объект инвентаря | конкретный экземпляр у игрока | `InventoryObject`; события `ObjectGiven`, `ObjectRemoved` (`ObjectRemoval`), `ObjectTransferred`, `ObjectChanged`, `ObjectLost`; откуда — `ObjectSource` |
-| Пакет контента | определения объектов и колёса лутбоксов, загружаемые в сезон; файлы `content/items`, `content/wheels` | `ContentPack`, `ContentFiles`, команда `PublishContent`, событие `ContentPublished`, в сезоне — `ContentCatalog` (`CatalogEntry.Deleted`) |
+| Пакет контента | определения объектов, колёса лутбоксов и колоды ивентов, загружаемые в сезон; файлы `content/items`, `content/wheels`, `content/events`, `content/decks` | `ContentPack`, `ContentFiles`, команда `PublishContent`, событие `ContentPublished`, в сезоне — `ContentCatalog` (`CatalogEntry.Deleted`) |
 | Колесо лутбокса | взвешенный список объектов для `spinWheel` | `WheelDefinition`, `WheelEntrySpec`, событие `WheelSpun` |
 | Использовать | применить свой предмет с целью и ответами | команда `UseItem`, событие `ItemUsed` |
 | Правка инвентаря | админ выдаёт или забирает объект с комментарием | команда `AdjustInventory`, событие `InventoryAdjusted` |
@@ -259,7 +259,7 @@
 
 ## Ивенты, голосования и взаимодействия (этап 5)
 
-Заведены при подготовке этапа 5 (2026-11-11, D-500…D-529). Имена в коде — план: при реализации задача сверяет их здесь, расхождение правится в глоссарии той же задачей.
+Заведены при подготовке этапа 5 (2026-11-11, D-500…D-529). Имена реализованных механик сверены в 5.17 (D-850); будущие экраны и отложенные предложения помечены отдельно. Новая задача сверяет имена здесь, расхождение правится в глоссарии той же задачей.
 
 | Термин | Что значит | В коде |
 | --- | --- | --- |
@@ -276,7 +276,7 @@
 | Условие прохождения | требование ивента к следующему прохождению («пройди на сложной», «пройди на лёгкой»), фиксируется в снапшоте при ролле, видно на странице прохождения (D-590) | `modifyNextRoll.runCondition` (`ConditionSpec.DifficultyAtLeast`, `DifficultyAtMost`), `RollModifier.RunCondition`, `RunSnapshot.Conditions` (`RunCondition`), `RunState.Condition` (`RunConditionState`), событие `RunConditionChecked`; в API — `me.waitingConditions`, `RunView.conditions`, `CompletedRunView.conditions` и `conditionCheck` (`RunConditionView`, `RunConditionCheckView`, D-821) |
 | Условие неприменимо | админ отмечает, что условие не подходит к игре: прохождение считается выполнившим его, условие ждёт следующего прохождения (D-546 (2), D-594) | команда `WaiveRunCondition`, `RunConditionChecked.Waived`; в API — `POST /api/admin/seasons/{id}/runs/{runId}/waive-conditions` |
 | Невыполненное условие | прохождение не выполнило условие: по умолчанию без кубов, с монетками; кубики снимает и докидывает правка сложности как поправка (D-592) | `UnmetConditionPolicy` (`NoDiceKeepCoins`, `CountAsDrop` — пока не поддержан, `Ignore`), `RunSnapshot.ConditionPolicy`, `RunConditionChecked.Met` |
-| Откуп от плохого ивента | снять ждущие последствия плохого ивента за монетки (выключен, D-508) | `events.badEventBuyout`, команда `BuyOutBadEvent` |
+| Откуп от плохого ивента | снять ждущие последствия плохого ивента за монетки; не реализуется на этапе 5 (D-508, D-540) | поля конфига и команды в движке нет |
 | IRL-ивент | ивент, выполняемый в жизни (караоке, готовка): ручной эффект с пруфом | `ObjectDefinition.Proof = ContentProof.Media` |
 | IRL-пруф | фото или ссылка на видео к IRL-ивенту; проверяет админ | команды `SubmitIrlProof`, `ReviewIrlProof`, события `IrlProofSubmitted`, `IrlProofReviewed`; `IrlProofStatus`, `IrlProofState` (`PendingManualEffect.IrlProof`), `IrlProofs.IsIrl`; лимит картинок — `events.irlProof.maxFiles`; в API — `POST /api/seasons/{id}/effects/{effectId}/irl-proof`, `ManualEffectView.irl` и `irlProof` (`IrlProofView`), проверка — `POST /api/admin/seasons/{id}/effects/{effectId}/irl-proof/review` (D-820) |
 | Очередь IRL-пруфов | поданные IRL-пруфы, ждущие проверки админом, старые первыми (D-820) | `GET /api/admin/seasons/{id}/irl-proofs`, `IrlProofQueueItemView` |
@@ -294,20 +294,20 @@
 | Общая цель | цель общего ивента с прогресс-баром: часы HLTB или число прохождений | `GlobalEventGoal` (`GoalMetric`: `Hours`, `Runs`), события `GlobalProgressChanged` (`GlobalProgressReason`: `Completed`, `Rejected`, `HoursCorrected`), `GlobalGoalReached` |
 | Вклад в общую цель | что одно прохождение внесло в цель: часы HLTB его снапшота или 1; реджект снимает, правка часов меняет разницей | `GlobalContribution` |
 | Голосование общего ивента | вопрос первого действия общего ивента голосующим; итог раздаётся всем ответом на вопрос (EV23) | `PollSource.GlobalEvent`, `PollStarted.GlobalEventId`, `ForAllQueued.Answers` |
-| Баннер общего ивента | плашка общего ивента на главной | `GlobalEventBanner` |
+| Баннер общего ивента | плашка общего ивента на главной; экран запланирован в 5.22 | компонент `GlobalEventBanner` — план, пока не реализован |
 | Напарник | второй игрок кооп-прохождения | `RunState.PartnerId`, событие `CoopJoined` |
 | Ролливший | игрок, чей ролл дал кооп-прохождение; бросает кубы и получает долю с округлением вверх | `RunState.PlayerId` |
 | Приглашение в кооп | предложение стать напарником в своём прохождении | `InteractionKind.Coop`, команда `InviteToCoop`, события `InteractionCreated`, `InteractionAnswered`, `InteractionExpired` |
 | Ответ на приглашение | принять или отклонить; без ответа за N часов приглашение сгорает | команда `AnswerInvitation`, `InteractionStatus` (`Pending`, `Accepted`, `Declined`, `Withdrawn`, `Expired`) |
 | Выйти из коопа | напарник покидает кооп-прохождение без штрафа (D-522) | команда `LeaveCoop`, событие `CoopLeft` |
 | Отозвать приглашение | приглашающий закрывает своё открытое приглашение (D-523) | команда `WithdrawInvitation`, событие `InteractionWithdrawn` |
-| Сгорание приглашения | приглашение закрыто без ответа: срок, дедлайн, конец прохождения или принято другое (D-523, D-712) | событие `InteractionExpired`, `InteractionExpiry` (`Timeout`, `Deadline`, `RunEnded`, `Superseded`; у вызова на дуэль ещё `Inactive`, `FirstFinisher`, D-734) |
+| Сгорание приглашения | приглашение закрыто без ответа: срок, дедлайн, конец прохождения, принято другое или закрыт запрос доски (D-523, D-712, D-742) | событие `InteractionExpired`, `InteractionExpiry` (`Timeout`, `Deadline`, `RunEnded`, `Superseded`, `RequestClosed`; у вызова на дуэль ещё `Inactive`, `FirstFinisher`, `AccountDeleted`, D-734) |
 | Конец коопа | напарник вне кооп-прохождения до завершения: вышел, дроп или тех-реролл роллившего, неактивен, кто-то стал первым (D-522, D-713) | `CoopLeaveReason` (`Left`, `RollerDropped`, `RollerTechRerolled`, `PartnerInactive`, `RollerFirst`, `PartnerFirst`) |
 | Сторона кооп-прохождения | учёт хода каждого из двоих: клетки, финиш, бонус клетки, доля (D-711) | `RunState.Coop` (`CoopPartner`), `RunState.Side` |
 | Деление кооп-награды | доли очков, шагов и монеток роллившего и напарника | событие `CoopRewardSplit`, `reward.coop` (`pointsShare`, `coinsShare`) |
 | Дуэль | гонка двух игроков до первого завершения прохождения за награду от системы (D-525) | `Duel`, `SeasonState.Duels`, `DuelStatus` (`Active`, `Won`, `Drawn`, `Cancelled`), события `DuelStarted`, `DuelSettled`, `DuelWinRevoked` |
 | Вызов на дуэль | приглашение на дуэль: ответ и отзыв — как у любого приглашения (D-718, D-730) | `InteractionKind.Duel`, команда `ChallengeToDuel` |
-| Итог дуэли | победа, ничья или отмена и почему (D-525, D-733) | `DuelEnd` (`Completed`, `Forfeit`, `TimeOut`, `Deadline`, `WinRejected`, `TechReroll`, `Inactive`, `FirstFinisher`) |
+| Итог дуэли | победа, ничья или отмена и почему (D-525, D-733, D-734) | `DuelEnd` (`Completed`, `Forfeit`, `TimeOut`, `Deadline`, `WinRejected`, `TechReroll`, `Inactive`, `FirstFinisher`, `AccountDeleted`) |
 | Свежее прохождение дуэли | прохождение, которое может выиграть дуэль: выпало не раньше принятия и не игралось в момент принятия (D-731) | `Duel.RunsAtAcceptance`, `duels.countRunsStartedAfterAccept` |
 | Поражение дропом | дроп свежего прохождения отдаёт дуэль сопернику (D-525) | `DuelEnd.Forfeit`, `duels.dropForfeits` |
 | Отклик на запрос напарника | заявка на чужой запрос доски; создаёт приглашение в кооп от откликнувшегося автору, которое автор принимает или отклоняет (D-524, D-545) | команда `RespondToPartnerRequest`, событие `InteractionCreated` |
@@ -316,7 +316,7 @@
 | Окно челленджа недели | время, в которое завершение прохождения засчитывается челленджу: от начала на `weeklyChallenge.durationDays` дней (D-526, D-570) | `WeeklyChallengeSet.StartsAt`, `EndsAt` |
 | Выполнение челленджа | действующая награда игрока за челлендж по одному прохождению; реджект снимает | `WeeklyChallengeCompletion`, `WeeklyChallengeState.Completions` |
 | Вид предложения | что предлагается: игра (с карточкой), ивент или предмет; лимит подачи — `suggestions.perDay` в день по часовому поясу сезона (D-527, D-571) | `SuggestionKind` (`Game`, `Event`, `Item`) |
-| Контракт | особое прохождение по договору с админом за доп. награду (RGG № 16; ждёт решения, D-529) | `features.contracts` |
+| Контракт | особое прохождение по договору с админом за доп. награду; снят с этапа 5 (RGG № 16, D-540), вариант на будущее | флага и команды в движке нет |
 
 ## Социальное
 
@@ -331,7 +331,7 @@
 | Галерея моментов | пруфы и смешные скрины сезона | `GalleryItem` |
 | Голосование | вопрос с вариантами и сроком | `Poll`, `PollOption`, `Vote`, в контенте — `PollDefinition` |
 | Номинация | награда по итогам сезона: автоматическая или голосованием | `Nomination` |
-| Челлендж недели | условие от админа с наградой на неделю | `WeeklyChallenge`, в контенте — `WeeklyChallengeDefinition` |
+| Челлендж недели | условие от админа с наградой на срок из конфига | `WeeklyChallengeState`, `SeasonState.WeeklyChallenges`, в контенте — `WeeklyChallengeDefinition` |
 | Доска «ищу напарника» | запросы игроков, ищущих напарника в своё кооп-прохождение (D-524) | `PartnerBoard`, флаг `features.partnerBoard`, срок `partnerBoard.requestTtlHours` |
 | Запрос напарника | объявление «ищу напарника» для своего идущего кооп-прохождения | `PartnerRequest`, `PartnerRequestStatus` (`Open`, `Closed`), команда `PostPartnerRequest`, событие `PartnerRequestPosted` |
 | Закрытие запроса | запрос закрыт: кооп, конец прохождения, срок, автор или дедлайн | команда `ClosePartnerRequest`, событие `PartnerRequestClosed`, `PartnerRequestCloseReason` (`Coop`, `RunEnded`, `Timeout`, `Author`, `Deadline`) |
