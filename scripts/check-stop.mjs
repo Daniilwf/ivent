@@ -83,6 +83,9 @@ if (areas.dotnet || areas.web || areas.e2e || areas.scripts || areas.matrix) {
     [quote(`${root}/scripts/check-matrix-tests.mjs`)],
   ]);
 }
+if (areas.scripts) {
+  steps.push(['scripts: Node tests', 'npm', ['run', '-s', 'test:scripts']]);
+}
 if (areas.web || areas.e2e || areas.scripts) {
   steps.push([
     'Prettier',

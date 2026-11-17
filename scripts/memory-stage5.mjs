@@ -77,10 +77,13 @@ export async function assertStage5MemoryReads({ call, seasonId }) {
         nonnegative(challenge.rewardCoins) &&
         Number.isFinite(Date.parse(challenge.startsAt)) &&
         Date.parse(challenge.endsAt) > Date.parse(challenge.startsAt) &&
-        Array.isArray(challenge.completedBy),
+        Array.isArray(challenge.completedBy) &&
+        challenge.completedBy.length > 0 &&
+        challenge.completedBy.every((player) => text(player?.playerId) && text(player?.name)),
     )
   )
-    throw new Error('Memory workload: no weekly challenge with its completion list.');
+    throw new Error('Memory workload: no weekly challenge with real completions.');
+  return { polls, events, challenges };
 }
 
 /** Keep the demo's pool, history, rules and held items; add stage 5 records with real player votes. */
@@ -147,16 +150,51 @@ export async function prepareStage5MemoryWorkload({ admin, players, seasonId, co
     durationHours: 24,
     goal: { metric: 'runs', target: 100 },
   });
+  const games = list(await read(admin, `${base}/games`), 'season games');
+  let completed;
+  for (const game of games
+    .filter((game) => text(game.gameId) && Number.isFinite(Date.parse(game.completedAt)))
+    .sort((a, b) => Date.parse(b.completedAt) - Date.parse(a.completedAt))) {
+    const runs = await read(admin, `/api/pool/${game.gameId}/runs`);
+    if (!Array.isArray(runs)) throw new Error('Memory workload: invalid game run history.');
+    completed = runs.find(
+      (run) =>
+        run.seasonId === seasonId &&
+        run.status === 'completed' &&
+        text(run.runId) &&
+        text(run.playerId) &&
+        Number.isFinite(Date.parse(run.completedAt)),
+    );
+    if (completed) break;
+  }
+  if (!completed) throw new Error('Memory workload: no completed run in the benchmark season.');
+  const oldChallenges = new Set(
+    (await read(admin, `${base}/weekly-challenges`)).map((challenge) => challenge.id),
+  );
   await write(admin, `${adminBase}/weekly-challenges`, {
     challenge: {
       id: 'memory-week',
       name: 'Неделя проверки памяти',
-      description: 'Пройди игру во время замера.',
+      description: 'Отметка реального прохождения для временного замера.',
       condition: { game: { minHours: 0 } },
       reward: { coins: ruleset.weeklyChallenge.defaultRewardCoins },
-      check: 'auto',
+      check: 'manual',
     },
-    startsAt: new Date().toISOString(),
+    startsAt: completed.completedAt,
   });
-  await assertStage5MemoryReads({ call: players[0], seasonId });
+  const challenge = list(await read(admin, `${base}/weekly-challenges`), 'weekly challenges').find(
+    (item) => !oldChallenges.has(item.id),
+  );
+  if (!challenge) throw new Error('Memory workload: the new weekly challenge was not projected.');
+  await write(admin, `${adminBase}/weekly-challenges/${challenge.id}/mark`, {
+    playerId: completed.playerId,
+    runId: completed.runId,
+  });
+  const reads = await assertStage5MemoryReads({ call: players[0], seasonId });
+  if (
+    !reads.challenges
+      .find((item) => item.id === challenge.id)
+      ?.completedBy.some((player) => player.playerId === completed.playerId)
+  )
+    throw new Error('Memory workload: the marked completion was not projected.');
 }

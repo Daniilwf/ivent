@@ -9,6 +9,10 @@ const seasonId = 'de300000-0000-0000-0000-000000000001';
 const season = `/api/seasons/${seasonId}`;
 const adminSeason = `/api/admin/seasons/${seasonId}`;
 const stage5Flags = ['items', 'events', 'polls', 'globalEvents', 'weeklyChallenge'];
+const gameId = '44000000-0000-0000-0000-000000000001';
+const playerId = '55000000-0000-0000-0000-000000000001';
+const runId = '66000000-0000-0000-0000-000000000001';
+const completedAt = new Date(Date.now() - 2 * 86_400_000).toISOString();
 const content = {
   objects: [
     {
@@ -77,18 +81,37 @@ function sampleReads() {
         id: '33000000-0000-0000-0000-000000000001',
         name: 'Неделя игр',
         description: 'Пройди игру.',
-        check: 'auto',
+        check: 'manual',
         rewardCoins: 10,
         startsAt: now,
         endsAt: end,
-        completedBy: [],
+        completedBy: [{ playerId, name: 'Первый игрок' }],
       },
     ],
   };
 }
 
 // A tiny HTTP state machine, not a mock of helper internals: writes change the state read by GET.
-function memorySite({ reject } = {}) {
+function completedRun(overrides = {}) {
+  return {
+    runId,
+    seasonId,
+    seasonName: 'Демо-сезон',
+    playerId,
+    userId: '77000000-0000-0000-0000-000000000001',
+    playerName: 'Первый игрок',
+    status: 'completed',
+    difficulty: 'normal',
+    hours: 6,
+    completedAt,
+    rating: null,
+    reviewText: null,
+    token: 1,
+    ...overrides,
+  };
+}
+
+function memorySite({ reject, runs } = {}) {
   const heldItem = {
     id: 'held-orange',
     kind: 'item',
@@ -110,6 +133,22 @@ function memorySite({ reject } = {}) {
     votes: new Map(),
     writes: [],
     refusals: 0,
+    reads: [],
+    marks: [],
+    completionReads: [],
+    challengeDefinitions: new Map(),
+    existingRuns: runs ?? [
+      completedRun({
+        runId: '66000000-0000-0000-0000-000000000002',
+        seasonId: 'de300000-0000-0000-0000-000000000002',
+      }),
+      completedRun({
+        runId: '66000000-0000-0000-0000-000000000003',
+        status: 'playing',
+        completedAt: null,
+      }),
+      completedRun(),
+    ],
   };
   const initialChoiceCount = state.ruleset.roll.choiceCount;
   const call =
@@ -118,12 +157,33 @@ function memorySite({ reject } = {}) {
       const path = inputPath.replace(/\/$/, '');
       const method = init.method ?? 'GET';
       const body = init.body ? JSON.parse(init.body) : undefined;
+      if (method === 'GET') state.reads.push(path);
       if (reject?.({ who, path, method, body })) {
         state.refusals++;
         return json({ code: 'test.refused', title: 'The setup command was refused.' }, 409);
       }
       if (method === 'GET' && path === `${season}/rules`) {
         return json({ version: state.version, ruleset: state.ruleset, history: [] });
+      }
+      if (method === 'GET' && path === `${season}/games`) {
+        return json(
+          state.existingRuns.length
+            ? [
+                {
+                  gameId,
+                  taken: 'completedInSeason',
+                  takenBy: 'Первый игрок',
+                  completedAt,
+                  marks: [],
+                  excludedForMe: null,
+                  offered: false,
+                },
+              ]
+            : [],
+        );
+      }
+      if (method === 'GET' && path === `/api/pool/${gameId}/runs`) {
+        return json(state.existingRuns);
       }
       if (method === 'GET' && path === `${adminSeason}/content`) {
         return json({
@@ -189,9 +249,50 @@ function memorySite({ reject } = {}) {
         assert.ok(body.commandId);
         assert.ok(body.challenge.condition);
         assert.ok(body.startsAt);
-        state.challenges.push(sampleReads()['weekly-challenges'][0]);
+        const challenge = sampleReads()['weekly-challenges'][0];
+        challenge.name = body.challenge.name;
+        challenge.description = body.challenge.description;
+        challenge.check = body.challenge.check;
+        challenge.startsAt = body.startsAt;
+        challenge.endsAt = new Date(
+          new Date(body.startsAt).getTime() +
+            state.ruleset.weeklyChallenge.durationDays * 86_400_000,
+        ).toISOString();
+        challenge.completedBy = [];
+        state.challenges.push(challenge);
+        state.challengeDefinitions.set(challenge.id, copy(body.challenge));
         state.writes.push('challenge');
         return json({ duplicate: false, events: [{ type: 'weekly-challenge-set' }] });
+      }
+      const mark = new RegExp(`^${adminSeason}/weekly-challenges/([^/]+)/mark$`).exec(path);
+      if (method === 'POST' && mark) {
+        assert.equal(who, 'admin');
+        assert.ok(body.commandId);
+        const challenge = state.challenges.find((item) => item.id === mark[1]);
+        assert.ok(challenge, 'The mark names a challenge created by the setup.');
+        assert.equal(state.challengeDefinitions.get(challenge.id).check, 'manual');
+        const run = state.existingRuns.find(
+          (item) =>
+            item.runId === body.runId &&
+            item.playerId === body.playerId &&
+            item.seasonId === seasonId &&
+            item.status === 'completed' &&
+            item.completedAt !== null,
+        );
+        assert.ok(run, 'The mark names a real completed run of this season and its owner.');
+        const finished = Date.parse(run.completedAt);
+        assert.ok(
+          finished >= Date.parse(challenge.startsAt),
+          'The challenge starts by the completion.',
+        );
+        assert.ok(
+          finished < Date.parse(challenge.endsAt),
+          'The completion precedes the challenge deadline.',
+        );
+        challenge.completedBy.push({ playerId: run.playerId, name: run.playerName });
+        state.marks.push({ playerId: body.playerId, runId: body.runId, challengeId: challenge.id });
+        state.writes.push('mark');
+        return json({ duplicate: false, events: [{ type: 'weekly-challenge-completed' }] });
       }
       const vote = new RegExp(`^${season}/polls/([^/]+)/vote$`).exec(path);
       if (method === 'POST' && vote) {
@@ -217,7 +318,10 @@ function memorySite({ reject } = {}) {
         return poll ? json({ ...poll, myVote: state.votes.get(who) ?? null }) : json({}, 404);
       }
       if (method === 'GET' && path === `${season}/global-events`) return json(state.globalEvents);
-      if (method === 'GET' && path === `${season}/weekly-challenges`) return json(state.challenges);
+      if (method === 'GET' && path === `${season}/weekly-challenges`) {
+        state.completionReads.push(copy(state.challenges.flatMap((item) => item.completedBy)));
+        return json(state.challenges);
+      }
       throw new Error(`Unexpected request ${who} ${method} ${path}`);
     };
   return {
@@ -269,6 +373,7 @@ for (const [name, match] of [
     'setting a weekly challenge',
     ({ path, method }) => method === 'POST' && path === `${adminSeason}/weekly-challenges`,
   ],
+  ['marking a weekly challenge completion', ({ path }) => path.endsWith('/mark')],
 ]) {
   test(`a refused command while ${name} fails the workload preparation`, async () => {
     const site = memorySite({ reject: match });
@@ -283,6 +388,44 @@ test('a workload without players cannot claim to measure player votes', async ()
     prepareStage5MemoryWorkload({ ...site, players: [], seasonId, content }),
   );
 });
+
+test('the setup marks a real completed run inside a manual challenge window and reads its completion', async () => {
+  const site = memorySite();
+
+  await prepareStage5MemoryWorkload({ ...site, seasonId, content });
+
+  assert.ok(site.state.reads.includes(`${season}/games`));
+  assert.ok(site.state.reads.includes(`/api/pool/${gameId}/runs`));
+  assert.ok(site.state.marks.some((mark) => mark.playerId === playerId && mark.runId === runId));
+  assert.ok(
+    site.state.completionReads.some((read) => read.some((item) => item.playerId === playerId)),
+  );
+  const marked = site.state.challenges.find((challenge) =>
+    site.state.marks.some((mark) => mark.challengeId === challenge.id),
+  );
+  assert.equal(marked.check, 'manual');
+  assert.ok(Date.parse(marked.startsAt) <= Date.parse(completedAt));
+  assert.ok(Date.parse(completedAt) < Date.parse(marked.endsAt));
+});
+
+for (const [name, runs] of [
+  ['no runs', []],
+  ['only playing runs', [completedRun({ status: 'playing', completedAt: null })]],
+  ['only dropped runs', [completedRun({ status: 'dropped' })]],
+  ['only rejected runs', [completedRun({ status: 'rejected' })]],
+  [
+    'only runs of another season',
+    [completedRun({ seasonId: 'de300000-0000-0000-0000-000000000002' })],
+  ],
+  ['a completed run without its completion time', [completedRun({ completedAt: null })]],
+]) {
+  test(`${name} cannot prepare a workload that measures weekly challenge completions`, async () => {
+    const site = memorySite({ runs });
+    await assert.rejects(() => prepareStage5MemoryWorkload({ ...site, seasonId, content }));
+    assert.ok(site.state.reads.includes(`${season}/games`));
+    assert.equal(site.state.marks.length, 0);
+  });
+}
 
 test('a populated response from all stage 5 tables is accepted', async () => {
   const reads = sampleReads();
@@ -322,4 +465,27 @@ for (const page of ['polls', 'global-events', 'weekly-challenges']) {
       assert.equal(reached, true, 'The assertion read the endpoint whose weak answer is tested.');
     });
   }
+}
+
+for (const [name, completedBy] of [
+  ['an empty completion list', []],
+  ['a completion without its player id', [{ name: 'Первый игрок' }]],
+  ['a string instead of a completion record', [playerId]],
+  ['a null completion record', [null]],
+]) {
+  test(`weekly-challenges returning ${name} cannot claim to read completion rows`, async () => {
+    const reads = sampleReads();
+    reads['weekly-challenges'][0].completedBy = completedBy;
+    let reached = false;
+    await assert.rejects(() =>
+      assertStage5MemoryReads({
+        seasonId,
+        call: async (path) => {
+          if (path === `${season}/weekly-challenges`) reached = true;
+          return json(reads[path.split('/').at(-1)]);
+        },
+      }),
+    );
+    assert.equal(reached, true);
+  });
 }
