@@ -91,7 +91,11 @@ public sealed record ProofRequest(Guid CommandId, IReadOnlyList<string?>? Links,
 /// <summary>A review of the player's own completed run, written later or changed.</summary>
 public sealed record ReviewRequest(Guid CommandId, int Rating, string? Text = null);
 
-public sealed record CommandResponse(bool Duplicate, IReadOnlyList<LoggedEventView> Events);
+public sealed record CommandResponse(
+    bool Duplicate,
+    IReadOnlyList<LoggedEventView> Events,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    IReadOnlyList<string>? Warnings = null);
 
 /// <summary>A game rule refused the action; <c>code</c> is stable and maps to a text in the interface dictionary.</summary>
 public sealed record RejectionProblem(string Title, int Status, string? Detail, string Code);
@@ -528,7 +532,7 @@ public static class SeasonEndpoints
             .ProducesProblem(StatusCodes.Status404NotFound)
             .Produces<RejectionProblem>(StatusCodes.Status409Conflict, "application/problem+json");
 
-    private static async Task<ActionResult> ActAsync(
+    internal static async Task<ActionResult> ActAsync(
         Guid seasonId,
         Guid commandId,
         ClaimsPrincipal user,
@@ -601,7 +605,8 @@ public static class SeasonEndpoints
 
         return TypedResults.Ok(new CommandResponse(
             outcome.IsDuplicate,
-            [.. outcome.Events.Select(e => new LoggedEventView(e.Sequence, EventCatalog.Describe(e.Event.GetType()).Name))]));
+            [.. outcome.Events.Select(e => new LoggedEventView(e.Sequence, EventCatalog.Describe(e.Event.GetType()).Name))],
+            outcome.Warnings));
     }
 
     private static async Task<Results<Ok<SeasonView>, NotFound>> GetSeasonAsync(

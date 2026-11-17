@@ -114,7 +114,7 @@
 | Дропы подряд | дропы игрока после его последнего засчитанного прохождения; каждый следующий добавляет к штрафу `drop.consecutiveExtraDice` кубиков; тех-реролл и отклонённое прохождение серию не меняют (D-205, D-324) | `DropStreak`, `DropRules.ConsecutiveExtraDice` |
 | Дроп | отказ от прохождения со штрафом | команда `DropRun`, событие `RunDropped`, исключение `ExclusionReason.Dropped`, плохой ивент `ManualEffectSource.Drop` |
 | Пометка игры | у предложенной игры: кто из других дропнул или тех-рерольнул её и почему | `GameMarkView` (`marks`) |
-| Кооп | общее прохождение двух игроков | `Run.PartnerId` |
+| Кооп | общее прохождение двух игроков | `RunState.PartnerId`, `RunState.Coop`; мой текущий кооп — `CoopView` (`GET …/coop`, JSON `null`, если коопа нет) |
 | Отзыв | оценка 1–10 и текст к прохождению | `RunReview`, команда `ReviewRun`, событие `RunReviewed`, таблица `Review` |
 | Челлендж | условие из заметки к игре, за которое даются дополнительные кубики; заявка — под флагом `features.challenges` | `CompleteRun.ChallengeDone`, `CompletionRolled.ChallengeDice`, `RunSnapshot.ChallengeExtraDice` |
 | Источник оценки | откуда игрок взял часы, если в пуле их нет: ссылка или пометка | `CompleteRun.HoursSource`, `RunState.HoursSource` |
@@ -255,7 +255,7 @@
 | Ожидание выбора | ход ждёт решения игрока | `PendingChoice` (`ChoiceKind`, варианты `ChoiceOption`) |
 | Выбор из нескольких игр | ролл при `choiceCount` > 1: игрок выбирает одну из выпавших | `GameChoiceRolled`, команда `MakeChoice`, событие `ChoiceMade` |
 | Сброс выбора | админ снимает ожидание выбора тем же флагом, что и сброс предложенной игры; игры снова свободны | `ChoiceDiscarded` (по `AdjustPlayer.DiscardOffer`) |
-| Приглашение | кооп или дуэль, ждущие ответа | `Interaction` |
+| Приглашение | кооп или дуэль, ждущие ответа | `Interaction`; личный список API — `InteractionView` (`GET …/interactions`) |
 
 ## Ивенты, голосования и взаимодействия (этап 5)
 
@@ -335,7 +335,7 @@
 | Доска «ищу напарника» | запросы игроков, ищущих напарника в своё кооп-прохождение (D-524) | `PartnerBoard`, флаг `features.partnerBoard`, срок `partnerBoard.requestTtlHours` |
 | Запрос напарника | объявление «ищу напарника» для своего идущего кооп-прохождения | `PartnerRequest`, `PartnerRequestStatus` (`Open`, `Closed`), команда `PostPartnerRequest`, событие `PartnerRequestPosted` |
 | Закрытие запроса | запрос закрыт: кооп, конец прохождения, срок, автор или дедлайн | команда `ClosePartnerRequest`, событие `PartnerRequestClosed`, `PartnerRequestCloseReason` (`Coop`, `RunEnded`, `Timeout`, `Author`, `Deadline`) |
-| Предложка | предложение игры, ивента или предмета от игрока | `Suggestion` |
+| Предложка | предложение игры, ивента или предмета от игрока | `Suggestion`; собственные предложения/модерация — `SuggestionView`, ответы — общий `CommandResponse` с необязательными `warnings` |
 
 ## Техническое
 

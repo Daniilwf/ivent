@@ -66,6 +66,11 @@ public static class AppSetup
 
     public const int VotesPerMinute = 20;
 
+    /// <summary>New player interaction writes share one per-user budget, across routes and seasons (5.20).</summary>
+    public const string InteractionRateLimit = "interaction-write";
+
+    public const int InteractionActionsPerMinute = 20;
+
     /// <summary>The map editor's checks (D-315): one after each edit settles, so more than the admin's other reads.</summary>
     public const string MapCheckRateLimit = "map-check";
 
@@ -229,6 +234,9 @@ public static class AppSetup
             o.AddPolicy(VoteRateLimit, ctx => RateLimitPartition.GetFixedWindowLimiter(
                 ctx.User.UserId()?.ToString() ?? WebSecurity.ClientKey(ctx.Connection.RemoteIpAddress),
                 _ => new FixedWindowRateLimiterOptions { PermitLimit = VotesPerMinute, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+            o.AddPolicy(InteractionRateLimit, ctx => RateLimitPartition.GetFixedWindowLimiter(
+                ctx.User.UserId()?.ToString() ?? WebSecurity.ClientKey(ctx.Connection.RemoteIpAddress),
+                _ => new FixedWindowRateLimiterOptions { PermitLimit = InteractionActionsPerMinute, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
             o.AddPolicy(SeasonReadRateLimit, ctx => RateLimitPartition.GetFixedWindowLimiter(
                 ctx.User.UserId()?.ToString() ?? WebSecurity.ClientKey(ctx.Connection.RemoteIpAddress),
                 _ => new FixedWindowRateLimiterOptions { PermitLimit = SeasonReadsPerMinute, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
@@ -301,6 +309,10 @@ public static class AppSetup
         Polls.PollEndpoints.MapPolls(api);
         GlobalEvents.GlobalEventEndpoints.MapGlobalEvents(api);
         Challenges.WeeklyChallengeEndpoints.MapWeeklyChallenges(api);
+        Interactions.InteractionEndpoints.MapInteractions(api);
+        Interactions.PartnerBoardEndpoints.MapPartnerBoard(api);
+        Duels.DuelEndpoints.MapDuels(api);
+        Suggestions.SuggestionEndpoints.MapSuggestions(api);
         api.MapAdminAccounts();
         api.MapFiles();
         api.MapAvatars();
