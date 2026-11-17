@@ -115,6 +115,10 @@ test('an IRL proof keeps its materials through rejection and resubmission until 
     }
     await expect(watcher.getByTestId(`manual-effect-${effect.id}`)).toHaveCount(0);
     await expect(watcher.locator(`a[href="${video}"]`)).toHaveCount(0);
+    await watcher.goto(`/seasons/${world.seasonId}/feed`);
+    await expect(
+      watcher.getByTestId(/^feed-item-/).filter({ hasText: 'IRL-пруф отправлен' }),
+    ).toHaveCount(1, live);
     await admin.post(`${adminPath}/effects/${effect.id}/irl-proof/review`, {
       approved: false,
       comment: 'Добавь голос в записи',
@@ -123,6 +127,10 @@ test('an IRL proof keeps its materials through rejection and resubmission until 
     await expect(task).toContainText('Добавь голос в записи');
     await expect(task.getByRole('textbox', { name: /ссылка на видео/i })).toHaveValue(video);
     await expect(task.getByRole('img')).toHaveCount(1);
+    await expect(
+      watcher.getByTestId(/^feed-item-/).filter({ hasText: 'IRL-пруф отклонён' }),
+    ).toHaveCount(1, live);
+    await expect(watcher.getByText('Добавь голос в записи', { exact: true })).toHaveCount(0);
     await page.screenshot({
       path: shot(`s5-21-irl-rejected-${info.project.name}.png`),
       fullPage: true,
@@ -140,6 +148,15 @@ test('an IRL proof keeps its materials through rejection and resubmission until 
     expect(approval.events.some((event) => event.type === 'irl-proof-reviewed')).toBe(true);
     await expect(task).toHaveCount(0, live);
     expect((await seasonOf(owner, world.seasonId)).me?.manualEffects).toHaveLength(0);
+    await expect(
+      watcher.getByTestId(/^feed-item-/).filter({ hasText: 'IRL-пруф одобрен' }),
+    ).toHaveCount(1, live);
+    await expect(watcher.locator(`a[href^="${video}"]`)).toHaveCount(0);
+    await expect(watcher.locator(`img[src*="${file.id}"]`)).toHaveCount(0);
+    await watcher.screenshot({
+      path: shot(`s5-21-irl-feed-${info.project.name}.png`),
+      fullPage: true,
+    });
     expect(externalRequests).toEqual([]);
   } finally {
     if (!page.isClosed()) await page.context().close();

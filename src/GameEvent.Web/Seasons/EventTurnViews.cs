@@ -19,9 +19,10 @@ public sealed record RunConditionCheckView(bool Met, bool Waived);
 
 /// <summary>
 /// An event I drew whose effect waits for my future steps (SPEC «Ивенты копятся», D-505, D-823): a change of my next roll
-/// or of my next throw; <c>kind</c> — the kind of the deck it came from.
+/// or of my next throw; <c>kind</c> — the kind of the deck it came from. <c>waitingForRoll</c> and
+/// <c>waitingForThrow</c> describe what still waits, not every action in the original description. Always set by the server.
 /// </summary>
-public sealed record WaitingEventView(string ObjectId, string Name, string Description, EventKind Kind);
+public sealed record WaitingEventView(string ObjectId, string Name, string Description, EventKind Kind, bool? WaitingForRoll = null, bool? WaitingForThrow = null);
 
 /// <summary>
 /// The proof of an IRL effect (D-509, D-820), for its owner only: <c>status</c>, the own uploaded pictures, the https link
@@ -62,15 +63,19 @@ internal sealed class EventTurnViews(SeasonState? state, Guid playerId)
         }
 
         var wallet = player.Wallet;
-        var fromEvents = wallet.NextRoll
+        var rollEvents = wallet.NextRoll
             .Where(m => m.RunCondition is null && m.EventKind is not null)
             .Select(m => (m.ObjectId, Kind: m.EventKind!.Value))
-            .Concat(wallet.NextDice.Where(d => d.EventKind is not null).Select(d => (d.ObjectId, Kind: d.EventKind!.Value)))
-            .Distinct();
+            .ToArray();
+        var throwEvents = wallet.NextDice.Where(d => d.EventKind is not null)
+            .Select(d => (d.ObjectId, Kind: d.EventKind!.Value)).ToArray();
+        var rollKeys = rollEvents.ToHashSet();
+        var throwKeys = throwEvents.ToHashSet();
+        var fromEvents = rollEvents.Concat(throwEvents).Distinct();
         return [.. fromEvents.Select(e =>
         {
             var definition = state.Catalog.Find(e.ObjectId);
-            return new WaitingEventView(e.ObjectId, definition?.Name ?? e.ObjectId, definition?.Description ?? "", e.Kind);
+            return new WaitingEventView(e.ObjectId, definition?.Name ?? e.ObjectId, definition?.Description ?? "", e.Kind, rollKeys.Contains(e), throwKeys.Contains(e));
         })];
     }
 

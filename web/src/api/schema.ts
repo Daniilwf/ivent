@@ -12580,13 +12580,16 @@ export interface components {
         };
         /**
          * @description An event I drew whose effect waits for my future steps (SPEC «Ивенты копятся», D-505, D-823): a change of my next roll
-         *     or of my next throw; `kind` — the kind of the deck it came from.
+         *     or of my next throw; `kind` — the kind of the deck it came from. `waitingForRoll` and
+         *     `waitingForThrow` describe what still waits, not every action in the original description. Always set by the server.
          */
         WaitingEventView: {
             objectId: string;
             name: string;
             description: string;
             kind: components["schemas"]["EventKind"];
+            waitingForRoll?: null | boolean;
+            waitingForThrow?: null | boolean;
         };
         /**
          * @description The admin marks the conditions of a completed run «не применимо» (D-546 (2), D-821): the run counts as if they were met

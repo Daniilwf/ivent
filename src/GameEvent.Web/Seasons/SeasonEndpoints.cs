@@ -660,12 +660,7 @@ public static class SeasonEndpoints
             var offer = mine.OfferJson is null ? null : JsonSerializer.Deserialize<RollOffer>(mine.OfferJson, EngineJson.Options);
             var choice = mine.ChoiceJson is null ? null : JsonSerializer.Deserialize<PendingChoice>(mine.ChoiceJson, EngineJson.Options);
             var run = mine.ActiveRunId is { } runId ? await db.Runs.AsNoTracking().SingleAsync(r => r.Id == runId, ct) : null;
-            // One active run per player (C4 keeps it that way), so the latest started completed run is the latest
-            // completed one. Revisit with a completion time column if several active runs are ever allowed.
-            var last = await db.Runs.AsNoTracking()
-                .Where(r => r.PlayerId == mine.Id && (r.Status == RunStatus.Completed || r.Status == RunStatus.Rejected))
-                .OrderByDescending(r => r.StartedAt)
-                .FirstOrDefaultAsync(ct);
+            var last = await LastCompletedAsync(db, seasonId, mine.Id, ct);
             var lastReview = last is null ? null : await db.Reviews.AsNoTracking().SingleOrDefaultAsync(x => x.RunId == last.Id, ct);
             var lastProof = last is null ? null : await db.Proofs.AsNoTracking().SingleOrDefaultAsync(x => x.RunId == last.Id, ct);
             var gameIds = new[] { offer?.GameId, run?.GameId, last?.GameId }
@@ -851,6 +846,54 @@ public static class SeasonEndpoints
             await SeasonMaps.BackgroundAsync(db, map, ct),
             new EconomyFeaturesView(rules.Features.Items, rules.Features.Shop, rules.Features.Bets),
             await GameEvent.Web.GlobalEvents.GlobalEventEndpoints.BannerAsync(db, seasonId, rules.Features.GlobalEvents, clock.UtcNow, ct)));
+    }
+
+    private static readonly string s_completedType = EventCatalog.Describe(typeof(RunCompleted)).Name;
+
+    /// <summary>How many completion events are read at a time to break an equal start time.</summary>
+    private const int CompletionsPerPage = 64;
+
+    private static async Task<Infrastructure.Seasons.RunRecord?> LastCompletedAsync(
+        GameEventDbContext db, Guid seasonId, Guid playerId, CancellationToken ct)
+    {
+        // One active run per player means the latest start is normally the latest completion. A clock can give
+        // consecutive runs the same timestamp, so only that tie needs the log's authoritative order.
+        var eligible = db.Runs.AsNoTracking()
+            .Where(r => r.SeasonId == seasonId && r.PlayerId == playerId
+                && (r.Status == RunStatus.Completed || r.Status == RunStatus.Rejected));
+        var latest = await eligible.OrderByDescending(r => r.StartedAt).Take(2).ToListAsync(ct);
+        if (latest.Count < 2 || latest[0].StartedAt != latest[1].StartedAt)
+        {
+            return latest.FirstOrDefault();
+        }
+
+        var startedAt = latest[0].StartedAt;
+        var tied = await eligible.Where(r => r.StartedAt == startedAt).ToDictionaryAsync(r => r.Id, ct);
+        long? before = null;
+        while (true)
+        {
+            var rows = await db.Events.AsNoTracking()
+                .Where(e => e.SeasonId == seasonId && e.Type == s_completedType && e.UndoneByEventId == null
+                    && (before == null || e.Sequence < before))
+                .OrderByDescending(e => e.Sequence)
+                .Take(CompletionsPerPage)
+                .ToListAsync(ct);
+            foreach (var row in rows)
+            {
+                if (EventCodec.Decode(new StoredEvent(row.Type, row.Version, row.Data)) is RunCompleted completed
+                    && completed.PlayerId == playerId && tied.TryGetValue(completed.RunId, out var run))
+                {
+                    return run;
+                }
+            }
+
+            if (rows.Count < CompletionsPerPage)
+            {
+                return latest[0];
+            }
+
+            before = rows[^1].Sequence;
+        }
     }
 
     private static readonly string s_rejectedType = EventCatalog.Describe(typeof(ProofRejected)).Name;

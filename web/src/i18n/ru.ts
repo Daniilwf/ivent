@@ -1414,6 +1414,10 @@ export const ru = {
     history: (name: string) => `Последний ивент: «${name}»`,
     waitingTitle: 'Накопленные ивенты',
     waitingConditionsTitle: 'Условия следующей игры',
+    waitingForRoll: 'Ждёт ролла игры',
+    waitingForThrow: 'Ждёт броска',
+    waitingForStep: 'Ждёт будущего шага',
+    originalText: (name: string) => `Текст ивента: «${name}»`,
     title: 'Ивент',
     choice: {
       prompt: 'Что выбираешь?',
@@ -1593,6 +1597,22 @@ export const ru = {
     noSeasonTitle: 'Такого сезона нет',
     noSeasonText: 'Возможно, ссылка устарела. Открой ленту текущего сезона.',
     lines: feedLines,
+    stage5: {
+      playerStatus: <T>(player: T, status: string): Line<T> => [player, ': ', status],
+      waiting: (name: string | null, poll: boolean) =>
+        `${name ? `Ивент «${name}»` : 'Ивент'} ждёт ${poll ? 'результата голосования' : 'ответа'}`,
+      resumed: <T>(player: T): Line<T> => [player, ': ответ ивента принят'],
+      irlSubmitted: <T>(player: T): Line<T> => [player, ': IRL-пруф отправлен'],
+      irlReviewed: <T>(player: T, approved: boolean | null): Line<T> => [
+        player,
+        ': IRL-пруф ',
+        approved === null ? 'проверен' : approved ? 'одобрен' : 'отклонён',
+      ],
+      conditionChecked: (met: boolean, waived: boolean) =>
+        `Условие прохождения ${waived ? 'неприменимо' : met ? 'выполнено' : 'не выполнено'}`,
+      manualTask: (name: string | null) =>
+        `${name ? `Ручной эффект «${name}»` : 'Ручной эффект'} ждёт разрешения`,
+    },
     facts: {
       points: (n: number) => `${signed(n)} ${plural(n, 'очко', 'очка', 'очков')}`,
       cells: (n: number) => `${signed(n)} ${plural(n, 'клетка', 'клетки', 'клеток')}`,

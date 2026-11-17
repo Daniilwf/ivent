@@ -61,3 +61,23 @@ test('a selected event answer keeps a visible check in the label color at its in
     appearance.intendedWidth,
   );
 });
+
+test('event history responds to Space while an unfocused map editor is mounted elsewhere', async ({
+  page,
+}) => {
+  await page.goto('/styleguide#event-history');
+  const history = page
+    .locator('details')
+    .filter({ hasText: 'Последний ивент: «Попутный ветер»' })
+    .first();
+  const summary = history.locator('summary').first();
+  await expect(summary).toBeVisible();
+  await expect(history).not.toHaveAttribute('open');
+  await summary.focus();
+  await summary.press('Space');
+  await expect(history).toHaveAttribute('open');
+  await summary.press('Enter');
+  await expect(history).not.toHaveAttribute('open');
+  await summary.press('Space');
+  await expect(history).toHaveAttribute('open');
+});

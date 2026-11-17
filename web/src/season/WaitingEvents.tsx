@@ -2,6 +2,7 @@ import { useId } from 'react';
 import type { Schemas } from '../api/client';
 import { ru } from '../i18n/ru';
 import { Tag } from '../ui/Marks';
+import { Summary } from '../ui/Disclosure';
 import { RunConditionList } from './RunConditions';
 
 export type WaitingEventsProps = {
@@ -28,9 +29,21 @@ export function WaitingEvents({ events, conditions }: WaitingEventsProps) {
                   <span className="font-bold wrap-anywhere">{event.name}</span>
                   <Tag>{ru.events.kinds[event.kind]}</Tag>
                 </div>
-                <p className="max-w-prose text-sm text-ink-soft wrap-anywhere">
-                  {event.description}
+                <p className="grid gap-1 text-sm text-ink-soft">
+                  {event.waitingForRoll ? <span>{ru.events.waitingForRoll}</span> : null}
+                  {event.waitingForThrow ? <span>{ru.events.waitingForThrow}</span> : null}
+                  {!event.waitingForRoll && !event.waitingForThrow ? (
+                    <span>{ru.events.waitingForStep}</span>
+                  ) : null}
                 </p>
+                {event.description ? (
+                  <details className="min-w-0 text-sm text-ink-soft">
+                    <Summary>
+                      <span className="wrap-anywhere">{ru.events.originalText(event.name)}</span>
+                    </Summary>
+                    <p className="max-w-prose pt-1 wrap-anywhere">{event.description}</p>
+                  </details>
+                ) : null}
               </li>
             ))}
           </ul>

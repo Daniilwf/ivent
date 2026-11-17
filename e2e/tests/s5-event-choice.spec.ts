@@ -143,6 +143,10 @@ test('an event question keeps an unsent answer through a live pause and resumes 
     await page.reload();
     await expect(page.getByTestId('event-choice')).toHaveCount(0);
     expect((await seasonOf(owner, world.seasonId)).me?.coins).toBe(before + 3);
+    await page.goto(`/seasons/${world.seasonId}/feed`);
+    await expect(
+      page.getByTestId(/^feed-item-/).filter({ hasText: 'ответ ивента принят' }),
+    ).toHaveCount(1, live);
   } finally {
     if (page && !page.isClosed()) await page.context().close();
     await owner.dispose();
@@ -208,6 +212,20 @@ test('waiting events and conditions follow the roll and show one completion resu
     await expect(turn.getByRole('heading', { name: 'Накопленные ивенты' })).toBeVisible(live);
     await expect(turn.getByRole('heading', { name: 'Условия следующей игры' })).toBeVisible();
     await expect(turn.getByText('Не ниже: Сложная', { exact: true })).toBeVisible();
+    await expect(turn.getByText('Ждёт броска', { exact: true })).toBeVisible();
+    await expect(turn.getByText('Ждёт ролла игры', { exact: true })).toHaveCount(0);
+    const sourceText = turn
+      .locator('details')
+      .filter({ hasText: 'Текст ивента: «Даже не вспотел»' });
+    await expect(sourceText).not.toHaveAttribute('open');
+    await sourceText.locator('summary').focus();
+    await sourceText.locator('summary').press('Space');
+    await expect(sourceText).toHaveAttribute('open');
+    await expect(sourceText).toContainText(
+      'Следующую игру нужно пройти на сложной сложности или выше.',
+    );
+    await sourceText.locator('summary').press('Enter');
+    await expect(sourceText).not.toHaveAttribute('open');
     await page.evaluate(() => document.fonts.ready);
     await page.screenshot({
       path: designShot(`s5-21-waiting-${info.project.name}.png`),
@@ -242,6 +260,8 @@ test('waiting events and conditions follow the roll and show one completion resu
     const result = (await seasonOf(owner, world.seasonId)).me?.lastCompleted;
     expect(result?.conditionCheck).toEqual({ met: false, waived: false });
     expect(result?.dice).toEqual([]);
+    await expect(turn.getByText('Ждёт броска', { exact: true })).toBeVisible();
+    await expect(sourceText).not.toHaveAttribute('open');
     await page.screenshot({
       path: designShot(`s5-21-unmet-${info.project.name}.png`),
       fullPage: true,
@@ -249,6 +269,10 @@ test('waiting events and conditions follow the roll and show one completion resu
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
     ).toBe(true);
+    await page.goto(`/seasons/${world.seasonId}/feed`);
+    await expect(
+      page.getByTestId(/^feed-item-/).filter({ hasText: 'Условие прохождения не выполнено' }),
+    ).toHaveCount(1, live);
   } finally {
     if (!page.isClosed()) await page.context().close();
     await owner.dispose();

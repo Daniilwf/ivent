@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { Schemas } from '../api/client';
 import { WaitingEvents } from './WaitingEvents';
 
@@ -47,11 +48,12 @@ describe('events and conditions waiting for my future steps', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it('shows event names and their descriptions without an empty conditions section', () => {
+  it('shows event names and their descriptions without an empty conditions section', async () => {
     render(<WaitingEvents events={[event()]} />);
 
     expect(screen.getByRole('heading', { name: 'Накопленные ивенты' })).toBeVisible();
     expect(screen.getByText('Попутный ветер')).toBeVisible();
+    await userEvent.click(screen.getByText('Текст ивента: «Попутный ветер»'));
     expect(
       screen.getByText('В следующем броске за прохождение на один кубик больше.'),
     ).toBeVisible();
@@ -105,7 +107,7 @@ describe('events and conditions waiting for my future steps', () => {
     }
   });
 
-  it('does not merge events from different decks merely because their object id is the same', () => {
+  it('does not merge events from different decks merely because their object id is the same', async () => {
     render(
       <WaitingEvents
         events={[
@@ -116,6 +118,9 @@ describe('events and conditions waiting for my future steps', () => {
     );
 
     expect(screen.getAllByText('Попутный ветер')).toHaveLength(2);
+    for (const summary of screen.getAllByText('Текст ивента: «Попутный ветер»')) {
+      await userEvent.click(summary);
+    }
     expect(screen.getByText('Эффект хорошего ивента ждёт броска.')).toBeVisible();
     expect(screen.getByText('Эффект плохого ивента ждёт броска.')).toBeVisible();
   });
@@ -140,7 +145,7 @@ describe('events and conditions waiting for my future steps', () => {
     expect(container).not.toHaveTextContent(/null|undefined/);
   });
 
-  it('keeps long content visible as text without interpreting markup', () => {
+  it('keeps long content visible as text without interpreting markup', async () => {
     const name =
       'Очень длинное название накопленного ивента с уточнением <img src=x onerror=alert(1)>';
     const description =
@@ -154,6 +159,7 @@ describe('events and conditions waiting for my future steps', () => {
     );
 
     expect(screen.getByText(name)).toBeVisible();
+    await userEvent.click(screen.getByText(`Текст ивента: «${name}»`));
     expect(screen.getByText(description)).toBeVisible();
     expect(screen.getByText(conditionName)).toBeVisible();
     expect(container.querySelector('img, script')).toBeNull();

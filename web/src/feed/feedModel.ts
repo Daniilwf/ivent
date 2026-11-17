@@ -157,6 +157,8 @@ type Context = {
   refOf: (id: string) => FeedRef;
   /** An object's name by its id; the id itself when the page does not know it */
   object: (id: string | null) => string;
+  /** A literal object reference, without interpreting another event's identifiers as object ids */
+  objectName: (id: string | null) => string | null;
   /** The player of an account named by the event (a voter of a named poll, D-515); null when none is known */
   voter: (d: Data) => FeedPlayer | null;
 };
@@ -167,6 +169,7 @@ const eventKind = (value: string | null): EventKind =>
 
 const L = ru.feed.lines;
 const F = ru.feed.facts;
+const S = ru.feed.stage5;
 const quoteOf = (comment: string | null) => (comment ? { rating: null, text: comment } : null);
 
 /**
@@ -562,6 +565,33 @@ const headlines: [string, (d: Data, c: Context) => Headline][] = [
     }),
   ],
   [
+    'irl-proof-reviewed',
+    (d, c) => ({
+      icon: 'proof',
+      actor: c.player(d),
+      // The explicit review is the verdict; a manual resolution alone does not prove approval.
+      line: S.irlReviewed(c.playerRef(d), typeof d.approved === 'boolean' ? d.approved : null),
+    }),
+  ],
+  [
+    'irl-proof-submitted',
+    (d, c) => ({
+      icon: 'proof',
+      actor: c.player(d),
+      // Proof media and moderation comments never belong in the feed, even for their owner.
+      line: S.irlSubmitted(c.playerRef(d)),
+    }),
+  ],
+  [
+    'effect-resumed',
+    (d, c) => ({
+      icon: 'effect',
+      actor: c.player(d),
+      // A timer or a vote may resume the effect; optionId does not establish who answered or what it means.
+      line: S.resumed(c.playerRef(d)),
+    }),
+  ],
+  [
     'manual-effect-resolved',
     (d, c) => ({
       icon: 'effect',
@@ -587,11 +617,25 @@ const headlines: [string, (d: Data, c: Context) => Headline][] = [
     }),
   ],
   [
+    'effect-suspended',
+    (d, c) => ({
+      icon: 'effect',
+      actor: c.player(d),
+      line: S.playerStatus(
+        c.playerRef(d),
+        S.waiting(c.objectName(text(d, 'objectId')), text(d, 'pollId') !== null),
+      ),
+    }),
+  ],
+  [
     'manual-effect-created',
     (d, c) => ({
       icon: 'effect',
       actor: c.player(d),
-      line: L.effectDrawn(c.playerRef(d), eventKind(text(d, 'drawEvent'))),
+      line:
+        text(d, 'objectId') !== null
+          ? S.playerStatus(c.playerRef(d), S.manualTask(c.objectName(text(d, 'objectId'))))
+          : L.effectDrawn(c.playerRef(d), eventKind(text(d, 'drawEvent'))),
     }),
   ],
   [
@@ -679,12 +723,32 @@ function factsOf(events: Event[], lead: Event, context: Context): string[] {
       case 'player-frozen':
         facts.push(F.frozen);
         break;
-      case 'manual-effect-created':
-        // A drawn event's own manual effect is told by the draw
+      case 'manual-effect-created': {
+        const objectId = text(d, 'objectId');
+        // A content object's manual task is not a legacy instruction to draw a good or bad event.
+        if (objectId !== null) {
+          const drawn = events.some(
+            (other) =>
+              other.type === 'event-drawn' &&
+              text(other.data, 'objectId') === objectId &&
+              text(other.data, 'playerId') === text(d, 'playerId'),
+          );
+          if (!drawn) facts.push(S.manualTask(context.objectName(objectId)));
+          break;
+        }
+        // An empty deck's legacy manual instruction is already told by the missed draw.
         if (text(d, 'source') !== 'event')
           facts.push(
             ru.effects.drawEvent(eventKind(text(d, 'drawEvent')), effectSource(text(d, 'source'))),
           );
+        break;
+      }
+      case 'effect-suspended':
+        facts.push(S.waiting(context.objectName(text(d, 'objectId')), text(d, 'pollId') !== null));
+        break;
+      case 'run-condition-checked':
+        // This is the aggregate check for the run. Rewards, if any, have their own events.
+        facts.push(S.conditionChecked(d.met === true, d.waived === true));
         break;
       case 'event-drawn':
         facts.push(F.eventDrawn(context.object(text(d, 'objectId'))));
@@ -772,6 +836,7 @@ function itemOf(entries: Entry[], refs: FeedRefs): FeedItem | null {
     playerRef: (d) => ({ kind: 'player', player: player(d) }),
     refOf: (id) => ({ kind: 'player', player: player({ playerId: id }) }),
     object,
+    objectName: (id) => (id ? (refs.objects.get(id) ?? null) : null),
     gameRef: (d) => {
       const id = text(d, 'gameId') ?? refs.runs.get(text(d, 'runId') ?? '') ?? '';
       return {

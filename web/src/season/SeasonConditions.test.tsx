@@ -1,4 +1,5 @@
 import { act, render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { Schemas } from '../api/client';
 import { fakeServer, seasonId } from '../test/fakeServer';
 import { SeasonScreen } from './SeasonScreen';
@@ -198,6 +199,7 @@ describe('events and run conditions on the season screen', () => {
     expect(within(turn).getByRole('heading', { name: titles[1] })).toBeVisible();
     for (const event of waitingEvents) {
       expect(within(turn).getByText(event.name)).toBeVisible();
+      await userEvent.click(within(turn).getByText(`Текст ивента: «${event.name}»`));
       expect(within(turn).getByText(event.description)).toBeVisible();
     }
     const first = within(turn).getByText('Попутный ветер');

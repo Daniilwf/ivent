@@ -18047,9 +18047,21 @@
           },
           "kind": {
             "$ref": "#/components/schemas/EventKind"
+          },
+          "waitingForRoll": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "waitingForThrow": {
+            "type": [
+              "null",
+              "boolean"
+            ]
           }
         },
-        "description": "An event I drew whose effect waits for my future steps (SPEC «Ивенты копятся», D-505, D-823): a change of my next roll\nor of my next throw; `kind` — the kind of the deck it came from."
+        "description": "An event I drew whose effect waits for my future steps (SPEC «Ивенты копятся», D-505, D-823): a change of my next roll\nor of my next throw; `kind` — the kind of the deck it came from. `waitingForRoll` and\n`waitingForThrow` describe what still waits, not every action in the original description. Always set by the server."
       },
       "WaiveConditionsRequest": {
         "required": [
