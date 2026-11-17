@@ -7,6 +7,7 @@ import {
   MessagesSquare,
   ShieldCheck,
   UserRound,
+  Vote,
 } from 'lucide-react';
 import { useSyncExternalStore, type ReactNode } from 'react';
 import { connectionStatus } from '../api/connection';
@@ -34,10 +35,20 @@ const sections: { kind: Route['kind'] & keyof typeof ru.nav; to: string; icon: R
  * The site's sections (H5–H7): the season (map, turn, leaderboard), its feed, the pool and the rules. One row: under
  * the name on a phone (the icons stay out, the four words fit 390 px), between the name and my menu on a desktop
  */
-function SiteNav({ admin }: { admin: boolean }) {
+function SiteNav({ admin, pollsSeasonId }: { admin: boolean; pollsSeasonId: string | null }) {
   const found = routeOf(usePath());
   // Anyone but the admin at the admin's address sees the game: its section is the current one
   const route: Route = found.kind === 'admin' && !admin ? { kind: 'season' } : found;
+  const shown = pollsSeasonId
+    ? [
+        ...sections,
+        {
+          kind: 'polls' as const,
+          to: paths.polls(pollsSeasonId),
+          icon: <Vote size={18} aria-hidden />,
+        },
+      ]
+    : sections;
   return (
     <nav
       aria-label={ru.nav.label}
@@ -45,7 +56,7 @@ function SiteNav({ admin }: { admin: boolean }) {
       className="order-last -mx-1 w-full overflow-x-auto p-1 desk:order-none desk:mx-0 desk:mr-auto desk:w-auto"
     >
       <ul className="flex gap-1">
-        {sections.map((section) => {
+        {shown.map((section) => {
           const current = route.kind === section.kind;
           return (
             <li key={section.kind} className="shrink-0">
@@ -54,7 +65,8 @@ function SiteNav({ admin }: { admin: boolean }) {
                 aria-current={current ? 'page' : undefined}
                 data-testid={`nav-${section.kind}`}
                 className={cx(
-                  'inline-flex min-h-11 items-center gap-2 rounded-full px-4 font-medium whitespace-nowrap transition duration-(--duration-fast) desk:px-3',
+                  'inline-flex min-h-11 items-center gap-2 rounded-full font-medium whitespace-nowrap transition duration-(--duration-fast) desk:px-3',
+                  pollsSeasonId ? 'px-2 text-sm desk:text-base' : 'px-4',
                   // The current section: filled, not by colour alone
                   current ? 'bg-ink text-on-color' : 'text-ink is-hover:bg-muted',
                 )}
@@ -77,6 +89,7 @@ function SiteNav({ admin }: { admin: boolean }) {
 export function Shell({
   user,
   seasonId = null,
+  pollsSeasonId = null,
   onChangePassword,
   onLogout,
   offline,
@@ -86,6 +99,7 @@ export function Shell({
   user: Schemas['CurrentUser'];
   /** The current season: the admin's count of proofs to check is its (D-263) */
   seasonId?: string | null;
+  pollsSeasonId?: string | null;
   onChangePassword: () => void;
   onLogout: () => void;
   /** The styleguide shows the lost connection without losing it */
@@ -113,7 +127,7 @@ export function Shell({
           >
             {ru.app.title}
           </Link>
-          <SiteNav admin={admin} />
+          <SiteNav admin={admin} pollsSeasonId={pollsSeasonId} />
           {online ? null : <ConnectionLost compact />}
           <BugReportButton />
           <Menu

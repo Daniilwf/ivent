@@ -5,11 +5,20 @@ import { useSeasonVersion } from './useSeasonVersion';
 // One way for every page to follow the season's log (D-202): the join is skipped, a burst is one read.
 
 let notify: (updates: SeasonUpdate[]) => void = () => undefined;
+let joined: (sequence: number) => void = () => undefined;
 const stopped = vi.fn();
 
 vi.mock('../api/realtime', () => ({
-  watchSeason: (_: string, onChange: (updates: SeasonUpdate[]) => void) => {
+  watchSeason: (
+    _: string,
+    onChange: (updates: SeasonUpdate[]) => void,
+    onInitialJoin?: (sequence: number) => void,
+  ) => {
     notify = onChange;
+    joined = (sequence) => {
+      onChange([]);
+      onInitialJoin?.(sequence);
+    };
     return stopped;
   },
 }));
@@ -38,6 +47,44 @@ describe('useSeasonVersion', () => {
       notify([]);
     });
     expect(result.current).toBe(2);
+  });
+
+  it('refreshes when the initial join is newer than the loaded snapshot', () => {
+    const { result } = renderHook(() => useSeasonVersion('s', { snapshotSequence: 10 }));
+
+    act(() => {
+      joined(11);
+    });
+
+    expect(result.current).toBe(1);
+  });
+
+  it('waits for the first snapshot when the hub answers first and compares it once', () => {
+    stopped.mockClear();
+    const { result, rerender } = renderHook<number, { sequence: number | null }>(
+      ({ sequence }) => useSeasonVersion('s', { snapshotSequence: sequence }),
+      { initialProps: { sequence: null } },
+    );
+
+    act(() => {
+      joined(12);
+    });
+    expect(result.current).toBe(0);
+
+    rerender({ sequence: 10 });
+    expect(result.current).toBe(1);
+    rerender({ sequence: 11 });
+    expect(result.current).toBe(1);
+    expect(stopped).not.toHaveBeenCalled();
+  });
+
+  it.each([12, 13])('skips the initial join when the snapshot sequence is %i', (sequence) => {
+    const { result } = renderHook(() => useSeasonVersion('s', { snapshotSequence: sequence }));
+
+    act(() => {
+      joined(12);
+    });
+    expect(result.current).toBe(0);
   });
 
   it('counts only the relevant updates, and a catch-up without a list', () => {

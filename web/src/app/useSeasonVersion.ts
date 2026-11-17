@@ -10,6 +10,8 @@ import { watchPool, watchSeason, type SeasonUpdate } from '../api/realtime';
  *   catch-up without the list of updates always counts.
  * - `debounceMs` — one read after a burst (a roll, its misses, a move come together).
  * - `throttleMs` — at most one read per period (the admin's reads are rate-limited).
+ * - `refreshOnJoin` — also refresh on a late initial join if an earlier HTTP snapshot could miss updates.
+ * - `snapshotSequence` — refresh once if the first snapshot trails the initial join, with `null` while loading.
  */
 export function useSeasonVersion(
   seasonId: string | null,
@@ -17,10 +19,14 @@ export function useSeasonVersion(
     relevant,
     debounceMs = 0,
     throttleMs = 0,
+    refreshOnJoin = false,
+    snapshotSequence,
   }: {
     relevant?: (update: SeasonUpdate) => boolean;
     debounceMs?: number;
     throttleMs?: number;
+    refreshOnJoin?: boolean;
+    snapshotSequence?: number | null;
   } = {},
 ): number {
   const [version, setVersion] = useState(0);
@@ -29,19 +35,29 @@ export function useSeasonVersion(
   );
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const last = useRef(0);
+  const initialJoinSequence = useRef<number | null>(null);
+  const trackSnapshot = snapshotSequence !== undefined;
+  const compareFirstSnapshot = useEffectEvent(() => {
+    if (snapshotSequence == null || initialJoinSequence.current === null) return;
+    const behind = snapshotSequence < initialJoinSequence.current;
+    initialJoinSequence.current = null;
+    if (behind) setVersion((v) => v + 1);
+  });
 
   useEffect(() => {
     if (!seasonId) return;
     let first = true;
+    let subscribing = true;
     const bump = () => {
       timer.current = null;
       last.current = Date.now();
       setVersion((v) => v + 1);
     };
-    const stop = watchSeason(seasonId, (updates) => {
+    const onChange = (updates: SeasonUpdate[]) => {
       if (first) {
         first = false;
-        return;
+        // A synchronous initial callback precedes the consumer's load effect and needs no second read.
+        if (!refreshOnJoin || subscribing) return;
       }
       if (!counts(updates)) return;
       if (debounceMs > 0) {
@@ -55,13 +71,24 @@ export function useSeasonVersion(
         return;
       }
       bump();
-    });
+    };
+    const onInitialJoin = (sequence: number) => {
+      initialJoinSequence.current = sequence;
+      compareFirstSnapshot();
+    };
+    const stop = watchSeason(seasonId, onChange, trackSnapshot ? onInitialJoin : undefined);
+    subscribing = false;
     return () => {
       stop();
+      initialJoinSequence.current = null;
       if (timer.current) clearTimeout(timer.current);
       timer.current = null;
     };
-  }, [seasonId, debounceMs, throttleMs]);
+  }, [seasonId, debounceMs, throttleMs, refreshOnJoin, trackSnapshot]);
+
+  useEffect(() => {
+    compareFirstSnapshot();
+  }, [snapshotSequence]);
 
   return version;
 }

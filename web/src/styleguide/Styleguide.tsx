@@ -19,6 +19,8 @@ import { RunConditions } from '../season/RunConditions';
 import { WaitingEvents } from '../season/WaitingEvents';
 import { IrlProofSection } from '../season/IrlProofSection';
 import { DrawnEventHistory } from '../season/DrawnEventHistory';
+import { GlobalEventBanner } from '../globalEvents/GlobalEventBanner';
+import { PollCard } from '../polls/PollCard';
 import type { Schemas } from '../api/client';
 import { MyFinish } from '../season/MyFinish';
 import { Leaderboard } from '../board/Leaderboard';
@@ -71,6 +73,33 @@ import { BetsDemos, ShopDemos } from './EconomyDemos';
 const noop = () => undefined;
 
 const t = ru.styleguide;
+const globalEventDemo: Schemas['GlobalEventView'] = {
+  id: 'weekend',
+  objectId: 'weekend',
+  name: t.globalEvent.name,
+  description: t.globalEvent.description,
+  status: 'active',
+  startsAt: '2026-11-20T12:00:00Z',
+  endsAt: '2026-11-22T20:00:00Z',
+  goal: { metric: 'hours', progress: 18.5, target: 50, reached: false },
+};
+const pollOptions = t.pollCard.options.map((label, index) => ({ id: String(index), label }));
+const pollDemo: Schemas['PollView'] = {
+  id: 'weekend-poll',
+  question: t.pollCard.question,
+  options: pollOptions,
+  voters: 'players',
+  anonymous: true,
+  status: 'open',
+  startedAt: globalEventDemo.startsAt,
+  closesAt: globalEventDemo.endsAt,
+  counts: null,
+  result: null,
+  myVote: null,
+  source: 'admin',
+  voting: { canVote: true, allowChangeVote: true, reason: null },
+};
+const demoVote = () => Promise.resolve();
 const eventChoiceDemo: Schemas['ChoiceView'] = {
   ...t.eventChoice.demo,
   options: [...t.eventChoice.demo.options],
@@ -799,6 +828,49 @@ export function Styleguide() {
           {drawnEvents.map((drawn) => (
             <DrawnEventCard key={drawn.sequence} drawn={drawn} />
           ))}
+        </div>
+      </Section>
+
+      <Section id="global-event" title={t.globalEvent.title}>
+        <div className="grid items-start gap-4 desk:grid-cols-2">
+          <GlobalEventBanner events={[globalEventDemo]} />
+          <GlobalEventBanner
+            events={[
+              {
+                ...globalEventDemo,
+                id: 'weekend-reached',
+                goal: { metric: 'hours', progress: 49, target: 50, reached: true },
+              },
+            ]}
+          />
+        </div>
+      </Section>
+
+      <Section id="poll-card" title={t.pollCard.title}>
+        <div className="grid items-start gap-4 desk:grid-cols-2">
+          <PollCard poll={pollDemo} pending={false} onVote={demoVote} />
+          <PollCard poll={{ ...pollDemo, id: 'pending' }} pending onVote={demoVote} />
+          <PollCard
+            poll={{
+              ...pollDemo,
+              id: 'closed',
+              status: 'closed',
+              result: '0',
+              myVote: '0',
+              counts: [
+                { optionId: '0', votes: 6 },
+                { optionId: '1', votes: 3 },
+                { optionId: '2', votes: 1 },
+              ],
+            }}
+            pending={false}
+            onVote={demoVote}
+          />
+          <PollCard
+            poll={{ ...pollDemo, id: 'cancelled', status: 'cancelled' }}
+            pending={false}
+            onVote={demoVote}
+          />
         </div>
       </Section>
 

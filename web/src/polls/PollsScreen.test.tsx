@@ -9,6 +9,7 @@ type Poll = Schemas['PollView'];
 type Update = Schemas['SeasonUpdate'];
 
 const live = vi.hoisted(() => ({
+  deferJoin: false,
   sequence: 0,
   subscriptions: [] as {
     seasonId: string;
@@ -21,8 +22,7 @@ vi.mock('../api/realtime', () => ({
   watchSeason: (seasonId: string, change: (updates: Update[]) => void) => {
     const subscription = { seasonId, change, stopped: false };
     live.subscriptions.push(subscription);
-    // The first empty callback is the initial join, not a reason to repeat the initial HTTP read.
-    change([]);
+    if (!live.deferJoin) change([]);
     return () => {
       subscription.stopped = true;
     };
@@ -123,6 +123,7 @@ function expectNoEnabledVote() {
 
 describe('the season polls screen (EV21/EV22/EV24/EV39)', () => {
   beforeEach(() => {
+    live.deferJoin = false;
     live.sequence = 0;
     live.subscriptions.length = 0;
   });
@@ -251,7 +252,9 @@ describe('the season polls screen (EV21/EV22/EV24/EV39)', () => {
     const server = serve(() => json(401));
     render(<PollsScreen seasonId={seasonA} onSignedOut={onSignedOut} />);
 
-    await waitFor(() => expect(onSignedOut).toHaveBeenCalledOnce());
+    await waitFor(() => {
+      expect(onSignedOut).toHaveBeenCalledOnce();
+    });
     expect(server.sent('GET', '/polls')).toHaveLength(1);
     expectNoEnabledVote();
   });
@@ -272,14 +275,18 @@ describe('the season polls screen (EV21/EV22/EV24/EV39)', () => {
     expect(server.sent('POST', '/vote')).toHaveLength(0);
     await userEvent.click(screen.getByRole('button', { name: 'Голосовать' }));
 
-    await waitFor(() => expect(server.sent('GET', '/polls')).toHaveLength(2));
+    await waitFor(() => {
+      expect(server.sent('GET', '/polls')).toHaveLength(2);
+    });
     const sent = server.sent('POST', '/vote');
     expect(sent).toHaveLength(1);
     expect(sent[0]?.path).toBe(votePath(seasonA));
     expect(sent[0]?.body).toEqual(
       expect.objectContaining({
         optionId: strategyId,
-        commandId: expect.stringMatching(/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i),
+        commandId: expect.stringMatching(
+          /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i,
+        ) as unknown,
       }),
     );
     expect(sent[0]?.body).not.toHaveProperty('playerId');
@@ -300,7 +307,9 @@ describe('the season polls screen (EV21/EV22/EV24/EV39)', () => {
     await userEvent.dblClick(screen.getByRole('button', { name: 'Голосовать' }));
 
     try {
-      await waitFor(() => expect(server.sent('POST', '/vote')).toHaveLength(1));
+      await waitFor(() => {
+        expect(server.sent('POST', '/vote')).toHaveLength(1);
+      });
       expect(screen.getByRole('heading', { name: firstQuestion })).toBeVisible();
       expect(radio('Стратегии')).toBeChecked();
       expect(radio('Стратегии')).toBeDisabled();
@@ -330,7 +339,9 @@ describe('the season polls screen (EV21/EV22/EV24/EV39)', () => {
     expect(screen.getByRole('button', { name: 'Голосовать' })).toBeEnabled();
     expect(server.sent('POST', '/vote')).toHaveLength(1);
     await userEvent.click(screen.getByRole('button', { name: 'Голосовать' }));
-    await waitFor(() => expect(server.sent('POST', '/vote')).toHaveLength(2));
+    await waitFor(() => {
+      expect(server.sent('POST', '/vote')).toHaveLength(2);
+    });
     expect(radio('Стратегии')).toBeChecked();
   });
 
@@ -343,7 +354,9 @@ describe('the season polls screen (EV21/EV22/EV24/EV39)', () => {
     await userEvent.click(radio('Стратегии'));
     await userEvent.click(screen.getByRole('button', { name: 'Голосовать' }));
 
-    await waitFor(() => expect(onSignedOut).toHaveBeenCalledOnce());
+    await waitFor(() => {
+      expect(onSignedOut).toHaveBeenCalledOnce();
+    });
     expect(screen.queryByText('Голос принят')).not.toBeInTheDocument();
     expect(server.sent('POST', '/vote')).toHaveLength(1);
   });
@@ -387,7 +400,9 @@ describe('the season polls screen (EV21/EV22/EV24/EV39)', () => {
     expect(radio('Стратегии')).toBeChecked();
     failed = false;
     await userEvent.click(screen.getByRole('button', { name: ru.ui.retry }));
-    await waitFor(() => expect(server.sent('GET', '/polls')).toHaveLength(3));
+    await waitFor(() => {
+      expect(server.sent('GET', '/polls')).toHaveLength(3);
+    });
     expect(radio('Стратегии')).toBeChecked();
     expect(server.sent('POST', '/vote')).toHaveLength(0);
   });
@@ -410,7 +425,9 @@ describe('the season polls screen (EV21/EV22/EV24/EV39)', () => {
     await screen.findByRole('heading', { name: firstQuestion });
     push([type]);
 
-    await waitFor(() => expect(server.sent('GET', '/polls')).toHaveLength(2));
+    await waitFor(() => {
+      expect(server.sent('GET', '/polls')).toHaveLength(2);
+    });
     expect(screen.getByRole('heading', { name: firstQuestion })).toBeVisible();
     expect(server.sent('POST', '/vote')).toHaveLength(0);
   });
@@ -422,7 +439,9 @@ describe('the season polls screen (EV21/EV22/EV24/EV39)', () => {
     await userEvent.click(radio('Стратегии'));
     push(['vote-cast']);
 
-    await waitFor(() => expect(server.sent('GET', '/polls')).toHaveLength(2));
+    await waitFor(() => {
+      expect(server.sent('GET', '/polls')).toHaveLength(2);
+    });
     expect(radio('Стратегии')).toBeChecked();
     expect(screen.getByText('Счёт скрыт до закрытия')).toBeVisible();
     expect(server.sent('POST', '/vote')).toHaveLength(0);
@@ -443,6 +462,28 @@ describe('the season polls screen (EV21/EV22/EV24/EV39)', () => {
     expect(
       await screen.findByText('В этом голосовании голосуют только игроки сезона.'),
     ).toBeVisible();
+    expectNoEnabledVote();
+    expect(server.sent('GET', '/polls')).toHaveLength(2);
+    expect(server.sent('POST', '/vote')).toHaveLength(0);
+  });
+
+  it('reloads a poll that closed after the first snapshot and before the initial hub join', async () => {
+    live.deferJoin = true;
+    let current = poll();
+    const server = serve(() => json(200, [current]));
+    render(<PollsScreen seasonId={seasonA} onSignedOut={vi.fn()} />);
+    await screen.findByRole('heading', { name: firstQuestion });
+    expect(radio('Стратегии')).toBeEnabled();
+    expect(server.sent('GET', '/polls')).toHaveLength(1);
+
+    current = poll({
+      status: 'closed',
+      result: horrorId,
+      voting: { canVote: false, reason: 'poll.closed', allowChangeVote: true },
+    });
+    reloadFromHub();
+
+    expect(await screen.findByText('Итог: Хорроры')).toBeVisible();
     expectNoEnabledVote();
     expect(server.sent('GET', '/polls')).toHaveLength(2);
     expect(server.sent('POST', '/vote')).toHaveLength(0);
@@ -515,7 +556,7 @@ describe('the season polls screen (EV21/EV22/EV24/EV39)', () => {
     expect(server.sent('GET', '/polls')).toHaveLength(1);
   });
 
-  it('stops an unsent vote when a hub refresh returns the closed result', async () => {
+  it('stops an unsent vote and moves focus to the same poll heading when it closes live', async () => {
     let closed = false;
     const server = serve(() =>
       json(200, [
@@ -535,14 +576,43 @@ describe('the season polls screen (EV21/EV22/EV24/EV39)', () => {
       ]),
     );
     render(<PollsScreen seasonId={seasonA} onSignedOut={vi.fn()} />);
-    await screen.findByRole('heading', { name: firstQuestion });
+    const openHeading = await screen.findByRole('heading', { name: firstQuestion });
     await userEvent.click(radio('Стратегии'));
+    expect(radio('Стратегии')).toHaveFocus();
     closed = true;
     push(['poll-closed']);
 
     expect(await screen.findByText('Итог: Хорроры')).toBeVisible();
+    expect(openHeading).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: firstQuestion })).toHaveFocus();
     expectNoEnabledVote();
     expect(server.sent('POST', '/vote')).toHaveLength(0);
+  });
+
+  it('keeps focus outside the poll if the player moves it while a closing refresh is pending', async () => {
+    const closing = deferred<Response>();
+    let closed = false;
+    const server = serve(() => (closed ? closing.promise : json(200, [poll()])));
+    render(
+      <>
+        <button>Другое действие</button>
+        <PollsScreen seasonId={seasonA} onSignedOut={vi.fn()} />
+      </>,
+    );
+    await screen.findByRole('heading', { name: firstQuestion });
+    await userEvent.click(radio('Стратегии'));
+    expect(radio('Стратегии')).toHaveFocus();
+    closed = true;
+    push(['poll-closed']);
+    await waitFor(() => {
+      expect(server.sent('GET', '/polls')).toHaveLength(2);
+    });
+    const otherAction = screen.getByRole('button', { name: 'Другое действие' });
+    await userEvent.click(otherAction);
+    closing.resolve(json(200, [poll({ status: 'closed', result: horrorId })]));
+
+    expect(await screen.findByText('Итог: Хорроры')).toBeVisible();
+    expect(otherAction).toHaveFocus();
   });
 
   it('uses server voting metadata instead of guessing availability from a poll source', async () => {
@@ -572,7 +642,9 @@ describe('the season polls screen (EV21/EV22/EV24/EV39)', () => {
     );
     const onSignedOut = vi.fn();
     const { rerender } = render(<PollsScreen seasonId={seasonA} onSignedOut={onSignedOut} />);
-    await waitFor(() => expect(server.sent('GET', '/polls')).toHaveLength(1));
+    await waitFor(() => {
+      expect(server.sent('GET', '/polls')).toHaveLength(1);
+    });
     rerender(<PollsScreen seasonId={seasonB} onSignedOut={onSignedOut} />);
     expect(await screen.findByRole('heading', { name: 'Вопрос другого сезона' })).toBeVisible();
 
@@ -613,7 +685,9 @@ describe('the season polls screen (EV21/EV22/EV24/EV39)', () => {
     await screen.findByRole('heading', { name: firstQuestion });
     await userEvent.click(radio('Стратегии'));
     await userEvent.click(screen.getByRole('button', { name: 'Голосовать' }));
-    await waitFor(() => expect(server.sent('POST', '/vote')).toHaveLength(1));
+    await waitFor(() => {
+      expect(server.sent('POST', '/vote')).toHaveLength(1);
+    });
     unmount();
 
     await act(async () => {

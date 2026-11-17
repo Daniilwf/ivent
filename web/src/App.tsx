@@ -9,6 +9,8 @@ import { onReopen, routeOf, usePath } from './app/router';
 import { UpdateBanner } from './app/WhatsNew';
 import { NotFoundPage } from './app/NotFound';
 import { Shell } from './app/Shell';
+import { answerOf, useLoaded } from './app/useLoaded';
+import { useSeasonVersion } from './app/useSeasonVersion';
 import { ru } from './i18n/ru';
 import { Button } from './ui/Button';
 import { EmptyState, ErrorState } from './ui/States';
@@ -27,6 +29,9 @@ const ProfileScreen = lazy(async () => ({
 const PoolScreen = lazy(async () => ({ default: (await import('./pool/PoolScreen')).PoolScreen }));
 const RulesScreen = lazy(async () => ({
   default: (await import('./rules/RulesScreen')).RulesScreen,
+}));
+const PollsScreen = lazy(async () => ({
+  default: (await import('./polls/PollsScreen')).PollsScreen,
 }));
 
 /** The admin's section of an address: none is the proof queue, an unknown one is «Такой страницы нет» */
@@ -57,12 +62,57 @@ function askCurrentSeason() {
 
 export function App() {
   const [state, setState] = useState<State>({ kind: 'loading' });
+  const [homeNavigation, setHomeNavigation] = useState<Schemas['SeasonNavigationView'] | null>(
+    null,
+  );
   const path = usePath();
   const route = routeOf(path);
 
   const signedOut = useCallback(() => {
     setState({ kind: 'signedOut' });
   }, []);
+
+  const navigationSeason =
+    state.kind === 'signedIn'
+      ? ((
+          (route.kind === 'feed' || route.kind === 'polls' ? route.seasonId : null) ??
+          state.seasonId
+        )?.toLowerCase() ?? null)
+      : null;
+  const showingHome =
+    state.kind === 'signedIn' &&
+    state.ownPassword !== path &&
+    (route.kind === 'season' || (route.kind === 'admin' && state.user.role !== 'admin'));
+  // The home view already refreshes on its own subscription and includes the flag.
+  if (!showingHome && homeNavigation !== null) setHomeNavigation(null);
+  const remoteNavigationSeason = showingHome ? null : navigationSeason;
+  const navigationVersion = useSeasonVersion(remoteNavigationSeason, {
+    refreshOnJoin: true,
+    relevant: (update) =>
+      update.seasonId.toLowerCase() === remoteNavigationSeason &&
+      update.types.some((type) => type === 'ruleset-changed' || type === 'command-undone'),
+  });
+  const loadNavigation = useCallback(async () => {
+    if (!remoteNavigationSeason) return { kind: 'loading' } as const;
+    return answerOf(
+      await api.GET('/api/seasons/{seasonId}/navigation', {
+        params: { path: { seasonId: remoteNavigationSeason } },
+      }),
+    );
+  }, [remoteNavigationSeason]);
+  const remoteNavigation = useLoaded(loadNavigation, {
+    version: navigationVersion,
+    onSignedOut: signedOut,
+  });
+  const navigation = showingHome
+    ? homeNavigation
+    : remoteNavigation.kind === 'ready'
+      ? remoteNavigation.value
+      : null;
+  const pollsSeasonId =
+    navigation?.id.toLowerCase() === navigationSeason && navigation.pollsEnabled
+      ? navigationSeason
+      : null;
 
   // A session ended elsewhere (another device, the admin, D-466): any 401 brings the sign-in form at once
   useEffect(() => {
@@ -85,8 +135,10 @@ export function App() {
     }
 
     const { data, response } = await (asked ?? askCurrentSeason());
-    if (data) setState({ kind: 'signedIn', user, seasonId: data.id });
-    else if (response.status === 404) setState({ kind: 'signedIn', user, seasonId: null });
+    if (data) {
+      setHomeNavigation(null);
+      setState({ kind: 'signedIn', user, seasonId: data.id });
+    } else if (response.status === 404) setState({ kind: 'signedIn', user, seasonId: null });
     else if (response.status === 401) setState({ kind: 'signedOut' });
     else setState({ kind: 'failed' });
   }, []);
@@ -198,6 +250,7 @@ export function App() {
       <Shell
         user={signedIn.user}
         seasonId={signedIn.seasonId}
+        pollsSeasonId={pollsSeasonId}
         onChangePassword={() => {
           setState({ ...signedIn, ownPassword: path });
         }}
@@ -260,6 +313,8 @@ export function App() {
           seasonId={(route.seasonId ?? signedIn.seasonId) as string}
           onSignedOut={signedOut}
         />
+      ) : route.kind === 'polls' && navigationSeason ? (
+        <PollsScreen key={navigationSeason} seasonId={navigationSeason} onSignedOut={signedOut} />
       ) : route.kind === 'pool' ? (
         <PoolScreen
           seasonId={signedIn.seasonId}
@@ -273,6 +328,7 @@ export function App() {
           seasonId={signedIn.seasonId}
           role={signedIn.user.role}
           onSignedOut={signedOut}
+          onNavigationLoaded={setHomeNavigation}
         />
       ) : (
         <main className="mx-auto grid max-w-110 px-4 py-10" data-testid="no-season">

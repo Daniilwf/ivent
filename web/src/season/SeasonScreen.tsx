@@ -31,6 +31,7 @@ import { TokenMove } from '../board/TokenMove';
 import { BranchChoice, branchTitle } from './BranchChoice';
 import { Leaderboard } from '../board/Leaderboard';
 import { FeedPreview } from '../feed/FeedPreview';
+import { GlobalEventBanner } from '../globalEvents/GlobalEventBanner';
 import { MapView, type MapApi } from '../board/MapView';
 import type { MomentHandle } from '../board/moment';
 import { WheelMoment, type WheelRoll } from '../board/Wheel';
@@ -171,11 +172,13 @@ export function SeasonScreen({
   seasonId,
   role = 'spectator',
   onSignedOut,
+  onNavigationLoaded,
 }: {
   seasonId: string;
   /** Who looks at the season: without a token of my own the turn card says why (K2-1) */
   role?: 'player' | 'admin' | 'spectator';
   onSignedOut: () => void;
+  onNavigationLoaded?: (navigation: Schemas['SeasonNavigationView']) => void;
 }) {
   const [season, setSeason] = useState<Season | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
@@ -280,9 +283,18 @@ export function SeasonScreen({
     [onSignedOut],
   );
 
+  const navigationId = season?.id;
+  const pollsEnabled = season?.pollsEnabled === true;
+  useEffect(() => {
+    if (navigationId) onNavigationLoaded?.({ id: navigationId, pollsEnabled });
+  }, [navigationId, onNavigationLoaded, pollsEnabled]);
+
   // Load now, after every committed command of the season (another player's move included), after every
   // reconnection to the hub (names and avatars live outside the season log) and after a catch-up (D-122).
-  const version = useSeasonVersion(seasonId);
+  const version = useSeasonVersion(seasonId, {
+    snapshotSequence:
+      season?.id.toLowerCase() === seasonId.toLowerCase() ? season.lastSequence : null,
+  });
   useEffect(() => {
     let active = true;
     void fetchSeason(seasonId).then((loaded) => {
@@ -1259,6 +1271,11 @@ export function SeasonScreen({
         <p className="text-sm text-ink-soft">{ru.board.rule}</p>
         <Leaderboard rows={shownRows} />
       </Panel>
+      {season.globalEvents?.length ? (
+        <div className="min-w-0 desk:col-start-1 desk:w-96">
+          <GlobalEventBanner events={season.globalEvents} />
+        </div>
+      ) : null}
       {/* Items on (D-441): my inventory under the map on a phone, under the leaderboard on a desktop (S4D-1: nothing goes
           between the turn and who leads), then the shop and the bets when they are on (D-447) — bets may play without
           items; a mechanic off is not shown at all */}

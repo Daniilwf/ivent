@@ -215,6 +215,7 @@ export function ChoiceGroup<T extends string>({
   value,
   onChange,
   disabled = false,
+  readOnly = false,
   checkMark = false,
   multiline = false,
   force,
@@ -223,10 +224,12 @@ export function ChoiceGroup<T extends string>({
 }: {
   label: string;
   hint?: string;
-  options: readonly { value: T; label: string }[];
+  options: readonly { value: T; label: string; description?: string }[];
   value: T;
   onChange: (value: T) => void;
   disabled?: boolean;
+  /** The choices are final information and need to remain readable when editing is unavailable. */
+  readOnly?: boolean;
   /** The picked pill wears a check besides its fill (S4D-17): an answer of a sheet, not a filter of a list */
   checkMark?: boolean;
   /** Longer answers keep their full text on a phone instead of widening the page. */
@@ -242,7 +245,7 @@ export function ChoiceGroup<T extends string>({
     <fieldset
       className={cx('grid min-w-0 gap-1', className)}
       aria-describedby={hint ? hintId : undefined}
-      disabled={disabled}
+      disabled={disabled || readOnly}
       {...rest}
     >
       <legend className="mb-1 max-w-full text-sm font-bold wrap-anywhere">{label}</legend>
@@ -252,17 +255,23 @@ export function ChoiceGroup<T extends string>({
         </span>
       ) : null}
       <div className="flex flex-wrap gap-2">
-        {options.map((option) => {
+        {options.map((option, index) => {
           const picked = option.value === value;
+          const optionLabelId = `${name}-option-${String(index)}-label`;
+          const descriptionId = `${name}-option-${String(index)}-description`;
           return (
             <label
               key={option.value}
               data-force={picked ? force : undefined}
               className={cx(
                 'inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-full border-2 border-ink px-4 text-base font-medium transition duration-(--duration-fast) select-none has-[:focus-visible]:focus-ring',
-                multiline ? 'max-w-full py-2 text-left wrap-anywhere' : 'whitespace-nowrap',
-                'has-[:disabled]:cursor-default has-[:disabled]:opacity-50',
-                picked ? 'bg-ink text-card' : 'bg-card text-ink is-hover:bg-page',
+                multiline || option.description
+                  ? 'max-w-full py-2 text-left wrap-anywhere'
+                  : 'whitespace-nowrap',
+                'has-[:disabled]:cursor-default',
+                !readOnly && 'has-[:disabled]:opacity-50',
+                picked ? 'bg-ink text-card' : 'bg-card text-ink',
+                !picked && !readOnly && 'is-hover:bg-page',
                 force?.includes('focus') && picked ? 'focus-ring' : undefined,
               )}
             >
@@ -271,6 +280,8 @@ export function ChoiceGroup<T extends string>({
                 name={name}
                 value={option.value}
                 checked={picked}
+                aria-labelledby={option.description ? optionLabelId : undefined}
+                aria-describedby={option.description ? descriptionId : undefined}
                 onChange={() => {
                   onChange(option.value);
                 }}
@@ -279,7 +290,16 @@ export function ChoiceGroup<T extends string>({
               {checkMark && picked ? (
                 <Check size={18} aria-hidden className="-ml-1 shrink-0" />
               ) : null}
-              {option.label}
+              {option.description ? (
+                <span className="grid min-w-0 gap-1">
+                  <span id={optionLabelId}>{option.label}</span>
+                  <span id={descriptionId} className="text-sm tabular-nums">
+                    {option.description}
+                  </span>
+                </span>
+              ) : (
+                option.label
+              )}
             </label>
           );
         })}
