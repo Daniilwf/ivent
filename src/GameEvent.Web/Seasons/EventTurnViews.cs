@@ -77,8 +77,12 @@ internal sealed class EventTurnViews(SeasonState? state, Guid playerId)
     /// <summary>The conditions a roll fixed on a run (D-507); none with events off or for an unknown run.</summary>
     public IReadOnlyList<RunConditionView> ConditionsOf(Guid runId) =>
         On && state!.Runs.TryGetValue(runId, out var run)
-            ? [.. run.Snapshot.Conditions.Select(c => Condition(c.ObjectId, c.Condition, c.Hostile, c.EventKind))]
+            ? ConditionsOf(run.Snapshot)
             : [];
+
+    /// <summary>The offered roll already fixed its conditions, before the player picks a starting difficulty.</summary>
+    public IReadOnlyList<RunConditionView> ConditionsOf(RunSnapshot snapshot) =>
+        On ? [.. snapshot.Conditions.Select(c => Condition(c.ObjectId, c.Condition, c.Hostile, c.EventKind))] : [];
 
     /// <summary>The check of a run's conditions; null for a run without any or with events off.</summary>
     public RunConditionCheckView? CheckOf(Guid runId) =>
@@ -96,27 +100,105 @@ internal sealed class EventTurnViews(SeasonState? state, Guid playerId)
             ? new IrlProofView(proof.Status, [.. proof.Files.Select(Files.FileLinkView.Of)], proof.Link, proof.Comment, proof.SubmittedAt)
             : null;
 
+    /// <summary>The games named by the current requestChoice, for one batched title lookup by its caller.</summary>
+    public IReadOnlyList<Guid> GameOptionIds(PendingChoice? choice)
+    {
+        if (SuspensionOf(choice) is not { } suspended
+            || ActionOf(suspended) is not RequestChoiceAction { Options.From: ChoiceSource.Games })
+        {
+            return [];
+        }
+
+        return [.. suspended.Options
+            .Select(o => Guid.TryParseExact(o.Id, "N", out var id) ? (Guid?)id : null)
+            .OfType<Guid>()
+            .Distinct()];
+    }
+
+    /// <summary>
+    /// An answer's name follows the question's source, never the shape of its id: a literal may look like a player's id.
+    /// Missing players, games and objects keep the answer's original id, which remains what the engine accepts.
+    /// </summary>
+    public string OptionLabel(PendingChoice choice, string optionId, IReadOnlyDictionary<Guid, string> gameTitles)
+    {
+        if (SuspensionOf(choice) is not { } suspended || !suspended.Options.Any(o => o.Id == optionId))
+        {
+            return optionId;
+        }
+
+        if (suspended.Step == SuspendedStep.Target)
+        {
+            return PlayerName(optionId);
+        }
+
+        return ActionOf(suspended) switch
+        {
+            RequestChoiceAction { Options.From: ChoiceSource.Players } => PlayerName(optionId),
+            RequestChoiceAction { Options.From: ChoiceSource.Games } when Guid.TryParseExact(optionId, "N", out var gameId)
+                => gameTitles.GetValueOrDefault(gameId, optionId),
+            TakeObjectAction { Pick: Pick.Chosen, All: false } take => ObjectName(suspended, take, optionId),
+            _ => optionId,
+        };
+    }
+
+    /// <summary>Only an actual chosen move gives its answers a direction; a literal «forward» stays a literal.</summary>
+    public ChoiceDirection? OptionDirection(PendingChoice choice, string optionId) =>
+        SuspensionOf(choice) is { } suspended && suspended.Options.Any(o => o.Id == optionId)
+            && ActionOf(suspended) is MoveAction { Direction: MoveDirection.Chosen }
+            ? optionId switch
+            {
+                "forward" => ChoiceDirection.Forward,
+                "back" => ChoiceDirection.Back,
+                _ => null,
+            }
+            : null;
+
     /// <summary>
     /// The question of a suspended event I am asked (D-511, D-822): the event and its prompt — the branch's question or the
     /// asking action's; null for a choice of another kind.
     /// </summary>
-    public (string ObjectId, string Name, string? Prompt)? QuestionOf(PendingChoice? choice)
+    public (string ObjectId, string Name, string? Prompt, string Description)? QuestionOf(PendingChoice? choice)
     {
-        if (choice is not { Kind: ChoiceKind.Effect } || state is null || !state.Players.TryGetValue(playerId, out var player)
-            || player.Suspended.FirstOrDefault(s => s.ChoiceId == choice.ChoiceId) is not { } suspended)
+        if (SuspensionOf(choice) is not { } suspended)
         {
             return null;
         }
 
-        var definition = state.Catalog.Find(suspended.ObjectId);
+        var definition = state!.Catalog.Find(suspended.ObjectId);
         var prompt = suspended.Step switch
         {
             SuspendedStep.Outcome => definition?.Effect?.Outcomes?.Choice?.Prompt,
-            SuspendedStep.Action when definition?.Effect is { } effect && suspended.NextAction - 1 is var at && at >= 0 && at < effect.Actions.Count
-                => (effect.Actions[at] as RequestChoiceAction)?.Prompt,
+            SuspendedStep.Action => (ActionOf(suspended) as RequestChoiceAction)?.Prompt,
             _ => null,
         };
-        return (suspended.ObjectId, definition?.Name ?? suspended.ObjectId, prompt);
+        return (suspended.ObjectId, definition?.Name ?? suspended.ObjectId, prompt, definition?.Description ?? "");
+    }
+
+    private SuspendedEffect? SuspensionOf(PendingChoice? choice) =>
+        choice is { Kind: ChoiceKind.Effect } && state is not null && state.Players.TryGetValue(playerId, out var player)
+            ? player.Suspended.FirstOrDefault(s => s.ChoiceId == choice.ChoiceId)
+            : null;
+
+    // Published events ask only in their top-level action list, never inside an outcomes case (D-511).
+    private ActionSpec? ActionOf(SuspendedEffect suspended) =>
+        suspended.Step == SuspendedStep.Action && state?.Catalog.Find(suspended.ObjectId)?.Effect is { } effect
+            && suspended.NextAction - 1 is var at && at >= 0 && at < effect.Actions.Count
+            ? effect.Actions[at]
+            : null;
+
+    private string PlayerName(string optionId) =>
+        Guid.TryParseExact(optionId, "N", out var id) && state is not null && state.Players.TryGetValue(id, out var player)
+            ? player.Name
+            : optionId;
+
+    private string ObjectName(SuspendedEffect suspended, TakeObjectAction action, string optionId)
+    {
+        // Giving always takes the user's own object; the other modes take from the action's self or effect target.
+        var owner = action.Mode == TakeMode.Give || action.Target == ActionTarget.Self ? playerId : suspended.TargetId ?? playerId;
+        return Guid.TryParseExact(optionId, "N", out var instanceId) && state is not null
+            && state.Players.TryGetValue(owner, out var player) && player.Wallet.Find(instanceId) is { } item
+            ? state.Catalog.Find(item.ObjectId)?.Name ?? optionId
+            : optionId;
     }
 
     private RunConditionView Condition(string objectId, ConditionSpec condition, bool hostile, EventKind? kind) =>

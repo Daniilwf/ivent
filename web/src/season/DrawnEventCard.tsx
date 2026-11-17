@@ -1,5 +1,6 @@
 import { m, useReducedMotion } from 'motion/react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import type { Schemas } from '../api/client';
 import { ru } from '../i18n/ru';
 import { Motion } from '../board/Motion';
@@ -23,18 +24,45 @@ const drawSeconds = 0.9;
  * while the page is open (`fresh`) comes off the deck and turns face up — a key moment (DESIGN.md «Движение»); a click
  * shows it at once, and with reduced motion it just stands there. Once it stands, it is an ordinary card.
  */
-export function DrawnEventCard({ drawn, fresh = false }: { drawn: Drawn; fresh?: boolean }) {
+export function DrawnEventCard({
+  drawn,
+  fresh = false,
+  waitingForAnswer = false,
+  headingId,
+  level = 4,
+  children,
+  onShown,
+}: {
+  drawn: Drawn;
+  fresh?: boolean;
+  waitingForAnswer?: boolean;
+  headingId?: string;
+  level?: 3 | 4;
+  children?: ReactNode;
+  onShown?: ((sequence: number) => void) | undefined;
+}) {
   const t = ru.events;
   const reduce = useReducedMotion() ?? false;
   const [skipped, setSkipped] = useState(false);
-  const animated = fresh && !reduce && !skipped;
+  // The sequence owns the moment: a live refresh must not restart or cut a draw already in progress.
+  const [freshOnMount] = useState(fresh);
+  const reported = useRef<number | null>(null);
+  useEffect(() => {
+    if (freshOnMount && reported.current !== drawn.sequence) {
+      reported.current = drawn.sequence;
+      onShown?.(drawn.sequence);
+    }
+  }, [freshOnMount, drawn.sequence, onShown]);
+  const animated = freshOnMount && !reduce && !skipped;
+  const titleId = headingId ?? `drawn-event-${String(drawn.sequence)}`;
+  const Heading = level === 3 ? 'h3' : 'h4';
   return (
     <Motion>
       <div className="perspective-distant">
         <m.article
           data-testid="drawn-event"
           data-drawing={animated ? 'true' : undefined}
-          aria-labelledby={`drawn-event-${String(drawn.sequence)}`}
+          aria-labelledby={titleId}
           className="grid min-w-0 gap-1 rounded-lg border-2 border-ink bg-card p-4"
           initial={animated ? { rotateY: -90, y: -24, scale: 0.92, opacity: 0 } : false}
           animate={{ rotateY: 0, y: 0, scale: 1, opacity: 1 }}
@@ -57,14 +85,16 @@ export function DrawnEventCard({ drawn, fresh = false }: { drawn: Drawn; fresh?:
             </span>
             <span className="text-ink-soft">{t.sources[drawn.source]}</span>
           </p>
-          <h4
-            id={`drawn-event-${String(drawn.sequence)}`}
-            className="font-display text-lg font-heavy break-words"
+          <Heading
+            id={titleId}
+            tabIndex={headingId ? -1 : undefined}
+            className="font-display text-lg font-heavy break-words focus:outline-none"
           >
             {drawn.name}
-          </h4>
+          </Heading>
           {drawn.description ? <p className="break-words">{drawn.description}</p> : null}
-          <p className="text-sm text-ink-soft">{t.played}</p>
+          <p className="text-sm text-ink-soft">{waitingForAnswer ? t.waitingAnswer : t.played}</p>
+          {children}
         </m.article>
       </div>
     </Motion>

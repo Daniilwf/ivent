@@ -12,6 +12,9 @@ import { CompletionMoment } from './CompletionMoment';
 import { AvatarSection } from './AvatarSection';
 import { ProofSection } from './ProofForm';
 import { DrawnEventCard } from './DrawnEventCard';
+import { EventChoice } from './EventChoice';
+import { WaitingEvents } from './WaitingEvents';
+import { RunConditions } from './RunConditions';
 import { ManualEffectItem, type EffectOutcome } from './ManualEffectItem';
 import { EconomySection } from './Inventory';
 import { RunActions } from './RunActions';
@@ -366,10 +369,29 @@ export function SeasonScreen({
   // An event drawn while the page is open is drawn on screen (a key moment); one drawn before it opened just stands
   // there. The first loaded view sets the base during render, so the new card mounts already knowing it is fresh.
   const drawnSequence = season?.me?.lastEvent?.sequence ?? null;
+  const eventQuestionId = season?.me?.choice?.kind === 'effect' ? season.me.choice.id : null;
+  const eventQuestionSeen = useRef<string | null | undefined>(undefined);
+  useEffect(() => {
+    if (thrown || walking) return;
+    if (
+      eventQuestionSeen.current !== undefined &&
+      eventQuestionId &&
+      eventQuestionId !== eventQuestionSeen.current
+    )
+      requestAnimationFrame(() =>
+        document.querySelector<HTMLElement>('[data-testid="event-choice"] h3')?.focus(),
+      );
+    if (season) eventQuestionSeen.current = eventQuestionId;
+  }, [eventQuestionId, season, thrown, walking]);
   const [drawBase, setDrawBase] = useState<{ sequence: number | null } | null>(null);
-  if (season && drawBase === null) setDrawBase({ sequence: drawnSequence });
-  const freshDraw =
-    drawBase !== null && drawnSequence !== null && drawnSequence !== drawBase.sequence;
+  const [shownDraws, setShownDraws] = useState<ReadonlySet<number>>(() => new Set());
+  const noteDrawShown = useCallback((sequence: number) => {
+    setShownDraws((shown) => (shown.has(sequence) ? shown : new Set([...shown, sequence])));
+  }, []);
+  if (season && drawBase === null) setDrawBase({ sequence: season.lastSequence });
+  const newDraw =
+    drawBase !== null && drawnSequence !== null && drawnSequence > (drawBase.sequence ?? 0);
+  const freshDraw = newDraw && !shownDraws.has(drawnSequence);
   const [retrying, setRetrying] = useState(false);
 
   if (loadFailed && !season)
@@ -394,15 +416,19 @@ export function SeasonScreen({
   if (!season) return <SeasonSkeleton />;
 
   const me = season.me;
+  const effectChoice = me?.choice?.kind === 'effect' ? me.choice : null;
+  const answerAllowed =
+    me?.eventsEnabled === true && (season.status === 'active' || season.status === 'closing');
   const waiting =
-    (me?.phase === 'rolling' && !me.offer && !me.choice) ||
-    (me?.phase === 'playing' && !me.activeRun);
+    !effectChoice &&
+    ((me?.phase === 'rolling' && !me.offer && !me.choice) ||
+      (me?.phase === 'playing' && !me.activeRun));
   const turnsOpen = season.status === 'active' && !pastDeadline;
   const choice =
     turnsOpen && me?.phase === 'rolling' && me.choice?.kind === 'game' ? me.choice : null;
   // A branch choice is part of a throw made before the deadline: it is answered after it too (D-305)
   const branch = me?.choice?.kind === 'branch' ? me.choice : null;
-  const offer = turnsOpen && me?.phase === 'rolling' ? me.offer : null;
+  const offer = turnsOpen && !effectChoice && me?.phase === 'rolling' ? me.offer : null;
   // A roll that came while the page is open spins its wheel first; the server chose everything, the page only shows it
   const fresh =
     (offer ?? choice) && me?.roll && landed !== undefined && me.roll.sequence > (landed ?? 0)
@@ -449,9 +475,12 @@ export function SeasonScreen({
 
   // The current step comes first — a roll waiting for my answer (H3) or the game I play (H4) — and the tails of the
   // last run fold under it
-  const stepFirst = Boolean(offer ?? choice) || (me?.phase === 'playing' && me.activeRun != null);
+  const stepFirst =
+    Boolean(effectChoice ?? offer ?? choice) || (me?.phase === 'playing' && me.activeRun != null);
+  // H2 keeps a manual task before the next roll; historical results and non-blocking IRL proofs stay below it.
+  const manualFirst = !stepFirst && me?.manualEffects.some((effect) => !effect.irl) === true;
   // The idle turn's main slot: a roll, or at the check limit the proof that opens it again
-  const rollSlot = me?.phase === 'idle' && turnsOpen && !throwing && !branch && !moving;
+  const rollSlot = me?.phase === 'idle' && turnsOpen && !throwing && !me.choice && !moving;
   /** Opens the proof form of a run on the card and puts the focus in it */
   const openProof = (runId: string) => {
     const fold = document.querySelector<HTMLDetailsElement>(`[data-proof-run="${runId}"]`);
@@ -461,7 +490,11 @@ export function SeasonScreen({
     (field ?? fold.querySelector('summary'))?.focus();
   };
   const afterRun =
-    me && (me.manualEffects.length > 0 || me.lastCompleted || me.lastEvent || checks.length > 0) ? (
+    me &&
+    (me.manualEffects.length > 0 ||
+      me.lastCompleted ||
+      (me.lastEvent && effectChoice?.objectId !== me.lastEvent.objectId) ||
+      checks.length > 0) ? (
       <section
         aria-labelledby="after-title"
         data-testid="after"
@@ -557,6 +590,13 @@ export function SeasonScreen({
                 )}
               </p>
             )}
+            {me.eventsEnabled === true ? (
+              <RunConditions
+                conditions={me.lastCompleted.conditions ?? null}
+                check={me.lastCompleted.conditionCheck ?? null}
+                resultNote={conditionResultNote(me.lastCompleted)}
+              />
+            ) : null}
             {/* The proof form folds into one line: it is not a to-do that holds the roll (H3 design review) */}
             <details
               data-testid="proof-details"
@@ -607,6 +647,13 @@ export function SeasonScreen({
                       ? ru.turn.checkRejected(run.game.title)
                       : ru.turn.checkWaiting(run.game.title, run.total)}
                   </p>
+                  {me.eventsEnabled === true ? (
+                    <RunConditions
+                      conditions={run.conditions ?? null}
+                      check={run.conditionCheck ?? null}
+                      resultNote={conditionResultNote(run)}
+                    />
+                  ) : null}
                   {run.status === 'rejected' ? (
                     <ProofSection
                       proof={run.proof ?? null}
@@ -643,8 +690,16 @@ export function SeasonScreen({
         )}
         {/* The event comes after the move that stopped on its cell: the card reads after the throw (design review) */}
         {/* Key moments one after another (DESIGN.md «Движение»): a fresh card waits for the token to stop */}
-        {me.lastEvent && !(freshDraw && moving) ? (
-          <DrawnEventCard key={me.lastEvent.sequence} drawn={me.lastEvent} fresh={freshDraw} />
+        {me.lastEvent &&
+        effectChoice?.objectId !== me.lastEvent.objectId &&
+        !(freshDraw && moving) ? (
+          <DrawnEventCard
+            key={me.lastEvent.sequence}
+            drawn={me.lastEvent}
+            fresh={freshDraw}
+            onShown={noteDrawShown}
+            waitingForAnswer={effectChoice?.objectId === me.lastEvent.objectId}
+          />
         ) : null}
       </section>
     ) : null;
@@ -917,7 +972,7 @@ export function SeasonScreen({
             {ru.turn.throwing(throwing.game.title)}
           </p>
         ) : null}
-        {stepFirst || throwing ? null : afterRun}
+        {manualFirst && !throwing ? afterRun : null}
         {waiting && (
           <div className="grid gap-2" aria-busy="true">
             <Skeleton className="h-6 w-2/3" />
@@ -967,9 +1022,34 @@ export function SeasonScreen({
           </div>
         )}
         {desk ? null : stage}
+        {effectChoice && !throwing && !moving ? (
+          <div className="grid min-w-0 gap-3">
+            <EventChoice
+              choice={effectChoice}
+              busy={pending}
+              disabled={!answerAllowed}
+              drawn={me?.lastEvent ?? null}
+              fresh={freshDraw}
+              onShown={noteDrawShown}
+              unavailableReason={
+                answerAllowed
+                  ? ''
+                  : finished
+                    ? ru.events.choice.closed
+                    : draft
+                      ? ru.events.choice.draft
+                      : ru.events.choice.paused
+              }
+              onChoose={(optionId) =>
+                void act({ kind: 'choose', choiceId: effectChoice.id, optionId })
+              }
+            />
+          </div>
+        ) : null}
         {choice && !spin && (
           <ChoiceCard
             choice={choice}
+            eventsEnabled={me?.eventsEnabled === true}
             roll={me?.roll ?? null}
             price={me?.nextReroll ?? null}
             coins={me?.coins ?? null}
@@ -984,6 +1064,7 @@ export function SeasonScreen({
         {offer && !spin && (
           <OfferCard
             offer={offer}
+            eventsEnabled={me?.eventsEnabled === true}
             roll={me?.roll ?? null}
             price={me?.nextReroll ?? null}
             coins={me?.coins ?? null}
@@ -999,7 +1080,7 @@ export function SeasonScreen({
         </p>
         {/* A card drawn while the page is open is said once, when it is drawn on screen */}
         <p className="sr-only" aria-live="polite" data-testid="draw-announce">
-          {freshDraw && !moving && me?.lastEvent
+          {newDraw && !moving && me?.lastEvent
             ? ru.events.announce(me.lastEvent.kind, me.lastEvent.name)
             : ''}
         </p>
@@ -1018,9 +1099,12 @@ export function SeasonScreen({
               total={routeLength}
               actions={null}
             />
+            {me.eventsEnabled === true ? (
+              <RunConditions conditions={me.activeRun.conditions ?? null} />
+            ) : null}
           </div>
         )}
-        {turnsOpen && me?.phase === 'playing' && me.activeRun && (
+        {turnsOpen && !effectChoice && me?.phase === 'playing' && me.activeRun && (
           <div className="grid min-w-0 gap-4">
             <CompleteForm
               needsHours={me.activeRun.game.hours == null}
@@ -1047,7 +1131,13 @@ export function SeasonScreen({
             />
           </div>
         )}
-        {stepFirst && !throwing ? afterRun : null}
+        {me?.eventsEnabled === true ? (
+          <WaitingEvents
+            events={me.waitingEvents ?? null}
+            conditions={me.waitingConditions ?? null}
+          />
+        ) : null}
+        {!manualFirst && !throwing ? afterRun : null}
       </section>
 
       <section
@@ -1267,6 +1357,17 @@ function SeasonSkeleton() {
       <Skeleton className="h-105 w-full rounded-lg desk:h-190" />
     </main>
   );
+}
+
+/** Describe the observed result: an ignored condition can still have dice; a rejected proof has separate penalties. */
+function conditionResultNote(run: Schemas['CompletedRunView']): string | null {
+  return run.status === 'completed' &&
+    run.conditionCheck?.met === false &&
+    !run.conditionCheck.waived &&
+    run.dice.length === 0 &&
+    run.challengeDice.length === 0
+    ? ru.runConditions.noDiceResult
+    : null;
 }
 
 // The longest delay setTimeout takes; a farther deadline is checked again when the timer fires.

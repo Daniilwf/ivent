@@ -12,6 +12,7 @@ import { Tag } from '../ui/Marks';
 import { GameMarks } from './GameMarks';
 import { RerollButton } from './RerollButton';
 import { Summary } from '../ui/Disclosure';
+import { RunConditions } from './RunConditions';
 
 type Offered = Schemas['OfferedGameView'];
 type Roll = Schemas['WheelRollView'];
@@ -111,6 +112,7 @@ export function OfferCard({
   price,
   coins = null,
   pending,
+  eventsEnabled = true,
   onStart,
   onAlreadyPlayed,
   onReroll,
@@ -120,6 +122,7 @@ export function OfferCard({
   price: Schemas['RerollPriceView'] | null;
   coins?: number | null;
   pending: boolean;
+  eventsEnabled?: boolean;
   onStart: (difficulty: Difficulty) => void;
   onAlreadyPlayed: () => void;
   onReroll: () => void;
@@ -149,6 +152,7 @@ export function OfferCard({
         </div>
       ) : null}
       <div className="col-span-2 grid gap-3">
+        {eventsEnabled ? <RunConditions conditions={offer.conditions ?? null} /> : null}
         <ChoiceGroup
           data-testid="start-difficulty"
           label={ru.turn.startDifficulty}
@@ -190,6 +194,7 @@ export function ChoiceCard({
   price,
   coins = null,
   pending,
+  eventsEnabled = true,
   onChoose,
   onAlreadyPlayed,
   onReroll,
@@ -199,6 +204,7 @@ export function ChoiceCard({
   price: Schemas['RerollPriceView'] | null;
   coins?: number | null;
   pending: boolean;
+  eventsEnabled?: boolean;
   /** The picked game starts at once (D-91), on the difficulty chosen above the cards (D-633) */
   onChoose: (optionId: string, difficulty: Difficulty) => void;
   onAlreadyPlayed: (gameId: string) => void;
@@ -236,6 +242,11 @@ export function ChoiceCard({
             // The ring goes round the whole card, «Уже проходил» included, not the button's half of it
             className="grid rounded-md border-2 border-ink bg-card has-[button[data-pick]:focus-visible]:focus-ring"
           >
+            {eventsEnabled && game.conditions?.length ? (
+              <div className="px-3 pt-3">
+                <RunConditions conditions={game.conditions} />
+              </div>
+            ) : null}
             {/* The card picks the game: a big target on a phone */}
             <button
               type="button"

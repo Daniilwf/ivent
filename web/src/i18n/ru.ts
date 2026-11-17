@@ -1126,6 +1126,29 @@ export const ru = {
       title: 'Вытянутый ивент',
       lead: 'Карточка ивента, который игрок вытянул последним: вид колоды, откуда он, название и текст. Ивент уже разыгран при вытягивании. Четыре вида, длинное название и ивент без текста.',
     },
+    eventChoice: {
+      title: 'Вопрос ивента',
+      lead: 'Один явный ответ: выбор сохраняется при обновлениях. Длинные варианты, отправка, пауза и отсутствие вариантов.',
+      demo: {
+        id: 'e5000000-0000-0000-0000-000000000001',
+        kind: 'effect' as const,
+        objectId: 'coin-or-step',
+        name: 'Монетки или шаг',
+        description: 'Сделай выбор: три монетки или шаг по карте без очков.',
+        prompt: 'Что берёшь?',
+        options: [
+          { id: 'монетки', label: 'Три монетки на покупку предмета в магазине', game: null },
+          { id: 'шаг', label: 'Шаг вперёд по карте без дополнительных очков', game: null },
+        ],
+      },
+    },
+    eventConditions: {
+      title: 'Ивенты и условия',
+      lead: 'Ожидания следующего хода, условия текущей игры и один общий результат проверки.',
+      name: 'Даже не вспотел',
+      waitingName: 'Попутный ветер',
+      waitingText: 'В следующем броске за прохождение на один кубик больше.',
+    },
     content: {
       title: 'Редактор контента',
       lead: 'Предмет в форме: ошибка схемы — у своего поля и в списке сверху со ссылкой «Перейти к полю». Ниже — как объекты увидят игроки.',
@@ -1369,6 +1392,18 @@ export const ru = {
   },
   // Events drawn from decks (stage 5, D-500): the card of the one I drew last
   events: {
+    waitingTitle: 'Накопленные ивенты',
+    waitingConditionsTitle: 'Условия следующей игры',
+    title: 'Ивент',
+    choice: {
+      prompt: 'Что выбираешь?',
+      answer: 'Ответить',
+      empty: 'Сейчас нет доступных вариантов. Обратись к админу.',
+      paused: 'Ивенты временно выключены. Ответить можно будет после включения.',
+      closed: 'Сезон завершён. На этот вопрос уже нельзя ответить.',
+      draft: 'Сезон ещё не начался. Ответить пока нельзя.',
+      directions: { forward: 'Вперёд', back: 'Назад' },
+    },
     kinds: eventKindNames,
     // Said once for a card drawn while the page is open, as the dice are
     announce: (kind: EventKind, name: string) => `Вытянут ${eventKindWords[kind]}: «${name}»`,
@@ -1382,6 +1417,16 @@ export const ru = {
       dropPenalty: 'за дроп',
     } as Record<'cell' | 'item' | 'difficulty' | 'incoming' | 'rerollCost' | 'dropPenalty', string>,
     played: 'Уже разыгран — дальше сработает сам.',
+    waitingAnswer: 'Ждёт твоего ответа.',
+  },
+  runConditions: {
+    noDiceResult: 'Кубиков за это прохождение нет.',
+    title: 'Условия прохождения',
+    atLeast: (label: string) => `Не ниже: ${label}`,
+    atMost: (label: string) => `Не выше: ${label}`,
+    met: 'Выполнено',
+    unmet: 'Нарушено',
+    waived: 'Не применимо',
   },
   effects: {
     title: 'Нужно разыграть',

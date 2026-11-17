@@ -216,6 +216,7 @@ export function ChoiceGroup<T extends string>({
   onChange,
   disabled = false,
   checkMark = false,
+  multiline = false,
   force,
   className,
   ...rest
@@ -228,6 +229,8 @@ export function ChoiceGroup<T extends string>({
   disabled?: boolean;
   /** The picked pill wears a check besides its fill (S4D-17): an answer of a sheet, not a filter of a list */
   checkMark?: boolean;
+  /** Longer answers keep their full text on a phone instead of widening the page. */
+  multiline?: boolean;
   /** Styleguide only: forces a state on the picked pill */
   force?: string;
   className?: string;
@@ -242,9 +245,9 @@ export function ChoiceGroup<T extends string>({
       disabled={disabled}
       {...rest}
     >
-      <legend className="mb-1 text-sm font-bold">{label}</legend>
+      <legend className="mb-1 max-w-full text-sm font-bold wrap-anywhere">{label}</legend>
       {hint ? (
-        <span id={hintId} className="text-sm text-ink-soft">
+        <span id={hintId} className="max-w-full text-sm text-ink-soft wrap-anywhere">
           {hint}
         </span>
       ) : null}
@@ -256,7 +259,8 @@ export function ChoiceGroup<T extends string>({
               key={option.value}
               data-force={picked ? force : undefined}
               className={cx(
-                'inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-full border-2 border-ink px-4 text-base font-medium whitespace-nowrap transition duration-(--duration-fast) select-none has-[:focus-visible]:focus-ring',
+                'inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-full border-2 border-ink px-4 text-base font-medium transition duration-(--duration-fast) select-none has-[:focus-visible]:focus-ring',
+                multiline ? 'max-w-full py-2 text-left wrap-anywhere' : 'whitespace-nowrap',
                 'has-[:disabled]:cursor-default has-[:disabled]:opacity-50',
                 picked ? 'bg-ink text-card' : 'bg-card text-ink is-hover:bg-page',
                 force?.includes('focus') && picked ? 'focus-ring' : undefined,
@@ -272,7 +276,9 @@ export function ChoiceGroup<T extends string>({
                 }}
                 className="sr-only"
               />
-              {checkMark && picked ? <Check size={18} aria-hidden className="-ml-1" /> : null}
+              {checkMark && picked ? (
+                <Check size={18} aria-hidden className="-ml-1 shrink-0" />
+              ) : null}
               {option.label}
             </label>
           );

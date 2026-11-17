@@ -14,6 +14,9 @@ import { ProofSection } from '../season/ProofForm';
 import { ChoiceCard, OfferCard } from '../season/RollResult';
 import { RunActions } from '../season/RunActions';
 import { DrawnEventCard } from '../season/DrawnEventCard';
+import { EventChoice } from '../season/EventChoice';
+import { RunConditions } from '../season/RunConditions';
+import { WaitingEvents } from '../season/WaitingEvents';
 import type { Schemas } from '../api/client';
 import { MyFinish } from '../season/MyFinish';
 import { Leaderboard } from '../board/Leaderboard';
@@ -66,6 +69,18 @@ import { BetsDemos, ShopDemos } from './EconomyDemos';
 const noop = () => undefined;
 
 const t = ru.styleguide;
+const eventChoiceDemo: Schemas['ChoiceView'] = {
+  ...t.eventChoice.demo,
+  options: [...t.eventChoice.demo.options],
+};
+const conditionDemo: Schemas['RunConditionView'] = {
+  objectId: 'not-even-sweating',
+  name: t.eventConditions.name,
+  kind: 'good',
+  hostile: false,
+  difficultyAtLeast: 'hard',
+  difficultyAtMost: null,
+};
 
 // The four kinds of decks, a long name and an event without text (stage 5)
 const drawnEvents: Schemas['DrawnEventView'][] = [
@@ -755,6 +770,50 @@ export function Styleguide() {
         <div className="grid items-start gap-4 desk:grid-cols-2">
           {drawnEvents.map((drawn) => (
             <DrawnEventCard key={drawn.sequence} drawn={drawn} />
+          ))}
+        </div>
+      </Section>
+
+      <Section id="event-choice" title={t.eventChoice.title} lead={t.eventChoice.lead}>
+        <div className="grid items-start gap-4 desk:grid-cols-2">
+          {[false, true].map((busy) => (
+            <EventChoice key={String(busy)} choice={eventChoiceDemo} busy={busy} onChoose={noop} />
+          ))}
+          <EventChoice
+            choice={eventChoiceDemo}
+            busy={false}
+            disabled
+            unavailableReason={ru.events.choice.paused}
+            onChoose={noop}
+          />
+          <EventChoice
+            choice={{ ...t.eventChoice.demo, options: [] }}
+            busy={false}
+            onChoose={noop}
+          />
+        </div>
+      </Section>
+
+      <Section id="event-conditions" title={t.eventConditions.title} lead={t.eventConditions.lead}>
+        <div className="grid items-start gap-4 desk:grid-cols-2">
+          <WaitingEvents
+            events={[
+              {
+                objectId: 'tailwind',
+                name: t.eventConditions.waitingName,
+                description: t.eventConditions.waitingText,
+                kind: 'good',
+              },
+            ]}
+            conditions={[conditionDemo]}
+          />
+          {[
+            null,
+            { met: true, waived: false },
+            { met: false, waived: false },
+            { met: true, waived: true },
+          ].map((check, i) => (
+            <RunConditions key={i} conditions={[conditionDemo]} check={check} />
           ))}
         </div>
       </Section>

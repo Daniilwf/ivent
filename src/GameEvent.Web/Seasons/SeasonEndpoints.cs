@@ -163,6 +163,8 @@ public sealed record PlayerView(Guid Id, string Name, string CellId, int Points,
 /// latest completed run is <c>lastCompleted</c> and never here (K1S-1, K1S-9, D-602). <c>waitingEvents</c> — my drawn events
 /// waiting for my future steps; <c>waitingConditions</c> — the conditions of events waiting for my next roll (D-821, D-823);
 /// both always set (empty with events off), optional for older clients.
+/// <c>eventsEnabled</c> — whether event answers and IRL proofs are open, including a question retained while off;
+/// <c>irlProofMaxFiles</c> — the current limit of pictures per IRL proof (zero allows a link only). Both always set.
 /// </summary>
 public sealed record MyTurnView(
     Guid PlayerId,
@@ -188,7 +190,9 @@ public sealed record MyTurnView(
     int? Coins = null,
     IReadOnlyList<CompletedRunView>? Checks = null,
     IReadOnlyList<WaitingEventView>? WaitingEvents = null,
-    IReadOnlyList<RunConditionView>? WaitingConditions = null);
+    IReadOnlyList<RunConditionView>? WaitingConditions = null,
+    bool? EventsEnabled = null,
+    int? IrlProofMaxFiles = null);
 
 /// <summary>The die a difficulty gives on completion, and the event it grants (<c>good</c>, <c>bad</c>) or none.</summary>
 public sealed record DifficultyDieView(Difficulty Difficulty, int Sides, EventKind? GrantEvent);
@@ -222,7 +226,7 @@ public sealed record DropPenaltyView(int Count, int Sides, bool AffectsPoints, b
 /// A game offered to the player, with the hours fixed at roll time, marks from other players (SPEC «Статусы игры») and
 /// the pool's cover, if it has one (D-222).
 /// </summary>
-public sealed record OfferedGameView(Guid Id, string Title, decimal? Hours, IReadOnlyList<GameMarkView> Marks, Files.FileLinkView? Cover = null);
+public sealed record OfferedGameView(Guid Id, string Title, decimal? Hours, IReadOnlyList<GameMarkView> Marks, Files.FileLinkView? Cover = null, IReadOnlyList<RunConditionView>? Conditions = null);
 
 /// <summary>Another player gave the game up this season: dropped or tech-rerolled it; the game is free again.</summary>
 public sealed record GameMarkView(string PlayerName, GameMarkKind Kind);
@@ -243,7 +247,7 @@ public sealed record RerollPriceView(RerollPayment Payment, int Coins);
 /// <c>irl</c> — the object asks for a media proof (D-509): only the admin resolves it, after the proof (<c>irlProof</c>, the
 /// owner's only; null before one is sent) or «не применимо» (D-820). Both always set, optional for older clients.
 /// </remarks>
-public sealed record ManualEffectView(Guid Id, EventKind DrawEvent, ManualEffectSource Source, string? ObjectId = null, bool Irl = false, IrlProofView? IrlProof = null);
+public sealed record ManualEffectView(Guid Id, EventKind DrawEvent, ManualEffectSource Source, string? ObjectId = null, bool Irl = false, IrlProofView? IrlProof = null, string? Name = null, string? Description = null);
 
 /// <summary>
 /// The pending choice, kept on the server: a reloaded page shows the same options (T2). A branch choice (D-304): each
@@ -251,9 +255,13 @@ public sealed record ManualEffectView(Guid Id, EventKind DrawEvent, ManualEffect
 /// of a suspended event (<c>effect</c>, D-511, D-822): <c>prompt</c> — its text, <c>objectId</c> and <c>name</c> — the event;
 /// an option's id is the answer sent back to <c>/choose</c> as it is (a list's text, a player's id).
 /// </summary>
-public sealed record ChoiceView(Guid Id, ChoiceKind Kind, IReadOnlyList<ChoiceOptionView> Options, int? Steps = null, string? Prompt = null, string? ObjectId = null, string? Name = null);
+public sealed record ChoiceView(Guid Id, ChoiceKind Kind, IReadOnlyList<ChoiceOptionView> Options, int? Steps = null, string? Prompt = null, string? ObjectId = null, string? Name = null, string? Description = null);
 
-public sealed record ChoiceOptionView(string Id, OfferedGameView? Game);
+/// <summary>The answer to a chosen move, not a direction guessed from a literal answer's text.</summary>
+public enum ChoiceDirection { Forward, Back }
+
+/// <summary>An option's raw id, optional game, data label and semantic move direction; the id is sent back unchanged.</summary>
+public sealed record ChoiceOptionView(string Id, OfferedGameView? Game, string? Label = null, ChoiceDirection? Direction = null);
 
 /// <summary>
 /// The player's latest completed run: <c>dice</c> — the dice by the hours, then the extra dice of items and events (the
@@ -664,7 +672,6 @@ public static class SeasonEndpoints
                 .Concat(choice?.Options.Select(o => o.Game?.GameId) ?? [])
                 .OfType<Guid>()
                 .ToList();
-            var games = await db.Games.AsNoTracking().Where(g => gameIds.Contains(g.Id)).ToDictionaryAsync(g => g.Id, ct);
 
             var coupons = JsonSerializer.Deserialize<ResourceBag>(mine.ResourcesJson, EngineJson.Options)[RerollPrice.FreeRerollsResource];
             var effects = await db.ManualEffects.AsNoTracking()
@@ -680,7 +687,19 @@ public static class SeasonEndpoints
                 ? await seasonStates.ReadAsync(db, seasonId, ct)
                 : null;
             var events = new EventTurnViews(state, mine.Id);
-            effects = [.. effects.Select(e => e with { Irl = events.IsIrl(e.Id), IrlProof = events.ProofOf(e.Id) })];
+            gameIds.AddRange(events.GameOptionIds(choice));
+            var games = await db.Games.AsNoTracking().Where(g => gameIds.Contains(g.Id)).ToDictionaryAsync(g => g.Id, ct);
+            var gameTitles = games.ToDictionary(g => g.Key, g => g.Value.Title);
+            var effectCards = effects.Any(e => e.ObjectId is not null)
+                ? await contentCards.OfAsync(db, seasonId, ct)
+                : new Dictionary<string, ObjectCard>();
+            effects = [.. effects.Select(e => e with
+            {
+                Irl = events.IsIrl(e.Id),
+                IrlProof = events.ProofOf(e.Id),
+                Name = e.ObjectId is { } objectId ? effectCards.GetValueOrDefault(objectId)?.Name ?? objectId : null,
+                Description = e.ObjectId is { } id ? effectCards.GetValueOrDefault(id)?.Description ?? "" : null,
+            })];
             var question = events.QuestionOf(choice);
             // D-134: the same count the engine checks (UncheckedRuns) — completed, the proof neither approved nor rejected;
             // the frozen first is never held
@@ -722,7 +741,7 @@ public static class SeasonEndpoints
                 .ToLookup(
                     x => x.GameId,
                     x => new GameMarkView(x.Name, x.Status == RunStatus.Dropped ? GameMarkKind.Dropped : GameMarkKind.TechRerolled));
-            OfferedGameView Offered(RollOffer o) => new(o.GameId, games[o.GameId].Title, o.Snapshot.Hours, [.. marks[o.GameId]], CoverOf(games[o.GameId]));
+            OfferedGameView Offered(RollOffer o) => new(o.GameId, games[o.GameId].Title, o.Snapshot.Hours, [.. marks[o.GameId]], CoverOf(games[o.GameId]), events.ConditionsOf(o.Snapshot));
 
             var playing = mine.Phase == TurnPhase.Playing && run is not null;
             var played = playing ? now - run!.StartedAt : TimeSpan.Zero;
@@ -750,11 +769,14 @@ public static class SeasonEndpoints
                 choice is null ? null : new ChoiceView(
                     choice.ChoiceId,
                     choice.Kind,
-                    [.. choice.Options.Select(o => new ChoiceOptionView(o.Id, o.Game is null ? null : Offered(o.Game)))],
+                    [.. choice.Options.Select(o => new ChoiceOptionView(o.Id, o.Game is null ? null : Offered(o.Game),
+                        choice.Kind == ChoiceKind.Effect ? events.OptionLabel(choice, o.Id, gameTitles) : null,
+                        choice.Kind == ChoiceKind.Effect ? events.OptionDirection(choice, o.Id) : null))],
                     choice.Move?.Steps,
                     question?.Prompt,
                     question?.ObjectId,
-                    question?.Name),
+                    question?.Name,
+                    question?.Description),
                 mine.Phase == TurnPhase.Rolling ? new RerollPriceView(price.Payment, price.Coins) : null,
                 run is null
                     ? null
@@ -801,7 +823,9 @@ public static class SeasonEndpoints
                 mine.Coins,
                 checks,
                 events.WaitingEvents(),
-                events.WaitingConditions());
+                events.WaitingConditions(),
+                rules.Features.Events,
+                rules.Events?.IrlProof?.MaxFiles ?? 0);
         }
 
         // Avatars live on the accounts, across seasons (SPEC «Сезоны»)

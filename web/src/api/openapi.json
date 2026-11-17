@@ -11227,6 +11227,12 @@
         },
         "description": "A new ruleset from the admin's editor: the whole document, the version it was edited from, and a command id\ngenerated once per save."
       },
+      "ChoiceDirection": {
+        "enum": [
+          "forward",
+          "back"
+        ]
+      },
       "ChoiceKind": {
         "enum": [
           "game",
@@ -11254,8 +11260,25 @@
                 "$ref": "#/components/schemas/OfferedGameView"
               }
             ]
+          },
+          "label": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "direction": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ChoiceDirection"
+              }
+            ]
           }
-        }
+        },
+        "description": "An option's raw id, optional game, data label and semantic move direction; the id is sent back unchanged."
       },
       "ChoiceView": {
         "required": [
@@ -11298,6 +11321,12 @@
             ]
           },
           "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "description": {
             "type": [
               "null",
               "string"
@@ -14279,6 +14308,18 @@
                 "$ref": "#/components/schemas/IrlProofView"
               }
             ]
+          },
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         },
         "description": "A manual effect the player still has to play out (D-10, D-93); the player resolves it (D-102)."
@@ -14769,9 +14810,22 @@
             "items": {
               "$ref": "#/components/schemas/RunConditionView"
             }
+          },
+          "eventsEnabled": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "irlProofMaxFiles": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
           }
         },
-        "description": "The signed-in player's own turn. While playing: `dropHintMinutes` is `roll.minPlayMinutesBeforeDrop` until\nthat much has been played by the server clock (only a hint: D-09), then null; `dropPenalty` is what a drop costs\nunder the rules in force; `techRerollOpen` says whether the player may still tech-reroll themselves (D-94);\n`challengesEnabled` says whether a challenge may be claimed on completion (`features.challenges`, D-96);\n`techRerollUntil` is when the player's own tech reroll window closes (the roll time plus the run's snapshot of\n`roll.techRerollWindowHours`), null while not playing. The active run's game carries the hours of the roll's\nsnapshot, the ones the completion counts (D-44): the pool may have got hours since (D-138). `difficultyDice` —\nwhile playing, the die each difficulty gives under the run's snapshot and the event it grants, if any.\n`dropPenalty.count` counts the extra dice of the drops in a row before this run (D-205, D-324).\n`wishRerollOpen` — whether the player may give the game up by wish now (D-206, D-325; always set, optional for older clients): a tech reroll with the\nreason `wish`, within the window, for a game with a listed tag the roll did not impose.\n`lastEvent` — the event I drew last (stage 5), while `features.events` is on; null before the first draw.\n`coins` — my balance, what a paid reroll spends (K1S-3). `checks` — my other runs that still take a proof\n(completed, the proof neither approved nor rejected) and the runs rejected since my latest roll, newest first; the\nlatest completed run is `lastCompleted` and never here (K1S-1, K1S-9, D-602). `waitingEvents` — my drawn events\nwaiting for my future steps; `waitingConditions` — the conditions of events waiting for my next roll (D-821, D-823);\nboth always set (empty with events off), optional for older clients."
+        "description": "The signed-in player's own turn. While playing: `dropHintMinutes` is `roll.minPlayMinutesBeforeDrop` until\nthat much has been played by the server clock (only a hint: D-09), then null; `dropPenalty` is what a drop costs\nunder the rules in force; `techRerollOpen` says whether the player may still tech-reroll themselves (D-94);\n`challengesEnabled` says whether a challenge may be claimed on completion (`features.challenges`, D-96);\n`techRerollUntil` is when the player's own tech reroll window closes (the roll time plus the run's snapshot of\n`roll.techRerollWindowHours`), null while not playing. The active run's game carries the hours of the roll's\nsnapshot, the ones the completion counts (D-44): the pool may have got hours since (D-138). `difficultyDice` —\nwhile playing, the die each difficulty gives under the run's snapshot and the event it grants, if any.\n`dropPenalty.count` counts the extra dice of the drops in a row before this run (D-205, D-324).\n`wishRerollOpen` — whether the player may give the game up by wish now (D-206, D-325; always set, optional for older clients): a tech reroll with the\nreason `wish`, within the window, for a game with a listed tag the roll did not impose.\n`lastEvent` — the event I drew last (stage 5), while `features.events` is on; null before the first draw.\n`coins` — my balance, what a paid reroll spends (K1S-3). `checks` — my other runs that still take a proof\n(completed, the proof neither approved nor rejected) and the runs rejected since my latest roll, newest first; the\nlatest completed run is `lastCompleted` and never here (K1S-1, K1S-9, D-602). `waitingEvents` — my drawn events\nwaiting for my future steps; `waitingConditions` — the conditions of events waiting for my next roll (D-821, D-823);\nboth always set (empty with events off), optional for older clients.\n`eventsEnabled` — whether event answers and IRL proofs are open, including a question retained while off;\n`irlProofMaxFiles` — the current limit of pictures per IRL proof (zero allows a link only). Both always set."
       },
       "NominationRules": {
         "required": [
@@ -14836,6 +14890,15 @@
                 "$ref": "#/components/schemas/FileLinkView"
               }
             ]
+          },
+          "conditions": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/RunConditionView"
+            }
           }
         },
         "description": "A game offered to the player, with the hours fixed at roll time, marks from other players (SPEC «Статусы игры») and\nthe pool's cover, if it has one (D-222)."

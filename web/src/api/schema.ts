@@ -10271,14 +10271,19 @@ export interface components {
             expectedVersion: number;
             ruleset: components["schemas"]["Ruleset"];
         };
+        /** @enum {unknown} */
+        ChoiceDirection: "forward" | "back";
         /**
          * @description What the player is choosing (K-5): a game, a branch at a fork, the answer of an event (D-511).
          * @enum {unknown}
          */
         ChoiceKind: "game" | "branch" | "effect";
+        /** @description An option's raw id, optional game, data label and semantic move direction; the id is sent back unchanged. */
         ChoiceOptionView: {
             id: string;
             game: null | components["schemas"]["OfferedGameView"];
+            label?: null | string;
+            direction?: null | components["schemas"]["ChoiceDirection"];
         };
         /**
          * @description The pending choice, kept on the server: a reloaded page shows the same options (T2). A branch choice (D-304): each
@@ -10296,6 +10301,7 @@ export interface components {
             prompt?: null | string;
             objectId?: null | string;
             name?: null | string;
+            description?: null | string;
         };
         /**
          * @description An answer to the pending choice: its id and the picked option's id; for a game, `difficulty` — the one it starts on
@@ -11359,6 +11365,8 @@ export interface components {
             /** @default false */
             irl: boolean;
             irlProof?: null | components["schemas"]["IrlProofView"];
+            name?: null | string;
+            description?: null | string;
         };
         /**
          * @description The picture under the map (D-277): an uploaded map background (`POST …/map/background`) and its natural size in
@@ -11479,6 +11487,8 @@ export interface components {
          *     latest completed run is `lastCompleted` and never here (K1S-1, K1S-9, D-602). `waitingEvents` — my drawn events
          *     waiting for my future steps; `waitingConditions` — the conditions of events waiting for my next roll (D-821, D-823);
          *     both always set (empty with events off), optional for older clients.
+         *     `eventsEnabled` — whether event answers and IRL proofs are open, including a question retained while off;
+         *     `irlProofMaxFiles` — the current limit of pictures per IRL proof (zero allows a link only). Both always set.
          */
         MyTurnView: {
             /** Format: uuid */
@@ -11509,6 +11519,9 @@ export interface components {
             checks?: null | components["schemas"]["CompletedRunView"][];
             waitingEvents?: null | components["schemas"]["WaitingEventView"][];
             waitingConditions?: null | components["schemas"]["RunConditionView"][];
+            eventsEnabled?: null | boolean;
+            /** Format: int32 */
+            irlProofMaxFiles?: null | number;
         };
         NominationRules: {
             auto: components["schemas"]["EquatableArrayOfAutoNomination"];
@@ -11531,6 +11544,7 @@ export interface components {
             hours: null | number;
             marks: components["schemas"]["GameMarkView"][];
             cover?: null | components["schemas"]["FileLinkView"];
+            conditions?: null | components["schemas"]["RunConditionView"][];
         };
         /** @description The rules of the partner board (SPEC «Взаимодействие игроков», D-524). */
         PartnerBoardRules: {
@@ -12682,6 +12696,7 @@ export const betStatusValues: ReadonlyArray<FlattenedDeepRequired<components>["s
 export const bugReportStatusValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["BugReportStatus"]> = ["new", "inWork", "closed"];
 export const cellTypeValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["CellType"]> = ["start", "empty", "finish", "fork", "teleport", "checkpoint", "pointsBonus", "event", "shop"];
 export const challengeCheckValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ChallengeCheck"]> = ["auto", "manual"];
+export const choiceDirectionValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ChoiceDirection"]> = ["forward", "back"];
 export const choiceKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ChoiceKind"]> = ["game", "branch", "effect"];
 export const coopRoundUpForValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["CoopRoundUpFor"]> = ["roller"];
 export const diceStageValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["DiceStage"]> = ["count", "sides", "add", "multiply", "reroll", "min", "max", "singleDie", "setOne", "replaceValue", "fixAverage", "bonusPerEven", "percent"];
