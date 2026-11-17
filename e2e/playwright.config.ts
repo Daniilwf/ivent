@@ -72,12 +72,15 @@ export default defineConfig({
     {
       name: 'desktop-late',
       testMatch: late,
+      // Keep the speed measurements free from other scenarios in this project too.
+      workers: 1,
       dependencies: ['desktop', 'phone'],
       use: desktop,
     },
     {
       name: 'phone-late',
       testMatch: late,
+      workers: 1,
       dependencies: ['desktop-late'],
       use: phone,
     },
