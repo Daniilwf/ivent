@@ -125,7 +125,11 @@ public sealed record SeasonView(
     MapMode MapMode,
     MapBackgroundView? Background = null,
     EconomyFeaturesView? Economy = null,
-    IReadOnlyList<GameEvent.Web.GlobalEvents.GlobalEventView>? GlobalEvents = null);
+    IReadOnlyList<GameEvent.Web.GlobalEvents.GlobalEventView>? GlobalEvents = null,
+    bool? PollsEnabled = null);
+
+/// <summary>The selected season's navigation flags, without its map, players or folded event state.</summary>
+public sealed record SeasonNavigationView(Guid Id, bool PollsEnabled);
 
 /// <summary>
 /// Which economy mechanics the season plays (D-441): a mechanic off is not shown at all; always set, optional for older
@@ -325,6 +329,11 @@ public static class SeasonEndpoints
         // The view folds the season's events when they matter (D-824): a cached fold caught up per read (D-828), and a
         // limit per user against a loop
         seasons.MapGet("/", GetSeasonAsync)
+            .RequireRateLimiting(AppSetup.SeasonViewRateLimit)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
+
+        seasons.MapGet("/navigation", GetNavigationAsync)
             .RequireRateLimiting(AppSetup.SeasonViewRateLimit)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status429TooManyRequests);
@@ -617,6 +626,22 @@ public static class SeasonEndpoints
             outcome.Warnings));
     }
 
+    private static async Task<Results<Ok<SeasonNavigationView>, NotFound>> GetNavigationAsync(
+        Guid seasonId, GameEventDbContext db, CancellationToken ct)
+    {
+        var json = await db.Seasons.AsNoTracking()
+            .Where(s => s.Id == seasonId)
+            .Select(s => s.RulesetJson)
+            .SingleOrDefaultAsync(ct);
+        if (json is null)
+        {
+            return TypedResults.NotFound();
+        }
+
+        var rules = JsonSerializer.Deserialize<Ruleset>(json, EngineJson.Options)!;
+        return TypedResults.Ok(new SeasonNavigationView(seasonId, rules.Features.Polls));
+    }
+
     private static async Task<Results<Ok<SeasonView>, NotFound>> GetSeasonAsync(
         Guid seasonId, ClaimsPrincipal user, GameEventDbContext db, ContentCards contentCards, SeasonStateReader seasonStates, IClock clock, CancellationToken ct)
     {
@@ -845,7 +870,8 @@ public static class SeasonEndpoints
             rules.Features.MapMode,
             await SeasonMaps.BackgroundAsync(db, map, ct),
             new EconomyFeaturesView(rules.Features.Items, rules.Features.Shop, rules.Features.Bets),
-            await GameEvent.Web.GlobalEvents.GlobalEventEndpoints.BannerAsync(db, seasonId, rules.Features.GlobalEvents, clock.UtcNow, ct)));
+            await GameEvent.Web.GlobalEvents.GlobalEventEndpoints.BannerAsync(db, seasonId, rules.Features.GlobalEvents, clock.UtcNow, ct),
+            rules.Features.Polls));
     }
 
     private static readonly string s_completedType = EventCatalog.Describe(typeof(RunCompleted)).Name;

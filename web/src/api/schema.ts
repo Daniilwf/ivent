@@ -375,6 +375,68 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/seasons/{seasonId}/navigation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SeasonNavigationView"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Too Many Requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/seasons/{seasonId}/roll": {
         parameters: {
             query?: never;
@@ -11650,7 +11712,8 @@ export interface components {
          * @description A poll as everyone sees it (D-830, D-831): the snapshot of its options, who votes, whether it is anonymous, its status
          *     and term. `counts` — the votes per option, only while the poll shows live counts or once it is closed (D-541);
          *     `result` — the option that won, after the close; `myVote` — the signed-in user's own vote, null to anyone
-         *     else. No answer names a voter.
+         *     else. No answer names a voter. `voting` describes whether the current session may cast a new or different vote;
+         *     posting the option already held remains a refusal.
          */
         PollView: {
             /** Format: uuid */
@@ -11668,9 +11731,16 @@ export interface components {
             result: null | string;
             myVote: null | string;
             source: components["schemas"]["PollSource"];
+            voting?: null | components["schemas"]["PollVotingView"];
         };
         /** @enum {unknown} */
         PollVoters: "players" | "everyone";
+        /** @description The signed-in user's current voting availability; a later POST still checks the authoritative rules. */
+        PollVotingView: {
+            canVote: boolean;
+            reason: null | string;
+            allowChangeVote: boolean;
+        };
         PoolActionRequest: {
             /** Format: uuid */
             commandId: string;
@@ -12205,6 +12275,12 @@ export interface components {
             /** Format: date-time */
             createdAt: string;
         };
+        /** @description The selected season's navigation flags, without its map, players or folded event state. */
+        SeasonNavigationView: {
+            /** Format: uuid */
+            id: string;
+            pollsEnabled: boolean;
+        };
         SeasonRules: {
             timezone: string;
             /** Format: int32 */
@@ -12265,6 +12341,7 @@ export interface components {
             background?: null | components["schemas"]["MapBackgroundView"];
             economy?: null | components["schemas"]["EconomyFeaturesView"];
             globalEvents?: null | components["schemas"]["GlobalEventView"][];
+            pollsEnabled?: null | boolean;
         };
         /**
          * @description A live session of the signed-in user (D-466): `userAgent` — the browser's own description at the sign-in, which

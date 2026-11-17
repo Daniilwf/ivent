@@ -4,7 +4,6 @@ using System.Text.Json.Nodes;
 using GameEvent.Engine.Finish;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Rulesets;
-using GameEvent.Engine.Seasons;
 using GameEvent.Infrastructure.Database;
 using GameEvent.Infrastructure.Queue;
 using GameEvent.Web.Accounts;
@@ -75,9 +74,10 @@ public static class RulesEndpoints
 
     private static async Task<Results<Ok<RulesView>, NotFound>> GetRulesAsync(Guid seasonId, GameEventDbContext db, CancellationToken ct)
     {
-        var rows = await db.Events.AsNoTracking()
-            .Where(e => e.SeasonId == seasonId && (e.Type == "season-created" || e.Type == "ruleset-changed"))
-            .OrderBy(e => e.Sequence)
+        // The projection keeps every version, including one restored by a compensating command-undone event.
+        var rows = await db.Rulesets.AsNoTracking()
+            .Where(r => r.SeasonId == seasonId)
+            .OrderBy(r => r.Version)
             .ToListAsync(ct);
         if (rows.Count == 0)
         {
@@ -89,16 +89,12 @@ public static class RulesEndpoints
         var version = 0;
         foreach (var row in rows)
         {
-            var (number, ruleset) = EventCodec.Decode(new StoredEvent(row.Type, row.Version, row.Data)) switch
-            {
-                SeasonCreated created => (1, created.Ruleset),
-                RulesetChanged changed => (changed.Version, changed.Ruleset),
-                var other => throw new InvalidOperationException($"Unexpected event {other.GetType().Name}."),
-            };
+            // Stored rules keep the log's lenient format; strict RulesetJson parsing is for new admin input.
+            var ruleset = JsonSerializer.Deserialize<Ruleset>(row.Json, EngineJson.Options)!;
             history.Add(new RulesVersionView(
-                number, row.OccurredAt, row.AuthorId, previous is null ? [] : RulesetDiff.Between(previous, ruleset)));
+                row.Version, row.CreatedAt, row.AuthorId, previous is null ? [] : RulesetDiff.Between(previous, ruleset)));
             previous = ruleset;
-            version = number;
+            version = row.Version;
         }
 
         history.Reverse(); // newest first

@@ -281,6 +281,59 @@
         }
       }
     },
+    "/api/seasons/{seasonId}/navigation": {
+      "get": {
+        "tags": [
+          "Seasons"
+        ],
+        "parameters": [
+          {
+            "name": "seasonId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SeasonNavigationView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/seasons/{seasonId}/roll": {
       "post": {
         "tags": [
@@ -15219,15 +15272,48 @@
           },
           "source": {
             "$ref": "#/components/schemas/PollSource"
+          },
+          "voting": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PollVotingView"
+              }
+            ]
           }
         },
-        "description": "A poll as everyone sees it (D-830, D-831): the snapshot of its options, who votes, whether it is anonymous, its status\nand term. `counts` — the votes per option, only while the poll shows live counts or once it is closed (D-541);\n`result` — the option that won, after the close; `myVote` — the signed-in user's own vote, null to anyone\nelse. No answer names a voter."
+        "description": "A poll as everyone sees it (D-830, D-831): the snapshot of its options, who votes, whether it is anonymous, its status\nand term. `counts` — the votes per option, only while the poll shows live counts or once it is closed (D-541);\n`result` — the option that won, after the close; `myVote` — the signed-in user's own vote, null to anyone\nelse. No answer names a voter. `voting` describes whether the current session may cast a new or different vote;\nposting the option already held remains a refusal."
       },
       "PollVoters": {
         "enum": [
           "players",
           "everyone"
         ]
+      },
+      "PollVotingView": {
+        "required": [
+          "canVote",
+          "reason",
+          "allowChangeVote"
+        ],
+        "type": "object",
+        "properties": {
+          "canVote": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "allowChangeVote": {
+            "type": "boolean"
+          }
+        },
+        "description": "The signed-in user's current voting availability; a later POST still checks the authoritative rules."
       },
       "PoolActionRequest": {
         "required": [
@@ -16941,6 +17027,23 @@
         },
         "description": "A season in the list everyone signed in sees: newest first."
       },
+      "SeasonNavigationView": {
+        "required": [
+          "id",
+          "pollsEnabled"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "pollsEnabled": {
+            "type": "boolean"
+          }
+        },
+        "description": "The selected season's navigation flags, without its map, players or folded event state."
+      },
       "SeasonRules": {
         "required": [
           "timezone",
@@ -17142,6 +17245,12 @@
             "items": {
               "$ref": "#/components/schemas/GlobalEventView"
             }
+          },
+          "pollsEnabled": {
+            "type": [
+              "null",
+              "boolean"
+            ]
           }
         },
         "description": "The season screen's data. `status` and `deadline` (UTC; the screen shows it in Moscow time) follow the\nlifecycle (D-101); after the finish `leaderboard` is the recorded result. The map is the one in force (the\nlatest published, D-300): `cells`, `edges` and `zones`; `mapMode` says whether the season plays\non the linear chain of stage 1 or on the graph (D-301); `background` — the picture under the cells, null when\nthe map has none or its file is not on this site (D-277). `globalEvents` — the banner of the global events running\nnow (D-832; always set, empty while the mechanic is off, optional for older clients)."
