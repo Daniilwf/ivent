@@ -17,6 +17,8 @@ import { DrawnEventCard } from '../season/DrawnEventCard';
 import { EventChoice } from '../season/EventChoice';
 import { RunConditions } from '../season/RunConditions';
 import { WaitingEvents } from '../season/WaitingEvents';
+import { IrlProofSection } from '../season/IrlProofSection';
+import { DrawnEventHistory } from '../season/DrawnEventHistory';
 import type { Schemas } from '../api/client';
 import { MyFinish } from '../season/MyFinish';
 import { Leaderboard } from '../board/Leaderboard';
@@ -80,6 +82,32 @@ const conditionDemo: Schemas['RunConditionView'] = {
   hostile: false,
   difficultyAtLeast: 'hard',
   difficultyAtMost: null,
+};
+const irlDemo: Schemas['ManualEffectView'] = {
+  id: 'e5000000-0000-0000-0000-000000000301',
+  objectId: 'karaoke',
+  name: t.irl.name,
+  description: t.irl.description,
+  drawEvent: 'bad',
+  source: 'event',
+  irl: true,
+  irlProof: null,
+};
+const irlPending: Schemas['IrlProofView'] = {
+  status: 'pending',
+  files: [...demoProofFiles.slice(0, 1)],
+  link: 'https://example.com/watch?v=karaoke',
+  comment: null,
+  submittedAt: '2026-11-17T12:00:00Z',
+};
+const historyDemo: Schemas['DrawnEventView'] = {
+  sequence: 501,
+  deck: 'good',
+  kind: 'good',
+  objectId: 'tailwind',
+  name: t.eventConditions.waitingName,
+  description: t.eventConditions.waitingText,
+  source: 'cell',
 };
 
 // The four kinds of decks, a long name and an event without text (stage 5)
@@ -815,6 +843,80 @@ export function Styleguide() {
           ].map((check, i) => (
             <RunConditions key={i} conditions={[conditionDemo]} check={check} />
           ))}
+        </div>
+      </Section>
+
+      <Section id="irl-proof" title={t.irl.title} lead={t.irl.lead}>
+        <div className="grid items-start gap-4 desk:grid-cols-2">
+          <Panel title={t.irl.cases.empty}>
+            <IrlProofSection
+              effect={irlDemo}
+              maxFiles={2}
+              pending={false}
+              enabled
+              onSubmit={noop}
+            />
+          </Panel>
+          <Panel title={t.irl.cases.linkOnly}>
+            <IrlProofSection
+              effect={irlDemo}
+              maxFiles={0}
+              pending={false}
+              enabled
+              onSubmit={noop}
+            />
+          </Panel>
+          <Panel title={t.irl.cases.submitting}>
+            <IrlProofSection effect={irlDemo} maxFiles={2} pending enabled onSubmit={noop} />
+          </Panel>
+          <Panel title={t.irl.cases.pending}>
+            <IrlProofSection
+              effect={{ ...irlDemo, irlProof: irlPending }}
+              maxFiles={2}
+              pending={false}
+              enabled
+              onSubmit={noop}
+            />
+          </Panel>
+          <Panel title={t.irl.cases.rejected}>
+            <IrlProofSection
+              effect={{
+                ...irlDemo,
+                irlProof: { ...irlPending, status: 'rejected', comment: t.irl.comment },
+              }}
+              maxFiles={2}
+              pending={false}
+              enabled
+              onSubmit={noop}
+            />
+          </Panel>
+          <Panel title={t.irl.cases.paused}>
+            <IrlProofSection
+              effect={irlDemo}
+              maxFiles={2}
+              pending={false}
+              enabled={false}
+              unavailableReason={ru.irlProof.paused}
+              onSubmit={noop}
+            />
+          </Panel>
+        </div>
+      </Section>
+
+      <Section id="event-history" title={t.eventHistory.title} lead={t.eventHistory.lead}>
+        <div className="grid items-start gap-4 desk:grid-cols-2">
+          <DrawnEventHistory
+            drawn={historyDemo}
+            fresh={false}
+            initiallyOpen={false}
+            onShown={noop}
+          />
+          <DrawnEventHistory
+            drawn={{ ...historyDemo, sequence: 502 }}
+            fresh={false}
+            initiallyOpen
+            onShown={noop}
+          />
         </div>
       </Section>
 

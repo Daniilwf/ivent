@@ -213,7 +213,8 @@ test('waiting events and conditions follow the roll and show one completion resu
       path: designShot(`s5-21-waiting-${info.project.name}.png`),
       fullPage: true,
     });
-    await owner.post(`${path}/roll`);
+    await page.getByTestId('roll').click();
+    await expect(page.getByTestId('offer').or(page.getByTestId('choice'))).toBeVisible(live);
     const rolled = await seasonOf(owner, world.seasonId);
     if (rolled.me?.choice?.kind === 'game') {
       const option = rolled.me.choice.options.find((candidate) => candidate.game);
@@ -227,7 +228,7 @@ test('waiting events and conditions follow the roll and show one completion resu
       path: designShot(`s5-21-offer-conditions-${info.project.name}.png`),
       fullPage: true,
     });
-    await owner.post(`${path}/start`);
+    await page.getByTestId('start').click();
     const active = page.getByTestId('active-run');
     await expect(active.getByRole('heading', { name: 'Условия прохождения' })).toBeVisible(live);
     await expect(active.getByText('Не ниже: Сложная', { exact: true })).toBeVisible();

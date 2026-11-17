@@ -308,6 +308,7 @@ describe('the suspended event on the season screen', () => {
         expect(screen.getByText('Ждёт твоего ответа.')).toBeVisible();
         expect(screen.queryByText(ru.events.played)).not.toBeInTheDocument();
       } else {
+        await userEvent.click(screen.getByText(ru.events.history('Другой ивент')));
         expect(screen.getByText(ru.events.played)).toBeVisible();
         expect(screen.queryByText('Ждёт твоего ответа.')).not.toBeInTheDocument();
       }

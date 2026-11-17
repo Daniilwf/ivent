@@ -11,11 +11,12 @@ import { ChoiceCard, OfferCard, rollResultTitle } from './RollResult';
 import { CompletionMoment } from './CompletionMoment';
 import { AvatarSection } from './AvatarSection';
 import { ProofSection } from './ProofForm';
-import { DrawnEventCard } from './DrawnEventCard';
+import { DrawnEventHistory } from './DrawnEventHistory';
 import { EventChoice } from './EventChoice';
 import { WaitingEvents } from './WaitingEvents';
 import { RunConditions } from './RunConditions';
 import { ManualEffectItem, type EffectOutcome } from './ManualEffectItem';
+import { IrlProofSection } from './IrlProofSection';
 import { EconomySection } from './Inventory';
 import { RunActions } from './RunActions';
 import { MyFinish } from './MyFinish';
@@ -63,7 +64,8 @@ type Command =
   | { kind: 'complete'; completion: Completion }
   | { kind: 'choose'; choiceId: string; optionId: string; difficulty?: Schemas['Difficulty'] }
   | { kind: 'alreadyPlayed'; gameId: string }
-  | { kind: 'resolveEffect'; effectId: string; outcome: EffectOutcome; comment: string | null };
+  | { kind: 'resolveEffect'; effectId: string; outcome: EffectOutcome; comment: string | null }
+  | { kind: 'irlProof'; effectId: string; files: string[]; link: string | null };
 type Loaded = { kind: 'season'; season: Season } | { kind: 'signedOut' } | { kind: 'failed' };
 /** The legs of one move of my token, as the server walked them (the graph map) */
 type Legs = Schemas['MoveLegView'][];
@@ -143,6 +145,11 @@ function send(seasonId: string, command: Command) {
         params: { path: { seasonId, effectId: command.effectId } },
         body: { commandId, outcome: command.outcome, comment: command.comment },
       });
+    case 'irlProof':
+      return api.POST('/api/seasons/{seasonId}/effects/{effectId}/irl-proof', {
+        params: { path: { seasonId, effectId: command.effectId } },
+        body: { commandId, files: command.files, link: command.link },
+      });
   }
 }
 
@@ -176,6 +183,7 @@ export function SeasonScreen({
   const heading = usePageHeading(season !== null);
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [historyFold, setHistoryFold] = useState({ through: 0, version: 0 });
   // Answers may arrive out of order: never replace newer data with an older view of the log.
   const lastSequence = useRef(-1);
 
@@ -286,6 +294,7 @@ export function SeasonScreen({
   }, [seasonId, apply, version]);
 
   async function act(command: Command) {
+    const drawBeforeCommand = season?.me?.lastEvent?.sequence ?? 0;
     setPending(true);
     setMessage(null);
     try {
@@ -298,6 +307,11 @@ export function SeasonScreen({
         const code = rejectionCode(result.error);
         setMessage((code && ru.rejection[code]) ?? ru.rejection.unknown);
       }
+      if (result.response.ok && !result.error)
+        setHistoryFold((previous) => ({
+          through: Math.max(previous.through, drawBeforeCommand),
+          version: previous.version + 1,
+        }));
       apply(await fetchSeason(seasonId));
     } catch {
       setMessage(ru.app.loadError);
@@ -416,6 +430,8 @@ export function SeasonScreen({
   if (!season) return <SeasonSkeleton />;
 
   const me = season.me;
+  const manualEffects = me?.manualEffects.filter((effect) => !effect.irl) ?? [];
+  const irlEffects = me?.manualEffects.filter((effect) => effect.irl) ?? [];
   const effectChoice = me?.choice?.kind === 'effect' ? me.choice : null;
   const answerAllowed =
     me?.eventsEnabled === true && (season.status === 'active' || season.status === 'closing');
@@ -491,7 +507,7 @@ export function SeasonScreen({
   };
   const afterRun =
     me &&
-    (me.manualEffects.length > 0 ||
+    (manualEffects.length > 0 ||
       me.lastCompleted ||
       (me.lastEvent && effectChoice?.objectId !== me.lastEvent.objectId) ||
       checks.length > 0) ? (
@@ -504,15 +520,15 @@ export function SeasonScreen({
         )}
       >
         <h3 id="after-title" className="font-display font-heavy">
-          {me.manualEffects.length > 0
-            ? ru.turn.todo(me.manualEffects.length)
+          {manualEffects.length > 0
+            ? ru.turn.todo(manualEffects.length)
             : stepFirst && me.lastCompleted
               ? ru.turn.afterGame(me.lastCompleted.game.title)
               : me.lastCompleted || me.lastEvent
                 ? ru.turn.after
                 : ru.turn.checksTitle}
         </h3>
-        {me.manualEffects.length > 0 && (
+        {manualEffects.length > 0 && (
           <section
             aria-labelledby="effects-title"
             data-testid="manual-effects"
@@ -520,7 +536,7 @@ export function SeasonScreen({
           >
             <h4 id="effects-title">{ru.effects.title}</h4>
             <ul>
-              {me.manualEffects.map((effect) => (
+              {manualEffects.map((effect) => (
                 <ManualEffectItem
                   key={effect.id}
                   effect={effect}
@@ -693,12 +709,12 @@ export function SeasonScreen({
         {me.lastEvent &&
         effectChoice?.objectId !== me.lastEvent.objectId &&
         !(freshDraw && moving) ? (
-          <DrawnEventCard
-            key={me.lastEvent.sequence}
+          <DrawnEventHistory
+            key={`${String(me.lastEvent.sequence)}:${String(historyFold.through >= me.lastEvent.sequence ? historyFold.version : 0)}`}
             drawn={me.lastEvent}
             fresh={freshDraw}
+            initiallyOpen={newDraw && me.lastEvent.sequence > historyFold.through}
             onShown={noteDrawShown}
-            waitingForAnswer={effectChoice?.objectId === me.lastEvent.objectId}
           />
         ) : null}
       </section>
@@ -1136,6 +1152,46 @@ export function SeasonScreen({
             events={me.waitingEvents ?? null}
             conditions={me.waitingConditions ?? null}
           />
+        ) : null}
+        {irlEffects.length > 0 ? (
+          <section
+            aria-labelledby="irl-proofs-title"
+            data-testid="irl-effects"
+            className={cx('min-w-0 gap-3', throwing || moving ? 'hidden' : 'grid')}
+            hidden={Boolean(throwing || moving)}
+          >
+            <h3 id="irl-proofs-title" className="font-display font-heavy">
+              {ru.irlProof.tasks}
+            </h3>
+            <ul className="grid min-w-0 gap-4">
+              {irlEffects.map((effect) => (
+                <li
+                  key={effect.id}
+                  data-testid={`manual-effect-${effect.id}`}
+                  className="grid min-w-0 gap-2"
+                >
+                  <IrlProofSection
+                    effect={effect}
+                    maxFiles={me?.irlProofMaxFiles ?? 0}
+                    pending={pending}
+                    enabled={answerAllowed}
+                    unavailableReason={
+                      answerAllowed
+                        ? ''
+                        : finished
+                          ? ru.irlProof.closed
+                          : draft
+                            ? ru.irlProof.draft
+                            : ru.irlProof.paused
+                    }
+                    onSubmit={(files, link) =>
+                      void act({ kind: 'irlProof', effectId: effect.id, files, link })
+                    }
+                  />
+                </li>
+              ))}
+            </ul>
+          </section>
         ) : null}
         {!manualFirst && !throwing ? afterRun : null}
       </section>
