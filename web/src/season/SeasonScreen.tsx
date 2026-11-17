@@ -1096,7 +1096,7 @@ export function SeasonScreen({
         </p>
         {/* A card drawn while the page is open is said once, when it is drawn on screen */}
         <p className="sr-only" aria-live="polite" data-testid="draw-announce">
-          {newDraw && !moving && me?.lastEvent
+          {newDraw && !moving && !throwing && me?.lastEvent
             ? ru.events.announce(me.lastEvent.kind, me.lastEvent.name)
             : ''}
         </p>

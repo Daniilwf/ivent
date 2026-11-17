@@ -2,6 +2,7 @@ import { m, useReducedMotion } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { Schemas } from '../api/client';
+import { eventDraw } from '../design/motion';
 import { ru } from '../i18n/ru';
 import { Motion } from '../board/Motion';
 import { cx } from '../ui/cx';
@@ -15,9 +16,6 @@ const tones: Record<Drawn['kind'], string> = {
   special: 'bg-info-soft text-info',
   risky: 'bg-warning-soft text-warning',
 };
-
-/** How long the card takes to come off the deck and turn its face up: a key moment, well under 3 s (DESIGN.md) */
-const drawSeconds = 0.9;
 
 /**
  * The event I drew last (D-500): its kind and where it came from, its name and its text, already played. A card drawn
@@ -64,11 +62,9 @@ export function DrawnEventCard({
           data-drawing={animated ? 'true' : undefined}
           aria-labelledby={titleId}
           className="grid min-w-0 gap-1 rounded-lg border-2 border-ink bg-card p-4"
-          initial={animated ? { rotateY: -90, y: -24, scale: 0.92, opacity: 0 } : false}
-          animate={{ rotateY: 0, y: 0, scale: 1, opacity: 1 }}
-          transition={
-            animated ? { duration: drawSeconds, ease: [0.2, 0.7, 0.3, 1] } : { duration: 0 }
-          }
+          initial={animated ? eventDraw.initial : false}
+          animate={eventDraw.animate}
+          transition={animated ? eventDraw.transition : eventDraw.instantTransition}
           onClick={() => {
             if (animated) setSkipped(true);
           }}

@@ -120,6 +120,8 @@
   --duration-fast: 150ms;
   --duration-base: 200ms;
   --duration-slow: 250ms;
+  /* Main moment: Motion's typed values in design/motion.ts are kept equal by tokens.test.ts. */
+  --duration-event-draw: 900ms;
   /* A new line of the feed from another player comes in softly on top (DESIGN.md «Обновления в реальном времени») */
   --animate-arrive: arrive var(--duration-base) var(--ease-out);
 
