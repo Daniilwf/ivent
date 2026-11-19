@@ -384,7 +384,9 @@ export interface paths {
         };
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    includeAdmin?: boolean;
+                };
                 header?: never;
                 path: {
                     seasonId: string;
@@ -9985,6 +9987,13 @@ export interface components {
             /** @default false */
             eventsEnabled: boolean;
         };
+        /** @description Which stage 5 sections exist for administrators in the selected season. */
+        AdminFeaturesView: {
+            globalEvents: boolean;
+            weeklyChallenge: boolean;
+            events: boolean;
+            suggestions: boolean;
+        };
         /**
          * @description A pending manual effect of any player, oldest first, for the admin to resolve (D-102); `irl` — an IRL one (D-509,
          *     D-820): its proof is checked in the IRL proof queue, or the admin closes it «не применимо» here; always set, optional
@@ -11194,6 +11203,12 @@ export interface components {
             settled: boolean;
             isIntact?: boolean;
         };
+        /** @description Availability of new invitations and of the public partner board in this season. */
+        InteractionFeaturesView: {
+            coop: boolean;
+            duels: boolean;
+            partnerBoard: boolean;
+        };
         /**
          * @description What an invitation is about (SPEC «Модель данных» Interaction, D-523): a coop now, a duel with task 5.12.
          * @enum {unknown}
@@ -11551,6 +11566,9 @@ export interface components {
          *     both always set (empty with events off), optional for older clients.
          *     `eventsEnabled` — whether event answers and IRL proofs are open, including a question retained while off;
          *     `irlProofMaxFiles` — the current limit of pictures per IRL proof (zero allows a link only). Both always set.
+         *     `partnerRequest` is my open request, including while the board is off. `hasInteractionActions`
+         *     keeps access to residual coop while coop is off. `activeDuels` are my races while playing.
+         *     `isCoopPartner` distinguishes the invited partner from the roller who submits the run's result.
          */
         MyTurnView: {
             /** Format: uuid */
@@ -11584,6 +11602,10 @@ export interface components {
             eventsEnabled?: null | boolean;
             /** Format: int32 */
             irlProofMaxFiles?: null | number;
+            partnerRequest?: null | components["schemas"]["PartnerRequestView"];
+            hasInteractionActions?: null | boolean;
+            activeDuels?: null | components["schemas"]["DuelView"][];
+            isCoopPartner?: null | boolean;
         };
         NominationRules: {
             auto: components["schemas"]["EquatableArrayOfAutoNomination"];
@@ -11634,6 +11656,7 @@ export interface components {
             /** Format: date-time */
             expiresAt: string;
             status: components["schemas"]["PartnerRequestStatus"];
+            gameTitle?: null | string;
         };
         PenaltyDice: {
             /** Format: int32 */
@@ -12197,6 +12220,7 @@ export interface components {
             /** Format: double */
             hours: null | number;
             cover?: null | components["schemas"]["FileLinkView"];
+            isCoop?: null | boolean;
         };
         /** @enum {unknown} */
         RunStatus: "playing" | "completed" | "dropped" | "techRerolled" | "rejected";
@@ -12280,6 +12304,7 @@ export interface components {
             /** Format: uuid */
             id: string;
             pollsEnabled: boolean;
+            adminFeatures?: null | components["schemas"]["AdminFeaturesView"];
         };
         SeasonRules: {
             timezone: string;
@@ -12342,6 +12367,7 @@ export interface components {
             economy?: null | components["schemas"]["EconomyFeaturesView"];
             globalEvents?: null | components["schemas"]["GlobalEventView"][];
             pollsEnabled?: null | boolean;
+            interactionFeatures?: null | components["schemas"]["InteractionFeaturesView"];
         };
         /**
          * @description A live session of the signed-in user (D-466): `userAgent` — the browser's own description at the sign-in, which

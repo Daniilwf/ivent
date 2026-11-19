@@ -111,6 +111,29 @@ public sealed class DuelApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_playing_participant_can_see_their_active_duel_on_their_turn_until_duels_are_switched_off()
+    {
+        var id = await AcceptedDuelAsync(_site);
+        var vasya = await _site.SignedInAsync("vasya");
+        var petya = await _site.SignedInAsync("petya");
+        await ApiCalls.PostOkAsync(vasya, Url("roll"));
+        await ApiCalls.PostOkAsync(vasya, Url("start"));
+
+        var card = Assert.Single((await GetAsync(vasya, "")).GetProperty("me").GetProperty("activeDuels").EnumerateArray());
+        Assert.Equal(id, card.GetProperty("id").GetGuid());
+        Assert.Equal(_site.Players["petya"], card.GetProperty("opponentId").GetGuid());
+        Assert.Empty((await GetAsync(petya, "")).GetProperty("me").GetProperty("activeDuels").EnumerateArray());
+
+        _site.Clock.UtcNow = card.GetProperty("expiresAt").GetDateTimeOffset();
+        await TickAsync(_site);
+        await RulesAsync(_site, Flags(f => f with { Duels = false }));
+
+        var season = await GetAsync(vasya, "");
+        Assert.False(season.GetProperty("interactionFeatures").GetProperty("duels").GetBoolean());
+        Assert.Empty(season.GetProperty("me").GetProperty("activeDuels").EnumerateArray());
+    }
+
+    [Fact]
     public async Task A_public_duel_list_does_not_include_races_of_other_seasons_for_the_same_accounts()
     {
         var own = await AcceptedDuelAsync(_site);

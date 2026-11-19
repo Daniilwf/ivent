@@ -20,7 +20,8 @@ namespace GameEvent.Web.Interactions;
 
 /// <summary>An open request for a partner to its author's running coop game.</summary>
 public sealed record PartnerRequestView(
-    Guid Id, Guid PlayerId, Guid RunId, DateTimeOffset CreatedAt, DateTimeOffset ExpiresAt, PartnerRequestStatus Status);
+    Guid Id, Guid PlayerId, Guid RunId, DateTimeOffset CreatedAt, DateTimeOffset ExpiresAt, PartnerRequestStatus Status,
+    string? GameTitle = null);
 
 /// <summary>The public partner board: reads use the projection; every write goes through the command queue.</summary>
 public static class PartnerBoardEndpoints
@@ -61,13 +62,22 @@ public static class PartnerBoardEndpoints
             return SeasonRules.FeatureOff("The partner board is off in this season.");
         }
 
-        var now = clock.UtcNow;
-        var rows = await db.PartnerRequests.AsNoTracking()
-            .Where(r => r.SeasonId == seasonId && r.Status == PartnerRequestStatus.Open).ToListAsync(ct);
+        return TypedResults.Ok(await OpenAsync(db, seasonId, null, clock.UtcNow, ct));
+    }
+
+    // For an author, the private turn can also retrieve their request while the board is off (D-794).
+    internal static async Task<IReadOnlyList<PartnerRequestView>> OpenAsync(
+        GameEventDbContext db, Guid seasonId, Guid? authorId, DateTimeOffset now, CancellationToken ct)
+    {
+        var rows = await (
+            from request in db.PartnerRequests.AsNoTracking()
+            where request.SeasonId == seasonId && request.Status == PartnerRequestStatus.Open
+                && (authorId == null || request.PlayerId == authorId)
+            join run in db.Runs.AsNoTracking() on request.RunId equals run.Id
+            join game in db.Games.AsNoTracking() on run.GameId equals game.Id
+            select new PartnerRequestView(request.Id, request.PlayerId, request.RunId,
+                request.CreatedAt, request.ExpiresAt, request.Status, game.Title)).ToListAsync(ct);
         // SQLite does not compare DateTimeOffset: filter the projected columns with the same clock as the engine.
-        IReadOnlyList<PartnerRequestView> requests = [.. rows.Where(r => now < r.ExpiresAt)
-            .OrderByDescending(r => r.CreatedAt).ThenBy(r => r.Id)
-            .Select(r => new PartnerRequestView(r.Id, r.PlayerId, r.RunId, r.CreatedAt, r.ExpiresAt, r.Status))];
-        return TypedResults.Ok(requests);
+        return [.. rows.Where(r => now < r.ExpiresAt).OrderByDescending(r => r.CreatedAt).ThenBy(r => r.Id)];
     }
 }

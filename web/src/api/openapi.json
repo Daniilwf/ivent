@@ -295,6 +295,13 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "includeAdmin",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -10258,6 +10265,30 @@
         },
         "description": "The season's content in the editor (4.12, D-490): whether items are on (the editor works either way, a pack is\npublished only with `features.items`), the season's status, the version in force, the pack in force as content\nJSON (CONTENT.md; null fields left out), the definitions deleted on the way and the versions, newest first.\n`eventsEnabled` — whether events are on (`features.events`, D-823): the pack's events and decks play only then;\nalways set, optional for older clients."
       },
+      "AdminFeaturesView": {
+        "required": [
+          "globalEvents",
+          "weeklyChallenge",
+          "events",
+          "suggestions"
+        ],
+        "type": "object",
+        "properties": {
+          "globalEvents": {
+            "type": "boolean"
+          },
+          "weeklyChallenge": {
+            "type": "boolean"
+          },
+          "events": {
+            "type": "boolean"
+          },
+          "suggestions": {
+            "type": "boolean"
+          }
+        },
+        "description": "Which stage 5 sections exist for administrators in the selected season."
+      },
       "AdminManualEffectView": {
         "required": [
           "id",
@@ -13691,6 +13722,26 @@
         },
         "description": "The result of an integrity check: the log's last event, what the stored state has that the log does not, and whether\nthe log stood still while it was read (bool IntegrityReport.Settled false: commands kept coming — check again)."
       },
+      "InteractionFeaturesView": {
+        "required": [
+          "coop",
+          "duels",
+          "partnerBoard"
+        ],
+        "type": "object",
+        "properties": {
+          "coop": {
+            "type": "boolean"
+          },
+          "duels": {
+            "type": "boolean"
+          },
+          "partnerBoard": {
+            "type": "boolean"
+          }
+        },
+        "description": "Availability of new invitations and of the public partner board in this season."
+      },
       "InteractionKind": {
         "enum": [
           "coop",
@@ -14876,9 +14927,40 @@
               "integer"
             ],
             "format": "int32"
+          },
+          "partnerRequest": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PartnerRequestView"
+              }
+            ]
+          },
+          "hasInteractionActions": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "activeDuels": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/DuelView"
+            }
+          },
+          "isCoopPartner": {
+            "type": [
+              "null",
+              "boolean"
+            ]
           }
         },
-        "description": "The signed-in player's own turn. While playing: `dropHintMinutes` is `roll.minPlayMinutesBeforeDrop` until\nthat much has been played by the server clock (only a hint: D-09), then null; `dropPenalty` is what a drop costs\nunder the rules in force; `techRerollOpen` says whether the player may still tech-reroll themselves (D-94);\n`challengesEnabled` says whether a challenge may be claimed on completion (`features.challenges`, D-96);\n`techRerollUntil` is when the player's own tech reroll window closes (the roll time plus the run's snapshot of\n`roll.techRerollWindowHours`), null while not playing. The active run's game carries the hours of the roll's\nsnapshot, the ones the completion counts (D-44): the pool may have got hours since (D-138). `difficultyDice` —\nwhile playing, the die each difficulty gives under the run's snapshot and the event it grants, if any.\n`dropPenalty.count` counts the extra dice of the drops in a row before this run (D-205, D-324).\n`wishRerollOpen` — whether the player may give the game up by wish now (D-206, D-325; always set, optional for older clients): a tech reroll with the\nreason `wish`, within the window, for a game with a listed tag the roll did not impose.\n`lastEvent` — the event I drew last (stage 5), while `features.events` is on; null before the first draw.\n`coins` — my balance, what a paid reroll spends (K1S-3). `checks` — my other runs that still take a proof\n(completed, the proof neither approved nor rejected) and the runs rejected since my latest roll, newest first; the\nlatest completed run is `lastCompleted` and never here (K1S-1, K1S-9, D-602). `waitingEvents` — my drawn events\nwaiting for my future steps; `waitingConditions` — the conditions of events waiting for my next roll (D-821, D-823);\nboth always set (empty with events off), optional for older clients.\n`eventsEnabled` — whether event answers and IRL proofs are open, including a question retained while off;\n`irlProofMaxFiles` — the current limit of pictures per IRL proof (zero allows a link only). Both always set."
+        "description": "The signed-in player's own turn. While playing: `dropHintMinutes` is `roll.minPlayMinutesBeforeDrop` until\nthat much has been played by the server clock (only a hint: D-09), then null; `dropPenalty` is what a drop costs\nunder the rules in force; `techRerollOpen` says whether the player may still tech-reroll themselves (D-94);\n`challengesEnabled` says whether a challenge may be claimed on completion (`features.challenges`, D-96);\n`techRerollUntil` is when the player's own tech reroll window closes (the roll time plus the run's snapshot of\n`roll.techRerollWindowHours`), null while not playing. The active run's game carries the hours of the roll's\nsnapshot, the ones the completion counts (D-44): the pool may have got hours since (D-138). `difficultyDice` —\nwhile playing, the die each difficulty gives under the run's snapshot and the event it grants, if any.\n`dropPenalty.count` counts the extra dice of the drops in a row before this run (D-205, D-324).\n`wishRerollOpen` — whether the player may give the game up by wish now (D-206, D-325; always set, optional for older clients): a tech reroll with the\nreason `wish`, within the window, for a game with a listed tag the roll did not impose.\n`lastEvent` — the event I drew last (stage 5), while `features.events` is on; null before the first draw.\n`coins` — my balance, what a paid reroll spends (K1S-3). `checks` — my other runs that still take a proof\n(completed, the proof neither approved nor rejected) and the runs rejected since my latest roll, newest first; the\nlatest completed run is `lastCompleted` and never here (K1S-1, K1S-9, D-602). `waitingEvents` — my drawn events\nwaiting for my future steps; `waitingConditions` — the conditions of events waiting for my next roll (D-821, D-823);\nboth always set (empty with events off), optional for older clients.\n`eventsEnabled` — whether event answers and IRL proofs are open, including a question retained while off;\n`irlProofMaxFiles` — the current limit of pictures per IRL proof (zero allows a link only). Both always set.\n`partnerRequest` is my open request, including while the board is off. `hasInteractionActions`\nkeeps access to residual coop while coop is off. `activeDuels` are my races while playing.\n`isCoopPartner` distinguishes the invited partner from the roller who submits the run's result."
       },
       "NominationRules": {
         "required": [
@@ -15010,6 +15092,12 @@
           },
           "status": {
             "$ref": "#/components/schemas/PartnerRequestStatus"
+          },
+          "gameTitle": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         },
         "description": "An open request for a partner to its author's running coop game."
@@ -16793,6 +16881,12 @@
                 "$ref": "#/components/schemas/FileLinkView"
               }
             ]
+          },
+          "isCoop": {
+            "type": [
+              "null",
+              "boolean"
+            ]
           }
         },
         "description": "The game of a run: its title, hours and the pool's cover (none when the game has none, D-222). Named apart from the pool's PoolGameView: the OpenAPI document\nkeys schemas by type name, so two records called GameView became one schema and the pool lost its fields (D-161)."
@@ -17040,6 +17134,16 @@
           },
           "pollsEnabled": {
             "type": "boolean"
+          },
+          "adminFeatures": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AdminFeaturesView"
+              }
+            ]
           }
         },
         "description": "The selected season's navigation flags, without its map, players or folded event state."
@@ -17250,6 +17354,16 @@
             "type": [
               "null",
               "boolean"
+            ]
+          },
+          "interactionFeatures": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/InteractionFeaturesView"
+              }
             ]
           }
         },

@@ -1,6 +1,9 @@
 using System.Security.Claims;
 using System.Text.Json;
+using System.Text.Json.Serialization;
+using GameEvent.Engine.Duels;
 using GameEvent.Engine.Effects;
+using GameEvent.Engine.Interactions;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Proofs;
 using GameEvent.Engine.Ranking;
@@ -14,7 +17,9 @@ using GameEvent.Infrastructure.EventLog;
 using GameEvent.Infrastructure.Pool;
 using GameEvent.Infrastructure.Queue;
 using GameEvent.Web.Accounts;
+using GameEvent.Web.Duels;
 using GameEvent.Web.Hosting;
+using GameEvent.Web.Interactions;
 using GameEvent.Web.Map;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
@@ -126,16 +131,26 @@ public sealed record SeasonView(
     MapBackgroundView? Background = null,
     EconomyFeaturesView? Economy = null,
     IReadOnlyList<GameEvent.Web.GlobalEvents.GlobalEventView>? GlobalEvents = null,
-    bool? PollsEnabled = null);
+    bool? PollsEnabled = null,
+    InteractionFeaturesView? InteractionFeatures = null);
 
 /// <summary>The selected season's navigation flags, without its map, players or folded event state.</summary>
-public sealed record SeasonNavigationView(Guid Id, bool PollsEnabled);
+public sealed record SeasonNavigationView(
+    Guid Id,
+    bool PollsEnabled,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] AdminFeaturesView? AdminFeatures = null);
+
+/// <summary>Which stage 5 sections exist for administrators in the selected season.</summary>
+public sealed record AdminFeaturesView(bool GlobalEvents, bool WeeklyChallenge, bool Events, bool Suggestions);
 
 /// <summary>
 /// Which economy mechanics the season plays (D-441): a mechanic off is not shown at all; always set, optional for older
 /// clients. The inventory, the shop and the bets come from <c>GET /api/seasons/{id}/economy</c>.
 /// </summary>
 public sealed record EconomyFeaturesView(bool Items, bool Shop, bool Bets);
+
+/// <summary>Availability of new invitations and of the public partner board in this season.</summary>
+public sealed record InteractionFeaturesView(bool Coop, bool Duels, bool PartnerBoard);
 
 /// <summary>
 /// A leaderboard row in place order (D-100): tied players share <c>place</c>; <c>isFirst</c> — the first finisher, on top
@@ -169,6 +184,9 @@ public sealed record PlayerView(Guid Id, string Name, string CellId, int Points,
 /// both always set (empty with events off), optional for older clients.
 /// <c>eventsEnabled</c> — whether event answers and IRL proofs are open, including a question retained while off;
 /// <c>irlProofMaxFiles</c> — the current limit of pictures per IRL proof (zero allows a link only). Both always set.
+/// <c>partnerRequest</c> is my open request, including while the board is off. <c>hasInteractionActions</c>
+/// keeps access to residual coop while coop is off. <c>activeDuels</c> are my races while playing.
+/// <c>isCoopPartner</c> distinguishes the invited partner from the roller who submits the run's result.
 /// </summary>
 public sealed record MyTurnView(
     Guid PlayerId,
@@ -196,7 +214,11 @@ public sealed record MyTurnView(
     IReadOnlyList<WaitingEventView>? WaitingEvents = null,
     IReadOnlyList<RunConditionView>? WaitingConditions = null,
     bool? EventsEnabled = null,
-    int? IrlProofMaxFiles = null);
+    int? IrlProofMaxFiles = null,
+    PartnerRequestView? PartnerRequest = null,
+    bool? HasInteractionActions = null,
+    IReadOnlyList<DuelView>? ActiveDuels = null,
+    bool? IsCoopPartner = null);
 
 /// <summary>The die a difficulty gives on completion, and the event it grants (<c>good</c>, <c>bad</c>) or none.</summary>
 public sealed record DifficultyDieView(Difficulty Difficulty, int Sides, EventKind? GrantEvent);
@@ -300,7 +322,7 @@ public sealed record CurrentSeasonView(Guid Id);
 /// The game of a run: its title, hours and the pool's cover (none when the game has none, D-222). Named apart from the pool's <see cref="Pool.PoolGameView"/>: the OpenAPI document
 /// keys schemas by type name, so two records called GameView became one schema and the pool lost its fields (D-161).
 /// </summary>
-public sealed record RunGameView(Guid Id, string Title, decimal? Hours, Files.FileLinkView? Cover = null);
+public sealed record RunGameView(Guid Id, string Title, decimal? Hours, Files.FileLinkView? Cover = null, bool? IsCoop = null);
 
 /// <summary>
 /// The active run; <c>declaredDifficulty</c> — the one named at the start, the cap of the completion's (D-633);
@@ -627,7 +649,7 @@ public static class SeasonEndpoints
     }
 
     private static async Task<Results<Ok<SeasonNavigationView>, NotFound>> GetNavigationAsync(
-        Guid seasonId, GameEventDbContext db, CancellationToken ct)
+        Guid seasonId, bool? includeAdmin, ClaimsPrincipal user, GameEventDbContext db, CancellationToken ct)
     {
         var json = await db.Seasons.AsNoTracking()
             .Where(s => s.Id == seasonId)
@@ -639,7 +661,11 @@ public static class SeasonEndpoints
         }
 
         var rules = JsonSerializer.Deserialize<Ruleset>(json, EngineJson.Options)!;
-        return TypedResults.Ok(new SeasonNavigationView(seasonId, rules.Features.Polls));
+        var features = rules.Features;
+        var adminFeatures = includeAdmin == true && user.IsInRole(nameof(Infrastructure.Accounts.Role.Admin))
+            ? new AdminFeaturesView(features.GlobalEvents, features.WeeklyChallenge, features.Events, features.Suggestions)
+            : null;
+        return TypedResults.Ok(new SeasonNavigationView(seasonId, features.Polls, adminFeatures));
     }
 
     private static async Task<Results<Ok<SeasonView>, NotFound>> GetSeasonAsync(
@@ -656,6 +682,8 @@ public static class SeasonEndpoints
         var players = (await db.SeasonPlayers.AsNoTracking().Where(p => p.SeasonId == seasonId).ToListAsync(ct)).InTokenOrder();
         var seasonRecord = await db.Seasons.AsNoTracking().SingleAsync(s => s.Id == seasonId, ct);
         var rules = JsonSerializer.Deserialize<Ruleset>(seasonRecord.RulesetJson, EngineJson.Options)!;
+        var interactionFeatures = new InteractionFeaturesView(
+            rules.Features.Coop, rules.Features.Duels, rules.Features.Coop && rules.Features.PartnerBoard);
         var completedRuns = await db.Runs.AsNoTracking()
             .Where(r => r.SeasonId == seasonId && r.Status == RunStatus.Completed)
             .GroupBy(r => r.PlayerId)
@@ -680,6 +708,7 @@ public static class SeasonEndpoints
 
         MyTurnView? me = null;
         var userId = user.UserId();
+        var playerInteractions = user.IsInRole(nameof(Infrastructure.Accounts.Role.Player));
         if (players.SingleOrDefault(p => p.UserId == userId) is { } mine)
         {
             var offer = mine.OfferJson is null ? null : JsonSerializer.Deserialize<RollOffer>(mine.OfferJson, EngineJson.Options);
@@ -703,7 +732,9 @@ public static class SeasonEndpoints
             // Events, conditions, IRL proofs and questions are read from the season folded from the log (D-824, D-828): only
             // when events are on, an object's text waits or an effect asks me (a question outlives events switched off), so
             // a season without them pays nothing
-            var state = rules.Features.Events || effects.Any(e => e.ObjectId is not null) || choice?.Kind == ChoiceKind.Effect
+            var playing = mine.Phase == TurnPhase.Playing && run is not null;
+            var showDuels = playerInteractions && interactionFeatures.Duels && playing;
+            var state = showDuels || rules.Features.Events || effects.Any(e => e.ObjectId is not null) || choice?.Kind == ChoiceKind.Effect
                 ? await seasonStates.ReadAsync(db, seasonId, ct)
                 : null;
             var events = new EventTurnViews(state, mine.Id);
@@ -763,7 +794,6 @@ public static class SeasonEndpoints
                     x => new GameMarkView(x.Name, x.Status == RunStatus.Dropped ? GameMarkKind.Dropped : GameMarkKind.TechRerolled));
             OfferedGameView Offered(RollOffer o) => new(o.GameId, games[o.GameId].Title, o.Snapshot.Hours, [.. marks[o.GameId]], CoverOf(games[o.GameId]), events.ConditionsOf(o.Snapshot));
 
-            var playing = mine.Phase == TurnPhase.Playing && run is not null;
             var played = playing ? now - run!.StartedAt : TimeSpan.Zero;
             var snapshot = playing ? JsonSerializer.Deserialize<RunSnapshot>(run!.SnapshotJson, EngineJson.Options)! : null;
             var drop = rules.Drop;
@@ -781,6 +811,16 @@ public static class SeasonEndpoints
                 : 0;
             var wishRerollOpen = techRerollOpen
                 && WishRerolls.Allowed(snapshot!, new Engine.Pool.Game(run!.GameId, games[run.GameId].Title, PoolReader.Tags(games[run.GameId].TagsJson), null));
+            var partnerRequests = playerInteractions && playing && run!.PlayerId == mine.Id
+                ? await PartnerBoardEndpoints.OpenAsync(db, seasonId, mine.Id, now, ct)
+                : [];
+            var partnerRequest = partnerRequests is [var request, ..] ? request : null;
+            var residualCoop = playerInteractions && !interactionFeatures.Coop
+                && (partnerRequest is not null || run?.PartnerId is not null || await PendingCoopAsync(db, seasonId, mine.Id, now, ct));
+            IReadOnlyList<DuelView> activeDuels = showDuels && state is not null
+                ? [.. state.Duels.Values.Where(d => d.Status == DuelStatus.Active && d.Involves(mine.Id))
+                    .OrderBy(d => d.ExpiresAt).ThenBy(d => d.DuelId).Select(DuelEndpoints.View)]
+                : [];
 
             me = new MyTurnView(
                 mine.Id,
@@ -805,7 +845,7 @@ public static class SeasonEndpoints
                         // Playing: the hours of the roll's snapshot, as the completion counts them (D-44, D-138)
                         snapshot is null
                             ? Game(run, games[run.GameId])
-                            : new RunGameView(run.GameId, games[run.GameId].Title, snapshot.Hours is > 0 ? snapshot.Hours : null, CoverOf(games[run.GameId])),
+                            : Game(run, games[run.GameId]) with { Hours = snapshot.Hours is > 0 ? snapshot.Hours : null },
                         run.StartedAt,
                         run.DeclaredDifficulty,
                         events.ConditionsOf(run.Id)),
@@ -845,7 +885,11 @@ public static class SeasonEndpoints
                 events.WaitingEvents(),
                 events.WaitingConditions(),
                 rules.Features.Events,
-                rules.Events?.IrlProof?.MaxFiles ?? 0);
+                rules.Events?.IrlProof?.MaxFiles ?? 0,
+                partnerRequest,
+                residualCoop,
+                activeDuels,
+                run?.PartnerId == mine.Id);
         }
 
         // Avatars live on the accounts, across seasons (SPEC «Сезоны»)
@@ -871,7 +915,17 @@ public static class SeasonEndpoints
             await SeasonMaps.BackgroundAsync(db, map, ct),
             new EconomyFeaturesView(rules.Features.Items, rules.Features.Shop, rules.Features.Bets),
             await GameEvent.Web.GlobalEvents.GlobalEventEndpoints.BannerAsync(db, seasonId, rules.Features.GlobalEvents, clock.UtcNow, ct),
-            rules.Features.Polls));
+            rules.Features.Polls,
+            interactionFeatures));
+    }
+
+    private static async Task<bool> PendingCoopAsync(GameEventDbContext db, Guid seasonId, Guid playerId, DateTimeOffset now, CancellationToken ct)
+    {
+        var terms = await db.Interactions.AsNoTracking().Where(i => i.SeasonId == seasonId
+                && i.Kind == InteractionKind.Coop && i.Status == InteractionStatus.Pending
+                && (i.FromPlayerId == playerId || i.ToPlayerId == playerId))
+            .Select(i => i.ExpiresAt).ToListAsync(ct);
+        return terms.Any(term => now < term);
     }
 
     private static readonly string s_completedType = EventCatalog.Describe(typeof(RunCompleted)).Name;
@@ -1064,7 +1118,7 @@ public static class SeasonEndpoints
 
     /// <summary>A run's game: the run's own hours when known, otherwise the pool's.</summary>
     private static RunGameView Game(Infrastructure.Seasons.RunRecord run, Infrastructure.Pool.GameRecord game) =>
-        new(run.GameId, game.Title, run.Hours ?? game.Hours, CoverOf(game));
+        new(run.GameId, game.Title, run.Hours ?? game.Hours, CoverOf(game), game.IsCoop);
 
     /// <summary>The pool game's cover as the screens show it (the thumbnail), or none (D-222).</summary>
     private static Files.FileLinkView? CoverOf(Infrastructure.Pool.GameRecord game) =>

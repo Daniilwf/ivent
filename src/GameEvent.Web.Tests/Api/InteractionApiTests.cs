@@ -57,6 +57,8 @@ public sealed class InteractionApiTests : IAsyncLifetime
         Assert.Equal(InteractionStatus.Accepted, state.Interactions[invitation.InteractionId].Status);
         Assert.Equal(_site.Players["petya"], state.Runs[runId].PartnerId);
         Assert.Equal(runId, state.Players[_site.Players["petya"]].ActiveRunId);
+        Assert.False((await GetAsync(vasya, "")).GetProperty("me").GetProperty("isCoopPartner").GetBoolean());
+        Assert.True((await GetAsync(petya, "")).GetProperty("me").GetProperty("isCoopPartner").GetBoolean());
         await using (var db = _site.NewDb())
         {
             Assert.Equal(_site.Players["petya"], (await db.Runs.SingleAsync(r => r.Id == runId, Ct)).PartnerId);
@@ -79,6 +81,7 @@ public sealed class InteractionApiTests : IAsyncLifetime
         Assert.Null(state.Runs[runId].Coop);
         Assert.Equal(TurnPhase.Idle, state.Players[_site.Players["petya"]].Phase);
         Assert.Equal(JsonValueKind.Null, (await GetAsync(petya, "coop")).ValueKind);
+        Assert.False((await GetAsync(petya, "")).GetProperty("me").GetProperty("isCoopPartner").GetBoolean());
         await AssertIntactAsync(_site);
     }
 
@@ -289,13 +292,16 @@ public sealed class InteractionApiTests : IAsyncLifetime
         Assert.Equal(InteractionStatus.Withdrawn, (await StateAsync(_site)).Interactions[id].Status);
     }
 
-    [Fact]
-    public async Task Switching_coop_off_keeps_the_live_coop_readable_and_the_partner_may_leave()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Switching_coop_off_keeps_the_live_coop_readable_and_the_partner_may_leave(bool duelsOn)
     {
         var (runId, _) = await JoinedAsync(_site);
-        await RulesAsync(_site, Flags(f => f with { Coop = false }));
+        await RulesAsync(_site, Flags(f => f with { Coop = false, Duels = duelsOn }));
         var petya = await _site.SignedInAsync("petya");
         Assert.Equal(runId, (await GetAsync(petya, "coop")).GetProperty("runId").GetGuid());
+        Assert.True((await GetAsync(petya, "")).GetProperty("me").GetProperty("hasInteractionActions").GetBoolean());
 
         await OkAsync(await PostAsync(petya, "coop/leave", new { commandId = Guid.NewGuid() }));
 

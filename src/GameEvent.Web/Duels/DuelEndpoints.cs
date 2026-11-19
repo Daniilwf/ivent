@@ -57,8 +57,10 @@ public static class DuelEndpoints
         // Duels have no separate table in Events (D-810): reuse the immutable cached fold, not a second projection.
         var state = await reader.ReadAsync(db, seasonId, ct);
         IReadOnlyList<DuelView> views = [.. state.Duels.Values.OrderByDescending(d => d.AcceptedAt).ThenBy(d => d.DuelId)
-            .Select(d => new DuelView(d.DuelId, d.ChallengerId, d.OpponentId, d.AcceptedAt, d.ExpiresAt,
-                d.Status, d.WinnerId, d.RunId, d.Coins, d.End, d.EndedAt))];
+            .Select(View)];
         return TypedResults.Ok(views);
     }
+
+    internal static DuelView View(Duel duel) => new(duel.DuelId, duel.ChallengerId, duel.OpponentId, duel.AcceptedAt,
+        duel.ExpiresAt, duel.Status, duel.WinnerId, duel.RunId, duel.Coins, duel.End, duel.EndedAt);
 }

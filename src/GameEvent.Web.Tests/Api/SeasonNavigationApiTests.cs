@@ -96,6 +96,34 @@ public sealed class SeasonNavigationApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Admin_section_availability_comes_from_the_requested_season()
+    {
+        await RulesAsync(_site, Flags(f => f with
+        {
+            Items = true,
+            Events = true,
+            GlobalEvents = true,
+            Suggestions = true,
+        }));
+        var other = await _site.CreateSeasonAsync();
+        var admin = await _site.SignedInAsync("admin");
+
+        var enabled = (await ApiCalls.OkAsync(await admin.GetAsync($"{Navigation(SiteFactory.SeasonId)}?includeAdmin=true", Ct)))
+            .GetProperty("adminFeatures");
+        Assert.True(enabled.GetProperty("events").GetBoolean());
+        Assert.True(enabled.GetProperty("globalEvents").GetBoolean());
+        Assert.True(enabled.GetProperty("suggestions").GetBoolean());
+        Assert.False(enabled.GetProperty("weeklyChallenge").GetBoolean());
+        var disabled = (await ApiCalls.OkAsync(await admin.GetAsync($"{Navigation(other)}?includeAdmin=true", Ct)))
+            .GetProperty("adminFeatures");
+        Assert.All(disabled.EnumerateObject(), field => Assert.False(field.Value.GetBoolean()));
+        var spectator = await _site.SignedInAsync("zritel");
+        var restricted = await ApiCalls.OkAsync(await spectator.GetAsync($"{Navigation(SiteFactory.SeasonId)}?includeAdmin=true", Ct));
+        Assert.False(restricted.TryGetProperty("adminFeatures", out _));
+        Assert.Equal(HttpStatusCode.BadRequest, (await admin.GetAsync($"{Navigation(other)}?includeAdmin=maybe", Ct)).StatusCode);
+    }
+
+    [Fact]
     public async Task Reading_navigation_and_home_does_not_append_commands_events_or_change_the_season_state()
     {
         var admin = await _site.SignedInAsync("admin");

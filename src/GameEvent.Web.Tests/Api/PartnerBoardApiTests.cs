@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using GameEvent.Engine.Interactions;
 using GameEvent.Engine.Players;
 using GameEvent.Engine.Rulesets;
@@ -74,6 +75,11 @@ public sealed class PartnerBoardApiTests : IAsyncLifetime
         Assert.Equal(expected.RunId, item.GetProperty("runId").GetGuid());
         Assert.Equal(expected.CreatedAt, item.GetProperty("createdAt").GetDateTimeOffset());
         Assert.Equal(expected.ExpiresAt, item.GetProperty("expiresAt").GetDateTimeOffset());
+        var owner = await _site.SignedInAsync("vasya");
+        var turn = (await ApiCalls.OkAsync(await owner.GetAsync(Url(""), Ct))).GetProperty("me");
+        var game = turn.GetProperty("activeRun").GetProperty("game");
+        Assert.True(game.GetProperty("isCoop").GetBoolean());
+        Assert.Equal(game.GetProperty("title").GetString(), item.GetProperty("gameTitle").GetString());
     }
 
     [Fact]
@@ -230,13 +236,39 @@ public sealed class PartnerBoardApiTests : IAsyncLifetime
         await AssertConflictAsync(await client.PostAsJsonAsync($"{Board}/{Guid.NewGuid()}/close", new { commandId = Guid.NewGuid() }, Ct), "partnerRequest.unknown");
     }
 
-    [Fact]
-    public async Task Switching_the_board_off_hides_it_and_blocks_new_actions_but_not_the_authors_close()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Switching_the_board_off_hides_it_and_blocks_new_actions_but_not_the_authors_close(bool changeGame)
     {
         var id = await PostedAsync();
         await RulesAsync(_site, Flags(f => f with { Coop = false, PartnerBoard = false }));
         var vasya = await _site.SignedInAsync("vasya");
         var petya = await _site.SignedInAsync("petya");
+        if (changeGame)
+        {
+            var view = await ApiCalls.OkAsync(await vasya.GetAsync(Url(""), Ct));
+            var game = view.GetProperty("me").GetProperty("activeRun").GetProperty("game");
+            var admin = await _site.SignedInAsync("admin");
+            var update = await admin.PutAsJsonAsync($"/api/admin/pool/{game.GetProperty("id").GetGuid()}", new
+            {
+                commandId = Guid.NewGuid(),
+                title = game.GetProperty("title").GetString(),
+                tags = new[] { "Test" },
+                hours = 5,
+                isCoop = false,
+            }, Ct);
+            await ApiCalls.OkAsync(update);
+        }
+
+        var ownerView = await ApiCalls.OkAsync(await vasya.GetAsync(Url(""), Ct));
+        var otherView = await ApiCalls.OkAsync(await petya.GetAsync(Url(""), Ct));
+        var owner = ownerView.GetProperty("me");
+        Assert.False(ownerView.GetProperty("interactionFeatures").GetProperty("partnerBoard").GetBoolean());
+        Assert.True(owner.GetProperty("hasInteractionActions").GetBoolean());
+        Assert.Equal(id, owner.GetProperty("partnerRequest").GetProperty("id").GetGuid());
+        Assert.False(otherView.GetProperty("me").TryGetProperty("partnerRequest", out var otherRequest)
+            && otherRequest.ValueKind != JsonValueKind.Null);
 
         await AssertConflictAsync(await petya.GetAsync(Board, Ct), "feature.disabled");
         await AssertConflictAsync(await vasya.PostAsJsonAsync(Board, new { commandId = Guid.NewGuid() }, Ct), "feature.disabled");
@@ -244,6 +276,8 @@ public sealed class PartnerBoardApiTests : IAsyncLifetime
         await ApiCalls.PostOkAsync(vasya, $"{Board}/{id}/close");
 
         Assert.Equal(PartnerRequestStatus.Closed, (await StateAsync(_site)).PartnerRequests[id].Status);
+        var after = (await ApiCalls.OkAsync(await vasya.GetAsync(Url(""), Ct))).GetProperty("me");
+        Assert.False(after.GetProperty("hasInteractionActions").GetBoolean());
     }
 
     [Fact]
