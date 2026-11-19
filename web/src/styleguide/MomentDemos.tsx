@@ -28,7 +28,7 @@ export function MapDemo() {
         players={demoPlayers}
         className="h-150 rounded-lg border-3 border-ink"
       />
-      <div className="grid justify-items-center gap-2 desk:w-90">
+      <div className="grid justify-items-center gap-2">
         <MapView
           board={demoBoard}
           players={demoPlayers}

@@ -525,7 +525,7 @@ function MarkChallenge({
               <option value="">{t.chooseGame}</option>
               {options.map(({ id, title, isDeleted }) => (
                 <option value={id} key={id}>
-                  {isDeleted ? `${title} · ${ru.gamePage.deleted}` : title}
+                  {isDeleted ? `${title} (${ru.gamePage.deleted})` : title}
                 </option>
               ))}
             </Select>
