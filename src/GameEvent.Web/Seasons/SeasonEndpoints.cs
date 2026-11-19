@@ -4,6 +4,7 @@ using System.Text.Json.Serialization;
 using GameEvent.Engine.Duels;
 using GameEvent.Engine.Effects;
 using GameEvent.Engine.Interactions;
+using GameEvent.Engine.Inventory;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Proofs;
 using GameEvent.Engine.Ranking;
@@ -723,35 +724,30 @@ public static class SeasonEndpoints
                 .ToList();
 
             var coupons = JsonSerializer.Deserialize<ResourceBag>(mine.ResourcesJson, EngineJson.Options)[RerollPrice.FreeRerollsResource];
-            var effects = await db.ManualEffects.AsNoTracking()
+            var effectRows = await db.ManualEffects.AsNoTracking()
                 .Where(x => x.SeasonId == seasonId && x.PlayerId == mine.Id)
                 .OrderBy(x => x.Id)
-                .Select(x => new ManualEffectView(x.Id, x.DrawEvent, x.Source, x.ObjectId, false, null))
                 .ToListAsync(ct);
 
-            // Events, conditions, IRL proofs and questions are read from the season folded from the log (D-824, D-828): only
-            // when events are on, an object's text waits or an effect asks me (a question outlives events switched off), so
-            // a season without them pays nothing
+            // The suspension and duels have no complete table projection. A question can outlive the events flag.
             var playing = mine.Phase == TurnPhase.Playing && run is not null;
             var showDuels = playerInteractions && interactionFeatures.Duels && playing;
-            var state = showDuels || rules.Features.Events || effects.Any(e => e.ObjectId is not null) || choice?.Kind == ChoiceKind.Effect
+            var state = showDuels || choice?.Kind == ChoiceKind.Effect
                 ? await seasonStates.ReadAsync(db, seasonId, ct)
                 : null;
-            var events = new EventTurnViews(state, mine.Id);
-            gameIds.AddRange(events.GameOptionIds(choice));
+            var questions = new EventQuestionViews(state, mine.Id);
+            gameIds.AddRange(questions.GameOptionIds(choice));
             var games = await db.Games.AsNoTracking().Where(g => gameIds.Contains(g.Id)).ToDictionaryAsync(g => g.Id, ct);
             var gameTitles = games.ToDictionary(g => g.Key, g => g.Value.Title);
-            var effectCards = effects.Any(e => e.ObjectId is not null)
+            var cards = rules.Features.Events || effectRows.Any(e => e.ObjectId is not null)
                 ? await contentCards.OfAsync(db, seasonId, ct)
                 : new Dictionary<string, ObjectCard>();
-            effects = [.. effects.Select(e => e with
-            {
-                Irl = events.IsIrl(e.Id),
-                IrlProof = events.ProofOf(e.Id),
-                Name = e.ObjectId is { } objectId ? effectCards.GetValueOrDefault(objectId)?.Name ?? objectId : null,
-                Description = e.ObjectId is { } id ? effectCards.GetValueOrDefault(id)?.Description ?? "" : null,
-            })];
-            var question = events.QuestionOf(choice);
+            var events = new EventTurnViews(rules.Features.Events, cards.GetValueOrDefault);
+            IReadOnlyList<ManualEffectView> effects = [.. effectRows.Select(events.ManualEffectOf)];
+            var wallet = rules.Features.Events && mine.EconomyJson is { } economyJson
+                ? JsonSerializer.Deserialize<PlayerEconomy>(economyJson, EngineJson.Options)
+                : null;
+            var question = questions.QuestionOf(choice);
             // D-134: the same count the engine checks (UncheckedRuns) — completed, the proof neither approved nor rejected;
             // the frozen first is never held
             UncheckedRunsView? waitingCheck = null;
@@ -767,7 +763,7 @@ public static class SeasonEndpoints
                 waitingCheck = new UncheckedRunsView(waiting, limit);
             }
 
-            IReadOnlyList<CompletedRunView> checks = [.. (await ChecksOf(db, seasonId, mine.Id, last?.Id, ct)).Select(c => WithConditions(c, events))];
+            var checks = await ChecksOf(db, seasonId, mine.Id, last?.Id, events, ct);
 
             // Only while turns are open: after the deadline the page offers nothing to spin for (D-101)
             var turnsOpen = seasonRecord.Status == SeasonStatus.Active && (seasonRecord.Deadline is not { } end || clock.UtcNow < end);
@@ -795,7 +791,8 @@ public static class SeasonEndpoints
             OfferedGameView Offered(RollOffer o) => new(o.GameId, games[o.GameId].Title, o.Snapshot.Hours, [.. marks[o.GameId]], CoverOf(games[o.GameId]), events.ConditionsOf(o.Snapshot));
 
             var played = playing ? now - run!.StartedAt : TimeSpan.Zero;
-            var snapshot = playing ? JsonSerializer.Deserialize<RunSnapshot>(run!.SnapshotJson, EngineJson.Options)! : null;
+            var runSnapshot = run is null ? null : JsonSerializer.Deserialize<RunSnapshot>(run.SnapshotJson, EngineJson.Options)!;
+            var snapshot = playing ? runSnapshot : null;
             var drop = rules.Drop;
             var techRerollOpen = playing && now - run!.RolledAt <= TimeSpan.FromHours(snapshot!.TechRerollWindowHours);
 
@@ -830,8 +827,8 @@ public static class SeasonEndpoints
                     choice.ChoiceId,
                     choice.Kind,
                     [.. choice.Options.Select(o => new ChoiceOptionView(o.Id, o.Game is null ? null : Offered(o.Game),
-                        choice.Kind == ChoiceKind.Effect ? events.OptionLabel(choice, o.Id, gameTitles) : null,
-                        choice.Kind == ChoiceKind.Effect ? events.OptionDirection(choice, o.Id) : null))],
+                        choice.Kind == ChoiceKind.Effect ? questions.OptionLabel(choice, o.Id, gameTitles) : null,
+                        choice.Kind == ChoiceKind.Effect ? questions.OptionDirection(choice, o.Id) : null))],
                     choice.Move?.Steps,
                     question?.Prompt,
                     question?.ObjectId,
@@ -848,8 +845,8 @@ public static class SeasonEndpoints
                             : Game(run, games[run.GameId]) with { Hours = snapshot.Hours is > 0 ? snapshot.Hours : null },
                         run.StartedAt,
                         run.DeclaredDifficulty,
-                        events.ConditionsOf(run.Id)),
-                last is null ? null : WithConditions(Completed(last, games[last.GameId], lastReview, lastProof), events),
+                        events.ConditionsOf(runSnapshot)),
+                last is null ? null : Completed(last, games[last.GameId], lastReview, lastProof, events),
                 effects,
                 playing && played < TimeSpan.FromMinutes(rules.Roll.MinPlayMinutesBeforeDrop) ? rules.Roll.MinPlayMinutesBeforeDrop : null,
                 // The frozen first drops with no penalty; a finisher's position is fixed (D-99).
@@ -879,11 +876,11 @@ public static class SeasonEndpoints
                 // The token walks the real branch and teleport on the graph map; the chain of stage 1 needs no path
                 rules.Features.MapMode == MapMode.Graph ? await SeasonMaps.LastMoveAsync(db, seasonId, mine.Id, ct) : null,
                 wishRerollOpen,
-                rules.Features.Events ? await EventViews.LastDrawnAsync(db, contentCards, seasonId, mine.Id, ct) : null,
+                rules.Features.Events ? await EventViews.LastDrawnAsync(db, cards, seasonId, mine.Id, ct) : null,
                 mine.Coins,
                 checks,
-                events.WaitingEvents(),
-                events.WaitingConditions(),
+                events.WaitingEvents(wallet),
+                events.WaitingConditions(wallet),
                 rules.Features.Events,
                 rules.Events?.IrlProof?.MaxFiles ?? 0,
                 partnerRequest,
@@ -984,7 +981,7 @@ public static class SeasonEndpoints
     /// latest roll, so the player sees the rejection and its comment; newest first.
     /// </summary>
     private static async Task<IReadOnlyList<CompletedRunView>> ChecksOf(
-        GameEventDbContext db, Guid seasonId, Guid playerId, Guid? latest, CancellationToken ct)
+        GameEventDbContext db, Guid seasonId, Guid playerId, Guid? latest, EventTurnViews events, CancellationToken ct)
     {
         var runs = await db.Runs.AsNoTracking()
             .Where(r => r.SeasonId == seasonId && r.PlayerId == playerId && r.Id != latest
@@ -1038,7 +1035,7 @@ public static class SeasonEndpoints
         var reviews = await db.Reviews.AsNoTracking().Where(x => ids.Contains(x.RunId)).ToDictionaryAsync(x => x.RunId, ct);
         return [.. waiting
             .OrderByDescending(r => r.StartedAt)
-            .Select(r => Completed(r, games[r.GameId], reviews.GetValueOrDefault(r.Id), proofs.GetValueOrDefault(r.Id)))];
+            .Select(r => Completed(r, games[r.GameId], reviews.GetValueOrDefault(r.Id), proofs.GetValueOrDefault(r.Id), events))];
     }
 
     private static readonly string[] s_rollTypes =
@@ -1124,27 +1121,26 @@ public static class SeasonEndpoints
     private static Files.FileLinkView? CoverOf(Infrastructure.Pool.GameRecord game) =>
         game.CoverFileId is { } cover ? Files.FileLinkView.Of(cover) : null;
 
-    private static CompletedRunView WithConditions(CompletedRunView run, EventTurnViews events) =>
-        run with { Conditions = events.ConditionsOf(run.Id), ConditionCheck = events.CheckOf(run.Id) };
-
     private static CompletedRunView Completed(
         Infrastructure.Seasons.RunRecord run,
         Infrastructure.Pool.GameRecord game,
         Infrastructure.Seasons.ReviewRecord? review,
-        Infrastructure.Seasons.ProofRecord? proof)
+        Infrastructure.Seasons.ProofRecord? proof,
+        EventTurnViews events)
     {
         var dice = JsonSerializer.Deserialize<EquatableArray<Die>>(run.DiceJson, EngineJson.Options);
         var challenge = JsonSerializer.Deserialize<EquatableArray<Die>>(run.ChallengeDiceJson, EngineJson.Options);
         // D-825: the extra dice of items and events (the count stage) are dice of the throw too — shown after the dice by
         // the hours, and the total goes through the whole pipeline as the engine counts it (D-408)
         var mods = run.DiceModsJson is null ? null : JsonSerializer.Deserialize<RunDiceMods>(run.DiceModsJson, EngineJson.Options);
+        var snapshot = JsonSerializer.Deserialize<RunSnapshot>(run.SnapshotJson, EngineJson.Options)!;
         return new CompletedRunView(
             run.Id,
             Game(run, game),
             run.Difficulty ?? throw new InvalidOperationException($"Completed run {run.Id} has no difficulty."),
             [.. dice.Concat(mods?.ExtraDice ?? []).Select(d => new DieView(d.Sides, d.Value))],
             [.. challenge.Select(d => new DieView(d.Sides, d.Value))],
-            RunTotal.Of(dice, challenge, JsonSerializer.Deserialize<RunSnapshot>(run.SnapshotJson, EngineJson.Options)!, mods),
+            RunTotal.Of(dice, challenge, snapshot, mods),
             review is null ? null : new ReviewView(review.Rating, review.Text),
             proof is null
                 ? null
@@ -1155,7 +1151,9 @@ public static class SeasonEndpoints
                     proof.Comment,
                     [.. JsonSerializer.Deserialize<EquatableArray<Guid>>(proof.FilesJson, EngineJson.Options).Select(Files.FileLinkView.Of)],
                     proof.WitnessId),
-            run.Status);
+            run.Status,
+            events.ConditionsOf(snapshot),
+            events.CheckOf(snapshot, run));
     }
 
     /// <summary>

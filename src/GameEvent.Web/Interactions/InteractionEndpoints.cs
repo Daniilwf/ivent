@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using GameEvent.Engine.Interactions;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Runs;
@@ -26,10 +27,14 @@ public sealed record InviteCoopRequest(Guid CommandId, Guid PartnerId);
 /// <summary>Missing accept is invalid input, not a silent decline.</summary>
 public sealed record AnswerInvitationRequest(Guid CommandId, bool? Accept);
 
-/// <summary>A participant's own incoming or outgoing invitation; account ids are never exposed.</summary>
+/// <summary>
+/// A participant's own incoming or outgoing invitation. A pending board response also has its effective deadline,
+/// the earlier of the invitation and the matched request's scheduled deadlines (D-742).
+/// </summary>
 public sealed record InteractionView(
     Guid Id, InteractionKind Kind, Guid FromPlayerId, Guid ToPlayerId, Guid? RunId,
-    DateTimeOffset CreatedAt, DateTimeOffset ExpiresAt, InteractionStatus Status);
+    DateTimeOffset CreatedAt, DateTimeOffset ExpiresAt, InteractionStatus Status,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] DateTimeOffset? EffectiveExpiresAt = null);
 
 /// <summary>The live shared run of the caller, also after new coop invitations have been switched off.</summary>
 public sealed record CoopView(Guid RunId, Guid RollerId, Guid PartnerId, DateTimeOffset JoinedAt);
@@ -94,9 +99,27 @@ public static class InteractionEndpoints
 
         // Do not erase residual invitations when new coop invitations are off: decline and withdrawal remain valid.
         var rows = await db.Interactions.AsNoTracking()
-            .Where(i => i.SeasonId == seasonId && (i.FromPlayerId == player || i.ToPlayerId == player)).ToListAsync(ct);
-        IReadOnlyList<InteractionView> views = [.. rows.OrderByDescending(i => i.CreatedAt).ThenBy(i => i.Id)
-            .Select(i => new InteractionView(i.Id, i.Kind, i.FromPlayerId, i.ToPlayerId, i.RunId, i.CreatedAt, i.ExpiresAt, i.Status))];
+            .Where(i => i.SeasonId == seasonId && (i.FromPlayerId == player || i.ToPlayerId == player))
+            .Select(i => new
+            {
+                Invitation = i,
+                // Match PartnerBoard.OutlivedItsRequest (D-742) in the same database snapshot as the invitation.
+                RequestExpiresAt = i.Kind == InteractionKind.Coop && i.Status == InteractionStatus.Pending && i.FromPlayerId != i.ToPlayerId
+                    ? db.PartnerRequests.Where(r => r.SeasonId == i.SeasonId && r.RunId == i.RunId
+                        && r.PlayerId == i.ToPlayerId && r.CreatedAt <= i.CreatedAt)
+                        .OrderByDescending(r => r.CreatedAt).ThenBy(r => r.Id)
+                        .Select(r => (DateTimeOffset?)r.ExpiresAt).FirstOrDefault()
+                    : null,
+            }).ToListAsync(ct);
+        IReadOnlyList<InteractionView> views = [.. rows.OrderByDescending(row => row.Invitation.CreatedAt).ThenBy(row => row.Invitation.Id)
+            .Select(row =>
+            {
+                var i = row.Invitation;
+                var effectiveExpiresAt = row.RequestExpiresAt is { } requestTerm && i.ExpiresAt < requestTerm
+                    ? i.ExpiresAt
+                    : row.RequestExpiresAt;
+                return new InteractionView(i.Id, i.Kind, i.FromPlayerId, i.ToPlayerId, i.RunId, i.CreatedAt, i.ExpiresAt, i.Status, effectiveExpiresAt);
+            })];
         return TypedResults.Ok(views);
     }
 

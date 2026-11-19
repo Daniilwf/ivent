@@ -6,11 +6,11 @@ using Microsoft.EntityFrameworkCore;
 
 namespace GameEvent.Web.Seasons;
 
-/// <summary>An object's card as the content describes it: its name and text.</summary>
-public sealed record ObjectCard(string Name, string Description);
+/// <summary>An object's name, text and proof requirement from the content.</summary>
+public sealed record ObjectCard(string Name, string Description, ContentProof? Proof);
 
 /// <summary>
-/// The cards of a season's objects (D-444, D-446): the latest name and text of each id over the season's content packs
+/// The cards of a season's objects (D-444, D-446): the latest metadata of each id over the season's content packs
 /// (a definition dropped from a later pack keeps the card it last had, D-400). Content publications are never undone
 /// (Undo rejects them, as it does map publications, D-308); the UndoneByEventId filter below is only a guard and changes nothing today. One mechanism for
 /// every view that names an object — the feed's item uses, gifts and drawn events, the season view's drawn event. Kept
@@ -50,7 +50,7 @@ public sealed class ContentCards
             {
                 foreach (var definition in pack.Objects)
                 {
-                    cards[definition.Id] = new ObjectCard(definition.Name, definition.Description);
+                    cards[definition.Id] = new ObjectCard(definition.Name, definition.Description, definition.Proof);
                 }
             }
         }

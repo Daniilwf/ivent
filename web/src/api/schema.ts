@@ -11229,7 +11229,10 @@ export interface components {
          * @enum {unknown}
          */
         InteractionStatus: "pending" | "accepted" | "declined" | "withdrawn" | "expired";
-        /** @description A participant's own incoming or outgoing invitation; account ids are never exposed. */
+        /**
+         * @description A participant's own incoming or outgoing invitation. A pending board response also has its effective deadline,
+         *     the earlier of the invitation and the matched request's scheduled deadlines (D-742).
+         */
         InteractionView: {
             /** Format: uuid */
             id: string;
@@ -11245,6 +11248,8 @@ export interface components {
             /** Format: date-time */
             expiresAt: string;
             status: components["schemas"]["InteractionStatus"];
+            /** Format: date-time */
+            effectiveExpiresAt?: null | string;
         };
         /**
          * @description An object I hold: its definition's name and description, what is left of its lifetime, who put it on me. `usable` —

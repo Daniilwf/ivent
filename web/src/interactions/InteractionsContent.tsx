@@ -169,7 +169,9 @@ function InvitationList({
               {incoming ? t.incoming(name(item.fromPlayerId)) : t.outgoing(name(item.toPlayerId))}
             </p>
             <p className="text-sm text-ink-soft">{t.invitationStatus[item.status]}</p>
-            {item.status === 'pending' ? <Expiration until={item.expiresAt} /> : null}
+            {item.status === 'pending' ? (
+              <Expiration until={item.effectiveExpiresAt ?? item.expiresAt} />
+            ) : null}
             {actions ? (
               <div className="flex flex-wrap gap-2">
                 {canAccept ? (

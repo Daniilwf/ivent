@@ -22,10 +22,10 @@ public static class EventViews
     private const int DrawsPerPage = 64;
 
     /// <summary>My latest draw that was not undone; null when there is none.</summary>
-    public static async Task<DrawnEventView?> LastDrawnAsync(GameEventDbContext db, ContentCards contentCards, Guid seasonId, Guid playerId, CancellationToken ct)
+    public static async Task<DrawnEventView?> LastDrawnAsync(GameEventDbContext db, IReadOnlyDictionary<string, ObjectCard> cards, Guid seasonId, Guid playerId, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(db);
-        ArgumentNullException.ThrowIfNull(contentCards);
+        ArgumentNullException.ThrowIfNull(cards);
         long? before = null;
         while (true)
         {
@@ -38,7 +38,7 @@ public static class EventViews
             {
                 if (EventCodec.Decode(new StoredEvent(row.Type, row.Version, row.Data)) is EventDrawn drawn && drawn.PlayerId == playerId)
                 {
-                    var card = (await contentCards.OfAsync(db, seasonId, ct)).GetValueOrDefault(drawn.ObjectId);
+                    var card = cards.GetValueOrDefault(drawn.ObjectId);
                     return new DrawnEventView(
                         row.Sequence, drawn.Deck, drawn.Kind, drawn.ObjectId, card?.Name ?? drawn.ObjectId, card?.Description ?? "", drawn.Source);
                 }

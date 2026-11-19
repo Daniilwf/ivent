@@ -110,7 +110,9 @@ public static class AdminProofEndpoints
             return TypedResults.NotFound();
         }
 
-        var conditions = new EventTurnViews(state, Guid.Empty);
+        var conditions = new EventTurnViews(state.Rules.Features.Events, id => state.Catalog.Find(id) is { } definition
+            ? new ObjectCard(definition.Name, definition.Description, definition.Proof)
+            : null);
         var order = ProofReviewOrder.Order(state);
         var gameIds = order.Select(id => state.Runs[id].GameId).Distinct().ToList();
         var titles = await db.Games.AsNoTracking().Where(g => gameIds.Contains(g.Id)).ToDictionaryAsync(g => g.Id, g => g.Title, ct);
@@ -142,8 +144,8 @@ public static class AdminProofEndpoints
                         ? new DropPenaltyView(penalty.Count, penalty.Sides, penalty.AffectsPoints, penalty.AffectsPosition, penalty.BadEvent)
                         : null,
                     run.HoursSource,
-                    conditions.ConditionsOf(run.RunId),
-                    conditions.CheckOf(run.RunId));
+                    conditions.ConditionsOf(run.Snapshot),
+                    conditions.CheckOf(run.Snapshot, run.Condition));
             }),
         ];
         return TypedResults.Ok(items);

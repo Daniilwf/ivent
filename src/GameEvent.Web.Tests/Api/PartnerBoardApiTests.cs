@@ -169,6 +169,65 @@ public sealed class PartnerBoardApiTests : IAsyncLifetime
     }
 
     [Theory]
+    [InlineData(1, 3, false)]
+    [InlineData(1, 3, true)]
+    [InlineData(3, 1, false)]
+    public async Task Pending_responses_show_the_earlier_term_and_direct_invites_keep_theirs(int requestHours, int inviteHours, bool switchOff)
+    {
+        await RulesAsync(_site, rules => rules with
+        {
+            PartnerBoard = rules.PartnerBoard! with { RequestTtlHours = requestHours },
+            Interactions = rules.Interactions with { InviteTtlHours = inviteHours },
+        });
+        var requestId = await PostedAsync();
+        await _site.SendAsync(new RespondToPartnerRequest(_site.Players["petya"], requestId));
+        await _site.SendAsync(new InviteToCoop(_site.Players["vasya"], _site.Players["petya"]));
+        if (switchOff)
+        {
+            await RulesAsync(_site, Flags(features => features with { Coop = false, PartnerBoard = false }));
+        }
+
+        var state = await StateAsync(_site);
+        var author = _site.Players["vasya"];
+        var boardResponse = Assert.Single(state.Interactions.Values, interaction => interaction.ToPlayerId == author);
+        var directInvite = Assert.Single(state.Interactions.Values, interaction => interaction.FromPlayerId == author);
+        var request = state.PartnerRequests[requestId];
+        var effectiveTerm = request.ExpiresAt < boardResponse.ExpiresAt ? request.ExpiresAt : boardResponse.ExpiresAt;
+        foreach (var login in new[] { "vasya", "petya" })
+        {
+            var client = await _site.SignedInAsync(login);
+            var list = (await ApiCalls.OkAsync(await client.GetAsync(Url("interactions"), Ct))).EnumerateArray().ToArray();
+            var response = Assert.Single(list, row => row.GetProperty("id").GetGuid() == boardResponse.InteractionId);
+            Assert.Equal(boardResponse.ExpiresAt, response.GetProperty("expiresAt").GetDateTimeOffset());
+            Assert.Equal(effectiveTerm, response.GetProperty("effectiveExpiresAt").GetDateTimeOffset());
+            var direct = Assert.Single(list, row => row.GetProperty("id").GetGuid() == directInvite.InteractionId);
+            Assert.Equal(directInvite.ExpiresAt, direct.GetProperty("expiresAt").GetDateTimeOffset());
+            Assert.False(direct.TryGetProperty("effectiveExpiresAt", out _));
+        }
+    }
+
+    [Fact]
+    public async Task A_response_to_a_reopened_request_uses_its_new_term()
+    {
+        await RulesAsync(_site, rules => rules with
+        {
+            PartnerBoard = rules.PartnerBoard! with { RequestTtlHours = 1 },
+            Interactions = rules.Interactions with { InviteTtlHours = 24 },
+        });
+        var oldRequest = await PostedAsync();
+        await _site.SendAsync(new ClosePartnerRequest(_site.Players["vasya"], oldRequest));
+        _site.Clock.UtcNow = _site.Clock.UtcNow.AddMinutes(10);
+        await _site.SendAsync(new PostPartnerRequest(_site.Players["vasya"]));
+        var request = Assert.Single((await StateAsync(_site)).PartnerRequests.Values, item => item.RequestId != oldRequest);
+        await _site.SendAsync(new RespondToPartnerRequest(_site.Players["petya"], request.RequestId));
+        var client = await _site.SignedInAsync("petya");
+
+        var response = Assert.Single((await ApiCalls.OkAsync(await client.GetAsync(Url("interactions"), Ct))).EnumerateArray());
+
+        Assert.Equal(request.ExpiresAt, response.GetProperty("effectiveExpiresAt").GetDateTimeOffset());
+    }
+
+    [Theory]
     [InlineData("zritel")]
     [InlineData("masha")]
     public async Task Only_a_player_of_the_season_responds(string login)
@@ -215,6 +274,9 @@ public sealed class PartnerBoardApiTests : IAsyncLifetime
         var state = await StateAsync(_site);
         Assert.Equal(PartnerRequestStatus.Closed, state.PartnerRequests[id].Status);
         Assert.Equal(InteractionStatus.Expired, Assert.Single(state.Interactions.Values).Status);
+        var ended = Assert.Single((await ApiCalls.OkAsync(await client.GetAsync(Url("interactions"), Ct))).EnumerateArray());
+        Assert.Equal("expired", ended.GetProperty("status").GetString());
+        Assert.False(ended.TryGetProperty("effectiveExpiresAt", out _));
         await AssertIntactAsync(_site);
     }
 

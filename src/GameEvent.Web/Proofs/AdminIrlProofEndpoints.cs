@@ -1,13 +1,14 @@
 using System.Security.Claims;
+using System.Text.Json;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Proofs;
 using GameEvent.Infrastructure.Database;
-using GameEvent.Infrastructure.EventLog;
 using GameEvent.Infrastructure.Queue;
 using GameEvent.Web.Accounts;
 using GameEvent.Web.Hosting;
 using GameEvent.Web.Seasons;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.EntityFrameworkCore;
 using ActionResult = Microsoft.AspNetCore.Http.HttpResults.Results<
     Microsoft.AspNetCore.Http.HttpResults.Ok<GameEvent.Web.Seasons.CommandResponse>,
     Microsoft.AspNetCore.Http.HttpResults.ProblemHttpResult,
@@ -61,33 +62,50 @@ public static class AdminIrlProofEndpoints
             .WithActionErrors();
     }
 
-    // The proofs live on the pending effects of the season folded from the log; the rate limit caps the cost
     private static async Task<Results<Ok<IReadOnlyList<IrlProofQueueItemView>>, NotFound>> GetQueueAsync(
-        Guid seasonId, GameEventDbContext db, SeasonStateReader seasonStates, CancellationToken ct)
+        Guid seasonId, GameEventDbContext db, ContentCards contentCards, CancellationToken ct)
     {
-        var state = await seasonStates.ReadAsync(db, seasonId, ct);
-        if (!state.IsCreated)
+        if (!await db.Seasons.AnyAsync(s => s.Id == seasonId, ct))
         {
             return TypedResults.NotFound();
         }
 
+        // Only effects with a stored proof need decoding. Proof status and submission order are read in memory.
+        var rows = await db.ManualEffects.AsNoTracking()
+            .Where(e => e.SeasonId == seasonId && e.IrlProofJson != null)
+            .Join(db.SeasonPlayers, effect => effect.PlayerId, player => player.Id, (effect, player) => new
+            {
+                effect.Id,
+                effect.PlayerId,
+                PlayerName = player.Name,
+                effect.ObjectId,
+                effect.IrlProofJson,
+            })
+            .ToListAsync(ct);
+        var pending = rows.Select(row => (row.Id, row.PlayerId, row.PlayerName, row.ObjectId,
+                Proof: JsonSerializer.Deserialize<IrlProofState>(row.IrlProofJson!, EngineJson.Options)))
+            .Where(item => item.Proof is { Status: IrlProofStatus.Pending })
+            .ToList();
+        if (pending.Count == 0)
+        {
+            return TypedResults.Ok<IReadOnlyList<IrlProofQueueItemView>>([]);
+        }
+
+        var cards = await contentCards.OfAsync(db, seasonId, ct);
         IReadOnlyList<IrlProofQueueItemView> items =
         [
-            .. state.ManualEffects.Values
-                .Where(e => e.IrlProof is { Status: IrlProofStatus.Pending })
-                .OrderBy(e => e.IrlProof!.SubmittedAt)
-                .ThenBy(e => e.EffectId)
-                .Select(e =>
+            .. pending.OrderBy(item => item.Proof!.SubmittedAt).ThenBy(item => item.Id)
+                .Select(item =>
                 {
-                    var definition = e.ObjectId is { } id ? state.Catalog.Find(id) : null;
-                    var proof = e.IrlProof!;
+                    var card = item.ObjectId is { } id ? cards.GetValueOrDefault(id) : null;
+                    var proof = item.Proof!;
                     return new IrlProofQueueItemView(
-                        e.EffectId,
-                        e.PlayerId,
-                        state.Players.TryGetValue(e.PlayerId, out var player) ? player.Name : "",
-                        e.ObjectId ?? "",
-                        definition?.Name ?? e.ObjectId ?? "",
-                        definition?.Description ?? "",
+                        item.Id,
+                        item.PlayerId,
+                        item.PlayerName,
+                        item.ObjectId ?? "",
+                        card?.Name ?? item.ObjectId ?? "",
+                        card?.Description ?? "",
                         [.. proof.Files.Select(Files.FileLinkView.Of)],
                         proof.Link,
                         proof.SubmittedAt);

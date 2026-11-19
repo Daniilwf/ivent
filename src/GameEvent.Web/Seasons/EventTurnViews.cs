@@ -1,10 +1,14 @@
+using System.Text.Json;
 using GameEvent.Engine.Content;
 using GameEvent.Engine.Effects;
+using GameEvent.Engine.Inventory;
+using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Proofs;
 using GameEvent.Engine.Rulesets;
 using GameEvent.Engine.Runs;
 using GameEvent.Engine.Seasons;
 using GameEvent.Engine.Turns;
+using GameEvent.Infrastructure.Seasons;
 
 namespace GameEvent.Web.Seasons;
 
@@ -31,38 +35,29 @@ public sealed record WaitingEventView(string ObjectId, string Name, string Descr
 public sealed record IrlProofView(IrlProofStatus Status, IReadOnlyList<Files.FileLinkView> Files, string? Link, string? Comment, DateTimeOffset SubmittedAt);
 
 /// <summary>
-/// The events part of my turn, read from the season folded from the log (stage 5): the projection tables of 5.16 are not
-/// read here (D-824). Every list is empty and every mark off with <c>features.events</c> off.
+/// Displays projected wallet modifiers, run snapshots and manual effects. Conditions and waiting events follow the
+/// events flag; the metadata of an existing manual effect remains available independently of it.
 /// </summary>
-internal sealed class EventTurnViews(SeasonState? state, Guid playerId)
+internal sealed class EventTurnViews(bool enabled, Func<string, ObjectCard?> cardOf)
 {
-    private bool On => state is { } s && s.Rules.Features.Events;
-
     /// <summary>The changes of my next roll that are conditions (D-507): they wait for my next roll.</summary>
-    public IReadOnlyList<RunConditionView> WaitingConditions()
-    {
-        if (!On || !state!.Players.TryGetValue(playerId, out var player))
-        {
-            return [];
-        }
-
-        return [.. player.Wallet.NextRoll
-            .Where(m => m.RunCondition is not null)
-            .Select(m => Condition(m.ObjectId, m.RunCondition!, m.Hostile, m.EventKind))];
-    }
+    public IReadOnlyList<RunConditionView> WaitingConditions(PlayerEconomy? wallet) =>
+        enabled && wallet is not null
+            ? [.. wallet.NextRoll.Where(m => m.RunCondition is not null)
+                .Select(m => Condition(m.ObjectId, m.RunCondition!, m.Hostile, m.EventKind))]
+            : [];
 
     /// <summary>
     /// My drawn events waiting for my future steps (D-505, D-823): the changes of the next roll (conditions apart — they are
     /// <see cref="WaitingConditions"/>) and of the next throw that came from an event, one row per event and kind.
     /// </summary>
-    public IReadOnlyList<WaitingEventView> WaitingEvents()
+    public IReadOnlyList<WaitingEventView> WaitingEvents(PlayerEconomy? wallet)
     {
-        if (!On || !state!.Players.TryGetValue(playerId, out var player))
+        if (!enabled || wallet is null)
         {
             return [];
         }
 
-        var wallet = player.Wallet;
         var rollEvents = wallet.NextRoll
             .Where(m => m.RunCondition is null && m.EventKind is not null)
             .Select(m => (m.ObjectId, Kind: m.EventKind!.Value))
@@ -74,37 +69,47 @@ internal sealed class EventTurnViews(SeasonState? state, Guid playerId)
         var fromEvents = rollEvents.Concat(throwEvents).Distinct();
         return [.. fromEvents.Select(e =>
         {
-            var definition = state.Catalog.Find(e.ObjectId);
+            var definition = cardOf(e.ObjectId);
             return new WaitingEventView(e.ObjectId, definition?.Name ?? e.ObjectId, definition?.Description ?? "", e.Kind, rollKeys.Contains(e), throwKeys.Contains(e));
         })];
     }
 
-    /// <summary>The conditions a roll fixed on a run (D-507); none with events off or for an unknown run.</summary>
-    public IReadOnlyList<RunConditionView> ConditionsOf(Guid runId) =>
-        On && state!.Runs.TryGetValue(runId, out var run)
-            ? ConditionsOf(run.Snapshot)
+    /// <summary>The roll fixes its conditions in its snapshot before the player picks a starting difficulty.</summary>
+    public IReadOnlyList<RunConditionView> ConditionsOf(RunSnapshot? snapshot) =>
+        enabled && snapshot is not null
+            ? [.. snapshot.Conditions.Select(c => Condition(c.ObjectId, c.Condition, c.Hostile, c.EventKind))]
             : [];
 
-    /// <summary>The offered roll already fixed its conditions, before the player picks a starting difficulty.</summary>
-    public IReadOnlyList<RunConditionView> ConditionsOf(RunSnapshot snapshot) =>
-        On ? [.. snapshot.Conditions.Select(c => Condition(c.ObjectId, c.Condition, c.Hostile, c.EventKind))] : [];
-
     /// <summary>The check of a run's conditions; null for a run without any or with events off.</summary>
-    public RunConditionCheckView? CheckOf(Guid runId) =>
-        On && state!.Runs.TryGetValue(runId, out var run) && run.Snapshot.Conditions.Count > 0 && run.Condition is { } check
+    public RunConditionCheckView? CheckOf(RunSnapshot snapshot, RunConditionState? check) =>
+        enabled && snapshot.Conditions.Count > 0 && check is not null
             ? new RunConditionCheckView(check.Met, check.Waived)
             : null;
 
-    /// <summary>Whether a manual effect is an IRL one (D-509): its object asks for a media proof.</summary>
-    public bool IsIrl(Guid effectId) =>
-        state is not null && state.ManualEffects.TryGetValue(effectId, out var effect) && IrlProofs.IsIrl(state, effect);
-
-    /// <summary>The owner's view of an IRL effect's proof; null before one is sent.</summary>
-    public IrlProofView? ProofOf(Guid effectId) =>
-        state is not null && state.ManualEffects.TryGetValue(effectId, out var effect) && effect.IrlProof is { } proof
-            ? new IrlProofView(proof.Status, [.. proof.Files.Select(Files.FileLinkView.Of)], proof.Link, proof.Comment, proof.SubmittedAt)
+    /// <summary>In the projection, the boolean column is authoritative (D-810).</summary>
+    public RunConditionCheckView? CheckOf(RunSnapshot snapshot, RunRecord run) =>
+        enabled && snapshot.Conditions.Count > 0 && run.ConditionsJson is { } json
+            ? new RunConditionCheckView(run.ConditionMet == true, JsonSerializer.Deserialize<RunConditionState>(json, EngineJson.Options)!.Waived)
             : null;
 
+    public ManualEffectView ManualEffectOf(PendingManualEffectRecord effect)
+    {
+        var card = effect.ObjectId is { } id ? cardOf(id) : null;
+        var proof = effect.IrlProofJson is { } json
+            ? JsonSerializer.Deserialize<IrlProofState>(json, EngineJson.Options)
+            : null;
+        return new ManualEffectView(effect.Id, effect.DrawEvent, effect.Source, effect.ObjectId, card?.Proof == ContentProof.Media,
+            proof is null ? null : new IrlProofView(proof.Status, [.. proof.Files.Select(Files.FileLinkView.Of)], proof.Link, proof.Comment, proof.SubmittedAt),
+            card?.Name ?? effect.ObjectId, effect.ObjectId is null ? null : card?.Description ?? "");
+    }
+
+    private RunConditionView Condition(string objectId, ConditionSpec condition, bool hostile, EventKind? kind) =>
+        new(objectId, cardOf(objectId)?.Name ?? objectId, kind, hostile, condition.DifficultyAtLeast, condition.DifficultyAtMost);
+}
+
+/// <summary>The live suspension includes its action and target, which the projected choice alone does not describe.</summary>
+internal sealed class EventQuestionViews(SeasonState? state, Guid playerId)
+{
     /// <summary>The games named by the current requestChoice, for one batched title lookup by its caller.</summary>
     public IReadOnlyList<Guid> GameOptionIds(PendingChoice? choice)
     {
@@ -206,6 +211,4 @@ internal sealed class EventTurnViews(SeasonState? state, Guid playerId)
             : optionId;
     }
 
-    private RunConditionView Condition(string objectId, ConditionSpec condition, bool hostile, EventKind? kind) =>
-        new(objectId, state!.Catalog.Find(objectId)?.Name ?? objectId, kind, hostile, condition.DifficultyAtLeast, condition.DifficultyAtMost);
 }

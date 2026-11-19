@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using GameEvent.Engine.Content;
 using GameEvent.Engine.Seasons;
 using GameEvent.Infrastructure.Database;
 using GameEvent.Infrastructure.Queue;
@@ -138,7 +139,7 @@ public static class AdminSeasonEndpoints
     private static async Task<Microsoft.AspNetCore.Http.HttpResults.Results<
         Microsoft.AspNetCore.Http.HttpResults.Ok<IReadOnlyList<AdminManualEffectView>>,
         Microsoft.AspNetCore.Http.HttpResults.NotFound>> GetEffectsAsync(
-            Guid seasonId, GameEventDbContext db, Infrastructure.EventLog.SeasonStateReader seasonStates, CancellationToken ct)
+            Guid seasonId, GameEventDbContext db, ContentCards contentCards, CancellationToken ct)
     {
         if (!await db.Seasons.AnyAsync(s => s.Id == seasonId, ct))
         {
@@ -156,11 +157,10 @@ public static class AdminSeasonEndpoints
         // An IRL mark comes from the object's definition in the season's catalog (IrlProofs.IsIrl): only an object's text can be one
         if (effects.Any(e => e.ObjectId is not null))
         {
-            var state = await seasonStates.ReadAsync(db, seasonId, ct);
-            effects = [.. effects.Select(e => e with
-            {
-                Irl = state.ManualEffects.TryGetValue(e.Id, out var pending) && Engine.Proofs.IrlProofs.IsIrl(state, pending),
-            })];
+            var cards = await contentCards.OfAsync(db, seasonId, ct);
+            effects = [.. effects.Select(e => e.ObjectId is { } id && cards.GetValueOrDefault(id)?.Proof == ContentProof.Media
+                ? e with { Irl = true }
+                : e)];
         }
 
         return TypedResults.Ok(effects);

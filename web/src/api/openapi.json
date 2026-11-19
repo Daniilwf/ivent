@@ -13824,9 +13824,16 @@
           },
           "status": {
             "$ref": "#/components/schemas/InteractionStatus"
+          },
+          "effectiveExpiresAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
           }
         },
-        "description": "A participant's own incoming or outgoing invitation; account ids are never exposed."
+        "description": "A participant's own incoming or outgoing invitation. A pending board response also has its effective deadline,\nthe earlier of the invitation and the matched request's scheduled deadlines (D-742)."
       },
       "InventoryItemView": {
         "required": [
