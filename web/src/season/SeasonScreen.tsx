@@ -1,9 +1,11 @@
-import { CalendarClock, Coins, Flag, Trophy } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { CalendarClock, Coins, Flag, Swords, Trophy } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, rejectionCode, type Schemas } from '../api/client';
 import { newCommandId } from '../api/commands';
-import { usePageHeading } from '../app/router';
+import { Link } from '../app/Link';
+import { paths, usePageHeading } from '../app/router';
 import { useSeasonVersion } from '../app/useSeasonVersion';
+import { useIsPast } from '../app/useIsPast';
 import { moscowTime } from '../app/time';
 import { ru } from '../i18n/ru';
 import { CompleteForm, type Completion } from './CompleteForm';
@@ -36,6 +38,7 @@ import { MapView, type MapApi } from '../board/MapView';
 import type { MomentHandle } from '../board/moment';
 import { WheelMoment, type WheelRoll } from '../board/Wheel';
 import { Button } from '../ui/Button';
+import { standaloneLink } from '../ui/buttonStyles';
 import { BottomSheet } from '../ui/Dialogs';
 import { Chip } from '../ui/Marks';
 import { Skeleton } from '../ui/Progress';
@@ -442,6 +445,11 @@ export function SeasonScreen({
   if (!season) return <SeasonSkeleton />;
 
   const me = season.me;
+  const interactions = season.interactionFeatures;
+  const showInteractions =
+    interactions?.duels ||
+    interactions?.partnerBoard ||
+    (role === 'player' && me && (interactions?.coop || me.hasInteractionActions));
   const manualEffects = me?.manualEffects.filter((effect) => !effect.irl) ?? [];
   const irlEffects = me?.manualEffects.filter((effect) => effect.irl) ?? [];
   const effectChoice = me?.choice?.kind === 'effect' ? me.choice : null;
@@ -1127,38 +1135,62 @@ export function SeasonScreen({
               total={routeLength}
               actions={null}
             />
+            {me.isCoopPartner ? (
+              <p className="text-ink-soft">{ru.turn.coopPartnerWaiting}</p>
+            ) : null}
             {me.eventsEnabled === true ? (
               <RunConditions conditions={me.activeRun.conditions ?? null} />
             ) : null}
+            {me.activeDuels?.length ? (
+              <ul data-testid="run-duels" className="grid gap-2 text-sm">
+                {me.activeDuels.map((duel) => {
+                  const opponentId =
+                    duel.challengerId === me.playerId ? duel.opponentId : duel.challengerId;
+                  const opponent = season.players.find((player) => player.id === opponentId);
+                  return opponent ? (
+                    <li key={duel.id} className="flex items-start gap-2 rounded-md bg-muted p-3">
+                      <Swords size={18} aria-hidden className="shrink-0" />
+                      <span>{ru.turn.race(opponent.name, moscowTime(duel.expiresAt))}</span>
+                    </li>
+                  ) : null;
+                })}
+              </ul>
+            ) : null}
           </div>
         )}
-        {turnsOpen && !effectChoice && me?.phase === 'playing' && me.activeRun && (
-          <div className="grid min-w-0 gap-4">
-            <CompleteForm
-              needsHours={me.activeRun.game.hours == null}
-              challengesEnabled={me.challengesEnabled}
-              dice={me.difficultyDice ?? null}
-              declared={me.activeRun.declaredDifficulty ?? null}
-              pending={pending}
-              onComplete={(completion) => void act({ kind: 'complete', completion })}
-            />
-            <RunActions
-              game={me.activeRun.game.title}
-              dropHintMinutes={me.dropHintMinutes}
-              dropPenalty={me.dropPenalty}
-              techRerollOpen={me.techRerollOpen}
-              techRerollUntil={me.techRerollUntil ?? null}
-              wishRerollOpen={me.wishRerollOpen === true}
-              onWishReroll={() => void act({ kind: 'techReroll', reason: 'wish', comment: null })}
-              frozen={me.finish?.frozen === true}
-              pending={pending}
-              onDrop={() => {
-                if (me.activeRun) void act({ kind: 'drop', runId: me.activeRun.id });
-              }}
-              onTechReroll={(reason, comment) => void act({ kind: 'techReroll', reason, comment })}
-            />
-          </div>
-        )}
+        {turnsOpen &&
+          !effectChoice &&
+          me?.phase === 'playing' &&
+          me.activeRun &&
+          !me.isCoopPartner && (
+            <div className="grid min-w-0 gap-4">
+              <CompleteForm
+                needsHours={me.activeRun.game.hours == null}
+                challengesEnabled={me.challengesEnabled}
+                dice={me.difficultyDice ?? null}
+                declared={me.activeRun.declaredDifficulty ?? null}
+                pending={pending}
+                onComplete={(completion) => void act({ kind: 'complete', completion })}
+              />
+              <RunActions
+                game={me.activeRun.game.title}
+                dropHintMinutes={me.dropHintMinutes}
+                dropPenalty={me.dropPenalty}
+                techRerollOpen={me.techRerollOpen}
+                techRerollUntil={me.techRerollUntil ?? null}
+                wishRerollOpen={me.wishRerollOpen === true}
+                onWishReroll={() => void act({ kind: 'techReroll', reason: 'wish', comment: null })}
+                frozen={me.finish?.frozen === true}
+                pending={pending}
+                onDrop={() => {
+                  if (me.activeRun) void act({ kind: 'drop', runId: me.activeRun.id });
+                }}
+                onTechReroll={(reason, comment) =>
+                  void act({ kind: 'techReroll', reason, comment })
+                }
+              />
+            </div>
+          )}
         {me?.eventsEnabled === true ? (
           <WaitingEvents
             events={me.waitingEvents ?? null}
@@ -1206,6 +1238,15 @@ export function SeasonScreen({
           </section>
         ) : null}
         {!manualFirst && !throwing ? afterRun : null}
+        {showInteractions ? (
+          <Link
+            to={paths.interactions(season.id)}
+            className={standaloneLink}
+            data-testid="season-interactions"
+          >
+            {ru.turn.interactions}
+          </Link>
+        ) : null}
       </section>
 
       <section
@@ -1441,23 +1482,4 @@ function conditionResultNote(run: Schemas['CompletedRunView']): string | null {
     run.challengeDice.length === 0
     ? ru.runConditions.noDiceResult
     : null;
-}
-
-// The longest delay setTimeout takes; a farther deadline is checked again when the timer fires.
-const maxTimeout = 2_147_483_647;
-
-/** Whether the UTC instant has passed; re-renders when it does. */
-function useIsPast(instant: string | null): boolean {
-  const at = instant === null ? null : Date.parse(instant);
-  const subscribe = useCallback(
-    (notify: () => void) => {
-      if (at === null) return () => {};
-      const timer = setTimeout(notify, Math.min(Math.max(0, at - Date.now()), maxTimeout));
-      return () => {
-        clearTimeout(timer);
-      };
-    },
-    [at],
-  );
-  return useSyncExternalStore(subscribe, () => at !== null && Date.now() >= at);
 }

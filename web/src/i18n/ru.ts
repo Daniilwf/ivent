@@ -1,5 +1,9 @@
 // The single dictionary of interface texts. Terms come from docs/GLOSSARY.md.
 
+import { stage5Moderation } from './stage5Moderation';
+import { stage5Operations } from './stage5Operations';
+import { stage5Interactions } from './stage5Interactions';
+
 // A Russian noun after a number: 1 очко, 2 очка, 5 очков
 const plural = (n: number, one: string, few: string, many: string) => {
   const tens = Math.abs(n) % 100;
@@ -31,6 +35,13 @@ const coinWords: Record<GrammaticalCase, readonly [string, string, string]> = {
 // монетка / монетки / монеток in the case asked; a debt with a real minus: −2 монетки
 export const coins = (n: number, grammaticalCase: GrammaticalCase = 'nominative') =>
   `${n < 0 ? '−' : ''}${Math.abs(n).toLocaleString('ru-RU')} ${plural(n, ...coinWords[grammaticalCase])}`;
+
+const sharePercent = (share: number) =>
+  share.toLocaleString('ru-RU', {
+    style: 'percent',
+    notation: share > 0 && share < 1e-22 ? 'scientific' : 'standard',
+    maximumFractionDigits: 20,
+  });
 
 // прохождение / прохождения / прохождений
 const runs = (n: number) => {
@@ -516,7 +527,11 @@ export const ru = {
     throttled: 'Слишком много попыток. Подожди немного и попробуй снова.',
     logout: 'Выйти',
   },
+  interactions: stage5Interactions,
   turn: {
+    interactions: 'Напарники и дуэли',
+    race: (opponent: string, deadline: string) => `Дуэль с игроком ${opponent} до ${deadline}`,
+    coopPartnerWaiting: 'Ты в коопе. Завершение прохождения отмечает роллер.',
     after: 'После прохождения',
     afterGame: (title: string) => `Прошлая игра: ${title}`,
     proofToSend: 'Пруф: ещё не отправлен',
@@ -1852,6 +1867,50 @@ export const ru = {
       economy: 'Монетки, предметы, магазин и ставки',
       history: 'История изменений',
     },
+    stage5: {
+      sections: {
+        coop: 'Кооп',
+        invitations: 'Приглашения',
+        partnerBoard: 'Доска «ищу напарника»',
+        duels: 'Дуэли',
+        weeklyChallenge: 'Челлендж недели',
+        suggestions: 'Предложка',
+        polls: 'Голосования',
+        globalEvents: 'Общие ивенты',
+        events: 'Ивенты и IRL-пруфы',
+      },
+      points: (share: number) =>
+        `Роллеру достаётся ${sharePercent(share)} очков и шагов за кооп. Его доля округляется вверх, остальное получает напарник.`,
+      coins: (share: number) =>
+        `Доля роллера в монетках за кооп — ${sharePercent(share)}. Округление такое же.`,
+      inviteTtl: (n: number) => `На ответ на приглашение есть ${n} ч.`,
+      inviteLimit: (n: number) => `Лимит отправленных приглашений, которые ждут ответа — ${n}.`,
+      sharedInvites: 'Приглашения в кооп и вызовы на дуэль считаются вместе.',
+      boardTtl: (n: number) => `Запрос на доске открыт до ${n} ч.`,
+      duelReward: (n: number) => `Победитель дуэли получает ${coins(n, 'accusative')}.`,
+      duelTtl: (n: number) => `Дуэль длится до ${n} дн. после принятия вызова.`,
+      duelLimit: (n: number) =>
+        `Лимит открытых дуэлей — ${n}. Сюда входят отправленные вызовы и принятые дуэли.`,
+      duelCooldown: (n: number) =>
+        `Та же пара может снова начать дуэль через ${n} дн. после её окончания.`,
+      duelWinLimit: (n: number) => `Лимит побед в дуэлях за сезон — ${n}.`,
+      duelFresh: 'В дуэли учитываются игры, выпавшие после принятия вызова.',
+      duelDrop: 'Дроп прохождения, которое участвует в дуэли, отдаёт победу сопернику.',
+      weeklyTtl: (n: number) =>
+        `Окно челленджа недели длится ${n} дн. с начала. Награда указана в самом челлендже.`,
+      suggestions: (n: number) =>
+        `Лимит предложений от игрока — ${n} за день по часовому поясу сезона.`,
+      gameOptions: (n: number) => `Число вариантов при голосовании за игру — до ${n}.`,
+      voteChange: 'Голос можно изменить до закрытия голосования.',
+      voteFixed: 'После отправки голос изменить нельзя.',
+      globalLimit: (n: number) => `Одновременно могут идти до ${n} общих ивентов.`,
+      answerTtl: (n: number) =>
+        `На ответ на вопрос ивента есть ${n} ч. Затем вариант выбирается случайно.`,
+      noAnswerTtl: 'Вопрос ивента ждёт ответа без срока.',
+      irlFiles: (n: number) =>
+        `Лимит фотографий в одном IRL-пруфе — ${n}. Вместо фото можно отправить ссылку.`,
+      irlLinkOnly: 'IRL-пруф принимается только по ссылке.',
+    },
     // D-207 (RGG 14): the owner's text, word for word; the order is the order of the check
     completion: {
       lead: 'Игра пройдена, когда выполнено первое подходящее условие из списка. Идём сверху вниз и останавливаемся на первом, которое у игры есть.',
@@ -2037,6 +2096,33 @@ export const ru = {
       'roll.techRerollWindowHours': 'Окно тех-реролла, часов',
       'roll.minPlayMinutesBeforeDrop': 'Минут игры до дропа',
       'reward.diceCount.hoursPerDie': 'Часов на один кубик',
+      'features.coop': 'Кооп',
+      'features.duels': 'Дуэли',
+      'features.partnerBoard': 'Доска «ищу напарника»',
+      'features.weeklyChallenge': 'Челлендж недели',
+      'features.suggestions': 'Предложка',
+      'features.polls': 'Голосования',
+      'features.globalEvents': 'Общие ивенты',
+      'reward.coop.pointsShare': 'Доля роллера в очках и шагах за кооп',
+      'reward.coop.coinsShare': 'Доля роллера в монетках за кооп',
+      'interactions.inviteTtlHours': 'Срок приглашения, часов',
+      'interactions.maxOpenInvitesPerPlayer': 'Лимит открытых приглашений',
+      'partnerBoard.requestTtlHours': 'Срок запроса на доске напарников, часов',
+      'duels.rewardCoins': 'Награда за победу в дуэли, монеток',
+      'duels.durationDays': 'Срок дуэли, дней',
+      'duels.maxOpenPerPlayer': 'Лимит открытых дуэлей',
+      'duels.samePairCooldownDays': 'Пауза между дуэлями одной пары, дней',
+      'duels.maxWinsPerSeason': 'Лимит побед в дуэлях за сезон',
+      'duels.countRunsStartedAfterAccept': 'В дуэли учитываются только свежие прохождения',
+      'duels.dropForfeits': 'Дроп отдаёт победу в дуэли сопернику',
+      'weeklyChallenge.durationDays': 'Окно челленджа недели, дней',
+      'suggestions.perDay': 'Лимит предложений в день',
+      'polls.gameOptions': 'Лимит игр в голосовании',
+      'polls.allowChangeVote': 'Можно менять голос',
+      'polls.showLiveCountsDefault': 'Показывать счёт до закрытия неанонимного голосования',
+      'globalEvents.maxActive': 'Лимит общих ивентов одновременно',
+      'events.answerTimeoutHours': 'Срок ответа на вопрос ивента, часов',
+      'events.irlProof.maxFiles': 'Лимит фотографий в IRL-пруфе',
       'reward.diceCount.rounding': 'Округление числа кубиков',
       'reward.diceCount.min': 'Минимум кубиков',
       'reward.diceCount.max': 'Максимум кубиков',
@@ -2096,6 +2182,8 @@ export const ru = {
   },
   // H8: the admin's pages (/admin/…)
   admin: {
+    stage5Moderation,
+    stage5Operations,
     title: 'Админка',
     nav: 'Разделы админки',
     sectionsButton: 'Разделы',
@@ -2115,6 +2203,10 @@ export const ru = {
       test: 'Инструменты для тестов',
       map: 'Карта',
       content: 'Контент',
+      globalevents: 'Общие ивенты',
+      weeklychallenges: 'Челлендж недели',
+      irlproofs: 'IRL-пруфы',
+      suggestions: 'Предложка',
     },
     leads: {
       proofs: 'Финиши сверху, дальше по времени завершения. Проверь пруф и одобри или отклони.',
@@ -2132,7 +2224,13 @@ export const ru = {
       map: 'Клетки, стрелки и зоны карты сезона. Игроки увидят правки только после публикации.',
       content:
         'Предметы, эффекты, спецроллы и колёса сезона. Каждое сохранение — новая версия контента в логе.',
+      globalevents: 'Запусти опубликованный ивент для всех игроков сезона.',
+      weeklychallenges: 'Задай новый челлендж или засчитай прохождение для ручного задания.',
+      irlproofs: 'Проверь подтверждения выполнения IRL-заданий.',
+      suggestions: 'Рассмотри предложенные игры и объекты.',
     },
+    featureOffTitle: 'Механика выключена',
+    featureOffText: 'Её можно включить в правилах выбранного сезона.',
     noSeasonTitle: 'Сезона пока нет',
     noSeasonText: 'Создай сезон в разделе «Сезон», и здесь появятся игроки и пруфы.',
     toSeason: 'Открыть «Сезон»',

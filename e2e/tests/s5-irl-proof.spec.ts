@@ -3,7 +3,15 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, test } from '@playwright/test';
 import type { Schemas } from '../support/api.ts';
-import { apiOf, live, rollAndStart, seasonOf, setUpSeason, signIn } from '../support/world.ts';
+import {
+  apiOf,
+  live,
+  openAdmin,
+  rollAndStart,
+  seasonOf,
+  setUpSeason,
+  signIn,
+} from '../support/world.ts';
 
 const picture = readFileSync(
   fileURLToPath(new URL('../../content/map.demo.background.png', import.meta.url)),
@@ -50,10 +58,13 @@ test('an IRL proof keeps its materials through rejection and resubmission until 
   const other = await apiOf(observer);
   const page = await signIn(browser, player);
   const watcher = await signIn(browser, observer);
+  const moderator = await signIn(browser, world.admin);
   const externalRequests: string[] = [];
-  page.on('request', (request) => {
-    if (new URL(request.url()).hostname === 'example.com') externalRequests.push(request.url());
-  });
+  for (const proofReader of [page, moderator]) {
+    proofReader.on('request', (request) => {
+      if (new URL(request.url()).hostname === 'example.com') externalRequests.push(request.url());
+    });
+  }
   try {
     await rollAndStart(owner, world.seasonId);
     await owner.post(`${path}/drop`);
@@ -119,10 +130,27 @@ test('an IRL proof keeps its materials through rejection and resubmission until 
     await expect(
       watcher.getByTestId(/^feed-item-/).filter({ hasText: 'IRL-пруф отправлен' }),
     ).toHaveCount(1, live);
-    await admin.post(`${adminPath}/effects/${effect.id}/irl-proof/review`, {
-      approved: false,
-      comment: 'Добавь голос в записи',
+    await openAdmin(moderator, world, 'irlproofs');
+    const proof = moderator
+      .getByTestId('irl-proof-queue')
+      .getByRole('article')
+      .filter({ hasText: 'Караоке' });
+    await expect(proof.getByRole('heading', { name: 'Караоке' })).toBeVisible(live);
+    await expect(proof).toContainText(player.name);
+    await expect(proof.getByRole('img')).toHaveAttribute('src', file.thumbnailUrl);
+    await expect(proof.getByRole('link', { name: /открыть видео/i })).toHaveAttribute(
+      'href',
+      video,
+    );
+    await moderator.evaluate(() => document.fonts.ready);
+    await moderator.screenshot({
+      path: shot(`s5-23-admin-irl-queue-${info.project.name}.png`),
     });
+    await proof.getByRole('button', { name: 'Отклонить', exact: true }).click();
+    const rejection = moderator.getByRole('alertdialog');
+    await rejection.getByRole('textbox', { name: 'Комментарий' }).fill('Добавь голос в записи');
+    await moderator.screenshot({ path: shot(`s5-23-admin-irl-reject-${info.project.name}.png`) });
+    await rejection.getByRole('button', { name: 'Отклонить', exact: true }).click();
     await expect(task.getByText('Пруф отклонён', { exact: true })).toBeVisible(live);
     await expect(task).toContainText('Добавь голос в записи');
     await expect(task.getByRole('textbox', { name: /ссылка на видео/i })).toHaveValue(video);
@@ -142,10 +170,23 @@ test('an IRL proof keeps its materials through rejection and resubmission until 
     expect((await seasonOf(owner, world.seasonId)).me?.manualEffects[0]?.irlProof?.link).toBe(
       corrected,
     );
-    const approval = await admin.post(`${adminPath}/effects/${effect.id}/irl-proof/review`, {
-      approved: true,
-    });
+    await expect(proof.getByRole('link', { name: /открыть видео/i })).toHaveAttribute(
+      'href',
+      corrected,
+      live,
+    );
+    const [approvalResponse] = await Promise.all([
+      moderator.waitForResponse(
+        (response) =>
+          response.request().method() === 'POST' &&
+          new URL(response.url()).pathname === `${adminPath}/effects/${effect.id}/irl-proof/review`,
+      ),
+      proof.getByRole('button', { name: 'Одобрить', exact: true }).click(),
+    ]);
+    expect(approvalResponse.ok()).toBe(true);
+    const approval = (await approvalResponse.json()) as Schemas['CommandResponse'];
     expect(approval.events.some((event) => event.type === 'irl-proof-reviewed')).toBe(true);
+    await expect(moderator.getByText('Нет IRL-пруфов на проверке')).toBeVisible(live);
     await expect(task).toHaveCount(0, live);
     expect((await seasonOf(owner, world.seasonId)).me?.manualEffects).toHaveLength(0);
     await expect(
@@ -161,6 +202,7 @@ test('an IRL proof keeps its materials through rejection and resubmission until 
   } finally {
     if (!page.isClosed()) await page.context().close();
     if (!watcher.isClosed()) await watcher.context().close();
+    if (!moderator.isClosed()) await moderator.context().close();
     await owner.dispose();
     await other.dispose();
     await admin.dispose();

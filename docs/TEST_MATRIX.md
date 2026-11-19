@@ -315,6 +315,13 @@ API, экраны инвентаря и магазина, редактор эф�
 | EV62 | Приглашения: лимиты открытых, принятие закрывает остальные, условие роллившего в коопе, напарник — поздний финишировавший, удаление напарника (D-520…D-523) | 5.10: `Coop/InvitationTests.*`; одно приглашение на прохождение и принятие — `One_pending_coop_invitation_per_run`, `After_a_withdrawal_another_player_is_invited_and_his_accept_leaves_nothing_pending_on_the_run`; лимит — `Coop/PartnerBoardTests.A_responder_at_the_limit_of_pending_invitations_does_not_respond`; снапшот роллившего — `Coop/CoopRunTests.The_partner_takes_the_rollers_snapshot_as_it_is`; поздний финиш — `Coop/FirstFinisherCoopTests.A_later_finisher_partner_gets_his_points_and_coins_but_does_not_move`. Осталось: явный сценарий удаления аккаунта кооп-напарника; выход и неактивность не доказывают удаление (D-850) | 🟨 |
 | EV63 | Дуэли против фарма: свежее прохождение, кулдаун пары, дроп и тех-реролл, правка часов не пересчитывает исход; несколько челленджей недели сразу; зритель не подаёт в предложку (D-540, D-526, D-527) | 5.12 (дуэли ✅): свежее прохождение — `Duels/DuelTests.The_game_a_player_was_playing_when_he_accepted_never_wins`, `A_game_rolled_before_the_accept_does_not_win_even_if_started_after`, `Without_the_freshness_rule_the_game_already_played_wins_too`; кулдаун пары — `The_same_pair_waits_out_the_cooldown_after_their_duel` (сразу, секунда до 14 дней, ровно 14 дней, в обе стороны), `A_drawn_duel_starts_the_cooldown_too`, `A_challenge_that_was_never_accepted_starts_no_cooldown`, `Other_pairs_are_not_held_by_a_cooldown`; дроп и тех-реролл — `Duels/DuelEndTests.*`, реролл по желанию — `Duels/DuelReviewTests.A_wish_reroll_*`; правка часов — `Duels/DuelTests.Correcting_the_hours_of_the_winning_run_does_not_redecide_the_duel`; 5.13: `Challenges/WeeklyChallengeTests.*`; 5.14: `Suggestions/SuggestionTests.*`; одновременные челленджи — `Challenges/WeeklyChallengeTests.One_run_completes_every_challenge_it_meets`; зритель — `Suggestions/SuggestionTests.A_spectator_without_a_player_in_the_season_cannot_suggest`; 5.20 API — `Web.Tests/Api/DuelApiTests.*`, `Web.Tests/Api/SuggestionApiTests.*`; экраны —5.23. | ✅ (движок и API; экран — 5.23) |
 
+### Интерфейс взаимодействий этапа 5 (5.23)
+
+| Правила | Сценарий | Тесты |
+| --- | --- | --- |
+| EV25, EV27–EV30, EV32, EV35 | Приглашения показывают срок и направление. Игрок явно отвечает, отзывает или выходит из коопа. Доска показывает игру и срок запроса. После выключения коопа или доски можно завершить оставшиеся действия, пока сезон принимает команды. Зритель читает публичные списки без личных запросов. Завершение общего прохождения отмечает роллер. | `web/src/interactions/InteractionsScreen.test.tsx`, `src/GameEvent.Web.Tests/Api/InteractionApiTests.cs`, `src/GameEvent.Web.Tests/Api/PartnerBoardApiTests.cs` |
+| EV30, EV39, EV63 | Два игрока начинают дуэль через приглашение. Состояние обновляется через SignalR, участник видит срок дуэли в карточке активного прохождения. | `src/GameEvent.Web.Tests/Api/DuelApiTests.cs`, `e2e/tests/s5-interactions-ui.spec.ts` |
+
 ## Симулятор (этап 3, ветка `feat/simulator`)
 
 Тесты — `Simulator.Tests/…`. Прогоны и выводы — `docs/SIMULATION.md`, решения — D-350…D-361.
@@ -518,6 +525,7 @@ API, экраны инвентаря и магазина, редактор эф�
 | RL3 | История: версии от новой к старой, автор и дата по Москве, «Было/Стало» словами (D-170, D-171) | `rulesText.test.ts` («the history in words»), `web/src/rules/RulesScreen.test.tsx` («lists the changes…», «says the rules have not changed…») | ✅ |
 | RL4 | API правил отдаёт имя автора версии и дедлайн сезона (D-170) | `src/GameEvent.Web.Tests/Api/RulesApiTests.cs` («History_names_the_author…», «Rules_carry_the_season_deadline…») | ✅ |
 | RL5 | Состояния страницы: загрузка, ошибка с повтором, нет сезона, выход при 401; правка правил видна без перезагрузки | `RulesScreen.test.tsx`; страница перечитывает правила только при их изменении, дедлайне или откате — «reads the rules again only when…» | ✅ |
+| RL6 | Числа механик этапа 5 выводятся из конфига сезона. Выключенные механики скрыты. Срок без ограничения, нулевые значения и история изменений читаются по-русски. | `web/src/rules/RulesStage5.test.tsx`, `e2e/tests/s5-interactions-ui.spec.ts` | ✅ |
 
 ## Админка (H8)
 
@@ -536,6 +544,8 @@ API, экраны инвентаря и магазина, редактор эф�
 | AD11 | Ручные эффекты за игрока (комментарий обязателен), отчёты о багах (фильтр, контекст, скрин, статус, выгрузка), журнал ошибок (пусто, ошибка с повтором), режим обслуживания (включение с подтверждением, баннер узнаёт сразу) | `web/src/admin/SupportSections.test.tsx` | ✅ |
 | AD12 | Схема OpenAPI пула не путается с игрой сезона (D-182) | `OpenApiContractTests.cs`; генерация клиента `npm run gen:api` (CI сверяет), `PoolSection.test.tsx` на полях `PoolGameView` | ✅ |
 | AD13 | Общие части админки в стайлгайде и под скриншот-тестами | `e2e/visual/map.visual.spec.ts` (раздел `admin`, 6 проектов) | ✅ |
+| AD14 | Админ запускает и заканчивает общий ивент, задаёт челлендж и отмечает прохождение выбранного сезона. Повтор после потери ответа сохраняет команду. Ссылки разделов учитывают флаги выбранного сезона. | `web/src/admin/GlobalEventsSection.test.tsx`, `web/src/admin/WeeklyChallengesSection.test.tsx`, `src/GameEvent.Web.Tests/Api/SeasonNavigationApiTests.cs`, `e2e/tests/s5-admin-operations.spec.ts` | ✅ |
+| AD15 | Админ проверяет IRL-пруфы и предложку. При отказе нужен комментарий. Предупреждение при добавлении игры в пул отображается после одобрения предложения. | `web/src/admin/Stage5Moderation.test.tsx`, `e2e/tests/s5-irl-proof.spec.ts`, `e2e/tests/s5-suggestions-admin.spec.ts` | ✅ |
 
 ## Инструменты тестовой копии (H9)
 

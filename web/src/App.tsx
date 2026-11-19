@@ -33,6 +33,9 @@ const RulesScreen = lazy(async () => ({
 const PollsScreen = lazy(async () => ({
   default: (await import('./polls/PollsScreen')).PollsScreen,
 }));
+const InteractionsScreen = lazy(async () => ({
+  default: (await import('./interactions/InteractionsScreen')).InteractionsScreen,
+}));
 
 /** The admin's section of an address: none is the proof queue, an unknown one is «Такой страницы нет» */
 const knownAdminSection = (section: string | null) =>
@@ -75,8 +78,9 @@ export function App() {
   const navigationSeason =
     state.kind === 'signedIn'
       ? ((
-          (route.kind === 'feed' || route.kind === 'polls' ? route.seasonId : null) ??
-          state.seasonId
+          (route.kind === 'feed' || route.kind === 'polls' || route.kind === 'interactions'
+            ? route.seasonId
+            : null) ?? state.seasonId
         )?.toLowerCase() ?? null)
       : null;
   const showingHome =
@@ -315,6 +319,13 @@ export function App() {
         />
       ) : route.kind === 'polls' && navigationSeason ? (
         <PollsScreen key={navigationSeason} seasonId={navigationSeason} onSignedOut={signedOut} />
+      ) : route.kind === 'interactions' ? (
+        <InteractionsScreen
+          key={navigationSeason}
+          seasonId={navigationSeason}
+          role={signedIn.user.role}
+          onSignedOut={signedOut}
+        />
       ) : route.kind === 'pool' ? (
         <PoolScreen
           seasonId={signedIn.seasonId}
