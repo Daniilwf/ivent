@@ -13,7 +13,8 @@ namespace GameEvent.Web.Tests.Api;
 /// </summary>
 public sealed class EventViewApiTests : IAsyncLifetime
 {
-    private readonly SiteFactory _site = new();
+    private const int ViewLimit = 12;
+    private readonly SiteFactory _site = new() { SeasonViewsPerMinute = ViewLimit };
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
@@ -34,16 +35,13 @@ public sealed class EventViewApiTests : IAsyncLifetime
         var petya = await _site.SignedInAsync("petya");
         await SetUpAsync(admin, Tailwind);
         var codes = new List<HttpStatusCode>();
-        for (var i = 0; i < Hosting.AppSetup.SeasonViewsPerMinute + 10; i++)
+        for (var i = 0; i < ViewLimit + 2; i++)
         {
             codes.Add((await vasya.GetAsync(Season, Ct)).StatusCode);
         }
 
-        Assert.Equal(HttpStatusCode.OK, codes[0]);
-        Assert.Contains(HttpStatusCode.TooManyRequests, codes);
-        Assert.All(codes, c => Assert.True(c is HttpStatusCode.OK or HttpStatusCode.TooManyRequests, $"Unexpected {c}."));
-        var firstLimited = codes.IndexOf(HttpStatusCode.TooManyRequests);
-        Assert.All(codes.Skip(firstLimited), c => Assert.Equal(HttpStatusCode.TooManyRequests, c));
+        Assert.All(codes.Take(ViewLimit), c => Assert.Equal(HttpStatusCode.OK, c));
+        Assert.All(codes.Skip(ViewLimit), c => Assert.Equal(HttpStatusCode.TooManyRequests, c));
         Assert.Equal(HttpStatusCode.OK, (await petya.GetAsync(Season, Ct)).StatusCode);
     }
 

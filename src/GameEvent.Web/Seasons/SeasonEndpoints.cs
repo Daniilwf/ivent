@@ -163,7 +163,16 @@ public sealed record LeaderboardRowView(Guid PlayerId, int Place, int Points, in
 /// A player on the map and the leaderboard; <c>finishOrder</c> is their order among the finishers, null before the finish;
 /// <c>avatar</c> — the account's picture (D-117), or none; <c>token</c> — the colour of their token (PlayerTokens, D-202).
 /// </summary>
-public sealed record PlayerView(Guid Id, string Name, string CellId, int Points, TurnPhase Phase, int? FinishOrder, Files.FileLinkView? Avatar, int Token);
+public sealed record PlayerView(
+    Guid Id,
+    string Name,
+    string CellId,
+    int Points,
+    TurnPhase Phase,
+    int? FinishOrder,
+    Files.FileLinkView? Avatar,
+    int Token,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? IsInactive = null);
 
 /// <summary>
 /// The signed-in player's own turn. While playing: <c>dropHintMinutes</c> is <c>roll.minPlayMinutesBeforeDrop</c> until
@@ -901,7 +910,9 @@ public static class SeasonEndpoints
             seasonRecord.Deadline,
             [.. map.Cells.Select(SeasonMaps.ToView)],
             [.. players.Select((p, token) => new PlayerView(
-                p.Id, p.Name, p.CellId, p.Points, p.Phase, p.FinishOrder, avatars.TryGetValue(p.UserId, out var avatar) ? Files.FileLinkView.Of(avatar) : null, token))],
+                p.Id, p.Name, p.CellId, p.Points, p.Phase, p.FinishOrder,
+                avatars.TryGetValue(p.UserId, out var avatar) ? Files.FileLinkView.Of(avatar) : null, token,
+                p.IsInactive ? true : null))],
             [.. leaderboard.Select(r => new LeaderboardRowView(r.PlayerId, r.Place, r.Points, r.CellsToFinish, r.IsFirst, r.Provisional))],
             me,
             lastSequence,

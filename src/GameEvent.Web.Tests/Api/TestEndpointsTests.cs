@@ -94,7 +94,7 @@ public sealed class TestEndpointsTests : IAsyncLifetime
         Assert.Equal(JsonValueKind.Null, fresh.GetProperty("random").GetProperty("seed").ValueKind);
         Assert.True(fresh.GetProperty("random").GetProperty("seedable").GetBoolean());
         Assert.Equal(
-            ["finish-soon", "deadline-in-hour", "five-manual-effects"],
+            ["finish-soon", "deadline-in-hour", "five-manual-effects", "irl-proof-pending", "coop-invitation", "poll-and-global-goal"],
             fresh.GetProperty("scenarios").EnumerateArray().Select(s => s.GetString()));
 
         await OkAsync(await admin.PostAsJsonAsync("/api/test/clock", new { advanceMinutes = -30 }, Ct));

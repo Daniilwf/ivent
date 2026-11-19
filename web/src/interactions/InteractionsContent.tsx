@@ -240,7 +240,7 @@ export function InteractionsContent({
   const name = (playerId: string) =>
     season.players.find(({ id }) => id === playerId)?.name ?? t.player;
   const candidates = season.players.filter(
-    ({ id, finishOrder }) => id !== meId && finishOrder !== 1,
+    ({ id, finishOrder, isInactive }) => id !== meId && finishOrder !== 1 && isInactive !== true,
   );
   const pendingInvitations = invitations.filter(({ status }) => status === 'pending');
   const invitationHistory = invitations.filter(({ status }) => status !== 'pending');

@@ -68,6 +68,7 @@ internal sealed class SiteFactory : WebApplicationFactory<Program>
         _directory = before._directory;
         _loginAttemptsPerMinute = before._loginAttemptsPerMinute;
         _environment = before._environment;
+        SeasonViewsPerMinute = before.SeasonViewsPerMinute;
         FrontendPath = before.FrontendPath;
         ConnectionString = before.ConnectionString;
         Random = before.Random;
@@ -112,6 +113,8 @@ internal sealed class SiteFactory : WebApplicationFactory<Program>
 
     /// <summary>Built frontend to serve; by default a missing folder, so tests run API-only.</summary>
     public string FrontendPath { get; }
+
+    public int? SeasonViewsPerMinute { get; init; }
 
     public TestClock Clock { get; } = new(new DateTimeOffset(2026, 10, 1, 12, 0, 0, TimeSpan.Zero).AddTicks(7_654_321));
 
@@ -243,6 +246,10 @@ internal sealed class SiteFactory : WebApplicationFactory<Program>
         // Tests log to the console only; one observability test turns the file on in its own folder
         builder.UseSetting("Logging:File:Enabled", "false");
         builder.UseSetting("Security:LoginAttemptsPerMinute", _loginAttemptsPerMinute.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        if (SeasonViewsPerMinute is { } views)
+        {
+            builder.UseSetting("Security:SeasonViewsPerMinute", views.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        }
         builder.ConfigureServices(services =>
         {
             services.RemoveAll<IClock>();

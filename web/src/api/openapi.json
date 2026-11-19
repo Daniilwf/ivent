@@ -15204,6 +15204,12 @@
           "token": {
             "type": "integer",
             "format": "int32"
+          },
+          "isInactive": {
+            "type": [
+              "null",
+              "boolean"
+            ]
           }
         },
         "description": "A player on the map and the leaderboard; `finishOrder` is their order among the finishers, null before the finish;\n`avatar` — the account's picture (D-117), or none; `token` — the colour of their token (PlayerTokens, D-202)."

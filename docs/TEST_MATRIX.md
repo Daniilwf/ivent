@@ -321,6 +321,7 @@ API, экраны инвентаря и магазина, редактор эф�
 | --- | --- | --- |
 | EV25, EV27–EV30, EV32, EV35 | Приглашения показывают срок и направление. Игрок явно отвечает, отзывает или выходит из коопа. Доска показывает игру и срок запроса. После выключения коопа или доски можно завершить оставшиеся действия, пока сезон принимает команды. Зритель читает публичные списки без личных запросов. Завершение общего прохождения отмечает роллер. | `web/src/interactions/InteractionsScreen.test.tsx`, `src/GameEvent.Web.Tests/Api/InteractionApiTests.cs`, `src/GameEvent.Web.Tests/Api/PartnerBoardApiTests.cs` |
 | EV30, EV39, EV63 | Два игрока начинают дуэль через приглашение. Состояние обновляется через SignalR, участник видит срок дуэли в карточке активного прохождения. | `src/GameEvent.Web.Tests/Api/DuelApiTests.cs`, `e2e/tests/s5-interactions-ui.spec.ts` |
+| EV27, EV30, EV42, D-712 | Списки напарников и соперников исключают неактивных игроков и первого финишировавшего. После смены флага оба списка обновляются, недоступный выбор нельзя отправить. Занятому активному игроку можно отправить прямое приглашение в кооп. | `web/src/interactions/InteractionsScreen.test.tsx`, `src/GameEvent.Web.Tests/Api/SeasonApiTests.cs` |
 
 ### Приёмка этапа 5 (5.24)
 
@@ -564,11 +565,14 @@ API, экраны инвентаря и магазина, редактор эф�
 | TT2 | Сценарий берёт игрока по id в сезоне; чужой id — 409 `test.playerUnknown`, ничего не двигается | `TestEndpointsTests.cs` («A_scenario_takes_the_player_by_their_id…») | ✅ |
 | TT3 | Невалидный ввод (зерно не целое или вне int, минуты строкой, id игрока не guid) — 400 | `TestEndpointsTests.cs` («A_malformed_test_request_is_invalid», «A_scenario_for_a_malformed_player_id…») | ✅ |
 | TT4 | Только админ: игрок и зритель — 403, без входа — 401, в том числе `GET /api/test` и зерно | `TestEndpointsTests.cs` («Only_the_admin_uses…», «Anonymous_does_not_use…») | ✅ |
-| TT5 | На боевом сайте и тестовой копии (`Staging`) маршрутов нет (404), документа OpenAPI на боевом нет; в Development и Test описание API их называет | `TestEndpointsTests.cs` («In_production_the_test_routes_do_not_exist», «On_the_test_copy_the_admin_has_no_test_tools_either», «The_api_description_of_the_test_copy…») | ✅ |
+| TT5 | Маршруты тестовых инструментов доступны администратору в Development, Test и Staging. В Production маршрутов и описания OpenAPI нет (404) | `TestEndpointsTests.cs` («In_production_the_test_routes_do_not_exist», «On_the_test_copy_the_admin_has_the_test_tools_and_a_player_does_not», «The_api_description_of_the_test_copy_names_the_test_endpoints»), `Stage5TestScenariosTests.cs` | ✅ |
 | TT6 | Статус называет окружение и наличие инструментов (Production, Staging, Development, Test) (D-220) | `TestEndpointsTests.cs` («The_status_names_the_copy_of_the_site…») | ✅ |
 | TT7 | Полоса «не настоящий сайт» на каждой странице не боевого окружения; на боевом и без ответа — нет | `web/src/app/EnvironmentBanner.test.tsx` | ✅ |
 | TT8 | Раздел «Инструменты для тестов» в админке только при `testTools`; по адресу без них — «Такой страницы нет» и ни одного запроса к `/api/test` | `web/src/admin/TestToolsSection.test.tsx` («The test tools on the live site») | ✅ |
 | TT9 | Страница: скелетон, ошибка с повтором, нет сезона, нет игроков; сценарий на выбранном игроке и «Дедлайн через час» без игрока, итог и отказ по-русски; +1 час, момент по Москве (с проверкой пустого), возврат к настоящему времени; зерно только целым, «Снова случайно»; часы и случайность, которые сайт не меняет, — пояснение вместо кнопок | `TestToolsSection.test.tsx` («The test tools») | ✅ |
+| TT10 | Сценарии этапа 5 подают пруф на подходящий IRL-эффект, оставляют приглашение в доступный кооп и подготавливают открытое голосование с активной целью. Проверяются роль и окружение, выбор игрока, отказ при отсутствии эффекта или напарника и отсутствие созданного голосования при заполненном лимите общих ивентов | `Stage5TestScenariosTests.cs`, `TestToolsSection.test.tsx` («loads the poll and global goal without selecting a player») | ✅ |
+
+Демо-сезон этапа 5 проверяется `Stage5DemoSeedTests.cs`: ожидание условий и бросков, IRL-пруфы в очереди и после обоих исходов проверки, открытое и закрытое голосования с голосами и результатом, действующий и завершённый кооп, активная и достигнутая общие цели.
 
 ## Обложки игр на экранах (H9, D-222)
 

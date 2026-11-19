@@ -48,6 +48,7 @@ const refreshEvents = new Set([
   'season-deadline-set',
   'season-player-added',
   'player-adjusted',
+  'player-inactivity-set',
   'player-finished',
   'player-finish-revoked',
   'game-rolled',

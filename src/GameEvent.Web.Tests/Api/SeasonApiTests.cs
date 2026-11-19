@@ -174,6 +174,32 @@ public sealed class SeasonApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Season_players_stay_visible_and_show_their_inactivity_flag_after_admin_changes_it()
+    {
+        var admin = await _site.SignedInAsync("admin");
+        var player = await _site.SignedInAsync("vasya");
+        var spectator = await _site.SignedInAsync("zritel");
+        var petya = _site.Players["petya"];
+        var seasonUrl = $"/api/seasons/{SiteFactory.SeasonId}";
+        var inactivityUrl = $"/api/admin/seasons/{SiteFactory.SeasonId}/players/{petya}/inactive";
+
+        async Task<JsonElement> FindPlayerAsync(HttpClient client)
+        {
+            var season = await client.GetFromJsonAsync<JsonElement>(seasonUrl, Ct);
+            return Assert.Single(season.GetProperty("players").EnumerateArray(), p => p.GetProperty("id").GetGuid() == petya);
+        }
+
+        using var marked = await admin.PostAsJsonAsync(inactivityUrl, new { commandId = Guid.NewGuid(), isInactive = true }, Ct);
+        marked.EnsureSuccessStatusCode();
+        Assert.True((await FindPlayerAsync(player)).GetProperty("isInactive").GetBoolean());
+        Assert.True((await FindPlayerAsync(spectator)).GetProperty("isInactive").GetBoolean());
+
+        using var unmarked = await admin.PostAsJsonAsync(inactivityUrl, new { commandId = Guid.NewGuid(), isInactive = false }, Ct);
+        unmarked.EnsureSuccessStatusCode();
+        Assert.False((await FindPlayerAsync(player)).TryGetProperty("isInactive", out var inactive) && inactive.GetBoolean());
+    }
+
+    [Fact]
     public async Task Player_chooses_one_of_several_rolled_games_and_the_choice_survives_a_reload()
     {
         // Given a season where the wheel offers a choice of three games (D-91)

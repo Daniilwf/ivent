@@ -15,6 +15,7 @@ using GameEvent.Engine.Turns;
 using GameEvent.Engine.Undo;
 using GameEvent.Infrastructure.Accounts;
 using GameEvent.Infrastructure.Database;
+using GameEvent.Infrastructure.EventLog;
 using GameEvent.Infrastructure.Files;
 using GameEvent.Infrastructure.Kernel;
 using GameEvent.Infrastructure.Queue;
@@ -36,8 +37,9 @@ namespace GameEvent.Web.Hosting;
 /// Stage 4 (4.13): items, the shop and bets are on with the repository's items and wheels: the bots roll the shop and buy,
 /// use their items on each other, bet on each other's runs; the admin gives items now and then. The season ends with
 /// items held, bets won, lost and open, offers gone and one shop offer still live.
+/// Stage 5 (5.25) adds active and historical events, polls and coop runs through the same queue.
 /// </summary>
-public static class DemoSeed
+public static partial class DemoSeed
 {
     public static readonly Guid SeasonId = Guid.Parse("de300000-0000-0000-0000-000000000001");
 
@@ -109,9 +111,12 @@ public static class DemoSeed
         random?.Seed(Seed);
         var background = await StoreBackgroundAsync(services, contentRoot, ct);
         var (first, published) = DemoMap(contentRoot);
+        var bots = new Bots(factory, bus, clock, ct);
         try
         {
-            await new Bots(factory, bus, clock, ct).PlayAsync((first with { Background = background }, published with { Background = background }), ItemsPack(contentRoot));
+            await bots.PlayAsync((first with { Background = background }, published with { Background = background }), ItemsPack(contentRoot));
+            clock.Reset();
+            await bots.FinishAsync(realNow.AddDays(5), contentRoot, services.GetRequiredService<SeasonStateReader>());
         }
         finally
         {
@@ -119,7 +124,6 @@ public static class DemoSeed
             random?.Seed(null);
         }
 
-        await new Bots(factory, bus, clock, ct).FinishAsync(realNow.AddDays(5));
         return true;
     }
 
@@ -147,7 +151,7 @@ public static class DemoSeed
         return new MapBackground(record.Id, record.Width, record.Height);
     }
 
-    /// <summary>The repository's items and wheels (stage 4); the demo season plays without events.</summary>
+    /// <summary>The repository's items and wheels used during the demo's initial bot history.</summary>
     private static ContentPack ItemsPack(string contentRoot)
     {
         IEnumerable<(string, string)> Read(string dir) =>
@@ -181,14 +185,9 @@ public static class DemoSeed
         private Guid _lastCommand;
         private bool _undone;
 
-        /// <summary>The last command, after the play with the real clock back: the deadline, five days from now.</summary>
-        public async Task FinishAsync(DateTimeOffset deadline)
+        /// <summary>Seed the live examples once the real clock is back, then set the deadline as the last command.</summary>
+        public async Task FinishAsync(DateTimeOffset deadline, string contentRoot, SeasonStateReader reader)
         {
-            await using (var db = await factory.CreateDbContextAsync(ct))
-            {
-                _admin = await db.Users.Where(u => u.Login == "admin").Select(u => u.Id).SingleAsync(ct);
-            }
-
             // One player rolls the shop with the real clock: the screens show a live offer with its timer
             await using (var db = await factory.CreateDbContextAsync(ct))
             {
@@ -220,6 +219,7 @@ public static class DemoSeed
                 }
             }
 
+            await new Stage5Demo(factory, bus, reader, _admin, ct).PlayAsync(contentRoot);
             await SendAsync(new SetSeasonDeadline(deadline), _admin);
         }
 

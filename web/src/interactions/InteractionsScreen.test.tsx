@@ -1,4 +1,4 @@
-import { act, render, screen, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Schemas } from '../api/client';
 import { answer, fakeServer, json, seasonId, type Handler } from '../test/fakeServer';
@@ -278,6 +278,106 @@ describe('season interactions', () => {
     ]);
     expect(server.sent('POST', '/duels')).toMatchObject([
       { body: { commandId: actionId, opponentId: other } },
+    ]);
+  });
+
+  it('keeps busy players eligible for direct coop invites and excludes inactive players and the first finisher', async () => {
+    const inactive = { ...player(other, 'Маша', 2), isInactive: true };
+    const firstId = '10000000-0000-0000-0000-000000000004';
+    const first = { ...player(firstId, 'Даша', 3), finishOrder: 1 };
+    const busy = { ...player(peer, 'Вася', 1), phase: 'playing' } as const;
+    const server = serve({
+      season: () =>
+        snapshot({ me: playingCoop(), players: [player(me, 'Оля', 0), inactive, first, busy] }),
+      writes: { [`POST ${prefix}/coop/invite`]: accepted },
+    });
+    open();
+
+    const partner = await screen.findByRole('combobox', { name: 'Напарник' });
+    const opponent = screen.getByRole('combobox', { name: 'Соперник' });
+    expect(within(partner).getByRole('option', { name: 'Вася' })).toBeVisible();
+    for (const picker of [partner, opponent]) {
+      expect(within(picker).queryByRole('option', { name: 'Маша' })).not.toBeInTheDocument();
+      expect(within(picker).queryByRole('option', { name: 'Даша' })).not.toBeInTheDocument();
+      expect(within(picker).queryByRole('option', { name: 'Оля' })).not.toBeInTheDocument();
+    }
+
+    await userEvent.selectOptions(partner, peer);
+    await userEvent.click(screen.getByRole('button', { name: 'Пригласить в кооп' }));
+    await screen.findByText('Приглашение отправлено.');
+    expect(server.sent('POST', '/coop/invite')).toMatchObject([
+      { body: { commandId: actionId, partnerId: peer } },
+    ]);
+  });
+
+  it('refreshes both pickers on inactivity changes and cannot submit an inactive selection', async () => {
+    let sequence = 1;
+    let isInactive = false;
+    const server = serve({
+      season: () => {
+        const candidate = { ...player(peer, 'Вася', 1), isInactive };
+        return snapshot({
+          me: playingCoop(),
+          lastSequence: sequence,
+          players: [player(me, 'Оля', 0), candidate, player(other, 'Маша', 2)],
+        });
+      },
+      writes: { [`POST ${prefix}/coop/invite`]: accepted, [`POST ${prefix}/duels`]: accepted },
+    });
+    open();
+
+    const partner = await screen.findByRole('combobox', { name: 'Напарник' });
+    const opponent = screen.getByRole('combobox', { name: 'Соперник' });
+    const invite = screen.getByRole('button', { name: 'Пригласить в кооп' });
+    const challenge = screen.getByRole('button', { name: 'Вызвать на дуэль' });
+    await userEvent.selectOptions(partner, peer);
+    await userEvent.selectOptions(opponent, peer);
+    expect(invite).toBeEnabled();
+    expect(challenge).toBeEnabled();
+
+    function updateInactivity(value: boolean) {
+      isInactive = value;
+      sequence += 1;
+      act(() =>
+        notify?.([
+          {
+            seasonId,
+            fromSequence: sequence,
+            toSequence: sequence,
+            types: ['player-inactivity-set'],
+          },
+        ]),
+      );
+    }
+
+    updateInactivity(true);
+    await waitFor(() => {
+      for (const picker of [partner, opponent]) {
+        expect(within(picker).queryByRole('option', { name: 'Вася' })).not.toBeInTheDocument();
+        expect(picker).not.toHaveValue(peer);
+      }
+      expect(invite).toBeDisabled();
+      expect(challenge).toBeDisabled();
+    });
+    await userEvent.click(invite);
+    await userEvent.click(challenge);
+    expect(server.sent('POST', '/coop/invite')).toHaveLength(0);
+    expect(server.sent('POST', '/duels')).toHaveLength(0);
+
+    vi.useFakeTimers();
+    try {
+      updateInactivity(false);
+      await act(async () => vi.advanceTimersByTimeAsync(8_000));
+    } finally {
+      vi.useRealTimers();
+    }
+    await within(partner).findByRole('option', { name: 'Вася' });
+    expect(within(opponent).getByRole('option', { name: 'Вася' })).toBeVisible();
+    await userEvent.selectOptions(opponent, peer);
+    await userEvent.click(challenge);
+    await screen.findByText('Вызов на дуэль отправлен.');
+    expect(server.sent('POST', '/duels')).toMatchObject([
+      { body: { commandId: actionId, opponentId: peer } },
     ]);
   });
 

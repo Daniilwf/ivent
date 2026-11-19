@@ -11697,6 +11697,7 @@ export interface components {
             avatar: null | components["schemas"]["FileLinkView"];
             /** Format: int32 */
             token: number;
+            isInactive?: null | boolean;
         };
         /** @description A player whose next roll would find no game: the empty-pool signal. */
         PlayerWithoutGamesView: {
