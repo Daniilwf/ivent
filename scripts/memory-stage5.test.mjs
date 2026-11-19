@@ -12,6 +12,10 @@ const stage5Flags = ['items', 'events', 'polls', 'globalEvents', 'weeklyChalleng
 const gameId = '44000000-0000-0000-0000-000000000001';
 const playerId = '55000000-0000-0000-0000-000000000001';
 const runId = '66000000-0000-0000-0000-000000000001';
+const kitInstanceId = '66000000-0000-0000-0000-000000000009';
+const effectId = '66000000-0000-0000-0000-000000000010';
+const trialId = 'memory-trial';
+const kitId = 'memory-event-kit';
 const completedAt = new Date(Date.now() - 2 * 86_400_000).toISOString();
 const content = {
   objects: [
@@ -28,6 +32,7 @@ const content = {
         actions: [{ type: 'changeResource', resource: 'coins', amount: 1 }],
       },
     },
+    JSON.parse(readFileSync(new URL('../content/events/karaoke.json', import.meta.url))),
   ],
   wheels: [],
 };
@@ -111,7 +116,7 @@ function completedRun(overrides = {}) {
   };
 }
 
-function memorySite({ reject, runs } = {}) {
+function memorySite({ reject, runs, hiddenRead } = {}) {
   const heldItem = {
     id: 'held-orange',
     kind: 'item',
@@ -137,6 +142,9 @@ function memorySite({ reject, runs } = {}) {
     marks: [],
     completionReads: [],
     challengeDefinitions: new Map(),
+    kitGranted: false,
+    kitUsed: false,
+    irlProof: null,
     existingRuns: runs ?? [
       completedRun({
         runId: '66000000-0000-0000-0000-000000000002',
@@ -161,6 +169,114 @@ function memorySite({ reject, runs } = {}) {
       if (reject?.({ who, path, method, body })) {
         state.refusals++;
         return json({ code: 'test.refused', title: 'The setup command was refused.' }, 409);
+      }
+      if (method === 'GET' && path === season) {
+        assert.equal(who, 'player01');
+        return json({
+          id: seasonId,
+          status: 'active',
+          me: {
+            playerId,
+            phase: 'idle',
+            eventsEnabled: state.ruleset.features.events,
+            waitingConditions:
+              state.kitUsed && hiddenRead !== 'condition'
+                ? [{ objectId: trialId, difficultyAtLeast: 'hard' }]
+                : [],
+            waitingEvents:
+              state.kitUsed && hiddenRead !== 'throw'
+                ? [{ objectId: trialId, waitingForRoll: false, waitingForThrow: true }]
+                : [],
+            manualEffects: state.kitUsed
+              ? [{ id: effectId, objectId: 'karaoke', irl: true, irlProof: state.irlProof }]
+              : [],
+          },
+        });
+      }
+      if (method === 'GET' && path === `${season}/economy`) {
+        assert.equal(who, 'player01');
+        return json({
+          inventoryLimit: 2,
+          items:
+            state.kitGranted && !state.kitUsed
+              ? [{ instanceId: kitInstanceId, objectId: kitId, kind: 'item', usable: true }]
+              : [],
+        });
+      }
+      if (method === 'POST' && path === `${adminSeason}/players/${playerId}/inventory`) {
+        assert.equal(who, 'admin');
+        assert.ok(body.commandId);
+        assert.ok(body.comment);
+        assert.equal(body.giveObjectId, kitId);
+        const kit = state.published.objects.find((object) => object.id === body.giveObjectId);
+        assert.equal(kit.kind, 'item');
+        assert.deepEqual(
+          kit.effect.actions.map(({ type }) => type),
+          ['drawEvent', 'drawEvent'],
+        );
+        assert.deepEqual(
+          kit.effect.actions.map(
+            ({ deck }) => state.published.wheels.find(({ id }) => id === deck).entries,
+          ),
+          [[{ objectId: trialId, weight: 1 }], [{ objectId: 'karaoke', weight: 1 }]],
+        );
+        state.kitGranted = true;
+        state.writes.push('grant');
+        return json({ duplicate: false, events: [] });
+      }
+      if (method === 'POST' && path === `${season}/items/${kitInstanceId}/use`) {
+        assert.equal(who, 'player01');
+        assert.ok(body.commandId);
+        assert.ok(state.kitGranted);
+        state.kitUsed = true;
+        state.writes.push('use');
+        return json({ duplicate: false, events: [] });
+      }
+      if (method === 'POST' && path === `${season}/effects/${effectId}/irl-proof`) {
+        assert.equal(who, 'player01');
+        assert.ok(body.commandId);
+        assert.equal(new URL(body.link).protocol, 'https:');
+        assert.ok(state.kitUsed);
+        state.irlProof = {
+          status: 'pending',
+          link: body.link,
+          files: [],
+          submittedAt: new Date().toISOString(),
+        };
+        state.writes.push('submitIrlProof');
+        return json({ duplicate: false, events: [] });
+      }
+      if (method === 'GET' && path === `${adminSeason}/irl-proofs`) {
+        assert.equal(who, 'admin');
+        return json(
+          state.irlProof && hiddenRead !== 'queue'
+            ? [
+                {
+                  effectId,
+                  playerId: hiddenRead === 'different owner' ? 'other-player' : playerId,
+                  objectId: 'karaoke',
+                  name: 'Караоке',
+                  link: state.irlProof.link,
+                  submittedAt: state.irlProof.submittedAt,
+                },
+              ]
+            : [],
+        );
+      }
+      if (method === 'GET' && path === `${adminSeason}/effects`) {
+        assert.equal(who, 'admin');
+        return json(
+          state.kitUsed && hiddenRead !== 'effects'
+            ? [
+                {
+                  id: effectId,
+                  playerId,
+                  objectId: 'karaoke',
+                  irl: true,
+                },
+              ]
+            : [],
+        );
       }
       if (method === 'GET' && path === `${season}/rules`) {
         return json({ version: state.version, ruleset: state.ruleset, history: [] });
@@ -359,6 +475,29 @@ test('the setup enables the mechanics and creates projected data with real playe
   assert.ok(site.state.challenges.length > 0);
   await assertStage5MemoryReads({ call: site.players[0], seasonId });
 });
+
+test('the memory setup creates waiting events and verifies the same pending proof on the player and admin views', async () => {
+  const site = memorySite();
+
+  await prepareStage5MemoryWorkload({ ...site, seasonId, content });
+
+  assert.deepEqual(
+    site.state.writes.filter((write) => ['grant', 'use', 'submitIrlProof'].includes(write)),
+    ['grant', 'use', 'submitIrlProof'],
+  );
+  assert.ok(site.state.reads.includes(season));
+  assert.ok(site.state.reads.includes(`${adminSeason}/irl-proofs`));
+  assert.ok(site.state.reads.includes(`${adminSeason}/effects`));
+  assert.equal(site.state.irlProof.status, 'pending');
+});
+
+for (const hiddenRead of ['condition', 'throw', 'queue', 'different owner', 'effects']) {
+  test(`an event workload with a missing or inconsistent ${hiddenRead} fails preparation`, async () => {
+    await assert.rejects(() =>
+      prepareStage5MemoryWorkload({ ...memorySite({ hiddenRead }), seasonId, content }),
+    );
+  });
+}
 
 for (const [name, match] of [
   ['saving enabled rules', ({ path, method }) => method === 'PUT' && path.endsWith('/rules')],

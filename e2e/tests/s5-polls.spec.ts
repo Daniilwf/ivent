@@ -4,14 +4,24 @@ import type { Schemas } from '../support/api.ts';
 import { apiOf, complete, live, rollAndStart, setUpSeason, signIn } from '../support/world.ts';
 import type { World } from '../support/world.ts';
 
-async function setFeatures(world: World, changes: Partial<Schemas['Features']>) {
+async function changeRules(
+  world: World,
+  change: (rules: Schemas['Ruleset']) => Schemas['Ruleset'],
+) {
   const rules = await world.adminApi.get<Schemas['RulesView']>(
     `/api/seasons/${world.seasonId}/rules`,
   );
   await world.adminApi.put(`/api/admin/seasons/${world.seasonId}/rules`, {
     expectedVersion: rules.version,
-    ruleset: { ...rules.ruleset, features: { ...rules.ruleset.features, ...changes } },
+    ruleset: change(rules.ruleset),
   });
+}
+
+function setFeatures(world: World, changes: Partial<Schemas['Features']>) {
+  return changeRules(world, (rules) => ({
+    ...rules,
+    features: { ...rules.features, ...changes },
+  }));
 }
 
 async function designShot(page: Page, name: string) {
@@ -130,6 +140,123 @@ test('an anonymous poll shows each player their own vote and reveals the result 
   await expect(first.getByRole('heading', { name: 'Голосования выключены' })).toBeVisible(live);
   await expect(first.getByTestId('nav-polls')).toHaveCount(0, live);
   await expect(firstCard).toHaveCount(0);
+});
+
+test('a spectator joins an everyone poll after a rule change and votes only once across tabs', async ({
+  browser,
+}, info) => {
+  const phone = info.project.name === 'phone';
+  const world = await setUpSeason({ players: ['Лена', 'Петя'], spectator: true, start: false });
+  const [lena, petya] = world.players;
+  const spectator = world.spectator;
+  if (!lena || !petya || !spectator) throw new Error('The poll needs two players and a spectator.');
+
+  const season = `/api/seasons/${world.seasonId}`;
+  const admin = `/api/admin/seasons/${world.seasonId}`;
+  const question = 'Какую игру обсудим после сезона?';
+  const playersQuestion = 'Какой ролл удивил участников?';
+  const portal = 'Portal 2';
+  const hades = 'Hades';
+  const notVoter = 'В этом голосовании голосуют только игроки сезона.';
+  await changeRules(world, (rules) => ({
+    ...rules,
+    features: { ...rules.features, polls: true },
+    social: { ...rules.social, spectatorsCanVote: false },
+  }));
+  await world.adminApi.post(`${admin}/status`, { to: 'active' });
+  for (const [prompt, voters] of [
+    [question, 'everyone'],
+    [playersQuestion, 'players'],
+  ] as const) {
+    await world.adminApi.post(`${admin}/polls`, {
+      poll: {
+        question: prompt,
+        options: { list: [portal, hades] },
+        anonymous: true,
+        showLiveCounts: false,
+        voters,
+        closesInHours: 168,
+      },
+    });
+  }
+  const polls = await world.adminApi.get<Schemas['PollView'][]>(`${season}/polls`);
+  const poll = polls.find((entry) => entry.question === question);
+  if (!poll) throw new Error('No everyone poll after starting one.');
+
+  const [first, second, viewer] = await Promise.all([
+    signIn(browser, lena),
+    signIn(browser, petya),
+    signIn(browser, spectator),
+  ]);
+  const scope = `/seasons/${world.seasonId}/polls`;
+  // The spectator's default season may change while another worker creates a season.
+  await Promise.all([first.goto(scope), second.goto(scope), viewer.goto(scope)]);
+  const everyoneCard = (page: Page) => page.getByRole('article', { name: question, exact: true });
+  const playersOnly = viewer.getByRole('article', { name: playersQuestion, exact: true });
+  const viewerCard = everyoneCard(viewer);
+  const submit = (card: Locator) => card.getByRole('button', { name: 'Голосовать', exact: true });
+  await expect(viewerCard.getByText(notVoter)).toBeVisible();
+  await expect(submit(viewerCard)).toHaveCount(0);
+  await expect(playersOnly.getByText(notVoter)).toBeVisible();
+
+  for (const [page, choice] of [
+    [first, portal],
+    [second, hades],
+  ] as const) {
+    const card = everyoneCard(page);
+    await activate(card.getByText(choice, { exact: true }), phone);
+    await activate(submit(card), phone);
+    await expect(card.getByText(`Твой голос: ${choice}`)).toBeVisible(live);
+  }
+  await expect(viewerCard.getByText('Счёт скрыт до закрытия')).toBeVisible();
+  await expect(viewerCard.getByText(/^Твой голос:/u)).toHaveCount(0);
+
+  await changeRules(world, (rules) => ({
+    ...rules,
+    social: { ...rules.social, spectatorsCanVote: true },
+  }));
+  await expect(submit(viewerCard)).toBeVisible(live);
+  await expect(playersOnly.getByText(notVoter)).toBeVisible();
+  await expect(submit(playersOnly)).toHaveCount(0);
+
+  const otherTab = await viewer.context().newPage();
+  await otherTab.goto(scope);
+  const voteUrl = new URL(`${season}/polls/${poll.id}/vote`, viewer.url()).href;
+  let releaseVotes: (() => void) | undefined;
+  const bothSubmitted = new Promise<void>((resolve) => {
+    releaseVotes = resolve;
+  });
+  let submitted = 0;
+  // Both real clicks reach the server before a refreshed view can disable either tab's submit button.
+  await viewer.context().route(voteUrl, async (route) => {
+    if (++submitted === 2) releaseVotes?.();
+    await bothSubmitted;
+    await route.continue();
+  });
+  try {
+    const otherCard = everyoneCard(otherTab);
+    for (const card of [viewerCard, otherCard])
+      await activate(card.getByText(hades, { exact: true }), phone);
+    const [fromViewer, fromOther] = await Promise.all([
+      viewer.waitForResponse(voteUrl),
+      otherTab.waitForResponse(voteUrl),
+      activate(submit(viewerCard), phone),
+      activate(submit(otherCard), phone),
+    ]);
+    expect([fromViewer.status(), fromOther.status()].sort()).toEqual([200, 409]);
+  } finally {
+    releaseVotes?.();
+    await viewer.context().unroute(voteUrl);
+  }
+
+  await world.adminApi.post(`${admin}/polls/${poll.id}/close`);
+  for (const page of [first, second, viewer, otherTab]) {
+    const card = everyoneCard(page);
+    await expect(card.getByText('Голосование закрыто')).toBeVisible(live);
+    await expect(card.getByText(`Итог: ${hades}`)).toBeVisible();
+    await expect(card.getByRole('radio', { name: portal })).toHaveAccessibleDescription('1 голос');
+    await expect(card.getByRole('radio', { name: hades })).toHaveAccessibleDescription('2 голоса');
+  }
 });
 
 test('the season banner shows a global goal and follows real completions and early ending', async ({

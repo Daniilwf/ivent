@@ -3,16 +3,21 @@
 //   1. Seeds the demo season locally (Development) into var/memory-check/game-event.db.
 //   2. Builds the site's image and starts it as the live site does: Production, the container's memory and CPU limits
 //      of deploy/docker-compose.yml, the demo database mounted as /data.
-//   3. Sixteen players sign in and walk the pages (season, feed, pool, rules, status, polls, global events, weekly challenges) for the given time, while the
-//      container's memory is sampled every two seconds.
+//   3. Sixteen players read season, feed, pool, rules, status, polls, global events and weekly challenges, while one
+//      admin reads the manual effects and IRL proof queues and the container's memory is sampled every two seconds.
 //   4. Prints the peak and the average; fails when the peak is over the budget.
 // Usage: npm run test:memory [-- --seconds 120 --budget 400 --image ivent:local]   (needs Docker)
 import { existsSync, lstatSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fail, quote, root, run } from './lib.mjs';
-import { assertStage5MemoryReads, prepareStage5MemoryWorkload } from './memory-stage5.mjs';
+import {
+  assertIrlMemoryReads,
+  assertStage5MemoryReads,
+  prepareStage5MemoryWorkload,
+} from './memory-stage5.mjs';
 import { withMemoryContainer } from './memory-container.mjs';
+import { startMemorySampler } from './memory-sampler.mjs';
 
 const arg = (name, fallback) => {
   const at = process.argv.indexOf(`--${name}`);
@@ -77,16 +82,9 @@ async function main() {
       { docker, image, data, name: container, port },
       async (containerId) => {
         let sampler;
-        let samplingError;
-        const samples = [];
         let requests = 0;
+        let adminRequests = 0;
         let errors = 0;
-        function sample() {
-          const stats = docker('stats', '--no-stream', '--format', '{{.MemUsage}}', containerId);
-          const m = /([\d.]+)\s*(KiB|MiB|GiB)/.exec(stats.out);
-          if (!stats.ok || !m) samplingError = 'Docker did not return a valid memory sample.';
-          else samples.push(Number(m[1]) * { KiB: 1 / 1024, MiB: 1, GiB: 1024 }[m[2]]);
-        }
         try {
           const base = `http://localhost:${port}`;
           const deadline = Date.now() + 120_000;
@@ -104,7 +102,7 @@ async function main() {
           }
           if (!ready)
             throw new Error('The benchmark site did not become healthy within 120 seconds.');
-          sampler = setInterval(sample, 2000);
+          sampler = startMemorySampler(containerId);
 
           // 3. The players, an authenticated admin and real stage 5 data.
 
@@ -153,19 +151,20 @@ async function main() {
           const id = season.id ?? season.seasonId;
           if (!id) throw new Error('The demo season has no id.');
           const admin = await signIn('admin');
-          await prepareStage5MemoryWorkload({
+          const irlProof = await prepareStage5MemoryWorkload({
             admin,
             players: clients,
             seasonId: id,
             content: {
               objects: [
                 JSON.parse(readFileSync(join(root, 'content', 'events', 'tailwind.json'), 'utf8')),
+                JSON.parse(readFileSync(join(root, 'content', 'events', 'karaoke.json'), 'utf8')),
               ],
               wheels: [],
             },
           });
           console.log(
-            'Stage 5 workload prepared: votes, an active goal and a completed weekly challenge.',
+            'Stage 5 workload prepared: votes, an active goal, a completed weekly challenge, a waiting event, and a pending IRL proof.',
           );
           const pages = [
             `/api/seasons/${id}`,
@@ -181,31 +180,53 @@ async function main() {
             `/api/seasons/${id}/weekly-challenges`,
           ];
           const end = Date.now() + seconds * 1000;
-          await Promise.all(
-            clients.map(async (call, n) => {
-              let i = n;
-              while (Date.now() < end) {
-                if (samplingError) throw new Error(samplingError);
-                const page = pages[i++ % pages.length];
-                const response = await call(page).catch(() => null);
-                requests++;
-                if (!response?.ok) errors++;
-                await response?.arrayBuffer().catch(() => {
-                  errors++;
-                });
-                // At most two reads/sec/player: three stage 5 routes share 60 reads/min, including setup.
-                await new Promise((r) => setTimeout(r, 500));
-              }
-            }),
-          );
+          const visit = async (call, routes, delay, cursor, isAdmin = false) => {
+            let i = cursor;
+            while (Date.now() < end) {
+              if (sampler.error) throw new Error(sampler.error);
+              const response = await call(routes[i++ % routes.length]).catch(() => null);
+              requests++;
+              if (isAdmin) adminRequests++;
+              if (!response?.ok) errors++;
+              await response?.arrayBuffer().catch(() => {
+                errors++;
+              });
+              await new Promise((r) => setTimeout(r, delay));
+            }
+          };
+          await Promise.all([
+            // At most two reads/sec/player: three stage 5 routes share 60 reads/min, including setup.
+            ...clients.map((call, n) => visit(call, pages, 500, n)),
+            // Admin reads share the 30/min limit, including the reads before and after load.
+            visit(
+              admin,
+              [`/api/admin/seasons/${id}/irl-proofs`, `/api/admin/seasons/${id}/effects`],
+              4000,
+              0,
+              true,
+            ),
+          ]);
           await assertStage5MemoryReads({ call: clients[0], seasonId: id });
-          sample();
+          await assertIrlMemoryReads({
+            admin,
+            player: clients[irlProof.playerIndex],
+            seasonId: id,
+            ...irlProof,
+          });
+          const samples = await sampler.finish();
+          const samplingError = sampler.error;
           const peak = Math.max(...samples);
           const average = samples.reduce((a, b) => a + b, 0) / samples.length;
           console.log(
-            `${players.length} players, ${seconds} s, ${requests} requests (${errors} failed); memory peak ${peak.toFixed(1)} MiB, average ${average.toFixed(1)} MiB, budget ${budget} MiB`,
+            `${players.length} players and one admin, ${seconds} s, ${requests} requests (${adminRequests} admin, ${errors} failed); memory peak ${peak.toFixed(1)} MiB, average ${average.toFixed(1)} MiB, budget ${budget} MiB`,
           );
-          if (samplingError || !samples.length || errors > 0 || requests === 0)
+          if (
+            samplingError ||
+            !samples.length ||
+            errors > 0 ||
+            adminRequests === 0 ||
+            requests === adminRequests
+          )
             throw new Error(
               samplingError ?? 'The load had failed requests or no samples/requests.',
             );
@@ -217,8 +238,8 @@ async function main() {
           console.error(docker('logs', '--tail', '80', containerId).out);
           throw error;
         } finally {
-          clearInterval(sampler);
           abort.abort();
+          await sampler?.stop();
         }
       },
     );

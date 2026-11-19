@@ -1,5 +1,6 @@
 import type { FullConfig } from '@playwright/test';
 import { Api, seedAdmin, type Schemas } from './api.ts';
+import { prepareCoopGame } from './coopFixture.ts';
 import { prepareStage5Speed } from './stage5-speed.ts';
 import { createAccountAt, testPassword } from './world.ts';
 
@@ -20,6 +21,7 @@ export default async function globalSetup(config: FullConfig) {
   if (!baseURL) throw new Error('No baseURL.');
   const admin = await Api.signIn(baseURL, seedAdmin.login, seedAdmin.password);
   try {
+    await prepareCoopGame(admin);
     const accounts = await admin.get<Schemas['AccountView'][]>('/api/admin/accounts');
     const existing = accounts.find((a) => a.login === speedPlayer.login);
     if (!existing) {

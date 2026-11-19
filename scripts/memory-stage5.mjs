@@ -24,6 +24,153 @@ function list(value, name) {
 const text = (value) => typeof value === 'string' && value.length > 0;
 const nonnegative = (value) => Number.isFinite(value) && value >= 0;
 
+const trialId = 'memory-trial';
+const kitId = 'memory-event-kit';
+const trialDeckId = 'memory-trial-deck';
+const irlDeckId = 'memory-irl-deck';
+const proofLink = 'https://example.invalid/ivent-memory-proof';
+
+const trial = {
+  id: trialId,
+  kind: 'event',
+  name: 'Испытание для замера памяти',
+  description:
+    'Следующую игру пройди на сложной сложности или выше. В броске на один кубик больше.',
+  rarity: 'common',
+  price: null,
+  hostile: false,
+  effect: {
+    target: { selector: 'self' },
+    actions: [
+      { type: 'modifyNextRoll', runCondition: { difficultyAtLeast: 'hard' } },
+      { type: 'modifyDice', when: 'next', stage: 'count', value: 1 },
+    ],
+  },
+};
+
+const kit = {
+  id: kitId,
+  kind: 'item',
+  name: 'Набор для замера памяти',
+  description: 'Разыграй испытание и IRL-ивент.',
+  rarity: 'common',
+  price: 1,
+  window: 'anytime',
+  hostile: false,
+  stackable: false,
+  effect: {
+    target: { selector: 'self' },
+    actions: [
+      { type: 'drawEvent', deck: trialDeckId },
+      { type: 'drawEvent', deck: irlDeckId },
+    ],
+  },
+};
+
+/** Verify the same live proof and the waiting event before and after the load. The link is read as data. */
+export async function assertIrlMemoryReads({
+  admin,
+  player,
+  seasonId,
+  playerId,
+  effectId,
+  objectId,
+}) {
+  const base = `/api/seasons/${seasonId}`;
+  const adminBase = `/api/admin/seasons/${seasonId}`;
+  const { me } = await read(player, base);
+  if (me?.eventsEnabled !== true || me.playerId !== playerId)
+    throw new Error('Memory workload: the proof owner has no active events view.');
+  if (
+    !me.waitingConditions?.some(
+      (row) => row.objectId === trialId && row.difficultyAtLeast === 'hard',
+    )
+  )
+    throw new Error('Memory workload: the player has no waiting condition from the trial event.');
+  if (
+    !me.waitingEvents?.some(
+      (row) =>
+        row.objectId === trialId && row.waitingForRoll === false && row.waitingForThrow === true,
+    )
+  )
+    throw new Error('Memory workload: the player has no waiting throw from the trial event.');
+  const effect = me.manualEffects?.find((row) => row.id === effectId);
+  if (
+    effect?.irl !== true ||
+    effect.objectId !== objectId ||
+    effect.irlProof?.status !== 'pending' ||
+    effect.irlProof.link !== proofLink ||
+    !Number.isFinite(Date.parse(effect.irlProof.submittedAt))
+  )
+    throw new Error('Memory workload: the owner has no matching pending IRL proof.');
+
+  const proofs = list(await read(admin, `${adminBase}/irl-proofs`), 'IRL proof queue');
+  if (
+    !proofs.some(
+      (row) =>
+        row.effectId === effectId &&
+        row.playerId === playerId &&
+        row.objectId === objectId &&
+        row.link === proofLink &&
+        row.submittedAt === effect.irlProof.submittedAt,
+    )
+  )
+    throw new Error('Memory workload: the admin queue has no matching pending IRL proof.');
+
+  const effects = list(await read(admin, `${adminBase}/effects`), 'admin effects');
+  if (
+    !effects.some(
+      (row) =>
+        row.id === effectId &&
+        row.playerId === playerId &&
+        row.objectId === objectId &&
+        row.irl === true,
+    )
+  )
+    throw new Error('Memory workload: the admin effects view has no matching IRL effect.');
+}
+
+async function prepareIrlProof(admin, players, seasonId, objectId) {
+  const base = `/api/seasons/${seasonId}`;
+  const adminBase = `/api/admin/seasons/${seasonId}`;
+  for (const [playerIndex, player] of players.entries()) {
+    const before = await read(player, base);
+    const playerId = before.me?.playerId;
+    if (
+      before.status !== 'active' ||
+      !text(playerId) ||
+      before.me.finish?.order === 1 ||
+      before.me.choice?.kind === 'branch'
+    )
+      continue;
+    const economy = await read(player, `${base}/economy`);
+    const itemCount = economy.items?.filter((item) => item.kind === 'item').length ?? 0;
+    if (itemCount >= economy.inventoryLimit) continue;
+
+    await write(admin, `${adminBase}/players/${playerId}/inventory`, {
+      giveObjectId: kitId,
+      comment: 'Подготовка замера памяти этапа 5',
+    });
+    const inventory = await read(player, `${base}/economy`);
+    const instance = inventory.items?.find((item) => item.objectId === kitId && item.usable);
+    if (!text(instance?.instanceId))
+      throw new Error('Memory workload: the granted event kit cannot be used.');
+    await write(player, `${base}/items/${instance.instanceId}/use`, {});
+
+    const previous = new Set(before.me.manualEffects.map((effect) => effect.id));
+    const after = await read(player, base);
+    const effect = after.me?.manualEffects.find(
+      (row) => row.irl && row.objectId === objectId && !previous.has(row.id),
+    );
+    if (!text(effect?.id)) throw new Error('Memory workload: the kit did not draw an IRL effect.');
+    await write(player, `${base}/effects/${effect.id}/irl-proof`, { link: proofLink });
+    const proof = { playerIndex, playerId, effectId: effect.id, objectId };
+    await assertIrlMemoryReads({ admin, player, seasonId, ...proof });
+    return proof;
+  }
+  throw new Error('Memory workload: no eligible demo player has room for the event kit.');
+}
+
 /** A disabled mechanic, an empty table, or an error is never evidence of stage 5 memory usage. */
 export async function assertStage5MemoryReads({ call, seasonId }) {
   const base = `/api/seasons/${seasonId}`;
@@ -92,6 +239,10 @@ export async function prepareStage5MemoryWorkload({ admin, players, seasonId, co
     throw new Error('Memory workload: players are required.');
   const event = content.objects.find((object) => object.kind === 'event' && !object.manual);
   if (!event) throw new Error('Memory workload: an automatic event is required.');
+  const irlEvent = content.objects.find(
+    (object) => object.kind === 'event' && object.manual && object.proof === 'media',
+  );
+  if (!irlEvent) throw new Error('Memory workload: an IRL event is required.');
   const base = `/api/seasons/${seasonId}`;
   const adminBase = `/api/admin/seasons/${seasonId}`;
   const rules = await read(admin, `${base}/rules`);
@@ -115,8 +266,22 @@ export async function prepareStage5MemoryWorkload({ admin, players, seasonId, co
   await write(admin, `${adminBase}/content/publish`, {
     expectedVersion: current.version,
     pack: {
-      objects: merge(current.pack.objects, content.objects),
-      wheels: merge(current.pack.wheels, content.wheels),
+      objects: merge(current.pack.objects, [...content.objects, trial, kit]),
+      wheels: merge(current.pack.wheels, [
+        ...content.wheels,
+        {
+          id: trialDeckId,
+          name: 'Испытание для замера',
+          deck: 'bad',
+          entries: [{ objectId: trialId, weight: 1 }],
+        },
+        {
+          id: irlDeckId,
+          name: 'IRL-ивент для замера',
+          deck: 'bad',
+          entries: [{ objectId: irlEvent.id, weight: 1 }],
+        },
+      ]),
     },
     comment: 'Контент временного замера памяти этапа 5',
   });
@@ -197,4 +362,5 @@ export async function prepareStage5MemoryWorkload({ admin, players, seasonId, co
       ?.completedBy.some((player) => player.playerId === completed.playerId)
   )
     throw new Error('Memory workload: the marked completion was not projected.');
+  return prepareIrlProof(admin, players, seasonId, irlEvent.id);
 }

@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import type { Schemas } from '../support/api.ts';
 
 // Smoke tests (I3, D-128): against any address — the local site, the test copy, the live site — and read-only there:
 // nothing here writes. `npm run test:smoke -- https://<address>`. A signed-in look runs only with an account given in
@@ -36,6 +37,12 @@ test.describe('smoke @smoke', () => {
     expect(typeof ((await status.json()) as { maintenance: unknown }).maintenance).toBe('boolean');
     expect(seasons.status()).toBe(401);
     expect(admin.status()).toBe(401);
+
+    const unknownSeason = '/api/seasons/00000000-0000-0000-0000-000000000000';
+    for (const section of ['polls', 'interactions']) {
+      const view = await request.get(`${unknownSeason}/${section}`);
+      expect(view.status(), section).toBe(401);
+    }
   });
 
   test('pages carry the security headers', async ({ request }) => {
@@ -59,7 +66,9 @@ test.describe('smoke @smoke', () => {
     expect([400, 401]).toContain(answer.status());
   });
 
-  test('a spectator sees the current season', async ({ page }) => {
+  test('a spectator sees the current season and reads its polls and interactions', async ({
+    page,
+  }) => {
     const login = process.env['SMOKE_LOGIN'] ?? '';
     const password = process.env['SMOKE_PASSWORD'] ?? '';
     test.skip(!login || !password, 'SMOKE_LOGIN and SMOKE_PASSWORD are not set');
@@ -70,5 +79,49 @@ test.describe('smoke @smoke', () => {
     await page.getByTestId('login-submit').click();
 
     await expect(page.getByTestId('current-user')).toBeVisible();
+    const current = await page.request.get('/api/seasons/current');
+    if (current.status() === 404) {
+      await expect(page.getByTestId('no-season')).toBeVisible();
+      return;
+    }
+    expect(current.ok()).toBe(true);
+    const { id } = (await current.json()) as Schemas['CurrentSeasonView'];
+    const response = await page.request.get(`/api/seasons/${id}`);
+    expect(response.ok()).toBe(true);
+    const { interactionFeatures, pollsEnabled } = (await response.json()) as Schemas['SeasonView'];
+
+    await page.goto(`/seasons/${id}/polls`);
+    const polls = page.getByRole('main');
+    await expect(polls.getByRole('heading', { level: 1, name: 'Голосования' })).toBeVisible();
+    if (pollsEnabled) {
+      await expect(
+        polls
+          .getByRole('heading', {
+            level: 2,
+            name: /^(Пока нет голосований|Открытые|Завершённые)$/u,
+          })
+          .first(),
+      ).toBeVisible();
+    } else {
+      await expect(polls.getByRole('heading', { name: 'Голосования выключены' })).toBeVisible();
+    }
+
+    await page.goto(`/seasons/${id}/interactions`);
+    const interactions = page.getByRole('main');
+    await expect(
+      interactions.getByRole('heading', { level: 1, name: 'Взаимодействия' }),
+    ).toBeVisible();
+    if (interactionFeatures?.duels || interactionFeatures?.partnerBoard) {
+      if (interactionFeatures.duels)
+        await expect(interactions.getByRole('heading', { name: 'Дуэли' })).toBeVisible();
+      if (interactionFeatures.partnerBoard)
+        await expect(
+          interactions.getByRole('heading', { name: 'Доска «ищу напарника»' }),
+        ).toBeVisible();
+    } else {
+      await expect(
+        interactions.getByRole('heading', { name: 'Взаимодействия недоступны в этом сезоне' }),
+      ).toBeVisible();
+    }
   });
 });
