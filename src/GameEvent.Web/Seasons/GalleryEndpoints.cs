@@ -295,10 +295,10 @@ internal static class GalleryEndpoints
         }
 
         var command = new PublishGalleryMoment(itemId, actor, caption, fingerprint);
-        var envelope = new CommandEnvelope(commandId, seasonId, command, actor);
         if (earlier)
         {
             // The queue verifies the author, command fingerprint and undo status against the committed log.
+            var envelope = new CommandEnvelope(commandId, seasonId, command, actor);
             return PublicationResult(seasonId, player.Name, await services.Bus.SendAsync(envelope, ct));
         }
 
@@ -308,6 +308,13 @@ internal static class GalleryEndpoints
             return failure!;
         }
 
+        var outcome = await StoreAndPublishAsync(commandId, seasonId, command, picture, services);
+        return PublicationResult(seasonId, player.Name, outcome);
+    }
+
+    internal static async Task<CommandOutcome> StoreAndPublishAsync(
+        Guid commandId, Guid seasonId, PublishGalleryMoment command, ProcessedFile picture, FileServices services)
+    {
         var fileId = services.Ids.NewId();
         var main = FileNames.Main(fileId, picture.MediaType);
         var thumbnail = FileNames.Thumbnail(fileId, picture.MediaType);
@@ -325,10 +332,11 @@ internal static class GalleryEndpoints
         // Once queued, the command must be able to finish even if the request is gone (D-108).
         var prepared = new PreparedGalleryFile(
             fileId, picture.MediaType, picture.Main.LongLength, picture.Width, picture.Height, picture.Frames, command.ImageSha256);
+        var envelope = new CommandEnvelope(commandId, seasonId, command, command.UserId) { PreparedGalleryFile = prepared };
         CommandOutcome outcome;
         try
         {
-            outcome = await services.Bus.SendAsync(envelope with { PreparedGalleryFile = prepared }, CancellationToken.None);
+            outcome = await services.Bus.SendAsync(envelope, CancellationToken.None);
         }
         catch (ChannelClosedException)
         {
@@ -343,7 +351,7 @@ internal static class GalleryEndpoints
             services.Storage.Delete(thumbnail);
         }
 
-        return PublicationResult(seasonId, player.Name, outcome);
+        return outcome;
     }
 
     private static async Task<bool> AtDailyLimitAsync(Ruleset rules, Guid seasonId, Guid actor, FileServices services, CancellationToken ct)
