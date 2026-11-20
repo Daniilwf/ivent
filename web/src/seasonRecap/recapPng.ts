@@ -17,11 +17,11 @@ export async function downloadRecap(card: RecapCard) {
     body: `400 ${token('--text-sm')} ${fontText}`,
     label: `600 ${token('--text-sm')} ${fontText}`,
     name: `800 ${token('--text-xl')} ${fontDisplay}`,
-    hero: `800 ${token('--text-3xl')} ${fontDisplay}`,
+    hero: `800 ${token('--text-2xl')} ${fontDisplay}`,
     section: `800 ${token('--text-sm')} ${fontDisplay}`,
     number: `800 ${token('--text-lg')} ${fontDisplay}`,
   };
-  const glyphs = `${card.player} ${card.season} ${t.noRatings} ${t.completed} ${t.attacksReceived} 0123456789`;
+  const glyphs = `${card.player} ${card.season} ${t.noRatings} ${t.completed} ${t.hours} ${t.attacksReceived} 0123456789,—`;
   await Promise.allSettled(Object.values(font).map((face) => document.fonts.load(face, glyphs)));
 
   const space = Number.parseFloat(token('--spacing'));
@@ -32,7 +32,15 @@ export async function downloadRecap(card: RecapCard) {
   const seasonLines = linesOf(ctx, card.season, font.body, inner);
   const nameLines = linesOf(ctx, card.player, font.name, inner);
   const heroTop = padding + (seasonLines.length * 5 + nameLines.length * 8 + 5) * space;
-  const heroHeight = 25 * space;
+  const headline = [card.completed, card.hours];
+  const heroWidth = inner - 10 * space;
+  ctx.font = font.hero;
+  const sideBySide = headline.every(
+    ({ value }) => ctx.measureText(value).width <= heroWidth / 2 - space,
+  );
+  const heroColumn = sideBySide ? heroWidth / 2 : heroWidth;
+  const heroRow = 22 * space;
+  const heroHeight = (sideBySide ? 1 : headline.length) * heroRow + 3 * space;
   const groupTop = heroTop + heroHeight + 5 * space;
   const height = groupTop + 20 * space + padding;
   canvas.width = width * ratio;
@@ -80,8 +88,12 @@ export async function downloadRecap(card: RecapCard) {
   ctx.roundRect(padding, heroTop, inner, heroHeight, innerRadius);
   ctx.fill();
   const heroX = padding + 5 * space;
-  text(card.completed.value, font.hero, white, heroX, heroTop + 4 * space, inner - 10 * space);
-  text(card.completed.label, font.label, white, heroX, heroTop + 17 * space, inner - 10 * space);
+  headline.forEach(({ value, label }, index) => {
+    const x = heroX + (sideBySide ? index * heroColumn : 0);
+    const y = heroTop + (sideBySide ? 0 : index * heroRow);
+    text(value, font.hero, white, x, y + 4 * space, heroColumn - space);
+    text(label, font.label, white, x, y + 17 * space, heroColumn - space);
+  });
 
   const groupWidth = inner / 2 - 4 * space;
   const right = padding + inner - groupWidth;

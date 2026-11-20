@@ -17,6 +17,7 @@ const refreshEvents = new Set([
   'ruleset-changed',
   'command-undone',
   'run-completed',
+  'run-hours-corrected',
   'run-reviewed',
   'proof-rejected',
   'coop-reward-split',
@@ -132,13 +133,16 @@ export function RecapPreview({ card }: { card: RecapCard }) {
           {card.player}
         </h2>
       </header>
-      <dl className="rounded-md bg-me p-4 text-on-color desk:p-5">
-        <div className="flex flex-col-reverse gap-1">
-          <dt className="font-medium">{card.completed.label}</dt>
-          <dd className="font-display text-3xl font-heavy wrap-anywhere tabular-nums">
-            {card.completed.value}
-          </dd>
-        </div>
+      <dl className="flex flex-wrap gap-4 rounded-md bg-me p-4 text-on-color desk:p-5">
+        {[card.completed, card.hours].map(({ label, value }) => (
+          <div
+            key={label}
+            className="flex max-w-full shrink-0 grow flex-col-reverse justify-end gap-1"
+          >
+            <dt className="font-medium">{label}</dt>
+            <dd className="font-display text-2xl font-heavy wrap-anywhere tabular-nums">{value}</dd>
+          </div>
+        ))}
       </dl>
       <div className="grid grid-cols-2 divide-x divide-muted">
         <section className="grid min-w-0 content-start gap-2 pr-2 desk:pr-4">

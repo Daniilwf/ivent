@@ -44,6 +44,24 @@ const records: Schemas['HallOfFameRecordsView'] = {
       hours: 9.9,
     },
   ],
+  fastestFinishes: [
+    {
+      seasonId: 'spring',
+      seasonName: 'Весна',
+      playerId: 'p1',
+      name: 'Яна',
+      elapsedSeconds: 93_784.125,
+      profileUserId: 'u1',
+    },
+    {
+      seasonId: 'autumn',
+      seasonName: 'Осень',
+      playerId: 'p2',
+      name: 'Анна',
+      elapsedSeconds: 93_784.125,
+      profileUserId: null,
+    },
+  ],
 };
 
 describe('HallOfFameScreen', () => {
@@ -76,10 +94,23 @@ describe('HallOfFameScreen', () => {
     expect(longest.getByText('Весна')).toBeVisible();
     expect(longest.getByText('Осень')).toBeVisible();
 
+    const fastest = within(screen.getByRole('region', { name: t.fastestFinish }));
+    expect(fastest.getByText('1 д 2 ч 3 мин 4,125 с')).toBeVisible();
+    const [firstFinish, secondFinish] = fastest.getAllByRole('listitem');
+    if (!firstFinish || !secondFinish) throw new Error('Both tied records must be visible.');
+    expect(within(firstFinish).getByRole('link', { name: 'Яна' })).toHaveAttribute(
+      'href',
+      '/users/u1',
+    );
+    expect(within(firstFinish).getByText('Весна')).toBeVisible();
+    expect(within(secondFinish).getByText('Анна')).toBeVisible();
+    expect(within(secondFinish).getByText('Осень')).toBeVisible();
+    expect(within(secondFinish).queryByRole('link')).not.toBeInTheDocument();
+
     const recordHeading = longest.getByRole('heading', { name: t.record });
     const scroll = vi.spyOn(recordHeading, 'scrollIntoView');
     const address = window.location.href;
-    await userEvent.click(screen.getByRole('link', { name: t.toRecord }));
+    await userEvent.click(screen.getByRole('link', { name: /^К рекордам$/ }));
     expect(recordHeading).toHaveFocus();
     expect(scroll).toHaveBeenCalledWith({ block: 'start' });
     expect(window.location.href).toBe(address);
@@ -110,14 +141,48 @@ describe('HallOfFameScreen', () => {
     expect(sent('GET', recordsPath)).toHaveLength(2);
   });
 
-  it('shows one empty state when both lists are empty', async () => {
-    fakeServer({ [winnersPath]: [], [recordsPath]: { longestGames: [] } });
+  it('shows one empty state when there are no winners or records', async () => {
+    fakeServer({ [winnersPath]: [], [recordsPath]: { longestGames: [], fastestFinishes: [] } });
     render(<HallOfFameScreen onSignedOut={vi.fn()} />);
 
     expect(await screen.findByRole('heading', { name: t.emptyTitle })).toBeVisible();
     expect(screen.queryByRole('link', { name: t.toRecord })).not.toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: t.noWinnersTitle })).not.toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: t.noRecordTitle })).not.toBeInTheDocument();
+  });
+
+  it('keeps showing the longest game when the server does not provide a fastest finish list', async () => {
+    fakeServer({ [winnersPath]: [], [recordsPath]: { longestGames: records.longestGames } });
+    render(<HallOfFameScreen onSignedOut={vi.fn()} />);
+
+    expect(await screen.findByRole('link', { name: 'Zelda' })).toBeVisible();
+    expect(screen.getByRole('link', { name: t.toRecord })).toBeVisible();
+    expect(screen.queryByRole('heading', { name: t.fastestFinish })).not.toBeInTheDocument();
+  });
+
+  it('jumps to the fastest finish when it is the only record', async () => {
+    fakeServer({
+      [winnersPath]: [],
+      [recordsPath]: {
+        longestGames: [],
+        fastestFinishes: records.fastestFinishes.map((finish) => ({
+          ...finish,
+          elapsedSeconds: 59.99999,
+        })),
+      },
+    });
+    render(<HallOfFameScreen onSignedOut={vi.fn()} />);
+
+    const recordHeading = await screen.findByRole('heading', { name: t.fastestFinish });
+    expect(screen.getByText('1 мин')).toBeVisible();
+    const scroll = vi.spyOn(recordHeading, 'scrollIntoView');
+    const jump = screen.getByRole('link', { name: t.toRecord });
+    expect(jump).toHaveAttribute('href', `#${recordHeading.id}`);
+    await userEvent.click(jump);
+    expect(recordHeading).toHaveFocus();
+    expect(scroll).toHaveBeenCalledWith({ block: 'start' });
+    expect(screen.queryByRole('heading', { name: t.record })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: t.emptyTitle })).not.toBeInTheDocument();
   });
 
   it('uses the signed-out callback when either request loses its session', async () => {

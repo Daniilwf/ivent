@@ -35,7 +35,7 @@ async function capture(page: Page, info: TestInfo, name: string) {
   await info.attach(name, { path, contentType: 'image/png' });
 }
 
-test('a spectator opens the hall from navigation and reads archived winners and the longest game', async ({
+test('a spectator opens the hall from navigation and reads archived winners and records', async ({
   browser,
 }, info) => {
   const tag = uniqueTag().slice(-6);
@@ -48,17 +48,26 @@ test('a spectator opens the hall from navigation and reads archived winners and 
 
   const { adminApi: admin, seasonId } = world;
   try {
+    const seasonAdmin = `/api/admin/seasons/${seasonId}`;
+    const { ruleset: openingRules } = await admin.get<Schemas['RulesView']>(
+      `/api/seasons/${seasonId}/rules`,
+    );
+    await admin.post(`${seasonAdmin}/players/${player.playerId}/adjust`, {
+      cellId: `c${String(openingRules.map.linearLength - 1)}`,
+      comment: 'Одна клетка до финиша',
+    });
     const actor = await apiOf(player);
     let run: Schemas['CompletedRunView'] | null | undefined;
     try {
       await rollAndStart(actor, seasonId);
       await complete(actor, seasonId);
-      run = (await seasonOf(actor, seasonId)).me?.lastCompleted;
+      const { me } = await seasonOf(actor, seasonId);
+      expect(me?.finish).toBeTruthy();
+      run = me?.lastCompleted;
     } finally {
       await actor.dispose();
     }
     if (!run) throw new Error('The game completion is missing.');
-    const seasonAdmin = `/api/admin/seasons/${seasonId}`;
     // At the accepted limit, our run is visible even when other browser fixtures finish concurrently.
     await admin.post(`${seasonAdmin}/runs/${run.id}/hours`, {
       hours: 1000,
@@ -119,8 +128,10 @@ test('a spectator opens the hall from navigation and reads archived winners and 
         navLink.press('Enter'),
       ]);
       expect(recordResponse.ok()).toBe(true);
-      const { longestGames } = (await recordResponse.json()) as Schemas['HallOfFameRecordsView'];
+      const { longestGames, fastestFinishes } =
+        (await recordResponse.json()) as Schemas['HallOfFameRecordsView'];
       expect(longestGames.some((record) => record.runId === run.id)).toBe(true);
+      expect(fastestFinishes.length).toBeGreaterThan(0);
       await expect(page).toHaveURL(/\/hall-of-fame$/);
       await expect(navLink).toHaveAttribute('aria-current', 'page');
       await expect(page.getByRole('heading', { name: 'Зал славы', level: 1 })).toBeFocused();
@@ -156,7 +167,7 @@ test('a spectator opens the hall from navigation and reads archived winners and 
       ).toEqual(longestGames.map(({ gameId }) => `/games/${gameId}`));
       await capture(page, info, 'hall-of-fame');
 
-      const jump = page.getByRole('link', { name: 'К рекорду', exact: true });
+      const jump = page.getByRole('link', { name: 'К рекордам', exact: true });
       if (info.project.name === 'phone') {
         const recordHeading = records.getByRole('heading', { level: 2 });
         await expect(recordHeading).not.toBeInViewport();
@@ -181,6 +192,19 @@ test('a spectator opens the hall from navigation and reads archived winners and 
       } else {
         await expect(jump).toBeHidden();
       }
+
+      const fastest = page.getByRole('region', { name: 'Самый быстрый финиш' });
+      const fastestHeading = fastest.getByRole('heading', { level: 2 });
+      await fastestHeading.evaluate((heading) => {
+        heading.scrollIntoView({ block: 'start' });
+      });
+      await expect(fastestHeading).toBeInViewport();
+      await expect(fastest.getByRole('listitem')).toHaveCount(fastestFinishes.length);
+      for (const finish of fastestFinishes) {
+        const row = fastest.getByRole('listitem').filter({ hasText: finish.seasonName });
+        await expect(row.getByText(finish.name, { exact: true })).toBeVisible();
+      }
+      await capture(page, info, 'hall-of-fame-fastest');
 
       await gameLinks
         .and(records.locator(`a[href="/games/${run.game.id}"]`))

@@ -15298,6 +15298,44 @@
         ],
         "description": "What a global goal counts (D-518): the HowLongToBeat hours of the completed games, or the completions."
       },
+      "HallOfFameFinishView": {
+        "required": [
+          "seasonId",
+          "seasonName",
+          "playerId",
+          "name",
+          "elapsedSeconds",
+          "profileUserId"
+        ],
+        "type": "object",
+        "properties": {
+          "seasonId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "seasonName": {
+            "type": "string"
+          },
+          "playerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "elapsedSeconds": {
+            "type": "number",
+            "format": "double"
+          },
+          "profileUserId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          }
+        }
+      },
       "HallOfFameGameView": {
         "required": [
           "seasonId",
@@ -15335,7 +15373,8 @@
       },
       "HallOfFameRecordsView": {
         "required": [
-          "longestGames"
+          "longestGames",
+          "fastestFinishes"
         ],
         "type": "object",
         "properties": {
@@ -15343,6 +15382,12 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/HallOfFameGameView"
+            }
+          },
+          "fastestFinishes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HallOfFameFinishView"
             }
           }
         }
@@ -19162,7 +19207,8 @@
           "worstRating",
           "attacksMade",
           "attacksReceived",
-          "seasonName"
+          "seasonName",
+          "totalHours"
         ],
         "type": "object",
         "properties": {
@@ -19198,6 +19244,10 @@
           },
           "seasonName": {
             "type": "string"
+          },
+          "totalHours": {
+            "type": "number",
+            "format": "double"
           }
         }
       },

@@ -27,6 +27,7 @@ const statistics: Schemas['SeasonStatisticsView'] = {
   seasonId,
   seasonName: 'Осень',
   completedRuns: 4,
+  totalHours: 12.75,
   bestRating: 8,
   worstRating: 4,
   attacksMade: 0,
@@ -44,12 +45,15 @@ describe('SeasonRecap', () => {
     expect(details.getByText(statistics.seasonName)).toBeInTheDocument();
     expect(details.getAllByText(t.ratingUnit)).toHaveLength(2);
     expect(details.getByText('0')).toBeInTheDocument();
+    expect(details.getByText(t.hours)).toBeInTheDocument();
+    expect(details.getByText('12,75')).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: t.download }));
     expect(downloadRecap).toHaveBeenCalledWith({
       season: statistics.seasonName,
       player: user.name,
       completed: { label: t.completed, value: '4' },
+      hours: { label: t.hours, value: '12,75' },
       ratings: [
         { label: t.bestRating, value: '8', unit: t.ratingUnit },
         { label: t.worstRating, value: '4', unit: t.ratingUnit },
@@ -59,6 +63,38 @@ describe('SeasonRecap', () => {
         { label: t.attacksReceived, value: '1' },
       ],
     });
+  });
+
+  it.each([
+    { totalHours: undefined, value: '—' },
+    { totalHours: 0, value: '0' },
+  ])('shows and exports "$value" for hours $totalHours', async ({ totalHours, value }) => {
+    fakeServer({ [path]: { ...statistics, totalHours } });
+    vi.mocked(downloadRecap).mockResolvedValue(undefined);
+    render(<SeasonRecap seasonId={seasonId} user={user} onSignedOut={vi.fn()} />);
+
+    const card = within(await screen.findByRole('article', { name: user.name }));
+    expect(card.getByText(t.hours).nextElementSibling).toHaveTextContent(new RegExp(`^${value}$`));
+
+    await userEvent.click(screen.getByRole('button', { name: t.download }));
+    expect(downloadRecap).toHaveBeenCalledWith(
+      expect.objectContaining({ hours: { label: t.hours, value } }),
+    );
+  });
+
+  it('reloads the displayed hours when a completion correction arrives', async () => {
+    let totalHours = 0;
+    fakeServer({ [path]: () => json(200, { ...statistics, totalHours }) });
+    render(<SeasonRecap seasonId={seasonId} user={user} onSignedOut={vi.fn()} />);
+
+    const card = within(await screen.findByRole('article', { name: user.name }));
+    expect(card.getByText(t.hours).parentElement).toHaveTextContent('Часы0');
+
+    totalHours = 14.125;
+    act(() =>
+      notify?.([{ seasonId, fromSequence: 1, toSequence: 1, types: ['run-hours-corrected'] }]),
+    );
+    expect(await card.findByText('14,125')).toBeInTheDocument();
   });
 
   it('retries a load error, shows missing ratings once, and keeps the card after an export failure', async () => {

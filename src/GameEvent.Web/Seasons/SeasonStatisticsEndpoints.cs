@@ -14,7 +14,8 @@ using Microsoft.EntityFrameworkCore;
 namespace GameEvent.Web.Seasons;
 
 public sealed record SeasonStatisticsView(
-    Guid SeasonId, int CompletedRuns, int? BestRating, int? WorstRating, int AttacksMade, int AttacksReceived, string SeasonName);
+    Guid SeasonId, int CompletedRuns, int? BestRating, int? WorstRating, int AttacksMade, int AttacksReceived, string SeasonName,
+    decimal TotalHours);
 
 internal static class SeasonStatisticsEndpoints
 {
@@ -58,17 +59,18 @@ internal static class SeasonStatisticsEndpoints
             where run.SeasonId == seasonId && run.PlayerId == participation.PlayerId && run.Status == RunStatus.Completed
             join review in ownReviews on run.Id equals review.RunId into reviews
             from review in reviews.DefaultIfEmpty()
-            group (int?)review.Rating by run.PlayerId into ratings
-            select new { Completed = ratings.Count(), Best = ratings.Max(), Worst = ratings.Min() }).SingleOrDefaultAsync(ct);
+            select new { run.Hours, Rating = (int?)review.Rating }).ToListAsync(ct);
 
         var partnerRuns = await CoopPartnerRuns.LoadAsync(db, [seasonId], [participation.PlayerId], ct);
-        var completed = (own?.Completed ?? 0) + partnerRuns.Count(run => run.Status == RunStatus.Completed);
+        var completedAsPartner = partnerRuns.FindAll(run => run.Status == RunStatus.Completed);
+        var totalHours = own.Sum(run => run.Hours ?? 0) + completedAsPartner.Sum(run => run.Hours ?? 0);
         var hits = await db.Events.AsNoTracking()
             .Where(row => row.SeasonId == seasonId && row.Type == s_attackType && row.UndoneByEventId == null)
             .Select(row => new { row.Type, row.Version, row.Data }).ToListAsync(ct);
         var attacks = AttackStatistics.ForPlayer(participation.PlayerId,
             hits.Select(row => EventCodec.Decode(new StoredEvent(row.Type, row.Version, row.Data))));
         return TypedResults.Ok(new SeasonStatisticsView(
-            seasonId, completed, own?.Best, own?.Worst, attacks.AttacksMade, attacks.AttacksReceived, participation.Name));
+            seasonId, own.Count + completedAsPartner.Count, own.Max(run => run.Rating), own.Min(run => run.Rating),
+            attacks.AttacksMade, attacks.AttacksReceived, participation.Name, totalHours));
     }
 }

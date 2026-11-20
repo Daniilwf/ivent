@@ -1,5 +1,5 @@
 import { Gamepad2, Trophy } from 'lucide-react';
-import { useRef } from 'react';
+import { useRef, type ReactNode, type Ref } from 'react';
 import { api, type Schemas } from '../api/client';
 import { Link } from '../app/Link';
 import { paths, usePageHeading, useRestoredScroll } from '../app/router';
@@ -15,6 +15,7 @@ import { Sticker } from '../ui/Sticker';
 const t = ru.hallOfFame;
 const winnersTitleId = 'hall-of-fame-winners-title';
 const recordTitleId = 'hall-of-fame-record-title';
+const fastestTitleId = 'hall-of-fame-fastest-title';
 
 const loadWinners = async () => answerOf(await api.GET('/api/hall-of-fame'));
 const loadRecords = async () => answerOf(await api.GET('/api/hall-of-fame/records'));
@@ -24,12 +25,18 @@ export function HallOfFameScreen({ onSignedOut }: { onSignedOut: () => void }) {
   const records = useLoaded(loadRecords, { onSignedOut });
   const heading = usePageHeading();
   const recordHeading = useRef<HTMLHeadingElement>(null);
+  // Tabs opened before a server rollback may still receive the previous records response.
+  const availableRecords: Partial<Schemas['HallOfFameRecordsView']> =
+    records.kind === 'ready' ? records.value : {};
+  const fastest = availableRecords.fastestFinishes ?? [];
+  const hasLongest = records.kind === 'ready' && records.value.longestGames.length > 0;
+  const hasFastest = fastest.length > 0;
+  const hasRecord = hasLongest || hasFastest;
   const noResults =
     winners.kind === 'ready' &&
     winners.value.length === 0 &&
     records.kind === 'ready' &&
-    records.value.longestGames.length === 0;
-  const hasRecord = records.kind === 'ready' && records.value.longestGames.length > 0;
+    !hasRecord;
   useRestoredScroll(winners.kind !== 'loading' && records.kind !== 'loading');
 
   return (
@@ -44,7 +51,7 @@ export function HallOfFameScreen({ onSignedOut }: { onSignedOut: () => void }) {
         </h1>
         {hasRecord ? (
           <a
-            href={`#${recordTitleId}`}
+            href={`#${hasLongest ? recordTitleId : fastestTitleId}`}
             className={cx(standaloneLink, 'font-bold text-action-strong desk:hidden')}
             onClick={(event) => {
               const target = recordHeading.current;
@@ -56,7 +63,7 @@ export function HallOfFameScreen({ onSignedOut }: { onSignedOut: () => void }) {
               target.scrollIntoView({ block: 'start' });
             }}
           >
-            {t.toRecord}
+            {hasLongest && hasFastest ? t.toRecords : t.toRecord}
           </a>
         ) : null}
       </header>
@@ -77,25 +84,56 @@ export function HallOfFameScreen({ onSignedOut }: { onSignedOut: () => void }) {
               {(seasons) => <WinningSeasons seasons={seasons} />}
             </AsyncState>
           </section>
-          <section
-            aria-labelledby={recordTitleId}
-            className="grid min-w-0 gap-3 rounded-lg border-2 border-muted bg-info-soft p-4 desk:p-5"
-          >
-            <h2
-              id={recordTitleId}
-              ref={recordHeading}
-              tabIndex={-1}
-              className="scroll-mt-44 rounded-sm font-display text-lg font-heavy is-focus:focus-ring"
-            >
-              {t.record}
-            </h2>
-            <AsyncState loaded={records} rows={1} errorTitle={t.recordError}>
-              {({ longestGames }) => <LongestGames games={longestGames} />}
-            </AsyncState>
-          </section>
+          <div className="grid min-w-0 gap-4 desk:gap-5">
+            {hasLongest || !hasFastest ? (
+              <RecordPanel title={t.record} titleId={recordTitleId} heading={recordHeading}>
+                <AsyncState loaded={records} rows={1} errorTitle={t.recordError}>
+                  {({ longestGames }) => <LongestGames games={longestGames} />}
+                </AsyncState>
+              </RecordPanel>
+            ) : null}
+            {hasFastest ? (
+              <RecordPanel
+                title={t.fastestFinish}
+                titleId={fastestTitleId}
+                heading={hasLongest ? null : recordHeading}
+              >
+                <FastestFinishes finishes={fastest} />
+              </RecordPanel>
+            ) : null}
+          </div>
         </div>
       )}
     </main>
+  );
+}
+
+function RecordPanel({
+  title,
+  titleId,
+  heading,
+  children,
+}: {
+  title: string;
+  titleId: string;
+  heading?: Ref<HTMLHeadingElement>;
+  children: ReactNode;
+}) {
+  return (
+    <section
+      aria-labelledby={titleId}
+      className="grid min-w-0 gap-3 rounded-lg border-2 border-muted bg-info-soft p-4 desk:p-5"
+    >
+      <h2
+        id={titleId}
+        ref={heading}
+        tabIndex={-1}
+        className="scroll-mt-44 rounded-sm font-display text-lg font-heavy is-focus:focus-ring"
+      >
+        {title}
+      </h2>
+      {children}
+    </section>
   );
 }
 
@@ -152,6 +190,36 @@ function WinningSeasons({ seasons }: { seasons: Schemas['HallOfFameSeasonView'][
         </li>
       ))}
     </ol>
+  );
+}
+
+function FastestFinishes({ finishes }: { finishes: Schemas['HallOfFameFinishView'][] }) {
+  const first = finishes[0];
+  if (!first) return null;
+
+  return (
+    <>
+      <p className="font-display text-2xl font-heavy wrap-anywhere tabular-nums desk:text-3xl">
+        {t.finishTime(first.elapsedSeconds)}
+      </p>
+      <ul className="grid gap-2">
+        {finishes.map(({ seasonId, seasonName, playerId, name, profileUserId }) => (
+          <li key={`${seasonId}:${playerId}`} className="min-w-0 wrap-anywhere">
+            {profileUserId ? (
+              <Link
+                to={paths.profile(profileUserId)}
+                className={cx(standaloneLink, 'min-w-11 font-bold text-action-strong')}
+              >
+                {name}
+              </Link>
+            ) : (
+              <p className="font-bold">{name}</p>
+            )}
+            <p className="text-sm text-ink-soft">{seasonName}</p>
+          </li>
+        ))}
+      </ul>
+    </>
   );
 }
 

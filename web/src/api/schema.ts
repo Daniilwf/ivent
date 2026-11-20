@@ -12592,6 +12592,18 @@ export interface components {
          * @enum {unknown}
          */
         GoalMetric: "hours" | "runs";
+        HallOfFameFinishView: {
+            /** Format: uuid */
+            seasonId: string;
+            seasonName: string;
+            /** Format: uuid */
+            playerId: string;
+            name: string;
+            /** Format: double */
+            elapsedSeconds: number;
+            /** Format: uuid */
+            profileUserId: null | string;
+        };
         HallOfFameGameView: {
             /** Format: uuid */
             seasonId: string;
@@ -12606,6 +12618,7 @@ export interface components {
         };
         HallOfFameRecordsView: {
             longestGames: components["schemas"]["HallOfFameGameView"][];
+            fastestFinishes: components["schemas"]["HallOfFameFinishView"][];
         };
         HallOfFameSeasonView: {
             /** Format: uuid */
@@ -13843,6 +13856,8 @@ export interface components {
             /** Format: int32 */
             attacksReceived: number;
             seasonName: string;
+            /** Format: double */
+            totalHours: number;
         };
         /**
          * @description Season lifecycle (GLOSSARY «Статус сезона»): draft → active → closing → finished → archived.

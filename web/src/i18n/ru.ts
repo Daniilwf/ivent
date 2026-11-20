@@ -1750,6 +1750,7 @@ export const ru = {
     toProfile: 'К моему профилю',
     profileLink: (season: string) => `Твой сезон, ${season}`,
     completed: 'Завершено игр',
+    hours: 'Часы',
     ratings: 'Оценки',
     bestRating: 'Лучшая',
     worstRating: 'Худшая',
@@ -1762,7 +1763,26 @@ export const ru = {
   hallOfFame: {
     winners: 'Победители сезонов',
     record: 'Самая длинная игра',
+    fastestFinish: 'Самый быстрый финиш',
+    finishTime: (totalSeconds: number) => {
+      const milliseconds = Math.round(totalSeconds * 1000);
+      const days = Math.floor(milliseconds / 86_400_000);
+      const hours = Math.floor((milliseconds % 86_400_000) / 3_600_000);
+      const minutes = Math.floor((milliseconds % 3_600_000) / 60_000);
+      const seconds = (milliseconds % 60_000) / 1000;
+      return [
+        days ? `${days} д` : '',
+        hours ? `${hours} ч` : '',
+        minutes ? `${minutes} мин` : '',
+        seconds || milliseconds === 0
+          ? `${seconds.toLocaleString('ru-RU', { maximumFractionDigits: 3 })} с`
+          : '',
+      ]
+        .filter(Boolean)
+        .join(' ');
+    },
     toRecord: 'К рекорду',
+    toRecords: 'К рекордам',
     tiedFirst: 'Общее первое место',
     emptyTitle: 'Здесь пока нет итогов',
     emptyText: 'Здесь будут итоги завершённых сезонов.',

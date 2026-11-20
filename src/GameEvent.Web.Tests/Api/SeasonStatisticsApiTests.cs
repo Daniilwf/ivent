@@ -180,11 +180,7 @@ public sealed class SeasonStatisticsApiTests : IAsyncLifetime
         using var admin = await _site.SignedInAsync("admin");
 
         await StartAsync(roller);
-        await PostOkAsync(roller, $"{Season}/coop/invite",
-            new { commandId = Guid.NewGuid(), partnerId = _site.Players["petya"] });
-        var invitation = Assert.Single((await ReadJsonAsync(partner, $"{Season}/interactions")).EnumerateArray());
-        await PostOkAsync(partner, $"{Season}/interactions/{invitation.GetProperty("id").GetGuid()}/answer",
-            new { commandId = Guid.NewGuid(), accept = true });
+        await JoinCoopAsync(roller, partner);
         var coopRun = await FinishAsync(roller);
         await ReviewAsync(roller, coopRun, 7);
         await EnableStatisticsAsync(SeasonId);
@@ -195,6 +191,62 @@ public sealed class SeasonStatisticsApiTests : IAsyncLifetime
         await RejectAsync(admin, coopRun);
         Assert.Equal((SeasonId, 0, null, null), await ReadStatisticsAsync(roller));
         Assert.Equal((SeasonId, 0, null, null), await ReadStatisticsAsync(partner));
+    }
+
+    [Fact]
+    public async Task Both_players_get_full_coop_hours_using_a_run_correction_until_the_proof_is_rejected()
+    {
+        const decimal CoopHours = 8.25m;
+        const decimal CorrectedHours = 10.75m;
+        const decimal SoloHours = 4.5m;
+        await SetUpCoopHoursAsync(CoopHours);
+        using var roller = await _site.SignedInAsync("vasya");
+        using var partner = await _site.SignedInAsync("petya");
+        using var admin = await _site.SignedInAsync("admin");
+
+        await StartAsync(roller);
+        await JoinCoopAsync(roller, partner);
+        var coopRun = await FinishAsync(roller);
+        Assert.Equal((1, CoopHours), await ReadHoursAsync(roller));
+        Assert.Equal((1, CoopHours), await ReadHoursAsync(partner));
+
+        await PostOkAsync(admin, $"{AdminSeason}/runs/{coopRun}/hours", new
+        {
+            commandId = Guid.NewGuid(),
+            hours = CorrectedHours,
+            comment = "Уточнили длину прохождения",
+        });
+        await using (var db = _site.NewDb())
+        {
+            await db.Games.ExecuteUpdateAsync(games => games.SetProperty(game => game.Hours, SoloHours), Ct);
+        }
+        await CompleteAsync(roller);
+        Assert.Equal((2, CorrectedHours + SoloHours), await ReadHoursAsync(roller));
+        Assert.Equal((1, CorrectedHours), await ReadHoursAsync(partner));
+
+        await RejectAsync(admin, coopRun);
+        Assert.Equal((1, SoloHours), await ReadHoursAsync(roller));
+        Assert.Equal((0, 0m), await ReadHoursAsync(partner));
+    }
+
+    [Fact]
+    public async Task Leaving_coop_and_playing_or_dropping_other_games_add_no_hours()
+    {
+        const decimal GameHours = 8.25m;
+        await SetUpCoopHoursAsync(GameHours);
+        using var roller = await _site.SignedInAsync("vasya");
+        using var partner = await _site.SignedInAsync("petya");
+
+        await StartAsync(roller);
+        await JoinCoopAsync(roller, partner);
+        await PostOkAsync(partner, $"{Season}/coop/leave", new { commandId = Guid.NewGuid() });
+        await FinishAsync(roller);
+
+        await StartAsync(partner);
+        await PostOkAsync(partner, $"{Season}/drop");
+        await StartAsync(partner);
+        Assert.Equal((1, GameHours), await ReadHoursAsync(roller));
+        Assert.Equal((0, 0m), await ReadHoursAsync(partner));
     }
 
     [Fact]
@@ -289,6 +341,25 @@ public sealed class SeasonStatisticsApiTests : IAsyncLifetime
         await OkAsync(response);
     }
 
+    private async Task SetUpCoopHoursAsync(decimal hours)
+    {
+        await using (var db = _site.NewDb())
+        {
+            await db.Games.ExecuteUpdateAsync(games => games.SetProperty(game => game.IsCoop, true)
+                .SetProperty(game => game.Hours, hours), Ct);
+        }
+        await RulesAsync(_site, Flags(flags => flags with { Coop = true, SeasonStatistics = true }));
+    }
+
+    private async Task JoinCoopAsync(HttpClient roller, HttpClient partner)
+    {
+        await PostOkAsync(roller, $"{Season}/coop/invite",
+            new { commandId = Guid.NewGuid(), partnerId = _site.Players["petya"] });
+        var invitation = Assert.Single((await ReadJsonAsync(partner, $"{Season}/interactions")).EnumerateArray());
+        await PostOkAsync(partner, $"{Season}/interactions/{invitation.GetProperty("id").GetGuid()}/answer",
+            new { commandId = Guid.NewGuid(), accept = true });
+    }
+
     private static async Task StartAsync(HttpClient player)
     {
         await PostOkAsync(player, $"{Season}/roll");
@@ -326,6 +397,13 @@ public sealed class SeasonStatisticsApiTests : IAsyncLifetime
         var stats = await ReadJsonAsync(player, Statistics(SeasonId));
         return (stats.GetProperty("seasonId").GetGuid(), stats.GetProperty("completedRuns").GetInt32(),
             Rating(stats, "bestRating"), Rating(stats, "worstRating"));
+    }
+
+    private static async Task<(int CompletedRuns, decimal TotalHours)> ReadHoursAsync(HttpClient player)
+    {
+        var stats = await ReadJsonAsync(player, Statistics(SeasonId));
+        Assert.True(stats.TryGetProperty("totalHours", out var hours), "The personal season summary must contain totalHours.");
+        return (stats.GetProperty("completedRuns").GetInt32(), hours.GetDecimal());
     }
 
     private static int? Rating(JsonElement body, string name)

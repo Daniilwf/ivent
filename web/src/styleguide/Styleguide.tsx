@@ -1027,6 +1027,7 @@ export function Styleguide() {
                 seasonId: demoProfile.seasons[0]?.seasonId ?? '',
                 seasonName: demoProfile.seasons[0]?.seasonName ?? '',
                 completedRuns: 1280,
+                totalHours: 2345.75,
                 bestRating: 10,
                 worstRating: 1,
                 attacksMade: 1234,

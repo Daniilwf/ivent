@@ -1,7 +1,15 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
 import type { Schemas } from '../support/api.ts';
-import { apiOf, complete, live, rollAndStart, setUpSeason, signIn } from '../support/world.ts';
+import {
+  apiOf,
+  complete,
+  live,
+  rollAndStart,
+  seasonOf,
+  setUpSeason,
+  signIn,
+} from '../support/world.ts';
 
 test('only a participant opens their own season recap and downloads it as PNG', async ({
   browser,
@@ -35,12 +43,17 @@ test('only a participant opens their own season recap and downloads it as PNG', 
   await setStatistics(true);
   await world.adminApi.post(`${adminPath}/status`, { to: 'active' });
   const playerApi = await apiOf(player);
+  let completedRun: Schemas['CompletedRunView'] | null | undefined;
   try {
     await rollAndStart(playerApi, world.seasonId);
     await complete(playerApi, world.seasonId, 'normal', { review: { rating: 8 } });
+    completedRun = (await seasonOf(playerApi, world.seasonId)).me?.lastCompleted;
   } finally {
     await playerApi.dispose();
   }
+  if (!completedRun) throw new Error('The game completion is missing.');
+  const correctedHours = completedRun.game.hours === 12.75 ? 15.125 : 12.75;
+  const displayedHours = correctedHours.toLocaleString('ru-RU');
 
   const ownerPage = await signIn(browser, player);
   const spectatorPage = await signIn(browser, spectator);
@@ -53,11 +66,27 @@ test('only a participant opens their own season recap and downloads it as PNG', 
     const card = ownerPage.getByRole('article', { name: player.name });
     await expect(card.getByText(world.seasonName)).toBeVisible();
     await expect(card.getByText('из 10')).toHaveCount(2);
+    await expect(card.getByText('Часы', { exact: true })).toBeVisible();
+    await world.adminApi.post(`${adminPath}/runs/${completedRun.id}/hours`, {
+      hours: correctedHours,
+      comment: 'Проверка часов в сводке и картинке',
+    });
+    await expect(card.getByText(displayedHours, { exact: true })).toBeVisible(live);
     await expect(card.getByText('8', { exact: true })).toHaveCount(2);
     expect(
       await ownerPage.evaluate(() => document.documentElement.scrollWidth),
     ).toBeLessThanOrEqual(ownerPage.viewportSize()?.width ?? 0);
 
+    const captions = await ownerPage.evaluateHandle(() => {
+      const written: string[] = [];
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- forward the original canvas context below
+      const fill = CanvasRenderingContext2D.prototype.fillText;
+      CanvasRenderingContext2D.prototype.fillText = function (...args) {
+        written.push(args[0]);
+        fill.apply(this, args);
+      };
+      return written;
+    });
     const action = ownerPage.getByRole('button', { name: 'Скачать картинку для чата' });
     const [download] = await Promise.all([
       ownerPage.waitForEvent('download'),
@@ -70,6 +99,8 @@ test('only a participant opens their own season recap and downloads it as PNG', 
     expect(png.subarray(0, 8).toString('hex')).toBe('89504e470d0a1a0a');
     expect(png.readUInt32BE(16)).toBeGreaterThan(700);
     expect(png.readUInt32BE(20)).toBeGreaterThan(400);
+    expect(await captions.jsonValue()).toEqual(expect.arrayContaining(['Часы', displayedHours]));
+    await captions.dispose();
 
     await spectatorPage.goto(profilePath);
     await expect(spectatorPage.getByRole('heading', { name: player.name })).toBeVisible();

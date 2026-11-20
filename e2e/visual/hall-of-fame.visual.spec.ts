@@ -39,6 +39,7 @@ const records: Schemas['HallOfFameRecordsView'] = {
       hours: 24.5,
     },
   ],
+  fastestFinishes: [],
 };
 
 test('the hall of fame shows long season names, tied winners and both longest games', async ({
