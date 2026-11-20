@@ -1,0 +1,28 @@
+{
+  "objects": [
+    {
+      "id": "horror-marathon",
+      "kind": "achievement",
+      "name": "Хоррор-марафон",
+      "description": "Пройди три хоррора подряд.",
+      "scope": "season",
+      "effect": {
+        "trigger": "runCompleted",
+        "condition": { "stat": "completedStreakWithTag", "tag": "Horror", "gte": 3 },
+        "actions": [{ "type": "changeResource", "resource": "coins", "amount": 5 }]
+      }
+    },
+    {
+      "id": "unbreakable",
+      "kind": "achievement",
+      "name": "Непробиваемый",
+      "description": "Переживи пять атак за сезон.",
+      "scope": "season",
+      "effect": {
+        "trigger": "hostileIncoming",
+        "condition": { "stat": "hostileReceived", "gte": 5 },
+        "actions": [{ "type": "changeResource", "resource": "coins", "amount": 5 }]
+      }
+    }
+  ]
+}

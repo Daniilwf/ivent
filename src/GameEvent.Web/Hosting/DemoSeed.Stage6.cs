@@ -1,7 +1,9 @@
 using System.Security.Cryptography;
 using GameEvent.Engine.Comments;
+using GameEvent.Engine.Content;
 using GameEvent.Engine.Files;
 using GameEvent.Engine.Gallery;
+using GameEvent.Engine.Inventory;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Players;
 using GameEvent.Engine.Proofs;
@@ -45,7 +47,7 @@ public static partial class DemoSeed
             var spectator = actors["zritel"];
             await AddDiscussionsAsync(db, player, spectator);
             await PublishMomentAsync(contentRoot, services, db, player, spectator);
-            await ArchiveSeasonAsync(player, actors["player02"]);
+            await ArchiveSeasonAsync(contentRoot, player, actors["player02"]);
         }
 
         private async Task AddDiscussionsAsync(GameEventDbContext db, Guid player, Guid spectator)
@@ -96,12 +98,14 @@ public static partial class DemoSeed
             await SendAsync(SeasonId, new SetGalleryReaction(moment.ItemId, spectator, "❤️", Selected: true), spectator);
         }
 
-        private async Task ArchiveSeasonAsync(Guid player, Guid opponent)
+        private async Task ArchiveSeasonAsync(string contentRoot, Guid player, Guid opponent)
         {
             var seat = Guid.CreateVersion7();
-            await SendAsync(s_archiveId, new CreateSeason(s_archiveId, "Демо-сезон: первый круг", RulesetJson.Default()), admin);
+            var opponentSeat = Guid.CreateVersion7();
+            var rules = RulesetJson.Default();
+            await SendAsync(s_archiveId, new CreateSeason(s_archiveId, "Демо-сезон: первый круг", rules), admin);
             await SendAsync(s_archiveId, new AddSeasonPlayer(seat, player, s_names[0]), admin);
-            await SendAsync(s_archiveId, new AddSeasonPlayer(Guid.CreateVersion7(), opponent, s_names[1]), admin);
+            await SendAsync(s_archiveId, new AddSeasonPlayer(opponentSeat, opponent, s_names[1]), admin);
             await SendAsync(s_archiveId, new ChangeSeasonStatus(SeasonStatus.Active), admin);
 
             await SendAsync(s_archiveId, new RollGame(seat), player);
@@ -110,6 +114,26 @@ public static partial class DemoSeed
                 EstimatedHours: started.Snapshot.Hours is null ? 5 : null,
                 HoursSource: started.Snapshot.Hours is null ? "Оценка демо-прохождения" : null,
                 Review: new RunReview(8, "Хорошая игра для первого круга.")), player);
+
+            // Keep the original archived run and result independent of the attack rolls.
+            var features = rules.Features with { Items = true, Achievements = true };
+            await SendAsync(s_archiveId, new ChangeRuleset(rules with { Features = features }), admin);
+            var pack = ContentJson.Parse<ContentPack>(await File.ReadAllTextAsync(
+                Path.Combine(contentRoot, "content", "stage6.demo.achievements.json"), ct));
+            var bird = ContentJson.Parse<ObjectDefinition>(await File.ReadAllTextAsync(
+                Path.Combine(contentRoot, "content", "items", "bird-thief.json"), ct));
+            await SendAsync(s_archiveId, new PublishContent(pack with { Objects = [.. pack.Objects, bird] }, "Демо сезонных достижений"), admin);
+
+            var requiredHits = pack.Objects.Single(definition => definition.Id == "unbreakable").Effect?.Condition?.Gte
+                ?? throw new InvalidOperationException("The demo achievement needs an attack threshold.");
+            await SendAsync(s_archiveId, new AdjustPlayer(seat, "Монетки для демонстрации достижения", CoinsDelta: 20), admin);
+            for (var attack = 0; attack < requiredHits; attack++)
+            {
+                var gift = await SendAsync(s_archiveId, new AdjustInventory(opponentSeat, bird.Id, null, "Демо Птичкерса"), admin);
+                var item = gift.Select(row => row.Event).OfType<ObjectGiven>().Single();
+                await SendAsync(s_archiveId, new UseItem(opponentSeat, item.Item.InstanceId, seat), opponent);
+            }
+
             await SendAsync(s_archiveId, new ChangeSeasonStatus(SeasonStatus.Closing), admin);
             await SendAsync(s_archiveId, new ApproveProof(started.RunId, Comment: "Подтверждено демо-прохождение"), admin);
             await SendAsync(s_archiveId, new ChangeSeasonStatus(SeasonStatus.Finished), admin);

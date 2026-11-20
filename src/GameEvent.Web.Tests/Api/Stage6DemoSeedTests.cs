@@ -58,8 +58,20 @@ public sealed class Stage6DemoSeedTests
         var archive = await db.Seasons.SingleAsync(season => season.Status == SeasonStatus.Archived, Ct);
         var fame = await spectator.GetFromJsonAsync<HallOfFameSeasonView[]>("/api/hall-of-fame", Ct);
         var winner = Assert.Single(Assert.Single(fame!, season => season.SeasonId == archive.Id).Winners);
+        Assert.Equal("Лиса", winner.Name);
         Assert.True(winner.Points > 0);
         Assert.NotNull(winner.ProfileUserId);
+        var profile = await spectator.GetFromJsonAsync<ProfileView>($"/api/users/{winner.ProfileUserId}", EngineJson.Options, Ct);
+        var badge = Assert.Single(profile!.Achievements);
+        Assert.Equal((archive.Id, "unbreakable", "Непробиваемый", "Переживи пять атак за сезон."),
+            (badge.SeasonId, badge.ObjectId, badge.Name, badge.Description));
+        var attacks = await db.Events.Where(row => row.SeasonId == archive.Id && row.Type == "hostile-received")
+            .OrderBy(row => row.Sequence).Select(row => row.CommandId).ToListAsync(Ct);
+        Assert.Equal(5, attacks.Count);
+        var awardingCommand = await db.Events.Where(row => row.SeasonId == archive.Id && row.Type == "achievement-earned")
+            .Select(row => row.CommandId).SingleAsync(Ct);
+        Assert.Equal(attacks[^1], awardingCommand);
+
         var records = await spectator.GetFromJsonAsync<HallOfFameRecordsView>("/api/hall-of-fame/records", Ct);
         var longest = Assert.Single(records!.LongestGames, game => game.SeasonId == archive.Id);
         Assert.True(longest.Hours > 0);
