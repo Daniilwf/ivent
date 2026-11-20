@@ -363,7 +363,12 @@ internal static class RunLifecycle
             Condition = state.Runs[e.RunId].Snapshot.Conditions.Count > 0 ? new RunConditionState(true, ChallengeDone: e.ChallengeDone) : null,
         };
         var player = state.Players[e.PlayerId] with { Phase = TurnPhase.Idle, ActiveRunId = null };
-        state = state with { Runs = state.Runs.SetItem(e.RunId, run), Players = state.Players.SetItem(e.PlayerId, player) };
+        state = state with
+        {
+            Runs = state.Runs.SetItem(e.RunId, run),
+            Players = state.Players.SetItem(e.PlayerId, player),
+            RunCompletionOrder = state.RunCompletionOrder.Add(e.RunId),
+        };
 
         // The run is over for its coop partner too (D-521); his side stays on the run
         return run.Coop is { } coop ? Interactions.Coop.Free(state, coop.PlayerId, e.RunId) : state;

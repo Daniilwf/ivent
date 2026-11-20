@@ -101,6 +101,102 @@ public sealed class HorrorMarathonTests
     }
 
     [Fact]
+    public void One_split_coop_completion_can_award_both_participants()
+    {
+        var s = Season();
+        s.CompleteTitle(Partner, FirstHorror, 1, 1);
+        s.CompleteTitle(Partner, SecondHorror, 1, 1);
+        s.CompleteTitle(Roller, ThirdHorror, 1, 1);
+        s.CompleteTitle(Roller, FourthHorror, 1, 1);
+        s.CoopRun(Roller, Partner, HorrorCoop);
+
+        s.CompleteWith(Roller, 1, 1);
+
+        Assert.Equal(2, s.LastEvents<AchievementEarned>().Count());
+        foreach (var player in new[] { Roller, Partner })
+        {
+            var playerId = s.PlayerId(player);
+            var award = Assert.Single(s.LastEvents<AchievementEarned>(), earned => earned.PlayerId == playerId);
+            Assert.Equal(AchievementId, award.Achievement.ObjectId);
+            Assert.Equal(award.Achievement, Assert.Single(s.Player(player).Achievements));
+            var reward = Assert.Single(s.LastEvents<CoinsChanged>(), change => change.PlayerId == playerId && change.Reason == CoinsReason.Achievement);
+            Assert.Equal(AchievementCoins, reward.Delta);
+        }
+
+        Assert.Equal(s.State, SeasonEngine.Replay(s.StoredLog));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Equal_completion_times_follow_the_journal_before_and_after_undo(bool coopCompletesFirst)
+    {
+        const string NonHorrorCoop = "Coop Non-Horror";
+        var s = Season().WithCoopGame(NonHorrorCoop, GameHours, "Games");
+        s.RollTitle(Roller, NonHorrorCoop).Start(Roller);
+        var coop = s.ActiveRun(Roller);
+
+        void CompleteCoop()
+        {
+            s.Accept(Partner, s.Invite(Roller, Partner));
+            s.NextRandom(1, 1).Complete(Roller);
+            Assert.Equal(s.PlayerId(Partner), Assert.Single(s.LastEvents<CoopRewardSplit>()).PartnerId);
+            NoAward(s, Partner);
+        }
+
+        if (coopCompletesFirst)
+        {
+            CompleteCoop();
+        }
+
+        s.RollTitle(Partner, FirstHorror).Start(Partner);
+        var firstHorror = s.ActiveRun(Partner);
+        s.NextRandom(1, 1).Complete(Partner);
+        NoAward(s, Partner);
+        s.RollTitle(Partner, SecondHorror).Start(Partner);
+        var secondHorror = s.ActiveRun(Partner);
+        s.NextRandom(1, 1).Complete(Partner);
+        NoAward(s, Partner);
+
+        if (!coopCompletesFirst)
+        {
+            CompleteCoop();
+        }
+
+        Guid[] expectedOrder = coopCompletesFirst ? [coop, firstHorror, secondHorror] : [firstHorror, secondHorror, coop];
+        Assert.True(coop.CompareTo(firstHorror) < 0);
+        Assert.Equal(expectedOrder, s.Log.OfType<RunCompleted>().Select(completion => completion.RunId));
+
+        s.RollTitle(Partner, ThirdHorror).Start(Partner);
+        var thirdHorror = s.ActiveRun(Partner);
+        var timestamp = s.Clock.UtcNow;
+        s.NextRandom(1, 1).Complete(Partner);
+        var completionCommand = s.LastCommandId;
+        Assert.All(s.Log.OfType<RunCompleted>(), completion => Assert.Equal(timestamp, completion.CompletedAt));
+        Assert.Equal(coopCompletesFirst ? 1 : 0, s.LastEvents<AchievementEarned>().Count());
+        Assert.Equal(coopCompletesFirst ? 1 : 0, s.Player(Partner).Achievements.Count);
+        Assert.Equal(s.State, SeasonEngine.Replay(s.StoredLog));
+
+        s.Act(new UndoCommand(completionCommand, "Undo completion"));
+        ScenarioAssert.Accepted(s);
+        NoAward(s, Partner);
+        Assert.Equal(thirdHorror, s.ActiveRun(Partner));
+        Assert.Equal(s.State, SeasonEngine.Replay(s.StoredLog));
+
+        s.NextRandom(1, 1).Complete(Partner);
+        if (coopCompletesFirst)
+        {
+            AssertAward(s, Partner);
+        }
+        else
+        {
+            NoAward(s, Partner);
+        }
+
+        Assert.Equal(s.State, SeasonEngine.Replay(s.StoredLog));
+    }
+
+    [Fact]
     public void A_rejected_completion_drops_out_of_the_streak_and_a_granted_award_stays()
     {
         var s = Season();
@@ -152,6 +248,42 @@ public sealed class HorrorMarathonTests
         s.CompleteWith(Roller, 1, 1);
         AssertAward(s, Roller);
         Assert.Single(s.EffectiveLog.OfType<AchievementEarned>());
+        Assert.Equal(s.State, SeasonEngine.Replay(s.StoredLog));
+    }
+
+    [Fact]
+    public void Repeating_an_undone_completion_counts_the_run_once()
+    {
+        var s = Season();
+        s.CompleteTitle(Roller, FirstHorror, 1, 1);
+        s.CompleteTitle(Roller, SecondHorror, 1, 1);
+        var completion = s.LastCommandId;
+
+        s.Act(new UndoCommand(completion, "Undo completion"));
+        ScenarioAssert.Accepted(s);
+        s.CompleteWith(Roller, 1, 1);
+
+        NoAward(s, Roller);
+        Assert.Equal(s.State, SeasonEngine.Replay(s.StoredLog));
+    }
+
+    [Fact]
+    public void Undoing_a_proof_rejection_restores_the_original_streak_break()
+    {
+        var s = Season();
+        s.CompleteTitle(Roller, FirstHorror, 1, 1);
+        s.CompleteTitle(Roller, SecondHorror, 1, 1);
+        var other = s.PlayTitle(Roller, CompletedNonHorror);
+        s.CompleteWith(Roller, 1, 1);
+        s.Act(new RejectProof(other, "Reject completion"));
+        ScenarioAssert.Accepted(s);
+        var rejection = s.LastCommandId;
+
+        s.Act(new UndoCommand(rejection, "Restore completion"));
+        ScenarioAssert.Accepted(s);
+        s.CompleteTitle(Roller, ThirdHorror, 1, 1);
+
+        NoAward(s, Roller);
         Assert.Equal(s.State, SeasonEngine.Replay(s.StoredLog));
     }
 

@@ -305,6 +305,9 @@ internal static class Undoing
     {
         var players = state.Players.RemoveRange(e.RemovedPlayers).SetItems(e.Players.Select(p => KeyValuePair.Create(p.PlayerId, p)));
         var runs = state.Runs.RemoveRange(e.RemovedRuns).SetItems(e.Runs.Select(r => KeyValuePair.Create(r.RunId, r)));
+        // Undo snapshots restore the run data. Keep the log position unless the completion itself is undone.
+        var reopenedRuns = e.Runs.Where(r => r.CompletedAt is null).Select(r => r.RunId);
+        var completionOrder = state.RunCompletionOrder.RemoveRange(e.RemovedRuns.Concat(reopenedRuns));
         var effects = state.ManualEffects.RemoveRange(e.RemovedEffects).SetItems(e.Effects.Select(x => KeyValuePair.Create(x.EffectId, x)));
         var challenges = state.WeeklyChallenges.RemoveRange(e.RemovedWeeklyChallenges ?? [])
             .SetItems((e.WeeklyChallenges ?? []).Select(c => KeyValuePair.Create(c.ChallengeId, c)));
@@ -341,6 +344,7 @@ internal static class Undoing
             Polls = polls,
             Players = players,
             Runs = runs,
+            RunCompletionOrder = completionOrder,
             ManualEffects = effects,
             WeeklyChallenges = challenges,
             Suggestions = suggestions,

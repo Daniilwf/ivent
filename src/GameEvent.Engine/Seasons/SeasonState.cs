@@ -36,6 +36,9 @@ public sealed record SeasonState(
     /// <summary>The season's content (D-400): empty until the admin publishes a pack.</summary>
     public GameEvent.Engine.Content.ContentCatalog Catalog => Content ?? GameEvent.Engine.Content.ContentCatalog.Empty;
 
+    // Rebuilt from RunCompleted events. Rejected runs keep their position so undo can restore the original order.
+    internal ImmutableList<Guid> RunCompletionOrder { get; init; } = [];
+
     /// <summary>The weekly challenges set in the season (D-526), by id.</summary>
     public ImmutableSortedDictionary<Guid, Challenges.WeeklyChallengeState> WeeklyChallenges { get; init; } =
         ImmutableSortedDictionary<Guid, Challenges.WeeklyChallengeState>.Empty;
@@ -111,6 +114,7 @@ public sealed record SeasonState(
         && Map == other.Map
         && Players.SequenceEqual(other.Players)
         && Runs.SequenceEqual(other.Runs)
+        && RunCompletionOrder.SequenceEqual(other.RunCompletionOrder)
         && ManualEffects.SequenceEqual(other.ManualEffects)
         && FinishesSoFar == other.FinishesSoFar
         && PointsChanges == other.PointsChanges
