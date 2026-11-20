@@ -98,6 +98,7 @@
   --spacing: 4px;
   /* Sticky side navigation fits below the header with a bottom gutter. */
   --spacing-sticky-nav: calc(100dvh - var(--spacing) * 28);
+  --spacing-gallery-photo: 50dvh;
   /* The smallest label on the map, in frame pixels: the camera opens closer rather than show one smaller (camera.ts) */
   --map-label-min: 9px;
 

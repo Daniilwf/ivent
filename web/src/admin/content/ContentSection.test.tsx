@@ -9,7 +9,7 @@ import { ContentSection } from './ContentSection';
 
 // EE5–EE8 (4.12, D-490…D-498): the content editor — the objects in force by kind, one opened in a form or as JSON,
 // the server's errors next to their fields, templates of the base actions, a save that publishes the whole pack made
-// from the version in force, removal, a pack from a file, the versions; with items off or on a phone nothing is saved.
+// from the version in force, removal, a pack from a file, the versions; publishing needs an enabled feature and a desktop.
 
 const t = ru.admin.content;
 
@@ -36,12 +36,25 @@ const curse = {
   },
 };
 const lootbox = { id: 'lootbox', name: 'Лутбокс', entries: [{ objectId: 'orange', weight: 1 }] };
+const unbreakable = {
+  id: 'unbreakable',
+  kind: 'achievement',
+  name: 'Непробиваемый',
+  description: 'Переживи пять атак за сезон.',
+  scope: 'season',
+  effect: {
+    trigger: 'hostileIncoming',
+    condition: { stat: 'hostileReceived', gte: 5 },
+    actions: [{ type: 'changeResource', resource: 'coins', amount: 5 }],
+  },
+};
 
 const view = (
   overrides: Partial<Schemas['AdminContentView']> = {},
 ): Schemas['AdminContentView'] => ({
   itemsEnabled: true,
   eventsEnabled: false,
+  achievementsEnabled: false,
   status: 'active',
   version: 2,
   pack: { objects: [orange, curse], wheels: [lootbox] },
@@ -159,6 +172,17 @@ const schema = {
     },
   },
 };
+
+const achievementSchema = structuredClone(schema);
+const achievementProperties = achievementSchema.properties.objects.items.properties;
+Object.assign(achievementProperties, { scope: { enum: ['season', 'allTime'] } });
+achievementProperties.effect.properties.trigger.enum.push('hostileIncoming');
+Object.assign(achievementProperties.effect.properties, {
+  condition: {
+    type: 'object',
+    properties: { stat: { type: 'string' }, gte: { type: 'integer' } },
+  },
+});
 
 const published = { duplicate: false, events: [{ sequence: 40, type: 'content-published' }] };
 
@@ -777,6 +801,123 @@ describe('The content editor', () => {
     await user.click(screen.getByTestId('content-check'));
     expect(await screen.findByText(t.checked)).toBeInTheDocument();
     expect(server.sent('POST', '/content/check')).toHaveLength(1);
+  });
+
+  it('opens and saves an achievement with items off and achievements on', async () => {
+    const user = userEvent.setup();
+    const content = {
+      ...view({ itemsEnabled: false, pack: { objects: [unbreakable], wheels: [] } }),
+      achievementsEnabled: true,
+    };
+    const server = open(
+      {
+        'GET /api/admin/content/schema': achievementSchema,
+        'POST /api/admin/seasons/*/content/publish': published,
+      },
+      content,
+    );
+
+    expect(await screen.findByRole('radio', { name: 'Достижения: 1' })).toBeChecked();
+    expect(screen.queryByTestId('content-new')).not.toBeInTheDocument();
+    await user.click(screen.getByTestId('content-open-unbreakable'));
+    await user.type(screen.getByTestId('content-field-name'), '!');
+    await user.type(screen.getByTestId('content-comment'), 'Уточнил название');
+    await user.click(screen.getByTestId('content-save'));
+
+    await waitFor(() => {
+      expect(server.sent('POST', '/content/publish')).toHaveLength(1);
+    });
+    expect(server.sent('POST', '/content/publish')[0]?.body).toMatchObject({
+      expectedVersion: 2,
+      comment: 'Уточнил название',
+      pack: { objects: [{ ...unbreakable, name: 'Непробиваемый!' }], wheels: [] },
+    });
+  });
+
+  it('can import an achievement pack with items off and achievements on', async () => {
+    const user = userEvent.setup();
+    const pack = { objects: [unbreakable], wheels: [] };
+    const content = {
+      ...view({ itemsEnabled: false, version: 0, pack: { objects: [], wheels: [] }, deleted: [] }),
+      achievementsEnabled: true,
+    };
+    const server = open(
+      {
+        'POST /api/admin/seasons/*/content/check': { valid: true, problems: [] },
+        'POST /api/admin/seasons/*/content/publish': published,
+      },
+      content,
+    );
+
+    await user.upload(
+      await screen.findByTestId('content-import-file'),
+      new File([JSON.stringify(pack)], 'achievements.json'),
+    );
+    expect(screen.queryByText(t.empty)).not.toBeInTheDocument();
+    expect(await screen.findByText(t.importValid)).toBeInTheDocument();
+    await user.type(screen.getByTestId('content-import-comment'), 'Добавил достижение');
+    await user.click(screen.getByTestId('content-import-publish'));
+    await user.click(await screen.findByTestId('content-import-confirm-yes'));
+
+    await waitFor(() => {
+      expect(server.sent('POST', '/content/publish')).toHaveLength(1);
+    });
+    expect(server.sent('POST', '/content/publish')[0]?.body).toMatchObject({
+      expectedVersion: 0,
+      comment: 'Добавил достижение',
+      pack,
+    });
+  });
+
+  it('keeps the draft and blocks publishing when achievements are turned off at the same pack version', async () => {
+    const user = userEvent.setup();
+    let current = {
+      ...view({ itemsEnabled: false, pack: { objects: [unbreakable], wheels: [] } }),
+      achievementsEnabled: true,
+    };
+    fakeServer({
+      'GET /api/admin/seasons/*/content': () => ({ body: current }),
+      'GET /api/admin/content/schema': achievementSchema,
+    });
+    const { rerender } = render(<ContentSection seasonId={seasonId} version={0} />);
+    await user.click(await screen.findByTestId('content-open-unbreakable'));
+    await user.type(screen.getByTestId('content-field-name'), '!');
+    expect(screen.getByTestId('content-save')).toBeEnabled();
+
+    current = { ...current, achievementsEnabled: false };
+    rerender(<ContentSection seasonId={seasonId} version={1} />);
+
+    expect(await screen.findByText(t.itemsOff)).toBeInTheDocument();
+    expect(screen.getByTestId('content-save')).toBeDisabled();
+    expect(screen.getByTestId('content-field-name')).toHaveValue('Непробиваемый!');
+  });
+
+  it('blocks a badge draft after achievements are turned off while items stay enabled', async () => {
+    const user = userEvent.setup();
+    let current = {
+      ...view({ pack: { objects: [orange, unbreakable], wheels: [] } }),
+      achievementsEnabled: true,
+    };
+    fakeServer({
+      'GET /api/admin/seasons/*/content': () => ({ body: current }),
+      'GET /api/admin/content/schema': achievementSchema,
+    });
+    const { rerender } = render(<ContentSection seasonId={seasonId} version={0} />);
+    await user.click(await screen.findByRole('radio', { name: 'Достижения: 1' }));
+    await user.click(screen.getByTestId('content-open-unbreakable'));
+    await user.type(screen.getByTestId('content-field-name'), '!');
+    expect(screen.getByTestId('content-save')).toBeEnabled();
+
+    current = { ...current, achievementsEnabled: false };
+    rerender(<ContentSection seasonId={seasonId} version={1} />);
+
+    await waitFor(() => {
+      expect(screen.queryByRole('radio', { name: 'Достижения: 1' })).not.toBeInTheDocument();
+    });
+    expect(screen.getByTestId('content-save')).toBeDisabled();
+    await openOrange(user);
+    await user.type(screen.getByTestId('content-field-name'), '!');
+    expect(screen.getByTestId('content-save')).toBeEnabled();
   });
 
   it('in a closed season says so and saves nothing', async () => {

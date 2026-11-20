@@ -22,9 +22,15 @@ const AdminScreen = lazy(async () => ({
   default: (await import('./admin/AdminScreen')).AdminScreen,
 }));
 const FeedScreen = lazy(async () => ({ default: (await import('./feed/FeedScreen')).FeedScreen }));
+const GalleryScreen = lazy(async () => ({
+  default: (await import('./gallery/GalleryScreen')).GalleryScreen,
+}));
 const GameScreen = lazy(async () => ({ default: (await import('./feed/GameScreen')).GameScreen }));
 const ProfileScreen = lazy(async () => ({
   default: (await import('./feed/ProfileScreen')).ProfileScreen,
+}));
+const SeasonRecap = lazy(async () => ({
+  default: (await import('./seasonRecap/SeasonRecap')).SeasonRecap,
 }));
 const PoolScreen = lazy(async () => ({ default: (await import('./pool/PoolScreen')).PoolScreen }));
 const RulesScreen = lazy(async () => ({
@@ -78,7 +84,10 @@ export function App() {
   const navigationSeason =
     state.kind === 'signedIn'
       ? ((
-          (route.kind === 'feed' || route.kind === 'polls' || route.kind === 'interactions'
+          (route.kind === 'feed' ||
+          route.kind === 'gallery' ||
+          route.kind === 'polls' ||
+          route.kind === 'interactions'
             ? route.seasonId
             : null) ?? state.seasonId
         )?.toLowerCase() ?? null)
@@ -112,6 +121,10 @@ export function App() {
     ? homeNavigation
     : remoteNavigation.kind === 'ready'
       ? remoteNavigation.value
+      : null;
+  const gallerySeasonId =
+    navigation?.id.toLowerCase() === navigationSeason && navigation.galleryEnabled
+      ? navigationSeason
       : null;
   const pollsSeasonId =
     navigation?.id.toLowerCase() === navigationSeason && navigation.pollsEnabled
@@ -255,6 +268,7 @@ export function App() {
         user={signedIn.user}
         seasonId={signedIn.seasonId}
         pollsSeasonId={pollsSeasonId}
+        gallerySeasonId={gallerySeasonId}
         onChangePassword={() => {
           setState({ ...signedIn, ownPassword: path });
         }}
@@ -306,6 +320,13 @@ export function App() {
           meId={signedIn.user.id}
           onSignedOut={signedOut}
         />
+      ) : route.kind === 'seasonRecap' ? (
+        <SeasonRecap
+          key={route.seasonId}
+          seasonId={route.seasonId}
+          user={signedIn.user}
+          onSignedOut={signedOut}
+        />
       ) : route.kind === 'game' ? (
         <GameScreen key={route.gameId} gameId={route.gameId} onSignedOut={signedOut} />
       ) : route.kind === 'notFound' || (route.kind === 'admin' && admin) ? (
@@ -315,6 +336,14 @@ export function App() {
         <FeedScreen
           key={route.seasonId ?? signedIn.seasonId}
           seasonId={(route.seasonId ?? signedIn.seasonId) as string}
+          onSignedOut={signedOut}
+        />
+      ) : route.kind === 'gallery' ? (
+        <GalleryScreen
+          key={route.seasonId?.toLowerCase() ?? ''}
+          requestedSeasonId={route.seasonId?.toLowerCase() ?? null}
+          currentSeasonId={signedIn.seasonId?.toLowerCase() ?? null}
+          admin={admin}
           onSignedOut={signedOut}
         />
       ) : route.kind === 'polls' && navigationSeason ? (

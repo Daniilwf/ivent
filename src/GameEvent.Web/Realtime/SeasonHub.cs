@@ -1,4 +1,6 @@
+using System.Text.Json.Serialization;
 using System.Threading.Channels;
+using GameEvent.Engine.Comments;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Pool;
 using GameEvent.Infrastructure.Database;
@@ -13,7 +15,9 @@ namespace GameEvent.Web.Realtime;
 /// Sent to everyone watching a season after each committed command: refetch what you show. The sequences are the
 /// command's place in the season log: a client that last saw <c>FromSequence - 1</c> missed nothing.
 /// </summary>
-public sealed record SeasonUpdate(Guid SeasonId, long FromSequence, long ToSequence, IReadOnlyList<string> Types);
+public sealed record SeasonUpdate(
+    Guid SeasonId, long FromSequence, long ToSequence, IReadOnlyList<string> Types,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] CommentTarget? CommentTarget = null);
 
 /// <summary>
 /// The answer to joining a season (E3, D-122): the last sequence of its log now, and what was committed after the
@@ -138,7 +142,8 @@ public sealed class SeasonBroadcaster : ICommittedEventsListener
             .Select(e => e.Event is Engine.Polls.VoteChanged { Anonymous: true } ? AnonymousVotes.CastType : EventCatalog.Describe(e.Event.GetType()).Name)];
         if (events[0].SeasonId != Guid.Empty)
         {
-            _updates.Writer.TryWrite(new SeasonUpdate(events[0].SeasonId, events[0].Sequence, events[^1].Sequence, types));
+            _updates.Writer.TryWrite(new SeasonUpdate(
+                events[0].SeasonId, events[0].Sequence, events[^1].Sequence, types, events[0].PublicCommentTarget));
         }
         else if (events.Any(e => e.Event is GameAdded or GameChanged or GameDeleted or GameRestored or CategorySet or CategoryRemoved))
         {

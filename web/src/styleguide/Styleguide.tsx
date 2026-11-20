@@ -54,6 +54,8 @@ import { EditorDemo, MapBackgroundDemo, GraphMapDemo } from './GraphDemos';
 import { FeedList, FeedSkeleton } from '../feed/FeedList';
 import { GameDetails } from '../feed/GameScreen';
 import { ProfileDetails } from '../feed/ProfileScreen';
+import { RecapPreview } from '../seasonRecap/SeasonRecap';
+import { recapCard } from '../seasonRecap/recapCard';
 import { SessionList } from '../feed/SessionsPanel';
 import {
   demoFeedDays,
@@ -1014,6 +1016,25 @@ export function Styleguide() {
         </div>
         <div className="grid max-w-180 gap-4 border-t-2 border-dashed border-muted pt-4">
           <ProfileDetails profile={demoProfileEmpty} mine />
+        </div>
+      </Section>
+
+      <Section id="season-recap" title={ru.seasonRecap.title} lead={t.seasonRecap}>
+        <div className="grid max-w-120">
+          <RecapPreview
+            card={recapCard(
+              {
+                seasonId: demoProfile.seasons[0]?.seasonId ?? '',
+                seasonName: demoProfile.seasons[0]?.seasonName ?? '',
+                completedRuns: 1280,
+                bestRating: 10,
+                worstRating: 1,
+                attacksMade: 1234,
+                attacksReceived: 999,
+              },
+              demoProfile.name,
+            )}
+          />
         </div>
       </Section>
 

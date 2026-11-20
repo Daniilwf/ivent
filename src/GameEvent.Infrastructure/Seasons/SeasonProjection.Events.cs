@@ -231,7 +231,7 @@ internal static partial class SeasonProjection
         db.WeeklyChallengeCompletions.RemoveRange(byPlayer.Values);
     }
 
-    /// <summary>The stage 5 parts of the stored state, read back for the integrity check: columns win over the JSON.</summary>
+    /// <summary>Events, interactions and social data read back for the integrity check: columns win over the JSON.</summary>
     private static async Task<SeasonState> ReadEventsAsync(GameEventDbContext db, SeasonState state, CancellationToken ct)
     {
         var seasonId = state.SeasonId;
@@ -247,9 +247,16 @@ internal static partial class SeasonProjection
         var completions = (await db.WeeklyChallengeCompletions.AsNoTracking().Where(c => challengeIds.Contains(c.ChallengeId)).ToListAsync(ct))
             .ToLookup(c => c.ChallengeId);
         var suggestions = await db.Suggestions.AsNoTracking().Where(x => x.SeasonId == seasonId).ToListAsync(ct);
+        var reviewReactions = await db.ReviewReactions.AsNoTracking().Where(x => x.SeasonId == seasonId).ToListAsync(ct);
+        var feedReactions = await db.FeedReactions.AsNoTracking().Where(x => x.SeasonId == seasonId).ToListAsync(ct);
 
         return state with
         {
+            Comments = await ReadCommentsAsync(db, seasonId, ct),
+            GalleryItems = await ReadGalleryAsync(db, seasonId, ct),
+            GalleryReactions = await ReadGalleryReactionsAsync(db, seasonId, ct),
+            ReviewReactions = [.. reviewReactions.Select(x => new Engine.Reactions.ReviewReaction(x.RunId, x.UserId, x.Emoji))],
+            FeedReactions = [.. feedReactions.Select(x => new Engine.Reactions.FeedReaction(x.TargetCommandId, x.UserId, x.Emoji))],
             Polls = polls.ToImmutableSortedDictionary(
                 p => p.Id,
                 p => Json<Poll>(p.DataJson) with

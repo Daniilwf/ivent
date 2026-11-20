@@ -67,6 +67,21 @@ public sealed record SeasonState(
     public ImmutableSortedDictionary<Guid, Duels.Duel> Duels { get; init; } =
         ImmutableSortedDictionary<Guid, Duels.Duel>.Empty;
 
+    /// <summary>The currently selected reactions on the season's run reviews.</summary>
+    public ImmutableHashSet<Reactions.ReviewReaction> ReviewReactions { get; init; } = [];
+
+    public ImmutableHashSet<Reactions.FeedReaction> FeedReactions { get; init; } = [];
+
+    public ImmutableHashSet<Reactions.GalleryReaction> GalleryReactions { get; init; } = [];
+
+    /// <summary>The season's comments, including the original posting debit of removed comments.</summary>
+    public ImmutableSortedDictionary<Guid, Comments.Comment> Comments { get; init; } =
+        ImmutableSortedDictionary<Guid, Comments.Comment>.Empty;
+
+    /// <summary>The season's gallery, including the original upload debit for hidden moments.</summary>
+    public ImmutableSortedDictionary<Guid, Gallery.GalleryItem> GalleryItems { get; init; } =
+        ImmutableSortedDictionary<Guid, Gallery.GalleryItem>.Empty;
+
     public static SeasonState Empty { get; } =
         new(
             Guid.Empty,
@@ -109,6 +124,11 @@ public sealed record SeasonState(
         && Polls.SequenceEqual(other.Polls)
         && GlobalEvents.SequenceEqual(other.GlobalEvents)
         && Duels.SequenceEqual(other.Duels)
+        && ReviewReactions.SetEquals(other.ReviewReactions)
+        && FeedReactions.SetEquals(other.FeedReactions)
+        && GalleryReactions.SetEquals(other.GalleryReactions)
+        && Comments.SequenceEqual(other.Comments)
+        && GalleryItems.SequenceEqual(other.GalleryItems)
         && MapVersion == other.MapVersion;
 
     // Explicit type arguments: a mutated count still compiles, so mutation testing keeps this method (D-281)
@@ -169,7 +189,11 @@ public sealed record SeasonPlayer(
 
     // Written only when an effect waits: snapshots of players made before stage 5 keep their format (D-511)
     [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    EquatableArray<Effects.SuspendedEffect> Suspended = default)
+    EquatableArray<Effects.SuspendedEffect> Suspended = default,
+
+    // Only written after the first award, so old player undo snapshots have the same format.
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    EquatableArray<Achievements.PlayerAchievement> Achievements = default)
 {
     /// <summary>The player's economy (D-401), empty when they have none.</summary>
     [System.Text.Json.Serialization.JsonIgnore]

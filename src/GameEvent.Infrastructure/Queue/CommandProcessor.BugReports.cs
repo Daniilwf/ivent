@@ -1,5 +1,6 @@
 using System.Text.Json;
 using GameEvent.Engine.BugReports;
+using GameEvent.Engine.Files;
 using GameEvent.Engine.Kernel;
 using GameEvent.Infrastructure.BugReports;
 using GameEvent.Infrastructure.Database;
@@ -33,7 +34,8 @@ public sealed partial class CommandProcessor
                     }
 
                     if (normalized.ScreenshotFileId is { } file
-                        && !await db.Files.AnyAsync(f => f.Id == file && f.OwnerId == normalized.AuthorId && !f.IsDeleted, ct))
+                        && !await db.Files.AnyAsync(f => f.Id == file && f.OwnerId == normalized.AuthorId && !f.IsDeleted
+                            && f.Kind != FileKind.GalleryImage, ct))
                     {
                         return Reject(BugReportRules.ScreenshotUnknown, "The screenshot is one of the author's own uploads.");
                     }

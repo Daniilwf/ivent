@@ -1,13 +1,20 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
+using GameEvent.Engine.Comments;
+using GameEvent.Engine.Gallery;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Map;
+using GameEvent.Engine.Reactions;
+using GameEvent.Engine.Rulesets;
 using GameEvent.Engine.Runs;
 using GameEvent.Engine.Seasons;
 using GameEvent.Engine.Turns;
 using GameEvent.Infrastructure.Database;
+using GameEvent.Infrastructure.EventLog;
 using GameEvent.Web.Accounts;
 using GameEvent.Web.Files;
+using GameEvent.Web.Hosting;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 
@@ -47,7 +54,9 @@ public sealed record FeedView(
     IReadOnlyList<FeedPlayerView> Players,
     IReadOnlyList<FeedGameView> Games,
     IReadOnlyList<FeedRunView> Runs,
-    IReadOnlyList<FeedObjectView>? Objects = null);
+    IReadOnlyList<FeedObjectView>? Objects = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyDictionary<Guid, ReactionView[]>? Reactions = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<Guid>? CommentTargets = null);
 
 /// <summary>
 /// An object of the season's content the page's events name (<c>objectId</c>: item uses and gifts, drawn events): its
@@ -58,18 +67,25 @@ public sealed record FeedObjectView(string Id, string Name);
 /// <summary>
 /// A season a user took part in, with their points and, once the season finished, their place. <c>token</c> — their place in
 /// the season's list of players (by name), which the screens colour their token by (D-150).
+/// <c>seasonRecapAvailable</c> is only present for the owner where the personal recap is enabled (D-905).
 /// </summary>
-public sealed record ProfileSeasonView(Guid SeasonId, string SeasonName, SeasonStatus Status, Guid PlayerId, int Points, int? Place, int Token);
+public sealed record ProfileSeasonView(
+    Guid SeasonId, string SeasonName, SeasonStatus Status, Guid PlayerId, int Points, int? Place, int Token,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? SeasonRecapAvailable = null);
 
 /// <summary>A review the user left: the game, the season, the rating and the text (SPEC «Отзыв»).</summary>
 public sealed record ProfileReviewView(Guid RunId, Guid GameId, string GameTitle, Guid SeasonId, string SeasonName, int Rating, string? Text, DateTimeOffset? CompletedAt);
+
+/// <summary>A seasonal badge, with the title and description it had when awarded.</summary>
+public sealed record ProfileAchievementView(Guid SeasonId, string ObjectId, string Name, string Description, DateTimeOffset EarnedAt);
 
 /// <summary>
 /// A user's profile (D-124): the name, the avatar, the seasons they played and their reviews. <c>completed</c> — games
 /// completed and not rejected, over all seasons.
 /// </summary>
 public sealed record ProfileView(
-    Guid Id, string Name, FileLinkView? Avatar, IReadOnlyList<ProfileSeasonView> Seasons, IReadOnlyList<ProfileReviewView> Reviews, int Completed);
+    Guid Id, string Name, FileLinkView? Avatar, IReadOnlyList<ProfileSeasonView> Seasons, IReadOnlyList<ProfileReviewView> Reviews, int Completed,
+    IReadOnlyList<ProfileAchievementView> Achievements);
 
 /// <summary>
 /// A run of a game in any season, with its review if there is one (the game page, D-124). <c>token</c> — the player's place
@@ -88,7 +104,9 @@ public sealed record GameRunView(
     DateTimeOffset? CompletedAt,
     int? Rating,
     string? ReviewText,
-    int Token);
+    int Token,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<ReactionView>? ReviewReactions = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? CanComment = null);
 
 /// <summary>
 /// The public reads built from the log and its projection (SPEC «Лента», «Отзыв … виден в ленте, профиле и на странице
@@ -101,13 +119,18 @@ public static class FeedEndpoints
     public static void MapFeed(this RouteGroupBuilder api)
     {
         ArgumentNullException.ThrowIfNull(api);
-        api.MapGet("/seasons/{seasonId:guid}/feed", FeedAsync).WithTags("Seasons").RequireAuthorization().Produces(StatusCodes.Status404NotFound);
+        api.MapGet("/seasons/{seasonId:guid}/feed", FeedAsync)
+            .WithTags("Seasons").RequireAuthorization().RequireRateLimiting(AppSetup.SeasonReadRateLimit)
+            .Produces(StatusCodes.Status404NotFound).ProducesProblem(StatusCodes.Status429TooManyRequests);
         api.MapGet("/users/{userId:guid}", ProfileAsync).WithTags("Accounts").RequireAuthorization().Produces(StatusCodes.Status404NotFound);
         api.MapGet("/pool/{gameId:guid}/runs", GameRunsAsync).WithTags("Pool").RequireAuthorization().Produces(StatusCodes.Status404NotFound);
+        ReviewReactionEndpoints.MapReviewReactions(api);
+        FeedReactionEndpoints.MapFeedReactions(api);
     }
 
     private static async Task<Results<Ok<FeedView>, NotFound, ValidationProblem>> FeedAsync(
-        Guid seasonId, System.Security.Claims.ClaimsPrincipal user, GameEventDbContext db, ContentCards contentCards, CancellationToken ct, long? before = null, int limit = 50)
+        Guid seasonId, System.Security.Claims.ClaimsPrincipal user, GameEventDbContext db, ContentCards contentCards,
+        IFeedReactionTargets targets, CancellationToken ct, long? before = null, int limit = 50)
     {
         if (limit is < 1 or > MaxFeedPage)
         {
@@ -120,7 +143,8 @@ public static class FeedEndpoints
         }
 
         // The global log (accounts, files, bug reports) is nobody's season, whatever the tables hold
-        if (seasonId == Guid.Empty || !await db.Seasons.AnyAsync(s => s.Id == seasonId, ct))
+        var rulesetJson = await db.Seasons.AsNoTracking().Where(s => s.Id == seasonId).Select(s => s.RulesetJson).SingleOrDefaultAsync(ct);
+        if (seasonId == Guid.Empty || rulesetJson is null)
         {
             return TypedResults.NotFound();
         }
@@ -133,7 +157,10 @@ public static class FeedEndpoints
             .SingleOrDefaultAsync(ct);
 
         var rows = await db.Events.AsNoTracking()
-            .Where(e => e.SeasonId == seasonId && (before == null || e.Sequence < before))
+            .Where(e => e.SeasonId == seasonId && e.Type != ReviewReactionSet.Type && e.Type != FeedReactionSet.Type && e.Type != GalleryReactionSet.Type
+                && e.Type != CommentPosted.Type && e.Type != CommentEdited.Type && e.Type != CommentDeleted.Type && e.Type != CommentHidden.Type
+                && e.Type != GalleryMomentPublished.Type && e.Type != GalleryMomentHidden.Type
+                && (before == null || e.Sequence < before))
             .OrderByDescending(e => e.Sequence)
             .Take(limit)
             .ToListAsync(ct);
@@ -166,7 +193,22 @@ public static class FeedEndpoints
         }).OfType<FeedEntryView>()];
         var nextBefore = rows.Count == limit && rows[^1].Sequence > 1 ? rows[^1].Sequence : (long?)null;
         var (players, games, runs) = await ReferencesAsync(db, seasonId, entries, admin, ct);
-        return TypedResults.Ok(new FeedView(entries, nextBefore, players, games, runs, await ObjectsAsync(db, contentCards, seasonId, entries, ct)));
+        var rules = JsonSerializer.Deserialize<Ruleset>(rulesetJson, EngineJson.Options)!;
+        var commandIds = entries.Select(e => e.CommandId).Distinct().ToArray();
+        var reactions = rules.Features.Reactions
+            ? await FeedReactionEndpoints.ReadAsync(db, targets, seasonId, commandIds, rules.Social.Reactions, viewer, ct)
+            : null;
+        IReadOnlyList<Guid>? commentTargets = null;
+        if (rules.Features.Comments)
+        {
+            var allowed = reactions is null
+                ? await targets.FindAsync(db, seasonId, commandIds, ct)
+                : reactions.Keys.ToHashSet();
+            commentTargets = [.. commandIds.Where(allowed.Contains)];
+        }
+
+        return TypedResults.Ok(new FeedView(
+            entries, nextBefore, players, games, runs, await ObjectsAsync(db, contentCards, seasonId, entries, ct), reactions, commentTargets));
     }
 
     private const string DiscardedChoice = "choice-discarded";
@@ -323,8 +365,9 @@ public static class FeedEndpoints
     }
 
     private static async Task<Results<Ok<ProfileView>, NotFound>> ProfileAsync(
-        Guid userId, System.Security.Claims.ClaimsPrincipal viewer, GameEventDbContext db, CancellationToken ct)
+        Guid userId, System.Security.Claims.ClaimsPrincipal viewer, HttpResponse response, GameEventDbContext db, CancellationToken ct)
     {
+        response.Headers.CacheControl = "private, no-store";
         // A deleted account keeps its name in the seasons it played, but has no page of its own
         if (await db.Users.AsNoTracking().SingleOrDefaultAsync(u => u.Id == userId && !u.IsDeleted, ct) is not { } user)
         {
@@ -345,6 +388,7 @@ public static class FeedEndpoints
         var games = await db.Games.AsNoTracking().Where(g => gameIds.Contains(g.Id) && (withDeleted || !g.IsDeleted)).ToDictionaryAsync(g => g.Id, g => g.Title, ct);
         reviews = [.. reviews.Where(r => games.ContainsKey(r.GameId))];
 
+        var ownProfile = viewer.UserId() == userId;
         IReadOnlyList<ProfileSeasonView> seasonViews = [.. players
             .Where(p => seasons.ContainsKey(p.SeasonId))
             .OrderByDescending(p => seasons[p.SeasonId].CreatedAt)
@@ -355,7 +399,8 @@ public static class FeedEndpoints
                 p.Id,
                 p.Points,
                 places.TryGetValue(p.Id, out var place) ? place : null,
-                tokens.GetValueOrDefault(p.Id)))];
+                tokens.GetValueOrDefault(p.Id),
+                ownProfile && SeasonStatisticsEndpoints.IsEnabled(seasons[p.SeasonId].RulesetJson) ? true : null))];
         var completedAt = runs.ToDictionary(r => r.Id, r => r.CompletedAt);
         IReadOnlyList<ProfileReviewView> reviewViews = [.. reviews
             .Select(r => new ProfileReviewView(
@@ -371,8 +416,17 @@ public static class FeedEndpoints
         var avatar = user.AvatarFileId is { } file ? FileLinkView.Of(file) : null;
         // A split coop run still completed is the partner's completed game too, as the engine counts it (D-716)
         var partnered = (await CoopPartnerRuns.LoadAsync(db, seasonIds, playerIds, ct)).Count(r => r.Status == RunStatus.Completed);
+        var seasonByPlayer = players.ToDictionary(player => player.Id, player => player.SeasonId);
+        var badges = await db.PlayerAchievements.AsNoTracking().Where(badge => playerIds.Contains(badge.PlayerId)).ToListAsync(ct);
+        var achievements = badges.GroupBy(badge => seasonByPlayer[badge.PlayerId])
+            .Where(group => seasons.TryGetValue(group.Key, out var season)
+                && JsonSerializer.Deserialize<Ruleset>(season.RulesetJson, EngineJson.Options)?.Features.Achievements == true)
+            .SelectMany(group => group.Select(badge => new ProfileAchievementView(
+                group.Key, badge.ObjectId, badge.Name, badge.Description, badge.EarnedAt)))
+            .OrderByDescending(badge => badge.EarnedAt).ThenBy(badge => badge.SeasonId).ThenBy(badge => badge.ObjectId, StringComparer.Ordinal)
+            .ToArray();
         return TypedResults.Ok(new ProfileView(
-            user.Id, user.Name, avatar, seasonViews, reviewViews, runs.Count(r => r.Status == RunStatus.Completed) + partnered));
+            user.Id, user.Name, avatar, seasonViews, reviewViews, runs.Count(r => r.Status == RunStatus.Completed) + partnered, achievements));
     }
 
     private static async Task<Results<Ok<IReadOnlyList<GameRunView>>, NotFound>> GameRunsAsync(
@@ -389,10 +443,33 @@ public static class FeedEndpoints
         var playerIds = runs.Select(r => r.PlayerId).Distinct().ToList();
         var players = await db.SeasonPlayers.AsNoTracking().Where(p => playerIds.Contains(p.Id)).ToDictionaryAsync(p => p.Id, ct);
         var seasonIds = runs.Select(r => r.SeasonId).Distinct().ToList();
-        var seasons = await db.Seasons.AsNoTracking().Where(s => seasonIds.Contains(s.Id)).ToDictionaryAsync(s => s.Id, s => s.Name, ct);
+        var seasons = await db.Seasons.AsNoTracking().Where(s => seasonIds.Contains(s.Id)).ToDictionaryAsync(s => s.Id, s => new { s.Name, s.RulesetJson }, ct);
         var tokens = await db.TokensAsync(seasonIds, ct);
         var runIds = runs.Select(r => r.Id).ToList();
         var reviews = await db.Reviews.AsNoTracking().Where(r => runIds.Contains(r.RunId)).ToDictionaryAsync(r => r.RunId, ct);
+        var reactionEmojis = new Dictionary<Guid, EquatableArray<string>>();
+        var commentSeasons = new HashSet<Guid>();
+        foreach (var id in game.IsDeleted ? [] : reviews.Values.Select(r => r.SeasonId).Distinct())
+        {
+            var rules = JsonSerializer.Deserialize<Ruleset>(seasons[id].RulesetJson, EngineJson.Options)!;
+            if (rules.Features.Reactions)
+            {
+                reactionEmojis.Add(id, rules.Social.Reactions);
+            }
+
+            if (rules.Features.Comments)
+            {
+                commentSeasons.Add(id);
+            }
+        }
+
+        var viewerId = user.UserId();
+        var eligibleRuns = reviews.Values.Where(r => reactionEmojis.ContainsKey(r.SeasonId)).Select(r => r.RunId).ToArray();
+        var counts = eligibleRuns.Length == 0 ? [] : await db.ReviewReactions.AsNoTracking().Where(r => eligibleRuns.Contains(r.RunId))
+            .GroupBy(r => new { r.RunId, r.Emoji })
+            .Select(group => new ReactionCount(group.Key.RunId, group.Key.Emoji, group.Count(), group.Count(r => r.UserId == viewerId) > 0))
+            .ToListAsync(ct);
+        var byRunAndEmoji = counts.ToDictionary(c => (c.RunId, c.Emoji));
         IReadOnlyList<GameRunView> views = [.. runs
             .OrderByDescending(r => r.StartedAt)
             .Select(r =>
@@ -402,7 +479,7 @@ public static class FeedEndpoints
                 return new GameRunView(
                     r.Id,
                     r.SeasonId,
-                    seasons.GetValueOrDefault(r.SeasonId) ?? "?",
+                    seasons.GetValueOrDefault(r.SeasonId)?.Name ?? "?",
                     r.PlayerId,
                     player?.UserId ?? Guid.Empty,
                     player?.Name ?? "?",
@@ -412,8 +489,18 @@ public static class FeedEndpoints
                     r.CompletedAt,
                     review?.Rating,
                     review?.Text,
-                    tokens.GetValueOrDefault(r.PlayerId));
+                    tokens.GetValueOrDefault(r.PlayerId),
+                    review is not null && reactionEmojis.TryGetValue(r.SeasonId, out var emojis)
+                        ? [.. emojis.Select(emoji =>
+                        {
+                            var count = byRunAndEmoji.GetValueOrDefault((r.Id, emoji));
+                            return new ReactionView(emoji, count?.Total ?? 0, count?.Selected ?? false);
+                        })]
+                        : null,
+                    CanComment: review is not null && commentSeasons.Contains(r.SeasonId) ? true : null);
             })];
         return TypedResults.Ok(views);
     }
+
+    private sealed record ReactionCount(Guid RunId, string Emoji, int Total, bool Selected);
 }

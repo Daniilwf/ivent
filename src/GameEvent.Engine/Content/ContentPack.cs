@@ -132,7 +132,8 @@ public sealed record ContentCatalog(
 
 /// <summary>
 /// The admin loads a content pack into the season (D-400): checked as a whole, all problems at once. Needs
-/// <c>features.items</c>; allowed while the season is a draft or running. <paramref name="ExpectedVersion"/> — the
+/// <c>features.items</c>, or <c>features.achievements</c> for a pack containing only achievements; allowed while the season
+/// is a draft or running. <paramref name="ExpectedVersion"/> — the
 /// content version the admin's editor was opened on (D-491): a pack made from an older one is refused instead of
 /// silently undoing someone else's change; null (a seed, a script) takes the pack whatever the version.
 /// </summary>

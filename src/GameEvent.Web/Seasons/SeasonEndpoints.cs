@@ -133,13 +133,15 @@ public sealed record SeasonView(
     EconomyFeaturesView? Economy = null,
     IReadOnlyList<GameEvent.Web.GlobalEvents.GlobalEventView>? GlobalEvents = null,
     bool? PollsEnabled = null,
-    InteractionFeaturesView? InteractionFeatures = null);
+    InteractionFeaturesView? InteractionFeatures = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? GalleryEnabled = null);
 
 /// <summary>The selected season's navigation flags, without its map, players or folded event state.</summary>
 public sealed record SeasonNavigationView(
     Guid Id,
     bool PollsEnabled,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] AdminFeaturesView? AdminFeatures = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] AdminFeaturesView? AdminFeatures = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? GalleryEnabled = null);
 
 /// <summary>Which stage 5 sections exist for administrators in the selected season.</summary>
 public sealed record AdminFeaturesView(bool GlobalEvents, bool WeeklyChallenge, bool Events, bool Suggestions);
@@ -675,7 +677,7 @@ public static class SeasonEndpoints
         var adminFeatures = includeAdmin == true && user.IsInRole(nameof(Infrastructure.Accounts.Role.Admin))
             ? new AdminFeaturesView(features.GlobalEvents, features.WeeklyChallenge, features.Events, features.Suggestions)
             : null;
-        return TypedResults.Ok(new SeasonNavigationView(seasonId, features.Polls, adminFeatures));
+        return TypedResults.Ok(new SeasonNavigationView(seasonId, features.Polls, adminFeatures, features.Gallery ? true : null));
     }
 
     private static async Task<Results<Ok<SeasonView>, NotFound>> GetSeasonAsync(
@@ -924,7 +926,8 @@ public static class SeasonEndpoints
             new EconomyFeaturesView(rules.Features.Items, rules.Features.Shop, rules.Features.Bets),
             await GameEvent.Web.GlobalEvents.GlobalEventEndpoints.BannerAsync(db, seasonId, rules.Features.GlobalEvents, clock.UtcNow, ct),
             rules.Features.Polls,
-            interactionFeatures));
+            interactionFeatures,
+            rules.Features.Gallery ? true : null));
     }
 
     private static async Task<bool> PendingCoopAsync(GameEventDbContext db, Guid seasonId, Guid playerId, DateTimeOffset now, CancellationToken ct)

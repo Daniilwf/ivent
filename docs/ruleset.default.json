@@ -17,7 +17,8 @@
     "suggestions": false,
     "coop": false,
     "globalEvents": false,
-    "duels": false
+    "duels": false,
+    "seasonStatistics": false
   },
   "season": {
     "timezone": "Europe/Moscow",

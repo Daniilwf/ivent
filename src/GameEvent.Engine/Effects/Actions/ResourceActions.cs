@@ -40,7 +40,7 @@ internal sealed class ChangeResourceHandler : ActionHandler<ChangeResourceAction
 
                 if (amount != 0)
                 {
-                    run.Emit(new CoinsChanged(target, amount, CoinsReason.Item, RunId: null));
+                    run.Emit(new CoinsChanged(target, amount, run.CoinReason, RunId: null));
                 }
 
                 break;

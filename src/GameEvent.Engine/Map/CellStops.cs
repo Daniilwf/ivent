@@ -1,3 +1,4 @@
+using GameEvent.Engine.Content;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Scoring;
 using GameEvent.Engine.Seasons;
@@ -52,7 +53,8 @@ internal static class CellStops
         var events = new List<IGameEvent>();
         foreach (var visit in Movement.Visits(move).Where(v => v.Kind == CellVisitKind.Stop || (v.Kind == CellVisitKind.Pass && move.Steps > 0)))
         {
-            if (state.Map.CellById(visit.CellId) is { Type: CellType.Shop, Grants: { } grants } && state.Catalog.Live(grants) is { } definition)
+            if (state.Map.CellById(visit.CellId) is { Type: CellType.Shop, Grants: { } grants }
+                && state.Catalog.Live(grants) is { Kind: not ObjectKind.Achievement } definition)
             {
                 var given = Inventory.Inventories.Give(state, context, move.PlayerId, definition, null, Inventory.ObjectSource.Cell, fromPlayerId: null);
                 events.Add(given);

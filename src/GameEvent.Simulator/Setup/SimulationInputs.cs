@@ -79,7 +79,8 @@ public sealed record SimulationInputs(
         else if (ruleset.Features.Events && content is not null)
         {
             problems.AddRange(
-                ContentPublishing.Check(content, events: true, polls: ruleset.Features.Polls).Select(e => $"content {e.Path}: {e.Message}"));
+                ContentPublishing.Check(content, events: true, polls: ruleset.Features.Polls, achievements: ruleset.Features.Achievements)
+                    .Select(e => $"content {e.Path}: {e.Message}"));
         }
 
         if (problems.Count > 0)

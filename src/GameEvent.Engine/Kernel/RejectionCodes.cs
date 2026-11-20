@@ -125,6 +125,14 @@ public static class RejectionCodes
     public const string UndoCellNotOnMap = "undo.cellNotOnMap";
     public const string InvalidRating = "review.invalidRating";
     public const string ReviewTooLong = "review.tooLong";
+    public const string ReviewReactionReviewUnknown = "reviewReaction.reviewUnknown";
+    public const string ReviewReactionInvalidUser = "reviewReaction.invalidUser";
+    public const string ReviewReactionInvalidEmoji = "reviewReaction.invalidEmoji";
+    public const string FeedReactionTargetUnknown = "feedReaction.targetUnknown";
+    public const string FeedReactionInvalidUser = "feedReaction.invalidUser";
+    public const string FeedReactionInvalidEmoji = "feedReaction.invalidEmoji";
+    public const string GalleryReactionInvalidUser = "galleryReaction.invalidUser";
+    public const string GalleryReactionInvalidEmoji = "galleryReaction.invalidEmoji";
     public const string ContentInvalid = "content.invalid";
     public const string ContentUnchanged = "content.unchanged";
 

@@ -3,6 +3,7 @@ using GameEvent.Engine.Content;
 using GameEvent.Engine.Inventory;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Runs;
+using GameEvent.Engine.Scoring;
 using GameEvent.Engine.Seasons;
 
 namespace GameEvent.Engine.Effects;
@@ -82,6 +83,8 @@ internal sealed class EffectRun
     public bool Hostile { get; }
 
     public ContentParamDictionary? Parameters { get; }
+
+    public CoinsReason CoinReason { get; init; } = CoinsReason.Item;
 
     public DiceScope Dice { get; }
 

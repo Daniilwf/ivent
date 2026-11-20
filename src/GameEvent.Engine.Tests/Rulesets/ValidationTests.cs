@@ -223,16 +223,12 @@ public class ValidationTests
         { "events without items", r => Flags(f => f with { Events = true })(r) with { Events = new EventRules { DefaultDeck = EventKind.Risky, IrlProof = new IrlProofRules { MaxFiles = 5 } } }, "features.events" },
         // Polls are played since stage 5 (D-512, D-720): they need their rules
         { "polls without their rules", Flags(f => f with { Polls = true }), "polls" },
-        { "achievements", Flags(f => f with { Achievements = true }), "features.achievements" },
         // The weekly challenge is played since stage 5 (D-526): it needs the length of its window
         { "weekly challenge without its window", Flags(f => f with { WeeklyChallenge = true }), "weeklyChallenge.durationDays" },
         // The suggestion box is played since stage 5 (D-527): it needs its daily limit
         { "suggestions without their limit", Flags(f => f with { Suggestions = true }), "suggestions" },
         // The partner board is played since stage 5 (D-524): a response is a coop invitation, so it needs coop
         { "partner board without coop", Flags(f => f with { PartnerBoard = true }), "features.partnerBoard" },
-        { "reactions", Flags(f => f with { Reactions = true }), "features.reactions" },
-        { "comments", Flags(f => f with { Comments = true }), "features.comments" },
-        { "gallery", Flags(f => f with { Gallery = true }), "features.gallery" },
     };
 
     [Theory]
@@ -245,6 +241,62 @@ public class ValidationTests
         var error = Assert.Single(errors);
         Assert.Equal(path, error.Path);
         Assert.False(string.IsNullOrWhiteSpace(error.Message));
+    }
+
+    [Fact]
+    public void Seasonal_achievement_support_can_be_enabled_on_its_own() =>
+        Assert.Empty(Errors(Flags(f => f with { Achievements = true })));
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    public void Comments_with_a_nonnegative_daily_limit_are_playable(int limit)
+    {
+        var errors = Errors(r => r with
+        {
+            Features = r.Features with { Comments = true },
+            Social = r.Social with { CommentsPerDay = limit },
+        });
+
+        Assert.True(errors.Count == 0, Show(errors));
+    }
+
+    [Fact]
+    public void An_enabled_negative_daily_comment_limit_is_refused_on_its_field()
+    {
+        var errors = Errors(r => r with
+        {
+            Features = r.Features with { Comments = true },
+            Social = r.Social with { CommentsPerDay = -1 },
+        });
+
+        Assert.Equal("social.commentsPerDay", Assert.Single(errors).Path);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    public void Gallery_with_a_nonnegative_daily_upload_limit_is_playable(int limit)
+    {
+        var errors = Errors(r => r with
+        {
+            Features = r.Features with { Gallery = true },
+            Social = r.Social with { GalleryUploadsPerDay = limit },
+        });
+
+        Assert.True(errors.Count == 0, Show(errors));
+    }
+
+    [Fact]
+    public void An_enabled_negative_daily_gallery_limit_is_refused_on_its_field()
+    {
+        var errors = Errors(r => r with
+        {
+            Features = r.Features with { Gallery = true },
+            Social = r.Social with { GalleryUploadsPerDay = -1 },
+        });
+
+        Assert.Equal("social.galleryUploadsPerDay", Assert.Single(errors).Path);
     }
 
     [Theory]

@@ -288,9 +288,10 @@ export function SeasonScreen({
 
   const navigationId = season?.id;
   const pollsEnabled = season?.pollsEnabled === true;
+  const galleryEnabled = season?.galleryEnabled === true;
   useEffect(() => {
-    if (navigationId) onNavigationLoaded?.({ id: navigationId, pollsEnabled });
-  }, [navigationId, onNavigationLoaded, pollsEnabled]);
+    if (navigationId) onNavigationLoaded?.({ id: navigationId, pollsEnabled, galleryEnabled });
+  }, [navigationId, onNavigationLoaded, pollsEnabled, galleryEnabled]);
 
   // Load now, after every committed command of the season (another player's move included), after every
   // reconnection to the hub (names and avatars live outside the season log) and after a catch-up (D-122).

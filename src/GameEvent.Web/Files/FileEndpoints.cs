@@ -109,7 +109,8 @@ public static class FileEndpoints
         && request.Path.Value?.TrimEnd('/') is { } path
         && (string.Equals(path, "/api/files", StringComparison.OrdinalIgnoreCase)
             || string.Equals(path, BugReports.BugReportEndpoints.ScreenshotPath, StringComparison.OrdinalIgnoreCase)
-            || Map.AdminMapEndpoints.IsBackgroundUpload(path));
+            || Map.AdminMapEndpoints.IsBackgroundUpload(path)
+            || Seasons.GalleryEndpoints.IsUpload(path));
 
     public static void MapFiles(this RouteGroupBuilder api)
     {
@@ -291,32 +292,10 @@ public static class FileEndpoints
         byte[] content, Guid commandId, Guid ownerId, FileServices services, CancellationToken ct, bool countTowardsLimit = true, FileKind kind = FileKind.Upload)
     {
         var (db, storage, limits, ids, _, bus) = services;
-        if (!await s_processing.WaitAsync(s_processingWait, ct))
-        {
-            return (Problem(StatusCodes.Status503ServiceUnavailable, "The server is busy with other pictures.", "Try again in a minute.", SafeDownloader.Busy), null);
-        }
-
-        ProcessedFile? processed;
-        Engine.Kernel.Rejection? rejection;
-        try
-        {
-            (processed, rejection) = await Task.Run(() => ImageProcessor.Process(content, ProcessingLimits(kind, limits)), CancellationToken.None);
-        }
-        finally
-        {
-            s_processing.Release();
-        }
-
+        var (processed, failure) = await ProcessPictureAsync(_ => ValueTask.FromResult(content), kind, limits, ct);
         if (processed is null)
         {
-            return (rejection!.Code == ImageProcessor.TooLarge
-                ? TooLarge(limits)
-                : Problem(StatusCodes.Status422UnprocessableEntity, "The picture was refused.", rejection.Detail, rejection.Code), null);
-        }
-
-        if (kind is (FileKind.BugScreenshot or FileKind.MapBackground) && processed.Frames > 1)
-        {
-            return (Problem(StatusCodes.Status422UnprocessableEntity, "The picture was refused.", "A screenshot or a map background is a still picture.", FileRules.NotStill), null);
+            return (failure!, null);
         }
 
         // The bytes go to disk first; the queue then records whose they are. From here the request is not cancelled: a
@@ -358,6 +337,54 @@ public static class FileEndpoints
             : Problem(StatusCodes.Status409Conflict, "The command was rejected.", outcome.Rejection.Detail, outcome.Rejection.Code), null);
     }
 
+    internal static async Task<(ProcessedFile? Picture, IResult? Failure)> ProcessPictureAsync(
+        IFormFile file, FileKind kind, FileLimits limits, CancellationToken ct) =>
+        await ProcessPictureAsync(async token =>
+        {
+            await using var stream = file.OpenReadStream();
+            var content = new byte[file.Length];
+            await stream.ReadExactlyAsync(content, token);
+            return content;
+        }, kind, limits, ct);
+
+    private static async Task<(ProcessedFile? Picture, IResult? Failure)> ProcessPictureAsync(
+        Func<CancellationToken, ValueTask<byte[]>> readAsync, FileKind kind, FileLimits limits, CancellationToken ct)
+    {
+        if (!await s_processing.WaitAsync(s_processingWait, ct))
+        {
+            return (null, Problem(StatusCodes.Status503ServiceUnavailable,
+                "The server is busy with other pictures.", "Try again in a minute.", SafeDownloader.Busy));
+        }
+
+        ProcessedFile? picture;
+        Rejection? rejection;
+        try
+        {
+            var content = await readAsync(ct);
+            (picture, rejection) = await Task.Run(
+                () => ImageProcessor.Process(content, ProcessingLimits(kind, limits), stillOnly: kind == FileKind.GalleryImage), CancellationToken.None);
+        }
+        finally
+        {
+            s_processing.Release();
+        }
+
+        if (picture is null)
+        {
+            return (null, rejection!.Code == ImageProcessor.TooLarge
+                ? TooLarge(limits)
+                : Problem(StatusCodes.Status422UnprocessableEntity, "The picture was refused.", rejection.Detail, rejection.Code));
+        }
+
+        if (kind is (FileKind.BugScreenshot or FileKind.MapBackground) && picture.Frames > 1)
+        {
+            return (null, Problem(StatusCodes.Status422UnprocessableEntity, "The picture was refused.",
+                "A screenshot or a map background is a still picture.", FileRules.NotStill));
+        }
+
+        return (picture, null);
+    }
+
     /// <summary>The answer to a command id seen before: the same user's stored file, or a refusal of someone else's id.</summary>
     private static async Task<IResult?> EarlierAsync(Guid commandId, Guid ownerId, GameEventDbContext db, CancellationToken ct)
     {
@@ -386,9 +413,15 @@ public static class FileEndpoints
 
     private static async Task<IResult> ServeAsync(Guid fileId, bool thumbnail, GameEventDbContext db, FileStorage storage, HttpContext http, CancellationToken ct)
     {
-        var record = await db.Files.AsNoTracking().SingleOrDefaultAsync(f => f.Id == fileId && !f.IsDeleted, ct);
-        var name = record is null ? null : thumbnail ? FileNames.Thumbnail(fileId, record.MediaType) : FileNames.Main(fileId, record.MediaType);
-        if (record is null || storage.OpenRead(name!) is not { } stream)
+        var record = await db.Files.AsNoTracking()
+            .SingleOrDefaultAsync(f => f.Id == fileId && !f.IsDeleted && f.Kind != FileKind.GalleryImage, ct);
+        return record is null ? TypedResults.NotFound() : ServePicture(record.Id, record.MediaType, thumbnail, storage, http, immutable: true);
+    }
+
+    internal static IResult ServePicture(Guid fileId, string mediaType, bool thumbnail, FileStorage storage, HttpContext http, bool immutable)
+    {
+        var name = thumbnail ? FileNames.Thumbnail(fileId, mediaType) : FileNames.Main(fileId, mediaType);
+        if (storage.OpenRead(name) is not { } stream)
         {
             return TypedResults.NotFound();
         }
@@ -397,12 +430,12 @@ public static class FileEndpoints
         var headers = http.Response.Headers;
         headers.XContentTypeOptions = "nosniff";
         headers.ContentSecurityPolicy = "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; frame-ancestors 'none'; sandbox";
-        headers.CacheControl = "private, max-age=31536000, immutable";
+        headers.CacheControl = immutable ? "private, max-age=31536000, immutable" : "private, no-store";
         headers["Cross-Origin-Resource-Policy"] = "same-origin";
-        return TypedResults.File(stream, record.MediaType, fileDownloadName: null, enableRangeProcessing: false);
+        return TypedResults.File(stream, mediaType, fileDownloadName: null, enableRangeProcessing: false);
     }
 
-    private static ProblemHttpResult TooLarge(FileLimits limits) =>
+    internal static ProblemHttpResult TooLarge(FileLimits limits) =>
         Problem(
             StatusCodes.Status413PayloadTooLarge,
             "The file is too large.",

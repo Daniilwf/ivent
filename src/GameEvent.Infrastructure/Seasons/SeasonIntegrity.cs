@@ -1,5 +1,8 @@
 using System.Collections;
 using System.Reflection;
+using GameEvent.Engine.Files;
+using GameEvent.Engine.Gallery;
+using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Seasons;
 using GameEvent.Infrastructure.Database;
 using GameEvent.Infrastructure.EventLog;
@@ -40,6 +43,7 @@ public static class SeasonIntegrity
             var differences = Differences(replayed, stored)
                 .Concat(await TimerDifferencesAsync(db, replayed, ct))
                 .Concat(await RulesetHistoryDifferencesAsync(db, seasonId, ct))
+                .Concat(await GalleryMediaDifferencesAsync(db, seasonId, ct))
                 .ToList();
             var lastAfter = await db.Events.AsNoTracking().Where(e => e.SeasonId == seasonId).MaxAsync(e => e.Sequence, ct);
             if (lastAfter == last || attempt == Attempts)
@@ -74,7 +78,55 @@ public static class SeasonIntegrity
         Compare("partnerRequest", fromLog.PartnerRequests, stored.PartnerRequests, differences);
         Compare("weeklyChallenge", fromLog.WeeklyChallenges, stored.WeeklyChallenges, differences);
         Compare("suggestion", fromLog.Suggestions, stored.Suggestions, differences);
+        Compare("comment", fromLog.Comments, stored.Comments, differences);
+        Compare("galleryMoment", fromLog.GalleryItems, stored.GalleryItems, differences);
+        if (!fromLog.ReviewReactions.SetEquals(stored.ReviewReactions))
+        {
+            differences.Add("reviewReactions");
+        }
+
+        if (!fromLog.FeedReactions.SetEquals(stored.FeedReactions))
+        {
+            differences.Add("feedReactions");
+        }
+
+        if (!fromLog.GalleryReactions.SetEquals(stored.GalleryReactions))
+        {
+            differences.Add("galleryReactions");
+        }
+
         return differences;
+    }
+
+    private static async Task<IEnumerable<string>> GalleryMediaDifferencesAsync(GameEventDbContext db, Guid seasonId, CancellationToken ct)
+    {
+        var bindings = await db.GalleryMediaBindings.AsNoTracking().Where(binding => binding.SeasonId == seasonId).ToListAsync(ct);
+        var rows = await db.Events.AsNoTracking().Where(e => e.SeasonId == seasonId && e.Type == GalleryMomentPublished.Type)
+            .Select(e => new StoredEvent(e.Type, e.Version, e.Data)).ToListAsync(ct);
+        var publications = rows.Select(EventCodec.Decode).OfType<GalleryMomentPublished>().ToLookup(publication => publication.FileId);
+        var ids = bindings.Select(binding => binding.FileId).Concat(publications.Select(group => group.Key)).Distinct().ToList();
+        if (ids.Count == 0)
+        {
+            return [];
+        }
+
+        var files = await db.Files.AsNoTracking().Where(file => ids.Contains(file.Id)).Select(file => new
+        {
+            file.Id,
+            file.IsDeleted,
+            file.Kind,
+            file.OwnerId,
+            HasBinding = db.GalleryMediaBindings.Any(binding => binding.FileId == file.Id),
+        }).ToDictionaryAsync(file => file.Id, ct);
+        var invalid = bindings.Where(binding => !files.TryGetValue(binding.FileId, out var file)
+            || file.IsDeleted || file.Kind != FileKind.GalleryImage
+            || !publications[binding.FileId].Any(publication => publication.ItemId == binding.ItemId && publication.UserId == file.OwnerId))
+            .Select(binding => binding.FileId);
+
+        // A protected file is registered atomically with its binding. An imported publication can name a file absent
+        // here, or one legitimately bound to a different season; neither gives the archive its own file association.
+        var detached = files.Values.Where(file => file.Kind == FileKind.GalleryImage && !file.HasBinding).Select(file => file.Id);
+        return invalid.Concat(detached).Order().Select(fileId => $"galleryMedia {fileId}");
     }
 
     // The timer columns the scheduler reads (D-404, D-812): the season's own moments and each player's are those of the

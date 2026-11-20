@@ -20,4 +20,13 @@ public sealed record EngineContext(
 {
     /// <summary>The levels of the command's own events above 0, set for each command by <see cref="SeasonEngine.Execute"/> (D-559 (1)).</summary>
     internal Effects.CommandLevels? Levels { get; init; }
+
+    /// <summary>The queue checked that the current reaction's target is a public, active feed row in this season.</summary>
+    public bool FeedReactionTargetAvailable { get; init; }
+
+    /// <summary>The queue checked that the comment's feed target is a public, active row in this season.</summary>
+    public bool CommentTargetAvailable { get; init; }
+
+    /// <summary>The queue prepared a protected image for this gallery publication.</summary>
+    public Guid? PreparedGalleryFileId { get; init; }
 }

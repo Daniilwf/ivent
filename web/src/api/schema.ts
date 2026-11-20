@@ -1526,6 +1526,174 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/seasons/{seasonId}/my-statistics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SeasonStatisticsView"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Too Many Requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/hall-of-fame": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["HallOfFameSeasonView"][];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Too Many Requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/hall-of-fame/records": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["HallOfFameRecordsView"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Too Many Requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/seasons/{seasonId}/rules": {
         parameters: {
             query?: never;
@@ -1923,6 +2091,15 @@ export interface paths {
                     };
                     content?: never;
                 };
+                /** @description Too Many Requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
             };
         };
         put?: never;
@@ -2015,6 +2192,340 @@ export interface paths {
         };
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/pool/{gameId}/runs/{runId}/review-reactions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    gameId: string;
+                    runId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ReactionRequest"];
+                };
+            };
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Too Many Requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/seasons/{seasonId}/feed/reactions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query: {
+                    commandIds: string[];
+                };
+                header?: never;
+                path: {
+                    seasonId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            [key: string]: components["schemas"]["ReactionView"][];
+                        };
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Too Many Requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/seasons/{seasonId}/feed/{targetCommandId}/reactions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                    targetCommandId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ReactionRequest"];
+                };
+            };
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Too Many Requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/seasons/gallery": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["GallerySeasonView"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/seasons/{seasonId}/gallery/{itemId}/hide": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                    itemId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["GalleryHideRequest"];
+                };
+            };
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+            };
+        };
         delete?: never;
         options?: never;
         head?: never;
@@ -5097,6 +5608,865 @@ export interface paths {
                 };
             };
         };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/seasons/{seasonId}/feed/{targetCommandId}/comments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    before?: string;
+                };
+                header?: never;
+                path: {
+                    seasonId: string;
+                    targetCommandId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CommentThreadView"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                    targetCommandId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["PostCommentRequest"];
+                };
+            };
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/seasons/{seasonId}/feed/{targetCommandId}/comments/{commentId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                    targetCommandId: string;
+                    commentId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["EditCommentRequest"];
+                };
+            };
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        delete: {
+            parameters: {
+                query: {
+                    commandId: string;
+                };
+                header?: never;
+                path: {
+                    seasonId: string;
+                    targetCommandId: string;
+                    commentId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/pool/{gameId}/runs/{runId}/review-comments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    before?: string;
+                };
+                header?: never;
+                path: {
+                    gameId: string;
+                    runId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CommentThreadView"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    gameId: string;
+                    runId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["PostCommentRequest"];
+                };
+            };
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/pool/{gameId}/runs/{runId}/review-comments/{commentId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    gameId: string;
+                    runId: string;
+                    commentId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["EditCommentRequest"];
+                };
+            };
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        delete: {
+            parameters: {
+                query: {
+                    commandId: string;
+                };
+                header?: never;
+                path: {
+                    gameId: string;
+                    runId: string;
+                    commentId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/seasons/{seasonId}/feed/{targetCommandId}/comments/{commentId}/hide": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                    targetCommandId: string;
+                    commentId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["HideCommentRequest"];
+                };
+            };
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/seasons/{seasonId}/reviews/{runId}/comments/{commentId}/hide": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                    runId: string;
+                    commentId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["HideCommentRequest"];
+                };
+            };
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/seasons/{seasonId}/gallery": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    playerId?: string;
+                    before?: string;
+                    itemId?: string;
+                };
+                header?: never;
+                path: {
+                    seasonId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["GalleryView"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "multipart/form-data": components["schemas"]["GalleryUploadForm"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["GalleryMomentView"];
+                    };
+                };
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["GalleryMomentView"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+                /** @description Payload Too Large */
+                413: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Unprocessable Entity */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Too Many Requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Service Unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/seasons/{seasonId}/gallery/{itemId}/image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                    itemId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "image/webp": string;
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Too Many Requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/seasons/{seasonId}/gallery/{itemId}/thumbnail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                    itemId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "image/webp": string;
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Too Many Requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/seasons/{seasonId}/gallery/{itemId}/reactions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                    itemId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ReactionRequest"];
+                };
+            };
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Too Many Requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -9970,8 +11340,8 @@ export interface components {
             comment?: null | string;
         };
         /**
-         * @description The season's content in the editor (4.12, D-490): whether items are on (the editor works either way, a pack is
-         *     published only with `features.items`), the season's status, the version in force, the pack in force as content
+         * @description The season's content in the editor (4.12, D-490): which kinds may be published, the season's status,
+         *     the version in force, the pack in force as content
          *     JSON (CONTENT.md; null fields left out), the definitions deleted on the way and the versions, newest first.
          *     `eventsEnabled` — whether events are on (`features.events`, D-823): the pack's events and decks play only then;
          *     always set, optional for older clients.
@@ -9986,6 +11356,8 @@ export interface components {
             history: components["schemas"]["ContentVersionInfo"][];
             /** @default false */
             eventsEnabled: boolean;
+            /** @default false */
+            achievementsEnabled: boolean;
         };
         /** @description Which stage 5 sections exist for administrators in the selected season. */
         AdminFeaturesView: {
@@ -10407,6 +11779,12 @@ export interface components {
             events: components["schemas"]["LoggedEventView"][];
             warnings?: null | string[];
         };
+        CommentThreadView: {
+            comments: components["schemas"]["ThreadCommentView"][];
+            /** Format: uuid */
+            nextBefore: null | string;
+            postingAllowed?: null | boolean;
+        };
         /**
          * @description The player's latest completed run: `dice` — the dice by the hours, then the extra dice of items and events (the
          *     count stage, D-825), each die separately; the challenge dice apart; the total counts all of them; the review when there is one; `status` is `rejected` when the admin took the run back.
@@ -10755,6 +12133,11 @@ export interface components {
             isDefaultForward: boolean;
             isPrimaryBackward: boolean;
         };
+        EditCommentRequest: {
+            /** Format: uuid */
+            commandId: string;
+            text: null | string;
+        };
         EffectRules: {
             /** Format: int32 */
             maxChainDepth: number;
@@ -10901,6 +12284,8 @@ export interface components {
              *     logged before it keeps its ruleset's format.
              */
             duels?: boolean;
+            /** @description Personal season statistics. An older ruleset without this flag keeps it off. */
+            seasonStatistics?: boolean;
         };
         /**
          * @description One event of the season's feed (GLOSSARY «Лента», D-124): its place in the log, the command it came from, when, the
@@ -10973,6 +12358,10 @@ export interface components {
             games: components["schemas"]["FeedGameView"][];
             runs: components["schemas"]["FeedRunView"][];
             objects?: null | components["schemas"]["FeedObjectView"][];
+            reactions?: null | {
+                [key: string]: components["schemas"]["ReactionView"][];
+            };
+            commentTargets?: null | string[];
         };
         /** @description A picture by link (D-117): https from Tenor, Giphy or Klipy; the server downloads it and stores it as an upload. */
         FileFromUrlRequest: {
@@ -11002,6 +12391,50 @@ export interface components {
             bonusByOrder: components["schemas"]["EquatableArrayOfint"];
             /** Format: int32 */
             bonusAfterList: number;
+        };
+        GalleryHideRequest: {
+            /** Format: uuid */
+            commandId: string;
+        };
+        GalleryMomentView: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            playerId: string;
+            playerName: string;
+            caption: string;
+            /** Format: date-time */
+            createdAt: string;
+            imageUrl: string;
+            thumbnailUrl: string;
+            reactions?: null | components["schemas"]["ReactionView"][];
+        };
+        GalleryPlayerView: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            /** Format: int32 */
+            token: number;
+        };
+        GallerySeasonView: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+        };
+        GalleryUploadForm: {
+            /** Format: uuid */
+            commandId: string;
+            /** Format: uuid */
+            itemId: string;
+            caption: string;
+            file: components["schemas"]["IFormFile"];
+        };
+        GalleryView: {
+            items: components["schemas"]["GalleryMomentView"][];
+            /** Format: uuid */
+            nextBefore: null | string;
+            players: components["schemas"]["GalleryPlayerView"][];
+            canPublish: boolean;
         };
         /**
          * @description A game's card as the pool keeps it: what a player sees and what the roll reads. string? GameCard.Note — the challenge or a
@@ -11099,6 +12532,8 @@ export interface components {
             reviewText: null | string;
             /** Format: int32 */
             token: number;
+            reviewReactions?: null | components["schemas"]["ReactionView"][];
+            canComment?: null | boolean;
         };
         /** @description The rules of global events (SPEC «Общие ивенты», D-517). */
         GlobalEventRules: {
@@ -11157,6 +12592,40 @@ export interface components {
          * @enum {unknown}
          */
         GoalMetric: "hours" | "runs";
+        HallOfFameGameView: {
+            /** Format: uuid */
+            seasonId: string;
+            seasonName: string;
+            /** Format: uuid */
+            gameId: string;
+            title: string;
+            /** Format: uuid */
+            runId: string;
+            /** Format: double */
+            hours: number;
+        };
+        HallOfFameRecordsView: {
+            longestGames: components["schemas"]["HallOfFameGameView"][];
+        };
+        HallOfFameSeasonView: {
+            /** Format: uuid */
+            seasonId: string;
+            seasonName: string;
+            winners: components["schemas"]["HallOfFameWinnerView"][];
+        };
+        HallOfFameWinnerView: {
+            /** Format: uuid */
+            playerId: string;
+            name: string;
+            /** Format: int32 */
+            points: number;
+            /** Format: uuid */
+            profileUserId: null | string;
+        };
+        HideCommentRequest: {
+            /** Format: uuid */
+            commandId: string;
+        };
         HostileCap: {
             enabled: boolean;
             /** Format: int32 */
@@ -11810,6 +13279,13 @@ export interface components {
             toSequence: number;
             types: string[];
         };
+        PostCommentRequest: {
+            /** Format: uuid */
+            commandId: string;
+            /** Format: uuid */
+            commentId: string;
+            text: null | string;
+        };
         ProblemDetails: {
             type?: null | string;
             title?: null | string;
@@ -11817,6 +13293,16 @@ export interface components {
             status?: null | number;
             detail?: null | string;
             instance?: null | string;
+        };
+        /** @description A seasonal badge, with the title and description it had when awarded. */
+        ProfileAchievementView: {
+            /** Format: uuid */
+            seasonId: string;
+            objectId: string;
+            name: string;
+            description: string;
+            /** Format: date-time */
+            earnedAt: string;
         };
         /** @description A review the user left: the game, the season, the rating and the text (SPEC «Отзыв»). */
         ProfileReviewView: {
@@ -11837,6 +13323,7 @@ export interface components {
         /**
          * @description A season a user took part in, with their points and, once the season finished, their place. `token` — their place in
          *     the season's list of players (by name), which the screens colour their token by (D-150).
+         *     `seasonRecapAvailable` is only present for the owner where the personal recap is enabled (D-905).
          */
         ProfileSeasonView: {
             /** Format: uuid */
@@ -11851,6 +13338,7 @@ export interface components {
             place: null | number;
             /** Format: int32 */
             token: number;
+            seasonRecapAvailable?: null | boolean;
         };
         /**
          * @description A user's profile (D-124): the name, the avatar, the seasons they played and their reviews. `completed` — games
@@ -11865,6 +13353,7 @@ export interface components {
             reviews: components["schemas"]["ProfileReviewView"][];
             /** Format: int32 */
             completed: number;
+            achievements: components["schemas"]["ProfileAchievementView"][];
         };
         /**
          * @description A run to check, in queue order (D-98, Q-3, D-662): the runs that decide a finish on top (`decidesFinish`), then
@@ -11975,6 +13464,18 @@ export interface components {
             epic: number;
             /** Format: int32 */
             legendary: number;
+        };
+        ReactionRequest: {
+            /** Format: uuid */
+            commandId: string;
+            emoji: null | string;
+            selected: null | boolean;
+        };
+        ReactionView: {
+            emoji: string;
+            /** Format: int32 */
+            count: number;
+            selected: boolean;
         };
         /** @description A game rule refused the action; `code` is stable and maps to a text in the interface dictionary. */
         RejectionProblem: {
@@ -12291,6 +13792,12 @@ export interface components {
                 /** Format: int64 */
                 toSequence: number;
                 types: string[];
+                commentTarget?: {
+                    /** @enum {unknown} */
+                    kind?: "feedEntry" | "review";
+                    /** Format: uuid */
+                    id?: string;
+                };
             }[];
             reload: boolean;
         };
@@ -12311,6 +13818,7 @@ export interface components {
             id: string;
             pollsEnabled: boolean;
             adminFeatures?: null | components["schemas"]["AdminFeaturesView"];
+            galleryEnabled?: null | boolean;
         };
         SeasonRules: {
             timezone: string;
@@ -12320,6 +13828,21 @@ export interface components {
             inactiveHintDays: number;
             /** Format: int32 */
             maxUncheckedRuns?: null | number;
+        };
+        SeasonStatisticsView: {
+            /** Format: uuid */
+            seasonId: string;
+            /** Format: int32 */
+            completedRuns: number;
+            /** Format: int32 */
+            bestRating: null | number;
+            /** Format: int32 */
+            worstRating: null | number;
+            /** Format: int32 */
+            attacksMade: number;
+            /** Format: int32 */
+            attacksReceived: number;
+            seasonName: string;
         };
         /**
          * @description Season lifecycle (GLOSSARY «Статус сезона»): draft → active → closing → finished → archived.
@@ -12344,6 +13867,12 @@ export interface components {
             /** Format: int64 */
             toSequence: number;
             types: string[];
+            commentTarget?: {
+                /** @enum {unknown} */
+                kind?: "feedEntry" | "review";
+                /** Format: uuid */
+                id?: string;
+            };
         };
         /**
          * @description The season screen's data. `status` and `deadline` (UTC; the screen shows it in Moscow time) follow the
@@ -12374,6 +13903,7 @@ export interface components {
             globalEvents?: null | components["schemas"]["GlobalEventView"][];
             pollsEnabled?: null | boolean;
             interactionFeatures?: null | components["schemas"]["InteractionFeaturesView"];
+            galleryEnabled?: null | boolean;
         };
         /**
          * @description A live session of the signed-in user (D-466): `userAgent` — the browser's own description at the sign-in, which
@@ -12632,6 +14162,18 @@ export interface components {
             random: components["schemas"]["TestRandomView"];
             scenarios: string[];
         };
+        ThreadCommentView: {
+            /** Format: uuid */
+            id: string;
+            author: string;
+            text: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            editedAt: null | string;
+            canEdit: boolean;
+            canHide: boolean;
+        };
         /**
          * @description Where the player is in the turn cycle. Moving and resolving happen inside one command.
          * @enum {unknown}
@@ -12844,7 +14386,9 @@ export const roleValues: ReadonlyArray<FlattenedDeepRequired<components>["schema
 export const rollMissReasonValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["RollMissReason"]> = ["completedInSeason", "beingPlayed"];
 export const roundingValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["Rounding"]> = ["nearest", "floor", "ceil"];
 export const runStatusValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["RunStatus"]> = ["playing", "completed", "dropped", "techRerolled", "rejected"];
+export const seasonJoinMissedCommentTargetKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["SeasonJoin"]["missed"]["commentTarget"]["kind"]> = ["feedEntry", "review"];
 export const seasonStatusValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["SeasonStatus"]> = ["draft", "active", "closing", "finished", "archived"];
+export const seasonUpdateCommentTargetKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["SeasonUpdate"]["commentTarget"]["kind"]> = ["feedEntry", "review"];
 export const shopPaymentValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ShopPayment"]> = ["freeRoll", "coins"];
 export const siteEnvironmentValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["SiteEnvironment"]> = ["production", "staging", "development", "test", "other"];
 export const suggestionKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["SuggestionKind"]> = ["game", "event", "item"];

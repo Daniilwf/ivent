@@ -1,11 +1,15 @@
+using GameEvent.Engine.Achievements;
+using GameEvent.Engine.Comments;
 using GameEvent.Engine.Effects;
 using GameEvent.Engine.Finish;
+using GameEvent.Engine.Gallery;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Map;
 using GameEvent.Engine.Players;
 using GameEvent.Engine.Pool;
 using GameEvent.Engine.Proofs;
 using GameEvent.Engine.Ranking;
+using GameEvent.Engine.Reactions;
 using GameEvent.Engine.Rolls;
 using GameEvent.Engine.Rulesets;
 using GameEvent.Engine.Runs;
@@ -197,6 +201,66 @@ public partial class EventFormatTests
             new RunReviewed(s_run, s_player, 9, "Страшно и красиво", s_at),
             1,
             """{"runId":"00000000-0000-0000-0000-000000000001","playerId":"10000000-0000-0000-0000-000000000001","rating":9,"text":"Страшно и красиво","reviewedAt":"2026-10-01T12:30:00+00:00"}"""
+        },
+        {
+            "review-reaction-set",
+            new ReviewReactionSet(s_run, s_user, "🔥", Selected: true),
+            1,
+            """{"runId":"00000000-0000-0000-0000-000000000001","userId":"40000000-0000-0000-0000-000000000001","emoji":"\uD83D\uDD25","selected":true}"""
+        },
+        {
+            "feed-reaction-set",
+            new FeedReactionSet(s_run, s_user, "🔥", Selected: true),
+            1,
+            """{"targetCommandId":"00000000-0000-0000-0000-000000000001","userId":"40000000-0000-0000-0000-000000000001","emoji":"\uD83D\uDD25","selected":true}"""
+        },
+        {
+            "comment-posted",
+            new CommentPosted(s_other, new CommentTarget(CommentTargetKind.FeedEntry, s_run), s_user, "Хороший бросок", s_at, new DateOnly(2026, 10, 1)),
+            1,
+            """{"commentId":"10000000-0000-0000-0000-000000000002","target":{"kind":"feedEntry","id":"00000000-0000-0000-0000-000000000001"},"userId":"40000000-0000-0000-0000-000000000001","text":"Хороший бросок","createdAt":"2026-10-01T12:30:00+00:00","createdDay":"2026-10-01"}"""
+        },
+        {
+            "comment-edited",
+            new CommentEdited(s_other, "Удачный бросок", s_at),
+            1,
+            """{"commentId":"10000000-0000-0000-0000-000000000002","text":"Удачный бросок","editedAt":"2026-10-01T12:30:00+00:00"}"""
+        },
+        {
+            "comment-deleted",
+            new CommentDeleted(s_other),
+            1,
+            """{"commentId":"10000000-0000-0000-0000-000000000002"}"""
+        },
+        {
+            "comment-hidden",
+            new CommentHidden(s_other),
+            1,
+            """{"commentId":"10000000-0000-0000-0000-000000000002"}"""
+        },
+        {
+            "achievement-earned",
+            new AchievementEarned(s_player, new PlayerAchievement("unbreakable", "Непробиваемый", "Пять атак", s_at)),
+            1,
+            """{"playerId":"10000000-0000-0000-0000-000000000001","achievement":{"objectId":"unbreakable","name":"Непробиваемый","description":"Пять атак","earnedAt":"2026-10-01T12:30:00+00:00"}}"""
+        },
+        {
+            "gallery-moment-published",
+            new GalleryMomentPublished(s_run, s_user, s_player, s_game, "Скриншот", s_at, new DateOnly(2026, 10, 1)),
+            1,
+            """{"itemId":"00000000-0000-0000-0000-000000000001","userId":"40000000-0000-0000-0000-000000000001","playerId":"10000000-0000-0000-0000-000000000001","fileId":"20000000-0000-0000-0000-000000000001","caption":"Скриншот","createdAt":"2026-10-01T12:30:00+00:00","createdDay":"2026-10-01"}"""
+        },
+        {
+            "gallery-moment-hidden",
+            new GalleryMomentHidden(s_run),
+            1,
+            """{"itemId":"00000000-0000-0000-0000-000000000001"}"""
+        },
+        {
+            "gallery-reaction-set",
+            new GalleryReactionSet(s_run, s_user, "🔥", Selected: true),
+            1,
+            """{"itemId":"00000000-0000-0000-0000-000000000001","userId":"40000000-0000-0000-0000-000000000001","emoji":"\uD83D\uDD25","selected":true}"""
         },
         {
             "run-hours-corrected",
@@ -513,6 +577,11 @@ public partial class EventFormatTests
             new GameRolled(s_player, "Horror", [], s_game, Snapshot() with { Zone = new RunZone("swamp", null, 1.5m) }, s_at, ["Horror"]),
             "\"coins\":{\"perHour\":1,\"min\":3},\"zone\":{\"id\":\"swamp\",\"diceModifier\":null,\"dropPenaltyMultiplier\":1.5}}"
         },
+        {
+            "file-stored",
+            new Engine.Files.FileStored(s_game, s_user, "image/webp", 12, 16, 16, 1, Engine.Files.FileKind.GalleryImage),
+            """{"fileId":"20000000-0000-0000-0000-000000000001","ownerId":"40000000-0000-0000-0000-000000000001","mediaType":"image/webp","bytes":12,"width":16,"height":16,"frames":1,"kind":"galleryImage"}"""
+        },
     };
 
     [Theory]
@@ -547,6 +616,43 @@ public partial class EventFormatTests
         var catalog = EventCatalog.Types.Select(t => EventCatalog.Describe(t).Name).Order(StringComparer.Ordinal);
 
         Assert.Equal(catalog, sampled);
+    }
+
+    [Fact]
+    public void Comment_undo_snapshots_are_optional_and_store_restorations_and_removals()
+    {
+        var oldUndo = FilledUndo();
+        var before = new Comment(s_other, new CommentTarget(CommentTargetKind.Review, s_run), s_user,
+            "Согласен", s_at, new DateOnly(2026, 10, 1), s_at, CommentStatus.Hidden);
+        var undo = oldUndo with { Comments = [new CommentSnapshot(s_other, before), new CommentSnapshot(s_player, Before: null)] };
+
+        Assert.DoesNotContain("\"comments\":", EventCodec.Encode(oldUndo).Data, StringComparison.Ordinal);
+        var stored = EventCodec.Encode(undo);
+        Assert.Contains(
+            """
+            "comments":[{"commentId":"10000000-0000-0000-0000-000000000002","before":{"commentId":"10000000-0000-0000-0000-000000000002","target":{"kind":"review","id":"00000000-0000-0000-0000-000000000001"},"userId":"40000000-0000-0000-0000-000000000001","text":"Согласен","createdAt":"2026-10-01T12:30:00+00:00","createdDay":"2026-10-01","editedAt":"2026-10-01T12:30:00+00:00","status":"hidden"}},{"commentId":"10000000-0000-0000-0000-000000000001","before":null}]
+            """,
+            stored.Data,
+            StringComparison.Ordinal);
+        Assert.Equal(undo, EventCodec.Decode(stored));
+    }
+
+    [Fact]
+    public void Gallery_undo_snapshots_are_optional_and_store_restorations_and_removals()
+    {
+        var oldUndo = FilledUndo();
+        var before = new GalleryItem(s_run, s_user, s_player, s_game, "Скриншот", s_at, new DateOnly(2026, 10, 1), Hidden: false);
+        var undo = oldUndo with { GalleryItems = [new GalleryItemSnapshot(s_run, before), new GalleryItemSnapshot(s_other, Before: null)] };
+
+        Assert.DoesNotContain("\"galleryItems\":", EventCodec.Encode(oldUndo).Data, StringComparison.Ordinal);
+        var stored = EventCodec.Encode(undo);
+        Assert.Contains(
+            """
+            "galleryItems":[{"itemId":"00000000-0000-0000-0000-000000000001","before":{"itemId":"00000000-0000-0000-0000-000000000001","userId":"40000000-0000-0000-0000-000000000001","playerId":"10000000-0000-0000-0000-000000000001","fileId":"20000000-0000-0000-0000-000000000001","caption":"Скриншот","createdAt":"2026-10-01T12:30:00+00:00","createdDay":"2026-10-01","hidden":false}},{"itemId":"10000000-0000-0000-0000-000000000002","before":null}]
+            """,
+            stored.Data,
+            StringComparison.Ordinal);
+        Assert.Equal(undo, EventCodec.Decode(stored));
     }
 
     [Fact]

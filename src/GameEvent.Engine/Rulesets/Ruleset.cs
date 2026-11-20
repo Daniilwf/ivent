@@ -251,6 +251,10 @@ public sealed record Features
     /// </summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public bool Duels { get; init; }
+
+    /// <summary>Personal season statistics. An older ruleset without this flag keeps it off.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool SeasonStatistics { get; init; }
 }
 
 public sealed record SeasonRules

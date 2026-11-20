@@ -324,6 +324,149 @@ namespace GameEvent.Infrastructure.Database.Migrations
                     b.ToTable("Game", (string)null);
                 });
 
+            modelBuilder.Entity("GameEvent.Infrastructure.Seasons.CommentRecord", b =>
+                {
+                    b.Property<Guid>("SeasonId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("CommentId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateOnly>("CreatedDay")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("EditedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("TargetId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("TargetKind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("SeasonId", "CommentId");
+
+                    b.HasIndex("SeasonId", "UserId", "CreatedDay");
+
+                    b.HasIndex("SeasonId", "TargetKind", "TargetId", "Status", "CreatedAt", "CommentId");
+
+                    b.ToTable("Comment", (string)null);
+                });
+
+            modelBuilder.Entity("GameEvent.Infrastructure.Seasons.FeedReactionRecord", b =>
+                {
+                    b.Property<Guid>("SeasonId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("TargetCommandId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Emoji")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("SeasonId", "TargetCommandId", "UserId", "Emoji");
+
+                    b.ToTable("FeedReaction", (string)null);
+                });
+
+            modelBuilder.Entity("GameEvent.Infrastructure.Seasons.GalleryMediaBindingRecord", b =>
+                {
+                    b.Property<Guid>("FileId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("ItemId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("SeasonId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("FileId");
+
+                    b.HasIndex("SeasonId");
+
+                    b.ToTable("GalleryMediaBinding", (string)null);
+                });
+
+            modelBuilder.Entity("GameEvent.Infrastructure.Seasons.GalleryMomentRecord", b =>
+                {
+                    b.Property<Guid>("SeasonId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("ItemId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Caption")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateOnly>("CreatedDay")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("FileId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("Hidden")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("PlayerId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("SeasonId", "ItemId");
+
+                    b.HasIndex("SeasonId", "Hidden", "CreatedAt", "ItemId");
+
+                    b.HasIndex("SeasonId", "PlayerId", "Hidden", "CreatedAt", "ItemId");
+
+                    b.ToTable("GalleryMoment", (string)null);
+                });
+
+            modelBuilder.Entity("GameEvent.Infrastructure.Seasons.GalleryReactionRecord", b =>
+                {
+                    b.Property<Guid>("SeasonId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("ItemId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Emoji")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("SeasonId", "ItemId", "UserId", "Emoji");
+
+                    b.ToTable("GalleryReaction", (string)null);
+                });
+
             modelBuilder.Entity("GameEvent.Infrastructure.Seasons.GlobalEventRecord", b =>
                 {
                     b.Property<Guid>("Id")
@@ -482,6 +625,35 @@ namespace GameEvent.Infrastructure.Database.Migrations
                     b.ToTable("PendingManualEffect", (string)null);
                 });
 
+            modelBuilder.Entity("GameEvent.Infrastructure.Seasons.PlayerAchievementRecord", b =>
+                {
+                    b.Property<Guid>("PlayerId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ObjectId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("EarnedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("PlayerId", "ObjectId");
+
+                    b.ToTable("PlayerAchievement", (string)null);
+                });
+
             modelBuilder.Entity("GameEvent.Infrastructure.Seasons.PlayerGameExclusionRecord", b =>
                 {
                     b.Property<Guid>("PlayerId")
@@ -596,6 +768,27 @@ namespace GameEvent.Infrastructure.Database.Migrations
                     b.HasIndex("SeasonId");
 
                     b.ToTable("Proof", (string)null);
+                });
+
+            modelBuilder.Entity("GameEvent.Infrastructure.Seasons.ReviewReactionRecord", b =>
+                {
+                    b.Property<Guid>("RunId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Emoji")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("SeasonId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("RunId", "UserId", "Emoji");
+
+                    b.HasIndex("SeasonId");
+
+                    b.ToTable("ReviewReaction", (string)null);
                 });
 
             modelBuilder.Entity("GameEvent.Infrastructure.Seasons.ReviewRecord", b =>
@@ -1037,6 +1230,57 @@ namespace GameEvent.Infrastructure.Database.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("GameEvent.Infrastructure.Seasons.CommentRecord", b =>
+                {
+                    b.HasOne("GameEvent.Infrastructure.Seasons.SeasonRecord", null)
+                        .WithMany()
+                        .HasForeignKey("SeasonId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("GameEvent.Infrastructure.Seasons.FeedReactionRecord", b =>
+                {
+                    b.HasOne("GameEvent.Infrastructure.Seasons.SeasonRecord", null)
+                        .WithMany()
+                        .HasForeignKey("SeasonId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("GameEvent.Infrastructure.Seasons.GalleryMediaBindingRecord", b =>
+                {
+                    b.HasOne("GameEvent.Infrastructure.Files.FileRecord", null)
+                        .WithMany()
+                        .HasForeignKey("FileId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("GameEvent.Infrastructure.Seasons.SeasonRecord", null)
+                        .WithMany()
+                        .HasForeignKey("SeasonId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("GameEvent.Infrastructure.Seasons.GalleryMomentRecord", b =>
+                {
+                    b.HasOne("GameEvent.Infrastructure.Seasons.SeasonRecord", null)
+                        .WithMany()
+                        .HasForeignKey("SeasonId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("GameEvent.Infrastructure.Seasons.GalleryReactionRecord", b =>
+                {
+                    b.HasOne("GameEvent.Infrastructure.Seasons.GalleryMomentRecord", null)
+                        .WithMany()
+                        .HasForeignKey("SeasonId", "ItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("GameEvent.Infrastructure.Seasons.GlobalEventRecord", b =>
                 {
                     b.HasOne("GameEvent.Infrastructure.Seasons.SeasonRecord", null)
@@ -1083,6 +1327,15 @@ namespace GameEvent.Infrastructure.Database.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("GameEvent.Infrastructure.Seasons.PlayerAchievementRecord", b =>
+                {
+                    b.HasOne("GameEvent.Infrastructure.Seasons.SeasonPlayerRecord", null)
+                        .WithMany()
+                        .HasForeignKey("PlayerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("GameEvent.Infrastructure.Seasons.PlayerGameExclusionRecord", b =>
                 {
                     b.HasOne("GameEvent.Infrastructure.Seasons.SeasonPlayerRecord", null)
@@ -1111,6 +1364,21 @@ namespace GameEvent.Infrastructure.Database.Migrations
                 });
 
             modelBuilder.Entity("GameEvent.Infrastructure.Seasons.ProofRecord", b =>
+                {
+                    b.HasOne("GameEvent.Infrastructure.Seasons.RunRecord", null)
+                        .WithMany()
+                        .HasForeignKey("RunId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("GameEvent.Infrastructure.Seasons.SeasonRecord", null)
+                        .WithMany()
+                        .HasForeignKey("SeasonId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("GameEvent.Infrastructure.Seasons.ReviewReactionRecord", b =>
                 {
                     b.HasOne("GameEvent.Infrastructure.Seasons.RunRecord", null)
                         .WithMany()

@@ -62,6 +62,7 @@ public sealed record ProcessedFile(string MediaType, byte[] Main, byte[] Thumbna
 /// content — JPEG, PNG, WebP or GIF, nothing else reaches the decoder. A still image is re-encoded to WebP no larger than
 /// <see cref="FileLimits.MaxLongSide"/>, turned by its orientation and stripped of metadata (a photo's location stays with
 /// the player). A GIF is kept byte for byte within <see cref="FileLimits.MaxGifBytes"/>; its thumbnail stays animated.
+/// Still-only callers get the same sanitized WebP variants for a single-frame GIF and refuse an animated picture.
 /// </summary>
 public static class ImageProcessor
 {
@@ -89,7 +90,7 @@ public static class ImageProcessor
         Gif,
     }
 
-    public static (ProcessedFile? File, Rejection? Rejection) Process(byte[] input, FileLimits limits)
+    public static (ProcessedFile? File, Rejection? Rejection) Process(byte[] input, FileLimits limits, bool stillOnly = false)
     {
         ArgumentNullException.ThrowIfNull(input);
         ArgumentNullException.ThrowIfNull(limits);
@@ -110,7 +111,7 @@ public static class ImageProcessor
 
         try
         {
-            return kind == Kind.Gif ? Gif(input, limits) : Still(input, kind, limits);
+            return kind == Kind.Gif ? Gif(input, limits, stillOnly) : Still(input, kind, limits, stillOnly);
         }
         catch (Exception e) when (e is VipsException or InvalidCastException or FormatException or OverflowException)
         {
@@ -118,7 +119,7 @@ public static class ImageProcessor
         }
     }
 
-    private static (ProcessedFile?, Rejection?) Still(byte[] input, Kind kind, FileLimits limits)
+    private static (ProcessedFile?, Rejection?) Still(byte[] input, Kind kind, FileLimits limits, bool stillOnly)
     {
         // The header only: the size is checked before anything is decoded
         using (var header = Image.NewFromBuffer(input, access: Enums.Access.Sequential, failOn: Enums.FailOn.Error))
@@ -126,6 +127,11 @@ public static class ImageProcessor
             if (Mismatch(header, kind) is { } mismatch)
             {
                 return (null, mismatch);
+            }
+
+            if (stillOnly && CountFrames(header) != 1)
+            {
+                return (null, NotStill());
             }
 
             var interlaced = header.Contains("interlaced") && Convert.ToInt32(header.Get("interlaced"), System.Globalization.CultureInfo.InvariantCulture) != 0;
@@ -136,20 +142,25 @@ public static class ImageProcessor
             }
         }
 
+        return (EncodeWebp(input, limits), null);
+    }
+
+    private static ProcessedFile EncodeWebp(byte[] input, FileLimits limits)
+    {
         // The upload is decoded once; the thumbnail comes from the reduced picture held in memory (at most MaxLongSide²)
         using var reduced = Image.ThumbnailBuffer(input, limits.MaxLongSide, height: limits.MaxLongSide, size: Enums.Size.Down, failOn: Enums.FailOn.Error);
         using var main = reduced.CopyMemory();
         using var thumbnail = main.ThumbnailImage(limits.ThumbnailSize, height: limits.ThumbnailSize, size: Enums.Size.Down);
-        return (new ProcessedFile(
+        return new ProcessedFile(
             FileNames.Webp,
             main.WebpsaveBuffer(q: limits.WebpQuality, keep: Enums.ForeignKeep.None),
             thumbnail.WebpsaveBuffer(q: limits.WebpQuality, keep: Enums.ForeignKeep.None),
             main.Width,
             main.Height,
-            1), null);
+            1);
     }
 
-    private static (ProcessedFile?, Rejection?) Gif(byte[] input, FileLimits limits)
+    private static (ProcessedFile?, Rejection?) Gif(byte[] input, FileLimits limits, bool stillOnly)
     {
         // libvips reads the frames a cut-off GIF still has without a word (DP-1): the blocks are walked to the trailer first
         if (!IsWholeGif(input))
@@ -167,7 +178,12 @@ public static class ImageProcessor
 
             width = header.Width;
             height = header.PageHeight;
-            frames = header.Contains("n-pages") ? (int)header.Get("n-pages") : 1;
+            frames = CountFrames(header);
+            if (stillOnly && frames != 1)
+            {
+                return (null, NotStill());
+            }
+
             if (frames > limits.MaxFrames)
             {
                 return (null, new Rejection(TooManyFrames, $"A GIF has at most {limits.MaxFrames} frames."));
@@ -176,6 +192,11 @@ public static class ImageProcessor
             if ((long)width * height * frames > limits.MaxPixels)
             {
                 return (null, new Rejection(TooManyPixels, $"A GIF has at most {limits.MaxPixels} pixels in all its frames."));
+            }
+
+            if (stillOnly)
+            {
+                return (EncodeWebp(input, limits), null);
             }
 
             // Decoding every frame once proves the whole file readable before it is kept as it is
@@ -187,6 +208,10 @@ public static class ImageProcessor
             input, limits.ThumbnailSize, optionString: "[n=-1]", height: limits.ThumbnailSize, size: Enums.Size.Down, failOn: Enums.FailOn.Error);
         return (new ProcessedFile(FileNames.Gif, input, thumbnail.GifsaveBuffer(keep: Enums.ForeignKeep.None), width, height, frames), null);
     }
+
+    private static int CountFrames(Image image) => image.Contains("n-pages") ? (int)image.Get("n-pages") : 1;
+
+    private static Rejection NotStill() => new(FileRules.NotStill, "This upload needs a still picture.");
 
     /// <summary>
     /// Walks the blocks of a GIF (the GIF89a layout): the screen descriptor with its colour table, then extensions and frames,

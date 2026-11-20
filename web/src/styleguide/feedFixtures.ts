@@ -135,6 +135,7 @@ export const demoProfile: Schemas['ProfileView'] = {
   name: player(0)?.name ?? '',
   avatar: null,
   completed: 14,
+  achievements: [],
   seasons: [
     {
       seasonId: id(1),

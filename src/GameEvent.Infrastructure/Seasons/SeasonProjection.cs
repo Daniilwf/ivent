@@ -128,6 +128,7 @@ internal static partial class SeasonProjection
             record.PointsTick = player.PointsTick;
             record.EconomyJson = player.Economy is null ? null : JsonSerializer.Serialize(player.Economy, EngineJson.Options);
             record.NextTimerAt = Engine.Economy.Timers.Next(after, player);
+            await WriteAchievementsAsync(db, id, old?.Achievements ?? default, player.Achievements, ct);
 
             // Exclusions grow within a season (D-08), a tech reroll turned into a drop changes its reason (D-11), an undo
             // takes back those its command added (D-104).
@@ -325,6 +326,68 @@ internal static partial class SeasonProjection
         }
 
         await WriteEventsAsync(db, before, after, ct);
+        await WriteReviewReactionsAsync(db, before, after, ct);
+        await WriteFeedReactionsAsync(db, before, after, ct);
+        await WriteCommentsAsync(db, after.SeasonId, before.Comments, after.Comments, ct);
+        await WriteGalleryAsync(db, after.SeasonId, before.GalleryItems, after.GalleryItems, ct);
+        await WriteGalleryReactionsAsync(db, before, after, ct);
+    }
+
+    private static async Task WriteReviewReactionsAsync(GameEventDbContext db, SeasonState before, SeasonState after, CancellationToken ct)
+    {
+        if (ReferenceEquals(before.ReviewReactions, after.ReviewReactions))
+        {
+            return;
+        }
+
+        foreach (var reaction in after.ReviewReactions.Except(before.ReviewReactions))
+        {
+            if (!after.Runs.TryGetValue(reaction.RunId, out var run) || run.Review is null)
+            {
+                throw new InvalidOperationException($"Run {reaction.RunId} has no review in season {after.SeasonId}.");
+            }
+
+            db.ReviewReactions.Add(new ReviewReactionRecord
+            {
+                RunId = reaction.RunId,
+                UserId = reaction.UserId,
+                Emoji = reaction.Emoji,
+                SeasonId = after.SeasonId,
+            });
+        }
+
+        foreach (var reaction in before.ReviewReactions.Except(after.ReviewReactions))
+        {
+            var row = await db.ReviewReactions.FindAsync([reaction.RunId, reaction.UserId, reaction.Emoji], ct)
+                ?? throw new InvalidOperationException($"A review reaction on run {reaction.RunId} has no projection row.");
+            db.ReviewReactions.Remove(row);
+        }
+    }
+
+    private static async Task WriteFeedReactionsAsync(GameEventDbContext db, SeasonState before, SeasonState after, CancellationToken ct)
+    {
+        if (ReferenceEquals(before.FeedReactions, after.FeedReactions))
+        {
+            return;
+        }
+
+        foreach (var reaction in after.FeedReactions.Except(before.FeedReactions))
+        {
+            db.FeedReactions.Add(new FeedReactionRecord
+            {
+                SeasonId = after.SeasonId,
+                TargetCommandId = reaction.TargetCommandId,
+                UserId = reaction.UserId,
+                Emoji = reaction.Emoji,
+            });
+        }
+
+        foreach (var reaction in before.FeedReactions.Except(after.FeedReactions))
+        {
+            var row = await db.FeedReactions.FindAsync([before.SeasonId, reaction.TargetCommandId, reaction.UserId, reaction.Emoji], ct)
+                ?? throw new InvalidOperationException($"A feed reaction on command {reaction.TargetCommandId} has no projection row.");
+            db.FeedReactions.Remove(row);
+        }
     }
 
     // Player ids are participation ids (one per season), never user ids: a clash means a bug upstream.
@@ -356,6 +419,8 @@ internal static partial class SeasonProjection
         var playerIds = players.Select(p => p.Id).ToList();
         var exclusions = (await db.Exclusions.AsNoTracking().Where(x => playerIds.Contains(x.PlayerId)).ToListAsync(ct))
             .ToLookup(x => x.PlayerId);
+        var achievements = (await db.PlayerAchievements.AsNoTracking().Where(x => playerIds.Contains(x.PlayerId)).ToListAsync(ct))
+            .ToLookup(x => x.PlayerId);
 
         var stored = replayed with
         {
@@ -384,7 +449,9 @@ internal static partial class SeasonProjection
                     p.PointsTick,
                     replayed.Players.TryGetValue(p.Id, out var folded) ? folded.LastMoveRunId : null,
                     p.EconomyJson is null ? null : JsonSerializer.Deserialize<Engine.Inventory.PlayerEconomy>(p.EconomyJson, EngineJson.Options),
-                    replayed.Players.TryGetValue(p.Id, out var waiting) ? waiting.Suspended : default)),
+                    replayed.Players.TryGetValue(p.Id, out var waiting) ? waiting.Suspended : default,
+                    [.. achievements[p.Id].OrderBy(row => row.Position).Select(row =>
+                        new Engine.Achievements.PlayerAchievement(row.ObjectId, row.Name, row.Description, row.EarnedAt))])),
             Runs = runs.ToImmutableSortedDictionary(
                 r => r.Id,
                 r => new RunState(

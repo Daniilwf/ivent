@@ -82,7 +82,17 @@ function Avatar({ item }: { item: FeedItem }) {
 }
 
 /** One line of the feed: one command of the log — who did what, a few facts and a quote */
-export function FeedLine({ item, fresh = false }: { item: FeedItem; fresh?: boolean }) {
+export function FeedLine({
+  item,
+  fresh = false,
+  reactions,
+  comments,
+}: {
+  item: FeedItem;
+  fresh?: boolean;
+  reactions?: ReactNode;
+  comments?: ReactNode;
+}) {
   return (
     <li
       data-testid={`feed-item-${item.id}`}
@@ -132,6 +142,8 @@ export function FeedLine({ item, fresh = false }: { item: FeedItem; fresh?: bool
           </ul>
         ) : null}
         {item.quote ? <Quote rating={item.quote.rating} text={item.quote.text} /> : null}
+        {reactions}
+        {comments}
       </div>
       {/* The completed game's cover: a card on the table beside the line, the title is in the line itself */}
       {item.cover ? (
@@ -150,10 +162,14 @@ export function FeedLine({ item, fresh = false }: { item: FeedItem; fresh?: bool
 export function FeedList({
   days,
   fresh,
+  renderReactions,
+  renderComments,
   level = 2,
 }: {
   days: FeedDay[];
   fresh?: ReadonlySet<string>;
+  renderReactions?: (id: string) => ReactNode;
+  renderComments?: (item: FeedItem) => ReactNode;
   /** The days' heading level: 2 on the feed's page, 3 inside a panel */
   level?: 2 | 3;
 }) {
@@ -170,7 +186,13 @@ export function FeedList({
           </Heading>
           <ol className="grid divide-y-2 divide-muted">
             {day.items.map((item) => (
-              <FeedLine key={item.id} item={item} fresh={fresh?.has(item.id) ?? false} />
+              <FeedLine
+                key={item.id}
+                item={item}
+                fresh={fresh?.has(item.id) ?? false}
+                reactions={item.undone ? null : renderReactions?.(item.id)}
+                comments={item.undone ? null : renderComments?.(item)}
+              />
             ))}
           </ol>
         </section>

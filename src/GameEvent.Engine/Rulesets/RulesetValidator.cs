@@ -391,6 +391,16 @@ public static class RulesetValidator
             Error("social.reactions", "must be a non-empty list without repeats");
         }
 
+        if (ruleset.Features.Comments)
+        {
+            NotNegative("social.commentsPerDay", ruleset.Social.CommentsPerDay);
+        }
+
+        if (ruleset.Features.Gallery)
+        {
+            NotNegative("social.galleryUploadsPerDay", ruleset.Social.GalleryUploadsPerDay);
+        }
+
         var bets = ruleset.Bets;
         PayoutSteps(bets.PayoutByHoursPerDay);
         Within("bets.maxStake", bets.MaxStake, 1, MaxCoins);

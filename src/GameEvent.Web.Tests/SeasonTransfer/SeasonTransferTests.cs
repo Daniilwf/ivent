@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using GameEvent.Engine.Comments;
 using GameEvent.Engine.Seasons;
 using GameEvent.Infrastructure.Accounts;
 using GameEvent.Infrastructure.Database;
@@ -318,6 +319,101 @@ public sealed class SeasonTransferTests : IAsyncLifetime
         var again = SeasonEngine.Execute(imported, new Engine.Polls.CastVote(poll.PollId, localVasya.Id, "Реролл"), context);
         Assert.DoesNotContain(again.Events, e => e is Engine.Polls.VoteCast);
         Assert.Equal(2, again.State.Polls[poll.PollId].Votes.Count);
+    }
+
+    [Fact]
+    public async Task A_restored_spectator_reaction_uses_the_imported_account_and_projection()
+    {
+        await PlayAsync();
+        await RulesAsync(_site, rules => rules with { Features = rules.Features with { Reactions = true } });
+        await using var origin = _site.NewDb();
+        var review = await origin.Reviews.SingleAsync(Ct);
+        var spectator = _site.Users["zritel"];
+        await _site.SendAsync(new Engine.Reactions.SetReviewReaction(review.RunId, spectator, "🔥", Selected: true));
+        var removal = Guid.NewGuid();
+        var bus = _site.Services.GetRequiredService<CommandBus>();
+        var removed = await bus.SendAsync(new CommandEnvelope(removal, review.SeasonId,
+            new Engine.Reactions.SetReviewReaction(review.RunId, spectator, "🔥", Selected: false), AuthorId: null), Ct);
+        Assert.True(removed.IsAccepted);
+        await _site.SendAsync(new Engine.Undo.UndoCommand(removal, "Восстановить реакцию"));
+
+        var archive = await ExportAsync();
+        Assert.Contains(archive.Users, user => user.Id == spectator);
+        await using var other = OpenOther();
+        var import = await Infrastructure.Seasons.SeasonTransfer.ImportAsync(other, archive, _site.Clock.UtcNow, ct: Ct);
+        Assert.True(import.Integrity.IsIntact);
+        var localSpectator = await other.Users.SingleAsync(user => user.NormalizedLogin == "zritel", Ct);
+        var row = await other.ReviewReactions.SingleAsync(Ct);
+        Assert.Equal((review.RunId, review.SeasonId, localSpectator.Id, "🔥"), (row.RunId, row.SeasonId, row.UserId, row.Emoji));
+        Assert.NotEqual(spectator, row.UserId);
+    }
+
+    [Fact]
+    public async Task A_restored_feed_reaction_keeps_its_command_and_matches_the_imported_account()
+    {
+        await PlayAsync();
+        await RulesAsync(_site, rules => rules with { Features = rules.Features with { Reactions = true } });
+        await using var origin = _site.NewDb();
+        var target = await origin.Events.Where(e => e.SeasonId == SiteFactory.SeasonId && e.Type == "run-completed")
+            .Select(e => e.CommandId).SingleAsync(Ct);
+        var spectator = _site.Users["zritel"];
+        await _site.SendAsync(new Engine.Reactions.SetFeedReaction(target, spectator, "🔥", Selected: true));
+        var removal = Guid.NewGuid();
+        var bus = _site.Services.GetRequiredService<CommandBus>();
+        var removed = await bus.SendAsync(new CommandEnvelope(removal, SiteFactory.SeasonId,
+            new Engine.Reactions.SetFeedReaction(target, spectator, "🔥", Selected: false), AuthorId: null), Ct);
+        Assert.True(removed.IsAccepted);
+        await _site.SendAsync(new Engine.Undo.UndoCommand(removal, "Восстановить реакцию"));
+
+        var archive = await ExportAsync();
+        Assert.Contains(archive.Users, user => user.Id == spectator);
+        await using var other = OpenOther();
+        var import = await Infrastructure.Seasons.SeasonTransfer.ImportAsync(other, archive, _site.Clock.UtcNow, ct: Ct);
+        Assert.True(import.Integrity.IsIntact);
+        var localSpectator = await other.Users.SingleAsync(user => user.NormalizedLogin == "zritel", Ct);
+        var row = await other.FeedReactions.SingleAsync(Ct);
+        Assert.Equal((target, SiteFactory.SeasonId, localSpectator.Id, "🔥"), (row.TargetCommandId, row.SeasonId, row.UserId, row.Emoji));
+        Assert.NotEqual(spectator, row.UserId);
+    }
+
+    [Fact]
+    public async Task Imported_comments_keep_both_targets_and_remap_the_author_in_undo()
+    {
+        await PlayAsync();
+        await RulesAsync(_site, rules => rules with { Features = rules.Features with { Comments = true } });
+        await using var origin = _site.NewDb();
+        var completedCommand = await origin.Events.Where(e => e.SeasonId == SiteFactory.SeasonId && e.Type == "run-completed")
+            .Select(e => e.CommandId).SingleAsync(Ct);
+        var review = await origin.Reviews.SingleAsync(Ct);
+        var feedTarget = new CommentTarget(CommentTargetKind.FeedEntry, completedCommand);
+        var reviewTarget = new CommentTarget(CommentTargetKind.Review, review.RunId);
+        var spectator = _site.Users["zritel"];
+        var feedCommentId = Guid.NewGuid();
+        var reviewCommentId = Guid.NewGuid();
+        await _site.SendAsync(new PostComment(feedCommentId, feedTarget, spectator, "Комментарий в ленте"));
+        await _site.SendAsync(new PostComment(reviewCommentId, reviewTarget, spectator, "Комментарий к отзыву"));
+        var removeId = Guid.NewGuid();
+        var bus = _site.Services.GetRequiredService<CommandBus>();
+        var removed = await bus.SendAsync(new CommandEnvelope(
+            removeId, SiteFactory.SeasonId, new DeleteComment(reviewCommentId, reviewTarget, spectator), AuthorId: spectator), Ct);
+        Assert.True(removed.IsAccepted, removed.Rejection?.Detail);
+        await _site.SendAsync(new Engine.Undo.UndoCommand(removeId, "Восстановить комментарий"));
+
+        var archive = await ExportAsync();
+        Assert.Contains(archive.Users, user => user.Id == spectator);
+        await using var other = OpenOther();
+        var result = await Infrastructure.Seasons.SeasonTransfer.ImportAsync(other, archive, _site.Clock.UtcNow, ct: Ct);
+        Assert.True(result.Integrity.IsIntact);
+        var localSpectator = await other.Users.SingleAsync(user => user.NormalizedLogin == "zritel", Ct);
+        Assert.NotEqual(spectator, localSpectator.Id);
+
+        var copied = await other.Comments.ToDictionaryAsync(row => row.CommentId, Ct);
+        Assert.Equal(2, copied.Count);
+        Assert.Equal((feedTarget.Kind, feedTarget.Id, localSpectator.Id, CommentStatus.Visible),
+            (copied[feedCommentId].TargetKind, copied[feedCommentId].TargetId, copied[feedCommentId].UserId, copied[feedCommentId].Status));
+        Assert.Equal((reviewTarget.Kind, reviewTarget.Id, localSpectator.Id, CommentStatus.Visible, "Комментарий к отзыву"),
+            (copied[reviewCommentId].TargetKind, copied[reviewCommentId].TargetId, copied[reviewCommentId].UserId,
+                copied[reviewCommentId].Status, copied[reviewCommentId].Text));
     }
 
     [Fact]

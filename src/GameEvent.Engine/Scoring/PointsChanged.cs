@@ -64,6 +64,9 @@ public enum CoinsReason
 
     /// <summary>A duel's reward taken back after the winning run's proof was rejected (D-525, the expert panel (5)).</summary>
     DuelRevoked,
+
+    /// <summary>A coin reward given with an achievement badge.</summary>
+    Achievement,
 }
 
 /// <summary>What changed another resource of a player.</summary>
