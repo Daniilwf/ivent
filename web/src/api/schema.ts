@@ -1588,6 +1588,59 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/me/statistics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AllTimeStatisticsView"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Too Many Requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/hall-of-fame": {
         parameters: {
             query?: never;
@@ -6285,6 +6338,297 @@ export interface paths {
                     };
                     content: {
                         "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/seasons/{seasonId}/gallery/proofs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["GalleryProofPhotoView"][];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+                /** @description Too Many Requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["GalleryProofPublicationRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["GalleryMomentView"];
+                    };
+                };
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["GalleryMomentView"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+                /** @description Payload Too Large */
+                413: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Unprocessable Entity */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Too Many Requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Service Unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/seasons/{seasonId}/gallery/{itemId}/withdraw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                    itemId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["GalleryProofWithdrawalRequest"];
+                };
+            };
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
                     };
                 };
             };
@@ -11270,6 +11614,8 @@ export interface components {
             /** Format: int32 */
             sessions: number;
         };
+        /** @enum {unknown} */
+        AchievementScope: "season" | "allTime";
         /**
          * @description The admin adds an account with the player role to the season (SE4): by default on the start with zero points and
          *     coins; mid-season the admin sets them.
@@ -11440,6 +11786,26 @@ export interface components {
             choosingBranch: boolean;
             /** @default false */
             eventQuestion: boolean;
+        };
+        AllTimeStatisticsView: {
+            /** Format: int32 */
+            seasonCount: number;
+            /** Format: int32 */
+            completedRuns: number;
+            /** Format: int32 */
+            droppedRuns: number;
+            /** Format: double */
+            totalHours: number;
+            /** Format: int32 */
+            bestRating: null | number;
+            /** Format: int32 */
+            worstRating: null | number;
+            /** Format: int32 */
+            attacksMade: number;
+            /** Format: int32 */
+            attacksReceived: number;
+            bestRoll: null | components["schemas"]["SeasonRollView"];
+            worstRoll: null | components["schemas"]["SeasonRollView"];
         };
         /** @description «Уже проходил» on the offered game or an option of the pending choice (D-92). */
         AlreadyPlayedRequest: {
@@ -12392,6 +12758,12 @@ export interface components {
             /** Format: int32 */
             bonusAfterList: number;
         };
+        GalleryHiddenProofPublicationView: {
+            /** Format: uuid */
+            id: string;
+            /** Format: date-time */
+            createdAt: string;
+        };
         GalleryHideRequest: {
             /** Format: uuid */
             commandId: string;
@@ -12408,6 +12780,7 @@ export interface components {
             imageUrl: string;
             thumbnailUrl: string;
             reactions?: null | components["schemas"]["ReactionView"][];
+            canWithdraw?: null | boolean;
         };
         GalleryPlayerView: {
             /** Format: uuid */
@@ -12415,6 +12788,29 @@ export interface components {
             name: string;
             /** Format: int32 */
             token: number;
+        };
+        GalleryProofPhotoView: {
+            /** Format: uuid */
+            runId: string;
+            /** Format: uuid */
+            fileId: string;
+            title: string;
+            thumbnailUrl: string;
+        };
+        GalleryProofPublicationRequest: {
+            /** Format: uuid */
+            commandId: string;
+            /** Format: uuid */
+            itemId: string;
+            /** Format: uuid */
+            runId: string;
+            /** Format: uuid */
+            fileId: string;
+            caption: null | string;
+        };
+        GalleryProofWithdrawalRequest: {
+            /** Format: uuid */
+            commandId: string;
         };
         GallerySeasonView: {
             /** Format: uuid */
@@ -12435,6 +12831,7 @@ export interface components {
             nextBefore: null | string;
             players: components["schemas"]["GalleryPlayerView"][];
             canPublish: boolean;
+            hiddenProofPublications?: null | components["schemas"]["GalleryHiddenProofPublicationView"][];
         };
         /**
          * @description A game's card as the pool keeps it: what a player sees and what the roll reads. string? GameCard.Note — the challenge or a
@@ -12619,6 +13016,21 @@ export interface components {
         HallOfFameRecordsView: {
             longestGames: components["schemas"]["HallOfFameGameView"][];
             fastestFinishes: components["schemas"]["HallOfFameFinishView"][];
+            largestRolls: components["schemas"]["HallOfFameRollView"][];
+        };
+        HallOfFameRollView: {
+            /** Format: uuid */
+            seasonId: string;
+            seasonName: string;
+            /** Format: uuid */
+            runId: string;
+            /** Format: uuid */
+            playerId: string;
+            name: string;
+            /** Format: int64 */
+            sum: number;
+            /** Format: uuid */
+            profileUserId: null | string;
         };
         HallOfFameSeasonView: {
             /** Format: uuid */
@@ -13307,7 +13719,7 @@ export interface components {
             detail?: null | string;
             instance?: null | string;
         };
-        /** @description A seasonal badge, with the title and description it had when awarded. */
+        /** @description A badge, with its origin season and the title and description it had when awarded. */
         ProfileAchievementView: {
             /** Format: uuid */
             seasonId: string;
@@ -13316,6 +13728,7 @@ export interface components {
             description: string;
             /** Format: date-time */
             earnedAt: string;
+            scope?: null | components["schemas"]["AchievementScope"];
         };
         /** @description A review the user left: the game, the season, the rating and the text (SPEC «Отзыв»). */
         ProfileReviewView: {
@@ -13833,6 +14246,18 @@ export interface components {
             adminFeatures?: null | components["schemas"]["AdminFeaturesView"];
             galleryEnabled?: null | boolean;
         };
+        SeasonRollView: {
+            /** Format: uuid */
+            runId: string;
+            /** Format: int64 */
+            sum: number;
+            /** Format: int64 */
+            minimum: number;
+            /** Format: int64 */
+            maximum: number;
+            /** Format: double */
+            luck: number;
+        };
         SeasonRules: {
             timezone: string;
             /** Format: int32 */
@@ -13858,6 +14283,8 @@ export interface components {
             seasonName: string;
             /** Format: double */
             totalHours: number;
+            bestRoll: null | components["schemas"]["SeasonRollView"];
+            worstRoll: null | components["schemas"]["SeasonRollView"];
         };
         /**
          * @description Season lifecycle (GLOSSARY «Статус сезона»): draft → active → closing → finished → archived.
@@ -14361,6 +14788,7 @@ type ReadonlyArray<T> = [
 ] extends [
     unknown[]
 ] ? Readonly<Exclude<T, undefined>> : Readonly<Exclude<T, undefined>[]>;
+export const achievementScopeValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["AchievementScope"]> = ["season", "allTime"];
 export const betStatusValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["BetStatus"]> = ["open", "won", "lost", "revoked"];
 export const bugReportStatusValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["BugReportStatus"]> = ["new", "inWork", "closed"];
 export const cellTypeValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["CellType"]> = ["start", "empty", "finish", "fork", "teleport", "checkpoint", "pointsBonus", "event", "shop"];

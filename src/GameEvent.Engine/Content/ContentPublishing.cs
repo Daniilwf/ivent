@@ -258,11 +258,6 @@ public static class ContentPublishing
 
     private static void Achievement(ObjectDefinition definition, string at, Action<string, string> error)
     {
-        if (definition.Scope != AchievementScope.Season)
-        {
-            error($"{at}.scope", "Only seasonal achievements are played by this build.");
-        }
-
         if (definition.Manual || definition.Hostile)
         {
             error(at, "An achievement is awarded automatically to the player whose condition holds.");
@@ -274,7 +269,18 @@ public static class ContentPublishing
             return;
         }
 
-        if (effect.Trigger is not (Trigger.HostileIncoming or Trigger.RunCompleted or Trigger.ProofApproved))
+        if (definition.Scope == AchievementScope.AllTime)
+        {
+            if (effect.Trigger != Trigger.AfterDice)
+            {
+                error($"{at}.effect.trigger", "Lifetime achievements support «afterDice».");
+            }
+            else if (!LifetimeAchievements.Supports(effect.Condition))
+            {
+                error($"{at}.effect.condition", "A lifetime throw achievement needs «allDiceMax» and a positive «minDice».");
+            }
+        }
+        else if (effect.Trigger is not (Trigger.HostileIncoming or Trigger.RunCompleted or Trigger.ProofApproved))
         {
             error($"{at}.effect.trigger", "Seasonal achievements support «hostileIncoming», «runCompleted» and «proofApproved».");
         }

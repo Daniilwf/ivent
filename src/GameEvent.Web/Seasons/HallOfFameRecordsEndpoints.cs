@@ -12,7 +12,10 @@ public sealed record HallOfFameGameView(Guid SeasonId, string SeasonName, Guid G
 
 public sealed record HallOfFameFinishView(Guid SeasonId, string SeasonName, Guid PlayerId, string Name, decimal ElapsedSeconds, Guid? ProfileUserId);
 
-public sealed record HallOfFameRecordsView(IReadOnlyList<HallOfFameGameView> LongestGames, IReadOnlyList<HallOfFameFinishView> FastestFinishes);
+public sealed record HallOfFameRollView(Guid SeasonId, string SeasonName, Guid RunId, Guid PlayerId, string Name, long Sum, Guid? ProfileUserId);
+
+public sealed record HallOfFameRecordsView(IReadOnlyList<HallOfFameGameView> LongestGames,
+    IReadOnlyList<HallOfFameFinishView> FastestFinishes, IReadOnlyList<HallOfFameRollView> LargestRolls);
 
 internal static class HallOfFameRecordsEndpoints
 {
@@ -29,7 +32,8 @@ internal static class HallOfFameRecordsEndpoints
     private static async Task<Ok<HallOfFameRecordsView>> ReadAsync(GameEventDbContext db, HttpResponse response, CancellationToken ct)
     {
         response.Headers.CacheControl = "private, no-store";
-        return TypedResults.Ok(new HallOfFameRecordsView(await ReadLongestAsync(db, ct), await ReadFastestAsync(db, ct)));
+        return TypedResults.Ok(new HallOfFameRecordsView(
+            await ReadLongestAsync(db, ct), await ReadFastestAsync(db, ct), await ReadLargestRollsAsync(db, ct)));
     }
 
     private static async Task<IReadOnlyList<HallOfFameGameView>> ReadLongestAsync(GameEventDbContext db, CancellationToken ct)
@@ -127,5 +131,50 @@ internal static class HallOfFameRecordsEndpoints
         }
 
         return fastest;
+    }
+
+    private static async Task<IReadOnlyList<HallOfFameRollView>> ReadLargestRollsAsync(GameEventDbContext db, CancellationToken ct)
+    {
+        var candidates =
+            from run in db.Runs.AsNoTracking()
+            join season in db.Seasons.AsNoTracking() on run.SeasonId equals season.Id
+            join player in db.SeasonPlayers.AsNoTracking() on run.PlayerId equals player.Id
+            where (season.Status == SeasonStatus.Finished || season.Status == SeasonStatus.Archived)
+                && run.Status == RunStatus.Completed
+            orderby season.CreatedAt descending, season.Id, run.Id
+            select new
+            {
+                SeasonId = season.Id,
+                SeasonName = season.Name,
+                RunId = run.Id,
+                PlayerId = player.Id,
+                player.Name,
+                ProfileUserId = db.Users.Any(user => user.Id == player.UserId && !user.IsDeleted) ? player.UserId : (Guid?)null,
+                run.DiceJson,
+                run.ChallengeDiceJson,
+                run.DiceModsJson,
+            };
+
+        var largest = new List<HallOfFameRollView>();
+        var maximum = long.MinValue;
+        await foreach (var roll in candidates.AsAsyncEnumerable().WithCancellation(ct))
+        {
+            if (SavedRoll.Measure(roll.DiceJson, roll.ChallengeDiceJson, roll.DiceModsJson) is not { } measurement
+                || measurement.Sum < maximum)
+            {
+                continue;
+            }
+
+            if (measurement.Sum > maximum)
+            {
+                maximum = measurement.Sum;
+                largest.Clear();
+            }
+
+            largest.Add(new HallOfFameRollView(roll.SeasonId, roll.SeasonName, roll.RunId,
+                roll.PlayerId, roll.Name, measurement.Sum, roll.ProfileUserId));
+        }
+
+        return largest;
     }
 }

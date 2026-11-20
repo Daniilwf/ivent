@@ -21,7 +21,23 @@ export async function downloadRecap(card: RecapCard) {
     section: `800 ${token('--text-sm')} ${fontDisplay}`,
     number: `800 ${token('--text-lg')} ${fontDisplay}`,
   };
-  const glyphs = `${card.player} ${card.season} ${t.noRatings} ${t.completed} ${t.hours} ${t.attacksReceived} 0123456789,—`;
+  const metrics = [
+    card.completed,
+    card.hours,
+    ...card.ratings,
+    ...card.attacks,
+    ...(card.rolls ?? []),
+  ];
+  const glyphs = [
+    card.player,
+    card.season,
+    t.ratings,
+    t.attacks,
+    t.noRatings,
+    t.rolls,
+    t.noRolls,
+    ...metrics.flatMap(({ label, value, unit, detail }) => [label, value, unit, detail]),
+  ].join(' ');
   await Promise.allSettled(Object.values(font).map((face) => document.fonts.load(face, glyphs)));
 
   const space = Number.parseFloat(token('--spacing'));
@@ -42,7 +58,10 @@ export async function downloadRecap(card: RecapCard) {
   const heroRow = 22 * space;
   const heroHeight = (sideBySide ? 1 : headline.length) * heroRow + 3 * space;
   const groupTop = heroTop + heroHeight + 5 * space;
-  const height = groupTop + 20 * space + padding;
+  const rollsTop = groupTop + 25 * space;
+  const bottom =
+    card.rolls === null ? groupTop + 20 * space : rollsTop + (card.rolls.length ? 24 : 14) * space;
+  const height = bottom + padding;
   canvas.width = width * ratio;
   canvas.height = height * ratio;
   ctx.scale(ratio, ratio);
@@ -105,19 +124,27 @@ export async function downloadRecap(card: RecapCard) {
   if (card.ratings.length) drawPair(card.ratings, padding);
   else text(t.noRatings, font.body, soft, padding, groupTop + 7 * space, groupWidth);
   drawPair(card.attacks, right);
+  if (card.rolls !== null) {
+    ctx.fillStyle = token('--color-muted');
+    ctx.fillRect(padding, rollsTop - 3 * space, inner, 1);
+    text(t.rolls, font.section, ink, padding, rollsTop);
+    if (card.rolls.length) drawPair(card.rolls, padding, inner, rollsTop);
+    else text(t.noRolls, font.body, soft, padding, rollsTop + 7 * space);
+  }
 
-  function drawPair(metrics: RecapMetric[], start: number) {
-    const columnWidth = groupWidth / 2;
-    metrics.forEach(({ label, value, unit }, index) => {
+  function drawPair(metrics: RecapMetric[], start: number, width = groupWidth, top = groupTop) {
+    const columnWidth = width / 2;
+    metrics.forEach(({ label, value, unit, detail }, index) => {
       const x = start + index * columnWidth;
       const cap = columnWidth - space;
-      const valueTop = groupTop + 7 * space;
+      const valueTop = top + 7 * space;
       text(value, font.number, ink, x, valueTop, cap);
       if (unit) {
         const unitX = x + ctx.measureText(value).width + space;
         text(unit, font.body, soft, unitX, valueTop + space, x + cap - unitX);
       }
-      text(label, font.body, soft, x, groupTop + 13 * space, cap);
+      text(label, font.body, soft, x, top + 13 * space, cap);
+      if (detail) text(detail, font.body, soft, x, top + 17 * space, cap);
     });
   }
 

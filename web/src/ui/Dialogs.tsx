@@ -15,6 +15,7 @@ type ConfirmProps = {
   confirm: string;
   onConfirm: () => void;
   busy?: boolean;
+  stackActionsOnPhone?: boolean;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   /**
@@ -46,6 +47,7 @@ function ConfirmWindow({
   confirm,
   onConfirm,
   busy = false,
+  stackActionsOnPhone = false,
   open,
   onOpenChange,
   children,
@@ -75,7 +77,14 @@ function ConfirmWindow({
             </ul>
           </AlertDialog.Description>
           {children}
-          <div className="flex flex-wrap justify-end gap-3">
+          <div
+            className={cx(
+              'gap-3',
+              stackActionsOnPhone
+                ? 'grid desk:flex desk:flex-wrap desk:justify-end'
+                : 'flex flex-wrap justify-end',
+            )}
+          >
             <AlertDialog.Cancel asChild>
               <Button data-testid={testId && `${testId}-no`}>{ru.ui.cancel}</Button>
             </AlertDialog.Cancel>

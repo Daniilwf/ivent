@@ -29,6 +29,7 @@ internal static partial class SeasonProjection
             {
                 var row = await db.GalleryMoments.FindAsync([seasonId, id], ct) ?? throw Missing("gallery moment", id);
                 row.Hidden = item.Hidden;
+                row.ConsentRevoked = item.ConsentRevoked;
             }
             else
             {
@@ -43,6 +44,10 @@ internal static partial class SeasonProjection
                     CreatedAt = item.CreatedAt,
                     CreatedDay = item.CreatedDay,
                     Hidden = item.Hidden,
+                    ProofRunId = item.ProofSource?.RunId,
+                    ProofFileId = item.ProofSource?.FileId,
+                    ProofApprovalCommandId = item.ProofSource?.ApprovalCommandId,
+                    ConsentRevoked = item.ConsentRevoked,
                 });
             }
         }
@@ -53,7 +58,11 @@ internal static partial class SeasonProjection
     {
         var rows = await db.GalleryMoments.AsNoTracking().Where(row => row.SeasonId == seasonId).ToListAsync(ct);
         return rows.ToImmutableSortedDictionary(row => row.ItemId, row => new GalleryItem(
-            row.ItemId, row.UserId, row.PlayerId, row.FileId, row.Caption, row.CreatedAt, row.CreatedDay, row.Hidden));
+            row.ItemId, row.UserId, row.PlayerId, row.FileId, row.Caption, row.CreatedAt, row.CreatedDay, row.Hidden,
+            row is { ProofRunId: { } runId, ProofFileId: { } fileId, ProofApprovalCommandId: { } approval }
+                ? new GalleryProofSource(runId, fileId, approval)
+                : null,
+            row.ConsentRevoked));
     }
 
     private static async Task WriteGalleryReactionsAsync(GameEventDbContext db, SeasonState before, SeasonState after, CancellationToken ct)

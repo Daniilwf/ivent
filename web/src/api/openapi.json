@@ -1542,6 +1542,45 @@
         }
       }
     },
+    "/api/me/statistics": {
+      "get": {
+        "tags": [
+          "Seasons"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AllTimeStatisticsView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/hall-of-fame": {
       "get": {
         "tags": [
@@ -6345,6 +6384,329 @@
           },
           "404": {
             "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RejectionProblem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/seasons/{seasonId}/gallery/proofs": {
+      "get": {
+        "tags": [
+          "Seasons"
+        ],
+        "parameters": [
+          {
+            "name": "seasonId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/GalleryProofPhotoView"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RejectionProblem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Seasons"
+        ],
+        "parameters": [
+          {
+            "name": "seasonId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GalleryProofPublicationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GalleryMomentView"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GalleryMomentView"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Payload Too Large",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RejectionProblem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/seasons/{seasonId}/gallery/{itemId}/withdraw": {
+      "post": {
+        "tags": [
+          "Seasons"
+        ],
+        "parameters": [
+          {
+            "name": "seasonId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "itemId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GalleryProofWithdrawalRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -11520,6 +11882,12 @@
         },
         "description": "An account as the admin sees it (D-106); `sessions` — how many devices it is signed in on (D-466)."
       },
+      "AchievementScope": {
+        "enum": [
+          "season",
+          "allTime"
+        ]
+      },
       "AddPlayerRequest": {
         "required": [
           "commandId",
@@ -11928,6 +12296,81 @@
           }
         },
         "description": "A player as the admin sees them (SE5, D-123): the balance and the place in the turn, the inactivity flag, when they\nlast acted themselves and the hint — no action of their own for the rules' `inactiveHintDays` while not marked\ninactive. `playing` — a run is going on: a long game is a reason to be quiet, not a sign of leaving.\n`choosingBranch` — the player's throw waits at a fork (D-305): the admin may discard the choice, the steps left burn.\n`eventQuestion` — an effect drawn from a deck waits for the player's answer (D-511, D-569 (8), D-822, D-827): an event,\nor an object of another kind a deck holds — only a drawn effect stops on a question, an item used gets its answers with\nthe use; the admin takes the question off with the correction `discardOffer`; always set, optional for older clients."
+      },
+      "AllTimeStatisticsView": {
+        "required": [
+          "seasonCount",
+          "completedRuns",
+          "droppedRuns",
+          "totalHours",
+          "bestRating",
+          "worstRating",
+          "attacksMade",
+          "attacksReceived",
+          "bestRoll",
+          "worstRoll"
+        ],
+        "type": "object",
+        "properties": {
+          "seasonCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "completedRuns": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "droppedRuns": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalHours": {
+            "type": "number",
+            "format": "double"
+          },
+          "bestRating": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "worstRating": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "attacksMade": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "attacksReceived": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "bestRoll": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SeasonRollView"
+              }
+            ]
+          },
+          "worstRoll": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SeasonRollView"
+              }
+            ]
+          }
+        }
       },
       "AlreadyPlayedRequest": {
         "required": [
@@ -14681,6 +15124,23 @@
           }
         }
       },
+      "GalleryHiddenProofPublicationView": {
+        "required": [
+          "id",
+          "createdAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "GalleryHideRequest": {
         "required": [
           "commandId"
@@ -14737,6 +15197,12 @@
             "items": {
               "$ref": "#/components/schemas/ReactionView"
             }
+          },
+          "canWithdraw": {
+            "type": [
+              "null",
+              "boolean"
+            ]
           }
         }
       },
@@ -14758,6 +15224,77 @@
           "token": {
             "type": "integer",
             "format": "int32"
+          }
+        }
+      },
+      "GalleryProofPhotoView": {
+        "required": [
+          "runId",
+          "fileId",
+          "title",
+          "thumbnailUrl"
+        ],
+        "type": "object",
+        "properties": {
+          "runId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "thumbnailUrl": {
+            "type": "string"
+          }
+        }
+      },
+      "GalleryProofPublicationRequest": {
+        "required": [
+          "commandId",
+          "itemId",
+          "runId",
+          "fileId",
+          "caption"
+        ],
+        "type": "object",
+        "properties": {
+          "commandId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "itemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "runId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "caption": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "GalleryProofWithdrawalRequest": {
+        "required": [
+          "commandId"
+        ],
+        "type": "object",
+        "properties": {
+          "commandId": {
+            "type": "string",
+            "format": "uuid"
           }
         }
       },
@@ -14832,6 +15369,15 @@
           },
           "canPublish": {
             "type": "boolean"
+          },
+          "hiddenProofPublications": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/GalleryHiddenProofPublicationView"
+            }
           }
         }
       },
@@ -15374,7 +15920,8 @@
       "HallOfFameRecordsView": {
         "required": [
           "longestGames",
-          "fastestFinishes"
+          "fastestFinishes",
+          "largestRolls"
         ],
         "type": "object",
         "properties": {
@@ -15389,6 +15936,55 @@
             "items": {
               "$ref": "#/components/schemas/HallOfFameFinishView"
             }
+          },
+          "largestRolls": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HallOfFameRollView"
+            }
+          }
+        }
+      },
+      "HallOfFameRollView": {
+        "required": [
+          "seasonId",
+          "seasonName",
+          "runId",
+          "playerId",
+          "name",
+          "sum",
+          "profileUserId"
+        ],
+        "type": "object",
+        "properties": {
+          "seasonId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "seasonName": {
+            "type": "string"
+          },
+          "runId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "playerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "sum": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "profileUserId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           }
         }
       },
@@ -17531,9 +18127,19 @@
           "earnedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "scope": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AchievementScope"
+              }
+            ]
           }
         },
-        "description": "A seasonal badge, with the title and description it had when awarded."
+        "description": "A badge, with its origin season and the title and description it had when awarded."
       },
       "ProfileReviewView": {
         "required": [
@@ -19171,6 +19777,38 @@
         },
         "description": "The selected season's navigation flags, without its map, players or folded event state."
       },
+      "SeasonRollView": {
+        "required": [
+          "runId",
+          "sum",
+          "minimum",
+          "maximum",
+          "luck"
+        ],
+        "type": "object",
+        "properties": {
+          "runId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sum": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "minimum": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "maximum": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "luck": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
       "SeasonRules": {
         "required": [
           "timezone",
@@ -19208,7 +19846,9 @@
           "attacksMade",
           "attacksReceived",
           "seasonName",
-          "totalHours"
+          "totalHours",
+          "bestRoll",
+          "worstRoll"
         ],
         "type": "object",
         "properties": {
@@ -19248,6 +19888,26 @@
           "totalHours": {
             "type": "number",
             "format": "double"
+          },
+          "bestRoll": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SeasonRollView"
+              }
+            ]
+          },
+          "worstRoll": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SeasonRollView"
+              }
+            ]
           }
         }
       },

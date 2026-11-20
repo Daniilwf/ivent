@@ -40,6 +40,17 @@ const records: Schemas['HallOfFameRecordsView'] = {
     },
   ],
   fastestFinishes: [],
+  largestRolls: [
+    {
+      seasonId: id(1),
+      seasonName,
+      runId: id(30),
+      playerId: id(10),
+      name: 'Лиса с Длинной Тропы',
+      profileUserId: id(100),
+      sum: 48,
+    },
+  ],
 };
 
 test('the hall of fame shows long season names, tied winners and both longest games', async ({

@@ -129,6 +129,11 @@ internal static class Undoing
 
         var target = history[index];
         // D-308: a map is taken back by publishing the previous version again
+        if (target.Events.Any(e => e is Gallery.GalleryProofConsentWithdrawn))
+        {
+            return Decision.Reject(RejectionCodes.UndoNotUndoable, "Only the author can grant consent to publish a proof again.");
+        }
+
         if (target.Events.Any(e => e is SeasonCreated or CommandUndone or Map.MapPublished or Content.ContentPublished))
         {
             return Decision.Reject(RejectionCodes.UndoNotUndoable, "The season's creation, map and content publications and undos are not undone; do the action again instead.");
@@ -334,9 +339,14 @@ internal static class Undoing
         foreach (var snapshot in e.GalleryItems ?? [])
         {
             galleryItems = snapshot.Before is { } previous
-                ? galleryItems.SetItem(snapshot.ItemId, previous)
+                ? galleryItems.SetItem(snapshot.ItemId,
+                    galleryItems.GetValueOrDefault(snapshot.ItemId)?.ConsentRevoked == true ? previous with { ConsentRevoked = true } : previous)
                 : galleryItems.Remove(snapshot.ItemId);
         }
+
+        galleryItems = galleryItems.SetItems(galleryItems
+            .Where(item => !item.Value.ConsentRevoked && item.Value.ProofSource?.ApprovalCommandId == e.CommandId)
+            .Select(item => KeyValuePair.Create(item.Key, item.Value with { ConsentRevoked = true })));
 
         var restored = state with
         {
@@ -658,7 +668,7 @@ internal static class Undoing
                 continue;
             }
 
-            if (e is Gallery.GalleryMomentPublished published)
+            if (e is Gallery.IGalleryMomentPublished published)
             {
                 // Enrollment and reactivation hold a player's publications independently of their turns.
                 keys.Add($"{AuthorPrefix}{published.PlayerId}:gallery-{published.ItemId}");

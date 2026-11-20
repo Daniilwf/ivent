@@ -197,7 +197,9 @@ public sealed record SeasonPlayer(
 
     // Only written after the first award, so old player undo snapshots have the same format.
     [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    EquatableArray<Achievements.PlayerAchievement> Achievements = default)
+    EquatableArray<Achievements.PlayerAchievement> Achievements = default,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    EquatableArray<Achievements.PlayerAchievement> LifetimeAchievements = default)
 {
     /// <summary>The player's economy (D-401), empty when they have none.</summary>
     [System.Text.Json.Serialization.JsonIgnore]

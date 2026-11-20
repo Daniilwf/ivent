@@ -1032,6 +1032,8 @@ export function Styleguide() {
                 worstRating: 1,
                 attacksMade: 1234,
                 attacksReceived: 999,
+                bestRoll: { runId: 'roll-best', sum: 17, minimum: 3, maximum: 18, luck: 14 / 15 },
+                worstRoll: { runId: 'roll-worst', sum: 4, minimum: 2, maximum: 12, luck: 0.2 },
               },
               demoProfile.name,
             )}

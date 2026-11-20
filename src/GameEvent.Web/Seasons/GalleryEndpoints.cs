@@ -6,14 +6,17 @@ using System.Threading.Channels;
 using GameEvent.Engine.Files;
 using GameEvent.Engine.Gallery;
 using GameEvent.Engine.Kernel;
+using GameEvent.Engine.Proofs;
 using GameEvent.Engine.Reactions;
 using GameEvent.Engine.Rulesets;
+using GameEvent.Engine.Runs;
 using GameEvent.Engine.Seasons;
 using GameEvent.Infrastructure.Accounts;
 using GameEvent.Infrastructure.Database;
 using GameEvent.Infrastructure.Files;
 using GameEvent.Infrastructure.Kernel;
 using GameEvent.Infrastructure.Queue;
+using GameEvent.Infrastructure.Seasons;
 using GameEvent.Web.Accounts;
 using GameEvent.Web.Files;
 using GameEvent.Web.Hosting;
@@ -24,13 +27,20 @@ namespace GameEvent.Web.Seasons;
 
 public sealed record GalleryUploadForm(Guid CommandId, Guid ItemId, string Caption, IFormFile File);
 public sealed record GalleryHideRequest(Guid CommandId);
+public sealed record GalleryProofPublicationRequest(Guid CommandId, Guid ItemId, Guid RunId, Guid FileId, string? Caption);
+public sealed record GalleryProofWithdrawalRequest(Guid CommandId);
+public sealed record GalleryProofPhotoView(Guid RunId, Guid FileId, string Title, string ThumbnailUrl);
 public sealed record GalleryMomentView(
     Guid Id, Guid PlayerId, string PlayerName, string Caption, DateTimeOffset CreatedAt, string ImageUrl, string ThumbnailUrl,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<ReactionView>? Reactions = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<ReactionView>? Reactions = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? CanWithdraw = null);
 public sealed record GallerySeasonView(Guid Id, string Name);
 public sealed record GalleryPlayerView(Guid Id, string Name, int Token);
+public sealed record GalleryHiddenProofPublicationView(Guid Id, DateTimeOffset CreatedAt);
 public sealed record GalleryView(
-    IReadOnlyList<GalleryMomentView> Items, Guid? NextBefore, IReadOnlyList<GalleryPlayerView> Players, bool CanPublish);
+    IReadOnlyList<GalleryMomentView> Items, Guid? NextBefore, IReadOnlyList<GalleryPlayerView> Players, bool CanPublish,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    IReadOnlyList<GalleryHiddenProofPublicationView>? HiddenProofPublications = null);
 
 internal static class GalleryEndpoints
 {
@@ -66,6 +76,26 @@ internal static class GalleryEndpoints
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
             .ProducesProblem(StatusCodes.Status429TooManyRequests)
             .ProducesProblem(StatusCodes.Status503ServiceUnavailable)
+            .WithActionErrors();
+        gallery.MapGet("/proofs", ListProofPhotosAsync)
+            .RequireAuthorization(Policies.Player)
+            .RequireRateLimiting(AppSetup.SeasonReadRateLimit)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests)
+            .WithActionErrors();
+        gallery.MapPost("/proofs", PublishProofAsync)
+            .RequireAuthorization(Policies.Player)
+            .RequireRateLimiting(FileEndpoints.UploadRateLimit)
+            .Accepts<GalleryProofPublicationRequest>("application/json")
+            .Produces<GalleryMomentView>(StatusCodes.Status201Created)
+            .Produces<GalleryMomentView>()
+            .ProducesProblem(StatusCodes.Status413PayloadTooLarge)
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests)
+            .ProducesProblem(StatusCodes.Status503ServiceUnavailable)
+            .WithActionErrors();
+        gallery.MapPost("/{itemId:guid}/withdraw", WithdrawProofAsync)
+            .RequireRateLimiting(AppSetup.InteractionRateLimit)
+            .Accepts<GalleryProofWithdrawalRequest>("application/json")
             .WithActionErrors();
         gallery.MapGet("/{itemId:guid}/image", (Guid seasonId, Guid itemId, GameEventDbContext db, FileStorage storage, HttpContext http, CancellationToken ct) =>
                 ReadPictureAsync(seasonId, itemId, thumbnail: false, db, storage, http, ct))
@@ -108,6 +138,66 @@ internal static class GalleryEndpoints
     private sealed record GalleryRulesFlags(GalleryFeatures? Features = null);
     private sealed record GalleryFeatures(bool Gallery = false);
 
+    private static async Task<Results<Ok<IReadOnlyList<GalleryProofPhotoView>>, NotFound, UnauthorizedHttpResult, ProblemHttpResult>> ListProofPhotosAsync(
+        Guid seasonId, ClaimsPrincipal user, HttpResponse response,
+        GameEventDbContext db, FileStorage storage, FileLimits limits, IClock clock, CancellationToken ct)
+    {
+        response.Headers.CacheControl = "private, no-store";
+        if (user.UserId() is not { } actor)
+        {
+            return TypedResults.Unauthorized();
+        }
+
+        if (await SeasonAsync(seasonId, db, ct) is not { } season)
+        {
+            return TypedResults.NotFound();
+        }
+
+        if (!season.Rules.Features.Gallery)
+        {
+            return Disabled();
+        }
+
+        if (season.Status is not (SeasonStatus.Active or SeasonStatus.Closing))
+        {
+            return TypedResults.Ok<IReadOnlyList<GalleryProofPhotoView>>([]);
+        }
+
+        if (await AtDailyLimitAsync(season.Rules, seasonId, actor, db, clock, ct))
+        {
+            return DailyLimit();
+        }
+
+        var approved = await (
+            from proof in db.Proofs.AsNoTracking()
+            join player in db.SeasonPlayers.AsNoTracking() on proof.PlayerId equals player.Id
+            join run in db.Runs.AsNoTracking() on proof.RunId equals run.Id
+            join game in db.Games.AsNoTracking() on run.GameId equals game.Id
+            where proof.SeasonId == seasonId && proof.Status == ProofStatus.Approved
+                && player.SeasonId == seasonId && player.UserId == actor && !player.IsInactive
+                && run.SeasonId == seasonId && run.PlayerId == proof.PlayerId && run.Status == RunStatus.Completed
+            orderby run.CompletedAt descending, run.Id descending
+            select new { proof.RunId, proof.FilesJson, game.Title }).ToListAsync(ct);
+        var attachments = approved.SelectMany(proof => JsonSerializer.Deserialize<EquatableArray<Guid>>(proof.FilesJson, EngineJson.Options)
+            .Select(fileId => new { proof.RunId, FileId = fileId, proof.Title })).ToArray();
+        var ids = attachments.Select(attachment => attachment.FileId).Distinct().ToArray();
+        if (ids.Length == 0)
+        {
+            return TypedResults.Ok<IReadOnlyList<GalleryProofPhotoView>>([]);
+        }
+
+        var files = await GalleryProofSources.StillUploads(db, actor)
+            .Where(file => ids.Contains(file.Id) && file.Bytes <= limits.MaxUploadBytes)
+            .Select(file => new { file.Id, file.MediaType }).ToDictionaryAsync(file => file.Id, file => file.MediaType, ct);
+        return TypedResults.Ok<IReadOnlyList<GalleryProofPhotoView>>([
+            .. attachments.Where(attachment => files.TryGetValue(attachment.FileId, out var mediaType)
+                    && storage.Exists(FileNames.Main(attachment.FileId, mediaType))
+                    && storage.Exists(FileNames.Thumbnail(attachment.FileId, mediaType)))
+                .Select(attachment => new GalleryProofPhotoView(
+                    attachment.RunId, attachment.FileId, attachment.Title, FileLinkView.Of(attachment.FileId).ThumbnailUrl)),
+        ]);
+    }
+
     private static async Task<Results<Ok<GalleryView>, NotFound, ProblemHttpResult>> ListAsync(
         Guid seasonId, Guid? playerId, Guid? before, Guid? itemId, ClaimsPrincipal user, HttpResponse response, GameEventDbContext db, CancellationToken ct)
     {
@@ -125,7 +215,7 @@ internal static class GalleryEndpoints
         var moments = db.GalleryMoments.AsNoTracking()
             .Where(item => item.SeasonId == seasonId && (playerId == null || item.PlayerId == playerId)
                 && (itemId == null || item.ItemId == itemId));
-        var visible = moments.Where(item => !item.Hidden);
+        var visible = moments.Where(item => !item.Hidden && !item.ConsentRevoked);
         if (before is { } cursor)
         {
             var anchor = await moments.Where(item => item.ItemId == cursor)
@@ -154,13 +244,21 @@ internal static class GalleryEndpoints
         var canPublish = season.Status is SeasonStatus.Active or SeasonStatus.Closing
             && user.IsInRole(nameof(Role.Player))
             && players.Any(player => player.UserId == actor && !player.IsInactive);
+        var hiddenProofs = before is null && itemId is null && actor is { } owner
+            ? await db.GalleryMoments.AsNoTracking()
+                .Where(item => item.SeasonId == seasonId && item.UserId == owner
+                    && item.Hidden && !item.ConsentRevoked && item.ProofRunId != null)
+                .OrderByDescending(item => item.CreatedAt).ThenByDescending(item => item.ItemId)
+                .Select(item => new GalleryHiddenProofPublicationView(item.ItemId, item.CreatedAt)).ToListAsync(ct)
+            : [];
         return TypedResults.Ok(new GalleryView(
             [.. page.Select(row => View(seasonId, row.item.ItemId, row.item.PlayerId, row.Name, row.item.Caption, row.item.CreatedAt,
-                reactions?.GetValueOrDefault(row.item.ItemId)))],
+                reactions?.GetValueOrDefault(row.item.ItemId), row.item.ProofRunId is not null && row.item.UserId == actor))],
             nextBefore,
             [.. players.InTokenOrder(player => player.Name, player => player.Id)
                 .Select((player, token) => new GalleryPlayerView(player.Id, player.Name, token))],
-            canPublish));
+            canPublish,
+            hiddenProofs.Count == 0 ? null : hiddenProofs));
     }
 
     private static async Task<Results<NoContent, NotFound, UnauthorizedHttpResult, ValidationProblem, ProblemHttpResult>> SetReactionAsync(
@@ -266,7 +364,7 @@ internal static class GalleryEndpoints
 
         // Read the debit first so a just-committed retry is still checked as a retry before an early quota refusal.
         var limited = season.Status is SeasonStatus.Active or SeasonStatus.Closing
-            && await AtDailyLimitAsync(season.Rules, seasonId, actor, services, ct);
+            && await AtDailyLimitAsync(season.Rules, seasonId, actor, services.Db, services.Clock, ct);
         var earlier = await services.Db.Events.AsNoTracking().AnyAsync(row => row.CommandId == commandId, ct);
         if (!earlier)
         {
@@ -313,7 +411,7 @@ internal static class GalleryEndpoints
     }
 
     internal static async Task<CommandOutcome> StoreAndPublishAsync(
-        Guid commandId, Guid seasonId, PublishGalleryMoment command, ProcessedFile picture, FileServices services)
+        Guid commandId, Guid seasonId, IWriteGalleryMoment command, ProcessedFile picture, FileServices services, Guid? proofApprovalCommandId = null)
     {
         var fileId = services.Ids.NewId();
         var main = FileNames.Main(fileId, picture.MediaType);
@@ -331,7 +429,8 @@ internal static class GalleryEndpoints
 
         // Once queued, the command must be able to finish even if the request is gone (D-108).
         var prepared = new PreparedGalleryFile(
-            fileId, picture.MediaType, picture.Main.LongLength, picture.Width, picture.Height, picture.Frames, command.ImageSha256);
+            fileId, picture.MediaType, picture.Main.LongLength, picture.Width, picture.Height, picture.Frames,
+            (command as PublishGalleryMoment)?.ImageSha256 ?? "", proofApprovalCommandId);
         var envelope = new CommandEnvelope(commandId, seasonId, command, command.UserId) { PreparedGalleryFile = prepared };
         CommandOutcome outcome;
         try
@@ -354,7 +453,110 @@ internal static class GalleryEndpoints
         return outcome;
     }
 
-    private static async Task<bool> AtDailyLimitAsync(Ruleset rules, Guid seasonId, Guid actor, FileServices services, CancellationToken ct)
+    private static async Task<IResult> PublishProofAsync(
+        Guid seasonId, GalleryProofPublicationRequest request, ClaimsPrincipal user, [AsParameters] FileServices services, CancellationToken ct)
+    {
+        if (user.UserId() is not { } actor)
+        {
+            return TypedResults.Unauthorized();
+        }
+
+        if (request.CommandId == Guid.Empty)
+        {
+            return SeasonEndpoints.Invalid("commandId", "A command id is required.");
+        }
+
+        if (request.ItemId == Guid.Empty)
+        {
+            return SeasonEndpoints.Invalid("itemId", "A moment id is required.");
+        }
+
+        if (request.RunId == Guid.Empty || request.FileId == Guid.Empty)
+        {
+            return SeasonEndpoints.Invalid(request.RunId == Guid.Empty ? "runId" : "fileId", "Select an attachment from a completed run.");
+        }
+
+        var caption = request.Caption?.Trim() ?? "";
+        if (caption.Length is 0 or > Limits.MaxCommentLength)
+        {
+            return SeasonEndpoints.Invalid("caption", $"Supply one caption of up to {Limits.MaxCommentLength} characters.");
+        }
+
+        if (await SeasonAsync(seasonId, services.Db, ct) is not { } season)
+        {
+            return TypedResults.NotFound();
+        }
+
+        if (!season.Rules.Features.Gallery)
+        {
+            return Disabled();
+        }
+
+        var player = await services.Db.SeasonPlayers.AsNoTracking().Where(p => p.SeasonId == seasonId && p.UserId == actor && !p.IsInactive)
+            .Select(p => new { p.Name }).SingleOrDefaultAsync(ct);
+        if (player is null)
+        {
+            return TypedResults.Forbid();
+        }
+
+        var command = new PublishProofGalleryMoment(request.ItemId, actor, caption, request.RunId, request.FileId);
+        var limited = season.Status is SeasonStatus.Active or SeasonStatus.Closing
+            && await AtDailyLimitAsync(season.Rules, seasonId, actor, services.Db, services.Clock, ct);
+        if (await services.Db.Events.AsNoTracking().AnyAsync(row => row.CommandId == request.CommandId, ct))
+        {
+            var repeated = await services.Bus.SendAsync(new CommandEnvelope(request.CommandId, seasonId, command, actor), ct);
+            return await ProofPublicationResultAsync(seasonId, player.Name, repeated, services.Db, ct);
+        }
+
+        if (season.Status is SeasonStatus.Finished or SeasonStatus.Archived)
+        {
+            return Problem(StatusCodes.Status409Conflict, RejectionCodes.SeasonClosed, "The season is closed to new gallery moments.");
+        }
+
+        if (season.Status is not (SeasonStatus.Active or SeasonStatus.Closing))
+        {
+            return Problem(StatusCodes.Status409Conflict, RejectionCodes.SeasonNotActive, "The season has not started.");
+        }
+
+        if (limited && await services.Db.Seasons.AsNoTracking().AnyAsync(s => s.Id == seasonId
+            && s.Status == season.Status && s.RulesetVersion == season.RulesetVersion, ct))
+        {
+            return DailyLimit();
+        }
+
+        if (await GalleryProofSources.FindAsync(services.Db, seasonId, request.RunId, request.FileId, actor, ct) is not { } source)
+        {
+            return TypedResults.NotFound();
+        }
+
+        await using var original = services.Storage.OpenRead(FileNames.Main(request.FileId, source.MediaType));
+        if (original is null)
+        {
+            return TypedResults.NotFound();
+        }
+
+        if (original.Length > services.Limits.MaxUploadBytes)
+        {
+            return FileEndpoints.TooLarge(services.Limits);
+        }
+
+        var (picture, failure) = await FileEndpoints.ProcessPictureAsync(async token =>
+        {
+            var bytes = new byte[original.Length];
+            await original.ReadExactlyAsync(bytes, token);
+            return bytes;
+        }, FileKind.GalleryImage, services.Limits, ct);
+        if (picture is null)
+        {
+            return failure!;
+        }
+
+        var outcome = await StoreAndPublishAsync(request.CommandId, seasonId, command, picture, services, source.ApprovalCommandId);
+        return await ProofPublicationResultAsync(seasonId, player.Name, outcome, services.Db, ct);
+    }
+
+    private static async Task<bool> AtDailyLimitAsync(
+        Ruleset rules, Guid seasonId, Guid actor, GameEventDbContext db, IClock clock, CancellationToken ct)
     {
         var limit = rules.Social.GalleryUploadsPerDay;
         if (limit == 0)
@@ -362,7 +564,7 @@ internal static class GalleryEndpoints
             return true;
         }
 
-        var now = services.Clock.UtcNow;
+        var now = clock.UtcNow;
         var zone = rules.Season.Timezone;
         var zones = SystemTimeZones.Instance;
         if (SeasonCalendar.Day(zones, zone, now) is not { } day)
@@ -373,14 +575,27 @@ internal static class GalleryEndpoints
         // A conservative UTC range bounds the query. The season calendar decides the exact day, including offset changes.
         var since = now.AddDays(-2);
         var until = now.AddDays(2);
-        var recent = await services.Db.GalleryMoments.AsNoTracking()
+        var recent = await db.GalleryMoments.AsNoTracking()
             .Where(item => item.SeasonId == seasonId && item.UserId == actor && item.CreatedAt >= since && item.CreatedAt <= until)
             .Select(item => item.CreatedAt).ToListAsync(ct);
         return recent.Count(created => SeasonCalendar.Day(zones, zone, created) == day) >= limit;
     }
 
-    private static GalleryMomentPublished? Published(CommandOutcome outcome) =>
-        outcome.Events.Select(record => record.Event).OfType<GalleryMomentPublished>().SingleOrDefault();
+    private static IGalleryMomentPublished? Published(CommandOutcome outcome) =>
+        outcome.Events.Select(record => record.Event).OfType<IGalleryMomentPublished>().SingleOrDefault();
+
+    private static async Task<IResult> ProofPublicationResultAsync(
+        Guid seasonId, string playerName, CommandOutcome outcome, GameEventDbContext db, CancellationToken ct)
+    {
+        if (outcome.IsDuplicate && Published(outcome) is GalleryProofMomentPublished recorded
+            && !await db.GalleryMoments.AsNoTracking().AnyAsync(item => item.SeasonId == seasonId && item.ItemId == recorded.ItemId
+                && item.UserId == recorded.UserId && item.FileId == recorded.FileId && !item.Hidden && !item.ConsentRevoked, ct))
+        {
+            return TypedResults.NotFound();
+        }
+
+        return PublicationResult(seasonId, playerName, outcome);
+    }
 
     private static IResult PublicationResult(Guid seasonId, string playerName, CommandOutcome outcome)
     {
@@ -396,7 +611,8 @@ internal static class GalleryEndpoints
         }
 
         var recorded = Published(outcome) ?? throw new InvalidOperationException("A successful gallery publication must record the moment.");
-        var view = View(seasonId, recorded.ItemId, recorded.PlayerId, playerName, recorded.Caption, recorded.CreatedAt);
+        var view = View(seasonId, recorded.ItemId, recorded.PlayerId, playerName, recorded.Caption, recorded.CreatedAt,
+            canWithdraw: recorded is GalleryProofMomentPublished);
         return outcome.IsDuplicate ? TypedResults.Ok(view) : TypedResults.Created(view.ImageUrl, view);
     }
 
@@ -414,7 +630,7 @@ internal static class GalleryEndpoints
             join binding in db.GalleryMediaBindings.AsNoTracking() on
                 new { item.FileId, item.SeasonId, item.ItemId } equals new { binding.FileId, binding.SeasonId, binding.ItemId }
             join record in db.Files.AsNoTracking() on binding.FileId equals record.Id
-            where item.SeasonId == seasonId && item.ItemId == itemId && !item.Hidden
+            where item.SeasonId == seasonId && item.ItemId == itemId && !item.Hidden && !item.ConsentRevoked
                 && record.Kind == FileKind.GalleryImage && !record.IsDeleted && record.OwnerId == item.UserId
             select new { record.Id, record.MediaType }).SingleOrDefaultAsync(ct);
         return file is null
@@ -443,6 +659,28 @@ internal static class GalleryEndpoints
         };
     }
 
+    private static async Task<Results<NoContent, UnauthorizedHttpResult, NotFound, ValidationProblem, ProblemHttpResult>> WithdrawProofAsync(
+        Guid seasonId, Guid itemId, GalleryProofWithdrawalRequest request, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, CancellationToken ct)
+    {
+        if (user.UserId() is not { } actor)
+        {
+            return TypedResults.Unauthorized();
+        }
+
+        var command = new WithdrawProofGalleryMoment(itemId, actor);
+        var sent = await SeasonEndpoints.PrecheckAndSendAsync(seasonId, request.CommandId, command, actor, db, bus, ct);
+        return sent.Result switch
+        {
+            Ok<CommandResponse> => TypedResults.NoContent(),
+            ProblemHttpResult problem when problem.ProblemDetails.Extensions.TryGetValue("code", out var code)
+                && Equals(code, GalleryRejectionCodes.TargetUnknown) => TypedResults.NotFound(),
+            ProblemHttpResult problem => problem,
+            NotFound missing => missing,
+            ValidationProblem invalid => invalid,
+            _ => throw new InvalidOperationException("An unexpected result came from proof consent withdrawal."),
+        };
+    }
+
     private static async Task<GallerySeason?> SeasonAsync(Guid seasonId, GameEventDbContext db, CancellationToken ct)
     {
         var season = await db.Seasons.AsNoTracking().Where(s => s.Id == seasonId)
@@ -455,10 +693,11 @@ internal static class GalleryEndpoints
     private sealed record GallerySeason(SeasonStatus Status, int RulesetVersion, Ruleset Rules);
 
     private static GalleryMomentView View(Guid seasonId, Guid id, Guid playerId, string name, string caption, DateTimeOffset createdAt,
-        IReadOnlyList<ReactionView>? reactions = null)
+        IReadOnlyList<ReactionView>? reactions = null, bool canWithdraw = false)
     {
         var url = $"/api/seasons/{seasonId}/gallery/{id}";
-        return new GalleryMomentView(id, playerId, name, caption, createdAt, $"{url}/image", $"{url}/thumbnail", reactions);
+        return new GalleryMomentView(id, playerId, name, caption, createdAt, $"{url}/image", $"{url}/thumbnail",
+            reactions, canWithdraw ? true : null);
     }
 
     private static ProblemHttpResult Disabled() =>

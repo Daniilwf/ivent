@@ -5,6 +5,8 @@ import { ru } from '../i18n/ru';
 import { ProfileScreen } from './ProfileScreen';
 import { fakeServer, json } from '../test/fakeServer';
 
+vi.mock('../api/realtime', () => ({ watchSeason: () => vi.fn() }));
+
 // H5: a player's profile (SPEC «Профиль», «Отзыв … виден в ленте, профиле и на странице игры», D-124) — name,
 // avatar, completed games, seasons with points and place, reviews; every state.
 
@@ -128,6 +130,30 @@ describe('ProfileScreen', () => {
     expect(badges[0]).toHaveTextContent(badge.description);
     expect(badges[0]).toHaveTextContent('Зима, 13.12');
     expect(badges[1]).toHaveTextContent('Осень, 12.09');
+  });
+
+  it('labels an account achievement as lifetime and keeps its award date', async () => {
+    serve(() =>
+      json(200, {
+        ...profile,
+        achievements: [
+          {
+            objectId: 'jackpot',
+            name: 'Джекпот',
+            description: 'Выбрось максимум на всех кубиках, когда их хотя бы три.',
+            scope: 'allTime',
+            seasonId,
+            earnedAt: '2026-09-12T10:00:00Z',
+          },
+        ],
+      }),
+    );
+
+    render(<ProfileScreen userId={userId} meId="spectator" onSignedOut={vi.fn()} />);
+
+    const badge = within(await screen.findByTestId('profile-achievements')).getByRole('listitem');
+    expect(badge).toHaveTextContent('Джекпот');
+    expect(badge).toHaveTextContent('За всё время, 12.09');
   });
 
   it('marks saved first places in finished and archived seasons as championships', async () => {

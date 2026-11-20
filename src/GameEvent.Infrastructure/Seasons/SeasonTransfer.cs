@@ -6,6 +6,7 @@ using GameEvent.Engine.Gallery;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Players;
 using GameEvent.Engine.Polls;
+using GameEvent.Engine.Proofs;
 using GameEvent.Engine.Reactions;
 using GameEvent.Engine.Seasons;
 using GameEvent.Engine.Suggestions;
@@ -293,7 +294,8 @@ public static class SeasonTransfer
         // ids and are written in the current format (D-105, D-816).
         var records = new List<GameEventRecord>();
         var previousCommands = new HashSet<Guid>();
-        var galleryPublications = new Dictionary<Guid, GalleryMomentPublished>();
+        var galleryPublications = new Dictionary<Guid, IGalleryMomentPublished>();
+        var proofApprovals = new Dictionary<Guid, ProofApproved>();
 
         FeedReactionSet MapFeedReaction(FeedReactionSet reaction)
         {
@@ -326,9 +328,8 @@ public static class SeasonTransfer
             ? snapshot with { Before = comment with { UserId = MapAccount(comment.UserId) } }
             : snapshot;
 
-        GalleryMomentPublished MapGalleryPublication(GalleryMomentPublished original, SeasonState state)
+        T TrackGalleryPublication<T>(T publication, SeasonState state) where T : IGalleryMomentPublished
         {
-            var publication = original with { UserId = MapAccount(original.UserId) };
             if (!state.Players.TryGetValue(publication.PlayerId, out var player) || player.UserId != publication.UserId
                 || publication.FileId == Guid.Empty || !galleryPublications.TryAdd(publication.FileId, publication))
             {
@@ -336,6 +337,20 @@ public static class SeasonTransfer
             }
 
             return publication;
+        }
+
+        GalleryProofMomentPublished MapGalleryProofPublication(GalleryProofMomentPublished original, SeasonState state)
+        {
+            if (original.ProofSource is not { } source || source.FileId == Guid.Empty || source.FileId == original.FileId
+                || !proofApprovals.TryGetValue(source.ApprovalCommandId, out var approval) || approval.RunId != source.RunId
+                || approval.PlayerId != original.PlayerId || !state.Runs.TryGetValue(source.RunId, out var run)
+                || run.PlayerId != original.PlayerId || run.Proof is not { Status: ProofStatus.Approved } proof
+                || !proof.Files.Contains(source.FileId))
+            {
+                throw new InvalidDataException($"Gallery moment {original.ItemId} does not name its active approved proof attachment.");
+            }
+
+            return TrackGalleryPublication(original with { UserId = MapAccount(original.UserId) }, state);
         }
 
         GalleryItemSnapshot MapGallerySnapshot(GalleryItemSnapshot snapshot)
@@ -348,7 +363,8 @@ public static class SeasonTransfer
             var mapped = item with { UserId = MapAccount(item.UserId) };
             if (!galleryPublications.TryGetValue(mapped.FileId, out var published)
                 || mapped.ItemId != snapshot.ItemId || mapped.ItemId != published.ItemId
-                || mapped.PlayerId != published.PlayerId || mapped.UserId != published.UserId)
+                || mapped.PlayerId != published.PlayerId || mapped.UserId != published.UserId
+                || mapped.ProofSource != (published as GalleryProofMomentPublished)?.ProofSource)
             {
                 throw new InvalidDataException($"The undo snapshot of gallery moment {snapshot.ItemId} does not match its publication.");
             }
@@ -371,7 +387,8 @@ public static class SeasonTransfer
                     FeedReactionSet reaction => MapFeedReaction(reaction),
                     GalleryReactionSet reaction => reaction with { UserId = MapAccount(reaction.UserId) },
                     CommentPosted posted => MapCommentPosted(posted, state),
-                    GalleryMomentPublished published => MapGalleryPublication(published, state),
+                    GalleryMomentPublished published => TrackGalleryPublication(published with { UserId = MapAccount(published.UserId) }, state),
+                    GalleryProofMomentPublished published => MapGalleryProofPublication(published, state),
                     SuggestionSubmitted submitted => submitted with { UserId = MapAccount(submitted.UserId) },
                     CommandUndone undone => undone with
                     {
@@ -415,14 +432,24 @@ public static class SeasonTransfer
                     OccurredAt = exported.OccurredAt,
                 });
                 state = SeasonEngine.Apply(state, mapped);
+                if (mapped is ProofApproved approval)
+                {
+                    proofApprovals[exported.CommandId] = approval;
+                }
+                else if (mapped is CommandUndone undo)
+                {
+                    proofApprovals.Remove(undo.CommandId);
+                }
             }
 
             var first = command.OrderBy(x => x.First.Sequence).First().First;
-            await SeasonProjection.WriteAsync(db, before, state, first.OccurredAt, first.AuthorId is { } a ? MapAccount(a) : null, ct);
+            await SeasonProjection.WriteAsync(db, before, state, first.OccurredAt, first.AuthorId is { } a ? MapAccount(a) : null, ct,
+                writeLifetimeAchievements: false);
             await db.SaveChangesAsync(ct);
             previousCommands.Add(command.Key);
         }
 
+        await SeasonProjection.WriteImportedLifetimeAchievementsAsync(db, state, ct);
         db.Events.AddRange(records);
         await db.SaveChangesAsync(ct);
 
@@ -542,7 +569,7 @@ public static class SeasonTransfer
             FeedReactionSet reaction => [reaction.UserId],
             GalleryReactionSet reaction => [reaction.UserId],
             CommentPosted posted => [posted.UserId],
-            GalleryMomentPublished published => [published.UserId],
+            IGalleryMomentPublished published => [published.UserId],
             SuggestionSubmitted submitted => [submitted.UserId],
             CommandUndone undone => undone.Players.Select(p => p.UserId)
                 .Concat((undone.Polls ?? []).SelectMany(p => p.Votes.Select(v => v.UserId)))

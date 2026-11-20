@@ -5,6 +5,7 @@ import { answerOf, type Answer } from '../app/useLoaded';
 
 export type Gallery = Schemas['GalleryView'];
 export type GalleryMoment = Schemas['GalleryMomentView'];
+export type GalleryProofPhoto = Schemas['GalleryProofPhotoView'];
 export type GalleryAnswer = Answer<Gallery> | { kind: 'disabled' };
 
 export async function readGallery(
@@ -19,6 +20,7 @@ export async function readGallery(
     ...(itemId ? { itemId } : {}),
   };
   const items: GalleryMoment[] = [];
+  let hiddenProofPublications: Gallery['hiddenProofPublications'];
   for (let page = 0; page < pages; page++) {
     const result = await api.GET('/api/seasons/{seasonId}/gallery', {
       params: { path: { seasonId }, query },
@@ -29,8 +31,17 @@ export async function readGallery(
     const answer = answerOf(result);
     if (answer.kind !== 'ready') return answer;
     items.push(...answer.value.items);
-    if (!answer.value.nextBefore || page === pages - 1)
-      return { kind: 'ready', value: { ...answer.value, items } };
+    if (page === 0) hiddenProofPublications = answer.value.hiddenProofPublications;
+    if (!answer.value.nextBefore || page === pages - 1) {
+      return {
+        kind: 'ready',
+        value: {
+          ...answer.value,
+          items,
+          ...(hiddenProofPublications ? { hiddenProofPublications } : {}),
+        },
+      };
+    }
     query = { ...query, before: answer.value.nextBefore };
   }
   return { kind: 'failed' };
@@ -70,5 +81,37 @@ export async function publishMoment(
   if (response.status === 429) throw new UploadError('file.tooOften');
   if (response.status === 403 || response.status === 404)
     throw new UploadError('gallery.notParticipant');
+  throw new UploadError(null);
+}
+
+export async function listProofCandidates(seasonId: string, signal: AbortSignal) {
+  const { response, data, error } = await api.GET('/api/seasons/{seasonId}/gallery/proofs', {
+    params: { path: { seasonId } },
+    signal,
+  });
+  if (data) return data;
+  const code = rejectionCode(error);
+  if (code) throw new UploadError(code);
+  throw new UploadError(response.status === 429 ? 'file.tooOften' : null);
+}
+
+export async function publishProofMoment(
+  seasonId: string,
+  ids: { commandId: string; itemId: string },
+  { runId, fileId }: GalleryProofPhoto,
+  caption: string,
+  signal: AbortSignal,
+): Promise<GalleryMoment> {
+  const { response, data, error } = await api.POST('/api/seasons/{seasonId}/gallery/proofs', {
+    params: { path: { seasonId } },
+    body: { ...ids, runId, fileId, caption },
+    signal,
+  });
+  if (data) return data;
+  const code = rejectionCode(error);
+  if (code) throw new UploadError(code);
+  if (response.status === 429) throw new UploadError('file.tooOften');
+  if (response.status === 403) throw new UploadError('gallery.notParticipant');
+  if (response.status === 404) throw new UploadError('gallery.proofUnavailable');
   throw new UploadError(null);
 }

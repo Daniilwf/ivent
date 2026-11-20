@@ -1,7 +1,16 @@
 import { readFileSync } from 'node:fs';
 import { expect, test, type Locator } from '@playwright/test';
 import { commandId, type Schemas } from '../support/api.ts';
-import { apiOf, live, setUpSeason, signIn, type Player } from '../support/world.ts';
+import {
+  apiOf,
+  complete,
+  live,
+  rollAndStart,
+  seasonOf,
+  setUpSeason,
+  signIn,
+  type Player,
+} from '../support/world.ts';
 
 const board = readFileSync(new URL('../../content/map.demo.background.png', import.meta.url));
 const pictures = [
@@ -185,4 +194,124 @@ test('gallery publishes and filters moments, restores focus, and removes hidden 
   );
 
   await world.adminApi.dispose();
+});
+
+test('the author chooses one approved proof frame and withdraws it in the archive', async ({
+  browser,
+}, info) => {
+  const world = await setUpSeason({ players: ['Лиса'], spectator: true });
+  const [owner] = world.players;
+  if (!owner || !world.spectator)
+    throw new Error('The proof moment needs an owner and a spectator.');
+  const season = `/api/seasons/${world.seasonId}`;
+  const adminSeason = `/api/admin/seasons/${world.seasonId}`;
+  const galleryPath = `/seasons/${world.seasonId}/gallery`;
+  const actor = await apiOf(owner);
+  const [page, viewer] = await Promise.all([
+    signIn(browser, owner),
+    signIn(browser, world.spectator),
+  ]);
+  try {
+    const rules = await world.adminApi.get<Schemas['RulesView']>(`${season}/rules`);
+    await world.adminApi.put(`${adminSeason}/rules`, {
+      expectedVersion: rules.version,
+      ruleset: { ...rules.ruleset, features: { ...rules.ruleset.features, gallery: true } },
+    });
+    await rollAndStart(actor, world.seasonId);
+    await complete(actor, world.seasonId);
+    const run = (await seasonOf(actor, world.seasonId)).me?.lastCompleted;
+    if (!run) throw new Error('An approved run is required.');
+    const first = await actor.upload('/api/files', picture(0), 'first.png');
+    const selected = await actor.upload('/api/files', picture(1), 'second.png');
+    await actor.post(`${season}/runs/${run.id}/proof`, {
+      links: [],
+      files: [first.id, selected.id],
+    });
+    await world.adminApi.post(`${adminSeason}/runs/${run.id}/approve`, {
+      comment: 'Кадры проверены',
+    });
+
+    await page.goto(galleryPath);
+    await page.getByRole('button', { name: 'Добавить момент' }).click();
+    const upload = page.getByRole('dialog', { name: 'Добавить момент' });
+    await upload.getByText('Из одобренного пруфа', { exact: true }).click();
+    await expect(upload.getByRole('radio', { name: 'Из одобренного пруфа' })).toBeChecked();
+    await upload.getByLabel('Одобренный кадр').selectOption(`${run.id}:${selected.id}`);
+    const preview = upload.getByRole('img', { name: 'Выбранный кадр пруфа' });
+    await expect(preview).toHaveAttribute('src', selected.thumbnailUrl);
+    await expect
+      .poll(() => preview.evaluate((image: HTMLImageElement) => image.naturalWidth))
+      .toBeGreaterThan(0);
+    const frameCaption = 'Титры из одобренного пруфа';
+    await upload.getByLabel('Подпись').fill(frameCaption);
+    await page.evaluate(() => document.fonts.ready);
+    const pickerShot = info.outputPath('gallery-proof-picker.png');
+    await page.screenshot({ path: pickerShot, scale: 'css' });
+    await info.attach('approved frame picker', { path: pickerShot, contentType: 'image/png' });
+    await upload.getByRole('button', { name: 'Опубликовать' }).click();
+    await expect(upload).toHaveCount(0);
+
+    const hidden = await actor.post<Schemas['GalleryMomentView']>(`${season}/gallery/proofs`, {
+      itemId: commandId(),
+      runId: run.id,
+      fileId: first.id,
+      caption: 'Скрытый кадр пруфа',
+    });
+    await world.adminApi.post(`${adminSeason}/gallery/${hidden.id}/hide`);
+    for (const to of ['closing', 'finished', 'archived']) {
+      await world.adminApi.post(`${adminSeason}/status`, { to });
+    }
+    await Promise.all([page.goto(galleryPath), viewer.goto(galleryPath)]);
+    const opening = `Открыть момент: ${frameCaption}`;
+    await viewer.getByRole('button', { name: opening }).click();
+    const viewed = viewer.getByRole('dialog', { name: 'Просмотр момента' });
+    await expect(viewed.getByRole('button', { name: 'Отозвать публикацию' })).toHaveCount(0);
+    const image = await viewed
+      .getByRole('img', { name: 'Скриншот игрока Лиса' })
+      .getAttribute('src');
+    if (!image) throw new Error('A public derivative URL was expected.');
+
+    await page.getByRole('button', { name: opening }).click();
+    await page.getByRole('button', { name: 'Отозвать публикацию' }).click();
+    const confirmation = page.getByRole('alertdialog', { name: 'Отозвать публикацию кадра?' });
+    await expect(confirmation).toBeVisible();
+    if (info.project.name === 'phone') {
+      const cancel = await confirmation.getByRole('button', { name: 'Отмена' }).boundingBox();
+      const confirm = await confirmation
+        .getByRole('button', { name: 'Отозвать публикацию' })
+        .boundingBox();
+      expect(cancel && confirm && { x: confirm.x, width: confirm.width }).toEqual(
+        cancel && { x: cancel.x, width: cancel.width },
+      );
+    }
+    const withdrawShot = info.outputPath('gallery-proof-withdrawal.png');
+    await page.screenshot({ path: withdrawShot, scale: 'css' });
+    await info.attach('withdrawal in archive', { path: withdrawShot, contentType: 'image/png' });
+    await confirmation.getByRole('button', { name: 'Отозвать публикацию' }).click();
+    await expect(page.getByText('Публикация отозвана.')).toBeVisible();
+    await expect(viewed).toHaveCount(0, live);
+    expect((await viewer.request.get(image)).status()).toBe(404);
+    await expect(page.getByRole('button', { name: opening })).toHaveCount(0);
+    const hiddenTitle = 'Твои скрытые кадры';
+    const hiddenList = page.getByRole('region', { name: hiddenTitle });
+    await expect(viewer.getByRole('region', { name: hiddenTitle })).toHaveCount(0);
+    const withdrawHidden = hiddenList.getByRole('button', { name: 'Отозвать публикацию' });
+    await expect(withdrawHidden).toHaveAccessibleDescription(/.+/);
+    const hiddenShot = info.outputPath('gallery-hidden-owner.png');
+    await page.screenshot({ path: hiddenShot, scale: 'css' });
+    await info.attach('hidden publication controls', {
+      path: hiddenShot,
+      contentType: 'image/png',
+    });
+    await withdrawHidden.click();
+    await confirmation.getByRole('button', { name: 'Отозвать публикацию' }).click();
+    await expect(hiddenList).toHaveCount(0);
+  } finally {
+    await Promise.all([
+      actor.dispose(),
+      world.adminApi.dispose(),
+      page.context().close(),
+      viewer.context().close(),
+    ]);
+  }
 });

@@ -32,6 +32,8 @@ const statistics: Schemas['SeasonStatisticsView'] = {
   worstRating: 4,
   attacksMade: 0,
   attacksReceived: 1,
+  bestRoll: { runId: 'best', sum: 2, minimum: 1, maximum: 2, luck: 1 },
+  worstRoll: { runId: 'worst', sum: 4, minimum: 2, maximum: 12, luck: 0.2 },
 };
 
 describe('SeasonRecap', () => {
@@ -47,6 +49,8 @@ describe('SeasonRecap', () => {
     expect(details.getByText('0')).toBeInTheDocument();
     expect(details.getByText(t.hours)).toBeInTheDocument();
     expect(details.getByText('12,75')).toBeInTheDocument();
+    expect(details.getByText('100 %')).toBeInTheDocument();
+    expect(details.getByText('Сумма 4, диапазон 2–12')).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: t.download }));
     expect(downloadRecap).toHaveBeenCalledWith({
@@ -62,7 +66,40 @@ describe('SeasonRecap', () => {
         { label: t.attacksMade, value: '0' },
         { label: t.attacksReceived, value: '1' },
       ],
+      rolls: [
+        { label: t.bestRoll, value: '100\u00a0%', detail: 'Сумма 2, диапазон 1–2' },
+        { label: t.worstRoll, value: '20\u00a0%', detail: 'Сумма 4, диапазон 2–12' },
+      ],
     });
+  });
+
+  it.each([
+    { roll: null, empty: true },
+    { roll: undefined, empty: false },
+  ])(
+    'shows the empty roll message only when the server measures dice ($roll)',
+    async ({ roll, empty }) => {
+      fakeServer({ [path]: { ...statistics, bestRoll: roll, worstRoll: roll } });
+      render(<SeasonRecap seasonId={seasonId} user={user} onSignedOut={vi.fn()} />);
+
+      const card = within(await screen.findByRole('article', { name: user.name }));
+      expect(card.queryAllByText(t.noRolls)).toHaveLength(empty ? 1 : 0);
+      expect(card.queryAllByRole('heading', { name: t.rolls })).toHaveLength(empty ? 1 : 0);
+    },
+  );
+
+  it('refreshes relative luck when dice are rerolled', async () => {
+    let bestRoll = statistics.bestRoll;
+    fakeServer({ [path]: () => json(200, { ...statistics, bestRoll }) });
+    render(<SeasonRecap seasonId={seasonId} user={user} onSignedOut={vi.fn()} />);
+    expect(await screen.findByText('100 %')).toBeInTheDocument();
+
+    bestRoll = { runId: 'best', sum: 3, minimum: 1, maximum: 5, luck: 0.5 };
+    act(() =>
+      notify?.([{ seasonId, fromSequence: 1, toSequence: 1, types: ['run-dice-rerolled'] }]),
+    );
+    expect(await screen.findByText('50 %')).toBeInTheDocument();
+    expect(screen.queryByText('100 %')).toBeNull();
   });
 
   it.each([

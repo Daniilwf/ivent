@@ -1,4 +1,4 @@
-import { EyeOff, ImageOff } from 'lucide-react';
+import { EyeOff, ImageOff, Undo2 } from 'lucide-react';
 import { useState, type RefObject } from 'react';
 import { moscowTime } from '../app/time';
 import { ReactionButtons, type ChangeReaction } from '../feed/ReviewReactionButtons';
@@ -12,11 +12,81 @@ import type { GalleryMoment } from './galleryApi';
 
 const t = ru.gallery;
 
+export type GalleryMomentAction = 'hide' | 'withdraw';
+type ChangeVisibility = (id: string, action: GalleryMomentAction) => Promise<boolean>;
+
+const momentActions = {
+  hide: {
+    Icon: EyeOff,
+    label: t.hide,
+    question: t.hideQuestion,
+    consequence: t.hideConsequence,
+    failed: t.hideFailed,
+  },
+  withdraw: {
+    Icon: Undo2,
+    label: t.withdraw,
+    question: t.withdrawQuestion,
+    consequence: t.withdrawConsequence,
+    failed: t.withdrawFailed,
+  },
+};
+
+export function GalleryMomentConfirm({
+  id,
+  action,
+  changeVisibility,
+  describedBy,
+}: {
+  id: string;
+  action: GalleryMomentAction;
+  changeVisibility: ChangeVisibility;
+  describedBy?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const { Icon, label, question, consequence, failed: failure } = momentActions[action];
+
+  async function confirmChange() {
+    setBusy(true);
+    setFailed(false);
+    if (!(await changeVisibility(id, action))) {
+      setBusy(false);
+      setFailed(true);
+    }
+  }
+
+  return (
+    <Confirm
+      trigger={
+        <Button aria-describedby={describedBy} icon={<Icon size={18} aria-hidden />}>
+          {label}
+        </Button>
+      }
+      title={question}
+      consequences={[consequence]}
+      confirm={label}
+      stackActionsOnPhone={action === 'withdraw'}
+      open={open}
+      onOpenChange={(next) => {
+        if (busy) return;
+        setOpen(next);
+        setFailed(false);
+      }}
+      busy={busy}
+      onConfirm={() => void confirmChange()}
+    >
+      {failed ? <Notice tone="danger">{failure}</Notice> : null}
+    </Confirm>
+  );
+}
+
 export function GalleryMomentDialog({
   item,
   close,
   admin,
-  hide,
+  changeVisibility,
   changeReaction,
   reactionsUnavailable,
   returnFocus,
@@ -24,24 +94,12 @@ export function GalleryMomentDialog({
   item: GalleryMoment;
   close: () => void;
   admin: boolean;
-  hide: (id: string) => Promise<boolean>;
+  changeVisibility: ChangeVisibility;
   changeReaction: ChangeReaction;
   reactionsUnavailable: boolean;
   returnFocus: RefObject<HTMLElement | null>;
 }) {
   const [picture, setPicture] = useState<'loading' | 'ready' | 'missing'>('loading');
-  const [confirm, setConfirm] = useState(false);
-  const [hiding, setHiding] = useState(false);
-  const [hideFailed, setHideFailed] = useState(false);
-
-  async function confirmHide() {
-    setHiding(true);
-    const hidden = await hide(item.id);
-    if (!hidden) {
-      setHiding(false);
-      setHideFailed(true);
-    }
-  }
 
   return (
     <FormDialog
@@ -94,24 +152,18 @@ export function GalleryMomentDialog({
       {reactionsUnavailable && item.reactions?.length ? (
         <Notice tone="warning">{t.reactionsUnavailable}</Notice>
       ) : null}
-      {admin ? (
-        <div className="grid justify-items-start">
-          <Confirm
-            trigger={<Button icon={<EyeOff size={18} aria-hidden />}>{t.hide}</Button>}
-            title={t.hideQuestion}
-            consequences={[t.hideConsequence]}
-            confirm={t.hide}
-            open={confirm}
-            onOpenChange={(open) => {
-              if (hiding) return;
-              setConfirm(open);
-              setHideFailed(false);
-            }}
-            busy={hiding}
-            onConfirm={() => void confirmHide()}
-          >
-            {hideFailed ? <Notice tone="danger">{t.hideFailed}</Notice> : null}
-          </Confirm>
+      {item.canWithdraw || admin ? (
+        <div className="flex flex-wrap gap-2">
+          {item.canWithdraw ? (
+            <GalleryMomentConfirm
+              id={item.id}
+              action="withdraw"
+              changeVisibility={changeVisibility}
+            />
+          ) : null}
+          {admin ? (
+            <GalleryMomentConfirm id={item.id} action="hide" changeVisibility={changeVisibility} />
+          ) : null}
         </div>
       ) : null}
     </FormDialog>

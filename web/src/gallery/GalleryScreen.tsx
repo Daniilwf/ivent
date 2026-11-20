@@ -21,7 +21,12 @@ import { Select } from '../ui/Field';
 import { Skeleton } from '../ui/Progress';
 import { EmptyState, ErrorState, Notice } from '../ui/States';
 import { Sticker } from '../ui/Sticker';
-import { GalleryMomentDialog, GalleryThumbnail } from './GalleryMomentDialog';
+import {
+  GalleryMomentConfirm,
+  GalleryMomentDialog,
+  GalleryThumbnail,
+  type GalleryMomentAction,
+} from './GalleryMomentDialog';
 import { GalleryUploadDialog } from './GalleryUploadDialog';
 import { readGallery, type Gallery, type GalleryAnswer, type GalleryMoment } from './galleryApi';
 
@@ -31,6 +36,10 @@ const grid = 'grid min-w-0 grid-cols-2 gap-3 desk:grid-cols-3 desk:gap-4';
 const refreshEvents = new Set([
   'gallery-moment-published',
   'gallery-moment-hidden',
+  'gallery-proof-moment-published',
+  'gallery-proof-consent-withdrawn',
+  'proof-submitted',
+  'proof-rejected',
   'ruleset-changed',
   'command-undone',
   'season-status-changed',
@@ -226,7 +235,7 @@ function GalleryContents({
     setOpenItem(null);
   }
 
-  // A live hide can take away the focused card together with its modal.
+  // A live removal can take away the focused card together with its modal.
   useEffect(() => {
     if (!openItem || shownItem) return;
     const frame = requestAnimationFrame(() => {
@@ -258,7 +267,17 @@ function GalleryContents({
   }
 
   function removeMoment(id: string) {
-    update((current) => ({ ...current, items: current.items.filter((item) => item.id !== id) }));
+    update((current) => ({
+      ...current,
+      items: current.items.filter((item) => item.id !== id),
+      ...(current.hiddenProofPublications
+        ? {
+            hiddenProofPublications: current.hiddenProofPublications.filter(
+              (item) => item.id !== id,
+            ),
+          }
+        : {}),
+    }));
   }
 
   function recordReactionUpdate(id: string) {
@@ -318,16 +337,23 @@ function GalleryContents({
     };
   }, [reactionTarget, reactionVersion]);
 
-  async function hide(id: string) {
+  async function changeVisibility(id: string, action: GalleryMomentAction) {
     try {
-      const { response } = await api.POST('/api/admin/seasons/{seasonId}/gallery/{itemId}/hide', {
+      const route =
+        action === 'withdraw'
+          ? '/api/seasons/{seasonId}/gallery/{itemId}/withdraw'
+          : '/api/admin/seasons/{seasonId}/gallery/{itemId}/hide';
+      const { response } = await api.POST(route, {
         params: { path: { seasonId, itemId: id } },
         body: { commandId: newCommandId() },
       });
       if (response.status === 401) onSignedOut();
       if (response.ok || response.status === 404) {
-        setStatus(t.hidden);
+        setStatus(action === 'withdraw' ? t.withdrawn : t.hidden);
         removeMoment(id);
+        if (data?.hiddenProofPublications?.some((item) => item.id === id)) {
+          requestAnimationFrame(() => heading.current?.focus());
+        }
         return true;
       }
     } catch {
@@ -417,6 +443,35 @@ function GalleryContents({
         ) : null}
       </div>
       {status ? <Notice tone="success">{status}</Notice> : null}
+      {data?.hiddenProofPublications?.length ? (
+        <section aria-labelledby="gallery-hidden-proofs" className="grid max-w-150 gap-2">
+          <h2 id="gallery-hidden-proofs" className="font-bold">
+            {t.hiddenProofs}
+          </h2>
+          <ul className="grid gap-2">
+            {data.hiddenProofPublications.map(({ id, createdAt }) => (
+              <li
+                key={id}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-md border-2 border-muted bg-card p-2"
+              >
+                <time
+                  id={`gallery-hidden-date-${id}`}
+                  className="text-sm text-ink-soft"
+                  dateTime={createdAt}
+                >
+                  {moscowTime(createdAt)}
+                </time>
+                <GalleryMomentConfirm
+                  id={id}
+                  action="withdraw"
+                  describedBy={`gallery-hidden-date-${id}`}
+                  changeVisibility={changeVisibility}
+                />
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
       {readIssue && data ? (
         <div className="flex flex-wrap items-center gap-2">
           <Notice tone="warning">{readIssue === 'tooOften' ? t.tooOften : t.retryRead}</Notice>
@@ -528,7 +583,7 @@ function GalleryContents({
           item={shownItem}
           close={closeMoment}
           admin={admin}
-          hide={hide}
+          changeVisibility={changeVisibility}
           changeReaction={changeReaction}
           reactionsUnavailable={reactionsUnavailable}
           returnFocus={momentFocus}

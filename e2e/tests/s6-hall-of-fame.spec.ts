@@ -128,7 +128,7 @@ test('a spectator opens the hall from navigation and reads archived winners and 
         navLink.press('Enter'),
       ]);
       expect(recordResponse.ok()).toBe(true);
-      const { longestGames, fastestFinishes } =
+      const { longestGames, fastestFinishes, largestRolls } =
         (await recordResponse.json()) as Schemas['HallOfFameRecordsView'];
       expect(longestGames.some((record) => record.runId === run.id)).toBe(true);
       expect(fastestFinishes.length).toBeGreaterThan(0);
@@ -205,6 +205,19 @@ test('a spectator opens the hall from navigation and reads archived winners and 
         await expect(row.getByText(finish.name, { exact: true })).toBeVisible();
       }
       await capture(page, info, 'hall-of-fame-fastest');
+
+      const largest = page.getByRole('region', { name: 'Самый большой бросок' });
+      const largestHeading = largest.getByRole('heading', { level: 2 });
+      await largestHeading.evaluate((heading) => {
+        heading.scrollIntoView({ block: 'start' });
+      });
+      await expect(largestHeading).toBeInViewport();
+      expect(largestRolls.length).toBeGreaterThan(0);
+      await expect(largest.getByRole('listitem')).toHaveCount(largestRolls.length);
+      await expect(largest.getByRole('listitem')).toHaveText(
+        largestRolls.map(({ name, seasonName }) => `${name}${seasonName}`),
+      );
+      await capture(page, info, 'hall-of-fame-largest');
 
       await gameLinks
         .and(records.locator(`a[href="/games/${run.game.id}"]`))

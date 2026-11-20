@@ -15,12 +15,16 @@ public sealed class AchievementPublishingTests
     private static readonly IReadOnlyDictionary<string, ObjectDefinition> s_examples = EconomyScenario.Examples();
 
     [Fact]
-    public void A_lifetime_achievement_is_refused_until_lifetime_storage_is_supported()
+    public void A_lifetime_achievement_with_a_seasonal_condition_is_refused()
     {
         var s = WithAchievements();
-        var pack = EconomyScenario.ExamplePack("jackpot");
+        var jackpot = s_examples["jackpot"];
+        var pack = new ContentPack
+        {
+            Objects = [jackpot with { Effect = jackpot.Effect! with { Condition = s_examples["unbreakable"].Effect!.Condition } }],
+        };
 
-        Assert.Contains(ContentPublishing.Check(pack, achievements: true), e => e.Path == "$.objects[0].scope");
+        Assert.Contains(ContentPublishing.Check(pack, achievements: true), e => e.Path == "$.objects[0].effect.condition");
         s.Act(new PublishContent(pack, "Проверка определения"));
         Assert.Equal(RejectionCodes.ContentInvalid, s.Last.Rejection?.Code);
         Assert.False(s.State.Catalog.Objects.ContainsKey("jackpot"));

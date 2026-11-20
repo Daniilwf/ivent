@@ -347,7 +347,7 @@ public static class FileEndpoints
             return content;
         }, kind, limits, ct);
 
-    private static async Task<(ProcessedFile? Picture, IResult? Failure)> ProcessPictureAsync(
+    internal static async Task<(ProcessedFile? Picture, IResult? Failure)> ProcessPictureAsync(
         Func<CancellationToken, ValueTask<byte[]>> readAsync, FileKind kind, FileLimits limits, CancellationToken ct)
     {
         if (!await s_processing.WaitAsync(s_processingWait, ct))

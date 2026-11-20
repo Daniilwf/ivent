@@ -245,10 +245,29 @@ public partial class EventFormatTests
             """{"playerId":"10000000-0000-0000-0000-000000000001","achievement":{"objectId":"unbreakable","name":"Непробиваемый","description":"Пять атак","earnedAt":"2026-10-01T12:30:00+00:00"}}"""
         },
         {
+            "lifetime-achievement-earned",
+            new LifetimeAchievementEarned(s_player, new PlayerAchievement("jackpot", "Джекпот", "Три максимума", s_at)),
+            1,
+            """{"playerId":"10000000-0000-0000-0000-000000000001","achievement":{"objectId":"jackpot","name":"Джекпот","description":"Три максимума","earnedAt":"2026-10-01T12:30:00+00:00"}}"""
+        },
+        {
             "gallery-moment-published",
             new GalleryMomentPublished(s_run, s_user, s_player, s_game, "Скриншот", s_at, new DateOnly(2026, 10, 1)),
             1,
             """{"itemId":"00000000-0000-0000-0000-000000000001","userId":"40000000-0000-0000-0000-000000000001","playerId":"10000000-0000-0000-0000-000000000001","fileId":"20000000-0000-0000-0000-000000000001","caption":"Скриншот","createdAt":"2026-10-01T12:30:00+00:00","createdDay":"2026-10-01"}"""
+        },
+        {
+            "gallery-proof-moment-published",
+            new GalleryProofMomentPublished(s_run, s_user, s_player, s_game, "Скриншот", s_at, new DateOnly(2026, 10, 1),
+                new GalleryProofSource(s_run, s_season, s_user)),
+            1,
+            """{"itemId":"00000000-0000-0000-0000-000000000001","userId":"40000000-0000-0000-0000-000000000001","playerId":"10000000-0000-0000-0000-000000000001","fileId":"20000000-0000-0000-0000-000000000001","caption":"Скриншот","createdAt":"2026-10-01T12:30:00+00:00","createdDay":"2026-10-01","proofSource":{"runId":"00000000-0000-0000-0000-000000000001","fileId":"30000000-0000-0000-0000-000000000001","approvalCommandId":"40000000-0000-0000-0000-000000000001"}}"""
+        },
+        {
+            "gallery-proof-consent-withdrawn",
+            new GalleryProofConsentWithdrawn(s_run),
+            1,
+            """{"itemId":"00000000-0000-0000-0000-000000000001"}"""
         },
         {
             "gallery-moment-hidden",

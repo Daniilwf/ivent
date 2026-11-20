@@ -16,6 +16,7 @@ const t = ru.hallOfFame;
 const winnersTitleId = 'hall-of-fame-winners-title';
 const recordTitleId = 'hall-of-fame-record-title';
 const fastestTitleId = 'hall-of-fame-fastest-title';
+const largestTitleId = 'hall-of-fame-largest-title';
 
 const loadWinners = async () => answerOf(await api.GET('/api/hall-of-fame'));
 const loadRecords = async () => answerOf(await api.GET('/api/hall-of-fame/records'));
@@ -29,14 +30,21 @@ export function HallOfFameScreen({ onSignedOut }: { onSignedOut: () => void }) {
   const availableRecords: Partial<Schemas['HallOfFameRecordsView']> =
     records.kind === 'ready' ? records.value : {};
   const fastest = availableRecords.fastestFinishes ?? [];
-  const hasLongest = records.kind === 'ready' && records.value.longestGames.length > 0;
+  const largest = availableRecords.largestRolls ?? [];
+  const hasLongest = Boolean(availableRecords.longestGames?.length);
   const hasFastest = fastest.length > 0;
-  const hasRecord = hasLongest || hasFastest;
+  const hasLargest = largest.length > 0;
+  const recordTitles = [
+    hasLongest && recordTitleId,
+    hasFastest && fastestTitleId,
+    hasLargest && largestTitleId,
+  ].filter(Boolean);
+  const recordTarget = recordTitles[0];
   const noResults =
     winners.kind === 'ready' &&
     winners.value.length === 0 &&
     records.kind === 'ready' &&
-    !hasRecord;
+    !recordTarget;
   useRestoredScroll(winners.kind !== 'loading' && records.kind !== 'loading');
 
   return (
@@ -49,9 +57,9 @@ export function HallOfFameScreen({ onSignedOut }: { onSignedOut: () => void }) {
         >
           {ru.nav.hallOfFame}
         </h1>
-        {hasRecord ? (
+        {recordTarget ? (
           <a
-            href={`#${hasLongest ? recordTitleId : fastestTitleId}`}
+            href={`#${recordTarget}`}
             className={cx(standaloneLink, 'font-bold text-action-strong desk:hidden')}
             onClick={(event) => {
               const target = recordHeading.current;
@@ -63,7 +71,7 @@ export function HallOfFameScreen({ onSignedOut }: { onSignedOut: () => void }) {
               target.scrollIntoView({ block: 'start' });
             }}
           >
-            {hasLongest && hasFastest ? t.toRecords : t.toRecord}
+            {recordTitles.length > 1 ? t.toRecords : t.toRecord}
           </a>
         ) : null}
       </header>
@@ -85,7 +93,7 @@ export function HallOfFameScreen({ onSignedOut }: { onSignedOut: () => void }) {
             </AsyncState>
           </section>
           <div className="grid min-w-0 gap-4 desk:gap-5">
-            {hasLongest || !hasFastest ? (
+            {hasLongest || !recordTarget ? (
               <RecordPanel title={t.record} titleId={recordTitleId} heading={recordHeading}>
                 <AsyncState loaded={records} rows={1} errorTitle={t.recordError}>
                   {({ longestGames }) => <LongestGames games={longestGames} />}
@@ -96,9 +104,18 @@ export function HallOfFameScreen({ onSignedOut }: { onSignedOut: () => void }) {
               <RecordPanel
                 title={t.fastestFinish}
                 titleId={fastestTitleId}
-                heading={hasLongest ? null : recordHeading}
+                heading={recordTarget === fastestTitleId ? recordHeading : null}
               >
                 <FastestFinishes finishes={fastest} />
+              </RecordPanel>
+            ) : null}
+            {hasLargest ? (
+              <RecordPanel
+                title={t.largestRoll}
+                titleId={largestTitleId}
+                heading={recordTarget === largestTitleId ? recordHeading : null}
+              >
+                <LargestRolls rolls={largest} />
               </RecordPanel>
             ) : null}
           </div>
@@ -202,9 +219,37 @@ function FastestFinishes({ finishes }: { finishes: Schemas['HallOfFameFinishView
       <p className="font-display text-2xl font-heavy wrap-anywhere tabular-nums desk:text-3xl">
         {t.finishTime(first.elapsedSeconds)}
       </p>
-      <ul className="grid gap-2">
-        {finishes.map(({ seasonId, seasonName, playerId, name, profileUserId }) => (
-          <li key={`${seasonId}:${playerId}`} className="min-w-0 wrap-anywhere">
+      <RecordHolders holders={finishes} />
+    </>
+  );
+}
+
+function LargestRolls({ rolls }: { rolls: Schemas['HallOfFameRollView'][] }) {
+  const first = rolls[0];
+  if (!first) return null;
+
+  return (
+    <>
+      <p className="font-display text-2xl font-heavy wrap-anywhere tabular-nums desk:text-3xl">
+        {first.sum.toLocaleString('ru-RU')}
+      </p>
+      <RecordHolders holders={rolls} />
+    </>
+  );
+}
+
+function RecordHolders({
+  holders,
+}: {
+  holders: (Schemas['HallOfFameFinishView'] | Schemas['HallOfFameRollView'])[];
+}) {
+  return (
+    <ul className="grid gap-2">
+      {holders.map((holder) => {
+        const { seasonId, seasonName, playerId, name, profileUserId } = holder;
+        const key = 'runId' in holder ? holder.runId : `${seasonId}:${playerId}`;
+        return (
+          <li key={key} className="min-w-0 wrap-anywhere">
             {profileUserId ? (
               <Link
                 to={paths.profile(profileUserId)}
@@ -217,9 +262,9 @@ function FastestFinishes({ finishes }: { finishes: Schemas['HallOfFameFinishView
             )}
             <p className="text-sm text-ink-soft">{seasonName}</p>
           </li>
-        ))}
-      </ul>
-    </>
+        );
+      })}
+    </ul>
   );
 }
 

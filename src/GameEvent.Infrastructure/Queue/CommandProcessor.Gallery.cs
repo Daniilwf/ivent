@@ -10,22 +10,29 @@ namespace GameEvent.Infrastructure.Queue;
 public sealed partial class CommandProcessor
 {
     private static async Task<PreparedGalleryFile?> CheckGalleryFileAsync(
-        GameEventDbContext db, PublishGalleryMoment command, PreparedGalleryFile? prepared, CancellationToken ct)
+        GameEventDbContext db, Guid seasonId, IWriteGalleryMoment command, PreparedGalleryFile? prepared, CancellationToken ct)
     {
         if (prepared is not { Bytes: > 0, Width: > 0, Height: > 0, Frames: 1 }
             || prepared.FileId == Guid.Empty
             || prepared.MediaType != FileNames.Webp
-            || !string.Equals(prepared.ImageSha256, command.ImageSha256, StringComparison.OrdinalIgnoreCase)
             || await db.Files.AnyAsync(file => file.Id == prepared.FileId, ct))
         {
             return null;
         }
 
-        return prepared;
+        return command switch
+        {
+            PublishGalleryMoment standalone when string.Equals(prepared.ImageSha256, standalone.ImageSha256, StringComparison.OrdinalIgnoreCase)
+                => prepared,
+            PublishProofGalleryMoment proof when prepared.ProofApprovalCommandId is { } expected
+                && (await GalleryProofSources.FindAsync(db, seasonId, proof.RunId, proof.FileId, proof.UserId, ct))?.ApprovalCommandId == expected
+                => prepared,
+            _ => null,
+        };
     }
 
     private static void RecordGalleryFile(
-        GameEventDbContext db, Guid seasonId, GalleryMomentPublished published, PreparedGalleryFile prepared)
+        GameEventDbContext db, Guid seasonId, IGalleryMomentPublished published, PreparedGalleryFile prepared)
     {
         if (published.FileId != prepared.FileId)
         {

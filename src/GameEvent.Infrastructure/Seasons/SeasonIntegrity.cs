@@ -101,9 +101,10 @@ public static class SeasonIntegrity
     private static async Task<IEnumerable<string>> GalleryMediaDifferencesAsync(GameEventDbContext db, Guid seasonId, CancellationToken ct)
     {
         var bindings = await db.GalleryMediaBindings.AsNoTracking().Where(binding => binding.SeasonId == seasonId).ToListAsync(ct);
-        var rows = await db.Events.AsNoTracking().Where(e => e.SeasonId == seasonId && e.Type == GalleryMomentPublished.Type)
+        var rows = await db.Events.AsNoTracking()
+            .Where(e => e.SeasonId == seasonId && (e.Type == GalleryMomentPublished.Type || e.Type == GalleryProofMomentPublished.Type))
             .Select(e => new StoredEvent(e.Type, e.Version, e.Data)).ToListAsync(ct);
-        var publications = rows.Select(EventCodec.Decode).OfType<GalleryMomentPublished>().ToLookup(publication => publication.FileId);
+        var publications = rows.Select(EventCodec.Decode).OfType<IGalleryMomentPublished>().ToLookup(publication => publication.FileId);
         var ids = bindings.Select(binding => binding.FileId).Concat(publications.Select(group => group.Key)).Distinct().ToList();
         if (ids.Count == 0)
         {

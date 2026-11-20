@@ -17,7 +17,12 @@ const refreshEvents = new Set([
   'ruleset-changed',
   'command-undone',
   'run-completed',
+  'completion-rolled',
   'run-hours-corrected',
+  'run-difficulty-changed',
+  'run-condition-checked',
+  'run-dice-modified',
+  'run-dice-rerolled',
   'run-reviewed',
   'proof-rejected',
   'coop-reward-split',
@@ -158,6 +163,16 @@ export function RecapPreview({ card }: { card: RecapCard }) {
           <MetricPair metrics={card.attacks} />
         </section>
       </div>
+      {card.rolls !== null && (
+        <section className="grid min-w-0 gap-2 border-t border-muted pt-4 desk:pt-5">
+          <h3 className="font-display text-sm font-heavy">{t.rolls}</h3>
+          {card.rolls.length ? (
+            <MetricPair metrics={card.rolls} />
+          ) : (
+            <p className="text-sm text-ink-soft">{t.noRolls}</p>
+          )}
+        </section>
+      )}
     </article>
   );
 }
@@ -165,7 +180,7 @@ export function RecapPreview({ card }: { card: RecapCard }) {
 function MetricPair({ metrics }: { metrics: RecapMetric[] }) {
   return (
     <dl className="grid grid-cols-2 gap-x-2 desk:gap-x-3">
-      {metrics.map(({ label, value, unit }) => (
+      {metrics.map(({ label, value, unit, detail }) => (
         <div key={label} className="flex min-w-0 flex-col-reverse gap-1">
           <dt className="text-xs wrap-anywhere text-ink-soft desk:text-sm">{label}</dt>
           <dd className="flex flex-wrap items-baseline gap-x-1">
@@ -173,6 +188,9 @@ function MetricPair({ metrics }: { metrics: RecapMetric[] }) {
               {value}
             </span>
             {unit ? <span className="text-xs text-ink-soft">{unit}</span> : null}
+            {detail ? (
+              <span className="basis-full text-xs wrap-anywhere text-ink-soft">{detail}</span>
+            ) : null}
           </dd>
         </div>
       ))}

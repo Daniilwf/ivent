@@ -80,7 +80,8 @@ internal static class EffectChain
         }
 
         IReadOnlyList<ITriggerHandler> handlers =
-            [Decks.EventCells.Instance, EffectTriggers.Instance, Achievements.SeasonalAchievements.Instance, .. context.Triggers ?? []];
+            [Decks.EventCells.Instance, EffectTriggers.Instance, Achievements.SeasonalAchievements.Instance,
+                Achievements.LifetimeAchievements.Instance, .. context.Triggers ?? []];
         var limits = ChainLimits.Of(state);
 
         var written = new List<IGameEvent>();

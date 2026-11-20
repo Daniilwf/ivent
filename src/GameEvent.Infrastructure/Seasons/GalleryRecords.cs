@@ -12,6 +12,10 @@ public sealed class GalleryMomentRecord
     public DateTimeOffset CreatedAt { get; init; }
     public DateOnly CreatedDay { get; init; }
     public bool Hidden { get; set; }
+    public Guid? ProofRunId { get; init; }
+    public Guid? ProofFileId { get; init; }
+    public Guid? ProofApprovalCommandId { get; init; }
+    public bool ConsentRevoked { get; set; }
 }
 
 /// <summary>Local files belong to exactly one season and gallery publication. The archive does not create bindings.</summary>

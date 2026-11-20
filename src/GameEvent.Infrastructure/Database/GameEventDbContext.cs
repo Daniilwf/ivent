@@ -20,6 +20,8 @@ public sealed class GameEventDbContext(DbContextOptions<GameEventDbContext> opti
 
     public DbSet<PlayerAchievementRecord> PlayerAchievements => Set<PlayerAchievementRecord>();
 
+    public DbSet<AccountAchievementRecord> AccountAchievements => Set<AccountAchievementRecord>();
+
     public DbSet<RulesetRecord> Rulesets => Set<RulesetRecord>();
 
     public DbSet<SeasonResultRecord> SeasonResults => Set<SeasonResultRecord>();
@@ -152,6 +154,17 @@ public sealed class GameEventDbContext(DbContextOptions<GameEventDbContext> opti
             e.ToTable("PlayerAchievement");
             e.HasKey(x => new { x.PlayerId, x.ObjectId });
             e.HasOne<SeasonPlayerRecord>().WithMany().HasForeignKey(x => x.PlayerId);
+            e.Property(x => x.Name).HasMaxLength(Engine.Content.ContentValidator.MaxNameLength);
+            e.Property(x => x.Description).HasMaxLength(Engine.Content.ContentValidator.MaxDescriptionLength);
+        });
+
+        modelBuilder.Entity<AccountAchievementRecord>(e =>
+        {
+            e.ToTable("AccountAchievement");
+            e.HasKey(x => new { x.UserId, x.ObjectId });
+            e.HasOne<UserRecord>().WithMany().HasForeignKey(x => x.UserId);
+            e.HasOne<SeasonPlayerRecord>().WithMany().HasForeignKey(x => x.PlayerId);
+            e.HasOne<SeasonRecord>().WithMany().HasForeignKey(x => x.SeasonId);
             e.Property(x => x.Name).HasMaxLength(Engine.Content.ContentValidator.MaxNameLength);
             e.Property(x => x.Description).HasMaxLength(Engine.Content.ContentValidator.MaxDescriptionLength);
         });

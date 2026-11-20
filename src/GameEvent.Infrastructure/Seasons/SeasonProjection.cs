@@ -20,7 +20,8 @@ namespace GameEvent.Infrastructure.Seasons;
 internal static partial class SeasonProjection
 {
     public static async Task WriteAsync(
-        GameEventDbContext db, SeasonState before, SeasonState after, DateTimeOffset now, Guid? authorId, CancellationToken ct)
+        GameEventDbContext db, SeasonState before, SeasonState after, DateTimeOffset now, Guid? authorId, CancellationToken ct,
+        bool writeLifetimeAchievements = true)
     {
         if (before.RulesetVersion != after.RulesetVersion)
         {
@@ -129,6 +130,10 @@ internal static partial class SeasonProjection
             record.EconomyJson = player.Economy is null ? null : JsonSerializer.Serialize(player.Economy, EngineJson.Options);
             record.NextTimerAt = Engine.Economy.Timers.Next(after, player);
             await WriteAchievementsAsync(db, id, old?.Achievements ?? default, player.Achievements, ct);
+            if (writeLifetimeAchievements)
+            {
+                await WriteLifetimeAchievementsAsync(db, after.SeasonId, player, old?.LifetimeAchievements ?? default, ct);
+            }
 
             // Exclusions grow within a season (D-08), a tech reroll turned into a drop changes its reason (D-11), an undo
             // takes back those its command added (D-104).
@@ -421,6 +426,8 @@ internal static partial class SeasonProjection
             .ToLookup(x => x.PlayerId);
         var achievements = (await db.PlayerAchievements.AsNoTracking().Where(x => playerIds.Contains(x.PlayerId)).ToListAsync(ct))
             .ToLookup(x => x.PlayerId);
+        var lifetimeAchievements = (await db.AccountAchievements.AsNoTracking().Where(x => x.SeasonId == replayed.SeasonId).ToListAsync(ct))
+            .ToLookup(x => (x.PlayerId, x.UserId));
 
         var stored = replayed with
         {
@@ -451,6 +458,8 @@ internal static partial class SeasonProjection
                     p.EconomyJson is null ? null : JsonSerializer.Deserialize<Engine.Inventory.PlayerEconomy>(p.EconomyJson, EngineJson.Options),
                     replayed.Players.TryGetValue(p.Id, out var waiting) ? waiting.Suspended : default,
                     [.. achievements[p.Id].OrderBy(row => row.Position).Select(row =>
+                        new Engine.Achievements.PlayerAchievement(row.ObjectId, row.Name, row.Description, row.EarnedAt))],
+                    [.. lifetimeAchievements[(p.Id, p.UserId)].OrderBy(row => row.Position).Select(row =>
                         new Engine.Achievements.PlayerAchievement(row.ObjectId, row.Name, row.Description, row.EarnedAt))])),
             Runs = runs.ToImmutableSortedDictionary(
                 r => r.Id,

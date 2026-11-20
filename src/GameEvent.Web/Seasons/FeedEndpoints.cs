@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using GameEvent.Engine.Comments;
+using GameEvent.Engine.Content;
 using GameEvent.Engine.Gallery;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Map;
@@ -76,8 +77,9 @@ public sealed record ProfileSeasonView(
 /// <summary>A review the user left: the game, the season, the rating and the text (SPEC «Отзыв»).</summary>
 public sealed record ProfileReviewView(Guid RunId, Guid GameId, string GameTitle, Guid SeasonId, string SeasonName, int Rating, string? Text, DateTimeOffset? CompletedAt);
 
-/// <summary>A seasonal badge, with the title and description it had when awarded.</summary>
-public sealed record ProfileAchievementView(Guid SeasonId, string ObjectId, string Name, string Description, DateTimeOffset EarnedAt);
+/// <summary>A badge, with its origin season and the title and description it had when awarded.</summary>
+public sealed record ProfileAchievementView(Guid SeasonId, string ObjectId, string Name, string Description, DateTimeOffset EarnedAt,
+    AchievementScope? Scope = null);
 
 /// <summary>
 /// A user's profile (D-124): the name, the avatar, the seasons they played and their reviews. <c>completed</c> — games
@@ -160,6 +162,7 @@ public static class FeedEndpoints
             .Where(e => e.SeasonId == seasonId && e.Type != ReviewReactionSet.Type && e.Type != FeedReactionSet.Type && e.Type != GalleryReactionSet.Type
                 && e.Type != CommentPosted.Type && e.Type != CommentEdited.Type && e.Type != CommentDeleted.Type && e.Type != CommentHidden.Type
                 && e.Type != GalleryMomentPublished.Type && e.Type != GalleryMomentHidden.Type
+                && e.Type != GalleryProofMomentPublished.Type && e.Type != GalleryProofConsentWithdrawn.Type
                 && (before == null || e.Sequence < before))
             .OrderByDescending(e => e.Sequence)
             .Take(limit)
@@ -418,11 +421,15 @@ public static class FeedEndpoints
         var partnered = (await CoopPartnerRuns.LoadAsync(db, seasonIds, playerIds, ct)).Count(r => r.Status == RunStatus.Completed);
         var seasonByPlayer = players.ToDictionary(player => player.Id, player => player.SeasonId);
         var badges = await db.PlayerAchievements.AsNoTracking().Where(badge => playerIds.Contains(badge.PlayerId)).ToListAsync(ct);
-        var achievements = badges.GroupBy(badge => seasonByPlayer[badge.PlayerId])
+        var lifetimeBadges = await db.AccountAchievements.AsNoTracking().Where(badge => badge.UserId == userId).ToListAsync(ct);
+        var achievements = badges.Select(badge => new ProfileAchievementView(
+                seasonByPlayer[badge.PlayerId], badge.ObjectId, badge.Name, badge.Description, badge.EarnedAt))
+            .Concat(lifetimeBadges.Select(badge => new ProfileAchievementView(
+                badge.SeasonId, badge.ObjectId, badge.Name, badge.Description, badge.EarnedAt, AchievementScope.AllTime)))
+            .GroupBy(badge => badge.SeasonId)
             .Where(group => seasons.TryGetValue(group.Key, out var season)
                 && JsonSerializer.Deserialize<Ruleset>(season.RulesetJson, EngineJson.Options)?.Features.Achievements == true)
-            .SelectMany(group => group.Select(badge => new ProfileAchievementView(
-                group.Key, badge.ObjectId, badge.Name, badge.Description, badge.EarnedAt)))
+            .SelectMany(group => group)
             .OrderByDescending(badge => badge.EarnedAt).ThenBy(badge => badge.SeasonId).ThenBy(badge => badge.ObjectId, StringComparer.Ordinal)
             .ToArray();
         return TypedResults.Ok(new ProfileView(

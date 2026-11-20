@@ -205,7 +205,13 @@ public sealed partial class CommandProcessor(
             return Rejected(RejectionCodes.GalleryReactionInvalidUser, "A reaction needs the current signed-in account.");
         }
 
-        if (envelope.Command is PublishGalleryMoment gallery)
+        if (envelope.Command is WithdrawProofGalleryMoment withdrawal
+            && (envelope.AuthorId != withdrawal.UserId || !await db.Users.AnyAsync(user => user.Id == withdrawal.UserId && !user.IsDeleted, ct)))
+        {
+            return Rejected(GalleryRejectionCodes.TargetUnknown, "There is no proof moment to withdraw with this id.");
+        }
+
+        if (envelope.Command is IWriteGalleryMoment gallery)
         {
             if (envelope.AuthorId != gallery.UserId
                 || !await db.Users.AnyAsync(user => user.Id == gallery.UserId && !user.IsDeleted && user.Role == Accounts.Role.Player, ct))
@@ -213,7 +219,7 @@ public sealed partial class CommandProcessor(
                 return Rejected(GalleryRejectionCodes.NotParticipant, "Only a current player can publish a gallery moment.");
             }
 
-            preparedGalleryFile = await CheckGalleryFileAsync(db, gallery, envelope.PreparedGalleryFile, ct);
+            preparedGalleryFile = await CheckGalleryFileAsync(db, envelope.SeasonId, gallery, envelope.PreparedGalleryFile, ct);
         }
 
         if (!_cache.TryGetValue(envelope.SeasonId, out var cached))
@@ -238,6 +244,7 @@ public sealed partial class CommandProcessor(
         var context = new EngineContext(
             clock, random, ids, await PoolReader.LoadAsync(db, ct), Triggers: triggers, History: history, TimeZones: Kernel.SystemTimeZones.Instance)
         {
+            AccountAchievements = await ReadAccountAchievementsAsync(db, cached.State, envelope.Command, ct),
             FeedReactionTargetAvailable = envelope.Command is Engine.Reactions.SetFeedReaction reaction
                 && cached.State.IsCreated && cached.State.Rules.Features.Reactions && feedReactionTargets is not null
                 && (await feedReactionTargets.FindAsync(db, envelope.SeasonId, [reaction.TargetCommandId], ct)).Contains(reaction.TargetCommandId),
@@ -245,6 +252,7 @@ public sealed partial class CommandProcessor(
                 && cached.State.IsCreated && cached.State.Rules.Features.Comments && feedReactionTargets is not null
                 && (await feedReactionTargets.FindAsync(db, envelope.SeasonId, [comment.Target.Id], ct)).Contains(comment.Target.Id),
             PreparedGalleryFileId = preparedGalleryFile?.FileId,
+            GalleryProofApprovalCommandId = preparedGalleryFile?.ProofApprovalCommandId,
         };
 
         var result = SeasonEngine.Execute(cached.State, envelope.Command, context);
@@ -285,7 +293,7 @@ public sealed partial class CommandProcessor(
             await SeasonProjection.WriteAsync(db, cached.State, result.State, now, envelope.AuthorId, ct);
             if (preparedGalleryFile is not null)
             {
-                var published = result.Events.OfType<GalleryMomentPublished>().Single();
+                var published = result.Events.OfType<IGalleryMomentPublished>().Single();
                 RecordGalleryFile(db, envelope.SeasonId, published, preparedGalleryFile);
             }
 

@@ -490,8 +490,9 @@ public partial class PlayerAdminInvariantTests
             Engine.Reactions.ReviewReactionSet or Engine.Reactions.FeedReactionSet or Engine.Reactions.GalleryReactionSet => "reactions",
             Engine.Comments.CommentPosted or Engine.Comments.CommentEdited or Engine.Comments.CommentDeleted
                 or Engine.Comments.CommentHidden => "comments",
-            Engine.Achievements.AchievementEarned or CoinsChanged { Reason: CoinsReason.Achievement } => "achievements",
-            Engine.Gallery.GalleryMomentPublished or Engine.Gallery.GalleryMomentHidden => "gallery",
+            Engine.Achievements.AchievementEarned or Engine.Achievements.LifetimeAchievementEarned
+                or CoinsChanged { Reason: CoinsReason.Achievement } => "achievements",
+            Engine.Gallery.IGalleryMomentPublished or Engine.Gallery.GalleryMomentHidden => "gallery",
 
             // The effect dispatcher reacts to content (items, events); stage 1 has no content effects in play (D-24, D-103)
             EffectChainCut => "effects",
@@ -504,6 +505,8 @@ public partial class PlayerAdminInvariantTests
                 or PointsChanged or CoinsChanged or ResourceChanged or PlayerMoved
                 or PlayerFinished or PlayerFrozen or PlayerFinishRevoked or FinishSurplusChanged or FinishBonusRulesRefreshed
                 or ManualEffectCreated or ManualEffectResolved or CommandUndone
+                // Authors can withdraw consent even while the gallery is switched off.
+                or Engine.Gallery.GalleryProofConsentWithdrawn
 
                 // Accounts (D8, D-106) and stored files (D4a, D-108) are the site's, not a season mechanic
                 or Accounts.AccountCreated or Accounts.AccountPasswordReset or Accounts.AccountPasswordChanged

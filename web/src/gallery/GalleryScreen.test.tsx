@@ -29,6 +29,7 @@ const view = {
       createdAt: '2026-11-20T10:00:00Z',
       imageUrl: '/photo',
       thumbnailUrl: '/thumb',
+      canWithdraw: false,
       reactions: [{ emoji: '🔥', selected: false, count: 0 }],
     },
   ],
@@ -53,6 +54,133 @@ function renderGallery() {
     />,
   );
 }
+
+test.each([false, true])(
+  'the author can withdraw an archived moment with admin access %s',
+  async (admin) => {
+    const route = `${readPath}/${itemId}/withdraw`;
+    let withdrawn = false;
+    const { sent } = fakeServer({
+      '/api/seasons/gallery': seasonList,
+      [readPath]: () => ({
+        body: {
+          ...view,
+          items: withdrawn
+            ? []
+            : view.items.map((item) => ({ ...item, reactions: [], canWithdraw: true })),
+        },
+      }),
+      [`POST ${route}`]: () => {
+        withdrawn = true;
+        return json(204);
+      },
+    });
+    render(
+      <GalleryScreen
+        requestedSeasonId={seasonId}
+        currentSeasonId={null}
+        admin={admin}
+        onSignedOut={vi.fn()}
+      />,
+    );
+    const card = await screen.findByRole('button', { name: 'Открыть момент: Первый момент' });
+    expect(screen.queryByRole('button', { name: 'Добавить момент' })).not.toBeInTheDocument();
+    fireEvent.click(card);
+    const details = screen.getByRole('dialog', { name: 'Просмотр момента' });
+    const hide = within(details).queryByRole('button', { name: 'Скрыть момент' });
+    if (admin) {
+      expect(hide).toBeInTheDocument();
+    } else {
+      expect(hide).not.toBeInTheDocument();
+    }
+    fireEvent.click(within(details).getByRole('button', { name: 'Отозвать публикацию' }));
+    const confirmation = screen.getByRole('alertdialog', { name: 'Отозвать публикацию кадра?' });
+    expect(within(confirmation).getByText(/останется в дневном лимите/)).toBeInTheDocument();
+    expect(sent('POST', route)).toHaveLength(0);
+    fireEvent.click(within(confirmation).getByRole('button', { name: 'Отозвать публикацию' }));
+
+    expect(await screen.findByText('Публикация отозвана.')).toBeInTheDocument();
+    expect(sent('POST', route)).toHaveLength(1);
+    const body = sent('POST', route)[0]?.body as { commandId: string };
+    expect(body.commandId).toMatch(/^[\da-f-]+$/i);
+    expect(details).not.toBeInTheDocument();
+    expect(card).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(sent('GET', readPath)).toHaveLength(2);
+      expect(screen.getByRole('heading', { name: 'Галерея моментов' })).toHaveFocus();
+    });
+  },
+);
+
+test('a live approval reversal removes the moment from a spectator and restores focus', async () => {
+  let approved = true;
+  fakeServer({
+    '/api/seasons/gallery': seasonList,
+    [readPath]: () => ({
+      body: {
+        ...view,
+        items: approved
+          ? view.items.map((item) => ({ ...item, reactions: [], canWithdraw: undefined }))
+          : [],
+      },
+    }),
+  });
+  renderGallery();
+  const card = await screen.findByRole('button', { name: 'Открыть момент: Первый момент' });
+  fireEvent.click(card);
+  const details = screen.getByRole('dialog', { name: 'Просмотр момента' });
+  expect(
+    within(details).queryByRole('button', { name: 'Отозвать публикацию' }),
+  ).not.toBeInTheDocument();
+  approved = false;
+  notify('command-undone');
+  await waitFor(() => {
+    expect(details).not.toBeInTheDocument();
+    expect(card).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Галерея моментов' })).toHaveFocus();
+  });
+});
+
+test('the author can withdraw hidden proof consent after loading another gallery page', async () => {
+  const hiddenId = '3d56eb2d-b52a-4a3b-81f5-236f520112b7';
+  const route = `${readPath}/${hiddenId}/withdraw`;
+  let withdrawn = false;
+  const { sent } = fakeServer({
+    '/api/seasons/gallery': seasonList,
+    [readPath]: ({ query }) => ({
+      body: query.has('before')
+        ? { ...view, items: [] }
+        : {
+            ...view,
+            nextBefore: itemId,
+            hiddenProofPublications: withdrawn
+              ? undefined
+              : [{ id: hiddenId, createdAt: '2026-11-20T10:00:00Z' }],
+          },
+    }),
+    [`POST ${route}`]: () => {
+      withdrawn = true;
+      return json(204);
+    },
+  });
+  renderGallery();
+  const hidden = await screen.findByRole('region', { name: 'Твои скрытые кадры' });
+  expect(within(hidden).queryByRole('img')).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Показать ещё' }));
+  await waitFor(() => {
+    expect(sent('GET', readPath).at(-1)?.query.get('before')).toBe(itemId);
+    expect(screen.queryByRole('button', { name: 'Показать ещё' })).not.toBeInTheDocument();
+  });
+  fireEvent.click(within(hidden).getByRole('button', { name: 'Отозвать публикацию' }));
+  const confirmation = screen.getByRole('alertdialog', { name: 'Отозвать публикацию кадра?' });
+  fireEvent.click(within(confirmation).getByRole('button', { name: 'Отозвать публикацию' }));
+  expect(await screen.findByText('Публикация отозвана.')).toBeInTheDocument();
+  expect(sent('POST', route)).toHaveLength(1);
+  expect(hidden).not.toBeInTheDocument();
+  await waitFor(() => {
+    expect(screen.getByRole('heading', { name: 'Галерея моментов' })).toHaveFocus();
+  });
+});
 
 test('live reactions leave a closed gallery alone and read only its open moment at most every two seconds', async () => {
   const { sent } = fakeServer({

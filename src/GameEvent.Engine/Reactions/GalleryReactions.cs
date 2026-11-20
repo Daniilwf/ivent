@@ -23,7 +23,7 @@ internal static class GalleryReactions
             return Decision.Reject(RejectionCodes.FeatureDisabled, "Gallery reactions are disabled in this season.");
         }
 
-        if (!state.GalleryItems.TryGetValue(command.ItemId, out var item) || item.Hidden)
+        if (!state.GalleryItems.TryGetValue(command.ItemId, out var item) || !item.Visible)
         {
             return Decision.Reject(GalleryRejectionCodes.TargetUnknown, "There is no visible gallery moment with this id.");
         }

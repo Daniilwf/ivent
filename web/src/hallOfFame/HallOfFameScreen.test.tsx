@@ -62,6 +62,26 @@ const records: Schemas['HallOfFameRecordsView'] = {
       profileUserId: null,
     },
   ],
+  largestRolls: [
+    {
+      seasonId: 'spring',
+      seasonName: 'Весна',
+      runId: 'r3',
+      playerId: 'p1',
+      name: 'Яна',
+      sum: 48,
+      profileUserId: 'u1',
+    },
+    {
+      seasonId: 'autumn',
+      seasonName: 'Осень',
+      runId: 'r4',
+      playerId: 'p2',
+      name: 'Анна',
+      sum: 48,
+      profileUserId: null,
+    },
+  ],
 };
 
 describe('HallOfFameScreen', () => {
@@ -106,6 +126,13 @@ describe('HallOfFameScreen', () => {
     expect(within(secondFinish).getByText('Анна')).toBeVisible();
     expect(within(secondFinish).getByText('Осень')).toBeVisible();
     expect(within(secondFinish).queryByRole('link')).not.toBeInTheDocument();
+
+    const largest = within(screen.getByRole('region', { name: t.largestRoll }));
+    expect(largest.getByText('48')).toBeVisible();
+    expect(largest.getAllByRole('listitem')).toHaveLength(2);
+    expect(largest.getByRole('link', { name: 'Яна' })).toHaveAttribute('href', '/users/u1');
+    expect(largest.getByText('Анна')).toBeVisible();
+    expect(largest.queryByRole('link', { name: 'Анна' })).not.toBeInTheDocument();
 
     const recordHeading = longest.getByRole('heading', { name: t.record });
     const scroll = vi.spyOn(recordHeading, 'scrollIntoView');

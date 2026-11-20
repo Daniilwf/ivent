@@ -73,6 +73,9 @@ test('only a participant opens their own season recap and downloads it as PNG', 
     });
     await expect(card.getByText(displayedHours, { exact: true })).toBeVisible(live);
     await expect(card.getByText('8', { exact: true })).toHaveCount(2);
+    await expect(card.getByRole('heading', { name: 'Броски' })).toBeVisible();
+    await expect(card.getByText('Самый удачный', { exact: true })).toBeVisible();
+    await expect(card.getByText('Самый неудачный', { exact: true })).toBeVisible();
     expect(
       await ownerPage.evaluate(() => document.documentElement.scrollWidth),
     ).toBeLessThanOrEqual(ownerPage.viewportSize()?.width ?? 0);
@@ -99,7 +102,15 @@ test('only a participant opens their own season recap and downloads it as PNG', 
     expect(png.subarray(0, 8).toString('hex')).toBe('89504e470d0a1a0a');
     expect(png.readUInt32BE(16)).toBeGreaterThan(700);
     expect(png.readUInt32BE(20)).toBeGreaterThan(400);
-    expect(await captions.jsonValue()).toEqual(expect.arrayContaining(['Часы', displayedHours]));
+    expect(await captions.jsonValue()).toEqual(
+      expect.arrayContaining([
+        'Часы',
+        displayedHours,
+        'Броски',
+        'Самый удачный',
+        'Самый неудачный',
+      ]),
+    );
     await captions.dispose();
 
     await spectatorPage.goto(profilePath);

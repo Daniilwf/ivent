@@ -1,5 +1,17 @@
 # Дизайн-ревью
 
+## Этап 6. Кадр пруфа, личная сводка и большой бросок (2026-11-20)
+
+| Состояние | 390×844 | 1440×900 |
+| --- | --- | --- |
+| Выбор одобренного кадра | [Телефон](../test-artifacts/design/s6-proofs-rolls-and-all-time/phone-proof-picker.png) | [Десктоп](../test-artifacts/design/s6-proofs-rolls-and-all-time/desktop-proof-picker.png) |
+| Подтверждение отзыва в архиве | [Телефон](../test-artifacts/design/s6-proofs-rolls-and-all-time/phone-proof-withdrawal.png) | [Десктоп](../test-artifacts/design/s6-proofs-rolls-and-all-time/desktop-proof-withdrawal.png) |
+| Скрытые кадры автора | [Телефон](../test-artifacts/design/s6-proofs-rolls-and-all-time/phone-hidden-owner.png) | [Десктоп](../test-artifacts/design/s6-proofs-rolls-and-all-time/desktop-hidden-owner.png) |
+| Сводка за всё время | [Телефон](../test-artifacts/design/s6-proofs-rolls-and-all-time/phone-all-time-recap.png) | [Десктоп](../test-artifacts/design/s6-proofs-rolls-and-all-time/desktop-all-time-recap.png) |
+| Самый большой бросок | [Телефон](../test-artifacts/design/s6-proofs-rolls-and-all-time/phone-largest-roll.png) | [Десктоп](../test-artifacts/design/s6-proofs-rolls-and-all-time/desktop-largest-roll.png) |
+
+Независимое ревью проверило сетку, читаемость, фокус и контраст от 4,83:1 до 16,10:1. Кнопки подтверждения отзыва на телефоне выровнены в колонку. Дата скрытого кадра связана с кнопкой для экранного чтеца. Подписи выбора кадра и диапазона броска используют запятые. После правок прошли 10 сценариев Playwright и 18 визуальных проверок в Chromium, Firefox и WebKit. [Playwright](../test-artifacts/stage6-extended-e2e-final.log) · [Эталоны](../test-artifacts/stage6-extended-visual-final.log)
+
 ## Этап 6. Часы и быстрейший финиш (2026-11-20)
 
 В сводке «Твой сезон» показатели `1 280` и `2 345,75` целиком читаются на обоих размерах. При нехватке места переносится весь показатель. PNG использует тот же текст и раскладывает числа по измеренной ширине. Playwright проверил обновление часов после правки и фактическую отрисовку числа в PNG. [Телефон](../e2e/visual/__screenshots__/chromium-phone/season-recap.png) · [Десктоп](../e2e/visual/__screenshots__/chromium-desktop/season-recap.png)

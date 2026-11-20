@@ -27,6 +27,12 @@ public sealed record EngineContext(
     /// <summary>The queue checked that the comment's feed target is a public, active row in this season.</summary>
     public bool CommentTargetAvailable { get; init; }
 
+    /// <summary>Active account awards supplied by the command queue, including those earned in another season.</summary>
+    public IReadOnlySet<Achievements.AccountAchievementKey>? AccountAchievements { get; init; }
+
     /// <summary>The queue prepared a protected image for this gallery publication.</summary>
     public Guid? PreparedGalleryFileId { get; init; }
+
+    /// <summary>The queue verified the approval command matches the proof attachment prepared for publication.</summary>
+    public Guid? GalleryProofApprovalCommandId { get; init; }
 }
