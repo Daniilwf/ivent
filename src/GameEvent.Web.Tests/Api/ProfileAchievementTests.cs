@@ -5,8 +5,10 @@ using System.Text.Json.Nodes;
 using GameEvent.Engine.Content;
 using GameEvent.Engine.Players;
 using GameEvent.Engine.Rulesets;
+using GameEvent.Infrastructure.Seasons;
 using static GameEvent.Web.Tests.Api.ApiCalls;
 using static GameEvent.Web.Tests.Api.PollSeason;
+using ArchiveTransfer = GameEvent.Infrastructure.Seasons.SeasonTransfer;
 
 namespace GameEvent.Web.Tests.Api;
 
@@ -43,12 +45,7 @@ public sealed class ProfileAchievementTests : IAsyncLifetime
         using var spectator = await _site.SignedInAsync("zritel");
         await PrepareAttackAsync();
 
-        for (var previous = 0; previous < 4; previous++)
-        {
-            await GiveAttackAsync(admin);
-            await AttackAsync(attacker);
-        }
-
+        await LandFourAttacksAsync(admin, attacker);
         await GiveAttackAsync(admin);
         await GiveAttackAsync(admin);
         var earnedAt = _site.Clock.UtcNow;
@@ -72,6 +69,81 @@ public sealed class ProfileAchievementTests : IAsyncLifetime
         await UndoAsync(admin, fifthAttack);
         Assert.Empty(await AchievementsAsync(spectator, Recipient));
         Assert.Empty(await AchievementsAsync(recipient, Recipient));
+    }
+
+    [Fact]
+    public async Task Disabling_achievements_hides_the_earned_badge_until_reenabled_without_changing_coins()
+    {
+        using var admin = await _site.SignedInAsync("admin");
+        using var attacker = await _site.SignedInAsync(Attacker);
+        using var recipient = await _site.SignedInAsync(Recipient);
+        using var spectator = await _site.SignedInAsync("zritel");
+        await PrepareAttackAsync();
+        await LandFourAttacksAsync(admin, attacker);
+        await GiveAttackAsync(admin);
+        var earnedAt = _site.Clock.UtcNow;
+        await AttackAsync(attacker);
+
+        AssertBadge(Assert.Single(await AchievementsAsync(spectator, Recipient)), earnedAt);
+        var coinsAfterAward = await CoinsAsync(recipient);
+
+        _site.Clock.Advance(TimeSpan.FromMinutes(1));
+        await ConfigureAchievementsAsync(itemsEnabled: true, achievementsEnabled: false);
+        Assert.Empty(await AchievementsAsync(spectator, Recipient));
+        Assert.Empty(await AchievementsAsync(recipient, Recipient));
+        Assert.Equal(coinsAfterAward, await CoinsAsync(recipient));
+
+        _site.Clock.Advance(TimeSpan.FromMinutes(1));
+        await ConfigureAchievementsAsync(itemsEnabled: true);
+        AssertBadge(Assert.Single(await AchievementsAsync(spectator, Recipient)), earnedAt);
+        Assert.Equal(coinsAfterAward, await CoinsAsync(recipient));
+    }
+
+    [Fact]
+    public async Task A_transferred_award_follows_the_matched_account_and_is_reversed_with_its_command()
+    {
+        using var admin = await _site.SignedInAsync("admin");
+        using var attacker = await _site.SignedInAsync(Attacker);
+        using var recipient = await _site.SignedInAsync(Recipient);
+        await PrepareAttackAsync();
+        await LandFourAttacksAsync(admin, attacker);
+        var coinsBeforeAward = await CoinsAsync(recipient);
+        await GiveAttackAsync(admin);
+        var earnedAt = _site.Clock.UtcNow;
+        var awardingAttack = await AttackAsync(attacker);
+        var coinsAfterAward = await CoinsAsync(recipient);
+        Assert.True(coinsAfterAward > coinsBeforeAward);
+
+        await using var destination = new SiteFactory();
+        await destination.SeedAsync(withSeason: false);
+        var matchedRecipient = destination.Users[Recipient];
+        Assert.NotEqual(_site.Users[Recipient], matchedRecipient);
+
+        await using var originDb = _site.NewDb();
+        var archive = await ArchiveTransfer.ExportAsync(originDb, SiteFactory.SeasonId, _site.Clock.UtcNow, Ct);
+        Assert.NotNull(archive);
+        using var zip = new MemoryStream();
+        await ArchiveTransfer.WriteZipAsync(archive, zip, Ct);
+        zip.Position = 0;
+        await using var destinationDb = destination.NewDb();
+        var imported = await ArchiveTransfer.ImportAsync(destinationDb, await ArchiveTransfer.ReadZipAsync(zip, Ct), destination.Clock.UtcNow, ct: Ct);
+        Assert.Contains(imported.MatchedUsers, user => user.Login == Recipient);
+        Assert.True(imported.Integrity.IsIntact, string.Join("; ", imported.Integrity.Differences));
+
+        using var localSpectator = await destination.SignedInAsync("zritel");
+        using var localRecipient = await destination.SignedInAsync(Recipient);
+        using var localAdmin = await destination.SignedInAsync("admin");
+        AssertBadge(Assert.Single(await AchievementsAsync(localSpectator, matchedRecipient)), earnedAt);
+        Assert.Empty(await AchievementsAsync(localSpectator, destination.Users[Attacker]));
+        Assert.Equal(coinsAfterAward, await CoinsAsync(localRecipient));
+
+        await UndoAsync(localAdmin, awardingAttack);
+        Assert.Empty(await AchievementsAsync(localSpectator, matchedRecipient));
+        Assert.Equal(coinsBeforeAward, await CoinsAsync(localRecipient));
+        AssertBadge(Assert.Single(await AchievementsAsync(recipient, Recipient)), earnedAt);
+        var integrity = await SeasonIntegrity.CheckAsync(destinationDb, SiteFactory.SeasonId, Ct);
+        Assert.NotNull(integrity);
+        Assert.True(integrity.IsIntact, string.Join("; ", integrity.Differences));
     }
 
     [Fact]
@@ -114,7 +186,7 @@ public sealed class ProfileAchievementTests : IAsyncLifetime
     public async Task The_admin_can_publish_the_documented_achievement_when_its_flag_is_enabled(bool itemsEnabled)
     {
         using var admin = await _site.SignedInAsync("admin");
-        await EnableAchievementsAsync(itemsEnabled);
+        await ConfigureAchievementsAsync(itemsEnabled);
         var view = await OkAsync(await admin.GetAsync(AdminUrl("content"), Ct));
         Assert.Equal(itemsEnabled, view.GetProperty("itemsEnabled").GetBoolean());
         Assert.True(view.GetProperty("achievementsEnabled").GetBoolean());
@@ -135,7 +207,7 @@ public sealed class ProfileAchievementTests : IAsyncLifetime
     public async Task Achievements_only_preflight_refuses_a_pack_that_cannot_be_published()
     {
         using var admin = await _site.SignedInAsync("admin");
-        await EnableAchievementsAsync(itemsEnabled: false);
+        await ConfigureAchievementsAsync(itemsEnabled: false);
         var pack = new { objects = new JsonArray(BirdDefinition(), JsonNode.Parse(Definition)), wheels = Array.Empty<object>() };
 
         using var response = await admin.PostAsJsonAsync(AdminUrl("content/check"), pack, Ct);
@@ -158,7 +230,7 @@ public sealed class ProfileAchievementTests : IAsyncLifetime
         using var admin = await _site.SignedInAsync("admin");
         using var player = await _site.SignedInAsync(Recipient);
         using var spectator = await _site.SignedInAsync("zritel");
-        await EnableAchievementsAsync(itemsEnabled: false);
+        await ConfigureAchievementsAsync(itemsEnabled: false);
         var pack = new { objects = new JsonArray(JsonNode.Parse(Horror)), wheels = Array.Empty<object>() };
         using var checkedPack = await admin.PostAsJsonAsync(AdminUrl("content/check"), pack, Ct);
         Assert.True((await OkAsync(checkedPack)).GetProperty("valid").GetBoolean());
@@ -210,7 +282,7 @@ public sealed class ProfileAchievementTests : IAsyncLifetime
 
     private async Task PrepareAttackAsync()
     {
-        await EnableAchievementsAsync(itemsEnabled: true);
+        await ConfigureAchievementsAsync(itemsEnabled: true);
         var pack = new ContentPack
         {
             Objects = [ContentJson.Parse<ObjectDefinition>(BirdDefinition().ToJsonString()), ContentJson.Parse<ObjectDefinition>(Definition)],
@@ -219,12 +291,12 @@ public sealed class ProfileAchievementTests : IAsyncLifetime
         await _site.SendAsync(new AdjustPlayer(_site.Players[Recipient], "Монетки для проверки атаки", CoinsDelta: 30));
     }
 
-    private Task EnableAchievementsAsync(bool itemsEnabled)
+    private Task ConfigureAchievementsAsync(bool itemsEnabled, bool achievementsEnabled = true)
     {
         var rules = RulesetJson.Default();
         return _site.SendAsync(new ChangeRuleset(rules with
         {
-            Features = rules.Features with { Items = itemsEnabled, Achievements = true },
+            Features = rules.Features with { Items = itemsEnabled, Achievements = achievementsEnabled },
         }));
     }
 
@@ -233,6 +305,15 @@ public sealed class ProfileAchievementTests : IAsyncLifetime
 
     private Task GiveAttackAsync(HttpClient admin) => PostOkAsync(admin, AdminUrl($"players/{_site.Players[Attacker]}/inventory"),
         new { commandId = Guid.NewGuid(), giveObjectId = AttackItem, comment = "Предмет для атаки" });
+
+    private async Task LandFourAttacksAsync(HttpClient admin, HttpClient attacker)
+    {
+        for (var previous = 0; previous < 4; previous++)
+        {
+            await GiveAttackAsync(admin);
+            await AttackAsync(attacker);
+        }
+    }
 
     private async Task<Guid> AttackAsync(HttpClient attacker)
     {
@@ -248,10 +329,18 @@ public sealed class ProfileAchievementTests : IAsyncLifetime
     private static Task UndoAsync(HttpClient admin, Guid attack) => PostOkAsync(admin, AdminUrl("undo"),
         new { commandId = Guid.NewGuid(), targetCommandId = attack, comment = "Атака ошибочной цели" });
 
-    private string Profile(string login) => $"/api/users/{_site.Users[login]}";
+    private static async Task<int> CoinsAsync(HttpClient player) =>
+        (await OkAsync(await player.GetAsync(Url("economy"), Ct))).GetProperty("coins").GetInt32();
 
-    private async Task<JsonElement.ArrayEnumerator> AchievementsAsync(HttpClient reader, string login) =>
-        AchievementsOf(await OkAsync(await reader.GetAsync(Profile(login), Ct)));
+    private string Profile(string login) => Profile(_site.Users[login]);
+
+    private static string Profile(Guid userId) => $"/api/users/{userId}";
+
+    private Task<JsonElement.ArrayEnumerator> AchievementsAsync(HttpClient reader, string login) =>
+        AchievementsAsync(reader, _site.Users[login]);
+
+    private static async Task<JsonElement.ArrayEnumerator> AchievementsAsync(HttpClient reader, Guid userId) =>
+        AchievementsOf(await OkAsync(await reader.GetAsync(Profile(userId), Ct)));
 
     private static JsonElement.ArrayEnumerator AchievementsOf(JsonElement profile)
     {

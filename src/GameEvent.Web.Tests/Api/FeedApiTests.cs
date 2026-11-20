@@ -1,6 +1,10 @@
 using System.Net;
 using System.Text.Json;
+using GameEvent.Engine.Rulesets;
+using GameEvent.Engine.Seasons;
+using GameEvent.Infrastructure.Queue;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using static GameEvent.Web.Tests.Api.ApiCalls;
 
 namespace GameEvent.Web.Tests.Api;
@@ -15,7 +19,7 @@ public sealed class FeedApiTests : IAsyncLifetime
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
-    private static string Url(string action) => $"/api/seasons/{SiteFactory.SeasonId}/{action}";
+    private static string Url(string action, Guid? seasonId = null) => $"/api/seasons/{seasonId ?? SiteFactory.SeasonId}/{action}";
 
     private static string Feed => $"/api/seasons/{SiteFactory.SeasonId}/feed";
 
@@ -194,6 +198,47 @@ public sealed class FeedApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_public_profile_counts_completed_games_across_seasons_regardless_of_recap_availability()
+    {
+        using var player = await _site.SignedInAsync("vasya");
+        using var admin = await _site.SignedInAsync("admin");
+        using var spectator = await _site.SignedInAsync("zritel");
+        var profileUrl = $"/api/users/{_site.Users["vasya"]}";
+        var archivedAdmin = $"/api/admin/seasons/{SiteFactory.SeasonId}";
+        var (approved, _) = await CompletedWithReviewAsync(player, 8, null);
+        await PostOkAsync(admin, $"{archivedAdmin}/status", new { commandId = Guid.NewGuid(), to = "closing" });
+        await PostOkAsync(admin, $"{archivedAdmin}/runs/{approved}/approve", new { commandId = Guid.NewGuid(), comment = "Saw the completion" });
+        await PostOkAsync(admin, $"{archivedAdmin}/status", new { commandId = Guid.NewGuid(), to = "finished" });
+        await PostOkAsync(admin, $"{archivedAdmin}/status", new { commandId = Guid.NewGuid(), to = "archived" });
+
+        var nextSeason = Guid.NewGuid();
+        var nextAdmin = $"/api/admin/seasons/{nextSeason}";
+        var rules = RulesetJson.Default();
+        var bus = _site.Services.GetRequiredService<CommandBus>();
+        var created = await bus.SendAsync(new CommandEnvelope(Guid.NewGuid(), nextSeason,
+            new CreateSeason(nextSeason, "Второй сезон", rules with { Features = rules.Features with { SeasonStatistics = true } }),
+            _site.Users["admin"]), Ct);
+        Assert.True(created.IsAccepted, created.Rejection?.Detail);
+        await PostOkAsync(admin, $"{nextAdmin}/players", new { commandId = Guid.NewGuid(), userId = _site.Users["vasya"] });
+        await PostOkAsync(admin, $"{nextAdmin}/status", new { commandId = Guid.NewGuid(), to = "active" });
+
+        using var disabledRecap = await player.GetAsync(Url("my-statistics"), Ct);
+        Assert.Equal(HttpStatusCode.NotFound, disabledRecap.StatusCode);
+        using var enabledRecap = await player.GetAsync(Url("my-statistics", nextSeason), Ct);
+        Assert.Equal(HttpStatusCode.OK, enabledRecap.StatusCode);
+
+        await CompletedWithReviewAsync(player, 8, null, nextSeason);
+        _site.Clock.UtcNow = _site.Clock.UtcNow.AddMinutes(1);
+        var (rejected, _) = await CompletedWithReviewAsync(player, 6, null, nextSeason);
+        using var before = await spectator.GetAsync(profileUrl, Ct);
+        Assert.Equal(3, (await OkAsync(before)).GetProperty("completed").GetInt32());
+
+        await PostOkAsync(admin, $"{nextAdmin}/runs/{rejected}/reject", new { commandId = Guid.NewGuid(), comment = "Completion could not be verified" });
+        using var after = await spectator.GetAsync(profileUrl, Ct);
+        Assert.Equal(2, (await OkAsync(after)).GetProperty("completed").GetInt32());
+    }
+
+    [Fact]
     public async Task One_player_has_one_token_on_the_season_screen_the_feed_the_header_and_the_profile()
     {
         var vasya = await _site.SignedInAsync("vasya");
@@ -267,14 +312,14 @@ public sealed class FeedApiTests : IAsyncLifetime
         return index;
     }
 
-    private static async Task<(Guid RunId, Guid GameId)> CompletedWithReviewAsync(HttpClient player, int rating, string? text)
+    private static async Task<(Guid RunId, Guid GameId)> CompletedWithReviewAsync(HttpClient player, int rating, string? text, Guid? seasonId = null)
     {
-        await PostOkAsync(player, Url("roll"));
-        await PostOkAsync(player, Url("start"));
-        await PostOkAsync(player, Url("complete"), new { commandId = Guid.NewGuid(), difficulty = "normal" });
-        var last = (await OkAsync(await player.GetAsync($"/api/seasons/{SiteFactory.SeasonId}", Ct))).GetProperty("me").GetProperty("lastCompleted");
+        await PostOkAsync(player, Url("roll", seasonId));
+        await PostOkAsync(player, Url("start", seasonId));
+        await PostOkAsync(player, Url("complete", seasonId), new { commandId = Guid.NewGuid(), difficulty = "normal" });
+        var last = (await OkAsync(await player.GetAsync($"/api/seasons/{seasonId ?? SiteFactory.SeasonId}", Ct))).GetProperty("me").GetProperty("lastCompleted");
         var runId = last.GetProperty("id").GetGuid();
-        await PostOkAsync(player, Url($"runs/{runId}/review"), new { commandId = Guid.NewGuid(), rating, text });
+        await PostOkAsync(player, Url($"runs/{runId}/review", seasonId), new { commandId = Guid.NewGuid(), rating, text });
         return (runId, last.GetProperty("game").GetProperty("id").GetGuid());
     }
 

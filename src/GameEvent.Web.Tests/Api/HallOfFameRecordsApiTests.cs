@@ -91,6 +91,54 @@ public sealed class HallOfFameRecordsApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_correction_while_closing_breaks_a_tie_for_the_archived_longest_game()
+    {
+        const decimal PoolHours = 10.25m;
+        const decimal CorrectedHours = 14.75m;
+        var seasonId = SiteFactory.SeasonId;
+        var seasonRoute = $"/api/seasons/{seasonId}";
+        var adminRoute = $"/api/admin/seasons/{seasonId}";
+        await using var db = _site.NewDb();
+        await db.Games.ExecuteUpdateAsync(games => games.SetProperty(game => game.Hours, PoolHours), Ct);
+
+        using var first = await _site.SignedInAsync("vasya");
+        using var second = await _site.SignedInAsync("petya");
+        using var admin = await _site.SignedInAsync("admin");
+        using var spectator = await _site.SignedInAsync("zritel");
+        foreach (var player in new[] { first, second })
+        {
+            await PostOkAsync(player, $"{seasonRoute}/roll");
+            await PostOkAsync(player, $"{seasonRoute}/start");
+            await PostOkAsync(player, $"{seasonRoute}/complete", new { commandId = Guid.NewGuid(), difficulty = "normal" });
+        }
+
+        var runs = await db.Runs.AsNoTracking().Where(run => run.SeasonId == seasonId).ToListAsync(Ct);
+        Assert.Equal(2, runs.Count);
+        Assert.All(runs, run => Assert.Equal((RunStatus.Completed, PoolHours), (run.Status, run.Hours)));
+        var corrected = Assert.Single(runs, run => run.PlayerId == _site.Players["vasya"]);
+        var title = await db.Games.Where(row => row.Id == corrected.GameId).Select(row => row.Title).SingleAsync(Ct);
+
+        await PostOkAsync(admin, $"{adminRoute}/status", new { commandId = Guid.NewGuid(), to = "closing" });
+        await PostOkAsync(admin, $"{adminRoute}/runs/{corrected.Id}/hours", new
+        {
+            commandId = Guid.NewGuid(),
+            hours = CorrectedHours,
+            comment = "Updated length from the proof",
+        });
+        foreach (var run in runs)
+        {
+            await PostOkAsync(admin, $"{adminRoute}/runs/{run.Id}/approve", new { commandId = Guid.NewGuid(), comment = "Saw the completion" });
+        }
+
+        Assert.Empty(await ReadAsync(spectator));
+        await PostOkAsync(admin, $"{adminRoute}/status", new { commandId = Guid.NewGuid(), to = "finished" });
+        await PostOkAsync(admin, $"{adminRoute}/status", new { commandId = Guid.NewGuid(), to = "archived" });
+
+        Assert.Equal(new GameLengthRecord(seasonId, "Тестовый сезон", corrected.GameId, title, corrected.Id, CorrectedHours),
+            Assert.Single(await ReadAsync(spectator)));
+    }
+
+    [Fact]
     public async Task All_decimal_maximum_ties_are_ordered_and_unfinished_or_hidden_candidates_are_excluded()
     {
         var older = await CreateSeasonAsync(Id(3), "Older archive");
