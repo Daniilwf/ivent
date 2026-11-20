@@ -274,15 +274,18 @@ public static class ContentPublishing
             return;
         }
 
-        if (effect.Trigger is not (Trigger.HostileIncoming or Trigger.RunCompleted))
+        if (effect.Trigger is not (Trigger.HostileIncoming or Trigger.RunCompleted or Trigger.ProofApproved))
         {
-            error($"{at}.effect.trigger", "Seasonal achievements support landed attacks («hostileIncoming») and completion streaks («runCompleted»).");
+            error($"{at}.effect.trigger", "Seasonal achievements support «hostileIncoming», «runCompleted» and «proofApproved».");
         }
         else if (!SeasonalAchievements.Supports(effect.Trigger, effect.Condition))
         {
-            error($"{at}.effect.condition", effect.Trigger == Trigger.HostileIncoming
-                ? "A landed attack achievement needs a positive «hostileReceived» threshold."
-                : "A tag streak achievement needs a tag and a positive «completedStreakWithTag» threshold.");
+            error($"{at}.effect.condition", effect.Trigger switch
+            {
+                Trigger.HostileIncoming => "A landed attack achievement needs a positive «hostileReceived» threshold.",
+                Trigger.RunCompleted => "A tag streak achievement needs a tag and a positive «completedStreakWithTag» threshold.",
+                _ => "A proof approval achievement needs a strict «gt» bound on «runHours».",
+            });
         }
 
         if (effect.Target is not (null or { Selector: TargetSelector.Self, ExcludeSelf: false }))

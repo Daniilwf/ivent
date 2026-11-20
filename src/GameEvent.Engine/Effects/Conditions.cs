@@ -37,6 +37,7 @@ internal static class Conditions
         {
             null => true,
             ContentStat.HostileReceived => state.Players[ownerId].Wallet.HostileReceived >= condition.Gte,
+            ContentStat.RunHours when condition.Gt is { } threshold => run?.Hours > threshold,
             ContentStat.RunHours => run?.Hours >= condition.Gte,
             ContentStat.AllDiceMax => run is not null && AllMax(run, condition.MinDice ?? 1),
             ContentStat.CompletedStreakWithTag => Streak(state, pool, ownerId, condition.Tag!) >= condition.Gte,

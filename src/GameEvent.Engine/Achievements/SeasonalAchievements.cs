@@ -3,6 +3,7 @@ using GameEvent.Engine.Effects;
 using GameEvent.Engine.Interactions;
 using GameEvent.Engine.Inventory;
 using GameEvent.Engine.Kernel;
+using GameEvent.Engine.Proofs;
 using GameEvent.Engine.Runs;
 using GameEvent.Engine.Scoring;
 using GameEvent.Engine.Seasons;
@@ -27,6 +28,8 @@ internal sealed class SeasonalAchievements : ITriggerHandler, IFiringTriggerHand
         Trigger.RunCompleted => condition is
         { Stat: ContentStat.CompletedStreakWithTag, Gte: > 0, Game: null, DifficultyAtLeast: null, DifficultyAtMost: null, Tag: { } tag, MinDice: null }
             && !string.IsNullOrWhiteSpace(tag),
+        Trigger.ProofApproved => condition is
+        { Stat: ContentStat.RunHours, Gt: >= 0, Gte: null, Lte: null, Game: null, DifficultyAtLeast: null, DifficultyAtMost: null, Tag: null, MinDice: null },
         _ => false,
     };
 
@@ -46,6 +49,8 @@ internal sealed class SeasonalAchievements : ITriggerHandler, IFiringTriggerHand
             HostileReceived hit => Awards(state, hit.PlayerId, Trigger.HostileIncoming, null, context, depth, eventsBefore),
             RunCompleted completed => Awards(state, completed.PlayerId, Trigger.RunCompleted, completed.RunId, context, depth, eventsBefore),
             CoopRewardSplit split => Awards(state, split.PartnerId, Trigger.RunCompleted, split.RunId, context, depth, eventsBefore),
+            ProofApproved approved => RunShares.Players(state.Runs[approved.RunId])
+                .SelectMany(playerId => Awards(state, playerId, Trigger.ProofApproved, approved.RunId, context, depth, eventsBefore)),
             _ => [],
         };
     }

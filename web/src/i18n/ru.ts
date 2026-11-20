@@ -2569,6 +2569,7 @@ export const ru = {
           beforeRoll: 'перед роллом',
           afterRoll: 'после ролла',
           runCompleted: 'прохождение завершено',
+          proofApproved: 'пруф одобрен',
           beforeDice: 'перед броском кубов',
           afterDice: 'после броска кубов',
           moveStep: 'каждый шаг фишки',

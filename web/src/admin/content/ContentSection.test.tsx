@@ -176,7 +176,7 @@ const schema = {
 const achievementSchema = structuredClone(schema);
 const achievementProperties = achievementSchema.properties.objects.items.properties;
 Object.assign(achievementProperties, { scope: { enum: ['season', 'allTime'] } });
-achievementProperties.effect.properties.trigger.enum.push('hostileIncoming');
+achievementProperties.effect.properties.trigger.enum.push('hostileIncoming', 'proofApproved');
 Object.assign(achievementProperties.effect.properties, {
   condition: {
     type: 'object',
@@ -803,6 +803,18 @@ describe('The content editor', () => {
     expect(server.sent('POST', '/content/check')).toHaveLength(1);
   });
 
+  it('does not offer proof approval as a trigger for an ordinary item', async () => {
+    const user = userEvent.setup();
+    open({ 'GET /api/admin/content/schema': achievementSchema });
+    await openOrange(user);
+
+    expect(
+      within(screen.getByTestId('content-field-effect.trigger')).queryByRole('option', {
+        name: 'пруф одобрен (proofApproved)',
+      }),
+    ).not.toBeInTheDocument();
+  });
+
   it('opens and saves an achievement with items off and achievements on', async () => {
     const user = userEvent.setup();
     const content = {
@@ -820,6 +832,11 @@ describe('The content editor', () => {
     expect(await screen.findByRole('radio', { name: 'Достижения: 1' })).toBeChecked();
     expect(screen.queryByTestId('content-new')).not.toBeInTheDocument();
     await user.click(screen.getByTestId('content-open-unbreakable'));
+    expect(
+      within(screen.getByTestId('content-field-effect.trigger')).getByRole('option', {
+        name: 'пруф одобрен (proofApproved)',
+      }),
+    ).toBeInTheDocument();
     await user.type(screen.getByTestId('content-field-name'), '!');
     await user.type(screen.getByTestId('content-comment'), 'Уточнил название');
     await user.click(screen.getByTestId('content-save'));

@@ -60,6 +60,9 @@ public enum Trigger
 
     /// <summary>A run ended: completed or dropped (D-479, the time bomb).</summary>
     RunEnded,
+
+    /// <summary>A completed run's proof was approved (D-927, achievements only).</summary>
+    ProofApproved,
 }
 
 /// <summary>Whom an effect targets (SPEC «Селекторы»).</summary>
@@ -235,7 +238,7 @@ public enum ContentStat
     /// <summary>Every die of the roll at its maximum; needs <c>minDice</c>.</summary>
     AllDiceMax,
 
-    /// <summary>The run's hours; needs <c>gte</c>.</summary>
+    /// <summary>The run's hours; needs <c>gte</c> or <c>gt</c>.</summary>
     RunHours,
 
     /// <summary>The owner's coins; needs <c>gte</c> or <c>lte</c> (D-483).</summary>
@@ -261,6 +264,10 @@ public sealed record ConditionSpec
     public string? Tag { get; init; }
 
     public int? Gte { get; init; }
+
+    /// <summary>Strictly greater than (D-927, run hours).</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public decimal? Gt { get; init; }
 
     /// <summary>At most (D-483); with <see cref="Gte"/> — a range, both equal — exactly.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
