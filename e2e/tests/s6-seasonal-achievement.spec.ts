@@ -17,7 +17,7 @@ const unbreakable = {
   },
 };
 
-test('the fifth landed attack earns the badge shown on the spectator’s copy of the profile', async ({
+test('the fifth landed attack earns a badge and a completed season adds the champion title to the profile', async ({
   browser,
 }, info) => {
   const world = await setUpSeason({ players: ['Вася', 'Петя'], spectator: true });
@@ -94,14 +94,17 @@ test('the fifth landed attack earns the badge shown on the spectator’s copy of
   const viewport =
     info.project.name === 'phone' ? { width: 390, height: 844 } : { width: 1440, height: 900 };
   expect(page.viewportSize()).toEqual(viewport);
-  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
-    viewport.width,
-  );
-  await page.evaluate(() => document.fonts.ready);
-  const screenshot = info.outputPath(`seasonal-achievement-${info.project.name}.png`);
-  const png = PNG.sync.read(await page.screenshot({ path: screenshot, scale: 'css' }));
-  expect({ width: png.width, height: png.height }).toEqual(viewport);
-  await info.attach('seasonal achievement', { path: screenshot, contentType: 'image/png' });
+  const capture = async (name: string) => {
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+      viewport.width,
+    );
+    await page.evaluate(() => document.fonts.ready);
+    const screenshot = info.outputPath(`${name}-${info.project.name}.png`);
+    const png = PNG.sync.read(await page.screenshot({ path: screenshot, scale: 'css' }));
+    expect({ width: png.width, height: png.height }).toEqual(viewport);
+    await info.attach(name, { path: screenshot, contentType: 'image/png' });
+  };
+  await capture('seasonal-achievement');
 
   await admin.post(`${adminSeason}/undo`, {
     targetCommandId: award.id,
@@ -110,5 +113,45 @@ test('the fifth landed attack earns the badge shown on the spectator’s copy of
   await page.reload();
   await expect(heading).toBeVisible();
   await expect(badges).toHaveCount(0);
+
+  const secondAchievement = {
+    ...unbreakable,
+    id: 'attack-survivor',
+    name: 'Последний защитник рассветного рубежа',
+    description: 'Выдержи пять атак за сезон и сохрани место в турнирной таблице.',
+  };
+  await admin.post(`${adminSeason}/content/publish`, {
+    expectedVersion: 1,
+    pack: { objects: [birdThief, unbreakable, secondAchievement], wheels: [] },
+    comment: 'Проверка профиля с двумя сезонными достижениями',
+  });
+  expect((await landAttack()).events.filter((type) => type === 'achievement-earned')).toHaveLength(
+    2,
+  );
+  await admin.post(`${adminSeason}/players/${recipient.playerId}/adjust`, {
+    pointsDelta: 17,
+    comment: 'Первое место для проверки титула',
+  });
+  for (const status of ['closing', 'finished', 'archived']) {
+    await admin.post(`${adminSeason}/status`, { to: status });
+  }
+
+  await page.reload();
+  await expect(badge).toHaveCount(2);
+  await expect(badges.getByText(unbreakable.name, { exact: true })).toBeVisible();
+  const longName = badges.getByText(secondAchievement.name, { exact: true });
+  await expect(longName).toBeVisible();
+  expect(await longName.evaluate((element) => element.scrollWidth)).toBeLessThanOrEqual(
+    await longName.evaluate((element) => element.clientWidth),
+  );
+  const seasons = page.getByTestId('profile-seasons');
+  const seasonLink = seasons.getByRole('link', { name: world.seasonName, exact: true });
+  await expect(seasons.getByText('Чемпион сезона', { exact: true })).toBeVisible();
+  await seasonLink.focus();
+  await page.keyboard.press('Shift+Tab');
+  await page.keyboard.press('Tab');
+  await expect(seasonLink).toBeFocused();
+  await expect(badges).toBeInViewport();
+  await capture('profile-badges-and-champion');
   await player.dispose();
 });

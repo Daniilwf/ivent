@@ -1,5 +1,14 @@
 # Дизайн-ревью
 
+## Этап 6. Сезонные достижения и титул в профиле (2026-11-20)
+
+| Состояние | 390×844 | 1440×900 |
+| --- | --- | --- |
+| Первое достижение | [Телефон](../test-artifacts/design/s6-dense-profile/seasonal-achievement-phone.png) | [Десктоп](../test-artifacts/design/s6-dense-profile/seasonal-achievement-desktop.png) |
+| Два достижения и титул чемпиона | [Телефон](../test-artifacts/design/s6-dense-profile/profile-badges-and-champion-phone.png) | [Десктоп](../test-artifacts/design/s6-dense-profile/profile-badges-and-champion-desktop.png) |
+
+На обоих размерах целиком видны значки, описания, даты, очки, первое место и титул. Длинное название переносится на телефоне на две строки. Горизонтальной прокрутки нет. Tab возвращает видимый фокус на ссылку сезона. Проверенные сочетания имеют контраст от 6,98:1 до 16,10:1. Состояния загрузки, ошибки и пустого профиля проверяет `web/src/feed/ProfileScreen.test.tsx`.
+
 ## Этап 6. Зал славы (2026-11-20)
 
 | Состояние | 390×844 | 1440×900 |
