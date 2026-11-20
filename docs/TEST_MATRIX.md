@@ -15,6 +15,8 @@
 | S6UI4 | BUG-S6-01. Живое уведомление комментария перечитывает только нужную ветку. После догрузки событий без адреса или отката обсуждения перепроверяются. | `Web.Tests/Api/HubCatchUpTests.cs` («A_comment_broadcast_names_only_its_public_thread_and_resume_omits_the_hint»), `web/src/feed/FeedScreen.test.tsx` («refreshes only the named discussion…») |
 | S6UI5 | BUG-S6-02. При нулевой квоте обсуждение остаётся доступно для чтения, редактирования и модерации. Форма новой публикации возвращается после повышения квоты. | `e2e/tests/s6-comment-posting.spec.ts`, `Web.Tests/Api/FeedCommentApiTests.cs` |
 | S6UI6 | Реакции зрителей обновляют только открытый кадр. Повтор неизменённой загрузки после потери ответа и временного 429 сохраняет одну публикацию и одну запись в квоте. | `web/src/gallery/GalleryScreen.test.tsx`, `web/src/gallery/GalleryUploadDialog.test.tsx` |
+| S6UI7 | Зал славы показывает опубликованных победителей завершённых и архивных сезонов, включая все первые места при ничьей. Имя удалённого победителя остаётся без ссылки. Зритель видит все равные рекорды самой длинной игры и переходит к их карточкам. Заголовки читаются и получают фокус на обоих размерах. | `Web.Tests/Api/HallOfFameApiTests.cs`, `Web.Tests/Api/HallOfFameRecordsApiTests.cs`, `e2e/tests/s6-hall-of-fame.spec.ts`, `e2e/visual/hall-of-fame.visual.spec.ts` |
+| S6UI8 | Архив и рекорд читаются независимо. Повтор после сбоя запрашивает только затронутую панель. Две пустые выборки показывают одно состояние. Истёкшая сессия возвращает ко входу. | `web/src/hallOfFame/HallOfFameScreen.test.tsx` |
 
 ## Правила этапа 1
 

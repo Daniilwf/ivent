@@ -1759,6 +1759,20 @@ export const ru = {
     attacksMade: 'Нанесено',
     attacksReceived: 'Получено',
   },
+  hallOfFame: {
+    winners: 'Победители сезонов',
+    record: 'Самая длинная игра',
+    toRecord: 'К рекорду',
+    tiedFirst: 'Общее первое место',
+    emptyTitle: 'Здесь пока нет итогов',
+    emptyText: 'Здесь будут итоги завершённых сезонов.',
+    noWinnersTitle: 'Пока нет победителей',
+    noWinnersText: 'Победители появятся после публикации итогов.',
+    noRecordTitle: 'Пока нет рекорда',
+    noRecordText: 'Рекорд появится после зачтённого прохождения в завершённом сезоне.',
+    winnersError: 'Победители не загрузились',
+    recordError: 'Рекорд не загрузился',
+  },
   // «Где я вошёл» (D-466): a session is a sign-in on one device; the page calls it «устройство»
   sessions: {
     title: 'Где я вошёл',
@@ -1857,6 +1871,7 @@ export const ru = {
     season: 'Сезон',
     feed: 'Лента',
     gallery: 'Галерея',
+    hallOfFame: 'Зал славы',
     pool: 'Пул',
     rules: 'Правила',
     polls: 'Голосования',

@@ -26,6 +26,9 @@ const GalleryScreen = lazy(async () => ({
   default: (await import('./gallery/GalleryScreen')).GalleryScreen,
 }));
 const GameScreen = lazy(async () => ({ default: (await import('./feed/GameScreen')).GameScreen }));
+const HallOfFameScreen = lazy(async () => ({
+  default: (await import('./hallOfFame/HallOfFameScreen')).HallOfFameScreen,
+}));
 const ProfileScreen = lazy(async () => ({
   default: (await import('./feed/ProfileScreen')).ProfileScreen,
 }));
@@ -327,6 +330,8 @@ export function App() {
           user={signedIn.user}
           onSignedOut={signedOut}
         />
+      ) : route.kind === 'hallOfFame' ? (
+        <HallOfFameScreen onSignedOut={signedOut} />
       ) : route.kind === 'game' ? (
         <GameScreen key={route.gameId} gameId={route.gameId} onSignedOut={signedOut} />
       ) : route.kind === 'notFound' || (route.kind === 'admin' && admin) ? (

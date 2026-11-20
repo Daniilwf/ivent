@@ -7,6 +7,7 @@ import {
   Map as MapIcon,
   MessagesSquare,
   ShieldCheck,
+  Trophy,
   UserRound,
   Vote,
 } from 'lucide-react';
@@ -30,11 +31,12 @@ const sections: { kind: Route['kind'] & keyof typeof ru.nav; to: string; icon: R
   { kind: 'feed', to: paths.feed(), icon: <MessagesSquare size={18} aria-hidden /> },
   { kind: 'pool', to: paths.pool(), icon: <Library size={18} aria-hidden /> },
   { kind: 'rules', to: paths.rules(), icon: <BookOpen size={18} aria-hidden /> },
+  { kind: 'hallOfFame', to: paths.hallOfFame(), icon: <Trophy size={18} aria-hidden /> },
 ];
 
 /**
  * The site's sections go under the name on a phone, between the name and my menu on a desktop.
- * Extra sections wrap when the header runs out of room.
+ * Compact labels leave room for the five common sections on a phone. Extra sections wrap.
  */
 function SiteNav({
   admin,
@@ -79,8 +81,7 @@ function SiteNav({
                 aria-current={current ? 'page' : undefined}
                 data-testid={`nav-${section.kind}`}
                 className={cx(
-                  'inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-full font-medium whitespace-nowrap transition duration-(--duration-fast) desk:px-3',
-                  pollsSeasonId || gallerySeasonId ? 'px-2 text-sm desk:text-base' : 'px-4',
+                  'inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-full px-2 text-sm font-medium whitespace-nowrap transition duration-(--duration-fast) desk:px-3 desk:text-base',
                   // The current section: filled, not by colour alone
                   current ? 'bg-ink text-on-color' : 'text-ink is-hover:bg-muted',
                 )}

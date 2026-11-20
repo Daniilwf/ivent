@@ -11,6 +11,7 @@ export type Route =
   | { kind: 'interactions'; seasonId: string | null }
   | { kind: 'profile'; userId: string }
   | { kind: 'seasonRecap'; seasonId: string }
+  | { kind: 'hallOfFame' }
   | { kind: 'game'; gameId: string }
   | { kind: 'pool' }
   | { kind: 'rules' }
@@ -30,7 +31,7 @@ const admin = /^\/admin(?:\/([a-z]+))?$/;
 
 /**
  * What page an address opens: `/`, `/feed` (the current season), `/seasons/{id}/feed`, `/users/{id}`, `/games/{id}`,
- * `/pool`, `/rules`, `/polls`, `/seasons/{id}/polls`, `/admin` and `/admin/{section}`
+ * `/pool`, `/rules`, `/hall-of-fame`, `/polls`, `/seasons/{id}/polls`, `/admin` and `/admin/{section}`
  */
 export function routeOf(path: string): Route {
   const clean = path.replace(/\/+$/, '') || '/';
@@ -41,6 +42,7 @@ export function routeOf(path: string): Route {
   if (clean === '/interactions') return { kind: 'interactions', seasonId: null };
   if (clean === '/pool') return { kind: 'pool' };
   if (clean === '/rules') return { kind: 'rules' };
+  if (clean === '/hall-of-fame') return { kind: 'hallOfFame' };
   let match = seasonFeed.exec(clean);
   if (match?.[1]) return { kind: 'feed', seasonId: match[1] };
   match = seasonGallery.exec(clean);
@@ -69,6 +71,7 @@ export const paths = {
     seasonId ? `/seasons/${seasonId}/interactions` : '/interactions',
   profile: (userId: string) => `/users/${userId}`,
   seasonRecap: (seasonId: string) => `/seasons/${seasonId}/recap`,
+  hallOfFame: () => '/hall-of-fame',
   game: (gameId: string) => `/games/${gameId}`,
   pool: () => '/pool',
   rules: () => '/rules',
