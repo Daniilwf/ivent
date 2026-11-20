@@ -35,4 +35,10 @@ public sealed record EngineContext(
 
     /// <summary>The queue verified the approval command matches the proof attachment prepared for publication.</summary>
     public Guid? GalleryProofApprovalCommandId { get; init; }
+
+    /// <summary>Effective landed attacks loaded by the queue when it records season results.</summary>
+    public IReadOnlyList<Inventory.HostileReceived>? EffectiveAttacks { get; init; }
+
+    /// <summary>The queue verified that these candidates of the requested category are public in this season.</summary>
+    public IReadOnlySet<Guid>? AvailableNominationCandidates { get; init; }
 }

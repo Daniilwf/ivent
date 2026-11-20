@@ -1581,6 +1581,59 @@
         }
       }
     },
+    "/api/seasons/{seasonId}/nominations": {
+      "get": {
+        "tags": [
+          "Seasons"
+        ],
+        "parameters": [
+          {
+            "name": "seasonId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NominationResultView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/hall-of-fame": {
       "get": {
         "tags": [
@@ -7886,6 +7939,193 @@
         }
       }
     },
+    "/api/admin/seasons/{seasonId}/nominations/polls": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "parameters": [
+          {
+            "name": "seasonId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartNominationPollRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RejectionProblem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/seasons/{seasonId}/nominations/candidates": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "parameters": [
+          {
+            "name": "seasonId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NominationCandidatesView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RejectionProblem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/seasons/{seasonId}/global-events": {
       "get": {
         "tags": [
@@ -12454,6 +12694,38 @@
         },
         "description": "Approve a run: with its proof, or without one («без скрина», a comment then); a lower proven difficulty."
       },
+      "AutomaticNominationView": {
+        "required": [
+          "nomination",
+          "value",
+          "winners"
+        ],
+        "type": "object",
+        "properties": {
+          "nomination": {
+            "$ref": "#/components/schemas/AutoNomination"
+          },
+          "value": {
+            "type": "number",
+            "format": "double"
+          },
+          "winners": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NominationPlayerView"
+            }
+          }
+        }
+      },
+      "AutoNomination": {
+        "enum": [
+          "mostHours",
+          "mostRuns",
+          "unluckiestDice",
+          "mostDrops",
+          "mostAttacks"
+        ]
+      },
       "AvatarRequest": {
         "required": [
           "commandId",
@@ -14818,6 +15090,10 @@
           "seasonStatistics": {
             "type": "boolean",
             "description": "Personal season statistics. An older ruleset without this flag keeps it off."
+          },
+          "seasonNominations": {
+            "type": "boolean",
+            "description": "Nomination ballots and saved season awards (D-927). Older seasons keep the feature off."
           }
         },
         "description": "Feature flags: a disabled mechanic is invisible in the interface and refused by the engine."
@@ -17441,6 +17717,121 @@
         },
         "description": "The signed-in player's own turn. While playing: `dropHintMinutes` is `roll.minPlayMinutesBeforeDrop` until\nthat much has been played by the server clock (only a hint: D-09), then null; `dropPenalty` is what a drop costs\nunder the rules in force; `techRerollOpen` says whether the player may still tech-reroll themselves (D-94);\n`challengesEnabled` says whether a challenge may be claimed on completion (`features.challenges`, D-96);\n`techRerollUntil` is when the player's own tech reroll window closes (the roll time plus the run's snapshot of\n`roll.techRerollWindowHours`), null while not playing. The active run's game carries the hours of the roll's\nsnapshot, the ones the completion counts (D-44): the pool may have got hours since (D-138). `difficultyDice` —\nwhile playing, the die each difficulty gives under the run's snapshot and the event it grants, if any.\n`dropPenalty.count` counts the extra dice of the drops in a row before this run (D-205, D-324).\n`wishRerollOpen` — whether the player may give the game up by wish now (D-206, D-325; always set, optional for older clients): a tech reroll with the\nreason `wish`, within the window, for a game with a listed tag the roll did not impose.\n`lastEvent` — the event I drew last (stage 5), while `features.events` is on; null before the first draw.\n`coins` — my balance, what a paid reroll spends (K1S-3). `checks` — my other runs that still take a proof\n(completed, the proof neither approved nor rejected) and the runs rejected since my latest roll, newest first; the\nlatest completed run is `lastCompleted` and never here (K1S-1, K1S-9, D-602). `waitingEvents` — my drawn events\nwaiting for my future steps; `waitingConditions` — the conditions of events waiting for my next roll (D-821, D-823);\nboth always set (empty with events off), optional for older clients.\n`eventsEnabled` — whether event answers and IRL proofs are open, including a question retained while off;\n`irlProofMaxFiles` — the current limit of pictures per IRL proof (zero allows a link only). Both always set.\n`partnerRequest` is my open request, including while the board is off. `hasInteractionActions`\nkeeps access to residual coop while coop is off. `activeDuels` are my races while playing.\n`isCoopPartner` distinguishes the invited partner from the roller who submits the run's result."
       },
+      "NominationCandidatesView": {
+        "required": [
+          "category",
+          "durationHours",
+          "minCandidates",
+          "maxCandidates",
+          "candidates"
+        ],
+        "type": "object",
+        "properties": {
+          "category": {
+            "$ref": "#/components/schemas/VotedNomination"
+          },
+          "durationHours": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "minCandidates": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxCandidates": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "candidates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NominationCandidateView"
+            }
+          }
+        }
+      },
+      "NominationCandidateView": {
+        "required": [
+          "id",
+          "label",
+          "detail",
+          "href",
+          "thumbnailUrl"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "label": {
+            "type": "string"
+          },
+          "detail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "href": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "thumbnailUrl": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "NominationPlayerView": {
+        "required": [
+          "playerId",
+          "name",
+          "profileUserId"
+        ],
+        "type": "object",
+        "properties": {
+          "playerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "profileUserId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          }
+        }
+      },
+      "NominationResultView": {
+        "required": [
+          "automatic",
+          "voted"
+        ],
+        "type": "object",
+        "properties": {
+          "automatic": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AutomaticNominationView"
+            }
+          },
+          "voted": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VotedNominationView"
+            }
+          }
+        }
+      },
       "NominationRules": {
         "required": [
           "auto",
@@ -17453,6 +17844,27 @@
           },
           "voted": {
             "$ref": "#/components/schemas/EquatableArrayOfVotedNomination"
+          },
+          "durationHours": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "minCandidates": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "maxCandidates": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
           }
         }
       },
@@ -17731,6 +18143,30 @@
           },
           "label": {
             "type": "string"
+          },
+          "detail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "href": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "thumbnailUrl": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "unavailable": {
+            "type": [
+              "null",
+              "boolean"
+            ]
           }
         },
         "description": "An option of the poll: the id a vote names, the words the screen shows."
@@ -17763,7 +18199,8 @@
         "enum": [
           "admin",
           "event",
-          "globalEvent"
+          "globalEvent",
+          "nomination"
         ],
         "description": "Who started a poll (D-512): the admin with a PollDefinition, or a drawn event's `requestChoice.vote`."
       },
@@ -17853,6 +18290,16 @@
               },
               {
                 "$ref": "#/components/schemas/PollVotingView"
+              }
+            ]
+          },
+          "nomination": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/VotedNomination"
               }
             ]
           }
@@ -20121,6 +20568,12 @@
               "null",
               "boolean"
             ]
+          },
+          "nominationsEnabled": {
+            "type": [
+              "null",
+              "boolean"
+            ]
           }
         },
         "description": "The season screen's data. `status` and `deadline` (UTC; the screen shows it in Moscow time) follow the\nlifecycle (D-101); after the finish `leaderboard` is the recorded result. The map is the one in force (the\nlatest published, D-300): `cells`, `edges` and `zones`; `mapMode` says whether the season plays\non the linear chain of stage 1 or on the graph (D-301); `background` — the picture under the cells, null when\nthe map has none or its file is not on this site (D-277). `globalEvents` — the banner of the global events running\nnow (D-832; always set, empty while the mechanic is off, optional for older clients)."
@@ -20413,6 +20866,45 @@
           },
           "spectatorsCanVote": {
             "type": "boolean"
+          }
+        }
+      },
+      "StartNominationPollRequest": {
+        "required": [
+          "commandId",
+          "pollId",
+          "category",
+          "candidateIds"
+        ],
+        "type": "object",
+        "properties": {
+          "commandId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "pollId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "category": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/VotedNomination"
+              }
+            ]
+          },
+          "candidateIds": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
           }
         }
       },
@@ -21029,6 +21521,44 @@
           "afterDice",
           "anytime"
         ]
+      },
+      "VotedNomination": {
+        "enum": [
+          "bestReview",
+          "gameOfSeason",
+          "funniestMoment"
+        ]
+      },
+      "VotedNominationView": {
+        "required": [
+          "nomination",
+          "pollId",
+          "hasWinner",
+          "winner"
+        ],
+        "type": "object",
+        "properties": {
+          "nomination": {
+            "$ref": "#/components/schemas/VotedNomination"
+          },
+          "pollId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "hasWinner": {
+            "type": "boolean"
+          },
+          "winner": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/NominationCandidateView"
+              }
+            ]
+          }
+        }
       },
       "VoteRequest": {
         "required": [

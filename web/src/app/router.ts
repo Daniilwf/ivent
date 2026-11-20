@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 // link changes the address without reloading the page (Link.tsx); the browser's back and forward buttons work as usual.
 
 export type Route =
-  | { kind: 'season' }
+  | { kind: 'season'; seasonId?: string }
   | { kind: 'feed'; seasonId: string | null }
   | { kind: 'gallery'; seasonId: string | null }
   | { kind: 'polls'; seasonId: string | null }
@@ -20,6 +20,7 @@ export type Route =
   | { kind: 'notFound' };
 
 const id = '([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})';
+const season = new RegExp(`^/seasons/${id}$`);
 const seasonFeed = new RegExp(`^/seasons/${id}/feed$`);
 const seasonGallery = new RegExp(`^/seasons/${id}/gallery$`);
 const seasonPolls = new RegExp(`^/seasons/${id}/polls$`);
@@ -30,7 +31,7 @@ const game = new RegExp(`^/games/${id}$`);
 const admin = /^\/admin(?:\/([a-z]+))?$/;
 
 /**
- * What page an address opens: `/`, `/feed` (the current season), `/seasons/{id}/feed`, `/users/{id}`, `/games/{id}`,
+ * What page an address opens: `/`, `/seasons/{id}`, `/feed` (the current season), `/seasons/{id}/feed`, `/users/{id}`, `/games/{id}`,
  * `/pool`, `/rules`, `/hall-of-fame`, `/polls`, `/seasons/{id}/polls`, `/admin` and `/admin/{section}`
  */
 export function routeOf(path: string): Route {
@@ -43,7 +44,9 @@ export function routeOf(path: string): Route {
   if (clean === '/pool') return { kind: 'pool' };
   if (clean === '/rules') return { kind: 'rules' };
   if (clean === '/hall-of-fame') return { kind: 'hallOfFame' };
-  let match = seasonFeed.exec(clean);
+  let match = season.exec(clean);
+  if (match?.[1]) return { kind: 'season', seasonId: match[1].toLowerCase() };
+  match = seasonFeed.exec(clean);
   if (match?.[1]) return { kind: 'feed', seasonId: match[1] };
   match = seasonGallery.exec(clean);
   if (match?.[1]) return { kind: 'gallery', seasonId: match[1] };
@@ -63,7 +66,7 @@ export function routeOf(path: string): Route {
 }
 
 export const paths = {
-  season: () => '/',
+  season: (seasonId?: string) => (seasonId ? `/seasons/${seasonId}` : '/'),
   feed: (seasonId?: string) => (seasonId ? `/seasons/${seasonId}/feed` : '/feed'),
   gallery: (seasonId?: string) => (seasonId ? `/seasons/${seasonId}/gallery` : '/gallery'),
   polls: (seasonId?: string) => (seasonId ? `/seasons/${seasonId}/polls` : '/polls'),

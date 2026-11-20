@@ -284,6 +284,11 @@ public static class RejectionCodes
 
     /// <summary>A poll needs at least two options to choose from when it starts (D-720).</summary>
     public const string PollNoOptions = "poll.noOptions";
+    public const string NominationNeedsClosing = "poll.nominationNeedsClosing";
+    public const string NominationCandidatesInvalid = "poll.nominationCandidatesInvalid";
+    public const string NominationAlreadyStarted = "poll.nominationAlreadyStarted";
+    public const string SeasonNominationPollsOpen = "season.nominationPollsOpen";
+    public const string NominationInPlay = "poll.nominationInPlay";
 
     // Global events (stage 5, D-517, D-518, D-750)
     public const string GlobalEventUnknown = "globalEvent.unknown";

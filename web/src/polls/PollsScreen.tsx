@@ -4,7 +4,7 @@ import { api, rejectionCode, type Schemas } from '../api/client';
 import { newCommandId } from '../api/commands';
 import { usePageHeading, useRestoredScroll } from '../app/router';
 import { answerOf, type Answer } from '../app/useLoaded';
-import { useSeasonVersion } from '../app/useSeasonVersion';
+import { usePoolVersion, useSeasonVersion } from '../app/useSeasonVersion';
 import { ru } from '../i18n/ru';
 import { Button } from '../ui/Button';
 import { Skeleton } from '../ui/Progress';
@@ -32,6 +32,7 @@ const refreshEvents = new Set([
   'vote-cast',
   'vote-changed',
   'poll-started',
+  'nomination-poll-started',
   'poll-closed',
   'poll-cancelled',
   'ruleset-changed',
@@ -40,6 +41,11 @@ const refreshEvents = new Set([
   'player-finished',
   'player-finish-revoked',
   'season-status-changed',
+  'run-reviewed',
+  'proof-submitted',
+  'proof-rejected',
+  'gallery-moment-hidden',
+  'gallery-proof-consent-withdrawn',
 ]);
 
 function isActive(session: Session) {
@@ -172,10 +178,13 @@ function SeasonPolls({ seasonId, onSignedOut }: PollsScreenProps) {
       update.seasonId.toLowerCase() === seasonId &&
       update.types.some((type) => refreshEvents.has(type)),
   });
+  const poolVersion = usePoolVersion(
+    state.kind === 'ready' && state.value.some((poll) => poll.nomination != null),
+  );
   const refreshForVersion = useEffectEvent(() => void refresh());
   useEffect(() => {
     refreshForVersion();
-  }, [version]);
+  }, [poolVersion, version]);
   useRestoredScroll(state.kind !== 'loading');
 
   async function vote(pollId: string, optionId: string) {

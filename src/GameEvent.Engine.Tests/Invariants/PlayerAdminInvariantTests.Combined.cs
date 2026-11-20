@@ -415,6 +415,7 @@ public partial class PlayerAdminInvariantTests
             "coop" => features.Coop,
             "partnerBoard" => features.PartnerBoard && features.Coop,
             "polls" => features.Polls,
+            "seasonNominations" => features.SeasonNominations,
             "globalEvents" => features.GlobalEvents && features.Events,
             "duels" => features.Duels,
             "interactions" => features.Coop || features.Duels,
@@ -482,6 +483,7 @@ public partial class PlayerAdminInvariantTests
             // Polls of stage 5 (D-512, D-720)
             Engine.Polls.PollStarted or Engine.Polls.VoteCast or Engine.Polls.VoteChanged or Engine.Polls.PollClosed
                 or Engine.Polls.PollCancelled => "polls",
+            Engine.Polls.NominationPollStarted or Engine.Statistics.SeasonNominationsRecorded => "seasonNominations",
 
             // Global events and their goals (D-517, D-518, D-750)
             Engine.GlobalEvents.GlobalEventLaunched or Engine.GlobalEvents.GlobalEventEnded or Engine.GlobalEvents.GlobalProgressChanged

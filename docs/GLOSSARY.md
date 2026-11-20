@@ -48,7 +48,7 @@
 | Тайбрейк | правило при равных очках: число пройденных игр, затем кто раньше набрал итоговые очки | `Tiebreaker` |
 | Клеток до финиша | наименьшее число шагов вперёд до финиша | `LeaderboardRow.CellsToFinish` |
 | Номер изменения очков | порядковый номер ненулевого изменения очков в сезоне; для тайбрейка «раньше набрал» | `SeasonPlayer.PointsTick`, счётчик — `SeasonState.PointsChanges` |
-| Итоги сезона | снимок мест, очков и результатов номинаций при завершении сезона | `SeasonResultRecorded`, `SeasonResultRecord`, `SeasonState.Result` |
+| Итоги сезона | снимок мест, очков и результатов номинаций при завершении сезона | `SeasonResultRecorded`, `SeasonResultRecord`, `SeasonState.Result`, `SeasonNominationsRecorded` |
 | Наступление дедлайна | системная команда планировщика: сезон «идёт» переходит в «закрытие» | `ReachDeadline`, `DeadlineScheduler` |
 | Планировщик | фоновый проход сайта раз в несколько секунд: закрывает сезоны по дедлайну, запускает наступившие таймеры, чистит сессии; сроки хранит база, поэтому перезапуск сайта их не теряет (D-101, D-404, D-773) | `DeadlineScheduler`, `Scheduler:IntervalSeconds` |
 | Проверка целостности | сверка состояния сезона в базе с повтором его лога | `SeasonIntegrity`, `GET /api/admin/seasons/{id}/integrity`, `season-check` |

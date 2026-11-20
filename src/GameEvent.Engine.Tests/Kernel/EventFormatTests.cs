@@ -15,6 +15,7 @@ using GameEvent.Engine.Rulesets;
 using GameEvent.Engine.Runs;
 using GameEvent.Engine.Scoring;
 using GameEvent.Engine.Seasons;
+using GameEvent.Engine.Statistics;
 using GameEvent.Engine.Tests.Support;
 using GameEvent.Engine.Turns;
 
@@ -330,6 +331,14 @@ public partial class EventFormatTests
             new PlayerFinished(s_player, s_run, 2, s_at, 3),
             1,
             """{"playerId":"10000000-0000-0000-0000-000000000001","runId":"00000000-0000-0000-0000-000000000001","order":2,"finishedAt":"2026-10-01T12:30:00+00:00","surplus":3}"""
+        },
+        {
+            "season-nominations-recorded",
+            new SeasonNominationsRecorded(
+                [new AutomaticNominationResult(AutoNomination.MostHours, [s_player, s_other], 9.5m)],
+                [new VotedNominationResult(VotedNomination.GameOfSeason, s_run, s_game)]),
+            1,
+            """{"automatic":[{"nomination":"mostHours","winnerPlayerIds":["10000000-0000-0000-0000-000000000001","10000000-0000-0000-0000-000000000002"],"value":9.5}],"voted":[{"nomination":"gameOfSeason","pollId":"00000000-0000-0000-0000-000000000001","winnerCandidateId":"20000000-0000-0000-0000-000000000001"}]}"""
         },
         {
             "season-result-recorded",

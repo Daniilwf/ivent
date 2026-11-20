@@ -134,7 +134,8 @@ public sealed record SeasonView(
     IReadOnlyList<GameEvent.Web.GlobalEvents.GlobalEventView>? GlobalEvents = null,
     bool? PollsEnabled = null,
     InteractionFeaturesView? InteractionFeatures = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? GalleryEnabled = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? GalleryEnabled = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? NominationsEnabled = null);
 
 /// <summary>The selected season's navigation flags, without its map, players or folded event state.</summary>
 public sealed record SeasonNavigationView(
@@ -927,7 +928,8 @@ public static class SeasonEndpoints
             await GameEvent.Web.GlobalEvents.GlobalEventEndpoints.BannerAsync(db, seasonId, rules.Features.GlobalEvents, clock.UtcNow, ct),
             rules.Features.Polls,
             interactionFeatures,
-            rules.Features.Gallery ? true : null));
+            rules.Features.Gallery ? true : null,
+            rules.Features.SeasonNominations ? true : null));
     }
 
     private static async Task<bool> PendingCoopAsync(GameEventDbContext db, Guid seasonId, Guid playerId, DateTimeOffset now, CancellationToken ct)

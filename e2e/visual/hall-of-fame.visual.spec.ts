@@ -53,7 +53,7 @@ const records: Schemas['HallOfFameRecordsView'] = {
   ],
 };
 
-test('the hall of fame shows long season names, tied winners and both longest games', async ({
+test('the hall of fame links long season names and shows tied winners and both longest games', async ({
   page,
 }) => {
   await page.route('**/api/auth/antiforgery', (route) =>
@@ -80,6 +80,10 @@ test('the hall of fame shows long season names, tied winners and both longest ga
   const archive = page.getByRole('region', { name: 'Победители сезонов' });
   const record = page.getByRole('region', { name: 'Самая длинная игра' });
   await expect(archive.getByRole('heading', { name: seasonName })).toBeVisible();
+  await expect(archive.getByRole('link', { name: seasonName, exact: true })).toHaveAttribute(
+    'href',
+    `/seasons/${id(1)}`,
+  );
   await expect(archive.getByRole('link', { name: 'Лиса с Длинной Тропы' })).toBeVisible();
   await expect(archive.getByText('Филин', { exact: true })).toBeVisible();
   await expect(record.getByRole('link', { name: 'Долгая дорога домой' })).toBeVisible();

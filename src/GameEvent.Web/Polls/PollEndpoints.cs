@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using GameEvent.Engine.Content;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Polls;
@@ -49,13 +50,18 @@ public sealed record PollView(
     string? Result,
     string? MyVote,
     PollSource Source,
-    PollVotingView? Voting = null);
+    PollVotingView? Voting = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] VotedNomination? Nomination = null);
 
 /// <summary>The signed-in user's current voting availability; a later POST still checks the authoritative rules.</summary>
 public sealed record PollVotingView(bool CanVote, string? Reason, bool AllowChangeVote);
 
 /// <summary>An option of the poll: the id a vote names, the words the screen shows.</summary>
-public sealed record PollOptionView(string Id, string Label);
+public sealed record PollOptionView(string Id, string Label,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Detail = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Href = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ThumbnailUrl = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? Unavailable = null);
 
 public sealed record PollCountView(string OptionId, int Votes);
 
@@ -91,6 +97,7 @@ public static class PollEndpoints
         admin.MapPost("/polls/{pollId:guid}/close", (Guid seasonId, Guid pollId, SeasonActionRequest request, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, CancellationToken ct) =>
                 SeasonEndpoints.PrecheckAndSendAsync(seasonId, request.CommandId, new ClosePoll(pollId), user.UserId(), db, bus, ct))
             .WithActionErrors();
+        admin.MapNominationPolls();
     }
 
     /// <summary>Error answers of a read, described so the generated client has their types.</summary>
@@ -102,8 +109,9 @@ public static class PollEndpoints
             .ProducesProblem(StatusCodes.Status429TooManyRequests);
 
     private static async Task<Results<Ok<IReadOnlyList<PollView>>, NotFound, ProblemHttpResult>> ListAsync(
-        Guid seasonId, ClaimsPrincipal user, GameEventDbContext db, IClock clock, CancellationToken ct)
+        Guid seasonId, ClaimsPrincipal user, HttpResponse response, GameEventDbContext db, IClock clock, CancellationToken ct)
     {
+        response.Headers.CacheControl = "private, no-store";
         if (await db.Seasons.AsNoTracking().SingleOrDefaultAsync(s => s.Id == seasonId, ct) is not { } season)
         {
             return TypedResults.NotFound();
@@ -120,8 +128,9 @@ public static class PollEndpoints
     }
 
     private static async Task<Results<Ok<PollView>, NotFound, ProblemHttpResult>> CardAsync(
-        Guid seasonId, Guid pollId, ClaimsPrincipal user, GameEventDbContext db, IClock clock, CancellationToken ct)
+        Guid seasonId, Guid pollId, ClaimsPrincipal user, HttpResponse response, GameEventDbContext db, IClock clock, CancellationToken ct)
     {
+        response.Headers.CacheControl = "private, no-store";
         if (await db.Seasons.AsNoTracking().SingleOrDefaultAsync(s => s.Id == seasonId, ct) is not { } season)
         {
             return TypedResults.NotFound();
@@ -134,7 +143,12 @@ public static class PollEndpoints
         }
 
         var row = await db.Polls.AsNoTracking().SingleOrDefaultAsync(p => p.Id == pollId && p.SeasonId == seasonId, ct);
-        return row is null ? TypedResults.NotFound() : TypedResults.Ok((await ViewsAsync(db, season, rules, [row], user.UserId(), clock.UtcNow, ct))[0]);
+        if (row is not null && await ViewsAsync(db, season, rules, [row], user.UserId(), clock.UtcNow, ct) is [var view])
+        {
+            return TypedResults.Ok(view);
+        }
+
+        return TypedResults.NotFound();
     }
 
     private static async Task<IReadOnlyList<PollView>> ViewsAsync(
@@ -145,8 +159,28 @@ public static class PollEndpoints
             return [];
         }
 
+        var polls = rows.ToDictionary(row => row.Id, row => JsonSerializer.Deserialize<Poll>(row.DataJson, EngineJson.Options)!);
+        rows = rows.Where(row => polls[row.Id].Nomination is not { } category
+            || rules.Features.SeasonNominations && rules.Nominations.Voted.Contains(category)).ToList();
         var ids = rows.Select(p => p.Id).ToList();
+        if (ids.Count == 0)
+        {
+            return [];
+        }
+
         var options = (await db.PollOptions.AsNoTracking().Where(o => ids.Contains(o.PollId)).ToListAsync(ct)).ToLookup(o => o.PollId);
+        var nomineeGroups = ids.Select(id => polls[id]).Where(poll => poll.Nomination != null)
+            .GroupBy(poll => poll.Nomination.GetValueOrDefault());
+        var candidates = new Dictionary<(VotedNomination Category, Guid Id), NominationCandidateView>();
+        foreach (var group in nomineeGroups)
+        {
+            var candidateIds = group.SelectMany(poll => options[poll.PollId]).Select(option => Guid.Parse(option.OptionId)).Distinct().ToArray();
+            foreach (var candidate in await NominationCandidates.ListAsync(db, season.Id, group.Key, rules.Features.Gallery, candidateIds, ct))
+            {
+                candidates.Add((group.Key, candidate.Id), NominationEndpoints.ViewOf(season.Id, candidate));
+            }
+        }
+
         var counts = (await db.Votes.AsNoTracking()
                 .Where(v => ids.Contains(v.PollId))
                 .GroupBy(v => new { v.PollId, v.OptionId })
@@ -164,6 +198,23 @@ public static class PollEndpoints
         var first = players.Where(p => p.FinishOrder is > 0).MinBy(p => p.FinishOrder);
         var isFirst = player is not null && player.Id == first?.Id;
         var allowChangeVote = rules.Polls?.AllowChangeVote == true;
+
+        PollOptionView OptionOf(PollOptionRecord option, Poll poll)
+        {
+            if (poll.Nomination is not { } nomination)
+            {
+                return new PollOptionView(option.OptionId, option.Label);
+            }
+
+            var candidateId = Guid.Parse(option.OptionId);
+            if (!candidates.TryGetValue((nomination, candidateId), out var candidate)
+                || nomination == VotedNomination.BestReview && !poll.MatchesNominationReview(candidateId, candidate.Detail))
+            {
+                return new PollOptionView(option.OptionId, "", Unavailable: true);
+            }
+
+            return new PollOptionView(option.OptionId, candidate.Label, candidate.Detail, candidate.Href, candidate.ThumbnailUrl);
+        }
 
         PollVotingView VotingOf(PollRecord row, Poll poll)
         {
@@ -195,7 +246,7 @@ public static class PollEndpoints
 
         return [.. rows.Select(row =>
         {
-            var poll = JsonSerializer.Deserialize<Poll>(row.DataJson, EngineJson.Options)!;
+            var poll = polls[row.Id];
             var snapshot = options[row.Id].OrderBy(o => o.Position).ToList();
             var byOption = counts[row.Id].ToDictionary(c => c.OptionId, c => c.Votes, StringComparer.Ordinal);
 
@@ -204,7 +255,7 @@ public static class PollEndpoints
             return new PollView(
                 row.Id,
                 poll.Question,
-                [.. snapshot.Select(o => new PollOptionView(o.OptionId, o.Label))],
+                [.. snapshot.Select(o => OptionOf(o, poll))],
                 poll.Voters,
                 row.Anonymous,
                 row.Status,
@@ -214,7 +265,8 @@ public static class PollEndpoints
                 row.Status == PollStatus.Closed ? poll.Result : null,
                 mine.GetValueOrDefault(row.Id),
                 poll.Source,
-                VotingOf(row, poll));
+                VotingOf(row, poll),
+                poll.Nomination);
         })];
     }
 

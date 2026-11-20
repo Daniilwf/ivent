@@ -255,6 +255,10 @@ public sealed record Features
     /// <summary>Personal season statistics. An older ruleset without this flag keeps it off.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public bool SeasonStatistics { get; init; }
+
+    /// <summary>Nomination ballots and saved season awards (D-927). Older seasons keep the feature off.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool SeasonNominations { get; init; }
 }
 
 public sealed record SeasonRules
@@ -632,6 +636,15 @@ public sealed record NominationRules
     public required EquatableArray<AutoNomination> Auto { get; init; }
 
     public required EquatableArray<VotedNomination> Voted { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? DurationHours { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? MinCandidates { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? MaxCandidates { get; init; }
 }
 
 public sealed record WeeklyChallengeRules

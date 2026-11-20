@@ -87,7 +87,8 @@ export function App() {
   const navigationSeason =
     state.kind === 'signedIn'
       ? ((
-          (route.kind === 'feed' ||
+          (route.kind === 'season' ||
+          route.kind === 'feed' ||
           route.kind === 'gallery' ||
           route.kind === 'polls' ||
           route.kind === 'interactions'
@@ -264,6 +265,8 @@ export function App() {
       );
 
     const signedIn = state;
+    const shownSeasonId =
+      route.kind === 'season' ? (route.seasonId ?? signedIn.seasonId) : signedIn.seasonId;
     // The admin's pages (H8) open for the admin only; anyone else at their address sees the game
     const admin = signedIn.user.role === 'admin';
     return (
@@ -368,9 +371,10 @@ export function App() {
         />
       ) : route.kind === 'rules' ? (
         <RulesScreen seasonId={signedIn.seasonId} onSignedOut={signedOut} />
-      ) : signedIn.seasonId ? (
+      ) : shownSeasonId ? (
         <SeasonScreen
-          seasonId={signedIn.seasonId}
+          key={shownSeasonId}
+          seasonId={shownSeasonId}
           role={signedIn.user.role}
           onSignedOut={signedOut}
           onNavigationLoaded={setHomeNavigation}

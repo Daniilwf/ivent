@@ -22,6 +22,7 @@ import { IrlProofSection } from './IrlProofSection';
 import { EconomySection } from './Inventory';
 import { RunActions } from './RunActions';
 import { MyFinish } from './MyFinish';
+import { NominationResults } from './NominationResults';
 import { seasonPicture } from './seasonView';
 import { linearBoard } from '../board/linearBoard';
 import { Cover, RunCard } from '../board/GameCards';
@@ -1313,6 +1314,9 @@ export function SeasonScreen({
         <p className="text-sm text-ink-soft">{ru.board.rule}</p>
         <Leaderboard rows={shownRows} />
       </Panel>
+      {finished && season.nominationsEnabled === true ? (
+        <NominationResults seasonId={season.id} onSignedOut={onSignedOut} />
+      ) : null}
       {season.globalEvents?.length ? (
         <div className="min-w-0 desk:col-start-1 desk:w-96">
           <GlobalEventBanner events={season.globalEvents} />

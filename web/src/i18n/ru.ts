@@ -150,6 +150,10 @@ const rejection = {
   'poll.notVoter': 'В этом голосовании голосуют только игроки сезона.',
   'poll.frozenVoter': 'Финишировавший первым не голосует там, где итог действует на игроков.',
   'poll.noOptions': 'В голосовании должно быть хотя бы два варианта.',
+  'poll.nominationNeedsClosing': 'Итоговое голосование можно открыть при закрытии сезона.',
+  'poll.nominationCandidatesInvalid': 'Выбери доступных кандидатов в пределах лимита категории.',
+  'poll.nominationAlreadyStarted': 'Для этой номинации уже есть итоговое голосование.',
+  'poll.nominationInPlay': 'Дождись публикации итогов действующего голосования.',
   'globalEvent.unknown': 'Такого общего ивента нет.',
   'globalEvent.ended': 'Общий ивент уже закончился.',
   'globalEvent.tooMany': 'Одновременно идёт максимум общих ивентов: сначала закончи один.',
@@ -206,6 +210,7 @@ const rejection = {
   'season.deadlinePassed': 'Дедлайн прошёл: броски закрыты, пруфы принимаются.',
   'season.deadlineNotReached': 'Дедлайн ещё не наступил.',
   'season.proofsPending': 'Сначала проверь все пруфы: итоги — только после проверки.',
+  'season.nominationPollsOpen': 'Дождись окончания всех открытых итоговых голосований.',
   'season.effectsPending': `Сначала разыграй ручные эффекты: отметь каждый «применено» или «не применимо» в разделе «${effectsSection}».`,
   'season.notActive': 'Сезон сейчас не идёт.',
   'player.finished': 'Позиция финишировавшего меняется только через его прохождения.',
@@ -3584,6 +3589,38 @@ export const ru = {
       runs: (target: number) => plural(target, 'прохождения', 'прохождений', 'прохождений'),
     },
   },
+  nomination: {
+    votedTitles: {
+      bestReview: 'Лучший отзыв',
+      gameOfSeason: 'Игра сезона',
+      funniestMoment: 'Самый смешной момент',
+    },
+    admin: {
+      title: 'Итоговые голосования',
+      enter: 'Подготовить голосование',
+      compose: 'Подготовка итогового голосования',
+      lead: 'Открой голосование после проверки всех пруфов.',
+      category: 'Номинация',
+      choose: 'Выбери номинацию',
+      candidates: 'Кандидаты',
+      open: 'Голосование уже открыто',
+      closed: 'Голосование уже закрыто',
+      allStarted: 'Для каждой номинации уже есть голосование',
+      tooFew: 'Пока мало кандидатов',
+      needCandidates: (minimum: number) =>
+        `Для голосования нужно хотя бы ${minimum} ${plural(minimum, 'доступный вариант', 'доступных варианта', 'доступных вариантов')}.`,
+      selection: (minimum: number, maximum: number) =>
+        minimum === maximum
+          ? `Выбери ${minimum} ${plural(minimum, 'вариант', 'варианта', 'вариантов')}.`
+          : `Выбери от ${minimum} до ${maximum} вариантов.`,
+      selected: (count: number, maximum: number) => `Выбрано ${count} из ${maximum}`,
+      duration: (hours: number) =>
+        `Голосование продлится ${hours} ${plural(hours, 'час', 'часа', 'часов')}.`,
+      candidateLoadFailed: 'Не удалось загрузить кандидатов',
+      launch: 'Открыть голосование',
+      launched: 'Итоговое голосование открыто.',
+    },
+  },
   polls: {
     title: 'Голосования',
     openGroup: 'Открытые',
@@ -3616,6 +3653,29 @@ export const ru = {
     votes: (count: number) => `${count} ${plural(count, 'голос', 'голоса', 'голосов')}`,
     noResult: 'Итог не выбран',
     resultUnavailable: 'Итог недоступен. Обнови страницу.',
+    nominationMaterials: 'Материалы голосования',
+    openGallery: 'Открыть галерею',
+    nominationCandidateHidden: 'Кандидат скрыт',
+    nominationCandidateMissing: 'Голосование приостановлено: один из вариантов скрыт.',
+  },
+  nominationResults: {
+    title: 'Номинации',
+    loadFailed: 'Не удалось загрузить номинации',
+    refreshingMaterials: 'Проверяем доступность материалов…',
+    refreshFailed: 'Не удалось проверить доступность материалов.',
+    empty: 'В этом сезоне нет победителей в номинациях.',
+    noWinner: 'Голосов не было.',
+    hiddenWinner: 'Материалы победителя скрыты.',
+    count: (value: number) => value.toLocaleString('ru-RU'),
+    luck: (value: number) =>
+      value.toLocaleString('ru-RU', { style: 'percent', maximumFractionDigits: 2 }),
+    automaticTitles: {
+      mostHours: 'Больше всех часов',
+      mostRuns: 'Больше всех игр',
+      unluckiestDice: 'Самый невезучий',
+      mostDrops: 'Больше всех дропов',
+      mostAttacks: 'Больше всех атак',
+    },
   },
   rejection: rejection as Readonly<Record<string, string>> & typeof rejection,
 } as const;

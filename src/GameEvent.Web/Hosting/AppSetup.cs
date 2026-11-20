@@ -309,6 +309,7 @@ public static class AppSetup
         api.MapSessions();
         api.MapSeasons();
         api.MapSeasonStatistics();
+        api.MapNominationResults();
         api.MapHallOfFame();
         api.MapHallOfFameRecords();
         api.MapRules();

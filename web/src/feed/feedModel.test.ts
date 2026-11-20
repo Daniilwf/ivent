@@ -821,6 +821,9 @@ describe('events drawn from decks (stage 5)', () => {
     expect(lineOf('poll-closed', { pollId: 'p', result: 'a'.repeat(32) })).toBe(
       'Голосование закрыто, итог подведён',
     );
+    expect(
+      lineOf('poll-closed', { pollId: 'p', result: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee' }),
+    ).toBe('Голосование закрыто, итог подведён');
     expect(lineOf('poll-closed', { pollId: 'p', result: null })).toBe(
       'Голосование закрыто: голосов нет',
     );

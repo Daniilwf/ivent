@@ -1641,6 +1641,68 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/seasons/{seasonId}/nominations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["NominationResultView"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Too Many Requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/hall-of-fame": {
         parameters: {
             query?: never;
@@ -7745,6 +7807,185 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/seasons/{seasonId}/nominations/polls": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["StartNominationPollRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CommandResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/seasons/{seasonId}/nominations/candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    category?: string;
+                };
+                header?: never;
+                path: {
+                    seasonId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["NominationCandidatesView"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+                /** @description Too Many Requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/seasons/{seasonId}/global-events": {
         parameters: {
             query?: never;
@@ -11831,6 +12072,14 @@ export interface components {
             difficulty?: null | components["schemas"]["Difficulty"];
             comment?: null | string;
         };
+        AutomaticNominationView: {
+            nomination: components["schemas"]["AutoNomination"];
+            /** Format: double */
+            value: number;
+            winners: components["schemas"]["NominationPlayerView"][];
+        };
+        /** @enum {unknown} */
+        AutoNomination: "mostHours" | "mostRuns" | "unluckiestDice" | "mostDrops" | "mostAttacks";
         /** @description A new avatar: a stored file (uploaded or downloaded by link) or none to remove it (D-117). */
         AvatarRequest: {
             /** Format: uuid */
@@ -12652,6 +12901,8 @@ export interface components {
             duels?: boolean;
             /** @description Personal season statistics. An older ruleset without this flag keeps it off. */
             seasonStatistics?: boolean;
+            /** @description Nomination ballots and saved season awards (D-927). Older seasons keep the feature off. */
+            seasonNominations?: boolean;
         };
         /**
          * @description One event of the season's feed (GLOSSARY «Лента», D-124): its place in the log, the command it came from, when, the
@@ -13506,9 +13757,44 @@ export interface components {
             activeDuels?: null | components["schemas"]["DuelView"][];
             isCoopPartner?: null | boolean;
         };
+        NominationCandidatesView: {
+            category: components["schemas"]["VotedNomination"];
+            /** Format: int32 */
+            durationHours: number;
+            /** Format: int32 */
+            minCandidates: number;
+            /** Format: int32 */
+            maxCandidates: number;
+            candidates: components["schemas"]["NominationCandidateView"][];
+        };
+        NominationCandidateView: {
+            /** Format: uuid */
+            id: string;
+            label: string;
+            detail: null | string;
+            href: null | string;
+            thumbnailUrl: null | string;
+        };
+        NominationPlayerView: {
+            /** Format: uuid */
+            playerId: string;
+            name: string;
+            /** Format: uuid */
+            profileUserId: null | string;
+        };
+        NominationResultView: {
+            automatic: components["schemas"]["AutomaticNominationView"][];
+            voted: components["schemas"]["VotedNominationView"][];
+        };
         NominationRules: {
             auto: components["schemas"]["EquatableArrayOfAutoNomination"];
             voted: components["schemas"]["EquatableArrayOfVotedNomination"];
+            /** Format: int32 */
+            durationHours?: null | number;
+            /** Format: int32 */
+            minCandidates?: null | number;
+            /** Format: int32 */
+            maxCandidates?: null | number;
         };
         /**
          * @description What an object is (CONTENT.md «Определение объекта», GLOSSARY).
@@ -13608,6 +13894,10 @@ export interface components {
         PollOptionView: {
             id: string;
             label: string;
+            detail?: null | string;
+            href?: null | string;
+            thumbnailUrl?: null | string;
+            unavailable?: null | boolean;
         };
         /** @description The rules of polls (SPEC «Голосования», D-512, D-513, D-541). */
         PollRules: {
@@ -13625,7 +13915,7 @@ export interface components {
          * @description Who started a poll (D-512): the admin with a PollDefinition, or a drawn event's `requestChoice.vote`.
          * @enum {unknown}
          */
-        PollSource: "admin" | "event" | "globalEvent";
+        PollSource: "admin" | "event" | "globalEvent" | "nomination";
         /**
          * @description Where a poll is: open for votes, closed with its result, or cancelled by the deadline (D-516).
          * @enum {unknown}
@@ -13655,6 +13945,7 @@ export interface components {
             myVote: null | string;
             source: components["schemas"]["PollSource"];
             voting?: null | components["schemas"]["PollVotingView"];
+            nomination?: null | components["schemas"]["VotedNomination"];
         };
         /** @enum {unknown} */
         PollVoters: "players" | "everyone";
@@ -14346,6 +14637,7 @@ export interface components {
             pollsEnabled?: null | boolean;
             interactionFeatures?: null | components["schemas"]["InteractionFeaturesView"];
             galleryEnabled?: null | boolean;
+            nominationsEnabled?: null | boolean;
         };
         /**
          * @description A live session of the signed-in user (D-466): `userAgent` — the browser's own description at the sign-in, which
@@ -14460,6 +14752,14 @@ export interface components {
             /** Format: int32 */
             commentsPerDay: number;
             spectatorsCanVote: boolean;
+        };
+        StartNominationPollRequest: {
+            /** Format: uuid */
+            commandId: string;
+            /** Format: uuid */
+            pollId: string;
+            category: null | components["schemas"]["VotedNomination"];
+            candidateIds: null | string[];
         };
         /** @description The admin starts a poll (D-512): `poll` is the poll of CONTENT.md «голосование». */
         StartPollRequest: {
@@ -14665,6 +14965,15 @@ export interface components {
         };
         /** @enum {unknown} */
         UseWindow: "beforeRoll" | "afterRoll" | "beforeDice" | "afterDice" | "anytime";
+        /** @enum {unknown} */
+        VotedNomination: "bestReview" | "gameOfSeason" | "funniestMoment";
+        VotedNominationView: {
+            nomination: components["schemas"]["VotedNomination"];
+            /** Format: uuid */
+            pollId: string;
+            hasWinner: boolean;
+            winner: null | components["schemas"]["NominationCandidateView"];
+        };
         /** @description A vote of the signed-in user (D-513, D-830): the option's id from the poll's snapshot. The voter is never in the body. */
         VoteRequest: {
             /** Format: uuid */
@@ -14789,6 +15098,7 @@ type ReadonlyArray<T> = [
     unknown[]
 ] ? Readonly<Exclude<T, undefined>> : Readonly<Exclude<T, undefined>[]>;
 export const achievementScopeValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["AchievementScope"]> = ["season", "allTime"];
+export const autoNominationValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["AutoNomination"]> = ["mostHours", "mostRuns", "unluckiestDice", "mostDrops", "mostAttacks"];
 export const betStatusValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["BetStatus"]> = ["open", "won", "lost", "revoked"];
 export const bugReportStatusValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["BugReportStatus"]> = ["new", "inWork", "closed"];
 export const cellTypeValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["CellType"]> = ["start", "empty", "finish", "fork", "teleport", "checkpoint", "pointsBonus", "event", "shop"];
@@ -14818,7 +15128,7 @@ export const mapModeValues: ReadonlyArray<FlattenedDeepRequired<components>["sch
 export const moveReasonValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["MoveReason"]> = ["completionRoll", "startingCell", "adminAdjustment", "dropPenalty", "runCorrection", "proofRejected", "teleport", "item", "itemTeleport", "diceModified"];
 export const objectKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ObjectKind"]> = ["item", "effect", "specialRoll", "event", "achievement"];
 export const partnerRequestStatusValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["PartnerRequestStatus"]> = ["open", "closed"];
-export const pollSourceValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["PollSource"]> = ["admin", "event", "globalEvent"];
+export const pollSourceValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["PollSource"]> = ["admin", "event", "globalEvent", "nomination"];
 export const pollStatusValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["PollStatus"]> = ["open", "closed", "cancelled"];
 export const pollVotersValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["PollVoters"]> = ["players", "everyone"];
 export const proofStatusValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ProofStatus"]> = ["pending", "approved", "rejected"];
@@ -14840,4 +15150,5 @@ export const techRerollReasonValues: ReadonlyArray<FlattenedDeepRequired<compone
 export const turnPhaseValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["TurnPhase"]> = ["idle", "rolling", "playing"];
 export const unmetConditionPolicyValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["UnmetConditionPolicy"]> = ["noDiceKeepCoins", "countAsDrop", "ignore"];
 export const useWindowValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["UseWindow"]> = ["beforeRoll", "afterRoll", "beforeDice", "afterDice", "anytime"];
+export const votedNominationValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["VotedNomination"]> = ["bestReview", "gameOfSeason", "funniestMoment"];
 export type operations = Record<string, never>;

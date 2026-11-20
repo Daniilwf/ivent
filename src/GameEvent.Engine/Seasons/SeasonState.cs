@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Text.Json.Serialization;
 using GameEvent.Engine.Effects;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Map;
@@ -38,6 +39,10 @@ public sealed record SeasonState(
 
     // Rebuilt from RunCompleted events. Rejected runs keep their position so undo can restore the original order.
     internal ImmutableList<Guid> RunCompletionOrder { get; init; } = [];
+
+    /// <summary>The immutable nomination results written when the season finishes (D-927).</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Statistics.SeasonNominationsRecorded? Nominations { get; init; }
 
     /// <summary>The weekly challenges set in the season (D-526), by id.</summary>
     public ImmutableSortedDictionary<Guid, Challenges.WeeklyChallengeState> WeeklyChallenges { get; init; } =
@@ -119,6 +124,7 @@ public sealed record SeasonState(
         && FinishesSoFar == other.FinishesSoFar
         && PointsChanges == other.PointsChanges
         && Result == other.Result
+        && Nominations == other.Nominations
         && Catalog == other.Catalog
         && WeeklyChallenges.SequenceEqual(other.WeeklyChallenges)
         && Suggestions.SequenceEqual(other.Suggestions)

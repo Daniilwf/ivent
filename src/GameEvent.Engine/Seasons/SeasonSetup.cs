@@ -126,16 +126,17 @@ internal static class SeasonSetup
             return Decision.Accept(changed);
         }
 
-        // Results only once every proof is checked; the leaderboard at that moment is the season's result (D-101).
-        if (Proofs.ProofReviewOrder.Order(state).Count > 0)
+        if (ProofsPending(state) is { } pending)
         {
-            return Decision.Reject(RejectionCodes.SeasonProofsPending, "Every completed run must be approved or rejected first.");
+            return pending;
         }
 
-        // D-516, D-546 (1): every submitted IRL proof is checked before the results, like a run's
-        if (Proofs.IrlProofs.Waiting(state) is { Count: > 0 } irl)
+        // Only final nomination ballots delay publication; ordinary polls keep D-724.
+        var openNominations = Polls.NominationPolling.InPlay(state).Where(p => p.Status == Polls.PollStatus.Open)
+            .Select(p => p.PollId).Order().ToEquatableArray();
+        if (openNominations.Count > 0)
         {
-            return Decision.Reject(RejectionCodes.SeasonProofsPending, "Every submitted IRL proof must be approved or rejected first.", [.. irl]);
+            return Decision.Reject(RejectionCodes.SeasonNominationPollsOpen, "Wait for the final nomination ballots to close.", openNominations);
         }
 
         // D-305: the steps waiting at a fork belong to a throw made before the deadline and may still reach the finish
@@ -157,7 +158,23 @@ internal static class SeasonSetup
             return Decision.Reject(RejectionCodes.SeasonEffectsPending, "A manual effect waits: resolve every pending effect first.", [.. state.ManualEffects.Keys]);
         }
 
-        return Decision.Accept(changed, new SeasonResultRecorded(Ranking.Leaderboard.Build(state)));
+        var finalTable = new SeasonResultRecorded(Ranking.Leaderboard.Build(state));
+        return state.Rules.Features.SeasonNominations
+            ? Decision.Accept(changed, finalTable, Statistics.SeasonNominations.Record(state, context))
+            : Decision.Accept(changed, finalTable);
+    }
+
+    public static Decision? ProofsPending(SeasonState state)
+    {
+        // Results only once every proof is checked (D-101 and D-516).
+        if (Proofs.ProofReviewOrder.Order(state).Count > 0)
+        {
+            return Decision.Reject(RejectionCodes.SeasonProofsPending, "Every completed run must be approved or rejected first.");
+        }
+
+        return Proofs.IrlProofs.Waiting(state) is { Count: > 0 } irl
+            ? Decision.Reject(RejectionCodes.SeasonProofsPending, "Every submitted IRL proof must be approved or rejected first.", [.. irl])
+            : null;
     }
 
     public static Decision Decide(SeasonState state, SetSeasonDeadline command, EngineContext context)

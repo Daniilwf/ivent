@@ -52,6 +52,7 @@ public sealed partial class CommandProcessor(
         {
             await SettleLeftPendingAsync(stoppingToken);
             await CancelDuelsLeftByDeletedAccountsAsync(seasonId: null, stoppingToken);
+            await ReconcileDeletedNominationGamesAsync(seasonId: null, gameId: null, bestEffort: true, stoppingToken);
             await foreach (var pending in queue.Reader.ReadAllAsync(stoppingToken))
             {
                 queue.Taken();
@@ -91,7 +92,22 @@ public sealed partial class CommandProcessor(
     {
         try
         {
-            var outcome = await ProcessAsync(pending.Envelope, ct);
+            var envelope = pending.Envelope;
+            if (envelope.Command is RestoreGame restore)
+            {
+                await ReconcileDeletedNominationGamesAsync(seasonId: null, restore.GameId, bestEffort: false, ct);
+            }
+            else if (envelope.Command is ChangeSeasonStatus { To: SeasonStatus.Finished }
+                or Engine.Polls.StartNominationPoll or Engine.Polls.CastVote or Engine.Polls.ClosePoll or Engine.Economy.FireTimers)
+            {
+                await ReconcileDeletedNominationGamesAsync(envelope.SeasonId, gameId: null, bestEffort: false, ct);
+            }
+
+            var outcome = await ProcessAsync(envelope, ct);
+            if (outcome.IsAccepted && envelope.Command is DeleteGame deletedGame)
+            {
+                await ReconcileDeletedNominationGamesAsync(seasonId: null, deletedGame.GameId, bestEffort: true, ct);
+            }
 
             // A deleted account leaves the duels of its running seasons before the deletion is reported done (D-734); a repeat
             // of the deletion tries again what a stop in between missed — the ids are the same, so nothing is written twice
@@ -198,6 +214,12 @@ public sealed partial class CommandProcessor(
             return Rejected(RejectionCodes.SeasonMismatch, $"CreateSeason {create.SeasonId} sent to season {envelope.SeasonId}.");
         }
 
+        if (envelope.Command is Engine.Polls.StartNominationPoll nomination
+            && await db.Polls.AnyAsync(poll => poll.Id == nomination.PollId && poll.SeasonId != envelope.SeasonId, ct))
+        {
+            return Rejected(RejectionCodes.NominationAlreadyStarted, "The poll ID belongs to another season.");
+        }
+
         PreparedGalleryFile? preparedGalleryFile = null;
         if (envelope.Command is SetGalleryReaction galleryChoice
             && (envelope.AuthorId != galleryChoice.UserId || !await db.Users.AnyAsync(user => user.Id == galleryChoice.UserId && !user.IsDeleted, ct)))
@@ -253,6 +275,8 @@ public sealed partial class CommandProcessor(
                 && (await feedReactionTargets.FindAsync(db, envelope.SeasonId, [comment.Target.Id], ct)).Contains(comment.Target.Id),
             PreparedGalleryFileId = preparedGalleryFile?.FileId,
             GalleryProofApprovalCommandId = preparedGalleryFile?.ProofApprovalCommandId,
+            AvailableNominationCandidates = await ReadNominationCandidatesAsync(db, cached.State, envelope.Command, ct),
+            EffectiveAttacks = await ReadNominationAttacksAsync(db, cached.State, envelope.Command, ct),
         };
 
         var result = SeasonEngine.Execute(cached.State, envelope.Command, context);

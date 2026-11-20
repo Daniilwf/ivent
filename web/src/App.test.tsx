@@ -1,8 +1,9 @@
 import { act, render, screen, waitFor } from '@testing-library/react';
 import { SIGNED_OUT_EVENT } from './api/client';
 import { App } from './App';
+import { navigate } from './app/router';
 import { ru } from './i18n/ru';
-import { fakeServer, json } from './test/fakeServer';
+import { fakeServer, json, seasonId } from './test/fakeServer';
 
 vi.mock('./api/realtime', () => ({ watchSeason: () => () => undefined }));
 
@@ -15,6 +16,7 @@ const user = { id: 'u1', login: 'vasya', name: 'Вася', role: 'player', mustC
 describe('App', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    globalThis.history.replaceState(null, '', '/');
   });
 
   it('shows the sign-in form to a visitor without a session', async () => {
@@ -32,6 +34,40 @@ describe('App', () => {
     render(<App />);
 
     expect(await screen.findByTestId('no-season')).toHaveTextContent(ru.shell.noSeasonTitle);
+  });
+
+  it('opens an archived season by its address and keeps the default season on the home page', async () => {
+    const archivedId = '5ea50000-0000-0000-0000-000000000002';
+    function season(id: string, name: string, status: 'active' | 'archived') {
+      return {
+        id,
+        name,
+        status,
+        deadline: null,
+        cells: [],
+        players: [],
+        leaderboard: [],
+        me: null,
+        lastSequence: 0,
+        edges: [],
+        zones: [],
+        mapMode: 'linear',
+      };
+    }
+    fakeServer({
+      '/api/auth/me': { ...user, role: 'spectator' },
+      '/api/seasons/current': { id: seasonId },
+      [`/api/seasons/${seasonId}`]: season(seasonId, 'Сейчас играем', 'active'),
+      [`/api/seasons/${archivedId}`]: season(archivedId, 'Прошлый сезон', 'archived'),
+    });
+    globalThis.history.replaceState(null, '', `/seasons/${archivedId}`);
+    render(<App />);
+
+    expect(await screen.findByRole('heading', { name: 'Прошлый сезон' })).toBeVisible();
+    act(() => {
+      navigate('/');
+    });
+    expect(await screen.findByRole('heading', { name: 'Сейчас играем' })).toBeVisible();
   });
 
   // D-466: the session ended on another device or by the admin; the page shows the sign-in form without a reload

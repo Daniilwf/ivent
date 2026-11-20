@@ -103,6 +103,13 @@ internal static class RulesetChanges
                 RejectionCodes.GlobalEventsInPlay, "A global event's vote is open: switch polls off after it closes.");
         }
 
+        if (Polls.NominationPolling.InPlay(state).Any(p => p.Nomination is { } category
+            && (!command.Ruleset.Features.Polls || !command.Ruleset.Features.SeasonNominations
+                || !command.Ruleset.Nominations.Voted.Contains(category))))
+        {
+            return Decision.Reject(RejectionCodes.NominationInPlay, "Keep a final ballot's nomination enabled until the season's results are published.");
+        }
+
         return command.Ruleset == state.Ruleset
             ? Decision.Reject(RejectionCodes.RulesetUnchanged, "The new ruleset equals the current one.")
             : Decision.Accept(new RulesetChanged(state.RulesetVersion + 1, command.Ruleset));

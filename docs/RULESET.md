@@ -127,7 +127,9 @@
 | `social.galleryUploadsPerDay`, `social.commentsPerDay` | лимиты на человека в день |
 | `social.spectatorsCanVote` | голосуют ли зрители |
 | `nominations.auto` | автоматические номинации |
-| `nominations.voted` | номинации голосованием. Срок итогового голосования и допустимые пределы выбора задаются в `nominations` по D-927. Реализация и поля добавляются в 6.6g |
+| `nominations.voted` | номинации голосованием. Открываются при включённых `features.seasonNominations` и `features.polls` после проверки пруфов в «Закрытии» |
+| `nominations.durationHours` | срок итогового голосования в часах. По умолчанию 24 |
+| `nominations.minCandidates`, `nominations.maxCandidates` | пределы числа вариантов, от 2 до 20. По умолчанию 2 и 20 |
 | `weeklyChallenge.defaultRewardCoins` | награда за челлендж недели по умолчанию |
 | `weeklyChallenge.durationDays` | сколько дней длится окно челленджа от его начала, 1–366; считается время завершения прохождения, окно `[начало, начало + дни)` (D-526, D-574). Необязательное поле (конфиг, записанный до него, читается), обязательно при включённом `features.weeklyChallenge`. По умолчанию 7 |
 

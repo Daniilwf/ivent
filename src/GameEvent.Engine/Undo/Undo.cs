@@ -155,6 +155,12 @@ internal static class Undoing
             var after = history[i].Events.Aggregate(before, SeasonEngine.Apply);
             if (i == index)
             {
+                if (target.Events.Count > 0 && target.Events.All(e => e is Polls.PollCancelled cancelled
+                    && before.Polls.GetValueOrDefault(cancelled.PollId)?.Source == Polls.PollSource.Nomination))
+                {
+                    return Decision.Reject(RejectionCodes.UndoNotUndoable, "Open a new final ballot after its candidates become eligible again.");
+                }
+
                 beforeTarget = before;
                 targetKeys = Keys(before, after, history[i].Events);
             }
@@ -778,7 +784,10 @@ internal static class Undoing
         var forAll = Changed(before.ForAll, after.ForAll).ToList();
         var interactions = Changed(before.Interactions, after.Interactions).ToList();
         var requests = Changed(before.PartnerRequests, after.PartnerRequests).ToList();
-        var polls = Changed(before.Polls, after.Polls).ToList();
+        // Making a candidate visible again leaves its cancelled final ballot closed to voting.
+        var polls = Changed(before.Polls, after.Polls)
+            .Where(id => after.Polls.GetValueOrDefault(id) is not { Source: Polls.PollSource.Nomination, Status: Polls.PollStatus.Cancelled })
+            .ToList();
         var globals = Changed(before.GlobalEvents, after.GlobalEvents).ToList();
         var duels = Changed(before.Duels, after.Duels).ToList();
         var seasonChanged = before.Status != after.Status || before.Deadline != after.Deadline || before.Name != after.Name

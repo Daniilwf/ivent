@@ -71,6 +71,47 @@ function accessibleOptionText(label: string): string {
   return `${accessibleName} ${description}`;
 }
 
+it('reads a final nomination and removes withheld material without losing its result', async () => {
+  const onVote = vi.fn(() => Promise.resolve());
+  const candidate = {
+    id: horrorId,
+    label: 'Ёж нашёл лифт',
+    detail: 'Титры на последнем этаже',
+    href: '/seasons/one/gallery',
+    thumbnailUrl: '/api/example/thumbnail',
+  };
+  const closed = poll({
+    question: '',
+    nomination: 'funniestMoment',
+    source: 'nomination',
+    status: 'closed',
+    result: horrorId,
+    myVote: horrorId,
+    options: [candidate, { id: strategyId, label: 'Упал со стула' }],
+  });
+  const { rerender } = render(<PollCard poll={closed} pending={false} onVote={onVote} />);
+  expect(screen.getByRole('heading', { name: 'Самый смешной момент' })).toBeVisible();
+  await userEvent.click(screen.getByText('Материалы голосования'));
+  expect(screen.getByRole('link', { name: 'Открыть галерею' })).toHaveAttribute(
+    'href',
+    candidate.href,
+  );
+  expect(screen.queryByRole('link', { name: candidate.label })).not.toBeInTheDocument();
+  expect(screen.getByText(candidate.detail)).toBeVisible();
+
+  rerender(
+    <PollCard
+      poll={{ ...closed, options: [{ ...candidate, unavailable: true }] }}
+      pending={false}
+      onVote={onVote}
+    />,
+  );
+  expect(screen.getByText('Материалы победителя скрыты.')).toBeVisible();
+  expect(screen.queryByText(candidate.detail)).not.toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: 'Открыть галерею' })).not.toBeInTheDocument();
+  expectNoEnabledVote();
+});
+
 describe('a poll card uses the server snapshot and my voting availability (EV21/EV22/EV24/EV39)', () => {
   it('shows the question, snapshot labels and readable deadline without selecting or sending a vote', () => {
     const onVote = vi.fn(() => Promise.resolve());

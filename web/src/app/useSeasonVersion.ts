@@ -94,9 +94,10 @@ export function useSeasonVersion(
 }
 
 /** The same for the pool (a game added, changed, deleted): skips the join, grows with every later change */
-export function usePoolVersion(): number {
+export function usePoolVersion(observe = true): number {
   const [version, setVersion] = useState(0);
   useEffect(() => {
+    if (!observe) return;
     let first = true;
     return watchPool(() => {
       if (first) {
@@ -105,6 +106,6 @@ export function usePoolVersion(): number {
       }
       setVersion((v) => v + 1);
     });
-  }, []);
+  }, [observe]);
   return version;
 }

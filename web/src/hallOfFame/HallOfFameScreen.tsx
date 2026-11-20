@@ -172,7 +172,14 @@ function WinningSeasons({ seasons }: { seasons: Schemas['HallOfFameSeasonView'][
           className="grid min-w-0 items-start gap-2 py-3 desk:grid-cols-2 desk:gap-4"
         >
           <div className="grid gap-1 wrap-anywhere desk:pt-2">
-            <h3 className="font-bold">{seasonName}</h3>
+            <h3 className="font-bold">
+              <Link
+                to={paths.season(seasonId)}
+                className={cx(standaloneLink, 'max-w-full min-w-11 text-action-strong')}
+              >
+                {seasonName}
+              </Link>
+            </h3>
             {winners.length > 1 ? <p className="text-sm text-ink-soft">{t.tiedFirst}</p> : null}
           </div>
           <ul className="grid min-w-0">

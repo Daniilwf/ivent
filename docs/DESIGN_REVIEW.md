@@ -1,5 +1,15 @@
 # Дизайн-ревью
 
+## Этап 6. Итоговое голосование и архив номинаций (2026-11-20)
+
+| Состояние | 390×844 | 1440×900 |
+| --- | --- | --- |
+| Подготовка итогового бюллетеня | [Телефон](../test-artifacts/design/s6-final-nominations/phone-final-ballot-composer.png) | [Десктоп](../test-artifacts/design/s6-final-nominations/desktop-final-ballot-composer.png) |
+| Результаты архивного сезона | [Телефон](../test-artifacts/design/s6-final-nominations/phone-final-nomination-results.png) | [Десктоп](../test-artifacts/design/s6-final-nominations/desktop-final-nomination-results.png) |
+| Материалы победителя скрыты | [Телефон](../test-artifacts/design/s6-final-nominations/phone-final-nomination-hidden-winner.png) | [Десктоп](../test-artifacts/design/s6-final-nominations/desktop-final-nomination-hidden-winner.png) |
+
+Независимое ревью проверило выбор кандидатов, подтверждение и архив на двух размерах. Контраст проверенных сочетаний составил 4,83:1–6,98:1. Playwright подтвердил, что после скрытия активной ссылки фокус переходит на заголовок её номинации. При повторном чтении фокус на неизменившихся автоматических победителях сохраняется. Подпись кадра отделена от ссылки «Открыть галерею». Лента показывает завершение голосования понятной строкой. [Финальный браузерный прогон](../test-artifacts/stage6-final-nomination-design-e2e.log)
+
 ## Этап 6. Кадр пруфа, личная сводка и большой бросок (2026-11-20)
 
 | Состояние | 390×844 | 1440×900 |

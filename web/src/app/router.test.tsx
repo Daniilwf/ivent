@@ -54,6 +54,7 @@ describe('router', () => {
 
   it('knows the pages of the site by their addresses', () => {
     expect(routeOf('/')).toEqual({ kind: 'season' });
+    expect(routeOf(`/seasons/${id}/`)).toEqual({ kind: 'season', seasonId: id });
     expect(routeOf('/feed')).toEqual({ kind: 'feed', seasonId: null });
     expect(routeOf('/feed/')).toEqual({ kind: 'feed', seasonId: null });
     expect(routeOf(`/seasons/${id}/feed`)).toEqual({ kind: 'feed', seasonId: id });
@@ -72,6 +73,7 @@ describe('router', () => {
   });
 
   it('builds the addresses the links point to', () => {
+    expect(routeOf(paths.season(id))).toEqual({ kind: 'season', seasonId: id });
     expect(paths.feed()).toBe('/feed');
     expect(paths.feed(id)).toBe(`/seasons/${id}/feed`);
     expect(paths.interactions(id)).toBe(`/seasons/${id}/interactions`);

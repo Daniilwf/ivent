@@ -400,7 +400,7 @@ internal static class Polling
     public static SeasonState Apply(SeasonState state, PollCancelled e)
     {
         var poll = state.Polls[e.PollId];
-        return Release(state with { Polls = state.Polls.SetItem(e.PollId, poll with { Status = PollStatus.Cancelled }) }, poll);
+        return Release(state with { Polls = state.Polls.SetItem(e.PollId, poll with { Status = PollStatus.Cancelled, Result = null }) }, poll);
     }
 
     // The suspended effect of an event's poll ends without its actions (D-514: no result, no effect)

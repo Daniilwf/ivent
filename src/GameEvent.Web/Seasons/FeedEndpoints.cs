@@ -171,14 +171,25 @@ public static class FeedEndpoints
         var branchChoices = rows.Any(r => r.Type == DiscardedChoice)
             ? await BranchChoiceIdsAsync(db, seasonId, ct)
             : [];
-        IReadOnlyList<FeedEntryView> entries = [.. rows.Select(r =>
+        var decodedRows = rows.Select(row => (Row: row, Event: EventCodec.Decode(new StoredEvent(row.Type, row.Version, row.Data)))).ToArray();
+        var publicReviews = admin
+            ? null
+            : await PublicReviewsAsync(db, seasonId, decodedRows.Select(row => row.Event).OfType<RunReviewed>(), ct);
+        IReadOnlyList<FeedEntryView> entries = [.. decodedRows.Select(item =>
         {
-            var decoded = EventCodec.Decode(new StoredEvent(r.Type, r.Version, r.Data));
+            var (r, decoded) = item;
             var data = (JsonObject)JsonSerializer.SerializeToNode(decoded, decoded.GetType(), EngineJson.Options)!;
             if (decoded is ChoiceDiscarded discarded)
             {
                 // The log keeps only the choice's id: the feed names what was discarded, a branch or a game (MP-1)
                 data["kind"] = branchChoices.Contains(discarded.ChoiceId) ? "branch" : "game";
+            }
+
+            if (publicReviews is not null && decoded is RunReviewed review
+                && (!publicReviews.TryGetValue(review.RunId, out var currentText)
+                    || !string.Equals(review.Text, currentText, StringComparison.Ordinal)))
+            {
+                data.Remove("text");
             }
 
             // An anonymous vote names nobody, not even through the command's author (D-541, D-726)
@@ -212,6 +223,24 @@ public static class FeedEndpoints
 
         return TypedResults.Ok(new FeedView(
             entries, nextBefore, players, games, runs, await ObjectsAsync(db, contentCards, seasonId, entries, ct), reactions, commentTargets));
+    }
+
+    private static async Task<Dictionary<Guid, string>> PublicReviewsAsync(
+        GameEventDbContext db, Guid seasonId, IEnumerable<RunReviewed> reviews, CancellationToken ct)
+    {
+        var runIds = reviews.Select(review => review.RunId).Distinct().ToArray();
+        if (runIds.Length == 0)
+        {
+            return [];
+        }
+
+        return await (
+            from review in db.Reviews.AsNoTracking()
+            join run in db.Runs.AsNoTracking() on review.RunId equals run.Id
+            join game in db.Games.AsNoTracking() on run.GameId equals game.Id
+            where review.SeasonId == seasonId && runIds.Contains(review.RunId) && run.Status == RunStatus.Completed
+                && !game.IsDeleted && review.Text != null
+            select new { review.RunId, review.Text }).ToDictionaryAsync(row => row.RunId, row => row.Text, ct);
     }
 
     private const string DiscardedChoice = "choice-discarded";

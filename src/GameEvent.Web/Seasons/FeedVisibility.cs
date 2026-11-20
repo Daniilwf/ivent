@@ -46,6 +46,7 @@ public static class FeedVisibility
         ["season-status-changed"] = Access.Public,
         ["season-deadline-set"] = Access.Public,
         ["season-result-recorded"] = Access.Public,
+        ["season-nominations-recorded"] = Access.NotInFeed,
         ["ruleset-changed"] = Access.Public,
         ["season-player-added"] = Access.Public,
         ["player-adjusted"] = Access.Public,
@@ -134,6 +135,7 @@ public static class FeedVisibility
         // The weekly challenge (stage 5, D-526): what was set, who completed it and what a reject took back are public
         // Polls (D-512…D-516): the start and the result are public, a vote by the poll's anonymity (D-541)
         ["poll-started"] = Access.Public,
+        ["nomination-poll-started"] = Access.NotInFeed,
         ["vote-cast"] = Access.AnonymousVote,
         ["vote-changed"] = Access.AnonymousVote,
         ["poll-closed"] = Access.Public,

@@ -38,17 +38,21 @@ describe('useLoaded', () => {
 
     answer = ready(2);
     rerender({ version: 1 });
-    expect(result.current).toMatchObject({ kind: 'ready', value: 1 });
+    expect(result.current).toMatchObject({ kind: 'ready', value: 1, refresh: { kind: 'loading' } });
     await waitFor(() => {
-      expect(result.current).toMatchObject({ kind: 'ready', value: 2 });
+      expect(result.current).toMatchObject({ kind: 'ready', value: 2, refresh: { kind: 'ready' } });
     });
 
     answer = { kind: 'failed' };
     rerender({ version: 2 });
     await waitFor(() => {
-      expect(load).toHaveBeenCalledTimes(3);
+      expect(result.current).toMatchObject({
+        kind: 'ready',
+        value: 2,
+        refresh: { kind: 'failed' },
+      });
     });
-    expect(result.current).toMatchObject({ kind: 'ready', value: 2 });
+    expect(load).toHaveBeenCalledTimes(3);
   });
 
   it('shows the skeleton again for other data (a new load)', async () => {
@@ -67,6 +71,32 @@ describe('useLoaded', () => {
       await next.promise;
     });
     expect(result.current).toMatchObject({ kind: 'ready', value: 'b' });
+  });
+
+  it('keeps the previous answer stale if a version returns while a read is in flight', async () => {
+    const middle = deferred<Answer<string>>();
+    const latest = deferred<Answer<string>>();
+    const load = vi
+      .fn(() => latest.promise)
+      .mockResolvedValueOnce(ready('original'))
+      .mockReturnValueOnce(middle.promise);
+    const { result, rerender } = renderHook(({ version }) => useLoaded(load, { version }), {
+      initialProps: { version: 0 },
+    });
+    await waitFor(() => {
+      expect(result.current).toMatchObject({ value: 'original', refresh: { kind: 'ready' } });
+    });
+
+    rerender({ version: 1 });
+    rerender({ version: 0 });
+    expect(result.current).toMatchObject({ value: 'original', refresh: { kind: 'loading' } });
+
+    await act(async () => {
+      middle.resolve(ready('discarded'));
+      latest.resolve(ready('latest'));
+      await Promise.all([middle.promise, latest.promise]);
+    });
+    expect(result.current).toMatchObject({ value: 'latest', refresh: { kind: 'ready' } });
   });
 
   it('drops an answer that comes after the page moved on', async () => {

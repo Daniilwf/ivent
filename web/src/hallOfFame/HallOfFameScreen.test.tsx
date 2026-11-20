@@ -94,7 +94,14 @@ describe('HallOfFameScreen', () => {
     expect(
       winners.getAllByRole('heading', { level: 3 }).map((heading) => heading.textContent),
     ).toEqual(['Весна', 'Осень']);
-    expect(winners.getAllByRole('link').map((link) => link.textContent)).toEqual(['Яна', 'Лиса']);
+    expect(winners.getByRole('link', { name: 'Весна' })).toHaveAttribute('href', '/seasons/spring');
+    expect(winners.getByRole('link', { name: 'Осень' })).toHaveAttribute('href', '/seasons/autumn');
+    expect(
+      winners
+        .getAllByRole('link')
+        .filter((link) => link.getAttribute('href')?.startsWith('/users/'))
+        .map((link) => link.textContent),
+    ).toEqual(['Яна', 'Лиса']);
     const firstWinner = winners.getByRole('link', { name: 'Яна' });
     const deletedWinner = winners.getByText('Анна');
     expect(firstWinner).toHaveAttribute('href', '/users/u1');
