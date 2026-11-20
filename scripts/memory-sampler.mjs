@@ -47,6 +47,9 @@ export function startMemorySampler(containerId, readUsage = readDockerUsage) {
     get error() {
       return error;
     },
+    get sampleCount() {
+      return samples.length;
+    },
     stop,
     async finish() {
       await stop();

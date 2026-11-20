@@ -5,8 +5,9 @@
 //      of deploy/docker-compose.yml, the demo database mounted as /data.
 //   3. Sixteen players read season, feed, pool, rules, status, polls, global events and weekly challenges, while one
 //      admin reads the manual effects and IRL proof queues and the container's memory is sampled every two seconds.
+//      --stage6 also reads the demo's gallery, social activity, private statistics and Hall of Fame.
 //   4. Prints the peak and the average; fails when the peak is over the budget.
-// Usage: npm run test:memory [-- --seconds 120 --budget 400 --image ivent:local]   (needs Docker)
+// Usage: npm run test:memory [-- --stage6 --seconds 120 --budget 400 --image ivent:local]   (needs Docker)
 import { existsSync, lstatSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -16,6 +17,7 @@ import {
   assertStage5MemoryReads,
   prepareStage5MemoryWorkload,
 } from './memory-stage5.mjs';
+import { assertStage6MemoryReads } from './memory-stage6.mjs';
 import { withMemoryContainer } from './memory-container.mjs';
 import { startMemorySampler } from './memory-sampler.mjs';
 
@@ -25,6 +27,7 @@ const arg = (name, fallback) => {
 };
 const seconds = Number(arg('seconds', '120'));
 const budget = Number(arg('budget', '400'));
+const stage6 = process.argv.includes('--stage6');
 if (!Number.isFinite(seconds) || seconds <= 0 || !Number.isFinite(budget) || budget <= 0)
   fail('Seconds and memory budget must be positive finite numbers.');
 const prebuilt = arg('image', null);
@@ -68,6 +71,7 @@ async function main() {
         env: {
           ASPNETCORE_ENVIRONMENT: 'Development',
           ConnectionStrings__Main: `Data Source=${join(data, 'game-event.db')}`,
+          Files__Path: join(data, 'files'),
         },
       },
     )
@@ -151,6 +155,9 @@ async function main() {
           const id = season.id ?? season.seasonId;
           if (!id) throw new Error('The demo season has no id.');
           const admin = await signIn('admin');
+          const stage6Workload = stage6
+            ? await assertStage6MemoryReads({ call: clients[0], seasonId: id })
+            : undefined;
           const irlProof = await prepareStage5MemoryWorkload({
             admin,
             players: clients,
@@ -166,6 +173,11 @@ async function main() {
           console.log(
             'Stage 5 workload prepared: votes, an active goal, a completed weekly challenge, a waiting event, and a pending IRL proof.',
           );
+          if (stage6Workload) {
+            console.log(
+              'Stage 6 demo verified: a gallery thumbnail, a feed discussion and reaction, a private recap, archived winners and a long game.',
+            );
+          }
           const pages = [
             `/api/seasons/${id}`,
             `/api/seasons/${id}/feed`,
@@ -178,16 +190,24 @@ async function main() {
             `/api/seasons/${id}/polls`,
             `/api/seasons/${id}/global-events`,
             `/api/seasons/${id}/weekly-challenges`,
+            ...(stage6Workload?.pages ?? []),
           ];
+          const unreadStage6Pages = new Set(stage6Workload?.pages);
+          // The stage 5 profile is unchanged. With stage 6, at most 48 GETs/min/player leave room
+          // for the probes under the shared 60/min policy. Some of those GETs use separate limits.
+          const playerDelay = stage6 ? 1250 : 500;
+          const samplesBeforeLoad = sampler.sampleCount;
           const end = Date.now() + seconds * 1000;
           const visit = async (call, routes, delay, cursor, isAdmin = false) => {
             let i = cursor;
             while (Date.now() < end) {
               if (sampler.error) throw new Error(sampler.error);
-              const response = await call(routes[i++ % routes.length]).catch(() => null);
+              const path = routes[i++ % routes.length];
+              const response = await call(path).catch(() => null);
               requests++;
               if (isAdmin) adminRequests++;
               if (!response?.ok) errors++;
+              else if (stage6) unreadStage6Pages.delete(path);
               await response?.arrayBuffer().catch(() => {
                 errors++;
               });
@@ -195,8 +215,7 @@ async function main() {
             }
           };
           await Promise.all([
-            // At most two reads/sec/player: three stage 5 routes share 60 reads/min, including setup.
-            ...clients.map((call, n) => visit(call, pages, 500, n)),
+            ...clients.map((call, n) => visit(call, pages, playerDelay, n)),
             // Admin reads share the 30/min limit, including the reads before and after load.
             visit(
               admin,
@@ -206,6 +225,8 @@ async function main() {
               true,
             ),
           ]);
+          if (sampler.sampleCount === samplesBeforeLoad)
+            throw new Error(sampler.error ?? 'Docker returned no memory sample during the load.');
           await assertStage5MemoryReads({ call: clients[0], seasonId: id });
           await assertIrlMemoryReads({
             admin,
@@ -213,6 +234,18 @@ async function main() {
             seasonId: id,
             ...irlProof,
           });
+          if (stage6Workload) {
+            if (unreadStage6Pages.size > 0) {
+              throw new Error(
+                `The load missed stage 6 routes: ${[...unreadStage6Pages].join(', ')}.`,
+              );
+            }
+            await assertStage6MemoryReads({
+              call: clients[0],
+              seasonId: id,
+              workload: stage6Workload,
+            });
+          }
           const samples = await sampler.finish();
           const samplingError = sampler.error;
           const peak = Math.max(...samples);

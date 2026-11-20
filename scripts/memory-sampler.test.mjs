@@ -15,6 +15,7 @@ test('slow Docker samples never overlap and stopping drains the active read', as
   t.mock.timers.tick(6000);
   await Promise.resolve();
   assert.equal(reads, 1);
+  assert.equal(sampler.sampleCount, 0);
 
   let stopped = false;
   const stopping = sampler.stop().then(() => {
@@ -31,6 +32,7 @@ test('slow Docker samples never overlap and stopping drains the active read', as
   assert.equal(stopped, true);
   assert.equal(reads, 1);
   assert.equal(sampler.error, undefined);
+  assert.equal(sampler.sampleCount, 1);
 });
 
 test('the closing sample follows the active read and returns both values in MiB', async (t) => {
