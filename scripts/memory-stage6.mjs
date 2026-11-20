@@ -50,12 +50,13 @@ async function discoverDiscussion(call, season) {
   )?.commandId;
 }
 
-// Discover the demo data before the stage 5 setup adds new feed entries. Recheck those same IDs after the load.
+// Discover the demo data before the stage 5 setup adds new feed entries. Recheck the same targets after the load.
 export async function assertStage6MemoryReads({ call, seasonId, workload }) {
   if (!guid(seasonId)) throw new Error('Memory workload: stage 6 requires a valid season ID.');
   const season = `/api/seasons/${seasonId}`;
   const gallery = `${season}/gallery`;
   const statistics = `${season}/my-statistics`;
+  const allTime = '/api/me/statistics';
   const hall = '/api/hall-of-fame';
   const records = `${hall}/records`;
 
@@ -99,6 +100,19 @@ export async function assertStage6MemoryReads({ call, seasonId, workload }) {
   ) {
     throw new Error('Memory workload: no private recap with completed runs in the current season.');
   }
+  const allTimeRecap = await readJson(call, allTime);
+  if (
+    !Number.isInteger(allTimeRecap?.seasonCount) ||
+    allTimeRecap.seasonCount < 2 ||
+    !Number.isInteger(allTimeRecap.completedRuns) ||
+    allTimeRecap.completedRuns <= recap.completedRuns ||
+    !Number.isFinite(allTimeRecap.totalHours) ||
+    allTimeRecap.totalHours <= 0
+  ) {
+    throw new Error(
+      'Memory workload: no private all-time statistics with the archived completion.',
+    );
+  }
 
   const winners = rows(await readJson(call, hall)).filter(
     (row) =>
@@ -112,23 +126,69 @@ export async function assertStage6MemoryReads({ call, seasonId, workload }) {
   if (winners.length === 0) throw new Error('Memory workload: no archived season with winners.');
   const archivedIds = new Set(winners.map((winner) => winner.seasonId));
   const recordView = await readJson(call, records);
+  const longestGame = rows(recordView?.longestGames).find(
+    (row) =>
+      archivedIds.has(row?.seasonId) &&
+      (!workload || row.seasonId === workload.archiveSeasonId) &&
+      guid(row.gameId) &&
+      guid(row.runId) &&
+      text(row.title) &&
+      Number.isFinite(row.hours) &&
+      row.hours > 0,
+  );
+  if (!longestGame) {
+    throw new Error('Memory workload: no longest game from an archived season with winners.');
+  }
   if (
-    !rows(recordView?.longestGames).some(
+    !rows(recordView?.largestRolls).some(
       (row) =>
         archivedIds.has(row?.seasonId) &&
-        guid(row.gameId) &&
         guid(row.runId) &&
-        text(row.title) &&
-        Number.isFinite(row.hours) &&
-        row.hours > 0,
+        guid(row.playerId) &&
+        text(row.name) &&
+        positiveInteger(row.sum),
     )
   ) {
-    throw new Error('Memory workload: no longest game from an archived season with winners.');
+    throw new Error('Memory workload: no largest roll from an archived season with winners.');
+  }
+
+  const archiveSeasonId = longestGame.seasonId;
+  const nominations = `/api/seasons/${archiveSeasonId}/nominations`;
+  const snapshot = await readJson(call, nominations);
+  const automatic = rows(snapshot?.automatic).some(
+    (row) =>
+      text(row?.nomination) &&
+      Number.isFinite(row.value) &&
+      rows(row.winners).some((winner) => guid(winner?.playerId) && text(winner.name)),
+  );
+  const voted = rows(snapshot?.voted).some(
+    (row) =>
+      text(row?.nomination) &&
+      guid(row.pollId) &&
+      row.hasWinner === true &&
+      guid(row.winner?.id) &&
+      text(row.winner.label),
+  );
+  if (!automatic || !voted) {
+    throw new Error(
+      'Memory workload: archived nominations lack an automatic or visible voted winner.',
+    );
   }
 
   return {
     itemId: moment.id,
     targetId,
-    pages: [gallery, moment.thumbnailUrl, comments, reactions, statistics, hall, records],
+    archiveSeasonId,
+    pages: [
+      gallery,
+      moment.thumbnailUrl,
+      comments,
+      reactions,
+      statistics,
+      allTime,
+      hall,
+      records,
+      nominations,
+    ],
   };
 }

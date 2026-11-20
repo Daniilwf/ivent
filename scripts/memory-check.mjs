@@ -5,7 +5,7 @@
 //      of deploy/docker-compose.yml, the demo database mounted as /data.
 //   3. Sixteen players read season, feed, pool, rules, status, polls, global events and weekly challenges, while one
 //      admin reads the manual effects and IRL proof queues and the container's memory is sampled every two seconds.
-//      --stage6 also reads the demo's gallery, social activity, private statistics and Hall of Fame.
+//      --stage6 also reads the demo's gallery, social activity, private statistics, records and archived nominations.
 //   4. Prints the peak and the average; fails when the peak is over the budget.
 // Usage: npm run test:memory [-- --stage6 --seconds 120 --budget 400 --image ivent:local]   (needs Docker)
 import { existsSync, lstatSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
@@ -175,7 +175,7 @@ async function main() {
           );
           if (stage6Workload) {
             console.log(
-              'Stage 6 demo verified: a gallery thumbnail, a feed discussion and reaction, a private recap, archived winners and a long game.',
+              'Stage 6 demo verified: a gallery thumbnail, a feed discussion and reaction, private recaps, archived winners and nominations, a longest game and a largest roll.',
             );
           }
           const pages = [

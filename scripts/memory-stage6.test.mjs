@@ -15,8 +15,10 @@ const feed = `${base}/feed?limit=100`;
 const comments = `${base}/feed/${targetId}/comments`;
 const reactions = `${base}/feed/reactions?commandIds=${targetId}`;
 const recap = `${base}/my-statistics`;
+const allTime = '/api/me/statistics';
 const hall = '/api/hall-of-fame';
 const records = `${hall}/records`;
+const nominations = `/api/seasons/${archivedSeasonId}/nominations`;
 const time = '2026-01-01T12:00:00Z';
 const json = (value, status = 200) => Response.json(value, { status });
 
@@ -56,6 +58,7 @@ function site() {
     ],
     [reactions, reactionRows],
     [recap, { seasonId, seasonName: 'Demo season', completedRuns: 2 }],
+    [allTime, { seasonCount: 2, completedRuns: 3, totalHours: 22.25 }],
     [
       hall,
       [
@@ -76,6 +79,31 @@ function site() {
             runId: id(8),
             title: 'Long game',
             hours: 20.25,
+          },
+        ],
+        largestRolls: [
+          {
+            seasonId: archivedSeasonId,
+            runId: id(8),
+            playerId,
+            name: 'Winner',
+            sum: 12,
+          },
+        ],
+      },
+    ],
+    [
+      nominations,
+      {
+        automatic: [
+          { nomination: 'mostHours', value: 20.25, winners: [{ playerId, name: 'Winner' }] },
+        ],
+        voted: [
+          {
+            nomination: 'bestReview',
+            pollId: id(9),
+            hasWinner: true,
+            winner: { id: id(8), label: 'Long game' },
           },
         ],
       },
@@ -105,18 +133,29 @@ test('discovers all stage 6 load routes from real data through read-only request
 
   assert.equal(workload.itemId, itemId);
   assert.equal(workload.targetId, targetId);
+  assert.equal(workload.archiveSeasonId, archivedSeasonId);
   assert.deepEqual(
     new Set(workload.pages),
-    new Set([gallery, thumbnail, comments, reactions, recap, hall, records]),
+    new Set([gallery, thumbnail, comments, reactions, recap, hall, records, allTime, nominations]),
   );
   assert.deepEqual(new Set(demo.paths), new Set([feed, ...workload.pages]));
 });
 
-test('postflight checks the same gallery item and discussion even if the feed window changes', async () => {
+test('postflight checks the same gallery item, discussion and archive even if discovery order changes', async () => {
   const demo = site();
   const workload = await assertStage6MemoryReads({ call: demo.call, seasonId });
   const after = site();
   after.pages.delete(feed);
+  const newerArchiveId = id('a');
+  after.pages.get(hall).unshift({
+    seasonId: newerArchiveId,
+    seasonName: 'Another archive',
+    winners: [{ playerId, name: 'Winner', points: 24 }],
+  });
+  after.pages.get(records).longestGames.unshift({
+    ...after.pages.get(records).longestGames[0],
+    seasonId: newerArchiveId,
+  });
 
   await assertStage6MemoryReads({ call: after.call, seasonId, workload });
 
@@ -142,7 +181,18 @@ test('rejects a malformed or empty season ID before making requests', async () =
   }
 });
 
-for (const path of [gallery, thumbnail, feed, comments, reactions, recap, hall, records]) {
+for (const path of [
+  gallery,
+  thumbnail,
+  feed,
+  comments,
+  reactions,
+  recap,
+  allTime,
+  hall,
+  records,
+  nominations,
+]) {
   test(`${path} returning an HTTP failure aborts preflight`, async () => {
     const demo = site();
     demo.overrides.set(path, () => json({ code: 'feature.disabled' }, 409));
@@ -188,6 +238,18 @@ const emptyResponses = [
     /private recap/,
   ],
   [
+    'all-time statistics showing only the current season',
+    allTime,
+    { seasonCount: 1, completedRuns: 2, totalHours: 15 },
+    /all-time statistics/,
+  ],
+  [
+    'all-time statistics without archived completions',
+    allTime,
+    { seasonCount: 2, completedRuns: 2, totalHours: 15 },
+    /all-time statistics/,
+  ],
+  [
     'Hall of Fame without winners',
     hall,
     [{ seasonId: archivedSeasonId, seasonName: 'Archived season', winners: [] }],
@@ -217,6 +279,31 @@ const emptyResponses = [
     /longest game/,
   ],
 ];
+
+test('the Hall of Fame needs a valid largest roll as well as a longest game', async () => {
+  const demo = site();
+  const record = demo.pages.get(records);
+  record.largestRolls[0].sum = 0;
+
+  await assert.rejects(
+    () => assertStage6MemoryReads({ call: demo.call, seasonId }),
+    /largest roll/,
+  );
+});
+
+test('the archive needs an automatic award and a visible voted winner', async () => {
+  for (const hideAward of [
+    (snapshot) => (snapshot.automatic = []),
+    (snapshot) => (snapshot.voted[0].winner = null),
+  ]) {
+    const demo = site();
+    hideAward(demo.pages.get(nominations));
+    await assert.rejects(
+      () => assertStage6MemoryReads({ call: demo.call, seasonId }),
+      /archived nominations/,
+    );
+  }
+});
 
 for (const [name, path, body, expected] of emptyResponses) {
   test(`${name} cannot count as stage 6 load`, async () => {

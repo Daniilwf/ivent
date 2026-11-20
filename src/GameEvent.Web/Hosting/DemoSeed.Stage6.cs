@@ -6,6 +6,7 @@ using GameEvent.Engine.Gallery;
 using GameEvent.Engine.Inventory;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Players;
+using GameEvent.Engine.Polls;
 using GameEvent.Engine.Proofs;
 using GameEvent.Engine.Reactions;
 using GameEvent.Engine.Rolls;
@@ -15,6 +16,7 @@ using GameEvent.Engine.Seasons;
 using GameEvent.Infrastructure.Database;
 using GameEvent.Infrastructure.EventLog;
 using GameEvent.Infrastructure.Files;
+using GameEvent.Infrastructure.Kernel;
 using GameEvent.Infrastructure.Queue;
 using GameEvent.Web.Files;
 using GameEvent.Web.Seasons;
@@ -31,6 +33,8 @@ public static partial class DemoSeed
         Guid admin,
         CancellationToken ct)
     {
+        private const string DemoPhoto = "map.demo.background.png";
+        private const decimal LongRunHours = 31;
         private static readonly Guid s_archiveId = Guid.Parse("de300000-0000-0000-0000-000000000002");
 
         public async Task PlayAsync(string contentRoot, IServiceProvider services)
@@ -45,9 +49,12 @@ public static partial class DemoSeed
                 .ToDictionaryAsync(user => user.Login, user => user.Id, ct);
             var player = actors["player01"];
             var spectator = actors["zritel"];
+            var files = new FileServices(db, services.GetRequiredService<FileStorage>(), services.GetRequiredService<FileLimits>(),
+                services.GetRequiredService<IIdGenerator>(), services.GetRequiredService<IClock>(), bus);
             await AddDiscussionsAsync(db, player, spectator);
-            await PublishMomentAsync(contentRoot, services, db, player, spectator);
-            await ArchiveSeasonAsync(contentRoot, player, actors["player02"]);
+            await PublishMomentAsync(contentRoot, files, player, spectator);
+            await ApproveDemoPhotoAsync(contentRoot, files);
+            await ArchiveSeasonAsync(contentRoot, player, actors["player02"], services.GetRequiredService<IRandomSource>() as IReseedableRandom);
         }
 
         private async Task AddDiscussionsAsync(GameEventDbContext db, Guid player, Guid spectator)
@@ -77,15 +84,12 @@ public static partial class DemoSeed
                 "Спасибо за отзыв, добавлю игру в список."), spectator);
         }
 
-        private async Task PublishMomentAsync(string contentRoot, IServiceProvider services, GameEventDbContext db, Guid player, Guid spectator)
+        private async Task PublishMomentAsync(string contentRoot, FileServices files, Guid player, Guid spectator)
         {
-            var files = new FileServices(db, services.GetRequiredService<FileStorage>(), services.GetRequiredService<FileLimits>(),
-                services.GetRequiredService<IIdGenerator>(), services.GetRequiredService<IClock>(), bus);
-            const string SourceName = "map.demo.background.png";
-            await using var source = File.OpenRead(Path.Combine(contentRoot, "content", SourceName));
+            await using var source = File.OpenRead(Path.Combine(contentRoot, "content", DemoPhoto));
             var fingerprint = Convert.ToHexString(await SHA256.HashDataAsync(source, ct));
             source.Position = 0;
-            var file = new FormFile(source, 0, source.Length, "file", SourceName);
+            var file = new FormFile(source, 0, source.Length, "file", DemoPhoto);
             var (picture, _) = await FileEndpoints.ProcessPictureAsync(file, FileKind.GalleryImage, files.Limits, ct);
             if (picture is null)
             {
@@ -98,7 +102,30 @@ public static partial class DemoSeed
             await SendAsync(SeasonId, new SetGalleryReaction(moment.ItemId, spectator, "❤️", Selected: true), spectator);
         }
 
-        private async Task ArchiveSeasonAsync(string contentRoot, Guid player, Guid opponent)
+        private async Task ApproveDemoPhotoAsync(string contentRoot, FileServices files)
+        {
+            // Leave a real candidate for the player to choose in the gallery, with their consent still pending.
+            var candidate = await (
+                from run in files.Db.Runs.AsNoTracking()
+                join seat in files.Db.SeasonPlayers.AsNoTracking() on run.PlayerId equals seat.Id
+                join account in files.Db.Users.AsNoTracking() on seat.UserId equals account.Id
+                where run.SeasonId == SeasonId && run.Status == RunStatus.Completed && !seat.IsInactive
+                    && !files.Db.Proofs.Any(proof => proof.RunId == run.Id)
+                orderby account.Login, run.CompletedAt descending, run.Id
+                select new { RunId = run.Id, run.PlayerId, seat.UserId }).FirstAsync(ct);
+            var image = await File.ReadAllBytesAsync(Path.Combine(contentRoot, "content", DemoPhoto), ct);
+            var (_, fileId) = await FileEndpoints.StoreFileAsync(image, Guid.CreateVersion7(), candidate.UserId, files, ct);
+            if (fileId is not { } screenshot)
+            {
+                throw new InvalidOperationException("The demo proof screenshot could not be stored.");
+            }
+
+            await SendAsync(SeasonId, new SubmitProof(candidate.PlayerId, candidate.RunId, [],
+                "Кадр для публикации из одобренного пруфа", Files: [screenshot]), candidate.UserId);
+            await SendAsync(SeasonId, new ApproveProof(candidate.RunId), admin);
+        }
+
+        private async Task ArchiveSeasonAsync(string contentRoot, Guid player, Guid opponent, IReseedableRandom? random)
         {
             var seat = Guid.CreateVersion7();
             var opponentSeat = Guid.CreateVersion7();
@@ -116,8 +143,9 @@ public static partial class DemoSeed
                 Review: new RunReview(8, "Хорошая игра для первого круга.")), player);
 
             // Keep the original archived run and result independent of the attack rolls.
-            var features = rules.Features with { Items = true, Achievements = true };
-            await SendAsync(s_archiveId, new ChangeRuleset(rules with { Features = features }), admin);
+            var features = rules.Features with { Items = true, Achievements = true, Polls = true, SeasonNominations = true };
+            var archiveRules = rules with { Features = features };
+            await SendAsync(s_archiveId, new ChangeRuleset(archiveRules), admin);
             var pack = ContentJson.Parse<ContentPack>(await File.ReadAllTextAsync(
                 Path.Combine(contentRoot, "content", "stage6.demo.achievements.json"), ct));
             var bird = ContentJson.Parse<ObjectDefinition>(await File.ReadAllTextAsync(
@@ -134,10 +162,56 @@ public static partial class DemoSeed
                 await SendAsync(s_archiveId, new UseItem(opponentSeat, item.Item.InstanceId, seat), opponent);
             }
 
+            var longRunId = await CompleteLongRunAsync(seat, player, archiveRules, random);
             await SendAsync(s_archiveId, new ChangeSeasonStatus(SeasonStatus.Closing), admin);
             await SendAsync(s_archiveId, new ApproveProof(started.RunId, Comment: "Подтверждено демо-прохождение"), admin);
+            await SendAsync(s_archiveId, new ApproveProof(longRunId, Comment: "Подтверждены сохранённые 31 час"), admin);
+            var pollId = Guid.CreateVersion7();
+            await SendAsync(s_archiveId, new StartNominationPoll(pollId, VotedNomination.BestReview, [started.RunId, longRunId]), admin);
+            foreach (var voter in new[] { player, opponent })
+            {
+                await SendAsync(s_archiveId, new CastVote(pollId, voter, longRunId.ToString("D")), voter);
+            }
+
+            await SendAsync(s_archiveId, new ClosePoll(pollId), admin);
             await SendAsync(s_archiveId, new ChangeSeasonStatus(SeasonStatus.Finished), admin);
             await SendAsync(s_archiveId, new ChangeSeasonStatus(SeasonStatus.Archived), admin);
+        }
+
+        private async Task<Guid> CompleteLongRunAsync(Guid seat, Guid player, Ruleset rules, IReseedableRandom? random)
+        {
+            var reward = rules.Reward with
+            {
+                DiceCount = rules.Reward.DiceCount with { Min = 3, Max = 3 },
+                UnmetConditionPolicy = UnmetConditionPolicy.Ignore,
+            };
+            await SendAsync(s_archiveId, new ChangeRuleset(rules with { Reward = reward }), admin);
+            await SendAsync(s_archiveId, new RollGame(seat), player);
+            var started = (await SendAsync(s_archiveId, new StartRun(seat, Difficulty.Easy), player))
+                .Select(row => row.Event).OfType<RunStarted>().Single();
+
+            // Seed 0 yields three maximum faces on the easy d2s. The engine still rolls and awards normally.
+            var previousSeed = random?.CurrentSeed;
+            try
+            {
+                random?.Seed(0);
+                await SendAsync(s_archiveId, new CompleteRun(seat, Difficulty.Easy,
+                    EstimatedHours: started.Snapshot.Hours is null ? LongRunHours : null,
+                    HoursSource: started.Snapshot.Hours is null ? "Оценка демо-прохождения" : null,
+                    Review: new RunReview(9, "Прохождение заняло несколько вечеров. Особенно запомнилась последняя глава.")), player);
+            }
+            finally
+            {
+                random?.Seed(previousSeed);
+            }
+
+            if (started.Snapshot.Hours is { } hours && hours != LongRunHours)
+            {
+                await SendAsync(s_archiveId, new CorrectRunHours(started.RunId, LongRunHours, "Уточнение часов длинного прохождения"), admin);
+            }
+
+            await SendAsync(s_archiveId, new ChangeRuleset(rules), admin);
+            return started.RunId;
         }
 
         private async Task<IReadOnlyList<LoggedEvent>> SendAsync(Guid seasonId, ICommand command, Guid author)

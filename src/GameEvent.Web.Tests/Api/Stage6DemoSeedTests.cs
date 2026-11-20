@@ -1,5 +1,10 @@
 using System.Net.Http.Json;
+using GameEvent.Engine.Achievements;
+using GameEvent.Engine.Content;
 using GameEvent.Engine.Kernel;
+using GameEvent.Engine.Rulesets;
+using GameEvent.Engine.Runs;
+using GameEvent.Engine.Scoring;
 using GameEvent.Engine.Seasons;
 using GameEvent.Infrastructure.Seasons;
 using GameEvent.Web.Hosting;
@@ -53,6 +58,21 @@ public sealed class Stage6DemoSeedTests
         await AssertPrivateWebpAsync(spectator, moment.ImageUrl);
         await AssertPrivateWebpAsync(spectator, moment.ThumbnailUrl);
 
+        var proof = await (
+            from entry in db.Proofs
+            join owner in db.SeasonPlayers on entry.PlayerId equals owner.Id
+            join account in db.Users on owner.UserId equals account.Id
+            where entry.SeasonId == DemoSeed.SeasonId && entry.Note == "Кадр для публикации из одобренного пруфа"
+            select new { entry.RunId, account.Login }).SingleOrDefaultAsync(Ct);
+        Assert.NotNull(proof);
+        using var proofOwner = await SignInAsync(site, proof.Login);
+        using var choices = await proofOwner.GetAsync($"{seasonUrl}/gallery/proofs", Ct);
+        choices.EnsureSuccessStatusCode();
+        Assert.True(choices.Headers.CacheControl is { Private: true, NoStore: true });
+        var photos = await choices.Content.ReadFromJsonAsync<GalleryProofPhotoView[]>(Ct);
+        var photo = Assert.Single(photos!, item => item.RunId == proof.RunId);
+        await AssertPrivateWebpAsync(proofOwner, photo.ThumbnailUrl, noStore: false);
+
         var stats = await player.GetFromJsonAsync<SeasonStatisticsView>($"{seasonUrl}/my-statistics", Ct);
         Assert.True(stats!.CompletedRuns > 0);
         var archive = await db.Seasons.SingleAsync(season => season.Status == SeasonStatus.Archived, Ct);
@@ -62,19 +82,43 @@ public sealed class Stage6DemoSeedTests
         Assert.True(winner.Points > 0);
         Assert.NotNull(winner.ProfileUserId);
         var profile = await spectator.GetFromJsonAsync<ProfileView>($"/api/users/{winner.ProfileUserId}", EngineJson.Options, Ct);
-        var badge = Assert.Single(profile!.Achievements);
+        var badge = Assert.Single(profile!.Achievements, achievement => achievement.ObjectId == "unbreakable");
         Assert.Equal((archive.Id, "unbreakable", "Непробиваемый", "Переживи пять атак за сезон."),
             (badge.SeasonId, badge.ObjectId, badge.Name, badge.Description));
+        Assert.Contains(profile.Achievements, achievement => achievement is
+        { ObjectId: "jackpot", Scope: AchievementScope.AllTime });
+        Assert.Contains(profile.Achievements, achievement => achievement is { ObjectId: "long-run" });
         var attacks = await db.Events.Where(row => row.SeasonId == archive.Id && row.Type == "hostile-received")
             .OrderBy(row => row.Sequence).Select(row => row.CommandId).ToListAsync(Ct);
         Assert.Equal(5, attacks.Count);
-        var awardingCommand = await db.Events.Where(row => row.SeasonId == archive.Id && row.Type == "achievement-earned")
+        var seasonalAwards = await db.Events.Where(row => row.SeasonId == archive.Id && row.Type == "achievement-earned").ToListAsync(Ct);
+        var unbreakable = Assert.Single(seasonalAwards, row => Decode(row.Type, row.Version, row.Data) is
+            AchievementEarned { Achievement.ObjectId: "unbreakable" });
+        Assert.Equal(attacks[^1], unbreakable.CommandId);
+        var longRun = Assert.Single(seasonalAwards, row => Decode(row.Type, row.Version, row.Data) is
+            AchievementEarned { Achievement.ObjectId: "long-run" });
+        Assert.True(await db.Events.AnyAsync(row => row.CommandId == longRun.CommandId && row.Type == "proof-approved", Ct));
+
+        var jackpotCommand = await db.Events.Where(row => row.SeasonId == archive.Id && row.Type == "lifetime-achievement-earned")
             .Select(row => row.CommandId).SingleAsync(Ct);
-        Assert.Equal(attacks[^1], awardingCommand);
+        var jackpotEvents = (await db.Events.Where(row => row.CommandId == jackpotCommand).ToListAsync(Ct))
+            .Select(row => Decode(row.Type, row.Version, row.Data)).ToList();
+        Assert.Contains(jackpotEvents, entry => entry is CoinsChanged { Delta: 10, Reason: CoinsReason.Achievement });
+        var jackpotThrow = Assert.Single(jackpotEvents.OfType<CompletionRolled>());
+        Assert.True(jackpotThrow.Dice.Count >= 3);
+        Assert.All(jackpotThrow.Dice, die => Assert.Equal(die.Sides, die.Value));
 
         var records = await spectator.GetFromJsonAsync<HallOfFameRecordsView>("/api/hall-of-fame/records", Ct);
         var longest = Assert.Single(records!.LongestGames, game => game.SeasonId == archive.Id);
-        Assert.True(longest.Hours > 0);
+        Assert.Equal(jackpotThrow.RunId, longest.RunId);
+        Assert.True(longest.Hours > 30);
+
+        var result = await spectator.GetFromJsonAsync<NominationResultView>($"/api/seasons/{archive.Id}/nominations", EngineJson.Options, Ct);
+        Assert.Contains(result!.Automatic, nomination => nomination.Nomination == AutoNomination.MostHours
+            && nomination.Winners.Any(player => player.Name == "Лиса") && nomination.Value >= longest.Hours);
+        var voted = Assert.Single(result.Voted, nomination => nomination.Nomination == VotedNomination.BestReview);
+        Assert.True(voted.HasWinner);
+        Assert.Equal(longest.RunId, voted.Winner?.Id);
 
         foreach (var id in new[] { DemoSeed.SeasonId, archive.Id })
         {
@@ -88,6 +132,8 @@ public sealed class Stage6DemoSeedTests
         Assert.Equal(events, await db.Events.CountAsync(Ct));
     }
 
+    private static IGameEvent Decode(string type, int version, string data) => EventCodec.Decode(new StoredEvent(type, version, data));
+
     private static async Task<HttpClient> SignInAsync(WebApplicationFactory<Program> site, string login)
     {
         var client = site.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = true });
@@ -96,12 +142,12 @@ public sealed class Stage6DemoSeedTests
         return client;
     }
 
-    private static async Task AssertPrivateWebpAsync(HttpClient viewer, string url)
+    private static async Task AssertPrivateWebpAsync(HttpClient viewer, string url, bool noStore = true)
     {
         using var response = await viewer.GetAsync(url, Ct);
         response.EnsureSuccessStatusCode();
         Assert.Equal("image/webp", response.Content.Headers.ContentType?.MediaType);
-        Assert.True(response.Headers.CacheControl is { Private: true, NoStore: true });
+        Assert.True(response.Headers.CacheControl is { Private: true } cache && cache.NoStore == noStore);
         Assert.NotEmpty(await response.Content.ReadAsByteArrayAsync(Ct));
     }
 
