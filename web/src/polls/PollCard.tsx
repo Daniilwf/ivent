@@ -6,6 +6,7 @@ import { Button } from '../ui/Button';
 import { ChoiceGroup } from '../ui/Field';
 import { Chip } from '../ui/Marks';
 import { Notice } from '../ui/States';
+import { isOpenPoll } from './pollView';
 
 export type PollCardProps = {
   poll: Schemas['PollView'];
@@ -24,6 +25,8 @@ function PollForm({ poll, pending, onVote, level = 2 }: PollCardProps) {
   const titleId = useId();
   const title = useRef<HTMLHeadingElement>(null);
   const Heading = level === 3 ? 'h3' : 'h2';
+  const open = isOpenPoll(poll);
+  const endedWithSeason = poll.status === 'open' && !open;
   const [draft, setDraft] = useState({ value: '', dirty: false });
   const [sending, setSending] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -40,9 +43,7 @@ function PollForm({ poll, pending, onVote, level = 2 }: PollCardProps) {
   const selected = draft.dirty ? draft.value : (ownOption?.id ?? '');
   const hasVoted = poll.myVote !== null;
   const mayVote =
-    poll.status === 'open' &&
-    poll.voting?.canVote === true &&
-    (!hasVoted || poll.voting.allowChangeVote);
+    open && poll.voting?.canVote === true && (!hasVoted || poll.voting.allowChangeVote);
   const busy = pending || sending;
   const validSelection = selected !== '' && poll.options.some((option) => option.id === selected);
   const canSubmit = mayVote && !busy && validSelection && selected !== poll.myVote;
@@ -51,7 +52,7 @@ function PollForm({ poll, pending, onVote, level = 2 }: PollCardProps) {
   const counts = new Map(visibleCounts?.map((count) => [count.optionId, count.votes]) ?? []);
   const winner =
     poll.status === 'closed' ? poll.options.find((option) => option.id === poll.result) : null;
-  const awaitingResult = poll.status === 'open' && poll.voting?.reason === 'poll.closed';
+  const awaitingResult = open && poll.voting?.reason === 'poll.closed';
   const reason = !poll.voting
     ? t.eligibilityUnknown
     : awaitingResult
@@ -102,10 +103,12 @@ function PollForm({ poll, pending, onVote, level = 2 }: PollCardProps) {
           {poll.question}
         </Heading>
         <div className="flex flex-wrap items-center gap-2 text-sm text-ink-soft">
-          {poll.status === 'open' ? (
+          {open ? (
             <span>
               {t.until} <time dateTime={poll.closesAt}>{moscowTime(poll.closesAt)}</time>
             </span>
+          ) : endedWithSeason ? (
+            <span>{t.endedWithSeason}</span>
           ) : (
             <Chip tone={poll.status === 'cancelled' ? 'warning' : 'muted'}>
               {poll.status === 'cancelled' ? t.cancelled : t.closed}
@@ -137,7 +140,7 @@ function PollForm({ poll, pending, onVote, level = 2 }: PollCardProps) {
               ...(count !== undefined ? { description: t.votes(count) } : {}),
             };
           })}
-          value={poll.status === 'open' ? selected : (ownOption?.id ?? '')}
+          value={open ? selected : (ownOption?.id ?? '')}
           onChange={(value) => {
             if (!mayVote || busy) return;
             setDraft({ value, dirty: value !== poll.myVote });
@@ -147,7 +150,7 @@ function PollForm({ poll, pending, onVote, level = 2 }: PollCardProps) {
           checkMark
           multiline
         />
-        {poll.status === 'open' && visibleCounts === null ? (
+        {open && visibleCounts === null ? (
           <p className="text-sm text-ink-soft">
             {awaitingResult ? t.pendingCounts : t.hiddenCounts}
           </p>
@@ -161,11 +164,9 @@ function PollForm({ poll, pending, onVote, level = 2 }: PollCardProps) {
                 : t.resultUnavailable}
           </p>
         ) : null}
-        {poll.status === 'open' && !mayVote ? (
-          <p className="text-sm text-ink-soft">{reason}</p>
-        ) : null}
+        {open && !mayVote ? <p className="text-sm text-ink-soft">{reason}</p> : null}
         {failed && mayVote ? <Notice tone="danger">{t.voteFailed}</Notice> : null}
-        {accepted !== null && accepted === poll.myVote && poll.status === 'open' ? (
+        {accepted !== null && accepted === poll.myVote && open ? (
           <Notice tone="success">{t.accepted}</Notice>
         ) : null}
         {mayVote && poll.options.length > 0 ? (

@@ -10,6 +10,7 @@ import { Button } from '../ui/Button';
 import { Skeleton } from '../ui/Progress';
 import { EmptyState, Notice } from '../ui/States';
 import { PollCard } from './PollCard';
+import { isOpenPoll } from './pollView';
 
 type Poll = Schemas['PollView'];
 type ReadAnswer = Answer<Poll[]> | { kind: 'disabled' };
@@ -275,13 +276,13 @@ function SeasonPolls({ seasonId, onSignedOut }: PollsScreenProps) {
         <>
           <PollGroup
             title={t.openGroup}
-            polls={state.value.filter((poll) => poll.status === 'open')}
+            polls={state.value.filter(isOpenPoll)}
             pending={voting}
             onVote={vote}
           />
           <PollGroup
             title={t.endedGroup}
-            polls={state.value.filter((poll) => poll.status !== 'open')}
+            polls={state.value.filter((poll) => !isOpenPoll(poll))}
             pending={voting}
             onVote={vote}
           />
@@ -314,7 +315,7 @@ function PollGroup({
           key={poll.id}
           poll={poll}
           level={3}
-          pending={pending && poll.status === 'open'}
+          pending={pending && isOpenPoll(poll)}
           onVote={(optionId) => onVote(poll.id, optionId)}
         />
       ))}
