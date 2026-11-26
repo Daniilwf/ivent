@@ -14,6 +14,7 @@ export type EventChoiceProps = {
   drawn?: Schemas['DrawnEventView'] | null;
   fresh?: boolean;
   onShown?: (sequence: number) => void;
+  onSettled?: ((sequence: number) => void) | undefined;
   onChoose: (optionId: string) => void;
 };
 
@@ -30,6 +31,7 @@ function AnswerForm({
   drawn,
   fresh = false,
   onShown,
+  onSettled,
   onChoose,
 }: EventChoiceProps) {
   const headingId = useId();
@@ -84,6 +86,7 @@ function AnswerForm({
           headingId={headingId}
           level={3}
           onShown={onShown}
+          onSettled={onSettled}
         >
           {form}
         </DrawnEventCard>
