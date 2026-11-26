@@ -54,13 +54,15 @@ export function TokenMove({
   children?: ReactNode;
 }) {
   const reduce = useReducedMotion() ?? false;
-  const last = path ? (path.at(-1) as number) : mover.cell;
+  // One move per key. A live refresh can supply new objects for the same path.
+  const [move] = useState(() => ({ board, path, jumps, budget }));
+  const last = move.path?.at(-1) ?? mover.cell;
   const [pos, setPos] = useState<Point>(() =>
-    cellById(board, reduce ? last : (path?.[0] ?? mover.cell)),
+    cellById(move.board, reduce ? last : (move.path?.[0] ?? mover.cell)),
   );
   const camera = useRef<MapApi | null>(null);
   const controls = useRef<ReturnType<typeof animate> | null>(null);
-  const stopped = useRef(false);
+  const deadline = useRef<number | undefined>(undefined);
   // The end is reported once, whether the token arrives or the moment is skipped
   const ended = useRef(false);
 
@@ -70,9 +72,10 @@ export function TokenMove({
   const end = () => {
     if (ended.current) return;
     ended.current = true;
-    stopped.current = true;
+    window.clearTimeout(deadline.current);
     controls.current?.stop();
-    const cell = cellById(board, last);
+    controls.current = null;
+    const cell = cellById(move.board, last);
     setPos(cell);
     camera.current?.centerOn(cell, 420);
     onPhase?.('done');
@@ -87,16 +90,14 @@ export function TokenMove({
   useImperativeHandle(ref, () => ({ skip: end }));
 
   useEffect(() => {
-    if (!path) return;
-    if (reduce) {
-      // The token already stands on its last cell; the camera and the report follow at once
-      const id = window.setTimeout(arrive, 0);
-      return () => {
-        window.clearTimeout(id);
-      };
-    }
-    stopped.current = false;
-    const halted = () => stopped.current;
+    const { board, path, budget, jumps } = move;
+    if (!path || ended.current) return;
+
+    // Loading Motion is part of the budget, including when this is the walking part of a completion.
+    const timer = window.setTimeout(arrive, reduce ? 0 : budget * 1000);
+    deadline.current = timer;
+    let cancelled = false;
+    const halted = () => cancelled || ended.current;
     // The whole move fits the moments' budget: long moves hop faster; a flight takes two hops' time
     const hops = path.length - 1 + jumps.filter((i) => i > 0 && i < path.length).length;
     const hop = Math.min(momentHop, budget / Math.max(hops, 1));
@@ -121,6 +122,7 @@ export function TokenMove({
           duration: flight ? hop * 2 : hop,
           ease: 'easeInOut',
           onUpdate: (k) => {
+            if (halted()) return;
             step({
               x: a.x + (b.x - a.x) * k,
               y: a.y + (b.y - a.y) * k - Math.sin(Math.PI * k) * height,
@@ -132,24 +134,26 @@ export function TokenMove({
       }
       arrive();
     };
-    void run();
+    if (!reduce) void run();
     return () => {
-      stopped.current = true;
+      cancelled = true;
+      window.clearTimeout(timer);
       controls.current?.stop();
+      controls.current = null;
     };
-  }, [board, path, reduce, budget, jumps]);
+  }, [move, reduce]);
 
   return (
     <MapView
-      board={board}
+      board={move.board}
       players={players}
       hide={[mover.id]}
-      focus={path?.[0] ?? mover.cell}
+      focus={move.path?.[0] ?? mover.cell}
       tools="none"
       {...(className ? { className } : {})}
       ref={camera}
     >
-      <MapSticker player={mover} at={pos} size={size} lift={atBigCell(board, pos) ? 52 : 32} />
+      <MapSticker player={mover} at={pos} size={size} lift={atBigCell(move.board, pos) ? 52 : 32} />
       {children}
     </MapView>
   );
