@@ -217,17 +217,7 @@ public static class AdminPlayerEndpoints
 
         var hintDays = RulesetJson.Parse(season.RulesetJson).Season.InactiveHintDays;
         var players = await db.SeasonPlayers.AsNoTracking().Where(p => p.SeasonId == seasonId).ToListAsync(ct);
-        var userIds = players.Select(p => (Guid?)p.UserId).ToList();
-
-        // A player's own actions are the commands they authored in this season; the admin's corrections do not count
-        var lastSequences = await db.Events.AsNoTracking()
-            .Where(e => e.SeasonId == seasonId && userIds.Contains(e.AuthorId))
-            .GroupBy(e => e.AuthorId)
-            .Select(g => g.Max(e => e.Sequence))
-            .ToListAsync(ct);
-        var lastActions = await db.Events.AsNoTracking()
-            .Where(e => e.SeasonId == seasonId && lastSequences.Contains(e.Sequence))
-            .ToDictionaryAsync(e => e.AuthorId!.Value, e => e.OccurredAt, ct);
+        var lastActions = await ReadLastOwnActionsAsync(db, seasonId, players.Select(p => p.UserId), ct);
 
         // The quiet time counts from the start of the season, or from the player's joining when later (SE4)
         var milestones = await db.Events.AsNoTracking()
@@ -262,6 +252,19 @@ public static class AdminPlayerEndpoints
                     choiceKind == Engine.Turns.ChoiceKind.Effect);
             })];
         return TypedResults.Ok(views);
+    }
+
+    // Own activity is the last command a player authored in this season; the admin's corrections do not count.
+    internal static Task<Dictionary<Guid, DateTimeOffset>> ReadLastOwnActionsAsync(
+        GameEventDbContext db, Guid seasonId, IEnumerable<Guid> userIds, CancellationToken ct)
+    {
+        var authors = userIds.Select(id => (Guid?)id).ToArray();
+        var seasonEvents = db.Events.AsNoTracking().Where(e => e.SeasonId == seasonId);
+        var lastSequences = seasonEvents.Where(e => authors.Contains(e.AuthorId))
+            .GroupBy(e => e.AuthorId)
+            .Select(g => g.Max(e => e.Sequence));
+        return seasonEvents.Where(e => lastSequences.Contains(e.Sequence))
+            .ToDictionaryAsync(e => e.AuthorId!.Value, e => e.OccurredAt, ct);
     }
 
     private static async Task<ActionResult> SendAsync(

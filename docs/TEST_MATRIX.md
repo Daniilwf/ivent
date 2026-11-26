@@ -18,6 +18,14 @@
 | STP5 | Создаёт только админ. Выключение настройки скрывает действие, обычное создание доступно | `Web.Tests/Api/SeasonTemplateApiTests.A_non_admin_cannot_create_from_a_template`, `Templates_are_opt_in_and_the_default_create_path_remains_available`, `web/src/admin/SeasonSection.test.tsx` | ✅ |
 | STP6 | После создания выбран новый черновик с указанным дедлайном. Заголовок в области просмотра и в фокусе. Журнал показывает создание по образцу | `e2e/tests/s7-season-template.spec.ts` | ✅ |
 
+### Статистика админа (7.5)
+
+| ID | Правило | Тесты | Статус |
+| --- | --- | --- | --- |
+| AS1 | Отчёт с `private, no-store` доступен админу при включённой настройке. Неизвестный сезон отклоняется, пустой возвращает пустой список | `Web.Tests/Api/AdminSeasonStatisticsApiTests.Only_the_admin_can_read_a_seasons_statistics`, `An_unknown_or_malformed_season_is_not_found`, `Statistics_are_off_by_default`, `A_draft_without_participants_has_an_empty_private_report` | ✅ |
+| AS2 | Время активности берётся из последней собственной команды участника в выбранном сезоне. Правка админа его не меняет | `Web.Tests/Api/AdminSeasonStatisticsApiTests.The_report_shows_the_latest_own_action_even_after_later_admin_corrections` | ✅ |
+| AS3 | Считаются сработавшие атаки выбранного сезона. Откат удаляет атаку из обоих счётчиков, архив сохраняет отчёт | `Web.Tests/Api/AdminSeasonStatisticsApiTests.A_landed_attack_only_counts_in_its_season_and_a_whole_undo_removes_it`, `An_archived_season_keeps_its_attack_and_activity_report` | ✅ |
+
 ## Правила этапа 6 (социальное и итоги)
 
 ### Реакции на отзывы (6.1)

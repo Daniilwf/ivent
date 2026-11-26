@@ -119,6 +119,12 @@ public static class AdminSeasonEndpoints
             .RequireRateLimiting(AppSetup.AdminReadRateLimit)
             .ProducesProblem(StatusCodes.Status429TooManyRequests);
 
+        season.MapGet("/statistics", AdminSeasonStatisticsEndpoints.ReadAsync)
+            .RequireRateLimiting(AppSetup.AdminReadRateLimit)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
+
         // Any player's effect; the comment is required (D-89, D-102).
         season.MapPost("/effects/{effectId:guid}/resolve", (Guid seasonId, Guid effectId, ResolveEffectRequest request, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, CancellationToken ct) =>
             SeasonEndpoints.ResolveInvalid(request) is { } invalid

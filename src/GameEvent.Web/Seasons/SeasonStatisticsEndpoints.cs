@@ -134,15 +134,21 @@ internal static class SeasonStatisticsEndpoints
         var partnerRuns = await CoopPartnerRuns.LoadAsync(db, seasonIds, playerIds, ct);
         var completedAsPartner = partnerRuns.FindAll(run => run.Status == RunStatus.Completed);
         var totalHours = own.Sum(run => run.Hours ?? 0) + completedAsPartner.Sum(run => run.Hours ?? 0);
-        var hits = await db.Events.AsNoTracking()
-            .Where(row => seasonIds.Contains(row.SeasonId) && row.Type == s_attackType && row.UndoneByEventId == null)
-            .Select(row => new { row.SeasonId, row.Type, row.Version, row.Data }).ToListAsync(ct);
-        var attacks = hits.GroupBy(row => row.SeasonId)
-            .Select(group => AttackStatistics.ForPlayer(memberships[group.Key],
-                group.Select(row => EventCodec.Decode(new StoredEvent(row.Type, row.Version, row.Data)))))
+        var hits = await ReadEffectiveAttacksAsync(db, seasonIds, ct);
+        var attacks = hits.Select(group => AttackStatistics.ForPlayer(memberships[group.Key], group))
             .ToArray();
         return new(own.Count + completedAsPartner.Count, totalHours, own.Max(run => run.Rating), own.Min(run => run.Rating),
             attacks.Sum(player => player.AttacksMade), attacks.Sum(player => player.AttacksReceived), ViewOf(best), ViewOf(worst));
+    }
+
+    internal static async Task<ILookup<Guid, HostileReceived>> ReadEffectiveAttacksAsync(
+        GameEventDbContext db, Guid[] seasonIds, CancellationToken ct)
+    {
+        var hits = await db.Events.AsNoTracking()
+            .Where(row => seasonIds.Contains(row.SeasonId) && row.Type == s_attackType && row.UndoneByEventId == null)
+            .Select(row => new { row.SeasonId, row.Type, row.Version, row.Data }).ToListAsync(ct);
+        return hits.ToLookup(row => row.SeasonId,
+            row => (HostileReceived)EventCodec.Decode(new StoredEvent(row.Type, row.Version, row.Data)));
     }
 
     private static SeasonRollView? ViewOf((Guid RunId, RollMeasurement Measurement)? roll) =>
