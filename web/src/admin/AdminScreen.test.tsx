@@ -14,10 +14,11 @@ const t = ru.admin;
 
 const player = { ...adminUser, id: 'u1', login: 'vasya', name: 'Вася', role: 'player' as const };
 
-function site(me: typeof adminUser | typeof player) {
+function site(me: typeof adminUser | typeof player, adminStatistics?: boolean) {
   return fakeServer({
     'GET /api/auth/antiforgery': { token: 't', headerName: 'X-CSRF-TOKEN' },
     'GET /api/auth/me': me,
+    'GET /api/status': { adminStatistics },
     'GET /api/seasons/current': { id: seasonId },
     'GET /api/seasons/*': {
       id: seasonId,
@@ -32,6 +33,7 @@ function site(me: typeof adminUser | typeof player) {
     },
     'GET /api/admin/seasons/*/proofs': [],
     'GET /api/admin/seasons/*/players': [],
+    'GET /api/admin/seasons/*/statistics': { players: [] },
   });
 }
 
@@ -187,6 +189,41 @@ describe('The admin pages', () => {
     expect(screen.queryByTestId('admin')).toBeNull();
     expect(server.calls.some((c) => c.path.startsWith('/api/admin'))).toBe(false);
   });
+
+  it('opens an opted-in statistics report from the admin navigation', async () => {
+    site(adminUser, true);
+    globalThis.history.pushState(null, '', '/admin');
+    render(<App />);
+
+    await userEvent.click(await screen.findByTestId('admin-sections'));
+    const sheet = await screen.findByRole('dialog');
+    await userEvent.click(await within(sheet).findByRole('link', { name: t.sections.statistics }));
+    expect(globalThis.location.pathname).toBe('/admin/statistics');
+    const heading = await screen.findByRole('heading', { name: t.sections.statistics, level: 1 });
+    await waitFor(() => {
+      expect(heading).toHaveFocus();
+    });
+    expect(await screen.findByRole('heading', { name: t.statistics.emptyTitle })).toBeVisible();
+  });
+
+  it.each([undefined, false])(
+    'does not show or read the report when the flag is %s',
+    async (flag) => {
+      const server = site(adminUser, flag);
+      const { rerender } = render(
+        <AdminScreen section={null} currentSeasonId={seasonId} user={adminUser} />,
+      );
+      await waitFor(() => {
+        expect(server.sent('GET', '/api/status')).toHaveLength(1);
+      });
+      await userEvent.click(screen.getByTestId('admin-sections'));
+      const sheet = await screen.findByRole('dialog');
+      expect(within(sheet).queryByRole('link', { name: t.sections.statistics })).toBeNull();
+      rerender(<AdminScreen section="statistics" currentSeasonId={seasonId} user={adminUser} />);
+      expect(await screen.findByTestId('page-not-found')).toBeVisible();
+      expect(server.sent('GET', '/statistics')).toHaveLength(0);
+    },
+  );
 
   // K1A: the season the admin opened stays after a reload and in a new tab, and every season page names it
   const other = '5ea50000-0000-0000-0000-000000000002';
