@@ -53,7 +53,10 @@
 | Планировщик | фоновый проход сайта раз в несколько секунд: закрывает сезоны по дедлайну, запускает наступившие таймеры, чистит сессии; сроки хранит база, поэтому перезапуск сайта их не теряет (D-101, D-404, D-773) | `DeadlineScheduler`, `Scheduler:IntervalSeconds` |
 | Проверка целостности | сверка состояния сезона в базе с повтором его лога | `SeasonIntegrity`, `GET /api/admin/seasons/{id}/integrity`, `season-check` |
 | Твой сезон | личная страница итогов игрока | `SeasonRecap` |
+| Сводка за всё время | личная статистика игрока по всем его сезонам в «Моём профиле» | `AllTimeStatisticsView` |
 | Зал славы | победители, рекорды и статистика за все сезоны | `HallOfFame` |
+| Самый большой бросок | рекорд по сумме итоговых граней зачтённого броска | `HallOfFameRollView`, `HallOfFameRecordsView.LargestRolls` |
+| Удача броска | положение итоговой суммы между возможным минимумом и максимумом того же набора кубиков; при совпадении границ оценка неопределённа (D-931) | `RollStatistics`, `SeasonRollView.Luck` |
 
 ## Игры и ролл
 
@@ -207,6 +210,7 @@
 | Колода | колесо с ивентами одного вида (D-501) | `WheelDefinition` с полем `Deck` (вид ивентов) |
 | Общий ивент | ивент на всех, запускается админом на срок, с баннером на главной и, может быть, общей целью (D-517) | `GlobalEvent` |
 | Достижение | значок за выполнение условия по статистике | `ObjectKind.Achievement`, `PlayerAchievement` |
+| Пожизненное достижение | награда и значок, которые аккаунт получает один раз за всё время; «Джекпот» относится к этой категории | `LifetimeAchievementEarned`, `SeasonPlayer.LifetimeAchievements` |
 | Определение объекта | шаблон предмета, эффекта, ивента или достижения | `ObjectDefinition`, блок эффекта — `EffectSpec`, разбор — `ContentJson`, проверка — `ContentValidator` |
 | Объект инвентаря | конкретный экземпляр у игрока | `InventoryObject`; события `ObjectGiven`, `ObjectRemoved` (`ObjectRemoval`), `ObjectTransferred`, `ObjectChanged`, `ObjectLost`; откуда — `ObjectSource` |
 | Пакет контента | определения объектов, колёса лутбоксов и колоды ивентов, загружаемые в сезон; файлы `content/items`, `content/wheels`, `content/events`, `content/decks` | `ContentPack`, `ContentFiles`, команда `PublishContent`, событие `ContentPublished`, в сезоне — `ContentCatalog` (`CatalogEntry.Deleted`) |
