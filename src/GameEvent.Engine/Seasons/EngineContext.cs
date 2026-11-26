@@ -41,4 +41,7 @@ public sealed record EngineContext(
 
     /// <summary>The queue verified that these candidates of the requested category are public in this season.</summary>
     public IReadOnlySet<Guid>? AvailableNominationCandidates { get; init; }
+
+    /// <summary>The recorded state of the source, read in the queue only after checking for a retry.</summary>
+    public SeasonState? TemplateSeason { get; init; }
 }

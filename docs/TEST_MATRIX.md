@@ -5,6 +5,19 @@
 Статус: ⬜ теста нет, 🟥 тест есть и падает (ждёт реализации), 🟨 часть правила покрыта зелёными тестами (остальное — в указанной задаче плана), ✅ тест зелёный, ➖ не относится к этапу 1 (указан этап).
 Пути тестов: `Engine.Tests/<Механика>/…`, `Web.Tests/…`, `web/src/…` (Vitest), `e2e/…` (Playwright). Имена — план, уточняются при написании.
 
+## Правила этапа 7 (полировка и удобство админа)
+
+### Сезон по образцу (7.1, D-936)
+
+| ID | Правило | Тесты | Статус |
+| --- | --- | --- | --- |
+| STP1 | Завершённый или архивный образец даёт черновик с опубликованной картой, правилами и действующим пакетом. История и участники остаются в исходном сезоне | `Web.Tests/Api/SeasonTemplateApiTests.An_admin_creates_an_empty_draft_with_the_sources_published_map_rules_and_live_content` | ✅ |
+| STP2 | Линейная карта сохраняется при изменении её длины в правилах. Новый журнал воспроизводится независимо. Дедлайн вводится отдельно | `Engine.Tests/Seasons/SeasonTemplateTests.A_draft_replays_from_its_own_events_without_the_source_season`, `Web.Tests/Api/SeasonTemplateApiTests.A_linear_season_with_no_content_can_be_copied_without_inheriting_a_deadline` | ✅ |
+| STP3 | Повтор запроса однократен. Иное тело с тем же ID и параллельная попытка создать сезон с тем же именем отклоняются | `Web.Tests/Api/SeasonTemplateApiTests.A_retry_after_the_template_is_archived_has_one_effect_and_a_changed_request_conflicts`, `Concurrent_requests_with_equivalent_names_create_only_one_draft` | ✅ |
+| STP4 | Несовместимый пакет отклоняет всю команду. Несуществующий, незавершённый или другой снимок отклоняется | `Engine.Tests/Seasons/SeasonTemplateTests.A_snapshot_of_a_different_season_cannot_be_used`, `Web.Tests/Api/SeasonTemplateApiTests.An_incompatible_archived_pack_refuses_the_whole_clone_and_preserves_the_source`, `An_unknown_source_returns_not_found_without_creating_the_draft`, `An_unfinished_source_is_refused_without_creating_the_draft`, `An_empty_source_id_or_using_the_draft_as_its_own_source_is_invalid` | ✅ |
+| STP5 | Создаёт только админ. Выключение настройки скрывает действие, обычное создание доступно | `Web.Tests/Api/SeasonTemplateApiTests.A_non_admin_cannot_create_from_a_template`, `Templates_are_opt_in_and_the_default_create_path_remains_available`, `web/src/admin/SeasonSection.test.tsx` | ✅ |
+| STP6 | После создания выбран новый черновик с указанным дедлайном. Заголовок в области просмотра и в фокусе. Журнал показывает создание по образцу | `e2e/tests/s7-season-template.spec.ts` | ✅ |
+
 ## Правила этапа 6 (социальное и итоги)
 
 ### Реакции на отзывы (6.1)

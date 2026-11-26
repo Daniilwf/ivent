@@ -12511,7 +12511,8 @@ export interface components {
         };
         /**
          * @description The admin creates a season (SE1, D-123) with the default rules (`docs/ruleset.default.json`), changed later on the
-         *     rules page. `seasonId` is chosen by the client like the command id, so a retry creates the same season once.
+         *     rules page, or from an optional finished or archived source. `seasonId` is chosen by the client like the command id,
+         *     so a retry creates the same season once.
          */
         CreateSeasonRequest: {
             /** Format: uuid */
@@ -12521,6 +12522,8 @@ export interface components {
             name: null | string;
             /** Format: date-time */
             deadline?: null | string;
+            /** Format: uuid */
+            sourceSeasonId?: null | string;
         };
         /** @description The season the signed-in user sees by default (D-18). */
         CurrentSeasonView: {
@@ -14736,7 +14739,8 @@ export interface components {
          *     that saw another version before shows «Что нового» (J4, D-201). `environment` — which copy of the site this is
          *     (anything but `production` shows a strip on every page); `testTools` — the test endpoints are there (only
          *     Development and Test), so the admin gets the page of the test tools (H9, D-220); `uploads` — the largest file
-         *     of each kind the site takes, so a page refuses a bigger one before sending it (D-617).
+         *     of each kind the site takes, so a page refuses a bigger one before sending it (D-617). `seasonTemplates` is set
+         *     when the site offers the admin the season template action (D-936).
          */
         SiteStatusView: {
             maintenance: boolean;
@@ -14744,6 +14748,7 @@ export interface components {
             environment: components["schemas"]["SiteEnvironment"];
             testTools: boolean;
             uploads: components["schemas"]["UploadLimitsView"];
+            seasonTemplates?: null | boolean;
         };
         SocialRules: {
             reactions: components["schemas"]["EquatableArrayOfstring"];

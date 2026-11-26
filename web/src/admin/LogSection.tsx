@@ -21,7 +21,7 @@ const step = 50;
 const most = 500;
 
 // Neither the season's creation nor an undo can be undone (undo.notUndoable)
-const final = new Set(['CreateSeason', 'UndoCommand']);
+const final = new Set(['CreateSeason', 'CreateSeasonFromTemplate', 'UndoCommand']);
 
 /** Whom and what a command touched: «Волк, «Celeste»», or nothing (K1A) */
 function subjectOf(command: Command): string {

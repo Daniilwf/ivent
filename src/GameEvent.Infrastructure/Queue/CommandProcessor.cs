@@ -209,9 +209,37 @@ public sealed partial class CommandProcessor(
             return Rejected(RejectionCodes.SeasonMismatch, "Season commands need a season id; Guid.Empty is the global log.");
         }
 
-        if (envelope.Command is CreateSeason create && create.SeasonId != envelope.SeasonId)
+        var copyRequest = envelope.Command as CreateSeasonFromTemplate;
+        if (copyRequest is not null && !await db.Users.AnyAsync(
+                user => user.Id == envelope.AuthorId && !user.IsDeleted && user.Role == Accounts.Role.Admin, ct))
         {
-            return Rejected(RejectionCodes.SeasonMismatch, $"CreateSeason {create.SeasonId} sent to season {envelope.SeasonId}.");
+            return Rejected(RejectionCodes.SeasonTemplateForbidden, "Only a current administrator can copy a season.");
+        }
+
+        (Guid SeasonId, string Name)? creation = envelope.Command switch
+        {
+            CreateSeason create => (create.SeasonId, create.Name),
+            CreateSeasonFromTemplate copy => (copy.SeasonId, copy.Name),
+            _ => null,
+        };
+        if (creation is { } draft)
+        {
+            if (draft.SeasonId != envelope.SeasonId)
+            {
+                return Rejected(RejectionCodes.SeasonMismatch, $"{commandType} {draft.SeasonId} sent to season {envelope.SeasonId}.");
+            }
+
+            // D-604 applies to admin creations. Checking here also serializes ordinary creations with copies.
+            if (envelope.AuthorId is not null)
+            {
+                var trimmedName = draft.Name.Trim();
+                var names = await db.Seasons.AsNoTracking().Where(season => season.Id != draft.SeasonId)
+                    .Select(season => season.Name).ToListAsync(ct);
+                if (names.Any(name => string.Equals(name.Trim(), trimmedName, StringComparison.OrdinalIgnoreCase)))
+                {
+                    return Rejected("season.nameTaken", $"A season named «{draft.Name}» already exists.");
+                }
+            }
         }
 
         if (envelope.Command is Engine.Polls.StartNominationPoll nomination
@@ -263,6 +291,14 @@ public sealed partial class CommandProcessor(
         // The rules come from the season's own log (D-82); a new season brings them in CreateSeason.
         // An undo decides on the whole log by command (D-104); other commands need only the state.
         var history = envelope.Command is Engine.Undo.UndoCommand ? await EventLogReader.ReadCommandsAsync(db, envelope.SeasonId, ct) : null;
+        SeasonState? templateSeason = null;
+        if (copyRequest is not null)
+        {
+            var sourceId = copyRequest.SourceSeasonId;
+            var source = _cache.TryGetValue(sourceId, out var recorded) ? recorded : await EventLogReader.ReplaySeasonAsync(db, sourceId, ct);
+            templateSeason = source.State;
+        }
+
         var context = new EngineContext(
             clock, random, ids, await PoolReader.LoadAsync(db, ct), Triggers: triggers, History: history, TimeZones: Kernel.SystemTimeZones.Instance)
         {
@@ -277,6 +313,7 @@ public sealed partial class CommandProcessor(
             GalleryProofApprovalCommandId = preparedGalleryFile?.ProofApprovalCommandId,
             AvailableNominationCandidates = await ReadNominationCandidatesAsync(db, cached.State, envelope.Command, ct),
             EffectiveAttacks = await ReadNominationAttacksAsync(db, cached.State, envelope.Command, ct),
+            TemplateSeason = templateSeason,
         };
 
         var result = SeasonEngine.Execute(cached.State, envelope.Command, context);
