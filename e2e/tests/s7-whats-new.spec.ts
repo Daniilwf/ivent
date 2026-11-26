@@ -23,12 +23,28 @@ test('opens the release journal from the menu and its own address', async ({ bro
   await expect(page).toHaveURL(season);
   await expect(menu).toBeVisible();
 
-  await page.goto('/whats-new');
-  await expect(heading).toBeVisible();
-  // Make the page scrollable even before the first real release has been recorded.
+  // Open the direct address at a short viewport so even the empty journal can scroll.
+  const height = 160;
   const viewport = page.viewportSize();
   if (!viewport) throw new Error('A viewport is required.');
-  await page.setViewportSize({ ...viewport, height: 160 });
+  await page.setViewportSize({ ...viewport, height });
+  await page.goto('/whats-new');
+  await expect(heading).toBeVisible();
+  await page.evaluate(() => document.fonts.ready);
+  await expect
+    .poll(() =>
+      page.evaluate(async (expectedHeight) => {
+        const contentHeight = document.documentElement.scrollHeight;
+        await new Promise<number>((resolve) => {
+          requestAnimationFrame(resolve);
+        });
+        return (
+          window.innerHeight === expectedHeight &&
+          document.documentElement.scrollHeight === contentHeight
+        );
+      }, height),
+    )
+    .toBe(true);
   const position = await page.evaluate(() => {
     window.scrollTo(0, document.documentElement.scrollHeight);
     return window.scrollY;
