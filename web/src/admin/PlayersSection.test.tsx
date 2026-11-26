@@ -321,8 +321,12 @@ describe('The players', () => {
       'POST /api/admin/seasons/*/players': ok,
     });
 
-    await userEvent.click(await screen.findByTestId('add-player-open'));
+    (await screen.findByTestId('add-player-open')).focus();
+    await userEvent.keyboard('{Enter}');
     const account = await screen.findByTestId('add-player-account');
+    expect(screen.getByRole('heading', { name: t.addTitle })).toHaveFocus();
+    await userEvent.tab();
+    expect(account).toHaveFocus();
     expect(
       within(account)
         .getAllByRole('option')

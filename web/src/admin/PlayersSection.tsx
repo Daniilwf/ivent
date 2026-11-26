@@ -505,8 +505,9 @@ function AddPlayer({
   onDone: (message: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const heading = useRef<HTMLHeadingElement>(null);
   return (
-    <Panel title={t.addTitle}>
+    <Panel title={t.addTitle} titleRef={heading}>
       {open ? (
         <AddPlayerForm
           seasonId={seasonId}
@@ -523,6 +524,8 @@ function AddPlayer({
             icon={<UserPlus size={20} aria-hidden />}
             data-testid="add-player-open"
             onClick={() => {
+              heading.current?.focus({ preventScroll: true });
+              heading.current?.scrollIntoView({ block: 'center' });
               setOpen(true);
             }}
           >

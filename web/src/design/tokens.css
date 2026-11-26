@@ -168,6 +168,14 @@
   outline-offset: 3px;
 }
 
+/* Keep the sidebar below the measured header and reserve a bottom gutter for its own scrolling. */
+@utility sticky-below-header {
+  --sticky-top: calc(var(--shell-header-height, var(--spacing) * 16) + var(--spacing) * 4);
+  position: sticky;
+  top: var(--sticky-top);
+  max-height: calc(100dvh - var(--sticky-top) - var(--spacing) * 8);
+}
+
 /* The wooden table with felt dots that the map and the moments stand on */
 @utility table-surface {
   background-color: var(--color-table);

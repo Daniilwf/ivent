@@ -241,7 +241,7 @@ export function AdminScreen({
       {desk ? (
         <nav
           aria-label={t.nav}
-          className="w-60 self-start desk:sticky desk:top-20 desk:max-h-sticky-nav desk:overflow-y-auto desk:overscroll-contain"
+          className="w-60 self-start desk:sticky-below-header desk:overflow-y-auto desk:overscroll-contain"
         >
           <p className="mb-2 px-3 font-display text-lg font-heavy">{t.title}</p>
           {links()}
