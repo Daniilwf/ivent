@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page, type TestInfo } from '@playwright/test';
 import type { Schemas } from '../support/api.ts';
 import { openAdmin, setUpSeason, signIn } from '../support/world.ts';
 
@@ -29,6 +29,32 @@ const orange = {
   effect: { target: { selector: 'self' }, actions: [{ type: 'move', steps: 1 }] },
 };
 
+async function expectEditorHeading(page: Page, name: string, testInfo: TestInfo) {
+  const editor = page.getByTestId('content-editor');
+  const heading = editor.getByRole('heading', { name });
+  const close = editor.getByTestId('content-editor-close');
+  await expect(heading).toBeFocused();
+  await expect(heading).toBeInViewport({ ratio: 1 });
+  await expect(close).toBeInViewport({ ratio: 1 });
+  const [headerBox, headingBox, closeBox] = await Promise.all([
+    page.getByRole('banner').boundingBox(),
+    heading.boundingBox(),
+    close.boundingBox(),
+  ]);
+  if (!headerBox || !headingBox || !closeBox) throw new Error('The editor header is missing.');
+  const headerBottom = headerBox.y + headerBox.height;
+  expect(headingBox.y).toBeGreaterThanOrEqual(headerBottom);
+  expect(closeBox.y).toBeGreaterThanOrEqual(headerBottom);
+
+  const screenshot = testInfo.outputPath('content-editor-header.png');
+  await page.evaluate(() => document.fonts.ready);
+  await page.screenshot({ path: screenshot, scale: 'css' });
+  await testInfo.attach('Focused content editor', { path: screenshot, contentType: 'image/png' });
+
+  await page.keyboard.press('Tab');
+  await expect(close).toBeFocused();
+}
+
 test('the admin fixes an invalid effect guided by the error at its field and saves a new version', async ({
   browser,
 }, testInfo) => {
@@ -53,6 +79,7 @@ test('the admin fixes an invalid effect guided by the error at its field and sav
     // A phone looks at the content: the JSON read-only, no saving
     await expect(page.getByText('на телефоне контент можно только посмотреть')).toBeVisible();
     await page.getByTestId('content-open-orange').click();
+    await expectEditorHeading(page, 'Редактор: Апельсин', testInfo);
     await expect(page.getByTestId('content-json')).toHaveAttribute('readonly', '');
     await expect(page.getByTestId('content-save')).toHaveCount(0);
     return;
@@ -61,7 +88,7 @@ test('the admin fixes an invalid effect guided by the error at its field and sav
   await page.getByRole('radio', { name: /^Эффекты/u }).check({ force: true });
   await page.getByTestId('content-open-curse').click();
   const editor = page.getByTestId('content-editor');
-  await expect(editor.getByRole('heading', { name: 'Редактор: Проклятие' })).toBeFocused();
+  await expectEditorHeading(page, 'Редактор: Проклятие', testInfo);
 
   // A new description, and the trigger taken away by mistake: the schema lets it be empty, the server's rules do not
   await editor
