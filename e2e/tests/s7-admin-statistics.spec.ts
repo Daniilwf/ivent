@@ -141,12 +141,20 @@ test('the admin retries a failed statistics read without changing the selected s
   page,
 }, info) => {
   const world = await setUpSeason({ players: ['Лиса'] });
+  let allowRetry = false;
+  let releaseRetry: (() => void) | undefined;
+  const retryGate = new Promise<void>((resolve) => {
+    releaseRetry = resolve;
+  });
   try {
-    await page.route(
-      `**/api/admin/seasons/${world.seasonId}/statistics`,
-      (route) => route.fulfill({ status: 503, json: {} }),
-      { times: 1 },
-    );
+    await page.route(`**/api/admin/seasons/${world.seasonId}/statistics`, async (route) => {
+      if (!allowRetry) {
+        await route.fulfill({ status: 503, json: {} });
+        return;
+      }
+      await retryGate;
+      await route.continue();
+    });
     await page.goto('/');
     await signInHere(page, world.admin);
     await openAdmin(page, world, 'statistics');
@@ -154,13 +162,22 @@ test('the admin retries a failed statistics read without changing the selected s
     await expect(error).toBeVisible();
     await expect(page.getByRole('table')).toHaveCount(0);
     await capture(page, info, 'statistics-error');
+    // A background refresh must not clear the error before the real retry click.
+    allowRetry = true;
     await error.getByRole('button', { name: 'Попробовать ещё раз' }).click();
+    await expect(page.getByTestId('loading')).toBeVisible();
+    releaseRetry?.();
     await expect(page.getByRole('table').getByRole('rowheader', { name: 'Лиса' })).toBeVisible();
     await expect(error).toHaveCount(0);
     await expect(
       page.getByText(`Сезон: ${world.seasonName} (идёт)`, { exact: true }),
     ).toBeVisible();
   } finally {
-    await world.adminApi.dispose();
+    releaseRetry?.();
+    try {
+      await page.unrouteAll({ behavior: 'wait' });
+    } finally {
+      await world.adminApi.dispose();
+    }
   }
 });
