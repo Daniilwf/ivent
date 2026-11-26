@@ -1,5 +1,15 @@
 # Дизайн-ревью
 
+## Этап 7. Страница «Что нового» (2026-11-26)
+
+| Состояние | 390×844 | 1440×900 |
+| --- | --- | --- |
+| История выпусков, Chromium | [Телефон](../test-artifacts/whats-new-design/implemented-chromium-390.png) | [Десктоп](../test-artifacts/whats-new-design/implemented-chromium-1440.png) |
+| История выпусков, Firefox | [Телефон](../test-artifacts/whats-new-design/implemented-firefox-390.png) | [Десктоп](../test-artifacts/whats-new-design/implemented-firefox-1440.png) |
+| История выпусков, WebKit | [Телефон](../test-artifacts/whats-new-design/implemented-webkit-390.png) | [Десктоп](../test-artifacts/whats-new-design/implemented-webkit-1440.png) |
+
+Из трёх вариантов выбран «Журнал». Заголовок страницы соответствует остальным разделам, у выпусков заголовки второго уровня. Снимки используют заметки, полученные штатным генератором из отдельного тестового репозитория. Независимое ревью сверило ширину списка, перенос длинной заметки и читаемость дат. Playwright проверил вход через меню клавишей Enter, видимый заголовок, Back и прямой адрес. Эталоны раздела `whats-new` совпали во всех шести проектах. Firefox Desktop прошёл отдельный повтор после тайм-аута завершения первого теста. [Браузерные проверки](../test-artifacts/playwright/report/index.html)
+
 ## Этап 6. Итоговое голосование и архив номинаций (2026-11-20)
 
 | Состояние | 390×844 | 1440×900 |

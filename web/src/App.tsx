@@ -39,6 +39,9 @@ const PoolScreen = lazy(async () => ({ default: (await import('./pool/PoolScreen
 const RulesScreen = lazy(async () => ({
   default: (await import('./rules/RulesScreen')).RulesScreen,
 }));
+const WhatsNewScreen = lazy(async () => ({
+  default: (await import('./app/WhatsNewScreen')).WhatsNewScreen,
+}));
 const PollsScreen = lazy(async () => ({
   default: (await import('./polls/PollsScreen')).PollsScreen,
 }));
@@ -335,6 +338,8 @@ export function App() {
         />
       ) : route.kind === 'hallOfFame' ? (
         <HallOfFameScreen onSignedOut={signedOut} />
+      ) : route.kind === 'whatsNew' ? (
+        <WhatsNewScreen />
       ) : route.kind === 'game' ? (
         <GameScreen key={route.gameId} gameId={route.gameId} onSignedOut={signedOut} />
       ) : route.kind === 'notFound' || (route.kind === 'admin' && admin) ? (
