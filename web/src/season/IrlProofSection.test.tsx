@@ -540,4 +540,137 @@ describe('the proof of an IRL task', () => {
     expect(linkField()).toHaveValue(localLink);
     expect(onSubmit).not.toHaveBeenCalled();
   });
+
+  it.each([false, true])(
+    'adopts another rejected proof after its own draft was acknowledged (equal timestamps: %s)',
+    async (equalTimestamps) => {
+      upload.mockResolvedValueOnce(shot(1));
+      const effect = task({
+        irlProof: equalTimestamps ? proof({ status: 'rejected', files: [], link: null }) : null,
+      });
+      const { rerender, onSubmit } = renderTask(effect);
+      const receive = (irlProof: Schemas['IrlProofView']) => {
+        rerender(
+          <IrlProofSection
+            effect={{ ...effect, irlProof }}
+            maxFiles={5}
+            pending={false}
+            enabled
+            onSubmit={onSubmit}
+          />,
+        );
+      };
+
+      fireEvent.change(linkField(), { target: { value: '  ' + videoLink + '  ' } });
+      await userEvent.upload(fileField(), picture());
+      await screen.findByRole('img');
+      await userEvent.click(submit());
+      expect(onSubmit).toHaveBeenCalledExactlyOnceWith([fileLink(1).id], videoLink);
+
+      receive(proof());
+      receive(proof({ status: 'rejected', comment: 'First refusal' }));
+      const replacement = proof({
+        files: [fileLink(2)],
+        link: 'https://example.com/corrected-video',
+        submittedAt: equalTimestamps ? proof().submittedAt : '2026-11-17T16:01:00Z',
+      });
+      receive(replacement);
+      receive({ ...replacement, status: 'rejected', comment: 'Second refusal' });
+
+      expect(linkField()).toHaveValue(replacement.link);
+      expect(screen.getByRole('img')).toHaveAttribute('src', fileLink(2).thumbnailUrl);
+      await userEvent.click(submit());
+      expect(onSubmit).toHaveBeenLastCalledWith([fileLink(2).id], replacement.link);
+    },
+  );
+
+  it('preserves the draft after a failed submission and a later refusal from another tab', async () => {
+    upload.mockResolvedValueOnce(shot(1));
+    const effect = task();
+    const { rerender, onSubmit } = renderTask(effect);
+    const receive = (irlProof: Schemas['IrlProofView'] | null, pending = false) => {
+      rerender(
+        <IrlProofSection
+          effect={{ ...effect, irlProof }}
+          maxFiles={5}
+          pending={pending}
+          enabled
+          onSubmit={onSubmit}
+        />,
+      );
+    };
+    fireEvent.change(linkField(), { target: { value: videoLink } });
+    await userEvent.upload(fileField(), picture());
+    await screen.findByRole('img');
+    await userEvent.click(submit());
+
+    receive(null, true);
+    receive(null);
+    const replacement = proof({ files: [fileLink(2)], link: 'https://example.com/another-tab' });
+    receive(replacement);
+    receive({ ...replacement, status: 'rejected' });
+
+    expect(linkField()).toHaveValue(videoLink);
+    expect(screen.getByRole('img')).toHaveAttribute('src', fileLink(1).thumbnailUrl);
+    await userEvent.click(submit());
+    expect(onSubmit).toHaveBeenLastCalledWith([fileLink(1).id], videoLink);
+  });
+
+  it('does not clear newer local edits when a late acknowledgement matches the submitted draft', async () => {
+    const effect = task();
+    const { rerender, onSubmit } = renderTask(effect);
+    const receive = (irlProof: Schemas['IrlProofView']) => {
+      rerender(
+        <IrlProofSection
+          effect={{ ...effect, irlProof }}
+          maxFiles={5}
+          pending={false}
+          enabled
+          onSubmit={onSubmit}
+        />,
+      );
+    };
+    fireEvent.change(linkField(), { target: { value: videoLink } });
+    await userEvent.click(submit());
+    const newerLink = 'https://example.com/not-yet-submitted';
+    fireEvent.change(linkField(), { target: { value: newerLink } });
+    receive(proof({ files: [] }));
+    receive(proof({ files: [], status: 'rejected' }));
+    const replacement = proof({
+      files: [],
+      link: 'https://example.com/another-tab',
+      submittedAt: '2026-11-17T16:01:00Z',
+    });
+    receive(replacement);
+    receive({ ...replacement, status: 'rejected' });
+
+    expect(linkField()).toHaveValue(newerLink);
+    await userEvent.click(submit());
+    expect(onSubmit).toHaveBeenLastCalledWith([], newerLink);
+  });
+
+  it('does not acknowledge a submission when the incoming proof has different photos', async () => {
+    upload.mockResolvedValueOnce(shot(1));
+    const effect = task();
+    const { rerender, onSubmit } = renderTask(effect);
+    fireEvent.change(linkField(), { target: { value: videoLink } });
+    await userEvent.upload(fileField(), picture());
+    await screen.findByRole('img');
+    await userEvent.click(submit());
+    for (const status of ['pending', 'rejected'] as const)
+      rerender(
+        <IrlProofSection
+          effect={{ ...effect, irlProof: proof({ status, files: [fileLink(2)] }) }}
+          maxFiles={5}
+          pending={false}
+          enabled
+          onSubmit={onSubmit}
+        />,
+      );
+
+    expect(linkField()).toHaveValue(videoLink);
+    expect(screen.getByRole('img')).toHaveAttribute('src', fileLink(1).thumbnailUrl);
+    await userEvent.click(submit());
+    expect(onSubmit).toHaveBeenLastCalledWith([fileLink(1).id], videoLink);
+  });
 });
