@@ -185,6 +185,24 @@ describe('season interactions', () => {
     vi.unstubAllGlobals();
   });
 
+  it('names the page and gives an idle player a way to start looking for a partner', async () => {
+    const server = serve();
+    open();
+
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Напарники и дуэли');
+    expect(await screen.findByRole('heading', { name: 'Нет открытых запросов' })).toBeVisible();
+    expect(screen.getByText('Начни кооп-прохождение, чтобы открыть запрос.')).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Перейти к сезону' })).toHaveAttribute(
+      'href',
+      `/seasons/${seasonId}`,
+    );
+    expect(
+      screen.getByRole('heading', { name: 'Нет приглашений, которые ждут ответа' }),
+    ).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Идущих дуэлей нет' })).toBeVisible();
+    expect(server.sent('POST', '/partner-requests')).toHaveLength(0);
+  });
+
   it('accepts an incoming coop invitation once, then shows the server’s shared run and lets the partner leave', async () => {
     let pending: Invitation[] = [invitation()];
     let shared: Coop | null = null;
@@ -265,6 +283,9 @@ describe('season interactions', () => {
     expect(within(opponent).queryByRole('option', { name: 'Оля' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Пригласить в кооп' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Вызвать на дуэль' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Вызвать на дуэль' })).toHaveAccessibleDescription(
+      'Выбери соперника, чтобы вызвать на дуэль.',
+    );
 
     await userEvent.selectOptions(partner, peer);
     await userEvent.click(screen.getByRole('button', { name: 'Пригласить в кооп' }));
@@ -473,7 +494,11 @@ describe('season interactions', () => {
     });
     open();
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Опубликовать запрос' }));
+    const emptyBoard = await screen.findByRole('heading', { name: 'Нет открытых запросов' });
+    expect(emptyBoard.parentElement).toContainElement(
+      screen.getByRole('button', { name: 'Опубликовать запрос' }),
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Опубликовать запрос' }));
     await screen.findByRole('button', { name: 'Закрыть запрос' });
     expect(screen.queryByRole('button', { name: 'Откликнуться' })).not.toBeInTheDocument();
     boardEnabled = false;
@@ -660,7 +685,7 @@ describe('season interactions', () => {
       const server = serve({ season: () => snapshot({ me: null, interactionFeatures }) });
       open('spectator');
 
-      await screen.findByRole('heading', { name: 'Взаимодействия недоступны в этом сезоне' });
+      await screen.findByRole('heading', { name: 'Напарники и дуэли недоступны в этом сезоне' });
       expect(server.calls.map(({ path }) => path)).toEqual([prefix]);
     },
   );

@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Schemas } from '../api/client';
 import { PollCard } from './PollCard';
@@ -120,12 +120,14 @@ describe('a poll card uses the server snapshot and my voting availability (EV21/
 
     expect(screen.getByRole('heading', { name: question })).toBeVisible();
     expect(
-      screen.queryByRole('radiogroup', { name: 'Твой голос' }) ??
-        screen.getByRole('group', { name: 'Твой голос' }),
+      screen.queryByRole('radiogroup', { name: 'Выбери вариант' }) ??
+        screen.getByRole('group', { name: 'Выбери вариант' }),
     ).toBeVisible();
     expect(option('Хорроры')).not.toBeChecked();
     expect(option('Стратегии')).not.toBeChecked();
     expect(voteButton()).toBeDisabled();
+    expect(voteButton()).toHaveAccessibleDescription('Выбери вариант, чтобы проголосовать.');
+    expect(screen.getByText('Выбери вариант, чтобы проголосовать.')).toBeVisible();
     expect(onVote).not.toHaveBeenCalled();
     const deadline = container.querySelector(`time[datetime="${value.closesAt}"]`);
     expect(deadline).toBeVisible();
@@ -143,6 +145,7 @@ describe('a poll card uses the server snapshot and my voting availability (EV21/
     expect(option('Стратегии')).toBeChecked();
     expect(option('Хорроры')).not.toBeChecked();
     expect(voteButton()).toBeEnabled();
+    expect(voteButton()).not.toHaveAccessibleDescription();
     expect(onVote).not.toHaveBeenCalled();
     await userEvent.click(voteButton());
     expect(onVote).toHaveBeenCalledExactlyOnceWith(strategyId);
@@ -318,6 +321,9 @@ describe('a poll card uses the server snapshot and my voting availability (EV21/
 
     expect(option('Хорроры')).toBeChecked();
     expect(screen.getByRole('button', { name: 'Изменить голос' })).toBeDisabled();
+    expect(voteButton()).toHaveAccessibleDescription(
+      'Выбери другой вариант, чтобы изменить голос.',
+    );
     await userEvent.click(option('Хорроры'));
     expect(onVote).not.toHaveBeenCalled();
     expect(voteButton()).toBeDisabled();
@@ -558,6 +564,16 @@ describe('a poll card uses the server snapshot and my voting availability (EV21/
 
     expect(screen.getByText('Голосование закрыто', { exact: true })).toBeVisible();
     expect(screen.getByText('Итог: Стратегии', { exact: true })).toBeVisible();
+    expect(screen.queryByRole('radio')).not.toBeInTheDocument();
+    const rows = within(screen.getByRole('list', { name: 'Варианты ответа' })).getAllByRole(
+      'listitem',
+    );
+    expect(rows[0]).toHaveTextContent('Хорроры');
+    expect(rows[0]).toHaveTextContent('1 голос');
+    expect(rows[0]).toHaveTextContent(/25\s*%/);
+    expect(rows[1]).toHaveTextContent('Стратегии');
+    expect(rows[1]).toHaveTextContent('3 голоса');
+    expect(rows[1]).toHaveTextContent(/75\s*%/);
     expect(container).not.toHaveTextContent(strategyId);
     expect(screen.queryByText('Счёт скрыт до закрытия')).not.toBeInTheDocument();
     expectNoEnabledVote();
@@ -627,6 +643,8 @@ describe('a poll card uses the server snapshot and my voting availability (EV21/
     );
 
     expect(screen.getByText('Голосование отменено', { exact: true })).toBeVisible();
+    expect(screen.queryByRole('radio')).not.toBeInTheDocument();
+    expect(screen.getByRole('list', { name: 'Варианты ответа' })).toHaveTextContent('Стратегии');
     expect(screen.queryByText(/^Итог:/)).not.toBeInTheDocument();
     expect(container).not.toHaveTextContent(/0\s+голос|ничья/i);
     expectNoEnabledVote();

@@ -27,6 +27,7 @@ import { Leaderboard } from '../board/Leaderboard';
 import { cellsToFinish } from '../board/geometry';
 import { demoBoard } from '../board/demoBoard';
 import { ru } from '../i18n/ru';
+import { PageHeader } from '../ui/PageHeader';
 import { Summary } from '../ui/Disclosure';
 import { Button, IconButton, type ButtonVariant } from '../ui/Button';
 import { BottomSheet, Confirm, ConfirmDanger, FormDialog } from '../ui/Dialogs';
@@ -280,7 +281,7 @@ export function Styleguide() {
   return (
     <main className="mx-auto grid max-w-300 gap-8 px-4 py-6 desk:px-8">
       <header className="grid gap-3">
-        <h1 className="font-display text-2xl font-heavy">{t.title}</h1>
+        <PageHeader>{t.title}</PageHeader>
         <p className="max-w-prose text-ink-soft">{t.lead}</p>
         <nav aria-label={t.contents} className="flex flex-wrap gap-2">
           {t.sections.map(([id, name]) => (
@@ -1034,6 +1035,10 @@ export function Styleguide() {
                 attacksReceived: 999,
                 bestRoll: { runId: 'roll-best', sum: 17, minimum: 3, maximum: 18, luck: 14 / 15 },
                 worstRoll: { runId: 'roll-worst', sum: 4, minimum: 2, maximum: 12, luck: 0.2 },
+                place: 2,
+                points: 432,
+                playerToken: demoProfile.seasons[0]?.token ?? null,
+                provisional: false,
               },
               demoProfile.name,
             )}

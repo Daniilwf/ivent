@@ -101,6 +101,7 @@ describe('the proof of an IRL task', () => {
     expect(screen.getByText(description + ' <svg onload=alert(1)>')).toBeVisible();
     expect(container.querySelector('img, svg[onload]')).toBeNull();
     expect(submit()).toBeDisabled();
+    expect(submit()).toHaveAccessibleDescription(ru.irlProof.required);
     expect(screen.queryByRole('button', { name: 'Применено' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Не применимо' })).not.toBeInTheDocument();
   });
@@ -111,6 +112,7 @@ describe('the proof of an IRL task', () => {
 
     expect(onSubmit).not.toHaveBeenCalled();
     expect(submit()).toBeEnabled();
+    expect(submit()).not.toHaveAccessibleDescription(ru.irlProof.required);
     await userEvent.click(submit());
 
     expect(onSubmit).toHaveBeenCalledExactlyOnceWith([], videoLink);
@@ -158,6 +160,7 @@ describe('the proof of an IRL task', () => {
     expect(onSubmit).not.toHaveBeenCalled();
     expect(input).toHaveAttribute('aria-invalid', 'true');
     expect(input).toHaveAccessibleDescription();
+    expect(submit()).toHaveAccessibleDescription(ru.irlProof.linkInvalid);
   });
 
   it('offers a link-only proof when the current season allows zero photos', async () => {

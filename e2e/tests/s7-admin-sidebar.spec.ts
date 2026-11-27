@@ -1,5 +1,6 @@
 import { expect, test, type Locator } from '@playwright/test';
 import { seedAdmin, type Schemas } from '../support/api.ts';
+import { demoSeasonId } from '../support/global-setup.ts';
 import { signInHere } from '../support/world.ts';
 
 test('the desktop admin sidebar stays visible when seasonal navigation becomes available', async ({
@@ -150,4 +151,88 @@ test('the desktop admin sidebar stays visible when seasonal navigation becomes a
   } finally {
     revealNavigation();
   }
+});
+
+test('DR7-14: the phone keeps the admin heading and Sections together below the site header', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'phone', 'The desktop uses a sidebar.');
+
+  await page.goto('/');
+  await signInHere(page, seedAdmin);
+  // Select the populated log by identity. Other specs can create a newer season while this one is running.
+  await page.goto('/admin/season');
+  await page.getByTestId(`season-open-${demoSeasonId}`).click();
+  await expect(page.getByTestId('season-status')).toContainText('Демо-сезон');
+  await page.goto('/admin/log');
+
+  const title = page.getByRole('heading', { level: 1 });
+  const sections = page.getByTestId('admin-sections');
+  const season = page.getByTestId('admin-season-name');
+  const getLayout = () =>
+    sections.evaluate((button) => {
+      const title = document.getElementById('admin-heading');
+      const siteHeader = document.querySelector('header:has([data-testid="site-nav"])');
+      const season = document.querySelector('[data-testid="admin-season-name"]');
+      if (!title || !siteHeader || !season)
+        throw new Error('The site and admin headings and current season must be present.');
+      const heading = title.getBoundingClientRect();
+      const action = button.getBoundingClientRect();
+      return {
+        headerBottom: siteHeader.getBoundingClientRect().bottom,
+        headingTop: heading.top,
+        headingBottom: heading.bottom,
+        seasonTop: season.getBoundingClientRect().top,
+        actionTop: action.top,
+        actionRight: action.right,
+        actionBottom: action.bottom,
+      };
+    });
+
+  await expect(title).toHaveText('Лог');
+  await expect(page.getByRole('link', { name: 'Сменить сезон' })).toBeVisible();
+  await expect(page.getByTestId('admin-log').getByRole('article').first()).toBeVisible();
+  await page.evaluate(() => {
+    window.scrollTo(0, 640);
+  });
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(320);
+  await expect
+    .poll(async () => {
+      const layout = await getLayout();
+      return layout.actionTop - layout.headerBottom;
+    })
+    .toBeGreaterThanOrEqual(-1);
+  const log = await getLayout();
+  expect(log.actionTop - log.headerBottom).toBeLessThan(20);
+  expect(log.seasonTop).toBeGreaterThanOrEqual(log.headerBottom);
+  expect(log.seasonTop - log.headingBottom).toBeLessThan(8);
+  expect(log.headingTop).toBeLessThan(log.actionBottom);
+  expect(log.headingBottom).toBeGreaterThan(log.actionTop);
+  await page.screenshot({
+    path: testInfo.outputPath('sticky-admin-log-390x844.png'),
+    scale: 'css',
+  });
+
+  await sections.click();
+  await page.getByRole('dialog').getByTestId('admin-nav-effects').click();
+  await expect(title).toHaveText('Ручные эффекты');
+  await expect(title).toBeFocused();
+  const effects = await getLayout();
+  expect(effects.actionRight).toBeCloseTo(log.actionRight, 0);
+  expect(effects.actionTop - effects.headerBottom).toBeCloseTo(log.actionTop - log.headerBottom, 0);
+  expect(effects.headingTop).toBeLessThan(effects.actionBottom);
+  expect(effects.headingBottom).toBeGreaterThan(effects.actionTop);
+  await expect(season).toBeVisible();
+  await page.screenshot({
+    path: testInfo.outputPath('admin-effects-390x844.png'),
+    scale: 'css',
+  });
+
+  await sections.click();
+  await page.keyboard.press('Escape');
+  await expect(sections).toBeFocused();
+  await testInfo.attach('mobile admin heading bounds', {
+    body: JSON.stringify({ log, effects }, null, 2),
+    contentType: 'application/json',
+  });
 });

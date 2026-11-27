@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { holdingTheClock } from '../support/clock.ts';
 import {
   apiOf,
   commandsOf,
@@ -50,21 +51,26 @@ test('two tabs: the same step clicked in both at once happens once, and both tab
   const tabs = [first, second];
   for (const tab of tabs) await expect(tab.getByTestId('roll')).toBeVisible();
 
-  // The roll: a double click in one tab and a click in the other, together
-  await clickTogether(tabs, 'roll', true);
-  for (const tab of tabs) await expect(tab.getByTestId('roll-game')).toBeEnabled(live);
-  await clickTogether(tabs, 'roll-game', true);
-  for (const tab of tabs) await expect(tab.getByTestId('offer')).toBeVisible();
-  const title = await first.locator('#roll-result-title').textContent();
-  await expect(second.locator('#roll-result-title')).toHaveText(title ?? '');
-  expect(await accepted(world, 'RollGame')).toBe(1);
-  expect(await accepted(world, 'ShowRolledGame')).toBe(1);
+  // A concurrent deadline test must not let the reveal timer win before the second simultaneous click.
+  const title = await holdingTheClock(async () => {
+    await clickTogether(tabs, 'roll', true);
+    for (const tab of tabs) await expect(tab.getByTestId('roll-game')).toBeEnabled(live);
+    await clickTogether(tabs, 'roll-game', true);
+    for (const tab of tabs) await expect(tab.getByTestId('offer')).toBeVisible();
+    const shown = first.locator('#roll-result-title');
+    await expect(shown).toHaveText(/\S/);
+    const game = (await shown.textContent()) ?? '';
+    await expect(second.locator('#roll-result-title')).toHaveText(game);
+    expect(await accepted(world, 'RollGame')).toBe(1);
+    expect(await accepted(world, 'ShowRolledGame')).toBe(1);
+    return game;
+  });
 
   // The start on the hard difficulty (the completion counts no higher, D-633), in both at once
   for (const tab of tabs)
     await tab.getByTestId('start-difficulty').getByText('Сложная', { exact: true }).click();
   await clickTogether(tabs, 'start');
-  for (const tab of tabs) await expect(tab.getByTestId('active-run')).toContainText(title ?? '');
+  for (const tab of tabs) await expect(tab.getByTestId('active-run')).toContainText(title);
   expect(await accepted(world, 'StartRun')).toBe(1);
 
   // The completion, sent from both at once

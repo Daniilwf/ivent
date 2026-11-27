@@ -89,7 +89,9 @@ describe('all-time profile statistics', () => {
     expect(await panel.findByText('9,5 ч')).toBeVisible();
     expect(screen.queryByTestId('profile-completed')).not.toBeInTheDocument();
     expect(panel.getByText('0 %')).toBeVisible();
-    expect(panel.getByText('Сумма 1, диапазон 1–4')).toBeVisible();
+    const range = panel.getByText('1–4');
+    expect(range).toHaveClass('whitespace-nowrap');
+    expect(range.parentElement).toHaveTextContent('Сумма 1, диапазон 1–4');
     expect(panel.getByText('9 из 10')).toBeVisible();
     expect(watchSeason).toHaveBeenCalledWith(seasonId, expect.any(Function), undefined);
     expect(server.sent('GET', path)[0]?.query.size).toBe(0);

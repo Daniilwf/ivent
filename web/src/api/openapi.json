@@ -20810,7 +20810,11 @@
           "seasonName",
           "totalHours",
           "bestRoll",
-          "worstRoll"
+          "worstRoll",
+          "place",
+          "points",
+          "playerToken",
+          "provisional"
         ],
         "type": "object",
         "properties": {
@@ -20870,6 +20874,30 @@
                 "$ref": "#/components/schemas/SeasonRollView"
               }
             ]
+          },
+          "place": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "points": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "playerToken": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "provisional": {
+            "type": "boolean"
           }
         }
       },

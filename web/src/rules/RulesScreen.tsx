@@ -7,6 +7,7 @@ import { moscowTime } from '../app/time';
 import { answerOf, useLoaded, type Answer } from '../app/useLoaded';
 import { useSeasonVersion } from '../app/useSeasonVersion';
 import { ru } from '../i18n/ru';
+import { PageHeader } from '../ui/PageHeader';
 import { Chip } from '../ui/Marks';
 import { Skeleton } from '../ui/Progress';
 import { AsyncState } from '../ui/AsyncState';
@@ -57,13 +58,9 @@ export function RulesScreen({
   );
 
   const title = (
-    <h1
-      ref={heading}
-      tabIndex={-1}
-      className="font-display text-2xl font-heavy outline-none desk:text-3xl"
-    >
+    <PageHeader ref={heading} tabIndex={-1} className="outline-none">
       {t.title}
-    </h1>
+    </PageHeader>
   );
 
   if (!seasonId)

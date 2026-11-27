@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode, type SyntheticEvent } from
 import { api, refreshCsrf, rejectionCode, type Schemas } from '../api/client';
 import { newCommandId } from '../api/commands';
 import { ru } from '../i18n/ru';
+import { PageHeader } from '../ui/PageHeader';
 import { Button } from '../ui/Button';
 import { Field } from '../ui/Field';
 import { Notice } from '../ui/States';
@@ -92,14 +93,14 @@ export function ChangePasswordForm({
       className="grid gap-4 rounded-lg border-3 border-ink bg-card p-5 shadow-lift"
     >
       <div className="grid gap-1">
-        <h1
+        <PageHeader
           id="password-title"
           ref={title}
           tabIndex={-1}
-          className="rounded-sm font-display text-2xl font-heavy outline-none"
+          className="rounded-sm outline-none"
         >
           {ru.password.title}
-        </h1>
+        </PageHeader>
         <p className="text-ink-soft">{temporary ? ru.password.why : ru.password.whyOwn}</p>
       </div>
       <Field

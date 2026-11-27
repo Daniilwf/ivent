@@ -7,6 +7,7 @@ import { answerOf, type Answer } from '../app/useLoaded';
 import { usePoolVersion, useSeasonVersion } from '../app/useSeasonVersion';
 import { ru } from '../i18n/ru';
 import { Button } from '../ui/Button';
+import { PageHeader } from '../ui/PageHeader';
 import { Skeleton } from '../ui/Progress';
 import { EmptyState, Notice } from '../ui/States';
 import { PollCard } from './PollCard';
@@ -239,9 +240,9 @@ function SeasonPolls({ seasonId, onSignedOut }: PollsScreenProps) {
       ref={main}
       className="mx-auto grid max-w-180 content-start gap-4 px-4 pt-4 pb-10 desk:px-8 desk:pt-8"
     >
-      <h1 ref={title} tabIndex={-1} className="font-display text-xl font-heavy outline-none">
+      <PageHeader ref={title} tabIndex={-1} className="outline-none">
         {t.title}
-      </h1>
+      </PageHeader>
       {state.kind === 'loading' ? (
         <div
           aria-busy="true"

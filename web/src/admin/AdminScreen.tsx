@@ -32,8 +32,8 @@ import { BottomSheet } from '../ui/Dialogs';
 import { AsyncState } from '../ui/AsyncState';
 import { EmptyState } from '../ui/States';
 import { cx } from '../ui/cx';
-import { standaloneLink } from '../ui/buttonStyles';
 import { useDesk } from '../ui/useDesk';
+import { AdminHeader } from './AdminHeader';
 import { AccountsSection } from './AccountsSection';
 import { BugsSection } from './BugsSection';
 import { EffectsSection } from './EffectsSection';
@@ -51,7 +51,6 @@ import { SeasonSection } from './SeasonSection';
 import { SiteSection } from './SiteSection';
 import { StatisticsSection } from './StatisticsSection';
 import { TestToolsSection } from './TestToolsSection';
-import { SectionHead } from './common';
 import { answerOf, useLoaded } from '../app/useLoaded';
 import { useSeasonVersion } from '../app/useSeasonVersion';
 import { reportWaitingProofs } from './waitingProofs';
@@ -245,7 +244,7 @@ export function AdminScreen({
 
   return (
     <main
-      className="mx-auto grid max-w-300 gap-6 px-4 py-6 desk:grid-cols-[auto_minmax(0,1fr)] desk:gap-8 desk:px-8"
+      className="mx-auto grid max-w-300 gap-6 px-4 pb-6 desk:grid-cols-[auto_minmax(0,1fr)] desk:gap-8 desk:px-8 desk:pt-6"
       data-testid="admin"
     >
       {desk ? (
@@ -257,12 +256,19 @@ export function AdminScreen({
           {links()}
         </nav>
       ) : null}
-      <div className="grid min-w-0 content-start gap-6">
-        <SectionHead
-          id="admin-heading"
+      <div className="grid min-w-0 content-start gap-3 desk:gap-6">
+        <AdminHeader
           headingRef={heading}
           title={t.sections[section]}
           lead={t.leads[section]}
+          season={
+            needsSeason && season
+              ? {
+                  label: t.seasonOf(season.name, ru.seasonStatus[season.status] ?? season.status),
+                  href: href('season'),
+                }
+              : null
+          }
           action={
             desk ? null : (
               <BottomSheet
@@ -286,18 +292,6 @@ export function AdminScreen({
             )
           }
         />
-        {needsSeason && season ? (
-          // Which season the queue, the players and the log belong to (K1A)
-          <p
-            className="flex flex-wrap items-center gap-x-3 gap-y-1"
-            data-testid="admin-season-name"
-          >
-            <span>{t.seasonOf(season.name, ru.seasonStatus[season.status] ?? season.status)}</span>
-            <Link to={href('season')} className={standaloneLink}>
-              {t.changeSeason}
-            </Link>
-          </p>
-        ) : null}
         {needsSeason && !seasonId ? (
           <EmptyState
             level={2}

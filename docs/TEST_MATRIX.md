@@ -175,6 +175,7 @@
 | ST13 | SPEC «Итоги сезона», D-927. Сводка суммирует сохранённые часы. Разделённый кооп даёт полные часы обоим, выход до завершения оставляет часы роллеру. Правка и реджект меняют оба зачёта. Дроп и текущая игра часов не добавляют. Карточка и PNG используют одно число. | `Web.Tests/Api/SeasonStatisticsApiTests.cs`, `web/src/seasonRecap/SeasonRecap.test.tsx`, `e2e/tests/s6-season-recap.spec.ts` | ✅ |
 | ST14 | Статистика бросков берёт итоговые сохранённые кубики зачтённых прохождений после правок и перебросов, включая челлендж и свободный режим. Кооп один раз за роллера. Удача сравнивается по доступному диапазону, номинация по минимальной средней удаче. | Сводка: `Engine.Tests/Statistics/RollStatisticsTests.cs`, `Web.Tests/Api/SeasonRollStatisticsApiTests.cs`, `web/src/seasonRecap/SeasonRecap.test.tsx`, `e2e/tests/s6-season-recap.spec.ts`. Номинация в 6.6f, нулевой диапазон в D-931. | 🟨 |
 | ST15 | Личная сводка за всё время включает текущий и каждый прежний сезон участия независимо от посезонного флага. Сводку читает владелец. | `Web.Tests/Api/AllTimeStatisticsApiTests.cs`, `web/src/feed/AllTimeStatisticsPanel.test.tsx`, `e2e/tests/s6-all-time-recap.spec.ts` | ✅ |
+| ST16 | DR7-07. В личной сводке и PNG видны место и очки владельца по лидерборду с отметкой предварительного первого места. Сводка обновляет отметку после проверки пруфа. Для архива используются сохранённые результаты. Цвет берётся от фишки участника. Запросы к сводке остаются личными и не кэшируются. Часы согласованы с числом, бросок пояснён словами, в профиле диапазон переносится целиком. | `Web.Tests/Api/SeasonStatisticsApiTests.An_active_recap_uses_the_owners_visible_place_points_and_token_even_for_a_provisional_first_finish`, `An_archived_recap_keeps_the_saved_place_and_points_when_the_live_projection_differs`, `web/src/seasonRecap/SeasonRecap.test.tsx`, `web/src/feed/AllTimeStatisticsPanel.test.tsx`, `e2e/tests/s6-season-recap.spec.ts` | ✅ |
 
 ### Победители сезонов (6.6a)
 
@@ -684,6 +685,12 @@ API, экраны инвентаря и магазина, редактор эф�
 | DS9 | Карта без чёрных полос в Chromium, Firefox и WebKit (баг D-132) | `e2e/visual/map.visual.spec.ts` («the map has no dark bands…», проверка пикселей, 6 проектов) | ✅ |
 | DS10 | Ключевые экраны защищены скриншот-тестами | `e2e/visual/map.visual.spec.ts` (карта и разделы стайлгайда, 6 проектов) | ✅ |
 | DS11 | Экран хода объясняет закрытый лимитом ролл (D-134) | `web/src/season/SeasonScreen.test.tsx` («closes the roll at the limit…», «keeps the roll open below the limit…», «says nothing when…», «shows the refusal…»); API: `Api/UncheckedLimitApiTests` | ✅ |
+| DS12 | DR7-05. Отключённая кнопка плоская, контраст соблюдается в обеих темах. Причина рядом описывает недостающий выбор или материал | `tokens.test.ts`, `PollCard.test.tsx`, `EventChoice.test.tsx`, `InteractionsScreen.test.tsx`, `IrlProofSection.test.tsx`; вид кнопки в `s5-polls.spec.ts` и визуальных разделах кнопок | ✅ |
+| DS13 | DR7-06. Видимые итоги голосования показаны строками с долями. Сохранённый итог и собственный голос различимы, скрытые числа не выводятся | `PollCard.test.tsx`, `s5-polls.spec.ts`, `s6-final-nominations.spec.ts`; светлый и тёмный разделы `poll-card` | ✅ |
+| DS14 | DR7-09. «Напарники и дуэли» одинаково названы в меню и на странице, пустое состояние объясняет следующий доступный шаг | `InteractionsScreen.test.tsx`, `s5-interactions-ui.spec.ts`, `s5-coop.spec.ts`, `smoke.spec.ts` | ✅ |
+| DS15 | DR7-11. Заголовки страниц и полноэкранных состояний используют `PageHeader`, включая перевод фокуса при навигации | `web/eslint.config.js`, `router.test.tsx`, `PollsNavigation.test.tsx`; браузерная проверка заголовков | ✅ |
+| DS16 | DR7-13. Текст лимита проверок учитывает завершённые прохождения с отправленным и неотправленным пруфом. Действие соответствует состоянию | `TurnCard.test.tsx`, `SeasonScreen.test.tsx`, `UncheckedLimitApiTests` | ✅ |
+| DS17 | DR7-14. Заголовок, имя сезона и «Разделы» остаются видны при прокрутке на телефоне. Фокус возвращается к триггеру или новому заголовку | `AdminScreen.test.tsx`, `s7-admin-sidebar.spec.ts` | ✅ |
 
 ## Каркас (H1)
 

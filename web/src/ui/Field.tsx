@@ -14,6 +14,7 @@ export function Field({
   label,
   hint,
   error,
+  errorId: describedByError,
   errorRestatesHint = false,
   announce = true,
   force,
@@ -23,6 +24,8 @@ export function Field({
   label: string;
   hint?: string;
   error?: string | undefined;
+  /** An id another control can use to point to this field's visible error. */
+  errorId?: string;
   /**
    * The error says the hint's own rule over again («от 1 до 7» and «целое число от 1 до 7»): it takes the hint's place,
    * so the rule is said once (S4D-7). A hint that says something else (why the field is asked) stays with the error.
@@ -36,7 +39,7 @@ export function Field({
 }) {
   const id = useId();
   const hintId = `${id}-hint`;
-  const errorId = `${id}-error`;
+  const errorId = describedByError ?? `${id}-error`;
   const shownHint = error && errorRestatesHint ? undefined : hint;
   return (
     <div className={cx('grid gap-1', className)}>

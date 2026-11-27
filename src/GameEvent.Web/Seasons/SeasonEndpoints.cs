@@ -731,27 +731,9 @@ public static class SeasonEndpoints
         var seasonRecord = await db.Seasons.AsNoTracking().SingleAsync(s => s.Id == seasonId, ct);
         var rules = JsonSerializer.Deserialize<Ruleset>(seasonRecord.RulesetJson, EngineJson.Options)!;
         var interactionFeatures = InteractionFeatures(rules);
-        var completedRuns = await db.Runs.AsNoTracking()
-            .Where(r => r.SeasonId == seasonId && r.Status == RunStatus.Completed)
-            .GroupBy(r => r.PlayerId)
-            .Select(g => new { g.Key, Count = g.Count() })
-            .ToDictionaryAsync(x => x.Key, x => x.Count, ct);
-        // A split coop run still completed is the partner's completed run too, for the tiebreaker as the engine counts it (D-716)
-        foreach (var partnered in await CoopPartnerRuns.LoadAsync(db, [seasonId], null, ct))
-        {
-            if (partnered.Status == RunStatus.Completed)
-            {
-                completedRuns[partnered.PartnerId] = completedRuns.GetValueOrDefault(partnered.PartnerId) + 1;
-            }
-        }
-        var result = await db.SeasonResults.AsNoTracking().Where(x => x.SeasonId == seasonId).OrderBy(x => x.Row).ToListAsync(ct);
-        var leaderboard = result.Count > 0
-            ? [.. result.Select(x => new LeaderboardRow(x.PlayerId, x.Place, x.Points, x.CellsToFinish, x.IsFirst, x.Provisional))]
-            : Leaderboard.Rank(
-            players.Select(p => new RankingEntry(
-                p.Id, p.Points, p.CellId, p.FinishOrder, p.Frozen, completedRuns.GetValueOrDefault(p.Id), p.PointsTick)),
-            rules.Ranking,
-            map);
+        var leaderboard = await SeasonLeaderboard.ReadAsync(
+            db, seasonId, rules.Ranking, map,
+            players.Select(p => new RankingEntry(p.Id, p.Points, p.CellId, p.FinishOrder, p.Frozen, 0, p.PointsTick)), ct);
 
         MyTurnView? me = null;
         if (players.SingleOrDefault(p => p.UserId == userId) is { } mine)

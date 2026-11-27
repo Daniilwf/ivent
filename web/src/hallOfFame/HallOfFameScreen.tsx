@@ -6,6 +6,7 @@ import { paths, usePageHeading, useRestoredScroll } from '../app/router';
 import { answerOf, useLoaded } from '../app/useLoaded';
 import { userToken } from '../design/players';
 import { ru } from '../i18n/ru';
+import { PageHeader } from '../ui/PageHeader';
 import { AsyncState } from '../ui/AsyncState';
 import { standaloneLink } from '../ui/buttonStyles';
 import { cx } from '../ui/cx';
@@ -50,13 +51,9 @@ export function HallOfFameScreen({ onSignedOut }: { onSignedOut: () => void }) {
   return (
     <main className="mx-auto grid max-w-280 gap-4 px-4 pt-4 pb-10 desk:gap-6 desk:px-8 desk:pt-8">
       <header className="grid justify-items-start gap-2">
-        <h1
-          ref={heading}
-          tabIndex={-1}
-          className="font-display text-2xl font-heavy outline-none desk:text-3xl"
-        >
+        <PageHeader ref={heading} tabIndex={-1} className="outline-none">
           {ru.nav.hallOfFame}
-        </h1>
+        </PageHeader>
         {recordTarget ? (
           <a
             href={`#${recordTarget}`}

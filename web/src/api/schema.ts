@@ -14974,6 +14974,13 @@ export interface components {
             totalHours: number;
             bestRoll: null | components["schemas"]["SeasonRollView"];
             worstRoll: null | components["schemas"]["SeasonRollView"];
+            /** Format: int32 */
+            place: null | number;
+            /** Format: int32 */
+            points: null | number;
+            /** Format: int32 */
+            playerToken: null | number;
+            provisional: boolean;
         };
         /**
          * @description Season lifecycle (GLOSSARY «Статус сезона»): draft → active → closing → finished → archived.

@@ -1,6 +1,7 @@
 import { useState, type ReactNode, type SyntheticEvent } from 'react';
 import { api, refreshCsrf, type Schemas } from '../api/client';
 import { ru } from '../i18n/ru';
+import { PageHeader } from '../ui/PageHeader';
 import { Button } from '../ui/Button';
 import { Field } from '../ui/Field';
 import { Notice } from '../ui/States';
@@ -72,9 +73,7 @@ export function LoginForm({ onSignedIn }: { onSignedIn: (user: Schemas['CurrentU
         className="grid gap-4 rounded-lg border-3 border-ink bg-card p-5 shadow-lift"
       >
         <div className="grid gap-1">
-          <h1 id="login-title" className="font-display text-2xl font-heavy">
-            {ru.login.title}
-          </h1>
+          <PageHeader id="login-title">{ru.login.title}</PageHeader>
           <p className="text-ink-soft">{ru.shell.loginLead}</p>
         </div>
         <Field

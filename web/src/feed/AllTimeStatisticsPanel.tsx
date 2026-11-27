@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { api, type Schemas } from '../api/client';
 import { answerOf, useLoaded } from '../app/useLoaded';
 import { useSeasonVersion } from '../app/useSeasonVersion';
@@ -117,7 +118,7 @@ function StatisticsValues({ stats }: { stats: Schemas['AllTimeStatisticsView'] }
   );
 }
 
-type Metric = { label: string; value: string; detail?: string };
+type Metric = { label: string; value: string; detail?: ReactNode };
 
 function Metrics({ items }: { items: Metric[] }) {
   return (
@@ -139,14 +140,19 @@ function rating(label: string, value: number | null): Metric[] {
 
 function roll(label: string, value: Schemas['SeasonRollView'] | null): Metric[] {
   if (!value) return [];
+  const { label: rangeLabel, range } = recap.rollRange(
+    count.format(value.sum),
+    count.format(value.minimum),
+    count.format(value.maximum),
+  );
   return [
     {
       label,
       value: percent.format(value.luck),
-      detail: recap.rollRange(
-        count.format(value.sum),
-        count.format(value.minimum),
-        count.format(value.maximum),
+      detail: (
+        <>
+          {rangeLabel} <span className="whitespace-nowrap">{range}</span>
+        </>
       ),
     },
   ];

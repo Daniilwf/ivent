@@ -60,6 +60,12 @@ const runs = (n: number) => {
   return `${n} ${word}`;
 };
 
+const unreviewedRuns = (count: number) =>
+  count === 1
+    ? 'Одно прохождение ещё не проверено.'
+    : `${runs(count)} ещё ${plural(count, 'не проверено', 'не проверены', 'не проверены')}.`;
+const moreRuns = (count: number) => (count === 1 ? 'ещё одно' : `ещё ${runs(count)}`);
+
 const effectSources = {
   paidReroll: '(за реролл)',
   drop: '(за дроп)',
@@ -539,7 +545,7 @@ export const ru = {
   playerSuggestions,
   playerPreview,
   turn: {
-    interactions: 'Напарники и дуэли',
+    interactions: stage5Interactions.title,
     race: (opponent: string, deadline: string) => `Дуэль с игроком ${opponent} до ${deadline}`,
     coopPartnerWaiting: 'Ты в коопе. Завершение прохождения отмечает роллер.',
     after: 'После прохождения',
@@ -552,9 +558,9 @@ export const ru = {
     // The roll is closed by the check limit: the main action is the proof of the oldest run that has none
     sendProof: 'Дослать пруф',
     uncheckedWaiting: (count: number, limit: number) =>
-      `На проверке ${count} из ${limit}: на ${limit}-м новый ролл закроется до проверки`,
+      `${unreviewedRuns(count)} Если завершишь ${moreRuns(limit - count)} до проверки, новый ролл закроется.`,
     uncheckedBlocked: (count: number, limit: number) =>
-      `Проверки ждут уже ${runs(count)}: новый ролл откроется, когда их станет меньше ${limit}. Пока можно дослать пруфы.`,
+      `${unreviewedRuns(count)} Новый ролл откроется, когда админ проверит ${moreRuns(count - limit + 1)}.`,
     retrying: 'Пробуем ещё раз…',
     title: 'Твой ход',
     spectatorTitle: 'Ты зритель',
@@ -1499,6 +1505,8 @@ export const ru = {
     choice: {
       prompt: 'Что выбираешь?',
       answer: 'Ответить',
+      chooseAnswer: 'Выбери вариант, чтобы ответить.',
+      unavailable: 'Ответ пока недоступен.',
       empty: 'Сейчас нет доступных вариантов. Обратись к админу.',
       paused: 'Ивенты временно выключены. Ответить можно будет после включения.',
       closed: 'Сезон завершён. На этот вопрос уже нельзя ответить.',
@@ -1523,7 +1531,7 @@ export const ru = {
   irlProof: {
     tasks: 'IRL-ивенты',
     title: 'IRL-ивент',
-    lead: 'Выполни задание и отправь фото или ссылку на видео. Задание не блокирует твой ход.',
+    lead: 'Выполни задание. Оно не блокирует твой ход.',
     link: 'Ссылка на видео',
     linkHint: 'Одна HTTPS-ссылка без логина и пароля.',
     linkInvalid: 'Укажи одну HTTPS-ссылку без логина, пароля и пробелов.',
@@ -1813,6 +1821,11 @@ export const ru = {
     profileLink: (season: string) => `Твой сезон, ${season}`,
     completed: 'Завершено игр',
     hours: 'Часы',
+    hoursUnit: (hours: number) =>
+      Number.isInteger(hours) ? plural(hours, 'час', 'часа', 'часов') : 'часа',
+    place: (n: number, provisional: boolean) =>
+      `${n.toLocaleString('ru-RU')}-е место${provisional ? ' (предварительно)' : ''}`,
+    points: (n: number) => `${n.toLocaleString('ru-RU')} ${plural(n, 'очко', 'очка', 'очков')}`,
     ratings: 'Оценки',
     bestRating: 'Лучшая',
     worstRating: 'Худшая',
@@ -1825,8 +1838,11 @@ export const ru = {
     bestRoll: 'Самый удачный',
     worstRoll: 'Самый неудачный',
     noRolls: 'Нет бросков для сравнения',
-    rollRange: (sum: string, minimum: string, maximum: string) =>
-      `Сумма ${sum}, диапазон ${minimum}–${maximum}`,
+    rollOutcome: (sum: string, maximum: string) => `Выпало ${sum} из ${maximum} возможных`,
+    rollRange: (sum: string, minimum: string, maximum: string) => ({
+      label: `Сумма ${sum}, диапазон`,
+      range: `${minimum}–${maximum}`,
+    }),
   },
   hallOfFame: {
     winners: 'Победители сезонов',
@@ -3614,8 +3630,7 @@ export const ru = {
           'Пять прохождений на «выше сложной» подряд, каждое сразу одобрено: у игрока пять хороших ивентов к розыгрышу. Нужно хотя бы пять свободных игр в пуле.',
         'irl-proof-pending':
           'В очередь проверки поступит тестовый пруф существующего IRL-ивента игрока. У ивента ещё нет пруфа или прошлый пруф отклонён.',
-        'coop-invitation':
-          'Игрок с начатой кооп-игрой пригласит свободного напарника. Ответить можно в разделе «Взаимодействия».',
+        'coop-invitation': `Игрок с начатой кооп-игрой пригласит свободного напарника. Ответить можно в разделе «${stage5Interactions.title}».`,
         'poll-and-global-goal':
           'В сезоне откроются голосование и общая цель на три прохождения. Включи ивенты, голосования и общие ивенты. Опубликуй «Попутный ветер» в контенте сезона.',
       } as Readonly<Record<string, string>>,
@@ -3738,10 +3753,12 @@ export const ru = {
     acceptedRefreshFailed: 'Голос принят. Не удалось обновить список.',
     refreshList: 'Обновить список',
     notFound: 'Такого сезона нет',
-    legend: 'Твой голос',
+    legend: 'Выбери вариант',
     options: 'Варианты ответа',
     vote: 'Голосовать',
     changeVote: 'Изменить голос',
+    chooseToVote: 'Выбери вариант, чтобы проголосовать.',
+    chooseToChangeVote: 'Выбери другой вариант, чтобы изменить голос.',
     voteFailed: 'Не удалось отправить голос. Попробуй ещё раз.',
     hiddenCounts: 'Счёт скрыт до закрытия',
     votingEnded: 'Приём голосов завершён.',
@@ -3758,6 +3775,7 @@ export const ru = {
     unavailable: 'Голосование сейчас недоступно.',
     eligibilityUnknown: 'Обнови страницу, чтобы проверить доступность голосования.',
     votes: (count: number) => `${count} ${plural(count, 'голос', 'голоса', 'голосов')}`,
+    voteShare: (share: number) => share.toLocaleString('ru-RU', { style: 'percent' }),
     noResult: 'Итог не выбран',
     resultUnavailable: 'Итог недоступен. Обнови страницу.',
     nominationMaterials: 'Материалы голосования',

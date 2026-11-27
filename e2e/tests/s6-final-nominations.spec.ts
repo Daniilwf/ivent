@@ -160,7 +160,7 @@ test('an admin opens a final ballot and an archived winner stays recorded after 
       expect(await premature.json()).toMatchObject({ code: 'season.nominationPollsOpen' });
 
       await expect(card).toBeVisible(live);
-      const choices = card.getByRole('group', { name: 'Твой голос' });
+      const choices = card.getByRole('group', { name: 'Выбери вариант' });
       await choices.getByText(captions[0], { exact: true }).click();
       await expect(choices.getByRole('radio', { name: captions[0] })).toBeChecked();
       await card.getByRole('button', { name: 'Голосовать', exact: true }).click();

@@ -5,6 +5,7 @@ import { useEntryState, usePageHeading, useRestoredScroll } from '../app/router'
 import { answerOf, useLoaded, type Answer } from '../app/useLoaded';
 import { usePoolVersion, useSeasonVersion } from '../app/useSeasonVersion';
 import { ru } from '../i18n/ru';
+import { PageHeader } from '../ui/PageHeader';
 import { Button } from '../ui/Button';
 import { FormDialog } from '../ui/Dialogs';
 import { Checkbox, ChoiceGroup, Field, Select } from '../ui/Field';
@@ -191,13 +192,9 @@ export function PoolScreen({
     <main className="mx-auto grid max-w-300 gap-4 px-4 pt-4 pb-10 desk:grid-cols-[auto_minmax(0,1fr)] desk:items-start desk:gap-x-8 desk:gap-y-6 desk:px-8 desk:pt-6">
       <header className="grid gap-3 desk:col-span-2 desk:flex desk:items-end desk:justify-between">
         <div className="grid gap-1">
-          <h1
-            ref={heading}
-            tabIndex={-1}
-            className="font-display text-2xl font-heavy outline-none desk:text-3xl"
-          >
+          <PageHeader ref={heading} tabIndex={-1} className="outline-none">
             {t.title}
-          </h1>
+          </PageHeader>
           {loaded.kind === 'ready' ? (
             <p className="text-ink-soft tabular-nums" aria-live="polite" data-testid="pool-count">
               {t.found(shown.length, games.length)}

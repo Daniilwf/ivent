@@ -1,10 +1,13 @@
-import { Handshake } from 'lucide-react';
+import { Handshake, Inbox, Swords } from 'lucide-react';
 import { useId, useState, type ReactNode } from 'react';
 import type { Schemas } from '../api/client';
+import { Link } from '../app/Link';
+import { paths } from '../app/router';
 import { moscowTime } from '../app/time';
 import { useIsPast } from '../app/useIsPast';
 import { ru } from '../i18n/ru';
 import { Button } from '../ui/Button';
+import { buttonClass } from '../ui/buttonStyles';
 import { Summary } from '../ui/Disclosure';
 import { Select } from '../ui/Field';
 import { EmptyState } from '../ui/States';
@@ -87,6 +90,7 @@ function PlayerChoice({
   kind: 'invite' | 'challenge';
   controls: Controls;
 }) {
+  const reasonId = useId();
   const [selected, setSelected] = useState('');
   const playerId = players.some(({ id }) => id === selected) ? selected : '';
   const action = { kind, playerId };
@@ -119,9 +123,15 @@ function PlayerChoice({
         type="submit"
         disabled={!playerId || (controls.disabled && !loading)}
         loading={loading}
+        aria-describedby={!playerId ? reasonId : undefined}
       >
         {kind === 'invite' ? t.invite : t.challenge}
       </Button>
+      {!playerId ? (
+        <p id={reasonId} className="text-sm text-ink-soft desk:col-span-2">
+          {kind === 'invite' ? t.choosePartner : t.chooseOpponent}
+        </p>
+      ) : null}
     </form>
   );
 }
@@ -250,6 +260,14 @@ export function InteractionsContent({
   const settledDuels = duels.filter(({ status }) => status !== 'active');
   const ownCoopGame =
     canStartInteraction && me?.activeRun?.game.isCoop === true && !coop && !me.isCoopPartner;
+  const publishRequest =
+    features.partnerBoard && ownCoopGame && !ownRequest ? (
+      <ActionButton action={{ kind: 'publish' }} controls={controls}>
+        {t.publish}
+      </ActionButton>
+    ) : null;
+  const showBoardInstructions =
+    !publishRequest && canStartInteraction && meId && !coop && !me.isCoopPartner;
   const activeRunId = me?.activeRun?.id;
   const mayInvite =
     ownCoopGame &&
@@ -285,7 +303,7 @@ export function InteractionsContent({
               controls={controls}
             />
           ) : (
-            <p className="text-ink-soft">{t.emptyInvitations}</p>
+            <EmptyState title={t.emptyInvitations} icon={<Inbox size={28} aria-hidden />} />
           )}
           {invitationHistory.length ? (
             <details className={detailsClass}>
@@ -343,12 +361,8 @@ export function InteractionsContent({
                 </div>
               ) : null}
             </div>
-          ) : features.partnerBoard && ownCoopGame ? (
-            <div>
-              <ActionButton action={{ kind: 'publish' }} controls={controls}>
-                {t.publish}
-              </ActionButton>
-            </div>
+          ) : boardRequests.length && publishRequest ? (
+            <div>{publishRequest}</div>
           ) : null}
           {features.partnerBoard && boardRequests.length ? (
             <ul className="grid min-w-0 gap-2">
@@ -383,7 +397,20 @@ export function InteractionsContent({
               })}
             </ul>
           ) : features.partnerBoard && !ownRequest ? (
-            <p className="text-ink-soft">{t.boardEmpty}</p>
+            <EmptyState
+              title={t.boardEmpty}
+              icon={<Handshake size={28} aria-hidden />}
+              {...(showBoardInstructions
+                ? {
+                    text: t.boardStart,
+                    action: (
+                      <Link to={paths.season(season.id)} className={buttonClass()}>
+                        {t.boardSeason}
+                      </Link>
+                    ),
+                  }
+                : { action: publishRequest })}
+            />
           ) : null}
         </Panel>
       ) : null}
@@ -395,7 +422,7 @@ export function InteractionsContent({
           {activeDuels.length ? (
             <DuelList items={activeDuels} name={name} />
           ) : (
-            <p className="text-ink-soft">{t.noDuels}</p>
+            <EmptyState title={t.noDuels} icon={<Swords size={28} aria-hidden />} />
           )}
           {settledDuels.length ? (
             <details className={detailsClass}>

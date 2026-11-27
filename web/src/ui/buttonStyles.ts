@@ -3,7 +3,7 @@ import { cx } from './cx';
 export type ButtonVariant = 'main' | 'quiet' | 'danger' | 'dangerMain' | 'link' | 'dangerLink';
 
 export const base = cx(
-  'inline-flex cursor-pointer items-center justify-center gap-2 font-bold whitespace-nowrap transition duration-(--duration-fast) ease-out select-none is-focus:focus-ring disabled:cursor-default disabled:not-aria-busy:opacity-50 disabled:not-aria-busy:disabled-look aria-busy:cursor-progress',
+  'inline-flex cursor-pointer items-center justify-center gap-2 font-bold whitespace-nowrap transition duration-(--duration-fast) ease-out select-none is-focus:focus-ring disabled:cursor-default disabled:not-aria-busy:disabled-look aria-busy:cursor-progress',
 );
 
 export const variants: Record<ButtonVariant, string> = {

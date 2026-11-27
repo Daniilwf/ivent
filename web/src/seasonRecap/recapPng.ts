@@ -1,3 +1,4 @@
+import { playerToken } from '../design/players';
 import { ru } from '../i18n/ru';
 import type { RecapCard, RecapMetric } from './recapCard';
 
@@ -31,6 +32,9 @@ export async function downloadRecap(card: RecapCard) {
   const glyphs = [
     card.player,
     card.season,
+    card.standing?.place,
+    card.standing?.points,
+    ru.app.title,
     t.ratings,
     t.attacks,
     t.noRatings,
@@ -47,12 +51,13 @@ export async function downloadRecap(card: RecapCard) {
   const inner = width - 2 * padding;
   const seasonLines = linesOf(ctx, card.season, font.body, inner);
   const nameLines = linesOf(ctx, card.player, font.name, inner);
-  const heroTop = padding + (seasonLines.length * 5 + nameLines.length * 8 + 5) * space;
+  const nameTop = padding + (seasonLines.length * 5 + 1) * space;
+  const standingTop = nameTop + nameLines.length * 8 * space;
+  const heroTop = standingTop + (card.standing ? 10 : 4) * space;
   const headline = [card.completed, card.hours];
   const heroWidth = inner - 10 * space;
-  ctx.font = font.hero;
   const sideBySide = headline.every(
-    ({ value }) => ctx.measureText(value).width <= heroWidth / 2 - space,
+    ({ value, unit }) => measure(value, font.hero) + unitRoom(unit) <= heroWidth / 2 - space,
   );
   const heroColumn = sideBySide ? heroWidth / 2 : heroWidth;
   const heroRow = 22 * space;
@@ -61,7 +66,8 @@ export async function downloadRecap(card: RecapCard) {
   const rollsTop = groupTop + 25 * space;
   const bottom =
     card.rolls === null ? groupTop + 20 * space : rollsTop + (card.rolls.length ? 24 : 14) * space;
-  const height = bottom + padding;
+  const footerTop = bottom + 3 * space;
+  const height = footerTop + 5 * space + padding;
   canvas.width = width * ratio;
   canvas.height = height * ratio;
   ctx.scale(ratio, ratio);
@@ -86,6 +92,38 @@ export async function downloadRecap(card: RecapCard) {
     ctx.fillText(label, x, y, maxWidth);
   }
 
+  function measure(label: string, face: string) {
+    ctx.font = face;
+    return ctx.measureText(label).width;
+  }
+
+  function unitRoom(unit: string | undefined) {
+    return unit ? space + measure(unit, font.body) : 0;
+  }
+
+  function metricValue(
+    { value, unit }: RecapMetric,
+    featured: boolean,
+    x: number,
+    y: number,
+    cap: number,
+  ) {
+    const face = featured ? font.hero : font.number;
+    const reserved = unitRoom(unit);
+    const valueWidth = Math.min(measure(value, face), cap - reserved);
+    text(value, face, featured ? white : ink, x, y, valueWidth);
+    if (unit) {
+      text(
+        unit,
+        font.body,
+        featured ? white : soft,
+        x + valueWidth + space,
+        y + (featured ? 3 : 1) * space,
+        reserved,
+      );
+    }
+  }
+
   ctx.fillStyle = token('--color-card');
   ctx.strokeStyle = ink;
   ctx.lineWidth = 2;
@@ -97,21 +135,34 @@ export async function downloadRecap(card: RecapCard) {
   seasonLines.forEach((line, index) => {
     text(line, font.body, soft, padding, padding + index * 5 * space);
   });
-  const nameTop = padding + (seasonLines.length * 5 + 1) * space;
   nameLines.forEach((line, index) => {
     text(line, font.name, ink, padding, nameTop + index * 8 * space);
   });
+  if (card.standing) {
+    let x = padding;
+    if (card.playerToken !== null) {
+      const fill = playerToken(card.playerToken).fill;
+      ctx.fillStyle = token(fill.slice(4, -1));
+      ctx.beginPath();
+      ctx.roundRect(x, standingTop + 2 * space, 8 * space, space, space / 2);
+      ctx.fill();
+      x += 10 * space;
+    }
+    text(card.standing.place, font.label, ink, x, standingTop);
+    x += measure(card.standing.place, font.label) + 2 * space;
+    text(card.standing.points, font.label, soft, x, standingTop);
+  }
 
   ctx.fillStyle = token('--color-me');
   ctx.beginPath();
   ctx.roundRect(padding, heroTop, inner, heroHeight, innerRadius);
   ctx.fill();
   const heroX = padding + 5 * space;
-  headline.forEach(({ value, label }, index) => {
+  headline.forEach((metric, index) => {
     const x = heroX + (sideBySide ? index * heroColumn : 0);
     const y = heroTop + (sideBySide ? 0 : index * heroRow);
-    text(value, font.hero, white, x, y + 4 * space, heroColumn - space);
-    text(label, font.label, white, x, y + 17 * space, heroColumn - space);
+    text(metric.label, font.label, white, x, y + 4 * space, heroColumn - space);
+    metricValue(metric, true, x, y + 10 * space, heroColumn - space);
   });
 
   const groupWidth = inner / 2 - 4 * space;
@@ -131,20 +182,18 @@ export async function downloadRecap(card: RecapCard) {
     if (card.rolls.length) drawPair(card.rolls, padding, inner, rollsTop);
     else text(t.noRolls, font.body, soft, padding, rollsTop + 7 * space);
   }
+  ctx.fillStyle = token('--color-muted');
+  ctx.fillRect(padding, footerTop - 2 * space, inner, 1);
+  text(ru.app.title, font.body, soft, padding, footerTop);
 
   function drawPair(metrics: RecapMetric[], start: number, width = groupWidth, top = groupTop) {
     const columnWidth = width / 2;
-    metrics.forEach(({ label, value, unit, detail }, index) => {
+    metrics.forEach((metric, index) => {
       const x = start + index * columnWidth;
       const cap = columnWidth - space;
-      const valueTop = top + 7 * space;
-      text(value, font.number, ink, x, valueTop, cap);
-      if (unit) {
-        const unitX = x + ctx.measureText(value).width + space;
-        text(unit, font.body, soft, unitX, valueTop + space, x + cap - unitX);
-      }
-      text(label, font.body, soft, x, top + 13 * space, cap);
-      if (detail) text(detail, font.body, soft, x, top + 17 * space, cap);
+      text(metric.label, font.body, soft, x, top + 6 * space, cap);
+      metricValue(metric, false, x, top + 11 * space, cap);
+      if (metric.detail) text(metric.detail, font.body, soft, x, top + 18 * space, cap);
     });
   }
 

@@ -45,6 +45,7 @@ import { Button } from '../ui/Button';
 import { standaloneLink } from '../ui/buttonStyles';
 import { BottomSheet, FormDialog } from '../ui/Dialogs';
 import { Chip } from '../ui/Marks';
+import { PageHeader } from '../ui/PageHeader';
 import { Skeleton } from '../ui/Progress';
 import { ErrorState, Notice } from '../ui/States';
 import { Sticker } from '../ui/Sticker';
@@ -1248,13 +1249,9 @@ export function SeasonScreen({
         className="grid min-w-0 content-start gap-4 desk:min-h-0 desk:overflow-y-auto desk:overscroll-contain desk:px-1"
       >
         <header className="grid min-w-0 gap-2">
-          <h1
-            ref={heading}
-            tabIndex={-1}
-            className="font-display text-xl font-heavy text-balance outline-none"
-          >
+          <PageHeader ref={heading} tabIndex={-1} className="text-balance outline-none">
             {season.name}
-          </h1>
+          </PageHeader>
           <div className="flex flex-wrap gap-2">
             {season.deadline ? (
               <span data-testid="season-deadline">

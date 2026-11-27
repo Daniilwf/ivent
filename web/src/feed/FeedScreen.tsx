@@ -4,6 +4,7 @@ import type { Schemas } from '../api/client';
 import { navigate, paths, useEntryState, usePageHeading, useRestoredScroll } from '../app/router';
 import { useSeasonVersion } from '../app/useSeasonVersion';
 import { ru } from '../i18n/ru';
+import { PageHeader } from '../ui/PageHeader';
 import { Button } from '../ui/Button';
 import { EmptyState, ErrorState, Notice } from '../ui/States';
 import { Panel } from '../ui/Surface';
@@ -478,9 +479,9 @@ export function FeedScreen({
 
   return (
     <main className="mx-auto grid max-w-180 content-start gap-4 px-4 pt-4 pb-10 desk:px-8 desk:pt-8">
-      <h1 ref={heading} tabIndex={-1} className="font-display text-xl font-heavy outline-none">
+      <PageHeader ref={heading} tabIndex={-1} className="outline-none">
         {ru.feed.title}
-      </h1>
+      </PageHeader>
       <p className="sr-only" aria-live="polite" data-testid="feed-announce">
         {announced}
       </p>

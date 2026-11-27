@@ -2,6 +2,7 @@ import { CircleAlert, CircleCheck, Info, TriangleAlert, WifiOff } from 'lucide-r
 import type { ReactNode } from 'react';
 import { ru } from '../i18n/ru';
 import { Button } from './Button';
+import { PageHeader } from './PageHeader';
 import { cx } from './cx';
 
 export type Tone = 'success' | 'info' | 'warning' | 'danger';
@@ -21,6 +22,12 @@ const tones: Record<Tone, { box: string; icon: ReactNode }> = {
     icon: <CircleAlert size={20} aria-hidden />,
   },
 };
+
+function StateHeading({ title, level }: { title: string; level: 1 | 2 | 3 }) {
+  if (level === 1) return <PageHeader className="text-balance">{title}</PageHeader>;
+  const Heading = `h${level}` as const;
+  return <Heading className="font-display text-lg font-heavy text-balance">{title}</Heading>;
+}
 
 /** A line of news about what just happened: colour, an icon and words together, never colour alone */
 export function Notice({ tone, children }: { tone: Tone; children: ReactNode }) {
@@ -53,13 +60,12 @@ export function EmptyState({
   /** The heading's level: 1 when the state is the whole page */
   level?: 1 | 2 | 3;
 }) {
-  const Heading = `h${level}` as const;
   return (
     <div className="grid justify-items-center gap-3 rounded-lg bg-card p-6 text-center">
       <span className="grid size-14 place-items-center rounded-full bg-muted text-ink-soft">
         {icon}
       </span>
-      <Heading className="font-display text-lg font-heavy text-balance">{title}</Heading>
+      <StateHeading title={title} level={level} />
       {text ? <p className="max-w-prose text-ink-soft">{text}</p> : null}
       {action}
     </div>
@@ -78,7 +84,6 @@ export function ErrorState({
   onRetry?: () => void;
   level?: 1 | 2 | 3;
 }) {
-  const Heading = `h${level}` as const;
   return (
     <div
       role="alert"
@@ -87,7 +92,7 @@ export function ErrorState({
       <span className="grid size-14 place-items-center rounded-full bg-danger-soft text-danger">
         <CircleAlert size={28} aria-hidden />
       </span>
-      <Heading className="font-display text-lg font-heavy text-balance">{title}</Heading>
+      <StateHeading title={title} level={level} />
       <p className="max-w-prose text-ink-soft">{text}</p>
       {onRetry ? <Button onClick={onRetry}>{ru.ui.retry}</Button> : null}
     </div>

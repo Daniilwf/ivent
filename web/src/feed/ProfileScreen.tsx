@@ -7,6 +7,7 @@ import { moscowDay } from '../app/time';
 import { userToken } from '../design/players';
 import { NotFound } from '../app/NotFound';
 import { ru } from '../i18n/ru';
+import { PageHeader } from '../ui/PageHeader';
 import { cx } from '../ui/cx';
 import { standaloneLink } from '../ui/buttonStyles';
 import { AsyncState } from '../ui/AsyncState';
@@ -139,14 +140,14 @@ export function ProfileDetails({
           size={80}
         />
         <div className="grid min-w-0 justify-items-start gap-2">
-          <h1
+          <PageHeader
             ref={headingRef}
             tabIndex={-1}
-            className="flex flex-wrap items-center gap-2 font-display text-xl font-heavy wrap-anywhere outline-none"
+            className="flex flex-wrap items-center gap-2 wrap-anywhere outline-none"
           >
             {profile.name}
             {mine ? <Badge tone="me">{ru.board.you}</Badge> : null}
-          </h1>
+          </PageHeader>
           {!recap || profile.seasons.length === 0 ? (
             <span data-testid="profile-completed">
               <Chip icon={<Trophy size={16} aria-hidden />}>

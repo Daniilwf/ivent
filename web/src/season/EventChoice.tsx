@@ -35,13 +35,20 @@ function AnswerForm({
   onChoose,
 }: EventChoiceProps) {
   const headingId = useId();
+  const reasonId = useId();
   const [picked, setPicked] = useState('');
   const selected = choice.options.some((option) => option.id === picked) ? picked : '';
   const blocked = busy || disabled;
   const t = ru.events.choice;
+  const blockedReason = unavailableReason ?? (disabled && !busy ? t.unavailable : null);
+  const needsChoice = !blockedReason && !blocked && !selected && choice.options.length > 0;
   const form = (
     <div className="grid min-w-0 gap-3">
-      {unavailableReason ? <p className="text-sm text-ink-soft">{unavailableReason}</p> : null}
+      {blockedReason ? (
+        <p id={reasonId} className="text-sm text-ink-soft">
+          {blockedReason}
+        </p>
+      ) : null}
       <ChoiceGroup
         label={choice.prompt ?? t.prompt}
         options={choice.options.map((option) => ({
@@ -61,6 +68,7 @@ function AnswerForm({
           variant={disabled ? 'quiet' : 'main'}
           loading={busy}
           disabled={blocked || !selected}
+          aria-describedby={blockedReason || needsChoice ? reasonId : undefined}
           onClick={() => {
             if (!blocked && selected) onChoose(selected);
           }}
@@ -68,6 +76,11 @@ function AnswerForm({
           {t.answer}
         </Button>
       )}
+      {needsChoice ? (
+        <p id={reasonId} className="text-sm text-ink-soft">
+          {t.chooseAnswer}
+        </p>
+      ) : null}
     </div>
   );
   return (
