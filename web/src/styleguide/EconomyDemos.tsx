@@ -31,6 +31,7 @@ export function ShopDemos() {
           <ShopPanel
             state={shopOf(
               shopFixture({
+                refusal: 'roll.notEnoughCoins',
                 lots: shop.lots.map((entry) => ({
                   ...entry,
                   sold: false,
