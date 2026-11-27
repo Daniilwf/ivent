@@ -15,6 +15,7 @@ using GameEvent.Web.Economy;
 using GameEvent.Web.Files;
 using GameEvent.Web.Map;
 using GameEvent.Web.Observability;
+using GameEvent.Web.PlayerPreview;
 using GameEvent.Web.Pool;
 using GameEvent.Web.Proofs;
 using GameEvent.Web.Realtime;
@@ -291,11 +292,13 @@ public static class AppSetup
         // Explicit routing after the static files: otherwise the SPA fallback endpoint is chosen first
         // and the static file middleware skips requests for /assets/*.js.
         app.UseRouting();
+        app.UsePlayerPreviewPrivacyHeaders();
         app.UseExceptionHandler();
         app.UseStatusCodePages();
         app.UseAuthentication();
         app.Use((http, next) => WebSecurity.RequirePasswordChangeAsync(http, () => next(http)));
         app.UseAuthorization();
+        app.UsePlayerPreview();
         app.UseRateLimiter();
         app.UseMaintenance();
 
@@ -309,6 +312,7 @@ public static class AppSetup
         api.MapSessions();
         api.MapSeasons();
         api.MapSeasonStatistics();
+        api.MapPlayerPreview();
         api.MapNominationResults();
         api.MapHallOfFame();
         api.MapHallOfFameRecords();
