@@ -41,6 +41,8 @@ ENV ASPNETCORE_URLS=http://+:8080
 ENV Frontend__DistPath=/app/frontend
 ENV ConnectionStrings__Main="Data Source=/data/game-event.db"
 ENV Files__Path=/data/files
+# Multipart spool files belong on the private data volume so they can be reclaimed as file cache (D-945).
+ENV ASPNETCORE_TEMP=/data
 ENV Logging__File__Path=/data/logs/game-event-.log
 ENV DataProtection__KeysPath=/data/keys
 ENV Site__LockFile=/data/site.lock

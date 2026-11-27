@@ -6,11 +6,13 @@ namespace GameEvent.Infrastructure.Files;
 /// <summary>Upload limits (D-108), from the <c>Files</c> section of the configuration.</summary>
 public sealed record FileLimits
 {
-    /// <summary>The largest upload of any kind.</summary>
-    public long MaxUploadBytes { get; init; } = 15L * 1024 * 1024;
+    /// <summary>The largest upload of any kind: room for the largest GIF (D-945).</summary>
+    public long MaxUploadBytes { get; init; } = 25L * 1024 * 1024;
 
-    /// <summary>The largest GIF: kept as it is, so its own size counts (SPEC «Файлы»).</summary>
-    public long MaxGifBytes { get; init; } = 8L * 1024 * 1024;
+    /// <summary>
+    /// The largest GIF, which is stored byte for byte. The decoded size and frame count have their own limits (D-945).
+    /// </summary>
+    public long MaxGifBytes { get; init; } = 20L * 1024 * 1024;
 
     /// <summary>A still image's longer side after re-encoding.</summary>
     public int MaxLongSide { get; init; } = 2560;

@@ -4,8 +4,14 @@ using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using GameEvent.Web.Tests.Api;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using NetVips;
 
 namespace GameEvent.Web.Tests.Files;
@@ -349,6 +355,116 @@ public sealed class FileUploadTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal("csrf.invalid", await CodeAsync(response));
         Assert.Empty(StoredFiles());
+    }
+
+    [Fact]
+    public async Task A_multipart_token_does_not_replace_the_antiforgery_header()
+    {
+        using var vasya = await _site.SignedInAsync("vasya");
+        var token = vasya.DefaultRequestHeaders.GetValues("X-CSRF-TOKEN").Single();
+        vasya.DefaultRequestHeaders.Remove("X-CSRF-TOKEN");
+        using var form = new MultipartFormDataContent();
+        form.Add(new StringContent(token), "__RequestVerificationToken");
+        form.Add(new StringContent(Guid.NewGuid().ToString()), "commandId");
+        form.Add(new ByteArrayContent(Png(10, 10)), "file", "a.png");
+
+        using var response = await vasya.PostAsync("/api/files", form, Ct);
+
+        await AssertRefusedAsync(response, HttpStatusCode.BadRequest, "csrf.invalid");
+        Assert.Empty(StoredFiles());
+    }
+
+    [Fact]
+    public async Task Another_multipart_upload_waits_before_reading_its_form()
+    {
+        var probe = new FormAdmissionProbe();
+        using var host = _site.WithWebHostBuilder(builder =>
+            builder.ConfigureTestServices(services => services.AddSingleton<IStartupFilter>(probe)));
+        using var vasya = await SignedInAsync(host, "vasya");
+        using var petya = await SignedInAsync(host, "petya");
+        vasya.DefaultRequestHeaders.Add(FormAdmissionProbe.Header, "first");
+        petya.DefaultRequestHeaders.Add(FormAdmissionProbe.Header, "second");
+
+        var first = UploadAsync(vasya, Png(10, 10), "first.png");
+        Task<HttpResponseMessage>? second = null;
+        Task observed;
+        try
+        {
+            await probe.FirstReading.Task.WaitAsync(Ct);
+            second = UploadAsync(petya, Png(10, 10), "second.png");
+            await probe.SecondArrived.Task.WaitAsync(Ct);
+            observed = await Task.WhenAny(probe.SecondReading.Task, second, Task.Delay(500, Ct));
+        }
+        finally
+        {
+            probe.ReleaseFirst.TrySetResult();
+        }
+
+        using var firstResponse = await first;
+        using var secondResponse = await second!;
+        await StoredAsync(firstResponse);
+        await StoredAsync(secondResponse);
+        Assert.NotSame(probe.SecondReading.Task, observed);
+        Assert.NotSame(second, observed);
+        Assert.True(probe.SecondReading.Task.IsCompletedSuccessfully);
+    }
+
+    private sealed class FormAdmissionProbe : IStartupFilter
+    {
+        public const string Header = "X-Test-Form-Admission";
+        public TaskCompletionSource FirstReading { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource ReleaseFirst { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource SecondArrived { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource SecondReading { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) => app =>
+        {
+            app.Use(async (context, following) =>
+            {
+                var marker = context.Request.Headers[Header].ToString();
+                if (context.Request.Path == "/api/files" && marker is "first" or "second")
+                {
+                    context.Features.Set<IFormFeature>(new ObservedForm(context.Request, this, marker == "first"));
+                    if (marker == "second")
+                    {
+                        SecondArrived.TrySetResult();
+                    }
+                }
+
+                await following(context);
+            });
+            next(app);
+        };
+
+        private sealed class ObservedForm(HttpRequest request, FormAdmissionProbe probe, bool first) : IFormFeature
+        {
+            private readonly FormFeature _form = new(request);
+
+            public bool HasFormContentType => _form.HasFormContentType;
+
+            public IFormCollection? Form
+            {
+                get => _form.Form;
+                set => _form.Form = value;
+            }
+
+            public IFormCollection ReadForm() => _form.ReadForm();
+
+            public async Task<IFormCollection> ReadFormAsync(CancellationToken cancellationToken)
+            {
+                if (first)
+                {
+                    probe.FirstReading.TrySetResult();
+                    await probe.ReleaseFirst.Task.WaitAsync(cancellationToken);
+                }
+                else
+                {
+                    probe.SecondReading.TrySetResult();
+                }
+
+                return await _form.ReadFormAsync(cancellationToken);
+            }
+        }
     }
 
     [Fact]
