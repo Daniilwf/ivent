@@ -1390,7 +1390,8 @@ export const ru = {
       `Монетки дают прохождения — ролл магазина стоит ${coins(price, 'accusative')}.`,
     // BUG-S7-12: the balance and the shortfall said in the shop, so a lot without «Купить» explains itself
     myCoins: (n: number) => `У тебя ${coins(n)}`,
-    short: (n: number) => `Не хватает монеток. Ещё ${coins(n)} — и можно купить.`,
+    short: (n: number, includeReason = true) =>
+      `${includeReason ? 'Не хватает монеток. ' : ''}До цены лота ещё ${coins(n)}.`,
     poorAll: (n: number) =>
       `Ни на один лот не хватает монеток: у тебя ${coins(n)}. Монетки дают прохождения.`,
     goneTitle: 'Лоты исчезли',

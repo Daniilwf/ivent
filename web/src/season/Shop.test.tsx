@@ -313,13 +313,13 @@ describe('the shop says why nothing can be bought (BUG-S7-12)', () => {
 
     await screen.findByTestId('shop-lots');
     expect(screen.getByTestId('lot-why-1')).toHaveTextContent(ru.shop.short(8));
-    expect(ru.shop.short(8)).toBe('Не хватает монеток. Ещё 8 монеток — и можно купить.');
+    expect(ru.shop.short(8)).toBe('Не хватает монеток. До цены лота ещё 8 монеток.');
   });
 
   it('says that no lot is affordable next to the lots, after the news of the roll', async () => {
-    const dear = shopFixture().lots.map((l) => ({
+    const dear = shopFixture().lots.map((l, index) => ({
       ...l,
-      price: 30,
+      price: 12 + 4 * index,
       sold: false,
       refusal: 'roll.notEnoughCoins',
     }));
@@ -335,6 +335,10 @@ describe('the shop says why nothing can be bought (BUG-S7-12)', () => {
       'Ни на один лот не хватает монеток: у тебя 3 монетки. Монетки дают прохождения.',
     );
     expect(screen.queryByTestId('buy-0')).not.toBeInTheDocument();
+    expect(screen.getAllByText(ru.shop.poorAll(3))).toHaveLength(1);
+    expect(screen.getByTestId('lot-why-0')).toHaveTextContent(/^До цены лота ещё 9 монеток\.$/);
+    expect(screen.getByTestId('lot-why-1')).toHaveTextContent(/^До цены лота ещё 13 монеток\.$/);
+    expect(screen.getByTestId('lot-why-2')).toHaveTextContent(/^До цены лота ещё 17 монеток\.$/);
     // Said where the buttons would be: right before the lots, not above the timer
     const lots = screen.getByTestId('shop-lots');
     const timer = screen.getByTestId('shop-timer');

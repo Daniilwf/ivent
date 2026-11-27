@@ -53,12 +53,13 @@ export function ShopPanel({
   const live = expiresAt !== null && now < expiresAt;
   const lots = live ? (shop?.lots ?? []) : [];
   const rolled = (shop?.lots.length ?? 0) > 0;
-  // A reason every lot still on sale shares (the inventory full, the coins) is said once, right before the lots (S4D-5)
+  // Say a shared reason once (S4D-5), and keep the price difference on each lot.
   const unsold = lots.filter((l) => !l.sold);
   const sharedWhy =
     unsold.length > 1 && unsold.every((l) => l.refusal !== null && l.refusal === unsold[0]?.refusal)
       ? (unsold[0]?.refusal ?? null)
       : null;
+  const allUnaffordable = sharedWhy === 'roll.notEnoughCoins' && myCoins !== null;
   // With no lots on screen a refused roll's cause is the empty state's text, not a «сделай ролл» above a closed roll
   const emptyWhy =
     lots.length === 0 && shop?.refusal
@@ -111,6 +112,11 @@ export function ShopPanel({
         />
       ) : shop ? (
         <>
+          {sharedWhy && !allUnaffordable ? (
+            <p className="text-sm text-ink-soft" data-testid="shop-why">
+              {refusalText(sharedWhy, ru.shop.refusals)}
+            </p>
+          ) : null}
           {done ? <Notice tone="success">{done}</Notice> : null}
           {expiresAt !== null && live ? (
             <p className="flex items-center gap-2 font-bold" data-testid="shop-timer">
@@ -118,12 +124,9 @@ export function ShopPanel({
               <span className="tabular-nums">{ru.shop.left(timeLeft(expiresAt, now))}</span>
             </p>
           ) : null}
-          {sharedWhy ? (
-            // Where the buttons would be (BUG-S7-12): the reason every lot shares, the balance with it when it is coins
+          {allUnaffordable ? (
             <p className="text-sm font-bold" data-testid="shop-why">
-              {sharedWhy === 'roll.notEnoughCoins' && myCoins !== null
-                ? ru.shop.poorAll(myCoins)
-                : refusalText(sharedWhy, ru.shop.refusals)}
+              {ru.shop.poorAll(myCoins)}
             </p>
           ) : null}
           {lots.length > 0 ? (
@@ -209,6 +212,10 @@ export function LotRow({
   force?: string;
 }) {
   const titleId = useId();
+  const shortfall =
+    lot.refusal === 'roll.notEnoughCoins' && coins !== null && coins < lot.price
+      ? lot.price - coins
+      : null;
   return (
     <li
       aria-labelledby={titleId}
@@ -245,13 +252,13 @@ export function LotRow({
           >
             {ru.shop.buyFor(lot.price)}
           </Button>
-        ) : !why ? null : (
+        ) : why || shortfall !== null ? (
           <span className="text-sm text-ink-soft" data-testid={`lot-why-${lot.lot}`}>
-            {lot.refusal === 'roll.notEnoughCoins' && coins !== null && coins < lot.price
-              ? ru.shop.short(lot.price - coins)
+            {shortfall !== null
+              ? ru.shop.short(shortfall, why)
               : refusalText(lot.refusal, ru.shop.refusals)}
           </span>
-        )}
+        ) : null}
       </div>
     </li>
   );

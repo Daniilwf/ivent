@@ -15,18 +15,35 @@ const shopOf = (shop: ReturnType<typeof shopFixture>, coins?: number) => ({
 /** The shop in each of its states and the lot's button in its states (4.11c); the clock stands still */
 export function ShopDemos() {
   const t = ru.styleguide.shop;
-  const lot = shopFixture().lots[0];
+  const shop = shopFixture();
+  const lot = shop.lots[0];
   return (
     <div className="grid gap-6">
       <div className="grid items-start gap-4 desk:grid-cols-2">
         <ShopPanel
-          state={shopOf(shopFixture())}
+          state={shopOf(shop)}
           onRetry={noop}
           onRoll={done}
           onBuy={done}
           now={fixtureNow}
         />
         <div className="grid content-start gap-4">
+          <ShopPanel
+            state={shopOf(
+              shopFixture({
+                lots: shop.lots.map((entry) => ({
+                  ...entry,
+                  sold: false,
+                  refusal: 'roll.notEnoughCoins',
+                })),
+              }),
+              3,
+            )}
+            onRetry={noop}
+            onRoll={done}
+            onBuy={done}
+            now={fixtureNow}
+          />
           <ShopPanel
             state={shopOf(
               shopFixture({
