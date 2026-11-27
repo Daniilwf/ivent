@@ -84,13 +84,16 @@ function keepConnected(
  * from that sequence, and the server lists what was missed. One catch-up runs at a time; whatever asks for another while
  * it runs gets one more after it. A failed join or catch-up is tried again after a pause. `onChange` runs once per new
  * update, after the first join, after every reconnection (names and avatars live outside the season log) and after a
- * catch-up that found anything. Returns an unsubscribe function.
+ * catch-up that found anything. `onInitialJoin` reports the first join's sequence for comparison with an HTTP snapshot.
+ * Returns an unsubscribe function.
  */
 export function watchSeason(
   seasonId: string,
   onChange: (updates: SeasonUpdate[]) => void,
+  onInitialJoin?: (sequence: number) => void,
 ): () => void {
   let stopped = false;
+  const isStopped = () => stopped;
   let last: number | null = null;
   const pending = { running: false, again: false, refresh: false };
   // Set by other callbacks while a catch-up awaits the server: read through a call, not narrowed away
@@ -123,9 +126,11 @@ export function watchSeason(
           last === null
             ? await connection.invoke<SeasonJoin>('Join', seasonId)
             : await connection.invoke<SeasonJoin>('Resume', seasonId, last);
+        if (isStopped()) break;
         const refreshNow = first || pending.refresh;
         pending.refresh = false;
         apply(join, refreshNow);
+        if (first && !stopped) onInitialJoin?.(join.lastSequence);
       } while (askedAgain() && !stopped);
     } catch {
       // Not joined or not caught up: try again after a pause, unless the connection is gone (its reconnect resumes)
@@ -156,11 +161,7 @@ export function watchSeason(
     onChange([update]);
   });
 
-  const release = keepConnected(
-    connection,
-    () => catchUp(true),
-    () => stopped,
-  );
+  const release = keepConnected(connection, () => catchUp(true), isStopped);
   return () => {
     stopped = true;
     release();

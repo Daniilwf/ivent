@@ -106,7 +106,11 @@ public sealed partial class CommandProcessor(
             // approval tries again, since the stop that lost its answer may have lost the game too (D-817)
             if (outcome.IsAccepted && pending.Envelope.SeasonId != Guid.Empty)
             {
-                await AddApprovedGamesAsync(pending.Envelope.SeasonId, outcome, ct);
+                var warnings = await AddApprovedGamesAsync(pending.Envelope.SeasonId, outcome, ct);
+                if (warnings.Count > 0)
+                {
+                    outcome = outcome with { Warnings = warnings };
+                }
             }
 
             pending.Completion.TrySetResult(outcome);

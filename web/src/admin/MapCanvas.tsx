@@ -256,6 +256,8 @@ export function MapCanvas({
         // One cell moves at a time: the draft takes the place of the node that was dropped
         multiSelectionKeyCode={null}
         selectionKeyCode={null}
+        // React Flow otherwise captures Space on window, including disclosures outside this editor.
+        panActivationKeyCode={null}
         onNodeDragStart={() => {
           setDragging(true);
         }}

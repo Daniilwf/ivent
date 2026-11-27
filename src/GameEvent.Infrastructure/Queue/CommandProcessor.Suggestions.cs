@@ -13,8 +13,9 @@ namespace GameEvent.Infrastructure.Queue;
 /// </summary>
 public sealed partial class CommandProcessor
 {
-    private async Task AddApprovedGamesAsync(Guid seasonId, CommandOutcome outcome, CancellationToken ct)
+    private async Task<IReadOnlyList<string>> AddApprovedGamesAsync(Guid seasonId, CommandOutcome outcome, CancellationToken ct)
     {
+        var warnings = new List<string>();
         foreach (var reviewed in outcome.Events.Select(e => e.Event).OfType<SuggestionReviewed>().Where(r => r.Status == SuggestionStatus.Approved))
         {
             // A repeat or a failure before it left no cached state: the season's state comes from its log (D-817)
@@ -43,14 +44,18 @@ public sealed partial class CommandProcessor
 #pragma warning restore CA1031
             {
                 LogCommandFailed(logger, e, envelope.CommandId, nameof(Pool.AddGame));
+                warnings.Add("pool.addFailed");
                 continue;
             }
 
             if (!added.IsAccepted)
             {
                 LogSuggestedGameRefused(logger, suggestion.SuggestionId, added.Rejection?.Code);
+                warnings.Add(added.Rejection?.Code ?? "pool.addFailed");
             }
         }
+
+        return warnings;
     }
 
     [LoggerMessage(Level = LogLevel.Information, Message = "The approved suggestion {SuggestionId} did not add its game to the pool: {Code}")]

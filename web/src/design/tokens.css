@@ -96,6 +96,8 @@
 
   /* ---- Space: Tailwind's 4 px step; the linter allows whole steps only ---- */
   --spacing: 4px;
+  /* Sticky side navigation fits below the header with a bottom gutter. */
+  --spacing-sticky-nav: calc(100dvh - var(--spacing) * 28);
   /* The smallest label on the map, in frame pixels: the camera opens closer rather than show one smaller (camera.ts) */
   --map-label-min: 9px;
 
@@ -120,6 +122,8 @@
   --duration-fast: 150ms;
   --duration-base: 200ms;
   --duration-slow: 250ms;
+  /* Main moment: Motion's typed values in design/motion.ts are kept equal by tokens.test.ts. */
+  --duration-event-draw: 900ms;
   /* A new line of the feed from another player comes in softly on top (DESIGN.md «Обновления в реальном времени») */
   --animate-arrive: arrive var(--duration-base) var(--ease-out);
 

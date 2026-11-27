@@ -12,6 +12,8 @@ import { Skeleton } from '../ui/Progress';
 import { AsyncState } from '../ui/AsyncState';
 import { cx } from '../ui/cx';
 import { EmptyState } from '../ui/States';
+import { Summary } from '../ui/Disclosure';
+import { useDesk } from '../ui/useDesk';
 import { fieldName, rulesPage, valueText } from './rulesText';
 
 const t = ru.rules;
@@ -22,18 +24,9 @@ const changesRules = (update: SeasonUpdate) =>
     ['ruleset-changed', 'season-deadline-set', 'command-undone'].includes(type),
   );
 
-type SectionId = keyof typeof t.sections;
-const order: SectionId[] = [
-  'win',
-  'roll',
-  'completion',
-  'reward',
-  'drop',
-  'finish',
-  'economy',
-  'deadline',
-  'history',
-];
+const titles = { ...t.sections, ...t.stage5.sections };
+type SectionId = keyof typeof titles;
+const order: SectionId[] = ['win', 'roll', 'completion', 'reward', 'drop', 'finish', 'economy'];
 
 /**
  * The season's rules (H7; SPEC «Правила на сайте»): every number from the ruleset in force, in words, and the history of
@@ -126,7 +119,29 @@ export function RulesScreen({
 /** The rules in force, section by section, with the contents beside them and the history at the end */
 export function RulesContent({ rules }: { rules: Schemas['RulesView'] }) {
   const page = rulesPage(rules.ruleset);
+  const desk = useDesk();
+  const sections: SectionId[] = [
+    ...order.filter((id) => id !== 'economy' || page.economy.length > 0),
+    ...page.stage5.map(({ id }) => id),
+    'deadline',
+    'history',
+  ];
   const deadline = rules.deadline ?? null;
+  const compact = page.stage5.length > 0 && !desk;
+  const contents = (
+    <ul className="grid gap-1">
+      {sections.map((id) => (
+        <li key={id}>
+          <a
+            href={`#rules-${id}`}
+            className="inline-flex min-h-11 items-center rounded-md px-2 underline-offset-4 is-hover:underline is-focus:focus-ring"
+          >
+            {titles[id]}
+          </a>
+        </li>
+      ))}
+    </ul>
+  );
   // A link to a section (D-207: «Что считается прохождением» from a run or the proof queue) came before the rules did:
   // the browser found nothing to scroll to, so the section is shown once it is here
   useEffect(() => {
@@ -140,23 +155,19 @@ export function RulesContent({ rules }: { rules: Schemas['RulesView'] }) {
     <>
       <nav
         aria-label={t.contents}
-        className="rounded-lg bg-card p-4 desk:sticky desk:top-24 desk:w-64"
+        className="rounded-lg bg-card p-4 desk:sticky desk:top-24 desk:max-h-sticky-nav desk:w-64 desk:overflow-y-auto desk:overscroll-contain"
       >
-        <h2 className="mb-2 text-sm font-bold">{t.contents}</h2>
-        <ul className="grid gap-1">
-          {order
-            .filter((id) => id !== 'economy' || page.economy.length > 0)
-            .map((id) => (
-              <li key={id}>
-                <a
-                  href={`#rules-${id}`}
-                  className="inline-flex min-h-11 items-center rounded-md px-2 underline-offset-4 is-hover:underline is-focus:focus-ring"
-                >
-                  {t.sections[id]}
-                </a>
-              </li>
-            ))}
-        </ul>
+        {compact ? (
+          <details>
+            <Summary className="font-bold">{t.contents}</Summary>
+            {contents}
+          </details>
+        ) : (
+          <>
+            <h2 className="mb-2 text-sm font-bold">{t.contents}</h2>
+            {contents}
+          </>
+        )}
       </nav>
 
       <div className="grid min-w-0 gap-4">
@@ -223,6 +234,11 @@ export function RulesContent({ rules }: { rules: Schemas['RulesView'] }) {
             <Lines lines={page.economy} />
           </RulesSection>
         ) : null}
+        {page.stage5.map(({ id, lines }) => (
+          <RulesSection key={id} id={id}>
+            <Lines lines={lines} />
+          </RulesSection>
+        ))}
         <RulesSection id="deadline">
           <p className="flex items-center gap-2 font-bold" data-testid="rules-deadline">
             <CalendarClock size={20} aria-hidden className="shrink-0" />
@@ -246,7 +262,7 @@ function RulesSection({ id, children }: { id: SectionId; children: ReactNode }) 
       className="grid scroll-mt-28 gap-3 rounded-lg bg-card p-4 desk:p-6"
     >
       <h2 id={`rules-${id}-title`} className="font-display text-xl font-heavy">
-        {t.sections[id]}
+        {titles[id]}
       </h2>
       {children}
     </section>

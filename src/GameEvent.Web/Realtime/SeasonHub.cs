@@ -90,14 +90,14 @@ public sealed class SeasonHub(HubSessions sessions, IDbContextFactory<GameEventD
         var missed = await db.Events.AsNoTracking()
             .Where(e => e.SeasonId == seasonId && e.Sequence > after && e.Sequence <= last)
             .OrderBy(e => e.Sequence)
-            .Select(e => new { e.Sequence, e.CommandId, e.Type })
+            .Select(e => new { e.Sequence, e.CommandId, e.Type, Data = e.Type == AnonymousVotes.ChangedType ? e.Data : null })
             .Take((MaxMissedCommands + 1) * 50)
             .ToListAsync(Context.ConnectionAborted);
         var updates = new List<SeasonUpdate>();
         foreach (var command in missed.GroupBy(e => e.CommandId))
         {
             var events = command.ToList();
-            updates.Add(new SeasonUpdate(seasonId, events[0].Sequence, events[^1].Sequence, [.. events.Select(e => e.Type)]));
+            updates.Add(new SeasonUpdate(seasonId, events[0].Sequence, events[^1].Sequence, [.. events.Select(e => AnonymousVotes.Listed(e.Type, e.Data))]));
         }
 
         return updates.Count > MaxMissedCommands || updates[^1].ToSequence < last
@@ -133,7 +133,9 @@ public sealed class SeasonBroadcaster : ICommittedEventsListener
             return Task.CompletedTask;
         }
 
-        IReadOnlyList<string> types = [.. events.Select(e => EventCatalog.Describe(e.Event.GetType()).Name)];
+        // D-726, D-831, D-835: a changed vote of an anonymous poll reads as a vote cast — the update still comes, so no gap is seen
+        IReadOnlyList<string> types = [.. events
+            .Select(e => e.Event is Engine.Polls.VoteChanged { Anonymous: true } ? AnonymousVotes.CastType : EventCatalog.Describe(e.Event.GetType()).Name)];
         if (events[0].SeasonId != Guid.Empty)
         {
             _updates.Writer.TryWrite(new SeasonUpdate(events[0].SeasonId, events[0].Sequence, events[^1].Sequence, types));
@@ -183,4 +185,24 @@ public sealed partial class SeasonBroadcastWorker(
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Broadcast of a {Update} failed")]
     private static partial void LogBroadcastFailed(ILogger logger, Exception exception, string update);
+}
+
+/// <summary>
+/// The anonymous poll in the hub and the admin's command journal (D-726, D-831, D-835): nobody learns that someone changed an
+/// anonymous vote, nor when. A changed vote is listed as a vote cast, so its update or row looks like any other vote of the
+/// poll (the feed shows a vote cast too, without its voter).
+/// </summary>
+internal static class AnonymousVotes
+{
+    public static readonly string ChangedType = EventCatalog.Describe(typeof(Engine.Polls.VoteChanged)).Name;
+
+    public static readonly string CastType = EventCatalog.Describe(typeof(Engine.Polls.VoteCast)).Name;
+
+    /// <summary>The type a stored event is listed by: a changed vote of an anonymous poll is a vote cast.</summary>
+    public static string Listed(string type, string? data) => IsHiddenChange(type, data) ? CastType : type;
+
+    /// <summary>Whether a stored event is a changed vote of an anonymous poll; <paramref name="data"/> is read only for that type.</summary>
+    public static bool IsHiddenChange(string type, string? data) =>
+        type == ChangedType && data is not null
+        && System.Text.Json.Nodes.JsonNode.Parse(data)?["anonymous"]?.GetValue<bool>() == true;
 }

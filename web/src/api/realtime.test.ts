@@ -108,6 +108,41 @@ afterEach(() => {
 });
 
 describe('watchSeason', () => {
+  it('reports the initial join sequence once and keeps reporting changes after reconnect', async () => {
+    connection.answers.push(joined(10));
+    const onChange = vi.fn();
+    const onInitialJoin = vi.fn();
+    const stop = watchSeason('s', onChange, onInitialJoin);
+    await vi.waitFor(() => {
+      expect(onInitialJoin).toHaveBeenCalledExactlyOnceWith(10);
+    });
+
+    connection.answers.push(joined(11, [update(11, 11)]));
+    connection.reconnected?.();
+    await vi.waitFor(() => {
+      expect(onChange).toHaveBeenLastCalledWith([update(11, 11)]);
+    });
+    expect(onInitialJoin).toHaveBeenCalledTimes(1);
+    stop();
+  });
+
+  it('drops the join response after the season subscription stops', async () => {
+    let answer: (join: SeasonJoin) => void = () => undefined;
+    connection.answers.push(new Promise<SeasonJoin>((resolve) => (answer = resolve)));
+    const onChange = vi.fn();
+    const onInitialJoin = vi.fn();
+    const stop = watchSeason('s', onChange, onInitialJoin);
+    await vi.waitFor(() => {
+      expect(connection.invoked).toEqual([['Join', 's']]);
+    });
+
+    stop();
+    answer(joined(10));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(onChange).not.toHaveBeenCalled();
+    expect(onInitialJoin).not.toHaveBeenCalled();
+  });
+
   it('joins, then passes each new update once and in order', async () => {
     const { onChange, stop } = await watching(joined(10));
 

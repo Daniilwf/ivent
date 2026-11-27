@@ -1,16 +1,24 @@
 using System.Security.Claims;
+using GameEvent.Engine.Content;
+using GameEvent.Engine.Finish;
+using GameEvent.Engine.GlobalEvents;
+using GameEvent.Engine.Interactions;
+using GameEvent.Engine.Inventory;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Map;
 using GameEvent.Engine.Players;
+using GameEvent.Engine.Polls;
 using GameEvent.Engine.Proofs;
 using GameEvent.Engine.Rolls;
 using GameEvent.Engine.Runs;
 using GameEvent.Engine.Seasons;
 using GameEvent.Engine.Turns;
+using GameEvent.Infrastructure.Accounts;
 using GameEvent.Infrastructure.Database;
 using GameEvent.Infrastructure.EventLog;
 using GameEvent.Infrastructure.Kernel;
 using GameEvent.Infrastructure.Queue;
+using GameEvent.Infrastructure.Seasons;
 using GameEvent.Web.Accounts;
 using GameEvent.Web.Hosting;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -53,7 +61,7 @@ public sealed record TestScenarioView(string Scenario, IReadOnlyList<string> Com
 
 /// <summary>
 /// Test endpoints (SPEC «Тестовые эндпоинты», E4, A7, D-120): rewind the time, seed the randomness, load a scenario —
-/// «финиш на носу», «дедлайн через час», «на игроке пять ручных эффектов». Mapped in Development, Test and on the test copy (Staging, D-220), admin
+/// a finish, a deadline, manual effects or a stage 5 interaction. Mapped in Development, Test and on the test copy (Staging, D-220), admin
 /// only; in Production the routes do not exist. Scenarios go through the queue like any admin action.
 /// </summary>
 public static class TestEndpoints
@@ -61,6 +69,9 @@ public static class TestEndpoints
     public const string FinishSoon = "finish-soon";
     public const string DeadlineInHour = "deadline-in-hour";
     public const string FiveManualEffects = "five-manual-effects";
+    public const string IrlProofPending = "irl-proof-pending";
+    public const string CoopInvitation = "coop-invitation";
+    public const string PollAndGlobalGoal = "poll-and-global-goal";
 
     /// <summary>How far one request moves the clock: ten years either way.</summary>
     public const double MaxAdvanceMinutes = 10 * 365 * 24 * 60;
@@ -68,7 +79,23 @@ public static class TestEndpoints
     public const int MinYear = 2000;
     public const int MaxYear = 2100;
 
-    private static readonly string[] s_scenarios = [FinishSoon, DeadlineInHour, FiveManualEffects];
+    private static readonly string[] s_scenarios = [FinishSoon, DeadlineInHour, FiveManualEffects, IrlProofPending, CoopInvitation, PollAndGlobalGoal];
+
+    // The scenario uses the published repository event and two fixed choices so it works with any pool.
+    private const string ScenarioGoalEvent = "tailwind";
+    private const int ScenarioHours = 24;
+    private static readonly LaunchGlobalEvent s_scenarioGoal = new(ScenarioGoalEvent, ScenarioHours, new GlobalEventGoal
+    {
+        Metric = GoalMetric.Runs,
+        Target = 3,
+    });
+    private static readonly StartPoll s_scenarioPoll = new(new PollDefinition
+    {
+        Question = "Что сыграть после теста?",
+        Options = new ChoiceOptionsSpec { List = ["Короткую игру", "Длинную игру"] },
+        Voters = PollVoters.Players,
+        ClosesInHours = ScenarioHours,
+    });
 
     public static bool Available(IWebHostEnvironment environment)
     {
@@ -224,16 +251,20 @@ public static class TestEndpoints
             return TypedResults.NotFound();
         }
 
-        var players = await db.SeasonPlayers.AsNoTracking().Where(p => p.SeasonId == seasonId).ToListAsync(ct);
-        var logins = await db.Users.AsNoTracking().ToDictionaryAsync(u => u.Id, u => u.Login, ct);
-        var player = request.PlayerId is { } playerId
-            ? players.FirstOrDefault(p => p.Id == playerId)
-            : request.Player is { Length: > 0 } login
-                ? players.FirstOrDefault(p => string.Equals(logins.GetValueOrDefault(p.UserId), login, StringComparison.OrdinalIgnoreCase))
-                : players.OrderBy(p => p.Name).FirstOrDefault();
-        if (player is null && name != DeadlineInHour)
+        SeasonPlayerRecord? player = null;
+        if (name is not (DeadlineInHour or PollAndGlobalGoal))
         {
-            return Problem("test.playerUnknown", "No such player in the season.");
+            var players = await db.SeasonPlayers.AsNoTracking().Where(p => p.SeasonId == seasonId).ToListAsync(ct);
+            var logins = await db.Users.AsNoTracking().ToDictionaryAsync(u => u.Id, u => u.Login, ct);
+            player = request.PlayerId is { } playerId
+                ? players.FirstOrDefault(p => p.Id == playerId)
+                : request.Player is { Length: > 0 } login
+                    ? players.FirstOrDefault(p => string.Equals(logins.GetValueOrDefault(p.UserId), login, StringComparison.OrdinalIgnoreCase))
+                    : players.OrderBy(p => p.Name).FirstOrDefault();
+            if (player is null)
+            {
+                return Problem("test.playerUnknown", "No such player in the season.");
+            }
         }
 
         var sent = new List<string>();
@@ -287,11 +318,131 @@ public static class TestEndpoints
                     break;
                 }
 
+            case IrlProofPending:
+                if (await SubmitScenarioProofAsync(player!.Id) is { } proofProblem)
+                {
+                    return proofProblem;
+                }
+
+                break;
+
+            case CoopInvitation:
+                if (await InviteScenarioPartnerAsync(player!.Id) is { } coopProblem)
+                {
+                    return coopProblem;
+                }
+
+                break;
+
+            case PollAndGlobalGoal:
+                if (await StartScenarioPollAndGoalAsync() is { } pollProblem)
+                {
+                    return pollProblem;
+                }
+
+                break;
+
             default:
                 throw new InvalidOperationException($"Scenario {name} has no steps.");
         }
 
         return TypedResults.Ok(new TestScenarioView(name, sent));
+
+        async Task<ProblemHttpResult?> SubmitScenarioProofAsync(Guid playerId)
+        {
+            if (state.ManualEffects.Values.FirstOrDefault(effect => effect.PlayerId == playerId
+                    && (effect.IrlProof is null or { Status: IrlProofStatus.Rejected })
+                    && IrlProofs.IsIrl(state, effect)) is not { } pending)
+            {
+                return Problem("test.noIrlEffect", "The player needs an IRL effect that can take a proof.");
+            }
+
+            return await SendAsync(new SubmitIrlProof(playerId, pending.EffectId, [], "https://example.invalid/ivent-test-irl")) is { } refused
+                ? Problem(refused, "The test proof could not be submitted.")
+                : null;
+        }
+
+        async Task<ProblemHttpResult?> InviteScenarioPartnerAsync(Guid playerId)
+        {
+            if (!state.Players.TryGetValue(playerId, out var roller) || roller.ActiveRunId is not { } runId
+                || !state.Runs.TryGetValue(runId, out var run) || run.Status != RunStatus.Playing || run.PlayerId != playerId)
+            {
+                return Problem(RejectionCodes.CoopRunNotActive, "The roller needs a run of their own in progress.");
+            }
+
+            if (run.Coop is not null)
+            {
+                return Problem(RejectionCodes.CoopAlreadyJoined, "The run already has a partner.");
+            }
+
+            if (!await db.Games.AsNoTracking().AnyAsync(game => game.Id == run.GameId && game.IsCoop, ct))
+            {
+                return Problem(RejectionCodes.CoopNotCoopGame, "The roller needs a coop game.");
+            }
+
+            var first = FinishLine.First(state);
+            var candidates = state.Players.Values
+                .Where(candidate => candidate.PlayerId != playerId && candidate.PlayerId != first && !candidate.IsInactive
+                    && candidate.Phase == TurnPhase.Idle && candidate.ActiveRunId is null && candidate.Offer is null && candidate.Choice is null
+                    && !candidate.Exclusions.Any(exclusion => exclusion.GameId == run.GameId)
+                    && !candidate.Wallet.Bets.Any(bet => bet.Status == BetStatus.Open && bet.RunId == run.RunId))
+                .ToList();
+            var userIds = candidates.Select(candidate => candidate.UserId).ToList();
+            var enabled = await db.Users.AsNoTracking()
+                .Where(account => userIds.Contains(account.Id) && account.Role == Role.Player && !account.IsDeleted)
+                .Select(account => account.Id).ToHashSetAsync(ct);
+            var partner = candidates.Where(candidate => enabled.Contains(candidate.UserId))
+                .OrderBy(candidate => candidate.Name, StringComparer.Ordinal).ThenBy(candidate => candidate.PlayerId).FirstOrDefault();
+            if (partner is null)
+            {
+                return Problem("test.noCoopPartner", "The season needs another player who could accept this coop invitation.");
+            }
+
+            return await SendAsync(new InviteToCoop(playerId, partner.PlayerId)) is { } refused
+                ? Problem(refused, "The invitation could not be sent.")
+                : null;
+        }
+
+        async Task<ProblemHttpResult?> StartScenarioPollAndGoalAsync()
+        {
+            var now = clock.UtcNow;
+            if (state.Status == SeasonStatus.Closing || state.Deadline is { } deadline && now >= deadline)
+            {
+                return Problem(RejectionCodes.SeasonDeadlinePassed, "The deadline has passed.");
+            }
+
+            if (state.Status != SeasonStatus.Active)
+            {
+                return Problem(RejectionCodes.SeasonNotActive, "Start the season before loading this scenario.");
+            }
+
+            if (state.Rules.Features is not { Events: true, Polls: true, GlobalEvents: true })
+            {
+                return Problem("test.pollGoalFeaturesOff", "Events, polls and global events are required.");
+            }
+
+            if (state.GlobalEvents.Values.Count(global => global.RunsAt(now)) >= (state.Rules.GlobalEvents?.MaxActive ?? 0))
+            {
+                return Problem(RejectionCodes.GlobalEventTooMany, "End a global event before loading this scenario.");
+            }
+
+            if (state.Catalog.Live(ScenarioGoalEvent) is not { Kind: ObjectKind.Event } definition
+                || definition is { Manual: false, Effect.Actions: [RequestChoiceAction { Vote: not null }, ..] })
+            {
+                return Problem("test.noScenarioGoalEvent", "Publish the standard Tailwind event before loading this scenario.");
+            }
+
+            // The goal is the step most likely to be refused. Leave the poll untouched if the launch fails.
+            if (await SendAsync(s_scenarioGoal) is { } goalRefused)
+            {
+                return Problem(goalRefused, "The goal could not be launched.");
+            }
+
+            // A concurrent admin action can change season status or flags between the two ordinary commands.
+            return await SendAsync(s_scenarioPoll) is { } pollRefused
+                ? Problem("test.goalStartedPollRefused", $"The goal was launched, but the poll was refused ({pollRefused}).")
+                : null;
+        }
 
         async Task<string?> CompleteExtremeAsync(Guid playerId)
         {

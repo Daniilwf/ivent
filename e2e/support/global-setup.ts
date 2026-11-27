@@ -1,6 +1,8 @@
 import type { FullConfig } from '@playwright/test';
 import { Api, seedAdmin, type Schemas } from './api.ts';
-import { createAccountAt } from './world.ts';
+import { prepareCoopGame } from './coopFixture.ts';
+import { prepareStage5Speed } from './stage5-speed.ts';
+import { createAccountAt, testPassword } from './world.ts';
 
 // Before any scenario moves the site's clock: a player of the demo season for scenario 13 (tests/late/s13-speed). The
 // demo players also play the development season, which is newer and would open instead; a player added to the demo
@@ -18,17 +20,27 @@ export default async function globalSetup(config: FullConfig) {
   const baseURL = config.projects[0]?.use.baseURL;
   if (!baseURL) throw new Error('No baseURL.');
   const admin = await Api.signIn(baseURL, seedAdmin.login, seedAdmin.password);
-  const accounts = await admin.get<Schemas['AccountView'][]>('/api/admin/accounts');
-  const existing = accounts.find((a) => a.login === speedPlayer.login);
-  if (!existing) {
-    const account = await createAccountAt(
-      baseURL,
-      admin,
-      'player',
-      speedPlayer.login,
-      speedPlayer.name,
-    );
-    await admin.post(`/api/admin/seasons/${demoSeasonId}/players`, { userId: account.id });
+  try {
+    await prepareCoopGame(admin);
+    const accounts = await admin.get<Schemas['AccountView'][]>('/api/admin/accounts');
+    const existing = accounts.find((a) => a.login === speedPlayer.login);
+    if (!existing) {
+      const account = await createAccountAt(
+        baseURL,
+        admin,
+        'player',
+        speedPlayer.login,
+        speedPlayer.name,
+      );
+      await admin.post(`/api/admin/seasons/${demoSeasonId}/players`, { userId: account.id });
+    }
+    const player = await Api.signIn(baseURL, speedPlayer.login, testPassword);
+    try {
+      await prepareStage5Speed(admin, player, demoSeasonId);
+    } finally {
+      await player.dispose();
+    }
+  } finally {
+    await admin.dispose();
   }
-  await admin.dispose();
 }

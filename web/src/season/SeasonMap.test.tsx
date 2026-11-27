@@ -1,5 +1,5 @@
 import { onDesktop } from '../test/desk';
-import { render, screen, within } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Schemas } from '../api/client';
 import { branchOptions, graphBoard, legsPath, zoneFill, zoneTheme } from '../board/graphBoard';
@@ -320,7 +320,11 @@ describe('the season screen on the graph map', () => {
     await screen.findByTestId('roll');
 
     current = season('f', { choice: branchChoice }, 5);
-    hubChange?.();
+    expect(hubChange).toBeTypeOf('function');
+    await act(() => {
+      hubChange?.();
+      return Promise.resolve();
+    });
 
     const title = await screen.findByText(ru.map.branch.title);
     await vi.waitFor(() => {

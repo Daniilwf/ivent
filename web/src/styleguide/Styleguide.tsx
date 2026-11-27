@@ -14,6 +14,13 @@ import { ProofSection } from '../season/ProofForm';
 import { ChoiceCard, OfferCard } from '../season/RollResult';
 import { RunActions } from '../season/RunActions';
 import { DrawnEventCard } from '../season/DrawnEventCard';
+import { EventChoice } from '../season/EventChoice';
+import { RunConditions } from '../season/RunConditions';
+import { WaitingEvents } from '../season/WaitingEvents';
+import { IrlProofSection } from '../season/IrlProofSection';
+import { DrawnEventHistory } from '../season/DrawnEventHistory';
+import { GlobalEventBanner } from '../globalEvents/GlobalEventBanner';
+import { PollCard } from '../polls/PollCard';
 import type { Schemas } from '../api/client';
 import { MyFinish } from '../season/MyFinish';
 import { Leaderboard } from '../board/Leaderboard';
@@ -66,6 +73,71 @@ import { BetsDemos, ShopDemos } from './EconomyDemos';
 const noop = () => undefined;
 
 const t = ru.styleguide;
+const globalEventDemo: Schemas['GlobalEventView'] = {
+  id: 'weekend',
+  objectId: 'weekend',
+  name: t.globalEvent.name,
+  description: t.globalEvent.description,
+  status: 'active',
+  startsAt: '2026-11-20T12:00:00Z',
+  endsAt: '2026-11-22T20:00:00Z',
+  goal: { metric: 'hours', progress: 18.5, target: 50, reached: false },
+};
+const pollOptions = t.pollCard.options.map((label, index) => ({ id: String(index), label }));
+const pollDemo: Schemas['PollView'] = {
+  id: 'weekend-poll',
+  question: t.pollCard.question,
+  options: pollOptions,
+  voters: 'players',
+  anonymous: true,
+  status: 'open',
+  startedAt: globalEventDemo.startsAt,
+  closesAt: globalEventDemo.endsAt,
+  counts: null,
+  result: null,
+  myVote: null,
+  source: 'admin',
+  voting: { canVote: true, allowChangeVote: true, reason: null },
+};
+const demoVote = () => Promise.resolve();
+const eventChoiceDemo: Schemas['ChoiceView'] = {
+  ...t.eventChoice.demo,
+  options: [...t.eventChoice.demo.options],
+};
+const conditionDemo: Schemas['RunConditionView'] = {
+  objectId: 'not-even-sweating',
+  name: t.eventConditions.name,
+  kind: 'good',
+  hostile: false,
+  difficultyAtLeast: 'hard',
+  difficultyAtMost: null,
+};
+const irlDemo: Schemas['ManualEffectView'] = {
+  id: 'e5000000-0000-0000-0000-000000000301',
+  objectId: 'karaoke',
+  name: t.irl.name,
+  description: t.irl.description,
+  drawEvent: 'bad',
+  source: 'event',
+  irl: true,
+  irlProof: null,
+};
+const irlPending: Schemas['IrlProofView'] = {
+  status: 'pending',
+  files: [...demoProofFiles.slice(0, 1)],
+  link: 'https://example.com/watch?v=karaoke',
+  comment: null,
+  submittedAt: '2026-11-17T12:00:00Z',
+};
+const historyDemo: Schemas['DrawnEventView'] = {
+  sequence: 501,
+  deck: 'good',
+  kind: 'good',
+  objectId: 'tailwind',
+  name: t.eventConditions.waitingName,
+  description: t.eventConditions.waitingText,
+  source: 'cell',
+};
 
 // The four kinds of decks, a long name and an event without text (stage 5)
 const drawnEvents: Schemas['DrawnEventView'][] = [
@@ -756,6 +828,167 @@ export function Styleguide() {
           {drawnEvents.map((drawn) => (
             <DrawnEventCard key={drawn.sequence} drawn={drawn} />
           ))}
+        </div>
+      </Section>
+
+      <Section id="global-event" title={t.globalEvent.title}>
+        <div className="grid items-start gap-4 desk:grid-cols-2">
+          <GlobalEventBanner events={[globalEventDemo]} />
+          <GlobalEventBanner
+            events={[
+              {
+                ...globalEventDemo,
+                id: 'weekend-reached',
+                goal: { metric: 'hours', progress: 49, target: 50, reached: true },
+              },
+            ]}
+          />
+        </div>
+      </Section>
+
+      <Section id="poll-card" title={t.pollCard.title}>
+        <div className="grid items-start gap-4 desk:grid-cols-2">
+          <PollCard poll={pollDemo} pending={false} onVote={demoVote} />
+          <PollCard poll={{ ...pollDemo, id: 'pending' }} pending onVote={demoVote} />
+          <PollCard
+            poll={{
+              ...pollDemo,
+              id: 'closed',
+              status: 'closed',
+              result: '0',
+              myVote: '0',
+              counts: [
+                { optionId: '0', votes: 6 },
+                { optionId: '1', votes: 3 },
+                { optionId: '2', votes: 1 },
+              ],
+            }}
+            pending={false}
+            onVote={demoVote}
+          />
+          <PollCard
+            poll={{ ...pollDemo, id: 'cancelled', status: 'cancelled' }}
+            pending={false}
+            onVote={demoVote}
+          />
+        </div>
+      </Section>
+
+      <Section id="event-choice" title={t.eventChoice.title} lead={t.eventChoice.lead}>
+        <div className="grid items-start gap-4 desk:grid-cols-2">
+          {[false, true].map((busy) => (
+            <EventChoice key={String(busy)} choice={eventChoiceDemo} busy={busy} onChoose={noop} />
+          ))}
+          <EventChoice
+            choice={eventChoiceDemo}
+            busy={false}
+            disabled
+            unavailableReason={ru.events.choice.paused}
+            onChoose={noop}
+          />
+          <EventChoice
+            choice={{ ...t.eventChoice.demo, options: [] }}
+            busy={false}
+            onChoose={noop}
+          />
+        </div>
+      </Section>
+
+      <Section id="event-conditions" title={t.eventConditions.title} lead={t.eventConditions.lead}>
+        <div className="grid items-start gap-4 desk:grid-cols-2">
+          <WaitingEvents
+            events={[
+              {
+                objectId: 'tailwind',
+                name: t.eventConditions.waitingName,
+                description: t.eventConditions.waitingText,
+                kind: 'good',
+              },
+            ]}
+            conditions={[conditionDemo]}
+          />
+          {[
+            null,
+            { met: true, waived: false },
+            { met: false, waived: false },
+            { met: true, waived: true },
+          ].map((check, i) => (
+            <RunConditions key={i} conditions={[conditionDemo]} check={check} />
+          ))}
+        </div>
+      </Section>
+
+      <Section id="irl-proof" title={t.irl.title} lead={t.irl.lead}>
+        <div className="grid items-start gap-4 desk:grid-cols-2">
+          <Panel title={t.irl.cases.empty}>
+            <IrlProofSection
+              effect={irlDemo}
+              maxFiles={2}
+              pending={false}
+              enabled
+              onSubmit={noop}
+            />
+          </Panel>
+          <Panel title={t.irl.cases.linkOnly}>
+            <IrlProofSection
+              effect={irlDemo}
+              maxFiles={0}
+              pending={false}
+              enabled
+              onSubmit={noop}
+            />
+          </Panel>
+          <Panel title={t.irl.cases.submitting}>
+            <IrlProofSection effect={irlDemo} maxFiles={2} pending enabled onSubmit={noop} />
+          </Panel>
+          <Panel title={t.irl.cases.pending}>
+            <IrlProofSection
+              effect={{ ...irlDemo, irlProof: irlPending }}
+              maxFiles={2}
+              pending={false}
+              enabled
+              onSubmit={noop}
+            />
+          </Panel>
+          <Panel title={t.irl.cases.rejected}>
+            <IrlProofSection
+              effect={{
+                ...irlDemo,
+                irlProof: { ...irlPending, status: 'rejected', comment: t.irl.comment },
+              }}
+              maxFiles={2}
+              pending={false}
+              enabled
+              onSubmit={noop}
+            />
+          </Panel>
+          <Panel title={t.irl.cases.paused}>
+            <IrlProofSection
+              effect={irlDemo}
+              maxFiles={2}
+              pending={false}
+              enabled={false}
+              unavailableReason={ru.irlProof.paused}
+              onSubmit={noop}
+            />
+          </Panel>
+        </div>
+      </Section>
+
+      <Section id="event-history" title={t.eventHistory.title} lead={t.eventHistory.lead}>
+        <div className="grid items-start gap-4 desk:grid-cols-2">
+          <DrawnEventHistory
+            drawn={historyDemo}
+            fresh={false}
+            initiallyOpen={false}
+            onShown={noop}
+          />
+          <DrawnEventHistory
+            drawn={{ ...historyDemo, sequence: 502 }}
+            fresh={false}
+            initiallyOpen
+            onShown={noop}
+          />
         </div>
       </Section>
 

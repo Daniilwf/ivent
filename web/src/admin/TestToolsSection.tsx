@@ -16,8 +16,8 @@ const t = ru.admin.test;
 
 type Message = { tone: 'success' | 'info' | 'danger'; text: string };
 
-/** The scenario that does not need a player: the deadline is the season's */
-const seasonWide = 'deadline-in-hour';
+/** Scenarios that affect the whole season and need no player selection. */
+const seasonWide = ['deadline-in-hour', 'poll-and-global-goal'];
 
 /** The clock's shift from the real time in words: «+1 дн 2 ч», «−30 мин»; none — the real time */
 function shiftText(minutes: number): string | null {
@@ -39,7 +39,7 @@ function shiftText(minutes: number): string | null {
 
 /**
  * The test tools (H9, D-221; SPEC «Тестовые эндпоинты», «Сценарии для ручной проверки»): load a ready situation onto
- * the season, move the site's clock, seed its randomness. Only where the test endpoints exist (Development and Test):
+ * the season, move the site's clock, seed its randomness. Only where the test endpoints exist (Development, Test and Staging):
  * the admin screen does not offer the section anywhere else, and the strip on top of every page names the copy of the
  * site. Loading a scenario is the main action.
  */
@@ -131,7 +131,7 @@ function ScenarioForm({ seasonId, scenarios }: { seasonId: string; scenarios: st
   return (
     <AsyncState loaded={players} rows={1} errorTitle={ru.admin.loadErrorTitle}>
       {(list) => {
-        const needsPlayer = scenario !== seasonWide;
+        const needsPlayer = !seasonWide.includes(scenario);
         const player = list.find((p) => p.id === picked) ?? list[0] ?? null;
         const blocked = needsPlayer && player === null;
         return (
@@ -140,7 +140,7 @@ function ScenarioForm({ seasonId, scenarios }: { seasonId: string; scenarios: st
             noValidate
             onSubmit={(e: SyntheticEvent) => {
               e.preventDefault();
-              if (!blocked)
+              if (!blocked && !busy)
                 void load(
                   needsPlayer ? (player?.id ?? null) : null,
                   needsPlayer ? (player?.name ?? null) : null,

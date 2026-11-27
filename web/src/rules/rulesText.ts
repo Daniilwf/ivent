@@ -50,6 +50,7 @@ export type RulesPage = {
   finish: string[];
   /** Coins, items, the shop and bets — empty while all their mechanics are off (S4-1) */
   economy: string[];
+  stage5: { id: keyof typeof t.stage5.sections; lines: string[] }[];
 };
 
 /** The page's sentences for a ruleset; the deadline comes apart (it is the season's, not the ruleset's) */
@@ -175,6 +176,7 @@ export function rulesPage(rules: Ruleset): RulesPage {
 
   return {
     economy: economyLines,
+    stage5: stage5Sections(rules),
     win,
     roll: rollLines,
     reward: rewardLines,
@@ -184,6 +186,95 @@ export function rulesPage(rules: Ruleset): RulesPage {
     bonuses: noBonus ? [] : bonuses,
     finish: finishLines,
   };
+}
+
+function stage5Sections(rules: Ruleset): RulesPage['stage5'] {
+  const {
+    features,
+    reward,
+    interactions,
+    partnerBoard,
+    duels,
+    weeklyChallenge,
+    suggestions,
+    polls,
+    globalEvents,
+    events,
+  } = rules;
+  const words = t.stage5;
+  const sections: RulesPage['stage5'] = [];
+  if (features.coop) {
+    sections.push({
+      id: 'coop',
+      lines: [
+        words.points(reward.coop.pointsShare),
+        ...(reward.coop.coinsShare == null ? [] : [words.coins(reward.coop.coinsShare)]),
+      ],
+    });
+  }
+  if (features.coop || features.duels) {
+    sections.push({
+      id: 'invitations',
+      lines: [
+        words.inviteTtl(interactions.inviteTtlHours),
+        ...(interactions.maxOpenInvitesPerPlayer == null
+          ? []
+          : [words.inviteLimit(interactions.maxOpenInvitesPerPlayer)]),
+        ...(features.coop && features.duels ? [words.sharedInvites] : []),
+      ],
+    });
+  }
+  if (features.coop && features.partnerBoard && partnerBoard) {
+    sections.push({ id: 'partnerBoard', lines: [words.boardTtl(partnerBoard.requestTtlHours)] });
+  }
+  if (features.duels && duels) {
+    sections.push({
+      id: 'duels',
+      lines: [
+        words.duelReward(duels.rewardCoins),
+        words.duelTtl(duels.durationDays),
+        words.duelLimit(duels.maxOpenPerPlayer),
+        words.duelCooldown(duels.samePairCooldownDays),
+        words.duelWinLimit(duels.maxWinsPerSeason),
+        ...(duels.countRunsStartedAfterAccept ? [words.duelFresh] : []),
+        ...(duels.dropForfeits ? [words.duelDrop] : []),
+      ],
+    });
+  }
+  if (features.weeklyChallenge && weeklyChallenge.durationDays != null) {
+    sections.push({
+      id: 'weeklyChallenge',
+      lines: [words.weeklyTtl(weeklyChallenge.durationDays)],
+    });
+  }
+  if (features.suggestions && suggestions) {
+    sections.push({ id: 'suggestions', lines: [words.suggestions(suggestions.perDay)] });
+  }
+  if (features.polls && polls) {
+    sections.push({
+      id: 'polls',
+      lines: [
+        words.gameOptions(polls.gameOptions),
+        polls.allowChangeVote ? words.voteChange : words.voteFixed,
+      ],
+    });
+  }
+  if (features.events && features.globalEvents && globalEvents) {
+    sections.push({ id: 'globalEvents', lines: [words.globalLimit(globalEvents.maxActive)] });
+  }
+  if (features.events && events) {
+    const maxFiles = events.irlProof?.maxFiles ?? 0;
+    sections.push({
+      id: 'events',
+      lines: [
+        events.answerTimeoutHours == null
+          ? words.noAnswerTtl
+          : words.answerTtl(events.answerTimeoutHours),
+        maxFiles > 0 ? words.irlFiles(maxFiles) : words.irlLinkOnly,
+      ],
+    });
+  }
+  return sections;
 }
 
 type PayoutStep = { upTo: number | null; multiplier: number };

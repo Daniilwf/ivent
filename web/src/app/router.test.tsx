@@ -57,6 +57,8 @@ describe('router', () => {
     expect(routeOf('/feed')).toEqual({ kind: 'feed', seasonId: null });
     expect(routeOf('/feed/')).toEqual({ kind: 'feed', seasonId: null });
     expect(routeOf(`/seasons/${id}/feed`)).toEqual({ kind: 'feed', seasonId: id });
+    expect(routeOf('/interactions')).toEqual({ kind: 'interactions', seasonId: null });
+    expect(routeOf(`/seasons/${id}/interactions`)).toEqual({ kind: 'interactions', seasonId: id });
     expect(routeOf(`/users/${id}`)).toEqual({ kind: 'profile', userId: id });
     expect(routeOf(`/games/${id}`)).toEqual({ kind: 'game', gameId: id });
     expect(routeOf('/games/not-an-id')).toEqual({ kind: 'notFound' });
@@ -72,6 +74,7 @@ describe('router', () => {
   it('builds the addresses the links point to', () => {
     expect(paths.feed()).toBe('/feed');
     expect(paths.feed(id)).toBe(`/seasons/${id}/feed`);
+    expect(paths.interactions(id)).toBe(`/seasons/${id}/interactions`);
     expect(paths.profile(id)).toBe(`/users/${id}`);
     expect(paths.game(id)).toBe(`/games/${id}`);
     expect(paths.pool()).toBe('/pool');

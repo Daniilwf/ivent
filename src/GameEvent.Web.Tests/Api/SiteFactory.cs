@@ -68,6 +68,7 @@ internal sealed class SiteFactory : WebApplicationFactory<Program>
         _directory = before._directory;
         _loginAttemptsPerMinute = before._loginAttemptsPerMinute;
         _environment = before._environment;
+        SeasonViewsPerMinute = before.SeasonViewsPerMinute;
         FrontendPath = before.FrontendPath;
         ConnectionString = before.ConnectionString;
         Random = before.Random;
@@ -113,6 +114,8 @@ internal sealed class SiteFactory : WebApplicationFactory<Program>
     /// <summary>Built frontend to serve; by default a missing folder, so tests run API-only.</summary>
     public string FrontendPath { get; }
 
+    public int? SeasonViewsPerMinute { get; init; }
+
     public TestClock Clock { get; } = new(new DateTimeOffset(2026, 10, 1, 12, 0, 0, TimeSpan.Zero).AddTicks(7_654_321));
 
     /// <summary>
@@ -121,6 +124,12 @@ internal sealed class SiteFactory : WebApplicationFactory<Program>
     /// </summary>
     /// <remarks>Starts at the real time: the test client's cookie jar drops a cookie whose expiry is in the real past.</remarks>
     public TestTimeProvider Time { get; } = new(DateTimeOffset.UtcNow);
+
+    /// <summary>
+    /// Services a test puts over the site's own, applied last (for example a clock that fails on purpose to reach the
+    /// «Ошибки» page). Kept by <see cref="Restarted"/> only when set again.
+    /// </summary>
+    public Action<IServiceCollection>? ExtraServices { get; init; }
 
     public Dictionary<string, Guid> Users { get; } = [];
 
@@ -237,6 +246,10 @@ internal sealed class SiteFactory : WebApplicationFactory<Program>
         // Tests log to the console only; one observability test turns the file on in its own folder
         builder.UseSetting("Logging:File:Enabled", "false");
         builder.UseSetting("Security:LoginAttemptsPerMinute", _loginAttemptsPerMinute.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        if (SeasonViewsPerMinute is { } views)
+        {
+            builder.UseSetting("Security:SeasonViewsPerMinute", views.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        }
         builder.ConfigureServices(services =>
         {
             services.RemoveAll<IClock>();
@@ -249,6 +262,7 @@ internal sealed class SiteFactory : WebApplicationFactory<Program>
             // A disposed site must not outlive its test (D-665)
             services.RemoveAll<Microsoft.AspNetCore.Hosting.Builder.IApplicationBuilderFactory>();
             services.AddSingleton<Microsoft.AspNetCore.Hosting.Builder.IApplicationBuilderFactory, CollectablePipelineFactory>();
+            ExtraServices?.Invoke(services);
         });
     }
 

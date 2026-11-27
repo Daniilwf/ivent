@@ -375,6 +375,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/seasons/{seasonId}/navigation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    includeAdmin?: boolean;
+                };
+                header?: never;
+                path: {
+                    seasonId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SeasonNavigationView"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Too Many Requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/seasons/{seasonId}/roll": {
         parameters: {
             query?: never;
@@ -5551,6 +5615,2286 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/seasons/{seasonId}/polls": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PollView"][];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+                /** @description Too Many Requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/seasons/{seasonId}/polls/{pollId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                    pollId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PollView"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+                /** @description Too Many Requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/seasons/{seasonId}/polls/{pollId}/vote": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                    pollId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["VoteRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CommandResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+                /** @description Too Many Requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/seasons/{seasonId}/polls": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["StartPollRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CommandResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/seasons/{seasonId}/polls/{pollId}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                    pollId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SeasonActionRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CommandResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/seasons/{seasonId}/global-events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["GlobalEventView"][];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+                /** @description Too Many Requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/seasons/{seasonId}/global-events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["LaunchGlobalEventRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CommandResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/seasons/{seasonId}/global-events/{globalEventId}/end": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                    globalEventId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SeasonActionRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CommandResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/seasons/{seasonId}/weekly-challenges": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WeeklyChallengeView"][];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+                /** @description Too Many Requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/seasons/{seasonId}/weekly-challenges": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SetWeeklyChallengeRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CommandResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/seasons/{seasonId}/weekly-challenges/{challengeId}/mark": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                    challengeId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["MarkWeeklyChallengeRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CommandResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/seasons/{seasonId}/interactions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["InteractionView"][];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+                /** @description Too Many Requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/seasons/{seasonId}/coop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CoopView"] | null;
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+                /** @description Too Many Requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/seasons/{seasonId}/coop/invite": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["InviteCoopRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CommandResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+                /** @description Too Many Requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/seasons/{seasonId}/interactions/{interactionId}/answer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                    interactionId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["AnswerInvitationRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CommandResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+                /** @description Too Many Requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/seasons/{seasonId}/interactions/{interactionId}/withdraw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                    interactionId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SeasonActionRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CommandResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+                /** @description Too Many Requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/seasons/{seasonId}/coop/leave": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SeasonActionRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CommandResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+                /** @description Too Many Requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/seasons/{seasonId}/partner-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PartnerRequestView"][];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+                /** @description Too Many Requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SeasonActionRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CommandResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+                /** @description Too Many Requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/seasons/{seasonId}/partner-requests/{requestId}/respond": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                    requestId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SeasonActionRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CommandResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+                /** @description Too Many Requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/seasons/{seasonId}/partner-requests/{requestId}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                    requestId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SeasonActionRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CommandResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+                /** @description Too Many Requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/seasons/{seasonId}/duels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DuelView"][];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+                /** @description Too Many Requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ChallengeDuelRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CommandResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+                /** @description Too Many Requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/seasons/{seasonId}/suggestions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SuggestionView"][];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+                /** @description Too Many Requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SubmitSuggestionRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CommandResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+                /** @description Too Many Requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/seasons/{seasonId}/suggestions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SuggestionView"][];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+                /** @description Too Many Requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/seasons/{seasonId}/suggestions/{suggestionId}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                    suggestionId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ReviewSuggestionRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CommandResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["RejectionProblem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/accounts": {
         parameters: {
             query?: never;
@@ -7643,6 +9987,13 @@ export interface components {
             /** @default false */
             eventsEnabled: boolean;
         };
+        /** @description Which stage 5 sections exist for administrators in the selected season. */
+        AdminFeaturesView: {
+            globalEvents: boolean;
+            weeklyChallenge: boolean;
+            events: boolean;
+            suggestions: boolean;
+        };
         /**
          * @description A pending manual effect of any player, oldest first, for the admin to resolve (D-102); `irl` — an IRL one (D-509,
          *     D-820): its proof is checked in the IRL proof queue, or the admin closes it «не применимо» here; always set, optional
@@ -7724,6 +10075,12 @@ export interface components {
             commandId: string;
             /** Format: uuid */
             gameId: string;
+        };
+        /** @description Missing accept is invalid input, not a silent decline. */
+        AnswerInvitationRequest: {
+            /** Format: uuid */
+            commandId: string;
+            accept: null | boolean;
         };
         AntiforgeryToken: {
             token: string;
@@ -7946,6 +10303,20 @@ export interface components {
             /** Format: int32 */
             extraDice: number;
         };
+        /** @enum {unknown} */
+        ChallengeCheck: "auto" | "manual";
+        /** @description A player who completed the challenge, in the order of completion. */
+        ChallengeCompletionView: {
+            /** Format: uuid */
+            playerId: string;
+            name: string;
+        };
+        ChallengeDuelRequest: {
+            /** Format: uuid */
+            commandId: string;
+            /** Format: uuid */
+            opponentId: string;
+        };
         /** @description The admin renames an account or changes its role. */
         ChangeAccountRequest: {
             /** Format: uuid */
@@ -7971,14 +10342,19 @@ export interface components {
             expectedVersion: number;
             ruleset: components["schemas"]["Ruleset"];
         };
+        /** @enum {unknown} */
+        ChoiceDirection: "forward" | "back";
         /**
          * @description What the player is choosing (K-5): a game, a branch at a fork, the answer of an event (D-511).
          * @enum {unknown}
          */
         ChoiceKind: "game" | "branch" | "effect";
+        /** @description An option's raw id, optional game, data label and semantic move direction; the id is sent back unchanged. */
         ChoiceOptionView: {
             id: string;
             game: null | components["schemas"]["OfferedGameView"];
+            label?: null | string;
+            direction?: null | components["schemas"]["ChoiceDirection"];
         };
         /**
          * @description The pending choice, kept on the server: a reloaded page shows the same options (T2). A branch choice (D-304): each
@@ -7996,6 +10372,7 @@ export interface components {
             prompt?: null | string;
             objectId?: null | string;
             name?: null | string;
+            description?: null | string;
         };
         /**
          * @description An answer to the pending choice: its id and the picked option's id; for a game, `difficulty` — the one it starts on
@@ -8028,6 +10405,7 @@ export interface components {
         CommandResponse: {
             duplicate: boolean;
             events: components["schemas"]["LoggedEventView"][];
+            warnings?: null | string[];
         };
         /**
          * @description The player's latest completed run: `dice` — the dice by the hours, then the extra dice of items and events (the
@@ -8118,6 +10496,17 @@ export interface components {
              *     season created before coop reads as it did (D-50); needed once `features.coop` is on. Not written while missing.
              */
             coinsShare?: null | number;
+        };
+        /** @description The live shared run of the caller, also after new coop invitations have been switched off. */
+        CoopView: {
+            /** Format: uuid */
+            runId: string;
+            /** Format: uuid */
+            rollerId: string;
+            /** Format: uuid */
+            partnerId: string;
+            /** Format: date-time */
+            joinedAt: string;
         };
         /** @description The admin creates an account: login, name, role; the answer carries the temporary password once. */
         CreateAccountRequest: {
@@ -8261,6 +10650,8 @@ export interface components {
             /** Format: int32 */
             consecutiveExtraDice?: null | number;
         };
+        /** @enum {unknown} */
+        DuelEnd: "completed" | "forfeit" | "timeOut" | "deadline" | "winRejected" | "techReroll" | "inactive" | "firstFinisher" | "accountDeleted";
         /** @description The rules of duels (D-525, the expert panel, D-540): a race to the next completion for coins from the system. */
         DuelRules: {
             /**
@@ -8292,6 +10683,34 @@ export interface components {
             maxWinsPerSeason: number;
             /** @description A voluntary drop (or wish reroll) of a run that counts loses the duel: the opponent wins at once (D-733). */
             dropForfeits: boolean;
+        };
+        /**
+         * @description Where an accepted duel stands: the race goes on, or how it ended.
+         * @enum {unknown}
+         */
+        DuelStatus: "active" | "won" | "drawn" | "cancelled";
+        /** @description Public season races; private account ids and the internal acceptance snapshot are omitted. */
+        DuelView: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            challengerId: string;
+            /** Format: uuid */
+            opponentId: string;
+            /** Format: date-time */
+            acceptedAt: string;
+            /** Format: date-time */
+            expiresAt: string;
+            status: components["schemas"]["DuelStatus"];
+            /** Format: uuid */
+            winnerId: null | string;
+            /** Format: uuid */
+            runId: null | string;
+            /** Format: int32 */
+            coins: number;
+            end: null | components["schemas"]["DuelEnd"];
+            /** Format: date-time */
+            endedAt: null | string;
         };
         /**
          * @description Which economy mechanics the season plays (D-441): a mechanic off is not shown at all; always set, optional for older
@@ -8584,6 +11003,25 @@ export interface components {
             /** Format: int32 */
             bonusAfterList: number;
         };
+        /**
+         * @description A game's card as the pool keeps it: what a player sees and what the roll reads. string? GameCard.Note — the challenge or a
+         *     remark (SPEC «Челлендж из заметки»); string? GameCard.CompletionCondition — what counts as finishing an endless or
+         *     multiplayer game (SPEC «условие прохождения»); bool GameCard.IsCoop — a game played together.
+         */
+        GameCard: {
+            title: string;
+            tags: components["schemas"]["EquatableArrayOfstring"];
+            /** Format: double */
+            hours: null | number;
+            /** Format: int32 */
+            year: null | number;
+            steamAppId: null | string;
+            /** Format: uuid */
+            coverFileId: null | string;
+            note: null | string;
+            isCoop: boolean;
+            completionCondition?: null | string;
+        };
         /** @description What the admin looks up for a game by its title (D-118). */
         GameLookupRequest: {
             /** Format: uuid */
@@ -8670,6 +11108,55 @@ export interface components {
              */
             maxActive: number;
         };
+        /**
+         * @description Where a global event is: running until its end, or ended (D-517).
+         * @enum {unknown}
+         */
+        GlobalEventStatus: "active" | "ended";
+        /**
+         * @description A global event (D-832): the name and the description of its snapshot, its status and term, its goal. Also the banner of
+         *     the season view (`globalEvents`), where only the running ones are.
+         */
+        GlobalEventView: {
+            /** Format: uuid */
+            id: string;
+            objectId: string;
+            name: string;
+            description: string;
+            status: components["schemas"]["GlobalEventStatus"];
+            /** Format: date-time */
+            startsAt: string;
+            /** Format: date-time */
+            endsAt: string;
+            goal: null | components["schemas"]["GlobalGoalView"];
+        };
+        /**
+         * @description The goal of a global event: `target` of `metric` together; `reward` — the effect (CONTENT.md «эффект»)
+         *     everyone gets when it is reached.
+         */
+        GlobalGoalRequest: {
+            metric: components["schemas"]["GoalMetric"];
+            /** Format: int32 */
+            target: number;
+            reward?: unknown;
+        };
+        /**
+         * @description A goal's progress (D-518, D-800): `progress` — the sum of the contributions in force (a rejected run's is gone);
+         *     `reached` — the goal was reached once, which stays.
+         */
+        GlobalGoalView: {
+            metric: components["schemas"]["GoalMetric"];
+            /** Format: int32 */
+            target: number;
+            /** Format: double */
+            progress: number;
+            reached: boolean;
+        };
+        /**
+         * @description What a global goal counts (D-518): the HowLongToBeat hours of the completed games, or the completions.
+         * @enum {unknown}
+         */
+        GoalMetric: "hours" | "runs";
         HostileCap: {
             enabled: boolean;
             /** Format: int32 */
@@ -8716,6 +11203,17 @@ export interface components {
             settled: boolean;
             isIntact?: boolean;
         };
+        /** @description Availability of new invitations and of the public partner board in this season. */
+        InteractionFeaturesView: {
+            coop: boolean;
+            duels: boolean;
+            partnerBoard: boolean;
+        };
+        /**
+         * @description What an invitation is about (SPEC «Модель данных» Interaction, D-523): a coop now, a duel with task 5.12.
+         * @enum {unknown}
+         */
+        InteractionKind: "coop" | "duel";
         InteractionRules: {
             /** Format: int32 */
             inviteTtlHours: number;
@@ -8725,6 +11223,33 @@ export interface components {
              *     before invitations reads as it did (D-50); needed once `features.coop` is on. Not written while missing.
              */
             maxOpenInvitesPerPlayer?: null | number;
+        };
+        /**
+         * @description Where an invitation stands (GLOSSARY «Ответ на приглашение»).
+         * @enum {unknown}
+         */
+        InteractionStatus: "pending" | "accepted" | "declined" | "withdrawn" | "expired";
+        /**
+         * @description A participant's own incoming or outgoing invitation. A pending board response also has its effective deadline,
+         *     the earlier of the invitation and the matched request's scheduled deadlines (D-742).
+         */
+        InteractionView: {
+            /** Format: uuid */
+            id: string;
+            kind: components["schemas"]["InteractionKind"];
+            /** Format: uuid */
+            fromPlayerId: string;
+            /** Format: uuid */
+            toPlayerId: string;
+            /** Format: uuid */
+            runId: null | string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            expiresAt: string;
+            status: components["schemas"]["InteractionStatus"];
+            /** Format: date-time */
+            effectiveExpiresAt?: null | string;
         };
         /**
          * @description An object I hold: its definition's name and description, what is left of its lifetime, who put it on me. `usable` —
@@ -8754,6 +11279,12 @@ export interface components {
             choosesTarget: boolean;
             targets: components["schemas"]["ItemTargetView"][];
             steps: components["schemas"]["ItemStepView"][];
+        };
+        InviteCoopRequest: {
+            /** Format: uuid */
+            commandId: string;
+            /** Format: uuid */
+            partnerId: string;
         };
         /**
          * @description An IRL proof waiting for the admin (D-509, D-820), oldest first: whose, the event (its card from the content in force),
@@ -8858,6 +11389,18 @@ export interface components {
             steps: components["schemas"]["EquatableArrayOfLengthFilterStep"];
         };
         /**
+         * @description The admin launches the event `objectId` of the season's content on everyone for `durationHours` (D-517, D-832),
+         *     with a goal or without.
+         */
+        LaunchGlobalEventRequest: {
+            /** Format: uuid */
+            commandId: string;
+            objectId: string;
+            /** Format: int32 */
+            durationHours: number;
+            goal?: null | components["schemas"]["GlobalGoalRequest"];
+        };
+        /**
          * @description A leaderboard row in place order (D-100): tied players share `place`; `isFirst` — the first finisher, on top
          *     whatever the points, `provisional` until frozen; `cellsToFinish` — fewest forward steps to the finish.
          */
@@ -8904,6 +11447,8 @@ export interface components {
             /** @default false */
             irl: boolean;
             irlProof?: null | components["schemas"]["IrlProofView"];
+            name?: null | string;
+            description?: null | string;
         };
         /**
          * @description The picture under the map (D-277): an uploaded map background (`POST …/map/background`) and its natural size in
@@ -8968,6 +11513,15 @@ export interface components {
             /** Format: int32 */
             minZoneGames?: null | number;
         };
+        /** @description The admin marks `playerId` as having completed a manual challenge with the run `runId` (D-526). */
+        MarkWeeklyChallengeRequest: {
+            /** Format: uuid */
+            commandId: string;
+            /** Format: uuid */
+            playerId: string;
+            /** Format: uuid */
+            runId: string;
+        };
         /**
          * @description One leg of my latest move: the cells entered from `from` in order. `reason` `teleport` is a transfer,
          *     not a walk (D-303); a leg that stopped at a fork with steps left is followed by a branch choice (D-304).
@@ -9015,6 +11569,11 @@ export interface components {
          *     latest completed run is `lastCompleted` and never here (K1S-1, K1S-9, D-602). `waitingEvents` — my drawn events
          *     waiting for my future steps; `waitingConditions` — the conditions of events waiting for my next roll (D-821, D-823);
          *     both always set (empty with events off), optional for older clients.
+         *     `eventsEnabled` — whether event answers and IRL proofs are open, including a question retained while off;
+         *     `irlProofMaxFiles` — the current limit of pictures per IRL proof (zero allows a link only). Both always set.
+         *     `partnerRequest` is my open request, including while the board is off. `hasInteractionActions`
+         *     keeps access to residual coop while coop is off. `activeDuels` are my races while playing.
+         *     `isCoopPartner` distinguishes the invited partner from the roller who submits the run's result.
          */
         MyTurnView: {
             /** Format: uuid */
@@ -9045,6 +11604,13 @@ export interface components {
             checks?: null | components["schemas"]["CompletedRunView"][];
             waitingEvents?: null | components["schemas"]["WaitingEventView"][];
             waitingConditions?: null | components["schemas"]["RunConditionView"][];
+            eventsEnabled?: null | boolean;
+            /** Format: int32 */
+            irlProofMaxFiles?: null | number;
+            partnerRequest?: null | components["schemas"]["PartnerRequestView"];
+            hasInteractionActions?: null | boolean;
+            activeDuels?: null | components["schemas"]["DuelView"][];
+            isCoopPartner?: null | boolean;
         };
         NominationRules: {
             auto: components["schemas"]["EquatableArrayOfAutoNomination"];
@@ -9067,6 +11633,7 @@ export interface components {
             hours: null | number;
             marks: components["schemas"]["GameMarkView"][];
             cover?: null | components["schemas"]["FileLinkView"];
+            conditions?: null | components["schemas"]["RunConditionView"][];
         };
         /** @description The rules of the partner board (SPEC «Взаимодействие игроков», D-524). */
         PartnerBoardRules: {
@@ -9075,6 +11642,26 @@ export interface components {
              * @description How many hours a request «ищу напарника» stays open unless something closes it earlier.
              */
             requestTtlHours: number;
+        };
+        /**
+         * @description Where a request of the partner board stands (GLOSSARY «Доска „ищу напарника“»).
+         * @enum {unknown}
+         */
+        PartnerRequestStatus: "open" | "closed";
+        /** @description An open request for a partner to its author's running coop game. */
+        PartnerRequestView: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            playerId: string;
+            /** Format: uuid */
+            runId: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            expiresAt: string;
+            status: components["schemas"]["PartnerRequestStatus"];
+            gameTitle?: null | string;
         };
         PenaltyDice: {
             /** Format: int32 */
@@ -9110,12 +11697,23 @@ export interface components {
             avatar: null | components["schemas"]["FileLinkView"];
             /** Format: int32 */
             token: number;
+            isInactive?: null | boolean;
         };
         /** @description A player whose next roll would find no game: the empty-pool signal. */
         PlayerWithoutGamesView: {
             /** Format: uuid */
             id: string;
             name: string;
+        };
+        PollCountView: {
+            optionId: string;
+            /** Format: int32 */
+            votes: number;
+        };
+        /** @description An option of the poll: the id a vote names, the words the screen shows. */
+        PollOptionView: {
+            id: string;
+            label: string;
         };
         /** @description The rules of polls (SPEC «Голосования», D-512, D-513, D-541). */
         PollRules: {
@@ -9128,6 +11726,49 @@ export interface components {
             allowChangeVote: boolean;
             /** @description Whether a poll shows its counts before the close when it does not say (D-541); never for an anonymous one. */
             showLiveCountsDefault: boolean;
+        };
+        /**
+         * @description Who started a poll (D-512): the admin with a PollDefinition, or a drawn event's `requestChoice.vote`.
+         * @enum {unknown}
+         */
+        PollSource: "admin" | "event" | "globalEvent";
+        /**
+         * @description Where a poll is: open for votes, closed with its result, or cancelled by the deadline (D-516).
+         * @enum {unknown}
+         */
+        PollStatus: "open" | "closed" | "cancelled";
+        /**
+         * @description A poll as everyone sees it (D-830, D-831): the snapshot of its options, who votes, whether it is anonymous, its status
+         *     and term. `counts` — the votes per option, only while the poll shows live counts or once it is closed (D-541);
+         *     `result` — the option that won, after the close; `myVote` — the signed-in user's own vote, null to anyone
+         *     else. No answer names a voter. `voting` describes whether the current session may cast a new or different vote;
+         *     posting the option already held remains a refusal.
+         */
+        PollView: {
+            /** Format: uuid */
+            id: string;
+            question: string;
+            options: components["schemas"]["PollOptionView"][];
+            voters: components["schemas"]["PollVoters"];
+            anonymous: boolean;
+            status: components["schemas"]["PollStatus"];
+            /** Format: date-time */
+            startedAt: string;
+            /** Format: date-time */
+            closesAt: string;
+            counts: null | components["schemas"]["PollCountView"][];
+            result: null | string;
+            myVote: null | string;
+            source: components["schemas"]["PollSource"];
+            voting?: null | components["schemas"]["PollVotingView"];
+        };
+        /** @enum {unknown} */
+        PollVoters: "players" | "everyone";
+        /** @description The signed-in user's current voting availability; a later POST still checks the authoritative rules. */
+        PollVotingView: {
+            canVote: boolean;
+            reason: null | string;
+            allowChangeVote: boolean;
         };
         PoolActionRequest: {
             /** Format: uuid */
@@ -9409,6 +12050,13 @@ export interface components {
             rating: number;
             text?: null | string;
         };
+        /** @description The admin's explicit decision; a missing answer must not silently reject a suggestion. */
+        ReviewSuggestionRequest: {
+            /** Format: uuid */
+            commandId: string;
+            approve: null | boolean;
+            comment?: null | string;
+        };
         ReviewView: {
             /** Format: int32 */
             rating: number;
@@ -9578,6 +12226,7 @@ export interface components {
             /** Format: double */
             hours: null | number;
             cover?: null | components["schemas"]["FileLinkView"];
+            isCoop?: null | boolean;
         };
         /** @enum {unknown} */
         RunStatus: "playing" | "completed" | "dropped" | "techRerolled" | "rejected";
@@ -9656,6 +12305,13 @@ export interface components {
             /** Format: date-time */
             createdAt: string;
         };
+        /** @description The selected season's navigation flags, without its map, players or folded event state. */
+        SeasonNavigationView: {
+            /** Format: uuid */
+            id: string;
+            pollsEnabled: boolean;
+            adminFeatures?: null | components["schemas"]["AdminFeaturesView"];
+        };
         SeasonRules: {
             timezone: string;
             /** Format: int32 */
@@ -9694,7 +12350,8 @@ export interface components {
          *     lifecycle (D-101); after the finish `leaderboard` is the recorded result. The map is the one in force (the
          *     latest published, D-300): `cells`, `edges` and `zones`; `mapMode` says whether the season plays
          *     on the linear chain of stage 1 or on the graph (D-301); `background` — the picture under the cells, null when
-         *     the map has none or its file is not on this site (D-277).
+         *     the map has none or its file is not on this site (D-277). `globalEvents` — the banner of the global events running
+         *     now (D-832; always set, empty while the mechanic is off, optional for older clients).
          */
         SeasonView: {
             /** Format: uuid */
@@ -9714,6 +12371,9 @@ export interface components {
             mapMode: components["schemas"]["MapMode"];
             background?: null | components["schemas"]["MapBackgroundView"];
             economy?: null | components["schemas"]["EconomyFeaturesView"];
+            globalEvents?: null | components["schemas"]["GlobalEventView"][];
+            pollsEnabled?: null | boolean;
+            interactionFeatures?: null | components["schemas"]["InteractionFeaturesView"];
         };
         /**
          * @description A live session of the signed-in user (D-466): `userAgent` — the browser's own description at the sign-in, which
@@ -9728,6 +12388,17 @@ export interface components {
             /** Format: date-time */
             lastSeenAt: string;
             current: boolean;
+        };
+        /**
+         * @description The admin sets a weekly challenge (D-526, D-833): `challenge` is the challenge of CONTENT.md «челлендж недели», its
+         *     window starts at `startsAt` and lasts `weeklyChallenge.durationDays`.
+         */
+        SetWeeklyChallengeRequest: {
+            /** Format: uuid */
+            commandId: string;
+            challenge: components["schemas"]["JsonElement"];
+            /** Format: date-time */
+            startsAt: string;
         };
         /** @description A lot of my offer; `refusal` — the engine's code when buying it is refused now (sold, too few coins, the inventory full…), D-447. */
         ShopLotView: {
@@ -9818,6 +12489,12 @@ export interface components {
             commentsPerDay: number;
             spectatorsCanVote: boolean;
         };
+        /** @description The admin starts a poll (D-512): `poll` is the poll of CONTENT.md «голосование». */
+        StartPollRequest: {
+            /** Format: uuid */
+            commandId: string;
+            poll: components["schemas"]["JsonElement"];
+        };
         /**
          * @description Start the offered game; `gameId` — the game the page showed: another one offered now is refused (409 turn.stale, D-600);
          *     `difficulty` — the one the player starts on, the cap of the completion's (D-633).
@@ -9847,6 +12524,16 @@ export interface components {
             thumbnailUrl: string;
             duplicate: boolean;
         };
+        /** @description A player's idea; a game uses the same card as the pool. The author comes from the session. */
+        SubmitSuggestionRequest: {
+            /** Format: uuid */
+            commandId: string;
+            kind: null | components["schemas"]["SuggestionKind"];
+            text: null | string;
+            game?: null | components["schemas"]["GameCard"];
+        };
+        /** @enum {unknown} */
+        SuggestionKind: "game" | "event" | "item";
         /** @description The rules of the suggestion box (SPEC «Предложка», D-527). */
         SuggestionRules: {
             /**
@@ -9854,6 +12541,22 @@ export interface components {
              * @description How many suggestions one player may send a calendar day of `season.timezone`.
              */
             perDay: number;
+        };
+        /** @enum {unknown} */
+        SuggestionStatus: "pending" | "approved" | "rejected";
+        /** @description A suggestion and the moderation visible to its author and the admin, without an account id. */
+        SuggestionView: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            playerId: string;
+            kind: components["schemas"]["SuggestionKind"];
+            text: string;
+            game: null | components["schemas"]["GameCard"];
+            /** Format: date-time */
+            submittedAt: string;
+            status: components["schemas"]["SuggestionStatus"];
+            comment: null | string;
         };
         TargetObjectsView: {
             /** Format: uuid */
@@ -9978,15 +12681,24 @@ export interface components {
         };
         /** @enum {unknown} */
         UseWindow: "beforeRoll" | "afterRoll" | "beforeDice" | "afterDice" | "anytime";
+        /** @description A vote of the signed-in user (D-513, D-830): the option's id from the poll's snapshot. The voter is never in the body. */
+        VoteRequest: {
+            /** Format: uuid */
+            commandId: string;
+            optionId: string;
+        };
         /**
          * @description An event I drew whose effect waits for my future steps (SPEC «Ивенты копятся», D-505, D-823): a change of my next roll
-         *     or of my next throw; `kind` — the kind of the deck it came from.
+         *     or of my next throw; `kind` — the kind of the deck it came from. `waitingForRoll` and
+         *     `waitingForThrow` describe what still waits, not every action in the original description. Always set by the server.
          */
         WaitingEventView: {
             objectId: string;
             name: string;
             description: string;
             kind: components["schemas"]["EventKind"];
+            waitingForRoll?: null | boolean;
+            waitingForThrow?: null | boolean;
         };
         /**
          * @description The admin marks the conditions of a completed run «не применимо» (D-546 (2), D-821): the run counts as if they were met
@@ -10006,6 +12718,24 @@ export interface components {
              *     it did (D-50); needed once `features.weeklyChallenge` is on. Not written while missing.
              */
             durationDays?: null | number;
+        };
+        /**
+         * @description A weekly challenge (D-833): its words, how it is checked, what it pays, its window and who completed it (the completions
+         *     in force: a rejected run's is gone).
+         */
+        WeeklyChallengeView: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            description: string;
+            check: components["schemas"]["ChallengeCheck"];
+            /** Format: int32 */
+            rewardCoins: number;
+            /** Format: date-time */
+            startsAt: string;
+            /** Format: date-time */
+            endsAt: string;
+            completedBy: components["schemas"]["ChallengeCompletionView"][];
         };
         /**
          * @description The wheel of the roll that offered what I see now (D-136), from the log: the categories that were on it, the one it
@@ -10077,15 +12807,23 @@ type ReadonlyArray<T> = [
 export const betStatusValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["BetStatus"]> = ["open", "won", "lost", "revoked"];
 export const bugReportStatusValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["BugReportStatus"]> = ["new", "inWork", "closed"];
 export const cellTypeValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["CellType"]> = ["start", "empty", "finish", "fork", "teleport", "checkpoint", "pointsBonus", "event", "shop"];
+export const challengeCheckValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ChallengeCheck"]> = ["auto", "manual"];
+export const choiceDirectionValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ChoiceDirection"]> = ["forward", "back"];
 export const choiceKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ChoiceKind"]> = ["game", "branch", "effect"];
 export const coopRoundUpForValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["CoopRoundUpFor"]> = ["roller"];
 export const diceStageValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["DiceStage"]> = ["count", "sides", "add", "multiply", "reroll", "min", "max", "singleDie", "setOne", "replaceValue", "fixAverage", "bonusPerEven", "percent"];
 export const difficultyValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["Difficulty"]> = ["easy", "normal", "hard", "extreme"];
+export const duelEndValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["DuelEnd"]> = ["completed", "forfeit", "timeOut", "deadline", "winRejected", "techReroll", "inactive", "firstFinisher", "accountDeleted"];
+export const duelStatusValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["DuelStatus"]> = ["active", "won", "drawn", "cancelled"];
 export const emptyPoolFallbackValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["EmptyPoolFallback"]> = ["dropZoneFilter"];
 export const eventKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["EventKind"]> = ["good", "bad", "special", "risky"];
 export const eventSourceValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["EventSource"]> = ["cell", "item", "difficulty", "incoming", "rerollCost", "dropPenalty"];
 export const exclusionReasonValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ExclusionReason"]> = ["alreadyPlayed", "dropped", "techRerolled"];
 export const gameMarkKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["GameMarkKind"]> = ["dropped", "techRerolled"];
+export const globalEventStatusValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["GlobalEventStatus"]> = ["active", "ended"];
+export const goalMetricValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["GoalMetric"]> = ["hours", "runs"];
+export const interactionKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["InteractionKind"]> = ["coop", "duel"];
+export const interactionStatusValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["InteractionStatus"]> = ["pending", "accepted", "declined", "withdrawn", "expired"];
 export const irlProofStatusValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["IrlProofStatus"]> = ["pending", "approved", "rejected"];
 export const itemStepKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ItemStepKind"]> = ["choice", "pickObject", "direction"];
 export const mandatoryEventValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["MandatoryEvent"]> = ["bad", "none"];
@@ -10094,6 +12832,10 @@ export const manualEffectSourceValues: ReadonlyArray<FlattenedDeepRequired<compo
 export const mapModeValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["MapMode"]> = ["linear", "graph"];
 export const moveReasonValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["MoveReason"]> = ["completionRoll", "startingCell", "adminAdjustment", "dropPenalty", "runCorrection", "proofRejected", "teleport", "item", "itemTeleport", "diceModified"];
 export const objectKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ObjectKind"]> = ["item", "effect", "specialRoll", "event", "achievement"];
+export const partnerRequestStatusValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["PartnerRequestStatus"]> = ["open", "closed"];
+export const pollSourceValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["PollSource"]> = ["admin", "event", "globalEvent"];
+export const pollStatusValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["PollStatus"]> = ["open", "closed", "cancelled"];
+export const pollVotersValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["PollVoters"]> = ["players", "everyone"];
 export const proofStatusValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ProofStatus"]> = ["pending", "approved", "rejected"];
 export const rarityValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["Rarity"]> = ["common", "epic", "legendary"];
 export const rerollCostKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["RerollCostKind"]> = ["coins", "badEvent"];
@@ -10105,6 +12847,8 @@ export const runStatusValues: ReadonlyArray<FlattenedDeepRequired<components>["s
 export const seasonStatusValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["SeasonStatus"]> = ["draft", "active", "closing", "finished", "archived"];
 export const shopPaymentValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["ShopPayment"]> = ["freeRoll", "coins"];
 export const siteEnvironmentValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["SiteEnvironment"]> = ["production", "staging", "development", "test", "other"];
+export const suggestionKindValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["SuggestionKind"]> = ["game", "event", "item"];
+export const suggestionStatusValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["SuggestionStatus"]> = ["pending", "approved", "rejected"];
 export const techRerollReasonValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["TechRerollReason"]> = ["weakPc", "paidUnavailable", "doesNotLaunch", "emulatorTooSlow", "other", "wish"];
 export const turnPhaseValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["TurnPhase"]> = ["idle", "rolling", "playing"];
 export const unmetConditionPolicyValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["UnmetConditionPolicy"]> = ["noDiceKeepCoins", "countAsDrop", "ignore"];

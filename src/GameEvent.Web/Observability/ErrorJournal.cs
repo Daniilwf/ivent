@@ -1,7 +1,6 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Security.Claims;
-using GameEvent.Engine.Kernel;
 using Microsoft.AspNetCore.Diagnostics;
 
 namespace GameEvent.Web.Observability;
@@ -36,7 +35,7 @@ public sealed class ErrorJournal
             at,
             http.Request.Method,
             Printable(http.Request.Path.Value ?? ""),
-            http.User.Identity?.IsAuthenticated == true ? http.User.FindFirstValue(ClaimTypes.Name) : null,
+            http.User.Identity?.IsAuthenticated == true && !IsVote(http.Request.Path) ? http.User.FindFirstValue(ClaimTypes.Name) : null,
             exception.GetType().FullName ?? exception.GetType().Name,
             Truncate(exception.Message, MaxMessage),
             Truncate(exception.StackTrace ?? "", MaxStackTrace),
@@ -48,6 +47,13 @@ public sealed class ErrorJournal
 
         return entry;
     }
+
+    /// <summary>
+    /// A vote's request names no user (D-541, D-831): the page would tell who voted in an anonymous poll. Every vote is
+    /// treated so, whatever the poll: the journal does not read the season.
+    /// </summary>
+    internal static bool IsVote(PathString path) =>
+        path.Value?.TrimEnd('/') is { } value && value.EndsWith("/vote", StringComparison.OrdinalIgnoreCase) && value.Contains("/polls/", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>The path is percent-decoded: control characters are escaped so that it cannot forge a line of the log.</summary>
     internal static string Printable(string text) => text.Any(char.IsControl)
@@ -61,11 +67,12 @@ public sealed class ErrorJournal
 /// Records every unhandled exception of a request in the journal and the log, then lets the standard handler answer
 /// 500 with a problem that tells the client nothing about the inside (D-107).
 /// </summary>
-public sealed partial class JournalExceptionHandler(ErrorJournal journal, IClock clock, ILogger<JournalExceptionHandler> logger) : IExceptionHandler
+public sealed partial class JournalExceptionHandler(ErrorJournal journal, TimeProvider time, ILogger<JournalExceptionHandler> logger) : IExceptionHandler
 {
     public ValueTask<bool> TryHandleAsync(HttpContext httpContext, Exception exception, CancellationToken cancellationToken)
     {
-        var entry = journal.Add(httpContext, exception, clock.UtcNow);
+        // The wall clock, not the game's: the game's clock may be what failed, and an error happened when it happened
+        var entry = journal.Add(httpContext, exception, time.GetUtcNow());
         LogUnhandled(logger, exception, entry.Method, entry.Path, entry.UserLogin ?? "-", entry.Id);
         return ValueTask.FromResult(false);
     }

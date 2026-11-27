@@ -7,7 +7,7 @@ import { AdminScreen } from './AdminScreen';
 import { forgetSiteEnvironment } from '../app/siteStatus';
 
 // H9, D-221: the test tools — scenarios, the site's clock and its randomness — for the admin, only where the test
-// endpoints exist (Development and Test); on the live site the section is neither listed nor opened.
+// endpoints exist (Development, Test, and Staging); on the live site the section is neither listed nor opened.
 
 vi.mock('../api/realtime', () => ({ watchSeason: () => () => undefined }));
 
@@ -33,7 +33,14 @@ const player = (id: string, name: string) => ({
 const tools = (shiftMinutes = 0, seed: number | null = null) => ({
   clock: { now: '2026-10-01T09:00:00Z', adjustable: true, shiftMinutes },
   random: { seed, seedable: true },
-  scenarios: ['finish-soon', 'deadline-in-hour', 'five-manual-effects'],
+  scenarios: [
+    'finish-soon',
+    'deadline-in-hour',
+    'five-manual-effects',
+    'irl-proof-pending',
+    'coop-invitation',
+    'poll-and-global-goal',
+  ],
 });
 
 const status = (testTools: boolean, environment = testTools ? 'development' : 'production') => ({
@@ -75,7 +82,7 @@ describe('The test tools', () => {
     expect(screen.getByTestId('test-random-state')).toHaveTextContent(t.unseeded);
     expect(screen.queryByTestId('random-unseed')).toBeNull();
     const choice = await screen.findByTestId('scenario-choice');
-    for (const name of ['finish-soon', 'deadline-in-hour', 'five-manual-effects'])
+    for (const name of tools().scenarios)
       expect(
         within(choice).getByRole('radio', { name: t.scenarioNames[name] ?? name }),
       ).toBeInTheDocument();
@@ -105,6 +112,14 @@ describe('The test tools', () => {
     expect(sent.map((c) => c.body)).toEqual([{ playerId: petya }]);
   });
 
+  it('describes availability on the test copy when the tools are open there', async () => {
+    site({ 'GET /api/status': status(true, 'staging') });
+    open();
+
+    expect(await screen.findByTestId('test-clock-now')).toBeVisible();
+    expect(screen.getByText(/разработке, в тестах и на тестовой копии/)).toBeVisible();
+  });
+
   it('load the deadline without a player', async () => {
     const server = site({
       'POST /api/test/seasons/*/scenarios/*': {
@@ -126,6 +141,34 @@ describe('The test tools', () => {
     await waitFor(() => {
       expect(server.sent('POST', '/scenarios/deadline-in-hour').map((c) => c.body)).toEqual([{}]);
     });
+  });
+
+  it('loads the poll and global goal without selecting a player', async () => {
+    const server = site({
+      'GET /api/admin/seasons/*/players': [],
+      'POST /api/test/seasons/*/scenarios/*': {
+        scenario: 'poll-and-global-goal',
+        commands: ['LaunchGlobalEvent', 'StartPoll'],
+      },
+    });
+    open();
+
+    await userEvent.click(
+      await screen.findByRole('radio', { name: t.scenarioNames['poll-and-global-goal'] ?? '' }),
+    );
+    expect(screen.queryByTestId('scenario-player')).toBeNull();
+    expect(screen.getByTestId('scenario-about')).toHaveTextContent(
+      t.scenarioAbout['poll-and-global-goal'] ?? '',
+    );
+    expect(screen.getByTestId('scenario-load')).toBeEnabled();
+    await userEvent.click(screen.getByTestId('scenario-load'));
+
+    expect(
+      await screen.findByText(`${t.done['poll-and-global-goal']?.('') ?? ''} ${t.undoHint}`),
+    ).toBeInTheDocument();
+    expect(server.sent('POST', '/scenarios/poll-and-global-goal').map((call) => call.body)).toEqual(
+      [{}],
+    );
   });
 
   it('say calmly that a scenario loaded before is already in place', async () => {

@@ -6,6 +6,8 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 export type Route =
   | { kind: 'season' }
   | { kind: 'feed'; seasonId: string | null }
+  | { kind: 'polls'; seasonId: string | null }
+  | { kind: 'interactions'; seasonId: string | null }
   | { kind: 'profile'; userId: string }
   | { kind: 'game'; gameId: string }
   | { kind: 'pool' }
@@ -16,22 +18,30 @@ export type Route =
 
 const id = '([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})';
 const seasonFeed = new RegExp(`^/seasons/${id}/feed$`);
+const seasonPolls = new RegExp(`^/seasons/${id}/polls$`);
+const seasonInteractions = new RegExp(`^/seasons/${id}/interactions$`);
 const profile = new RegExp(`^/users/${id}$`);
 const game = new RegExp(`^/games/${id}$`);
 const admin = /^\/admin(?:\/([a-z]+))?$/;
 
 /**
  * What page an address opens: `/`, `/feed` (the current season), `/seasons/{id}/feed`, `/users/{id}`, `/games/{id}`,
- * `/pool`, `/rules`, `/admin` and `/admin/{section}`
+ * `/pool`, `/rules`, `/polls`, `/seasons/{id}/polls`, `/admin` and `/admin/{section}`
  */
 export function routeOf(path: string): Route {
   const clean = path.replace(/\/+$/, '') || '/';
   if (clean === '/') return { kind: 'season' };
   if (clean === '/feed') return { kind: 'feed', seasonId: null };
+  if (clean === '/polls') return { kind: 'polls', seasonId: null };
+  if (clean === '/interactions') return { kind: 'interactions', seasonId: null };
   if (clean === '/pool') return { kind: 'pool' };
   if (clean === '/rules') return { kind: 'rules' };
   let match = seasonFeed.exec(clean);
   if (match?.[1]) return { kind: 'feed', seasonId: match[1] };
+  match = seasonPolls.exec(clean);
+  if (match?.[1]) return { kind: 'polls', seasonId: match[1] };
+  match = seasonInteractions.exec(clean);
+  if (match?.[1]) return { kind: 'interactions', seasonId: match[1] };
   match = profile.exec(clean);
   if (match?.[1]) return { kind: 'profile', userId: match[1] };
   match = game.exec(clean);
@@ -44,6 +54,9 @@ export function routeOf(path: string): Route {
 export const paths = {
   season: () => '/',
   feed: (seasonId?: string) => (seasonId ? `/seasons/${seasonId}/feed` : '/feed'),
+  polls: (seasonId?: string) => (seasonId ? `/seasons/${seasonId}/polls` : '/polls'),
+  interactions: (seasonId?: string) =>
+    seasonId ? `/seasons/${seasonId}/interactions` : '/interactions',
   profile: (userId: string) => `/users/${userId}`,
   game: (gameId: string) => `/games/${gameId}`,
   pool: () => '/pool',

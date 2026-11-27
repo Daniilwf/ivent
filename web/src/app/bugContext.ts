@@ -30,6 +30,12 @@ export function recordError(text: string) {
 /** A request as the context keeps it: the method, the path without ids and the answer's status. */
 export function recordRequest(method: string, url: string, status: number) {
   const path = new URL(url, globalThis.location.origin).pathname.replace(ids, '…');
+  // A timestamp in a named report could identify a voter, including the immediate list refresh after a vote.
+  if (
+    (method.toUpperCase() === 'POST' && /^\/api\/seasons\/…\/polls\/…\/vote\/?$/i.test(path)) ||
+    (method.toUpperCase() === 'GET' && /^\/api\/seasons\/…\/polls\/?$/i.test(path))
+  )
+    return;
   recordAction(`${method} ${path} → ${status}`);
 }
 
@@ -49,7 +55,7 @@ export function describe(element: Element): string {
 /** An element's text without the fields inside it: a label around a text area never carries what was typed. */
 function visibleText(element: Element): string {
   const copy = element.cloneNode(true) as Element;
-  copy.querySelectorAll('input, textarea, select').forEach((field) => {
+  copy.querySelectorAll('input, textarea, select, [data-private]').forEach((field) => {
     field.remove();
   });
   return copy.textContent;
@@ -69,7 +75,8 @@ export function message(reason: unknown): string {
 /** Starts keeping the context; the answer stops it (tests start and stop it around each case). */
 export function startBugContext(): () => void {
   const onClick = (event: MouseEvent) => {
-    if (event.target instanceof Element) recordAction(describe(event.target));
+    if (event.target instanceof Element && !event.target.closest('[data-private]'))
+      recordAction(describe(event.target));
   };
   const onError = (event: ErrorEvent) => {
     recordError(event.error instanceof Error ? message(event.error) : event.message);

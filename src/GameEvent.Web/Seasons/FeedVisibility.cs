@@ -256,9 +256,18 @@ public static class FeedVisibility
     {
         foreach (var poll in (data["polls"] as JsonArray ?? []).OfType<JsonObject>())
         {
-            // A poll without live counts does not show its votes before the result either (D-726)
-            if (poll["anonymous"]?.GetValue<bool>() == true || poll["showLiveCounts"]?.GetValue<bool>() != true)
+            if (poll["anonymous"]?.GetValue<bool>() == true)
             {
+                // An anonymous poll brought back by an undo is named, nothing more: what it offers and how it stands
+                // would hint at the vote taken away (D-831)
+                foreach (var key in poll.Select(p => p.Key).Where(k => k is not ("pollId" or "question" or "anonymous" or "status")).ToList())
+                {
+                    poll.Remove(key);
+                }
+            }
+            else if (poll["showLiveCounts"]?.GetValue<bool>() != true)
+            {
+                // A poll without live counts does not show its votes before the result either (D-726)
                 poll.Remove("votes");
             }
         }

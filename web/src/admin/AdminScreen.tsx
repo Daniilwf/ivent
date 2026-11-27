@@ -1,6 +1,8 @@
 import {
   Boxes,
+  BadgeCheck,
   Bug,
+  CalendarDays,
   CalendarCog,
   ClipboardCheck,
   FileJson,
@@ -11,6 +13,7 @@ import {
   Menu as MenuIcon,
   ServerCrash,
   Sparkles,
+  Lightbulb,
   UserCog,
   Users,
   Wrench,
@@ -39,6 +42,10 @@ import { PlayersSection } from './PlayersSection';
 import { PoolSection } from './PoolSection';
 import { ProofQueue } from './ProofQueue';
 import { RulesSection } from './RulesSection';
+import { GlobalEventsSection } from './GlobalEventsSection';
+import { IrlProofQueue } from './IrlProofQueue';
+import { SuggestionsSection } from './SuggestionsSection';
+import { WeeklyChallengesSection } from './WeeklyChallengesSection';
 import { SeasonSection } from './SeasonSection';
 import { SiteSection } from './SiteSection';
 import { TestToolsSection } from './TestToolsSection';
@@ -67,6 +74,10 @@ const sections: { id: AdminSectionId; icon: ReactNode; season: boolean }[] = [
   { id: 'rules', icon: <FileJson size={20} aria-hidden />, season: true },
   { id: 'map', icon: <MapIcon size={20} aria-hidden />, season: true },
   { id: 'content', icon: <Boxes size={20} aria-hidden />, season: true },
+  { id: 'irlproofs', icon: <BadgeCheck size={20} aria-hidden />, season: true },
+  { id: 'suggestions', icon: <Lightbulb size={20} aria-hidden />, season: true },
+  { id: 'globalevents', icon: <Sparkles size={20} aria-hidden />, season: true },
+  { id: 'weeklychallenges', icon: <CalendarDays size={20} aria-hidden />, season: true },
   { id: 'season', icon: <CalendarCog size={20} aria-hidden />, season: false },
   { id: 'pool', icon: <Library size={20} aria-hidden />, season: false },
   { id: 'accounts', icon: <UserCog size={20} aria-hidden />, season: false },
@@ -83,6 +94,13 @@ function adminSection(name: string | null): AdminSectionId {
 }
 
 const href = (id: AdminSectionId) => paths.admin(id === 'proofs' ? undefined : id);
+
+const stage5Features: Partial<Record<AdminSectionId, keyof Schemas['AdminFeaturesView']>> = {
+  globalevents: 'globalEvents',
+  weeklychallenges: 'weeklyChallenge',
+  irlproofs: 'events',
+  suggestions: 'suggestions',
+};
 
 // Season updates come in bursts while people play: the admin's reads are rate-limited, so they are refreshed at most
 // this often
@@ -113,7 +131,22 @@ export function AdminScreen({
       ? kept
       : currentSeasonId;
   const season = listed?.find((s) => s.id === seasonId) ?? null;
-  const version = useSeasonVersion(seasonId, { throttleMs: refreshEveryMs });
+  const version = useSeasonVersion(seasonId, { throttleMs: refreshEveryMs, refreshOnJoin: true });
+  const feature = stage5Features[section];
+  const available = useLoaded(
+    useCallback(async () => {
+      if (!seasonId) return { kind: 'ready' as const, value: null };
+      const answer = answerOf(
+        await api.GET('/api/seasons/{seasonId}/navigation', {
+          params: { path: { seasonId }, query: { includeAdmin: true } },
+        }),
+      );
+      return answer.kind === 'ready'
+        ? { kind: 'ready' as const, value: answer.value.adminFeatures ?? null }
+        : answer;
+    }, [seasonId]),
+    { version },
+  );
   const [sheet, setSheet] = useState(false);
   // A section picked in the sheet takes the focus to its heading, not back to the «Разделы» button
   const picked = useRef(false);
@@ -141,7 +174,13 @@ export function AdminScreen({
     }, []),
   );
   const testTools = status.kind === 'ready' && status.value.testTools;
-  const shown = sections.filter((s) => s.id !== 'test' || testTools);
+  const shown = sections.filter(({ id }) => {
+    if (id === 'test') return testTools;
+    const required = stage5Features[id];
+    return (
+      required === undefined || (available.kind === 'ready' && available.value?.[required] === true)
+    );
+  });
 
   // The admin's pages opened from the menu, and a new section, take the focus to the heading, so a screen reader and
   // the keyboard start there
@@ -200,7 +239,10 @@ export function AdminScreen({
       data-testid="admin"
     >
       {desk ? (
-        <nav aria-label={t.nav} className="w-60 self-start desk:sticky desk:top-20">
+        <nav
+          aria-label={t.nav}
+          className="w-60 self-start desk:sticky desk:top-20 desk:max-h-sticky-nav desk:overflow-y-auto desk:overscroll-contain"
+        >
           <p className="mb-2 px-3 font-display text-lg font-heavy">{t.title}</p>
           {links()}
         </nav>
@@ -262,6 +304,21 @@ export function AdminScreen({
               </Button>
             }
           />
+        ) : feature ? (
+          <AsyncState loaded={available} errorTitle={t.loadErrorTitle}>
+            {(flags) =>
+              flags?.[feature] ? (
+                content()
+              ) : (
+                <EmptyState
+                  level={2}
+                  icon={<FileJson size={28} aria-hidden />}
+                  title={t.featureOffTitle}
+                  text={t.featureOffText}
+                />
+              )
+            }
+          </AsyncState>
         ) : (
           content()
         )}
@@ -280,6 +337,14 @@ export function AdminScreen({
         return <LogSection seasonId={id} version={version} />;
       case 'effects':
         return <EffectsSection seasonId={id} version={version} />;
+      case 'globalevents':
+        return <GlobalEventsSection key={id} seasonId={id} version={version} />;
+      case 'weeklychallenges':
+        return <WeeklyChallengesSection key={id} seasonId={id} version={version} />;
+      case 'irlproofs':
+        return <IrlProofQueue key={id} seasonId={id} version={version} />;
+      case 'suggestions':
+        return <SuggestionsSection key={id} seasonId={id} version={version} />;
       case 'rules':
         return <RulesSection seasonId={id} version={version} />;
       case 'map':

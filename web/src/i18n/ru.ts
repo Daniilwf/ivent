@@ -1,5 +1,10 @@
 // The single dictionary of interface texts. Terms come from docs/GLOSSARY.md.
 
+import { stage5Moderation } from './stage5Moderation';
+import { stage5Operations } from './stage5Operations';
+import { stage5Interactions } from './stage5Interactions';
+import { playerSuggestions } from './playerSuggestions';
+
 // A Russian noun after a number: 1 очко, 2 очка, 5 очков
 const plural = (n: number, one: string, few: string, many: string) => {
   const tens = Math.abs(n) % 100;
@@ -31,6 +36,13 @@ const coinWords: Record<GrammaticalCase, readonly [string, string, string]> = {
 // монетка / монетки / монеток in the case asked; a debt with a real minus: −2 монетки
 export const coins = (n: number, grammaticalCase: GrammaticalCase = 'nominative') =>
   `${n < 0 ? '−' : ''}${Math.abs(n).toLocaleString('ru-RU')} ${plural(n, ...coinWords[grammaticalCase])}`;
+
+const sharePercent = (share: number) =>
+  share.toLocaleString('ru-RU', {
+    style: 'percent',
+    notation: share > 0 && share < 1e-22 ? 'scientific' : 'standard',
+    maximumFractionDigits: 20,
+  });
 
 // прохождение / прохождения / прохождений
 const runs = (n: number) => {
@@ -516,7 +528,12 @@ export const ru = {
     throttled: 'Слишком много попыток. Подожди немного и попробуй снова.',
     logout: 'Выйти',
   },
+  interactions: stage5Interactions,
+  playerSuggestions,
   turn: {
+    interactions: 'Напарники и дуэли',
+    race: (opponent: string, deadline: string) => `Дуэль с игроком ${opponent} до ${deadline}`,
+    coopPartnerWaiting: 'Ты в коопе. Завершение прохождения отмечает роллер.',
     after: 'После прохождения',
     afterGame: (title: string) => `Прошлая игра: ${title}`,
     proofToSend: 'Пруф: ещё не отправлен',
@@ -954,6 +971,8 @@ export const ru = {
       ['feed', 'Лента'],
       ['profile', 'Профиль'],
       ['game', 'Страница игры'],
+      ['global-event', 'Общий ивент'],
+      ['poll-card', 'Голосование'],
       ['whats-new', 'Что нового'],
     ] as [string, string][],
     zones: {
@@ -1125,6 +1144,58 @@ export const ru = {
     drawnEvent: {
       title: 'Вытянутый ивент',
       lead: 'Карточка ивента, который игрок вытянул последним: вид колоды, откуда он, название и текст. Ивент уже разыгран при вытягивании. Четыре вида, длинное название и ивент без текста.',
+    },
+    eventChoice: {
+      title: 'Вопрос ивента',
+      lead: 'Один явный ответ: выбор сохраняется при обновлениях. Длинные варианты, отправка, пауза и отсутствие вариантов.',
+      demo: {
+        id: 'e5000000-0000-0000-0000-000000000001',
+        kind: 'effect' as const,
+        objectId: 'coin-or-step',
+        name: 'Монетки или шаг',
+        description: 'Сделай выбор: три монетки или шаг по карте без очков.',
+        prompt: 'Что берёшь?',
+        options: [
+          { id: 'монетки', label: 'Три монетки на покупку предмета в магазине', game: null },
+          { id: 'шаг', label: 'Шаг вперёд по карте без дополнительных очков', game: null },
+        ],
+      },
+    },
+    irl: {
+      title: 'IRL-пруф',
+      lead: 'Фото или одна ссылка на видео. Черновик сохраняется при обновлениях. В первой форме можно проверить ошибку неверной ссылки.',
+      name: 'Караоке',
+      description: 'Спой песню на выбор остальных и скинь видео в галерею.',
+      comment: 'На записи не слышно голоса. Добавь другую ссылку или фото.',
+      cases: {
+        empty: 'До отправки',
+        linkOnly: 'Только ссылка',
+        submitting: 'Отправка',
+        pending: 'На проверке',
+        rejected: 'После отказа',
+        paused: 'Ивенты выключены',
+      },
+    },
+    eventHistory: {
+      title: 'История ивента',
+      lead: 'Старый ивент раскрывается своей строкой. Свежий показан полностью до следующей принятой команды.',
+    },
+    globalEvent: {
+      title: 'Общий ивент',
+      name: 'Кооперативные выходные',
+      description: 'Вместе наиграйте 50 часов по оценкам HowLongToBeat.',
+    },
+    pollCard: {
+      title: 'Голосование',
+      question: 'Какой жанр выберем для следующего челленджа?',
+      options: ['Приключения', 'Головоломки', 'Игры с длинным сюжетом для прохождения вдвоём'],
+    },
+    eventConditions: {
+      title: 'Ивенты и условия',
+      lead: 'Ожидания следующего хода, условия текущей игры и один общий результат проверки.',
+      name: 'Даже не вспотел',
+      waitingName: 'Попутный ветер',
+      waitingText: 'В следующем броске за прохождение на один кубик больше.',
     },
     content: {
       title: 'Редактор контента',
@@ -1369,6 +1440,23 @@ export const ru = {
   },
   // Events drawn from decks (stage 5, D-500): the card of the one I drew last
   events: {
+    history: (name: string) => `Последний ивент: «${name}»`,
+    waitingTitle: 'Накопленные ивенты',
+    waitingConditionsTitle: 'Условия следующей игры',
+    waitingForRoll: 'Ждёт ролла игры',
+    waitingForThrow: 'Ждёт броска',
+    waitingForStep: 'Ждёт будущего шага',
+    originalText: (name: string) => `Текст ивента: «${name}»`,
+    title: 'Ивент',
+    choice: {
+      prompt: 'Что выбираешь?',
+      answer: 'Ответить',
+      empty: 'Сейчас нет доступных вариантов. Обратись к админу.',
+      paused: 'Ивенты временно выключены. Ответить можно будет после включения.',
+      closed: 'Сезон завершён. На этот вопрос уже нельзя ответить.',
+      draft: 'Сезон ещё не начался. Ответить пока нельзя.',
+      directions: { forward: 'Вперёд', back: 'Назад' },
+    },
     kinds: eventKindNames,
     // Said once for a card drawn while the page is open, as the dice are
     announce: (kind: EventKind, name: string) => `Вытянут ${eventKindWords[kind]}: «${name}»`,
@@ -1382,6 +1470,39 @@ export const ru = {
       dropPenalty: 'за дроп',
     } as Record<'cell' | 'item' | 'difficulty' | 'incoming' | 'rerollCost' | 'dropPenalty', string>,
     played: 'Уже разыгран — дальше сработает сам.',
+    waitingAnswer: 'Ждёт твоего ответа.',
+  },
+  irlProof: {
+    tasks: 'IRL-ивенты',
+    title: 'IRL-ивент',
+    lead: 'Выполни задание и отправь фото или ссылку на видео. Задание не блокирует твой ход.',
+    link: 'Ссылка на видео',
+    linkHint: 'Одна HTTPS-ссылка без логина и пароля.',
+    linkInvalid: 'Укажи одну HTTPS-ссылку без логина, пароля и пробелов.',
+    required: 'Добавь фото или ссылку на видео.',
+    photo: 'Добавить фото',
+    photoHint: (left: number) => `Можно добавить ещё ${left} фото. JPEG, PNG, WebP или GIF.`,
+    photoAlt: (n: number) => `Фото пруфа ${n}`,
+    removePhoto: (n: number) => `Убрать фото ${n}`,
+    limit: (max: number) => `В этом сезоне можно приложить не больше ${max} фото. Убери лишние.`,
+    submit: 'Отправить пруф',
+    pending: 'Пруф на проверке',
+    rejected: 'Пруф отклонён',
+    disabled: 'Сейчас отправить пруф нельзя.',
+    paused: 'Ивенты временно выключены. Пруф можно будет отправить после включения.',
+    closed: 'Сезон завершён. Отправить пруф уже нельзя.',
+    draft: 'Сезон ещё не начался. Отправить пруф пока нельзя.',
+    linkOnly: 'В этом сезоне отправь одну ссылку на видео.',
+    retryLead: 'Исправь материалы по комментарию админа и отправь пруф снова.',
+  },
+  runConditions: {
+    noDiceResult: 'Кубиков за это прохождение нет.',
+    title: 'Условия прохождения',
+    atLeast: (label: string) => `Не ниже: ${label}`,
+    atMost: (label: string) => `Не выше: ${label}`,
+    met: 'Выполнено',
+    unmet: 'Нарушено',
+    waived: 'Не применимо',
   },
   effects: {
     title: 'Нужно разыграть',
@@ -1505,6 +1626,22 @@ export const ru = {
     noSeasonTitle: 'Такого сезона нет',
     noSeasonText: 'Возможно, ссылка устарела. Открой ленту текущего сезона.',
     lines: feedLines,
+    stage5: {
+      playerStatus: <T>(player: T, status: string): Line<T> => [player, ': ', status],
+      waiting: (name: string | null, poll: boolean) =>
+        `${name ? `Ивент «${name}»` : 'Ивент'} ждёт ${poll ? 'результата голосования' : 'ответа'}`,
+      resumed: <T>(player: T): Line<T> => [player, ': ответ ивента принят'],
+      irlSubmitted: <T>(player: T): Line<T> => [player, ': IRL-пруф отправлен'],
+      irlReviewed: <T>(player: T, approved: boolean | null): Line<T> => [
+        player,
+        ': IRL-пруф ',
+        approved === null ? 'проверен' : approved ? 'одобрен' : 'отклонён',
+      ],
+      conditionChecked: (met: boolean, waived: boolean) =>
+        `Условие прохождения ${waived ? 'неприменимо' : met ? 'выполнено' : 'не выполнено'}`,
+      manualTask: (name: string | null) =>
+        `${name ? `Ручной эффект «${name}»` : 'Ручной эффект'} ждёт разрешения`,
+    },
     facts: {
       points: (n: number) => `${signed(n)} ${plural(n, 'очко', 'очка', 'очков')}`,
       cells: (n: number) => `${signed(n)} ${plural(n, 'клетка', 'клетки', 'клеток')}`,
@@ -1623,6 +1760,7 @@ export const ru = {
     feed: 'Лента',
     pool: 'Пул',
     rules: 'Правила',
+    polls: 'Голосования',
     profile: 'Мой профиль',
     admin: 'Админка',
     adminWaiting: (waiting: number) => `Админка, ждут проверки пруфов: ${waiting}`,
@@ -1730,6 +1868,50 @@ export const ru = {
       deadline: 'Сроки',
       economy: 'Монетки, предметы, магазин и ставки',
       history: 'История изменений',
+    },
+    stage5: {
+      sections: {
+        coop: 'Кооп',
+        invitations: 'Приглашения',
+        partnerBoard: 'Доска «ищу напарника»',
+        duels: 'Дуэли',
+        weeklyChallenge: 'Челлендж недели',
+        suggestions: 'Предложка',
+        polls: 'Голосования',
+        globalEvents: 'Общие ивенты',
+        events: 'Ивенты и IRL-пруфы',
+      },
+      points: (share: number) =>
+        `Роллеру достаётся ${sharePercent(share)} очков и шагов за кооп. Его доля округляется вверх, остальное получает напарник.`,
+      coins: (share: number) =>
+        `Доля роллера в монетках за кооп — ${sharePercent(share)}. Округление такое же.`,
+      inviteTtl: (n: number) => `На ответ на приглашение есть ${n} ч.`,
+      inviteLimit: (n: number) => `Лимит отправленных приглашений, которые ждут ответа — ${n}.`,
+      sharedInvites: 'Приглашения в кооп и вызовы на дуэль считаются вместе.',
+      boardTtl: (n: number) => `Запрос на доске открыт до ${n} ч.`,
+      duelReward: (n: number) => `Победитель дуэли получает ${coins(n, 'accusative')}.`,
+      duelTtl: (n: number) => `Дуэль длится до ${n} дн. после принятия вызова.`,
+      duelLimit: (n: number) =>
+        `Лимит открытых дуэлей — ${n}. Сюда входят отправленные вызовы и принятые дуэли.`,
+      duelCooldown: (n: number) =>
+        `Та же пара может снова начать дуэль через ${n} дн. после её окончания.`,
+      duelWinLimit: (n: number) => `Лимит побед в дуэлях за сезон — ${n}.`,
+      duelFresh: 'В дуэли учитываются игры, выпавшие после принятия вызова.',
+      duelDrop: 'Дроп прохождения, которое участвует в дуэли, отдаёт победу сопернику.',
+      weeklyTtl: (n: number) =>
+        `Окно челленджа недели длится ${n} дн. с начала. Награда указана в самом челлендже.`,
+      suggestions: (n: number) =>
+        `Лимит предложений от игрока — ${n} за день по часовому поясу сезона.`,
+      gameOptions: (n: number) => `Число вариантов при голосовании за игру — до ${n}.`,
+      voteChange: 'Голос можно изменить до закрытия голосования.',
+      voteFixed: 'После отправки голос изменить нельзя.',
+      globalLimit: (n: number) => `Одновременно могут идти до ${n} общих ивентов.`,
+      answerTtl: (n: number) =>
+        `На ответ на вопрос ивента есть ${n} ч. Затем вариант выбирается случайно.`,
+      noAnswerTtl: 'Вопрос ивента ждёт ответа без срока.',
+      irlFiles: (n: number) =>
+        `Лимит фотографий в одном IRL-пруфе — ${n}. Вместо фото можно отправить ссылку.`,
+      irlLinkOnly: 'IRL-пруф принимается только по ссылке.',
     },
     // D-207 (RGG 14): the owner's text, word for word; the order is the order of the check
     completion: {
@@ -1916,6 +2098,33 @@ export const ru = {
       'roll.techRerollWindowHours': 'Окно тех-реролла, часов',
       'roll.minPlayMinutesBeforeDrop': 'Минут игры до дропа',
       'reward.diceCount.hoursPerDie': 'Часов на один кубик',
+      'features.coop': 'Кооп',
+      'features.duels': 'Дуэли',
+      'features.partnerBoard': 'Доска «ищу напарника»',
+      'features.weeklyChallenge': 'Челлендж недели',
+      'features.suggestions': 'Предложка',
+      'features.polls': 'Голосования',
+      'features.globalEvents': 'Общие ивенты',
+      'reward.coop.pointsShare': 'Доля роллера в очках и шагах за кооп',
+      'reward.coop.coinsShare': 'Доля роллера в монетках за кооп',
+      'interactions.inviteTtlHours': 'Срок приглашения, часов',
+      'interactions.maxOpenInvitesPerPlayer': 'Лимит открытых приглашений',
+      'partnerBoard.requestTtlHours': 'Срок запроса на доске напарников, часов',
+      'duels.rewardCoins': 'Награда за победу в дуэли, монеток',
+      'duels.durationDays': 'Срок дуэли, дней',
+      'duels.maxOpenPerPlayer': 'Лимит открытых дуэлей',
+      'duels.samePairCooldownDays': 'Пауза между дуэлями одной пары, дней',
+      'duels.maxWinsPerSeason': 'Лимит побед в дуэлях за сезон',
+      'duels.countRunsStartedAfterAccept': 'В дуэли учитываются только свежие прохождения',
+      'duels.dropForfeits': 'Дроп отдаёт победу в дуэли сопернику',
+      'weeklyChallenge.durationDays': 'Окно челленджа недели, дней',
+      'suggestions.perDay': 'Лимит предложений в день',
+      'polls.gameOptions': 'Лимит игр в голосовании',
+      'polls.allowChangeVote': 'Можно менять голос',
+      'polls.showLiveCountsDefault': 'Показывать счёт до закрытия неанонимного голосования',
+      'globalEvents.maxActive': 'Лимит общих ивентов одновременно',
+      'events.answerTimeoutHours': 'Срок ответа на вопрос ивента, часов',
+      'events.irlProof.maxFiles': 'Лимит фотографий в IRL-пруфе',
       'reward.diceCount.rounding': 'Округление числа кубиков',
       'reward.diceCount.min': 'Минимум кубиков',
       'reward.diceCount.max': 'Максимум кубиков',
@@ -1975,6 +2184,8 @@ export const ru = {
   },
   // H8: the admin's pages (/admin/…)
   admin: {
+    stage5Moderation,
+    stage5Operations,
     title: 'Админка',
     nav: 'Разделы админки',
     sectionsButton: 'Разделы',
@@ -1994,6 +2205,10 @@ export const ru = {
       test: 'Инструменты для тестов',
       map: 'Карта',
       content: 'Контент',
+      globalevents: 'Общие ивенты',
+      weeklychallenges: 'Челлендж недели',
+      irlproofs: 'IRL-пруфы',
+      suggestions: 'Предложка',
     },
     leads: {
       proofs: 'Финиши сверху, дальше по времени завершения. Проверь пруф и одобри или отклони.',
@@ -2007,11 +2222,17 @@ export const ru = {
       bugs: 'Отчёты с кнопки «Сообщить о баге». Возьми в работу и выгрузи файлом для агента.',
       errors: 'Последние необработанные ошибки сервера с запросом и пользователем.',
       site: 'На время выкладки сайт можно перевести в режим только для чтения.',
-      test: 'Готовые ситуации для ручной проверки, время и случайность сайта. Раздел есть только при разработке и в тестах.',
+      test: 'Готовые ситуации для ручной проверки, время и случайность сайта. Раздел доступен в разработке, в тестах и на тестовой копии.',
       map: 'Клетки, стрелки и зоны карты сезона. Игроки увидят правки только после публикации.',
       content:
         'Предметы, эффекты, спецроллы и колёса сезона. Каждое сохранение — новая версия контента в логе.',
+      globalevents: 'Запусти опубликованный ивент для всех игроков сезона.',
+      weeklychallenges: 'Задай новый челлендж или засчитай прохождение для ручного задания.',
+      irlproofs: 'Проверь подтверждения выполнения IRL-заданий.',
+      suggestions: 'Рассмотри предложенные игры и объекты.',
     },
+    featureOffTitle: 'Механика выключена',
+    featureOffText: 'Её можно включить в правилах выбранного сезона.',
     noSeasonTitle: 'Сезона пока нет',
     noSeasonText: 'Создай сезон в разделе «Сезон», и здесь появятся игроки и пруфы.',
     toSeason: 'Открыть «Сезон»',
@@ -2632,6 +2853,14 @@ export const ru = {
       'test.noFinish': 'На карте сезона нет пути к финишу.',
       'test.noGameToChoose': 'В выборе нет игры: добавь игр в пул.',
       'test.noActiveRun': 'Прохождение не началось. Попробуй ещё раз.',
+      'test.noIrlEffect':
+        'У игрока нужен IRL-ивент, для которого пруф ещё не отправлен или был отклонён.',
+      'test.noCoopPartner':
+        'В сезоне нужен свободный игрок, который может сыграть в эту кооп-игру.',
+      'test.pollGoalFeaturesOff': 'Включи ивенты, голосования и общие ивенты в правилах сезона.',
+      'test.noScenarioGoalEvent': 'Опубликуй «Попутный ветер» в контенте сезона.',
+      'test.goalStartedPollRefused':
+        'Общая цель уже запущена. Голосование не открылось. Проверь правила сезона и дедлайн.',
       'map.invalid': 'В карте есть ошибки: исправь те, что в проверке.',
       'map.unchanged': 'Карта не изменилась: публиковать нечего.',
       'content.invalid': 'В пакете есть ошибки: исправь те, что у полей.',
@@ -3093,6 +3322,9 @@ export const ru = {
         'finish-soon': 'Финиш на носу',
         'deadline-in-hour': 'Дедлайн через час',
         'five-manual-effects': 'Пять ручных эффектов',
+        'irl-proof-pending': 'IRL-пруф ждёт проверки',
+        'coop-invitation': 'Приглашение в кооп',
+        'poll-and-global-goal': 'Голосование и общая цель',
       } as Readonly<Record<string, string>>,
       scenarioAbout: {
         'finish-soon':
@@ -3100,6 +3332,12 @@ export const ru = {
         'deadline-in-hour': 'Дедлайн сезона — через час по часам сайта. Игрок не нужен.',
         'five-manual-effects':
           'Пять прохождений на «выше сложной» подряд, каждое сразу одобрено: у игрока пять хороших ивентов к розыгрышу. Нужно хотя бы пять свободных игр в пуле.',
+        'irl-proof-pending':
+          'В очередь проверки поступит тестовый пруф существующего IRL-ивента игрока. У ивента ещё нет пруфа или прошлый пруф отклонён.',
+        'coop-invitation':
+          'Игрок с начатой кооп-игрой пригласит свободного напарника. Ответить можно в разделе «Взаимодействия».',
+        'poll-and-global-goal':
+          'В сезоне откроются голосование и общая цель на три прохождения. Включи ивенты, голосования и общие ивенты. Опубликуй «Попутный ветер» в контенте сезона.',
       } as Readonly<Record<string, string>>,
       player: 'Игрок',
       load: 'Загрузить сценарий',
@@ -3109,6 +3347,11 @@ export const ru = {
         'deadline-in-hour': () => 'Дедлайн сезона — через час.',
         'five-manual-effects': (player: string) =>
           `${player}: пять хороших ивентов ждут розыгрыша.`,
+        'irl-proof-pending': (player: string) =>
+          `Тестовый IRL-пруф игрока ${player} ждёт проверки.`,
+        'coop-invitation': (player: string) =>
+          `Приглашение игрока ${player} ждёт ответа напарника.`,
+        'poll-and-global-goal': () => 'Голосование открыто. Общая цель уже на главной сезона.',
       } as Readonly<Record<string, (player: string) => string>>,
       loaded: 'Сценарий загружен.',
       undoHint: 'Отменить можно откатом в разделе «Лог».',
@@ -3158,6 +3401,52 @@ export const ru = {
       turnedOn: 'Обслуживание включено.',
       turnedOff: 'Обслуживание выключено.',
     },
+  },
+  globalEvents: {
+    title: 'Общие ивенты',
+    until: 'До',
+    reached: 'Цель достигнута',
+    goalTitle: 'Общая цель',
+    goal: (name: string) => `Общая цель: ${name}`,
+    progress: (current: number, target: number) =>
+      `${current.toLocaleString('ru-RU')} из ${target.toLocaleString('ru-RU')}`,
+    metrics: {
+      hours: (target: number) =>
+        Number.isInteger(target) ? plural(target, 'часа', 'часов', 'часов') : 'часа',
+      runs: (target: number) => plural(target, 'прохождения', 'прохождений', 'прохождений'),
+    },
+  },
+  polls: {
+    title: 'Голосования',
+    openGroup: 'Открытые',
+    endedGroup: 'Завершённые',
+    empty: 'Пока нет голосований',
+    loadFailed: 'Не удалось загрузить голосования',
+    disabled: 'Голосования выключены',
+    acceptedRefreshFailed: 'Голос принят. Не удалось обновить список.',
+    refreshList: 'Обновить список',
+    notFound: 'Такого сезона нет',
+    legend: 'Твой голос',
+    options: 'Варианты ответа',
+    vote: 'Голосовать',
+    changeVote: 'Изменить голос',
+    voteFailed: 'Не удалось отправить голос. Попробуй ещё раз.',
+    hiddenCounts: 'Счёт скрыт до закрытия',
+    votingEnded: 'Приём голосов завершён.',
+    pendingCounts: 'Счёт появится после подведения итогов.',
+    closed: 'Голосование закрыто',
+    cancelled: 'Голосование отменено',
+    open: 'Голосование открыто',
+    anonymous: 'Анонимно',
+    until: 'До',
+    result: (label: string) => `Итог: ${label}`,
+    ownVote: (label: string) => `Твой голос: ${label}`,
+    accepted: 'Голос принят',
+    unavailable: 'Голосование сейчас недоступно.',
+    eligibilityUnknown: 'Обнови страницу, чтобы проверить доступность голосования.',
+    votes: (count: number) => `${count} ${plural(count, 'голос', 'голоса', 'голосов')}`,
+    noResult: 'Итог не выбран',
+    resultUnavailable: 'Итог недоступен. Обнови страницу.',
   },
   rejection: rejection as Readonly<Record<string, string>> & typeof rejection,
 } as const;

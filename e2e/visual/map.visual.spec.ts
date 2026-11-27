@@ -151,9 +151,13 @@ for (const section of [
   'content',
   'map-background',
   'drawn-event',
+  'global-event',
+  'poll-card',
   'whats-new',
 ]) {
   test(`the styleguide section «${section}» looks as approved`, async ({ page }) => {
+    if (section === 'global-event' || section === 'poll-card')
+      await page.clock.setFixedTime(new Date('2026-11-18T12:00:00Z'));
     await openStyleguide(page, section);
     // The map's picture fades in once it is loaded (D-277): the screenshot waits for it
     if (section === 'map-background')

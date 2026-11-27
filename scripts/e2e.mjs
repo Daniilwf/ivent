@@ -17,6 +17,7 @@ if (mode === 'smoke') {
     process.exit(1);
   }
   env.E2E_BASE_URL = address;
+  env.E2E_LOCAL_SITE = '0';
   args.push('--grep', '@smoke');
 }
 args.push(...rest.map(quote));

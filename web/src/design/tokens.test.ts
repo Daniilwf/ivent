@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { camera, mapLabel } from '../board/camera';
+import { eventDraw } from './motion';
 import { contrast, playerToken, tokenColors } from './players';
 
 // Read as a file: the tests do not process CSS
@@ -55,6 +56,13 @@ describe('design tokens', () => {
   it('has the same smallest map label as src/board/camera.ts, and a close-up that keeps it', () => {
     expect(css).toContain(`--map-label-min: ${String(mapLabel.min)}px;`);
     expect(camera.closeUp * mapLabel.world).toBeGreaterThanOrEqual(mapLabel.min);
+  });
+
+  it('has the same event draw duration and easing as the transition used by Motion', () => {
+    expect(css).toContain(
+      `--duration-event-draw: ${String(eventDraw.transition.duration * 1000)}ms;`,
+    );
+    expect(css).toContain(`--ease-out: cubic-bezier(${eventDraw.transition.ease.join(', ')});`);
   });
 
   it('gives a player beyond 16 a colour again, from the start of the set', () => {
