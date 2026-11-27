@@ -214,6 +214,7 @@ public static class AppSetup
         services.AddAntiforgery(o =>
         {
             o.HeaderName = Csrf.HeaderName;
+            o.SuppressReadingTokenFromFormBody = true;
             o.Cookie.Name = cookiePrefix + "ge.csrf";
             o.Cookie.SameSite = SameSiteMode.Strict;
             o.Cookie.SecurePolicy = securePolicy;
@@ -307,7 +308,7 @@ public static class AppSetup
             app.MapOpenApi();
         }
 
-        var api = app.MapGroup("/api").AddEndpointFilter<Csrf.Filter>();
+        var api = app.MapGroup("/api").AddEndpointFilter<Csrf.Filter>().AddEndpointFilter<FileEndpoints.UploadAdmissionFilter>();
         api.MapAccounts();
         api.MapSessions();
         api.MapSeasons();

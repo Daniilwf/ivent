@@ -1,10 +1,16 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Security.Claims;
 using System.Text.Json;
+using GameEvent.Engine.Files;
+using GameEvent.Engine.Kernel;
+using GameEvent.Infrastructure.Database;
 using GameEvent.Infrastructure.Files;
+using GameEvent.Infrastructure.Queue;
 using GameEvent.Web.Files;
 using GameEvent.Web.Tests.Api;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
@@ -212,6 +218,117 @@ public sealed class AvatarApiTests : IAsyncLifetime
         Assert.Equal(JsonValueKind.Null, players.Single(p => p.GetProperty("id").GetGuid() == _site.Players["petya"]).GetProperty("avatar").ValueKind);
     }
 
+    // D-945: the owner's 11 MB GIF was refused at the old 8 MB limit; the lists show its small animated thumbnail
+    [Fact]
+    public async Task An_11_mb_gif_is_an_avatar_and_the_lists_show_its_small_animated_thumbnail()
+    {
+        var vasya = await _site.SignedInAsync("vasya");
+        var gif = PlainGif.Make(320, 320, frames: 100);
+        Assert.InRange(gif.Length, 11L * 1024 * 1024, 12L * 1024 * 1024);
+        using var form = new MultipartFormDataContent();
+        form.Add(new StringContent(Guid.NewGuid().ToString()), "commandId");
+        var file = new ByteArrayContent(gif);
+        file.Headers.ContentType = new MediaTypeHeaderValue("image/gif");
+        form.Add(file, "file", "big.gif");
+        var fileId = (await OkAsync(await vasya.PostAsync("/api/files", form, Ct))).GetProperty("id").GetGuid();
+
+        await OkAsync(await vasya.PutAsJsonAsync("/api/auth/me/avatar", new { commandId = Guid.NewGuid(), fileId }, Ct));
+
+        var petya = await _site.SignedInAsync("petya");
+        using var season = JsonDocument.Parse(await petya.GetStringAsync($"/api/seasons/{SiteFactory.SeasonId}", Ct));
+        var avatar = season.RootElement.GetProperty("players").EnumerateArray()
+            .Single(p => p.GetProperty("id").GetGuid() == _site.Players["vasya"]).GetProperty("avatar");
+        Assert.Equal($"/api/files/{fileId}/thumbnail", avatar.GetProperty("thumbnailUrl").GetString());
+        var small = await petya.GetByteArrayAsync(avatar.GetProperty("thumbnailUrl").GetString(), Ct);
+        using var thumbnail = Image.NewFromBuffer(small, "[n=-1]");
+        Assert.StartsWith("gifload", (string)thumbnail.Get("vips-loader"), StringComparison.Ordinal);
+        Assert.Equal(100, (int)thumbnail.Get("n-pages"));
+        Assert.Equal(256, Math.Max(thumbnail.Width, thumbnail.PageHeight));
+        Assert.True(small.Length < gif.Length / 2, $"The thumbnail is {small.Length} bytes of {gif.Length}");
+
+        // The profile keeps the original
+        Assert.Equal(gif, await petya.GetByteArrayAsync(avatar.GetProperty("url").GetString(), Ct));
+    }
+
+    [Fact]
+    public async Task A_gif_over_20_mb_is_refused_with_the_limits_named()
+    {
+        var vasya = await _site.SignedInAsync("vasya");
+        var gif = new byte[(20 * 1024 * 1024) + 1];
+        "GIF89a"u8.CopyTo(gif);
+        using var form = new MultipartFormDataContent();
+        form.Add(new StringContent(Guid.NewGuid().ToString()), "commandId");
+        var file = new ByteArrayContent(gif);
+        file.Headers.ContentType = new MediaTypeHeaderValue("image/gif");
+        form.Add(file, "file", "huge.gif");
+
+        var response = await vasya.PostAsync("/api/files", form, Ct);
+
+        await RefusedAsync(response, HttpStatusCode.RequestEntityTooLarge, "file.tooLarge");
+        using var problem = JsonDocument.Parse(await response.Content.ReadAsStringAsync(Ct));
+        Assert.Equal("A picture is at most 25 MB, a GIF at most 20 MB.", problem.RootElement.GetProperty("detail").GetString());
+    }
+
+    [Fact]
+    public void The_default_limits_are_20_mib_for_gif_and_25_mib_for_uploads()
+    {
+        var limits = new FileLimits();
+
+        Assert.Equal(20L * 1024 * 1024, limits.MaxGifBytes);
+        Assert.Equal(25L * 1024 * 1024, limits.MaxUploadBytes);
+        Assert.Equal(40_000_000, limits.MaxPixels);
+        Assert.Equal(1000, limits.MaxFrames);
+        Assert.Equal(256, limits.ThumbnailSize);
+    }
+
+    [Fact]
+    public async Task A_multipart_upload_waits_for_the_picture_slot_before_opening_the_file()
+    {
+        await using var scope = _site.Services.CreateAsyncScope();
+        var services = scope.ServiceProvider;
+        var limits = services.GetRequiredService<FileLimits>();
+        var files = new FileServices(
+            services.GetRequiredService<GameEventDbContext>(), services.GetRequiredService<FileStorage>(),
+            limits, services.GetRequiredService<IIdGenerator>(), services.GetRequiredService<IClock>(),
+            services.GetRequiredService<CommandBus>());
+        using var data = new MemoryStream(Gif());
+        var file = new WatchedFile(new FormFile(data, 0, data.Length, "file", "avatar.gif"));
+        var http = new DefaultHttpContext();
+        http.Request.ContentType = "multipart/form-data";
+        http.Request.Form = new FormCollection(new Dictionary<string, Microsoft.Extensions.Primitives.StringValues>
+        {
+            ["commandId"] = Guid.NewGuid().ToString(),
+        }, new FormFileCollection { file });
+        var principal = new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, _site.Users["vasya"].ToString())]));
+
+        var busy = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var occupying = FileEndpoints.ProcessPictureAsync(async ct =>
+        {
+            busy.SetResult();
+            await release.Task.WaitAsync(ct);
+            return Gif();
+        }, FileKind.Upload, limits, Ct);
+        Assert.Same(busy.Task, await Task.WhenAny(busy.Task, occupying).WaitAsync(Ct));
+
+        var upload = FileEndpoints.UploadPictureAsync(http.Request, principal, files, FileKind.Upload, Ct);
+        Task observed;
+        try
+        {
+            observed = await Task.WhenAny(file.Opened.Task, upload, Task.Delay(250, Ct));
+        }
+        finally
+        {
+            release.TrySetResult();
+        }
+
+        Assert.NotNull((await occupying).Picture);
+        Assert.Equal(StatusCodes.Status200OK, Assert.IsAssignableFrom<IStatusCodeHttpResult>(await upload).StatusCode);
+        Assert.NotSame(file.Opened.Task, observed);
+        Assert.NotSame(upload, observed);
+        Assert.True(file.Opened.Task.IsCompletedSuccessfully);
+    }
+
     [Fact]
     public async Task The_avatar_is_removed_with_no_file()
     {
@@ -328,6 +445,27 @@ public sealed class AvatarApiTests : IAsyncLifetime
     private sealed class Internet(Func<HttpRequestMessage, HttpResponseMessage> answer) : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) => Task.FromResult(answer(request));
+    }
+
+    private sealed class WatchedFile(IFormFile inner) : IFormFile
+    {
+        public TaskCompletionSource Opened { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public string ContentType => inner.ContentType;
+        public string ContentDisposition => inner.ContentDisposition;
+        public IHeaderDictionary Headers => inner.Headers;
+        public long Length => inner.Length;
+        public string Name => inner.Name;
+        public string FileName => inner.FileName;
+
+        public void CopyTo(Stream target) => inner.CopyTo(target);
+        public Task CopyToAsync(Stream target, CancellationToken cancellationToken = default) => inner.CopyToAsync(target, cancellationToken);
+
+        public Stream OpenReadStream()
+        {
+            Opened.SetResult();
+            return inner.OpenReadStream();
+        }
     }
 
     private static HttpResponseMessage Picture(byte[] bytes) => new(HttpStatusCode.OK) { Content = new ByteArrayContent(bytes) };

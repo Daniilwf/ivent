@@ -17,6 +17,8 @@ const stored = {
   duplicate: false,
 };
 
+const mebibyte = 1024 * 1024;
+
 type Sent = { url: string; method: string; body: unknown };
 
 // Every request other than the site's status goes to `answer` and is recorded.
@@ -30,13 +32,17 @@ function serve(answer: (url: string, method: string) => Response) {
       const method = request?.method ?? init?.method ?? 'GET';
       // The site names its upload limits (D-617): the defaults of FileLimits
       if (method === 'GET' && url.endsWith('/api/status')) {
-        const mb = 1024 * 1024;
         return json(200, {
           maintenance: false,
           version: '1',
           environment: 'test',
           testTools: false,
-          uploads: { picture: 15 * mb, gif: 8 * mb, bugScreenshot: 3 * mb, mapBackground: 10 * mb },
+          uploads: {
+            picture: 25 * mebibyte,
+            gif: 20 * mebibyte,
+            bugScreenshot: 3 * mebibyte,
+            mapBackground: 10 * mebibyte,
+          },
         });
       }
       const body: unknown = request
@@ -59,7 +65,7 @@ describe('My avatar', () => {
     vi.unstubAllGlobals();
   });
 
-  it('uploads a picture and sets it as the avatar', async () => {
+  it('uploads an 11 MiB GIF and sets it as the avatar (D-945)', async () => {
     const avatar = { id: stored.id, url: stored.url, thumbnailUrl: stored.thumbnailUrl };
     const sent = serve((url) =>
       url.endsWith('/api/files') ? json(200, stored) : json(200, { duplicate: false, avatar }),
@@ -67,10 +73,18 @@ describe('My avatar', () => {
     const onChanged = vi.fn();
     render(<AvatarSection avatar={null} onChanged={onChanged} />);
 
-    await userEvent.upload(screen.getByTestId('avatar-file'), picture());
+    const file = new File([new Uint8Array(11 * mebibyte)], 'me.gif', { type: 'image/gif' });
+    await userEvent.upload(screen.getByTestId('avatar-file'), file);
 
     await vi.waitFor(() => {
       expect(onChanged).toHaveBeenCalledWith(avatar);
+    });
+    const form = sent.find((request) => request.method === 'POST')?.body;
+    expect(form).toBeInstanceOf(FormData);
+    expect((form as FormData).get('file')).toMatchObject({
+      name: file.name,
+      type: file.type,
+      size: file.size,
     });
     const put = sent.find((s) => s.method === 'PUT');
     expect(put?.url).toMatch(/\/api\/auth\/me\/avatar$/);
@@ -134,11 +148,11 @@ describe('My avatar', () => {
     expect(ru.upload.errors['file.hostNotAllowed']).toMatch(/media\.tenor\.com/);
   });
 
-  it('refuses a file over the limit before sending it (K1A)', async () => {
+  it('refuses a GIF one byte over the advertised limit before sending it (K1A, D-945)', async () => {
     const sent = serve(() => json(500, {}));
     render(<AvatarSection avatar={null} onChanged={vi.fn()} />);
     const huge = picture();
-    Object.defineProperty(huge, 'size', { value: 40 * 1024 * 1024 });
+    Object.defineProperty(huge, 'size', { value: 20 * mebibyte + 1 });
 
     await userEvent.upload(screen.getByTestId('avatar-file'), huge);
 

@@ -122,8 +122,18 @@ public sealed class SafeDownloader : IDisposable
         _client.DefaultRequestHeaders.UserAgent.ParseAdd("GameEvent/1.0 (avatar download)");
     }
 
-    public async Task<(byte[]? Content, Rejection? Rejection)> DownloadAsync(string url, CancellationToken ct)
+    public Task<(byte[]? Content, Rejection? Rejection)> DownloadAsync(string url, CancellationToken ct) =>
+        DownloadAsync(url, static (content, _) => Task.FromResult(content), ct);
+
+    /// <summary>
+    /// Runs <paramref name="consumeAsync"/> after a successful download and holds the download slot until it finishes.
+    /// The callback returns a non-null result, or lets storage failures propagate.
+    /// </summary>
+    public async Task<(T? Result, Rejection? Rejection)> DownloadAsync<T>(
+        string url, Func<byte[], CancellationToken, Task<T>> consumeAsync, CancellationToken ct) where T : class
     {
+        ArgumentNullException.ThrowIfNull(consumeAsync);
+
         if (Check(url) is { } refused)
         {
             return (null, refused);
@@ -136,7 +146,8 @@ public sealed class SafeDownloader : IDisposable
 
         try
         {
-            return await DownloadCheckedAsync(url, ct);
+            var (content, rejection) = await DownloadCheckedAsync(url, ct);
+            return content is null ? (null, rejection) : (await consumeAsync(content, ct), null);
         }
         finally
         {

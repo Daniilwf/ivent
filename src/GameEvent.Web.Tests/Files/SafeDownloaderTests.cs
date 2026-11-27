@@ -192,6 +192,66 @@ public sealed class SafeDownloaderTests
     }
 
     [Fact]
+    public async Task A_download_holds_its_slot_until_the_picture_is_stored()
+    {
+        var storing = new TaskCompletionSource<byte[]>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var fetched = 0;
+        using var downloader = new SafeDownloader(
+            new DownloadSettings { MaxConcurrent = 1, QueueWaitSeconds = 0 },
+            s_limits,
+            new FakeHandler((_, _) =>
+            {
+                Interlocked.Increment(ref fetched);
+                return Task.FromResult(Png());
+            }));
+
+        var first = downloader.DownloadAsync("https://media.tenor.com/a.png", async (bytes, ct) =>
+        {
+            storing.SetResult(bytes);
+            await release.Task.WaitAsync(ct);
+            return "stored";
+        }, Ct);
+        try
+        {
+            Assert.Equal(s_pngBytes, await storing.Task.WaitAsync(Ct));
+            var (content, refused) = await downloader.DownloadAsync("https://media.tenor.com/b.png", Ct);
+            Assert.Equal(SafeDownloader.Busy, refused?.Code);
+            Assert.Null(content);
+            Assert.Equal(1, fetched);
+        }
+        finally
+        {
+            release.TrySetResult();
+            await first;
+        }
+
+        Assert.Equal(("stored", null), await first);
+        var (next, failure) = await downloader.DownloadAsync("https://media.tenor.com/c.png", Ct);
+        Assert.Null(failure);
+        Assert.Equal(s_pngBytes, next);
+        Assert.Equal(2, fetched);
+    }
+
+    [Fact]
+    public async Task An_error_while_storing_a_download_is_propagated_and_releases_the_slot()
+    {
+        using var downloader = new SafeDownloader(
+            new DownloadSettings { MaxConcurrent = 1, QueueWaitSeconds = 0 },
+            s_limits,
+            new FakeHandler((_, _) => Task.FromResult(Png())));
+        var diskError = new IOException("Writing the stored picture failed.");
+
+        var problem = await Assert.ThrowsAsync<IOException>(() => downloader.DownloadAsync(
+            "https://media.tenor.com/a.png", (_, _) => Task.FromException<string>(diskError), Ct));
+        Assert.Same(diskError, problem);
+
+        var (next, failure) = await downloader.DownloadAsync("https://media.tenor.com/b.png", Ct);
+        Assert.Null(failure);
+        Assert.Equal(s_pngBytes, next);
+    }
+
+    [Fact]
     public async Task An_error_answer_is_a_failed_download()
     {
         using var downloader = Downloader(_ => new HttpResponseMessage(HttpStatusCode.NotFound));

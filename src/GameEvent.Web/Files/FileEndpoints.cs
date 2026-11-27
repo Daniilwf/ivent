@@ -112,6 +112,36 @@ public static class FileEndpoints
             || Map.AdminMapEndpoints.IsBackgroundUpload(path)
             || Seasons.GalleryEndpoints.IsUpload(path));
 
+    /// <summary>Bounds multipart buffering in the site's in-memory temporary directory (D-945).</summary>
+    public sealed class UploadAdmissionFilter : IEndpointFilter
+    {
+        private static readonly SemaphoreSlim s_uploads = new(1, 1);
+
+        public async ValueTask<object?> InvokeAsync(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
+        {
+            ArgumentNullException.ThrowIfNull(context);
+            ArgumentNullException.ThrowIfNull(next);
+            var http = context.HttpContext;
+            if (!IsUpload(http.Request))
+            {
+                return await next(context);
+            }
+
+            if (!await s_uploads.WaitAsync(s_processingWait, http.RequestAborted))
+            {
+                return PictureBusy();
+            }
+
+            // Completion callbacks run in reverse order, so form temp files registered by the handler are disposed first.
+            http.Response.OnCompleted(static () =>
+            {
+                s_uploads.Release();
+                return Task.CompletedTask;
+            });
+            return await next(context);
+        }
+    }
+
     public static void MapFiles(this RouteGroupBuilder api)
     {
         ArgumentNullException.ThrowIfNull(api);
@@ -200,14 +230,7 @@ public static class FileEndpoints
             return limited;
         }
 
-        byte[] content;
-        await using (var stream = file.OpenReadStream())
-        {
-            content = new byte[file.Length];
-            await stream.ReadExactlyAsync(content, ct);
-        }
-
-        return (await StoreFileAsync(content, commandId, ownerId, services, ct, kind: kind)).Answer;
+        return (await StoreFileAsync(token => ReadFormFileAsync(file, token), commandId, ownerId, services, kind, countTowardsLimit: true, ct)).Answer;
     }
 
     /// <summary>
@@ -242,18 +265,17 @@ public static class FileEndpoints
             return limited;
         }
 
-        var (content, refused) = await downloader.DownloadAsync(request.Url.Trim(), ct);
-        if (content is null)
+        var (result, refused) = await downloader.DownloadAsync(
+            request.Url.Trim(),
+            (content, token) => StoreAsync(content, request.CommandId, ownerId, services, token),
+            ct);
+        return refused switch
         {
-            return refused!.Code switch
-            {
-                ImageProcessor.TooLarge => TooLarge(services.Limits),
-                SafeDownloader.Busy => Problem(StatusCodes.Status503ServiceUnavailable, "The server is busy.", refused.Detail, refused.Code),
-                _ => Problem(StatusCodes.Status422UnprocessableEntity, "The link was refused.", refused.Detail, refused.Code),
-            };
-        }
-
-        return await StoreAsync(content, request.CommandId, ownerId, services, ct);
+            null => result!,
+            { Code: ImageProcessor.TooLarge } => TooLarge(services.Limits),
+            { Code: SafeDownloader.Busy } => Problem(StatusCodes.Status503ServiceUnavailable, "The server is busy.", refused.Detail, refused.Code),
+            _ => Problem(StatusCodes.Status422UnprocessableEntity, "The link was refused.", refused.Detail, refused.Code),
+        };
     }
 
     // Before any decoding or download: a user at the daily limit costs a count, not a picture (the queue decides for sure)
@@ -288,11 +310,15 @@ public static class FileEndpoints
     /// Stores a picture as an upload of <paramref name="ownerId"/> (D-108): the answer an endpoint gives, and the stored
     /// file's id when there is one (a cover found for the pool, D-118, uses it).
     /// </summary>
-    internal static async Task<(IResult Answer, Guid? FileId)> StoreFileAsync(
-        byte[] content, Guid commandId, Guid ownerId, FileServices services, CancellationToken ct, bool countTowardsLimit = true, FileKind kind = FileKind.Upload)
+    internal static Task<(IResult Answer, Guid? FileId)> StoreFileAsync(
+        byte[] content, Guid commandId, Guid ownerId, FileServices services, CancellationToken ct, bool countTowardsLimit = true, FileKind kind = FileKind.Upload) =>
+        StoreFileAsync(_ => ValueTask.FromResult(content), commandId, ownerId, services, kind, countTowardsLimit, ct);
+
+    private static async Task<(IResult Answer, Guid? FileId)> StoreFileAsync(
+        Func<CancellationToken, ValueTask<byte[]>> readAsync, Guid commandId, Guid ownerId, FileServices services, FileKind kind, bool countTowardsLimit, CancellationToken ct)
     {
         var (db, storage, limits, ids, _, bus) = services;
-        var (processed, failure) = await ProcessPictureAsync(_ => ValueTask.FromResult(content), kind, limits, ct);
+        var (processed, failure) = await ProcessPictureAsync(readAsync, kind, limits, ct);
         if (processed is null)
         {
             return (failure!, null);
@@ -337,23 +363,24 @@ public static class FileEndpoints
             : Problem(StatusCodes.Status409Conflict, "The command was rejected.", outcome.Rejection.Detail, outcome.Rejection.Code), null);
     }
 
-    internal static async Task<(ProcessedFile? Picture, IResult? Failure)> ProcessPictureAsync(
+    internal static Task<(ProcessedFile? Picture, IResult? Failure)> ProcessPictureAsync(
         IFormFile file, FileKind kind, FileLimits limits, CancellationToken ct) =>
-        await ProcessPictureAsync(async token =>
-        {
-            await using var stream = file.OpenReadStream();
-            var content = new byte[file.Length];
-            await stream.ReadExactlyAsync(content, token);
-            return content;
-        }, kind, limits, ct);
+        ProcessPictureAsync(token => ReadFormFileAsync(file, token), kind, limits, ct);
+
+    private static async ValueTask<byte[]> ReadFormFileAsync(IFormFile file, CancellationToken ct)
+    {
+        await using var stream = file.OpenReadStream();
+        var content = new byte[file.Length];
+        await stream.ReadExactlyAsync(content, ct);
+        return content;
+    }
 
     internal static async Task<(ProcessedFile? Picture, IResult? Failure)> ProcessPictureAsync(
         Func<CancellationToken, ValueTask<byte[]>> readAsync, FileKind kind, FileLimits limits, CancellationToken ct)
     {
         if (!await s_processing.WaitAsync(s_processingWait, ct))
         {
-            return (null, Problem(StatusCodes.Status503ServiceUnavailable,
-                "The server is busy with other pictures.", "Try again in a minute.", SafeDownloader.Busy));
+            return (null, PictureBusy());
         }
 
         ProcessedFile? picture;
@@ -384,6 +411,9 @@ public static class FileEndpoints
 
         return (picture, null);
     }
+
+    private static ProblemHttpResult PictureBusy() => Problem(StatusCodes.Status503ServiceUnavailable,
+        "The server is busy with other pictures.", "Try again in a minute.", SafeDownloader.Busy);
 
     /// <summary>The answer to a command id seen before: the same user's stored file, or a refusal of someone else's id.</summary>
     private static async Task<IResult?> EarlierAsync(Guid commandId, Guid ownerId, GameEventDbContext db, CancellationToken ct)
