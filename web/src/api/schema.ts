@@ -12301,7 +12301,7 @@ export interface components {
             /** @default false */
             eventQuestion: boolean;
         };
-        /** @description Effective attacks and the latest command authored by a participant in this season. */
+        /** @description Effective attacks, credited completion rewards and the latest command authored by a participant in this season. */
         AdminSeasonStatisticsPlayerView: {
             /** Format: uuid */
             playerId: string;
@@ -12312,8 +12312,14 @@ export interface components {
             attacksReceived: number;
             /** Format: date-time */
             lastActionAt: null | string;
+            /** Format: int64 */
+            completedRunPoints: number;
+            /** Format: double */
+            completedRunHours: number;
+            /** Format: double */
+            pointsPerHour: null | number;
         };
-        /** @description A season's attack and activity report for the admin. */
+        /** @description A season's attack, completion efficiency and activity report for the admin. */
         AdminSeasonStatisticsView: {
             players: components["schemas"]["AdminSeasonStatisticsPlayerView"][];
         };

@@ -12834,7 +12834,10 @@
           "name",
           "attacksMade",
           "attacksReceived",
-          "lastActionAt"
+          "lastActionAt",
+          "completedRunPoints",
+          "completedRunHours",
+          "pointsPerHour"
         ],
         "type": "object",
         "properties": {
@@ -12859,9 +12862,24 @@
               "string"
             ],
             "format": "date-time"
+          },
+          "completedRunPoints": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "completedRunHours": {
+            "type": "number",
+            "format": "double"
+          },
+          "pointsPerHour": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
           }
         },
-        "description": "Effective attacks and the latest command authored by a participant in this season."
+        "description": "Effective attacks, credited completion rewards and the latest command authored by a participant in this season."
       },
       "AdminSeasonStatisticsView": {
         "required": [
@@ -12876,7 +12894,7 @@
             }
           }
         },
-        "description": "A season's attack and activity report for the admin."
+        "description": "A season's attack, completion efficiency and activity report for the admin."
       },
       "AllTimeStatisticsView": {
         "required": [
