@@ -1,16 +1,25 @@
-import type { HTMLAttributes, ReactNode } from 'react';
+import type { HTMLAttributes, ReactNode, Ref } from 'react';
 import { cx } from './cx';
 
 /** A flat panel: the leaderboard, the feed, a form. The hard shadow belongs to the main action and the moments. */
 export function Panel({
   title,
+  titleRef,
   children,
   className,
   ...rest
-}: HTMLAttributes<HTMLElement> & { title?: ReactNode }) {
+}: HTMLAttributes<HTMLElement> & { title?: ReactNode; titleRef?: Ref<HTMLHeadingElement> }) {
   return (
     <section className={cx('grid gap-3 rounded-lg bg-card p-4', className)} {...rest}>
-      {title ? <h2 className="font-display text-lg font-heavy">{title}</h2> : null}
+      {title ? (
+        <h2
+          ref={titleRef}
+          tabIndex={titleRef ? -1 : undefined}
+          className="font-display text-lg font-heavy"
+        >
+          {title}
+        </h2>
+      ) : null}
       {children}
     </section>
   );

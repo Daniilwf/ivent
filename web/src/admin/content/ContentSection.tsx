@@ -202,8 +202,8 @@ function Workspace({
   useEffect(() => {
     if (opened === 0) return;
     const heading = document.getElementById('content-editor-title');
-    heading?.focus();
-    heading?.scrollIntoView({ block: 'start' });
+    heading?.focus({ preventScroll: true });
+    heading?.scrollIntoView({ block: 'center' });
   }, [opened]);
 
   // A season that never had content says so once, with the two ways to start (DESIGN.md, «Компоненты и состояния»)

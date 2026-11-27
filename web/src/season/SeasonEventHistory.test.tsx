@@ -10,15 +10,19 @@ vi.mock('motion/react', async (original) => ({
   useReducedMotion: () => false,
 }));
 
+const hubListeners = new Set<(updates: unknown[]) => void>();
 let hubChange: (() => void) | null = null;
 vi.mock('../api/realtime', () => ({
   watchSeason: (_id: string, onChange: (updates: unknown[]) => void) => {
+    hubListeners.add(onChange);
+    // Each real subscription has its own connection; a new child must not replace the screen's listener.
     hubChange = () => {
-      onChange([]);
+      for (const notify of hubListeners) notify([]);
     };
     onChange([]);
     return () => {
-      hubChange = null;
+      hubListeners.delete(onChange);
+      if (hubListeners.size === 0) hubChange = null;
     };
   },
 }));

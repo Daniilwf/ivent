@@ -42,6 +42,7 @@ export function DrawnEventCard({
   level = 4,
   children,
   onShown,
+  onSettled,
 }: {
   drawn: Drawn;
   fresh?: boolean;
@@ -50,6 +51,7 @@ export function DrawnEventCard({
   level?: 3 | 4;
   children?: ReactNode;
   onShown?: ((sequence: number) => void) | undefined;
+  onSettled?: ((sequence: number) => void) | undefined;
 }) {
   const t = ru.events;
   const reduce = useReducedMotion() ?? false;
@@ -65,6 +67,9 @@ export function DrawnEventCard({
     }
   }, [freshOnMount, drawn.sequence, onShown]);
   const animated = freshOnMount && !reduce && !skipped;
+  useEffect(() => {
+    if (!animated) onSettled?.(drawn.sequence);
+  }, [animated, drawn.sequence, onSettled]);
   useEffect(() => {
     if (!animated) return;
     let cancelled = false;

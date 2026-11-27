@@ -1,16 +1,16 @@
-import { Download } from 'lucide-react';
-import { useCallback, useRef, useState, type SyntheticEvent } from 'react';
-import { api, type Schemas } from '../api/client';
-import { moscowTime } from '../app/time';
+import { ArrowDown, Download } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState, type Ref, type SyntheticEvent } from 'react';
+import { api, rejectionCode, type Schemas } from '../api/client';
+import { siteEnvironment } from '../app/siteStatus';
+import { moscowInput, moscowTime } from '../app/time';
 import { ru } from '../i18n/ru';
 import { Button } from '../ui/Button';
 import { buttonClass } from '../ui/buttonStyles';
 import { ConfirmDanger } from '../ui/Dialogs';
-import { Field } from '../ui/Field';
+import { Field, Select } from '../ui/Field';
 import { Notice } from '../ui/States';
 import { Panel } from '../ui/Surface';
 import { refusal } from './actions';
-import { moscowInput } from '../app/time';
 import { newCommandId } from '../api/commands';
 import { AsyncState } from '../ui/AsyncState';
 import { answerOf, useLoaded } from '../app/useLoaded';
@@ -27,6 +27,11 @@ const next: Partial<Record<Status, Status>> = {
   closing: 'finished',
   finished: 'archived',
 };
+
+function focusHeading(heading: HTMLHeadingElement | null) {
+  heading?.focus({ preventScroll: true });
+  heading?.scrollIntoView({ block: 'center' });
+}
 
 /** The season's lifecycle, deadline, archive and integrity; the list of seasons and a new one */
 export function SeasonSection({
@@ -56,6 +61,28 @@ export function SeasonSection({
     { version },
   );
   const [message, setMessage] = useState<Message>(null);
+  const [templatesEnabled, setTemplatesEnabled] = useState(false);
+  const createdSeason = useRef<string>(null);
+  const statusHeading = useRef<HTMLHeadingElement>(null);
+  const creationHeading = useRef<HTMLHeadingElement>(null);
+  const viewedSeason = loaded.kind === 'ready' ? loaded.value.season?.id : undefined;
+
+  useEffect(() => {
+    const heading = statusHeading.current;
+    if (!heading || createdSeason.current !== viewedSeason) return;
+    createdSeason.current = null;
+    focusHeading(heading);
+  }, [viewedSeason]);
+
+  useEffect(() => {
+    let open = true;
+    void siteEnvironment().then((status) => {
+      if (open) setTemplatesEnabled(status?.seasonTemplates === true);
+    });
+    return () => {
+      open = false;
+    };
+  }, []);
 
   return (
     <AsyncState loaded={loaded} errorTitle={ru.admin.loadErrorTitle}>
@@ -70,9 +97,24 @@ export function SeasonSection({
         return (
           <div className="grid gap-6" data-testid="admin-season">
             {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
+            <Button
+              className="justify-self-start"
+              icon={<ArrowDown size={20} aria-hidden />}
+              onClick={() => {
+                focusHeading(creationHeading.current);
+              }}
+            >
+              {t.createJump}
+            </Button>
             {season && seasonId ? (
               <>
-                <StatusPanel seasonId={seasonId} season={season} onDone={done} onFailed={failed} />
+                <StatusPanel
+                  seasonId={seasonId}
+                  season={season}
+                  headingRef={statusHeading}
+                  onDone={done}
+                  onFailed={failed}
+                />
                 {season.status === 'closing' ? (
                   <NominationSection key={seasonId} seasonId={seasonId} version={version} />
                 ) : null}
@@ -129,7 +171,16 @@ export function SeasonSection({
               </ul>
             </Panel>
             <CreateSeason
+              headingRef={creationHeading}
+              templates={
+                templatesEnabled
+                  ? list.filter(
+                      (entry) => entry.status === 'finished' || entry.status === 'archived',
+                    )
+                  : []
+              }
               onCreated={(id, name) => {
+                createdSeason.current = id;
                 onPick(id);
                 done(t.created(name));
               }}
@@ -148,7 +199,13 @@ type Props = {
   onFailed: (text: string) => void;
 };
 
-function StatusPanel({ seasonId, season, onDone, onFailed }: Props) {
+function StatusPanel({
+  seasonId,
+  season,
+  headingRef,
+  onDone,
+  onFailed,
+}: Props & { headingRef: Ref<HTMLHeadingElement> }) {
   const to = next[season.status];
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -173,7 +230,7 @@ function StatusPanel({ seasonId, season, onDone, onFailed }: Props) {
   }
 
   return (
-    <Panel title={t.current(season.name)} data-testid="season-status">
+    <Panel title={t.current(season.name)} titleRef={headingRef} data-testid="season-status">
       <p>
         {t.status}: <span className="font-bold">{ru.seasonStatus[season.status]}</span>
       </p>
@@ -348,12 +405,30 @@ function IntegrityPanel({ seasonId }: { seasonId: string }) {
   );
 }
 
-function CreateSeason({ onCreated }: { onCreated: (id: string, name: string) => void }) {
+function CreateSeason({
+  headingRef,
+  templates,
+  onCreated,
+}: {
+  headingRef: Ref<HTMLHeadingElement>;
+  templates: Schemas['SeasonListItemView'][];
+  onCreated: (id: string, name: string) => void;
+}) {
   const [name, setName] = useState('');
+  const [templateId, setTemplateId] = useState('');
+  const [templateDeadline, setTemplateDeadline] = useState('');
   const [error, setError] = useState<string>();
   const [failure, setFailure] = useState<string>();
   const [busy, setBusy] = useState(false);
-  const pending = useRef<{ name: string; id: string } | null>(null);
+  const pending = useRef<{
+    id: string;
+    name: string;
+    sourceSeasonId: string | undefined;
+    deadline: string | undefined;
+  } | null>(null);
+  const template = templates.find((source) => source.id === templateId);
+  const sourceSeasonId = template?.id;
+  const deadline = sourceSeasonId && templateDeadline ? moscowInput(templateDeadline) : undefined;
 
   async function submit(e: SyntheticEvent) {
     e.preventDefault();
@@ -365,18 +440,38 @@ function CreateSeason({ onCreated }: { onCreated: (id: string, name: string) => 
     setError(undefined);
     setFailure(undefined);
     setBusy(true);
-    // The new season's id stays until the server answers: a retry after a lost answer creates one season (D-68)
-    const seasonId = pending.current?.name === clean ? pending.current.id : crypto.randomUUID();
-    pending.current = { name: clean, id: seasonId };
+    // An unchanged retry keeps the target season id, so the shared command middleware also keeps its id (D-68).
+    const previous = pending.current;
+    const seasonId =
+      previous?.name === clean &&
+      previous.sourceSeasonId === sourceSeasonId &&
+      previous.deadline === deadline
+        ? previous.id
+        : crypto.randomUUID();
+    pending.current = { name: clean, id: seasonId, sourceSeasonId, deadline };
     try {
       const answer = await api.POST('/api/admin/seasons', {
-        body: { commandId: newCommandId(), seasonId, name: clean },
+        body: {
+          commandId: newCommandId(),
+          seasonId,
+          name: clean,
+          ...(sourceSeasonId ? { sourceSeasonId } : {}),
+          ...(deadline ? { deadline } : {}),
+        },
       });
       pending.current = null;
       if (answer.data) {
         setName('');
+        setTemplateId('');
+        setTemplateDeadline('');
         onCreated(seasonId, clean);
-      } else setFailure(refusal(answer));
+      } else {
+        const code = rejectionCode(answer.error);
+        const incompatibleContent =
+          sourceSeasonId !== undefined &&
+          (code === 'content.invalid' || code === 'feature.disabled');
+        setFailure(incompatibleContent ? t.incompatibleTemplateContent : refusal(answer));
+      }
     } catch {
       setFailure(ru.admin.failed);
     } finally {
@@ -385,8 +480,10 @@ function CreateSeason({ onCreated }: { onCreated: (id: string, name: string) => 
   }
 
   return (
-    <Panel title={t.create}>
-      <p className="max-w-prose text-ink-soft">{t.createLead}</p>
+    <Panel title={t.create} titleRef={headingRef}>
+      <p className="max-w-prose wrap-anywhere text-ink-soft">
+        {template ? t.templateLead(template.name) : t.createLead}
+      </p>
       <form className="grid gap-3" onSubmit={(e) => void submit(e)} noValidate>
         <Field
           label={t.name}
@@ -398,6 +495,36 @@ function CreateSeason({ onCreated }: { onCreated: (id: string, name: string) => 
             setName(e.target.value);
           }}
         />
+        {templates.length > 0 ? (
+          <Select
+            label={t.template}
+            value={sourceSeasonId ?? ''}
+            data-testid="season-template"
+            onChange={(e) => {
+              setTemplateId(e.target.value);
+              setFailure(undefined);
+            }}
+          >
+            <option value="">{t.noTemplate}</option>
+            {templates.map((source) => (
+              <option key={source.id} value={source.id}>
+                {source.name}
+              </option>
+            ))}
+          </Select>
+        ) : null}
+        {sourceSeasonId ? (
+          <Field
+            type="datetime-local"
+            label={t.templateDeadline}
+            hint={t.templateDeadlineHint}
+            value={templateDeadline}
+            data-testid="season-template-deadline"
+            onChange={(e) => {
+              setTemplateDeadline(e.target.value);
+            }}
+          />
+        ) : null}
         {failure ? <Notice tone="danger">{failure}</Notice> : null}
         <div>
           <Button type="submit" loading={busy} data-testid="season-create">

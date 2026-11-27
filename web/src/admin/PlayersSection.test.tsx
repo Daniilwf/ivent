@@ -321,8 +321,13 @@ describe('The players', () => {
       'POST /api/admin/seasons/*/players': ok,
     });
 
-    await userEvent.click(await screen.findByTestId('add-player-open'));
+    (await screen.findByTestId('add-player-open')).focus();
+    await userEvent.keyboard('{Enter}');
     const account = await screen.findByTestId('add-player-account');
+    expect(screen.getByRole('heading', { name: t.addTitle })).toHaveFocus();
+    await userEvent.tab();
+    expect(account).toHaveFocus();
+    expect(account).not.toHaveAccessibleDescription();
     expect(
       within(account)
         .getAllByRole('option')
@@ -332,6 +337,7 @@ describe('The players', () => {
     expect(screen.getByText(t.accountRequired)).toBeInTheDocument();
 
     await userEvent.selectOptions(account, 'u3');
+    expect(account).toHaveAccessibleDescription(expect.stringContaining('Сова (sova)'));
     await userEvent.selectOptions(screen.getByTestId('add-player-cell'), 'c1');
     await userEvent.type(screen.getByTestId('add-player-points'), '10');
     await userEvent.click(screen.getByTestId('add-player-submit'));

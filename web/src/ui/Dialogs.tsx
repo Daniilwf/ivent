@@ -64,22 +64,30 @@ function ConfirmWindow({
         <AlertDialog.Overlay className={overlay} />
         <AlertDialog.Content
           data-testid={testId}
-          className="fixed inset-x-4 top-1/2 z-20 mx-auto grid max-w-110 -translate-y-1/2 gap-4 rounded-lg border-3 border-ink bg-card p-5 shadow-lift"
+          className="fixed inset-x-4 top-1/2 z-20 mx-auto flex max-h-11/12 min-w-0 max-w-110 -translate-y-1/2 flex-col gap-4 rounded-lg border-3 border-ink bg-card p-5 wrap-anywhere shadow-lift"
         >
-          <AlertDialog.Title className="font-display text-lg font-heavy text-balance wrap-anywhere">
+          <AlertDialog.Title className="shrink-0 font-display text-lg font-heavy text-balance wrap-anywhere">
             {title}
           </AlertDialog.Title>
-          <AlertDialog.Description asChild>
-            <ul className="grid list-disc gap-1 pl-5 text-base">
-              {consequences.map((c) => (
-                <li key={c}>{c}</li>
-              ))}
-            </ul>
-          </AlertDialog.Description>
-          {children}
+          <div
+            className="-mx-2 grid min-h-0 content-start gap-4 overflow-y-auto overscroll-contain scroll-py-2 p-2"
+            onFocus={(event) => {
+              // The Radix focus loop can move focus into this body without scrolling.
+              event.target.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+            }}
+          >
+            <AlertDialog.Description asChild>
+              <ul className="grid list-disc gap-1 pl-5 text-base">
+                {consequences.map((c) => (
+                  <li key={c}>{c}</li>
+                ))}
+              </ul>
+            </AlertDialog.Description>
+            {children}
+          </div>
           <div
             className={cx(
-              'gap-3',
+              'shrink-0 gap-3',
               stackActionsOnPhone
                 ? 'grid desk:flex desk:flex-wrap desk:justify-end'
                 : 'flex flex-wrap justify-end',

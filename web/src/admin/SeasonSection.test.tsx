@@ -1,5 +1,6 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { Schemas } from '../api/client';
 import { ru } from '../i18n/ru';
 import { answer, fakeServer, seasonId } from '../test/fakeServer';
 import { SeasonSection } from './SeasonSection';
@@ -27,6 +28,16 @@ const list = [
   },
 ];
 const ok = { duplicate: false, events: [] };
+const finished = '5ea50000-0000-0000-0000-000000000003';
+const templateRoutes = {
+  'GET /api/status': { seasonTemplates: true },
+  'GET /api/seasons': [
+    ...list,
+    { ...list[1], id: finished, name: 'Лето', status: 'finished' },
+    { ...list[1], id: 'closing', name: 'Проверка', status: 'closing' },
+    { ...list[1], id: 'draft', name: 'Черновик', status: 'draft' },
+  ],
+};
 
 function open(
   status = 'active',
@@ -214,6 +225,43 @@ describe('The season section', () => {
     expect(onPick).toHaveBeenCalledWith(other);
   });
 
+  it('gets to the existing creation form from the top of a long season list', async () => {
+    const archives = Array.from({ length: 12 }, (_, index) => ({
+      id: `archive-${index}`,
+      name: `Длинное название завершённого архивного сезона ${index}`,
+      status: 'archived',
+      deadline: null,
+      createdAt: '2026-03-01T00:00:00Z',
+    }));
+    const originalScroll = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollIntoView');
+    const scrollIntoView = vi.fn();
+    Object.defineProperty(Element.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: scrollIntoView,
+    });
+    try {
+      open('active', { 'GET /api/seasons': [...archives, ...list] });
+      const shortcut = await screen.findByRole('button', { name: 'К созданию сезона' });
+      const heading = screen.getByRole('heading', { name: t.create, level: 2 });
+      await userEvent.tab();
+      expect(shortcut).toHaveFocus();
+
+      await userEvent.keyboard('{Enter}');
+
+      expect(heading).toHaveFocus();
+      expect(screen.getAllByTestId('season-name')).toHaveLength(1);
+      expect(scrollIntoView).toHaveBeenCalledWith({ block: 'center' });
+      await userEvent.tab();
+      expect(screen.getByTestId('season-name')).toHaveFocus();
+    } finally {
+      if (originalScroll) {
+        Object.defineProperty(Element.prototype, 'scrollIntoView', originalScroll);
+      } else {
+        Reflect.deleteProperty(Element.prototype, 'scrollIntoView');
+      }
+    }
+  });
+
   it('creates a season by its name and opens it', async () => {
     const onPick = vi.fn();
     const server = open('active', { 'POST /api/admin/seasons': ok }, onPick);
@@ -229,6 +277,109 @@ describe('The season section', () => {
     const created = (server.sent('POST', '/api/admin/seasons')[0]?.body as { seasonId: string })
       .seasonId;
     expect(onPick).toHaveBeenCalledWith(created);
+  });
+
+  it('keeps season templates hidden when the site capability is disabled', async () => {
+    const server = open('active', {
+      'GET /api/status': { seasonTemplates: false },
+      'POST /api/admin/seasons': ok,
+    });
+
+    await userEvent.type(await screen.findByTestId('season-name'), 'Зима');
+    expect(screen.queryByRole('combobox', { name: 'Сезон по образцу' })).toBeNull();
+    expect(screen.queryByTestId('season-template-deadline')).toBeNull();
+    await userEvent.click(screen.getByTestId('season-create'));
+
+    await waitFor(() => {
+      expect(server.sent('POST', '/api/admin/seasons')).toHaveLength(1);
+    });
+    const body = server.sent('POST', '/api/admin/seasons')[0]?.body;
+    expect(body).not.toHaveProperty('sourceSeasonId');
+    expect(body).not.toHaveProperty('deadline');
+  });
+
+  it('offers only completed sources and opens the copy with the new Moscow deadline', async () => {
+    const onPick = vi.fn();
+    const server = open('active', { ...templateRoutes, 'POST /api/admin/seasons': ok }, onPick);
+
+    const source = await screen.findByRole('combobox', { name: 'Сезон по образцу' });
+    expect(source).toHaveValue('');
+    expect(
+      within(source)
+        .getAllByRole('option')
+        .map((option) => option.textContent),
+    ).toEqual(['Без образца', 'Весна', 'Лето']);
+    expect(screen.queryByTestId('season-template-deadline')).toBeNull();
+
+    await userEvent.selectOptions(source, finished);
+    expect(screen.getByText(t.templateLead('Лето'))).toBeInTheDocument();
+    await userEvent.type(screen.getByTestId('season-name'), 'Новый сезон');
+    await userEvent.type(screen.getByTestId('season-template-deadline'), '2028-12-20T18:00');
+    await userEvent.click(screen.getByTestId('season-create'));
+
+    await waitFor(() => {
+      expect(server.sent('POST', '/api/admin/seasons')[0]?.body).toMatchObject({
+        name: 'Новый сезон',
+        sourceSeasonId: finished,
+        deadline: '2028-12-20T18:00:00+03:00',
+      });
+    });
+    const body = server.sent('POST', '/api/admin/seasons')[0]
+      ?.body as Schemas['CreateSeasonRequest'];
+    expect(onPick).toHaveBeenCalledWith(body.seasonId);
+    expect(await screen.findByText(t.created('Новый сезон'))).toBeInTheDocument();
+  });
+
+  it('retries an unchanged copy once and uses new ids after changing the source', async () => {
+    const server = open('active', {
+      ...templateRoutes,
+      'POST /api/admin/seasons': () => {
+        throw new TypeError('Failed to fetch');
+      },
+    });
+
+    const source = await screen.findByRole('combobox', { name: 'Сезон по образцу' });
+    await userEvent.selectOptions(source, finished);
+    await userEvent.type(screen.getByTestId('season-name'), 'Новый сезон');
+    const submit = screen.getByTestId('season-create');
+    await userEvent.click(submit);
+    await screen.findByText(ru.admin.failed);
+    await userEvent.click(submit);
+    await screen.findByText(ru.admin.failed);
+    await userEvent.selectOptions(source, other);
+    await userEvent.click(submit);
+
+    await waitFor(() => {
+      expect(server.sent('POST', '/api/admin/seasons')).toHaveLength(3);
+    });
+    const [first, again, changed] = server
+      .sent('POST', '/api/admin/seasons')
+      .map((call) => call.body as Schemas['CreateSeasonRequest']);
+    expect(first).toMatchObject({ sourceSeasonId: finished });
+    expect(first).not.toHaveProperty('deadline');
+    expect(again).toEqual(first);
+    expect(changed).toMatchObject({ sourceSeasonId: other });
+    expect(changed?.seasonId).not.toBe(first?.seasonId);
+    expect(changed?.commandId).not.toBe(first?.commandId);
+  });
+
+  it.each([
+    ['season.templateUnavailable', ru.admin.rejection['season.templateUnavailable'] ?? ''],
+    ['content.invalid', t.incompatibleTemplateContent],
+    ['feature.disabled', t.incompatibleTemplateContent],
+  ])('shows a reason that applies to the source after %s', async (code, message) => {
+    open('active', {
+      ...templateRoutes,
+      'POST /api/admin/seasons': answer(409, { status: 409, code }),
+    });
+
+    const source = await screen.findByRole('combobox', { name: 'Сезон по образцу' });
+    await userEvent.selectOptions(source, other);
+    await userEvent.type(screen.getByTestId('season-name'), 'Зима');
+    await userEvent.click(screen.getByTestId('season-create'));
+
+    expect(await screen.findByText(message)).toBeVisible();
+    expect(source).toHaveValue(other);
   });
 
   it('creates one season when the first answer was lost and the admin tries again', async () => {

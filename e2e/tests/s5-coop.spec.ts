@@ -8,6 +8,7 @@ import {
   commandsOf,
   completeHere,
   confirmButton,
+  fillCompletionHere,
   leaderRow,
   live,
   openAdmin,
@@ -41,7 +42,7 @@ function coopMap(): Schemas['MapGraphView'] {
   };
 }
 
-async function setupCoopSeason(partnerBoard = false) {
+async function setupCoopSeason(partnerBoard = false, runConditions = false) {
   const world = await setUpSeason({ players: ['Лена', 'Петя'], start: false });
   const [roller, partner] = world.players;
   if (!roller || !partner) throw new Error('Two season players are required.');
@@ -50,7 +51,13 @@ async function setupCoopSeason(partnerBoard = false) {
   const rules = await world.adminApi.get<Schemas['RulesView']>(`${season}/rules`);
   const ruleset: Schemas['Ruleset'] = {
     ...rules.ruleset,
-    features: { ...rules.ruleset.features, mapMode: 'graph', coop: true, partnerBoard },
+    features: {
+      ...rules.ruleset.features,
+      mapMode: 'graph',
+      coop: true,
+      partnerBoard,
+      ...(runConditions ? { items: true, events: true } : {}),
+    },
     map: { ...rules.ruleset.map, minZoneGames: 1 },
     reward: {
       ...rules.ruleset.reward,
@@ -65,6 +72,31 @@ async function setupCoopSeason(partnerBoard = false) {
   };
   await world.adminApi.put(`${admin}/rules`, { expectedVersion: rules.version, ruleset });
   await world.adminApi.post(`${admin}/map/publish`, { map: coopMap(), comment: 'Кооп-карта' });
+  if (runConditions)
+    await world.adminApi.post(`/api/test/seasons/${world.seasonId}/content`, {
+      objects: [
+        ['coop-hard-condition', 'Сложная кооп-игра', { difficultyAtLeast: 'hard' }],
+        ['coop-easy-condition', 'Лёгкая будущая игра', { difficultyAtMost: 'easy' }],
+      ].map(([id, name, runCondition]) =>
+        JSON.stringify({
+          id,
+          name,
+          kind: 'item',
+          description: 'Условие следующего прохождения.',
+          rarity: 'common',
+          price: null,
+          window: 'anytime',
+          hostile: false,
+          stackable: false,
+          effect: {
+            target: { selector: 'self' },
+            actions: [{ type: 'modifyNextRoll', runCondition }],
+          },
+        }),
+      ),
+      wheels: [],
+      comment: 'Разные условия роллившего и напарника',
+    });
   await world.adminApi.post(`${admin}/status`, { to: 'active' });
   return { world, roller, partner, season };
 }
@@ -169,6 +201,237 @@ test('two players complete one coop run, receive their shares and lose both shar
     expect((await seasonOf(rollerApi, world.seasonId)).me?.lastCompleted?.status).toBe('rejected');
   } finally {
     await Promise.all([rollerApi.dispose(), partnerApi.dispose(), world.adminApi.dispose()]);
+  }
+});
+
+for (const { difficulty, label, met } of [
+  { difficulty: 'hard', label: 'Сложная', met: true },
+  { difficulty: 'normal', label: 'Нормальная', met: false },
+] as const)
+  test(`a coop uses the roller's nonempty conditions when the shared run ${met ? 'meets' : 'misses'} them`, async ({
+    browser,
+  }) => {
+    const { world, roller, partner, season } = await setupCoopSeason(false, true);
+    const [rollerApi, partnerApi] = await Promise.all([apiOf(roller), apiOf(partner)]);
+    const rollerPage = await signIn(browser, roller);
+    const partnerPage = await signIn(browser, partner);
+
+    try {
+      for (const [account, api, objectId] of [
+        [roller, rollerApi, 'coop-hard-condition'],
+        [partner, partnerApi, 'coop-easy-condition'],
+      ] as const) {
+        await world.adminApi.post(
+          `/api/admin/seasons/${world.seasonId}/players/${account.playerId}/inventory`,
+          { giveObjectId: objectId, comment: 'Условие для проверки кооп-снапшота' },
+        );
+        const item = (await api.get<Schemas['EconomyView']>(`${season}/economy`)).items?.find(
+          (candidate) => candidate.objectId === objectId,
+        );
+        if (!item) throw new Error(`The condition item ${objectId} was not granted.`);
+        await api.post(`${season}/items/${item.instanceId}/use`);
+      }
+
+      expect((await seasonOf(rollerApi, world.seasonId)).me?.waitingConditions).toEqual([
+        expect.objectContaining({ objectId: 'coop-hard-condition', difficultyAtLeast: 'hard' }),
+      ]);
+      expect((await seasonOf(partnerApi, world.seasonId)).me?.waitingConditions).toEqual([
+        expect.objectContaining({ objectId: 'coop-easy-condition', difficultyAtMost: 'easy' }),
+      ]);
+      await expect(rollerPage.getByTestId('roll')).toBeEnabled(live);
+      await rollerPage.getByTestId('roll').click();
+      const offer = rollerPage.getByTestId('offer');
+      await expect(offer).toBeVisible();
+      await expect(offer).toContainText(coopGameTitle);
+      await offer.getByText('Сложная', { exact: true }).click();
+      await expect(offer.getByRole('radio', { name: 'Сложная', exact: true })).toBeChecked();
+      await rollerPage.getByTestId('start').click();
+      await expect(rollerPage.getByTestId('active-run')).toBeVisible(live);
+      const run = (await seasonOf(rollerApi, world.seasonId)).me?.activeRun;
+      if (!run) throw new Error('The roller has no active run.');
+      expect(run.declaredDifficulty).toBe('hard');
+      expect(run.conditions).toEqual([
+        expect.objectContaining({ objectId: 'coop-hard-condition', difficultyAtLeast: 'hard' }),
+      ]);
+
+      await openInteractions(rollerPage, world.seasonId);
+      await openInteractions(partnerPage, world.seasonId);
+      await rollerPage.getByLabel('Напарник', { exact: true }).selectOption(partner.playerId);
+      await rollerPage.getByRole('button', { name: 'Пригласить в кооп', exact: true }).click();
+      await partnerPage
+        .getByRole('region', { name: 'Приглашения', exact: true })
+        .getByRole('button', { name: 'Принять', exact: true })
+        .click();
+
+      await partnerPage.getByTestId('nav-season').click();
+      const partnerRun = partnerPage.getByTestId('active-run');
+      await expect(partnerRun.getByText('Не ниже: Сложная', { exact: true })).toBeVisible(live);
+      const joined = await seasonOf(partnerApi, world.seasonId);
+      expect(joined.me?.activeRun).toMatchObject({ id: run.id, conditions: run.conditions });
+      expect(joined.me?.waitingConditions).toEqual([
+        expect.objectContaining({ objectId: 'coop-easy-condition', difficultyAtMost: 'easy' }),
+      ]);
+
+      await rollerPage.getByTestId('nav-season').click();
+      await expect(
+        rollerPage.getByTestId('active-run').getByText('Не ниже: Сложная', { exact: true }),
+      ).toBeVisible(live);
+      await fillCompletionHere(rollerPage, label);
+      await rollerPage.getByTestId('complete-submit').click();
+      await expect
+        .poll(async () => (await seasonOf(rollerApi, world.seasonId)).me?.lastCompleted?.id, live)
+        .toBe(run.id);
+
+      const [rollerAfter, partnerAfter] = await Promise.all([
+        seasonOf(rollerApi, world.seasonId),
+        seasonOf(partnerApi, world.seasonId),
+      ]);
+      const result = rollerAfter.me?.lastCompleted;
+      if (!result) throw new Error('The common completion is missing.');
+      expect(result).toMatchObject({
+        id: run.id,
+        difficulty,
+        conditions: run.conditions,
+        conditionCheck: { met, waived: false },
+      });
+      await rollerApi.post(`${season}/runs/${run.id}/proof`, {
+        links: ['https://example.com/coop-conditions.png'],
+      });
+      const sharedProofs = (
+        await world.adminApi.get<Schemas['ProofQueueItemView'][]>(
+          `/api/admin/seasons/${world.seasonId}/proofs`,
+        )
+      ).filter((candidate) => candidate.runId === run.id);
+      expect(sharedProofs).toHaveLength(1);
+      expect(sharedProofs[0]).toMatchObject({
+        runId: run.id,
+        playerId: roller.playerId,
+        conditions: run.conditions,
+        conditionCheck: { met, waived: false },
+      });
+      expect(result.dice).toHaveLength(met ? 2 : 0);
+      expect(result.total).toBe(result.dice.reduce((sum, die) => sum + die.value, 0));
+      if (met) expect(result.total).toBeGreaterThan(0);
+      const rollerPoints = Math.ceil(result.total / 2);
+      expect(rollerAfter.me?.coins).toBe(5);
+      expect(partnerAfter.me?.coins).toBe(4);
+      expect(
+        rollerAfter.players.find((candidate) => candidate.id === roller.playerId)?.points,
+      ).toBe(rollerPoints);
+      expect(
+        partnerAfter.players.find((candidate) => candidate.id === partner.playerId)?.points,
+      ).toBe(result.total - rollerPoints);
+      expect(rollerAfter.me?.waitingConditions ?? []).toEqual([]);
+      expect(partnerAfter.me?.waitingConditions).toEqual([
+        expect.objectContaining({ objectId: 'coop-easy-condition', difficultyAtMost: 'easy' }),
+      ]);
+      await expect(leaderRow(rollerPage, roller.playerId)).toContainText(
+        points(rollerPoints),
+        live,
+      );
+      await expect(leaderRow(partnerPage, partner.playerId)).toContainText(
+        points(result.total - rollerPoints),
+        live,
+      );
+      const events = (await commandsOf(world)).flatMap((command) => command.events);
+      expect(events.filter((event) => event === 'run-completed')).toHaveLength(1);
+      expect(events.filter((event) => event === 'run-condition-checked')).toHaveLength(1);
+      expect(events.filter((event) => event === 'coop-reward-split')).toHaveLength(1);
+    } finally {
+      await Promise.all([
+        rollerPage.context().close(),
+        partnerPage.context().close(),
+        rollerApi.dispose(),
+        partnerApi.dispose(),
+        world.adminApi.dispose(),
+      ]);
+    }
+  });
+
+test('deleting a joined coop partner preserves the shared run and its reward without restoring account access', async ({
+  browser,
+}) => {
+  const { world, roller, partner, season } = await setupCoopSeason();
+  const [rollerApi, partnerApi] = await Promise.all([apiOf(roller), apiOf(partner)]);
+  const rollerPage = await signIn(browser, roller);
+  const partnerPage = await signIn(browser, partner);
+
+  try {
+    expect(await rollAndStartHere(rollerPage)).toBe(coopGameTitle);
+    const run = (await seasonOf(rollerApi, world.seasonId)).me?.activeRun;
+    if (!run) throw new Error('The roller has no active run.');
+    await openInteractions(rollerPage, world.seasonId);
+    await openInteractions(partnerPage, world.seasonId);
+    await rollerPage.getByLabel('Напарник', { exact: true }).selectOption(partner.playerId);
+    await rollerPage.getByRole('button', { name: 'Пригласить в кооп', exact: true }).click();
+    await partnerPage
+      .getByRole('region', { name: 'Приглашения', exact: true })
+      .getByRole('button', { name: 'Принять', exact: true })
+      .click();
+    await expect(rollerPage.getByText('Твой напарник — Петя.')).toBeVisible(live);
+    const expectedCoop = { runId: run.id, rollerId: roller.playerId, partnerId: partner.playerId };
+    expect(await rollerApi.get<Schemas['CoopView']>(`${season}/coop`)).toMatchObject(expectedCoop);
+
+    const deletion = await world.adminApi.post<Schemas['AccountActionResponse']>(
+      `/api/admin/accounts/${partner.id}/delete`,
+    );
+    expect(deletion.account).toMatchObject({ id: partner.id, isDeleted: true });
+    expect((await partnerApi.send('GET', season)).status()).toBe(401);
+    expect(await rollerApi.get<Schemas['CoopView']>(`${season}/coop`)).toMatchObject(expectedCoop);
+    const afterDeletion = await seasonOf(rollerApi, world.seasonId);
+    expect(afterDeletion.me?.activeRun?.id).toBe(run.id);
+    expect(
+      afterDeletion.players.find((candidate) => candidate.id === partner.playerId),
+    ).toMatchObject({
+      points: 0,
+    });
+    const playersAfterDeletion = await world.adminApi.get<Schemas['AdminPlayerView'][]>(
+      `/api/admin/seasons/${world.seasonId}/players`,
+    );
+    expect(
+      playersAfterDeletion.find((candidate) => candidate.id === partner.playerId),
+    ).toMatchObject({
+      isInactive: false,
+    });
+
+    await rollerPage.getByTestId('nav-season').click();
+    await expect(rollerPage.getByTestId('active-run')).toContainText(coopGameTitle, live);
+    await completeHere(rollerPage);
+    const afterCompletion = await seasonOf(rollerApi, world.seasonId);
+    const result = afterCompletion.me?.lastCompleted;
+    if (!result) throw new Error('Deleting the partner prevented the roller from completing.');
+    expect(result.id).toBe(run.id);
+    expect(result.dice).toHaveLength(2);
+    const rollerPoints = Math.ceil(result.total / 2);
+    const partnerPoints = result.total - rollerPoints;
+    expect(afterCompletion.me).toMatchObject({ coins: 5, activeRun: null });
+    expect(
+      afterCompletion.players.find((candidate) => candidate.id === roller.playerId)?.points,
+    ).toBe(rollerPoints);
+    expect(
+      afterCompletion.players.find((candidate) => candidate.id === partner.playerId),
+    ).toMatchObject({ points: partnerPoints });
+    const adminPlayers = await world.adminApi.get<Schemas['AdminPlayerView'][]>(
+      `/api/admin/seasons/${world.seasonId}/players`,
+    );
+    expect(adminPlayers.find((candidate) => candidate.id === partner.playerId)).toMatchObject({
+      coins: 4,
+      isInactive: false,
+    });
+    expect(await rollerApi.get<Schemas['CoopView'] | null>(`${season}/coop`)).toBeNull();
+    const events = (await commandsOf(world)).flatMap((command) => command.events);
+    expect(events.filter((event) => event === 'coop-left')).toHaveLength(0);
+    expect(events.filter((event) => event === 'run-completed')).toHaveLength(1);
+    expect(events.filter((event) => event === 'coop-reward-split')).toHaveLength(1);
+    expect((await partnerApi.send('GET', season)).status()).toBe(401);
+  } finally {
+    await Promise.all([
+      rollerPage.context().close(),
+      partnerPage.context().close(),
+      rollerApi.dispose(),
+      partnerApi.dispose(),
+      world.adminApi.dispose(),
+    ]);
   }
 });
 

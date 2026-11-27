@@ -27,9 +27,10 @@ public sealed record SeasonListItemView(Guid Id, string Name, SeasonStatus Statu
 
 /// <summary>
 /// The admin creates a season (SE1, D-123) with the default rules (<c>docs/ruleset.default.json</c>), changed later on the
-/// rules page. <c>seasonId</c> is chosen by the client like the command id, so a retry creates the same season once.
+/// rules page, or from an optional finished or archived source. <c>seasonId</c> is chosen by the client like the command id,
+/// so a retry creates the same season once.
 /// </summary>
-public sealed record CreateSeasonRequest(Guid CommandId, Guid SeasonId, string? Name, DateTimeOffset? Deadline = null);
+public sealed record CreateSeasonRequest(Guid CommandId, Guid SeasonId, string? Name, DateTimeOffset? Deadline = null, Guid? SourceSeasonId = null);
 
 /// <summary>
 /// The admin adds an account with the player role to the season (SE4): by default on the start with zero points and
@@ -83,6 +84,8 @@ public sealed record AdminPlayerView(
 /// </summary>
 public static class AdminPlayerEndpoints
 {
+    internal const string SeasonTemplatesKey = "Site:SeasonTemplates";
+
     public static void MapSeasonsAndPlayers(this RouteGroupBuilder api)
     {
         ArgumentNullException.ThrowIfNull(api);
@@ -118,7 +121,7 @@ public static class AdminPlayerEndpoints
         return TypedResults.Ok(views);
     }
 
-    private static async Task<ActionResult> CreateAsync(CreateSeasonRequest request, ClaimsPrincipal user, GameEventDbContext db, CommandBus bus, CancellationToken ct)
+    private static async Task<ActionResult> CreateAsync(CreateSeasonRequest request, ClaimsPrincipal user, IConfiguration configuration, CommandBus bus, CancellationToken ct)
     {
         if (request.CommandId == Guid.Empty || request.SeasonId == Guid.Empty)
         {
@@ -130,18 +133,26 @@ public static class AdminPlayerEndpoints
             return Invalid("name", "A season has a name.");
         }
 
-        // D-604: the seasons are told apart by their names in the list; a retry of the same season is not a clash. Few
-        // seasons ever exist, and Cyrillic case is compared in memory, not by SQLite
         var name = request.Name.Trim();
-        var names = await db.Seasons.AsNoTracking().Where(s => s.Id != request.SeasonId).Select(s => s.Name).ToListAsync(ct);
-        if (names.Any(n => string.Equals(n.Trim(), name, StringComparison.OrdinalIgnoreCase)))
+        if (request.SourceSeasonId is { } sourceId)
         {
-            return Rejected("season.nameTaken", $"A season named «{name}» already exists.");
+            if (!configuration.GetValue<bool>(SeasonTemplatesKey))
+            {
+                return TypedResults.NotFound();
+            }
+
+            if (sourceId == Guid.Empty || sourceId == request.SeasonId)
+            {
+                return Invalid("sourceSeasonId", "Choose another, completed season as the template.");
+            }
+
+            return await SeasonEndpoints.SendAsync(request.SeasonId, request.CommandId,
+                new CreateSeasonFromTemplate(request.SeasonId, name, sourceId, request.Deadline), user.UserId(), bus, ct);
         }
 
         // The engine checks the name, the rules and the deadline; a season id taken is refused by the log itself
         return await SeasonEndpoints.SendAsync(
-            request.SeasonId, request.CommandId, new CreateSeason(request.SeasonId, request.Name.Trim(), RulesetJson.Default(), request.Deadline), user.UserId(), bus, ct);
+            request.SeasonId, request.CommandId, new CreateSeason(request.SeasonId, name, RulesetJson.Default(), request.Deadline), user.UserId(), bus, ct);
     }
 
     private static async Task<ActionResult> AddAsync(

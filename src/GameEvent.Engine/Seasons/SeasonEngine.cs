@@ -42,6 +42,7 @@ public static class SeasonEngine
         var decision = command switch
         {
             CreateSeason c => SeasonSetup.Decide(state, c),
+            CreateSeasonFromTemplate c => SeasonSetup.Decide(state, c, context),
             ChangeRuleset c => RulesetChanges.Decide(state, c),
             ChangeSeasonStatus c => SeasonSetup.Decide(state, c, context),
             SetSeasonDeadline c => SeasonSetup.Decide(state, c, context),
