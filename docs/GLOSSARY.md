@@ -139,6 +139,7 @@
 | Термин | Что значит | В коде |
 | --- | --- | --- |
 | Очки | сумма кубов за прохождения плюс явные эффекты на очки | `Points` |
+| Очки в час | начисленные очки зачтённых прохождений, делённые на сумму их сохранённых часов; свободный режим исключён, в коопе каждому полные часы | `PointsPerHour`, `CompletedRunPoints`, `CompletedRunHours` |
 | Причина изменения очков | за что начислены или сняты очки: кубы за прохождение, стартовый баланс, правка админа, предмет, изменение броска предметом | `PointsReason` (`CompletionRoll`, `StartingBalance`, `AdminAdjustment`, …, `Item`, `DiceModified`) |
 | Причина изменения монеток | стартовый баланс, правка админа, предмет, ролл магазина, покупка, залог ставки, выигрыш и его отмена | `CoinsReason` (`StartingBalance`, `AdminAdjustment`, …, `Item`, `ShopRoll`, `Purchase`, `BetStake`, `BetPayout`, `BetPayoutRevoked`) |
 | Причина изменения ресурса | правка админа, реролл, предмет, ролл магазина | `ResourceReason` (`AdminAdjustment`, `Reroll`, `Item`, `ShopRoll`) |
