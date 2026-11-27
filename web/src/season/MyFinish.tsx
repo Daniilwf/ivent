@@ -49,7 +49,9 @@ export function MyFinish({
         {t.title}
       </h3>
       <p>{main}</p>
-      <p className="text-sm text-ink-soft">{rollsOpen ? next : t.closedNext}</p>
+      <p className="text-sm text-ink-soft">
+        {rollsOpen ? next : finish.frozen ? t.frozenClosedNext : t.closedNext}
+      </p>
     </section>
   );
 }

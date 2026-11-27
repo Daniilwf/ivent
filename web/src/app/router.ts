@@ -16,6 +16,7 @@ export type Route =
   | { kind: 'pool' }
   | { kind: 'rules' }
   | { kind: 'whatsNew' }
+  | { kind: 'playerPreview'; seasonId: string; playerId: string }
   /** The admin's pages (H8), for the admin only: App shows anyone else the game. `section` null is the proof queue */
   | { kind: 'admin'; section: string | null }
   | { kind: 'notFound' };
@@ -30,6 +31,15 @@ const seasonRecap = new RegExp(`^/seasons/${id}/recap$`);
 const profile = new RegExp(`^/users/${id}$`);
 const game = new RegExp(`^/games/${id}$`);
 const admin = /^\/admin(?:\/([a-z]+))?$/;
+const playerPreview = new RegExp(`^/admin/seasons/${id}/players/${id}/preview$`);
+const exactId = new RegExp(`^${id}$`);
+
+/** An explicit return scope for the admin players page; it never changes the browser's kept selection. */
+export function adminPlayersSeason(search: string): string | null {
+  const values = new URLSearchParams(search).getAll('season');
+  const selected = values.length === 1 ? values[0] : null;
+  return selected && exactId.test(selected) ? selected.toLowerCase() : null;
+}
 
 /**
  * What page an address opens: `/`, `/seasons/{id}`, `/feed` (the current season), `/seasons/{id}/feed`, `/users/{id}`, `/games/{id}`,
@@ -62,6 +72,13 @@ export function routeOf(path: string): Route {
   if (match?.[1]) return { kind: 'profile', userId: match[1] };
   match = game.exec(clean);
   if (match?.[1]) return { kind: 'game', gameId: match[1] };
+  match = playerPreview.exec(clean);
+  if (match?.[1] && match[2])
+    return {
+      kind: 'playerPreview',
+      seasonId: match[1].toLowerCase(),
+      playerId: match[2].toLowerCase(),
+    };
   match = admin.exec(clean);
   if (match) return { kind: 'admin', section: match[1] ?? null };
   return { kind: 'notFound' };
@@ -82,6 +99,9 @@ export const paths = {
   rules: () => '/rules',
   whatsNew: () => '/whats-new',
   admin: (section?: string) => (section ? `/admin/${section}` : '/admin'),
+  adminPlayers: (seasonId: string) => `/admin/players?season=${encodeURIComponent(seasonId)}`,
+  playerPreview: (seasonId: string, playerId: string) =>
+    `/admin/seasons/${seasonId}/players/${playerId}/preview`,
 };
 
 const listeners = new Set<() => void>();

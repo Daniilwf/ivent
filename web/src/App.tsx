@@ -5,7 +5,7 @@ import { ChangePasswordForm } from './app/ChangePasswordForm';
 import { LoginForm, TablePage } from './app/LoginForm';
 import { EnvironmentBanner } from './app/EnvironmentBanner';
 import { MaintenanceBanner } from './app/MaintenanceBanner';
-import { onReopen, routeOf, usePath } from './app/router';
+import { adminPlayersSeason, onReopen, routeOf, usePath } from './app/router';
 import { UpdateBanner } from './app/WhatsNew';
 import { NotFoundPage } from './app/NotFound';
 import { Shell } from './app/Shell';
@@ -20,6 +20,9 @@ import { SeasonScreen } from './season/SeasonScreen';
 // «Производительность», FL-3): every other screen loads apart, when it is opened, and stays out of the first download
 const AdminScreen = lazy(async () => ({
   default: (await import('./admin/AdminScreen')).AdminScreen,
+}));
+const PlayerPreviewScreen = lazy(async () => ({
+  default: (await import('./admin/PlayerPreviewScreen')).PlayerPreviewScreen,
 }));
 const FeedScreen = lazy(async () => ({ default: (await import('./feed/FeedScreen')).FeedScreen }));
 const GalleryScreen = lazy(async () => ({
@@ -88,7 +91,7 @@ export function App() {
   }, []);
 
   const navigationSeason =
-    state.kind === 'signedIn'
+    state.kind === 'signedIn' && route.kind !== 'playerPreview'
       ? ((
           (route.kind === 'season' ||
           route.kind === 'feed' ||
@@ -272,6 +275,28 @@ export function App() {
       route.kind === 'season' ? (route.seasonId ?? signedIn.seasonId) : signedIn.seasonId;
     // The admin's pages (H8) open for the admin only; anyone else at their address sees the game
     const admin = signedIn.user.role === 'admin';
+    // Preview is a scoped read, not another account: no password/logout/queue controls from the ordinary shell.
+    if (route.kind === 'playerPreview')
+      return (
+        <Suspense
+          fallback={
+            <main className="grid place-items-center px-4 py-10" aria-busy="true">
+              <Loading />
+            </main>
+          }
+        >
+          {admin ? (
+            <PlayerPreviewScreen
+              key={`${route.seasonId}:${route.playerId}`}
+              seasonId={route.seasonId}
+              playerId={route.playerId}
+              onSignedOut={signedOut}
+            />
+          ) : (
+            <NotFoundPage />
+          )}
+        </Suspense>
+      );
     return (
       <Shell
         user={signedIn.user}
@@ -320,6 +345,9 @@ export function App() {
         <AdminScreen
           section={route.section}
           currentSeasonId={signedIn.seasonId}
+          initialSeasonId={
+            route.section === 'players' ? adminPlayersSeason(globalThis.location.search) : null
+          }
           user={signedIn.user}
         />
       ) : route.kind === 'profile' ? (
