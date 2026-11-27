@@ -73,7 +73,7 @@
 | Убрана из пула | та же игра удалена админом: добавить заново нельзя, только вернуть в пул (D-208, D-241) | отказ `pool.removed`, `SimilarGameView.IsDeleted` |
 | Тег | метка жанра или свойства игры | `Tag` |
 | Тег объекта | метка самого предмета или эффекта: съедобный, крысиный, гремлинский, свиной, оружие, зелье; по ней фильтр действия пропускает объекты (D-470) | `ObjectDefinition.Tags`, `ObjectFilterSpec.ExcludeTags` |
-| Категория | тег с весом на колесе категорий | `Category`, `SetCategory`, `RemoveCategory`, события `CategorySet`, `CategoryRemoved` |
+| Категория (жанр на колесе) | тег с весом на колесе категорий | `Category`, `SetCategory`, `RemoveCategory`, события `CategorySet`, `CategoryRemoved` |
 | Часы | длина игры по HowLongToBeat, основной сюжет | `Game.Hours`, `RunSnapshot.Hours` |
 | Условие прохождения | что считается прохождением для бесконечной или мультиплеерной игры | `GameRecord.CompletionCondition`, `GameCard.CompletionCondition` |
 | Что считается прохождением | раздел страницы правил: общий порядок условий (концовка → круг уровней → весь контент → победа над компьютером → рекорд очков); условие в заметке к игре важнее (D-207) | `ru.rules.completion`, раздел `rules-completion`, `CompletionCriteria`, ссылка `CompletionRulesLink` |
@@ -82,6 +82,8 @@
 | Колесо | взвешенный список записей | `Wheel`, `WheelEntry` |
 | Колесо категорий | колесо, по которому выбирается категория для ролла | `Wheel` с видом `Categories` |
 | Ролл | выбор игры: категория, затем игра | `Roll` |
+| Колесо игр | сохранённые секторы для показа основных вариантов ролла и промахов (D-943) | `GameRolled.WheelGames`, `GameChoiceRolled.WheelGames` |
+| Показ игры | раскрытие сохранённого предложения по второму нажатию игрока или по таймеру (D-943) | `RollReveal`, команда `ShowRolledGame`, событие `RollGameShown` |
 | Промах | колесо попало в недоступную игру; фиксируется в логе | `RollMiss` |
 | Секторы колеса | категории, что были на колесе категорий в момент ролла; хранятся в событии ролла, по ним экран рисует колесо (D-136) | `GameRolled.Sectors`, `GameChoiceRolled.Sectors`, `WheelRollView.Sectors` |
 | Причина промаха | уже пройдена в сезоне, сейчас играет | `RollMissReason` (`CompletedInSeason`, `BeingPlayed`) |

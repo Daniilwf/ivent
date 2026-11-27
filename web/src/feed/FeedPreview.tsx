@@ -10,6 +10,7 @@ import { Panel } from '../ui/Surface';
 import { FeedList, FeedSkeleton } from './FeedList';
 import { emptyRefs, feedDays, withRefs } from './feedModel';
 import { fetchFeedPage } from './feedApi';
+import { useRollDisclosureRefresh } from './useRollDisclosureRefresh';
 
 /** How many lines the season screen shows */
 const PREVIEW_LINES = 5;
@@ -36,6 +37,7 @@ export function FeedPreview({
     useCallback(() => fetchFeedPage(seasonId, null, 30), [seasonId]),
     { version },
   );
+  useRollDisclosureRefresh(state.kind === 'ready' ? state.value.entries : null, state.reload);
 
   const days = useMemo(() => {
     if (state.kind !== 'ready') return [];

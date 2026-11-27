@@ -43,6 +43,7 @@
 | SRW3 | Через две минуты непоказанный ролл раскрывает таймер, в том числе в статусе «Закрытие». Старые события v1/v2 читаются без колеса игр и нового таймера | `Engine.Tests/Rolls/RollRevealTests.The_timer_shows_an_unseen_roll_at_its_deadline_even_in_closing`, `Older_roll_events_have_no_game_wheel_or_pending_reveal` | ✅ |
 | SRW4 | Лента, пул и чужое колесо не выдают скрытую игру. Снятие предложения и чтение ленты одновременно с записью ролла не раскрывают её досрочно | `Web.Tests/Api/WheelRollApiTests.The_result_is_private_in_the_feed_and_pool_until_the_owner_shows_it`, `An_unshown_reservation_does_not_leak_through_another_players_wheel`, `An_admin_discard_keeps_an_unshown_result_private_until_its_disclosure_time`, `Discarding_a_hidden_offer_does_not_unmask_another_players_saved_miss`, `Web.Tests/Api/RollDisclosureFeedRaceTests.A_roll_committed_during_a_spectators_feed_read_does_not_disclose_the_game` | ✅ |
 | SRW5 | Перезагрузка возвращает к жанру, если устройство ещё не показало игру. Второе нажатие или пропуск показывают сохранённый результат, в том числе с системным уменьшением анимаций | `web/src/season/SeasonScreen.test.tsx`, `e2e/tests/s7-roll-reveal.spec.ts` | ✅ |
+| SRW6 | Отменённый сброс предложения не выдаёт название до срока. Уже открытая лента и её превью обновляют скрытую запись по сроку даже без сигнала | `Web.Tests/Api/WheelRollApiTests.Undoing_a_discard_and_its_roll_keeps_the_discard_private_until_disclosure_time`, `web/src/feed/FeedScreen.test.tsx`, `web/src/feed/FeedPreview.test.tsx` | ✅ |
 
 ### Статистика админа (7.5)
 

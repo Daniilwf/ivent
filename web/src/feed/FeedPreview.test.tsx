@@ -65,6 +65,33 @@ describe('FeedPreview', () => {
     expect(calls).toHaveBeenCalledTimes(2);
   });
 
+  it('reads the preview again at a hidden roll deadline without a live update', async () => {
+    const latest = page(0);
+    const [first] = entries(1);
+    if (!first) throw new Error('The fixture needs a roll');
+    const hidden = {
+      ...first,
+      type: 'game-roll-hidden',
+      data: { playerId: vasya, revealId: 'preview-reveal', disclosureInMilliseconds: 300 },
+    };
+    const revealed = {
+      ...first,
+      type: 'game-rolled',
+      data: { playerId: vasya, gameId: 'g', category: 'Platformer' },
+    };
+    let requests = 0;
+    const calls = serve(() =>
+      json(200, { ...latest, entries: [requests++ === 0 ? hidden : revealed] }),
+    );
+    render(<FeedPreview seasonId={seasonId} version={1} />);
+
+    const roll = await screen.findByTestId('feed-item-c0');
+    expect(roll).toHaveTextContent('Вася крутит колесо игр…');
+    expect(calls).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(roll).toHaveTextContent('Вася выкручивает Celeste'));
+    expect(calls).toHaveBeenCalledTimes(2);
+  });
+
   it('holds an entire command until its result is visible on the season screen', async () => {
     const latest = page(3);
     const first = latest.entries[0];

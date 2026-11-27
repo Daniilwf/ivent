@@ -280,6 +280,51 @@ public sealed class WheelRollApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Undoing_a_discard_and_its_roll_keeps_the_discard_private_until_disclosure_time()
+    {
+        var owner = await _site.SignedInAsync("vasya");
+        var spectator = await _site.SignedInAsync("zritel");
+        var admin = await _site.SignedInAsync("admin");
+        var rollCommand = Guid.NewGuid();
+        await PostOkAsync(owner, $"{Season}/roll", new { commandId = rollCommand });
+        var game = (await MeAsync(owner)).GetProperty("offer").GetProperty("id").GetGuid();
+        var discardCommand = Guid.NewGuid();
+        await DiscardOfferAsync(admin, discardCommand);
+        foreach (var target in new[] { discardCommand, rollCommand })
+        {
+            await PostOkAsync(admin, $"/api/admin/seasons/{SiteFactory.SeasonId}/undo", new
+            {
+                commandId = Guid.NewGuid(),
+                targetCommandId = target,
+                comment = "Отменить правку",
+            });
+        }
+
+        _site.Clock.Advance(TimeSpan.FromSeconds(119));
+        var hidden = await OkAsync(await spectator.GetAsync($"{Season}/feed", Ct));
+        var entries = hidden.GetProperty("entries").EnumerateArray().ToArray();
+        var roll = Assert.Single(entries, entry => entry.GetProperty("commandId").GetGuid() == rollCommand);
+        Assert.True(roll.GetProperty("undone").GetBoolean());
+        Assert.Equal("game-roll-hidden", roll.GetProperty("type").GetString());
+        Assert.Equal(1000, roll.GetProperty("data").GetProperty("disclosureInMilliseconds").GetInt64());
+        var discard = Assert.Single(entries, entry => entry.GetProperty("type").GetString() == "offer-discarded");
+        Assert.True(discard.GetProperty("undone").GetBoolean());
+        Assert.False(discard.GetProperty("data").TryGetProperty("gameId", out _));
+        Assert.DoesNotContain(game.ToString("D"), hidden.GetRawText(), StringComparison.OrdinalIgnoreCase);
+
+        _site.Clock.Advance(TimeSpan.FromSeconds(1));
+        var disclosed = await OkAsync(await spectator.GetAsync($"{Season}/feed", Ct));
+        var dueEntries = disclosed.GetProperty("entries").EnumerateArray().ToArray();
+        var dueRoll = Assert.Single(dueEntries, entry => entry.GetProperty("commandId").GetGuid() == rollCommand);
+        Assert.True(dueRoll.GetProperty("undone").GetBoolean());
+        Assert.Equal("game-rolled", dueRoll.GetProperty("type").GetString());
+        Assert.Equal(game, dueRoll.GetProperty("data").GetProperty("gameId").GetGuid());
+        var dueDiscard = Assert.Single(dueEntries, entry => entry.GetProperty("type").GetString() == "offer-discarded");
+        Assert.True(dueDiscard.GetProperty("undone").GetBoolean());
+        Assert.Equal(game, dueDiscard.GetProperty("data").GetProperty("gameId").GetGuid());
+    }
+
+    [Fact]
     public async Task Discarding_a_hidden_offer_does_not_unmask_another_players_saved_miss()
     {
         var owner = await _site.SignedInAsync("vasya");
@@ -333,10 +378,10 @@ public sealed class WheelRollApiTests : IAsyncLifetime
 
     // ---- Helpers ----
 
-    private Task DiscardOfferAsync(HttpClient admin) =>
+    private Task DiscardOfferAsync(HttpClient admin, Guid? commandId = null) =>
         PostOkAsync(admin, $"/api/admin/seasons/{SiteFactory.SeasonId}/players/{_site.Players["vasya"]}/adjust", new
         {
-            commandId = Guid.NewGuid(),
+            commandId = commandId ?? Guid.NewGuid(),
             comment = "Снять предложение",
             discardOffer = true,
         });

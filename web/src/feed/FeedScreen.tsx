@@ -20,6 +20,7 @@ import {
   type FeedReactionMap,
 } from './feedApi';
 import { ReactionButtons, type ChangeReaction } from './ReviewReactionButtons';
+import { useRollDisclosureRefresh } from './useRollDisclosureRefresh';
 
 type Entry = Schemas['FeedEntryView'];
 type ReactionRow = { values: FeedReactionMap[string]; revision: number; stale: boolean };
@@ -198,17 +199,10 @@ export function FeedScreen({
     [seasonId, onSignedOut, show],
   );
 
-  const refreshOlderRolls = useCallback(
-    async (entries: readonly Entry[], head: readonly Entry[], signal: AbortSignal) => {
-      const revealed = new Set(
-        head.filter((entry) => entry.type === 'roll-game-shown').map(rollRevealId),
-      );
-      if (revealed.size === 0) return;
+  const refreshHiddenRolls = useCallback(
+    async (entries: readonly Entry[], signal: AbortSignal) => {
       for (const entry of entries) {
-        if (entry.type !== 'game-roll-hidden') continue;
-        const id = rollRevealId(entry);
-        if (id === null || !revealed.has(id)) continue;
-        // The reveal receipt carries no title. Read just the already loaded row from the canonical feed.
+        // A receipt or elapsed delay only asks the server again. The server still decides when to name the game.
         const updated = await fetchFeedPage(seasonId, entry.sequence + 1, 1, signal);
         if (signal.aborted) return;
         if (updated.kind === 'signedOut') {
@@ -220,10 +214,13 @@ export function FeedScreen({
         const roll = updated.value.entries.find(
           (candidate) => candidate.sequence === entry.sequence,
         );
-        if (roll && roll.type !== 'game-roll-hidden') {
+        const previous = latest.entries.find((candidate) => candidate.sequence === entry.sequence);
+        if (roll && previous?.type === 'game-roll-hidden') {
           show({
             ...latest,
-            entries: mergeEntries(latest.entries, [roll]),
+            entries: mergeEntries(latest.entries, [
+              previous.undone ? { ...roll, undone: true } : roll,
+            ]),
             refs: withRefs(latest.refs, updated.value),
           });
         }
@@ -231,6 +228,10 @@ export function FeedScreen({
     },
     [seasonId, onSignedOut, show],
   );
+  useRollDisclosureRefresh(state.kind === 'ready' ? state.entries : null, (due) => {
+    const signal = lifetime.current?.signal;
+    if (signal) void refreshHiddenRolls(due, signal);
+  });
 
   const load = useCallback(async () => {
     newestPage.current?.abort();
@@ -304,7 +305,19 @@ export function FeedScreen({
       setFresh(arrived);
       setAnnounced(ru.feed.fresh(arrived.size));
     }
-    void refreshOlderRolls(entries, page.entries, request.signal);
+    const revealed = new Set(
+      page.entries
+        .filter((entry) => entry.type === 'roll-game-shown' && !entry.undone)
+        .map(rollRevealId)
+        .filter((id) => id !== null),
+    );
+    if (revealed.size) {
+      const hidden = entries.filter((entry) => {
+        const id = rollRevealId(entry);
+        return entry.type === 'game-roll-hidden' && id !== null && revealed.has(id);
+      });
+      void refreshHiddenRolls(hidden, request.signal);
+    }
     if (commentTargets && page.nextBefore !== null) {
       const oldestUnchecked = entries.findLast(
         (entry) => !entry.undone && !commentTargets.has(entry.commandId),
@@ -319,7 +332,7 @@ export function FeedScreen({
       );
       void refreshReactions(olderIds, request.signal);
     }
-  }, [seasonId, onSignedOut, refreshCommentTargets, refreshOlderRolls, refreshReactions, show]);
+  }, [seasonId, onSignedOut, refreshCommentTargets, refreshHiddenRolls, refreshReactions, show]);
 
   // Others' actions come in without a reload (DESIGN.md «Обновления в реальном времени»)
   const version = useSeasonVersion(seasonId, {

@@ -258,9 +258,10 @@ public static class FeedEndpoints
         GameEventDbContext db, Guid seasonId, DateTimeOffset now, CancellationToken ct)
     {
         var cutoff = now - (RollReveal.DisclosureDelay + RollReveal.DisclosureDelay);
+        // Undone rolls may still be named by historical discard entries. Only surviving receipts disclose them.
         var recent = await db.Events.AsNoTracking()
-            .Where(row => row.SeasonId == seasonId && row.OccurredAt >= cutoff && row.UndoneByEventId == null
-                && (row.Type == "roll-game-shown" || row.Type == "game-rolled"))
+            .Where(row => row.SeasonId == seasonId && row.OccurredAt >= cutoff
+                && (row.Type == "game-rolled" || (row.Type == "roll-game-shown" && row.UndoneByEventId == null)))
             .Select(row => new { row.Sequence, row.Type, row.Version, row.Data })
             .ToListAsync(ct);
         var decoded = recent.Select(row => (row.Sequence, Event: EventCodec.Decode(new StoredEvent(row.Type, row.Version, row.Data)))).ToArray();
@@ -289,6 +290,7 @@ public static class FeedEndpoints
             {
                 ["playerId"] = JsonValue.Create(playerId),
                 ["revealId"] = JsonValue.Create(reveal.Id),
+                ["disclosureInMilliseconds"] = JsonValue.Create((long)Math.Ceiling((reveal.ExpiresAt - now).TotalMilliseconds)),
             });
         }
 
