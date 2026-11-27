@@ -65,6 +65,18 @@ async function showResultsBelowHeader(title: Locator) {
   await title.evaluate((heading) => {
     const header = document.querySelector('[data-testid="site-nav"]')?.closest('header');
     const panel = heading.closest('section') ?? heading;
+    const column = panel.closest('[data-testid="season-left"]');
+    if (column && getComputedStyle(column).overflowY === 'auto') {
+      column.scrollTo({
+        top:
+          column.scrollTop +
+          panel.getBoundingClientRect().top -
+          column.getBoundingClientRect().top -
+          8,
+        behavior: 'instant',
+      });
+      return;
+    }
     const panelTop = window.scrollY + panel.getBoundingClientRect().top;
     const headerBottom = header?.getBoundingClientRect().bottom ?? 0;
     window.scrollTo(0, panelTop - headerBottom - 8);
@@ -168,6 +180,13 @@ test('an admin opens a final ballot and an archived winner stays recorded after 
     const results = resultsTitle.locator('..');
     await expect(results.getByRole('heading', { name: 'Больше всех игр' })).toBeVisible();
     await expect(results.getByText(captions[0], { exact: true })).toBeVisible();
+    await expect
+      .poll(() =>
+        viewerPage
+          .getByTestId('season-left')
+          .evaluate((left) => left.scrollWidth - left.clientWidth),
+      )
+      .toBe(0);
     const gallery = results.getByRole('link', { name: 'Открыть галерею' });
     await expect(gallery).toHaveAttribute('href', `${seasonPage}/gallery`);
     await expect(results.getByRole('link', { name: captions[0] })).toHaveCount(0);

@@ -48,7 +48,7 @@ function ResultPanel({ seasonId, onSignedOut, version }: Props & { version: numb
   if (state.kind === 'notFound') return null;
 
   return (
-    <Panel title={t.title} className="min-w-0 desk:col-start-1 desk:w-96">
+    <Panel title={t.title} className="min-w-0">
       <AsyncState loaded={state} errorTitle={t.loadFailed} rows={2}>
         {({ automatic, voted }, retry) =>
           automatic.length || voted.length ? (

@@ -9,12 +9,7 @@ const shot = (name: string) =>
 async function captureBox(page: Page, name: string) {
   await page.evaluate(() => document.fonts.ready);
   await page.getByTestId('player-suggestions').evaluate((section) => {
-    const header = document.querySelector('header')?.getBoundingClientRect().height ?? 0;
-    const gap = Number.parseFloat(getComputedStyle(section).paddingTop);
-    window.scrollTo({
-      top: Math.max(0, section.getBoundingClientRect().top + window.scrollY - header - gap),
-      behavior: 'instant',
-    });
+    section.scrollIntoView({ block: 'center', behavior: 'instant' });
   });
   await page.screenshot({ path: shot(name), scale: 'css' });
 }
@@ -38,6 +33,7 @@ test('a player proposes a game and an item from the season and privately sees th
   const player = await signIn(browser, author);
   const another = await signIn(browser, other);
   try {
+    const column = player.getByTestId('season-right');
     const box = player.getByTestId('player-suggestions');
     await expect(box).toBeVisible(live);
     await expect(
@@ -53,6 +49,7 @@ test('a player proposes a game and an item from the season and privately sees th
     await captureBox(player, `publish-stage5-player-suggestions-form-${info.project.name}.png`);
     const submit = box.getByRole('button', { name: 'Отправить предложение', exact: true });
     await expect(submit).toBeInViewport({ ratio: 1 });
+    expect(await column.evaluate((pane) => pane.scrollWidth - pane.clientWidth)).toBe(0);
     expect(
       await submit.evaluate((control) => {
         const rect = control.getBoundingClientRect();
@@ -60,6 +57,15 @@ test('a player proposes a game and an item from the season and privately sees th
         return target === control || control.contains(target);
       }),
     ).toBe(true);
+    if (info.project.name === 'desktop') {
+      const viewport = player.viewportSize();
+      if (!viewport) throw new Error('Expected a desktop viewport');
+      await player.setViewportSize({ ...viewport, width: 900 });
+      expect(await column.evaluate((pane) => pane.scrollWidth - pane.clientWidth)).toBe(0);
+      await submit.scrollIntoViewIfNeeded();
+      await expect(submit).toBeInViewport({ ratio: 1 });
+      await player.setViewportSize(viewport);
+    }
     await box.getByText('Дополнить карточку игры', { exact: true }).click();
     await box.getByRole('spinbutton', { name: 'Длина игры, часы', exact: true }).fill('8.5');
     await box.getByRole('textbox', { name: 'Описание предложения', exact: true }).click();
@@ -107,6 +113,7 @@ test('a player proposes a game and an item from the season and privately sees th
       live,
     );
     await captureBox(player, `publish-stage5-player-suggestions-dense-${info.project.name}.png`);
+    expect(await column.evaluate((pane) => pane.scrollWidth - pane.clientWidth)).toBe(0);
     expect(await player.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,
     );
