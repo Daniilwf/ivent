@@ -1,5 +1,6 @@
 import {
   Boxes,
+  ChartNoAxesColumn,
   BadgeCheck,
   Bug,
   CalendarDays,
@@ -48,6 +49,7 @@ import { SuggestionsSection } from './SuggestionsSection';
 import { WeeklyChallengesSection } from './WeeklyChallengesSection';
 import { SeasonSection } from './SeasonSection';
 import { SiteSection } from './SiteSection';
+import { StatisticsSection } from './StatisticsSection';
 import { TestToolsSection } from './TestToolsSection';
 import { SectionHead } from './common';
 import { answerOf, useLoaded } from '../app/useLoaded';
@@ -69,6 +71,7 @@ export type AdminSectionId = keyof typeof t.sections;
 const sections: { id: AdminSectionId; icon: ReactNode; season: boolean }[] = [
   { id: 'proofs', icon: <ClipboardCheck size={20} aria-hidden />, season: true },
   { id: 'players', icon: <Users size={20} aria-hidden />, season: true },
+  { id: 'statistics', icon: <ChartNoAxesColumn size={20} aria-hidden />, season: true },
   { id: 'log', icon: <History size={20} aria-hidden />, season: true },
   { id: 'effects', icon: <Sparkles size={20} aria-hidden />, season: true },
   { id: 'rules', icon: <FileJson size={20} aria-hidden />, season: true },
@@ -174,8 +177,10 @@ export function AdminScreen({
     }, []),
   );
   const testTools = status.kind === 'ready' && status.value.testTools;
+  const adminStatistics = status.kind === 'ready' && status.value.adminStatistics === true;
   const shown = sections.filter(({ id }) => {
     if (id === 'test') return testTools;
+    if (id === 'statistics') return adminStatistics;
     const required = stage5Features[id];
     return (
       required === undefined || (available.kind === 'ready' && available.value?.[required] === true)
@@ -184,7 +189,9 @@ export function AdminScreen({
 
   // The admin's pages opened from the menu, and a new section, take the focus to the heading, so a screen reader and
   // the keyboard start there
-  const heading = usePageHeading(true, section);
+  const unavailableSection =
+    (section === 'test' && !testTools) || (section === 'statistics' && !adminStatistics);
+  const heading = usePageHeading(!unavailableSection, section);
 
   const links = () => (
     <ul className="grid gap-1">
@@ -220,9 +227,8 @@ export function AdminScreen({
 
   const needsSeason = sections.find((s) => s.id === section)?.season ?? false;
 
-  // The test tools' address on a copy without them is an address the site does not have; until the site answered,
-  // nothing is said about the section at all
-  if (section === 'test' && !testTools)
+  // A section hidden by site configuration is unavailable by address as well.
+  if (unavailableSection)
     return status.kind === 'ready' ? (
       <NotFoundPage />
     ) : (
@@ -333,6 +339,8 @@ export function AdminScreen({
         return <ProofQueue seasonId={id} loaded={proofs} />;
       case 'players':
         return <PlayersSection seasonId={id} version={version} />;
+      case 'statistics':
+        return <StatisticsSection seasonId={id} version={version} />;
       case 'log':
         return <LogSection seasonId={id} version={version} />;
       case 'effects':

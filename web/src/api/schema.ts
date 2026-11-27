@@ -4449,6 +4449,77 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/seasons/{seasonId}/statistics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    seasonId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminSeasonStatisticsView"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Too Many Requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/seasons/{seasonId}/effects/{effectId}/resolve": {
         parameters: {
             query?: never;
@@ -12028,6 +12099,22 @@ export interface components {
             /** @default false */
             eventQuestion: boolean;
         };
+        /** @description Effective attacks and the latest command authored by a participant in this season. */
+        AdminSeasonStatisticsPlayerView: {
+            /** Format: uuid */
+            playerId: string;
+            name: string;
+            /** Format: int32 */
+            attacksMade: number;
+            /** Format: int32 */
+            attacksReceived: number;
+            /** Format: date-time */
+            lastActionAt: null | string;
+        };
+        /** @description A season's attack and activity report for the admin. */
+        AdminSeasonStatisticsView: {
+            players: components["schemas"]["AdminSeasonStatisticsPlayerView"][];
+        };
         AllTimeStatisticsView: {
             /** Format: int32 */
             seasonCount: number;
@@ -14740,7 +14827,8 @@ export interface components {
          *     (anything but `production` shows a strip on every page); `testTools` — the test endpoints are there (only
          *     Development and Test), so the admin gets the page of the test tools (H9, D-220); `uploads` — the largest file
          *     of each kind the site takes, so a page refuses a bigger one before sending it (D-617). `seasonTemplates` is set
-         *     when the site offers the admin the season template action (D-936).
+         *     when the site offers the admin the season template action (D-936). `adminStatistics` is set when the site offers
+         *     the season statistics report to the admin.
          */
         SiteStatusView: {
             maintenance: boolean;
@@ -14749,6 +14837,7 @@ export interface components {
             testTools: boolean;
             uploads: components["schemas"]["UploadLimitsView"];
             seasonTemplates?: null | boolean;
+            adminStatistics?: null | boolean;
         };
         SocialRules: {
             reactions: components["schemas"]["EquatableArrayOfstring"];
