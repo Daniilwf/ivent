@@ -5,15 +5,19 @@ import { ru } from '../i18n/ru';
 import { fakeServer, seasonId, type Handler } from '../test/fakeServer';
 import { SeasonScreen } from './SeasonScreen';
 
+const hubListeners = new Set<(updates: unknown[]) => void>();
 let hubChange: (() => void) | null = null;
 vi.mock('../api/realtime', () => ({
   watchSeason: (_seasonId: string, onChange: (updates: unknown[]) => void) => {
+    hubListeners.add(onChange);
+    // Each real subscription has its own connection; a new child must not replace the screen's listener.
     hubChange = () => {
-      onChange([]);
+      for (const notify of hubListeners) notify([]);
     };
     onChange([]);
     return () => {
-      hubChange = null;
+      hubListeners.delete(onChange);
+      if (hubListeners.size === 0) hubChange = null;
     };
   },
 }));

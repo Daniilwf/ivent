@@ -19,6 +19,7 @@ import { WaitingEvents } from './WaitingEvents';
 import { RunConditions } from './RunConditions';
 import { ManualEffectItem, type EffectOutcome } from './ManualEffectItem';
 import { IrlProofSection } from './IrlProofSection';
+import { PlayerSuggestions } from '../suggestions/PlayerSuggestions';
 import { EconomySection } from './Inventory';
 import { RunActions } from './RunActions';
 import { MyFinish } from './MyFinish';
@@ -1364,6 +1365,13 @@ export function SeasonScreen({
           className="desk:col-start-1 desk:w-96"
         />
       ) : null}
+      <PlayerSuggestions
+        seasonId={seasonId}
+        role={role}
+        participating={me !== null}
+        seasonStatus={season.status}
+        onSignedOut={onSignedOut}
+      />
       {/* The latest of the feed beside the map on a desktop; a phone opens the feed from the header */}
       {desk ? (
         <FeedPreview
