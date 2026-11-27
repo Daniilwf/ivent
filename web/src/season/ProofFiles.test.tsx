@@ -1,5 +1,6 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useState } from 'react';
 import { refreshCsrf, type Schemas } from '../api/client';
 import { ru } from '../i18n/ru';
 import { ProofSection } from './ProofForm';
@@ -81,6 +82,49 @@ describe('Screenshots in the proof', () => {
     await userEvent.click(screen.getByTestId('proof-submit'));
 
     expect(onSubmit).toHaveBeenCalledWith([], null, null, [shot(1).id]);
+  });
+
+  it('shows a prepared screenshot and the submit action ahead of the optional materials', async () => {
+    const onSubmit = vi.fn();
+    function Draft() {
+      const [prepared, setPrepared] = useState<ReturnType<typeof shot> | undefined>(shot(1));
+      return (
+        <ProofSection
+          proof={null}
+          preparedShot={prepared}
+          onRemovePreparedShot={() => {
+            setPrepared(undefined);
+          }}
+          witnesses={[]}
+          pending={false}
+          onSubmit={onSubmit}
+        />
+      );
+    }
+    render(<Draft />);
+
+    expect(screen.getByText(ru.proof.prepared)).toBeVisible();
+    expect(screen.getByTestId('proof-submit')).toBeVisible();
+    expect(screen.getByTestId('proof-link')).not.toBeVisible();
+    const materials = screen.getByText(ru.proof.moreMaterials);
+    await userEvent.click(materials);
+    await userEvent.type(screen.getByTestId('proof-link'), 'example.com');
+    await userEvent.click(materials);
+    await userEvent.click(screen.getByTestId('proof-submit'));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(ru.proof.linkInvalid);
+    expect(screen.getByTestId('proof-link')).toBeVisible();
+    expect(onSubmit).not.toHaveBeenCalled();
+    await vi.waitFor(() => {
+      expect(screen.getByTestId('proof-link')).toHaveFocus();
+    });
+
+    await userEvent.click(screen.getByRole('button', { name: ru.proof.removeShot(1) }));
+    expect(screen.queryByTestId('proof-shots')).toBeNull();
+    expect(screen.getByTestId('proof-link')).toHaveValue('example.com');
+    await vi.waitFor(() => {
+      expect(screen.getByTestId('proof-file')).toHaveFocus();
+    });
   });
 
   it('removes a screenshot before sending', async () => {

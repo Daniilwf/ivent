@@ -1,4 +1,5 @@
 import { json } from '../test/fakeServer';
+import { refreshCsrf } from './client';
 import { uploadFile, UploadError } from './files';
 
 // D-617: a file over the site's limit is refused before it is sent, by the limits the site says it is configured with
@@ -99,5 +100,37 @@ describe('uploadFile', () => {
 
     expect(await refusal(uploadFile(file(40 * 1024 * 1024)))).toBeNull();
     expect(server.posts()).toEqual(['/api/files']);
+  });
+
+  it('keeps the original antiforgery token if the account changes while limits load', async () => {
+    let token = 'original-user';
+    let sentToken: string | null = null;
+    let answerStatus: (response: Response) => void = () => {
+      throw new Error('The status promise has no resolver');
+    };
+    const waiting = new Promise<Response>((resolve) => {
+      answerStatus = resolve;
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: Request | string, init?: RequestInit) => {
+        const url = typeof input === 'string' ? input : input.url;
+        if (url.endsWith('/api/auth/antiforgery')) {
+          return Promise.resolve(json(200, { headerName: 'X-XSRF-TOKEN', token }));
+        }
+        if (url.endsWith('/api/status')) return waiting;
+        sentToken = new Headers(init?.headers).get('X-XSRF-TOKEN');
+        return Promise.resolve(json(200, stored));
+      }),
+    );
+
+    await refreshCsrf();
+    const uploading = uploadFile(file(10));
+    token = 'different-user';
+    await refreshCsrf();
+    answerStatus(json(200, status));
+    await uploading;
+
+    expect(sentToken).toBe('original-user');
   });
 });

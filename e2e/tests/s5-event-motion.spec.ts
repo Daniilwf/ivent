@@ -41,7 +41,7 @@ type VisualStyle = { element: number; transform: string; opacity: string };
 type PhysicalFrame = {
   at: number;
   dice: VisualStyle[];
-  token: { x: number; y: number } | null;
+  token: { x: number; y: number; overflow: number } | null;
   card: VisualStyle[];
 };
 type MotionTrace = {
@@ -101,7 +101,16 @@ function observeMotion(title: string) {
       if (screen && camera) {
         // Express the token in the root SVG's coordinates. Page scrolling, zoom and camera movement cancel out.
         const position = camera.inverse().multiply(screen);
-        token = { x: position.e, y: position.f };
+        const sticker = mover.getBoundingClientRect();
+        const frame = mover.ownerSVGElement.getBoundingClientRect();
+        const overflow = Math.max(
+          0,
+          frame.left - sticker.left,
+          sticker.right - frame.right,
+          frame.top - sticker.top,
+          sticker.bottom - frame.bottom,
+        );
+        token = { x: position.e, y: position.f, overflow };
       }
     }
     const card = document.querySelector('[data-testid="drawn-event"][data-drawing="true"]');
@@ -404,6 +413,13 @@ for (const skip of [false, true]) {
             tokenPositions.size,
             'The token must move in SVG coordinates, independently of the camera',
           ).toBeGreaterThanOrEqual(3);
+          const overflow = Math.max(
+            ...trace.physicalFrames.map((frame) => frame.token?.overflow ?? 0),
+          );
+          expect(
+            overflow,
+            'The visible map frame must contain the moving sticker',
+          ).toBeLessThanOrEqual(1);
         }
         expect(trace.drawStarts).toHaveLength(skip ? 0 : 1);
         if (skip) {

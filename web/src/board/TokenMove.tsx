@@ -9,6 +9,7 @@ import {
   type Ref,
 } from 'react';
 import { cameraFrameSeconds, moveMotion, movePathSeconds } from '../design/motion';
+import { hopPoint, moveHops, stickerLift } from './camera';
 import { cellById } from './geometry';
 import { loadMotion } from './loadMotion';
 import { MapSticker, MapView, type MapApi } from './MapView';
@@ -119,61 +120,58 @@ export function TokenMove({
         arrive(false);
         return;
       }
-      const { animate } = motion;
+      const { animate, easeInOut } = motion;
       const points = path.map((id) => cellById(board, id));
-      const plan = camera.current?.planMove(points);
-      const frameSeconds = plan?.frame
-        ? Math.min(cameraFrameSeconds, Math.max(0, budget - moveMotion.minHopSeconds))
-        : 0;
+      const radius = size / 2;
+      const circle = radius + (mover.me ? 9 : 5);
+      // Account for the outer ring and the tilted name badge above the moving sticker.
+      const padX = Math.max(moveMotion.pathPadding, circle);
+      const sticker = {
+        x0: -padX,
+        x1: padX,
+        y0: -stickerLift.onBigCell - (mover.me ? radius + 26 : circle),
+        y1: Math.max(moveMotion.pathPadding, circle - stickerLift.onCell),
+      };
+      const frameSeconds = Math.min(
+        cameraFrameSeconds,
+        Math.max(0, budget - moveMotion.minHopSeconds),
+      );
+      let hops = moveHops(points, jumps, Math.min(movePathSeconds, budget));
+      let plan = camera.current?.planMove(points, { easeInOut, hops, sticker });
       if (plan?.frame && frameSeconds > 0) {
-        controls.current = animate(0, 1, {
-          duration: frameSeconds,
-          ease: 'easeInOut',
-          onUpdate: plan.frame,
-        });
-        await controls.current;
-        if (halted()) return;
+        hops = moveHops(points, jumps, Math.min(movePathSeconds, budget - frameSeconds));
+        plan = camera.current?.planMove(points, { easeInOut, hops, sticker });
+        if (plan?.frame) {
+          controls.current = animate(0, 1, {
+            duration: frameSeconds,
+            ease: 'easeInOut',
+            onUpdate: plan.frame,
+          });
+          await controls.current;
+          if (halted()) return;
+        }
+      } else {
+        plan?.frame?.(1);
       }
 
-      const travelBudget = Math.min(movePathSeconds, budget - frameSeconds);
-      const steps = points.length - 1;
-      const units = steps + jumps.filter((i) => i > 0 && i <= steps).length;
-      const long = units * moveMotion.minHopSeconds > travelBudget;
-      const groups = long
-        ? Math.min(steps, Math.max(1, Math.floor(travelBudget / moveMotion.minHopSeconds)))
-        : steps;
-      const hop = Math.min(
-        moveMotion.hopSeconds,
-        travelBudget / Math.max(1, long ? groups : units),
-      );
-      const started = performance.now();
-      for (let group = 1; group <= groups; group++) {
-        // A long route groups several cells into a single hop, still crossing them in order.
-        const start = Math.round(((group - 1) * steps) / groups);
-        const finish = Math.round((group * steps) / groups);
-        const from = points[start] as Point;
-        const to = points[finish] as Point;
-        const flight = finish === start + 1 && jumps.includes(finish);
-        const height = flight
-          ? Math.max(Math.hypot(to.x - from.x, to.y - from.y) / 3, 40)
-          : moveMotion.hopHeight;
+      let elapsed = 0;
+      for (const hop of hops) {
+        const { duration, height } = hop;
         controls.current = animate(0, 1, {
-          duration: flight && !long ? hop * 2 : hop,
-          ease: 'easeInOut',
-          onUpdate: (k) => {
+          duration,
+          ease: 'linear',
+          onUpdate: (time) => {
             if (halted()) return;
-            const progress = start + (finish - start) * k;
-            const index = Math.min(finish - 1, Math.floor(progress));
-            const a = points[index] as Point;
-            const b = points[index + 1] as Point;
-            const along = progress - index;
-            const position = { x: a.x + (b.x - a.x) * along, y: a.y + (b.y - a.y) * along };
-            plan?.follow?.(position, (performance.now() - started) / 1000);
+            // The token eases into and out of its hop. The camera travels at a steady pace.
+            const k = easeInOut(time);
+            const position = hopPoint(points, hop, k);
+            plan?.follow?.(elapsed + time * duration);
             step({ ...position, y: position.y - Math.sin(Math.PI * k) * height });
           },
         });
         await controls.current;
         if (halted()) return;
+        elapsed += duration;
       }
       arrive(true);
     };
@@ -184,7 +182,7 @@ export function TokenMove({
       controls.current?.stop();
       controls.current = null;
     };
-  }, [move, reduce]);
+  }, [move, mover.me, reduce, size]);
 
   return (
     <MapView
@@ -196,7 +194,12 @@ export function TokenMove({
       {...(className ? { className } : {})}
       ref={camera}
     >
-      <MapSticker player={mover} at={pos} size={size} lift={atBigCell(move.board, pos) ? 52 : 32} />
+      <MapSticker
+        player={mover}
+        at={pos}
+        size={size}
+        lift={atBigCell(move.board, pos) ? stickerLift.onBigCell : stickerLift.onCell}
+      />
       {children}
     </MapView>
   );

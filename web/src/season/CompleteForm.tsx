@@ -1,11 +1,14 @@
-import { useRef, useState, type SyntheticEvent } from 'react';
+import { X } from 'lucide-react';
+import { useRef, useState, type ChangeEvent, type SyntheticEvent } from 'react';
 import type { Schemas } from '../api/client';
+import { uploadFile } from '../api/files';
 import { difficultyValues } from '../api/schema';
 import { ru } from '../i18n/ru';
 import { CompletionRulesLink } from '../rules/CompletionRulesLink';
-import { Button } from '../ui/Button';
-import { Checkbox, ChoiceGroup, Field, Select, TextArea } from '../ui/Field';
+import { Button, IconButton } from '../ui/Button';
+import { Checkbox, ChoiceGroup, Field, FilePicker, Select, TextArea } from '../ui/Field';
 import { Summary } from '../ui/Disclosure';
+import { proofPictureTypes, proofUploadError, type ProofShot } from './proofAttachments';
 
 export type Completion = {
   difficulty: Schemas['Difficulty'];
@@ -39,6 +42,7 @@ export function CompleteForm({
   declared = null,
   showHeading = true,
   pending,
+  proofDraft,
   onComplete,
 }: {
   /** The die of each difficulty under the run's snapshot, and its event */
@@ -49,6 +53,7 @@ export function CompleteForm({
   challengesEnabled?: boolean;
   showHeading?: boolean;
   pending: boolean;
+  proofDraft?: { shot: ProofShot | undefined; onChange: (shot: ProofShot | undefined) => void };
   onComplete: (completion: Completion) => void;
 }) {
   const [difficulty, setDifficulty] = useState<Schemas['Difficulty']>(declared ?? 'normal');
@@ -64,12 +69,38 @@ export function CompleteForm({
   const [challengeDone, setChallengeDone] = useState(false);
   const [rating, setRating] = useState('');
   const [reviewText, setReviewText] = useState('');
+  const [localShot, setLocalShot] = useState<ProofShot>();
+  const shot = proofDraft ? proofDraft.shot : localShot;
+  const setShot = proofDraft?.onChange ?? setLocalShot;
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [problems, setProblems] = useState<Problem[]>([]);
-  const [reviewOpen, setReviewOpen] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(shot !== undefined);
   const form = useRef<HTMLFormElement>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
+
+  async function upload(event: ChangeEvent<HTMLInputElement>) {
+    const input = event.currentTarget;
+    const picked = input.files?.[0];
+    input.value = '';
+    if (!picked || pending || uploading) return;
+
+    setUploading(true);
+    setUploadError(null);
+    try {
+      const { id, thumbnailUrl } = await uploadFile(picked);
+      if (form.current) setShot({ id, thumbnailUrl });
+    } catch (error) {
+      setUploadError(proofUploadError(error));
+      setReviewOpen(true);
+    } finally {
+      setUploading(false);
+    }
+  }
 
   function submit(event: SyntheticEvent) {
     event.preventDefault();
+    if (pending || uploading) return;
     const completion: Completion = { difficulty };
     const found: Problem[] = [];
 
@@ -220,14 +251,58 @@ export function CompleteForm({
               setReviewText(e.target.value);
             }}
           />
+          <div className="grid gap-2">
+            {shot ? (
+              <div className="flex items-center gap-2">
+                <img
+                  src={shot.thumbnailUrl}
+                  alt={ru.proof.shotAlt(1)}
+                  width={72}
+                  height={72}
+                  className="size-18 rounded-sm border-2 border-ink object-cover"
+                />
+                <IconButton
+                  label={ru.proof.removeShot(1)}
+                  disabled={pending || uploading}
+                  onClick={() => {
+                    setShot(undefined);
+                    setUploadError(null);
+                    fileInput.current?.focus();
+                  }}
+                >
+                  <X size={20} aria-hidden />
+                </IconButton>
+              </div>
+            ) : null}
+            <FilePicker
+              ref={fileInput}
+              data-testid="complete-proof-file"
+              label={shot ? ru.turn.proofShotReplace : ru.turn.proofShot}
+              hint={ru.turn.proofShotHint}
+              accept={proofPictureTypes}
+              busy={uploading}
+              disabled={pending}
+              onChange={(event) => {
+                void upload(event);
+              }}
+            />
+            <p role="status" className="text-sm text-ink-soft empty:hidden">
+              {uploading ? ru.upload.uploading : ''}
+            </p>
+            {uploadError ? (
+              <p role="alert" className="text-sm font-medium text-danger">
+                {uploadError}
+              </p>
+            ) : null}
+          </div>
         </div>
       </details>
       <Button
         variant="main"
         data-testid="complete-submit"
         type="submit"
-        loading={pending}
-        disabled={pending}
+        loading={pending || uploading}
+        disabled={pending || uploading}
       >
         {ru.turn.complete}
       </Button>

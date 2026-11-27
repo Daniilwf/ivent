@@ -1,4 +1,5 @@
 import { act, render, screen } from '@testing-library/react';
+import { easeInOut } from 'motion/react';
 import { createRef, StrictMode, useImperativeHandle } from 'react';
 import { TokenMove } from './TokenMove';
 import type { MapViewProps } from './MapView';
@@ -11,7 +12,7 @@ type Animate = (
   to: number,
   options: { duration: number; onUpdate: (value: number) => void },
 ) => Animation;
-type Features = { animate: Animate };
+type Features = { animate: Animate; easeInOut: typeof easeInOut };
 
 const motion = vi.hoisted(() => ({
   load: vi.fn<() => Promise<Features>>(),
@@ -66,7 +67,7 @@ describe('TokenMove budget', () => {
       onUpdate(to);
       return Object.assign(Promise.resolve(), { stop: vi.fn() });
     });
-    motion.load.mockResolvedValue({ animate: motion.animate });
+    motion.load.mockResolvedValue({ animate: motion.animate, easeInOut });
   });
 
   afterEach(() => {
@@ -109,7 +110,7 @@ describe('TokenMove budget', () => {
     expect(phase).toHaveBeenCalledExactlyOnceWith('done');
     expect(screen.getByTestId('position')).toHaveTextContent('350,70');
     await act(async () => {
-      resolve({ animate: motion.animate });
+      resolve({ animate: motion.animate, easeInOut });
       await delayed;
     });
     expect(motion.animate).not.toHaveBeenCalled();

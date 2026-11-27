@@ -1,5 +1,5 @@
 import { onDesktop } from '../test/desk';
-import { act, render, screen, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Schemas } from '../api/client';
 import { moscowTime } from '../app/time';
@@ -1795,6 +1795,17 @@ describe('SeasonScreen completion reward (C7a, D-96)', () => {
   type CompletedWithReward = Schemas['CompletedRunView'];
 
   const runId = 'b1000000-0000-0000-0000-000000000009';
+  const screenshot: Schemas['StoredFileView'] = {
+    id: '50000000-0000-0000-0000-000000000001',
+    mediaType: 'image/webp',
+    width: 40,
+    height: 30,
+    frames: 1,
+    url: '/api/files/screenshot',
+    thumbnailUrl: '/api/files/screenshot/thumbnail',
+    duplicate: false,
+  };
+  const picture = (name = 'credits.png') => new File(['credits'], name, { type: 'image/png' });
 
   function completed(last: CompletedWithReward, effects: Schemas['ManualEffectView'][] = []) {
     return season({
@@ -1895,6 +1906,22 @@ describe('SeasonScreen completion reward (C7a, D-96)', () => {
       return json(200, { duplicate: false, events: [] });
     });
     return commands;
+  }
+
+  function serveCompletionUploads(handler: Handler, answers: (Response | Promise<Response>)[]) {
+    const uploads: FormData[] = [];
+    const apiFetch = serve(handler);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: Request | string, init?: RequestInit) => {
+        if (typeof input !== 'string') return apiFetch(input);
+        if (!input.endsWith('/api/files') || !(init?.body instanceof FormData))
+          return json(404, {});
+        uploads.push(init.body);
+        return answers.shift() ?? json(500, {});
+      }),
+    );
+    return uploads;
   }
 
   it('shows the challenge dice and the review of the last completed run', async () => {
@@ -2035,6 +2062,187 @@ describe('SeasonScreen completion reward (C7a, D-96)', () => {
     });
   });
 
+  it.each(['completion response', 'season refresh'] as const)(
+    'prepares a rating screenshot and waits for explicit proof submission when losing the %s',
+    async (lost) => {
+      let current = playingWithoutHours();
+      let failNextSeasonLoad = false;
+      const completions: unknown[] = [];
+      const proofs: unknown[] = [];
+      const uploads = serveCompletionUploads(
+        async (request) => {
+          if (isSeasonGet(request)) {
+            if (failNextSeasonLoad) {
+              failNextSeasonLoad = false;
+              throw new TypeError('Failed to fetch');
+            }
+            return json(200, current);
+          }
+          if (request.method === 'POST' && request.url.endsWith('/complete')) {
+            completions.push(await request.json());
+            if (completions.length === 1)
+              return json(409, { title: 'rejected', status: 409, code: 'run.hoursSourceTooLong' });
+            current = completed(last({ review: { rating: 7, text: null } }));
+            if (lost === 'completion response') throw new TypeError('Failed to fetch');
+            failNextSeasonLoad = true;
+            return json(200, { duplicate: false, events: [] });
+          }
+          if (
+            request.method === 'POST' &&
+            request.url.endsWith(`/api/seasons/${seasonId}/runs/${runId}/proof`)
+          ) {
+            proofs.push(await request.json());
+            current = completed(
+              last({
+                review: { rating: 7, text: null },
+                proof: {
+                  status: 'pending',
+                  files: [screenshot],
+                  links: [],
+                  note: null,
+                  comment: null,
+                },
+              }),
+            );
+            return json(200, { duplicate: false, events: [] });
+          }
+          return json(404, {});
+        },
+        [json(422, { title: 'refused', status: 422, code: 'file.broken' }), json(200, screenshot)],
+      );
+      render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+      const form = await openCompletion();
+      await userEvent.type(screen.getByTestId('complete-hours'), '6');
+      await userEvent.type(screen.getByTestId('complete-hours-source'), 'HLTB');
+      await userEvent.click(within(form).getByText(ru.turn.review));
+      await userEvent.selectOptions(screen.getByTestId('complete-review-rating'), '7');
+
+      const picker = screen.getByTestId('complete-proof-file');
+      await userEvent.upload(picker, picture());
+      expect(await within(form).findByRole('alert')).toHaveTextContent(
+        ru.upload.errors['file.broken'],
+      );
+      await userEvent.upload(picker, picture());
+      expect(await within(form).findByRole('img', { name: ru.proof.shotAlt(1) })).toHaveAttribute(
+        'src',
+        screenshot.thumbnailUrl,
+      );
+      expect(uploads.map((body) => (body.get('file') as File).name)).toEqual([
+        'credits.png',
+        'credits.png',
+      ]);
+      expect(completions).toHaveLength(0);
+      expect(proofs).toHaveLength(0);
+
+      await userEvent.click(screen.getByTestId('complete-submit'));
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        ru.rejection['run.hoursSourceTooLong'],
+      );
+      expect(within(form).getByRole('img', { name: ru.proof.shotAlt(1) })).toBeVisible();
+      await userEvent.click(screen.getByTestId('complete-submit'));
+
+      expect(await screen.findByText(ru.app.loadError)).toBeVisible();
+      act(() => {
+        hubChange?.();
+      });
+      const dice = await screen.findByTestId('dice');
+      await userEvent.click(within(dice).getByRole('button', { name: ru.moments.skip }));
+      await userEvent.click(await screen.findByText(ru.turn.proofShotReady));
+      const shots = await screen.findByTestId('proof-shots');
+      expect(within(shots).getByRole('img', { name: ru.proof.shotAlt(1) })).toHaveAttribute(
+        'src',
+        screenshot.thumbnailUrl,
+      );
+      expect(shots).toBeVisible();
+      expect(completions[1]).toEqual({
+        commandId: expect.any(String) as string,
+        difficulty: 'normal',
+        estimatedHours: 6,
+        hoursSource: 'HLTB',
+        challengeDone: false,
+        review: { rating: 7 },
+      });
+      expect(proofs).toHaveLength(0);
+      expect(uploads).toHaveLength(2);
+
+      await userEvent.click(screen.getByRole('button', { name: ru.proof.submit }));
+      await vi.waitFor(() => {
+        expect(proofs).toEqual([
+          {
+            commandId: expect.any(String) as string,
+            links: [],
+            note: null,
+            witnessId: null,
+            files: [screenshot.id],
+          },
+        ]);
+      });
+      const sent = await screen.findByTestId('proof-files');
+      expect(within(sent).getByRole('link')).toHaveAttribute('href', screenshot.url);
+      expect(screen.queryByTestId('proof-shots')).not.toBeInTheDocument();
+    },
+  );
+
+  it.each(['removes', 'replaces'] as const)(
+    'uses the latest proof draft when the player %s the screenshot before another tab completes the run',
+    async (edit) => {
+      let current = playingWithoutHours();
+      const replacement = {
+        ...screenshot,
+        id: '50000000-0000-0000-0000-000000000002',
+        thumbnailUrl: '/api/files/replacement/thumbnail',
+      };
+      serveCompletionUploads(
+        (request) =>
+          isSeasonGet(request)
+            ? json(200, current)
+            : json(409, { title: 'rejected', status: 409, code: 'run.hoursSourceTooLong' }),
+        [json(200, screenshot), json(200, replacement)],
+      );
+      render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+      const form = await openCompletion();
+      await userEvent.type(screen.getByTestId('complete-hours'), '6');
+      await userEvent.type(screen.getByTestId('complete-hours-source'), 'HLTB');
+      await userEvent.click(within(form).getByText(ru.turn.review));
+      await userEvent.upload(screen.getByTestId('complete-proof-file'), picture());
+      await within(form).findByRole('img', { name: ru.proof.shotAlt(1) });
+      await userEvent.click(screen.getByTestId('complete-submit'));
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        ru.rejection['run.hoursSourceTooLong'],
+      );
+
+      if (edit === 'removes') {
+        await userEvent.click(within(form).getByRole('button', { name: ru.proof.removeShot(1) }));
+      } else {
+        await userEvent.upload(screen.getByTestId('complete-proof-file'), picture('new.png'));
+        await vi.waitFor(() => {
+          expect(within(form).getByRole('img', { name: ru.proof.shotAlt(1) })).toHaveAttribute(
+            'src',
+            replacement.thumbnailUrl,
+          );
+        });
+      }
+      current = completed(last());
+      act(() => {
+        hubChange?.();
+      });
+      const dice = await screen.findByTestId('dice');
+      await userEvent.click(within(dice).getByRole('button', { name: ru.moments.skip }));
+      const proof = await screen.findByTestId('proof-details');
+      if (edit === 'removes') {
+        expect(within(proof).queryByTestId('proof-shots')).toBeNull();
+      } else {
+        await userEvent.click(within(proof).getByText(ru.turn.proofShotReady));
+        expect(within(proof).getByRole('img', { name: ru.proof.shotAlt(1) })).toHaveAttribute(
+          'src',
+          replacement.thumbnailUrl,
+        );
+      }
+    },
+  );
+
   it('offers no challenge when the season has challenges off', async () => {
     serve((r) => (isSeasonGet(r) ? json(200, playingWithoutHours(false)) : json(404, {})));
     render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
@@ -2056,10 +2264,23 @@ describe('SeasonScreen completion reward (C7a, D-96)', () => {
     const turn = current.me;
     const run = turn?.activeRun;
     if (!turn || !run) throw new Error('The fixture needs an active run');
-    serve((request) => (isSeasonGet(request) ? json(200, current) : json(404, {})));
+    let finishUpload: (response: Response) => void;
+    const upload = new Promise<Response>((resolve) => {
+      finishUpload = resolve;
+    });
+    const uploads = serveCompletionUploads(
+      (request) => (isSeasonGet(request) ? json(200, current) : json(404, {})),
+      [upload],
+    );
     render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
-    await openCompletion();
+    const form = await openCompletion();
     await userEvent.type(screen.getByTestId('complete-hours'), '6');
+    await userEvent.click(within(form).getByText(ru.turn.review));
+    await userEvent.upload(screen.getByTestId('complete-proof-file'), picture());
+    await vi.waitFor(() => {
+      expect(uploads).toHaveLength(1);
+    });
+    expect(screen.getByTestId('complete-submit')).toBeDisabled();
 
     current = {
       ...current,
@@ -2075,7 +2296,13 @@ describe('SeasonScreen completion reward (C7a, D-96)', () => {
     await vi.waitFor(() => expect(screen.getByTestId('active-run')).toHaveTextContent('Celeste'));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     await openCompletion();
+    await act(async () => {
+      finishUpload(json(200, screenshot));
+      await upload;
+    });
     expect(screen.getByTestId('complete-hours')).toHaveValue('');
+    expect(screen.queryByRole('img', { name: ru.proof.shotAlt(1), hidden: true })).toBeNull();
+    expect(screen.getByTestId('complete-submit')).toBeEnabled();
   });
 
   it.each([
@@ -2931,6 +3158,52 @@ describe('SeasonScreen completion moment (H4)', () => {
     expect(ru.moments.dice.atFirst(true)).toContain(ru.moments.finish.provisional);
     expect(screen.getByTestId('roll-announce')).toHaveTextContent(ru.moments.dice.atFirst(true));
     expect(screen.getByTestId('throw-result')).toHaveTextContent(ru.moments.dice.atFirst(true));
+  });
+
+  it('launches mobile finish confetti from the last frame of the visible move', async () => {
+    vi.stubGlobal('innerWidth', 390);
+    vi.stubGlobal('innerHeight', 844);
+    vi.stubGlobal('devicePixelRatio', 1);
+    const translate = vi.fn<(x: number, y: number) => void>();
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+      clearRect: vi.fn(),
+      fillRect: vi.fn(),
+      restore: vi.fn(),
+      rotate: vi.fn(),
+      save: vi.fn(),
+      translate,
+    } as unknown as CanvasRenderingContext2D);
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const map = SVGSVGElement.prototype;
+    const descriptor = Object.getOwnPropertyDescriptor(map, 'getScreenCTM');
+    Object.defineProperty(map, 'getScreenCTM', {
+      configurable: true,
+      value(this: SVGSVGElement) {
+        // The main map's projection lies under the bottom bar. The move happens in the fixed panel.
+        const moving = this.closest('[data-testid="dice"]');
+        return { a: 0, b: 0, c: 0, d: 0, e: moving ? 177 : 190, f: moving ? 420 : 838 };
+      },
+    });
+    try {
+      serveCompletion(view(done, 6, 'finish', { finish: { order: 1, frozen: false } }));
+      render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+      await complete();
+
+      await waitFor(
+        () => {
+          expect(translate).toHaveBeenCalled();
+        },
+        { timeout: 6000 },
+      );
+      const [x, y] = translate.mock.calls[0] ?? [];
+      expect(x).toBe(177);
+      expect(y).toBeGreaterThanOrEqual(420);
+      expect(y).toBeLessThan(450);
+    } finally {
+      if (descriptor) Object.defineProperty(map, 'getScreenCTM', descriptor);
+      else Reflect.deleteProperty(map, 'getScreenCTM');
+      vi.restoreAllMocks();
+    }
   });
 
   it('says a later finish reached by the dice with its order', async () => {

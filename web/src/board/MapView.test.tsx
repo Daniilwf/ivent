@@ -1,13 +1,15 @@
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { onDesktop } from '../test/desk';
 import userEvent from '@testing-library/user-event';
+import { easeInOut } from 'motion/react';
 import { createRef } from 'react';
 import { ru } from '../i18n/ru';
 import { graphBoard } from './graphBoard';
 import { linearBoard, type ChainCell } from './linearBoard';
-import { camera, mapLabel, openingView } from './camera';
-import { MapView, type MapApi } from './MapView';
-import type { Board, Player } from './types';
+import { camera, mapLabel, openingView, type MoveFraming } from './camera';
+import { MapSticker, MapView, type MapApi } from './MapView';
+import { TokenMove } from './TokenMove';
+import type { Board, Player, Point } from './types';
 
 // The map's camera and taps (K1M exploratory testing of stages 1 and 2): pan and zoom keep the board in the frame, a
 // phone's first view shows my token clear of the zoom buttons, a tap names the players on a cell, labels stay readable.
@@ -141,11 +143,24 @@ const movingBoard: Board = {
   zones: [],
 };
 
+const hopSeconds = 0.32;
+
+function moveFraming(path: readonly Point[]): MoveFraming {
+  return {
+    easeInOut,
+    hops: path
+      .slice(1)
+      .map((_, start) => ({ start, finish: start + 1, height: 22, duration: hopSeconds })),
+    sticker: { x0: -52, x1: 52, y0: -96, y1: 52 },
+  };
+}
+
 it('frames the whole short path once and keeps the angle still during the hops', () => {
   const ref = createRef<MapApi>();
   render(<MapView board={movingBoard} players={[]} ref={ref} focus={1} tools="none" />);
   const before = viewBox();
-  const plan = ref.current?.planMove(movingBoard.cells.slice(0, 2));
+  const path = movingBoard.cells.slice(0, 2);
+  const plan = ref.current?.planMove(path, moveFraming(path));
   expect(plan?.frame).toBeDefined();
   expect(viewBox()).toEqual(before);
   act(() => plan?.frame?.(0.5));
@@ -160,14 +175,199 @@ it('frames the whole short path once and keeps the angle still during the hops',
 it('follows a long path at at most half a screen per second without changing zoom', () => {
   const ref = createRef<MapApi>();
   render(<MapView board={movingBoard} players={[]} ref={ref} focus={1} tools="none" />);
-  const plan = ref.current?.planMove(movingBoard.cells);
+  const plan = ref.current?.planMove(movingBoard.cells, moveFraming(movingBoard.cells));
   act(() => plan?.frame?.(1));
   expect(plan?.follow).toBeDefined();
   const before = viewBox();
-  act(() => plan?.follow?.({ x: 1500, y: 200 }, 0.25));
+  act(() => plan?.follow?.(0.25));
   expect(viewBox().w).toBe(before.w);
   expect(viewBox().x - before.x).toBeGreaterThan(0);
   expect(viewBox().x - before.x).toBeLessThanOrEqual((before.w * 0.25) / 2);
+});
+
+it.each([
+  { name: 'follow', follows: true, path: movingBoard.cells },
+  {
+    name: 'a stationary shot',
+    follows: false,
+    path: [
+      { x: 100, y: 200 },
+      { x: 230, y: 200 },
+    ],
+  },
+])('keeps camera coverage when the viewport gets shorter during $name', ({ follows, path }) => {
+  let resize: (() => void) | undefined;
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      constructor(callback: () => void) {
+        resize = callback;
+      }
+      observe() {}
+      disconnect() {}
+    },
+  );
+  const portrait = frame;
+  const ref = createRef<MapApi>();
+  render(<MapView board={movingBoard} players={[]} ref={ref} focus={1} tools="none" />);
+  const initial = viewBox();
+  let follow: ((seconds: number) => void) | undefined;
+  act(() => {
+    const plan = ref.current?.planMove(path, moveFraming(path));
+    expect(Boolean(plan?.frame)).toBe(follows);
+    expect(Boolean(plan?.follow)).toBe(follows);
+    plan?.frame?.(1);
+    plan?.follow?.(0.12);
+    follow = plan?.follow;
+  });
+  const planned = viewBox();
+  if (!follows) expect(planned).toEqual(initial);
+
+  frame = { ...portrait, height: 180 };
+  act(() => resize?.());
+  expect(viewBox().h).toBeCloseTo(planned.h);
+  expect(viewBox().w).toBeGreaterThan(planned.w);
+  act(() => follow?.(0.24));
+  expect(viewBox().h).toBeCloseTo(planned.h);
+
+  frame = portrait;
+  act(() => resize?.());
+  expect(viewBox().w).toBeCloseTo(planned.w);
+  expect(viewBox().h).toBeCloseTo(planned.h);
+});
+
+it('frames a move in the measured phone viewport before the resize observer reports', () => {
+  frame = { width: 358, height: 420 };
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      disconnect() {}
+      unobserve() {}
+    },
+  );
+  const ref = createRef<MapApi>();
+  render(<MapView board={movingBoard} players={[]} ref={ref} focus={1} tools="none" />);
+
+  const path = movingBoard.cells.slice(0, 2);
+  const plan = ref.current?.planMove(path, moveFraming(path));
+  act(() => plan?.frame?.(1));
+
+  const { w, h } = viewBox();
+  expect(w / h).toBeCloseTo(frame.width / frame.height);
+  for (const cell of path) {
+    const point = onScreen(cell);
+    expect(point.x).toBeGreaterThan(0);
+    expect(point.x).toBeLessThan(frame.width);
+    expect(point.y).toBeGreaterThan(0);
+    expect(point.y).toBeLessThan(frame.height);
+  }
+});
+
+it.each([
+  { width: 358, height: 400, needsFollow: true },
+  { width: 730, height: 520, needsFollow: false },
+])(
+  'keeps the jumping sticker inside a $width x $height map frame throughout a long route',
+  ({ width, height, needsFollow }) => {
+    frame = { width, height };
+    const ref = createRef<MapApi>();
+    const [player] = crowd(1, 1);
+    if (!player) throw new Error('The route needs a player');
+    const start = { x: 100, y: 200 };
+    const stops = Array.from({ length: 8 }, (_, i) => ({ x: start.x + (i + 1) * 175, y: start.y }));
+    const stickerSize = 36;
+    const map = (at: Point) => (
+      <MapView board={movingBoard} players={[]} ref={ref} focus={1} tools="none">
+        <MapSticker player={player} at={at} size={stickerSize} />
+      </MapView>
+    );
+    const { rerender } = render(map(start));
+    const path = [start, ...stops];
+    const plan = ref.current?.planMove(path, moveFraming(path));
+    act(() => plan?.frame?.(1));
+
+    const expectStickerInFrame = (label: string) => {
+      const { x, y, scale } = onScreen(stickerAt(player.id));
+      const radius = (stickerSize / 2) * scale;
+      expect(x - radius, label).toBeGreaterThanOrEqual(0);
+      expect(x + radius, label).toBeLessThanOrEqual(frame.width);
+      expect(y - radius, label).toBeGreaterThanOrEqual(0);
+      expect(y + radius, label).toBeLessThanOrEqual(frame.height);
+    };
+    expectStickerInFrame('before the first hop');
+
+    const samplesPerHop = 8;
+    const secondsPerSample = hopSeconds / samplesPerHop;
+    const framed = viewBox();
+    let previous = framed;
+    let from = start;
+    for (const [hop, to] of stops.entries()) {
+      for (let sample = 1; sample <= samplesPerHop; sample++) {
+        const progress = sample / samplesPerHop;
+        const point = { x: from.x + (to.x - from.x) * progress, y: from.y };
+        act(() => plan?.follow?.((hop * samplesPerHop + sample) * secondsPerSample));
+        rerender(map({ ...point, y: point.y - 22 * Math.sin(Math.PI * progress) }));
+
+        expectStickerInFrame(`hop ${hop + 1}, frame ${sample}`);
+        const current = viewBox();
+        expect(current.w).toBe(previous.w);
+        expect(current.h).toBe(previous.h);
+        const distance =
+          (Math.hypot(current.x - previous.x, current.y - previous.y) * frame.width) / current.w;
+        expect(distance).toBeLessThanOrEqual(
+          (Math.min(frame.width, frame.height) * secondsPerSample) / 2 + 0.001,
+        );
+        previous = current;
+      }
+      from = to;
+    }
+    if (needsFollow) expect(viewBox().x).toBeGreaterThan(framed.x);
+  },
+);
+
+it('keeps the token visible when a teleport crosses the height of the map', async () => {
+  frame = { width: 358, height: 400 };
+  const [mover] = crowd(1, 1);
+  if (!mover) throw new Error('The teleport needs a player');
+  const board: Board = {
+    width: 380,
+    height: 1850,
+    cells: [
+      { id: 1, kind: 'teleport', to: 2, x: 200, y: 100 },
+      { id: 2, kind: 'plain', x: 200, y: 1500 },
+    ],
+    edges: [],
+    roads: [],
+    zones: [],
+  };
+  const onPhase = vi.fn();
+  render(
+    <TokenMove
+      board={board}
+      players={[mover]}
+      mover={mover}
+      path={[1, 2]}
+      jumps={[1]}
+      onPhase={onPhase}
+    />,
+  );
+
+  const initial = stickerAt(mover.id);
+  expect(onScreen(initial).y).toBeGreaterThan(0);
+  await waitFor(
+    () => {
+      expect(onPhase).toHaveBeenCalledExactlyOnceWith('done');
+    },
+    { timeout: 3_000 },
+  );
+
+  const landed = stickerAt(mover.id);
+  expect(landed.y - initial.y).toBeCloseTo(1400);
+  const point = onScreen(landed);
+  const radius = 18 * point.scale;
+  expect(point.y - radius).toBeGreaterThanOrEqual(0);
+  expect(point.y + radius).toBeLessThanOrEqual(frame.height);
 });
 
 describe('the camera of the map', () => {
